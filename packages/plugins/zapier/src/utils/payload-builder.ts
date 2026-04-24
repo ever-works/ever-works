@@ -11,12 +11,23 @@ interface PayloadOptions {
 
 /**
  * Builds the `inputs` payload forwarded to the Zapier action.
- * Uses inline data by default, with optional GitHub repo reference.
+ *
+ * The returned object merges two layers:
+ *  - **Envelope** — `metadata`, `existingSummary`, `dataSource`, `actionParams`.
+ *    Custom Zaps can destructure these for directory context.
+ *  - **Flattened `action_params`** — each key is also spread at the top level so
+ *    catalog actions (Gmail, Slack, Sheets, …) see their required input fields
+ *    where Zapier expects them (e.g. `{ to, subject, body }` for Gmail send).
+ *
+ * Collision handling: if the user's `action_params` contain a key that clashes
+ * with an envelope key (e.g. `metadata`), the user's value wins via spread order.
  */
-export function buildWorkflowPayload(options: PayloadOptions): ZapierWorkflowInput {
+export function buildWorkflowPayload(
+	options: PayloadOptions
+): ZapierWorkflowInput & Record<string, unknown> {
 	const { directory, request, existing, config } = options;
 
-	const payload: ZapierWorkflowInput = {
+	const envelope: ZapierWorkflowInput = {
 		metadata: {
 			directoryId: directory.id,
 			directoryName: directory.name,
@@ -29,7 +40,7 @@ export function buildWorkflowPayload(options: PayloadOptions): ZapierWorkflowInp
 	};
 
 	if (config.pass_existing_items !== false && existing.items.length > 0) {
-		payload.existingSummary = {
+		envelope.existingSummary = {
 			totalItems: existing.items.length,
 			categories: existing.categories.map((c) => c.name),
 			tags: existing.tags.map((t) => t.name),
@@ -41,7 +52,7 @@ export function buildWorkflowPayload(options: PayloadOptions): ZapierWorkflowInp
 	}
 
 	if (config.pass_repo_access && config.repo_url) {
-		payload.dataSource = {
+		envelope.dataSource = {
 			type: 'github-repo',
 			repoUrl: config.repo_url as string,
 			accessToken: config.repo_access_token as string | undefined,
@@ -50,9 +61,17 @@ export function buildWorkflowPayload(options: PayloadOptions): ZapierWorkflowInp
 		};
 	}
 
-	if (config.action_params && typeof config.action_params === 'object') {
-		payload.actionParams = config.action_params as Record<string, unknown>;
+	const actionParams =
+		config.action_params && typeof config.action_params === 'object'
+			? (config.action_params as Record<string, unknown>)
+			: undefined;
+
+	if (actionParams) {
+		envelope.actionParams = actionParams;
 	}
 
-	return payload;
+	return {
+		...envelope,
+		...(actionParams ?? {})
+	};
 }

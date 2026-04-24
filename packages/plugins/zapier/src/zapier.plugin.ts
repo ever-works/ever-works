@@ -38,7 +38,7 @@ import { ZAPIER_STEP_IDS, DEFAULT_BASE_URL, ZAPIER_ACTION_TYPES, DEFAULT_TIMEOUT
 import { STEP_DEFINITIONS } from './steps.js';
 import { ZapierClient, type ZapierExecutionResult } from './utils/zapier-client.js';
 import { buildWorkflowPayload } from './utils/payload-builder.js';
-import { parseZapierOutput, deduplicateItems } from './utils/result-parser.js';
+import { parseZapierOutput, deduplicateItems, type ParsedResults } from './utils/result-parser.js';
 import {
 	initializeState,
 	updateStepState,
@@ -80,18 +80,16 @@ export class ZapierPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvid
 				type: 'string',
 				title: 'Zapier Client ID',
 				description:
-					'Long-lived client ID produced by `npx zapier-sdk create-client-credentials`. Recommended for production and CI. Pair with Client Secret.',
-				'x-scope': 'user',
-				'x-envVar': 'ZAPIER_CREDENTIALS_CLIENT_ID'
+					'Long-lived client ID produced by `npx zapier-sdk create-client-credentials`. Recommended for production. Pair with Client Secret.',
+				'x-scope': 'user'
 			},
 			clientSecret: {
 				type: 'string',
 				title: 'Zapier Client Secret',
 				description:
-					'Long-lived client secret produced by `npx zapier-sdk create-client-credentials`. Shown only once — store as an env-var secret.',
+					'Long-lived client secret produced by `npx zapier-sdk create-client-credentials`. Shown only once — paste it carefully.',
 				'x-secret': true,
-				'x-scope': 'user',
-				'x-envVar': 'ZAPIER_CREDENTIALS_CLIENT_SECRET'
+				'x-scope': 'user'
 			},
 			accessToken: {
 				type: 'string',
@@ -99,14 +97,12 @@ export class ZapierPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvid
 				description:
 					'Short-lived bearer token from `npx zapier-sdk login`. Use for local development only — prefer Client ID / Secret in production.',
 				'x-secret': true,
-				'x-scope': 'user',
-				'x-envVar': 'ZAPIER_ACCESS_TOKEN'
+				'x-scope': 'user'
 			},
 			baseUrl: {
 				type: 'string',
 				title: 'Zapier API Base URL',
-				description: 'Override the Zapier SDK base URL (leave empty for default).',
-				default: DEFAULT_BASE_URL,
+				description: `Override the Zapier SDK base URL. Leave empty to use the SDK default (${DEFAULT_BASE_URL}).`,
 				'x-scope': 'user'
 			},
 			defaultAppKey: {
@@ -411,16 +407,27 @@ export class ZapierPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvid
 			setState('collect-results', 'running');
 			reportProgress(onProgress, 3, 75, 'Collect & Validate Results');
 
-			const parsed = parseZapierOutput(execResult.data, zapierSettings.resultShape, zapierSettings.fieldMapping);
+			let parsed: ParsedResults;
+			let items: ItemData[];
 
-			const existingNames = existing.items.map((i) => i.name);
-			const items = deduplicateItems(parsed.items, existingNames);
-
-			logger.log(
-				`Collected ${parsed.items.length} items from Zapier, ` +
-					`${parsed.items.length - items.length} duplicates removed, ` +
-					`${items.length} new items`
-			);
+			if (zapierSettings.resultShape === 'side-effect') {
+				// Fire-and-forget action (send email, post message, create task, …). The action
+				// executed successfully but produces no directory items — treat as success with 0 items.
+				logger.log(
+					`Side-effect action completed — no items parsed. Response: ${safeStringify(execResult.data)}`
+				);
+				parsed = { items: [], categories: [], tags: [], brands: [] };
+				items = [];
+			} else {
+				parsed = parseZapierOutput(execResult.data, zapierSettings.resultShape, zapierSettings.fieldMapping);
+				const existingNames = existing.items.map((i) => i.name);
+				items = deduplicateItems(parsed.items, existingNames);
+				logger.log(
+					`Collected ${parsed.items.length} items from Zapier, ` +
+						`${parsed.items.length - items.length} duplicates removed, ` +
+						`${items.length} new items`
+				);
+			}
 			setState('collect-results', 'completed');
 
 			// ── Step 5: Capture screenshots ───────────────────────────
@@ -658,6 +665,15 @@ function normalizeAuthId(value: unknown): string | number | undefined {
 function isValidAuthId(value: string | number): boolean {
 	if (typeof value === 'number') return Number.isFinite(value) && value > 0;
 	return typeof value === 'string' && value.trim() !== '';
+}
+
+function safeStringify(value: unknown, maxLength = 500): string {
+	try {
+		const s = JSON.stringify(value);
+		return s.length > maxLength ? `${s.slice(0, maxLength)}…` : s;
+	} catch {
+		return String(value);
+	}
 }
 
 function hasAccessToken(settings: Record<string, unknown>): boolean {

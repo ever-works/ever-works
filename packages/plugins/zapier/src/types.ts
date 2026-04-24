@@ -17,7 +17,7 @@ export const ZAPIER_STEP_IDS: readonly ZapierStepId[] = [
 ] as const;
 
 /** Plugin constants */
-export const DEFAULT_BASE_URL = 'https://actions.zapier.com';
+export const DEFAULT_BASE_URL = 'https://zapier.com';
 export const DEFAULT_TARGET_ITEMS = 50;
 export const DEFAULT_TIMEOUT_MS = 180000;
 
@@ -52,8 +52,14 @@ export interface ZapierActionRef {
 	authenticationId: string | number;
 }
 
-/** How the plugin should interpret the action's `data` payload. */
-export type ZapierResultShape = 'structured' | 'native';
+/**
+ * How the plugin should interpret the action's `data` payload.
+ *  - `structured`: the Zap returns `{ items: [...] }` — cleanest for custom Zaps.
+ *  - `native`: raw records projected onto directory items via a field mapping.
+ *  - `side-effect`: the action is fire-and-forget (e.g. send email, post message)
+ *    and produces no directory items. The plugin completes successfully with 0 items.
+ */
+export type ZapierResultShape = 'structured' | 'native' | 'side-effect';
 
 /** Field mapping used when the action returns native records instead of { items: [...] }. */
 export interface ZapierFieldMapping {

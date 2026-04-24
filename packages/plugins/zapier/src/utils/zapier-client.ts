@@ -123,7 +123,7 @@ export class ZapierClient {
 		}
 		if (error instanceof ZapierAuthenticationError) {
 			return new Error(
-				'Zapier credentials are invalid or expired. For local dev re-run `npx zapier-sdk login`; for production verify ZAPIER_CREDENTIALS_CLIENT_ID / ZAPIER_CREDENTIALS_CLIENT_SECRET.'
+				'Zapier credentials are invalid or expired. For local dev re-run `npx zapier-sdk login` and update the Access Token; for production verify the Client ID and Client Secret in plugin settings.'
 			);
 		}
 		if (error instanceof ZapierRateLimitError) {

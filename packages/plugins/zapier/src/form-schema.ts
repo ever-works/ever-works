@@ -65,10 +65,11 @@ export function getFormFields(): FormFieldDefinition[] {
 			type: 'select',
 			label: 'Result Shape',
 			description:
-				'How the plugin should interpret the action response. "Structured" expects { items: [...] }. "Native" maps raw Zapier records via the field mapping below.',
+				'How the plugin should interpret the action response. "Structured" expects { items: [...] }. "Native" maps raw Zapier records via the field mapping below. "Side-effect" runs the action for its effect only (e.g. send email, post message) and produces no directory items.',
 			options: [
 				{ value: 'structured', label: 'Structured ({ items: [...] })' },
-				{ value: 'native', label: 'Native records (with field mapping)' }
+				{ value: 'native', label: 'Native records (with field mapping)' },
+				{ value: 'side-effect', label: 'Side-effect only (no items expected)' }
 			],
 			defaultValue: 'structured',
 			group: 'mapping'
