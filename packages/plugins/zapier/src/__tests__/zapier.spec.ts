@@ -192,6 +192,14 @@ describe('ZapierPlugin', () => {
 			expect(props.clientSecret['x-secret']).toBe(true);
 			expect(props.clientId['x-secret']).toBeUndefined();
 		});
+
+		it('should keep action selection out of plugin settings', () => {
+			const props = plugin.settingsSchema.properties as Record<string, Record<string, unknown>>;
+			expect(props.defaultAppKey).toBeUndefined();
+			expect(props.defaultActionType).toBeUndefined();
+			expect(props.defaultActionKey).toBeUndefined();
+			expect(props.defaultAuthenticationId).toBeUndefined();
+		});
 	});
 
 	describe('lifecycle', () => {

@@ -104,32 +104,6 @@ export class ZapierPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvid
 				title: 'Zapier API Base URL',
 				description: `Override the Zapier SDK base URL. Leave empty to use the SDK default (${DEFAULT_BASE_URL}).`,
 				'x-scope': 'user'
-			},
-			defaultAppKey: {
-				type: 'string',
-				title: 'Default App Key',
-				description: 'Default Zapier app slug (e.g. slack, google_sheets).',
-				'x-scope': 'user'
-			},
-			defaultActionType: {
-				type: 'string',
-				title: 'Default Action Type',
-				description: 'One of search, filter, read, read_bulk, run, search_and_write, search_or_write, write.',
-				enum: [...ZAPIER_ACTION_TYPES],
-				'x-scope': 'user'
-			},
-			defaultActionKey: {
-				type: 'string',
-				title: 'Default Action Key',
-				description: 'Default action slug within the app (e.g. custom).',
-				'x-scope': 'user'
-			},
-			defaultAuthenticationId: {
-				type: 'string',
-				title: 'Default Authentication ID',
-				description:
-					'Zapier authentication (connection) ID to use when not overridden in the form. Accepts UUID strings (SDK 1.x) or legacy numeric IDs.',
-				'x-scope': 'user'
 			}
 		},
 		anyOf: [{ required: ['accessToken'] }, { required: ['clientId', 'clientSecret'] }]
