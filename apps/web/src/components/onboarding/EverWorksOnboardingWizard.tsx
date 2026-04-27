@@ -11,30 +11,30 @@ import {
     Sparkles,
     Zap,
 } from 'lucide-react';
-import { ONBOARDING_STORAGE_KEY, ROUTES } from '@/lib/constants';
+import { ROUTES } from '@/lib/constants';
 import { Dialog, DialogContent, DialogDescription, DialogHeader } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils/cn';
-import { useLocalStorage } from '@/lib/hooks/use-local-storage';
 import { Link } from '@/i18n/navigation';
 import { PluginIcon } from '@/components/plugins/PluginIcon';
 import { OnboardingPluginStep } from './OnboardingPluginStep';
 import { useMounted } from '@/lib/hooks/use-mounted';
+import type { OnboardingState } from './use-onboarding-state';
 import type { UserPlugin } from '@/lib/api/plugins';
 import type { OAuthConnectionInfo } from '@/lib/api/plugins-capabilities/oauth';
+import type { GitProviderConnectionInfo } from '@/lib/api/plugins-capabilities/git-providers';
+import type { PluginDeviceAuthStatus } from '@/lib/api/plugins-capabilities/device-auth';
 
 interface EverWorksOnboardingWizardProps {
-    totalDirectories: number;
+    open: boolean;
+    state: OnboardingState;
     plugins: UserPlugin[];
-    oauthConnections: Record<string, OAuthConnectionInfo | null>;
+    connections: Record<string, OAuthConnectionInfo | GitProviderConnectionInfo | null>;
+    deviceAuthStatuses: Record<string, PluginDeviceAuthStatus | null>;
+    isStatusLoading?: boolean;
+    onStateChange: (state: OnboardingState) => void;
+    onClose: () => void;
 }
-
-interface OnboardingState {
-    dismissed: boolean;
-    step: number;
-}
-
-const DEFAULT_STATE: OnboardingState = { dismissed: false, step: 0 };
 
 type WizardStep =
     | { kind: 'welcome' }
@@ -43,11 +43,13 @@ type WizardStep =
 
 function isPluginConnected(
     plugin: UserPlugin,
-    oauthConnections: Record<string, OAuthConnectionInfo | null>,
+    connections: Record<string, OAuthConnectionInfo | GitProviderConnectionInfo | null>,
 ): boolean {
-    const isOAuth = plugin.capabilities.includes('oauth');
-    if (isOAuth) {
-        return oauthConnections[plugin.pluginId]?.connected === true;
+    if (plugin.capabilities.includes('git-provider') || plugin.capabilities.includes('oauth')) {
+        return connections[plugin.pluginId]?.connected === true;
+    }
+    if (plugin.connectionStatus) {
+        return plugin.connectionStatus.connected === true;
     }
     const fields = plugin.uiHints?.completionFields;
     if (fields && fields.length > 0) {
@@ -60,20 +62,17 @@ function isPluginConnected(
 }
 
 export function EverWorksOnboardingWizard({
-    totalDirectories,
+    open,
+    state,
     plugins,
-    oauthConnections,
+    connections,
+    deviceAuthStatuses,
+    isStatusLoading = false,
+    onStateChange,
+    onClose,
 }: EverWorksOnboardingWizardProps) {
     const t = useTranslations('onboarding');
     const mounted = useMounted();
-    const [storedState, setStoredState] = useLocalStorage<OnboardingState>(
-        ONBOARDING_STORAGE_KEY,
-        DEFAULT_STATE,
-        {
-            serialize: JSON.stringify,
-            deserialize: (raw) => JSON.parse(raw) as OnboardingState,
-        },
-    );
 
     const steps = useMemo<WizardStep[]>(
         () => [
@@ -84,21 +83,19 @@ export function EverWorksOnboardingWizard({
         [plugins],
     );
 
-    const shouldOpen = totalDirectories === 0 && !storedState.dismissed;
-    const activeStep = Math.min(storedState.step, steps.length - 1);
+    const activeStep = Math.min(state.step, steps.length - 1);
     const isLastStep = activeStep === steps.length - 1;
 
-    const setStep = (index: number) => setStoredState({ ...storedState, step: index });
-    const dismiss = () => setStoredState({ ...storedState, dismissed: true });
+    const setStep = (index: number) => onStateChange({ ...state, step: index });
     const goNext = () => setStep(Math.min(activeStep + 1, steps.length - 1));
 
-    if (!mounted || !shouldOpen) return null;
+    if (!mounted || !open) return null;
 
     const currentStep = steps[activeStep];
     const progressPercent = Math.round(((activeStep + 1) / steps.length) * 100);
 
     return (
-        <Dialog open={shouldOpen} onOpenChange={(open) => !open && dismiss()}>
+        <Dialog open={open} onOpenChange={(nextOpen) => !nextOpen && onClose()}>
             <DialogContent className="max-w-5xl p-0 overflow-hidden rounded-lg shadow-2xl">
                 {/* Top progress bar */}
                 <div className="absolute top-0 left-0 right-0 h-[3px] bg-border dark:bg-border-dark z-10 rounded-t-lg">
@@ -132,7 +129,7 @@ export function EverWorksOnboardingWizard({
                                 const isActive = index === activeStep;
                                 const isDone = (() => {
                                     if (step.kind === 'plugin') {
-                                        return isPluginConnected(step.plugin, oauthConnections);
+                                        return isPluginConnected(step.plugin, connections);
                                     }
                                     return false;
                                 })();
@@ -199,7 +196,7 @@ export function EverWorksOnboardingWizard({
                             <Button
                                 variant="ghost"
                                 size="sm"
-                                onClick={dismiss}
+                                onClick={onClose}
                                 className="w-4/5 mx-auto text-xs py-2.5 text-text-muted dark:text-text-muted-dark hover:text-text dark:hover:text-text-dark"
                             >
                                 {t('skipButton')}
@@ -295,9 +292,11 @@ export function EverWorksOnboardingWizard({
                                     </div>
                                     <OnboardingPluginStep
                                         plugin={currentStep.plugin}
-                                        oauthConnection={
-                                            oauthConnections[currentStep.plugin.pluginId]
+                                        connection={connections[currentStep.plugin.pluginId]}
+                                        deviceAuthStatus={
+                                            deviceAuthStatuses[currentStep.plugin.pluginId]
                                         }
+                                        isStatusLoading={isStatusLoading}
                                         returnPath={ROUTES.DASHBOARD}
                                     />
                                 </div>
@@ -326,7 +325,7 @@ export function EverWorksOnboardingWizard({
                                         <Link
                                             href={ROUTES.DASHBOARD_DIRECTORIES_NEW}
                                             className="inline-flex items-center gap-2 rounded-lg bg-black dark:bg-button-primary-dark px-4 py-2.5 text-sm font-medium text-white dark:text-black transition-colors hover:bg-button-primary-hover dark:hover:bg-button-primary-hover-dark"
-                                            onClick={dismiss}
+                                            onClick={onClose}
                                         >
                                             {t('steps.directory.action')}
                                             <ArrowRight className="w-4 h-4" />

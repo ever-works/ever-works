@@ -1,5 +1,10 @@
 import type { PluginEnvironment, EnvironmentVariables } from './plugin-environment.interface.js';
-import type { PluginSettings, ResolvedSettings, SettingScope } from '../settings/settings.types.js';
+import type {
+	PluginSettings,
+	PluginSettingsWrite,
+	ResolvedSettings,
+	SettingScope
+} from '../settings/settings.types.js';
 import type { PluginEventName, PluginEventPayloads, EventHandler, EventSubscription } from '../events/event-types.js';
 
 /**
@@ -156,6 +161,12 @@ export interface PluginContext {
 	 * Get fully resolved settings with source information
 	 */
 	getResolvedSettings(scope?: SettingScope, scopeId?: string): Promise<ResolvedSettings>;
+
+	/**
+	 * Persist settings for this plugin at the requested scope.
+	 * Secret settings are stored through the platform secret-settings layer.
+	 */
+	updateSettings(scope: 'user' | 'directory', scopeId: string | undefined, data: PluginSettingsWrite): Promise<void>;
 
 	/**
 	 * Subscribe to a platform event

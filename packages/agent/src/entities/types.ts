@@ -80,6 +80,11 @@ export enum DomainEnvironment {
 
 export interface CommunityPrState {
     processedPrNumbers: number[];
+    processedPrs?: Array<{
+        number: number;
+        updatedAt: string;
+        outcome: 'applied' | 'ignored';
+    }>;
     lastProcessedAt?: string;
     totalItemsAdded?: number;
     lastError?: string | null;

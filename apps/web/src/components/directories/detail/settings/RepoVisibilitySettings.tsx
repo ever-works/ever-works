@@ -27,6 +27,7 @@ export function RepoVisibilitySettings({ initialRepositories }: RepoVisibilitySe
     const { context } = useSettings();
     const { directory } = context;
     const t = useTranslations('dashboard.directoryDetail.settings');
+    const tVisibility = useTranslations('common.visibility');
     const [repositories, setRepositories] = useState<RepositoryStatus[]>(initialRepositories);
     const [updating, setUpdating] = useState<RepositoryType | null>(null);
     const [pendingPrivateRepo, setPendingPrivateRepo] = useState<RepositoryStatus | null>(null);
@@ -66,7 +67,12 @@ export function RepoVisibilitySettings({ initialRepositories }: RepoVisibilitySe
                     prev.map((r) => (r.type === repo.type ? { ...r, isPrivate: newIsPrivate } : r)),
                 );
 
-                toast.success(`${repo.name} is now ${newIsPrivate ? 'Private' : 'Public'}`);
+                toast.success(
+                    t('visibilityUpdated', {
+                        name: repo.name,
+                        visibility: newIsPrivate ? tVisibility('private') : tVisibility('public'),
+                    }),
+                );
             } else {
                 toast.error(result.error || t('visibilityUpdateFailed'));
             }
@@ -82,7 +88,7 @@ export function RepoVisibilitySettings({ initialRepositories }: RepoVisibilitySe
         <div className="bg-card dark:bg-card-primary-dark/30 border border-card-border dark:border-border-secondary-dark rounded-lg overflow-hidden">
             <div className="px-5 py-3.5 border-b border-card-border dark:border-border-secondary-dark">
                 <h3 className="text-sm font-semibold text-text dark:text-text-dark">
-                    Repository Visibility
+                    {t('repositoryVisibilityTitle')}
                 </h3>
             </div>
             <div className="px-5 py-4 space-y-4">
@@ -95,11 +101,11 @@ export function RepoVisibilitySettings({ initialRepositories }: RepoVisibilitySe
                             <div className="flex items-center gap-2">
                                 <span className="text-xs font-medium text-text dark:text-text-dark capitalize">
                                     {repo.type === 'directory'
-                                        ? 'Main'
+                                        ? t('repositoryTypes.main')
                                         : repo.type === 'data'
-                                          ? 'Data'
-                                          : 'Website'}{' '}
-                                    Repo
+                                          ? t('repositoryTypes.data')
+                                          : t('repositoryTypes.website')}{' '}
+                                    {t('repositoryTypeSuffix')}
                                 </span>
                                 {repo.isPrivate ? (
                                     <Lock className="h-3 w-3 text-text-muted dark:text-text-muted-dark" />
@@ -115,7 +121,7 @@ export function RepoVisibilitySettings({ initialRepositories }: RepoVisibilitySe
 
                         <div className="flex items-center gap-3">
                             <span className="text-xs font-medium text-text dark:text-text-dark">
-                                {repo.isPrivate ? 'Private' : 'Public'}
+                                {repo.isPrivate ? tVisibility('private') : tVisibility('public')}
                             </span>
                             <Switch
                                 checked={!repo.isPrivate}

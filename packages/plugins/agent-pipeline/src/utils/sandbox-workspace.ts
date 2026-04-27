@@ -1,7 +1,7 @@
 import { mkdir, writeFile, readdir, readFile, rm } from 'node:fs/promises';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { createHash } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import type { ItemData, DirectoryReference, GenerationRequest, ExistingItems } from '@ever-works/plugin';
 import { slugify, validateRequiredItemFields, normalizeItemTags, jsonrepair } from '@ever-works/plugin';
 
@@ -43,8 +43,8 @@ async function parallelBatch<T>(tasks: (() => Promise<T>)[], concurrency: number
 	return results;
 }
 
-export function getWorkspacePath(userId: string, directoryId: string): string {
-	return join(BASE_DIR, userId, directoryId);
+export function getWorkspacePath(userId: string, directoryId: string, runId: string): string {
+	return join(BASE_DIR, userId, `${directoryId}-${runId}`);
 }
 
 /**
@@ -57,7 +57,7 @@ export async function createWorkspace(
 	directory: DirectoryReference,
 	request: GenerationRequest
 ): Promise<string> {
-	const workspacePath = getWorkspacePath(userId, directoryId);
+	const workspacePath = getWorkspacePath(userId, directoryId, randomUUID());
 	const metaDir = join(workspacePath, '_meta');
 
 	await mkdir(metaDir, { recursive: true });
@@ -194,12 +194,11 @@ export async function collectItemsFromWorkspace(workspacePath: string, logger?: 
 	return results.filter((item): item is ItemData => item !== null);
 }
 
-export async function cleanupWorkspace(userId: string, directoryId: string): Promise<void> {
-	const workspacePath = getWorkspacePath(userId, directoryId);
+export async function cleanupWorkspace(workspacePath: string): Promise<void> {
 	await rm(workspacePath, { recursive: true, force: true });
 
 	// Remove parent user directory if now empty
-	const userDir = join(BASE_DIR, userId);
+	const userDir = dirname(workspacePath);
 	try {
 		const remaining = await readdir(userDir);
 		if (remaining.length === 0) {

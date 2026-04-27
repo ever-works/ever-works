@@ -1,9 +1,10 @@
 'use client';
 
 import { Fragment, useEffect, useState } from 'react';
-import { useTranslations } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
 import { formatDistanceToNow } from 'date-fns';
 import type { ActivityLogEntry } from '@/lib/api/activity-log';
+import { formatActivitySummary } from './activity-summary';
 import { ActivityStatusBadge } from './ActivityStatusBadge';
 import { ActivityTypeBadge } from './ActivityTypeBadge';
 import { ChevronDown, ChevronRight, Loader2 } from 'lucide-react';
@@ -12,10 +13,62 @@ import { Link } from '@/i18n/navigation';
 import { ROUTES } from '@/lib/constants';
 import { TerminalLogViewer } from '@/components/directories/detail/shared/TerminalLogViewer';
 import type { GenerationStepLog } from '@/lib/api/types-only';
+import { Button } from '@/components/ui/button';
+import { cancelGeneration } from '@/app/actions/dashboard/generator';
+import { toast } from 'sonner';
+import { useMounted } from '@/lib/hooks/use-mounted';
 
 interface ActivityTableProps {
     activities: ActivityLogEntry[];
     loading: boolean;
+    onStopRequested?: () => void;
+}
+
+const dateTimeFormatterCache = new Map<string, Intl.DateTimeFormat>();
+
+function formatActivityDateTime(value: string, locale: string) {
+    if (!dateTimeFormatterCache.has(locale)) {
+        dateTimeFormatterCache.set(
+            locale,
+            new Intl.DateTimeFormat(locale, {
+                dateStyle: 'medium',
+                timeStyle: 'short',
+            }),
+        );
+    }
+
+    return dateTimeFormatterCache.get(locale)!.format(new Date(value));
+}
+
+function ActivityTimestamp({
+    value,
+    variant = 'absolute',
+    className,
+}: {
+    value: string;
+    variant?: 'absolute' | 'relative';
+    className?: string;
+}) {
+    const locale = useLocale();
+    const mounted = useMounted();
+
+    if (!mounted) {
+        return <time dateTime={value} className={className} />;
+    }
+
+    const absoluteValue = formatActivityDateTime(value, locale);
+
+    return (
+        <time
+            dateTime={value}
+            title={variant === 'relative' ? absoluteValue : undefined}
+            className={className}
+        >
+            {variant === 'relative'
+                ? formatDistanceToNow(new Date(value), { addSuffix: true })
+                : absoluteValue}
+        </time>
+    );
 }
 
 function hasStructuredData(value?: Record<string, unknown>) {
@@ -23,6 +76,8 @@ function hasStructuredData(value?: Record<string, unknown>) {
 }
 
 function DetailValue({ value }: { value: unknown }) {
+    const tCommon = useTranslations('common.ui');
+
     if (value === null || value === undefined) {
         return <span className="text-text-muted dark:text-text-muted-dark">—</span>;
     }
@@ -35,7 +90,7 @@ function DetailValue({ value }: { value: unknown }) {
                         : 'bg-muted/50 text-text-muted dark:text-text-muted-dark'
                 }`}
             >
-                {value ? 'Yes' : 'No'}
+                {value ? tCommon('yes') : tCommon('no')}
             </span>
         );
     }
@@ -118,12 +173,14 @@ function RawJsonPanel({
     );
 }
 
-export function ActivityTable({ activities, loading }: ActivityTableProps) {
+export function ActivityTable({ activities, loading, onStopRequested }: ActivityTableProps) {
     const t = useTranslations('dashboard.activity');
+    const tSummary = useTranslations('dashboard.activity.summary');
     const [expandedIds, setExpandedIds] = useState<string[]>([]);
     const [hydratedActivities, setHydratedActivities] = useState<Record<string, ActivityLogEntry>>(
         {},
     );
+    const [stoppingDirectoryIds, setStoppingDirectoryIds] = useState<string[]>([]);
 
     const toggleExpanded = (id: string) => {
         setExpandedIds((current) =>
@@ -189,6 +246,32 @@ export function ActivityTable({ activities, loading }: ActivityTableProps) {
         }
     };
 
+    const stopGeneration = async (directoryId: string) => {
+        setStoppingDirectoryIds((current) =>
+            current.includes(directoryId) ? current : [...current, directoryId],
+        );
+
+        try {
+            const result = await cancelGeneration(directoryId);
+
+            if (!result.success) {
+                if (result.error?.includes('is not generating')) {
+                    toast.error(result.error);
+                    onStopRequested?.();
+                    return;
+                }
+
+                toast.error(result.error || t('actions.stopFailed'));
+                return;
+            }
+
+            toast.success(result.message || t('actions.stopRequested'));
+            onStopRequested?.();
+        } finally {
+            setStoppingDirectoryIds((current) => current.filter((id) => id !== directoryId));
+        }
+    };
+
     return (
         <div className="relative overflow-hidden rounded-lg border border-border dark:border-border-dark">
             {loading && activities.length > 0 && (
@@ -202,7 +285,7 @@ export function ActivityTable({ activities, loading }: ActivityTableProps) {
                     <thead className="bg-muted/50 dark:bg-muted/20">
                         <tr>
                             <th scope="col" className="w-8 px-3 py-3">
-                                <span className="sr-only">Expand</span>
+                                <span className="sr-only">{t('detail.expand')}</span>
                             </th>
                             <th
                                 scope="col"
@@ -253,6 +336,10 @@ export function ActivityTable({ activities, loading }: ActivityTableProps) {
                             const liveLogs = hydratedActivity.details?.liveLogs as
                                 | GenerationStepLog[]
                                 | undefined;
+                            const resolvedSummary = formatActivitySummary(
+                                hydratedActivity,
+                                tSummary,
+                            );
                             const detailsWithoutLiveLogs = hydratedActivity.details
                                 ? Object.fromEntries(
                                       Object.entries(hydratedActivity.details).filter(
@@ -263,6 +350,9 @@ export function ActivityTable({ activities, loading }: ActivityTableProps) {
                             const hasDetails = hasStructuredData(detailsWithoutLiveLogs);
                             const hasMetadata = hasStructuredData(hydratedActivity.metadata);
                             const hasStructuredContent = hasDetails || hasMetadata;
+                            const isStopping = activity.directoryId
+                                ? stoppingDirectoryIds.includes(activity.directoryId)
+                                : false;
 
                             return (
                                 <Fragment key={activity.id}>
@@ -300,15 +390,10 @@ export function ActivityTable({ activities, loading }: ActivityTableProps) {
                                             <ActivityStatusBadge status={activity.status} />
                                         </td>
                                         <td className="px-4 py-3 text-xs text-text-muted dark:text-text-muted-dark whitespace-nowrap">
-                                            <span
-                                                title={new Date(
-                                                    activity.createdAt,
-                                                ).toLocaleString()}
-                                            >
-                                                {formatDistanceToNow(new Date(activity.createdAt), {
-                                                    addSuffix: true,
-                                                })}
-                                            </span>
+                                            <ActivityTimestamp
+                                                value={activity.createdAt}
+                                                variant="relative"
+                                            />
                                         </td>
                                         <td className="px-4 py-3 text-xs">
                                             {activity.directory ? (
@@ -331,8 +416,27 @@ export function ActivityTable({ activities, loading }: ActivityTableProps) {
                                             <ActivityTypeBadge actionType={activity.actionType} />
                                         </td>
                                         <td className="px-4 py-3 text-xs text-text dark:text-text-dark max-w-md">
-                                            <div className="line-clamp-3 break-words">
-                                                {activity.summary}
+                                            <div className="flex items-start justify-between gap-3">
+                                                <div className="min-w-0 flex-1 line-clamp-3 break-words">
+                                                    {resolvedSummary}
+                                                </div>
+                                                {activity.actionType === 'generation' &&
+                                                activity.status === 'in_progress' &&
+                                                activity.directoryId ? (
+                                                    <Button
+                                                        variant="danger"
+                                                        size="sm"
+                                                        loading={isStopping}
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            stopGeneration(activity.directoryId!);
+                                                        }}
+                                                    >
+                                                        {isStopping
+                                                            ? t('actions.stopping')
+                                                            : t('actions.stop')}
+                                                    </Button>
+                                                ) : null}
                                             </div>
                                         </td>
                                     </tr>
@@ -379,22 +483,25 @@ export function ActivityTable({ activities, loading }: ActivityTableProps) {
                                                                     <span className="font-medium text-text-secondary dark:text-text-secondary-dark">
                                                                         {t('detail.created')}:
                                                                     </span>{' '}
-                                                                    <span className="text-[11px] text-text-muted dark:text-text-muted-dark">
-                                                                        {new Date(
-                                                                            hydratedActivity.createdAt,
-                                                                        ).toLocaleString()}
-                                                                    </span>
+                                                                    <ActivityTimestamp
+                                                                        value={
+                                                                            hydratedActivity.createdAt
+                                                                        }
+                                                                        className="text-[11px] text-text-muted dark:text-text-muted-dark"
+                                                                    />
                                                                 </p>
                                                             </div>
                                                         </div>
                                                         {liveLogs && liveLogs.length > 0 && (
                                                             <section className="space-y-2">
                                                                 <h5 className="text-xs font-semibold uppercase tracking-wide text-text-secondary dark:text-text-secondary-dark">
-                                                                    Live Logs
+                                                                    {t('detail.liveLogs')}
                                                                 </h5>
                                                                 <TerminalLogViewer
                                                                     logs={liveLogs}
-                                                                    title="Generation"
+                                                                    title={t(
+                                                                        'filters.types.generation',
+                                                                    )}
                                                                     maxHeight="max-h-72"
                                                                     showCursor={
                                                                         hydratedActivity.status ===

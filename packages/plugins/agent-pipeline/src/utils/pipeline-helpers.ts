@@ -56,7 +56,7 @@ export function updateStepState(
 	return {
 		...state,
 		steps,
-		currentStep: status === 'running' ? stepId : state.currentStep,
+		currentStep: status === 'running' ? stepId : state.currentStep === stepId ? undefined : state.currentStep,
 		completedSteps,
 		failedSteps
 	};
@@ -89,13 +89,14 @@ export async function resolveSettings(
 			context.getSettings('directory', directoryId)
 		]);
 
+		const merged: PluginSettings = { ...userSettings };
 		for (const key in directorySettings) {
-			if (directorySettings[key]) {
-				userSettings[key] = directorySettings[key];
+			if (directorySettings[key] !== undefined && directorySettings[key] !== null) {
+				merged[key] = directorySettings[key];
 			}
 		}
 
-		return userSettings;
+		return merged;
 	} catch {
 		return {};
 	}
@@ -105,13 +106,27 @@ export function buildMetrics(
 	startTime: number,
 	duration: number,
 	itemCount: number,
-	tokenUsage?: TokenUsageBreakdown
+	tokenUsage?: TokenUsageBreakdown,
+	totalCost?: number
 ): AgentPipelineMetrics {
 	const metrics: AgentPipelineMetrics = { startTime, duration, itemsProcessed: itemCount, steps: {} };
 	if (tokenUsage) {
 		metrics.tokenUsage = tokenUsage;
 	}
+	if (typeof totalCost === 'number' && totalCost > 0) {
+		metrics.totalCost = totalCost;
+	}
 	return metrics;
+}
+
+export function finalizeCompletedState(state: PipelineState<AgentPipelineStepId>): PipelineState<AgentPipelineStepId> {
+	return {
+		...state,
+		isRunning: false,
+		isCancelled: false,
+		currentStep: undefined,
+		completedAt: Date.now()
+	};
 }
 
 export function buildErrorResult(
@@ -129,6 +144,14 @@ export function buildErrorResult(
 			}
 		}
 	}
+
+	currentState = {
+		...currentState,
+		isRunning: false,
+		isCancelled: false,
+		currentStep: undefined,
+		completedAt: Date.now()
+	};
 
 	return {
 		state: currentState,
@@ -153,6 +176,7 @@ export function buildCancelledResult(
 		...currentState,
 		isRunning: false,
 		isCancelled: true,
+		currentStep: undefined,
 		completedAt: Date.now()
 	};
 

@@ -44,7 +44,7 @@ export type {
 export interface ItemsGeneratorResponse {
     id: string;
     slug: string;
-    status: string;
+    status: 'success' | 'error' | 'pending' | 'skipped';
     message?: string;
 }
 
@@ -76,6 +76,12 @@ export interface RegenerateMarkdownResponse {
     message?: string;
 }
 
+export interface CancelGenerationResponse {
+    status: 'success';
+    message: string;
+    mode: 'trigger' | 'in_process' | 'stale' | 'already_finished';
+}
+
 export const itemsGeneratorAPI = {
     // Generate items
     generate: async (directoryId: string, data: CreateItemsGeneratorDto) => {
@@ -92,6 +98,15 @@ export const itemsGeneratorAPI = {
         return serverMutation<ItemsGeneratorResponse>({
             endpoint: `/directories/${directoryId}/update`,
             data,
+            method: 'POST',
+            wrapInData: false,
+        });
+    },
+
+    cancel: async (directoryId: string) => {
+        return serverMutation<CancelGenerationResponse>({
+            endpoint: `/directories/${directoryId}/cancel-generation`,
+            data: {},
             method: 'POST',
             wrapInData: false,
         });

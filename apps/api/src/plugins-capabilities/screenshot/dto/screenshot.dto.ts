@@ -1,10 +1,36 @@
-import { IsOptional, IsNumber, IsBoolean, IsUrl, Min, Max, IsIn } from 'class-validator';
+import {
+    IsOptional,
+    IsNumber,
+    IsBoolean,
+    IsUrl,
+    Min,
+    Max,
+    IsIn,
+    IsString,
+    IsUUID,
+} from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class CaptureScreenshotDto {
     @ApiProperty({ description: 'URL of the page to capture', example: 'https://example.com' })
     @IsUrl()
     url: string;
+
+    @ApiPropertyOptional({
+        description: 'Optional provider override',
+        example: 'screenshotone',
+    })
+    @IsOptional()
+    @IsString()
+    providerOverride?: string;
+
+    @ApiPropertyOptional({
+        description: 'Optional directory context for provider resolution',
+        example: 'a0499a65-9b8c-4bf7-857e-895f52da30b3',
+    })
+    @IsOptional()
+    @IsUUID()
+    directoryId?: string;
 
     @ApiPropertyOptional({
         description: 'Viewport width in pixels',

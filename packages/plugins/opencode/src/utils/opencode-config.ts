@@ -1,5 +1,6 @@
 import * as fs from 'fs/promises';
 import * as path from 'path';
+import { randomUUID } from 'node:crypto';
 import type { AiProviderConfig } from '@ever-works/plugin';
 import { BASE_TEMP_DIR } from '../types.js';
 
@@ -9,17 +10,20 @@ export interface OpenCodeSessionConfig {
 	readonly sessionDir: string;
 	readonly configDir: string;
 	readonly env: Record<string, string>;
+	readonly model: string;
 }
 
-function getSessionDir(userId: string, directoryId: string): string {
+function getSessionRoot(userId: string, directoryId: string): string {
 	return path.join(BASE_TEMP_DIR, userId, 'opencode', directoryId);
 }
 
 function buildConfig(providerConfig: AiProviderConfig, model: string) {
+	const qualifiedModel = `${OPENCODE_PROVIDER_ID}/${model}`;
+
 	return {
 		$schema: 'https://opencode.ai/config.json',
-		model,
-		small_model: model,
+		model: qualifiedModel,
+		small_model: qualifiedModel,
 		enabled_providers: [OPENCODE_PROVIDER_ID],
 		provider: {
 			[OPENCODE_PROVIDER_ID]: {
@@ -52,6 +56,10 @@ function buildConfig(providerConfig: AiProviderConfig, model: string) {
 	};
 }
 
+function buildQualifiedModel(model: string): string {
+	return `${OPENCODE_PROVIDER_ID}/${model}`;
+}
+
 export async function prepareOpenCodeSessionConfig(options: {
 	userId: string;
 	directoryId: string;
@@ -59,11 +67,13 @@ export async function prepareOpenCodeSessionConfig(options: {
 	model: string;
 }): Promise<OpenCodeSessionConfig> {
 	const { userId, directoryId, providerConfig, model } = options;
-	const sessionDir = getSessionDir(userId, directoryId);
+	const sessionRoot = getSessionRoot(userId, directoryId);
+	await fs.mkdir(sessionRoot, { recursive: true });
+	const sessionDir = path.join(sessionRoot, `run-${randomUUID()}`);
 	const configDir = path.join(sessionDir, 'config');
 	const dataHome = path.join(sessionDir, 'data');
+	const qualifiedModel = buildQualifiedModel(model);
 
-	await fs.rm(sessionDir, { recursive: true, force: true });
 	await fs.mkdir(configDir, { recursive: true });
 	await fs.mkdir(path.join(dataHome, 'opencode'), { recursive: true });
 
@@ -73,6 +83,7 @@ export async function prepareOpenCodeSessionConfig(options: {
 	return {
 		sessionDir,
 		configDir,
+		model: qualifiedModel,
 		env: {
 			HOME: sessionDir,
 			XDG_DATA_HOME: dataHome,
@@ -85,9 +96,9 @@ export async function prepareOpenCodeSessionConfig(options: {
 	};
 }
 
-export async function cleanupOpenCodeSessionConfig(userId: string, directoryId: string): Promise<void> {
+export async function cleanupOpenCodeSessionConfig(sessionDir: string): Promise<void> {
 	try {
-		await fs.rm(getSessionDir(userId, directoryId), { recursive: true, force: true });
+		await fs.rm(sessionDir, { recursive: true, force: true });
 	} catch {
 		// Cleanup failures are non-fatal
 	}

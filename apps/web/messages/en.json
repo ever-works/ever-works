@@ -235,12 +235,72 @@
             "saveButton": "Save settings",
             "savedSuccess": "Settings saved.",
             "noSettings": "No configuration required for this plugin.",
-            "getTokenPrompt": "Create a token first, then paste it below and save to verify the connection."
+            "getTokenPrompt": "Create a token first, then paste it below and save to verify the connection.",
+            "loadingStatus": "Loading connection status..."
         },
         "plugins": {
             "byokDescription": "Connect your own key to unlock the full configuration.",
             "byokDefaultButton": "Bring your own key",
-            "setupTokenDescription": "Create a token first, then paste it below and save to verify the connection."
+            "setupTokenDescription": "Create a token first, then paste it below and save to verify the connection.",
+            "wizard": {
+                "setupLabel": "Setup",
+                "back": "Back",
+                "continue": "Continue",
+                "errors": {
+                    "loadStatus": "Failed to load device authentication status.",
+                    "start": "Failed to start device authentication."
+                },
+                "steps": {
+                    "configure": {
+                        "title": "Configuration",
+                        "description": "Configure {pluginName} settings."
+                    },
+                    "credentials": {
+                        "title": "Credentials",
+                        "description": "Configure credentials for {pluginName}."
+                    },
+                    "verify": {
+                        "title": "Verify",
+                        "description": "Save settings and verify the connection.",
+                        "cardTitle": "Verify Connection",
+                        "cardDescription": "Save the current settings and run the plugin connection validation.",
+                        "action": "Save and Verify",
+                        "successDefault": "Connection verified successfully."
+                    }
+                },
+                "authModes": {
+                    "apiKey": {
+                        "eyebrow": "User-scoped",
+                        "title": "API Key",
+                        "description": "Use a user-scoped API key for this plugin."
+                    },
+                    "deviceAuth": {
+                        "eyebrow": "User-scoped",
+                        "title": "Device Authentication",
+                        "description": "Start a device-code flow for this plugin and complete it in your browser."
+                    }
+                },
+                "deviceAuth": {
+                    "badges": {
+                        "connected": "Connected",
+                        "pending": "Pending"
+                    },
+                    "status": {
+                        "title": "Device Authentication Status",
+                        "fallback": "Start or refresh device authentication for this plugin.",
+                        "backendHint": "Device authentication is stored in a managed backend workspace for your user account. It must be completed and used on the same Ever Works deployment.",
+                        "deviceCode": "Device Code",
+                        "verificationUrl": "Verification URL"
+                    },
+                    "actions": {
+                        "notInstalled": "The required CLI is not installed on this machine.",
+                        "connected": "Device authentication connected",
+                        "start": "Start Device Auth",
+                        "restart": "Restart Device Auth",
+                        "refresh": "Refresh Status"
+                    }
+                }
+            }
         },
         "claudeWizard": {
             "label": "Claude Code setup",
@@ -264,6 +324,50 @@
                     "checkDescription": "Saving here runs a Claude API or CLI check depending on which credential you supplied.",
                     "button": "Verify and finish setup",
                     "successDefault": "Claude connection verified."
+                }
+            }
+        },
+        "codexWizard": {
+            "label": "Codex setup",
+            "title": "Set up Codex in three steps",
+            "subtitle": "This flow keeps the recommended configuration visible and verifies the connection before you finish.",
+            "stepIndex": "Step {index}",
+            "continueButton": "Continue",
+            "steps": {
+                "model": {
+                    "title": "Pick a model",
+                    "description": "Choose the Codex model you want to run for end-to-end directory generation."
+                },
+                "credentials": {
+                    "title": "Add credentials",
+                    "description": "Choose whether Codex should use an OpenAI API key or the Codex CLI login available on the backend machine.",
+                    "api": {
+                        "title": "OpenAI API key",
+                        "description": "Use an OpenAI API key for Codex execution."
+                    },
+                    "local": {
+                        "title": "Backend Codex login",
+                        "description": "Reuse the Codex CLI session already available on the machine running Ever Works.",
+                        "machineTitle": "Backend Codex CLI authentication",
+                        "machineDescription": "This checks `codex login status` and the local Codex auth file on the backend machine.",
+                        "connected": "Connected",
+                        "pending": "Pending",
+                        "connectButton": "Connect Codex CLI",
+                        "retryButton": "Open login again",
+                        "connectedButton": "Connected on backend machine",
+                        "notInstalled": "Codex CLI is not installed on the backend machine.",
+                        "codeLabel": "Device code",
+                        "pathLabel": "Auth file: {path}",
+                        "error": "Failed to read Codex CLI authentication status."
+                    }
+                },
+                "verify": {
+                    "title": "Verify connection",
+                    "description": "Save settings and run a live connection check against Codex before finishing.",
+                    "checkTitle": "Run a live Codex validation",
+                    "checkDescription": "Saving here runs a Codex API-key or local-CLI validation depending on how you configured authentication.",
+                    "button": "Verify and finish setup",
+                    "successDefault": "Codex connection verified."
                 }
             }
         },
@@ -291,12 +395,6 @@
                 }
             },
             "modes": {
-                "machine-local": {
-                    "title": "Use the machine-local Gemini login",
-                    "description": "Reuse the Gemini CLI login already cached on this machine. This is best when Gemini has already been authenticated locally.",
-                    "hint": "No secret is required here. Gemini will reuse the cached login from this machine, typically under ~/.gemini.",
-                    "verifyHint": "Saving here checks whether a cached machine-local Gemini login is present and usable."
-                },
                 "api-key": {
                     "description": "Paste a Gemini API key from Google AI Studio.",
                     "verifyHint": "Saving here verifies your Gemini API key against the selected model."
@@ -368,14 +466,28 @@
         "header": {
             "welcome": "Welcome back, {username}!",
             "subtitle": "Manage your AI-powered directories and track their performance",
+            "onboarding": {
+                "badge": "Onboarding {currentStep}/{totalSteps}",
+                "dismiss": "Hide onboarding shortcut"
+            },
+            "tooltips": {
+                "openSidebar": "Open sidebar",
+                "help": "Help & docs"
+            },
             "notifications": {
                 "title": "Notifications",
                 "empty": "No new notifications",
-                "fetchFailed": "Failed to load notifications"
+                "fetchFailed": "Failed to load notifications",
+                "dismissFailed": "Failed to dismiss notification"
             },
             "help": {
                 "title": "Help & Resources",
                 "subtitle": "Quick tips and useful links to help you get started",
+                "onboarding": {
+                    "title": "Onboarding",
+                    "description": "Reopen the guided setup anytime and continue where you left off.",
+                    "action": "Open onboarding ({currentStep}/{totalSteps})"
+                },
                 "quickTips": {
                     "title": "Quick Tips",
                     "tip1": "Create your first directory by clicking the 'Create Directory' button on the dashboard.",
@@ -446,7 +558,11 @@
             },
             "actions": {
                 "export": "Export CSV",
-                "clearFilters": "Clear filters"
+                "clearFilters": "Clear filters",
+                "stop": "Stop",
+                "stopping": "Stopping...",
+                "stopRequested": "Generation cancellation requested",
+                "stopFailed": "Failed to stop generation"
             },
             "empty": {
                 "title": "No activities yet",
@@ -463,8 +579,15 @@
                 "status": "Status",
                 "created": "Created",
                 "fields": "Details",
+                "liveLogs": "Live Logs",
                 "metadata": "Metadata",
                 "rawJson": "Raw JSON"
+            },
+            "summary": {
+                "generation": {
+                    "withChanges": "Added {added}. Changed {changed}. Total: {total}",
+                    "noChanges": "No item changes. Total: {total}"
+                }
             },
             "pagination": {
                 "previous": "Previous",
@@ -876,7 +999,15 @@
                 "page": {
                     "title": "Scheduled updates",
                     "subtitle": "Automate refreshes for {name} with a dedicated cadence and failure handling.",
-                    "fallbackName": "this directory"
+                    "fallbackName": "this directory",
+                    "loadFailed": "Failed to load schedule settings.",
+                    "providerCategories": {
+                        "pipeline": "Pipeline",
+                        "ai": "AI",
+                        "search": "Search",
+                        "screenshot": "Screenshot",
+                        "contentExtractor": "Extractor"
+                    }
                 },
                 "card": {
                     "title": "Automation",
@@ -935,6 +1066,7 @@
                     },
                     "plans": {
                         "free": "Free",
+                        "pro": "Pro",
                         "standard": "Standard",
                         "premium": "Premium",
                         "unmetered": "Unmetered"
@@ -962,7 +1094,9 @@
                         "requireUsage": "Enable pay-per-use billing to use this cadence.",
                         "updateFailed": "Failed to update schedule.",
                         "runFailed": "Failed to start run.",
-                        "cancelFailed": "Failed to cancel schedule."
+                        "cancelFailed": "Failed to cancel schedule.",
+                        "generationRunning": "Generation is running, please wait for it to finish.",
+                        "scheduleInactive": "Schedule must be active to run now."
                     },
                     "empty": {
                         "title": "Run a manual generation first",
@@ -990,7 +1124,11 @@
                 "generating": {
                     "title": "Generation in Progress",
                     "description": "Processing your request...",
-                    "processing": "Processing..."
+                    "processing": "Processing...",
+                    "stop": "Stop",
+                    "stopping": "Stopping...",
+                    "stopRequested": "Generation cancellation requested",
+                    "stopFailed": "Failed to stop generation"
                 },
                 "generated": {
                     "title": "Generation Complete",
@@ -1233,6 +1371,8 @@
                 "showing": "Showing {current} of {total} items",
                 "noMatch": "No items match your search criteria",
                 "source": "Source",
+                "viewOnWebsite": "View on website",
+                "openSourceUrl": "Open source URL",
                 "addItem": "Add Item",
                 "delete": "Delete",
                 "deleteWithPR": "Delete with Pull Request",
@@ -1318,6 +1458,12 @@
                     "failed": "Failed to capture screenshot",
                     "error": "An error occurred while capturing screenshot",
                     "notConfigured": "Screenshot service is not configured",
+                    "providerLabel": "Provider",
+                    "providerRequired": "Please select a screenshot provider",
+                    "selectProviderTitle": "Choose screenshot provider",
+                    "selectProviderDescription": "Select which screenshot provider to use for this item.",
+                    "selected": "Selected",
+                    "confirmCapture": "Capture screenshot",
                     "captureFailed": "Failed to capture image",
                     "captureSuccess": "Image captured successfully",
                     "captureError": "An error occurred while capturing image",
@@ -1332,7 +1478,8 @@
                     "categories": "Categories",
                     "tags": "Tags",
                     "collections": "Collections",
-                    "sourceHealth": "Source Health"
+                    "sourceHealth": "Source Health",
+                    "navigationLabel": "Item tabs"
                 },
                 "taxonomy": {
                     "categories": {
@@ -1501,7 +1648,8 @@
                     "generate": "Generate",
                     "schedule": "Schedule",
                     "history": "History",
-                    "comparisons": "Comparisons"
+                    "comparisons": "Comparisons",
+                    "navigationLabel": "Generator tabs"
                 },
                 "regenerationWarning": "Regeneration Warning",
                 "regenerationWarningDescription": "This directory has already been generated. Starting a new generation will replace existing items.",
@@ -1620,7 +1768,9 @@
                 "useDirectoryDefault": "Use Directory Default",
                 "default": "Default",
                 "notConfigured": "Not configured",
-                "notConfiguredTooltip": "This provider requires configuration. Visit Settings → Plugins to set it up."
+                "notConfiguredTooltip": "This provider requires configuration. Visit Settings → Plugins to set it up.",
+                "jsonObjectError": "Value must be a JSON object",
+                "invalidJsonError": "Invalid JSON format"
             },
             "progress": {
                 "title": "Generation in Progress",
@@ -1645,7 +1795,8 @@
                 "progress": "Progress",
                 "closeNote": "This may take a few minutes. You can close this page and come back later.",
                 "showLogs": "Show step logs",
-                "hideLogs": "Hide step logs"
+                "hideLogs": "Hide step logs",
+                "waitingForLogs": "Waiting for live logs to arrive..."
             },
             "settings": {
                 "sourceSettings": "Source Repository",
@@ -1709,6 +1860,14 @@
                     "updateFailed": "Failed to update deploy provider"
                 },
                 "visibilityUpdateFailed": "Failed to update repository visibility",
+                "visibilityUpdated": "{name} is now {visibility}",
+                "repositoryVisibilityTitle": "Repository Visibility",
+                "repositoryTypes": {
+                    "main": "Main",
+                    "data": "Data",
+                    "website": "Website"
+                },
+                "repositoryTypeSuffix": "repository",
                 "visibilityWarningTitle": "Make Repository Private?",
                 "visibilityWarningDescription": "You are about to make {name} private.",
                 "visibilityWarningPermanent": "This action has permanent consequences:",
@@ -1829,6 +1988,9 @@
                             "themeSelectorHelper": "Allow users to switch between themes",
                             "defaults": "Defaults",
                             "defaultLayout": "Default Layout",
+                            "layoutHome1": "Home 1",
+                            "layoutHome2": "Home 2",
+                            "layoutHome3": "Home 3",
                             "defaultTheme": "Default Theme",
                             "themeLight": "Light",
                             "themeDark": "Dark",
@@ -1941,6 +2103,8 @@
                         "deployPending": "Deployment is queued and will start shortly",
                         "deployFailed": "Failed to deploy",
                         "deployError": "An error occurred during deployment",
+                        "saveSettingsFailed": "Failed to save settings",
+                        "saveSettingsBeforeDeploymentFailed": "Failed to save settings before deployment",
                         "updateSuccess": "Repository updated successfully",
                         "updateFailed": "Failed to update repository",
                         "updateError": "An error occurred while updating the repository"
@@ -2088,7 +2252,9 @@
                     "unconfiguredProviders": "{providers} not configured. Visit Settings → Plugins to set up before generating.",
                     "nameRequired": "Directory name is required",
                     "slugRequired": "Directory slug is required",
-                    "descriptionRequired": "Directory description is required"
+                    "descriptionRequired": "Directory description is required",
+                    "githubRequired": "Please connect your GitHub account first.",
+                    "createFailed": "Failed to create directory"
                 },
                 "success": {
                     "started": "Directory creation started!",
@@ -2135,6 +2301,7 @@
                 "nameRequired": "Directory name is required",
                 "slugRequired": "Directory slug is required",
                 "descriptionRequired": "Directory description is required",
+                "createFailed": "Failed to create directory",
                 "success": {
                     "created": "Directory created successfully!"
                 }
@@ -2324,7 +2491,8 @@
                 "notConnected": "Not connected",
                 "connected": "Connected",
                 "connecting": "Connecting...",
-                "connect": "Connect"
+                "connect": "Connect",
+                "connectError": "Failed to connect"
             },
             "settings": {
                 "title": "Git Provider Connections",
@@ -2343,7 +2511,12 @@
                 "organizations": "Organizations ({count})",
                 "organizationsNote": "Only organizations where you have granted access are shown.",
                 "connectDescription": "Connect your {provider} account to import repositories and manage your projects.",
-                "selectedProvider": "Selected Provider"
+                "selectedProvider": "Selected Provider",
+                "confirmDisconnect": "Are you sure you want to disconnect {provider}?",
+                "disconnected": "{provider} disconnected",
+                "connectError": "Failed to connect",
+                "reconnectError": "Failed to reconnect",
+                "disconnectError": "Failed to disconnect"
             }
         },
         "apiTokens": {
@@ -2440,12 +2613,17 @@
             "menu": "Menu",
             "aiChat": "AI Chat",
             "newDirectory": "New Directory",
+            "activityIndicator": "Directory generating",
             "navigation": {
                 "dashboard": "Dashboard",
                 "activity": "Activity",
                 "directories": "Directories",
                 "plugins": "Plugins",
                 "settings": "Settings"
+            },
+            "tooltips": {
+                "expandSidebar": "Expand sidebar",
+                "collapseSidebar": "Collapse sidebar"
             },
             "profileMenu": {
                 "accountSettings": "Account Settings",
@@ -2491,6 +2669,7 @@
         },
         "aiChat": {
             "title": "AI Assistant",
+            "panelTitle": "Chat",
             "subtitle": "Create directories with natural language",
             "welcomeTitle": "Welcome to AI Assistant \uD83D\uDC4B",
             "welcomeSubtitle": "Your AI-powered assistant. Ask me anything about creating directories, generating content, or organizing your data.",
@@ -2510,7 +2689,12 @@
             "loadingConversation": "Loading conversation\u2026",
             "inputPlaceholder": "Ask me anything...",
             "sendButton": "Send",
+            "stopGenerating": "Stop generating",
             "sendHint": "Enter to send \u00b7 Shift+Enter for new line",
+            "closeChat": "Close chat",
+            "collapseChat": "Collapse chat",
+            "resizeChat": "Drag to resize chat",
+            "expandChat": "Expand chat",
             "providersError": "Failed to load AI providers. Chat may not work correctly.",
             "providerNotConfigured": "This provider is not configured. Set it up in Plugins.",
             "editMessage": "Edit message",
@@ -2595,6 +2779,7 @@
             "cancel": "Cancel",
             "missingRequiredFields": "Missing required fields: {fields}",
             "saveError": "Failed to save settings. Please try again.",
+            "enableFirstToSave": "Enable this plugin first, then save its settings.",
             "goToPluginSettings": "Go to plugin settings",
             "userLevelRequiredError": "User-level required settings must be configured first",
             "modelSelect": {
@@ -2633,6 +2818,23 @@
                 "connectError": "Failed to connect. Please try again.",
                 "reconnectError": "Failed to reconnect. Please try again.",
                 "disconnectError": "Failed to disconnect. Please try again."
+            },
+            "deviceAuth": {
+                "title": "Device Authentication",
+                "connected": "Connected",
+                "pending": "Pending",
+                "notConnected": "Not connected",
+                "description": "Connect {plugin} for this Ever Works user with a device-code flow.",
+                "backendHint": "This auth is stored in a managed backend workspace for your user account and is only usable from this Ever Works deployment.",
+                "deviceCode": "Device Code",
+                "verificationUrl": "Verification URL",
+                "start": "Start",
+                "restart": "Restart",
+                "refresh": "Refresh",
+                "open": "Open",
+                "notInstalled": "The required CLI is not installed on this machine.",
+                "loadError": "Failed to load device authentication status.",
+                "startError": "Failed to start device authentication."
             },
             "githubOrganizations": {
                 "title": "GitHub Organizations",
@@ -2740,6 +2942,8 @@
     "errors": {
         "global": {
             "title": "Something went wrong!",
+            "description": "An unexpected error occurred. Please try again or contact support if the problem persists.",
+            "errorId": "Error ID",
             "tryAgain": "Try again"
         },
         "notFound": {
@@ -2751,6 +2955,7 @@
         "dashboard": {
             "title": "Something went wrong",
             "description": "An unexpected error occurred. Please try again or contact support if the problem persists.",
+            "errorId": "Error ID",
             "tryAgain": "Try again"
         }
     },
@@ -2845,8 +3050,10 @@
             "promptRequired": "Prompt is required",
             "nameRequired": "Name is required",
             "generationStartedSuccessfully": "Generation started successfully",
+            "generationCancellationRequested": "Generation cancellation requested",
             "updateStartedSuccessfully": "Update started successfully",
             "failedToGenerateItems": "Failed to generate items",
+            "failedToCancelGeneration": "Failed to cancel generation",
             "failedToUpdateItems": "Failed to update items",
             "markdownRegeneratedSuccessfully": "Markdown regenerated successfully",
             "failedToRegenerateMarkdown": "Failed to regenerate markdown",
@@ -2933,7 +3140,12 @@
     "common": {
         "ui": {
             "close": "Close",
-            "dismiss": "Dismiss"
+            "dismiss": "Dismiss",
+            "selectLanguage": "Select language",
+            "increment": "Increment",
+            "decrement": "Decrement",
+            "yes": "Yes",
+            "no": "No"
         },
         "theme": {
             "toggle": "Toggle theme",

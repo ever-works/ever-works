@@ -135,10 +135,10 @@ export function DirectoryAICreator({
                     router.push(ROUTES.DASHBOARD_DIRECTORIES);
                 }
             } else if (result.requiresGitProvider) {
-                toast.error(result.error || 'Git provider connection required');
+                toast.error(result.error || t('errors.githubRequired'));
                 router.push(ROUTES.DASHBOARD_DIRECTORIES_NEW);
             } else {
-                toast.error(result.error || 'Failed to create directory');
+                toast.error(result.error || t('errors.createFailed'));
             }
         });
     };

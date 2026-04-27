@@ -67,7 +67,7 @@ export function GitProviderSelector({
             if (result.success && result.url) {
                 window.location.href = result.url;
             } else {
-                toast.error(result.error || 'Failed to connect');
+                toast.error(result.error || t('connectError'));
             }
         });
     };

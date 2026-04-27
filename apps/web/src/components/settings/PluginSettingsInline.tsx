@@ -4,6 +4,7 @@ import { useCallback, useMemo, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { UserPlugin } from '@/lib/api/plugins';
 import { OAuthConnectionInfo } from '@/lib/api/plugins-capabilities/oauth';
+import type { PluginDeviceAuthStatus } from '@/lib/api/plugins-capabilities/device-auth';
 import { Button } from '@/components/ui/button';
 import { CollapsibleCard } from '@/components/ui/collapsible-card';
 import { Save, Check, AlertCircle } from 'lucide-react';
@@ -11,6 +12,7 @@ import { updatePluginSettings } from '@/app/actions/plugins';
 import { PluginIcon } from '@/components/plugins/PluginIcon';
 import { PluginSettingsField } from '@/components/plugins/form/PluginSettingsField';
 import { GitHubOrganizationsSettings } from '@/components/settings/GitHubOrganizationsSettings';
+import { PluginDeviceAuthConnection } from '@/components/settings/PluginDeviceAuthConnection';
 import { PluginOAuthConnection } from '@/components/settings/PluginOAuthConnection';
 import { getCapabilityLabel } from '@/lib/utils/plugin-category-icons';
 import { usePluginSettings } from '@/lib/hooks/use-plugin-settings';
@@ -18,12 +20,14 @@ import { usePluginSettings } from '@/lib/hooks/use-plugin-settings';
 interface PluginSettingsInlineProps {
     plugin: UserPlugin;
     oauthConnection?: OAuthConnectionInfo | null;
+    deviceAuthStatus?: PluginDeviceAuthStatus | null;
     defaultExpanded?: boolean;
 }
 
 export function PluginSettingsInline({
     plugin,
     oauthConnection,
+    deviceAuthStatus,
     defaultExpanded = false,
 }: PluginSettingsInlineProps) {
     const t = useTranslations('dashboard.plugins');
@@ -35,6 +39,9 @@ export function PluginSettingsInline({
     );
 
     const hasOAuth = plugin.capabilities.includes('oauth') && oauthConnection !== undefined;
+    const hasDeviceAuth =
+        plugin.capabilities.includes('device-auth') && deviceAuthStatus !== undefined;
+    const deviceAuthModeField = plugin.uiHints?.deviceAuth?.authModeField ?? 'authMode';
 
     const onSave = useCallback(
         async (data: {
@@ -151,6 +158,17 @@ export function PluginSettingsInline({
                     />
                 )}
 
+                {hasDeviceAuth && (
+                    <PluginDeviceAuthConnection
+                        pluginId={plugin.pluginId}
+                        pluginName={plugin.name}
+                        initialStatus={deviceAuthStatus ?? null}
+                        onActivate={() =>
+                            handleFieldChange(deviceAuthModeField, 'device-auth', false)
+                        }
+                    />
+                )}
+
                 {plugin.uiHints?.organizationSettings && (
                     <GitHubOrganizationsSettings
                         plugin={plugin}
@@ -232,7 +250,7 @@ export function PluginSettingsInline({
                             )}
                         </div>
                     </div>
-                ) : !hasOAuth ? (
+                ) : !hasOAuth && !hasDeviceAuth ? (
                     <div className="py-4 text-center">
                         <p className="text-sm text-text-muted dark:text-text-muted-dark">
                             {t('noSettings')}

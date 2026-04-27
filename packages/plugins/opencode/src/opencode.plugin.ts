@@ -55,7 +55,8 @@ import {
 	resolveSettings,
 	buildMetrics,
 	buildErrorResult,
-	buildCancelledResult
+	buildCancelledResult,
+	finalizeCompletedState
 } from './utils/pipeline-helpers.js';
 import { prepareOpenCodeSessionConfig, cleanupOpenCodeSessionConfig } from './utils/opencode-config.js';
 import {
@@ -149,8 +150,9 @@ export class OpenCodePlugin implements IPlugin, IPipelinePlugin, IFormSchemaProv
 		}
 
 		return {
-			success: true,
-			message: 'OpenCode uses the configured Ever Works AI provider for authentication and model selection.'
+			success: false,
+			message:
+				'OpenCode uses the active directory AI provider for credentials and model routing. Verify the directory AI provider configuration to confirm this pipeline is runnable.'
 		};
 	}
 
@@ -185,38 +187,34 @@ export class OpenCodePlugin implements IPlugin, IPipelinePlugin, IFormSchemaProv
 			selectableProviderCategories: ['ai-provider', 'screenshot'],
 			uiHints: {
 				onboardingWizard: false,
-				includeInOnboarding: true,
-				onboardingPriority: 1,
-				completionFields: [],
-				onboardingDescription:
-					'Use your configured AI provider to power OpenCode-based content generation across your directories.'
+				includeInOnboarding: false
 			},
 			readme: [
 				'# OpenCode Generator Plugin',
 				'',
-				'Full pipeline plugin that delegates the entire directory generation to OpenCode using your configured Ever Works AI provider.',
+				'Use OpenCode as the pipeline engine for directory generation inside Ever Works.',
 				'',
-				'## How it works',
+				'OpenCode researches sources and generates structured directory items by using the AI provider configured for the directory in Ever Works.',
 				'',
-				'The plugin runs 6 sequential steps:',
+				'Choose this plugin when you want OpenCode-style generation while keeping provider credentials managed by your existing Ever Works AI provider setup.',
 				'',
-				'1. **Setup OpenCode** - Downloads and caches the OpenCode CLI binary',
-				'2. **Prepare Context** - Creates a temporary workspace and seeds it with existing items and metadata',
-				'3. **Generate Items** - Executes OpenCode CLI to research and generate directory items as JSON files',
-				'4. **Collect Results** - Reads the generated JSON files back to build the pipeline result',
-				'5. **Capture Screenshots** - Takes screenshots for items that need images',
-				'6. **Cleanup** - Removes the temporary workspace',
+				'## What It Does',
 				'',
-				'## Providers',
+				'- Researches sources for the current directory topic.',
+				'- Generates structured item data for Ever Works.',
+				'- Reuses your directory context and existing items during generation.',
+				'- Can work with screenshot providers for item imagery.',
 				'',
-				'OpenCode does not manage its own provider credentials in Ever Works.',
-				'Instead, it uses the active Ever Works `ai-provider` for the directory/user context, just like `agent-pipeline`.',
+				'## Provider Model',
 				'',
-				'The plugin creates an isolated, user-scoped OpenCode config for each run, wires in the resolved AI provider base URL and API key, and enables web tools explicitly.',
+				'OpenCode does not ask for its own API key in plugin settings.',
+				'It uses the active Ever Works `ai-provider` configured for the directory.',
 				'',
 				'## Usage',
 				'',
-				"Enable the plugin for a directory, configure an `ai-provider`, and trigger generation with `providers.pipeline: 'opencode'`."
+				'1. Configure an `ai-provider` for the directory.',
+				'2. Enable the OpenCode plugin.',
+				'3. Select `opencode` as the pipeline provider for generation.'
 			].join('\n'),
 			homepage: 'https://opencode.ai/docs/cli/',
 			icon: {
@@ -258,26 +256,36 @@ export class OpenCodePlugin implements IPlugin, IPipelinePlugin, IFormSchemaProv
 		onProgress?: PipelineProgressCallback
 	): Promise<PipelineResult> {
 		const startTime = Date.now();
-		this.abortController = new AbortController();
-		const signal = options?.signal ?? this.abortController.signal;
-		const onLogEntry = options?.onLogEntry;
 		const execContext = options?.execContext;
-
-		this.state = initializeState();
-
-		const logger = this.context?.logger ?? console;
 		if (!execContext) {
 			return this.handleError(new Error('Execution context (execContext) is required for opencode'), startTime);
 		}
 
 		const userId = execContext.user?.id ?? directory.user?.id;
-
 		if (!userId) {
 			return this.handleError(new Error('User ID is required'), startTime);
 		}
 
+		if (this.abortController) {
+			return this.handleError(
+				new Error(
+					'OpenCode Generator is already executing another generation. Wait for it to finish or cancel it first.'
+				),
+				startTime
+			);
+		}
+
+		const abortController = new AbortController();
+		this.abortController = abortController;
+		const signal = options?.signal ?? abortController.signal;
+		const onLogEntry = options?.onLogEntry;
+
+		this.state = initializeState();
+
+		const logger = this.context?.logger ?? console;
 		const facadeOptions: FacadeOptions = { userId, directoryId: directory.id };
 		let sessionConfig: Awaited<ReturnType<typeof prepareOpenCodeSessionConfig>> | null = null;
+		let workspacePath: string | null = null;
 
 		try {
 			const settings = await resolveSettings(this.context, userId, directory.id);
@@ -305,8 +313,10 @@ export class OpenCodePlugin implements IPlugin, IPipelinePlugin, IFormSchemaProv
 			this.completeStep('setup-opencode', setupStepStartedAt, onLogEntry);
 
 			if (signal.aborted) {
-				await cleanupWorkspace(userId, directory.id);
-				await cleanupOpenCodeSessionConfig(userId, directory.id);
+				if (workspacePath) {
+					await cleanupWorkspace(workspacePath);
+					workspacePath = null;
+				}
 				return this.handleCancel(startTime);
 			}
 
@@ -314,7 +324,7 @@ export class OpenCodePlugin implements IPlugin, IPipelinePlugin, IFormSchemaProv
 			const prepareContextStepStartedAt = this.startStep('prepare-context', onLogEntry);
 			reportProgress(onProgress, 1, 20, 'Prepare Context');
 
-			const workspacePath = await createWorkspace(userId, directory.id);
+			workspacePath = await createWorkspace(userId, directory.id);
 			sessionConfig = await prepareOpenCodeSessionConfig({
 				userId,
 				directoryId: directory.id,
@@ -332,8 +342,14 @@ export class OpenCodePlugin implements IPlugin, IPipelinePlugin, IFormSchemaProv
 			this.completeStep('prepare-context', prepareContextStepStartedAt, onLogEntry);
 
 			if (signal.aborted) {
-				await cleanupWorkspace(userId, directory.id);
-				await cleanupOpenCodeSessionConfig(userId, directory.id);
+				if (workspacePath) {
+					await cleanupWorkspace(workspacePath);
+					workspacePath = null;
+				}
+				if (sessionConfig) {
+					await cleanupOpenCodeSessionConfig(sessionConfig.sessionDir);
+					sessionConfig = null;
+				}
 				return this.handleCancel(startTime);
 			}
 
@@ -377,7 +393,7 @@ export class OpenCodePlugin implements IPlugin, IPipelinePlugin, IFormSchemaProv
 					prompt: this.buildCombinedPrompt(systemPrompt, userPrompt),
 					cwd: workspacePath,
 					env: sessionConfig.env,
-					model: modelName,
+					model: sessionConfig.model,
 					signal,
 					onStdoutLine,
 					onStderrLine
@@ -392,8 +408,14 @@ export class OpenCodePlugin implements IPlugin, IPipelinePlugin, IFormSchemaProv
 
 			if (execResult.killed || signal.aborted) {
 				this.failStep('generate-items', new Error('Cancelled'), onLogEntry);
-				await cleanupWorkspace(userId, directory.id);
-				await cleanupOpenCodeSessionConfig(userId, directory.id);
+				if (workspacePath) {
+					await cleanupWorkspace(workspacePath);
+					workspacePath = null;
+				}
+				if (sessionConfig) {
+					await cleanupOpenCodeSessionConfig(sessionConfig.sessionDir);
+					sessionConfig = null;
+				}
 				return this.handleCancel(startTime);
 			}
 
@@ -447,15 +469,26 @@ export class OpenCodePlugin implements IPlugin, IPipelinePlugin, IFormSchemaProv
 			const cleanupStepStartedAt = this.startStep('cleanup', onLogEntry);
 			reportProgress(onProgress, 5, 95, 'Cleanup');
 
-			await cleanupWorkspace(userId, directory.id);
-			await cleanupOpenCodeSessionConfig(userId, directory.id);
+			if (workspacePath) {
+				await cleanupWorkspace(workspacePath);
+				workspacePath = null;
+			}
+			if (sessionConfig) {
+				await cleanupOpenCodeSessionConfig(sessionConfig.sessionDir);
+				sessionConfig = null;
+			}
 			this.completeStep('cleanup', cleanupStepStartedAt, onLogEntry);
+
+			if (signal.aborted) {
+				return this.handleCancel(startTime);
+			}
 
 			// ── Build result ───────────────────────────────────────────
 			reportProgress(onProgress, 6, 100, 'Complete');
 
 			const duration = Date.now() - startTime;
 			const warnings = [...(generationWarning ? [generationWarning] : []), ...screenshotWarnings];
+			this.state = finalizeCompletedState(this.state!);
 
 			return buildSuccessPipelineResult(
 				{
@@ -481,9 +514,18 @@ export class OpenCodePlugin implements IPlugin, IPipelinePlugin, IFormSchemaProv
 				this.failStep(runningStepId, err, onLogEntry);
 			}
 			logger.error(`OpenCode pipeline failed: ${err.message}`);
-			await cleanupWorkspace(userId, directory.id);
-			await cleanupOpenCodeSessionConfig(userId, directory.id);
+			if (workspacePath) {
+				await cleanupWorkspace(workspacePath);
+			}
+			if (sessionConfig) {
+				await cleanupOpenCodeSessionConfig(sessionConfig.sessionDir);
+			}
 			return this.handleError(err, startTime);
+		} finally {
+			if (this.abortController === abortController) {
+				this.abortController = null;
+				this.killProcess = null;
+			}
 		}
 	}
 

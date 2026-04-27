@@ -18,18 +18,16 @@ describe('workspace-manager', () => {
 	});
 
 	describe('createWorkspace', () => {
-		it('should clean up existing workspace and create _meta directory', async () => {
-			vi.mocked(fs.rm).mockResolvedValue(undefined);
+		it('should create a per-run workspace and create _meta directory', async () => {
 			vi.mocked(fs.mkdir).mockResolvedValue(undefined as unknown as string);
+			vi.mocked(fs.mkdtemp).mockResolvedValue('/tmp/gemini-generator/user1/dir1/run-123');
 
 			const result = await createWorkspace('user1', 'dir1');
 
-			expect(fs.rm).toHaveBeenCalledWith('/tmp/gemini-generator/user1/dir1', {
-				recursive: true,
-				force: true
-			});
+			expect(fs.mkdir).toHaveBeenCalledWith('/tmp/gemini-generator/user1/dir1', { recursive: true });
+			expect(fs.mkdtemp).toHaveBeenCalledWith('/tmp/gemini-generator/user1/dir1/run-');
 			expect(fs.mkdir).toHaveBeenCalledWith(expect.stringContaining('_meta'), { recursive: true });
-			expect(result).toBe('/tmp/gemini-generator/user1/dir1');
+			expect(result).toBe('/tmp/gemini-generator/user1/dir1/run-123');
 		});
 	});
 
@@ -294,8 +292,8 @@ describe('workspace-manager', () => {
 	describe('cleanupWorkspace', () => {
 		it('should remove workspace directory', async () => {
 			vi.mocked(fs.rm).mockResolvedValue(undefined);
-			await cleanupWorkspace('user1', 'dir1');
-			expect(fs.rm).toHaveBeenCalledWith('/tmp/gemini-generator/user1/dir1', {
+			await cleanupWorkspace('/tmp/gemini-generator/user1/dir1/run-123');
+			expect(fs.rm).toHaveBeenCalledWith('/tmp/gemini-generator/user1/dir1/run-123', {
 				recursive: true,
 				force: true
 			});
@@ -303,7 +301,7 @@ describe('workspace-manager', () => {
 
 		it('should not throw on failure', async () => {
 			vi.mocked(fs.rm).mockRejectedValue(new Error('Permission denied'));
-			await expect(cleanupWorkspace('user1', 'dir1')).resolves.not.toThrow();
+			await expect(cleanupWorkspace('/tmp/gemini-generator/user1/dir1/run-123')).resolves.not.toThrow();
 		});
 	});
 });

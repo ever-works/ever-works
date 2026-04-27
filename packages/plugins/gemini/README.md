@@ -19,49 +19,24 @@ During step 3, a **taxonomy watcher** monitors the workspace for new item files 
 
 ## Authentication
 
-Gemini CLI supports three authentication modes:
-
-### API Key (default)
-
 Provide a Gemini API key from [Google AI Studio](https://aistudio.google.com/apikey) in plugin settings (`apiKey` field).
 
-### Machine-Local
-
-Uses an existing local Google login cached by Gemini CLI at `~/.gemini/`. Authenticate manually:
-
-```bash
-gemini login
-```
-
-### API Key
-
-### Vertex AI
-
-Use Google Cloud / Vertex AI environment-based authentication. Requires:
-
-- `googleCloudProject` - Google Cloud project ID
-- `googleCloudLocation` - Region (default: `us-central1`)
-- `googleApiKey` (optional) - Google Cloud API key
-
-The onboarding wizard (`GeminiOnboardingWizard`) provides a 3-step flow: choose auth mode, configure credentials, and verify the connection.
+This plugin does not reuse host machine Gemini CLI login state from `~/.gemini/`.
+Credentials must come from Ever Works user settings so each user keeps isolated auth.
+The runtime also uses an isolated per-user Gemini home/config directory instead of the machine user's home.
 
 ## Settings
 
-| Setting               | Type    | Scope  | Description                                                       |
-| --------------------- | ------- | ------ | ----------------------------------------------------------------- |
-| `authMode`            | string  | user   | `machine-local`, `api-key`, or `vertex`                           |
-| `apiKey`              | string  | user   | Gemini API key (secret, supports env var `PLUGIN_GEMINI_API_KEY`) |
-| `googleApiKey`        | string  | user   | Google Cloud API key for Vertex AI (secret, optional)             |
-| `googleCloudProject`  | string  | user   | Google Cloud project ID for Vertex AI                             |
-| `googleCloudLocation` | string  | user   | Google Cloud region for Vertex AI (default: `us-central1`)        |
-| `model`               | string  | user   | Model for generation (default: `gemini-2.5-pro`)                  |
-| `version`             | string  | hidden | Gemini CLI version to install (default: `latest`)                 |
-| `maxTurns`            | integer | hidden | Maximum agentic turns (default: 500)                              |
+| Setting   | Type   | Scope  | Description                                                       |
+| --------- | ------ | ------ | ----------------------------------------------------------------- |
+| `apiKey`  | string | user   | Gemini API key (secret, supports env var `PLUGIN_GEMINI_API_KEY`) |
+| `model`   | string | user   | Model for generation (default: `gemini-2.5-flash`)                |
+| `version` | string | hidden | Gemini CLI version to install (default: `latest`)                 |
 
 ### Supported Models
 
-- **Gemini 2.5 Pro** (default) - 200k context
-- **Gemini 2.5 Flash** - 200k context
+- **Gemini 2.5 Flash** (default) - 200k context
+- **Gemini 2.5 Pro** - 200k context
 - **Gemini 2.0 Flash** - 200k context
 
 ## Form Schema
@@ -86,10 +61,10 @@ Both support variable substitution for directory context, existing items, catego
 
 ## Binary Management
 
-The plugin installs the Gemini CLI via npm:
+The plugin runs Gemini CLI through `npx`:
 
-- Packages are cached at `{tmpdir}/gemini-generator/bin/gemini-{version}/`
-- Uses `@google/gemini-cli` npm package
+- Uses `npx --yes @google/gemini-cli`
+- Supports version pinning through `@google/gemini-cli@<version>`
 - Default version: `latest`
 
 ## Error Handling

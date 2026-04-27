@@ -143,7 +143,7 @@ function DirectoryHistoryPageClientContent({
 
             if (!result.success || !result.data?.history) {
                 console.error('Failed to load history page', result.error);
-                toast.error(t('error') ?? 'Failed to load history');
+                toast.error(t('error'));
                 return;
             }
 
@@ -188,7 +188,7 @@ function DirectoryHistoryPageClientContent({
 
             if (!result.success || !result.data?.history) {
                 console.error('Failed to load filtered history', result.error);
-                toast.error(t('error') ?? 'Failed to load history');
+                toast.error(t('error'));
                 return;
             }
 

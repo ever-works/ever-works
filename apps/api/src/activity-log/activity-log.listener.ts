@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
 import { ActivityLogService } from '@ever-works/agent/activity-log';
+import { DirectoryGenerationHistoryRepository } from '@ever-works/agent/database';
 import { ActivityActionType, ActivityStatus } from '@ever-works/agent/entities';
 import {
     UserCreatedEvent,
@@ -15,7 +16,10 @@ import { DirectoryGenerationCompletedEvent } from '@ever-works/agent/events';
 export class ActivityLogListener {
     private readonly logger = new Logger(ActivityLogListener.name);
 
-    constructor(private readonly activityLogService: ActivityLogService) {}
+    constructor(
+        private readonly activityLogService: ActivityLogService,
+        private readonly generationHistoryRepository: DirectoryGenerationHistoryRepository,
+    ) {}
 
     @OnEvent(DirectoryCreatedEvent.EVENT_NAME)
     async onDirectoryCreated(event: DirectoryCreatedEvent) {
@@ -37,17 +41,24 @@ export class ActivityLogListener {
     async onGenerationCompleted(event: DirectoryGenerationCompletedEvent) {
         try {
             const directory = event.directory;
-            const itemCount = directory.itemsCount || 0;
+            const generateStatus = directory.generateStatus?.status;
+            const latestHistory =
+                await this.generationHistoryRepository.findLatestCompletedByDirectory(directory.id);
             const status =
-                directory.generateStatus?.status === 'error'
+                generateStatus === 'error' || generateStatus === 'cancelled'
                     ? ActivityStatus.FAILED
                     : ActivityStatus.COMPLETED;
             const summary =
-                status === ActivityStatus.FAILED
-                    ? `Generation failed for ${directory.name}`
-                    : `Generated ${itemCount} items for ${directory.name}`;
+                generateStatus === 'cancelled'
+                    ? `Generation cancelled for ${directory.name}`
+                    : status === ActivityStatus.FAILED
+                      ? `Generation failed for ${directory.name}`
+                      : this.activityLogService.formatGenerationSummary(latestHistory);
+
             const details = {
-                itemsCount: itemCount,
+                itemsCount: latestHistory?.totalItemsCount ?? directory.itemsCount ?? 0,
+                newItemsCount: latestHistory?.newItemsCount ?? 0,
+                updatedItemsCount: latestHistory?.updatedItemsCount ?? 0,
                 generateStatus: directory.generateStatus,
             };
 

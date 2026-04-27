@@ -1,16 +1,16 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, LessThan, IsNull, Brackets, Raw, LessThanOrEqual } from 'typeorm';
+import { Repository, LessThan, IsNull, Brackets, Raw, LessThanOrEqual, In } from 'typeorm';
 import { Directory } from '../../entities/directory.entity';
 import { User } from '../../entities';
-import { prepareLikeSearchTerm } from '../utils';
+import { buildCaseInsensitiveLikeClause, prepareCaseInsensitiveContainsPattern } from '../utils';
 
 /**
  * Cross-database case-insensitive LIKE using LOWER() function.
  * Works with SQLite, PostgreSQL, and MySQL.
  */
 function caseInsensitiveLike(search: string) {
-    return Raw((alias) => `LOWER(${alias}) LIKE LOWER(:search)`, { search: `%${search}%` });
+    return Raw((alias) => buildCaseInsensitiveLikeClause(alias), { search });
 }
 
 @Injectable()
@@ -77,20 +77,33 @@ export class DirectoryRepository {
         });
     }
 
+    async findByIds(ids: string[]): Promise<Directory[]> {
+        const uniqueIds = [...new Set(ids.filter(Boolean))];
+
+        if (uniqueIds.length === 0) {
+            return [];
+        }
+
+        return this.repository.find({
+            where: { id: In(uniqueIds) },
+            relations: ['user'],
+        });
+    }
+
     private buildWhereConditions(options?: { userId?: string; search?: string }): any {
         const { userId, search } = options || {};
 
         let whereConditions: any = [];
 
         if (search) {
-            const sanitizedSearch = prepareLikeSearchTerm(search);
+            const searchPattern = prepareCaseInsensitiveContainsPattern(search);
 
-            if (sanitizedSearch) {
+            if (searchPattern) {
                 // Create OR conditions for search using cross-database case-insensitive LIKE
                 const searchConditions = [
-                    { name: caseInsensitiveLike(sanitizedSearch) },
-                    { description: caseInsensitiveLike(sanitizedSearch) },
-                    { slug: caseInsensitiveLike(sanitizedSearch) },
+                    { name: caseInsensitiveLike(searchPattern) },
+                    { description: caseInsensitiveLike(searchPattern) },
+                    { slug: caseInsensitiveLike(searchPattern) },
                 ];
 
                 // If userId is specified, add it to each search condition
@@ -280,16 +293,17 @@ export class DirectoryRepository {
 
         // Apply search filter using cross-database case-insensitive LIKE
         if (search) {
-            const sanitizedSearch = prepareLikeSearchTerm(search);
-            if (sanitizedSearch) {
-                const searchPattern = `%${sanitizedSearch.toLowerCase()}%`;
+            const searchPattern = prepareCaseInsensitiveContainsPattern(search);
+            if (searchPattern) {
                 queryBuilder.andWhere(
                     new Brackets((qb) => {
-                        qb.where('LOWER(directory.name) LIKE :search', { search: searchPattern })
-                            .orWhere('LOWER(directory.description) LIKE :search', {
+                        qb.where(buildCaseInsensitiveLikeClause('directory.name'), {
+                            search: searchPattern,
+                        })
+                            .orWhere(buildCaseInsensitiveLikeClause('directory.description'), {
                                 search: searchPattern,
                             })
-                            .orWhere('LOWER(directory.slug) LIKE :search', {
+                            .orWhere(buildCaseInsensitiveLikeClause('directory.slug'), {
                                 search: searchPattern,
                             });
                     }),
@@ -342,16 +356,17 @@ export class DirectoryRepository {
 
         // Apply search filter using cross-database case-insensitive LIKE
         if (search) {
-            const sanitizedSearch = prepareLikeSearchTerm(search);
-            if (sanitizedSearch) {
-                const searchPattern = `%${sanitizedSearch.toLowerCase()}%`;
+            const searchPattern = prepareCaseInsensitiveContainsPattern(search);
+            if (searchPattern) {
                 queryBuilder.andWhere(
                     new Brackets((qb) => {
-                        qb.where('LOWER(directory.name) LIKE :search', { search: searchPattern })
-                            .orWhere('LOWER(directory.description) LIKE :search', {
+                        qb.where(buildCaseInsensitiveLikeClause('directory.name'), {
+                            search: searchPattern,
+                        })
+                            .orWhere(buildCaseInsensitiveLikeClause('directory.description'), {
                                 search: searchPattern,
                             })
-                            .orWhere('LOWER(directory.slug) LIKE :search', {
+                            .orWhere(buildCaseInsensitiveLikeClause('directory.slug'), {
                                 search: searchPattern,
                             });
                     }),
@@ -400,7 +415,10 @@ export class DirectoryRepository {
                 'activeWebsites',
             )
             .addSelect(
-                'COALESCE(SUM(CASE WHEN directory.generationStartedAt IS NOT NULL AND directory.generationFinishedAt IS NULL THEN 1 ELSE 0 END), 0)',
+                // `generateStatus` is stored as TypeORM `simple-json`, so it is persisted as plain text
+                // across the supported databases in this repo. Keep this query portable by matching the
+                // serialized status field instead of using engine-specific JSON operators.
+                `COALESCE(SUM(CASE WHEN directory.generateStatus LIKE '%"status":"generating"%' THEN 1 ELSE 0 END), 0)`,
                 'generatingCount',
             )
             .getRawOne();

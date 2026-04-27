@@ -135,7 +135,7 @@ export function DirectoryInfo({ directory, config }: DirectoryInfoProps) {
                         {directory.repoVisibility && (
                             <RepoVisibilityIcon
                                 isPrivate={directory.repoVisibility.data}
-                                label="Data Repo"
+                                label={t('dataRepo')}
                             />
                         )}
                         <Link
@@ -152,7 +152,7 @@ export function DirectoryInfo({ directory, config }: DirectoryInfoProps) {
                         {directory.repoVisibility && (
                             <RepoVisibilityIcon
                                 isPrivate={directory.repoVisibility.website}
-                                label="Website Repo"
+                                label={t('websiteRepo')}
                             />
                         )}
                         <Link
@@ -169,7 +169,7 @@ export function DirectoryInfo({ directory, config }: DirectoryInfoProps) {
                         {directory.repoVisibility && (
                             <RepoVisibilityIcon
                                 isPrivate={directory.repoVisibility.directory}
-                                label="Main Repo"
+                                label={t('mainRepo')}
                             />
                         )}
                         <Link

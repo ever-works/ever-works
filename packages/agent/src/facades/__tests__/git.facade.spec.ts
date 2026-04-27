@@ -524,6 +524,65 @@ describe('GitFacadeService', () => {
             expect(result).toBeNull();
         });
 
+        it('should prefer plugin-integration account over sign-in account', async () => {
+            const gitPlugin = createMockGitPlugin('github', 'GitHub');
+            const registered = createRegisteredPlugin(gitPlugin, {
+                capabilities: [PLUGIN_CAPABILITIES.GIT_PROVIDER],
+            });
+            registry.get.mockReturnValue(registered);
+            registry.getByCapability.mockReturnValue([registered]);
+
+            authAccountRepository.findProviderAccount.mockImplementation(
+                async (_userId: string, providerId: string) => {
+                    if (providerId === 'plugin:github') {
+                        return createMockProviderAccount({
+                            accessToken: 'plugin-token',
+                            scope: 'repo,user',
+                        });
+                    }
+                    return createMockProviderAccount({
+                        accessToken: 'signin-token',
+                        scope: 'repo,user',
+                    });
+                },
+            );
+            authAccountRepository.isAccessTokenExpired.mockReturnValue(false);
+
+            const result = await service.getAccessToken({
+                providerId: 'github',
+                userId: 'user-123',
+            });
+
+            expect(result).toBe('plugin-token');
+        });
+
+        it('should fall back to sign-in account when plugin-integration account is missing', async () => {
+            const gitPlugin = createMockGitPlugin('github', 'GitHub');
+            const registered = createRegisteredPlugin(gitPlugin, {
+                capabilities: [PLUGIN_CAPABILITIES.GIT_PROVIDER],
+            });
+            registry.get.mockReturnValue(registered);
+            registry.getByCapability.mockReturnValue([registered]);
+
+            authAccountRepository.findProviderAccount.mockImplementation(
+                async (_userId: string, providerId: string) => {
+                    if (providerId === 'plugin:github') return null;
+                    return createMockProviderAccount({
+                        accessToken: 'signin-token',
+                        scope: 'repo,user',
+                    });
+                },
+            );
+            authAccountRepository.isAccessTokenExpired.mockReturnValue(false);
+
+            const result = await service.getAccessToken({
+                providerId: 'github',
+                userId: 'user-123',
+            });
+
+            expect(result).toBe('signin-token');
+        });
+
         it('should return null when provider account is missing required git scopes', async () => {
             const gitPlugin = createMockGitPlugin('github', 'GitHub');
             const registered = createRegisteredPlugin(gitPlugin, {
@@ -1351,9 +1410,11 @@ describe('GitFacadeService', () => {
             });
 
             expect(gitPlugin.getUser).toHaveBeenCalledWith('oauth-token');
+            // The facade prefers the plugin-integration account (broader scopes);
+            // the first lookup uses the `plugin:` namespaced provider id.
             expect(authAccountRepository.findProviderAccount).toHaveBeenCalledWith(
                 'user-123',
-                'github',
+                'plugin:github',
             );
         });
 

@@ -128,6 +128,30 @@ export class DirectoryGenerationHistoryRepository {
         return this.repository.findOne({ where: { id } });
     }
 
+    async findLatestInProgressByDirectory(
+        directoryId: string,
+    ): Promise<DirectoryGenerationHistory | null> {
+        return this.repository.findOne({
+            where: {
+                directoryId,
+                status: GenerateStatusType.GENERATING,
+            },
+            order: { startedAt: 'DESC', createdAt: 'DESC' },
+        });
+    }
+
+    async findLatestCompletedByDirectory(
+        directoryId: string,
+    ): Promise<DirectoryGenerationHistory | null> {
+        return this.repository
+            .createQueryBuilder('history')
+            .where('history.directoryId = :directoryId', { directoryId })
+            .andWhere('history.finishedAt IS NOT NULL')
+            .orderBy('history.finishedAt', 'DESC')
+            .addOrderBy('history.createdAt', 'DESC')
+            .getOne();
+    }
+
     async findLatestPositiveItemCounts(directoryIds: string[]): Promise<Map<string, number>> {
         const uniqueDirectoryIds = Array.from(new Set(directoryIds));
         if (uniqueDirectoryIds.length === 0) {
