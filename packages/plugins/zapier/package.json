@@ -1,0 +1,66 @@
+{
+	"name": "@ever-works/zapier-plugin",
+	"version": "1.0.0",
+	"description": "Zapier Automation Pipeline Plugin - Triggers Zapier actions during directory generation",
+	"private": true,
+	"type": "module",
+	"main": "./dist/index.cjs",
+	"module": "./dist/index.js",
+	"types": "./dist/index.d.ts",
+	"exports": {
+		".": {
+			"types": "./dist/index.d.ts",
+			"import": "./dist/index.js",
+			"require": "./dist/index.cjs"
+		}
+	},
+	"files": [
+		"dist"
+	],
+	"scripts": {
+		"build": "tsc --noEmit && tsup",
+		"dev": "tsup --watch",
+		"clean": "rm -rf dist",
+		"type-check": "tsc --noEmit",
+		"test": "vitest run",
+		"test:watch": "vitest",
+		"test:coverage": "vitest run --coverage"
+	},
+	"dependencies": {
+		"@zapier/zapier-sdk": "^0.41.0"
+	},
+	"peerDependencies": {
+		"@ever-works/plugin": "workspace:*"
+	},
+	"devDependencies": {
+		"@ever-works/plugin": "workspace:*",
+		"@types/node": "^22.0.0",
+		"@zapier/zapier-sdk-cli": "^0.39.9",
+		"tsup": "^8.0.0",
+		"typescript": "^5.9.3",
+		"vitest": "^3.2.1"
+	},
+	"everworks": {
+		"plugin": {
+			"id": "zapier",
+			"name": "Zapier Automation",
+			"version": "1.0.0",
+			"category": "pipeline",
+			"capabilities": [
+				"pipeline",
+				"form-schema-provider"
+			],
+			"description": "Pipeline plugin that triggers Zapier actions during directory generation",
+			"author": {
+				"name": "Ever Works Team"
+			},
+			"license": "MIT",
+			"builtIn": true,
+			"autoEnable": false,
+			"visibility": "public",
+			"selectableProviderCategories": [
+				"screenshot"
+			]
+		}
+	}
+}
