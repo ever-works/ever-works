@@ -13,7 +13,7 @@ import { TimestampColumn } from './_types';
 
 @Entity({ name: 'notifications' })
 @Index(['userId', 'isRead'])
-@Index(['userId', 'deduplicationKey'], { unique: true, where: '"deduplicationKey" IS NOT NULL' })
+@Index(['userId', 'deduplicationKey'], { unique: true })
 export class Notification {
     @PrimaryGeneratedColumn('uuid')
     id: string;

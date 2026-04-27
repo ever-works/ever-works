@@ -21,6 +21,7 @@ import { PipelineOrchestratorService } from '../../pipeline';
 import { buildDirectoryChangelog } from '../../utils/directory-changelog.utils';
 import { cloneFreshRepository } from '../../utils/fresh-repository-clone.utils';
 import { assertCreatedRepositoryTarget } from '../../utils/git-repository.utils';
+import { extractPipelineUsageMetrics } from '../../utils/metrics.util';
 import type {
     DirectoryReference,
     GenerationRequest,
@@ -1140,12 +1141,15 @@ export class DataGeneratorService {
             return undefined;
         }
 
+        const usageMetrics = extractPipelineUsageMetrics(result.metrics);
+
         return {
             urls_scanned: 0,
             pages_processed: 0,
             items_extracted_current_run: result.outputs.items.length,
             new_items_added_to_store: result.outputs.items.length,
             total_items_in_store: result.outputs.items.length,
+            ...usageMetrics,
         };
     }
 

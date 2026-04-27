@@ -23,6 +23,7 @@ export interface GitProviderConnectionInfo extends GitProviderInfo {
     username?: string;
     email?: string;
     avatarUrl?: string;
+    authMethod?: 'oauth' | 'personal-access-token';
 }
 
 export const gitProvidersAPI = {

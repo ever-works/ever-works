@@ -8,9 +8,6 @@ import { GET_DIRECTORY_LIST_LIMIT, ROUTES } from '@/lib/constants';
 import { Link, useRouter } from '@/i18n/navigation';
 import { useTranslations } from 'next-intl';
 import type { Directory } from '@/lib/api';
-import type { UserPlugin } from '@/lib/api/plugins';
-import type { OAuthConnectionInfo } from '@/lib/api/plugins-capabilities/oauth';
-import { EverWorksOnboardingWizard } from '@/components/onboarding/EverWorksOnboardingWizard';
 
 interface DashboardClientProps {
     user: AuthUser;
@@ -18,8 +15,6 @@ interface DashboardClientProps {
     totalDirectories: number;
     totalItems: number;
     activeWebsites: number;
-    onboardingPlugins: UserPlugin[];
-    oauthConnections: Record<string, OAuthConnectionInfo | null>;
 }
 
 export default function DashboardClient({
@@ -28,8 +23,6 @@ export default function DashboardClient({
     totalDirectories,
     totalItems,
     activeWebsites,
-    onboardingPlugins,
-    oauthConnections,
 }: DashboardClientProps) {
     const router = useRouter();
     const t = useTranslations('dashboard');
@@ -37,12 +30,6 @@ export default function DashboardClient({
 
     return (
         <div className="w-full">
-            <EverWorksOnboardingWizard
-                totalDirectories={totalDirectories}
-                plugins={onboardingPlugins}
-                oauthConnections={oauthConnections}
-            />
-
             <div className="mb-8">
                 <h1 className="text-3xl font-bold text-text dark:text-text-dark">
                     {t('header.welcome', { username: user.username })}

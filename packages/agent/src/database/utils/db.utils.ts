@@ -12,6 +12,17 @@ export function sanitizeLikePattern(search: string): string {
 }
 
 /**
+ * Builds a portable case-insensitive LIKE clause for PostgreSQL, MySQL, and SQLite.
+ * The explicit ESCAPE clause makes backslash escaping behave consistently.
+ */
+export function buildCaseInsensitiveLikeClause(
+    columnExpression: string,
+    paramName = 'search',
+): string {
+    return `LOWER(${columnExpression}) LIKE :${paramName} ESCAPE '\\'`;
+}
+
+/**
  * Prepares a search term for use in SQL LIKE queries.
  * Trims whitespace and escapes special characters.
  *
@@ -29,4 +40,16 @@ export function prepareLikeSearchTerm(search?: string): string | undefined {
     }
 
     return sanitizeLikePattern(trimmed);
+}
+
+/**
+ * Prepares a case-insensitive contains-search pattern for SQL LIKE queries.
+ */
+export function prepareCaseInsensitiveContainsPattern(search?: string): string | undefined {
+    const prepared = prepareLikeSearchTerm(search);
+    if (!prepared) {
+        return undefined;
+    }
+
+    return `%${prepared.toLowerCase()}%`;
 }

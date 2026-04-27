@@ -566,9 +566,15 @@ function FullLayout({
                                 onValueChange={(val) => updateHeaderSettings('layout_default', val)}
                                 size="sm"
                             >
-                                <option value="home1">Home 1</option>
-                                <option value="home2">Home 2</option>
-                                <option value="home3">Home 3</option>
+                                <option value="home1">
+                                    {tSettings('sections.header.layoutHome1')}
+                                </option>
+                                <option value="home2">
+                                    {tSettings('sections.header.layoutHome2')}
+                                </option>
+                                <option value="home3">
+                                    {tSettings('sections.header.layoutHome3')}
+                                </option>
                             </Select>
                         </div>
                         <div className="space-y-1.5">
@@ -850,9 +856,15 @@ function HeaderFields({
                             onValueChange={(val) => updateHeaderSettings('layout_default', val)}
                             size="sm"
                         >
-                            <option value="home1">Home 1</option>
-                            <option value="home2">Home 2</option>
-                            <option value="home3">Home 3</option>
+                            <option value="home1">
+                                {tSettings('sections.header.layoutHome1')}
+                            </option>
+                            <option value="home2">
+                                {tSettings('sections.header.layoutHome2')}
+                            </option>
+                            <option value="home3">
+                                {tSettings('sections.header.layoutHome3')}
+                            </option>
                         </Select>
                     </div>
                     <div className="space-y-1.5">

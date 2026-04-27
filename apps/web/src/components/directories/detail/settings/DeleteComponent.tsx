@@ -51,7 +51,7 @@ export function DeleteComponent({ directory }: { directory: Directory }) {
 
     const handleDelete = async () => {
         if (confirmationName !== directory.name) {
-            toast.error(t('deleteNameMismatch') || 'Directory name does not match');
+            toast.error(t('deleteNameMismatch'));
             return;
         }
 

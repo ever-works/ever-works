@@ -233,7 +233,7 @@ function GitProviderCard({
                 if (result.success && result.url) {
                     window.location.href = result.url;
                 } else {
-                    toast.error(result.error || 'Failed to connect');
+                    toast.error(result.error || t('connectError'));
                 }
             })();
         });
@@ -247,14 +247,14 @@ function GitProviderCard({
                 if (result.success && result.url) {
                     window.location.href = result.url;
                 } else {
-                    toast.error(result.error || 'Failed to reconnect');
+                    toast.error(result.error || t('reconnectError'));
                 }
             })();
         });
     };
 
     const handleDisconnect = () => {
-        if (!confirm(`Are you sure you want to disconnect ${provider.name}?`)) {
+        if (!confirm(t('confirmDisconnect', { provider: provider.name }))) {
             return;
         }
 
@@ -263,10 +263,10 @@ function GitProviderCard({
                 const result = await disconnectOAuthProvider(provider.id);
 
                 if (result.success) {
-                    toast.success(`${provider.name} disconnected`);
+                    toast.success(t('disconnected', { provider: provider.name }));
                     window.location.reload();
                 } else {
-                    toast.error(result.error || 'Failed to disconnect');
+                    toast.error(result.error || t('disconnectError'));
                 }
             })();
         });
