@@ -48,6 +48,17 @@ describe('parseZapierOutput — structured shape', () => {
 		expect(result.items[0].name).toBe('Async Item');
 	});
 
+	it('should unwrap a single Zapier result wrapper returned in an array', () => {
+		const result = parseZapierOutput(
+			[{ output: { items: [{ name: 'Wrapped Item' }] } }],
+			'structured',
+			EMPTY_MAPPING
+		);
+
+		expect(result.items).toHaveLength(1);
+		expect(result.items[0].name).toBe('Wrapped Item');
+	});
+
 	it('should unwrap nested `data` field', () => {
 		const result = parseZapierOutput({ data: { items: [{ name: 'Data Item' }] } }, 'structured', EMPTY_MAPPING);
 		expect(result.items).toHaveLength(1);

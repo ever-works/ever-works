@@ -33,6 +33,11 @@ interface ZapierClientOptions {
 	logger: { log(...args: unknown[]): void; warn(...args: unknown[]): void };
 }
 
+interface ExecuteActionOptions {
+	signal?: AbortSignal;
+	timeoutMs?: number;
+}
+
 /**
  * Thin wrapper around the Zapier SDK that adds abort-signal support
  * and user-friendly error messages.
@@ -67,9 +72,9 @@ export class ZapierClient {
 	async validateAction(ref: ZapierActionRef): Promise<ActionItem> {
 		try {
 			const response = await this.sdk.getAction({
-				appKey: ref.appKey,
+				app: ref.appKey,
 				actionType: ref.actionType,
-				actionKey: ref.actionKey
+				action: ref.actionKey
 			});
 			return response.data;
 		} catch (error) {
@@ -85,19 +90,21 @@ export class ZapierClient {
 	async executeAction(
 		ref: ZapierActionRef,
 		inputs: Record<string, unknown>,
-		signal?: AbortSignal
+		options?: ExecuteActionOptions
 	): Promise<ZapierExecutionResult> {
+		const signal = options?.signal;
 		if (signal?.aborted) throw new Error('Pipeline execution was cancelled');
 
 		const startTime = Date.now();
 		this.logger.log(`Running Zapier action "${ref.appKey}.${ref.actionType}.${ref.actionKey}"`);
 
 		const runPromise = this.sdk.runAction({
-			appKey: ref.appKey,
+			app: ref.appKey,
 			actionType: ref.actionType,
-			actionKey: ref.actionKey,
-			authenticationId: ref.authenticationId,
-			inputs
+			action: ref.actionKey,
+			connection: ref.authenticationId,
+			inputs,
+			...(options?.timeoutMs ? { timeoutMs: options.timeoutMs } : {})
 		});
 
 		let result: { data: unknown[]; nextCursor?: string };

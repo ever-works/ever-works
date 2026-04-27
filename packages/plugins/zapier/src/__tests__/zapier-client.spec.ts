@@ -137,9 +137,9 @@ describe('ZapierClient', () => {
 
 			await expect(client.validateAction(createRef())).resolves.toEqual({ key: 'custom' });
 			expect(mockGetAction).toHaveBeenCalledWith({
-				appKey: 'slack',
+				app: 'slack',
 				actionType: 'write',
-				actionKey: 'custom'
+				action: 'custom'
 			});
 		});
 
@@ -184,18 +184,19 @@ describe('ZapierClient', () => {
 			expect(result.zapierDuration).toBeGreaterThanOrEqual(0);
 		});
 
-		it('should pass appKey, actionType, actionKey, authenticationId, and inputs to runAction', async () => {
+		it('should pass app, actionType, action, connection, inputs, and timeoutMs to runAction', async () => {
 			mockRunAction.mockResolvedValue({ data: [] });
 			const client = createClient();
 
-			await client.executeAction(createRef(), { custom: 'input' });
+			await client.executeAction(createRef(), { custom: 'input' }, { timeoutMs: 120_000 });
 
 			expect(mockRunAction).toHaveBeenCalledWith({
-				appKey: 'slack',
+				app: 'slack',
 				actionType: 'write',
-				actionKey: 'custom',
-				authenticationId: 12345,
-				inputs: { custom: 'input' }
+				action: 'custom',
+				connection: 12345,
+				inputs: { custom: 'input' },
+				timeoutMs: 120_000
 			});
 		});
 
@@ -204,7 +205,9 @@ describe('ZapierClient', () => {
 			const controller = new AbortController();
 			controller.abort();
 
-			await expect(client.executeAction(createRef(), {}, controller.signal)).rejects.toThrow('cancelled');
+			await expect(client.executeAction(createRef(), {}, { signal: controller.signal })).rejects.toThrow(
+				'cancelled'
+			);
 			expect(mockRunAction).not.toHaveBeenCalled();
 		});
 
@@ -218,7 +221,7 @@ describe('ZapierClient', () => {
 			const client = createClient();
 			const controller = new AbortController();
 
-			const promise = client.executeAction(createRef(), {}, controller.signal);
+			const promise = client.executeAction(createRef(), {}, { signal: controller.signal });
 			controller.abort();
 
 			await expect(promise).rejects.toThrow('cancelled');

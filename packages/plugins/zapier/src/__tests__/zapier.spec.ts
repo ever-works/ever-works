@@ -376,10 +376,11 @@ describe('ZapierPlugin', () => {
 
 			expect(mockRunAction).toHaveBeenCalledWith(
 				expect.objectContaining({
-					appKey: 'slack',
+					app: 'slack',
 					actionType: 'write',
-					actionKey: 'custom',
-					authenticationId: 12345
+					action: 'custom',
+					connection: 12345,
+					timeoutMs: 600_000
 				})
 			);
 		});

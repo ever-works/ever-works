@@ -75,6 +75,14 @@ function normalizeStructured(raw: unknown): ZapierWorkflowOutput {
 	}
 
 	if (Array.isArray(raw)) {
+		if (raw.length === 1 && raw[0] && typeof raw[0] === 'object') {
+			const single = raw[0] as Record<string, unknown>;
+			for (const key of ['items', 'output', 'result', 'content', 'data', 'response', 'body', 'payload']) {
+				if (single[key] != null && single[key] !== '') {
+					return normalizeStructured(single);
+				}
+			}
+		}
 		return { items: raw as ZapierOutputItem[] };
 	}
 

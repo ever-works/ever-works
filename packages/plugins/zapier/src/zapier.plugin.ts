@@ -403,7 +403,7 @@ export class ZapierPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvid
 			const execResult: ZapierExecutionResult = await client.executeAction(
 				actionRef,
 				payload as unknown as Record<string, unknown>,
-				signal
+				{ signal, timeoutMs: zapierSettings.timeoutMs }
 			);
 
 			reportProgress(onProgress, 2, 70, 'Execute Zapier Action', 'Action completed.');
