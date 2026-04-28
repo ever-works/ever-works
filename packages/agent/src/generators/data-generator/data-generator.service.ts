@@ -32,7 +32,8 @@ import type {
 import type { DirectoryHistoryChangeEntry } from '@ever-works/contracts/api';
 import type { GenerationLogCollector } from './generation-log-collector';
 import { GENERATION_CANCELLED } from '@src/constants/messages';
-import { WorksConfigWriterService, type ResolvedWorksConfig } from '@src/works-config';
+import { WorksConfigWriterService } from '@src/works-config/services/works-config-writer.service';
+import type { ResolvedWorksConfig } from '@src/works-config/services/works-config.service';
 
 const PARALLEL_WRITE_CONCURRENCY = 10;
 
