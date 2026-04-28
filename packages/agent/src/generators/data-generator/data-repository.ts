@@ -207,7 +207,6 @@ const createDefaultConfig = (overrides: Partial<IDataConfig> = {}): IDataConfig 
 export class DataRepository {
     private static readonly logger = new Logger(DataRepository.name);
     private static readonly CONFIG_FILENAMES = ['config.yml', 'config.yaml'] as const;
-    private static readonly WORKS_CONFIG_FILENAMES = ['works.yml', 'works.yaml'] as const;
     private config?: IDataConfig;
     private categories?: Category[];
 
@@ -261,10 +260,7 @@ export class DataRepository {
     private static async resolveConfigFallbackPaths(dir: string): Promise<string[]> {
         const fallbackPaths: string[] = [];
 
-        for (const filename of [
-            ...this.CONFIG_FILENAMES.slice(1),
-            ...this.WORKS_CONFIG_FILENAMES,
-        ]) {
+        for (const filename of this.CONFIG_FILENAMES.slice(1)) {
             const candidatePath = path.join(dir, filename);
 
             try {

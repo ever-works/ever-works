@@ -121,10 +121,9 @@ describe('SourceRepoAnalyzerService.analyzeRepository', () => {
                 isPrivate: false,
                 permissions: { push: true },
             }),
-            getDirectoryContents: jest.fn().mockResolvedValue([
-                { name: 'works_config', type: 'dir', path: 'works_config' },
-                { name: 'README.md', type: 'file', path: 'README.md' },
-            ]),
+            getDirectoryContents: jest
+                .fn()
+                .mockResolvedValue([{ name: 'works_config', type: 'dir', path: 'works_config' }]),
         };
 
         const worksConfigService = {
@@ -145,6 +144,55 @@ describe('SourceRepoAnalyzerService.analyzeRepository', () => {
         expect(result.structure).toMatchObject({
             hasDataFolder: false,
             hasWorksConfig: true,
+        });
+    });
+
+    it('classifies awesome README repos with works.yml as awesome_readme', async () => {
+        const gitFacade = {
+            isConfigured: jest.fn().mockReturnValue(true),
+            getRepository: jest.fn().mockResolvedValue({
+                isPrivate: false,
+                permissions: { push: true },
+            }),
+            getDirectoryContents: jest.fn().mockResolvedValue([
+                { name: 'works.yml', type: 'file', path: 'works.yml' },
+                { name: 'README.md', type: 'file', path: 'README.md' },
+            ]),
+            getFileContent: jest.fn().mockResolvedValue({
+                content: [
+                    '# Awesome Testing',
+                    '- [Tool 1](https://example.com/1)',
+                    '- [Tool 2](https://example.com/2)',
+                    '- [Tool 3](https://example.com/3)',
+                    '- [Tool 4](https://example.com/4)',
+                    '- [Tool 5](https://example.com/5)',
+                ].join('\n'),
+            }),
+        };
+
+        const worksConfigService = {
+            loadFromRepository: jest.fn().mockResolvedValue({
+                initialPrompt: 'Use this config',
+                raw: {},
+            }),
+        };
+
+        const service = new SourceRepoAnalyzerService(gitFacade as any, worksConfigService as any);
+
+        const result = await service.analyzeRepository(
+            'https://github.com/ever-works/awesome-testing',
+            'token',
+        );
+
+        expect(result.detectedType).toBe('awesome_readme');
+        expect(result.worksConfig).toMatchObject({
+            initialPrompt: 'Use this config',
+        });
+        expect(result.structure).toMatchObject({
+            hasDataFolder: false,
+            hasWorksConfig: true,
+            hasReadme: true,
+            itemCount: 5,
         });
     });
 });

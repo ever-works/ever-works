@@ -47,6 +47,7 @@ export interface ImportFromAwesomeReadmeOptions {
     sourceUrl: string;
     expansionFactor?: number;
     providers?: ProvidersDto;
+    worksConfig?: ResolvedWorksConfig | null;
     updateWithPullRequest?: boolean;
 }
 
@@ -195,6 +196,7 @@ export class ImportExecutorService {
             sourceUrl,
             expansionFactor,
             providers,
+            worksConfig,
             updateWithPullRequest = false,
         } = options;
 
@@ -203,7 +205,11 @@ export class ImportExecutorService {
                 directory,
                 sourceUrl,
                 expansionFactor,
-                providers,
+                providers: {
+                    ...(worksConfig?.providers ?? {}),
+                    ...(providers ?? {}),
+                },
+                model: worksConfig?.model,
                 updateWithPullRequest,
             });
 
@@ -398,6 +404,7 @@ export class ImportExecutorService {
                     sourceUrl: opts.sourceUrl,
                     expansionFactor: opts.expansionFactor,
                     providers: opts.providers,
+                    worksConfig: opts.worksConfig,
                 });
             case 'link_existing': {
                 if (!token) {

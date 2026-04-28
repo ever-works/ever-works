@@ -75,7 +75,7 @@ describe('DataRepository', () => {
         await fs.rm(repoDir, { recursive: true, force: true });
     });
 
-    it('falls back to works.yml when config.yml is missing', async () => {
+    it('does not treat works.yml as data config when config.yml is missing', async () => {
         const repoDir = await fs.mkdtemp(path.join(os.tmpdir(), 'data-repository-spec-'));
 
         await fs.mkdir(path.join(repoDir, 'data'), { recursive: true });
@@ -88,7 +88,7 @@ describe('DataRepository', () => {
 
         const repository = await DataRepository.create(repoDir);
 
-        await expect(repository.getConfig()).resolves.toMatchObject({
+        await expect(repository.getConfig()).resolves.not.toMatchObject({
             name: 'Compare Cloud Pricing',
         });
 

@@ -264,7 +264,8 @@ export class DirectoryImportService {
             if (
                 shouldRestoreWorksConfig &&
                 (dto.sourceType === ImportSourceTypeEnum.WORKS_CONFIG ||
-                    dto.sourceType === ImportSourceTypeEnum.DATA_REPO)
+                    dto.sourceType === ImportSourceTypeEnum.DATA_REPO ||
+                    dto.sourceType === ImportSourceTypeEnum.AWESOME_README)
             ) {
                 const token = await this.getProviderToken(user, dto.gitProvider);
                 worksConfig = await this.worksConfigService.loadFromRepository(
@@ -350,6 +351,7 @@ export class DirectoryImportService {
                     repo: parsed.repo,
                     type: dto.sourceType as ImportSourceType,
                     importedAt: new Date(),
+                    worksConfig: this.worksConfigRestoreService.toSnapshot(worksConfig),
                 };
             } else if (dto.sourceType === ImportSourceTypeEnum.DATA_REPO) {
                 updateData.sourceRepository = this.worksConfigRestoreService.buildSourceRepository({

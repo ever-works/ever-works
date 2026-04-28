@@ -368,10 +368,6 @@ export class SourceRepoAnalyzerService {
             return { type: 'data_repo', structure, worksConfig };
         }
 
-        if (hasWorksConfig) {
-            return { type: 'works_config', structure, worksConfig };
-        }
-
         if (hasReadme) {
             try {
                 const readmeContent = await this.getFileContentInternal(
@@ -428,11 +424,15 @@ export class SourceRepoAnalyzerService {
                             : undefined;
                     }
 
-                    return { type: 'awesome_readme', structure };
+                    return { type: 'awesome_readme', structure, worksConfig };
                 }
             } catch (err) {
                 this.logger.warn(`Failed to analyze README: ${owner}/${repo}`, err);
             }
+        }
+
+        if (hasWorksConfig) {
+            return { type: 'works_config', structure, worksConfig };
         }
 
         return { type: null, structure };
