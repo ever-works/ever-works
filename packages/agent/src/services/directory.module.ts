@@ -20,7 +20,11 @@ import { DirectoryImportService } from './directory-import.service';
 import { DirectoryAdvancedPromptsService } from './directory-advanced-prompts.service';
 import { DirectoryTaxonomyService } from './directory-taxonomy.service';
 import { GeneratorFormSchemaService } from './generator-form-schema.service';
-import { WorksConfigRestoreService } from './works-config-restore.service';
+import {
+    WorksConfigImportApplierService,
+    WorksConfigImportPlannerService,
+    WorksConfigRestoreService,
+} from '@src/works-config';
 import { ItemHealthService } from './item-health.service';
 import { ItemSourceValidationSchedulerService } from './item-source-validation-scheduler.service';
 import { PluginOperationsService } from '../plugins/services/plugin-operations.service';
@@ -65,6 +69,8 @@ import { NotificationsModule } from '@src/notifications';
         ItemSourceValidationSchedulerService,
         RepositoryManagementService,
         GeneratorFormSchemaService,
+        WorksConfigImportPlannerService,
+        WorksConfigImportApplierService,
         WorksConfigRestoreService,
         PluginOperationsService,
         SettingsSchemaValidatorService,
@@ -85,6 +91,8 @@ import { NotificationsModule } from '@src/notifications';
         ItemSourceValidationSchedulerService,
         RepositoryManagementService,
         GeneratorFormSchemaService,
+        WorksConfigImportPlannerService,
+        WorksConfigImportApplierService,
         WorksConfigRestoreService,
         CommunityPrModule,
         ComparisonGeneratorModule,

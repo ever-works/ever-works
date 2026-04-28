@@ -6,7 +6,7 @@ import {
     AnalyzeForLinkingResponseDto,
     RelatedRepoStatus,
 } from '@src/dto/import-directory.dto';
-import { WorksConfigService } from './works-config.service';
+import { WorksConfigService } from '@src/works-config/services/works-config.service';
 
 interface ParsedRepoUrl {
     owner: string;

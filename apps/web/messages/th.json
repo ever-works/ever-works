@@ -1664,6 +1664,9 @@
                 "selectOption": "เลือกตัวเลือก",
                 "directoryName": "ชื่อไดเรกทอรี",
                 "generationPrompt": "พรอมต์การสร้าง",
+                "modelOverride": "แทนที่โมเดล AI",
+                "modelOverridePlaceholder": "เช่น openai/gpt-4.1 หรือ openrouter/openai/gpt-4.1",
+                "modelOverrideHelperText": "ไม่บังคับ ใช้โมเดลที่นำเข้าหรือโมเดลก่อนหน้าเป็นค่าเริ่มต้น เว้นแต่จะแทนที่ที่นี่",
                 "recommended": "แนะนำ",
                 "promptPlaceholder": "อธิบายว่ารายการใดที่ควรสร้างสำหรับไดเรกทอรีนี้...",
                 "promptHelperText": "ระบุรายละเอียดเกี่ยวกับประเภทเนื้อหาที่ต้องการสร้าง",
@@ -1805,6 +1808,28 @@
                 "syncDescription": "ดึงการอัปเดตจากคลังต้นทางโดยอัตโนมัติ",
                 "syncUpdateFailed": "ไม่สามารถอัปเดตการตั้งค่าการซิงค์ได้",
                 "syncDisabled": "ปิดการซิงค์",
+                "worksConfig": {
+                    "imported": "นำเข้าจาก works.yml",
+                    "applied": "นำไปใช้: {value}",
+                    "enabled": "เปิดใช้งาน",
+                    "disabled": "ปิดใช้งาน",
+                    "fields": {
+                        "sourceType": "ประเภทแหล่งที่มา",
+                        "configName": "ชื่อการตั้งค่า",
+                        "initialPrompt": "พรอมต์เริ่มต้น",
+                        "model": "โมเดล",
+                        "schedule": "กำหนดการ",
+                        "providers": "ผู้ให้บริการ",
+                        "websiteRepo": "คลังเว็บไซต์",
+                        "additionalAgents": "ตัวแทนเพิ่มเติม"
+                    },
+                    "sourceTypes": {
+                        "dataRepo": "คลังข้อมูล",
+                        "awesomeReadme": "Awesome README",
+                        "linkExisting": "เชื่อมโยงคลังที่มีอยู่",
+                        "worksConfig": "works.yml"
+                    }
+                },
                 "generalSettings": "การตั้งค่าทั่วไป",
                 "generalTitle": "การตั้งค่าทั่วไป",
                 "directoryName": "ชื่อไดเรกทอรี",
@@ -2348,15 +2373,19 @@
                 },
                 "detectedType": {
                     "dataRepo": "ตรวจพบ Data Repository",
-                    "awesomeReadme": "ตรวจพบ Awesome List"
+                    "awesomeReadme": "ตรวจพบ Awesome List",
+                    "worksConfig": "คลังการตั้งค่า Works"
                 },
                 "badges": {
                     "dataRepo": "Data Repo",
-                    "awesomeReadme": "Awesome List"
+                    "awesomeReadme": "Awesome List",
+                    "worksConfig": "works.yml"
                 },
                 "preview": {
                     "items": "ไอเท็ม",
-                    "categories": "หมวดหมู่"
+                    "categories": "หมวดหมู่",
+                    "schedule": "กำหนดการ: {cadence}",
+                    "providers": "ผู้ให้บริการ: {providers}"
                 },
                 "nameLabel": "ชื่อไดเรกทอรี",
                 "namePlaceholder": "เช่น My Awesome Directory",
@@ -2453,6 +2482,7 @@
                     "linkRepos": "ลิงก์ repository"
                 },
                 "detectionFailed": "เราไม่สามารถตรวจจับรูปแบบโดยอัตโนมัติได้ กรุณาเลือกวิธีนำเข้าของ repository นี้",
+                "detectionFailedMissingConfig": "ไม่พบการตั้งค่าที่รองรับ เพิ่ม config.yml, works.yml หรือ works_config/works.yml ลงในคลัง หรือเลือกการนำเข้าด้วยตนเองด้านล่าง",
                 "errors": {
                     "urlRequired": "กรุณาป้อน URL GitHub repository",
                     "unsupportedFormat": "รูปแบบ repository นี้ไม่รองรับ กรุณาใช้รูปแบบ Data Repository หรือ Awesome List",

@@ -1,5 +1,5 @@
 import { DirectoryScheduleCadence } from '@ever-works/contracts/api';
-import { WorksConfigService } from '../works-config.service';
+import { WorksConfigService } from '../services/works-config.service';
 
 describe('WorksConfigService', () => {
     const service = new WorksConfigService({} as any);

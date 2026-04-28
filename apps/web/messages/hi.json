@@ -1664,6 +1664,9 @@
                 "selectOption": "एक विकल्प चुनें",
                 "directoryName": "निर्देशिका का नाम",
                 "generationPrompt": "उत्पादन प्रॉम्प्ट",
+                "modelOverride": "एआई मॉडल ओवरराइड",
+                "modelOverridePlaceholder": "जैसे openai/gpt-4.1 या openrouter/openai/gpt-4.1",
+                "modelOverrideHelperText": "वैकल्पिक। डिफ़ॉल्ट रूप से आयातित या पिछला मॉडल उपयोग किया जाता है जब तक कि आप इसे यहाँ ओवरराइड न करें।",
                 "recommended": "अनुशंसित",
                 "promptPlaceholder": "वर्णन करें कि इस निर्देशिका के लिए कौन से आइटम उत्पन्न करने चाहिए...",
                 "promptHelperText": "उत्पन्न करने वाले कंटेंट के प्रकार के बारे में विशिष्ट रहें",
@@ -1805,6 +1808,28 @@
                 "syncDescription": "स्रोत रिपॉजिटरी से अपडेट स्वचालित रूप से खींचें।",
                 "syncUpdateFailed": "सिंक सेटिंग्स अपडेट करने में विफल",
                 "syncDisabled": "सिंक अक्षम",
+                "worksConfig": {
+                    "imported": "works.yml से आयातित",
+                    "applied": "लागू: {value}",
+                    "enabled": "सक्षम",
+                    "disabled": "अक्षम",
+                    "fields": {
+                        "sourceType": "स्रोत प्रकार",
+                        "configName": "कॉन्फ़िग नाम",
+                        "initialPrompt": "प्रारंभिक प्रॉम्प्ट",
+                        "model": "मॉडल",
+                        "schedule": "अनुसूची",
+                        "providers": "प्रदाता",
+                        "websiteRepo": "वेबसाइट रिपॉजिटरी",
+                        "additionalAgents": "अतिरिक्त एजेंट"
+                    },
+                    "sourceTypes": {
+                        "dataRepo": "डेटा रिपॉजिटरी",
+                        "awesomeReadme": "शानदार README",
+                        "linkExisting": "लिंक की गई मौजूदा रिपॉजिटरीज़",
+                        "worksConfig": "works.yml"
+                    }
+                },
                 "generalSettings": "सामान्य सेटिंग्स",
                 "generalTitle": "सामान्य सेटिंग्स",
                 "directoryName": "डायरेक्टरी का नाम",
@@ -2348,15 +2373,19 @@
                 },
                 "detectedType": {
                     "dataRepo": "डेटा रिपॉजिटरी का पता चला",
-                    "awesomeReadme": "अद्भुत सूची का पता चला"
+                    "awesomeReadme": "अद्भुत सूची का पता चला",
+                    "worksConfig": "वर्क्स कॉन्फ़िग रिपॉजिटरी"
                 },
                 "badges": {
                     "dataRepo": "डेटा रिपो",
-                    "awesomeReadme": "अद्भुत सूची"
+                    "awesomeReadme": "अद्भुत सूची",
+                    "worksConfig": "works.yml"
                 },
                 "preview": {
                     "items": "आइटम",
-                    "categories": "श्रेणियाँ"
+                    "categories": "श्रेणियाँ",
+                    "schedule": "अनुसूची: {cadence}",
+                    "providers": "प्रदाता: {providers}"
                 },
                 "nameLabel": "निर्देशिका का नाम",
                 "namePlaceholder": "उदाहरण: मेरी अद्भुत निर्देशिका",
@@ -2453,6 +2482,7 @@
                     "linkRepos": "रिपॉजिटरीज़ लिंक करें"
                 },
                 "detectionFailed": "हम प्रारूप का स्वचालित रूप से पता नहीं लगा सके। कृपया बताएँ कि इस रिपॉजिटरी को कैसे आयात करें।",
+                "detectionFailedMissingConfig": "कोई समर्थित कॉन्फ़िग़ नहीं मिला। रिपॉजिटरी में config.yml, works.yml, या works_config/works.yml जोड़ें, या नीचे मैनुअल आयात प्रारूप चुनें।",
                 "errors": {
                     "urlRequired": "कृपया GitHub रिपॉजिटरी URL दर्ज करें",
                     "unsupportedFormat": "यह रिपॉजिटरी प्रारूप समर्थित नहीं है। कृपया डेटा रिपॉजिटरी या अद्भुत सूची प्रारूप उपयोग करें।",

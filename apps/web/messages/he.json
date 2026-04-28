@@ -1664,6 +1664,9 @@
                 "selectOption": "בחר אפשרות",
                 "directoryName": "שם תיקייה",
                 "generationPrompt": "הנחיית יצירה",
+                "modelOverride": "עקיפת מודל AI",
+                "modelOverridePlaceholder": "לדוגמה openai/gpt-4.1 או openrouter/openai/gpt-4.1",
+                "modelOverrideHelperText": "אופציונלי. משתמש במודל המיובא או הקודם כברירת מחדל אלא אם תעקוף אותו כאן.",
                 "recommended": "מומלץ",
                 "promptPlaceholder": "תאר אילו פריטים יש לייצר עבור תיקייה זו...",
                 "promptHelperText": "היה ספציפי לגבי סוג התוכן שברצונך לייצר",
@@ -1805,6 +1808,28 @@
                 "syncDescription": "משיכת עדכונים אוטומטית ממאגר המקור.",
                 "syncUpdateFailed": "נכשל בעדכון הגדרות הסנכרון",
                 "syncDisabled": "סנכרון מושבת",
+                "worksConfig": {
+                    "imported": "מיובא מ-works.yml",
+                    "applied": "מיושם: {value}",
+                    "enabled": "מופעל",
+                    "disabled": "לא פעיל",
+                    "fields": {
+                        "sourceType": "סוג מקור",
+                        "configName": "שם התצורה",
+                        "initialPrompt": "הנחיה ראשונית",
+                        "model": "מודל",
+                        "schedule": "תזמון",
+                        "providers": "ספקים",
+                        "websiteRepo": "מאגר אתר",
+                        "additionalAgents": "סוכנים נוספים"
+                    },
+                    "sourceTypes": {
+                        "dataRepo": "מאגר נתונים",
+                        "awesomeReadme": "README מדהים",
+                        "linkExisting": "מאגרים קיימים מקושרים",
+                        "worksConfig": "works.yml"
+                    }
+                },
                 "generalSettings": "הגדרות כלליות",
                 "generalTitle": "הגדרות כלליות",
                 "directoryName": "שם ספרייה",
@@ -2348,15 +2373,19 @@
                 },
                 "detectedType": {
                     "dataRepo": "מאגר נתונים זוהה",
-                    "awesomeReadme": "רשימת Awesome זוהתה"
+                    "awesomeReadme": "רשימת Awesome זוהתה",
+                    "worksConfig": "מאגר תצורת works"
                 },
                 "badges": {
                     "dataRepo": "מאגר נתונים",
-                    "awesomeReadme": "רשימת Awesome"
+                    "awesomeReadme": "רשימת Awesome",
+                    "worksConfig": "works.yml"
                 },
                 "preview": {
                     "items": "פריטים",
-                    "categories": "קטגוריות"
+                    "categories": "קטגוריות",
+                    "schedule": "תזמון: {cadence}",
+                    "providers": "ספקים: {providers}"
                 },
                 "nameLabel": "שם ספרייה",
                 "namePlaceholder": "למשל, הספרייה המדהימה שלי",
@@ -2453,6 +2482,7 @@
                     "linkRepos": "קשר מאגרים"
                 },
                 "detectionFailed": "לא הצלחנו לזהות את הפורמט אוטומטית. נא בחר כיצד לייבא מאגר זה.",
+                "detectionFailedMissingConfig": "לא נמצאה תצורה נתמכת. הוסף config.yml, works.yml או works_config/works.yml למאגר, או בחר בפורמט ייבוא ידני למטה.",
                 "errors": {
                     "urlRequired": "נא הזן URL מאגר GitHub",
                     "unsupportedFormat": "פורמט מאגר זה לא נתמך. נא השתמש בפורמט מאגר נתונים או רשימת Awesome.",

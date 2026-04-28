@@ -9,13 +9,7 @@ import { ExternalLink, Loader2 } from 'lucide-react';
 import { updateDirectorySchedule } from '@/app/actions/dashboard/directories';
 import { useRouter } from '@/i18n/navigation';
 import { toast } from 'sonner';
-
-const SOURCE_TYPE_LABELS: Record<string, string> = {
-    data_repo: 'Data Repository',
-    awesome_readme: 'Awesome README',
-    link_existing: 'Linked Existing Repositories',
-    works_config: 'works.yml',
-};
+import { formatWorksConfigProviders } from '../../shared/works-config';
 
 export function SourceSettings() {
     const t = useTranslations('dashboard.directoryDetail.settings');
@@ -30,8 +24,7 @@ export function SourceSettings() {
 
     const sourceRepository = directory.sourceRepository;
     const worksConfig = sourceRepository.worksConfig;
-    const sourceTypeLabel =
-        SOURCE_TYPE_LABELS[sourceRepository.type] || sourceRepository.type.replace(/_/g, ' ');
+    const sourceTypeLabel = getSourceTypeLabel(sourceRepository.type, t);
     const fallbackOwner = directory.owner || sourceRepository.owner;
     const websiteTarget =
         sourceRepository.relatedRepositories?.website?.owner &&
@@ -42,63 +35,60 @@ export function SourceSettings() {
         ? `${sourceRepository.relatedRepositories.website.owner || fallbackOwner}/${sourceRepository.relatedRepositories.website.repo}`
         : `${fallbackOwner}/${directory.slug}-website`;
     const appliedSchedule = directory.scheduledUpdatesEnabled
-        ? directory.scheduledCadence || 'enabled'
-        : 'disabled';
-    const importedProviders =
-        worksConfig?.providers && Object.keys(worksConfig.providers).length > 0
-            ? Object.entries(worksConfig.providers)
-                  .map(([capability, provider]) => `${capability}: ${provider}`)
-                  .join(', ')
-            : null;
+        ? directory.scheduledCadence || t('worksConfig.enabled')
+        : t('worksConfig.disabled');
+    const importedProviders = formatWorksConfigProviders(worksConfig?.providers);
     const appliedProviderOverrides =
         directory.scheduledUpdatesEnabled && sourceRepository.type === 'works_config'
             ? importedProviders
             : null;
 
     const metadataRows = [
-        { label: 'Source Type', value: sourceTypeLabel },
-        worksConfig?.name ? { label: 'Config Name', value: worksConfig.name } : null,
+        { label: t('worksConfig.fields.sourceType'), value: sourceTypeLabel },
+        worksConfig?.name
+            ? { label: t('worksConfig.fields.configName'), value: worksConfig.name }
+            : null,
         worksConfig?.initialPrompt
             ? {
-                  label: 'Initial Prompt',
+                  label: t('worksConfig.fields.initialPrompt'),
                   value: worksConfig.initialPrompt,
                   multiline: true,
               }
             : null,
         worksConfig?.model
             ? {
-                  label: 'Model',
+                  label: t('worksConfig.fields.model'),
                   value: worksConfig.model,
-                  hint: 'Imported from works.yml',
+                  hint: t('worksConfig.imported'),
               }
             : null,
         worksConfig?.scheduleCadence
             ? {
-                  label: 'Schedule',
+                  label: t('worksConfig.fields.schedule'),
                   value: worksConfig.scheduleCadence,
-                  hint: `Applied: ${appliedSchedule}`,
+                  hint: t('worksConfig.applied', { value: appliedSchedule }),
               }
             : null,
         importedProviders
             ? {
-                  label: 'Providers',
+                  label: t('worksConfig.fields.providers'),
                   value: importedProviders,
                   hint: appliedProviderOverrides
-                      ? `Applied: ${appliedProviderOverrides}`
-                      : 'Imported from works.yml',
+                      ? t('worksConfig.applied', { value: appliedProviderOverrides })
+                      : t('worksConfig.imported'),
                   multiline: true,
               }
             : null,
         websiteTarget
             ? {
-                  label: 'Website Repo',
+                  label: t('worksConfig.fields.websiteRepo'),
                   value: websiteTarget,
-                  hint: `Applied: ${appliedWebsiteRepo}`,
+                  hint: t('worksConfig.applied', { value: appliedWebsiteRepo }),
               }
             : null,
         typeof worksConfig?.additionalAgentsCount === 'number'
             ? {
-                  label: 'Additional Agents',
+                  label: t('worksConfig.fields.additionalAgents'),
                   value: String(worksConfig.additionalAgentsCount),
               }
             : null,
@@ -206,4 +196,19 @@ export function SourceSettings() {
             </div>
         </div>
     );
+}
+
+function getSourceTypeLabel(sourceType: string, t: ReturnType<typeof useTranslations>): string {
+    switch (sourceType) {
+        case 'data_repo':
+            return t('worksConfig.sourceTypes.dataRepo');
+        case 'awesome_readme':
+            return t('worksConfig.sourceTypes.awesomeReadme');
+        case 'link_existing':
+            return t('worksConfig.sourceTypes.linkExisting');
+        case 'works_config':
+            return t('worksConfig.sourceTypes.worksConfig');
+        default:
+            return sourceType.replace(/_/g, ' ');
+    }
 }

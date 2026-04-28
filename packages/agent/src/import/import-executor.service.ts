@@ -16,7 +16,8 @@ import {
     WorksConfigService,
     type ParsedWorksConfig,
     type ResolvedWorksConfig,
-} from './works-config.service';
+} from '@src/works-config/services/works-config.service';
+import { mergeWorksConfigIntoDataConfig } from '@src/works-config/works-config-data';
 
 export interface ExecuteBySourceTypeOptions {
     directory: Directory;
@@ -99,7 +100,7 @@ export class ImportExecutorService {
             const categories = await sourceData.getCategories().catch(() => []);
             const tags = await sourceData.getTags().catch(() => []);
             const config = await sourceData.getConfig().catch(() => ({}));
-            const configWithWorksState = this.mergeWorksConfigIntoDataConfig(
+            const configWithWorksState = mergeWorksConfigIntoDataConfig(
                 config as Record<string, any>,
                 directory.name,
                 worksConfig,
@@ -422,38 +423,5 @@ export class ImportExecutorService {
             default:
                 throw new Error(`Unsupported source type: ${sourceType}`);
         }
-    }
-
-    private mergeWorksConfigIntoDataConfig(
-        config: Record<string, any>,
-        directoryName: string,
-        worksConfig?: ResolvedWorksConfig | null,
-    ): Record<string, any> {
-        if (!worksConfig) {
-            return config;
-        }
-
-        const metadata = {
-            ...(config.metadata || {}),
-        };
-
-        if (worksConfig.initialPrompt && !metadata.initial_prompt) {
-            metadata.initial_prompt = worksConfig.initialPrompt;
-        }
-
-        if (!metadata.last_request_data && worksConfig.initialPrompt) {
-            metadata.last_request_data = {
-                name: worksConfig.name || directoryName,
-                prompt: worksConfig.initialPrompt,
-                model: worksConfig.model,
-                providers: worksConfig.providers,
-                pluginConfig: {},
-            };
-        }
-
-        return {
-            ...config,
-            metadata,
-        };
     }
 }

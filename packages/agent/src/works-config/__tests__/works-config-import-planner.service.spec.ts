@@ -1,13 +1,9 @@
-jest.mock('../directory-schedule.service', () => ({
-    DirectoryScheduleService: class DirectoryScheduleService {},
-}));
-
 import { BadRequestException } from '@nestjs/common';
-import { WorksConfigRestoreService } from '../works-config-restore.service';
+import { WorksConfigImportPlannerService } from '../services/works-config-import-planner.service';
 
-describe('WorksConfigRestoreService', () => {
+describe('WorksConfigImportPlannerService', () => {
     const createService = () =>
-        new WorksConfigRestoreService(
+        new WorksConfigImportPlannerService(
             {
                 parseRepositoryReference: jest.fn((value?: string) => {
                     if (!value) return undefined;
@@ -15,8 +11,6 @@ describe('WorksConfigRestoreService', () => {
                     return repo ? { owner, repo } : { repo: owner };
                 }),
             } as any,
-            {} as any,
-            {} as any,
             {} as any,
         );
 

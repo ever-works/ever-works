@@ -22,7 +22,12 @@ import {
     LinkExistingConfirm,
     type ImportMode,
 } from './import';
-import type { AnalyzeForLinkingResponseDto, ImportEnrichmentConfig } from '@/lib/api/directory';
+import type {
+    AnalyzeForLinkingResponseDto,
+    AnalyzeRepositoryResponseDto,
+    ImportEnrichmentConfig,
+    ImportSourceType,
+} from '@/lib/api/directory';
 
 interface DirectoryImportFormProps {
     user: AuthUser;
@@ -32,42 +37,7 @@ interface DirectoryImportFormProps {
 
 type ImportStep = 'source' | 'analyzing' | 'choose_mode' | 'configure';
 type ImportPath = 'direct' | 'from_choose_mode';
-
-interface AnalysisResult {
-    sourceUrl: string;
-    owner: string;
-    repo: string;
-    detectedType: 'data_repo' | 'awesome_readme' | 'link_existing' | 'works_config' | null;
-    isPublic: boolean;
-    requiresAuth: boolean;
-    structure?: {
-        hasConfig: boolean;
-        hasDataFolder: boolean;
-        hasReadme: boolean;
-        hasWorksConfig?: boolean;
-        isMultiFile?: boolean;
-        itemCount?: number;
-        categoryCount?: number;
-    };
-    worksConfig?: {
-        name?: string;
-        initialPrompt?: string;
-        model?: string;
-        websiteRepo?: string;
-        scheduleCadence?: string | null;
-        providers?: Record<string, string>;
-        additionalAgentsCount?: number;
-    };
-    relatedDataRepo?: { name: string; owner: string };
-    baseSlug?: string;
-    slugConflict?: {
-        hasConflict: boolean;
-        conflictingRepos: string[];
-        suggestedSlug: string;
-    };
-    hasDataRepoWriteAccess?: boolean;
-    error?: string;
-}
+type ManualSourceType = Extract<ImportSourceType, 'data_repo' | 'awesome_readme'>;
 
 interface ImportProviderErrors {
     ai?: string;
@@ -107,12 +77,10 @@ export function DirectoryImportForm({ gitProvider, deployProvider }: DirectoryIm
     const [sourceUrl, setSourceUrl] = useState('');
     const [directoryName, setDirectoryName] = useState('');
     const [sync, setSync] = useState(false);
-    const [analysisResult, setAnalysisResult] = useState<AnalysisResult | null>(null);
+    const [analysisResult, setAnalysisResult] = useState<AnalyzeRepositoryResponseDto | null>(null);
     const [linkAnalysis, setLinkAnalysis] = useState<AnalyzeForLinkingResponseDto | null>(null);
     const [showLinkConfirm, setShowLinkConfirm] = useState(false);
-    const [manualSourceType, setManualSourceType] = useState<'data_repo' | 'awesome_readme' | null>(
-        null,
-    );
+    const [manualSourceType, setManualSourceType] = useState<ManualSourceType | null>(null);
     const [owner, setOwner] = useState('');
     const [organization, setOrganization] = useState(false);
     const [importPath, setImportPath] = useState<ImportPath>('direct');
@@ -138,7 +106,7 @@ export function DirectoryImportForm({ gitProvider, deployProvider }: DirectoryIm
             const result = await analyzeRepository(sourceUrl, gitProvider);
 
             if (result.success && result.data) {
-                setAnalysisResult(result.data as AnalysisResult);
+                setAnalysisResult(result.data);
 
                 if (result.data.error) {
                     toast.error(result.data.error);

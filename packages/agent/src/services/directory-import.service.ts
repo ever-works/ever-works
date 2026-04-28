@@ -20,7 +20,8 @@ import {
     WorksConfigService,
     type ParsedWorksConfig,
     type ResolvedWorksConfig,
-} from '@src/import/works-config.service';
+} from '@src/works-config/services/works-config.service';
+import { WorksConfigRestoreService } from '@src/works-config/services/works-config-restore.service';
 import {
     AnalyzeRepositoryDto,
     AnalyzeRepositoryResponseDto,
@@ -51,7 +52,6 @@ import { slugifyText } from '@src/utils/text.utils';
 import { GenerationMethod } from '@src/items-generator/dto';
 import { DirectoryGenerationHistory } from '@src/entities/directory-generation-history.entity';
 import { GeneratorFormSchemaService } from './generator-form-schema.service';
-import { WorksConfigRestoreService } from './works-config-restore.service';
 
 import { OperationTriggerContext, DEFAULT_TRIGGER_CONTEXT } from './types/trigger-context.types';
 

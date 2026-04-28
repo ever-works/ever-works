@@ -9,54 +9,27 @@ import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { OrganizationSelector } from '../OrganizationSelector';
 import { ProviderSelectionSection } from '../shared/ProviderSelectionSection';
+import { formatWorksConfigProviders } from '../shared/works-config';
 import { SlugConflictWarning } from './SlugConflictWarning';
 import { getGlobalFormSchema } from '@/app/actions/dashboard/generator-form';
 import { useProviderSelection } from '@/lib/hooks/use-provider-selection';
 import type { GeneratorFormSchema } from '@/lib/api/types-only';
-import type { ImportEnrichmentConfig } from '@/lib/api/directory';
+import type {
+    AnalyzeRepositoryResponseDto,
+    ImportEnrichmentConfig,
+    ImportSourceType,
+} from '@/lib/api/directory';
 import { Upload, CheckCircle2, FileText, Database, ArrowLeft, Sparkles } from 'lucide-react';
 
-type DetectedType = 'data_repo' | 'awesome_readme' | 'link_existing' | 'works_config' | null;
-
-interface AnalysisResult {
-    sourceUrl: string;
-    owner: string;
-    repo: string;
-    detectedType: DetectedType;
-    isPublic: boolean;
-    requiresAuth: boolean;
-    structure?: {
-        hasConfig: boolean;
-        hasDataFolder: boolean;
-        hasReadme: boolean;
-        hasWorksConfig?: boolean;
-        isMultiFile?: boolean;
-        itemCount?: number;
-        categoryCount?: number;
-    };
-    worksConfig?: {
-        name?: string;
-        initialPrompt?: string;
-        model?: string;
-        websiteRepo?: string;
-        scheduleCadence?: string | null;
-        providers?: Record<string, string>;
-        additionalAgentsCount?: number;
-    };
-    slugConflict?: {
-        hasConflict: boolean;
-        conflictingRepos: string[];
-        suggestedSlug: string;
-    };
-}
+type ManualSourceType = Extract<ImportSourceType, 'data_repo' | 'awesome_readme'>;
 
 interface ImportConfigureStepProps {
-    analysisResult: AnalysisResult | null;
+    analysisResult: AnalyzeRepositoryResponseDto | null;
     sourceUrl: string;
     directoryName: string;
     onDirectoryNameChange: (name: string) => void;
-    manualSourceType: 'data_repo' | 'awesome_readme' | null;
-    onManualSourceTypeChange: (type: 'data_repo' | 'awesome_readme' | null) => void;
+    manualSourceType: ManualSourceType | null;
+    onManualSourceTypeChange: (type: ManualSourceType | null) => void;
     sync: boolean;
     onSyncChange: (sync: boolean) => void;
     gitProvider?: string;
@@ -166,6 +139,32 @@ export function ImportConfigureStep({
     const seedCount = analysisResult?.structure?.itemCount ?? 0;
     const targetCount = Math.ceil(seedCount * expansionFactor);
     const newItemsTarget = targetCount - seedCount;
+    const worksConfigProviders = formatWorksConfigProviders(
+        analysisResult?.worksConfig?.providers,
+        '=',
+    );
+
+    const getDetectedTypeLabel = (sourceType: ImportSourceType) => {
+        switch (sourceType) {
+            case 'data_repo':
+                return t('detectedType.dataRepo');
+            case 'works_config':
+                return t('detectedType.worksConfig');
+            default:
+                return t('detectedType.awesomeReadme');
+        }
+    };
+
+    const getDetectedTypeBadge = (sourceType: ImportSourceType) => {
+        switch (sourceType) {
+            case 'data_repo':
+                return t('badges.dataRepo');
+            case 'works_config':
+                return t('badges.worksConfig');
+            default:
+                return t('badges.awesomeReadme');
+        }
+    };
 
     const handleImport = () => {
         if (isAwesomeReadme) {
@@ -206,11 +205,7 @@ export function ImportConfigureStep({
                         <div className="flex-1">
                             <div className="flex items-center gap-2 mb-1">
                                 <h4 className="font-medium text-text dark:text-text-dark">
-                                    {analysisResult.detectedType === 'data_repo'
-                                        ? t('detectedType.dataRepo')
-                                        : analysisResult.detectedType === 'works_config'
-                                          ? 'Works config repository'
-                                          : t('detectedType.awesomeReadme')}
+                                    {getDetectedTypeLabel(analysisResult.detectedType)}
                                 </h4>
                                 <span
                                     className={cn(
@@ -218,11 +213,7 @@ export function ImportConfigureStep({
                                         'bg-primary/10 text-primary',
                                     )}
                                 >
-                                    {analysisResult.detectedType === 'data_repo'
-                                        ? t('badges.dataRepo')
-                                        : analysisResult.detectedType === 'works_config'
-                                          ? 'works.yml'
-                                          : t('badges.awesomeReadme')}
+                                    {getDetectedTypeBadge(analysisResult.detectedType)}
                                 </span>
                             </div>
                             <p className="text-sm text-text-secondary dark:text-text-secondary-dark">
@@ -249,24 +240,18 @@ export function ImportConfigureStep({
                                     )}
                                     {analysisResult.worksConfig?.scheduleCadence && (
                                         <span>
-                                            Schedule: {analysisResult.worksConfig.scheduleCadence}
+                                            {t('preview.schedule', {
+                                                cadence: analysisResult.worksConfig.scheduleCadence,
+                                            })}
                                         </span>
                                     )}
-                                    {analysisResult.worksConfig?.providers &&
-                                        Object.keys(analysisResult.worksConfig.providers).length >
-                                            0 && (
-                                            <span>
-                                                Providers:{' '}
-                                                {Object.entries(
-                                                    analysisResult.worksConfig.providers,
-                                                )
-                                                    .map(
-                                                        ([capability, provider]) =>
-                                                            `${capability}=${provider}`,
-                                                    )
-                                                    .join(', ')}
-                                            </span>
-                                        )}
+                                    {worksConfigProviders && (
+                                        <span>
+                                            {t('preview.providers', {
+                                                providers: worksConfigProviders,
+                                            })}
+                                        </span>
+                                    )}
                                 </div>
                             )}
                         </div>

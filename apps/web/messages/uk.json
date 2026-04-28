@@ -1664,6 +1664,9 @@
                 "selectOption": "Виберіть опцію",
                 "directoryName": "Назва каталогу",
                 "generationPrompt": "Запит генерації",
+                "modelOverride": "Перевизначення моделі ШІ",
+                "modelOverridePlaceholder": "наприклад openai/gpt-4.1 або openrouter/openai/gpt-4.1",
+                "modelOverrideHelperText": "Необов’язково. За замовчуванням використовує імпортовану або попередню модель, доки ви не перевизначите її тут.",
                 "recommended": "Рекомендовано",
                 "promptPlaceholder": "Опишіть, які елементи потрібно згенерувати для цього каталогу...",
                 "promptHelperText": "Будьте конкретними щодо типу контенту, який ви хочете згенерувати",
@@ -1805,6 +1808,28 @@
                 "syncDescription": "Автоматично завантажувати оновлення з джерельного репозиторію.",
                 "syncUpdateFailed": "Не вдалося оновити налаштування синхронізації",
                 "syncDisabled": "Синхронізація вимкнена",
+                "worksConfig": {
+                    "imported": "Імпортовано з works.yml",
+                    "applied": "Застосовано: {value}",
+                    "enabled": "увімкнено",
+                    "disabled": "вимкнено",
+                    "fields": {
+                        "sourceType": "Тип джерела",
+                        "configName": "Назва конфігурації",
+                        "initialPrompt": "Початковий промпт",
+                        "model": "Модель",
+                        "schedule": "Розклад",
+                        "providers": "Постачальники",
+                        "websiteRepo": "Репозиторій вебсайту",
+                        "additionalAgents": "Додаткові агенти"
+                    },
+                    "sourceTypes": {
+                        "dataRepo": "Репозиторій даних",
+                        "awesomeReadme": "Чудовий README",
+                        "linkExisting": "Пов’язані наявні репозиторії",
+                        "worksConfig": "works.yml"
+                    }
+                },
                 "generalSettings": "Загальні налаштування",
                 "generalTitle": "Загальні налаштування",
                 "directoryName": "Назва каталогу",
@@ -2348,15 +2373,19 @@
                 },
                 "detectedType": {
                     "dataRepo": "Виявлено репозиторій даних",
-                    "awesomeReadme": "Виявлено Awesome-список"
+                    "awesomeReadme": "Виявлено Awesome-список",
+                    "worksConfig": "Репозиторій конфігурації works"
                 },
                 "badges": {
                     "dataRepo": "Репозиторій даних",
-                    "awesomeReadme": "Awesome-список"
+                    "awesomeReadme": "Awesome-список",
+                    "worksConfig": "works.yml"
                 },
                 "preview": {
                     "items": "елементів",
-                    "categories": "категорій"
+                    "categories": "категорій",
+                    "schedule": "Розклад: {cadence}",
+                    "providers": "Постачальники: {providers}"
                 },
                 "nameLabel": "Назва каталогу",
                 "namePlaceholder": "наприклад, My Awesome Directory",
@@ -2453,6 +2482,7 @@
                     "linkRepos": "Підключити репозиторії"
                 },
                 "detectionFailed": "Не вдалося автоматично виявити формат. Будь ласка, оберіть, як імпортувати цей репозиторій.",
+                "detectionFailedMissingConfig": "Не знайдено підтримуваної конфігурації. Додайте config.yml, works.yml або works_config/works.yml до репозиторію, або оберіть формат ручного імпорту нижче.",
                 "errors": {
                     "urlRequired": "Будь ласка, введіть URL репозиторію GitHub",
                     "unsupportedFormat": "Цей формат репозиторію не підтримується. Будь ласка, використовуйте формат Репозиторію даних або Awesome-списку.",

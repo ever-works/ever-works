@@ -1664,6 +1664,9 @@
                 "selectOption": "Pilih opsi",
                 "directoryName": "Nama Direktori",
                 "generationPrompt": "Prompt Generasi",
+                "modelOverride": "Penggantian Model AI",
+                "modelOverridePlaceholder": "misalnya openai/gpt-4.1 atau openrouter/openai/gpt-4.1",
+                "modelOverrideHelperText": "Opsional. Secara default menggunakan model yang diimpor atau model sebelumnya kecuali Anda menimpa di sini.",
                 "recommended": "Direkomendasikan",
                 "promptPlaceholder": "Jelaskan item apa yang harus dihasilkan untuk direktori ini...",
                 "promptHelperText": "Jadilah spesifik tentang jenis konten yang ingin Anda hasilkan",
@@ -1805,6 +1808,28 @@
                 "syncDescription": "Secara otomatis tarik pembaruan dari repositori sumber.",
                 "syncUpdateFailed": "Gagal memperbarui pengaturan sinkronisasi",
                 "syncDisabled": "Sinkronisasi Dinonaktifkan",
+                "worksConfig": {
+                    "imported": "Diimpor dari works.yml",
+                    "applied": "Diterapkan: {value}",
+                    "enabled": "diaktifkan",
+                    "disabled": "dinonaktifkan",
+                    "fields": {
+                        "sourceType": "Jenis Sumber",
+                        "configName": "Nama Konfigurasi",
+                        "initialPrompt": "Prompt Awal",
+                        "model": "Model",
+                        "schedule": "Jadwal",
+                        "providers": "Penyedia",
+                        "websiteRepo": "Repositori Situs Web",
+                        "additionalAgents": "Agen Tambahan"
+                    },
+                    "sourceTypes": {
+                        "dataRepo": "Repositori Data",
+                        "awesomeReadme": "README Hebat",
+                        "linkExisting": "Repositori Eksisting yang Ditautkan",
+                        "worksConfig": "works.yml"
+                    }
+                },
                 "generalSettings": "Pengaturan Umum",
                 "generalTitle": "Pengaturan Umum",
                 "directoryName": "Nama Direktori",
@@ -2348,15 +2373,19 @@
                 },
                 "detectedType": {
                     "dataRepo": "Repositori Data Terdeteksi",
-                    "awesomeReadme": "Daftar Hebat Terdeteksi"
+                    "awesomeReadme": "Daftar Hebat Terdeteksi",
+                    "worksConfig": "Repositori konfigurasi Works"
                 },
                 "badges": {
                     "dataRepo": "Repo Data",
-                    "awesomeReadme": "Daftar Hebat"
+                    "awesomeReadme": "Daftar Hebat",
+                    "worksConfig": "works.yml"
                 },
                 "preview": {
                     "items": "item",
-                    "categories": "kategori"
+                    "categories": "kategori",
+                    "schedule": "Jadwal: {cadence}",
+                    "providers": "Penyedia: {providers}"
                 },
                 "nameLabel": "Nama Direktori",
                 "namePlaceholder": "misalnya, Direktori Hebat Saya",
@@ -2453,6 +2482,7 @@
                     "linkRepos": "Hubungkan repositori"
                 },
                 "detectionFailed": "Kami tidak dapat mendeteksi format secara otomatis. Harap pilih cara mengimpor repositori ini.",
+                "detectionFailedMissingConfig": "Tidak ditemukan konfigurasi yang didukung. Tambahkan config.yml, works.yml, atau works_config/works.yml ke repositori, atau pilih format impor manual di bawah ini.",
                 "errors": {
                     "urlRequired": "Harap masukkan URL repositori GitHub",
                     "unsupportedFormat": "Format repositori ini tidak didukung. Harap gunakan format Repositori Data atau Daftar Hebat.",

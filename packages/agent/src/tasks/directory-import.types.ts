@@ -1,7 +1,7 @@
 import { ImportSourceType } from '@src/entities/directory.entity';
 import type { ImportEnrichmentConfigDto } from '@src/dto/import-directory.dto';
 import type { ProvidersDto } from '@ever-works/contracts/api';
-import type { ResolvedWorksConfig } from '@src/import/works-config.service';
+import type { ResolvedWorksConfig } from '@src/works-config/services/works-config.service';
 
 export type DirectoryImportPayload = {
     directoryId: string;

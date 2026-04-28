@@ -1664,6 +1664,9 @@
                 "selectOption": "Выберите вариант",
                 "directoryName": "Имя директории",
                 "generationPrompt": "Промпт генерации",
+                "modelOverride": "Переопределение модели ИИ",
+                "modelOverridePlaceholder": "например, openai/gpt-4.1 или openrouter/openai/gpt-4.1",
+                "modelOverrideHelperText": "Необязательно. По умолчанию используется импортированная или предыдущая модель, если вы не переопределите её здесь.",
                 "recommended": "Рекомендуется",
                 "promptPlaceholder": "Опишите, какие элементы должны быть сгенерированы для этой директории...",
                 "promptHelperText": "Будьте конкретны относительно типа контента, который хотите сгенерировать",
@@ -1805,6 +1808,28 @@
                 "syncDescription": "Автоматически загружать обновления из репозитория источника.",
                 "syncUpdateFailed": "Не удалось обновить настройки синхронизации",
                 "syncDisabled": "Синхронизация отключена",
+                "worksConfig": {
+                    "imported": "Импортировано из works.yml",
+                    "applied": "Применено: {value}",
+                    "enabled": "включено",
+                    "disabled": "выключено",
+                    "fields": {
+                        "sourceType": "Тип источника",
+                        "configName": "Имя конфигурации",
+                        "initialPrompt": "Начальный промпт",
+                        "model": "Модель",
+                        "schedule": "Расписание",
+                        "providers": "Провайдеры",
+                        "websiteRepo": "Репозиторий сайта",
+                        "additionalAgents": "Дополнительные агенты"
+                    },
+                    "sourceTypes": {
+                        "dataRepo": "Репозиторий данных",
+                        "awesomeReadme": "Awesome README",
+                        "linkExisting": "Связанные существующие репозитории",
+                        "worksConfig": "works.yml"
+                    }
+                },
                 "generalSettings": "Общие настройки",
                 "generalTitle": "Общие настройки",
                 "directoryName": "Имя каталога",
@@ -2348,15 +2373,19 @@
                 },
                 "detectedType": {
                     "dataRepo": "Обнаружен репозиторий данных",
-                    "awesomeReadme": "Обнаружен Awesome List"
+                    "awesomeReadme": "Обнаружен Awesome List",
+                    "worksConfig": "Репозиторий конфигурации works"
                 },
                 "badges": {
                     "dataRepo": "Репозиторий данных",
-                    "awesomeReadme": "Awesome List"
+                    "awesomeReadme": "Awesome List",
+                    "worksConfig": "works.yml"
                 },
                 "preview": {
                     "items": "элементов",
-                    "categories": "категорий"
+                    "categories": "категорий",
+                    "schedule": "Расписание: {cadence}",
+                    "providers": "Провайдеры: {providers}"
                 },
                 "nameLabel": "Название каталога",
                 "namePlaceholder": "e.g., My Awesome Directory",
@@ -2453,6 +2482,7 @@
                     "linkRepos": "Связать репозитории"
                 },
                 "detectionFailed": "Не удалось автоматически определить формат. Пожалуйста, выберите способ импорта этого репозитория.",
+                "detectionFailedMissingConfig": "Поддерживаемая конфигурация не найдена. Добавьте config.yml, works.yml или works_config/works.yml в репозиторий или выберите формат ручного импорта ниже.",
                 "errors": {
                     "urlRequired": "Пожалуйста, введите URL репозитория GitHub",
                     "unsupportedFormat": "Этот формат репозитория не поддерживается. Используйте формат репозитория данных или Awesome List.",

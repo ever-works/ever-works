@@ -1664,6 +1664,9 @@
                 "selectOption": "Bir seçenek seçin",
                 "directoryName": "Dizin Adı",
                 "generationPrompt": "Oluşturma İstemı",
+                "modelOverride": "AI Modeli Geçersiz Kılma",
+                "modelOverridePlaceholder": "ör. openai/gpt-4.1 veya openrouter/openai/gpt-4.1",
+                "modelOverrideHelperText": "İsteğe bağlı. Burada geçersiz kılmadığınız sürece varsayılan olarak içe aktarılan veya önceki modeli kullanır.",
                 "recommended": "Önerilen",
                 "promptPlaceholder": "Bu dizin için oluşturulacak öğeleri açıklayın...",
                 "promptHelperText": "Oluşturmak istediğiniz içerik türünü detaylı belirtin",
@@ -1805,6 +1808,28 @@
                 "syncDescription": "Kaynak depodan güncellemeleri otomatik olarak çekin.",
                 "syncUpdateFailed": "Senkronizasyon ayarları güncellenemedi",
                 "syncDisabled": "Senkronizasyon Devre Dışı",
+                "worksConfig": {
+                    "imported": "works.yml'den içe aktarıldı",
+                    "applied": "Uygulandı: {value}",
+                    "enabled": "etkin",
+                    "disabled": "devre dışı",
+                    "fields": {
+                        "sourceType": "Kaynak Türü",
+                        "configName": "Yapılandırma Adı",
+                        "initialPrompt": "İlk İstem",
+                        "model": "Model",
+                        "schedule": "Zamanlama",
+                        "providers": "Sağlayıcılar",
+                        "websiteRepo": "Web Sitesi Deposu",
+                        "additionalAgents": "Ek Ajanlar"
+                    },
+                    "sourceTypes": {
+                        "dataRepo": "Veri Deposu",
+                        "awesomeReadme": "Harika README",
+                        "linkExisting": "Bağlı Mevcut Depolar",
+                        "worksConfig": "works.yml"
+                    }
+                },
                 "generalSettings": "Genel Ayarlar",
                 "generalTitle": "Genel Ayarlar",
                 "directoryName": "Dizin Adı",
@@ -2348,15 +2373,19 @@
                 },
                 "detectedType": {
                     "dataRepo": "Veri Deposu Tespit Edildi",
-                    "awesomeReadme": "Harika Liste Tespit Edildi"
+                    "awesomeReadme": "Harika Liste Tespit Edildi",
+                    "worksConfig": "Works yapılandırma deposu"
                 },
                 "badges": {
                     "dataRepo": "Veri Deposu",
-                    "awesomeReadme": "Harika Liste"
+                    "awesomeReadme": "Harika Liste",
+                    "worksConfig": "works.yml"
                 },
                 "preview": {
                     "items": "öğe",
-                    "categories": "kategori"
+                    "categories": "kategori",
+                    "schedule": "Zamanlama: {cadence}",
+                    "providers": "Sağlayıcılar: {providers}"
                 },
                 "nameLabel": "Dizin Adı",
                 "namePlaceholder": "ör. Harika Dizinim",
@@ -2453,6 +2482,7 @@
                     "linkRepos": "Depoları bağla"
                 },
                 "detectionFailed": "Formatı otomatik tespit edemedik. Lütfen bu deposunu nasıl içe aktaracağınızı seçin.",
+                "detectionFailedMissingConfig": "Desteklenen bir yapılandırma bulunamadı. Depoya config.yml, works.yml veya works_config/works.yml ekleyin veya aşağıdan manuel içe aktarma biçimini seçin.",
                 "errors": {
                     "urlRequired": "Lütfen GitHub depo URL'si girin",
                     "unsupportedFormat": "Bu depo formatı desteklenmiyor. Lütfen Veri Deposu veya Harika Liste formatı kullanın.",
