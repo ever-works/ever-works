@@ -345,14 +345,14 @@ export class DirectoryImportService {
             };
 
             if (dto.sourceType === ImportSourceTypeEnum.AWESOME_README) {
-                updateData.sourceRepository = {
-                    url: dto.sourceUrl,
-                    owner: parsed.owner,
-                    repo: parsed.repo,
-                    type: dto.sourceType as ImportSourceType,
-                    importedAt: new Date(),
-                    worksConfig: this.worksConfigRestoreService.toSnapshot(worksConfig),
-                };
+                updateData.sourceRepository = this.worksConfigRestoreService.buildSourceRepository({
+                    sourceUrl: dto.sourceUrl,
+                    sourceOwner: parsed.owner,
+                    sourceRepo: parsed.repo,
+                    sourceType: dto.sourceType as ImportSourceType,
+                    sourceRole: null,
+                    worksConfig,
+                });
             } else if (dto.sourceType === ImportSourceTypeEnum.DATA_REPO) {
                 updateData.sourceRepository = this.worksConfigRestoreService.buildSourceRepository({
                     sourceUrl: dto.sourceUrl,

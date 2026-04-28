@@ -25,7 +25,7 @@ export type WorksConfigSourceRepositoryOptions = {
     sourceOwner: string;
     sourceRepo: string;
     sourceType: ImportSourceType;
-    sourceRole?: WorksConfigSourceRole;
+    sourceRole?: WorksConfigSourceRole | null;
     importedAt?: Date;
     previous?: SourceRepository | null;
     worksConfig?: ParsedWorksConfig | ResolvedWorksConfig | null;
@@ -125,7 +125,7 @@ export class WorksConfigImportPlannerService {
             sourceTarget,
             options.worksConfig?.websiteRepositoryTarget,
         );
-        const sourceRole = options.sourceRole ?? 'directory';
+        const sourceRole = options.sourceRole === undefined ? 'directory' : options.sourceRole;
 
         return {
             ...(options.previous || {
@@ -139,7 +139,7 @@ export class WorksConfigImportPlannerService {
             worksConfig: this.toSnapshot(options.worksConfig),
             relatedRepositories: {
                 ...(options.previous?.relatedRepositories || {}),
-                [sourceRole]: sourceTarget,
+                ...(sourceRole ? { [sourceRole]: sourceTarget } : {}),
                 ...(options.worksConfig?.websiteRepositoryTarget
                     ? {
                           website: options.worksConfig.websiteRepositoryTarget,

@@ -137,6 +137,7 @@ export class ImportExecutorService {
                             import_type: 'data_repo',
                         },
                     },
+                    worksConfig,
                     importRequest: {
                         sourceUrl: this.gitFacade.getWebUrl(
                             directory.gitProvider,

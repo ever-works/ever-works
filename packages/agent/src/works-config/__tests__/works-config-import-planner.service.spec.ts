@@ -63,4 +63,35 @@ describe('WorksConfigImportPlannerService', () => {
         });
         expect(sourceRepository.relatedRepositories?.directory).toBeUndefined();
     });
+
+    it('can snapshot works config metadata without assigning the source repo a directory role', () => {
+        const service = createService();
+
+        const sourceRepository = service.buildSourceRepository({
+            sourceUrl: 'https://github.com/awesome/awesome-testing',
+            sourceOwner: 'awesome',
+            sourceRepo: 'awesome-testing',
+            sourceType: 'awesome_readme',
+            sourceRole: null,
+            worksConfig: {
+                initialPrompt: 'Build from the README',
+                websiteRepo: 'ever-works/awesome-testing-site',
+                websiteRepositoryTarget: {
+                    owner: 'ever-works',
+                    repo: 'awesome-testing-site',
+                },
+            },
+        });
+
+        expect(sourceRepository.relatedRepositories).toEqual({
+            website: {
+                owner: 'ever-works',
+                repo: 'awesome-testing-site',
+            },
+        });
+        expect(sourceRepository.worksConfig).toMatchObject({
+            initialPrompt: 'Build from the README',
+            websiteRepo: 'ever-works/awesome-testing-site',
+        });
+    });
 });
