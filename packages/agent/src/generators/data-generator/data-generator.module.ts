@@ -4,10 +4,12 @@ import { FacadesModule } from '../../facades/facades.module';
 import { PipelineModule } from '../../pipeline/pipeline.module';
 import { DatabaseModule } from '@src/database';
 import { DirectoryOperationsModule } from '@src/directory-operations';
+import { WorksConfigService } from '@src/works-config/services/works-config.service';
+import { WorksConfigWriterService } from '@src/works-config/services/works-config-writer.service';
 
 @Module({
     imports: [FacadesModule, PipelineModule, DatabaseModule, DirectoryOperationsModule],
-    providers: [DataGeneratorService],
+    providers: [DataGeneratorService, WorksConfigService, WorksConfigWriterService],
     exports: [DataGeneratorService],
 })
 export class DataGeneratorModule {}

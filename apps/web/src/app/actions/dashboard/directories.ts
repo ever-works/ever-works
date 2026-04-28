@@ -23,6 +23,7 @@ import { ROUTES } from '@/lib/constants';
 import { redirect } from 'next/navigation';
 import { sanitizeName, sanitizeDescription, sanitizePrompt } from '@/lib/utils/sanitize';
 import { slugify } from '@ever-works/plugin';
+import { ApiResponseError } from '@/lib/api/server-api';
 
 const readmeConfigSchema = z.object({
     header: z.string().optional(),
@@ -559,10 +560,27 @@ interface ImportDirectoryRequest {
     owner?: string;
     createMissingRepos?: boolean;
     sync?: boolean;
+    restoreWorksConfig?: boolean;
     gitProvider?: string;
     deployProvider?: string;
     providers?: Record<string, string>;
     enrichmentConfig?: ImportEnrichmentConfig;
+}
+
+interface ImportDirectoryProviderErrors {
+    ai?: string;
+    search?: string;
+    contentExtractor?: string;
+    screenshot?: string;
+    pipeline?: string;
+}
+
+function isImportDirectoryProviderErrors(value: unknown): value is ImportDirectoryProviderErrors {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) {
+        return false;
+    }
+
+    return Object.values(value).every((entry) => typeof entry === 'string');
 }
 
 export async function importDirectory(data: ImportDirectoryRequest) {
@@ -570,7 +588,7 @@ export async function importDirectory(data: ImportDirectoryRequest) {
 
     const importSchema = z.object({
         sourceUrl: z.string().url(t('import.invalidUrl')),
-        sourceType: z.enum(['data_repo', 'awesome_readme', 'link_existing']),
+        sourceType: z.enum(['data_repo', 'awesome_readme', 'link_existing', 'works_config']),
         name: z
             .string()
             .min(1, t('name.required'))
@@ -580,6 +598,7 @@ export async function importDirectory(data: ImportDirectoryRequest) {
         owner: z.string().optional(),
         createMissingRepos: z.boolean().optional(),
         sync: z.boolean().optional(),
+        restoreWorksConfig: z.boolean().optional(),
         gitProvider: z.string().optional(),
         deployProvider: z.string().optional(),
         providers: z.record(z.string()).optional(),
@@ -631,6 +650,7 @@ export async function importDirectory(data: ImportDirectoryRequest) {
             owner: owner || undefined,
             createMissingRepos: validation.data.createMissingRepos,
             sync: validation.data.sync,
+            restoreWorksConfig: validation.data.restoreWorksConfig,
             gitProvider: providerId,
             deployProvider: validation.data.deployProvider,
             providers: validation.data.providers,
@@ -646,6 +666,22 @@ export async function importDirectory(data: ImportDirectoryRequest) {
         };
     } catch (error) {
         console.error('Failed to import directory:', error);
+
+        if (error instanceof ApiResponseError) {
+            const providerErrors = error.details?.providerErrors;
+            const resolvedPipelineId = error.details?.resolvedPipelineId;
+
+            return {
+                success: false,
+                error: error.message,
+                providerErrors: isImportDirectoryProviderErrors(providerErrors)
+                    ? providerErrors
+                    : undefined,
+                resolvedPipelineId:
+                    typeof resolvedPipelineId === 'string' ? resolvedPipelineId : undefined,
+            };
+        }
+
         return {
             success: false,
             error: error instanceof Error ? error.message : t('import.failed'),

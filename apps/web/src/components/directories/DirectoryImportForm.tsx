@@ -22,7 +22,12 @@ import {
     LinkExistingConfirm,
     type ImportMode,
 } from './import';
-import type { AnalyzeForLinkingResponseDto, ImportEnrichmentConfig } from '@/lib/api/directory';
+import type {
+    AnalyzeForLinkingResponseDto,
+    AnalyzeRepositoryResponseDto,
+    ImportEnrichmentConfig,
+    ImportSourceType,
+} from '@/lib/api/types-only';
 
 interface DirectoryImportFormProps {
     user: AuthUser;
@@ -32,31 +37,38 @@ interface DirectoryImportFormProps {
 
 type ImportStep = 'source' | 'analyzing' | 'choose_mode' | 'configure';
 type ImportPath = 'direct' | 'from_choose_mode';
+type ManualSourceType = Extract<ImportSourceType, 'data_repo' | 'awesome_readme'>;
 
-interface AnalysisResult {
-    sourceUrl: string;
-    owner: string;
-    repo: string;
-    detectedType: 'data_repo' | 'awesome_readme' | 'link_existing' | null;
-    isPublic: boolean;
-    requiresAuth: boolean;
-    structure?: {
-        hasConfig: boolean;
-        hasDataFolder: boolean;
-        hasReadme: boolean;
-        isMultiFile?: boolean;
-        itemCount?: number;
-        categoryCount?: number;
-    };
-    relatedDataRepo?: { name: string; owner: string };
-    baseSlug?: string;
-    slugConflict?: {
-        hasConflict: boolean;
-        conflictingRepos: string[];
-        suggestedSlug: string;
-    };
-    hasDataRepoWriteAccess?: boolean;
-    error?: string;
+interface ImportProviderErrors {
+    ai?: string;
+    search?: string;
+    contentExtractor?: string;
+    screenshot?: string;
+    pipeline?: string;
+}
+
+function formatProviderLabel(providerType: string): string {
+    if (providerType === 'contentExtractor') {
+        return 'Content extractor';
+    }
+
+    return providerType.charAt(0).toUpperCase() + providerType.slice(1);
+}
+
+function buildImportErrorMessage(
+    error?: string,
+    providerErrors?: ImportProviderErrors,
+): string | undefined {
+    const providerEntries = providerErrors ? Object.entries(providerErrors) : [];
+    if (providerEntries.length === 0) {
+        return error;
+    }
+
+    const providerMessage = providerEntries
+        .map(([providerType, message]) => `${formatProviderLabel(providerType)}: ${message}`)
+        .join('\n');
+
+    return error ? `${error}\n${providerMessage}` : providerMessage;
 }
 
 export function DirectoryImportForm({ gitProvider, deployProvider }: DirectoryImportFormProps) {
@@ -65,12 +77,11 @@ export function DirectoryImportForm({ gitProvider, deployProvider }: DirectoryIm
     const [sourceUrl, setSourceUrl] = useState('');
     const [directoryName, setDirectoryName] = useState('');
     const [sync, setSync] = useState(false);
-    const [analysisResult, setAnalysisResult] = useState<AnalysisResult | null>(null);
+    const [restoreWorksConfig, setRestoreWorksConfig] = useState(true);
+    const [analysisResult, setAnalysisResult] = useState<AnalyzeRepositoryResponseDto | null>(null);
     const [linkAnalysis, setLinkAnalysis] = useState<AnalyzeForLinkingResponseDto | null>(null);
     const [showLinkConfirm, setShowLinkConfirm] = useState(false);
-    const [manualSourceType, setManualSourceType] = useState<'data_repo' | 'awesome_readme' | null>(
-        null,
-    );
+    const [manualSourceType, setManualSourceType] = useState<ManualSourceType | null>(null);
     const [owner, setOwner] = useState('');
     const [organization, setOrganization] = useState(false);
     const [importPath, setImportPath] = useState<ImportPath>('direct');
@@ -96,14 +107,18 @@ export function DirectoryImportForm({ gitProvider, deployProvider }: DirectoryIm
             const result = await analyzeRepository(sourceUrl, gitProvider);
 
             if (result.success && result.data) {
-                setAnalysisResult(result.data as AnalysisResult);
+                setAnalysisResult(result.data);
+                setRestoreWorksConfig(true);
 
                 if (result.data.error) {
                     toast.error(result.data.error);
                     setStep('source');
                 } else {
                     if (result.data.repo) {
-                        let repoName = result.data.baseSlug || result.data.repo;
+                        let repoName =
+                            result.data.worksConfig?.name ||
+                            result.data.baseSlug ||
+                            result.data.repo;
                         if (repoName.endsWith('-data')) {
                             repoName = repoName.slice(0, -5);
                         } else if (repoName.endsWith('-website')) {
@@ -231,6 +246,7 @@ export function DirectoryImportForm({ gitProvider, deployProvider }: DirectoryIm
                 sourceType,
                 name: directoryName,
                 sync,
+                restoreWorksConfig: analysisResult.worksConfig ? restoreWorksConfig : undefined,
                 gitProvider,
                 deployProvider,
                 providers,
@@ -249,7 +265,10 @@ export function DirectoryImportForm({ gitProvider, deployProvider }: DirectoryIm
             } else if (result.requiresGitProvider) {
                 toast.error(result.error || 'Git provider connection required');
             } else {
-                toast.error(result.error || t('errors.importFailed'));
+                toast.error(
+                    buildImportErrorMessage(result.error, result.providerErrors) ||
+                        t('errors.importFailed'),
+                );
             }
         });
     };
@@ -342,6 +361,8 @@ export function DirectoryImportForm({ gitProvider, deployProvider }: DirectoryIm
                         onManualSourceTypeChange={setManualSourceType}
                         sync={sync}
                         onSyncChange={setSync}
+                        restoreWorksConfig={restoreWorksConfig}
+                        onRestoreWorksConfigChange={setRestoreWorksConfig}
                         gitProvider={gitProvider}
                         isPending={isPending}
                         owner={owner}

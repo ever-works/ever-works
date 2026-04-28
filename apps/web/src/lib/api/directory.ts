@@ -15,6 +15,7 @@ import {
     type SourceValidationSettingsDto,
     type UpdateSourceValidationPayload,
     type GenerationStepLog,
+    type ProvidersDto,
 } from '@ever-works/contracts/api';
 import { APIResponse, ItemData, Category, Tag, Collection } from './types';
 import { CreateItemsGeneratorDto, ItemsGeneratorResponse } from './items-generator';
@@ -118,6 +119,29 @@ export interface SourceRepository {
     repo: string;
     type: ImportSourceType;
     importedAt: string;
+    relatedRepositories?: RelatedRepositories;
+    worksConfig?: WorksConfigSnapshot;
+}
+
+export interface RepositoryTarget {
+    owner?: string;
+    repo: string;
+}
+
+export interface RelatedRepositories {
+    data?: RepositoryTarget;
+    directory?: RepositoryTarget;
+    website?: RepositoryTarget;
+}
+
+export interface WorksConfigSnapshot {
+    name?: string;
+    initialPrompt?: string;
+    model?: string;
+    websiteRepo?: string;
+    scheduleCadence?: DirectoryScheduleCadence | null;
+    providers?: Record<string, string>;
+    additionalAgentsCount?: number;
 }
 
 export interface RepoVisibility {
@@ -342,7 +366,7 @@ export interface SyncDirectoryResponse {
 }
 
 // Import types
-export type ImportSourceType = 'data_repo' | 'awesome_readme' | 'link_existing';
+export type ImportSourceType = 'data_repo' | 'awesome_readme' | 'link_existing' | 'works_config';
 
 export interface ImportEnrichmentConfig {
     expansionFactor?: number;
@@ -364,8 +388,18 @@ export interface AnalyzeRepositoryResponseDto {
         hasConfig: boolean;
         hasDataFolder: boolean;
         hasReadme: boolean;
+        hasWorksConfig?: boolean;
         itemCount?: number;
         categoryCount?: number;
+    };
+    worksConfig?: {
+        name?: string;
+        initialPrompt?: string;
+        model?: string;
+        websiteRepo?: string;
+        scheduleCadence?: string | null;
+        providers?: ProvidersDto;
+        additionalAgentsCount?: number;
     };
     relatedDataRepo?: { name: string; owner: string };
     baseSlug?: string;
@@ -386,6 +420,7 @@ export interface ImportDirectoryDto {
     organization?: boolean;
     createMissingRepos?: boolean;
     sync?: boolean;
+    restoreWorksConfig?: boolean;
     gitProvider: string;
     deployProvider?: string;
     providers?: Record<string, string>;

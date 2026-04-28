@@ -1664,6 +1664,9 @@
                 "selectOption": "Seleziona un'opzione",
                 "directoryName": "Nome Directory",
                 "generationPrompt": "Prompt di Generazione",
+                "modelOverride": "Sovrascrittura modello AI",
+                "modelOverridePlaceholder": "es. openai/gpt-4.1 o openrouter/openai/gpt-4.1",
+                "modelOverrideHelperText": "Opzionale. Usa il modello importato o precedente per impostazione predefinita a meno che non lo sovrascriva qui.",
                 "recommended": "Consigliato",
                 "promptPlaceholder": "Descrivi quali elementi devono essere generati per questa directory...",
                 "promptHelperText": "Sii specifico sul tipo di contenuto che vuoi generare",
@@ -1805,6 +1808,28 @@
                 "syncDescription": "Recupera automaticamente gli aggiornamenti dal repository di origine.",
                 "syncUpdateFailed": "Impossibile aggiornare le impostazioni di sincronizzazione",
                 "syncDisabled": "Sincronizzazione disabilitata",
+                "worksConfig": {
+                    "imported": "Importato da works.yml",
+                    "applied": "Applicato: {value}",
+                    "enabled": "abilitato",
+                    "disabled": "disabilitato",
+                    "fields": {
+                        "sourceType": "Tipo di sorgente",
+                        "configName": "Nome configurazione",
+                        "initialPrompt": "Prompt iniziale",
+                        "model": "Modello",
+                        "schedule": "Pianificazione",
+                        "providers": "Fornitori",
+                        "websiteRepo": "Repo sito web",
+                        "additionalAgents": "Agenti aggiuntivi"
+                    },
+                    "sourceTypes": {
+                        "dataRepo": "Repository dati",
+                        "awesomeReadme": "README Awesome",
+                        "linkExisting": "Repository esistenti collegati",
+                        "worksConfig": "works.yml"
+                    }
+                },
                 "generalSettings": "Impostazioni generali",
                 "generalTitle": "Impostazioni generali",
                 "directoryName": "Nome directory",
@@ -2318,6 +2343,10 @@
                     "title": "Mantieni sincronizzato",
                     "description": "Estrai automaticamente gli aggiornamenti dal repository sorgente."
                 },
+                "worksConfigRestore": {
+                    "title": "Ripristina impostazioni works.yml",
+                    "description": "Applica provider IA, modello, pianificazione e repository correlati da questo repository."
+                },
                 "sourceMethod": {
                     "url": {
                         "title": "Incolla URL",
@@ -2348,15 +2377,19 @@
                 },
                 "detectedType": {
                     "dataRepo": "Repository Dati Rilevato",
-                    "awesomeReadme": "Lista Awesome Rilevata"
+                    "awesomeReadme": "Lista Awesome Rilevata",
+                    "worksConfig": "Repository configurazione Works"
                 },
                 "badges": {
                     "dataRepo": "Repo Dati",
-                    "awesomeReadme": "Lista Awesome"
+                    "awesomeReadme": "Lista Awesome",
+                    "worksConfig": "works.yml"
                 },
                 "preview": {
                     "items": "elementi",
-                    "categories": "categorie"
+                    "categories": "categorie",
+                    "schedule": "Pianificazione: {cadence}",
+                    "providers": "Fornitori: {providers}"
                 },
                 "nameLabel": "Nome Directory",
                 "namePlaceholder": "es., La Mia Directory Awesome",
@@ -2372,6 +2405,7 @@
                     "seedDetected": "~{count} elementi seed rilevati",
                     "expansionFactor": "Obiettivo di espansione",
                     "expansionDescription": "Quante volte più grande deve essere la collezione finale rispetto alla sorgente?",
+                    "recommendedMultiplier": "{value} (consigliato)",
                     "preview": "~{seedCount} elementi seed → obiettivo ~{targetCount} elementi finali (~{newItems} nuovi elementi da scoprire)",
                     "enrichmentOptions": "Opzioni di arricchimento",
                     "enrichDescriptions": "Riscrivi descrizioni",
@@ -2453,6 +2487,7 @@
                     "linkRepos": "Collega repository"
                 },
                 "detectionFailed": "Non siamo riusciti a rilevare automaticamente il formato. Seleziona come importare questo repository.",
+                "detectionFailedMissingConfig": "Non è stata trovata alcuna configurazione supportata. Aggiungi config.yml, works.yml o works_config/works.yml nel repository, o seleziona un formato di importazione manuale qui sotto.",
                 "errors": {
                     "urlRequired": "Inserisci un URL repository GitHub",
                     "unsupportedFormat": "Questo formato di repository non è supportato. Usa un formato Repository Dati o Lista Awesome.",

@@ -45,30 +45,31 @@ export class WebsiteGeneratorService {
 
     private async ensureTemplateDefaultBranch(directory: Directory, userId: string): Promise<void> {
         const targetBranch = WEBSITE_TEMPLATE_CONFIG.branch;
+        const websiteOwner = directory.getRepoOwner('website');
+        const websiteRepo = directory.getWebsiteRepo();
 
         try {
-            const branches = await this.gitFacade.listBranches(
-                directory.getRepoOwner(),
-                directory.getWebsiteRepo(),
-                { userId, providerId: directory.gitProvider },
-            );
+            const branches = await this.gitFacade.listBranches(websiteOwner, websiteRepo, {
+                userId,
+                providerId: directory.gitProvider,
+            });
 
             if (!branches.some((branch) => branch.name === targetBranch)) {
                 this.logger.warn(
-                    `Cannot set default branch to '${targetBranch}' for ${directory.getRepoOwner()}/${directory.getWebsiteRepo()} because the branch does not exist yet`,
+                    `Cannot set default branch to '${targetBranch}' for ${websiteOwner}/${websiteRepo} because the branch does not exist yet`,
                 );
                 return;
             }
 
             await this.gitFacade.updateRepository(
-                directory.getRepoOwner(),
-                directory.getWebsiteRepo(),
+                websiteOwner,
+                websiteRepo,
                 { defaultBranch: targetBranch },
                 { userId, providerId: directory.gitProvider },
             );
         } catch (error) {
             this.logger.warn(
-                `Failed to set default branch for ${directory.getRepoOwner()}/${directory.getWebsiteRepo()}: ${error instanceof Error ? error.message : String(error)}`,
+                `Failed to set default branch for ${websiteOwner}/${websiteRepo}: ${error instanceof Error ? error.message : String(error)}`,
             );
         }
     }
@@ -91,18 +92,20 @@ export class WebsiteGeneratorService {
         );
 
         // Create target repo
+        const websiteOwner = directory.getRepoOwner('website');
+        const websiteRepo = directory.getWebsiteRepo();
         const websiteRepository = assertCreatedRepositoryTarget(
             await this.gitFacade.createRepository(
                 {
-                    name: directory.getWebsiteRepo(),
+                    name: websiteRepo,
                     description: `Website for ${directory.name}`,
-                    organization: directory.organization ? directory.getRepoOwner() : undefined,
+                    organization: directory.organization ? websiteOwner : undefined,
                     isPrivate: true,
                 },
                 { userId: directoryOwner.id, providerId: directory.gitProvider },
             ),
-            directory.getRepoOwner(),
-            directory.getWebsiteRepo(),
+            websiteOwner,
+            websiteRepo,
             'Website repository',
         );
 
@@ -141,13 +144,15 @@ export class WebsiteGeneratorService {
 
     private async createUsingTemplate(directory: Directory, user: User) {
         const directoryOwner = getDirectoryOwner(directory);
+        const websiteOwner = directory.getRepoOwner('website');
+        const websiteRepo = directory.getWebsiteRepo();
 
         const createdWebsiteRepository = await this.gitFacade.createRepositoryFromTemplate(
             WEBSITE_TEMPLATE_CONFIG.owner,
             WEBSITE_TEMPLATE_CONFIG.repo,
             {
-                name: directory.getWebsiteRepo(),
-                organization: directory.organization ? directory.getRepoOwner() : undefined,
+                name: websiteRepo,
+                organization: directory.organization ? websiteOwner : undefined,
                 isPrivate: true,
             },
             { userId: directoryOwner.id, providerId: directory.gitProvider },
@@ -156,8 +161,8 @@ export class WebsiteGeneratorService {
         if (createdWebsiteRepository) {
             assertCreatedRepositoryTarget(
                 createdWebsiteRepository,
-                directory.getRepoOwner(),
-                directory.getWebsiteRepo(),
+                websiteOwner,
+                websiteRepo,
                 'Website repository',
             );
 
@@ -213,7 +218,7 @@ export class WebsiteGeneratorService {
         const directoryOwner = getDirectoryOwner(directory);
 
         await this.gitFacade.deleteRepository(
-            directory.getRepoOwner(),
+            directory.getRepoOwner('website'),
             directory.getWebsiteRepo(),
             {
                 userId: directoryOwner.id,
@@ -225,7 +230,7 @@ export class WebsiteGeneratorService {
     public cleanup(directory: Directory) {
         const dataDir = this.gitFacade.getLocalDir(
             directory.gitProvider,
-            directory.getRepoOwner(),
+            directory.getRepoOwner('website'),
             directory.getWebsiteRepo(),
         );
 

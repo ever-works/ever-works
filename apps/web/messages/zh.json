@@ -1664,6 +1664,9 @@
                 "selectOption": "选择选项",
                 "directoryName": "目录名称",
                 "generationPrompt": "生成提示",
+                "modelOverride": "AI 模型覆盖",
+                "modelOverridePlaceholder": "例如 openai/gpt-4.1 或 openrouter/openai/gpt-4.1",
+                "modelOverrideHelperText": "可选。默认使用导入或之前的模型，除非在此处覆盖。",
                 "recommended": "推荐",
                 "promptPlaceholder": "描述为此目录应生成哪些项目...",
                 "promptHelperText": "具体说明您想要生成的内容类型",
@@ -1805,6 +1808,28 @@
                 "syncDescription": "自动从源仓库拉取更新。",
                 "syncUpdateFailed": "更新同步设置失败",
                 "syncDisabled": "同步已禁用",
+                "worksConfig": {
+                    "imported": "从 works.yml 导入",
+                    "applied": "已应用：{value}",
+                    "enabled": "已启用",
+                    "disabled": "已禁用",
+                    "fields": {
+                        "sourceType": "源类型",
+                        "configName": "配置名称",
+                        "initialPrompt": "初始提示词",
+                        "model": "模型",
+                        "schedule": "调度",
+                        "providers": "提供商",
+                        "websiteRepo": "网站仓库",
+                        "additionalAgents": "额外代理"
+                    },
+                    "sourceTypes": {
+                        "dataRepo": "数据仓库",
+                        "awesomeReadme": "精选 README",
+                        "linkExisting": "链接现有仓库",
+                        "worksConfig": "works.yml"
+                    }
+                },
                 "generalSettings": "通用设置",
                 "generalTitle": "通用设置",
                 "directoryName": "目录名称",
@@ -2318,6 +2343,10 @@
                     "title": "保持同步",
                     "description": "自动从源仓库拉取更新。"
                 },
+                "worksConfigRestore": {
+                    "title": "恢复 works.yml 设置",
+                    "description": "从此仓库应用 AI 提供商、模型、计划和相关仓库设置。"
+                },
                 "sourceMethod": {
                     "url": {
                         "title": "粘贴 URL",
@@ -2348,15 +2377,19 @@
                 },
                 "detectedType": {
                     "dataRepo": "检测到数据仓库",
-                    "awesomeReadme": "检测到 Awesome 列表"
+                    "awesomeReadme": "检测到 Awesome 列表",
+                    "worksConfig": "Works 配置仓库"
                 },
                 "badges": {
                     "dataRepo": "数据仓库",
-                    "awesomeReadme": "Awesome 列表"
+                    "awesomeReadme": "Awesome 列表",
+                    "worksConfig": "works.yml"
                 },
                 "preview": {
                     "items": "项目",
-                    "categories": "类别"
+                    "categories": "类别",
+                    "schedule": "调度：{cadence}",
+                    "providers": "提供商：{providers}"
                 },
                 "nameLabel": "目录名称",
                 "namePlaceholder": "例如，我的 Awesome 目录",
@@ -2372,6 +2405,7 @@
                     "seedDetected": "~{count} 个种子项目已检测",
                     "expansionFactor": "扩展目标",
                     "expansionDescription": "最终集合相比源应该大多少倍？",
+                    "recommendedMultiplier": "{value} (推荐)",
                     "preview": "~{seedCount} 个种子项目 → 目标 ~{targetCount} 个最终项目（~{newItems} 个新项目待发现）",
                     "enrichmentOptions": "丰富选项",
                     "enrichDescriptions": "重写描述",
@@ -2453,6 +2487,7 @@
                     "linkRepos": "链接仓库"
                 },
                 "detectionFailed": "我们无法自动检测格式。请选择导入此仓库的方式。",
+                "detectionFailedMissingConfig": "未找到支持的配置。请在仓库中添加 config.yml、works.yml 或 works_config/works.yml，或者在下面选择手动导入格式。",
                 "errors": {
                     "urlRequired": "请输入 GitHub 仓库 URL",
                     "unsupportedFormat": "不支持此仓库格式。请使用数据仓库或 Awesome 列表格式。",

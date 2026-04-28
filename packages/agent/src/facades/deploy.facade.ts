@@ -541,7 +541,11 @@ export class DeployFacadeService implements IDeployFacade {
 
         const teamScope = await this.getTeamScope(plugin.id, options);
         if (plugin.lookupExistingDeployment) {
-            const result = await plugin.lookupExistingDeployment(directory.slug, token, teamScope);
+            const result = await plugin.lookupExistingDeployment(
+                directory.getWebsiteRepo(),
+                token,
+                teamScope,
+            );
             if (result.found && result.projectId) {
                 // Cache the projectId for future calls
                 await this.directoryRepository.update(directory.id, {

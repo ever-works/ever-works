@@ -1664,6 +1664,9 @@
                 "selectOption": "اختر خيارًا",
                 "directoryName": "اسم المجلد",
                 "generationPrompt": "موجه التوليد",
+                "modelOverride": "تجاوز نموذج الذكاء الاصطناعي",
+                "modelOverridePlaceholder": "مثل openai/gpt-4.1 أو openrouter/openai/gpt-4.1",
+                "modelOverrideHelperText": "اختياري. يستخدم النموذج المستورد أو السابق افتراضيًا إلا إذا قمت بتجاوزه هنا.",
                 "recommended": "مُوصى به",
                 "promptPlaceholder": "صف ما يجب توليده من عناصر لهذا المجلد...",
                 "promptHelperText": "كن محددًا بشأن نوع المحتوى الذي تريد توليده",
@@ -1805,6 +1808,28 @@
                 "syncDescription": "سحب التحديثات تلقائيًا من مستودع المصدر.",
                 "syncUpdateFailed": "فشل في تحديث إعدادات المزامنة",
                 "syncDisabled": "المزامنة معطلة",
+                "worksConfig": {
+                    "imported": "مستورد من works.yml",
+                    "applied": "مُطبق: {value}",
+                    "enabled": "مُفعّل",
+                    "disabled": "مُعطّل",
+                    "fields": {
+                        "sourceType": "نوع المصدر",
+                        "configName": "اسم التكوين",
+                        "initialPrompt": "الموجه الأولي",
+                        "model": "النموذج",
+                        "schedule": "الجدولة",
+                        "providers": "المزودون",
+                        "websiteRepo": "مستودع الموقع",
+                        "additionalAgents": "وكلاء إضافيون"
+                    },
+                    "sourceTypes": {
+                        "dataRepo": "مستودع البيانات",
+                        "awesomeReadme": "ملف README الرائع",
+                        "linkExisting": "مستودعات موجودة مرتبطة",
+                        "worksConfig": "works.yml"
+                    }
+                },
                 "generalSettings": "الإعدادات العامة",
                 "generalTitle": "الإعدادات العامة",
                 "directoryName": "اسم الدليل",
@@ -2318,6 +2343,10 @@
                     "title": "الحفاظ على المزامنة",
                     "description": "سحب التحديثات تلقائيًا من المستودع المصدر."
                 },
+                "worksConfigRestore": {
+                    "title": "استعادة إعدادات works.yml",
+                    "description": "تطبيق مزود الذكاء الاصطناعي والنموذج والجدولة والمستودعات المرتبطة من هذا المستودع."
+                },
                 "sourceMethod": {
                     "url": {
                         "title": "لصق الرابط",
@@ -2348,15 +2377,19 @@
                 },
                 "detectedType": {
                     "dataRepo": "تم كشف مستودع بيانات",
-                    "awesomeReadme": "تم كشف قائمة Awesome"
+                    "awesomeReadme": "تم كشف قائمة Awesome",
+                    "worksConfig": "مستودع تكوين Works"
                 },
                 "badges": {
                     "dataRepo": "مستودع بيانات",
-                    "awesomeReadme": "قائمة Awesome"
+                    "awesomeReadme": "قائمة Awesome",
+                    "worksConfig": "works.yml"
                 },
                 "preview": {
                     "items": "عناصر",
-                    "categories": "فئات"
+                    "categories": "فئات",
+                    "schedule": "الجدولة: {cadence}",
+                    "providers": "المزودون: {providers}"
                 },
                 "nameLabel": "اسم الدليل",
                 "namePlaceholder": "مثلًا، دليلي الرائع",
@@ -2372,6 +2405,7 @@
                     "seedDetected": "~{count} عنصر بذرة مكتشف",
                     "expansionFactor": "هدف التوسع",
                     "expansionDescription": "كم مرة يجب أن يكون المجموعة النهائية أكبر من المصدر؟",
+                    "recommendedMultiplier": "{value} (موصى به)",
                     "preview": "~{seedCount} عنصر بذرة → هدف ~{targetCount} عنصر نهائي (~{newItems} عناصر جديدة للاكتشاف)",
                     "enrichmentOptions": "خيارات الإثراء",
                     "enrichDescriptions": "إعادة كتابة الوصفات",
@@ -2453,6 +2487,7 @@
                     "linkRepos": "ربط المستودعات"
                 },
                 "detectionFailed": "لم نتمكن من كشف الصيغة تلقائيًا. يرجى اختيار كيفية استيراد هذا المستودع.",
+                "detectionFailedMissingConfig": "لم يتم العثور على تكوين مدعوم. أضف config.yml أو works.yml أو works_config/works.yml إلى المستودع، أو اختر تنسيق استيراد يدوي أدناه.",
                 "errors": {
                     "urlRequired": "يرجى إدخال رابط مستودع GitHub",
                     "unsupportedFormat": "صيغة هذا المستودع غير مدعومة. يرجى استخدام صيغة مستودع بيانات أو قائمة Awesome.",

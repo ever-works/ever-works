@@ -76,6 +76,10 @@
             "types": "./dist/import/index.d.ts",
             "default": "./dist/import/index.js"
         },
+        "./works-config": {
+            "types": "./dist/works-config/index.d.ts",
+            "default": "./dist/works-config/index.js"
+        },
         "./facades": {
             "types": "./dist/facades/index.d.ts",
             "default": "./dist/facades/index.js"

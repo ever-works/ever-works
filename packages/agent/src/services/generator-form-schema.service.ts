@@ -494,12 +494,79 @@ export class GeneratorFormSchemaService {
         }
     }
 
+    async validateRequiredProvidersForPipeline(
+        pipelineId: string | undefined,
+        providers: ProvidersDto | undefined,
+        options: FormSchemaOptions,
+    ): Promise<void> {
+        const providerErrors: Record<string, string> = {};
+        const pipelinePlugin = await this.resolvePipelinePlugin(pipelineId, options);
+        const resolvedPipelineId = pipelinePlugin?.plugin.id ?? pipelineId;
+
+        if (resolvedPipelineId) {
+            const error = await this.validateSingleProvider(resolvedPipelineId, options);
+            if (error) {
+                providerErrors.pipeline = error;
+            }
+        }
+
+        const requiredCategories = this.getRequiredProviderUiKeysForPipeline(resolvedPipelineId);
+
+        for (const { uiKey, capability } of getIndividualProviderCategories()) {
+            if (!requiredCategories.includes(uiKey as keyof ProvidersDto)) {
+                continue;
+            }
+
+            const pluginId = providers?.[uiKey as keyof ProvidersDto];
+            if (pluginId) {
+                const error = await this.validateSingleProvider(pluginId, options);
+                if (error) {
+                    providerErrors[uiKey] = error;
+                }
+                continue;
+            }
+
+            const defaultProvider = await this.resolveDefaultProvider(capability, options);
+            if (!defaultProvider) {
+                providerErrors[uiKey] =
+                    `No default provider is available for required category "${uiKey}". ` +
+                    'Visit Settings → Plugins to enable and configure one.';
+                continue;
+            }
+
+            if (!defaultProvider.configured) {
+                providerErrors[uiKey] =
+                    `Default provider "${defaultProvider.name}" is not configured. ` +
+                    'Visit Settings → Plugins to set it up.';
+            }
+        }
+
+        if (Object.keys(providerErrors).length > 0) {
+            throw new BadRequestException({
+                message:
+                    'One or more required providers for the selected pipeline are not available.',
+                providerErrors,
+                resolvedPipelineId,
+            });
+        }
+    }
+
     private async resolveDefaultProvider(
         capability: string,
         options: FormSchemaOptions,
     ): Promise<ProviderOption | null> {
         const providerOptions = await this.getProvidersForCapability(capability, options);
         return providerOptions.find((p) => p.isDefault) ?? null;
+    }
+
+    private getRequiredProviderUiKeysForPipeline(pipelineId?: string): Array<keyof ProvidersDto> {
+        switch (pipelineId) {
+            case 'agent-pipeline':
+            case 'standard-pipeline':
+                return ['ai', 'search', 'contentExtractor'];
+            default:
+                return [];
+        }
     }
 
     /**

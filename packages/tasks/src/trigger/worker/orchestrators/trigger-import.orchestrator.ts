@@ -7,6 +7,7 @@ import {
 import { NotificationService } from '@ever-works/agent/notifications';
 import { DirectoryImportPayload, DirectoryImportResult } from '@ever-works/agent/tasks';
 import { normalizeGeneratorError } from '@ever-works/agent/services';
+import { DirectoryScheduleService } from '@ever-works/agent/services';
 import { ImportExecutorService } from '@ever-works/agent/import';
 import { calculateDurationSeconds } from '@ever-works/agent/utils';
 import { BaseOrchestrator } from './base-orchestrator';
@@ -31,6 +32,7 @@ export class TriggerImportOrchestrator extends BaseOrchestrator {
 
     constructor(
         private readonly importExecutor: ImportExecutorService,
+        private readonly directoryScheduleService: DirectoryScheduleService,
         directoryOperations: DirectoryOperationsService,
         @Optional()
         notificationService?: NotificationService,
@@ -67,6 +69,7 @@ export class TriggerImportOrchestrator extends BaseOrchestrator {
                 createMissingRepos: payload.options?.createMissingRepos,
                 expansionFactor: payload.enrichmentConfig?.expansionFactor,
                 providers: payload.providers,
+                worksConfig: payload.worksConfig,
             });
 
             if (!result.success) {
@@ -74,6 +77,31 @@ export class TriggerImportOrchestrator extends BaseOrchestrator {
             }
 
             const endTime = new Date();
+
+            if (payload.worksConfig?.scheduleCadence) {
+                try {
+                    await this.directoryScheduleService.updateSchedule(
+                        directory.id,
+                        {
+                            enable: true,
+                            cadence: payload.worksConfig.scheduleCadence,
+                            alwaysCreatePullRequest: true,
+                            providerOverrides:
+                                payload.worksConfig.providers &&
+                                Object.keys(payload.worksConfig.providers).length > 0
+                                    ? payload.worksConfig.providers
+                                    : null,
+                        },
+                        user,
+                    );
+                } catch (error) {
+                    this.logger.warn(
+                        `Failed to restore schedule from works.yml for directory ${directory.id}: ${
+                            error instanceof Error ? error.message : String(error)
+                        }`,
+                    );
+                }
+            }
 
             await Promise.all([
                 this.directoryOperations.recordGenerationFinishTime(directory.id, endTime),

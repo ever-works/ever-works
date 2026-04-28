@@ -20,30 +20,31 @@ export class WebsiteUpdateService {
 
     private async ensureTemplateDefaultBranch(directory: Directory, userId: string): Promise<void> {
         const targetBranch = WEBSITE_TEMPLATE_CONFIG.branch;
+        const websiteOwner = directory.getRepoOwner('website');
+        const websiteRepo = directory.getWebsiteRepo();
 
         try {
-            const branches = await this.gitFacade.listBranches(
-                directory.getRepoOwner(),
-                directory.getWebsiteRepo(),
-                { userId, providerId: directory.gitProvider },
-            );
+            const branches = await this.gitFacade.listBranches(websiteOwner, websiteRepo, {
+                userId,
+                providerId: directory.gitProvider,
+            });
 
             if (!branches.some((branch) => branch.name === targetBranch)) {
                 this.logger.warn(
-                    `Cannot set default branch to '${targetBranch}' for ${directory.getRepoOwner()}/${directory.getWebsiteRepo()} because the branch does not exist yet`,
+                    `Cannot set default branch to '${targetBranch}' for ${websiteOwner}/${websiteRepo} because the branch does not exist yet`,
                 );
                 return;
             }
 
             await this.gitFacade.updateRepository(
-                directory.getRepoOwner(),
-                directory.getWebsiteRepo(),
+                websiteOwner,
+                websiteRepo,
                 { defaultBranch: targetBranch },
                 { userId, providerId: directory.gitProvider },
             );
         } catch (error) {
             this.logger.warn(
-                `Failed to set default branch for ${directory.getRepoOwner()}/${directory.getWebsiteRepo()}: ${error instanceof Error ? error.message : String(error)}`,
+                `Failed to set default branch for ${websiteOwner}/${websiteRepo}: ${error instanceof Error ? error.message : String(error)}`,
             );
         }
     }
@@ -65,18 +66,18 @@ export class WebsiteUpdateService {
         branchSync?: BranchSyncSummary;
     }> {
         const directoryOwner = getDirectoryOwner(directory);
+        const websiteOwner = directory.getRepoOwner('website');
         const websiteRepo = directory.getWebsiteRepo();
         const branch = options?.branch || WEBSITE_TEMPLATE_CONFIG.branch;
 
         // Check if the target repository exists
-        const repositoryExists = await this.gitFacade.repositoryExists(
-            directory.getRepoOwner(),
-            websiteRepo,
-            { userId: directoryOwner.id, providerId: directory.gitProvider },
-        );
+        const repositoryExists = await this.gitFacade.repositoryExists(websiteOwner, websiteRepo, {
+            userId: directoryOwner.id,
+            providerId: directory.gitProvider,
+        });
         if (!repositoryExists) {
             throw new NotFoundException(
-                `Website repository '${directory.getRepoOwner()}/${websiteRepo}' does not exist`,
+                `Website repository '${websiteOwner}/${websiteRepo}' does not exist`,
             );
         }
 
@@ -188,13 +189,14 @@ export class WebsiteUpdateService {
     private async updateFork(directory: Directory, user: User): Promise<boolean> {
         const directoryOwner = getDirectoryOwner(directory);
         const committer = directory.resolveCommitter(user);
+        const websiteOwner = directory.getRepoOwner('website');
         const websiteRepo = directory.getWebsiteRepo();
 
         try {
             // Clone the target repository
             const targetDir = await this.gitFacade.cloneOrPull(
                 {
-                    owner: directory.getRepoOwner(),
+                    owner: websiteOwner,
                     repo: websiteRepo,
                     committer,
                 },
@@ -203,7 +205,7 @@ export class WebsiteUpdateService {
 
             // Check if this is actually a fork by looking for upstream remote
             const isActualFork = await this.gitFacade.hasForkRelationship(
-                directory.getRepoOwner(),
+                websiteOwner,
                 websiteRepo,
                 WEBSITE_TEMPLATE_CONFIG.owner,
                 WEBSITE_TEMPLATE_CONFIG.repo,
@@ -232,6 +234,7 @@ export class WebsiteUpdateService {
         branch: string = WEBSITE_TEMPLATE_CONFIG.branch,
     ): Promise<void> {
         const directoryOwner = getDirectoryOwner(directory);
+        const websiteOwner = directory.getRepoOwner('website');
         const websiteRepo = directory.getWebsiteRepo();
 
         await this.gitFacade.removeLocalDir(
@@ -254,7 +257,7 @@ export class WebsiteUpdateService {
         // Get the target repository URL
         const targetRepoUrl = this.gitFacade.getCloneUrl(
             directory.gitProvider,
-            directory.getRepoOwner(),
+            websiteOwner,
             websiteRepo,
         );
 
@@ -274,7 +277,7 @@ export class WebsiteUpdateService {
         );
 
         this.logger.log(
-            `Successfully updated ${directory.getRepoOwner()}/${websiteRepo} using duplicate method (branch: ${branch})`,
+            `Successfully updated ${websiteOwner}/${websiteRepo} using duplicate method (branch: ${branch})`,
         );
     }
 
@@ -288,6 +291,7 @@ export class WebsiteUpdateService {
     ): Promise<void> {
         const directoryOwner = getDirectoryOwner(directory);
         const committer = directory.resolveCommitter(user);
+        const websiteOwner = directory.getRepoOwner('website');
         const websiteRepo = directory.getWebsiteRepo();
 
         // Clone both repositories
@@ -304,7 +308,7 @@ export class WebsiteUpdateService {
 
             this.gitFacade.cloneOrPull(
                 {
-                    owner: directory.getRepoOwner(),
+                    owner: websiteOwner,
                     repo: websiteRepo,
                     branch,
                     committer,
@@ -332,7 +336,7 @@ export class WebsiteUpdateService {
         );
 
         this.logger.log(
-            `Successfully updated ${directory.getRepoOwner()}/${websiteRepo} using template method (branch: ${branch})`,
+            `Successfully updated ${websiteOwner}/${websiteRepo} using template method (branch: ${branch})`,
         );
     }
 

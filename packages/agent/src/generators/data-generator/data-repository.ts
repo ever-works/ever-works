@@ -206,12 +206,14 @@ const createDefaultConfig = (overrides: Partial<IDataConfig> = {}): IDataConfig 
 
 export class DataRepository {
     private static readonly logger = new Logger(DataRepository.name);
+    private static readonly CONFIG_FILENAMES = ['config.yml', 'config.yaml'] as const;
     private config?: IDataConfig;
     private categories?: Category[];
 
     private constructor(
         public readonly dir: string,
         private readonly configPath: string,
+        private readonly configFallbackPaths: string[],
         private categoriesPath: string,
         private readonly tagsPath: string,
         private readonly collectionsPath: string,
@@ -244,6 +246,7 @@ export class DataRepository {
         const repo = new DataRepository(
             dir,
             path.join(dir, 'config.yml'),
+            await this.resolveConfigFallbackPaths(dir),
             categoriesPath,
             tagsPath,
             collectionsPath,
@@ -252,6 +255,28 @@ export class DataRepository {
         );
 
         return repo;
+    }
+
+    private static async resolveConfigFallbackPaths(dir: string): Promise<string[]> {
+        const fallbackPaths: string[] = [];
+
+        for (const filename of this.CONFIG_FILENAMES.slice(1)) {
+            const candidatePath = path.join(dir, filename);
+
+            try {
+                const stat = await fs.stat(candidatePath);
+                if (stat.isFile()) {
+                    fallbackPaths.push(candidatePath);
+                }
+            } catch (err) {
+                if ((err as NodeJS.ErrnoException | undefined)?.code === 'ENOENT') {
+                    continue;
+                }
+                throw err;
+            }
+        }
+
+        return fallbackPaths;
     }
 
     private static async shouldeUseDir(dir: string, type: 'categories' | 'tags' | 'collections') {
@@ -324,12 +349,34 @@ export class DataRepository {
             return this.config;
         } catch (err) {
             if (err?.code === 'ENOENT') {
+                const fallbackConfig = await this.readFallbackConfig();
+                if (fallbackConfig) {
+                    this.config = fallbackConfig;
+                    return fallbackConfig;
+                }
+
                 const defaultConfig = createDefaultConfig();
                 await this.writeConfig(defaultConfig);
                 return defaultConfig;
             }
             throw err;
         }
+    }
+
+    private async readFallbackConfig(): Promise<IDataConfig | null> {
+        for (const fallbackPath of this.configFallbackPaths) {
+            try {
+                const config = await fs.readFile(fallbackPath, 'utf-8');
+                return yaml.parse(config);
+            } catch (err) {
+                if ((err as NodeJS.ErrnoException | undefined)?.code === 'ENOENT') {
+                    continue;
+                }
+                throw err;
+            }
+        }
+
+        return null;
     }
 
     async getCategories(): Promise<Category[]> {
