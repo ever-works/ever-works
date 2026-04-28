@@ -99,7 +99,16 @@ function validateItemRecord(record: Record<string, unknown>, index: number): str
 		errors.push(`Item ${index} has invalid tags: all tags must be non-empty strings`);
 	}
 
-	for (const field of ['name', 'description', 'source_url', 'category', 'brand', 'website_url', 'image_url', 'markdown']) {
+	for (const field of [
+		'name',
+		'description',
+		'source_url',
+		'category',
+		'brand',
+		'website_url',
+		'image_url',
+		'markdown'
+	]) {
 		const value = record[field];
 		if (value !== undefined && value !== null && typeof value !== 'string') {
 			errors.push(`Item ${index} has invalid ${field}: expected a string`);
@@ -150,10 +159,7 @@ export async function writeResultSchema(workspacePath: string): Promise<void> {
 	);
 }
 
-export async function readGeneratedResult(
-	workspacePath: string,
-	logger?: Logger
-): Promise<GeneratedItemsReadResult> {
+export async function readGeneratedResult(workspacePath: string, logger?: Logger): Promise<GeneratedItemsReadResult> {
 	let content: string;
 	const resultFilePath = getResultFilePath(workspacePath);
 	try {

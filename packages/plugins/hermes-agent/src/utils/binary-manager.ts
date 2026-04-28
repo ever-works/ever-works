@@ -33,9 +33,7 @@ export async function validateProfile(settings: HermesRuntimeSettings, logger: L
 	});
 
 	if (result.error || result.status !== 0) {
-		const detail = [result.stderr, result.stdout]
-			.map((value) => value?.trim())
-			.find((value) => Boolean(value));
+		const detail = [result.stderr, result.stdout].map((value) => value?.trim()).find((value) => Boolean(value));
 		const suffix = detail ? ` Hermes output: ${detail}` : '';
 
 		throw new Error(

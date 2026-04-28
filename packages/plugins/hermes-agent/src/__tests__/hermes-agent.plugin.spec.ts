@@ -31,7 +31,9 @@ vi.mock('../utils/screenshot-capture.js', () => ({
 	captureScreenshots: vi.fn()
 }));
 
-function createMockContext(overrides?: Partial<Record<'global' | 'user' | 'directory', PluginSettings>>): PluginContext {
+function createMockContext(
+	overrides?: Partial<Record<'global' | 'user' | 'directory', PluginSettings>>
+): PluginContext {
 	return {
 		pluginId: 'hermes-agent',
 		logger: {
