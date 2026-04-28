@@ -2343,6 +2343,10 @@
                     "title": "同期を維持",
                     "description": "ソースリポジトリから自動的に更新を取得。"
                 },
+                "worksConfigRestore": {
+                    "title": "works.yml 設定を復元",
+                    "description": "このリポジトリから AI プロバイダー、モデル、スケジュール、関連リポジトリ設定を適用します。"
+                },
                 "sourceMethod": {
                     "url": {
                         "title": "URL を貼り付け",

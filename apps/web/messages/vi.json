@@ -2343,6 +2343,10 @@
                     "title": "Giữ Đồng Bộ",
                     "description": "Tự động kéo cập nhật từ kho nguồn."
                 },
+                "worksConfigRestore": {
+                    "title": "Khôi phục cài đặt works.yml",
+                    "description": "Áp dụng nhà cung cấp AI, mô hình, lịch và kho liên quan từ kho này."
+                },
                 "sourceMethod": {
                     "url": {
                         "title": "Dán URL",

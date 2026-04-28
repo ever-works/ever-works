@@ -106,6 +106,10 @@ export class ImportDirectoryDto {
     @IsBoolean()
     sync?: boolean;
 
+    @IsOptional()
+    @IsBoolean()
+    restoreWorksConfig?: boolean;
+
     @IsString()
     @IsNotEmpty({ message: 'Git provider is required' })
     gitProvider: string;

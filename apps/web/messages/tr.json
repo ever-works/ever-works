@@ -2343,6 +2343,10 @@
                     "title": "Senkronize Tut",
                     "description": "Kaynak deposundan güncellemeleri otomatik çekin."
                 },
+                "worksConfigRestore": {
+                    "title": "works.yml ayarlarını geri yükle",
+                    "description": "Bu depodan AI sağlayıcısı, model, zamanlama ve ilgili depo ayarlarını uygula."
+                },
                 "sourceMethod": {
                     "url": {
                         "title": "URL Yapıştır",

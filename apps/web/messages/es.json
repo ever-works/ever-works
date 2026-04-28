@@ -2343,6 +2343,10 @@
                     "title": "Mantener sincronizado",
                     "description": "Actualizar automáticamente desde el repositorio fuente."
                 },
+                "worksConfigRestore": {
+                    "title": "Restaurar configuración de works.yml",
+                    "description": "Aplicar proveedor de IA, modelo, programación y repositorios relacionados desde este repositorio."
+                },
                 "sourceMethod": {
                     "url": {
                         "title": "Pegar URL",

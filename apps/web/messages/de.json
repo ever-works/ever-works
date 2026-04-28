@@ -2343,6 +2343,10 @@
                     "title": "Synchron halten",
                     "description": "Automatisch Updates aus dem Quell-Repository ziehen."
                 },
+                "worksConfigRestore": {
+                    "title": "works.yml-Einstellungen wiederherstellen",
+                    "description": "KI-Anbieter, Modell, Zeitplan und verknüpfte Repository-Einstellungen aus diesem Repository anwenden."
+                },
                 "sourceMethod": {
                     "url": {
                         "title": "URL einfügen",

@@ -256,10 +256,15 @@ export class DirectoryImportService {
                 });
             }
 
+            const shouldRestoreWorksConfig =
+                dto.sourceType === ImportSourceTypeEnum.WORKS_CONFIG ||
+                dto.restoreWorksConfig !== false;
+
             let worksConfig: ParsedWorksConfig | null = null;
             if (
-                dto.sourceType === ImportSourceTypeEnum.WORKS_CONFIG ||
-                dto.sourceType === ImportSourceTypeEnum.DATA_REPO
+                shouldRestoreWorksConfig &&
+                (dto.sourceType === ImportSourceTypeEnum.WORKS_CONFIG ||
+                    dto.sourceType === ImportSourceTypeEnum.DATA_REPO)
             ) {
                 const token = await this.getProviderToken(user, dto.gitProvider);
                 worksConfig = await this.worksConfigService.loadFromRepository(

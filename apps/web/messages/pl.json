@@ -2343,6 +2343,10 @@
                     "title": "Utrzymuj synchronizację",
                     "description": "Automatycznie pobieraj aktualizacje z repozytorium źródłowego."
                 },
+                "worksConfigRestore": {
+                    "title": "Przywróć ustawienia works.yml",
+                    "description": "Zastosuj dostawcę AI, model, harmonogram i powiązane repozytoria z tego repozytorium."
+                },
                 "sourceMethod": {
                     "url": {
                         "title": "Wklej URL",

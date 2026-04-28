@@ -382,6 +382,103 @@ describe('DirectoryImportService.initiateImport', () => {
             },
         });
     });
+
+    it('does not restore works.yml settings for data repo imports when disabled', async () => {
+        const directoryRepository = {
+            findByOwnerAndSlug: jest.fn().mockResolvedValue(null),
+            create: jest.fn().mockResolvedValue({
+                id: 'dir-1',
+                slug: 'compare-cloud-pricing',
+                name: 'Compare Cloud Pricing',
+                owner: 'Ntermast',
+                organization: false,
+                gitProvider: 'github',
+            }),
+            update: jest.fn().mockResolvedValue(undefined),
+        };
+
+        const generationHistoryRepository = {
+            createEntry: jest.fn().mockResolvedValue({
+                id: 'history-1',
+                startedAt: new Date('2026-04-24T00:00:00.000Z'),
+            }),
+        };
+
+        const sourceRepoAnalyzer = {
+            parseGitUrl: jest.fn().mockReturnValue({
+                owner: 'Ntermast',
+                repo: 'Compare-Cloud-Pricing-data',
+                provider: 'github',
+            }),
+            checkSlugConflicts: jest.fn().mockResolvedValue({
+                hasConflict: false,
+                conflictingRepos: [],
+                suggestedSlug: 'compare-cloud-pricing',
+            }),
+        };
+
+        const worksConfigService = {
+            loadFromRepository: jest.fn(),
+            parseRepositoryReference: jest.fn(),
+        };
+        const worksConfigRestoreService = createWorksConfigRestoreServiceMock();
+
+        const service = new DirectoryImportService(
+            directoryRepository as any,
+            generationHistoryRepository as any,
+            {} as any,
+            {} as any,
+            {} as any,
+            {
+                getAccessToken: jest.fn().mockResolvedValue('token'),
+            } as any,
+            sourceRepoAnalyzer as any,
+            {} as any,
+            worksConfigService as any,
+            worksConfigRestoreService as any,
+            {} as any,
+            {
+                validateSelectedProviders: jest.fn().mockResolvedValue(undefined),
+                validateRequiredProvidersForPipeline: jest.fn().mockResolvedValue(undefined),
+            } as any,
+            {
+                emit: jest.fn(),
+            } as any,
+        );
+
+        const dispatchImportTask = jest.fn().mockResolvedValue(undefined);
+        (service as any).dispatchImportTask = dispatchImportTask;
+
+        const result = await service.initiateImport(
+            {
+                sourceUrl: 'https://github.com/Ntermast/Compare-Cloud-Pricing-data',
+                sourceType: ImportSourceTypeEnum.DATA_REPO,
+                name: 'Compare Cloud Pricing',
+                gitProvider: 'github',
+                deployProvider: 'vercel',
+                organization: false,
+                restoreWorksConfig: false,
+            } as any,
+            {
+                id: 'user-1',
+                username: 'Ntermast',
+            } as any,
+        );
+
+        expect(result.status).toBe('success');
+        expect(worksConfigService.loadFromRepository).not.toHaveBeenCalled();
+        expect(worksConfigRestoreService.applyPipelineSettings).not.toHaveBeenCalled();
+        expect(worksConfigRestoreService.validateProviderSettings).not.toHaveBeenCalled();
+        expect(worksConfigRestoreService.validateRepositoryTargets).not.toHaveBeenCalled();
+        expect(worksConfigRestoreService.buildSourceRepository).toHaveBeenCalledWith(
+            expect.objectContaining({
+                sourceType: ImportSourceTypeEnum.DATA_REPO,
+                sourceRole: 'data',
+                worksConfig: null,
+            }),
+        );
+        expect(dispatchImportTask.mock.calls[0][6]).toBeNull();
+    });
 });
 
 describe('DirectoryImportService.syncDirectory', () => {

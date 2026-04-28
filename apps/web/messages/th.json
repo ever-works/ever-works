@@ -2343,6 +2343,10 @@
                     "title": "ซิงค์อัตโนมัติ",
                     "description": "ดึงการอัปเดตจาก repository ต้นทางโดยอัตโนมัติ"
                 },
+                "worksConfigRestore": {
+                    "title": "กู้คืนการตั้งค่า works.yml",
+                    "description": "ใช้ผู้ให้บริการ AI โมเดล กำหนดการ และการตั้งค่าคลังที่เกี่ยวข้องจากคลังนี้"
+                },
                 "sourceMethod": {
                     "url": {
                         "title": "วาง URL",

@@ -2343,6 +2343,10 @@
                     "title": "동기화 유지",
                     "description": "소스 저장소에서 업데이트 자동 가져오기."
                 },
+                "worksConfigRestore": {
+                    "title": "works.yml 설정 복원",
+                    "description": "이 저장소의 AI 제공자, 모델, 일정 및 관련 저장소 설정을 적용합니다."
+                },
                 "sourceMethod": {
                     "url": {
                         "title": "URL 붙여넣기",

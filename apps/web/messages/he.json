@@ -2343,6 +2343,10 @@
                     "title": "שמור מסונכרן",
                     "description": "משוך עדכונים אוטומטית ממאגר המקור."
                 },
+                "worksConfigRestore": {
+                    "title": "שחזר הגדרות works.yml",
+                    "description": "החל ספק AI, מודל, לוח זמנים ומאגרים קשורים ממאגר זה."
+                },
                 "sourceMethod": {
                     "url": {
                         "title": "הדבק URL",

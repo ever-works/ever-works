@@ -32,6 +32,8 @@ interface ImportConfigureStepProps {
     onManualSourceTypeChange: (type: ManualSourceType | null) => void;
     sync: boolean;
     onSyncChange: (sync: boolean) => void;
+    restoreWorksConfig: boolean;
+    onRestoreWorksConfigChange: (restore: boolean) => void;
     gitProvider?: string;
     isPending: boolean;
     owner: string;
@@ -62,6 +64,8 @@ export function ImportConfigureStep({
     onManualSourceTypeChange,
     sync,
     onSyncChange,
+    restoreWorksConfig,
+    onRestoreWorksConfigChange,
     gitProvider,
     isPending,
     owner,
@@ -88,6 +92,8 @@ export function ImportConfigureStep({
 
     const effectiveSourceType = analysisResult?.detectedType || manualSourceType;
     const isAwesomeReadme = effectiveSourceType === 'awesome_readme';
+    const canToggleWorksConfigRestore =
+        !!analysisResult?.worksConfig && effectiveSourceType !== 'works_config';
     const isMissingSupportedConfig =
         !!analysisResult &&
         !analysisResult.detectedType &&
@@ -419,6 +425,25 @@ export function ImportConfigureStep({
                         </p>
                     </div>
                     <Switch checked={sync} onChange={onSyncChange} disabled={isPending} />
+                </div>
+            )}
+
+            {/* works.yml restore option */}
+            {canToggleWorksConfigRestore && (
+                <div className="flex items-center justify-between gap-4 p-4 rounded-lg bg-surface dark:bg-surface-dark border border-border dark:border-border-dark">
+                    <div>
+                        <h3 className="font-medium text-text dark:text-text-dark">
+                            {t('worksConfigRestore.title')}
+                        </h3>
+                        <p className="text-sm text-text-muted dark:text-text-muted-dark">
+                            {t('worksConfigRestore.description')}
+                        </p>
+                    </div>
+                    <Switch
+                        checked={restoreWorksConfig}
+                        onChange={onRestoreWorksConfigChange}
+                        disabled={isPending}
+                    />
                 </div>
             )}
 

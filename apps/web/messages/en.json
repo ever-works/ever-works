@@ -2343,6 +2343,10 @@
                     "title": "Keep synchronized",
                     "description": "Automatically pull updates from the source repository."
                 },
+                "worksConfigRestore": {
+                    "title": "Restore works.yml settings",
+                    "description": "Apply AI provider, model, schedule, and related repository settings from this repository."
+                },
                 "sourceMethod": {
                     "url": {
                         "title": "Paste URL",

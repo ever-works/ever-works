@@ -2343,6 +2343,10 @@
                     "title": "Tetap disinkronkan",
                     "description": "Tarik pembaruan secara otomatis dari repositori sumber."
                 },
+                "worksConfigRestore": {
+                    "title": "Pulihkan pengaturan works.yml",
+                    "description": "Terapkan penyedia AI, model, jadwal, dan pengaturan repositori terkait dari repositori ini."
+                },
                 "sourceMethod": {
                     "url": {
                         "title": "Tempel URL",

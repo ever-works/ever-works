@@ -2343,6 +2343,10 @@
                     "title": "保持同步",
                     "description": "自动从源仓库拉取更新。"
                 },
+                "worksConfigRestore": {
+                    "title": "恢复 works.yml 设置",
+                    "description": "从此仓库应用 AI 提供商、模型、计划和相关仓库设置。"
+                },
                 "sourceMethod": {
                     "url": {
                         "title": "粘贴 URL",

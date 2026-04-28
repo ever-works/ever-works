@@ -77,6 +77,7 @@ export function DirectoryImportForm({ gitProvider, deployProvider }: DirectoryIm
     const [sourceUrl, setSourceUrl] = useState('');
     const [directoryName, setDirectoryName] = useState('');
     const [sync, setSync] = useState(false);
+    const [restoreWorksConfig, setRestoreWorksConfig] = useState(true);
     const [analysisResult, setAnalysisResult] = useState<AnalyzeRepositoryResponseDto | null>(null);
     const [linkAnalysis, setLinkAnalysis] = useState<AnalyzeForLinkingResponseDto | null>(null);
     const [showLinkConfirm, setShowLinkConfirm] = useState(false);
@@ -107,6 +108,7 @@ export function DirectoryImportForm({ gitProvider, deployProvider }: DirectoryIm
 
             if (result.success && result.data) {
                 setAnalysisResult(result.data);
+                setRestoreWorksConfig(true);
 
                 if (result.data.error) {
                     toast.error(result.data.error);
@@ -244,6 +246,7 @@ export function DirectoryImportForm({ gitProvider, deployProvider }: DirectoryIm
                 sourceType,
                 name: directoryName,
                 sync,
+                restoreWorksConfig: analysisResult.worksConfig ? restoreWorksConfig : undefined,
                 gitProvider,
                 deployProvider,
                 providers,
@@ -358,6 +361,8 @@ export function DirectoryImportForm({ gitProvider, deployProvider }: DirectoryIm
                         onManualSourceTypeChange={setManualSourceType}
                         sync={sync}
                         onSyncChange={setSync}
+                        restoreWorksConfig={restoreWorksConfig}
+                        onRestoreWorksConfigChange={setRestoreWorksConfig}
                         gitProvider={gitProvider}
                         isPending={isPending}
                         owner={owner}

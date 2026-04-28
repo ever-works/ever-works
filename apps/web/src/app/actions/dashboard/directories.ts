@@ -560,6 +560,7 @@ interface ImportDirectoryRequest {
     owner?: string;
     createMissingRepos?: boolean;
     sync?: boolean;
+    restoreWorksConfig?: boolean;
     gitProvider?: string;
     deployProvider?: string;
     providers?: Record<string, string>;
@@ -597,6 +598,7 @@ export async function importDirectory(data: ImportDirectoryRequest) {
         owner: z.string().optional(),
         createMissingRepos: z.boolean().optional(),
         sync: z.boolean().optional(),
+        restoreWorksConfig: z.boolean().optional(),
         gitProvider: z.string().optional(),
         deployProvider: z.string().optional(),
         providers: z.record(z.string()).optional(),
@@ -648,6 +650,7 @@ export async function importDirectory(data: ImportDirectoryRequest) {
             owner: owner || undefined,
             createMissingRepos: validation.data.createMissingRepos,
             sync: validation.data.sync,
+            restoreWorksConfig: validation.data.restoreWorksConfig,
             gitProvider: providerId,
             deployProvider: validation.data.deployProvider,
             providers: validation.data.providers,

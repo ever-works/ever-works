@@ -420,6 +420,7 @@ export interface ImportDirectoryDto {
     organization?: boolean;
     createMissingRepos?: boolean;
     sync?: boolean;
+    restoreWorksConfig?: boolean;
     gitProvider: string;
     deployProvider?: string;
     providers?: Record<string, string>;

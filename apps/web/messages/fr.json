@@ -2343,6 +2343,10 @@
                     "title": "Rester synchronisé",
                     "description": "Récupérer automatiquement les mises à jour du dépôt source."
                 },
+                "worksConfigRestore": {
+                    "title": "Restaurer les paramètres works.yml",
+                    "description": "Appliquer le fournisseur IA, le modèle, la planification et les dépôts liés depuis ce dépôt."
+                },
                 "sourceMethod": {
                     "url": {
                         "title": "Coller l'URL",

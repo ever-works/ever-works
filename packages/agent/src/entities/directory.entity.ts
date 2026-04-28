@@ -200,28 +200,39 @@ export class Directory {
     updatedAt: Date;
 
     getDataRepo() {
-        return this.sourceRepository?.relatedRepositories?.data?.repo || `${this.slug}-data`;
+        return this.getRelatedRepository('data').repo;
     }
 
     getWebsiteRepo() {
-        return this.sourceRepository?.relatedRepositories?.website?.repo || `${this.slug}-website`;
+        return this.getRelatedRepository('website').repo;
     }
 
     getMainRepo() {
-        return this.sourceRepository?.relatedRepositories?.directory?.repo || this.slug;
+        return this.getRelatedRepository('directory').repo;
     }
 
-    getRepoOwner(type?: 'data' | 'directory' | 'website'): string {
-        const relatedOwner =
-            type === 'data'
-                ? this.sourceRepository?.relatedRepositories?.data?.owner
-                : type === 'website'
-                  ? this.sourceRepository?.relatedRepositories?.website?.owner
-                  : type === 'directory'
-                    ? this.sourceRepository?.relatedRepositories?.directory?.owner
-                    : undefined;
+    getRepoOwner(type: RepositoryRole = 'data'): string {
+        return this.getRelatedRepository(type).owner;
+    }
 
-        return relatedOwner || this.owner || this.user?.username || '';
+    private getRelatedRepository(type: RepositoryRole): Required<RepositoryTarget> {
+        const related = this.sourceRepository?.relatedRepositories?.[type];
+        const owner = related?.owner || this.owner || this.user?.username || '';
+        const repo = related?.repo || this.getDefaultRepositoryName(type);
+
+        return { owner, repo };
+    }
+
+    private getDefaultRepositoryName(type: RepositoryRole): string {
+        if (type === 'website') {
+            return `${this.slug}-website`;
+        }
+
+        if (type === 'directory') {
+            return this.slug;
+        }
+
+        return `${this.slug}-data`;
     }
 
     /**
@@ -285,6 +296,7 @@ export interface MarkdownReadmeConfig {
 }
 
 export type ImportSourceType = 'data_repo' | 'awesome_readme' | 'link_existing' | 'works_config';
+export type RepositoryRole = 'data' | 'directory' | 'website';
 
 export type RepositoryTarget = {
     owner?: string;

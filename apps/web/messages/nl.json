@@ -2343,6 +2343,10 @@
                     "title": "Gesynchroniseerd houden",
                     "description": "Updates automatisch ophalen uit de bronrepository."
                 },
+                "worksConfigRestore": {
+                    "title": "works.yml-instellingen herstellen",
+                    "description": "AI-provider, model, planning en gekoppelde repository-instellingen uit deze repository toepassen."
+                },
                 "sourceMethod": {
                     "url": {
                         "title": "URL plakken",
