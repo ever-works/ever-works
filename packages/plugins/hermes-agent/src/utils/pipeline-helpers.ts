@@ -93,11 +93,18 @@ async function resolveScopedSettings(
 	}
 
 	try {
-		const [userSettings, directorySettings] = await Promise.all([
+		const [globalSettings, userSettings, directorySettings] = await Promise.all([
+			context.getSettings('global'),
 			context.getSettings('user', userId),
 			context.getSettings('directory', directoryId)
 		]);
-		const merged: PluginSettings = { ...userSettings };
+		const merged: PluginSettings = { ...globalSettings };
+
+		for (const key in userSettings) {
+			if (userSettings[key] !== undefined && userSettings[key] !== null) {
+				merged[key] = userSettings[key];
+			}
+		}
 
 		for (const key in directorySettings) {
 			if (directorySettings[key] !== undefined && directorySettings[key] !== null) {

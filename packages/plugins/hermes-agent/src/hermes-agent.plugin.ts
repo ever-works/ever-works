@@ -160,6 +160,37 @@ function buildBrandOutputs(names: readonly string[]) {
 	}));
 }
 
+function createExecutionSignal(pluginController: AbortController, externalSignal?: AbortSignal): {
+	signal: AbortSignal;
+	cleanup: () => void;
+} {
+	if (!externalSignal) {
+		return {
+			signal: pluginController.signal,
+			cleanup: () => {}
+		};
+	}
+
+	if (externalSignal.aborted) {
+		pluginController.abort((externalSignal as AbortSignal & { reason?: unknown }).reason);
+		return {
+			signal: pluginController.signal,
+			cleanup: () => {}
+		};
+	}
+
+	const abortFromExternal = () => {
+		pluginController.abort((externalSignal as AbortSignal & { reason?: unknown }).reason);
+	};
+
+	externalSignal.addEventListener('abort', abortFromExternal, { once: true });
+
+	return {
+		signal: pluginController.signal,
+		cleanup: () => externalSignal.removeEventListener('abort', abortFromExternal)
+	};
+}
+
 export class HermesAgentPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvider {
 	readonly id = 'hermes-agent';
 	readonly name = 'Hermes Agent';
@@ -326,7 +357,7 @@ export class HermesAgentPlugin implements IPlugin, IPipelinePlugin, IFormSchemaP
 	): Promise<PipelineResult> {
 		const startTime = Date.now();
 		const abortController = new AbortController();
-		const signal = options?.signal ?? abortController.signal;
+		const { signal, cleanup: cleanupSignal } = createExecutionSignal(abortController, options?.signal);
 		const logger = this.context?.logger ?? console;
 		const onLogEntry = options?.onLogEntry;
 		const userId = directory.user?.id;
@@ -373,7 +404,8 @@ export class HermesAgentPlugin implements IPlugin, IPipelinePlugin, IFormSchemaP
 				request,
 				existing,
 				workspacePath,
-				options,
+				signal,
+				options?.execContext,
 				facadeOptions,
 				onProgress,
 				onLogEntry
@@ -445,6 +477,7 @@ export class HermesAgentPlugin implements IPlugin, IPipelinePlugin, IFormSchemaP
 			}
 			return this.handleError(err, startTime);
 		} finally {
+			cleanupSignal();
 			if (this.abortController === abortController) {
 				this.abortController = null;
 				this.killProcess = null;
@@ -508,7 +541,8 @@ export class HermesAgentPlugin implements IPlugin, IPipelinePlugin, IFormSchemaP
 		request: GenerationRequest,
 		existing: ExistingItems,
 		workspacePath: string,
-		options: PipelineExecutionOptions | undefined,
+		signal: AbortSignal,
+		execContext: PipelineExecutionOptions['execContext'],
 		facadeOptions: FacadeOptions,
 		onProgress: PipelineProgressCallback | undefined,
 		onLogEntry?: PipelineExecutionOptions['onLogEntry']
@@ -516,7 +550,7 @@ export class HermesAgentPlugin implements IPlugin, IPipelinePlugin, IFormSchemaP
 		const startedAt = this.startStep('generate-items', onLogEntry);
 		reportProgress(onProgress, 2, 30, 'Generate Items');
 
-		const promptFacade = options?.execContext?.promptFacade;
+		const promptFacade = execContext?.promptFacade;
 		const promptInput = { directory, request, existing };
 
 		const sysTemplate = promptFacade
@@ -540,7 +574,7 @@ export class HermesAgentPlugin implements IPlugin, IPipelinePlugin, IFormSchemaP
 			skills: runtimeSettings.skills,
 			maxTurns: runtimeSettings.maxTurns,
 			yolo: runtimeSettings.yolo,
-			signal: options?.signal,
+			signal,
 			onStdoutLine: (line) => this.emitLine(onLogEntry, 'info', line),
 			onStderrLine: (line) => this.emitLine(onLogEntry, 'warn', line)
 		});
