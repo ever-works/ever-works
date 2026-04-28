@@ -11,6 +11,65 @@ jest.mock('@src/generators/website-generator/website-generator.service', () => (
 import { DirectoryImportService } from '../directory-import.service';
 import { ImportSourceTypeEnum } from '@src/dto/import-directory.dto';
 
+function createWorksConfigRestoreServiceMock() {
+    return {
+        getConflictRepoNames: jest.fn(
+            (slug: string, sourceRepoName?: string, worksConfig?: any) => {
+                const repoNames = [`${slug}-data`];
+                const websiteRepo = worksConfig?.websiteRepo?.split('/').pop() || `${slug}-website`;
+                return repoNames
+                    .concat(websiteRepo)
+                    .filter((repoName) => repoName.toLowerCase() !== sourceRepoName?.toLowerCase());
+            },
+        ),
+        sanitizeConflict: jest.fn((conflict: any, sourceRepoName?: string, worksConfig?: any) => {
+            const benign = new Set<string>();
+            if (sourceRepoName) benign.add(sourceRepoName.toLowerCase());
+            const websiteRepo = worksConfig?.websiteRepo?.split('/').pop();
+            if (websiteRepo?.toLowerCase() === sourceRepoName?.toLowerCase()) {
+                benign.add(websiteRepo.toLowerCase());
+            }
+            const conflictingRepos = conflict.conflictingRepos.filter(
+                (repoName: string) => !benign.has(repoName.toLowerCase()),
+            );
+            return {
+                ...conflict,
+                hasConflict: conflictingRepos.length > 0,
+                conflictingRepos,
+            };
+        }),
+        validateForImport: jest.fn().mockResolvedValue(undefined),
+        validateRepositoryTargets: jest.fn(),
+        buildSourceRepository: jest.fn((options: any) => ({
+            url: options.sourceUrl,
+            owner: options.sourceOwner,
+            repo: options.sourceRepo,
+            type: options.sourceType,
+            importedAt: new Date('2026-04-24T00:00:00.000Z'),
+            worksConfig: options.worksConfig
+                ? {
+                      initialPrompt: options.worksConfig.initialPrompt,
+                      websiteRepo: options.worksConfig.websiteRepo,
+                      providers: options.worksConfig.providers,
+                  }
+                : undefined,
+            relatedRepositories: {
+                [options.sourceRole ?? 'directory']: {
+                    owner: options.sourceOwner,
+                    repo: options.sourceRepo,
+                },
+                ...(options.worksConfig?.websiteRepositoryTarget
+                    ? { website: options.worksConfig.websiteRepositoryTarget }
+                    : {}),
+            },
+        })),
+        applyPipelineSettings: jest.fn().mockResolvedValue(undefined),
+        applyInitialSchedule: jest.fn().mockResolvedValue(undefined),
+        applyScheduleOverrides: jest.fn().mockResolvedValue(undefined),
+        toResolved: jest.fn((worksConfig: any) => worksConfig ?? null),
+    };
+}
+
 describe('DirectoryImportService.analyzeRepository', () => {
     it('does not surface the source works.yml repo as a slug conflict', async () => {
         const sourceRepoAnalyzer = {
@@ -55,7 +114,7 @@ describe('DirectoryImportService.analyzeRepository', () => {
                     return repo ? { owner, repo } : { repo: owner };
                 }),
             } as any,
-            {} as any,
+            createWorksConfigRestoreServiceMock() as any,
             {} as any,
             {} as any,
             {} as any,
@@ -118,7 +177,7 @@ describe('DirectoryImportService.analyzeRepository', () => {
             {
                 parseRepositoryReference: jest.fn(),
             } as any,
-            {} as any,
+            createWorksConfigRestoreServiceMock() as any,
             {} as any,
             {} as any,
             {} as any,
@@ -182,7 +241,7 @@ describe('DirectoryImportService.analyzeRepository', () => {
                     return repo ? { owner, repo } : { repo: owner };
                 }),
             } as any,
-            {} as any,
+            createWorksConfigRestoreServiceMock() as any,
             {} as any,
             {} as any,
             {} as any,
@@ -241,10 +300,10 @@ describe('DirectoryImportService.initiateImport', () => {
         const worksConfigService = {
             loadFromRepository: jest.fn().mockResolvedValue({
                 initialPrompt: 'Build everything',
-                websiteRepo: 'Ntermast/Compare-Cloud-Pricing',
+                websiteRepo: 'Ntermast/Compare-Cloud-Pricing-Website',
                 websiteRepositoryTarget: {
                     owner: 'Ntermast',
-                    repo: 'Compare-Cloud-Pricing',
+                    repo: 'Compare-Cloud-Pricing-Website',
                 },
                 providers: {
                     ai: 'groq',
@@ -273,13 +332,11 @@ describe('DirectoryImportService.initiateImport', () => {
             sourceRepoAnalyzer as any,
             {} as any,
             worksConfigService as any,
+            createWorksConfigRestoreServiceMock() as any,
             {} as any,
             {
                 validateSelectedProviders: jest.fn().mockResolvedValue(undefined),
                 validateRequiredProvidersForPipeline: jest.fn().mockResolvedValue(undefined),
-            } as any,
-            {
-                enablePluginForDirectory: jest.fn().mockResolvedValue(undefined),
             } as any,
             {
                 emit: jest.fn(),
@@ -319,7 +376,7 @@ describe('DirectoryImportService.initiateImport', () => {
                 },
                 website: {
                     owner: 'Ntermast',
-                    repo: 'Compare-Cloud-Pricing',
+                    repo: 'Compare-Cloud-Pricing-Website',
                 },
             },
         });
@@ -362,11 +419,9 @@ describe('DirectoryImportService.syncDirectory', () => {
                     },
                 }),
             } as any,
+            createWorksConfigRestoreServiceMock() as any,
             {} as any,
             {} as any,
-            {
-                enablePluginForDirectory: jest.fn().mockResolvedValue(undefined),
-            } as any,
             {
                 emit: jest.fn(),
             } as any,

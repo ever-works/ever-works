@@ -32,12 +32,7 @@ import {
     GetUserRepositoriesResponseDto,
     GitRepoDto,
 } from '@src/dto/import-directory.dto';
-import {
-    Directory,
-    ImportSourceType,
-    SourceRepository,
-    type WorksConfigSnapshot,
-} from '@src/entities/directory.entity';
+import { Directory, ImportSourceType, SourceRepository } from '@src/entities/directory.entity';
 import { User } from '@src/entities/user.entity';
 import { DirectoryGenerationCompletedEvent } from '@src/events';
 import { buildImportStatsUpdate } from '@src/directory-operations';
@@ -56,7 +51,7 @@ import { slugifyText } from '@src/utils/text.utils';
 import { GenerationMethod } from '@src/items-generator/dto';
 import { DirectoryGenerationHistory } from '@src/entities/directory-generation-history.entity';
 import { GeneratorFormSchemaService } from './generator-form-schema.service';
-import { PluginOperationsService } from '@src/plugins/services/plugin-operations.service';
+import { WorksConfigRestoreService } from './works-config-restore.service';
 
 import { OperationTriggerContext, DEFAULT_TRIGGER_CONTEXT } from './types/trigger-context.types';
 
@@ -74,154 +69,14 @@ export class DirectoryImportService {
         private readonly sourceRepoAnalyzer: SourceRepoAnalyzerService,
         private readonly importExecutor: ImportExecutorService,
         private readonly worksConfigService: WorksConfigService,
+        private readonly worksConfigRestoreService: WorksConfigRestoreService,
         private readonly directoryScheduleService: DirectoryScheduleService,
         private readonly generatorFormSchemaService: GeneratorFormSchemaService,
-        private readonly pluginOperationsService: PluginOperationsService,
         private readonly eventEmitter: EventEmitter2,
         @Optional()
         @Inject(DIRECTORY_IMPORT_DISPATCHER)
         private readonly importDispatcher?: DirectoryImportDispatcher,
     ) {}
-
-    private toWorksConfigSnapshot(
-        worksConfig?: ParsedWorksConfig | null,
-    ): WorksConfigSnapshot | undefined {
-        if (!worksConfig) {
-            return undefined;
-        }
-
-        return {
-            name: worksConfig.name,
-            initialPrompt: worksConfig.initialPrompt,
-            model: worksConfig.model,
-            websiteRepo: worksConfig.websiteRepo,
-            scheduleCadence: worksConfig.scheduleCadence ?? null,
-            providers:
-                worksConfig.providers && Object.keys(worksConfig.providers).length > 0
-                    ? worksConfig.providers
-                    : undefined,
-            additionalAgentsCount: worksConfig.additionalAgentsCount,
-        };
-    }
-
-    private toResolvedWorksConfig(
-        worksConfig?: ParsedWorksConfig | null,
-    ): ResolvedWorksConfig | null {
-        if (!worksConfig) {
-            return null;
-        }
-
-        const { raw: _raw, ...resolvedWorksConfig } = worksConfig;
-        return resolvedWorksConfig;
-    }
-
-    private getWorksConfigConflictRepoNames(
-        slug: string,
-        sourceRepoName?: string | null,
-        worksConfig?: { websiteRepo?: string } | null,
-    ): string[] {
-        const normalizedSourceRepoName = sourceRepoName?.toLowerCase();
-        const repoNames = [`${slug}-data`];
-
-        const websiteRepo =
-            this.worksConfigService.parseRepositoryReference(worksConfig?.websiteRepo)?.repo ||
-            `${slug}-website`;
-        repoNames.push(websiteRepo);
-
-        return Array.from(
-            new Set(
-                repoNames.filter(
-                    (repoName) =>
-                        typeof repoName === 'string' &&
-                        repoName.length > 0 &&
-                        repoName.toLowerCase() !== normalizedSourceRepoName,
-                ),
-            ),
-        );
-    }
-
-    private sanitizeWorksConfigConflict(
-        conflict: {
-            hasConflict: boolean;
-            conflictingRepos: string[];
-            suggestedSlug: string;
-        },
-        sourceRepoName?: string | null,
-        worksConfig?: { websiteRepo?: string } | null,
-    ): {
-        hasConflict: boolean;
-        conflictingRepos: string[];
-        suggestedSlug: string;
-    } {
-        const benignRepos = new Set<string>();
-        const normalizedSourceRepoName = sourceRepoName?.toLowerCase();
-
-        if (sourceRepoName) {
-            benignRepos.add(sourceRepoName.toLowerCase());
-        }
-
-        const websiteRepo = this.worksConfigService.parseRepositoryReference(
-            worksConfig?.websiteRepo,
-        )?.repo;
-        if (
-            websiteRepo &&
-            normalizedSourceRepoName &&
-            websiteRepo.toLowerCase() === normalizedSourceRepoName
-        ) {
-            benignRepos.add(websiteRepo.toLowerCase());
-        }
-
-        const conflictingRepos = conflict.conflictingRepos.filter(
-            (repoName) => !benignRepos.has(repoName.toLowerCase()),
-        );
-
-        return {
-            hasConflict: conflictingRepos.length > 0,
-            conflictingRepos,
-            suggestedSlug: conflict.suggestedSlug,
-        };
-    }
-
-    private getPipelinePluginSettingsFromWorksConfig(
-        worksConfig?: ParsedWorksConfig | null,
-    ): { pluginId: 'codex' | 'claude-code'; settings: Record<string, unknown> } | null {
-        const pipelineId = worksConfig?.providers?.pipeline;
-        const model = worksConfig?.model;
-
-        if (!model) {
-            return null;
-        }
-
-        if (pipelineId === 'codex' || pipelineId === 'claude-code') {
-            return {
-                pluginId: pipelineId,
-                settings: { model },
-            };
-        }
-
-        return null;
-    }
-
-    private async applyWorksConfigPipelineSettings(
-        directoryId: string,
-        userId: string,
-        worksConfig?: ParsedWorksConfig | null,
-    ): Promise<void> {
-        const pipelineSettings = this.getPipelinePluginSettingsFromWorksConfig(worksConfig);
-        if (!pipelineSettings) {
-            return;
-        }
-
-        await this.pluginOperationsService.enablePluginForDirectory(
-            directoryId,
-            pipelineSettings.pluginId,
-            userId,
-            {
-                activeCapability: 'pipeline',
-                settings: pipelineSettings.settings,
-            },
-        );
-    }
 
     /**
      * Analyze a repository to detect its type and structure
@@ -247,9 +102,9 @@ export class DirectoryImportService {
                     slug,
                     token,
                     providerId,
-                    result.detectedType === ImportSourceTypeEnum.WORKS_CONFIG
+                    result.worksConfig
                         ? {
-                              includeRepoNames: this.getWorksConfigConflictRepoNames(
+                              includeRepoNames: this.worksConfigRestoreService.getConflictRepoNames(
                                   slug,
                                   result.repo,
                                   result.worksConfig,
@@ -257,14 +112,13 @@ export class DirectoryImportService {
                           }
                         : undefined,
                 );
-                const conflict =
-                    result.detectedType === ImportSourceTypeEnum.WORKS_CONFIG
-                        ? this.sanitizeWorksConfigConflict(
-                              rawConflict,
-                              result.repo,
-                              result.worksConfig,
-                          )
-                        : rawConflict;
+                const conflict = result.worksConfig
+                    ? this.worksConfigRestoreService.sanitizeConflict(
+                          rawConflict,
+                          result.repo,
+                          result.worksConfig,
+                      )
+                    : rawConflict;
                 if (conflict.hasConflict) {
                     result.slugConflict = conflict;
                 }
@@ -403,7 +257,10 @@ export class DirectoryImportService {
             }
 
             let worksConfig: ParsedWorksConfig | null = null;
-            if (dto.sourceType === ImportSourceTypeEnum.WORKS_CONFIG) {
+            if (
+                dto.sourceType === ImportSourceTypeEnum.WORKS_CONFIG ||
+                dto.sourceType === ImportSourceTypeEnum.DATA_REPO
+            ) {
                 const token = await this.getProviderToken(user, dto.gitProvider);
                 worksConfig = await this.worksConfigService.loadFromRepository(
                     parsed.owner,
@@ -412,21 +269,13 @@ export class DirectoryImportService {
                     token,
                 );
 
-                if (!worksConfig?.initialPrompt) {
-                    return {
-                        status: 'error',
-                        message: 'works.yml is missing initial_prompt',
-                    };
+                if (dto.sourceType === ImportSourceTypeEnum.WORKS_CONFIG) {
+                    await this.worksConfigRestoreService.validateForImport(worksConfig, user.id);
                 }
 
-                await this.generatorFormSchemaService.validateSelectedProviders(
-                    worksConfig.providers,
-                    { userId: user.id },
-                );
-                await this.generatorFormSchemaService.validateRequiredProvidersForPipeline(
-                    worksConfig.providers?.pipeline,
-                    worksConfig.providers,
-                    { userId: user.id },
+                this.worksConfigRestoreService.validateRepositoryTargets(
+                    { owner: parsed.owner, repo: parsed.repo },
+                    worksConfig,
                 );
             }
 
@@ -436,8 +285,12 @@ export class DirectoryImportService {
                     dto.owner || user.username,
                     user,
                     dto.gitProvider,
-                    dto.sourceType === ImportSourceTypeEnum.WORKS_CONFIG
-                        ? this.getWorksConfigConflictRepoNames(slug, parsed.repo, worksConfig)
+                    worksConfig
+                        ? this.worksConfigRestoreService.getConflictRepoNames(
+                              slug,
+                              parsed.repo,
+                              worksConfig,
+                          )
                         : undefined,
                 );
             }
@@ -465,8 +318,12 @@ export class DirectoryImportService {
                 return this.handleLinkExisting(directory, dto, parsed, user);
             }
 
-            if (dto.sourceType === ImportSourceTypeEnum.WORKS_CONFIG) {
-                await this.applyWorksConfigPipelineSettings(directory.id, user.id, worksConfig);
+            if (worksConfig) {
+                await this.worksConfigRestoreService.applyPipelineSettings(
+                    directory.id,
+                    user.id,
+                    worksConfig,
+                );
             }
 
             const updateData: Partial<Directory> = {
@@ -484,26 +341,23 @@ export class DirectoryImportService {
                     type: dto.sourceType as ImportSourceType,
                     importedAt: new Date(),
                 };
+            } else if (dto.sourceType === ImportSourceTypeEnum.DATA_REPO) {
+                updateData.sourceRepository = this.worksConfigRestoreService.buildSourceRepository({
+                    sourceUrl: dto.sourceUrl,
+                    sourceOwner: parsed.owner,
+                    sourceRepo: parsed.repo,
+                    sourceType: dto.sourceType as ImportSourceType,
+                    sourceRole: 'data',
+                    worksConfig,
+                });
             } else if (dto.sourceType === ImportSourceTypeEnum.WORKS_CONFIG) {
-                updateData.sourceRepository = {
-                    url: dto.sourceUrl,
-                    owner: parsed.owner,
-                    repo: parsed.repo,
-                    type: dto.sourceType as ImportSourceType,
-                    importedAt: new Date(),
-                    worksConfig: this.toWorksConfigSnapshot(worksConfig),
-                    relatedRepositories: {
-                        directory: {
-                            owner: parsed.owner,
-                            repo: parsed.repo,
-                        },
-                        ...(worksConfig?.websiteRepositoryTarget
-                            ? {
-                                  website: worksConfig.websiteRepositoryTarget,
-                              }
-                            : {}),
-                    },
-                };
+                updateData.sourceRepository = this.worksConfigRestoreService.buildSourceRepository({
+                    sourceUrl: dto.sourceUrl,
+                    sourceOwner: parsed.owner,
+                    sourceRepo: parsed.repo,
+                    sourceType: dto.sourceType as ImportSourceType,
+                    worksConfig,
+                });
             }
 
             await this.directoryRepository.update(directory.id, updateData);
@@ -533,7 +387,7 @@ export class DirectoryImportService {
                 parsed,
                 history,
                 context,
-                this.toResolvedWorksConfig(worksConfig),
+                this.worksConfigRestoreService.toResolved(worksConfig),
             );
 
             // Enable sync schedule only for awesome_readme imports
@@ -705,22 +559,11 @@ export class DirectoryImportService {
                 ...buildImportStatsUpdate(result),
             });
 
-            if (
-                dto.sourceType === ImportSourceTypeEnum.WORKS_CONFIG &&
-                worksConfig?.scheduleCadence
-            ) {
-                await this.directoryScheduleService.updateSchedule(
+            if (worksConfig) {
+                await this.worksConfigRestoreService.applyInitialSchedule(
                     directory.id,
-                    {
-                        enable: true,
-                        cadence: worksConfig.scheduleCadence,
-                        alwaysCreatePullRequest: true,
-                        providerOverrides:
-                            worksConfig.providers && Object.keys(worksConfig.providers).length > 0
-                                ? worksConfig.providers
-                                : null,
-                    },
                     user,
+                    worksConfig,
                 );
             }
 
@@ -932,60 +775,42 @@ export class DirectoryImportService {
             directory.gitProvider,
             token,
         );
-        const updatedSourceRepository: SourceRepository = {
-            ...(directory.sourceRepository || {
+        const previousSourceRepository =
+            directory.sourceRepository ||
+            ({
                 url: this.gitFacade.getWebUrl(directory.gitProvider, source.owner, source.repo),
                 owner: source.owner,
                 repo: source.repo,
                 type: ImportSourceTypeEnum.WORKS_CONFIG as ImportSourceType,
                 importedAt: new Date(),
-            }),
-            owner: source.owner,
-            repo: source.repo,
-            type: ImportSourceTypeEnum.WORKS_CONFIG as ImportSourceType,
-            worksConfig: this.toWorksConfigSnapshot(worksConfig),
-            relatedRepositories: {
-                ...(directory.sourceRepository?.relatedRepositories || {}),
-                directory: {
-                    owner: source.owner,
-                    repo: source.repo,
-                },
-                ...(worksConfig?.websiteRepositoryTarget
-                    ? {
-                          website: worksConfig.websiteRepositoryTarget,
-                      }
-                    : {}),
-            },
-        };
+            } as SourceRepository);
+        const updatedSourceRepository = this.worksConfigRestoreService.buildSourceRepository({
+            sourceUrl: previousSourceRepository.url,
+            sourceOwner: source.owner,
+            sourceRepo: source.repo,
+            sourceType: ImportSourceTypeEnum.WORKS_CONFIG as ImportSourceType,
+            previous: previousSourceRepository,
+            worksConfig,
+        });
 
         await this.directoryRepository.update(directory.id, {
             sourceRepository: updatedSourceRepository,
         });
         directory.sourceRepository = updatedSourceRepository;
 
-        if (
-            directory.scheduledUpdatesEnabled &&
-            (worksConfig?.scheduleCadence || worksConfig?.providers)
-        ) {
-            await this.directoryScheduleService.updateSchedule(
-                directory.id,
-                {
-                    cadence: worksConfig?.scheduleCadence ?? undefined,
-                    providerOverrides:
-                        worksConfig?.providers !== undefined ? worksConfig.providers : undefined,
-                },
-                user,
-            );
-        }
-
-        await this.applyWorksConfigPipelineSettings(directory.id, user.id, worksConfig);
+        await this.worksConfigRestoreService.applyScheduleOverrides(directory, user, worksConfig);
+        await this.worksConfigRestoreService.applyPipelineSettings(
+            directory.id,
+            user.id,
+            worksConfig,
+        );
 
         return this.importExecutor.importFromWorksConfig({
             directory,
             user,
             source,
             token,
-            worksConfig: this.toResolvedWorksConfig(worksConfig),
+            worksConfig: this.worksConfigRestoreService.toResolved(worksConfig),
         });
     }
 

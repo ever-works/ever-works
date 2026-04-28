@@ -1359,7 +1359,7 @@ export class DataGeneratorService {
                 version: await data.getNextVersion(),
                 metadata: {
                     ...existingMetadata,
-                    initial_prompt: initialPrompt,
+                    initial_prompt: existingMetadata.initial_prompt ?? initialPrompt,
                 },
             };
 
@@ -1368,7 +1368,7 @@ export class DataGeneratorService {
                 // Store minimal request data - plugin-specific defaults come from plugins
                 const initialRequestData: Partial<CreateItemsGeneratorDto> = {
                     name: directory.name,
-                    prompt: initialPrompt,
+                    prompt: configData.metadata.initial_prompt,
                     // pluginConfig is intentionally empty - plugins provide defaults
                     pluginConfig: {},
                 };

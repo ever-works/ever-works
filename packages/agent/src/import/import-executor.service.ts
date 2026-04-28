@@ -37,6 +37,7 @@ export interface ImportFromDataRepoOptions {
     user: User;
     source: { owner: string; repo: string };
     token: string;
+    worksConfig?: ResolvedWorksConfig | null;
 }
 
 export interface ImportFromAwesomeReadmeOptions {
@@ -79,7 +80,7 @@ export class ImportExecutorService {
     ) {}
 
     async importFromDataRepo(options: ImportFromDataRepoOptions): Promise<DirectoryImportResult> {
-        const { directory, user, source, token } = options;
+        const { directory, user, source, token, worksConfig } = options;
 
         try {
             this.logger.log(`Cloning source repo: ${source.owner}/${source.repo}`);
@@ -98,6 +99,11 @@ export class ImportExecutorService {
             const categories = await sourceData.getCategories().catch(() => []);
             const tags = await sourceData.getTags().catch(() => []);
             const config = await sourceData.getConfig().catch(() => ({}));
+            const configWithWorksState = this.mergeWorksConfigIntoDataConfig(
+                config as Record<string, any>,
+                directory.name,
+                worksConfig,
+            );
 
             this.logger.log(
                 `Found ${items.length} items, ${categories.length} categories, ${tags.length} tags`,
@@ -112,7 +118,7 @@ export class ImportExecutorService {
                 };
             }
 
-            const configWithMeta = config as Record<string, any>;
+            const configWithMeta = configWithWorksState as Record<string, any>;
             const initResult = await this.dataGenerator.initializeWithImportedData(
                 directory,
                 user,
@@ -381,6 +387,7 @@ export class ImportExecutorService {
                     user,
                     source: { owner: opts.sourceOwner, repo: opts.sourceRepo },
                     token,
+                    worksConfig: opts.worksConfig,
                 });
             }
             case 'awesome_readme':
@@ -415,5 +422,38 @@ export class ImportExecutorService {
             default:
                 throw new Error(`Unsupported source type: ${sourceType}`);
         }
+    }
+
+    private mergeWorksConfigIntoDataConfig(
+        config: Record<string, any>,
+        directoryName: string,
+        worksConfig?: ResolvedWorksConfig | null,
+    ): Record<string, any> {
+        if (!worksConfig) {
+            return config;
+        }
+
+        const metadata = {
+            ...(config.metadata || {}),
+        };
+
+        if (worksConfig.initialPrompt && !metadata.initial_prompt) {
+            metadata.initial_prompt = worksConfig.initialPrompt;
+        }
+
+        if (!metadata.last_request_data && worksConfig.initialPrompt) {
+            metadata.last_request_data = {
+                name: worksConfig.name || directoryName,
+                prompt: worksConfig.initialPrompt,
+                model: worksConfig.model,
+                providers: worksConfig.providers,
+                pluginConfig: {},
+            };
+        }
+
+        return {
+            ...config,
+            metadata,
+        };
     }
 }
