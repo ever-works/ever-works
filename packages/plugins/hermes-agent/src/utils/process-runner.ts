@@ -15,8 +15,46 @@ const PASSTHROUGH_ENV_KEYS = [
 	'SSL_CERT_DIR',
 	'NODE_EXTRA_CA_CERTS',
 	'REQUESTS_CA_BUNDLE',
-	'CURL_CA_BUNDLE'
+	'CURL_CA_BUNDLE',
+	'OPENROUTER_API_KEY',
+	'OPENAI_API_KEY',
+	'NOUS_API_KEY',
+	'ANTHROPIC_API_KEY',
+	'GOOGLE_API_KEY',
+	'GEMINI_API_KEY',
+	'GEMINI_BASE_URL',
+	'GLM_API_KEY',
+	'GLM_BASE_URL',
+	'KIMI_API_KEY',
+	'KIMI_BASE_URL',
+	'KIMI_CN_API_KEY',
+	'ARCEEAI_API_KEY',
+	'ARCEE_BASE_URL',
+	'MINIMAX_API_KEY',
+	'MINIMAX_BASE_URL',
+	'MINIMAX_CN_API_KEY',
+	'MINIMAX_CN_BASE_URL',
+	'OPENCODE_ZEN_API_KEY',
+	'OPENCODE_ZEN_BASE_URL',
+	'OPENCODE_GO_API_KEY',
+	'OPENCODE_GO_BASE_URL',
+	'HF_TOKEN',
+	'NVIDIA_API_KEY',
+	'XIAOMI_API_KEY',
+	'XIAOMI_BASE_URL',
+	'OLLAMA_API_KEY',
+	'OLLAMA_BASE_URL',
+	'AI_GATEWAY_API_KEY',
+	'EXA_API_KEY',
+	'PARALLEL_API_KEY',
+	'FIRECRAWL_API_KEY',
+	'FIRECRAWL_API_URL',
+	'TAVILY_API_KEY',
+	'BROWSERBASE_API_KEY',
+	'BROWSER_USE_API_KEY'
 ] as const;
+
+const PASSTHROUGH_ENV_PREFIXES = ['HERMES_'] as const;
 
 export interface ExecuteOptions {
 	readonly binaryPath: string;
@@ -77,6 +115,16 @@ export function buildHermesEnv(cwd: string): Record<string, string> {
 	for (const key of PASSTHROUGH_ENV_KEYS) {
 		const value = process.env[key];
 		if (value) {
+			env[key] = value;
+		}
+	}
+
+	for (const [key, value] of Object.entries(process.env)) {
+		if (!value) {
+			continue;
+		}
+
+		if (PASSTHROUGH_ENV_PREFIXES.some((prefix) => key.startsWith(prefix))) {
 			env[key] = value;
 		}
 	}

@@ -68,22 +68,28 @@ describe('process-runner', () => {
 		expect(removeSpy).toHaveBeenCalledWith('abort', expect.any(Function));
 	});
 
-	it('only forwards a minimal allowlisted environment to Hermes', () => {
+	it('only forwards a Hermes-specific allowlisted environment to Hermes', () => {
 		process.env.DATABASE_URL = 'postgres://secret';
-		process.env.OPENAI_API_KEY = 'sk-secret';
+		process.env.OPENAI_API_KEY = 'sk-openai';
+		process.env.GEMINI_API_KEY = 'sk-gemini';
+		process.env.HERMES_INFERENCE_PROVIDER = 'gemini';
 		process.env.HTTP_PROXY = 'http://proxy.local';
 		process.env.NODE_EXTRA_CA_CERTS = '/tmp/custom-ca.pem';
 
 		const env = buildHermesEnv('/tmp/workspace');
 
 		expect(env.DATABASE_URL).toBeUndefined();
-		expect(env.OPENAI_API_KEY).toBeUndefined();
+		expect(env.OPENAI_API_KEY).toBe('sk-openai');
+		expect(env.GEMINI_API_KEY).toBe('sk-gemini');
+		expect(env.HERMES_INFERENCE_PROVIDER).toBe('gemini');
 		expect(env.HTTP_PROXY).toBe('http://proxy.local');
 		expect(env.NODE_EXTRA_CA_CERTS).toBe('/tmp/custom-ca.pem');
 		expect(env.TERMINAL_CWD).toBe('/tmp/workspace');
 
 		delete process.env.DATABASE_URL;
 		delete process.env.OPENAI_API_KEY;
+		delete process.env.GEMINI_API_KEY;
+		delete process.env.HERMES_INFERENCE_PROVIDER;
 		delete process.env.HTTP_PROXY;
 		delete process.env.NODE_EXTRA_CA_CERTS;
 	});
