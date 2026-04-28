@@ -42,11 +42,7 @@ function assertWithinBaseDir(targetPath: string): string {
 
 export function getWorkspacePath(userId: string, directoryId: string): string {
 	return assertWithinBaseDir(
-		path.join(
-			BASE_TEMP_DIR,
-			sanitizePathSegment(userId, 'userId'),
-			sanitizePathSegment(directoryId, 'directoryId')
-		)
+		path.join(BASE_TEMP_DIR, sanitizePathSegment(userId, 'userId'), sanitizePathSegment(directoryId, 'directoryId'))
 	);
 }
 
@@ -54,9 +50,7 @@ export async function createWorkspace(userId: string, directoryId: string): Prom
 	const workspaceRoot = getWorkspacePath(userId, directoryId);
 	await fs.mkdir(workspaceRoot, { recursive: true });
 
-	const workspacePath = assertWithinBaseDir(
-		await fs.mkdtemp(path.join(workspaceRoot, `run-${randomUUID()}-`))
-	);
+	const workspacePath = assertWithinBaseDir(await fs.mkdtemp(path.join(workspaceRoot, `run-${randomUUID()}-`)));
 	await fs.mkdir(path.join(workspacePath, '_meta'), { recursive: true });
 	return workspacePath;
 }

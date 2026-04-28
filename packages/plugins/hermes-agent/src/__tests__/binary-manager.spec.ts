@@ -9,11 +9,7 @@ vi.mock('child_process', () => ({
 import { spawn } from 'child_process';
 import { ensureBinary, validateProfile } from '../utils/binary-manager.js';
 
-function createMockChild(options?: {
-	stdout?: string;
-	stderr?: string;
-	exitCode?: number | null;
-}): EventEmitter & {
+function createMockChild(options?: { stdout?: string; stderr?: string; exitCode?: number | null }): EventEmitter & {
 	stdout: PassThrough;
 	stderr: PassThrough;
 } {
