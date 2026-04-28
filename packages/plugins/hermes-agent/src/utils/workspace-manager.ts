@@ -25,10 +25,7 @@ export async function seedExistingItems(workspacePath: string, items: readonly I
 	);
 }
 
-export async function seedMetadata(
-	workspacePath: string,
-	metadata: Record<string, unknown>
-): Promise<void> {
+export async function seedMetadata(workspacePath: string, metadata: Record<string, unknown>): Promise<void> {
 	await fs.writeFile(
 		path.join(workspacePath, '_meta', 'workspace-metadata.json'),
 		JSON.stringify(metadata, null, 2),
@@ -121,10 +118,7 @@ export async function writeResultSchema(workspacePath: string): Promise<void> {
 	);
 }
 
-export async function readGeneratedItems(
-	workspacePath: string,
-	logger?: Logger
-): Promise<ItemData[]> {
+export async function readGeneratedItems(workspacePath: string, logger?: Logger): Promise<ItemData[]> {
 	let content: string;
 	try {
 		content = await fs.readFile(getResultFilePath(workspacePath), 'utf-8');
@@ -141,8 +135,7 @@ export async function readGeneratedItems(
 		logger?.warn('Repaired malformed JSON in Hermes result file');
 	}
 
-	const rawItems =
-		Array.isArray(parsed) ? parsed : (parsed as { items?: unknown } | null | undefined)?.items;
+	const rawItems = Array.isArray(parsed) ? parsed : (parsed as { items?: unknown } | null | undefined)?.items;
 	if (!Array.isArray(rawItems)) {
 		logger?.warn('Hermes result file did not contain an items array');
 		return [];

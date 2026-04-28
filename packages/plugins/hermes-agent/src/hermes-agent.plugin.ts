@@ -160,7 +160,10 @@ function buildBrandOutputs(names: readonly string[]) {
 	}));
 }
 
-function createExecutionSignal(pluginController: AbortController, externalSignal?: AbortSignal): {
+function createExecutionSignal(
+	pluginController: AbortController,
+	externalSignal?: AbortSignal
+): {
 	signal: AbortSignal;
 	cleanup: () => void;
 } {
@@ -721,10 +724,7 @@ export class HermesAgentPlugin implements IPlugin, IPipelinePlugin, IFormSchemaP
 		});
 	}
 
-	private startStep(
-		stepId: HermesAgentStepId,
-		onLogEntry?: PipelineExecutionOptions['onLogEntry']
-	): number {
+	private startStep(stepId: HermesAgentStepId, onLogEntry?: PipelineExecutionOptions['onLogEntry']): number {
 		if (this.state) {
 			this.state = updateStepState(this.state, stepId, 'running');
 		}

@@ -5,10 +5,7 @@ interface Logger {
 	log(message: string, ...args: unknown[]): void;
 }
 
-export async function ensureBinary(
-	settings: HermesRuntimeSettings,
-	logger: Logger
-): Promise<string> {
+export async function ensureBinary(settings: HermesRuntimeSettings, logger: Logger): Promise<string> {
 	const binaryPath = settings.binaryPath || 'hermes';
 
 	const result = spawnSync(binaryPath, ['--version'], {

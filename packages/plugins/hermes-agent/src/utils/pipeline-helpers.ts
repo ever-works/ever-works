@@ -9,11 +9,7 @@ import type {
 	StepState,
 	StepStatus
 } from '@ever-works/plugin';
-import {
-	buildCancelledPipelineResult,
-	buildErrorPipelineResult,
-	createEmptyPipelineOutputs
-} from '@ever-works/plugin';
+import { buildCancelledPipelineResult, buildErrorPipelineResult, createEmptyPipelineOutputs } from '@ever-works/plugin';
 import type { HermesAgentStepId } from '../types.js';
 import { HERMES_AGENT_STEP_IDS } from '../types.js';
 import { STEP_DEFINITIONS } from '../steps.js';
@@ -76,9 +72,7 @@ function updatePipelineStepState<TStepId extends string>(
 		steps,
 		currentStep: status === 'running' ? stepId : state.currentStep === stepId ? undefined : state.currentStep,
 		completedSteps:
-			status === 'completed' || status === 'skipped'
-				? [...state.completedSteps, stepId]
-				: state.completedSteps,
+			status === 'completed' || status === 'skipped' ? [...state.completedSteps, stepId] : state.completedSteps,
 		failedSteps: status === 'failed' ? [...state.failedSteps, stepId] : state.failedSteps
 	};
 }
@@ -166,9 +160,7 @@ export function buildMetrics(
 	};
 }
 
-export function finalizeCompletedState(
-	state: PipelineState<HermesAgentStepId>
-): PipelineState<HermesAgentStepId> {
+export function finalizeCompletedState(state: PipelineState<HermesAgentStepId>): PipelineState<HermesAgentStepId> {
 	return {
 		...state,
 		isRunning: false,
@@ -237,23 +229,17 @@ export function buildCancelledResult(
 	};
 }
 
-export function resolveHermesRuntimeSettings(
-	settings: Record<string, unknown>
-): HermesRuntimeSettings {
+export function resolveHermesRuntimeSettings(settings: Record<string, unknown>): HermesRuntimeSettings {
 	return {
 		profile: typeof settings.profile === 'string' && settings.profile.trim() ? settings.profile.trim() : 'default',
 		provider:
-			typeof settings.provider === 'string' && settings.provider.trim()
-				? settings.provider.trim()
-				: undefined,
-		model:
-			typeof settings.model === 'string' && settings.model.trim() ? settings.model.trim() : undefined,
+			typeof settings.provider === 'string' && settings.provider.trim() ? settings.provider.trim() : undefined,
+		model: typeof settings.model === 'string' && settings.model.trim() ? settings.model.trim() : undefined,
 		toolsets:
 			typeof settings.toolsets === 'string' && settings.toolsets.trim()
 				? settings.toolsets.trim()
 				: 'web,terminal,skills',
-		skills:
-			typeof settings.skills === 'string' && settings.skills.trim() ? settings.skills.trim() : undefined,
+		skills: typeof settings.skills === 'string' && settings.skills.trim() ? settings.skills.trim() : undefined,
 		maxTurns:
 			typeof settings.maxTurns === 'number' && Number.isFinite(settings.maxTurns)
 				? Math.max(1, Math.floor(settings.maxTurns))
