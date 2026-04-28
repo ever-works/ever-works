@@ -1,6 +1,6 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { buildHermesArgs } from '../utils/process-runner.js';
-import { resolveHermesRuntimeSettings } from '../utils/pipeline-helpers.js';
+import { resolveHermesRuntimeSettings, resolveSettings } from '../utils/pipeline-helpers.js';
 
 describe('resolveHermesRuntimeSettings', () => {
 	it('applies defaults', () => {
@@ -71,5 +71,41 @@ describe('buildHermesArgs', () => {
 			'--query',
 			'Return JSON'
 		]);
+	});
+});
+
+describe('resolveSettings', () => {
+	it('merges global, user, then directory settings by precedence', async () => {
+		const context = {
+			getSettings: vi.fn(async (scope: 'global' | 'user' | 'directory') => {
+				if (scope === 'global') {
+					return {
+						model: 'global-model',
+						binaryPath: '/usr/bin/hermes',
+						toolsets: 'web'
+					};
+				}
+
+				if (scope === 'user') {
+					return {
+						model: 'user-model',
+						profile: 'work'
+					};
+				}
+
+				return {
+					model: 'directory-model',
+					maxTurns: 25
+				};
+			})
+		};
+
+		await expect(resolveSettings(context as never, 'user-1', 'dir-1')).resolves.toEqual({
+			model: 'directory-model',
+			binaryPath: '/usr/bin/hermes',
+			toolsets: 'web',
+			profile: 'work',
+			maxTurns: 25
+		});
 	});
 });
