@@ -2,6 +2,22 @@ import { spawn, type ChildProcess } from 'child_process';
 import * as os from 'os';
 import { KILL_TIMEOUT_MS, MAX_BUFFER_SIZE } from '../types.js';
 
+const PASSTHROUGH_ENV_KEYS = [
+	'HTTP_PROXY',
+	'HTTPS_PROXY',
+	'ALL_PROXY',
+	'NO_PROXY',
+	'http_proxy',
+	'https_proxy',
+	'all_proxy',
+	'no_proxy',
+	'SSL_CERT_FILE',
+	'SSL_CERT_DIR',
+	'NODE_EXTRA_CA_CERTS',
+	'REQUESTS_CA_BUNDLE',
+	'CURL_CA_BUNDLE'
+] as const;
+
 export interface ExecuteOptions {
 	readonly binaryPath: string;
 	readonly prompt: string;
@@ -50,6 +66,24 @@ export function buildHermesArgs(options: ExecuteOptions): string[] {
 	return args;
 }
 
+export function buildHermesEnv(cwd: string): Record<string, string> {
+	const env: Record<string, string> = {
+		PATH: process.env.PATH ?? '/usr/local/bin:/usr/bin:/bin',
+		HOME: process.env.HOME ?? os.homedir(),
+		TMPDIR: process.env.TMPDIR ?? os.tmpdir(),
+		TERMINAL_CWD: cwd
+	};
+
+	for (const key of PASSTHROUGH_ENV_KEYS) {
+		const value = process.env[key];
+		if (value) {
+			env[key] = value;
+		}
+	}
+
+	return env;
+}
+
 export function executeHermes(options: ExecuteOptions): {
 	promise: Promise<ExecuteResult>;
 	kill: () => void;
@@ -75,19 +109,10 @@ export function executeHermes(options: ExecuteOptions): {
 	const promise = new Promise<ExecuteResult>((resolve, reject) => {
 		const startTime = Date.now();
 		const args = buildHermesArgs(options);
-		const env: Record<string, string> = {
-			...Object.fromEntries(
-				Object.entries(process.env).filter((entry): entry is [string, string] => typeof entry[1] === 'string')
-			),
-			PATH: process.env.PATH ?? '/usr/local/bin:/usr/bin:/bin',
-			HOME: process.env.HOME ?? os.homedir(),
-			TMPDIR: process.env.TMPDIR ?? os.tmpdir(),
-			TERMINAL_CWD: options.cwd
-		};
 
 		childProcess = spawn(options.binaryPath, args, {
 			cwd: options.cwd,
-			env,
+			env: buildHermesEnv(options.cwd),
 			stdio: ['ignore', 'pipe', 'pipe']
 		});
 

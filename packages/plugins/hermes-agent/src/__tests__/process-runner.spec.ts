@@ -7,7 +7,7 @@ vi.mock('child_process', () => ({
 }));
 
 import { spawn } from 'child_process';
-import { executeHermes } from '../utils/process-runner.js';
+import { buildHermesEnv, executeHermes } from '../utils/process-runner.js';
 
 function createMockChild(exitCode = 0): EventEmitter & {
 	stdout: PassThrough;
@@ -66,5 +66,25 @@ describe('process-runner', () => {
 		expect(result.exitCode).toBe(0);
 		expect(addSpy).toHaveBeenCalledWith('abort', expect.any(Function), { once: true });
 		expect(removeSpy).toHaveBeenCalledWith('abort', expect.any(Function));
+	});
+
+	it('only forwards a minimal allowlisted environment to Hermes', () => {
+		process.env.DATABASE_URL = 'postgres://secret';
+		process.env.OPENAI_API_KEY = 'sk-secret';
+		process.env.HTTP_PROXY = 'http://proxy.local';
+		process.env.NODE_EXTRA_CA_CERTS = '/tmp/custom-ca.pem';
+
+		const env = buildHermesEnv('/tmp/workspace');
+
+		expect(env.DATABASE_URL).toBeUndefined();
+		expect(env.OPENAI_API_KEY).toBeUndefined();
+		expect(env.HTTP_PROXY).toBe('http://proxy.local');
+		expect(env.NODE_EXTRA_CA_CERTS).toBe('/tmp/custom-ca.pem');
+		expect(env.TERMINAL_CWD).toBe('/tmp/workspace');
+
+		delete process.env.DATABASE_URL;
+		delete process.env.OPENAI_API_KEY;
+		delete process.env.HTTP_PROXY;
+		delete process.env.NODE_EXTRA_CA_CERTS;
 	});
 });
