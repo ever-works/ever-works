@@ -701,6 +701,13 @@ export class DirectoryImportService {
         }
 
         try {
+            const worksConfig = await this.loadAndApplySourceWorksConfig(directory, user, {
+                owner: source.owner,
+                repo: source.repo,
+                url: this.gitFacade.getWebUrl(directory.gitProvider, source.owner, source.repo),
+                type: ImportSourceTypeEnum.DATA_REPO as ImportSourceType,
+                role: 'data',
+            });
             const sourceDir = await this.gitFacade.cloneOrPull(
                 {
                     owner: source.owner,
@@ -714,11 +721,12 @@ export class DirectoryImportService {
             const items = await sourceData.getItems();
             const categories = await sourceData.getCategories().catch(() => []);
             const tags = await sourceData.getTags().catch(() => []);
+            const config = await sourceData.getConfig().catch(() => ({}));
 
             const syncResult = await this.dataGenerator.updateWithImportedData(
                 directory,
                 user,
-                { items, categories, tags },
+                { items, categories, tags, config: config as Record<string, any>, worksConfig },
                 { updateWithPullRequest: true },
             );
 
@@ -767,11 +775,23 @@ export class DirectoryImportService {
         user: User,
         sourceUrl: string,
     ): Promise<DirectoryImportResult> {
+        const source = this.sourceRepoAnalyzer.parseGitUrl(sourceUrl);
+        const worksConfig = source
+            ? await this.loadAndApplySourceWorksConfig(directory, user, {
+                  owner: source.owner,
+                  repo: source.repo,
+                  url: sourceUrl,
+                  type: ImportSourceTypeEnum.AWESOME_README as ImportSourceType,
+                  role: null,
+              })
+            : null;
+
         return this.importExecutor.importFromAwesomeReadme({
             directory,
             user,
             sourceUrl,
             updateWithPullRequest: true,
+            worksConfig,
         });
     }
 
@@ -834,6 +854,58 @@ export class DirectoryImportService {
         } catch (error) {
             this.logger.error(`Failed to cleanup after import failure: ${error.message}`);
         }
+    }
+
+    private async loadAndApplySourceWorksConfig(
+        directory: Directory,
+        user: User,
+        source: {
+            owner: string;
+            repo: string;
+            url: string;
+            type: ImportSourceType;
+            role: 'data' | 'directory' | null;
+        },
+    ): Promise<ResolvedWorksConfig | null> {
+        const token = await this.getProviderToken(user, directory.gitProvider);
+        const parsedWorksConfig = await this.worksConfigService.loadFromRepository(
+            source.owner,
+            source.repo,
+            directory.gitProvider,
+            token,
+        );
+
+        if (!parsedWorksConfig) {
+            return null;
+        }
+
+        const updatedSourceRepository = this.worksConfigRestoreService.buildSourceRepository({
+            sourceUrl: source.url,
+            sourceOwner: source.owner,
+            sourceRepo: source.repo,
+            sourceType: source.type,
+            sourceRole: source.role,
+            previous: directory.sourceRepository,
+            worksConfig: parsedWorksConfig,
+        });
+
+        await this.directoryRepository.update(directory.id, {
+            sourceRepository: updatedSourceRepository,
+        });
+        directory.sourceRepository = updatedSourceRepository;
+
+        await this.worksConfigRestoreService.applyScheduleOverrides(
+            directory,
+            user,
+            parsedWorksConfig,
+        );
+        await this.worksConfigRestoreService.applyPipelineSettings(
+            directory.id,
+            user.id,
+            parsedWorksConfig,
+        );
+
+        return this.worksConfigRestoreService.toResolved(parsedWorksConfig);
     }
 
     private async getProviderToken(user: User, providerId?: string): Promise<string | undefined> {

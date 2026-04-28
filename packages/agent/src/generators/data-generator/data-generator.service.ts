@@ -104,6 +104,7 @@ export class DataGeneratorService {
             tryResume?: boolean;
             logCollector?: GenerationLogCollector;
             signal?: AbortSignal;
+            worksConfig?: ResolvedWorksConfig | null;
         },
     ): Promise<InitializeResult> {
         this.logger.debug(
@@ -400,6 +401,7 @@ export class DataGeneratorService {
                 directory,
                 dataRepository: data,
                 request: createItemsGeneratorDto,
+                importedWorksConfig: options?.worksConfig,
                 initialPrompt:
                     existingData.existingConfig?.metadata?.initial_prompt ??
                     createItemsGeneratorDto.prompt,
@@ -1538,6 +1540,22 @@ export class DataGeneratorService {
                 );
             }
 
+            if (importedData.config) {
+                const currentConfig = (await data.getConfig().catch(() => ({}))) as Record<
+                    string,
+                    any
+                >;
+                await data.mergeConfig({
+                    ...currentConfig,
+                    ...importedData.config,
+                    version: await data.getNextVersion(),
+                    metadata: {
+                        ...(currentConfig.metadata || {}),
+                        ...(importedData.config.metadata || {}),
+                    },
+                });
+            }
+
             // Prepare items
             const existingItemsBySlug = new Map<string, ItemData>(
                 existingItems.map((item) => [slugifyText(item.slug || item.name), item] as const),
@@ -1581,7 +1599,9 @@ export class DataGeneratorService {
             await this.worksConfigWriter.writeToDataRepository({
                 directory,
                 dataRepository: data,
+                request: importedData.config?.metadata?.last_request_data,
                 importedWorksConfig: importedData.worksConfig,
+                initialPrompt: importedData.config?.metadata?.initial_prompt,
             });
 
             // Commit

@@ -82,4 +82,41 @@ describe('WorksConfigWriterService', () => {
 
         await fs.rm(repoDir, { recursive: true, force: true });
     });
+
+    it('writes imported works.yml-only state before schedule is applied to the directory', async () => {
+        const repoDir = await fs.mkdtemp(path.join(os.tmpdir(), 'works-config-writer-'));
+        const directory = {
+            ...createDirectory(),
+            scheduledUpdatesEnabled: false,
+            scheduledCadence: null,
+        };
+        const service = new WorksConfigWriterService(new WorksConfigService({} as any));
+
+        await service.writeToDataRepository({
+            directory,
+            dataRepository: { dir: repoDir } as any,
+            importedWorksConfig: {
+                initialPrompt: 'Imported prompt',
+                model: 'openai/gpt-5.1',
+                scheduleCadence: 'daily' as any,
+                providers: {
+                    ai: 'openai',
+                    pipeline: 'agent-pipeline',
+                },
+            },
+        });
+
+        const written = yaml.parse(await fs.readFile(path.join(repoDir, 'works.yml'), 'utf-8'));
+
+        expect(written).toMatchObject({
+            initial_prompt: 'Imported prompt',
+            model: 'openai/gpt-5.1',
+            schedule: {
+                enabled: true,
+                cadence: 'daily',
+            },
+        });
+
+        await fs.rm(repoDir, { recursive: true, force: true });
+    });
 });

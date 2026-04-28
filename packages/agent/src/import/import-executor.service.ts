@@ -220,7 +220,9 @@ export class ImportExecutorService {
                     `pipeline=${generationDto.providers?.pipeline}`,
             );
 
-            const genResult = await this.dataGenerator.initialize(directory, user, generationDto);
+            const genResult = await this.dataGenerator.initialize(directory, user, generationDto, {
+                worksConfig,
+            });
 
             if (genResult.success !== false) {
                 await this.markdownGenerator.initialize(directory, user);
@@ -353,7 +355,9 @@ export class ImportExecutorService {
                 delete generationDto.providers;
             }
 
-            const genResult = await this.dataGenerator.initialize(directory, user, generationDto);
+            const genResult = await this.dataGenerator.initialize(directory, user, generationDto, {
+                worksConfig: resolvedWorksConfig,
+            });
 
             if (genResult.success !== false) {
                 await this.markdownGenerator.initialize(directory, user);
