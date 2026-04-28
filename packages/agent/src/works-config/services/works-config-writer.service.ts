@@ -142,8 +142,6 @@ export class WorksConfigWriterService {
     }
 
     private withoutUndefined(value: Record<string, unknown>): Record<string, unknown> {
-        return Object.fromEntries(
-            Object.entries(value).filter(([, entry]) => entry !== undefined),
-        );
+        return Object.fromEntries(Object.entries(value).filter(([, entry]) => entry !== undefined));
     }
 }
