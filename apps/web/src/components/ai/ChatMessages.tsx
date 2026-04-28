@@ -50,12 +50,12 @@ export function ChatMessages({ messages, isStreaming }: ChatMessagesProps) {
             {!isAtTop && (
                 <div className="absolute top-0 left-0 right-0 h-24 bg-gradient-to-b from-white dark:from-surface-dark to-transparent pointer-events-none z-10 transition-opacity duration-200" />
             )}
-            
+
             {/* Bottom gradient - only show when not at bottom */}
             {!isAtBottom && (
                 <div className="absolute bottom-0 left-0 right-0 h-24 bg-gradient-to-t from-white dark:from-surface-dark to-transparent pointer-events-none z-10 transition-opacity duration-200" />
             )}
-            
+
             <div ref={scrollRef} className="h-full overflow-y-auto">
                 <div ref={contentRef} className="px-4 py-3 space-y-3">
                     {messages.map((message, index) => {
