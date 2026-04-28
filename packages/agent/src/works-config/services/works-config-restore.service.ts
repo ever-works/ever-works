@@ -47,6 +47,14 @@ export class WorksConfigRestoreService {
         await this.planner.validateForGeneratedImport(worksConfig, userId);
     }
 
+    async validateProviderSettings(
+        worksConfig: ParsedWorksConfig | ResolvedWorksConfig | null,
+        userId: string,
+        options?: { validateDefaults?: boolean },
+    ): Promise<void> {
+        await this.planner.validateProviderSettings(worksConfig, userId, options);
+    }
+
     validateRepositoryTargets(
         source: RepositoryTarget,
         worksConfig?: ParsedWorksConfig | ResolvedWorksConfig | null,

@@ -27,7 +27,7 @@ import type {
     AnalyzeRepositoryResponseDto,
     ImportEnrichmentConfig,
     ImportSourceType,
-} from '@/lib/api/directory';
+} from '@/lib/api/types-only';
 
 interface DirectoryImportFormProps {
     user: AuthUser;

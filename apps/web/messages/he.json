@@ -2401,6 +2401,7 @@
                     "seedDetected": "~{count} פריטי זרע זוהו",
                     "expansionFactor": "מטרת הרחבה",
                     "expansionDescription": "כמה פעמים גדולה יותר צריכה האוסף הסופי להיות בהשוואה למקור?",
+                    "recommendedMultiplier": "{value} (מומלץ)",
                     "preview": "~{seedCount} פריטי זרע → מטרה ~{targetCount} פריטים סופיים (~{newItems} פריטים חדשים לגילוי)",
                     "enrichmentOptions": "אפשרויות העשרה",
                     "enrichDescriptions": "שכתב תיאורים",

@@ -2401,6 +2401,7 @@
                     "seedDetected": "~{count} elementów bazowych wykrytych",
                     "expansionFactor": "Cel rozszerzenia",
                     "expansionDescription": "Ile razy większa powinna być ostateczna kolekcja w porównaniu do źródła?",
+                    "recommendedMultiplier": "{value} (zalecane)",
                     "preview": "~{seedCount} elementów bazowych → cel ~{targetCount} elementów końcowych (~{newItems} nowych elementów do odkrycia)",
                     "enrichmentOptions": "Opcje wzbogacania",
                     "enrichDescriptions": "Przepisz opisy",

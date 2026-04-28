@@ -92,6 +92,18 @@ describe('DataRepository', () => {
             name: 'Compare Cloud Pricing',
         });
 
+        await repository.writeConfig({
+            name: 'Generated Config',
+            version: 1,
+        } as any);
+
+        await expect(fs.readFile(path.join(repoDir, 'works.yml'), 'utf-8')).resolves.toBe(
+            'name: Compare Cloud Pricing\n',
+        );
+        await expect(fs.readFile(path.join(repoDir, 'config.yml'), 'utf-8')).resolves.toContain(
+            'name: Generated Config',
+        );
+
         await fs.rm(repoDir, { recursive: true, force: true });
     });
 });

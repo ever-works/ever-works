@@ -2401,6 +2401,7 @@
                     "seedDetected": "~{count} itens sementes detectados",
                     "expansionFactor": "Meta de expansão",
                     "expansionDescription": "Quantas vezes maior a coleção final deve ser em comparação com a fonte?",
+                    "recommendedMultiplier": "{value} (recomendado)",
                     "preview": "~{seedCount} itens sementes → meta ~{targetCount} itens finais (~{newItems} novos itens a descobrir)",
                     "enrichmentOptions": "Opções de enriquecimento",
                     "enrichDescriptions": "Reescrever descrições",

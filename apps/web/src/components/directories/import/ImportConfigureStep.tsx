@@ -13,12 +13,12 @@ import { formatWorksConfigProviders } from '../shared/works-config';
 import { SlugConflictWarning } from './SlugConflictWarning';
 import { getGlobalFormSchema } from '@/app/actions/dashboard/generator-form';
 import { useProviderSelection } from '@/lib/hooks/use-provider-selection';
-import type { GeneratorFormSchema } from '@/lib/api/types-only';
 import type {
     AnalyzeRepositoryResponseDto,
+    GeneratorFormSchema,
     ImportEnrichmentConfig,
     ImportSourceType,
-} from '@/lib/api/directory';
+} from '@/lib/api/types-only';
 import { Upload, CheckCircle2, FileText, Database, ArrowLeft, Sparkles } from 'lucide-react';
 
 type ManualSourceType = Extract<ImportSourceType, 'data_repo' | 'awesome_readme'>;
@@ -44,11 +44,11 @@ interface ImportConfigureStepProps {
 }
 
 const EXPANSION_OPTIONS = [
-    { value: 1.5, label: '1.5x' },
-    { value: 2, label: '2x' },
-    { value: 2.5, label: '2.5x (recommended)' },
-    { value: 3, label: '3x' },
-    { value: 5, label: '5x' },
+    { value: 1.5 },
+    { value: 2 },
+    { value: 2.5, recommended: true },
+    { value: 3 },
+    { value: 5 },
 ];
 
 const ALLOWED_IMPORT_PIPELINES = ['agent-pipeline', 'claude-code'];
@@ -386,7 +386,11 @@ export function ImportConfigureStep({
                                             : 'bg-surface-secondary dark:bg-surface-secondary-dark text-text-secondary dark:text-text-secondary-dark hover:bg-primary/10',
                                     )}
                                 >
-                                    {option.label}
+                                    {option.recommended
+                                        ? t('research.recommendedMultiplier', {
+                                              value: `${option.value}x`,
+                                          })
+                                        : `${option.value}x`}
                                 </button>
                             ))}
                         </div>

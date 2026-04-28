@@ -66,6 +66,7 @@ function createWorksConfigRestoreServiceMock() {
         applyPipelineSettings: jest.fn().mockResolvedValue(undefined),
         applyInitialSchedule: jest.fn().mockResolvedValue(undefined),
         applyScheduleOverrides: jest.fn().mockResolvedValue(undefined),
+        validateProviderSettings: jest.fn().mockResolvedValue(undefined),
         toResolved: jest.fn((worksConfig: any) => worksConfig ?? null),
     };
 }

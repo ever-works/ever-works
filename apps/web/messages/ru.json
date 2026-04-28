@@ -2401,6 +2401,7 @@
                     "seedDetected": "~{count} обнаружено исходных элементов",
                     "expansionFactor": "Цель расширения",
                     "expansionDescription": "Во сколько раз больше должна быть итоговая коллекция по сравнению с исходной?",
+                    "recommendedMultiplier": "{value} (рекомендуется)",
                     "preview": "~{seedCount} исходных элементов → цель ~{targetCount} итоговых элементов (~{newItems} новых элементов для обнаружения)",
                     "enrichmentOptions": "Опции обогащения",
                     "enrichDescriptions": "Переписать описания",

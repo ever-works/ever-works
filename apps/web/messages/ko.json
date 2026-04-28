@@ -2401,6 +2401,7 @@
                     "seedDetected": "~{count} 시드 항목 감지됨",
                     "expansionFactor": "확장 목표",
                     "expansionDescription": "최종 컬렉션이 소스 대비 몇 배 커야 하나요?",
+                    "recommendedMultiplier": "{value} (권장)",
                     "preview": "~{seedCount} 시드 항목 → 목표 ~{targetCount} 최종 항목 (~{newItems} 새 항목 발견)",
                     "enrichmentOptions": "풍부화 옵션",
                     "enrichDescriptions": "설명 재작성",

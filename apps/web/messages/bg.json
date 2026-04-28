@@ -2401,6 +2401,7 @@
                     "seedDetected": "Открити ~{count} семенни елемента",
                     "expansionFactor": "Цел за разширяване",
                     "expansionDescription": "Колко пъти по-голяма трябва да бъде крайната колекция в сравнение с източника?",
+                    "recommendedMultiplier": "{value} (препоръчително)",
                     "preview": "~{seedCount} семенни елемента → цел ~{targetCount} крайни елемента (~{newItems} нови елемента за откриване)",
                     "enrichmentOptions": "Опции за обогатяване",
                     "enrichDescriptions": "Препиши описанията",

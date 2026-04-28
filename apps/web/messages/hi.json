@@ -2401,6 +2401,7 @@
                     "seedDetected": "~{count} बीज आइटम का पता चला",
                     "expansionFactor": "विस्तार लक्ष्य",
                     "expansionDescription": "अंतिम संग्रह स्रोत की तुलना में कितना बड़ा होना चाहिए?",
+                    "recommendedMultiplier": "{value} (अनुशंसित)",
                     "preview": "~{seedCount} बीज आइटम → लक्ष्य ~{targetCount} अंतिम आइटम (~{newItems} नए आइटम खोजने हैं)",
                     "enrichmentOptions": "संवर्धन विकल्प",
                     "enrichDescriptions": "विवरण पुनर्लिखित करें",

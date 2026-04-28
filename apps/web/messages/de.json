@@ -2401,6 +2401,7 @@
                     "seedDetected": "~{count} Seed-Einträge erkannt",
                     "expansionFactor": "Erweiterungsziel",
                     "expansionDescription": "Wie vielmal größer soll die endgültige Sammlung im Vergleich zur Quelle sein?",
+                    "recommendedMultiplier": "{value} (empfohlen)",
                     "preview": "~{seedCount} Seed-Einträge → Ziel ~{targetCount} finale Einträge (~{newItems} neue Einträge zu entdecken)",
                     "enrichmentOptions": "Anreicherungsoptionen",
                     "enrichDescriptions": "Beschreibungen umschreiben",

@@ -2401,6 +2401,7 @@
                     "seedDetected": "~{count} 個のシードアイテムを検出",
                     "expansionFactor": "拡張目標",
                     "expansionDescription": "最終コレクションはソースに比べて何倍大きくすべきか？",
+                    "recommendedMultiplier": "{value} (推奨)",
                     "preview": "~{seedCount} シードアイテム → 目標 ~{targetCount} 最終アイテム (~{newItems} 個の新規アイテムを発見)",
                     "enrichmentOptions": "エンハンスメント オプション",
                     "enrichDescriptions": "説明を書き直し",

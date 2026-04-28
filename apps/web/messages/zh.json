@@ -2401,6 +2401,7 @@
                     "seedDetected": "~{count} 个种子项目已检测",
                     "expansionFactor": "扩展目标",
                     "expansionDescription": "最终集合相比源应该大多少倍？",
+                    "recommendedMultiplier": "{value} (推荐)",
                     "preview": "~{seedCount} 个种子项目 → 目标 ~{targetCount} 个最终项目（~{newItems} 个新项目待发现）",
                     "enrichmentOptions": "丰富选项",
                     "enrichDescriptions": "重写描述",

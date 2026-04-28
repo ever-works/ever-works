@@ -79,20 +79,28 @@ export class TriggerImportOrchestrator extends BaseOrchestrator {
             const endTime = new Date();
 
             if (payload.worksConfig?.scheduleCadence) {
-                await this.directoryScheduleService.updateSchedule(
-                    directory.id,
-                    {
-                        enable: true,
-                        cadence: payload.worksConfig.scheduleCadence,
-                        alwaysCreatePullRequest: true,
-                        providerOverrides:
-                            payload.worksConfig.providers &&
-                            Object.keys(payload.worksConfig.providers).length > 0
-                                ? payload.worksConfig.providers
-                                : null,
-                    },
-                    user,
-                );
+                try {
+                    await this.directoryScheduleService.updateSchedule(
+                        directory.id,
+                        {
+                            enable: true,
+                            cadence: payload.worksConfig.scheduleCadence,
+                            alwaysCreatePullRequest: true,
+                            providerOverrides:
+                                payload.worksConfig.providers &&
+                                Object.keys(payload.worksConfig.providers).length > 0
+                                    ? payload.worksConfig.providers
+                                    : null,
+                        },
+                        user,
+                    );
+                } catch (error) {
+                    this.logger.warn(
+                        `Failed to restore schedule from works.yml for directory ${directory.id}: ${
+                            error instanceof Error ? error.message : String(error)
+                        }`,
+                    );
+                }
             }
 
             await Promise.all([

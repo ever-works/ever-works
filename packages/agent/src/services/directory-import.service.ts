@@ -271,6 +271,11 @@ export class DirectoryImportService {
 
                 if (dto.sourceType === ImportSourceTypeEnum.WORKS_CONFIG) {
                     await this.worksConfigRestoreService.validateForImport(worksConfig, user.id);
+                } else {
+                    await this.worksConfigRestoreService.validateProviderSettings(
+                        worksConfig,
+                        user.id,
+                    );
                 }
 
                 this.worksConfigRestoreService.validateRepositoryTargets(

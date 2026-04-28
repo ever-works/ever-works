@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import type { ParsedWorksConfig, ResolvedWorksConfig } from './works-config.service';
 import { Directory } from '@src/entities/directory.entity';
 import { User } from '@src/entities/user.entity';
@@ -7,6 +7,8 @@ import { DirectoryScheduleService } from '@src/services/directory-schedule.servi
 
 @Injectable()
 export class WorksConfigImportApplierService {
+    private readonly logger = new Logger(WorksConfigImportApplierService.name);
+
     constructor(
         private readonly pluginOperationsService: PluginOperationsService,
         private readonly directoryScheduleService: DirectoryScheduleService,
@@ -42,19 +44,27 @@ export class WorksConfigImportApplierService {
             return;
         }
 
-        await this.directoryScheduleService.updateSchedule(
-            directoryId,
-            {
-                enable: true,
-                cadence: worksConfig.scheduleCadence,
-                alwaysCreatePullRequest: true,
-                providerOverrides:
-                    worksConfig.providers && Object.keys(worksConfig.providers).length > 0
-                        ? worksConfig.providers
-                        : null,
-            },
-            user,
-        );
+        try {
+            await this.directoryScheduleService.updateSchedule(
+                directoryId,
+                {
+                    enable: true,
+                    cadence: worksConfig.scheduleCadence,
+                    alwaysCreatePullRequest: true,
+                    providerOverrides:
+                        worksConfig.providers && Object.keys(worksConfig.providers).length > 0
+                            ? worksConfig.providers
+                            : null,
+                },
+                user,
+            );
+        } catch (error) {
+            this.logger.warn(
+                `Failed to restore schedule from works.yml for directory ${directoryId}: ${
+                    error instanceof Error ? error.message : String(error)
+                }`,
+            );
+        }
     }
 
     async applyScheduleOverrides(
@@ -69,15 +79,23 @@ export class WorksConfigImportApplierService {
             return;
         }
 
-        await this.directoryScheduleService.updateSchedule(
-            directory.id,
-            {
-                cadence: worksConfig?.scheduleCadence ?? undefined,
-                providerOverrides:
-                    worksConfig?.providers !== undefined ? worksConfig.providers : undefined,
-            },
-            user,
-        );
+        try {
+            await this.directoryScheduleService.updateSchedule(
+                directory.id,
+                {
+                    cadence: worksConfig?.scheduleCadence ?? undefined,
+                    providerOverrides:
+                        worksConfig?.providers !== undefined ? worksConfig.providers : undefined,
+                },
+                user,
+            );
+        } catch (error) {
+            this.logger.warn(
+                `Failed to restore schedule overrides from works.yml for directory ${directory.id}: ${
+                    error instanceof Error ? error.message : String(error)
+                }`,
+            );
+        }
     }
 
     private getPipelinePluginSettings(

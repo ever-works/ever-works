@@ -2401,6 +2401,7 @@
                     "seedDetected": "~{count} item benih terdeteksi",
                     "expansionFactor": "Target ekspansi",
                     "expansionDescription": "Berapa kali lebih besar koleksi akhir dibandingkan sumber?",
+                    "recommendedMultiplier": "{value} (direkomendasikan)",
                     "preview": "~{seedCount} item benih → target ~{targetCount} item akhir (~{newItems} item baru untuk ditemukan)",
                     "enrichmentOptions": "Opsi pengayaan",
                     "enrichDescriptions": "Tulis ulang deskripsi",

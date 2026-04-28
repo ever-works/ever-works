@@ -214,6 +214,7 @@ export class DataRepository {
     private constructor(
         public readonly dir: string,
         private readonly configPath: string,
+        private readonly configFallbackPaths: string[],
         private categoriesPath: string,
         private readonly tagsPath: string,
         private readonly collectionsPath: string,
@@ -243,11 +244,10 @@ export class DataRepository {
         const tagsPath = await this.getCollectionPath(dir, 'tags');
         const collectionsPath = await this.getCollectionPath(dir, 'collections');
 
-        const configPath = await this.resolveConfigPath(dir);
-
         const repo = new DataRepository(
             dir,
-            configPath,
+            path.join(dir, 'config.yml'),
+            await this.resolveConfigFallbackPaths(dir),
             categoriesPath,
             tagsPath,
             collectionsPath,
@@ -258,14 +258,19 @@ export class DataRepository {
         return repo;
     }
 
-    private static async resolveConfigPath(dir: string): Promise<string> {
-        for (const filename of [...this.CONFIG_FILENAMES, ...this.WORKS_CONFIG_FILENAMES]) {
+    private static async resolveConfigFallbackPaths(dir: string): Promise<string[]> {
+        const fallbackPaths: string[] = [];
+
+        for (const filename of [
+            ...this.CONFIG_FILENAMES.slice(1),
+            ...this.WORKS_CONFIG_FILENAMES,
+        ]) {
             const candidatePath = path.join(dir, filename);
 
             try {
                 const stat = await fs.stat(candidatePath);
                 if (stat.isFile()) {
-                    return candidatePath;
+                    fallbackPaths.push(candidatePath);
                 }
             } catch (err) {
                 if ((err as NodeJS.ErrnoException | undefined)?.code === 'ENOENT') {
@@ -275,7 +280,7 @@ export class DataRepository {
             }
         }
 
-        return path.join(dir, 'config.yml');
+        return fallbackPaths;
     }
 
     private static async shouldeUseDir(dir: string, type: 'categories' | 'tags' | 'collections') {
@@ -348,12 +353,34 @@ export class DataRepository {
             return this.config;
         } catch (err) {
             if (err?.code === 'ENOENT') {
+                const fallbackConfig = await this.readFallbackConfig();
+                if (fallbackConfig) {
+                    this.config = fallbackConfig;
+                    return fallbackConfig;
+                }
+
                 const defaultConfig = createDefaultConfig();
                 await this.writeConfig(defaultConfig);
                 return defaultConfig;
             }
             throw err;
         }
+    }
+
+    private async readFallbackConfig(): Promise<IDataConfig | null> {
+        for (const fallbackPath of this.configFallbackPaths) {
+            try {
+                const config = await fs.readFile(fallbackPath, 'utf-8');
+                return yaml.parse(config);
+            } catch (err) {
+                if ((err as NodeJS.ErrnoException | undefined)?.code === 'ENOENT') {
+                    continue;
+                }
+                throw err;
+            }
+        }
+
+        return null;
     }
 
     async getCategories(): Promise<Category[]> {

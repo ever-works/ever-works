@@ -2401,6 +2401,7 @@
                     "seedDetected": "~{count} عنصر بذرة مكتشف",
                     "expansionFactor": "هدف التوسع",
                     "expansionDescription": "كم مرة يجب أن يكون المجموعة النهائية أكبر من المصدر؟",
+                    "recommendedMultiplier": "{value} (موصى به)",
                     "preview": "~{seedCount} عنصر بذرة → هدف ~{targetCount} عنصر نهائي (~{newItems} عناصر جديدة للاكتشاف)",
                     "enrichmentOptions": "خيارات الإثراء",
                     "enrichDescriptions": "إعادة كتابة الوصفات",

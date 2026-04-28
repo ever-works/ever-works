@@ -60,6 +60,18 @@ export class WorksConfigImportPlannerService {
             throw new BadRequestException('works.yml is missing initial_prompt');
         }
 
+        await this.validateProviderSettings(worksConfig, userId, { validateDefaults: true });
+    }
+
+    async validateProviderSettings(
+        worksConfig: ParsedWorksConfig | ResolvedWorksConfig | null,
+        userId: string,
+        options: { validateDefaults?: boolean } = {},
+    ): Promise<void> {
+        if (!worksConfig || (!options.validateDefaults && !worksConfig.providers)) {
+            return;
+        }
+
         await this.generatorFormSchemaService.validateSelectedProviders(worksConfig.providers, {
             userId,
         });

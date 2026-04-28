@@ -2401,6 +2401,7 @@
                     "seedDetected": "~{count} mục hạt giống được phát hiện",
                     "expansionFactor": "Mục tiêu mở rộng",
                     "expansionDescription": "Bộ sưu tập cuối cùng nên lớn hơn nguồn bao nhiêu lần?",
+                    "recommendedMultiplier": "{value} (được đề xuất)",
                     "preview": "~{seedCount} mục hạt giống → mục tiêu ~{targetCount} mục cuối cùng (~{newItems} mục mới để khám phá)",
                     "enrichmentOptions": "Tùy chọn làm giàu",
                     "enrichDescriptions": "Viết lại mô tả",
