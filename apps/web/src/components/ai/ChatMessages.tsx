@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { cn } from '@/lib/utils/cn';
 import { useStickToBottom } from 'use-stick-to-bottom';
 import { useTranslations } from 'next-intl';
@@ -16,6 +16,7 @@ interface ChatMessagesProps {
 export function ChatMessages({ messages, isStreaming }: ChatMessagesProps) {
     const t = useTranslations('dashboard.aiChat');
     const { scrollRef, contentRef, isAtBottom, scrollToBottom } = useStickToBottom();
+    const [isAtTop, setIsAtTop] = useState(true);
 
     const lastMessage = messages[messages.length - 1];
     const isWaitingForResponse = isStreaming && lastMessage?.role === 'user';
@@ -29,8 +30,32 @@ export function ChatMessages({ messages, isStreaming }: ChatMessagesProps) {
         prevCountRef.current = messages.length;
     }, [messages.length, scrollToBottom]);
 
+    // Track scroll position to detect if at top
+    useEffect(() => {
+        const scrollElement = scrollRef.current;
+        if (!scrollElement) return;
+
+        const checkScrollTop = () => {
+            setIsAtTop(scrollElement.scrollTop <= 10);
+        };
+
+        checkScrollTop();
+        scrollElement.addEventListener('scroll', checkScrollTop);
+        return () => scrollElement.removeEventListener('scroll', checkScrollTop);
+    }, [scrollRef]);
+
     return (
         <div className="flex-1 min-h-0 relative">
+            {/* Top gradient - only show when not at top */}
+            {!isAtTop && (
+                <div className="absolute top-0 left-0 right-0 h-24 bg-gradient-to-b from-white dark:from-surface-dark to-transparent pointer-events-none z-10 transition-opacity duration-200" />
+            )}
+            
+            {/* Bottom gradient - only show when not at bottom */}
+            {!isAtBottom && (
+                <div className="absolute bottom-0 left-0 right-0 h-24 bg-gradient-to-t from-white dark:from-surface-dark to-transparent pointer-events-none z-10 transition-opacity duration-200" />
+            )}
+            
             <div ref={scrollRef} className="h-full overflow-y-auto">
                 <div ref={contentRef} className="px-4 py-3 space-y-3">
                     {messages.map((message, index) => {
@@ -58,8 +83,8 @@ export function ChatMessages({ messages, isStreaming }: ChatMessagesProps) {
                 <button
                     onClick={() => scrollToBottom()}
                     className={cn(
-                        'absolute bottom-3 left-1/2 -translate-x-1/2 z-10',
-                        'flex items-center justify-center w-8 h-8 rounded-full',
+                        'absolute bottom-3 left-1/2 -translate-x-1/2 z-20',
+                        'flex items-center justify-center w-6 h-6 rounded-full',
                         'bg-white dark:bg-surface-dark',
                         'border border-border dark:border-white/10',
                         'text-text-muted dark:text-text-muted-dark',
@@ -67,7 +92,7 @@ export function ChatMessages({ messages, isStreaming }: ChatMessagesProps) {
                         'shadow-md transition-all cursor-pointer',
                     )}
                 >
-                    <ArrowDown className="w-3.5 h-3.5" />
+                    <ArrowDown className="w-3 h-3" />
                 </button>
             )}
         </div>
@@ -77,7 +102,7 @@ export function ChatMessages({ messages, isStreaming }: ChatMessagesProps) {
 function StreamingIndicator({ label }: { label: string }) {
     return (
         <div className="flex justify-start">
-            <div className="rounded-lg px-3 py-2.5 bg-surface-secondary dark:bg-surface-tertiary-dark/50">
+            <div className="rounded-lg px-3 py-2.5 bg-surface-secondary dark:bg-white/4">
                 <div className="flex items-center gap-1.5">
                     <div className="flex space-x-1">
                         <span className="w-1.5 h-1.5 bg-text-muted dark:bg-text-muted-dark rounded-full animate-bounce" />
