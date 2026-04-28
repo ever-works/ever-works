@@ -22,3 +22,26 @@ export async function ensureBinary(settings: HermesRuntimeSettings, logger: Logg
 	logger.log(`Using Hermes CLI from "${binaryPath}"`);
 	return binaryPath;
 }
+
+export async function validateProfile(settings: HermesRuntimeSettings, logger: Logger): Promise<void> {
+	const binaryPath = await ensureBinary(settings, logger);
+	const profile = settings.profile || 'default';
+
+	const result = spawnSync(binaryPath, ['profile', 'show', profile], {
+		encoding: 'utf-8',
+		stdio: ['ignore', 'pipe', 'pipe']
+	});
+
+	if (result.error || result.status !== 0) {
+		const detail = [result.stderr, result.stdout]
+			.map((value) => value?.trim())
+			.find((value) => Boolean(value));
+		const suffix = detail ? ` Hermes output: ${detail}` : '';
+
+		throw new Error(
+			`Hermes profile "${profile}" is not available or not configured correctly on the backend machine.${suffix}`
+		);
+	}
+
+	logger.log(`Validated Hermes profile "${profile}"`);
+}

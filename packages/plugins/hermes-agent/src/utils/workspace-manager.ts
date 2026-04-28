@@ -7,6 +7,13 @@ interface Logger {
 	warn(message: string, ...args: unknown[]): void;
 }
 
+export interface GeneratedItemsReadResult {
+	items: ItemData[];
+	errors: string[];
+	repairedJson: boolean;
+	resultFilePath: string;
+}
+
 export function getWorkspacePath(userId: string, directoryId: string): string {
 	return path.join(BASE_TEMP_DIR, userId, directoryId);
 }
@@ -77,6 +84,31 @@ export function getResultFilePath(workspacePath: string): string {
 	return path.join(workspacePath, '_meta', RESULT_FILE_NAME);
 }
 
+function validateItemRecord(record: Record<string, unknown>, index: number): string[] {
+	const errors: string[] = [];
+	const requiredFields = ['name', 'description', 'source_url', 'category'] as const;
+	const missingFields = requiredFields.filter((field) => !record[field]);
+
+	if (missingFields.length > 0 || !validateRequiredItemFields(record)) {
+		errors.push(`Item ${index} is missing required fields: ${missingFields.join(', ')}`);
+	}
+
+	if (!Array.isArray(record.tags)) {
+		errors.push(`Item ${index} has invalid tags: expected an array of strings`);
+	} else if (record.tags.some((tag) => typeof tag !== 'string' || !tag.trim())) {
+		errors.push(`Item ${index} has invalid tags: all tags must be non-empty strings`);
+	}
+
+	for (const field of ['name', 'description', 'source_url', 'category', 'brand', 'website_url', 'image_url', 'markdown']) {
+		const value = record[field];
+		if (value !== undefined && value !== null && typeof value !== 'string') {
+			errors.push(`Item ${index} has invalid ${field}: expected a string`);
+		}
+	}
+
+	return errors;
+}
+
 export async function writeResultSchema(workspacePath: string): Promise<void> {
 	const schema = {
 		type: 'object',
@@ -118,41 +150,64 @@ export async function writeResultSchema(workspacePath: string): Promise<void> {
 	);
 }
 
-export async function readGeneratedItems(workspacePath: string, logger?: Logger): Promise<ItemData[]> {
+export async function readGeneratedResult(
+	workspacePath: string,
+	logger?: Logger
+): Promise<GeneratedItemsReadResult> {
 	let content: string;
+	const resultFilePath = getResultFilePath(workspacePath);
 	try {
-		content = await fs.readFile(getResultFilePath(workspacePath), 'utf-8');
+		content = await fs.readFile(resultFilePath, 'utf-8');
 	} catch {
-		logger?.warn(`Hermes result file not found at ${getResultFilePath(workspacePath)}`);
-		return [];
+		const message = `Hermes result file not found at ${resultFilePath}`;
+		logger?.warn(message);
+		return {
+			items: [],
+			errors: [message],
+			repairedJson: false,
+			resultFilePath
+		};
 	}
 
 	let parsed: unknown;
+	let repairedJson = false;
 	try {
 		parsed = JSON.parse(content);
 	} catch {
 		parsed = JSON.parse(jsonrepair(content));
+		repairedJson = true;
 		logger?.warn('Repaired malformed JSON in Hermes result file');
 	}
 
 	const rawItems = Array.isArray(parsed) ? parsed : (parsed as { items?: unknown } | null | undefined)?.items;
 	if (!Array.isArray(rawItems)) {
-		logger?.warn('Hermes result file did not contain an items array');
-		return [];
+		const message = 'Hermes result file did not contain an items array';
+		logger?.warn(message);
+		return {
+			items: [],
+			errors: [message],
+			repairedJson,
+			resultFilePath
+		};
 	}
 
 	const items: ItemData[] = [];
+	const errors: string[] = [];
 	for (const [index, candidate] of rawItems.entries()) {
 		if (!candidate || typeof candidate !== 'object' || Array.isArray(candidate)) {
-			logger?.warn(`Skipping Hermes item at index ${index}: expected object`);
+			const message = `Skipping Hermes item at index ${index}: expected object`;
+			logger?.warn(message);
+			errors.push(message);
 			continue;
 		}
 
 		const record = { ...(candidate as Record<string, unknown>) };
-		if (!validateRequiredItemFields(record)) {
-			logger?.warn(
-				`Skipping Hermes item at index ${index}: missing required fields (name, description, source_url, category)`
-			);
+		const itemErrors = validateItemRecord(record, index);
+		if (itemErrors.length > 0) {
+			for (const message of itemErrors) {
+				logger?.warn(message);
+				errors.push(message);
+			}
 			continue;
 		}
 
@@ -160,5 +215,14 @@ export async function readGeneratedItems(workspacePath: string, logger?: Logger)
 		items.push(record as unknown as ItemData);
 	}
 
-	return items;
+	return {
+		items,
+		errors,
+		repairedJson,
+		resultFilePath
+	};
+}
+
+export async function readGeneratedItems(workspacePath: string, logger?: Logger): Promise<ItemData[]> {
+	return (await readGeneratedResult(workspacePath, logger)).items;
 }

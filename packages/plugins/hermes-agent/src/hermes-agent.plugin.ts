@@ -48,7 +48,7 @@ import {
 	DEFAULT_SYSTEM_PROMPT,
 	DEFAULT_USER_PROMPT
 } from './prompt/system-prompt.js';
-import { ensureBinary } from './utils/binary-manager.js';
+import { ensureBinary, validateProfile } from './utils/binary-manager.js';
 import {
 	buildCancelledResult,
 	buildErrorResult,
@@ -65,7 +65,7 @@ import {
 	cleanupWorkspace,
 	collectMetadataFromItems,
 	createWorkspace,
-	readGeneratedItems,
+	readGeneratedResult,
 	seedExistingItems,
 	seedMetadata,
 	writeResultSchema
@@ -315,8 +315,10 @@ export class HermesAgentPlugin implements IPlugin, IPipelinePlugin, IFormSchemaP
 	}
 
 	async validateConnection(settings: Record<string, unknown>): Promise<ConnectionValidationResult> {
+		const runtimeSettings = resolveHermesRuntimeSettings(settings);
+
 		try {
-			await ensureBinary(resolveHermesRuntimeSettings(settings), this.context?.logger ?? console);
+			await validateProfile(runtimeSettings, this.context?.logger ?? console);
 		} catch (error) {
 			return {
 				success: false,
@@ -326,8 +328,7 @@ export class HermesAgentPlugin implements IPlugin, IPipelinePlugin, IFormSchemaP
 
 		return {
 			success: true,
-			message:
-				'Hermes CLI is available. Make sure the selected Hermes profile has already been configured on the backend machine.'
+			message: `Hermes CLI and profile "${runtimeSettings.profile}" are available on the backend machine.`
 		};
 	}
 
@@ -599,12 +600,20 @@ export class HermesAgentPlugin implements IPlugin, IPipelinePlugin, IFormSchemaP
 		const startedAt = this.startStep('collect-results', onLogEntry);
 		reportProgress(onProgress, 3, 85, 'Collect Results');
 
-		const items = await readGeneratedItems(workspacePath, logger);
+		const result = await readGeneratedResult(workspacePath, logger);
+		const items = result.items;
 		if (items.length === 0) {
 			const stderrExcerpt = execResult.stderr.trim().split('\n').slice(0, 5).join('\n');
 			const stdoutExcerpt = execResult.stdout.trim().split('\n').slice(-5).join('\n');
-			const detail = stderrExcerpt || stdoutExcerpt || `exit code ${execResult.exitCode}`;
-			throw new Error(`Hermes completed but produced no valid items. CLI output:\n${detail}`);
+			const validationExcerpt = result.errors.slice(0, 5).join('\n');
+			const detail = validationExcerpt || stderrExcerpt || stdoutExcerpt || `exit code ${execResult.exitCode}`;
+			throw new Error(
+				`Hermes completed but produced no valid items from ${result.resultFilePath}. Details:\n${detail}`
+			);
+		}
+
+		if (result.repairedJson) {
+			logger.warn(`Hermes result JSON required repair before parsing: ${result.resultFilePath}`);
 		}
 
 		this.completeStep('collect-results', startedAt, onLogEntry);

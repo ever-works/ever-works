@@ -2,7 +2,7 @@ import * as fs from 'fs/promises';
 import * as os from 'os';
 import * as path from 'path';
 import { afterEach, describe, expect, it } from 'vitest';
-import { readGeneratedItems, writeResultSchema } from '../utils/workspace-manager.js';
+import { readGeneratedItems, readGeneratedResult, writeResultSchema } from '../utils/workspace-manager.js';
 
 const tmpDirs: string[] = [];
 
@@ -58,5 +58,28 @@ describe('workspace manager', () => {
 
 		const items = await readGeneratedItems(workspace, { warn: () => {} });
 		expect(items).toEqual([]);
+	});
+
+	it('returns detailed validation errors for malformed result items', async () => {
+		const workspace = await createWorkspace();
+		await fs.writeFile(
+			path.join(workspace, '_meta', 'hermes-result.json'),
+			JSON.stringify({
+				items: [
+					{
+						name: 'Invalid',
+						description: 'Missing category and source',
+						tags: 'not-an-array'
+					}
+				]
+			}),
+			'utf-8'
+		);
+
+		const result = await readGeneratedResult(workspace, { warn: () => {} });
+		expect(result.items).toEqual([]);
+		expect(result.errors).toContain('Item 0 is missing required fields: source_url, category');
+		expect(result.errors).toContain('Item 0 has invalid tags: expected an array of strings');
+		expect(result.resultFilePath).toContain('_meta/hermes-result.json');
 	});
 });

@@ -13,7 +13,8 @@ vi.mock('../utils/process-runner.js', () => ({
 }));
 
 vi.mock('../utils/binary-manager.js', () => ({
-	ensureBinary: vi.fn()
+	ensureBinary: vi.fn(),
+	validateProfile: vi.fn()
 }));
 
 vi.mock('../utils/workspace-manager.js', () => ({
@@ -21,7 +22,7 @@ vi.mock('../utils/workspace-manager.js', () => ({
 	seedExistingItems: vi.fn(),
 	seedMetadata: vi.fn(),
 	writeResultSchema: vi.fn(),
-	readGeneratedItems: vi.fn(),
+	readGeneratedResult: vi.fn(),
 	collectMetadataFromItems: vi.fn(),
 	cleanupWorkspace: vi.fn()
 }));
@@ -106,11 +107,17 @@ describe('HermesAgentPlugin', () => {
 		vi.clearAllMocks();
 
 		vi.mocked(binaryManager.ensureBinary).mockResolvedValue('/usr/bin/hermes');
+		vi.mocked(binaryManager.validateProfile).mockResolvedValue(undefined);
 		vi.mocked(workspaceManager.createWorkspace).mockResolvedValue('/tmp/hermes-workspace');
 		vi.mocked(workspaceManager.seedExistingItems).mockResolvedValue(undefined);
 		vi.mocked(workspaceManager.seedMetadata).mockResolvedValue(undefined);
 		vi.mocked(workspaceManager.writeResultSchema).mockResolvedValue(undefined);
-		vi.mocked(workspaceManager.readGeneratedItems).mockResolvedValue([]);
+		vi.mocked(workspaceManager.readGeneratedResult).mockResolvedValue({
+			items: [],
+			errors: [],
+			repairedJson: false,
+			resultFilePath: '/tmp/hermes-workspace/_meta/hermes-result.json'
+		});
 		vi.mocked(workspaceManager.collectMetadataFromItems).mockReturnValue({
 			categories: [],
 			tags: [],
@@ -126,6 +133,25 @@ describe('HermesAgentPlugin', () => {
 
 	afterEach(async () => {
 		await plugin.onUnload();
+	});
+
+	it('validates the selected Hermes profile during connection checks', async () => {
+		await plugin.onLoad(createMockContext());
+
+		const result = await plugin.validateConnection({
+			profile: 'work',
+			binaryPath: '/usr/bin/hermes'
+		});
+
+		expect(binaryManager.validateProfile).toHaveBeenCalledWith(
+			expect.objectContaining({
+				profile: 'work',
+				binaryPath: '/usr/bin/hermes'
+			}),
+			expect.any(Object)
+		);
+		expect(result.success).toBe(true);
+		expect(result.message).toContain('profile "work"');
 	});
 
 	it('cancels the merged execution signal even when an external signal is provided', async () => {
