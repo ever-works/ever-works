@@ -56,6 +56,7 @@ export function executeHermes(options: ExecuteOptions): {
 } {
 	let childProcess: ChildProcess | null = null;
 	let killed = false;
+	let abortListener: (() => void) | null = null;
 
 	const kill = () => {
 		if (!childProcess || killed) return;
@@ -89,6 +90,13 @@ export function executeHermes(options: ExecuteOptions): {
 			env,
 			stdio: ['ignore', 'pipe', 'pipe']
 		});
+
+		const cleanupAbortListener = () => {
+			if (options.signal && abortListener) {
+				options.signal.removeEventListener('abort', abortListener);
+				abortListener = null;
+			}
+		};
 
 		let stdout = '';
 		let stderr = '';
@@ -133,8 +141,12 @@ export function executeHermes(options: ExecuteOptions): {
 			}
 		});
 
-		childProcess.on('error', reject);
+		childProcess.on('error', (error) => {
+			cleanupAbortListener();
+			reject(error);
+		});
 		childProcess.on('exit', (code) => {
+			cleanupAbortListener();
 			if (stdoutRemainder.trim()) {
 				options.onStdoutLine?.(stdoutRemainder);
 			}
@@ -155,7 +167,8 @@ export function executeHermes(options: ExecuteOptions): {
 			if (options.signal.aborted) {
 				kill();
 			} else {
-				options.signal.addEventListener('abort', kill, { once: true });
+				abortListener = kill;
+				options.signal.addEventListener('abort', abortListener, { once: true });
 			}
 		}
 	});

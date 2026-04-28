@@ -2,7 +2,14 @@ import * as fs from 'fs/promises';
 import * as os from 'os';
 import * as path from 'path';
 import { afterEach, describe, expect, it } from 'vitest';
-import { readGeneratedItems, readGeneratedResult, writeResultSchema } from '../utils/workspace-manager.js';
+import {
+	createWorkspace as createPluginWorkspace,
+	getWorkspacePath,
+	readGeneratedItems,
+	readGeneratedResult,
+	writeResultSchema
+} from '../utils/workspace-manager.js';
+import { BASE_TEMP_DIR } from '../types.js';
 
 const tmpDirs: string[] = [];
 
@@ -18,6 +25,27 @@ afterEach(async () => {
 });
 
 describe('workspace manager', () => {
+	it('creates isolated workspaces for concurrent runs of the same directory', async () => {
+		const workspaceA = await createPluginWorkspace('user-1', 'dir-1');
+		const workspaceB = await createPluginWorkspace('user-1', 'dir-1');
+		tmpDirs.push(path.resolve(BASE_TEMP_DIR));
+
+		expect(workspaceA).not.toBe(workspaceB);
+		expect(path.basename(workspaceA)).toMatch(/^run-/);
+		expect(path.basename(workspaceB)).toMatch(/^run-/);
+		expect(workspaceA.startsWith(getWorkspacePath('user-1', 'dir-1'))).toBe(true);
+		expect(workspaceB.startsWith(getWorkspacePath('user-1', 'dir-1'))).toBe(true);
+	});
+
+	it('sanitizes workspace path segments so they stay under the Hermes temp root', () => {
+		const workspaceRoot = getWorkspacePath('../unsafe/user', '../../unsafe/dir');
+		const resolvedBaseDir = path.resolve(BASE_TEMP_DIR);
+		const relativePath = path.relative(resolvedBaseDir, workspaceRoot);
+
+		expect(workspaceRoot.startsWith(`${resolvedBaseDir}${path.sep}`)).toBe(true);
+		expect(relativePath.split(path.sep)).not.toContain('..');
+	});
+
 	it('writes a result schema file', async () => {
 		const workspace = await createWorkspace();
 		await writeResultSchema(workspace);

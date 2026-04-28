@@ -1,5 +1,6 @@
 import * as fs from 'fs/promises';
 import * as path from 'path';
+import { randomUUID } from 'node:crypto';
 import { jsonrepair, normalizeItemTags, validateRequiredItemFields, type ItemData } from '@ever-works/plugin';
 import { BASE_TEMP_DIR, RESULT_FILE_NAME, RESULT_SCHEMA_FILE_NAME } from '../types.js';
 
@@ -14,12 +15,48 @@ export interface GeneratedItemsReadResult {
 	resultFilePath: string;
 }
 
+function sanitizePathSegment(value: string, fieldName: string): string {
+	const trimmed = value.trim();
+	if (!trimmed) {
+		throw new Error(`${fieldName} is required to create a Hermes workspace`);
+	}
+
+	const sanitized = trimmed.replace(/[^a-zA-Z0-9._-]/g, '_').slice(0, 120);
+	if (!sanitized) {
+		throw new Error(`${fieldName} did not contain any path-safe characters`);
+	}
+
+	return sanitized;
+}
+
+function assertWithinBaseDir(targetPath: string): string {
+	const resolvedBaseDir = path.resolve(BASE_TEMP_DIR);
+	const resolvedTargetPath = path.resolve(targetPath);
+
+	if (resolvedTargetPath !== resolvedBaseDir && !resolvedTargetPath.startsWith(`${resolvedBaseDir}${path.sep}`)) {
+		throw new Error(`Resolved Hermes workspace path escaped the base temp directory: ${resolvedTargetPath}`);
+	}
+
+	return resolvedTargetPath;
+}
+
 export function getWorkspacePath(userId: string, directoryId: string): string {
-	return path.join(BASE_TEMP_DIR, userId, directoryId);
+	return assertWithinBaseDir(
+		path.join(
+			BASE_TEMP_DIR,
+			sanitizePathSegment(userId, 'userId'),
+			sanitizePathSegment(directoryId, 'directoryId')
+		)
+	);
 }
 
 export async function createWorkspace(userId: string, directoryId: string): Promise<string> {
-	const workspacePath = getWorkspacePath(userId, directoryId);
+	const workspaceRoot = getWorkspacePath(userId, directoryId);
+	await fs.mkdir(workspaceRoot, { recursive: true });
+
+	const workspacePath = assertWithinBaseDir(
+		await fs.mkdtemp(path.join(workspaceRoot, `run-${randomUUID()}-`))
+	);
 	await fs.mkdir(path.join(workspacePath, '_meta'), { recursive: true });
 	return workspacePath;
 }
@@ -41,7 +78,7 @@ export async function seedMetadata(workspacePath: string, metadata: Record<strin
 }
 
 export async function cleanupWorkspace(workspacePath: string): Promise<void> {
-	await fs.rm(workspacePath, { recursive: true, force: true });
+	await fs.rm(assertWithinBaseDir(workspacePath), { recursive: true, force: true });
 }
 
 export function collectMetadataFromItems(items: readonly ItemData[]): {
