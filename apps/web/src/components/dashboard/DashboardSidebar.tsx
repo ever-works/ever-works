@@ -9,7 +9,7 @@ import { ROUTES, getSiteConfig } from '@/lib/constants';
 import { Link, usePathname, useRouter } from '@/i18n/navigation';
 import {
     Home,
-    Folder,
+    FolderClosed,
     Settings,
     LogOut,
     Plus,
@@ -101,7 +101,11 @@ export function DashboardSidebar({
 
     const navigation = [
         { name: t('navigation.dashboard'), href: ROUTES.DASHBOARD, icon: Home },
-        { name: t('navigation.directories'), href: ROUTES.DASHBOARD_DIRECTORIES, icon: Folder },
+        {
+            name: t('navigation.directories'),
+            href: ROUTES.DASHBOARD_DIRECTORIES,
+            icon: FolderClosed,
+        },
         { name: t('navigation.plugins'), href: ROUTES.DASHBOARD_PLUGINS, icon: Plug },
         { name: t('navigation.activity'), href: ROUTES.DASHBOARD_ACTIVITY, icon: Activity },
         { name: t('navigation.settings'), href: ROUTES.DASHBOARD_SETTINGS, icon: Settings },
@@ -167,9 +171,15 @@ export function DashboardSidebar({
                                             )}
                                         >
                                             {isCollapsed ? (
-                                                <PanelLeftOpen className="w-4 h-4" />
+                                                <PanelLeftOpen
+                                                    className="w-4 h-4"
+                                                    strokeWidth={1.3}
+                                                />
                                             ) : (
-                                                <PanelLeftClose className="w-4 h-4" />
+                                                <PanelLeftClose
+                                                    className="w-4 h-4"
+                                                    strokeWidth={1.3}
+                                                />
                                             )}
                                         </button>
                                     </Tooltip>
@@ -182,7 +192,7 @@ export function DashboardSidebar({
                                     size="icon"
                                     className="xl:hidden text-text-muted dark:text-text-muted-dark hover:text-text dark:hover:text-text-dark"
                                 >
-                                    <X className="w-5 h-5" />
+                                    <X className="w-5 h-5" strokeWidth={1.3} />
                                 </Button>
                             )}
                         </div>
@@ -202,7 +212,7 @@ export function DashboardSidebar({
                                 className="w-8 h-8 shadow-sm rounded-xl"
                                 onClick={() => onInteraction?.()}
                             >
-                                <Plus className="w-5 h-5" />
+                                <Plus className="w-5 h-5" strokeWidth={1.3} />
                             </Button>
                         </ConditionalTooltip>
                     ) : (
@@ -253,7 +263,7 @@ export function DashboardSidebar({
                                             )}
                                         >
                                             <span className="shrink-0 inline-flex">
-                                                <item.icon className="w-5 h-5" />
+                                                <item.icon className="w-5 h-5" strokeWidth={1.5} />
                                             </span>
                                             {!isCollapsed && (
                                                 <span className="text-sm">{item.name}</span>
@@ -351,7 +361,10 @@ export function DashboardSidebar({
                                         }}
                                         className="cursor-pointer px-3 rounded-md hover:bg-surface-tertiary/50 dark:hover:bg-card-primary-dark"
                                     >
-                                        <Settings className="w-4 h-4 mr-2 shrink-0" />
+                                        <Settings
+                                            className="w-4 h-4 mr-2 shrink-0"
+                                            strokeWidth={1.5}
+                                        />
                                         {t('profileMenu.accountSettings')}
                                     </DropdownMenuItem>
                                     <DropdownMenuItem
@@ -361,7 +374,10 @@ export function DashboardSidebar({
                                         }}
                                         className="cursor-pointer px-3 rounded-sm hover:bg-surface-tertiary/50 dark:hover:bg-card-primary-dark"
                                     >
-                                        <HelpCircle className="w-4 h-4 mr-2 shrink-0" />
+                                        <HelpCircle
+                                            className="w-4 h-4 mr-2 shrink-0"
+                                            strokeWidth={1.5}
+                                        />
                                         {t('profileMenu.helpDocs')}
                                     </DropdownMenuItem>
                                     <DropdownMenuItem
@@ -374,7 +390,10 @@ export function DashboardSidebar({
                                         }}
                                         className="cursor-pointer px-3 rounded-md hover:bg-surface-tertiary/50 dark:hover:bg-card-primary-dark"
                                     >
-                                        <MessageSquare className="w-4 h-4 mr-2 shrink-0" />
+                                        <MessageSquare
+                                            className="w-4 h-4 mr-2 shrink-0"
+                                            strokeWidth={1.5}
+                                        />
                                         {t('profileMenu.support')}
                                     </DropdownMenuItem>
                                     <DropdownMenuItem
@@ -385,7 +404,10 @@ export function DashboardSidebar({
                                         disabled={!onOpenHelp}
                                         className="cursor-pointer px-3 rounded-md hover:bg-surface-tertiary/50 dark:hover:bg-card-primary-dark"
                                     >
-                                        <Keyboard className="w-4 h-4 mr-2 shrink-0" />
+                                        <Keyboard
+                                            className="w-4 h-4 mr-2 shrink-0"
+                                            strokeWidth={1.3}
+                                        />
                                         {t('profileMenu.keyboardShortcuts')}
                                     </DropdownMenuItem>
                                     <DropdownMenuSeparator />
@@ -397,7 +419,10 @@ export function DashboardSidebar({
                                         disabled={isPending}
                                         className="text-danger hover:bg-danger/10 cursor-pointer px-3"
                                     >
-                                        <LogOut className="w-4 h-4 mr-2 shrink-0" />
+                                        <LogOut
+                                            className="w-4 h-4 mr-2 shrink-0"
+                                            strokeWidth={1.3}
+                                        />
                                         {isPending ? t('signingOut') : t('signOut')}
                                     </DropdownMenuItem>
                                 </DropdownMenuContent>

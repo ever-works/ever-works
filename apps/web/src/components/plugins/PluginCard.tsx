@@ -91,13 +91,13 @@ export function PluginCard({ plugin }: PluginCardProps) {
                     {visibleCaps.slice(0, 2).map((cap) => (
                         <span
                             key={cap}
-                            className="text-[11px] px-1.5 py-0.5 rounded-md bg-surface-tertiary dark:bg-surface-tertiary-dark text-text-muted dark:text-text-muted-dark"
+                            className="text-[11px] px-1.5 py-0.5 rounded-md bg-surface-tertiary dark:bg-white/6 text-text-muted dark:text-text-muted-dark"
                         >
                             {getCapabilityLabel(cap)}
                         </span>
                     ))}
                     {visibleCaps.length > 2 && (
-                        <span className="text-[11px] px-1.5 py-0.5 rounded-md bg-surface-tertiary dark:bg-surface-tertiary-dark text-text-muted dark:text-text-muted-dark">
+                        <span className="text-[11px] px-1.5 py-0.5 rounded-md bg-surface-tertiary dark:bg-white/4 text-text-muted dark:text-text-muted-dark">
                             +{visibleCaps.length - 2}
                         </span>
                     )}
