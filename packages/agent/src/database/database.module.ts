@@ -18,6 +18,9 @@ import { UsageLedgerRepository } from './repositories/usage-ledger.repository';
 import { NotificationRepository } from './repositories/notification.repository';
 import { ActivityLogRepository } from './repositories/activity-log.repository';
 import { ConversationRepository } from './repositories/conversation.repository';
+import { GitHubAppInstallationRepository } from './repositories/github-app-installation.repository';
+import { GitHubAppInstallationRepoRepository } from './repositories/github-app-installation-repository.repository';
+import { GitHubAppUserLinkRepository } from './repositories/github-app-user-link.repository';
 
 @Module({
     imports: [
@@ -51,6 +54,9 @@ import { ConversationRepository } from './repositories/conversation.repository';
         NotificationRepository,
         ActivityLogRepository,
         ConversationRepository,
+        GitHubAppInstallationRepository,
+        GitHubAppInstallationRepoRepository,
+        GitHubAppUserLinkRepository,
     ],
     exports: [
         TypeOrmModule,
@@ -70,6 +76,9 @@ import { ConversationRepository } from './repositories/conversation.repository';
         NotificationRepository,
         ActivityLogRepository,
         ConversationRepository,
+        GitHubAppInstallationRepository,
+        GitHubAppInstallationRepoRepository,
+        GitHubAppUserLinkRepository,
     ],
 })
 export class DatabaseModule {}
