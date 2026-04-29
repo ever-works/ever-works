@@ -224,7 +224,7 @@ export function DashboardSidebar({
                             className="shadow-s dark:border"
                             onClick={() => onInteraction?.()}
                         >
-                            <Plus className="w-5 h-5"/>
+                            <Plus className="w-5 h-5" />
                             <span className="font-medium">{t('newDirectory')}</span>
                         </Button>
                     )}
