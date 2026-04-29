@@ -38,6 +38,15 @@ export class GitHubAppInstallationRepository {
         });
     }
 
+    async listByCreatedByUserId(createdByUserId: string): Promise<GitHubAppInstallation[]> {
+        return this.repository.find({
+            where: { createdByUserId },
+            order: {
+                createdAt: 'DESC',
+            },
+        });
+    }
+
     async upsertFromGithub(data: UpsertGitHubAppInstallationData): Promise<GitHubAppInstallation> {
         const existing = await this.findByInstallationId(data.installationId);
 

@@ -103,6 +103,10 @@ export const config = {
             const webUrl = config.webAppUrl();
             return process.env.GITHUB_APP_SETUP_URL || `${webUrl}/api/github-app/setup`;
         },
+        callbackUrl: () => {
+            const webUrl = config.webAppUrl();
+            return process.env.GITHUB_APP_CALLBACK_URL || `${webUrl}/api/github-app/callback`;
+        },
     },
     facebook: {
         clientId: () => process.env.FACEBOOK_CLIENT_ID,
