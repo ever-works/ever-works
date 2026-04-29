@@ -101,7 +101,11 @@ export function DashboardSidebar({
 
     const navigation = [
         { name: t('navigation.dashboard'), href: ROUTES.DASHBOARD, icon: Home },
-        {name: t('navigation.directories'), href: ROUTES.DASHBOARD_DIRECTORIES,icon: FolderClosed,},
+        {
+            name: t('navigation.directories'),
+            href: ROUTES.DASHBOARD_DIRECTORIES,
+            icon: FolderClosed,
+        },
         { name: t('navigation.plugins'), href: ROUTES.DASHBOARD_PLUGINS, icon: Plug },
         { name: t('navigation.activity'), href: ROUTES.DASHBOARD_ACTIVITY, icon: Activity },
         { name: t('navigation.settings'), href: ROUTES.DASHBOARD_SETTINGS, icon: Settings },
@@ -415,7 +419,10 @@ export function DashboardSidebar({
                                         disabled={isPending}
                                         className="text-danger hover:bg-danger/10 cursor-pointer px-3"
                                     >
-                                        <LogOut className="w-4 h-4 mr-2 shrink-0" strokeWidth={1.3} />
+                                        <LogOut
+                                            className="w-4 h-4 mr-2 shrink-0"
+                                            strokeWidth={1.3}
+                                        />
                                         {isPending ? t('signingOut') : t('signOut')}
                                     </DropdownMenuItem>
                                 </DropdownMenuContent>
