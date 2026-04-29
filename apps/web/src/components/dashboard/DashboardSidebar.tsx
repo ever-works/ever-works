@@ -258,8 +258,8 @@ export function DashboardSidebar({
                                                     ? 'justify-center w-8 h-8 px-0'
                                                     : 'gap-3 px-4 py-2',
                                                 isActive
-                                                    ? 'border bg-surface-secondary border-surface-tertiary dark:border-transparent dark:bg-card-secondary-dark text-text dark:text-text-dark'
-                                                    : 'text-text dark:text-text-secondary-dark/70 hover:bg-surface-secondary dark:hover:bg-card-primary-dark hover:text-text dark:hover:text-text-dark',
+                                                    ? 'border bg-surface-secondary border-surface-tertiary dark:border-transparent dark:bg-card-secondary-dark text-text dark:text-gray-300'
+                                                    : 'text-text dark:text-gray-500 hover:bg-surface-secondary dark:hover:bg-card-primary-dark hover:text-text dark:hover:text-text-dark',
                                             )}
                                         >
                                             <span className="shrink-0 inline-flex">

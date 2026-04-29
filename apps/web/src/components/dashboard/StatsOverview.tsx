@@ -20,11 +20,11 @@ export function StatsOverview({
     const statCards: Array<{
         title: string;
         value: string | number;
-        icon: React.ComponentType<{ className?: string; strokeWidth?: number }>;
+         icon: React.ComponentType<{ className?: string; strokeWidth?: number }>;
         change: string;
         changeType: 'positive' | 'negative' | 'neutral';
-        iconColor: string;
-        dotColor: string;
+        iconColor?: string;
+        dotColor?: string;
     }> = [
         {
             title: t('totalDirectories'),
@@ -40,7 +40,7 @@ export function StatsOverview({
             value: totalItems,
             icon: ListTodo,
             iconColor: 'text-violet-500',
-            dotColor: 'bg-violet-500',
+             dotColor: 'bg-violet-500',
             change: '+23%',
             changeType: 'positive',
         },
@@ -56,16 +56,26 @@ export function StatsOverview({
     ];
 
     return (
-        <div className="grid grid-cols-1 dark:bg-white/2 @lg/main:grid-cols-2 @3xl/main:grid-cols-3 gap-6 border border-card-border dark:border-border-dark rounded-lg p-5">
+        <div className="grid grid-cols-1 @lg/main:grid-cols-2 @3xl/main:grid-cols-3 gap-6">
             {statCards.map((stat) => (
                 <div
                     key={stat.title}
                     className={cn(
-                        'group relative transition-shadow duration-200 overflow-hidden',
-                        '',
-                    )}
+                            'group relative rounded-md p-1 transition-shadow duration-200 overflow-hidden',
+                            'border border-card-border dark:border-border-dark',
+                        )}
                 >
-                    <div className="flex items-end space-x-2">
+                    <div
+                        className={cn(
+                            'group relative rounded-sm p-5 transition-shadow duration-200 overflow-hidden',
+                            'bg-card dark:bg-surface-secondary-dark',
+                            'border border-card-border dark:border-border-dark',
+                        )}
+                    >
+                        {/* Decorative short top border accent with fading edges */}
+                        <div className="card-top-accent pointer-events-none absolute left-1/2 -translate-x-1/2 top-0 w-1/2 h-px z-20 opacity-40 rounded-full" />
+
+                        <div className="flex items-end space-x-2">
                         <div
                             className={cn(
                                 'rounded-md w-8 h-8 flex items-center justify-center',
@@ -77,7 +87,7 @@ export function StatsOverview({
                                 strokeWidth={1.3}
                             />
                         </div>
-                        <p className="text-3xl text-text dark:text-text-dark">{stat.value}</p>
+                        <p className="text-3xl text-text dark:text-text-dark truncate">{stat.value}</p>
                     </div>
                     <div className="mt-1 flex items-center space-x-2">
                         <div className={cn('w-1 h-1 rounded-full mt-0.5', stat.dotColor)} />
@@ -100,6 +110,7 @@ export function StatsOverview({
                         <span className="text-sm text-text-muted dark:text-text-muted-dark ml-2">
                             {t('fromLastMonth')}
                         </span>
+                    </div>
                     </div>
                 </div>
             ))}
