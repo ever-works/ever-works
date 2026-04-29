@@ -108,4 +108,31 @@ describe('resolveSettings', () => {
 			maxTurns: 25
 		});
 	});
+
+	it('keeps user and directory settings when global settings lookup fails', async () => {
+		const context = {
+			getSettings: vi.fn(async (scope: 'global' | 'user' | 'directory') => {
+				if (scope === 'global') {
+					throw new Error('global settings unavailable');
+				}
+
+				if (scope === 'user') {
+					return {
+						profile: 'everworks-test',
+						model: 'user-model'
+					};
+				}
+
+				return {
+					maxTurns: 25
+				};
+			})
+		};
+
+		await expect(resolveSettings(context as never, 'user-1', 'dir-1')).resolves.toEqual({
+			profile: 'everworks-test',
+			model: 'user-model',
+			maxTurns: 25
+		});
+	});
 });

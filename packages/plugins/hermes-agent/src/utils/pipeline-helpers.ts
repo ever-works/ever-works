@@ -86,30 +86,34 @@ async function resolveScopedSettings(
 		return {};
 	}
 
-	try {
-		const [globalSettings, userSettings, directorySettings] = await Promise.all([
-			context.getSettings('global'),
-			context.getSettings('user', userId),
-			context.getSettings('directory', directoryId)
-		]);
-		const merged: PluginSettings = { ...globalSettings };
-
-		for (const key in userSettings) {
-			if (userSettings[key] !== undefined && userSettings[key] !== null) {
-				merged[key] = userSettings[key];
-			}
+	const loadSettings = async (scope: 'global' | 'user' | 'directory', scopeId?: string): Promise<PluginSettings> => {
+		try {
+			return await context.getSettings(scope, scopeId);
+		} catch {
+			return {};
 		}
+	};
 
-		for (const key in directorySettings) {
-			if (directorySettings[key] !== undefined && directorySettings[key] !== null) {
-				merged[key] = directorySettings[key];
-			}
+	const [globalSettings, userSettings, directorySettings] = await Promise.all([
+		loadSettings('global'),
+		loadSettings('user', userId),
+		loadSettings('directory', directoryId)
+	]);
+	const merged: PluginSettings = { ...globalSettings };
+
+	for (const key in userSettings) {
+		if (userSettings[key] !== undefined && userSettings[key] !== null) {
+			merged[key] = userSettings[key];
 		}
-
-		return merged;
-	} catch {
-		return {};
 	}
+
+	for (const key in directorySettings) {
+		if (directorySettings[key] !== undefined && directorySettings[key] !== null) {
+			merged[key] = directorySettings[key];
+		}
+	}
+
+	return merged;
 }
 
 export function initializeState(): PipelineState<HermesAgentStepId> {

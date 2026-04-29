@@ -508,6 +508,7 @@ export class HermesAgentPlugin implements IPlugin, IPipelinePlugin, IFormSchemaP
 		const startedAt = this.startStep('setup-hermes', onLogEntry);
 		reportProgress(onProgress, 0, 0, 'Setup Hermes');
 		const binaryPath = await ensureBinary(runtimeSettings, logger);
+		logger.log(`Using Hermes profile "${runtimeSettings.profile}"`);
 		this.completeStep('setup-hermes', startedAt, onLogEntry);
 		return binaryPath;
 	}
