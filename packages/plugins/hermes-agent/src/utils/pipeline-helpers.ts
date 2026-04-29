@@ -26,10 +26,6 @@ export interface HermesRuntimeSettings {
 	yolo: boolean;
 }
 
-type MinimalLogger = {
-	debug?: (message: string, ...args: unknown[]) => void;
-};
-
 function initializePipelineState<TStepId extends string>(
 	stepDefinitions: readonly PipelineStepDefinition<TStepId>[]
 ): PipelineState<TStepId> {
@@ -85,8 +81,7 @@ function updatePipelineStepState<TStepId extends string>(
 async function resolveScopedSettings(
 	context: PluginContext | null,
 	userId: string,
-	directoryId: string,
-	logger?: MinimalLogger
+	directoryId: string
 ): Promise<PluginSettings> {
 	if (!context) {
 		return {};
@@ -108,9 +103,6 @@ async function resolveScopedSettings(
 		loadResolvedSettings('user', userId),
 		loadResolvedSettings('directory', directoryId)
 	]);
-	logger?.debug?.(
-		`Hermes settings resolution: global=${JSON.stringify(globalSettings)} user=${JSON.stringify(userSettings)} directory=${JSON.stringify(directorySettings)}`
-	);
 
 	const merged: PluginSettings = {};
 
@@ -169,10 +161,9 @@ export function reportProgress(
 export async function resolveSettings(
 	context: PluginContext | null,
 	userId: string,
-	directoryId: string,
-	logger?: MinimalLogger
+	directoryId: string
 ): Promise<PluginSettings> {
-	return resolveScopedSettings(context, userId, directoryId, logger);
+	return resolveScopedSettings(context, userId, directoryId);
 }
 
 export function buildMetrics(
