@@ -54,7 +54,7 @@ describe('process-runner', () => {
 			profile: 'everworks-test',
 			toolsets: 'web',
 			maxTurns: 10,
-			yolo: true,
+			yolo: true
 		});
 
 		expect(args.slice(0, 3)).toEqual(['-p', 'everworks-test', 'chat']);
