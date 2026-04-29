@@ -75,27 +75,29 @@ describe('buildHermesArgs', () => {
 });
 
 describe('resolveSettings', () => {
-	it('merges global, user, then directory settings by precedence', async () => {
+	it('merges global, user, then directory settings by actual source precedence', async () => {
 		const context = {
-			getSettings: vi.fn(async (scope: 'global' | 'user' | 'directory') => {
+			getResolvedSettings: vi.fn(async (scope: 'global' | 'user' | 'directory') => {
 				if (scope === 'global') {
 					return {
-						model: 'global-model',
-						binaryPath: '/usr/bin/hermes',
-						toolsets: 'web'
+						model: { value: 'global-model', source: 'default' },
+						binaryPath: { value: '/usr/bin/hermes', source: 'default' },
+						toolsets: { value: 'web', source: 'default' },
+						profile: { value: 'default', source: 'default' }
 					};
 				}
 
 				if (scope === 'user') {
 					return {
-						model: 'user-model',
-						profile: 'work'
+						model: { value: 'user-model', source: 'user' },
+						profile: { value: 'work', source: 'user' }
 					};
 				}
 
 				return {
-					model: 'directory-model',
-					maxTurns: 25
+					model: { value: 'directory-model', source: 'directory' },
+					maxTurns: { value: 25, source: 'directory' },
+					profile: { value: 'default', source: 'default' }
 				};
 			})
 		};
@@ -111,20 +113,20 @@ describe('resolveSettings', () => {
 
 	it('keeps user and directory settings when global settings lookup fails', async () => {
 		const context = {
-			getSettings: vi.fn(async (scope: 'global' | 'user' | 'directory') => {
+			getResolvedSettings: vi.fn(async (scope: 'global' | 'user' | 'directory') => {
 				if (scope === 'global') {
 					throw new Error('global settings unavailable');
 				}
 
 				if (scope === 'user') {
 					return {
-						profile: 'everworks-test',
-						model: 'user-model'
+						profile: { value: 'everworks-test', source: 'user' },
+						model: { value: 'user-model', source: 'user' }
 					};
 				}
 
 				return {
-					maxTurns: 25
+					maxTurns: { value: 25, source: 'directory' }
 				};
 			})
 		};
@@ -133,6 +135,32 @@ describe('resolveSettings', () => {
 			profile: 'everworks-test',
 			model: 'user-model',
 			maxTurns: 25
+		});
+	});
+
+	it('does not let directory fallback values override explicit user settings', async () => {
+		const context = {
+			getResolvedSettings: vi.fn(async (scope: 'global' | 'user' | 'directory') => {
+				if (scope === 'global') {
+					return {
+						profile: { value: 'default', source: 'default' }
+					};
+				}
+
+				if (scope === 'user') {
+					return {
+						profile: { value: 'everworks-test', source: 'user' }
+					};
+				}
+
+				return {
+					profile: { value: 'default', source: 'default' }
+				};
+			})
+		};
+
+		await expect(resolveSettings(context as never, 'user-1', 'dir-1')).resolves.toEqual({
+			profile: 'everworks-test'
 		});
 	});
 });

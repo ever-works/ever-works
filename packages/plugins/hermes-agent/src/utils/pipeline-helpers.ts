@@ -6,6 +6,7 @@ import type {
 	PipelineStepDefinition,
 	PluginContext,
 	PluginSettings,
+	ResolvedSettings,
 	StepState,
 	StepStatus
 } from '@ever-works/plugin';
@@ -91,33 +92,43 @@ async function resolveScopedSettings(
 		return {};
 	}
 
-	const loadSettings = async (scope: 'global' | 'user' | 'directory', scopeId?: string): Promise<PluginSettings> => {
+	const loadResolvedSettings = async (
+		scope: 'global' | 'user' | 'directory',
+		scopeId?: string
+	): Promise<ResolvedSettings> => {
 		try {
-			return await context.getSettings(scope, scopeId);
+			return await context.getResolvedSettings(scope, scopeId);
 		} catch {
 			return {};
 		}
 	};
 
 	const [globalSettings, userSettings, directorySettings] = await Promise.all([
-		loadSettings('global'),
-		loadSettings('user', userId),
-		loadSettings('directory', directoryId)
+		loadResolvedSettings('global'),
+		loadResolvedSettings('user', userId),
+		loadResolvedSettings('directory', directoryId)
 	]);
 	logger?.debug?.(
 		`Hermes settings resolution: global=${JSON.stringify(globalSettings)} user=${JSON.stringify(userSettings)} directory=${JSON.stringify(directorySettings)}`
 	);
-	const merged: PluginSettings = { ...globalSettings };
 
-	for (const key in userSettings) {
-		if (userSettings[key] !== undefined && userSettings[key] !== null) {
-			merged[key] = userSettings[key];
+	const merged: PluginSettings = {};
+
+	for (const [key, entry] of Object.entries(globalSettings)) {
+		if (entry?.value !== undefined && entry?.value !== null) {
+			merged[key] = entry.value;
 		}
 	}
 
-	for (const key in directorySettings) {
-		if (directorySettings[key] !== undefined && directorySettings[key] !== null) {
-			merged[key] = directorySettings[key];
+	for (const [key, entry] of Object.entries(userSettings)) {
+		if (entry?.source === 'user' && entry.value !== undefined && entry.value !== null) {
+			merged[key] = entry.value;
+		}
+	}
+
+	for (const [key, entry] of Object.entries(directorySettings)) {
+		if (entry?.source === 'directory' && entry.value !== undefined && entry.value !== null) {
+			merged[key] = entry.value;
 		}
 	}
 

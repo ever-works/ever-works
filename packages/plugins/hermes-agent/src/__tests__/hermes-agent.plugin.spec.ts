@@ -34,6 +34,19 @@ vi.mock('../utils/screenshot-capture.js', () => ({
 function createMockContext(
 	overrides?: Partial<Record<'global' | 'user' | 'directory', PluginSettings>>
 ): PluginContext {
+	const toResolved = (scope: 'global' | 'user' | 'directory', settings: PluginSettings = {}) =>
+		Object.fromEntries(
+			Object.entries(settings).map(([key, value]) => [
+				key,
+				{
+					key,
+					value,
+					source: scope === 'global' ? 'default' : scope,
+					isFallback: false
+				}
+			])
+		);
+
 	return {
 		pluginId: 'hermes-agent',
 		logger: {
@@ -69,7 +82,9 @@ function createMockContext(
 		},
 		services: {},
 		getSettings: vi.fn(async (scope: 'global' | 'user' | 'directory') => overrides?.[scope] ?? {}),
-		getResolvedSettings: vi.fn(),
+		getResolvedSettings: vi.fn(async (scope: 'global' | 'user' | 'directory') =>
+			toResolved(scope, overrides?.[scope])
+		),
 		updateSettings: vi.fn(),
 		onEvent: vi.fn().mockReturnValue({ unsubscribe: vi.fn() }),
 		emitEvent: vi.fn(),
