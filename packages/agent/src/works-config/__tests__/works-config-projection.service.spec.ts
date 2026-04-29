@@ -79,7 +79,7 @@ describe('WorksConfigProjectionService', () => {
 
         await expect(service.buildWriteRequest(directory)).resolves.toEqual({
             name: 'Compare Cloud Pricing',
-            model: undefined,
+            model: null,
             providers: { ai: 'openai', screenshot: 'screenshotone' },
         });
     });
@@ -99,7 +99,7 @@ describe('WorksConfigProjectionService', () => {
 
         await expect(service.buildWriteRequest(directory)).resolves.toEqual({
             name: 'Compare Cloud Pricing',
-            model: undefined,
+            model: null,
             providers: null,
         });
     });

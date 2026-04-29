@@ -23,7 +23,7 @@ export class WorksConfigProjectionService {
 
         return {
             name: directory.name,
-            model: pipelineModel,
+            model: pipelineModel ?? null,
             providers: this.mergeProviders(activeProviders, scheduleProviders) ?? null,
         };
     }

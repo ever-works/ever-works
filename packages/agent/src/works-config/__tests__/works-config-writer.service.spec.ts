@@ -146,6 +146,31 @@ describe('WorksConfigWriterService', () => {
         await fs.rm(repoDir, { recursive: true, force: true });
     });
 
+    it('removes stale model when a projection explicitly clears it', async () => {
+        const repoDir = await fs.mkdtemp(path.join(os.tmpdir(), 'works-config-writer-'));
+        await fs.writeFile(
+            path.join(repoDir, 'works.yml'),
+            ['model: openai/gpt-5.1', ''].join('\n'),
+            'utf-8',
+        );
+
+        const service = new WorksConfigWriterService(new WorksConfigService({} as any));
+
+        await service.writeToDataRepository({
+            directory: createDirectory(),
+            dataRepository: { dir: repoDir } as any,
+            request: {
+                model: null,
+            },
+        });
+
+        const written = yaml.parse(await fs.readFile(path.join(repoDir, 'works.yml'), 'utf-8'));
+
+        expect(written.model).toBeUndefined();
+
+        await fs.rm(repoDir, { recursive: true, force: true });
+    });
+
     it('writes imported works.yml-only state before schedule is applied to the directory', async () => {
         const repoDir = await fs.mkdtemp(path.join(os.tmpdir(), 'works-config-writer-'));
         const directory = {
