@@ -261,9 +261,9 @@ describe('HermesAgentPlugin', () => {
 		const secondResult = await plugin.execute(directory as never, request as never, existing as never);
 
 		expect(secondResult.success).toBe(false);
-		expect(
-			secondResult.error instanceof Error ? secondResult.error.message : String(secondResult.error)
-		).toBe('Hermes Agent is already running a pipeline execution on this plugin instance');
+		expect(secondResult.error instanceof Error ? secondResult.error.message : String(secondResult.error)).toBe(
+			'Hermes Agent is already running a pipeline execution on this plugin instance'
+		);
 
 		resolveExecution?.({
 			stdout: '',

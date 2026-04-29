@@ -117,11 +117,7 @@ describe('workspace manager', () => {
 		const repairSpy = vi.spyOn(pluginPackage, 'jsonrepair').mockImplementation(() => {
 			throw new Error('repair failed');
 		});
-		await fs.writeFile(
-			path.join(workspace, '_meta', 'hermes-result.json'),
-			'{"items":[{"name":"Broken"',
-			'utf-8'
-		);
+		await fs.writeFile(path.join(workspace, '_meta', 'hermes-result.json'), '{"items":[{"name":"Broken"', 'utf-8');
 
 		const result = await readGeneratedResult(workspace, { warn: () => {} });
 		repairSpy.mockRestore();
