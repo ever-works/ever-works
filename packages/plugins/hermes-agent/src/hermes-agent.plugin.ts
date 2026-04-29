@@ -376,7 +376,7 @@ export class HermesAgentPlugin implements IPlugin, IPipelinePlugin, IFormSchemaP
 		let workspacePath: string | null = null;
 
 		try {
-			const settings = await resolveSettings(this.context, userId, directory.id);
+			const settings = await resolveSettings(this.context, userId, directory.id, logger);
 			const runtimeSettings = resolveHermesRuntimeSettings(settings);
 			const binaryPath = await this.runSetupStep(runtimeSettings, logger, onProgress, onLogEntry);
 
