@@ -238,7 +238,9 @@ export class DirectoryLifecycleService {
             if (deleteDirectoryDto.delete_markdown_repository !== false) {
                 try {
                     await this.markdownGenerator.removeRepository(directory, user);
-                    deletedRepositories.push(`${directory.getRepoOwner()}/${directory.slug}`);
+                    deletedRepositories.push(
+                        `${directory.getRepoOwner('directory')}/${directory.getMainRepo()}`,
+                    );
                 } catch (error) {
                     if (error instanceof HttpException) {
                         throw error;
@@ -252,7 +254,7 @@ export class DirectoryLifecycleService {
                 try {
                     await this.websiteGenerator.removeRepository(directory, user);
                     deletedRepositories.push(
-                        `${directory.getRepoOwner()}/${directory.getWebsiteRepo()}`,
+                        `${directory.getRepoOwner('website')}/${directory.getWebsiteRepo()}`,
                     );
                 } catch (error) {
                     if (error instanceof HttpException) {

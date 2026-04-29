@@ -37,6 +37,11 @@ export interface ResearchDependencies {
     readonly extractContent: (url: string) => Promise<string | null>;
 }
 
+export interface ResearchSeedResult {
+    readonly url: string;
+    readonly snippet: string;
+}
+
 /**
  * Research a comparison pair by searching the web and extracting content.
  * Returns aggregated research content and source URLs.
@@ -44,13 +49,30 @@ export interface ResearchDependencies {
 export async function researchPair(
     pair: ComparisonPair,
     deps: ResearchDependencies,
-    options: { maxQueries?: number; maxResultsPerQuery?: number; maxExtractions?: number } = {},
+    options: {
+        maxQueries?: number;
+        maxResultsPerQuery?: number;
+        maxExtractions?: number;
+        seedResults?: ResearchSeedResult[];
+    } = {},
 ): Promise<ComparisonResearch> {
-    const { maxQueries = 3, maxResultsPerQuery = 5, maxExtractions = 5 } = options;
+    const {
+        maxQueries = 3,
+        maxResultsPerQuery = 5,
+        maxExtractions = 5,
+        seedResults = [],
+    } = options;
     const queries = buildSearchQueries(pair).slice(0, maxQueries);
 
     const allResults: Array<{ url: string; snippet: string }> = [];
     const seenUrls = new Set<string>();
+
+    for (const result of seedResults) {
+        if (!seenUrls.has(result.url)) {
+            seenUrls.add(result.url);
+            allResults.push(result);
+        }
+    }
 
     for (const query of queries) {
         try {

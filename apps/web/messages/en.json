@@ -470,10 +470,15 @@
                 "badge": "Onboarding {currentStep}/{totalSteps}",
                 "dismiss": "Hide onboarding shortcut"
             },
+            "tooltips": {
+                "openSidebar": "Open sidebar",
+                "help": "Help & docs"
+            },
             "notifications": {
                 "title": "Notifications",
                 "empty": "No new notifications",
-                "fetchFailed": "Failed to load notifications"
+                "fetchFailed": "Failed to load notifications",
+                "dismissFailed": "Failed to dismiss notification"
             },
             "help": {
                 "title": "Help & Resources",
@@ -574,8 +579,15 @@
                 "status": "Status",
                 "created": "Created",
                 "fields": "Details",
+                "liveLogs": "Live Logs",
                 "metadata": "Metadata",
                 "rawJson": "Raw JSON"
+            },
+            "summary": {
+                "generation": {
+                    "withChanges": "Added {added}. Changed {changed}. Total: {total}",
+                    "noChanges": "No item changes. Total: {total}"
+                }
             },
             "pagination": {
                 "previous": "Previous",
@@ -987,7 +999,15 @@
                 "page": {
                     "title": "Scheduled updates",
                     "subtitle": "Automate refreshes for {name} with a dedicated cadence and failure handling.",
-                    "fallbackName": "this directory"
+                    "fallbackName": "this directory",
+                    "loadFailed": "Failed to load schedule settings.",
+                    "providerCategories": {
+                        "pipeline": "Pipeline",
+                        "ai": "AI",
+                        "search": "Search",
+                        "screenshot": "Screenshot",
+                        "contentExtractor": "Extractor"
+                    }
                 },
                 "card": {
                     "title": "Automation",
@@ -1046,6 +1066,7 @@
                     },
                     "plans": {
                         "free": "Free",
+                        "pro": "Pro",
                         "standard": "Standard",
                         "premium": "Premium",
                         "unmetered": "Unmetered"
@@ -1073,7 +1094,9 @@
                         "requireUsage": "Enable pay-per-use billing to use this cadence.",
                         "updateFailed": "Failed to update schedule.",
                         "runFailed": "Failed to start run.",
-                        "cancelFailed": "Failed to cancel schedule."
+                        "cancelFailed": "Failed to cancel schedule.",
+                        "generationRunning": "Generation is running, please wait for it to finish.",
+                        "scheduleInactive": "Schedule must be active to run now."
                     },
                     "empty": {
                         "title": "Run a manual generation first",
@@ -1348,6 +1371,8 @@
                 "showing": "Showing {current} of {total} items",
                 "noMatch": "No items match your search criteria",
                 "source": "Source",
+                "viewOnWebsite": "View on website",
+                "openSourceUrl": "Open source URL",
                 "addItem": "Add Item",
                 "delete": "Delete",
                 "deleteWithPR": "Delete with Pull Request",
@@ -1433,6 +1458,12 @@
                     "failed": "Failed to capture screenshot",
                     "error": "An error occurred while capturing screenshot",
                     "notConfigured": "Screenshot service is not configured",
+                    "providerLabel": "Provider",
+                    "providerRequired": "Please select a screenshot provider",
+                    "selectProviderTitle": "Choose screenshot provider",
+                    "selectProviderDescription": "Select which screenshot provider to use for this item.",
+                    "selected": "Selected",
+                    "confirmCapture": "Capture screenshot",
                     "captureFailed": "Failed to capture image",
                     "captureSuccess": "Image captured successfully",
                     "captureError": "An error occurred while capturing image",
@@ -1447,7 +1478,8 @@
                     "categories": "Categories",
                     "tags": "Tags",
                     "collections": "Collections",
-                    "sourceHealth": "Source Health"
+                    "sourceHealth": "Source Health",
+                    "navigationLabel": "Item tabs"
                 },
                 "taxonomy": {
                     "categories": {
@@ -1616,7 +1648,8 @@
                     "generate": "Generate",
                     "schedule": "Schedule",
                     "history": "History",
-                    "comparisons": "Comparisons"
+                    "comparisons": "Comparisons",
+                    "navigationLabel": "Generator tabs"
                 },
                 "regenerationWarning": "Regeneration Warning",
                 "regenerationWarningDescription": "This directory has already been generated. Starting a new generation will replace existing items.",
@@ -1631,6 +1664,9 @@
                 "selectOption": "Select an option",
                 "directoryName": "Directory Name",
                 "generationPrompt": "Generation Prompt",
+                "modelOverride": "AI Model Override",
+                "modelOverridePlaceholder": "e.g. openai/gpt-4.1 or openrouter/openai/gpt-4.1",
+                "modelOverrideHelperText": "Optional. Uses the imported or previous model by default unless you override it here.",
                 "recommended": "Recommended",
                 "promptPlaceholder": "Describe what items should be generated for this directory...",
                 "promptHelperText": "Be specific about the type of content you want to generate",
@@ -1735,7 +1771,9 @@
                 "useDirectoryDefault": "Use Directory Default",
                 "default": "Default",
                 "notConfigured": "Not configured",
-                "notConfiguredTooltip": "This provider requires configuration. Visit Settings → Plugins to set it up."
+                "notConfiguredTooltip": "This provider requires configuration. Visit Settings → Plugins to set it up.",
+                "jsonObjectError": "Value must be a JSON object",
+                "invalidJsonError": "Invalid JSON format"
             },
             "progress": {
                 "title": "Generation in Progress",
@@ -1770,6 +1808,28 @@
                 "syncDescription": "Automatically pull updates from the source repository.",
                 "syncUpdateFailed": "Failed to update sync settings",
                 "syncDisabled": "Sync Disabled",
+                "worksConfig": {
+                    "imported": "Imported from works.yml",
+                    "applied": "Applied: {value}",
+                    "enabled": "enabled",
+                    "disabled": "disabled",
+                    "fields": {
+                        "sourceType": "Source Type",
+                        "configName": "Config Name",
+                        "initialPrompt": "Initial Prompt",
+                        "model": "Model",
+                        "schedule": "Schedule",
+                        "providers": "Providers",
+                        "websiteRepo": "Website Repo",
+                        "additionalAgents": "Additional Agents"
+                    },
+                    "sourceTypes": {
+                        "dataRepo": "Data Repository",
+                        "awesomeReadme": "Awesome README",
+                        "linkExisting": "Linked Existing Repositories",
+                        "worksConfig": "works.yml"
+                    }
+                },
                 "generalSettings": "General Settings",
                 "generalTitle": "General Settings",
                 "directoryName": "Directory Name",
@@ -1825,6 +1885,14 @@
                     "updateFailed": "Failed to update deploy provider"
                 },
                 "visibilityUpdateFailed": "Failed to update repository visibility",
+                "visibilityUpdated": "{name} is now {visibility}",
+                "repositoryVisibilityTitle": "Repository Visibility",
+                "repositoryTypes": {
+                    "main": "Main",
+                    "data": "Data",
+                    "website": "Website"
+                },
+                "repositoryTypeSuffix": "repository",
                 "visibilityWarningTitle": "Make Repository Private?",
                 "visibilityWarningDescription": "You are about to make {name} private.",
                 "visibilityWarningPermanent": "This action has permanent consequences:",
@@ -1945,6 +2013,9 @@
                             "themeSelectorHelper": "Allow users to switch between themes",
                             "defaults": "Defaults",
                             "defaultLayout": "Default Layout",
+                            "layoutHome1": "Home 1",
+                            "layoutHome2": "Home 2",
+                            "layoutHome3": "Home 3",
                             "defaultTheme": "Default Theme",
                             "themeLight": "Light",
                             "themeDark": "Dark",
@@ -2057,6 +2128,8 @@
                         "deployPending": "Deployment is queued and will start shortly",
                         "deployFailed": "Failed to deploy",
                         "deployError": "An error occurred during deployment",
+                        "saveSettingsFailed": "Failed to save settings",
+                        "saveSettingsBeforeDeploymentFailed": "Failed to save settings before deployment",
                         "updateSuccess": "Repository updated successfully",
                         "updateFailed": "Failed to update repository",
                         "updateError": "An error occurred while updating the repository"
@@ -2204,7 +2277,9 @@
                     "unconfiguredProviders": "{providers} not configured. Visit Settings → Plugins to set up before generating.",
                     "nameRequired": "Directory name is required",
                     "slugRequired": "Directory slug is required",
-                    "descriptionRequired": "Directory description is required"
+                    "descriptionRequired": "Directory description is required",
+                    "githubRequired": "Please connect your GitHub account first.",
+                    "createFailed": "Failed to create directory"
                 },
                 "success": {
                     "started": "Directory creation started!",
@@ -2251,6 +2326,7 @@
                 "nameRequired": "Directory name is required",
                 "slugRequired": "Directory slug is required",
                 "descriptionRequired": "Directory description is required",
+                "createFailed": "Failed to create directory",
                 "success": {
                     "created": "Directory created successfully!"
                 }
@@ -2266,6 +2342,10 @@
                 "sync": {
                     "title": "Keep synchronized",
                     "description": "Automatically pull updates from the source repository."
+                },
+                "worksConfigRestore": {
+                    "title": "Restore works.yml settings",
+                    "description": "Apply AI provider, model, schedule, and related repository settings from this repository."
                 },
                 "sourceMethod": {
                     "url": {
@@ -2297,15 +2377,19 @@
                 },
                 "detectedType": {
                     "dataRepo": "Data Repository Detected",
-                    "awesomeReadme": "Awesome List Detected"
+                    "awesomeReadme": "Awesome List Detected",
+                    "worksConfig": "Works config repository"
                 },
                 "badges": {
                     "dataRepo": "Data Repo",
-                    "awesomeReadme": "Awesome List"
+                    "awesomeReadme": "Awesome List",
+                    "worksConfig": "works.yml"
                 },
                 "preview": {
                     "items": "items",
-                    "categories": "categories"
+                    "categories": "categories",
+                    "schedule": "Schedule: {cadence}",
+                    "providers": "Providers: {providers}"
                 },
                 "nameLabel": "Directory Name",
                 "namePlaceholder": "e.g., My Awesome Directory",
@@ -2321,6 +2405,7 @@
                     "seedDetected": "~{count} seed items detected",
                     "expansionFactor": "Expansion target",
                     "expansionDescription": "How many times larger should the final collection be compared to the source?",
+                    "recommendedMultiplier": "{value} (recommended)",
                     "preview": "~{seedCount} seed items \u2192 target ~{targetCount} final items (~{newItems} new items to discover)",
                     "enrichmentOptions": "Enrichment options",
                     "enrichDescriptions": "Rewrite descriptions",
@@ -2402,6 +2487,7 @@
                     "linkRepos": "Link repositories"
                 },
                 "detectionFailed": "We could not automatically detect the format. Please select how to import this repository.",
+                "detectionFailedMissingConfig": "No supported config was found. Add config.yml, works.yml, or works_config/works.yml to the repository, or choose a manual import format below.",
                 "errors": {
                     "urlRequired": "Please enter a GitHub repository URL",
                     "unsupportedFormat": "This repository format is not supported. Please use a Data Repository or Awesome List format.",
@@ -2440,7 +2526,8 @@
                 "notConnected": "Not connected",
                 "connected": "Connected",
                 "connecting": "Connecting...",
-                "connect": "Connect"
+                "connect": "Connect",
+                "connectError": "Failed to connect"
             },
             "settings": {
                 "title": "Git Provider Connections",
@@ -2459,7 +2546,12 @@
                 "organizations": "Organizations ({count})",
                 "organizationsNote": "Only organizations where you have granted access are shown.",
                 "connectDescription": "Connect your {provider} account to import repositories and manage your projects.",
-                "selectedProvider": "Selected Provider"
+                "selectedProvider": "Selected Provider",
+                "confirmDisconnect": "Are you sure you want to disconnect {provider}?",
+                "disconnected": "{provider} disconnected",
+                "connectError": "Failed to connect",
+                "reconnectError": "Failed to reconnect",
+                "disconnectError": "Failed to disconnect"
             }
         },
         "apiTokens": {
@@ -2556,12 +2648,17 @@
             "menu": "Menu",
             "aiChat": "AI Chat",
             "newDirectory": "New Directory",
+            "activityIndicator": "Directory generating",
             "navigation": {
                 "dashboard": "Dashboard",
                 "activity": "Activity",
                 "directories": "Directories",
                 "plugins": "Plugins",
                 "settings": "Settings"
+            },
+            "tooltips": {
+                "expandSidebar": "Expand sidebar",
+                "collapseSidebar": "Collapse sidebar"
             },
             "profileMenu": {
                 "accountSettings": "Account Settings",
@@ -2607,6 +2704,7 @@
         },
         "aiChat": {
             "title": "AI Assistant",
+            "panelTitle": "Chat",
             "subtitle": "Create directories with natural language",
             "welcomeTitle": "Welcome to AI Assistant \uD83D\uDC4B",
             "welcomeSubtitle": "Your AI-powered assistant. Ask me anything about creating directories, generating content, or organizing your data.",
@@ -2626,7 +2724,12 @@
             "loadingConversation": "Loading conversation\u2026",
             "inputPlaceholder": "Ask me anything...",
             "sendButton": "Send",
+            "stopGenerating": "Stop generating",
             "sendHint": "Enter to send \u00b7 Shift+Enter for new line",
+            "closeChat": "Close chat",
+            "collapseChat": "Collapse chat",
+            "resizeChat": "Drag to resize chat",
+            "expandChat": "Expand chat",
             "providersError": "Failed to load AI providers. Chat may not work correctly.",
             "providerNotConfigured": "This provider is not configured. Set it up in Plugins.",
             "editMessage": "Edit message",
@@ -2874,6 +2977,8 @@
     "errors": {
         "global": {
             "title": "Something went wrong!",
+            "description": "An unexpected error occurred. Please try again or contact support if the problem persists.",
+            "errorId": "Error ID",
             "tryAgain": "Try again"
         },
         "notFound": {
@@ -2885,6 +2990,7 @@
         "dashboard": {
             "title": "Something went wrong",
             "description": "An unexpected error occurred. Please try again or contact support if the problem persists.",
+            "errorId": "Error ID",
             "tryAgain": "Try again"
         }
     },
@@ -3069,7 +3175,12 @@
     "common": {
         "ui": {
             "close": "Close",
-            "dismiss": "Dismiss"
+            "dismiss": "Dismiss",
+            "selectLanguage": "Select language",
+            "increment": "Increment",
+            "decrement": "Decrement",
+            "yes": "Yes",
+            "no": "No"
         },
         "theme": {
             "toggle": "Toggle theme",

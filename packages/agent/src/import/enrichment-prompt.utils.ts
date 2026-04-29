@@ -26,6 +26,7 @@ export function buildImportGenerationDto(options: {
     sourceUrl: string;
     expansionFactor?: number;
     providers?: ProvidersDto;
+    model?: string;
     updateWithPullRequest?: boolean;
 }): CreateItemsGeneratorDto {
     const {
@@ -33,6 +34,7 @@ export function buildImportGenerationDto(options: {
         sourceUrl,
         expansionFactor = DEFAULT_EXPANSION_FACTOR,
         providers,
+        model,
         updateWithPullRequest = false,
     } = options;
 
@@ -72,6 +74,7 @@ export function buildImportGenerationDto(options: {
     const dto = new CreateItemsGeneratorDto();
     dto.name = directory.name ?? directory.slug;
     dto.prompt = prompt;
+    dto.model = model;
     dto.generation_method = GenerationMethod.CREATE_UPDATE;
     dto.update_with_pull_request = updateWithPullRequest;
     dto.website_repository_creation_method = WebsiteRepositoryCreationMethod.CREATE_USING_TEMPLATE;

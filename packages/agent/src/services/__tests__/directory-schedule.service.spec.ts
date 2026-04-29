@@ -76,7 +76,11 @@ describe('DirectoryScheduleService', () => {
             }),
         };
         pluginRegistry = {
-            get: jest.fn(),
+            get: jest.fn((pluginId: string) =>
+                ['openrouter', 'agent-pipeline'].includes(pluginId)
+                    ? { id: pluginId, state: 'loaded' }
+                    : null,
+            ),
         };
         notificationService = {
             notifySchedulePaused: jest.fn(),
@@ -231,6 +235,54 @@ describe('DirectoryScheduleService', () => {
             expect.objectContaining({
                 nextRunAt: recalculated,
                 cadence: DirectoryScheduleCadence.WEEKLY,
+            }),
+        );
+    });
+
+    it('defaults provider overrides from imported works.yml config when enabling schedule', async () => {
+        const worksConfigDirectory = {
+            ...directory,
+            sourceRepository: {
+                type: 'works_config',
+                worksConfig: {
+                    providers: {
+                        ai: 'openrouter',
+                        pipeline: 'agent-pipeline',
+                    },
+                },
+            },
+        };
+
+        ownershipService.ensureCanEdit.mockResolvedValue({ directory: worksConfigDirectory });
+        scheduleRepository.findByDirectoryId.mockResolvedValue(null);
+        scheduleRepository.upsert.mockResolvedValue({
+            directoryId: directory.id,
+            userId: user.id,
+            cadence: DirectoryScheduleCadence.DAILY,
+            billingMode: DirectoryScheduleBillingMode.SUBSCRIPTION,
+            status: DirectoryScheduleStatus.ACTIVE,
+            providerOverrides: {
+                ai: 'openrouter',
+                pipeline: 'agent-pipeline',
+            },
+        });
+
+        await service.updateSchedule(
+            directory.id,
+            {
+                enable: true,
+                cadence: DirectoryScheduleCadence.DAILY,
+            },
+            user,
+        );
+
+        expect(scheduleRepository.upsert).toHaveBeenCalledWith(
+            directory.id,
+            expect.objectContaining({
+                providerOverrides: {
+                    ai: 'openrouter',
+                    pipeline: 'agent-pipeline',
+                },
             }),
         );
     });

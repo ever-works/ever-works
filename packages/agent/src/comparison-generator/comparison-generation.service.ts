@@ -1,4 +1,6 @@
 import { Inject, Injectable, Logger, NotFoundException, Optional } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { LessThan, Repository } from 'typeorm';
 import { z } from 'zod';
 import { AiFacadeService } from '../facades/ai.facade';
 import { SearchFacadeService } from '../facades/search.facade';
@@ -8,12 +10,13 @@ import { PromptFacadeService } from '../facades/prompt.facade';
 import { DirectoryRepository } from '../database/repositories/directory.repository';
 import { DirectoryGenerationHistoryRepository } from '../database/repositories/directory-generation-history.repository';
 import { DirectoryPluginRepository } from '../plugins/repositories/directory-plugin.repository';
+import { CacheEntry } from '../entities/cache.entity';
 import type { Directory } from '../entities/directory.entity';
 import type { ComparisonData } from '@ever-works/contracts';
 import type { FacadeOptions } from '@ever-works/plugin';
 import { DataRepository, type IDataConfig } from '../generators/data-generator/data-repository';
 import { CACHE_MANAGER, type Cache } from '../cache';
-import { GenerateStatusType } from '../entities/types';
+import { DirectoryScheduleCadence, GenerateStatusType } from '../entities/types';
 import {
     DEFAULT_COMPARISON_SETTINGS,
     selectNextPair,
@@ -63,6 +66,7 @@ export interface ComparisonResult {
 @Injectable()
 export class ComparisonGenerationService {
     private readonly logger = new Logger(ComparisonGenerationService.name);
+    private readonly activeGenerationLocks = new Set<string>();
 
     constructor(
         private readonly aiFacade: AiFacadeService,
@@ -74,12 +78,20 @@ export class ComparisonGenerationService {
         private readonly generationHistoryRepository: DirectoryGenerationHistoryRepository,
         private readonly directoryPluginRepository: DirectoryPluginRepository,
         @Optional() @Inject(CACHE_MANAGER) private readonly cacheManager?: Cache,
+        @Optional()
+        @InjectRepository(CacheEntry)
+        private readonly cacheEntryRepository?: Repository<CacheEntry>,
     ) {}
 
     private static readonly PROGRESS_CACHE_TTL = 120_000; // 2 minutes
+    private static readonly GENERATION_LOCK_TTL = 2 * 60 * 60 * 1000; // 2 hours
 
     private progressCacheKey(directoryId: string): string {
         return `comparison-progress-${directoryId}`;
+    }
+
+    private generationLockKey(directoryId: string): string {
+        return `comparison-generation-lock:${directoryId}`;
     }
 
     private async setProgress(
@@ -151,6 +163,9 @@ export class ComparisonGenerationService {
         );
         const settings = dirPlugin?.settings ?? {};
         return {
+            cadence_override:
+                (settings.cadence_override as string) ??
+                DEFAULT_COMPARISON_SETTINGS.cadence_override,
             max_comparisons_mode:
                 (settings.max_comparisons_mode as string) ??
                 DEFAULT_COMPARISON_SETTINGS.max_comparisons_mode,
@@ -166,6 +181,138 @@ export class ComparisonGenerationService {
         };
     }
 
+    private resolveComparisonCadence(
+        directory: Directory,
+        cadenceOverride: string,
+    ): DirectoryScheduleCadence | null {
+        switch (cadenceOverride) {
+            case 'daily':
+                return DirectoryScheduleCadence.DAILY;
+            case 'weekly':
+                return DirectoryScheduleCadence.WEEKLY;
+            case 'monthly':
+                return DirectoryScheduleCadence.MONTHLY;
+            case 'use_directory':
+                return directory.scheduledCadence ?? null;
+            default:
+                return null;
+        }
+    }
+
+    private calculateNextComparisonRun(
+        cadence: DirectoryScheduleCadence,
+        fromDate = new Date(),
+    ): Date {
+        const next = new Date(fromDate);
+
+        switch (cadence) {
+            case DirectoryScheduleCadence.HOURLY:
+                next.setMinutes(0, 0, 0);
+                next.setHours(next.getHours() + 1);
+                break;
+            case DirectoryScheduleCadence.EVERY_3_HOURS:
+                next.setMinutes(0, 0, 0);
+                next.setHours(next.getHours() + 3);
+                break;
+            case DirectoryScheduleCadence.EVERY_8_HOURS:
+                next.setMinutes(0, 0, 0);
+                next.setHours(next.getHours() + 8);
+                break;
+            case DirectoryScheduleCadence.EVERY_12_HOURS:
+                next.setMinutes(0, 0, 0);
+                next.setHours(next.getHours() + 12);
+                break;
+            case DirectoryScheduleCadence.DAILY:
+                next.setDate(next.getDate() + 1);
+                break;
+            case DirectoryScheduleCadence.WEEKLY:
+                next.setDate(next.getDate() + 7);
+                break;
+            case DirectoryScheduleCadence.MONTHLY:
+                next.setMonth(next.getMonth() + 1);
+                break;
+        }
+
+        return next;
+    }
+
+    private isComparisonDue(
+        directory: Directory,
+        cadenceOverride: string,
+        lastGeneratedAt?: string,
+    ): boolean {
+        const cadence = this.resolveComparisonCadence(directory, cadenceOverride);
+        if (!cadence || !lastGeneratedAt) {
+            return true;
+        }
+
+        const lastGeneratedDate = new Date(lastGeneratedAt);
+        if (Number.isNaN(lastGeneratedDate.getTime())) {
+            return true;
+        }
+
+        return this.calculateNextComparisonRun(cadence, lastGeneratedDate) <= new Date();
+    }
+
+    private async tryAcquireGenerationLock(directoryId: string): Promise<string | null> {
+        if (this.activeGenerationLocks.has(directoryId)) {
+            return null;
+        }
+
+        const lockToken = `${process.pid}-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+
+        if (this.cacheEntryRepository) {
+            const lockKey = this.generationLockKey(directoryId);
+            const now = Date.now();
+
+            await this.cacheEntryRepository.delete({
+                key: lockKey,
+                expiresAt: LessThan(now),
+            });
+
+            try {
+                await this.cacheEntryRepository.insert({
+                    key: lockKey,
+                    value: lockToken,
+                    expiresAt: now + ComparisonGenerationService.GENERATION_LOCK_TTL,
+                });
+            } catch (error) {
+                const existingLock = await this.cacheEntryRepository.findOne({
+                    where: { key: lockKey },
+                    select: ['key'],
+                });
+
+                if (existingLock) {
+                    return null;
+                }
+
+                throw error;
+            }
+        }
+
+        this.activeGenerationLocks.add(directoryId);
+        return lockToken;
+    }
+
+    private async releaseGenerationLock(
+        directoryId: string,
+        lockToken: string | null,
+    ): Promise<void> {
+        this.activeGenerationLocks.delete(directoryId);
+
+        if (!lockToken || !this.cacheEntryRepository) {
+            return;
+        }
+
+        await this.cacheEntryRepository
+            .createQueryBuilder()
+            .delete()
+            .from(CacheEntry)
+            .where('key = :key', { key: this.generationLockKey(directoryId) })
+            .andWhere('value = :value', { value: lockToken })
+            .execute();
+    }
+
     private getDirectoryGitOptions(directory: Directory): GitFacadeOptions {
         return {
             userId: directory.userId,
@@ -173,54 +320,139 @@ export class ComparisonGenerationService {
         };
     }
 
+    private extractMarkdownLinkSeeds(
+        markdown: string | undefined,
+    ): Array<{ url: string; snippet: string }> {
+        if (!markdown) {
+            return [];
+        }
+
+        const matches = markdown.matchAll(/\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)/g);
+        return Array.from(matches, (match) => ({
+            url: match[2].trim(),
+            snippet: match[1].trim(),
+        })).filter((seed) => seed.url.length > 0 && seed.snippet.length > 0);
+    }
+
+    private buildResearchSeedResults(
+        pair: ComparisonPair,
+    ): Array<{ url: string; snippet: string }> {
+        const candidates: Array<{ url?: string; snippet: string }> = [
+            {
+                url:
+                    pair.itemA.source_validation?.suggested_source_url?.trim() ||
+                    pair.itemA.source_url?.trim(),
+                snippet: `${pair.itemA.name} official source`,
+            },
+            {
+                url:
+                    pair.itemB.source_validation?.suggested_source_url?.trim() ||
+                    pair.itemB.source_url?.trim(),
+                snippet: `${pair.itemB.name} official source`,
+            },
+            {
+                url: pair.itemA.source_url?.trim(),
+                snippet: `${pair.itemA.name} original source`,
+            },
+            {
+                url: pair.itemB.source_url?.trim(),
+                snippet: `${pair.itemB.name} original source`,
+            },
+            ...this.extractMarkdownLinkSeeds(pair.itemA.markdown),
+            ...this.extractMarkdownLinkSeeds(pair.itemB.markdown),
+        ];
+
+        const deduped = new Map<string, { url: string; snippet: string }>();
+        for (const candidate of candidates) {
+            const url = candidate.url?.trim();
+            if (!url || deduped.has(url)) {
+                continue;
+            }
+
+            deduped.set(url, {
+                url,
+                snippet: candidate.snippet,
+            });
+        }
+
+        return Array.from(deduped.values());
+    }
+
     /**
      * Generate the next automatic comparison for a directory.
      * Picks the best un-compared pair and generates a full comparison page.
      */
-    async generateNextComparison(directoryId: string, userId: string): Promise<ComparisonResult> {
+    async generateNextComparison(
+        directoryId: string,
+        userId: string,
+        options: { respectCadence?: boolean } = {},
+    ): Promise<ComparisonResult> {
         const directory = await this.findDirectoryOrFail(directoryId);
+        const lockToken = await this.tryAcquireGenerationLock(directoryId);
 
-        const gitOptions = this.getDirectoryGitOptions(directory);
-
-        const dest = await this.gitFacade.cloneOrPull(
-            { owner: directory.getRepoOwner(), repo: directory.getDataRepo() },
-            gitOptions,
-        );
-        const dataRepo = await DataRepository.create(dest);
-        const config = await dataRepo.getConfig();
-        const items = await dataRepo.getItems();
-
-        const comparisonState = config.metadata?.comparison_state ?? {
-            generated_pairs: [],
-            total_generated: 0,
-        };
-
-        const pluginSettings = await this.getComparisonPluginSettings(directoryId);
-        const maxComparisons =
-            pluginSettings.max_comparisons_mode === 'unlimited'
-                ? Number.MAX_SAFE_INTEGER
-                : pluginSettings.max_comparisons;
-        const minItems = pluginSettings.min_items_for_comparison;
-
-        const pair = selectNextPair({
-            items,
-            generatedPairs: comparisonState.generated_pairs,
-            minItemsForComparison: minItems,
-            maxComparisons,
-        });
-
-        if (!pair) {
-            return { status: 'skipped', message: 'No more pairs available for comparison' };
+        if (!lockToken) {
+            return {
+                status: 'skipped',
+                message: 'Comparison generation is already in progress for this directory',
+            };
         }
 
-        return this.generateComparisonForPair(
-            pair,
-            directory,
-            dataRepo,
-            config,
-            comparisonState,
-            gitOptions,
-        );
+        try {
+            const gitOptions = this.getDirectoryGitOptions(directory);
+
+            const dest = await this.gitFacade.cloneOrPull(
+                { owner: directory.getRepoOwner(), repo: directory.getDataRepo() },
+                gitOptions,
+            );
+            const dataRepo = await DataRepository.create(dest);
+            const config = await dataRepo.getConfig();
+            const items = await dataRepo.getItems();
+
+            const comparisonState = config.metadata?.comparison_state ?? {
+                generated_pairs: [],
+                total_generated: 0,
+            };
+
+            const pluginSettings = await this.getComparisonPluginSettings(directoryId);
+            if (
+                options.respectCadence &&
+                !this.isComparisonDue(
+                    directory,
+                    pluginSettings.cadence_override,
+                    comparisonState.last_generated_at,
+                )
+            ) {
+                return { status: 'skipped', message: 'Comparison generation is not due yet' };
+            }
+
+            const maxComparisons =
+                pluginSettings.max_comparisons_mode === 'unlimited'
+                    ? Number.MAX_SAFE_INTEGER
+                    : pluginSettings.max_comparisons;
+            const minItems = pluginSettings.min_items_for_comparison;
+
+            const pair = selectNextPair({
+                items,
+                generatedPairs: comparisonState.generated_pairs,
+                minItemsForComparison: minItems,
+                maxComparisons,
+            });
+
+            if (!pair) {
+                return { status: 'skipped', message: 'No more pairs available for comparison' };
+            }
+
+            return this.generateComparisonForPair(
+                pair,
+                directory,
+                dataRepo,
+                config,
+                comparisonState,
+                gitOptions,
+            );
+        } finally {
+            await this.releaseGenerationLock(directoryId, lockToken);
+        }
     }
 
     /**
@@ -268,50 +500,62 @@ export class ComparisonGenerationService {
         itemBSlug: string,
     ): Promise<ComparisonResult> {
         const directory = await this.findDirectoryOrFail(directoryId);
+        const lockToken = await this.tryAcquireGenerationLock(directoryId);
 
-        const gitOptions = this.getDirectoryGitOptions(directory);
-
-        const dest = await this.gitFacade.cloneOrPull(
-            { owner: directory.getRepoOwner(), repo: directory.getDataRepo() },
-            gitOptions,
-        );
-        const dataRepo = await DataRepository.create(dest);
-        const config = await dataRepo.getConfig();
-        const items = await dataRepo.getItems();
-
-        const comparisonState = config.metadata?.comparison_state ?? {
-            generated_pairs: [],
-            total_generated: 0,
-        };
-
-        const pair = findManualPair(items, itemASlug, itemBSlug);
-        if (!pair) {
+        if (!lockToken) {
             return {
-                status: 'error',
-                message: `Could not find items: ${itemASlug} and/or ${itemBSlug}`,
+                status: 'skipped',
+                message: 'Comparison generation is already in progress for this directory',
             };
         }
 
-        const pairKey = buildPairKey(itemASlug, itemBSlug);
-        if (comparisonState.generated_pairs.includes(pairKey)) {
-            const exists = await dataRepo.comparisonExists(pairKey);
-            if (exists) {
+        try {
+            const gitOptions = this.getDirectoryGitOptions(directory);
+
+            const dest = await this.gitFacade.cloneOrPull(
+                { owner: directory.getRepoOwner(), repo: directory.getDataRepo() },
+                gitOptions,
+            );
+            const dataRepo = await DataRepository.create(dest);
+            const config = await dataRepo.getConfig();
+            const items = await dataRepo.getItems();
+
+            const comparisonState = config.metadata?.comparison_state ?? {
+                generated_pairs: [],
+                total_generated: 0,
+            };
+
+            const pair = findManualPair(items, itemASlug, itemBSlug);
+            if (!pair) {
                 return {
-                    status: 'skipped',
-                    slug: pairKey,
-                    message: 'Comparison already exists for this pair',
+                    status: 'error',
+                    message: `Could not find items: ${itemASlug} and/or ${itemBSlug}`,
                 };
             }
-        }
 
-        return this.generateComparisonForPair(
-            pair,
-            directory,
-            dataRepo,
-            config,
-            comparisonState,
-            gitOptions,
-        );
+            const pairKey = buildPairKey(itemASlug, itemBSlug);
+            if (comparisonState.generated_pairs.includes(pairKey)) {
+                const exists = await dataRepo.comparisonExists(pairKey);
+                if (exists) {
+                    return {
+                        status: 'skipped',
+                        slug: pairKey,
+                        message: 'Comparison already exists for this pair',
+                    };
+                }
+            }
+
+            return this.generateComparisonForPair(
+                pair,
+                directory,
+                dataRepo,
+                config,
+                comparisonState,
+                gitOptions,
+            );
+        } finally {
+            await this.releaseGenerationLock(directoryId, lockToken);
+        }
     }
 
     /**
@@ -482,7 +726,10 @@ export class ComparisonGenerationService {
                         { maxResults: limit },
                         facadeOptions,
                     );
-                    return results.map((r) => ({ url: r.url, snippet: r.title || '' }));
+                    return results.map((r) => ({
+                        url: r.url,
+                        snippet: [r.title, r.publishedDate].filter(Boolean).join(' - '),
+                    }));
                 },
                 extractContent: async (url: string) => {
                     const result = await this.contentExtractorFacade.extractContent(
@@ -495,11 +742,13 @@ export class ComparisonGenerationService {
             };
 
             this.logger.log(`Researching comparison: ${pair.itemA.name} vs ${pair.itemB.name}`);
-            const research = await researchPair(pair, researchDeps);
+            const research = await researchPair(pair, researchDeps, {
+                seedResults: this.buildResearchSeedResults(pair),
+            });
 
             // 2. Generate comparison via AI
             const aiDeps: ComparisonAiDependencies = {
-                askJson: async <T>(prompt: string, _schema: Record<string, unknown>) => {
+                askJson: async <T>(prompt: string) => {
                     const response = await this.aiFacade.askJson(
                         prompt,
                         comparisonStructureSchema,

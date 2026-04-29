@@ -115,12 +115,12 @@ export function DeployForm({ directory, isDeploying, providerName }: DeployFormP
                     });
 
                     if (!result.success) {
-                        toast.error(result.error || 'Failed to save settings');
+                        toast.error(result.error || t('form.messages.saveSettingsFailed'));
                         return;
                     }
                 } catch (error) {
                     console.error('Failed to save settings:', error);
-                    toast.error('Failed to save settings before deployment');
+                    toast.error(t('form.messages.saveSettingsBeforeDeploymentFailed'));
                     return;
                 }
 

@@ -1,43 +1,44 @@
 {
     "auth": {
         "error": {
-            "title": "认证错误",
-            "subtitle": "我们在您的认证过程中遇到了问题",
+            "title": "身份验证错误",
+            "subtitle": "您的身份验证出现问题",
             "errorOccurred": "发生错误",
-            "somethingWentWrong": "出现了问题",
-            "generic": "发生意外错误。请稍后再试。",
-            "invalidCredentials": "您输入的邮箱或密码不正确。",
-            "emailNotVerified": "请先验证您的邮箱地址再登录。",
-            "accountLocked": "您的账户因安全原因已被锁定。",
-            "sessionExpired": "您的会话已过期。请重新登录。",
-            "networkError": "无法连接。请检查您的网络连接。",
+            "somethingWentWrong": "出了些问题",
+            "generic": "发生意外错误。请稍后重试。",
+            "invalidCredentials": "输入的电子邮件或密码不正确。",
+            "emailNotVerified": "请先验证您的电子邮件地址，然后再登录。",
+            "accountLocked": "出于安全原因，您的帐户已被锁定。",
+            "sessionExpired": "您的会话已过期。请再次登录。",
+            "networkError": "无法连接。请检查您的互联网连接。",
             "oauth": {
-                "missingCode": "缺少授权代码。请重新尝试登录。",
-                "invalidState": "授权状态无效。请重新尝试登录。",
-                "unsupportedProvider": "不支持此认证提供商。",
-                "callbackFailed": "完成认证失败。请重试。"
+                "missingCode": "缺少授权码。请再次尝试登录。",
+                "invalidState": "无效的授权状态。请再次尝试登录。",
+                "unsupportedProvider": "不支持此身份验证提供程序。",
+                "providerConflict": "此提供程序帐户已链接到另一个用户。如果这是意外情况，请使用其他帐户或联系支持。",
+                "callbackFailed": "无法完成身份验证。请重试。"
             },
             "resetPassword": {
                 "missingToken": "重置密码链接无效。缺少验证令牌。",
                 "invalidToken": "重置密码链接无效或已被篡改。",
-                "expiredToken": "重置密码链接已过期。请申请新的链接。",
-                "failed": "重置密码失败。请重试或申请新的重置链接。"
+                "expiredToken": "重置密码链接已过期。请请求新的链接。",
+                "failed": "重置密码失败。请重试或请求新的重置链接。"
             },
             "verifyEmail": {
-                "missingToken": "邮箱验证链接无效。缺少验证令牌。",
-                "invalidToken": "邮箱验证链接无效或已被使用。",
-                "expiredToken": "邮箱验证链接已过期。请申请新的链接。",
-                "failed": "验证邮箱失败。请重试或申请新的验证链接。"
+                "missingToken": "电子邮件验证链接无效。缺少验证令牌。",
+                "invalidToken": "电子邮件验证链接无效或已被使用。",
+                "expiredToken": "电子邮件验证链接已过期。请请求新的链接。",
+                "failed": "验证电子邮件失败。请重试或请求新的验证链接。"
             },
             "authorize": {
-                "invalidRedirectUrl": "重定向 URL 无效或不被允许。如果您认为这是错误，请联系支持。"
+                "invalidRedirectUrl": "重定向 URL 无效或不允许。如果您认为这是错误，请联系支持。"
             },
             "actions": {
                 "backToLogin": "返回登录",
                 "tryRegister": "尝试注册",
                 "resendVerification": "重新发送验证邮件",
                 "contactSupport": "联系支持",
-                "requestNewReset": "申请新的重置链接"
+                "requestNewReset": "请求新的重置链接"
             },
             "helpText": "如果您继续遇到问题，请查看下面的帮助资源。",
             "links": {
@@ -47,10 +48,10 @@
         },
         "login": {
             "title": "欢迎回来",
-            "subtitle": "登录您的账户以继续",
+            "subtitle": "登录您的帐户以继续",
             "form": {
                 "email": {
-                    "label": "邮箱地址",
+                    "label": "电子邮件地址",
                     "placeholder": "you@example.com"
                 },
                 "password": {
@@ -68,26 +69,26 @@
                 "github": "GitHub"
             },
             "signUp": {
-                "text": "还没有账户？",
+                "text": "没有帐户？",
                 "link": "注册"
             },
             "errors": {
-                "invalidCredentials": "邮箱或密码无效"
+                "invalidCredentials": "无效的电子邮件或密码"
             },
             "passwordReset": {
                 "success": "密码重置成功！",
-                "canLogin": "您现在可以使用新密码登录了。"
+                "canLogin": "您现在可以使用新密码登录。"
             }
         },
         "forgotPassword": {
             "title": "忘记密码？",
-            "subtitle": "别担心，我们会向您发送重置说明",
-            "successTitle": "请查看您的邮箱",
+            "subtitle": "别担心，我们会发送重置说明",
+            "successTitle": "检查您的电子邮件",
             "successSubtitle": "我们已向您发送密码重置说明",
             "form": {
                 "email": {
-                    "label": "邮箱地址",
-                    "placeholder": "输入您的邮箱"
+                    "label": "电子邮件地址",
+                    "placeholder": "输入您的电子邮件"
                 },
                 "submit": "发送重置链接",
                 "submitting": "正在发送..."
@@ -95,29 +96,29 @@
             "success": {
                 "title": "邮件发送成功",
                 "message": "我们已向 {email} 发送密码重置说明",
-                "checkSpam": "如果您没有收到邮件，请检查垃圾邮件文件夹。"
+                "checkSpam": "如果您没有看到邮件，请检查垃圾邮件文件夹。"
             },
             "errors": {
                 "failed": "发送重置邮件失败。请重试。"
             },
             "backToLogin": "返回登录",
             "noAccount": {
-                "text": "还没有账户？",
+                "text": "没有帐户？",
                 "link": "注册"
             }
         },
         "resetPassword": {
             "title": "重置您的密码",
-            "subtitle": "请在下方输入您的新密码",
+            "subtitle": "在下面输入您的新密码",
             "successTitle": "密码重置成功",
             "successSubtitle": "您的密码已更新",
             "form": {
                 "password": {
                     "label": "新密码",
                     "placeholder": "输入您的新密码",
-                    "helperText": "至少 6 个字符，包含小写字母和数字/特殊字符",
+                    "helperText": "至少 6 个字符，包含小写字母、数字/特殊字符",
                     "errors": {
-                        "minLength": "密码至少需要 6 个字符",
+                        "minLength": "密码至少 6 个字符",
                         "lowercase": "密码必须包含至少一个小写字母",
                         "numberOrSpecial": "密码必须包含至少一个数字或特殊字符",
                         "cannotStartWith": "密码不能以点或换行符开头"
@@ -136,27 +137,27 @@
             "success": {
                 "title": "密码重置成功",
                 "message": "您的密码已成功更新。您现在可以使用新密码登录。",
-                "loginButton": "前往登录"
+                "loginButton": "转到登录"
             },
             "errors": {
-                "failed": "重置密码失败。请重试或申请新的重置链接。",
-                "noToken": "重置链接无效",
-                "invalidLink": "重置链接无效",
-                "missingTokenMessage": "密码重置链接无效或不完整。请申请新的密码重置。",
-                "requestNewLink": "申请新的重置链接"
+                "failed": "重置密码失败。请重试或请求新的重置链接。",
+                "noToken": "无效的重置链接",
+                "invalidLink": "无效的重置链接",
+                "missingTokenMessage": "密码重置链接无效或不完整。请请求新的密码重置。",
+                "requestNewLink": "请求新的重置链接"
             },
             "backToLogin": "返回登录"
         },
         "register": {
-            "title": "创建您的账户",
-            "subtitle": "立即开始构建精彩的目录",
+            "title": "创建您的帐户",
+            "subtitle": "今天开始构建精彩的目录",
             "form": {
                 "name": {
                     "label": "全名",
                     "placeholder": "John Doe"
                 },
                 "email": {
-                    "label": "邮箱地址",
+                    "label": "电子邮件地址",
                     "placeholder": "you@example.com"
                 },
                 "password": {
@@ -174,8 +175,8 @@
                     "and": "和",
                     "privacyLink": "隐私政策"
                 },
-                "submit": "创建账户",
-                "submitting": "正在创建账户..."
+                "submit": "创建帐户",
+                "submitting": "正在创建帐户..."
             },
             "socialSignUp": {
                 "divider": "或使用以下方式注册",
@@ -183,116 +184,572 @@
                 "github": "GitHub"
             },
             "signIn": {
-                "text": "已有账户？",
+                "text": "已有帐户？",
                 "link": "登录"
             },
             "errors": {
                 "passwordsDoNotMatch": "密码不匹配",
-                "passwordTooShort": "密码至少需要 8 个字符",
+                "passwordTooShort": "密码至少 8 个字符",
                 "generic": "发生错误。请重试。"
+            }
+        }
+    },
+    "onboarding": {
+        "label": "开始使用",
+        "title": "欢迎使用 Ever Works",
+        "subtitle": "几分钟内构建并发布您的第一个目录。",
+        "skipButton": "暂时跳过",
+        "nextButton": "下一步",
+        "stepIndex": "步骤 {index}",
+        "steps": {
+            "welcome": {
+                "title": "什么是 Ever Works？",
+                "description": "Ever Works 是一个开源目录构建器。创建结构化的内容目录——工具、工作、链接、产品——并将它们发布为实时网站。",
+                "detail": "让我们为您设置。下方连接您的提供商，然后创建您的第一个目录。",
+                "feature1": {
+                    "title": "AI 驱动的内容",
+                    "description": "使用您的 AI 提供商自动生成和丰富目录项。"
+                },
+                "feature2": {
+                    "title": "即时发布",
+                    "description": "一键部署到 Vercel —— 无需服务器配置。"
+                },
+                "feature3": {
+                    "title": "基于 Git",
+                    "description": "每个目录都是您拥有和控制的 GitHub 仓库。"
+                }
+            },
+            "directory": {
+                "title": "创建您的第一个目录",
+                "description": "目录是您的内容中心。添加项目、配置布局，并一键发布。",
+                "detail": "您已准备就绪！创建您的第一个目录，开始构建和发布内容。",
+                "action": "创建目录"
+            },
+            "publish": {
+                "title": "上线",
+                "description": "连接 Vercel 或 GitHub，将您的目录部署为公共网站 —— 无需托管配置。",
+                "action": "设置发布"
+            }
+        },
+        "pluginStep": {
+            "saveButton": "保存设置",
+            "savedSuccess": "设置已保存。",
+            "noSettings": "此插件无需配置。",
+            "getTokenPrompt": "首先创建令牌，然后粘贴到下方并保存以验证连接。",
+            "loadingStatus": "正在加载连接状态..."
+        },
+        "plugins": {
+            "byokDescription": "连接您自己的密钥以解锁完整配置。",
+            "byokDefaultButton": "使用您自己的密钥",
+            "setupTokenDescription": "首先创建令牌，然后粘贴到下方并保存以验证连接。",
+            "wizard": {
+                "setupLabel": "设置",
+                "back": "返回",
+                "continue": "继续",
+                "errors": {
+                    "loadStatus": "加载设备认证状态失败。",
+                    "start": "启动设备认证失败。"
+                },
+                "steps": {
+                    "configure": {
+                        "title": "配置",
+                        "description": "配置 {pluginName} 设置。"
+                    },
+                    "credentials": {
+                        "title": "凭据",
+                        "description": "配置 {pluginName} 的凭据。"
+                    },
+                    "verify": {
+                        "title": "验证",
+                        "description": "保存设置并验证连接。",
+                        "cardTitle": "验证连接",
+                        "cardDescription": "保存当前设置并运行插件连接验证。",
+                        "action": "保存并验证",
+                        "successDefault": "连接验证成功。"
+                    }
+                },
+                "authModes": {
+                    "apiKey": {
+                        "eyebrow": "用户范围",
+                        "title": "API 密钥",
+                        "description": "为此插件使用用户范围的 API 密钥。"
+                    },
+                    "deviceAuth": {
+                        "eyebrow": "用户范围",
+                        "title": "设备认证",
+                        "description": "为此插件启动设备代码流程，并在您的浏览器中完成。"
+                    }
+                },
+                "deviceAuth": {
+                    "badges": {
+                        "connected": "已连接",
+                        "pending": "待定"
+                    },
+                    "status": {
+                        "title": "设备认证状态",
+                        "fallback": "为此插件启动或刷新设备认证。",
+                        "backendHint": "设备认证存储在为您用户帐户管理的后端工作区中。它必须在相同的 Ever Works 部署上完成和使用。",
+                        "deviceCode": "设备代码",
+                        "verificationUrl": "验证 URL"
+                    },
+                    "actions": {
+                        "notInstalled": "此机器上未安装所需的 CLI。",
+                        "connected": "设备认证已连接",
+                        "start": "启动设备认证",
+                        "restart": "重新启动设备认证",
+                        "refresh": "刷新状态"
+                    }
+                }
+            }
+        },
+        "claudeWizard": {
+            "label": "Claude Code 设置",
+            "title": "通过三个步骤设置 Claude Code",
+            "subtitle": "此流程保持推荐配置可见，并在您完成前验证连接。",
+            "stepIndex": "步骤 {index}",
+            "continueButton": "继续",
+            "steps": {
+                "model": {
+                    "title": "选择模型",
+                    "description": "Sonnet 被预选为质量和速度的推荐平衡，但您可以切换到任何支持的模型。"
+                },
+                "credentials": {
+                    "title": "添加凭据",
+                    "description": "粘贴您的 Claude Code OAuth 令牌或 Anthropic API 密钥。两者均可。"
+                },
+                "verify": {
+                    "title": "验证连接",
+                    "description": "在完成前保存设置并针对 Claude 运行实时连接检查。",
+                    "checkTitle": "运行实时 Claude 验证",
+                    "checkDescription": "在此保存将根据您提供的凭据运行 Claude API 或 CLI 检查。",
+                    "button": "验证并完成设置",
+                    "successDefault": "Claude 连接已验证。"
+                }
+            }
+        },
+        "codexWizard": {
+            "label": "Codex 设置",
+            "title": "通过三个步骤设置 Codex",
+            "subtitle": "此流程保持推荐配置可见，并在您完成前验证连接。",
+            "stepIndex": "步骤 {index}",
+            "continueButton": "继续",
+            "steps": {
+                "model": {
+                    "title": "选择模型",
+                    "description": "选择您想要运行的用于端到端目录生成的 Codex 模型。"
+                },
+                "credentials": {
+                    "title": "添加凭据",
+                    "description": "选择 Codex 是否应使用 OpenAI API 密钥或后端机器上可用的 Codex CLI 登录。",
+                    "api": {
+                        "title": "OpenAI API 密钥",
+                        "description": "使用 OpenAI API 密钥执行 Codex。"
+                    },
+                    "local": {
+                        "title": "后端 Codex 登录",
+                        "description": "重用运行 Ever Works 的机器上已有的 Codex CLI 会话。",
+                        "machineTitle": "后端 Codex CLI 认证",
+                        "machineDescription": "这会检查后端机器上的 `codex login status` 和本地 Codex 认证文件。",
+                        "connected": "已连接",
+                        "pending": "待定",
+                        "connectButton": "连接 Codex CLI",
+                        "retryButton": "再次打开登录",
+                        "connectedButton": "后端机器已连接",
+                        "notInstalled": "后端机器上未安装 Codex CLI。",
+                        "codeLabel": "设备代码",
+                        "pathLabel": "认证文件：{path}",
+                        "error": "读取 Codex CLI 认证状态失败。"
+                    }
+                },
+                "verify": {
+                    "title": "验证连接",
+                    "description": "在完成前保存设置并针对 Codex 运行实时连接检查。",
+                    "checkTitle": "运行实时 Codex 验证",
+                    "checkDescription": "在此保存将根据您配置的认证方式运行 Codex API 密钥或本地 CLI 验证。",
+                    "button": "验证并完成设置",
+                    "successDefault": "Codex 连接已验证。"
+                }
+            }
+        },
+        "geminiWizard": {
+            "label": "Gemini 设置",
+            "title": "通过三个步骤设置 Gemini",
+            "subtitle": "选择 Gemini 在此机器上应如何认证，然后在完成前验证连接。",
+            "stepIndex": "步骤 {index}",
+            "continueButton": "继续",
+            "steps": {
+                "mode": {
+                    "title": "选择认证模式",
+                    "description": "选择您希望此插件使用的 Gemini 认证流程，并同时确认模型。"
+                },
+                "credentials": {
+                    "title": "配置访问",
+                    "description": "添加所选 Gemini 认证流程所需的凭据。"
+                },
+                "verify": {
+                    "title": "验证连接",
+                    "description": "在完成前保存设置并运行实时 Gemini 验证。",
+                    "checkTitle": "运行实时 Gemini 验证",
+                    "button": "验证并完成设置",
+                    "successDefault": "Gemini 连接已验证。"
+                }
+            },
+            "modes": {
+                "api-key": {
+                    "description": "粘贴来自 Google AI Studio 的 Gemini API 密钥。",
+                    "verifyHint": "在此保存将针对所选模型验证您的 Gemini API 密钥。"
+                },
+                "vertex": {
+                    "description": "提供 Gemini 应用于 Vertex AI 的 Google Cloud 项目详细信息。",
+                    "verifyHint": "在此保存将使用您的 Vertex AI 配置运行实时 Gemini CLI 验证。"
+                }
+            }
+        },
+        "simWizard": {
+            "label": "SIM AI 设置",
+            "title": "通过两个步骤设置 SIM AI",
+            "subtitle": "添加您的 SIM AI API 密钥并验证连接，以开始将目录生成委托给 SIM 工作流。",
+            "stepIndex": "步骤 {index}",
+            "continueButton": "继续",
+            "steps": {
+                "credentials": {
+                    "title": "添加 API 密钥",
+                    "description": "从您的仪表板粘贴 SIM AI API 密钥。如果您使用自托管实例，可选设置自定义基础 URL。"
+                },
+                "verify": {
+                    "title": "验证连接",
+                    "description": "保存您的 API 密钥并针对 SIM AI 运行实时连接检查。",
+                    "checkTitle": "运行实时 SIM AI 验证",
+                    "checkDescription": "在此保存将验证您的 API 密钥有效并能连接到 SIM AI。",
+                    "button": "验证并完成设置",
+                    "successDefault": "SIM AI 连接已验证。"
+                }
             }
         }
     },
     "dashboard": {
         "title": "仪表板",
+        "connectGithub": {
+            "title": "连接您的 GitHub 帐户",
+            "description": "创建和管理目录仓库需要 GitHub。请连接您的帐户以开始使用。",
+            "connect": "连接 GitHub",
+            "dismiss": "我稍后做"
+        },
         "toasts": {
             "newUser": {
-                "title": "欢迎使用 {companyName}！🎉",
-                "description": "您的账户已成功创建。请查看您的邮箱以验证账户。"
+                "title": "欢迎来到 {companyName}！🎉",
+                "description": "您的帐户已成功创建。请检查您的电子邮件以验证帐户。"
             },
             "emailVerification": {
-                "title": "验证您的邮箱",
-                "description": "我们已向您的邮箱地址发送验证链接。请查看您的收件箱和垃圾邮件文件夹。",
-                "action": "重新发送邮件"
+                "title": "验证您的电子邮件",
+                "description": "我们已向您的电子邮件地址发送验证链接。请检查您的收件箱和垃圾邮件文件夹。",
+                "action": "重新发送电子邮件"
             },
             "verified": {
-                "title": "邮箱验证成功！✅",
-                "description": "您的邮箱地址已通过验证。您现在可以完全访问所有功能。"
+                "title": "电子邮件验证成功！✅",
+                "description": "您的电子邮件地址已验证。现在您可以完全访问所有功能。"
             },
             "oauthConnected": {
-                "title": "账户已连接到 GitHub",
-                "description": "您的账户已成功连接到 GitHub。",
+                "title": "帐户已连接",
+                "description": "您的帐户已成功连接到 {provider}。",
                 "defaultProvider": "Git 提供商"
+            },
+            "oauthConflict": {
+                "title": "提供商帐户已链接",
+                "description": "此 {provider} 帐户已链接到另一个 Ever Works 用户。"
+            },
+            "oauthConnectFailed": {
+                "title": "连接失败",
+                "description": "无法连接您的 {provider} 帐户。请重试。"
             }
         },
         "header": {
             "welcome": "欢迎回来，{username}！",
             "subtitle": "管理您的 AI 驱动目录并跟踪其性能",
+            "onboarding": {
+                "badge": "入门 {currentStep}/{totalSteps}",
+                "dismiss": "隐藏入门快捷方式"
+            },
+            "tooltips": {
+                "openSidebar": "打开侧边栏",
+                "help": "帮助与文档"
+            },
             "notifications": {
                 "title": "通知",
-                "empty": "没有新通知"
+                "empty": "没有新通知",
+                "fetchFailed": "加载通知失败",
+                "dismissFailed": "关闭通知失败"
             },
             "help": {
                 "title": "帮助与资源",
-                "subtitle": "快速提示和有用链接",
+                "subtitle": "快速提示和有用链接，帮助您入门",
+                "onboarding": {
+                    "title": "入门",
+                    "description": "随时重新打开引导设置，并从您停止的地方继续。",
+                    "action": "打开入门 ({currentStep}/{totalSteps})"
+                },
                 "quickTips": {
                     "title": "快速提示",
-                    "tip1": "使用AI聊天以自然语言创建目录",
-                    "tip2": "导入现有的awesome列表或数据仓库",
-                    "tip3": "在设置中自定义目录外观"
+                    "tip1": "通过点击仪表板上的“创建目录”按钮创建您的第一个目录。",
+                    "tip2": "使用 AI 生成器自动用相关项目填充您的目录。",
+                    "tip3": "连接您的 GitHub 帐户，以将目录作为仓库同步和部署。"
                 },
                 "shortcuts": {
                     "title": "键盘快捷键",
-                    "search": "搜索",
-                    "newDirectory": "新建目录",
-                    "help": "帮助",
-                    "hint": "按?键查看所有快捷键"
+                    "search": "搜索目录",
+                    "newDirectory": "创建新目录",
+                    "help": "打开帮助",
+                    "hint": "在 Mac 上使用 Cmd，在 Windows/Linux 上使用 Ctrl"
                 },
                 "links": {
-                    "title": "有用链接",
-                    "github": "GitHub仓库",
+                    "title": "资源",
+                    "github": "GitHub 仓库",
                     "issues": "报告问题",
                     "docs": "文档",
                     "comingSoon": "即将推出"
                 },
-                "version": "版本 {version}"
+                "version": "Ever Works v{version}"
+            }
+        },
+        "activity": {
+            "title": "活动日志",
+            "subtitle": "跟踪您的目录中的所有操作",
+            "loading": "加载中...",
+            "fetchFailed": "加载活动失败",
+            "exportFailed": "导出活动日志失败",
+            "showing": "显示 {from} 到 {to} 的 {total} 项",
+            "columns": {
+                "status": "状态",
+                "dateTime": "日期 / 时间",
+                "directory": "目录",
+                "type": "类型",
+                "summary": "摘要"
+            },
+            "filters": {
+                "search": "搜索活动...",
+                "types": {
+                    "allTypes": "所有类型",
+                    "generation": "生成",
+                    "comparison": "比较",
+                    "deployment": "部署",
+                    "directoryCreated": "目录已创建",
+                    "directoryUpdated": "目录已更新",
+                    "directoryDeleted": "目录已删除",
+                    "pluginEnabled": "插件已启用",
+                    "pluginDisabled": "插件已禁用",
+                    "pluginConfigured": "插件已配置",
+                    "memberInvited": "成员已邀请",
+                    "memberRoleChanged": "角色已更改",
+                    "memberRemoved": "成员已移除",
+                    "scheduleCreated": "计划已创建",
+                    "scheduleExecuted": "计划已执行",
+                    "import": "导入",
+                    "login": "登录",
+                    "signup": "注册",
+                    "passwordChanged": "密码已更改"
+                },
+                "statuses": {
+                    "allStatuses": "所有状态",
+                    "pending": "待处理",
+                    "inProgress": "进行中",
+                    "completed": "已完成",
+                    "failed": "失败"
+                }
+            },
+            "actions": {
+                "export": "导出 CSV",
+                "clearFilters": "清除筛选器",
+                "stop": "停止",
+                "stopping": "正在停止...",
+                "stopRequested": "生成取消请求已提交",
+                "stopFailed": "停止生成失败"
+            },
+            "empty": {
+                "title": "尚无活动",
+                "description": "使用平台时，活动将显示在此处。",
+                "noResults": "没有匹配的活动",
+                "noResultsDescription": "没有活动匹配当前筛选器。请尝试调整搜索或筛选器。"
+            },
+            "detail": {
+                "title": "详细信息",
+                "expand": "展开详细信息",
+                "collapse": "折叠详细信息",
+                "event": "事件",
+                "action": "操作",
+                "status": "状态",
+                "created": "创建时间",
+                "fields": "详细信息",
+                "liveLogs": "实时日志",
+                "metadata": "元数据",
+                "rawJson": "原始 JSON"
+            },
+            "summary": {
+                "generation": {
+                    "withChanges": "添加了 {added}。更改了 {changed}。总计：{total}",
+                    "noChanges": "无条目变更。总计：{total}"
+                }
+            },
+            "pagination": {
+                "previous": "上一页",
+                "next": "下一页",
+                "pageOf": "第 {page} 页，共 {total} 页"
             }
         },
         "directories": {
             "title": "目录",
             "subtitle": "管理和组织您的 AI 驱动目录",
+            "summary": {
+                "totalDirectories": "目录总数",
+                "generating": "正在生成",
+                "totalItems": "项目总数"
+            },
             "recent": "最近目录",
             "viewAll": "查看全部 ({count})",
             "search": "搜索目录...",
             "create": "创建目录",
-            "showing": "显示 {current} / {total} 个目录",
+            "showing": "显示 {total} 个目录中的 {current} 个",
+            "searchFailed": "搜索目录失败。请重试。",
             "pagination": {
                 "previous": "上一页",
                 "next": "下一页"
             },
             "empty": {
-                "title": "还没有目录",
+                "title": "尚无目录",
                 "description": "创建您的第一个 AI 驱动目录，开始组织和展示您的内容。",
                 "action": "创建您的第一个目录",
                 "notFound": {
                     "title": "未找到目录",
-                    "withSearch": "尝试调整您的搜索词",
-                    "withoutSearch": "创建您的第一个 AI 驱动目录以开始"
+                    "withSearch": "尝试调整搜索词",
+                    "withoutSearch": "创建您的第一个 AI 驱动目录以开始使用"
                 }
             }
         },
         "settings": {
             "title": "设置",
-            "subtitle": "管理您的账户设置和偏好",
+            "subtitle": "管理您的帐户设置和偏好",
             "tabs": {
                 "profile": "个人资料",
                 "security": "安全",
-                "apiTokens": "API 和令牌",
-                "oauth": "已连接账户",
-                "notifications": "通知",
+                "apiKeys": "API 密钥",
+                "data": "数据",
+                "gitProviders": "Git 提供商",
                 "dangerZone": "危险区域"
+            },
+            "data": {
+                "exportTitle": "导出数据",
+                "exportDescription": "以 JSON 文件形式下载您的帐户数据，包括目录、插件设置和个人资料信息。",
+                "includeSecrets": "包含机密设置（API 密钥、令牌）—以掩码值导出",
+                "secretsWarning": "机密设置将以掩码值导出。导入前，您需要手动用真实凭据替换它们。",
+                "exportButton": "导出数据",
+                "exporting": "正在导出...",
+                "exportSuccess": "数据导出成功",
+                "exportError": "导出数据失败",
+                "importTitle": "导入数据",
+                "importDescription": "从以前导出的 JSON 文件导入数据。您可以解决具有匹配 slug 的目录冲突。",
+                "importButton": "导入数据",
+                "syncTitle": "GitHub 同步",
+                "syncDescription": "将您的帐户配置同步到私有 GitHub 存储库，用于备份和实例间迁移。",
+                "import": {
+                    "dropzone": "将 JSON 导出文件拖放到此处，或点击浏览",
+                    "selectFile": "选择文件",
+                    "analyzing": "正在分析...",
+                    "invalidFileType": "请选择 JSON 文件",
+                    "invalidJson": "无效的 JSON 文件",
+                    "previewError": "分析导入文件失败",
+                    "summary": "导入摘要",
+                    "directories": "目录",
+                    "items": "项目",
+                    "userPlugins": "用户插件",
+                    "version": "格式版本",
+                    "missingPlugins": "这些插件未安装，将被跳过",
+                    "conflicts": "Slug 冲突",
+                    "existingDirectory": "现有",
+                    "incoming": "传入",
+                    "strategySkip": "跳过（保留现有）",
+                    "strategyOverwrite": "覆盖现有",
+                    "strategyRename": "使用新 slug 导入",
+                    "secretsIncluded": "此导出包含将导入的机密设置。",
+                    "maskedSecretsWarning": "此文件包含掩码机密值 (MASKED:***)。请打开 JSON 文件，并在导入前将所有掩码值替换为您的真实 API 密钥和凭据。导入期间将跳过掩码值。",
+                    "applyImport": "应用导入",
+                    "applying": "正在导入...",
+                    "importSuccess": "数据导入成功",
+                    "importFailed": "导入完成但有错误",
+                    "importError": "导入数据失败",
+                    "cancel": "取消",
+                    "done": "完成",
+                    "validationErrors": "验证错误",
+                    "resultSuccess": "导入成功完成",
+                    "resultFailed": "导入失败",
+                    "directoriesCreated": "目录已创建",
+                    "directoriesUpdated": "目录已更新",
+                    "directoriesSkipped": "目录已跳过",
+                    "pluginsImported": "插件已导入",
+                    "warnings": "警告",
+                    "errors": "错误"
+                },
+                "sync": {
+                    "loading": "正在加载同步状态...",
+                    "connectGitHub": "连接 GitHub",
+                    "connectGitHubDescription": "在 Git 提供商设置中连接您的 GitHub 帐户以启用同步。",
+                    "setupSync": "设置 GitHub 同步",
+                    "createNewRepo": "创建新的私有存储库 (ever-works-config)",
+                    "or": "或",
+                    "repoPlaceholder": "owner/repo-name",
+                    "connect": "连接",
+                    "cancel": "取消",
+                    "configureSuccess": "同步存储库已配置",
+                    "configureError": "配置同步失败",
+                    "invalidRepoName": "请输入有效的存储库名称 (owner/repo)",
+                    "lastPush": "最后推送",
+                    "lastPull": "最后拉取",
+                    "push": "推送到 GitHub",
+                    "pull": "从 GitHub 拉取",
+                    "disconnect": "断开连接",
+                    "pushSuccess": "配置已推送到 GitHub",
+                    "pushError": "推送到 GitHub 失败",
+                    "pullError": "从 GitHub 拉取失败",
+                    "disconnectSuccess": "同步已断开",
+                    "disconnectError": "断开连接失败",
+                    "includeSecrets": "包含 API 密钥和机密（掩码）",
+                    "secretsWarning": "机密值将作为掩码占位符存储在您的 GitHub 存储库中。真实凭据永远不会推送到 GitHub。"
+                }
+            },
+            "pluginCategories": {
+                "ai-provider": "AI 提供商",
+                "deployment": "部署",
+                "search": "搜索",
+                "screenshot": "截图",
+                "content-extractor": "内容提取器",
+                "data-source": "数据源",
+                "git-provider": "Git 提供商",
+                "pipeline": "管道"
+            },
+            "plugins": {
+                "configure": "配置",
+                "noPluginsInCategory": "此类别中没有插件",
+                "requiredSettingsMissing": "必需设置未配置",
+                "backToCategory": "返回 {category}",
+                "pipelineDefault": {
+                    "title": "默认管道",
+                    "description": "选择生成目录项目时默认使用的管道。",
+                    "autoLabel": "自动",
+                    "autoDescription": "为每个目录使用系统解析的管道",
+                    "enforceLabel": "强制使用此默认值",
+                    "enforceDescription": "即使目录有自己的管道配置，也始终预选此管道。您仍可在表单中手动切换管道。",
+                    "saveFailed": "保存默认管道失败"
+                }
             },
             "profile": {
                 "title": "个人资料设置",
                 "subtitle": "更新您的个人资料信息和头像",
                 "fields": {
-                    "name": "姓名",
+                    "name": "名称",
                     "username": "用户名",
-                    "email": "邮箱",
-                    "emailHelperText": "邮箱无法更改"
+                    "email": "电子邮件",
+                    "emailHelperText": "电子邮件无法更改"
                 },
                 "placeholders": {
-                    "name": "输入您的姓名",
+                    "name": "输入您的名称",
                     "username": "输入您的用户名"
                 },
                 "actions": {
@@ -303,13 +760,26 @@
                     "usernameRequired": "用户名是必需的",
                     "error": "更新个人资料失败",
                     "unexpectedError": "发生意外错误"
+                },
+                "emailVerification": {
+                    "title": "电子邮件未验证",
+                    "description": "请验证您的电子邮件地址。检查您的收件箱中的验证链接。",
+                    "resend": "重新发送",
+                    "sent": "验证电子邮件已发送。请检查您的收件箱。",
+                    "sendFailed": "发送验证电子邮件失败。请重试。"
+                },
+                "committer": {
+                    "title": "Git 提交者",
+                    "description": "覆盖 git 提交中使用的名称和电子邮件。留空以使用您的帐户名称 ({defaultName}) 和电子邮件 ({defaultEmail})。",
+                    "nameLabel": "提交者名称",
+                    "emailLabel": "提交者电子邮件"
                 }
             },
             "security": {
                 "title": "安全设置",
-                "subtitle": "管理您的账户安全和认证",
+                "subtitle": "管理您的帐户安全和身份验证",
                 "changePassword": {
-                    "title": "修改密码",
+                    "title": "更改密码",
                     "currentPassword": "当前密码",
                     "newPassword": "新密码",
                     "confirmPassword": "确认新密码",
@@ -325,7 +795,7 @@
                     "messages": {
                         "success": "密码更新成功",
                         "fillAllFields": "请填写所有密码字段",
-                        "minLength": "新密码必须至少 8 个字符",
+                        "minLength": "新密码至少 8 个字符",
                         "mismatch": "新密码不匹配",
                         "sameAsCurrent": "新密码必须与当前密码不同",
                         "error": "更新密码失败",
@@ -333,47 +803,99 @@
                     }
                 },
                 "twoFactor": {
-                    "title": "双因素认证",
-                    "subtitle": "为您的账户添加额外的安全层",
+                    "title": "双因素身份验证",
+                    "subtitle": "为您的帐户添加额外的安全层",
                     "action": "即将推出"
                 },
                 "sessions": {
                     "title": "活动会话",
-                    "subtitle": "管理您在不同设备上的活动会话",
+                    "subtitle": "管理跨设备的活动会话",
                     "action": "查看会话（即将推出）"
                 }
             },
             "oauth": {
-                "title": "已连接账户",
-                "subtitle": "连接您的外部账户以增强功能",
+                "title": "已连接帐户",
+                "subtitle": "连接您的外部帐户以增强功能",
                 "github": {
                     "name": "GitHub",
-                    "connected": "使用 GitHub 仓库创建和管理目录",
-                    "disconnected": "连接以从仓库创建目录",
+                    "connected": "使用 GitHub 存储库创建和管理目录",
+                    "disconnected": "连接以从存储库创建目录",
                     "scopes": "权限范围",
+                    "organizations": "已连接组织",
+                    "organizationsHint": "使用重新连接授予对其他组织的访问权限",
                     "actions": {
                         "connect": "连接",
+                        "reconnect": "重新连接",
                         "disconnect": "断开连接",
-                        "confirmDisconnect": "您确定要断开 GitHub 账户连接吗？",
-                        "reconnect": "Reconnect"
+                        "confirmDisconnect": "您确定要断开您的 GitHub 帐户吗？"
                     },
                     "messages": {
-                        "disconnected": "GitHub 账户已断开连接",
+                        "disconnected": "GitHub 帐户已断开",
                         "connectError": "连接 GitHub 失败",
-                        "disconnectError": "断开 GitHub 连接失败"
-                    },
-                    "organizations": "Connected Organizations",
-                    "organizationsHint": "Use Reconnect to grant access to additional organizations"
+                        "disconnectError": "断开 GitHub 失败"
+                    }
+                }
+            },
+            "apiKeys": {
+                "title": "API 密钥",
+                "subtitle": "管理外部访问您资源的 API 密钥",
+                "create": "创建 API 密钥",
+                "empty": "尚未有 API 密钥。创建第一个以开始使用。",
+                "neverExpires": "永不过期",
+                "columns": {
+                    "name": "名称",
+                    "key": "密钥",
+                    "created": "创建时间",
+                    "lastUsed": "最后使用",
+                    "expires": "到期",
+                    "actions": "操作"
+                },
+                "dialog": {
+                    "title": "创建 API 密钥",
+                    "nameLabel": "名称",
+                    "namePlaceholder": "例如，我的集成",
+                    "expirationLabel": "到期",
+                    "cancel": "取消",
+                    "createButton": "创建",
+                    "keyCreated": "API 密钥已创建",
+                    "keyWarning": "立即复制此密钥。您将无法再次查看它。",
+                    "done": "完成",
+                    "copy": "复制到剪贴板",
+                    "copied": "已复制！"
+                },
+                "revoke": {
+                    "title": "撤销 API 密钥",
+                    "description": "您确定要撤销 API 密钥 \"{name}\" 吗？此操作无法撤销，使用此密钥的任何集成将停止工作。",
+                    "cancel": "取消",
+                    "confirm": "撤销"
+                },
+                "messages": {
+                    "nameRequired": "请输入 API 密钥的名称",
+                    "createSuccess": "API 密钥创建成功",
+                    "createError": "创建 API 密钥失败",
+                    "revokeSuccess": "API 密钥撤销成功",
+                    "revokeError": "撤销 API 密钥失败",
+                    "copyError": "复制到剪贴板失败"
                 }
             }
         },
         "stats": {
             "totalDirectories": "总目录数",
             "totalItems": "总项目数",
-            "activeWebsites": "活跃网站",
-            "fromLastMonth": "较上月"
+            "activeWebsites": "活动网站",
+            "fromLastMonth": "上月"
         },
         "directoryCard": {
+            "status": {
+                "active": "活动",
+                "notStarted": "未开始",
+                "generating": "正在生成",
+                "generated": "已生成",
+                "error": "错误",
+                "cancelled": "已取消",
+                "idle": "空闲",
+                "opening": "正在打开"
+            },
             "role": {
                 "owner": "所有者",
                 "manager": "管理员",
@@ -381,17 +903,7 @@
                 "viewer": "查看者"
             },
             "shared": {
-                "tooltip": "以{role}身份与您共享"
-            },
-            "status": {
-                "active": "活跃",
-                "notStarted": "未开始",
-                "generating": "生成中",
-                "generated": "已生成",
-                "error": "错误",
-                "cancelled": "已取消",
-                "idle": "空闲",
-                "opening": "正在打开"
+                "tooltip": "以 {role} 身份与您共享"
             },
             "noDescription": "未提供描述",
             "items": "{count} 个项目",
@@ -399,7 +911,7 @@
             "updated": "更新于 {date}",
             "viewAction": "查看 →",
             "openingTitle": "正在打开目录",
-            "openingMessage": "我们正在准备您的目录，详情即将打开。请停留在此页面。"
+            "openingMessage": "正在准备您的目录。详细信息即将打开。请留在此页面。"
         },
         "directoryList": {
             "title": "您的目录",
@@ -416,12 +928,13 @@
                 "viewer": "查看者"
             },
             "shared": {
-                "tooltip": "以{role}身份与您共享"
+                "tooltip": "已与您共享，角色为 {role}"
             },
             "status": {
                 "notStarted": "未开始",
                 "generating": "生成中",
                 "generated": "已生成",
+                "generatedWithWarnings": "生成完成但有警告",
                 "error": "错误",
                 "cancelled": "已取消"
             },
@@ -429,8 +942,10 @@
                 "overview": "概览",
                 "items": "项目",
                 "generator": "生成器",
-                "schedule": "定时任务",
-                "history": "历史",
+                "schedule": "计划",
+                "history": "历史记录",
+                "comparisons": "比较",
+                "plugins": "插件",
                 "deploy": "部署",
                 "members": "成员",
                 "settings": "设置"
@@ -439,7 +954,7 @@
                 "title": "团队成员",
                 "subtitle": "管理谁可以访问此目录及其权限。",
                 "inviteMember": "邀请成员",
-                "noMembers": "还没有团队成员。邀请人协作。",
+                "noMembers": "尚未有团队成员。邀请某人协作。",
                 "roles": {
                     "creator": "创建者",
                     "owner": "所有者",
@@ -448,14 +963,14 @@
                     "viewer": "查看者"
                 },
                 "roleDescriptions": {
-                    "owner": "完全控制，包括删除和成员管理。",
+                    "owner": "完全控制，包括删除和管理成员。",
                     "manager": "可以编辑目录和管理成员，但不能删除。",
-                    "editor": "可以编辑目录内容和运行生成。",
-                    "viewer": "只能查看目录的只读访问。"
+                    "editor": "可以编辑目录内容并运行生成。",
+                    "viewer": "只读访问以查看目录。"
                 },
                 "invite": {
                     "title": "邀请团队成员",
-                    "description": "添加新成员来协作此目录。",
+                    "description": "添加新成员以协作此目录。",
                     "emailLabel": "电子邮件地址",
                     "emailPlaceholder": "colleague@example.com",
                     "roleLabel": "角色",
@@ -463,63 +978,272 @@
                     "cancel": "取消",
                     "success": "成员邀请成功。",
                     "errors": {
-                        "emailRequired": "需要电子邮件地址。",
+                        "emailRequired": "电子邮件地址为必填项。",
                         "failed": "邀请成员失败。请重试。"
                     }
                 },
                 "confirmRemove": {
                     "title": "移除成员",
-                    "description": "您确定要从此目录中移除 {username} 吗？他们将失去所有访问权限。",
+                    "description": "您确定要从此目录移除 {username} 吗？他们将失去所有访问权限。",
                     "confirm": "移除",
                     "cancel": "取消"
                 },
                 "roleUpdated": "成员角色已更新。",
-                "memberRemoved": "成员已成功移除。",
+                "memberRemoved": "成员移除成功。",
                 "errors": {
                     "updateFailed": "更新成员角色失败。",
                     "removeFailed": "移除成员失败。"
                 }
             },
+            "schedule": {
+                "page": {
+                    "title": "计划更新",
+                    "subtitle": "使用专用节奏和故障处理为 {name} 自动化刷新。",
+                    "fallbackName": "此目录",
+                    "loadFailed": "加载计划设置失败。",
+                    "providerCategories": {
+                        "pipeline": "管道",
+                        "ai": "AI",
+                        "search": "搜索",
+                        "screenshot": "截图",
+                        "contentExtractor": "提取器"
+                    }
+                },
+                "card": {
+                    "title": "自动化",
+                    "subtitle": {
+                        "enabled": "调整节奏、计费和防护措施，以确保计划刷新可靠。",
+                        "disabled": "不受订阅限制地自动化刷新——自由设置节奏和故障防护。"
+                    },
+                    "summary": {
+                        "status": "状态",
+                        "nextRun": "下次运行",
+                        "lastRun": "上次运行",
+                        "failures": "故障",
+                        "notScheduled": "未计划",
+                        "never": "从未",
+                        "statusMap": {
+                            "active": "自动化激活",
+                            "paused": "已暂停",
+                            "canceled": "已取消",
+                            "disabled": "已禁用"
+                        }
+                    },
+                    "fields": {
+                        "automation": "自动化",
+                        "automationHelp": "暂停以临时停止未来运行。",
+                        "billing": "计费模式",
+                        "billingHelp": "订阅解锁无限运行。按使用付费按执行计费。",
+                        "cadence": "节奏",
+                        "cadenceHelp": "当前计划：{plan}",
+                        "cadenceOpen": "订阅禁用时，所有节奏均可用。",
+                        "maxFailures": "故障限制",
+                        "maxFailuresHelp": "发生此数量故障后自动暂停。",
+                        "createPullRequest": "创建拉取请求",
+                        "createPullRequestHelp": "启用时，计划更新将创建拉取请求而不是直接提交。",
+                        "pipeline": "管道",
+                        "pipelineHelp": "覆盖计划运行的管道。留为空使用最后手动生成的相同管道。"
+                    },
+                    "pipeline": {
+                        "inherit": "使用最后运行设置",
+                        "notConfigured": "未配置"
+                    },
+                    "providers": {
+                        "title": "下次运行的活动提供程序"
+                    },
+                    "billing": {
+                        "subscription": "订阅",
+                        "usage": "按使用付费"
+                    },
+                    "cadence": {
+                        "hourly": "每小时",
+                        "every_3_hours": "每 3 小时",
+                        "every_8_hours": "每 8 小时",
+                        "every_12_hours": "每 12 小时",
+                        "daily": "每天",
+                        "weekly": "每周",
+                        "monthly": "每月"
+                    },
+                    "plans": {
+                        "free": "免费",
+                        "pro": "专业版",
+                        "standard": "标准",
+                        "premium": "高级",
+                        "unmetered": "无限"
+                    },
+                    "usageRequired": "切换到按使用付费以使用此节奏。",
+                    "cadenceAllowed": "您的计划允许此节奏。",
+                    "actions": {
+                        "save": "保存更改",
+                        "saving": "保存中...",
+                        "runNow": "立即运行",
+                        "starting": "启动中...",
+                        "cancel": "取消计划",
+                        "cancelling": "取消中...",
+                        "startAutomation": "启动自动化",
+                        "stopAutomation": "停止自动化"
+                    },
+                    "success": {
+                        "saved": "计划已保存。",
+                        "runStarted": "计划运行已启动。",
+                        "cancelled": "计划已取消。",
+                        "started": "自动化已启动。",
+                        "stopped": "自动化已停止。"
+                    },
+                    "errors": {
+                        "requireUsage": "启用按使用付费计费以使用此节奏。",
+                        "updateFailed": "更新计划失败。",
+                        "runFailed": "启动运行失败。",
+                        "cancelFailed": "取消计划失败。",
+                        "generationRunning": "生成正在运行，请等待完成。",
+                        "scheduleInactive": "计划必须激活才能立即运行。"
+                    },
+                    "empty": {
+                        "title": "首先运行手动生成",
+                        "description": "完成一次成功的手动运行以解锁自动化计划。一旦目录有数据，我们可以为您保持其新鲜。",
+                        "refresh": "刷新状态"
+                    },
+                    "requiresGeneration": "在启用计划前至少运行一次项目生成。"
+                },
+                "actions": {
+                    "invalid": "无效数据",
+                    "updated": "计划已更新。",
+                    "updateFailed": "更新计划失败。",
+                    "runStarted": "计划运行已启动。",
+                    "runFailed": "触发运行失败。",
+                    "cancelled": "计划已取消。",
+                    "cancelFailed": "取消计划失败。"
+                }
+            },
             "statusCard": {
                 "notStarted": {
                     "title": "生成未开始",
-                    "description": "开始为您的目录生成项目以填充内容。",
+                    "description": "启动生成项目以用内容填充您的目录。",
                     "action": "开始生成"
                 },
                 "generating": {
-                    "title": "生成进行中",
+                    "title": "生成中",
                     "description": "正在处理您的请求...",
-                    "processing": "处理中..."
+                    "processing": "处理中...",
+                    "stop": "停止",
+                    "stopping": "停止中...",
+                    "stopRequested": "生成取消请求",
+                    "stopFailed": "停止生成失败"
                 },
                 "generated": {
                     "title": "生成完成",
                     "description": "您的目录已成功填充项目。",
+                    "withWarnings": "完成但有警告：",
                     "viewItems": "查看项目",
                     "regenerate": "重新生成"
                 },
                 "error": {
                     "title": "生成失败",
                     "description": "生成过程中发生错误。",
+                    "withWarnings": "生成失败，错误如下：",
                     "retry": "重试生成"
                 },
                 "cancelled": {
                     "title": "生成已取消",
-                    "description": "之前的生成在完成前被停止。",
-                    "restart": "重新开始生成"
+                    "description": "先前的生成在完成前被停止。",
+                    "restart": "重新启动生成"
                 }
             },
             "stats": {
                 "totalItems": "总项目数",
-                "categories": "分类",
+                "categories": "类别",
+                "comparisons": "比较",
                 "generationStatus": "生成状态",
                 "daysActive": "活跃天数"
             },
+            "comparisons": {
+                "title": "比较",
+                "subtitle": "目录项目之间的 A 与 B 比较页面",
+                "vs": "与",
+                "winner": "获胜者：{name}",
+                "tie": "平局",
+                "actions": {
+                    "compareItems": "比较项目",
+                    "generateNext": "生成下一个",
+                    "generating": "生成中...",
+                    "generateAll": "生成全部",
+                    "save": "保存",
+                    "stop": "停止",
+                    "generate": "生成",
+                    "cancel": "取消",
+                    "delete": "删除"
+                },
+                "aiModel": {
+                    "title": "AI 模型",
+                    "provider": "提供程序",
+                    "model": "模型",
+                    "default": "默认",
+                    "defaultSuffix": "(默认)",
+                    "loadingModels": "加载模型中...",
+                    "providerDefault": "提供程序默认",
+                    "extendedAnalysisLabel": "扩展分析",
+                    "extendedAnalysisDescription": "为每个比较生成深入的深度分析"
+                },
+                "manualForm": {
+                    "title": "比较两个项目",
+                    "itemA": "项目 A",
+                    "itemB": "项目 B",
+                    "searchPlaceholder": "搜索项目...",
+                    "noItems": "未找到项目"
+                },
+                "progress": {
+                    "generating": "生成比较：{completed} / {total} 已完成",
+                    "error": "{count, plural, one {# 个错误} other {# 个错误}}",
+                    "stopped": "已停止。生成了 {count, plural, one {# 个比较} other {# 个比较}}，有 {errors, plural, one {# 个错误} other {# 个错误}}。",
+                    "done": "完成！生成了 {count, plural, one {# 个比较} other {# 个比较}}。",
+                    "stages": {
+                        "researching": "研究 {itemA} 与 {itemB}...",
+                        "analyzing": "分析比较数据...",
+                        "writing": "撰写比较文章...",
+                        "writing_extended": "撰写扩展分析...",
+                        "saving": "保存并发布..."
+                    }
+                },
+                "pagination": {
+                    "showing": "显示 {from}–{to} / {total}"
+                },
+                "empty": {
+                    "title": "尚未有比较",
+                    "description": "点击“生成下一个”自动选择项目，或“比较项目”选择特定对。"
+                },
+                "deleteDialog": {
+                    "title": "删除比较",
+                    "confirmation": "您确定要删除“{title}”吗？此操作不可撤销。"
+                },
+                "generateAllDialog": {
+                    "title": "生成所有比较",
+                    "confirmation": "生成剩余的 {count} 个 {count, plural, one {比较} other {比较}}？这可能需要几分钟。您可以随时停止。"
+                },
+                "toast": {
+                    "selectTwo": "请选择两个项目进行比较",
+                    "cannotCompareSelf": "无法比较项目自身",
+                    "noRemaining": "没有剩余对可生成",
+                    "consecutiveErrors": "连续 3 个错误后停止",
+                    "deleted": "比较已删除",
+                    "aiConfigSaved": "AI 模型设置已保存",
+                    "aiConfigFailed": "保存 AI 配置失败"
+                },
+                "detail": {
+                    "backToComparisons": "返回比较",
+                    "summary": "摘要",
+                    "dimensions": "维度",
+                    "verdict": "裁决",
+                    "article": "文章",
+                    "extendedAnalysis": "扩展分析",
+                    "sources": "来源"
+                }
+            },
             "history": {
                 "title": "生成历史",
-                "subtitle": "跟踪过去的生成运行、创建的项目和执行详情。",
+                "subtitle": "跟踪过去的生成运行、创建的项目和执行细节。",
                 "error": "加载更多条目失败",
                 "empty": {
-                    "title": "还没有历史记录",
+                    "title": "尚未有历史",
                     "description": "请求生成以在此处查看进度和结果。"
                 },
                 "status": {
@@ -532,24 +1256,24 @@
                     "run": "运行",
                     "status": "状态",
                     "newItems": "新项目",
-                    "updatedItems": "已更新",
+                    "updatedItems": "更新",
                     "totalItems": "总计",
                     "duration": "持续时间",
                     "startedAt": "开始时间",
                     "tokens": "令牌",
-                    "cost": "费用"
+                    "cost": "成本"
                 },
                 "loadMore": "加载更多",
                 "noMore": "没有更多记录",
                 "unknown": "未知",
                 "activity": {
                     "generation": "生成",
-                    "item_added": "已添加条目",
-                    "item_updated": "已更新条目",
-                    "item_removed": "已移除条目",
-                    "comparison_added": "已添加比较",
-                    "comparison_removed": "已移除比较",
-                    "category_change": "分类变更",
+                    "item_added": "项目已添加",
+                    "item_updated": "项目已更新",
+                    "item_removed": "项目已移除",
+                    "comparison_added": "比较已添加",
+                    "comparison_removed": "比较已移除",
+                    "category_change": "类别变更",
                     "tag_change": "标签变更",
                     "collection_change": "集合变更",
                     "community_pr_merged": "社区 PR"
@@ -559,20 +1283,26 @@
                     "updated": "已更新",
                     "removed": "已移除",
                     "fields": "字段",
-                    "expand": "展开变更日志详情",
-                    "collapse": "收起变更日志详情"
+                    "expand": "展开详情",
+                    "collapse": "折叠详情",
+                    "stepLogs": "步骤日志",
+                    "changes": "变更"
+                },
+                "trigger": {
+                    "schedule": "计划",
+                    "api": "API"
                 },
                 "filters": {
                     "label": "活动",
-                    "all": "全部活动",
+                    "all": "所有活动",
                     "generation": "生成",
-                    "items": "条目",
+                    "items": "项目",
                     "comparisons": "比较",
-                    "taxonomy": "分类",
+                    "taxonomy": "分类法",
                     "community_pr": "社区 PR"
                 },
                 "pagination": {
-                    "showing": "显示 {from}-{to} / 共 {total}"
+                    "showing": "显示 {from}-{to} / {total}"
                 }
             },
             "info": {
@@ -584,25 +1314,25 @@
                     "editor": "编辑者",
                     "viewer": "查看者"
                 },
-                "slug": "标识符",
+                "slug": "Slug",
                 "repositories": "仓库",
                 "dataRepo": "数据仓库",
                 "websiteRepo": "网站仓库",
                 "mainRepo": "主仓库",
-                "gitProvider": "Git提供商",
+                "gitProvider": "Git 提供程序",
                 "organization": "组织",
                 "created": "创建时间",
                 "lastUpdated": "最后更新",
-                "readmeHeader": "README 头部",
-                "readmeFooter": "README 底部",
+                "readmeHeader": "README 页眉",
+                "readmeFooter": "README 页脚",
                 "custom": "自定义",
                 "customOverwrite": "自定义（覆盖）",
                 "yes": "是",
                 "no": "否",
-                "deployProvider": "Deploy Provider",
-                "notConnected": "Not connected",
-                "notConfigured": "Not configured",
-                "viewSite": "View site"
+                "deployProvider": "部署提供程序",
+                "notConnected": "未连接",
+                "notConfigured": "未配置",
+                "viewSite": "查看站点"
             },
             "config": {
                 "title": "配置详情",
@@ -612,9 +1342,9 @@
                 "companyWebsite": "网站",
                 "generationSettings": "生成设置",
                 "generationMethod": "生成方法",
-                "autoApproval": "自动批准",
+                "autoApproval": "自动审批",
                 "pagingMode": "分页模式",
-                "contentTable": "内容表格",
+                "contentTable": "内容表",
                 "enabled": "已启用",
                 "disabled": "已禁用",
                 "pullRequestUpdate": "拉取请求详情",
@@ -625,36 +1355,41 @@
             },
             "activity": {
                 "title": "最近活动",
-                "noActivity": "还没有活动",
+                "noActivity": "尚未有活动",
                 "created": "目录已创建",
-                "directoryCreated": "目录已成功创建",
+                "directoryCreated": "目录创建成功",
                 "justNow": "刚刚"
             },
             "items": {
                 "title": "目录项目",
                 "subtitle": "管理和组织您目录中的项目",
-                "noItemsTitle": "还没有项目",
-                "noItemsDescription": "您的目录还没有任何项目。生成项目以填充您目录的内容。",
+                "noItemsTitle": "暂无项目",
+                "noItemsDescription": "您的目录中还没有任何项目。生成项目来填充您的目录内容。",
                 "generateItems": "生成项目",
                 "searchPlaceholder": "搜索项目...",
-                "allCategories": "所有分类",
-                "showing": "显示 {current} / {total} 个项目",
+                "allCategories": "所有类别",
+                "showing": "显示 {total} 个项目中的 {current} 个",
                 "noMatch": "没有项目匹配您的搜索条件",
                 "source": "来源",
+                "viewOnWebsite": "在网站查看",
+                "openSourceUrl": "打开来源链接",
                 "addItem": "添加项目",
                 "delete": "删除",
                 "deleteWithPR": "通过拉取请求删除",
-                "deleteConfirm": "您确定要删除 \"{name}\" 吗？",
+                "deleteConfirm": "您确定要删除“{name}”吗？",
                 "deleteSuccess": "项目删除成功",
                 "deleteFailed": "删除项目失败",
                 "deleteError": "删除项目时发生错误",
+                "updateSuccess": "项目更新成功",
+                "updateFailed": "更新项目失败",
+                "updateError": "更新项目时发生错误",
                 "updateItem": "更新项目",
                 "loadingMore": "加载更多... ({current} / {total})",
                 "addModal": {
                     "title": "添加新项目",
                     "sourceUrl": "来源 URL",
                     "sourceUrlPlaceholder": "https://example.com/product",
-                    "sourceUrlHelp": "点击 '提取' 以自动从 URL 获取项目详情",
+                    "sourceUrlHelp": "点击“提取”从 URL 自动获取项目详情",
                     "extract": "提取",
                     "extractSuccess": "项目详情提取成功",
                     "extractFailed": "提取项目详情失败",
@@ -662,24 +1397,38 @@
                     "name": "名称",
                     "namePlaceholder": "输入项目名称",
                     "description": "描述",
-                    "descriptionPlaceholder": "输入项目的简要描述",
-                    "category": "分类",
+                    "descriptionPlaceholder": "输入项目简短描述",
+                    "category": "类别",
+                    "categories": "类别",
+                    "existingCategories": "从现有中选择",
+                    "addNewCategory": "或添加新类别",
+                    "categoryPlaceholder": "搜索或创建类别...",
+                    "addMoreCategories": "添加更多...",
+                    "createCategory": "创建",
+                    "noMatchingCategories": "没有匹配的类别",
+                    "noCategories": "暂无类别。输入以创建一个。",
+                    "categoriesRequired": "至少选择一个类别",
                     "tags": "标签",
                     "tagPlaceholder": "添加标签并按 Enter",
-                    "slug": "标识符（可选）",
+                    "slug": "Slug（可选）",
                     "slugPlaceholder": "custom-item-slug",
                     "slugHelp": "URL 友好的标识符。如果留空将自动生成",
                     "brand": "品牌（可选）",
                     "brandPlaceholder": "输入品牌名称",
-                    "brandLogoUrl": "品牌Logo链接（可选）",
+                    "brandLogoUrl": "品牌 Logo URL（可选）",
                     "brandLogoUrlPlaceholder": "https://example.com/logo.png",
                     "images": "图片（可选）",
                     "imagePlaceholder": "https://example.com/screenshot.png",
-                    "imagesHelp": "添加图片链接（截图、产品图片）",
+                    "imagesHelp": "添加图片 URL（截图、产品图片）",
+                    "captureScreenshot": "捕获截图",
+                    "captureScreenshotHelp": "从来源 URL 自动捕获截图",
+                    "screenshotSuccess": "截图捕获成功",
+                    "screenshotFailed": "捕获截图失败",
+                    "screenshotError": "捕获截图时发生错误",
                     "featured": "精选项目",
-                    "featuredHelp": "将此项目标记为目录中的精选项目",
+                    "featuredHelp": "在目录中标记此项目为精选",
                     "updateWithPR": "创建拉取请求",
-                    "updateWithPRHelp": "以拉取请求方式提交更改，而不是直接提交",
+                    "updateWithPRHelp": "以拉取请求形式提交更改，而不是直接提交",
                     "cancel": "取消",
                     "adding": "添加中...",
                     "addItem": "添加项目",
@@ -689,226 +1438,278 @@
                     "error": "添加项目时发生错误",
                     "errors": {
                         "urlRequired": "提取需要来源 URL",
-                        "invalidUrl": "请输入包含 http:// 或 https:// 的有效 URL",
-                        "requiredFields": "请填写所有必填字段",
-                        "invalidImageUrl": "请输入有效的图片链接"
-                    },
-                    "categories": "Categories",
-                    "existingCategories": "Select from existing",
-                    "addNewCategory": "Or add new category",
-                    "categoryPlaceholder": "Search or create category...",
-                    "addMoreCategories": "Add more...",
-                    "createCategory": "Create",
-                    "noMatchingCategories": "No matching categories",
-                    "noCategories": "No categories yet. Type to create one.",
-                    "categoriesRequired": "Select at least one category",
-                    "captureScreenshot": "Capture Screenshot",
-                    "captureScreenshotHelp": "Auto-capture a screenshot from the source URL",
-                    "screenshotSuccess": "Screenshot captured successfully",
-                    "screenshotFailed": "Failed to capture screenshot",
-                    "screenshotError": "An error occurred while capturing screenshot"
+                        "invalidUrl": "请输入有效的 URL，包括 http:// 或 https://",
+                        "invalidImageUrl": "请输入有效的图片 URL",
+                        "requiredFields": "请填写所有必填字段"
+                    }
                 },
-                "updateSuccess": "项目删除成功",
-                "updateFailed": "删除项目失败",
-                "updateError": "删除项目时发生错误",
-                "editDisplay": "删除",
-                "editDisplayDescription": "切换推荐状态并设置显示顺序。",
+                "editDisplay": "编辑显示",
+                "editDisplayDescription": "切换精选状态并设置显示顺序。",
                 "orderLabel": "显示顺序（可选）",
-                "orderHelp": "较小的数字在推荐/非推荐组中显示在前面。",
-                "deleteDialogTitle": "删除",
+                "orderHelp": "较低数字在精选/非精选组中显示更早。",
+                "deleteDialogTitle": "删除项目",
                 "deleteDialogDescription": "这将从仓库中移除 {name}。",
                 "createPRLabel": "创建拉取请求",
-                "createPRHelp": "如果启用，更改将通过 PR 提议而非直接提交。",
-                "reasonLabel": "原因（可选）",
-                "reasonPlaceholder": "您为什么要移除此项目？",
-                "confirmDelete": "删除项目",
-                "captureScreenshot": "Capture screenshot",
+                "createPRHelp": "启用后，更改将通过 PR 提出，而不是直接提交。",
+                "captureScreenshot": "捕获截图",
                 "screenshot": {
-                    "noSourceUrl": "No source URL available for this item",
-                    "success": "Screenshot captured successfully",
-                    "failed": "Failed to capture screenshot",
-                    "error": "An error occurred while capturing screenshot",
-                    "notConfigured": "Screenshot service is not configured. Please add your ScreenshotOne API key in Settings.",
-                    "captureFailed": "Failed to capture image",
-                    "captureSuccess": "Image captured successfully",
-                    "captureError": "An error occurred while capturing image",
-                    "bulkCaptureComplete": "Bulk image capture completed",
-                    "bulkCaptureError": "An error occurred during bulk image capture"
+                    "noSourceUrl": "此项目无来源 URL",
+                    "success": "截图捕获成功",
+                    "failed": "捕获截图失败",
+                    "error": "捕获截图时发生错误",
+                    "notConfigured": "截图服务未配置",
+                    "providerLabel": "提供商",
+                    "providerRequired": "请选择截图提供商",
+                    "selectProviderTitle": "选择截图提供商",
+                    "selectProviderDescription": "选择用于此项目的截图提供商。",
+                    "selected": "已选择",
+                    "confirmCapture": "捕获截图",
+                    "captureFailed": "捕获图片失败",
+                    "captureSuccess": "图片捕获成功",
+                    "captureError": "捕获图片时发生错误",
+                    "bulkCaptureComplete": "批量图片捕获完成",
+                    "bulkCaptureError": "批量图片捕获时发生错误"
                 },
+                "reasonLabel": "原因（可选）",
+                "reasonPlaceholder": "您为什么移除此项目？",
+                "confirmDelete": "删除项目",
                 "tabs": {
-                    "browseItems": "Browse Items",
-                    "categories": "Categories",
-                    "tags": "Tags",
-                    "sourceHealth": "Source Health"
+                    "browseItems": "浏览项目",
+                    "categories": "类别",
+                    "tags": "标签",
+                    "collections": "合集",
+                    "sourceHealth": "来源健康",
+                    "navigationLabel": "项目标签页"
                 },
                 "taxonomy": {
                     "categories": {
-                        "searchPlaceholder": "Search categories...",
-                        "add": "Add Category",
-                        "addFirst": "Add First Category",
-                        "showing": "Showing {current} of {total} categories",
-                        "empty": "No categories yet",
-                        "noMatch": "No categories match your search",
+                        "searchPlaceholder": "搜索类别...",
+                        "add": "添加类别",
+                        "addFirst": "添加首个类别",
+                        "showing": "显示 {total} 个类别中的 {current} 个",
+                        "empty": "暂无类别",
+                        "noMatch": "没有类别匹配您的搜索",
                         "columns": {
-                            "name": "Name",
-                            "description": "Description",
-                            "items": "Items",
-                            "priority": "Priority",
-                            "actions": "Actions"
+                            "name": "名称",
+                            "description": "描述",
+                            "items": "项目",
+                            "priority": "优先级",
+                            "actions": "操作"
                         },
-                        "createSuccess": "Category created successfully",
-                        "createFailed": "Failed to create category",
-                        "updateSuccess": "Category updated successfully",
-                        "updateFailed": "Failed to update category",
-                        "deleteSuccess": "Category deleted successfully",
-                        "deleteFailed": "Failed to delete category",
-                        "deleteConfirm": "Are you sure you want to delete \"{name}\"?",
-                        "deleteHasItems": "Cannot delete category with {count} items assigned",
+                        "createSuccess": "类别创建成功",
+                        "createFailed": "创建类别失败",
+                        "updateSuccess": "类别更新成功",
+                        "updateFailed": "更新类别失败",
+                        "deleteSuccess": "类别删除成功",
+                        "deleteFailed": "删除类别失败",
+                        "deleteConfirm": "您确定要删除“{name}”吗？",
+                        "deleteHasItems": "无法删除已分配 {count} 个项目的类别",
                         "modal": {
-                            "createTitle": "Create Category",
-                            "editTitle": "Edit Category",
-                            "name": "Name",
-                            "namePlaceholder": "e.g., Monitoring Tools",
-                            "description": "Description",
-                            "descriptionPlaceholder": "Brief description of this category",
-                            "iconUrl": "Icon URL",
+                            "createTitle": "创建类别",
+                            "editTitle": "编辑类别",
+                            "name": "名称",
+                            "namePlaceholder": "例如，监控工具",
+                            "description": "描述",
+                            "descriptionPlaceholder": "此类别的简短描述",
+                            "iconUrl": "图标 URL",
                             "iconUrlPlaceholder": "https://example.com/icon.png",
-                            "iconUrlHelp": "Optional URL to an icon image",
-                            "priority": "Priority",
-                            "priorityPlaceholder": "e.g., 1",
-                            "priorityHelp": "Lower numbers appear first in lists",
-                            "cancel": "Cancel",
-                            "save": "Save",
-                            "create": "Create",
-                            "saving": "Saving...",
+                            "iconUrlHelp": "可选的图标图片 URL",
+                            "priority": "优先级",
+                            "priorityPlaceholder": "例如，1",
+                            "priorityHelp": "较低数字在列表中优先显示",
+                            "cancel": "取消",
+                            "save": "保存",
+                            "create": "创建",
+                            "saving": "保存中...",
                             "errors": {
-                                "nameRequired": "Category name is required",
-                                "nameExists": "A category with this name already exists"
+                                "nameRequired": "类别名称必填",
+                                "nameExists": "已存在同名类别"
                             }
                         }
                     },
                     "tags": {
-                        "searchPlaceholder": "Search tags...",
-                        "add": "Add Tag",
-                        "addFirst": "Add First Tag",
-                        "showing": "Showing {current} of {total} tags",
-                        "empty": "No tags yet",
-                        "noMatch": "No tags match your search",
+                        "searchPlaceholder": "搜索标签...",
+                        "add": "添加标签",
+                        "addFirst": "添加首个标签",
+                        "showing": "显示 {total} 个标签中的 {current} 个",
+                        "empty": "暂无标签",
+                        "noMatch": "没有标签匹配您的搜索",
                         "columns": {
-                            "name": "Name",
-                            "items": "Items",
-                            "actions": "Actions"
+                            "name": "名称",
+                            "items": "项目",
+                            "actions": "操作"
                         },
-                        "createSuccess": "Tag created successfully",
-                        "createFailed": "Failed to create tag",
-                        "updateSuccess": "Tag updated successfully",
-                        "updateFailed": "Failed to update tag",
-                        "deleteSuccess": "Tag deleted successfully",
-                        "deleteFailed": "Failed to delete tag",
-                        "deleteConfirm": "Are you sure you want to delete \"{name}\"?",
-                        "deleteHasItems": "Cannot delete tag with {count} items assigned",
+                        "createSuccess": "标签创建成功",
+                        "createFailed": "创建标签失败",
+                        "updateSuccess": "标签更新成功",
+                        "updateFailed": "更新标签失败",
+                        "deleteSuccess": "标签删除成功",
+                        "deleteFailed": "删除标签失败",
+                        "deleteConfirm": "您确定要删除“{name}”吗？",
+                        "deleteHasItems": "无法删除已分配 {count} 个项目的标签",
                         "modal": {
-                            "createTitle": "Create Tag",
-                            "editTitle": "Edit Tag",
-                            "name": "Name",
-                            "namePlaceholder": "e.g., open-source",
-                            "nameHelp": "Use lowercase with hyphens for multi-word tags",
-                            "cancel": "Cancel",
-                            "save": "Save",
-                            "create": "Create",
-                            "saving": "Saving...",
+                            "createTitle": "创建标签",
+                            "editTitle": "编辑标签",
+                            "name": "名称",
+                            "namePlaceholder": "例如，open-source",
+                            "nameHelp": "多词标签使用小写连字符",
+                            "cancel": "取消",
+                            "save": "保存",
+                            "create": "创建",
+                            "saving": "保存中...",
                             "errors": {
-                                "nameRequired": "Tag name is required",
-                                "nameExists": "A tag with this name already exists"
+                                "nameRequired": "标签名称必填",
+                                "nameExists": "已存在同名标签"
+                            }
+                        }
+                    },
+                    "collections": {
+                        "searchPlaceholder": "搜索合集...",
+                        "add": "添加合集",
+                        "addFirst": "添加首个合集",
+                        "showing": "显示 {total} 个合集中的 {current} 个",
+                        "empty": "暂无合集",
+                        "noMatch": "没有合集匹配您的搜索",
+                        "columns": {
+                            "name": "名称",
+                            "description": "描述",
+                            "items": "项目",
+                            "priority": "优先级",
+                            "actions": "操作"
+                        },
+                        "createSuccess": "合集创建成功",
+                        "createFailed": "创建合集失败",
+                        "updateSuccess": "合集更新成功",
+                        "updateFailed": "更新合集失败",
+                        "deleteSuccess": "合集删除成功",
+                        "deleteFailed": "删除合集失败",
+                        "deleteConfirm": "您确定要删除“{name}”吗？",
+                        "deleteHasItems": "无法删除已分配 {count} 个项目的合集",
+                        "modal": {
+                            "createTitle": "创建合集",
+                            "editTitle": "编辑合集",
+                            "name": "名称",
+                            "namePlaceholder": "例如，编辑精选",
+                            "description": "描述",
+                            "descriptionPlaceholder": "此合集的简短描述",
+                            "iconUrl": "图标 URL",
+                            "iconUrlPlaceholder": "https://example.com/icon.png",
+                            "iconUrlHelp": "可选的图标图片 URL",
+                            "priority": "优先级",
+                            "priorityPlaceholder": "例如，1",
+                            "priorityHelp": "较低数字在列表中优先显示",
+                            "cancel": "取消",
+                            "save": "保存",
+                            "create": "创建",
+                            "saving": "保存中...",
+                            "errors": {
+                                "nameRequired": "合集名称必填",
+                                "nameExists": "已存在同名合集"
                             }
                         }
                     }
                 },
                 "sourceValidation": {
                     "recheckSource": "重新检查来源",
-                    "checkCompleted": "来源检查已完成",
-                    "checkFailed": "来源检查失败",
-                    "failedToCheckSource": "无法检查项目来源",
-                    "brokenLink": "失效链接",
-                    "healthy": "正常",
+                    "checkCompleted": "项目来源检查完成",
+                    "checkFailed": "项目来源检查失败",
+                    "failedToCheckSource": "检查项目来源失败",
+                    "brokenLink": "链接损坏",
+                    "needsReview": "需要审查",
+                    "healthy": "健康",
                     "couldNotVerify": "无法验证",
-                    "sourceMayHaveIssues": "来源可能存在问题",
+                    "sourceMayHaveIssues": "来源可能有问题",
                     "sourceChecked": "来源已检查",
-                    "reachable": "可访问",
-                    "reachabilityInconclusive": "自动可达性检查结果不明确",
+                    "reachable": "可达",
+                    "reachabilityInconclusive": "自动可达性不确定",
                     "accurateSource": "准确来源",
-                    "sourceTooGeneric": "来源过于泛化",
-                    "weakSource": "较弱来源",
+                    "sourceTooGeneric": "来源过于通用",
+                    "weakSource": "来源较弱",
                     "sourceAccuracyUnknown": "来源准确性未知",
                     "useSuggestedSource": "应用建议",
-                    "suggestedSourceApplied": "已应用建议来源",
-                    "failedToUseSuggestedSource": "无法使用建议来源",
-                    "needsReview": "Needs review"
+                    "suggestedSourceApplied": "建议来源已应用",
+                    "failedToUseSuggestedSource": "使用建议来源失败"
                 },
                 "sourceValidationSettings": {
-                    "title": "Source Health Checks",
-                    "subtitle": "Automatically check item source URLs on a recurring schedule.",
-                    "enableLabel": "Enable scheduled checks",
-                    "enableHelp": "Periodically verify that all item source URLs are reachable and accurate.",
-                    "cadenceLabel": "Check frequency",
-                    "cadenceHelp": "How often to run source validation on your items.",
-                    "save": "Save",
-                    "saving": "Saving...",
-                    "saveSuccess": "Source validation settings saved",
-                    "saveFailed": "Failed to save source validation settings"
+                    "title": "来源健康检查",
+                    "subtitle": "定期自动检查项目来源 URL。",
+                    "enableLabel": "启用定时检查",
+                    "enableHelp": "定期验证所有项目来源 URL 的可达性和准确性。",
+                    "cadenceLabel": "检查频率",
+                    "cadenceHelp": "您的项目来源验证运行频率。",
+                    "save": "保存",
+                    "saving": "保存中...",
+                    "saveSuccess": "来源验证设置已保存",
+                    "saveFailed": "保存来源验证设置失败"
                 }
             },
             "generator": {
+                "tabs": {
+                    "generate": "生成",
+                    "schedule": "计划",
+                    "history": "历史",
+                    "comparisons": "比较",
+                    "navigationLabel": "生成器选项卡"
+                },
                 "regenerationWarning": "重新生成警告",
-                "regenerationWarningDescription": "此目录已生成。开始新的生成将替换现有项目。",
-                "requiredInfo": "必需信息",
+                "regenerationWarningDescription": "此目录已生成。启动新生成将替换现有项目。",
+                "requiredInfo": "所需信息",
                 "updateConfiguration": "更新配置",
-                "promptRequired": "提示是必需的",
-                "operationStartedSuccessfully": "操作成功启动",
+                "promptRequired": "提示必填",
+                "unconfiguredProviders": "{providers} 未配置。请访问 设置 → 插件 在生成前进行设置。",
+                "operationStartedSuccessfully": "操作启动成功",
                 "failedToStartOperation": "启动操作失败",
+                "loadingFormSchema": "正在加载表单配置...",
+                "failedToLoadFormSchema": "加载表单配置失败",
+                "selectOption": "选择选项",
                 "directoryName": "目录名称",
                 "generationPrompt": "生成提示",
+                "modelOverride": "AI 模型覆盖",
+                "modelOverridePlaceholder": "例如 openai/gpt-4.1 或 openrouter/openai/gpt-4.1",
+                "modelOverrideHelperText": "可选。默认使用导入或之前的模型，除非在此处覆盖。",
                 "recommended": "推荐",
-                "promptPlaceholder": "描述应该为此目录生成哪些项目...",
-                "promptHelperText": "请具体说明您要生成的内容类型",
+                "promptPlaceholder": "描述为此目录应生成哪些项目...",
+                "promptHelperText": "具体说明您想要生成的内容类型",
                 "repositoryDescription": "仓库描述",
                 "repositoryPlaceholder": "仓库的简要描述（可选）",
                 "startGeneration": "开始生成",
                 "regenerateItems": "重新生成项目",
-                "updateItems": "更新项目",
+                "updateItems": "运行生成",
                 "recreateDirectory": "重新创建目录",
                 "showAdvancedOptions": "显示高级选项",
                 "hideAdvancedOptions": "隐藏高级选项",
                 "cancel": "取消",
                 "companyInformation": "公司信息",
-                "companyInfoDescription": "用于品牌内容的可选公司详情",
+                "companyInfoDescription": "用于品牌内容的可选公司详细信息",
                 "companyName": "公司名称",
                 "companyNamePlaceholder": "输入公司名称",
                 "companyWebsite": "公司网站",
                 "companyWebsitePlaceholder": "https://example.com",
-                "categoriesKeywords": "分类和关键词",
-                "categoriesDescription": "定义用于内容组织的分类和关键词",
-                "initialCategories": "初始分类",
-                "priorityCategories": "优先分类",
+                "categoriesKeywords": "类别与关键词",
+                "categoriesDescription": "定义内容组织的类别和关键词",
+                "initialCategories": "初始类别",
+                "priorityCategories": "优先类别",
                 "targetKeywords": "目标关键词",
-                "addCategoryPlaceholder": "添加分类",
-                "addPriorityCategoryPlaceholder": "添加优先分类",
+                "addCategoryPlaceholder": "添加类别",
+                "addPriorityCategoryPlaceholder": "添加优先类别",
                 "addKeywordPlaceholder": "添加关键词",
                 "add": "添加",
-                "sourceUrls": "来源 URL",
-                "sourceUrlsDescription": "添加要从中提取内容的特定 URL",
+                "sourceUrls": "源 URL",
+                "sourceUrlsDescription": "添加特定 URL 以提取内容",
                 "sourceUrlPlaceholder": "https://example.com/page",
                 "addUrl": "添加 URL",
-                "noSourceUrlsMessage": "未添加来源 URL。生成器将使用搜索来查找内容。",
+                "noSourceUrlsMessage": "未添加源 URL。生成器将使用搜索查找内容。",
                 "advancedConfig": "高级配置",
                 "advancedConfigDescription": "微调生成参数和行为",
                 "generationMethod": "生成方法",
                 "methodCreateUpdate": "创建或更新",
                 "methodRecreate": "重新创建（替换全部）",
-                "updateWithPullRequest": "通过拉取请求更新",
+                "updateWithPullRequest": "使用拉取请求更新",
                 "updateWithPullRequestDescription": "创建拉取请求而不是直接提交",
                 "enableBadgeEvaluation": "启用徽章评估",
                 "enableBadgeEvaluationDescription": "评估并为项目添加质量徽章",
+                "captureScreenshots": "捕获项目截图",
+                "captureScreenshotsDescription": "在生成过程中自动为每个项目捕获截图或产品图像",
                 "websiteRepositoryCreationMethod": "网站仓库创建方法",
                 "methodDuplicate": "复制",
                 "methodFork": "分叉",
@@ -916,79 +1717,121 @@
                 "methodCreateFromTemplate": "从模板创建",
                 "aiProcessingConfiguration": "AI 处理配置",
                 "maxSearchQueries": "最大搜索查询数",
-                "resultsPerQuery": "每次查询结果数",
+                "resultsPerQuery": "每个查询的结果数",
                 "maxPagesToProcess": "最大处理页面数",
                 "relevanceThreshold": "相关性阈值",
                 "aiFirstGeneration": "AI 优先生成",
-                "aiFirstGenerationDescription": "在网页搜索之前启用 AI 生成初始项目。",
+                "aiFirstGenerationDescription": "在网络搜索前启用 AI 生成初始项目。",
                 "contentFiltering": "内容过滤",
                 "contentFilteringDescription": "启用内容质量过滤",
                 "recreateConfirmTitle": "重新创建目录数据？",
-                "recreateConfirmDescription": "重新创建将删除现有项目并从头开始重新生成。此操作无法撤销。",
-                "confirmRecreate": "是的，重新创建",
-                "recreateInlineTitle": "重新创建将删除现有项目",
-                "recreateInlineDescription": "此模式会删除当前项目并从头开始重建。仅在您想要替换所有内容时继续。",
-                "captureScreenshots": "Capture Item Screenshots",
-                "captureScreenshotsDescription": "Automatically capture screenshots or product images for each item during generation",
-                "companyNameDescription": "Used to personalize generated content with your brand identity.",
-                "companyWebsiteDescription": "AI will analyze your website to better understand your brand context.",
-                "initialCategoriesDescription": "Seed categories to organize items. The AI will use these as a starting point.",
-                "priorityCategoriesDescription": "Categories that will appear first in the generated output. Useful for highlighting important sections.",
-                "targetKeywordsDescription": "Keywords to guide the AI search and content generation. More specific keywords yield better results.",
-                "sourceUrlsFieldDescription": "Specific URLs to extract content from. If empty, the generator will search the web automatically.",
-                "generationMethodDescription": "Choose whether to update existing items or recreate everything from scratch.",
-                "websiteRepositoryCreationMethodDescription": "How the website repository is created. Template is recommended for most cases.",
-                "maxSearchQueriesDescription": "Number of search queries the AI will generate to find relevant content (1-50).",
-                "resultsPerQueryDescription": "Maximum results to retrieve per search query (1-20).",
-                "maxPagesToProcessDescription": "Maximum web pages to process for content extraction (1-100).",
-                "relevanceThresholdDescription": "Minimum relevance score (0-1) for content to be included. Higher values mean stricter filtering.",
-                "dataGeneration": "Data Generation Options",
-                "dataGenerationDescription": "Configure data volume and entity generation",
-                "dataVolumeMode": "Data Volume Mode",
-                "dataVolumeModeReal": "Real",
-                "dataVolumeModeRealDescription": "Generate full production-ready data",
-                "dataVolumeModeSample": "Sample",
-                "dataVolumeModeSampleDescription": "Generate minimal sample data (~10 items)",
-                "entityGeneration": "Entity Generation",
-                "generateCategories": "Generate Categories",
-                "generateCategoriesDescription": "Create category structure for organizing items",
-                "generateTags": "Generate Tags",
-                "generateTagsDescription": "Create tags for flexible item labeling",
-                "generateBrands": "Generate Brands",
-                "generateBrandsDescription": "Extract and create brand entities from items"
+                "recreateConfirmDescription": "重新创建将删除现有项目并从头重新生成。此操作不可撤销。",
+                "confirmRecreate": "是，重新创建",
+                "recreateInlineTitle": "重新创建将移除现有项目",
+                "recreateInlineDescription": "此模式删除当前项目并从头重建。只有在您想替换一切时才继续。",
+                "companyNameDescription": "用于使用您的品牌身份个性化生成的内容。",
+                "companyWebsiteDescription": "AI 将分析您的网站以更好地理解您的品牌上下文。",
+                "initialCategoriesDescription": "用于组织项目的种子类别。AI 将使用这些作为起点。",
+                "priorityCategoriesDescription": "在生成输出中首先出现的类别。用于突出重要部分。",
+                "targetKeywordsDescription": "指导 AI 搜索和内容生成的关键词。更具体的关键词产生更好的结果。",
+                "sourceUrlsFieldDescription": "提取内容的特定 URL。如果为空，生成器将自动搜索网络。",
+                "generationMethodDescription": "选择是更新现有项目还是从头重新创建一切。",
+                "websiteRepositoryCreationMethodDescription": "网站仓库的创建方式。对于大多数情况，推荐使用模板。",
+                "maxSearchQueriesDescription": "AI 生成的用于查找相关内容的搜索查询数（1-50）。",
+                "resultsPerQueryDescription": "每个搜索查询检索的最大结果数（1-20）。",
+                "maxPagesToProcessDescription": "用于内容提取的最大网页数（1-100）。",
+                "relevanceThresholdDescription": "内容包含的最小相关性分数（0-1）。较高值意味着更严格的过滤。",
+                "dataGeneration": "数据生成选项",
+                "dataGenerationDescription": "配置数据量和实体生成",
+                "dataVolumeMode": "数据量模式",
+                "dataVolumeModeReal": "真实",
+                "dataVolumeModeRealDescription": "生成完整的生产就绪数据",
+                "dataVolumeModeSample": "样本",
+                "dataVolumeModeSampleDescription": "生成最小样本数据（~10 项目）",
+                "entityGeneration": "实体生成",
+                "generateCategories": "生成类别",
+                "generateCategoriesDescription": "创建用于组织项目的类别结构",
+                "generateTags": "生成标签",
+                "generateTagsDescription": "创建用于灵活项目标记的标签",
+                "generateBrands": "生成品牌",
+                "generateBrandsDescription": "从项目中提取并创建品牌实体",
+                "pipelineMode": "管道模式",
+                "standardPipeline": "标准管道",
+                "standardPipelineDescription": "使用具有单个提供商选择的逐步管道",
+                "providerSelection": "提供商选择",
+                "providerSelectionDescription": "为每个功能选择要使用的提供商",
+                "searchProvider": "搜索提供商",
+                "searchProviderDescription": "用于网络搜索和内容发现的提供商",
+                "screenshotProvider": "截图提供商",
+                "screenshotProviderDescription": "用于捕获项目截图的提供商",
+                "aiProvider": "AI 提供商",
+                "aiProviderDescription": "用于内容生成和提取的 AI 模型提供商",
+                "contentExtractorProvider": "内容提取器",
+                "contentExtractorProviderDescription": "用于从网页提取内容的提供商",
+                "useDirectoryDefault": "使用目录默认",
+                "default": "默认",
+                "notConfigured": "未配置",
+                "notConfiguredTooltip": "此提供商需要配置。请访问 设置 → 插件 进行设置。",
+                "jsonObjectError": "值必须是 JSON 对象",
+                "invalidJsonError": "无效的 JSON 格式"
             },
             "progress": {
-                "title": "生成进行中",
+                "title": "生成中",
                 "processingRequest": "正在处理您的请求...",
                 "steps": {
                     "promptComparison": "比较提示",
                     "promptProcessing": "处理您的提示",
-                    "domainDetection": "检测域类型",
+                    "domainDetection": "检测领域类型",
                     "aiFirstItemsGeneration": "生成初始 AI 项目",
                     "searchQueriesGeneration": "创建搜索查询",
                     "webSearch": "搜索网络",
                     "contentRetrieval": "检索内容",
                     "contentFiltering": "过滤相关内容",
                     "itemsExtraction": "从内容中提取项目",
-                    "deduplicationDataAggregation": "去重并聚合数据",
-                    "categoriesTagsProcessing": "处理分类和标签",
+                    "deduplicationDataAggregation": "移除重复项并聚合数据",
+                    "categoriesTagsProcessing": "处理类别和标签",
                     "sourcesValidation": "验证来源",
                     "badgesProcessing": "处理质量徽章",
-                    "markdownGeneration": "生成Markdown内容",
+                    "markdownGeneration": "生成 Markdown 内容",
                     "processing": "处理中..."
                 },
                 "progress": "进度",
-                "closeNote": "这可能需要几分钟。您可以关闭此页面稍后再回来。"
+                "closeNote": "这可能需要几分钟。您可以关闭此页面并稍后返回。",
+                "showLogs": "显示步骤日志",
+                "hideLogs": "隐藏步骤日志",
+                "waitingForLogs": "等待实时日志到达..."
             },
             "settings": {
                 "sourceSettings": "源仓库",
-                "originalSource": "原始来源",
+                "originalSource": "原始源",
                 "syncEnabled": "同步已启用",
                 "syncDescription": "自动从源仓库拉取更新。",
                 "syncUpdateFailed": "更新同步设置失败",
                 "syncDisabled": "同步已禁用",
-                "generalSettings": "常规设置",
-                "generalTitle": "常规设置",
+                "worksConfig": {
+                    "imported": "从 works.yml 导入",
+                    "applied": "已应用：{value}",
+                    "enabled": "已启用",
+                    "disabled": "已禁用",
+                    "fields": {
+                        "sourceType": "源类型",
+                        "configName": "配置名称",
+                        "initialPrompt": "初始提示词",
+                        "model": "模型",
+                        "schedule": "调度",
+                        "providers": "提供商",
+                        "websiteRepo": "网站仓库",
+                        "additionalAgents": "额外代理"
+                    },
+                    "sourceTypes": {
+                        "dataRepo": "数据仓库",
+                        "awesomeReadme": "精选 README",
+                        "linkExisting": "链接现有仓库",
+                        "worksConfig": "works.yml"
+                    }
+                },
+                "generalSettings": "通用设置",
+                "generalTitle": "通用设置",
                 "directoryName": "目录名称",
                 "description": "描述",
                 "organizationRepository": "组织仓库",
@@ -998,16 +1841,16 @@
                 "readmeConfiguration": "README 配置",
                 "readmeTitle": "README 配置",
                 "customHeader": "自定义头部",
-                "customHeaderPlaceholder": "在 README 头部添加自定义内容",
+                "customHeaderPlaceholder": "向 README 头部添加自定义内容",
                 "overwriteDefaultHeader": "覆盖默认头部",
                 "customFooter": "自定义底部",
-                "cantDeleteWhileGenerating": "在生成项目时无法删除目录。",
-                "customFooterPlaceholder": "在 README 底部添加自定义内容",
+                "cantDeleteWhileGenerating": "项目生成中无法删除目录。",
+                "customFooterPlaceholder": "向 README 底部添加自定义内容",
                 "overwriteDefaultFooter": "覆盖默认底部",
                 "dangerZone": "危险区域",
                 "dangerTitle": "危险区域",
-                "deleteWarning": "一旦删除目录，将无法恢复。请确认。",
-                "dangerDescription": "一旦删除目录，将无法恢复。请确认。",
+                "deleteWarning": "删除目录后无法恢复。请确认。",
+                "dangerDescription": "删除目录后无法恢复。请确认。",
                 "deleteOptions": "选择要删除的内容：",
                 "deleteDataRepository": "删除数据仓库",
                 "deleteDataRepositoryDescription": "从 GitHub 删除 JSON 数据仓库",
@@ -1018,7 +1861,7 @@
                 "deleteConfirm": "您确定吗？",
                 "deleteConfirmDetail": "此操作无法撤销。目录和选定的仓库将被永久删除。",
                 "confirmDirectoryName": "输入目录名称以确认",
-                "confirmDirectoryNameDescription": "输入 \"{name}\" 以确认删除",
+                "confirmDirectoryNameDescription": "输入“{name}”以确认删除",
                 "deleteNameMismatch": "目录名称不匹配",
                 "deleteButton": "删除目录",
                 "deleteConfirmButton": "是的，删除",
@@ -1030,159 +1873,222 @@
                 "updateReadme": "更新 README",
                 "updateSuccess": "设置更新成功",
                 "updateFailed": "更新设置失败",
-                "visibilityUpdateFailed": "Failed to update repository visibility",
-                "visibilityWarningTitle": "Make Repository Private?",
-                "visibilityWarningDescription": "You are about to make {name} private.",
-                "visibilityWarningPermanent": "This action has permanent consequences:",
-                "visibilityWarningStars": "All stars will be permanently lost",
-                "visibilityWarningWatchers": "All watchers will be removed",
-                "visibilityWarningNotRestored": "Stars and watchers will NOT be restored if you make the repository public again",
-                "visibilityConfirmPrivate": "Yes, Make Private",
+                "deployProvider": {
+                    "title": "部署提供商",
+                    "description": "选择部署目录网站的位置",
+                    "configure": "配置",
+                    "ready": "准备部署",
+                    "notConfigured": "未配置",
+                    "deployed": "已部署",
+                    "viewSite": "查看网站",
+                    "updateSuccess": "部署提供商更新成功",
+                    "updateFailed": "更新部署提供商失败"
+                },
+                "visibilityUpdateFailed": "更新仓库可见性失败",
+                "visibilityUpdated": "{name} 现在是 {visibility}",
+                "repositoryVisibilityTitle": "仓库可见性",
+                "repositoryTypes": {
+                    "main": "主仓库",
+                    "data": "数据",
+                    "website": "网站"
+                },
+                "repositoryTypeSuffix": "仓库",
+                "visibilityWarningTitle": "将仓库设为私有？",
+                "visibilityWarningDescription": "您即将将 {name} 设为私有。",
+                "visibilityWarningPermanent": "此操作将产生永久性后果：",
+                "visibilityWarningStars": "所有星标将被永久丢失",
+                "visibilityWarningWatchers": "所有监视者将被移除",
+                "visibilityWarningNotRestored": "如果再次公开仓库，星标和监视者将不会恢复",
+                "visibilityConfirmPrivate": "是的，设为私有",
                 "advancedPrompts": {
-                    "title": "Advanced Prompts",
-                    "subtitle": "Customize AI prompts for directory generation. Leave empty to use defaults.",
-                    "save": "Save Prompts",
-                    "saveSuccess": "Advanced prompts saved successfully",
-                    "saveFailed": "Failed to save advanced prompts",
+                    "title": "标准管道",
+                    "subtitle": "自定义提示",
+                    "comparisonTitle": "比较",
+                    "comparisonSubtitle": "自定义提示",
+                    "save": "保存提示",
+                    "saveSuccess": "高级提示保存成功",
+                    "saveFailed": "保存高级提示失败",
+                    "saveComparisonSuccess": "比较提示保存成功",
                     "prompts": {
                         "relevanceAssessment": {
-                            "title": "Relevance Assessment",
-                            "description": "Additional instructions for filtering web pages by relevance to your directory topic.",
-                            "placeholder": "e.g., Only include pages that focus on open-source projects..."
+                            "title": "相关性评估",
+                            "description": "用于根据目录主题相关性过滤网页的附加说明。",
+                            "placeholder": "例如，仅包括关注开源项目的页面..."
                         },
                         "itemGeneration": {
-                            "title": "Item Generation",
-                            "description": "Additional instructions for AI-generated initial items before web search.",
-                            "placeholder": "e.g., Focus on enterprise-grade solutions with active maintenance..."
+                            "title": "项目生成",
+                            "description": "在网络搜索前为 AI 生成的初始项目提供的附加说明。",
+                            "placeholder": "例如，关注具有活跃维护的企业级解决方案..."
                         },
                         "itemExtraction": {
-                            "title": "Item Extraction",
-                            "description": "Additional instructions for extracting items from web page content.",
-                            "placeholder": "e.g., Prioritize tools with official documentation links..."
+                            "title": "项目提取",
+                            "description": "从网页内容提取项目的附加说明。",
+                            "placeholder": "例如，优先考虑带有官方文档链接的工具..."
                         },
                         "searchQuery": {
-                            "title": "Search Query Generation",
-                            "description": "Additional instructions for generating search queries to find content.",
-                            "placeholder": "e.g., Include queries targeting GitHub repositories and official docs..."
+                            "title": "搜索查询生成",
+                            "description": "生成搜索查询以查找内容的附加说明。",
+                            "placeholder": "例如，包括针对 GitHub 仓库和官方文档的查询..."
                         },
                         "categorization": {
-                            "title": "Categorization",
-                            "description": "Additional instructions for categorizing and tagging extracted items.",
-                            "placeholder": "e.g., Use technical categories like 'CLI Tools', 'Libraries', 'Frameworks'..."
+                            "title": "分类",
+                            "description": "对提取的项目进行分类和标记的附加说明。",
+                            "placeholder": "例如，使用技术类别如 'CLI Tools'、'Libraries'、'Frameworks'..."
                         },
                         "deduplication": {
-                            "title": "Deduplication",
-                            "description": "Additional instructions for identifying and removing duplicate items.",
-                            "placeholder": "e.g., Consider items with similar GitHub repos as duplicates..."
+                            "title": "去重",
+                            "description": "识别并移除重复项目的附加说明。",
+                            "placeholder": "例如，将具有相似 GitHub 仓库的项目视为重复项..."
                         },
                         "sourceValidation": {
-                            "title": "Source Validation",
-                            "description": "Additional instructions for validating item source URLs.",
-                            "placeholder": "e.g., Prefer official project websites over third-party reviews..."
+                            "title": "源验证",
+                            "description": "验证项目源 URL 的附加说明。",
+                            "placeholder": "例如，优先选择官方项目网站而非第三方评论..."
+                        },
+                        "comparisonCustomPrompt": {
+                            "title": "自定义提示",
+                            "description": "附加到比较生成提示的说明。",
+                            "placeholder": "例如，\"关注定价差异\"，\"以随意语气写作\""
                         }
                     }
                 },
+                "communityPrProcessing": "社区 PR",
+                "communityPrEnableLabel": "启用社区 PR",
+                "communityPrEnableDescription": "自动处理社区提交的拉取请求。",
+                "communityPrAutoCloseLabel": "处理后自动关闭 PR",
+                "communityPrAutoCloseDescription": "处理社区拉取请求后自动关闭。",
+                "communityPrEnabled": "社区 PR 处理已启用",
+                "communityPrDisabled": "社区 PR 处理已禁用",
+                "communityPrSettingsUpdated": "社区 PR 设置已更新",
+                "communityPrUpdateFailed": "更新社区 PR 设置失败",
                 "websiteConfig": {
-                    "title": "Website Configuration",
-                    "subtitle": "Customize how your directory website looks and behaves",
-                    "loadFailed": "Failed to load website settings",
-                    "saveSuccess": "Website settings saved successfully",
-                    "saveFailed": "Failed to save website settings",
-                    "save": "Save Settings",
+                    "title": "网站配置",
+                    "subtitle": "自定义目录网站的外观和行为",
+                    "loadFailed": "加载网站设置失败",
+                    "saveSuccess": "网站设置保存成功",
+                    "saveFailed": "保存网站设置失败",
+                    "save": "保存设置",
+                    "tabs": {
+                        "general": "通用",
+                        "header": "头部",
+                        "homepage": "首页",
+                        "footer": "底部"
+                    },
                     "sections": {
                         "siteName": {
-                            "title": "Site Identity",
-                            "label": "Site Name",
-                            "placeholder": "My Directory",
-                            "helper": "The name displayed on your website header and browser tab"
+                            "title": "网站标识",
+                            "label": "网站名称",
+                            "placeholder": "我的目录",
+                            "helper": "显示在网站头部和浏览器标签上的名称"
+                        },
+                        "siteUrl": {
+                            "label": "网站 URL",
+                            "placeholder": "https://example.com",
+                            "helper": "公司或目录网站的 URL"
                         },
                         "global": {
-                            "title": "Global Features",
-                            "categories": "Categories",
-                            "categoriesHelper": "Show category filtering and navigation",
-                            "tags": "Tags",
-                            "tagsHelper": "Show tag filtering and navigation",
-                            "companies": "Companies",
-                            "companiesHelper": "Show company information for items",
-                            "surveys": "Surveys",
-                            "surveysHelper": "Enable survey functionality"
+                            "title": "全局功能",
+                            "categories": "类别",
+                            "categoriesHelper": "显示类别过滤和导航",
+                            "collections": "合集",
+                            "collectionsHelper": "显示精选合集",
+                            "tags": "标签",
+                            "tagsHelper": "显示标签过滤和导航",
+                            "companies": "公司",
+                            "companiesHelper": "显示项目的公司信息",
+                            "surveys": "调查",
+                            "surveysHelper": "启用调查功能"
                         },
                         "header": {
-                            "title": "Header Settings",
-                            "submit": "Submit Button",
-                            "submitHelper": "Show the submit item button in header",
-                            "pricing": "Pricing Link",
-                            "pricingHelper": "Show pricing link in header navigation",
-                            "layoutSelector": "Layout Selector",
-                            "layoutSelectorHelper": "Allow users to switch between layouts",
-                            "languageSelector": "Language Selector",
-                            "languageSelectorHelper": "Allow users to change language",
-                            "themeSelector": "Theme Selector",
-                            "themeSelectorHelper": "Allow users to switch between themes",
-                            "defaultLayout": "Default Layout",
-                            "defaultTheme": "Default Theme",
-                            "themeLight": "Light",
-                            "themeDark": "Dark",
-                            "themeSystem": "System",
-                            "defaultPagination": "Default Pagination",
-                            "paginationStandard": "Standard",
-                            "paginationInfinite": "Infinite Scroll",
-                            "paginationLoadMore": "Load More"
+                            "title": "头部设置",
+                            "submit": "提交按钮",
+                            "submitHelper": "在头部显示提交项目按钮",
+                            "pricing": "定价链接",
+                            "pricingHelper": "在头部导航中显示定价链接",
+                            "layoutSelector": "布局选择器",
+                            "layoutSelectorHelper": "允许用户在布局之间切换",
+                            "languageSelector": "语言选择器",
+                            "languageSelectorHelper": "允许用户更改语言",
+                            "themeSelector": "主题选择器",
+                            "themeSelectorHelper": "允许用户在主题之间切换",
+                            "defaults": "默认值",
+                            "defaultLayout": "默认布局",
+                            "layoutHome1": "首页 1",
+                            "layoutHome2": "首页 2",
+                            "layoutHome3": "首页 3",
+                            "defaultTheme": "默认主题",
+                            "themeLight": "浅色",
+                            "themeDark": "深色",
+                            "themeSystem": "系统",
+                            "defaultPagination": "默认分页",
+                            "paginationStandard": "标准",
+                            "paginationInfinite": "无限滚动",
+                            "paginationLoadMore": "加载更多"
                         },
                         "homepage": {
-                            "title": "Homepage Settings",
-                            "hero": "Hero Section",
-                            "heroHelper": "Show the hero section with title and description",
-                            "search": "Search Bar",
-                            "searchHelper": "Show the search bar on homepage",
-                            "defaultView": "Default View",
-                            "viewClassic": "Classic",
-                            "viewGrid": "Grid",
-                            "viewList": "List",
-                            "defaultSort": "Default Sort",
-                            "sortPopularity": "Popularity",
-                            "sortNewest": "Newest",
-                            "sortAlphabetical": "Alphabetical"
+                            "title": "首页设置",
+                            "hero": "英雄区",
+                            "heroHelper": "显示带有标题和描述的英雄区",
+                            "search": "搜索栏",
+                            "searchHelper": "在首页显示搜索栏",
+                            "defaults": "默认值",
+                            "defaultView": "默认视图",
+                            "viewClassic": "经典",
+                            "viewGrid": "网格",
+                            "viewList": "列表",
+                            "defaultSort": "默认排序",
+                            "sortPopularity": "受欢迎度",
+                            "sortNewest": "最新",
+                            "sortAlphabetical": "字母顺序"
                         },
                         "footer": {
-                            "title": "Footer Settings",
-                            "subscribe": "Newsletter Subscribe",
-                            "subscribeHelper": "Show newsletter subscription form",
-                            "version": "Version Display",
-                            "versionHelper": "Show version information in footer",
-                            "themeSelector": "Footer Theme Selector",
-                            "themeSelectorHelper": "Show theme toggle in footer"
+                            "title": "底部设置",
+                            "subscribe": "新闻通讯订阅",
+                            "subscribeHelper": "显示新闻通讯订阅表单",
+                            "version": "版本显示",
+                            "versionHelper": "在底部显示版本信息",
+                            "themeSelector": "底部主题选择器",
+                            "themeSelectorHelper": "在底部显示主题切换"
                         },
                         "customMenu": {
-                            "title": "Custom Menu Links",
-                            "description": "Add custom links to your website header and footer navigation",
-                            "headerLinks": "Header Links",
-                            "footerLinks": "Footer Links",
-                            "addLink": "Add Link",
-                            "noLinks": "No custom links added",
-                            "labelPlaceholder": "Link label",
+                            "title": "自定义菜单链接",
+                            "description": "向网站头部和底部导航添加自定义链接",
+                            "headerLinks": "头部链接",
+                            "footerLinks": "底部链接",
+                            "addLink": "添加链接",
+                            "noLinks": "未添加自定义链接",
+                            "labelPlaceholder": "链接标签",
                             "pathPlaceholder": "/about or https://...",
-                            "targetSelf": "Same tab",
-                            "targetBlank": "New tab"
+                            "targetSelf": "同一标签页",
+                            "targetBlank": "新标签页"
                         }
                     }
+                },
+                "committer": {
+                    "title": "Git 提交者",
+                    "description": "覆盖此目录中 git 提交的提交者名称和电子邮件。留空以使用用户级设置或账户默认值。",
+                    "nameLabel": "提交者名称",
+                    "emailLabel": "提交者电子邮件",
+                    "save": "保存提交者",
+                    "saved": "提交者设置已保存",
+                    "saveFailed": "保存提交者设置失败"
                 }
             },
             "deploy": {
                 "noProviderAlert": {
-                    "title": "No Deployment Provider",
-                    "description": "Select a deployment provider to deploy your directory website.",
-                    "selectButton": "Select & Continue",
-                    "noProviders": "No deployment providers available. Install a deployment plugin first."
+                    "title": "无部署提供商",
+                    "description": "选择部署提供商来部署您的目录网站。",
+                    "selectButton": "选择并继续",
+                    "noProviders": "没有可用的部署提供商。请先安装部署插件。"
                 },
                 "noTokenAlert": {
-                    "title": "{provider} Token Required",
-                    "description": "To deploy your directory, you need to configure your {provider} API token in Plugin Settings.",
-                    "configureButton": "前往 API 令牌设置",
-                    "getTokenButton": "获取 Vercel 令牌",
+                    "title": "{provider} 令牌必需",
+                    "description": "要部署您的目录，您需要在插件设置中配置 {provider} API 令牌。",
+                    "configureButton": "在插件设置中配置",
+                    "getTokenButton": "获取 API 令牌",
                     "howTo": {
-                        "title": "如何配置您的 Vercel 令牌：",
-                        "step1": "点击 '获取 Vercel 令牌' 打开 Vercel 仪表板",
+                        "title": "如何配置部署：",
+                        "step1": "点击“获取 API 令牌”打开您的提供商仪表板",
                         "step2": "创建具有部署权限的新令牌",
                         "step3": "在插件设置 > {provider} 中配置您的 {provider} API 令牌",
                         "step4": "返回此处部署您的目录"
@@ -1190,22 +2096,22 @@
                 },
                 "sharedNoTokenAlert": {
                     "title": "部署不可用",
-                    "description": "目录所有者尚未配置用于部署的 Vercel 令牌。请联系目录所有者以设置部署。",
-                    "hint": "作为协作者，一旦所有者配置了 Vercel 集成，您就可以触发部署。"
+                    "description": "目录所有者尚未配置部署。请联系目录所有者设置部署。",
+                    "hint": "作为协作者，一旦所有者配置了他们的部署提供商，您就可以触发部署。"
                 },
                 "form": {
                     "deployment": {
-                        "title": "部署到 Vercel",
-                        "description": "在 Vercel 上部署您的目录网站仓库。",
+                        "title": "部署网站",
+                        "description": "部署您的目录网站仓库。",
                         "deployButton": "部署到 {provider}",
-                        "deployingButton": "部署中...",
-                        "deployingStateButton": "部署中 ({state})...",
+                        "deployingButton": "正在部署...",
+                        "deployingStateButton": "正在部署 ({state})...",
                         "successMessage": "您的网站已成功部署！",
                         "teamSelection": {
-                            "title": "选择 Vercel 团队",
-                            "description": "选择要部署此目录的 Vercel 团队。",
+                            "title": "选择团队",
+                            "description": "选择部署此目录的团队。",
                             "label": "团队",
-                            "placeholder": "选择一个团队",
+                            "placeholder": "选择团队",
                             "confirmButton": "部署到团队",
                             "cancelButton": "取消"
                         }
@@ -1215,147 +2121,85 @@
                         "description": "将模板的最新更改同步到",
                         "websiteRepository": "网站仓库",
                         "updateButton": "更新仓库",
-                        "updatingButton": "更新中..."
+                        "updatingButton": "正在更新..."
                     },
                     "messages": {
-                        "deploySuccess": "部署成功启动",
-                        "deployPending": "部署已排队，将很快开始",
-                        "deployFailed": "部署到 Vercel 失败",
+                        "deploySuccess": "部署已成功启动",
+                        "deployPending": "部署已排队，很快将启动",
+                        "deployFailed": "部署失败",
                         "deployError": "部署过程中发生错误",
-                        "updateSuccess": "仓库更新成功",
+                        "saveSettingsFailed": "保存设置失败",
+                        "saveSettingsBeforeDeploymentFailed": "部署前保存设置失败",
+                        "updateSuccess": "仓库已成功更新",
                         "updateFailed": "更新仓库失败",
                         "updateError": "更新仓库时发生错误"
                     },
                     "info": {
-                        "deployInfo": "部署通常需要 1-3 分钟。完成后您将收到一个 URL。",
-                        "updateInfo": "更新会将您的目录内容同步到网站仓库，以便下次部署。"
+                        "deployInfo": "部署通常需要 1-3 分钟。完成后您将收到 URL。",
+                        "updateInfo": "更新将您的目录内容同步到网站仓库，以供下次部署使用。"
                     },
                     "websiteTemplate": {
                         "title": "自动模板更新",
-                        "description": "自动保持您的网站与最新模板更改同步。",
+                        "description": "保持您的网站自动与最新模板更改同步。",
                         "autoUpdate": "自动更新",
                         "autoUpdateDescription": "每小时检查模板更新并自动应用。",
-                        "useBeta": "使用模板测试版",
+                        "useBeta": "使用模板的 beta 版本",
                         "useBetaDescription": "使用 stage 分支而不是稳定的 main 分支。",
-                        "lastUpdated": "上次更新",
-                        "lastChecked": "上次检查",
-                        "lastError": "上次错误",
-                        "updateSuccess": "设置更新成功",
-                        "updateFailed": "设置更新失败",
-                        "githubRequired": "GitHub connection required. Please connect your GitHub account in Settings to enable automatic updates."
+                        "lastUpdated": "最后更新",
+                        "lastChecked": "最后检查",
+                        "lastError": "最后错误",
+                        "updateSuccess": "设置已成功更新",
+                        "updateFailed": "更新设置失败",
+                        "githubRequired": "需要 GitHub 连接。请在设置中连接您的 GitHub 账户以启用自动更新。"
                     },
                     "configDialog": {
-                        "title": "Configure Before Deploy",
-                        "description": "Review and customize your website settings before deployment",
-                        "siteName": "Site Name",
-                        "siteNamePlaceholder": "My Directory",
-                        "siteNameHelper": "The name displayed on your website (default: Acme)",
-                        "advancedSettings": "Advanced Settings",
-                        "advancedSettingsDescription": "Configure additional website options",
-                        "loadFailed": "Failed to load current settings",
-                        "saveAndDeploy": "Save & Deploy",
-                        "skipAndDeploy": "Skip & Deploy",
-                        "cancel": "Cancel"
+                        "title": "部署前配置",
+                        "description": "在部署前查看和自定义您的网站设置",
+                        "siteName": "网站名称",
+                        "siteNamePlaceholder": "我的目录",
+                        "siteNameHelper": "显示在您网站上的名称（默认：Acme）",
+                        "tabGeneral": "全局",
+                        "tabHeader": "页眉",
+                        "tabHomepage": "首页",
+                        "tabFooter": "页脚",
+                        "featuresLabel": "已启用功能",
+                        "visibilityLabel": "可见性",
+                        "defaultsLabel": "默认值",
+                        "advancedSettings": "高级设置",
+                        "advancedSettingsDescription": "配置额外的网站选项",
+                        "loadFailed": "加载当前设置失败",
+                        "saveAndDeploy": "保存并部署",
+                        "skipAndDeploy": "跳过并部署",
+                        "cancel": "取消"
                     }
-                }
-            },
-            "schedule": {
-                "page": {
-                    "title": "计划更新",
-                    "subtitle": "为 {name} 自动化更新，设置专用频率和错误处理。",
-                    "fallbackName": "此目录"
                 },
-                "card": {
-                    "title": "自动化",
-                    "subtitle": {
-                        "enabled": "调整频率、计费和保护措施，确保计划更新保持可靠。",
-                        "disabled": "无订阅限制地自动化更新 - 自由设置频率和错误保护。"
-                    },
-                    "summary": {
-                        "status": "状态",
-                        "nextRun": "下次运行",
-                        "lastRun": "上次运行",
-                        "failures": "失败次数",
-                        "notScheduled": "未计划",
-                        "never": "从未",
-                        "statusMap": {
-                            "active": "自动化运行中",
-                            "paused": "已暂停",
-                            "canceled": "已取消",
-                            "disabled": "已禁用"
-                        },
-                        "nextSourceValidation": "下次来源校验"
-                    },
-                    "fields": {
-                        "automation": "自动化",
-                        "automationHelp": "暂停以临时停止未来的运行。",
-                        "billing": "计费模式",
-                        "billingHelp": "订阅解锁无限运行。按使用付费按执行收费。",
-                        "cadence": "频率",
-                        "cadenceHelp": "当前方案：{plan}",
-                        "cadenceOpen": "订阅禁用时所有频率均可用。",
-                        "maxFailures": "失败限制",
-                        "maxFailuresHelp": "发生此数量的失败后自动暂停。",
-                        "createPullRequest": "创建 Pull Request",
-                        "createPullRequestHelp": "启用后，计划更新将创建 pull request 而不是直接提交。",
-                        "sourceValidationCadence": "来源校验频率",
-                        "sourceValidationCadenceHelp": "默认与更新频率一致，但你也可以将其调慢或调快。"
-                    },
-                    "billing": {
-                        "subscription": "订阅",
-                        "usage": "按使用付费"
-                    },
-                    "cadence": {
-                        "hourly": "每小时",
-                        "every_3_hours": "Every 3 hours",
-                        "every_8_hours": "Every 8 hours",
-                        "every_12_hours": "Every 12 hours",
-                        "daily": "每天",
-                        "weekly": "每周",
-                        "monthly": "每月"
-                    },
-                    "plans": {
-                        "free": "免费",
-                        "standard": "标准",
-                        "premium": "高级",
-                        "unmetered": "无限制"
-                    },
-                    "usageRequired": "切换到按使用付费以使用此频率。",
-                    "cadenceAllowed": "您的方案允许此频率。",
-                    "actions": {
-                        "save": "保存更改",
-                        "saving": "保存中...",
-                        "runNow": "立即运行",
-                        "starting": "启动中...",
-                        "cancel": "取消计划",
-                        "cancelling": "取消中..."
-                    },
-                    "success": {
-                        "saved": "计划已保存。",
-                        "runStarted": "计划运行已开始。",
-                        "cancelled": "计划已取消。"
-                    },
-                    "errors": {
-                        "requireUsage": "启用按使用付费计费以使用此频率。",
-                        "updateFailed": "更新计划失败。",
-                        "runFailed": "启动运行失败。",
-                        "cancelFailed": "取消计划失败。"
-                    },
-                    "empty": {
-                        "title": "请先运行手动生成",
-                        "description": "完成一次成功的手动运行以解锁自动计划。一旦您的目录有了数据，我们可以为您保持更新。",
-                        "refresh": "刷新状态"
-                    },
-                    "requiresGeneration": "在启用计划之前，请至少运行一次项目生成。"
-                },
-                "actions": {
-                    "invalid": "数据无效",
-                    "updated": "计划已更新。",
-                    "updateFailed": "更新计划失败。",
-                    "runStarted": "计划运行已开始。",
-                    "runFailed": "触发运行失败。",
-                    "cancelled": "计划已取消。",
-                    "cancelFailed": "取消计划失败。"
+                "domains": {
+                    "title": "自定义域名",
+                    "description": "为您的部署网站添加自定义域名。",
+                    "placeholder": "example.com",
+                    "addButton": "添加",
+                    "loading": "正在加载域名...",
+                    "loadFailed": "加载域名失败",
+                    "noDomains": "未配置自定义域名。在上方添加一个以开始。",
+                    "added": "域名已添加。配置 DNS 以验证它。",
+                    "addedAndVerified": "域名已添加并验证！",
+                    "addFailed": "添加域名失败",
+                    "removed": "域名已移除",
+                    "removeFailed": "移除域名失败",
+                    "verified": "域名验证成功！",
+                    "verifyPending": "DNS 尚未验证。请检查您的 DNS 设置并稍后重试。",
+                    "verifyFailed": "验证域名失败",
+                    "copied": "已复制到剪贴板",
+                    "autoAssigned": "自动分配",
+                    "verifiedBadge": "已验证",
+                    "pendingBadge": "待处理",
+                    "verifyButton": "验证 DNS",
+                    "removeButton": "移除域名",
+                    "dnsInstructions": "显示 DNS 说明",
+                    "dnsTitle": "配置这些 DNS 记录：",
+                    "dnsName": "名称：",
+                    "dnsValue": "值：",
+                    "copyButton": "复制"
                 }
             }
         },
@@ -1363,15 +2207,27 @@
             "title": "创建新目录",
             "subtitle": "选择您想要创建目录的方式",
             "backToOptions": "返回选项",
+            "sidebar": {
+                "selectedProvider": "Git 提供商",
+                "selectedDeployProvider": "部署提供商"
+            },
+            "deployProvider": {
+                "title": "部署提供商",
+                "description": "选择部署目录网站的位置",
+                "noProviders": "没有可用的部署提供商",
+                "notConfigured": "未配置",
+                "configured": "准备部署",
+                "configureLink": "配置"
+            },
             "organizationSelector": {
                 "label": "仓库所有者",
-                "loading": "加载组织中...",
+                "loading": "正在加载组织...",
                 "personal": "个人账户",
-                "personalAccount": "仓库将在您的个人账户下创建",
+                "personalAccount": "仓库将创建在您的个人账户下",
                 "organizations": "组织",
-                "personalHelp": "仓库将在您的个人 GitHub 账户下创建",
-                "organizationHelp": "仓库将在 {org} 组织下创建",
-                "connectRequired": "在侧边栏中连接 Git 提供商，以选择您的仓库创建位置。"
+                "personalHelp": "仓库将创建在您的个人 GitHub 账户下",
+                "organizationHelp": "仓库将创建在 {org} 组织下",
+                "connectRequired": "在侧边栏连接 Git 提供商，以选择仓库创建位置。"
             },
             "ai": {
                 "title": "使用 AI 创建",
@@ -1380,16 +2236,16 @@
                 "formTitle": "使用 AI 创建目录",
                 "formSubtitle": "描述您的目录想法，让 AI 处理设置和初始内容生成",
                 "directoryNameLabel": "目录名称",
-                "directoryNamePlaceholder": "例如：Awesome AI Tools",
+                "directoryNamePlaceholder": "例如，Awesome AI Tools",
                 "directoryNameHelp": "如果留空，AI 将建议一个名称",
                 "promptLabel": "描述您的目录",
                 "githubRequired": "请先连接您的 GitHub 账户。",
-                "promptPlaceholder": "描述您想要创建什么样的目录，它应该包含哪些项目，以及任何特定要求...",
+                "promptPlaceholder": "描述您想要创建什么样的目录，它应该包含什么项目，以及任何具体要求...",
                 "inspirationText": "需要灵感？试试这些：",
                 "examplePrompts": {
                     "0": {
                         "name": "AI 开发者工具",
-                        "prompt": "创建一个面向开发者的最佳 AI 工具目录"
+                        "prompt": "创建一个最佳 AI 开发者工具目录"
                     },
                     "1": {
                         "name": "React 组件中心",
@@ -1397,30 +2253,33 @@
                     },
                     "2": {
                         "name": "远程团队工具",
-                        "prompt": "生成一个面向远程团队的生产力应用目录"
+                        "prompt": "生成一个远程团队生产力应用的目录"
                     },
                     "3": {
                         "name": "可持续时尚",
-                        "prompt": "制作一个可持续时尚品牌集合"
+                        "prompt": "创建一个可持续时尚品牌集合"
                     }
                 },
                 "featuresTitle": "AI 将为您做什么：",
                 "features": {
-                    "0": "生成合适的名称和描述",
-                    "1": "创建初始分类和结构",
+                    "0": "生成合适名称和描述",
+                    "1": "创建初始类别和结构",
                     "2": "自动查找并添加相关项目",
-                    "3": "设置带有适当文档的 GitHub 仓库"
+                    "3": "设置 GitHub 仓库并附带适当文档"
                 },
                 "generateButton": "使用 AI 生成",
-                "generatingButton": "生成目录中...",
+                "generatingButton": "正在生成目录...",
                 "cancelButton": "取消",
                 "noteTitle": "注意：",
-                "noteText": "AI 生成通常需要 2-5 分钟，具体取决于您请求的复杂性。目录准备好时您会收到通知。",
+                "noteText": "AI 生成通常需要 2-5 分钟，具体取决于您的请求复杂性。目录准备好时会通知您。",
                 "errors": {
                     "promptRequired": "请描述您想要创建什么样的目录",
-                    "nameRequired": "目录名称是必需的",
-                    "slugRequired": "目录标识符是必需的",
-                    "descriptionRequired": "目录描述是必需的"
+                    "unconfiguredProviders": "{providers} 未配置。请访问设置 → 插件在生成前进行设置。",
+                    "nameRequired": "目录名称是必填的",
+                    "slugRequired": "目录 slug 是必填的",
+                    "descriptionRequired": "目录描述是必填的",
+                    "githubRequired": "请先连接您的 GitHub 账户。",
+                    "createFailed": "创建目录失败"
                 },
                 "success": {
                     "started": "目录创建已启动！",
@@ -1430,7 +2289,7 @@
                 "advancedSettings": "高级设置",
                 "advancedSubtitle": "配置组织和仓库设置",
                 "organizationLabel": "组织仓库",
-                "organizationHelp": "在组织下创建仓库，而不是您的个人账户",
+                "organizationHelp": "在组织下创建仓库，而不是个人账户",
                 "organizationNameLabel": "组织名称",
                 "organizationNamePlaceholder": "输入组织名称"
             },
@@ -1442,216 +2301,284 @@
                 "formSubtitle": "完全控制每个设置来配置您的目录",
                 "basicInfo": "基本信息",
                 "nameLabel": "目录名称 *",
-                "namePlaceholder": "例如：Awesome AI Tools",
-                "slugLabel": "目录标识符 *",
+                "namePlaceholder": "例如，Awesome AI Tools",
+                "slugLabel": "目录 Slug *",
                 "slugPlaceholder": "awesome-ai-tools",
                 "githubRequired": "请先连接您的 GitHub 账户。",
-                "slugHelp": "URL 友好的标识符（仅小写字母、数字和连字符）",
+                "slugHelp": "URL 友好的标识符（仅限小写字母、数字和连字符）",
                 "descriptionLabel": "描述 *",
-                "descriptionPlaceholder": "面向开发者的最佳 AI 工具和资源精选列表",
+                "descriptionPlaceholder": "开发者最佳 AI 工具和资源的精选列表",
                 "advancedSettings": "高级设置",
-                "advancedSubtitle": "组织、自定义头部等",
+                "advancedSubtitle": "组织、自定义标头等",
                 "organizationLabel": "在组织下创建",
-                "organizationHelp": "在 GitHub 组织下创建此目录，而不是您的个人账户",
+                "organizationHelp": "在 GitHub 组织下创建此目录，而不是个人账户",
                 "organizationNameLabel": "组织名称",
                 "organizationNamePlaceholder": "my-organization",
-                "headerLabel": "自定义 README 头部",
+                "headerLabel": "自定义 README 标头",
                 "headerPlaceholder": "在 README 文件顶部添加自定义内容",
-                "headerOverwrite": "完全替换默认头部",
-                "footerLabel": "自定义 README 底部",
+                "headerOverwrite": "完全替换默认标头",
+                "footerLabel": "自定义 README 尾部",
                 "footerPlaceholder": "在 README 文件底部添加自定义内容",
-                "footerOverwrite": "完全替换默认底部",
+                "footerOverwrite": "完全替换默认尾部",
                 "createButton": "创建目录",
-                "creatingButton": "创建目录中...",
+                "creatingButton": "正在创建目录...",
                 "cancelButton": "取消",
-                "nameRequired": "目录名称是必需的",
-                "slugRequired": "目录标识符是必需的",
-                "descriptionRequired": "目录描述是必需的",
+                "nameRequired": "目录名称是必填的",
+                "slugRequired": "目录 slug 是必填的",
+                "descriptionRequired": "目录描述是必填的",
+                "createFailed": "创建目录失败",
                 "success": {
                     "created": "目录创建成功！"
                 }
             },
             "import": {
-                "title": "导入已有",
+                "title": "导入现有目录",
                 "subtitle": "从现有 GitHub 仓库导入目录",
                 "importNow": "立即导入",
+                "aiProviderSettings": "AI 提供商",
+                "aiProviderSettingsDescription": "选择用于解析 README 的 AI 提供商",
                 "formTitle": "从 GitHub 导入目录",
                 "formSubtitle": "从现有 GitHub 仓库导入项目来创建您的目录",
                 "sync": {
                     "title": "保持同步",
                     "description": "自动从源仓库拉取更新。"
                 },
+                "worksConfigRestore": {
+                    "title": "恢复 works.yml 设置",
+                    "description": "从此仓库应用 AI 提供商、模型、计划和相关仓库设置。"
+                },
                 "sourceMethod": {
                     "url": {
-                        "title": "粘贴链接",
-                        "description": "直接输入 GitHub 仓库链接"
+                        "title": "粘贴 URL",
+                        "description": "直接输入 GitHub 仓库 URL"
                     },
                     "repository": {
                         "title": "我的仓库",
                         "description": "从您的 GitHub 仓库中选择"
                     }
                 },
-                "urlLabel": "GitHub 仓库链接",
+                "urlLabel": "GitHub 仓库 URL",
                 "urlPlaceholder": "https://github.com/owner/repository",
-                "urlHelp": "输入 GitHub 仓库的完整链接",
+                "urlHelp": "输入 GitHub 仓库的完整 URL",
                 "supportedFormats": {
                     "title": "支持的仓库格式",
                     "dataRepo": {
                         "title": "数据仓库",
-                        "description": "包含 config.yml 和 data/ 文件夹结构的仓库"
+                        "description": "具有 config.yml 和 data/ 文件夹结构的仓库"
                     },
                     "awesomeReadme": {
                         "title": "Awesome 列表",
-                        "description": "包含 markdown README 的精选列表仓库"
+                        "description": "具有 Markdown README 的精选列表仓库"
                     }
                 },
                 "analyzing": {
-                    "title": "分析仓库中",
-                    "subtitle": "检测仓库类型和结构..."
+                    "title": "正在分析仓库",
+                    "subtitle": "正在检测仓库类型和结构..."
                 },
                 "detectedType": {
                     "dataRepo": "检测到数据仓库",
-                    "awesomeReadme": "检测到 Awesome 列表"
+                    "awesomeReadme": "检测到 Awesome 列表",
+                    "worksConfig": "Works 配置仓库"
                 },
                 "badges": {
                     "dataRepo": "数据仓库",
-                    "awesomeReadme": "Awesome 列表"
+                    "awesomeReadme": "Awesome 列表",
+                    "worksConfig": "works.yml"
                 },
                 "preview": {
                     "items": "项目",
-                    "categories": "分类"
+                    "categories": "类别",
+                    "schedule": "调度：{cadence}",
+                    "providers": "提供商：{providers}"
                 },
                 "nameLabel": "目录名称",
-                "namePlaceholder": "例如：我的精选目录",
+                "namePlaceholder": "例如，我的 Awesome 目录",
                 "advancedSettings": "高级设置",
                 "advancedSubtitle": "配置组织和仓库设置",
                 "attribution": {
-                    "title": "来源归属：",
-                    "text": "此目录将引用 {url} 作为其来源"
+                    "title": "源归属：",
+                    "text": "此目录将引用 {url} 作为其源"
+                },
+                "research": {
+                    "title": "导入和研究模式",
+                    "description": "源仓库的项目将用作研究种子。AI 管道将发现新项目、重写描述并扩展分类法。",
+                    "seedDetected": "~{count} 个种子项目已检测",
+                    "expansionFactor": "扩展目标",
+                    "expansionDescription": "最终集合相比源应该大多少倍？",
+                    "recommendedMultiplier": "{value} (推荐)",
+                    "preview": "~{seedCount} 个种子项目 → 目标 ~{targetCount} 个最终项目（~{newItems} 个新项目待发现）",
+                    "enrichmentOptions": "丰富选项",
+                    "enrichDescriptions": "重写描述",
+                    "enrichDescriptionsHint": "AI 将重写并扩展所有导入的描述",
+                    "expandTaxonomy": "扩展类别和标签",
+                    "expandTaxonomyHint": "生成超出源分类法的新的类别和标签",
+                    "parsePrIssues": "解析 PR 和问题",
+                    "parsePrIssuesHint": "从拉取请求和问题中提取额外项目",
+                    "legalNote": "注意：",
+                    "legalDescription": "研究模式仅将源仓库用作输入数据。最终集合主要由新发现的项目组成，带有原创的 AI 生成描述。源内容不会逐字复制。",
+                    "importButton": "开始导入和研究",
+                    "importingButton": "正在启动研究管道..."
                 },
                 "analyzeButton": "分析仓库",
                 "importButton": "导入目录",
-                "importingButton": "导入中...",
+                "importingButton": "正在导入...",
                 "backButton": "返回",
                 "cancelButton": "取消",
                 "importing": {
-                    "title": "导入目录中",
+                    "title": "正在导入目录",
                     "subtitle": "正在从源仓库设置您的目录..."
                 },
                 "repositorySelector": {
                     "title": "选择仓库",
                     "searchPlaceholder": "搜索仓库...",
-                    "loading": "加载仓库中...",
+                    "loading": "正在加载仓库...",
                     "noRepositories": "未找到仓库",
                     "noResults": "没有仓库匹配您的搜索",
                     "tryAgain": "重试",
                     "loadMore": "加载更多",
-                    "showing": "显示 {shown} 个，共 {total} 个仓库",
+                    "showing": "显示 {total} 个仓库中的 {shown} 个",
                     "today": "今天",
                     "yesterday": "昨天",
                     "daysAgo": "{days} 天前",
                     "weeksAgo": "{weeks} 周前",
                     "repositoriesLoaded": "个仓库已加载",
                     "moreAvailable": "更多可用",
+                    "ownerLabel": "仓库所有者",
+                    "personalAccount": "个人账户",
+                    "organizations": "组织",
+                    "showingPersonalRepos": "显示您的个人仓库",
+                    "showingOrgRepos": "显示 {org} 的仓库",
                     "errors": {
                         "fetchFailed": "加载仓库失败"
                     }
                 },
                 "chooseMode": {
-                    "title": "选择导入方式",
+                    "title": "选择导入方法",
                     "repository": "仓库：{owner}/{repo}",
                     "repositoryWithItems": "仓库：{owner}/{repo}（{itemCount} 个项目）",
                     "importCopy": {
-                        "title": "导入并复制",
-                        "description": "创建新仓库并复制数据。适合 fork 或全新开始。"
+                        "title": "导入和复制",
+                        "description": "使用数据副本创建新仓库。最适合分叉或从头开始。"
                     },
                     "linkExisting": {
-                        "title": "链接已有",
-                        "description": "直接使用您现有的仓库。无需复制，更改自动同步。"
+                        "title": "链接现有",
+                        "description": "直接使用现有仓库。无需复制，更改自动同步。"
+                    },
+                    "research": {
+                        "title": "导入和研究",
+                        "description": "用作研究种子，自动发现新项目并使用 AI 丰富内容。"
                     },
                     "back": "返回"
                 },
                 "linkConfirm": {
                     "title": "链接仓库",
-                    "descriptionMissing": "未找到部分仓库。您可以继续而不使用它们，或立即创建。",
-                    "descriptionReady": "已找到所有仓库。准备链接。",
+                    "descriptionMissing": "未找到某些仓库。您可以继续而不使用它们，或立即创建它们。",
+                    "descriptionReady": "所有仓库已找到。准备链接。",
                     "dataRepo": "数据仓库",
                     "markdownRepo": "Markdown 仓库",
                     "websiteRepo": "网站仓库",
                     "found": "已找到",
                     "notFound": "未找到",
                     "cancel": "取消",
-                    "continueWithout": "继续而不创建",
+                    "continueWithout": "不使用继续",
                     "createMissing": "创建缺失的",
-                    "creating": "创建中...",
-                    "linking": "链接中...",
+                    "creating": "正在创建...",
+                    "linking": "正在链接...",
                     "linkRepos": "链接仓库"
                 },
+                "detectionFailed": "我们无法自动检测格式。请选择导入此仓库的方式。",
+                "detectionFailedMissingConfig": "未找到支持的配置。请在仓库中添加 config.yml、works.yml 或 works_config/works.yml，或者在下面选择手动导入格式。",
                 "errors": {
-                    "urlRequired": "请输入 GitHub 仓库链接",
+                    "urlRequired": "请输入 GitHub 仓库 URL",
                     "unsupportedFormat": "不支持此仓库格式。请使用数据仓库或 Awesome 列表格式。",
                     "analyzeFailed": "分析仓库失败",
                     "analyzeForLinkingFailed": "链接分析失败",
-                    "nameRequired": "目录名称是必需的",
-                    "noAnalysis": "请先分析一个仓库",
+                    "nameRequired": "目录名称是必填的",
+                    "noAnalysis": "请先分析仓库",
                     "githubRequired": "请先连接您的 GitHub 账户",
                     "importFailed": "导入目录失败",
-                    "linkFailed": "链接目录失败"
+                    "linkFailed": "链接目录失败",
+                    "providerNotConfigured": "{provider} 未配置。请访问设置 → 插件在导入前进行设置。"
                 },
                 "success": {
-                    "started": "导入已开始！正在跳转到您的目录...",
+                    "started": "导入已启动！正在重定向到您的目录...",
                     "linked": "目录链接成功"
                 },
-                "detectionFailed": "无法自动检测格式。请选择如何导入此仓库。"
+                "slugConflict": {
+                    "title": "仓库名称冲突",
+                    "description": "您的账户中已存在此名称的仓库。您可以使用不同的名称或接受建议。",
+                    "useSuggestion": "改用 \"{slug}\""
+                }
             }
         },
-        "github": {
+        "gitProvider": {
             "connection": {
                 "alert": {
-                    "title": "GitHub 未连接",
-                    "subtitle": "连接您的 GitHub 账户以创建和管理目录",
-                    "connectButton": "连接 GitHub",
+                    "title": "{provider} 未连接",
+                    "subtitle": "连接您的 {provider} 帐户以创建目录",
+                    "connectButton": "连接 {provider}",
                     "connectingButton": "连接中..."
-                },
-                "status": {
-                    "title": "GitHub 状态",
-                    "connected": "已连接",
-                    "notConnected": "未连接",
-                    "connectedDescription": "您的目录将作为 GitHub 仓库存储在您的账户中。",
-                    "notConnectedDescription": "连接您的 GitHub 账户以创建和管理目录。",
-                    "connectedAccount": "已连接账户：",
-                    "requiredNote": "创建目录需要",
-                    "connectButton": "连接 GitHub",
-                    "connectingButton": "连接中...",
-                    "failedToConnect": "连接 GitHub 失败"
                 }
+            },
+            "selector": {
+                "title": "选择 Git 提供商",
+                "noProviders": "没有可用的 git 提供商",
+                "notConnected": "未连接",
+                "connected": "已连接",
+                "connecting": "连接中...",
+                "connect": "连接",
+                "connectError": "连接失败"
+            },
+            "settings": {
+                "title": "Git 提供商连接",
+                "subtitle": "连接您的 git 提供商帐户以导入仓库、创建目录和管理您的项目。",
+                "connectedCount": "{count, plural, =0 {没有提供商已连接} =1 {1 个提供商已连接} other {# 个提供商已连接}}",
+                "noProvidersConnected": "没有提供商已连接",
+                "canImport": "您可以导入和管理仓库",
+                "connectToStart": "连接一个提供商以开始",
+                "noProvidersTitle": "没有可用的 Git 提供商",
+                "noProvidersSubtitle": "当前没有启用 git 提供商插件。请联系管理员启用 git 提供商插件。",
+                "reconnect": "重新连接",
+                "reconnecting": "重新连接中...",
+                "disconnect": "断开连接",
+                "connect": "连接 {provider}",
+                "connecting": "连接中...",
+                "organizations": "组织 ({count})",
+                "organizationsNote": "仅显示您已授予访问权限的组织。",
+                "connectDescription": "连接您的 {provider} 帐户以导入仓库和管理您的项目。",
+                "selectedProvider": "选定的提供商",
+                "confirmDisconnect": "您确定要断开 {provider} 的连接吗？",
+                "disconnected": "{provider} 已断开连接",
+                "connectError": "连接失败",
+                "reconnectError": "重新连接失败",
+                "disconnectError": "断开连接失败"
             }
         },
         "apiTokens": {
             "title": "API 和令牌",
             "subtitle": "管理您的 API 密钥和第三方集成",
-            "vercel": {
-                "title": "Vercel 集成",
-                "subtitle": "连接您的 Vercel 账户以将目录部署为网站",
+            "deployment": {
+                "title": "部署集成",
+                "subtitle": "在插件设置中配置部署提供商",
                 "connected": "已连接",
                 "notConnected": "未连接",
-                "connectedMessage": "您的 Vercel 账户已连接。您现在可以将目录部署到 Vercel。",
-                "disconnect": "断开 Vercel",
+                "connectedMessage": "您的部署提供商已配置。您现在可以部署目录。",
+                "disconnect": "断开连接",
                 "disconnecting": "移除中...",
-                "apiTokenLabel": "Vercel API 令牌",
-                "placeholder": "vc_...",
+                "apiTokenLabel": "API 令牌",
+                "placeholder": "输入您的 API 令牌",
                 "showToken": "显示",
                 "hideToken": "隐藏",
-                "getTokenHelp": "您可以从以下位置获取 API 令牌",
-                "vercelDashboard": "Vercel 仪表板",
+                "getTokenHelp": "您可以从提供商仪表板获取您的 API 令牌",
+                "providerDashboard": "提供商仪表板",
                 "save": "保存令牌",
                 "saving": "保存中...",
                 "messages": {
-                    "tokenRequired": "请输入有效的 Vercel 令牌",
-                    "saveSuccess": "Vercel 令牌保存成功",
-                    "saveFailed": "保存 Vercel 令牌失败",
-                    "removeSuccess": "Vercel 令牌移除成功",
-                    "removeFailed": "移除 Vercel 令牌失败",
+                    "tokenRequired": "请输入有效的令牌",
+                    "saveSuccess": "令牌保存成功",
+                    "saveFailed": "保存令牌失败",
+                    "removeSuccess": "令牌移除成功",
+                    "removeFailed": "移除令牌失败",
                     "unexpectedError": "发生意外错误"
                 }
             },
@@ -1661,59 +2588,31 @@
                 "generate": "生成 API 密钥（即将推出）"
             },
             "webhooks": {
-                "title": "Webhooks",
-                "subtitle": "配置 webhooks 以接收实时更新",
-                "configure": "配置 Webhooks（即将推出）"
-            },
-            "screenshotone": {
-                "title": "ScreenshotOne Integration",
-                "subtitle": "Automatically capture screenshots of directory items using ScreenshotOne",
-                "connected": "Connected",
-                "notConnected": "Not Connected",
-                "connectedMessage": "Your ScreenshotOne account is connected. Screenshots will be automatically captured for directory items.",
-                "disconnect": "Disconnect ScreenshotOne",
-                "disconnecting": "Removing...",
-                "accessKeyLabel": "Access Key",
-                "placeholder": "Your access key...",
-                "secretKeyLabel": "Secret Key (Optional)",
-                "secretKeyPlaceholder": "Your secret key...",
-                "showKey": "Show",
-                "hideKey": "Hide",
-                "accessKeyHelp": "Required. Used to authenticate with the ScreenshotOne API.",
-                "secretKeyHelp": "Optional. Enables signed URLs for enhanced security. Get your keys from",
-                "dashboard": "ScreenshotOne Dashboard",
-                "save": "Save Keys",
-                "saving": "Saving...",
-                "messages": {
-                    "accessKeyRequired": "Please enter a valid ScreenshotOne access key",
-                    "saveSuccess": "ScreenshotOne keys saved successfully",
-                    "saveFailed": "Failed to save ScreenshotOne keys",
-                    "removeSuccess": "ScreenshotOne keys removed successfully",
-                    "removeFailed": "Failed to remove ScreenshotOne keys",
-                    "unexpectedError": "An unexpected error occurred"
-                }
+                "title": "Webhook",
+                "subtitle": "配置 webhook 以接收实时更新",
+                "configure": "配置 Webhook（即将推出）"
             }
         },
         "notifications": {
-            "title": "通知偏好",
+            "title": "通知偏好设置",
             "subtitle": "选择您希望如何接收重要更新的通知",
             "email": {
-                "title": "邮件通知",
+                "title": "电子邮件通知",
                 "directoryUpdates": {
                     "label": "目录更新",
-                    "description": "接收关于您目录的重要更新通知"
+                    "description": "接收目录重要更新的通知"
                 },
                 "newItems": {
                     "label": "新项目",
-                    "description": "当新项目添加到您的目录时接收通知"
+                    "description": "当目录中添加新项目时接收通知"
                 },
                 "weeklyDigest": {
                     "label": "每周摘要",
-                    "description": "接收您目录活动的每周摘要"
+                    "description": "接收目录活动的每周摘要"
                 },
                 "marketing": {
-                    "label": "营销和促销",
-                    "description": "接收关于新功能和优惠的更新"
+                    "label": "营销与促销",
+                    "description": "接收新功能和优惠的更新"
                 }
             },
             "app": {
@@ -1724,24 +2623,24 @@
                 },
                 "comments": {
                     "label": "评论",
-                    "description": "接收关于您目录评论的通知"
+                    "description": "接收目录评论的通知"
                 },
                 "mentions": {
-                    "label": "提及",
+                    "label": "@提及",
                     "description": "当有人提及您时接收通知"
                 },
                 "systemUpdates": {
                     "label": "系统更新",
-                    "description": "重要的系统通知和维护提醒"
+                    "description": "重要的系统通知和维护警报"
                 }
             },
             "actions": {
-                "save": "保存偏好",
+                "save": "保存偏好设置",
                 "saving": "保存中..."
             },
             "messages": {
-                "success": "通知偏好已更新",
-                "error": "更新偏好失败",
+                "success": "通知偏好设置已更新",
+                "error": "更新偏好设置失败",
                 "unexpectedError": "发生意外错误"
             }
         },
@@ -1749,87 +2648,294 @@
             "menu": "菜单",
             "aiChat": "AI 聊天",
             "newDirectory": "新建目录",
+            "activityIndicator": "目录生成中",
             "navigation": {
                 "dashboard": "仪表板",
+                "activity": "活动",
                 "directories": "目录",
+                "plugins": "插件",
                 "settings": "设置"
             },
+            "tooltips": {
+                "expandSidebar": "展开侧边栏",
+                "collapseSidebar": "折叠侧边栏"
+            },
+            "profileMenu": {
+                "accountSettings": "帐户设置",
+                "helpDocs": "帮助与文档",
+                "support": "支持",
+                "keyboardShortcuts": "键盘快捷键"
+            },
             "signOut": "退出登录",
-            "signingOut": "退出中..."
+            "signingOut": "退出登录中..."
         },
         "dangerZone": {
             "title": "危险区域",
-            "subtitle": "不可逆和破坏性操作",
+            "subtitle": "不可逆的破坏性操作",
             "export": {
                 "title": "导出您的数据",
                 "subtitle": "下载您的所有目录、项目和设置",
                 "action": "导出数据（即将推出）"
             },
             "delete": {
-                "title": "删除账户",
-                "subtitle": "永久删除您的账户和所有关联数据。此操作无法撤销。",
-                "button": "删除我的账户",
+                "title": "删除帐户",
+                "subtitle": "永久删除您的帐户和所有相关数据。此操作无法撤销。",
+                "button": "删除我的帐户",
                 "confirmTitle": "⚠️ 这将永久删除：",
                 "confirmItems": [
-                    "您的账户和个人资料",
+                    "您的帐户和个人资料",
                     "您的所有目录",
                     "所有目录项目和数据",
                     "API 密钥和集成",
-                    "所有关联网站"
+                    "所有相关网站"
                 ],
-                "confirmLabel": "输入您的邮箱 {email} 以确认",
-                "confirmPlaceholder": "输入您的邮箱",
-                "confirmButton": "是的，删除我的账户",
+                "confirmLabel": "输入您的电子邮件 {email} 以确认",
+                "confirmPlaceholder": "输入您的电子邮件",
+                "confirmButton": "是的，删除我的帐户",
                 "deleting": "删除中...",
                 "cancel": "取消"
             },
             "messages": {
-                "confirmEmail": "请正确输入您的邮箱以确认",
-                "deleteSuccess": "账户删除成功",
-                "deleteFailed": "删除账户失败",
+                "confirmEmail": "请输入正确的电子邮件以确认",
+                "deleteSuccess": "帐户删除成功",
+                "deleteFailed": "删除帐户失败",
                 "unexpectedError": "发生意外错误"
             }
         },
         "aiChat": {
             "title": "AI 助手",
+            "panelTitle": "聊天",
             "subtitle": "使用自然语言创建目录",
-            "welcomeMessage": "你好！我可以帮助你使用自然语言创建目录。试着问“为 AI 工具创建一个目录”或描述你需要的内容。",
-            "newChat": "新聊天",
+            "welcomeTitle": "欢迎使用 AI 助手 👋",
+            "welcomeSubtitle": "您的 AI 驱动助手。询问我有关创建目录、生成内容或组织数据的任何问题。",
+            "welcomeMessage": "嗨！我可以使用自然语言帮助您创建目录。例如询问“为 AI 工具创建一个目录”或描述您的需求。",
+            "capabilities": {
+                "directoryCreation": "目录创建",
+                "directoryCreationDesc": "从自然语言描述构建目录",
+                "webResearch": "网络研究",
+                "webResearchDesc": "在整个网络上搜索和收集数据",
+                "contentGeneration": "内容生成",
+                "contentGenerationDesc": "生成描述、类别和元数据",
+                "smartSuggestions": "智能建议",
+                "smartSuggestionsDesc": "获取项目 AI 驱动的推荐"
+            },
+            "newChat": "新建聊天",
+            "history": "历史记录",
             "loadingConversation": "加载对话中…",
-            "inputPlaceholder": "描述您想要创建的目录...",
+            "inputPlaceholder": "问我任何问题...",
             "sendButton": "发送",
-            "sendHint": "按 Enter 发送 · Shift+Enter 换行",
-            "providerNotConfigured": "此提供商未配置。请在插件中进行设置。",
+            "stopGenerating": "停止生成",
+            "sendHint": "Enter 发送 · Shift+Enter 新行",
+            "closeChat": "关闭聊天",
+            "collapseChat": "折叠聊天",
+            "resizeChat": "拖动调整聊天大小",
+            "expandChat": "展开聊天",
+            "providersError": "加载 AI 提供商失败。聊天可能无法正常工作。",
+            "providerNotConfigured": "此提供商未配置。请在插件中设置。",
             "editMessage": "编辑消息",
-            "saveEdit": "保存并发送",
+            "saveEdit": "保存并提交",
             "cancelEdit": "取消",
             "edited": "(已编辑)",
+            "thinking": "思考中...",
+            "toolCompleted": "完成",
+            "selectProvider": "提供商",
+            "notConfigured": "未配置",
+            "gitNotConnected": "Git 提供商未连接",
+            "gitNotConnectedDesc": "连接您的 Git 提供商以创建和管理目录。",
+            "connectGithub": "连接 GitHub",
+            "gitConnectedAs": "通过 {provider} 以 {username} 身份连接",
+            "deployNotConfigured": "部署提供商未配置",
+            "deployNotConfiguredDesc": "配置部署提供商以发布您的目录网站。",
+            "configureDeployProvider": "配置部署提供商",
+            "deployConfigured": "部署提供商已配置 ({provider})",
+            "opened": "已打开",
+            "historyEmpty": "还没有对话。开始聊天以在此处查看您的历史记录。",
+            "historyUntitled": "未命名对话",
+            "historyToday": "今天",
+            "historyYesterday": "昨天",
+            "historyDaysAgo": "{days} 天前",
+            "suggestions": {
+                "s1": "显示我的目录",
+                "s2": "创建一个 AI 工具目录",
+                "s3": "检查我的 Git 连接",
+                "s4": "显示我的统计信息"
+            },
+            "feelingLucky": "建议一个要创建的目录",
+            "errors": {
+                "unableToSend": "无法发送消息"
+            }
+        },
+        "plugins": {
+            "title": "插件",
+            "subtitle": "管理您的已安装插件和集成",
+            "empty": "没有可用的插件",
+            "noDescription": "未提供描述",
+            "enabled": "已启用",
+            "disabled": "已禁用",
+            "enable": "启用",
+            "enableDescription": "配置此插件在您的目录中的启用方式。",
+            "disable": "禁用",
+            "settings": "设置",
+            "saveSettings": "保存设置",
+            "settingsTitle": "插件设置",
+            "settingsSaved": "设置保存成功",
+            "noSettings": "此插件没有可配置的设置",
+            "builtIn": "内置",
+            "system": "系统",
+            "docs": "文档",
+            "author": "作者",
+            "documentation": "文档",
+            "about": "关于",
+            "backToPlugins": "返回插件",
+            "filters": {
+                "all": "全部",
+                "enabledOnly": "仅启用",
+                "search": "搜索插件...",
+                "clearSearch": "清除搜索"
+            },
+            "searchEmpty": "没有插件匹配“{query}”",
+            "categories": {
+                "git": "Git",
+                "deployment": "部署",
+                "screenshot": "截图",
+                "search": "搜索",
+                "content": "内容",
+                "dataSource": "数据源",
+                "ai": "AI",
+                "pipeline": "流水线"
+            },
+            "alwaysEnabled": "始终启用",
+            "disableWarning": "禁用此插件也将禁用您所有目录中的插件",
+            "cannotDisableSystem": "系统插件无法禁用",
+            "disableFailed": "禁用插件失败",
+            "autoEnableForDirectories": "同时为所有目录启用",
+            "autoEnableForDirectoriesDescription": "此插件将在您所有目录中自动激活。您仍可按目录禁用它。",
+            "confirmDisable": "确认禁用",
+            "cancel": "取消",
+            "missingRequiredFields": "缺少必需字段：{fields}",
+            "saveError": "保存设置失败。请重试。",
+            "enableFirstToSave": "先启用此插件，然后保存其设置。",
+            "goToPluginSettings": "转到插件设置",
+            "userLevelRequiredError": "必须先配置用户级必需设置",
+            "modelSelect": {
+                "placeholder": "选择模型...",
+                "loading": "加载模型中...",
+                "loadError": "加载模型失败",
+                "searchPlaceholder": "搜索模型...",
+                "noModels": "未找到模型",
+                "context": "{value} 上下文",
+                "customModelPlaceholder": "输入模型 ID...",
+                "addCustomModel": "+ 添加自定义模型",
+                "add": "添加"
+            },
+            "settingsField": {
+                "selectPlaceholder": "选择...",
+                "fieldEncrypted": "此字段已加密",
+                "nullValue": "未设置值",
+                "removeItem": "移除",
+                "addItem": "添加",
+                "modify": "修改",
+                "cancel": "取消",
+                "enterNewValue": "输入新值..."
+            },
+            "oauth": {
+                "title": "账户连接",
+                "connected": "已连接",
+                "notConnected": "未连接",
+                "connect": "连接",
+                "disconnect": "断开连接",
+                "reconnect": "重新连接",
+                "connecting": "连接中...",
+                "reconnecting": "重新连接中...",
+                "connectDescription": "连接您的 {plugin} 账户以启用完整功能",
+                "confirmDisconnect": "您确定要断开 {plugin} 的连接吗？",
+                "disconnected": "{plugin} 断开连接成功",
+                "connectError": "连接失败。请重试。",
+                "reconnectError": "重新连接失败。请重试。",
+                "disconnectError": "断开连接失败。请重试。"
+            },
+            "deviceAuth": {
+                "title": "设备认证",
+                "connected": "已连接",
+                "pending": "待处理",
+                "notConnected": "未连接",
+                "description": "使用设备码流程为当前 Ever Works 用户连接 {plugin}。",
+                "backendHint": "此认证存储在为您用户账户管理的后端工作区中，仅可在此 Ever Works 部署中使用。",
+                "deviceCode": "设备码",
+                "verificationUrl": "验证 URL",
+                "start": "开始",
+                "restart": "重新开始",
+                "refresh": "刷新",
+                "open": "打开",
+                "notInstalled": "此机器上未安装所需的 CLI。",
+                "loadError": "加载设备认证状态失败。",
+                "startError": "启动设备认证失败。"
+            },
+            "githubOrganizations": {
+                "title": "GitHub 组织",
+                "description": "查看 GitHub 连接中可用的组织，并添加您希望 Ever Works 针对的任何额外组织。",
+                "noOrganizations": "当前 GitHub 连接中没有可用的组织。",
+                "connectToLoad": "连接 GitHub 以加载您的组织。",
+                "placeholder": "按登录名添加组织",
+                "addButton": "添加组织",
+                "saveButton": "保存组织",
+                "savedSuccess": "已保存组织访问权限。",
+                "saveFailed": "保存失败。",
+                "removeLabel": "移除 {login}"
+            }
+        },
+        "directoryPlugins": {
+            "title": "目录插件",
+            "subtitle": "为该目录配置插件",
+            "active": "已激活",
+            "enable": "启用",
+            "disable": "禁用",
+            "enableForDirectory": "为此目录启用",
+            "disableForDirectory": "为此目录禁用",
+            "enableAtUserLevelFirst": "先在您的设置中启用此插件",
+            "disabledByUser": "用户级已禁用",
+            "systemAlwaysEnabled": "系统插件 - 始终启用",
+            "showSettings": "显示设置",
+            "hideSettings": "隐藏设置",
+            "directorySettingsInfo": "在此配置目录特定设置",
+            "save": "保存",
+            "saved": "已保存",
+            "showInstalledOnly": "仅显示已安装",
+            "noInstalledPlugins": "未安装插件。请访问插件设置安装插件。",
+            "noPlugins": "没有可用的插件",
+            "showAllPlugins": "显示所有插件",
+            "capabilityProviders": "能力提供者",
+            "capabilityProvidersDescription": "选择为该目录提供每个能力的插件",
+            "noProvidersAvailable": "没有可用的提供者",
+            "categories": {
+                "git": "Git",
+                "deployment": "部署",
+                "screenshot": "截图",
+                "search": "搜索",
+                "content": "内容",
+                "dataSource": "数据源",
+                "ai": "AI",
+                "pipeline": "流水线"
+            },
+            "missingRequiredFields": "缺少必需字段：{fields}",
+            "saveError": "保存设置失败。请重试。",
+            "sendButton": "发送",
             "errors": {
                 "unableToSend": "无法发送消息。"
             },
-            "settingsModalTitle": "Directory Settings",
-            "settingsModalDescription": "Override settings for this directory. Unset fields inherit from your user settings.",
-            "inheritedFrom": "Inherited: {value}",
-            "inheritedSecret": "Inherited: ••••••••",
-            "resetToDefaults": "Reset to Defaults",
-            "resetConfirm": "This will clear all directory-specific overrides. Settings will fall back to your user-level values.",
-            "resetSuccess": "Settings reset to defaults",
-            "cancel": "Cancel",
-            "clickToConfigure": "Click to configure"
-        },
-        "plugins": {
-            "githubOrganizations": {
-                "title": "GitHub 组织",
-                "description": "查看您的 GitHub 连接中可用的组织，并添加您希望 Ever Works 使用的其他组织。",
-                "noOrganizations": "尚未找到任何组织。",
-                "connectToLoad": "连接 GitHub 以加载您的组织。",
-                "placeholder": "通过登录名添加组织",
-                "addButton": "添加组织",
-                "saveButton": "保存组织",
-                "savedSuccess": "组织访问权限已保存。",
-                "saveFailed": "保存失败。",
-                "removeLabel": "删除 {login}"
-            }
+            "settingsModalTitle": "目录设置",
+            "settingsModalDescription": "覆盖此目录的设置。未设置字段将继承自用户设置。",
+            "inheritedFrom": "继承：{value}",
+            "inheritedSecret": "继承：••••••••",
+            "resetToDefaults": "重置为默认值",
+            "resetConfirm": "这将清除所有目录特定覆盖。设置将回退到用户级值。",
+            "resetSuccess": "设置已重置为默认值",
+            "cancel": "取消",
+            "clickToConfigure": "点击配置",
+            "autoEnabledByUser": "通过用户设置自动启用",
+            "toggleError": "切换插件失败",
+            "system": "系统",
+            "goToPluginSettings": "转到插件设置"
         }
     },
     "layout": {
@@ -1837,22 +2943,22 @@
             "backToHome": "返回首页",
             "feature": {
                 "title": "使用 AI 构建目录",
-                "subtitle": "使用自然语言在几分钟内创建美观、可搜索的目录。无需编码。",
+                "subtitle": "使用自然语言在几分钟内创建美丽、可搜索的目录。无需编码。",
+                "badge": "AI 驱动",
                 "benefits": {
                     "ai": {
                         "title": "AI 驱动创建",
-                        "description": "描述您想要的，让 AI 来完成工作"
+                        "description": "描述您想要的内容，让 AI 来完成工作"
                     },
                     "templates": {
                         "title": "专业模板",
-                        "description": "从美观、可自定义的设计开始"
+                        "description": "从美丽、可自定义的设计开始"
                     },
                     "management": {
                         "title": "轻松管理",
                         "description": "轻松更新和组织您的内容"
                     }
                 },
-                "badge": "AI 驱动",
                 "howItWorks": {
                     "step1": "描述您的想法",
                     "step2": "选择模板",
@@ -1861,7 +2967,7 @@
                 }
             },
             "footer": {
-                "copyright": "© {year} {companyName}. 保留所有权利。",
+                "copyright": "© {year} {companyName}。保留所有权利。",
                 "terms": "服务条款",
                 "privacy": "隐私政策",
                 "help": "帮助"
@@ -1870,21 +2976,61 @@
     },
     "errors": {
         "global": {
-            "title": "出现了问题！",
+            "title": "出了点问题！",
+            "description": "发生了意外错误。如果问题持续存在，请重试或联系支持。",
+            "errorId": "错误 ID",
+            "tryAgain": "重试"
+        },
+        "notFound": {
+            "title": "页面未找到",
+            "description": "您要查找的页面不存在或已被移动。",
+            "backHome": "返回仪表板",
+            "goBack": "返回"
+        },
+        "dashboard": {
+            "title": "出了点问题",
+            "description": "发生了意外错误。如果问题持续存在，请重试或联系支持。",
+            "errorId": "错误 ID",
             "tryAgain": "重试"
         }
     },
     "metadata": {
         "title": "{companyName} - 目录构建器",
-        "description": "用于构建和管理目录的 SaaS 平台"
+        "description": "一个用于构建和管理目录的 SaaS 平台",
+        "pages": {
+            "signIn": "登录",
+            "createAccount": "创建账户",
+            "forgotPassword": "忘记密码",
+            "resetPassword": "重置密码",
+            "authError": "认证错误",
+            "dashboard": "仪表板",
+            "activity": "活动日志",
+            "directories": "目录",
+            "newDirectory": "新目录",
+            "directory": "目录",
+            "overview": "概览",
+            "items": "项目",
+            "generator": "生成器",
+            "settings": "设置",
+            "deploy": "部署",
+            "members": "成员",
+            "history": "历史记录",
+            "comparisons": "比较",
+            "plugins": "插件",
+            "profile": "个人资料",
+            "security": "安全",
+            "apiKeys": "API 密钥",
+            "dangerZone": "危险区域",
+            "pluginSettings": "插件设置"
+        }
     },
     "api": {
         "errors": {
             "unauthorized": "您无权执行此操作",
             "unauthorizedLogin": "未授权：请重新登录。",
-            "forbidden": "禁止：您没有执行此操作的权限。",
+            "forbidden": "禁止：您没有权限执行此操作。",
             "serverError": "服务器错误：{message}",
-            "unexpected": "发生意外服务器错误。",
+            "unexpected": "发生了意外的服务器错误。",
             "apiError": "API 错误：{status} {statusText}",
             "loginFailed": "登录失败",
             "registerFailed": "注册失败",
@@ -1897,15 +3043,15 @@
     "actions": {
         "directories": {
             "slug": {
-                "required": "标识符是必需的",
-                "format": "标识符只能包含小写字母、数字和连字符"
+                "required": "Slug 必填",
+                "format": "Slug 只能包含小写字母、数字和连字符"
             },
             "name": {
-                "required": "名称是必需的",
+                "required": "名称必填",
                 "maxLength": "名称必须少于 100 个字符"
             },
             "description": {
-                "required": "描述是必需的",
+                "required": "描述必填",
                 "maxLength": "描述必须少于 500 个字符"
             },
             "prompt": {
@@ -1925,10 +3071,10 @@
             "deleteFailed": "删除目录失败",
             "fetchFailed": "获取目录失败",
             "organization": {
-                "requiredWhenOwnerProvided": "提供所有者时必须启用组织"
+                "requiredWhenOwnerProvided": "当提供所有者时，必须启用组织"
             },
             "import": {
-                "invalidUrl": "请输入有效的链接",
+                "invalidUrl": "请输入有效的 URL",
                 "analyzeFailed": "分析仓库失败",
                 "started": "导入已成功启动",
                 "failed": "导入目录失败",
@@ -1936,83 +3082,82 @@
             }
         },
         "generator": {
-            "promptRequired": "提示是必需的",
-            "nameRequired": "名称是必需的",
-            "generationStartedSuccessfully": "生成成功启动",
-            "updateStartedSuccessfully": "更新成功启动",
+            "promptRequired": "提示必填",
+            "nameRequired": "名称必填",
+            "generationStartedSuccessfully": "生成已成功启动",
+            "generationCancellationRequested": "已请求取消生成",
+            "updateStartedSuccessfully": "更新已成功启动",
             "failedToGenerateItems": "生成项目失败",
+            "failedToCancelGeneration": "取消生成失败",
             "failedToUpdateItems": "更新项目失败",
             "markdownRegeneratedSuccessfully": "Markdown 重新生成成功",
             "failedToRegenerateMarkdown": "重新生成 Markdown 失败",
-            "notAuthorizedToAccessOrganization": "您无权访问此组织。请联系所有者 ({owner}) 寻求帮助。"
+            "notAuthorizedToAccessOrganization": "您无权访问此组织。请联系所有者 ({owner}) 获取帮助。",
+            "failedToLoadFormSchema": "加载表单配置失败"
         },
         "settings": {
             "profile": {
-                "usernameRequired": "用户名是必需的",
+                "usernameRequired": "用户名必填",
                 "usernameMaxLength": "用户名必须少于 50 个字符",
                 "usernameFormat": "用户名只能包含字母、数字、破折号和下划线",
                 "updateFailed": "更新个人资料失败",
                 "notAuthenticated": "未认证"
             },
             "password": {
-                "currentRequired": "当前密码是必需的",
+                "currentRequired": "当前密码必填",
                 "newMinLength": "密码必须至少 8 个字符",
                 "newMaxLength": "密码必须少于 100 个字符",
                 "updateFailed": "更新密码失败",
                 "updateSuccess": "密码更新成功",
                 "notAuthenticated": "未认证"
             },
-            "vercel": {
+            "deployment": {
                 "notAuthenticated": "未认证",
-                "tokenRequired": "令牌是必需的",
-                "invalidFormat": "无效的 Vercel 令牌格式",
-                "saveFailed": "保存 Vercel 令牌失败",
-                "saveSuccess": "Vercel 令牌保存成功",
-                "validationFailed": "提供的 Vercel 令牌无效。请仔细检查并重试。",
-                "removeFailed": "移除 Vercel 令牌失败",
-                "removeSuccess": "Vercel 令牌移除成功"
+                "tokenRequired": "令牌必填",
+                "invalidFormat": "无效的令牌格式",
+                "saveFailed": "保存部署令牌失败",
+                "saveSuccess": "部署令牌保存成功",
+                "validationFailed": "提供的令牌无效。请仔细检查并重试。",
+                "removeFailed": "移除部署令牌失败",
+                "removeSuccess": "部署令牌移除成功"
             },
             "github": {
                 "notAuthenticated": "未认证",
-                "disconnectFailed": "断开 GitHub 连接失败",
-                "disconnectSuccess": "GitHub 账户断开连接成功"
+                "disconnectFailed": "断开 GitHub 失败",
+                "disconnectSuccess": "GitHub 账户断开成功"
             },
             "notifications": {
                 "notAuthenticated": "未认证",
-                "updateFailed": "更新偏好失败",
-                "updateSuccess": "通知偏好更新成功"
+                "updateFailed": "更新首选项失败",
+                "updateSuccess": "通知首选项更新成功"
             },
             "danger": {
                 "notAuthenticated": "未认证",
                 "deleteFailed": "删除账户失败",
-                "deleteDisabled": "在演示中禁用账户删除"
+                "deleteDisabled": "演示中禁用账户删除"
             },
-            "screenshotone": {
-                "notAuthenticated": "Not authenticated",
-                "accessKeyRequired": "Access key is required",
-                "saveFailed": "Failed to save ScreenshotOne keys",
-                "saveSuccess": "ScreenshotOne keys saved successfully",
-                "validationFailed": "The provided ScreenshotOne keys are invalid. Please double-check and try again.",
-                "removeFailed": "Failed to remove ScreenshotOne keys",
-                "removeSuccess": "ScreenshotOne keys removed successfully"
+            "emailVerification": {
+                "notAuthenticated": "未认证",
+                "sent": "验证邮件已发送",
+                "sendFailed": "发送验证邮件失败"
             }
         },
         "deploy": {
-            "deployVercelFailed": "部署到 Vercel 失败",
+            "deployFailed": "部署失败",
             "updateRepositoryFailed": "更新仓库失败",
             "updateSettingsFailed": "更新网站模板设置失败"
         }
     },
     "validation": {
         "auth": {
-            "invalidCredentials": "无效的邮箱或密码",
+            "invalidCredentials": "无效的电子邮件或密码",
             "account": {
                 "suspended": "账户已被暂停"
             },
             "email": {
-                "required": "邮箱不能为空",
-                "invalid": "无效的邮箱",
-                "emailAlreadyRegistered": "邮箱已被注册"
+                "required": "电子邮件不能为空",
+                "invalid": "无效的电子邮件",
+                "emailAlreadyRegistered": "电子邮件已被注册"
             },
             "password": {
                 "required": "密码不能为空",
@@ -2030,7 +3175,12 @@
     "common": {
         "ui": {
             "close": "关闭",
-            "dismiss": "忽略"
+            "dismiss": "关闭",
+            "selectLanguage": "选择语言",
+            "increment": "增加",
+            "decrement": "减少",
+            "yes": "是",
+            "no": "否"
         },
         "theme": {
             "toggle": "切换主题",

@@ -42,6 +42,7 @@ import { PromptFacadeService } from '../facades/prompt.facade';
 export interface FacadeBindingContext {
     readonly directoryId: string;
     readonly userId: string;
+    readonly aiModelOverride?: string;
     readonly providerOverrides?: {
         readonly ai?: string;
         readonly search?: string;
@@ -78,6 +79,7 @@ export class PipelineFacadeService {
     createStepExecutionContext(
         directory: DirectoryReference,
         providerOverrides?: GenerationRequest['providers'],
+        aiModelOverride?: string,
         signal?: AbortSignal,
     ): StepExecutionContext {
         const stepLogger: StepLogger = {
@@ -102,6 +104,7 @@ export class PipelineFacadeService {
         const facadeContext: FacadeBindingContext = {
             directoryId: directory.id,
             userId: directory.user.id,
+            aiModelOverride,
             providerOverrides,
         };
 
@@ -133,17 +136,40 @@ export class PipelineFacadeService {
                 options: AskJsonOptions<Template> | undefined,
                 _facadeOptions: FacadeOptions,
             ): Promise<AskJsonResponse<T>> =>
-                facade.askJson(promptTemplate, schema as any, options, boundFacadeOptions),
+                facade.askJson(
+                    promptTemplate,
+                    schema as any,
+                    {
+                        ...options,
+                        routing: {
+                            ...options?.routing,
+                            modelOverride: options?.routing?.modelOverride ?? ctx.aiModelOverride,
+                        },
+                    },
+                    boundFacadeOptions,
+                ),
             createChatCompletion: (
                 options: ChatCompletionOptions,
                 _facadeOptions: FacadeOptions,
             ): Promise<ChatCompletionResponse> =>
-                facade.createChatCompletion(options, boundFacadeOptions),
+                facade.createChatCompletion(
+                    {
+                        ...options,
+                        model: options.model ?? ctx.aiModelOverride,
+                    },
+                    boundFacadeOptions,
+                ),
             createStreamingChatCompletion: (
                 options: ChatCompletionOptions,
                 _facadeOptions: FacadeOptions,
             ): AsyncGenerator<ChatCompletionChunk> =>
-                facade.createStreamingChatCompletion(options, boundFacadeOptions),
+                facade.createStreamingChatCompletion(
+                    {
+                        ...options,
+                        model: options.model ?? ctx.aiModelOverride,
+                    },
+                    boundFacadeOptions,
+                ),
             isConfigured: () => facade.isConfigured(),
             testConnection: (_facadeOptions: FacadeOptions) =>
                 facade.testConnection(boundFacadeOptions),
@@ -151,6 +177,8 @@ export class PipelineFacadeService {
                 facade.getAvailableModels(boundFacadeOptions),
             getProviderConfig: (_facadeOptions: FacadeOptions) =>
                 facade.getProviderConfig(boundFacadeOptions),
+            resolveModelMetadata: (modelId: string, _facadeOptions: FacadeOptions) =>
+                facade.resolveModelMetadata(modelId, boundFacadeOptions),
             resolveModelContextLength: (modelId: string, _facadeOptions: FacadeOptions) =>
                 facade.resolveModelContextLength(modelId, boundFacadeOptions),
         };

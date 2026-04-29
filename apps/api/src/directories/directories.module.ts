@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { DistributedTaskLockService } from '@ever-works/agent/cache';
 import { DirectoryModule } from '@ever-works/agent/services';
 import { DatabaseModule } from '@ever-works/agent/database';
 import { AuthModule } from '@src/auth';
@@ -40,6 +41,7 @@ import { DirectoryCacheWarmupService } from './tasks/directory-cache-warmup.serv
         ComparisonSchedulerService,
         ItemSourceValidationCronService,
         DirectoryCacheWarmupService,
+        DistributedTaskLockService,
     ],
     controllers: [DirectoriesController, MembersController],
 })

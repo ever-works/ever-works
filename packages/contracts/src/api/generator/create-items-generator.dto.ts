@@ -10,6 +10,8 @@ export interface CreateItemsGeneratorDto {
 	name: string;
 	/** Generation prompt */
 	prompt: string;
+	/** Optional AI model override */
+	model?: string;
 	/** Method for generation (create-update or recreate) */
 	generation_method?: GenerationMethod;
 	/** Whether to update with pull request */
@@ -26,6 +28,8 @@ export interface CreateItemsGeneratorDto {
  * DTO for updating items generator configuration
  */
 export interface UpdateItemsGeneratorDto {
+	/** Optional AI model override */
+	model?: string;
 	/** Method for generation (create-update or recreate) */
 	generation_method?: GenerationMethod;
 	/** Whether to update with pull request */

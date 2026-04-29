@@ -74,4 +74,36 @@ describe('DataRepository', () => {
 
         await fs.rm(repoDir, { recursive: true, force: true });
     });
+
+    it('does not treat works.yml as data config when config.yml is missing', async () => {
+        const repoDir = await fs.mkdtemp(path.join(os.tmpdir(), 'data-repository-spec-'));
+
+        await fs.mkdir(path.join(repoDir, 'data'), { recursive: true });
+        await Promise.all([
+            fs.writeFile(path.join(repoDir, 'works.yml'), 'name: Compare Cloud Pricing\n', 'utf-8'),
+            fs.writeFile(path.join(repoDir, 'categories.yml'), '[]\n', 'utf-8'),
+            fs.writeFile(path.join(repoDir, 'tags.yml'), '[]\n', 'utf-8'),
+            fs.writeFile(path.join(repoDir, 'collections.yml'), '[]\n', 'utf-8'),
+        ]);
+
+        const repository = await DataRepository.create(repoDir);
+
+        await expect(repository.getConfig()).resolves.not.toMatchObject({
+            name: 'Compare Cloud Pricing',
+        });
+
+        await repository.writeConfig({
+            name: 'Generated Config',
+            version: 1,
+        } as any);
+
+        await expect(fs.readFile(path.join(repoDir, 'works.yml'), 'utf-8')).resolves.toBe(
+            'name: Compare Cloud Pricing\n',
+        );
+        await expect(fs.readFile(path.join(repoDir, 'config.yml'), 'utf-8')).resolves.toContain(
+            'name: Generated Config',
+        );
+
+        await fs.rm(repoDir, { recursive: true, force: true });
+    });
 });

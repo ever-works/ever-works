@@ -57,10 +57,11 @@ export class UpdateWebsiteSubCommand extends CommandRunner {
             console.log(chalk.gray('  • Maintain your existing customizations'));
             console.log(chalk.gray('  • Push updates to the repository'));
 
-            const websiteRepo = `${directory.slug}-website`;
+            const websiteOwner = directory.getRepoOwner('website');
+            const websiteRepo = directory.getWebsiteRepo();
             console.log(
                 chalk.gray('\nTarget repository:'),
-                chalk.white(`${directory.getRepoOwner()}/${websiteRepo}`),
+                chalk.white(`${websiteOwner}/${websiteRepo}`),
             );
 
             const confirmed = await inquirer.prompt([

@@ -28,7 +28,7 @@ import type {
 import { buildSuccessPipelineResult, substituteVariables } from '@ever-works/plugin';
 import { collectMetadataFromItems, createItemLookupIndex, isItemDuplicate } from '@ever-works/plugin';
 
-import type { AgentPipelineStepId, TokenUsageBreakdown } from './types.js';
+import type { AgentPipelineStepId, TokenUsageBreakdown, AgentTokenUsage } from './types.js';
 import {
 	AGENT_PIPELINE_STEP_IDS,
 	DEFAULT_MAX_STEPS,
@@ -286,6 +286,13 @@ export class AgentPipelinePlugin implements IPlugin, IPipelinePlugin<AgentPipeli
 			this.setState('generate-items', 'completed');
 			this.emitLog(onLogEntry, 'step_completed', 'Generate Items', 1);
 
+			const totalCost = await this.calculateGenerationCost(
+				execContext,
+				facadeOptions,
+				providerConfig,
+				tokenUsage
+			);
+
 			// ── Step 3: Collect Results ────────────────────────────────
 			this.setState('collect-results', 'running');
 			reportProgress(onProgress, 2, 82, 'Collect Results');
@@ -327,7 +334,7 @@ export class AgentPipelinePlugin implements IPlugin, IPipelinePlugin<AgentPipeli
 			reportProgress(onProgress, 5, 100, 'Complete');
 			this.state = finalizeCompletedState(this.state!);
 
-			return this.buildSuccessResult(items, metadata, startTime, warnings, tokenUsage);
+			return this.buildSuccessResult(items, metadata, startTime, warnings, tokenUsage, totalCost);
 		} catch (error) {
 			const err = error instanceof Error ? error : new Error(String(error));
 			logger.error(`Agent pipeline failed: ${err.message}`);
@@ -380,11 +387,23 @@ export class AgentPipelinePlugin implements IPlugin, IPipelinePlugin<AgentPipeli
 		if (!providerConfig.baseUrl || !providerConfig.apiKey) {
 			return { providerConfig: null, modelName: null };
 		}
-		const modelName = providerConfig.routing.complexModel || providerConfig.defaultModel;
+		const { parentModelName } = this.getExecutionModelNames(providerConfig);
+		const modelName = parentModelName;
 		if (!modelName) {
 			return { providerConfig, modelName: null };
 		}
 		return { providerConfig, modelName };
+	}
+
+	private getExecutionModelNames(
+		providerConfig: Awaited<
+			ReturnType<NonNullable<PipelineExecutionOptions['execContext']>['aiFacade']['getProviderConfig']>
+		>
+	): { parentModelName: string | null; workerModelName: string | null } {
+		return {
+			parentModelName: providerConfig.routing.complexModel || providerConfig.defaultModel || null,
+			workerModelName: providerConfig.defaultModel || providerConfig.routing.complexModel || null
+		};
 	}
 
 	private async queryDataSources(
@@ -441,8 +460,7 @@ export class AgentPipelinePlugin implements IPlugin, IPipelinePlugin<AgentPipeli
 		onLogEntry?: PipelineExecutionOptions['onLogEntry']
 	): Promise<{ warnings: string[]; tokenUsage: TokenUsageBreakdown }> {
 		// Two-model resolution: parent (orchestrator) and worker (extraction)
-		const parentModelName = providerConfig.routing.complexModel || providerConfig.defaultModel;
-		const workerModelName = providerConfig.defaultModel || providerConfig.routing.complexModel;
+		const { parentModelName, workerModelName } = this.getExecutionModelNames(providerConfig);
 
 		if (!parentModelName || !workerModelName) {
 			throw new Error('AI model configuration error: both parent and worker models required');
@@ -651,6 +669,51 @@ export class AgentPipelinePlugin implements IPlugin, IPipelinePlugin<AgentPipeli
 		return { warnings, tokenUsage };
 	}
 
+	private async calculateGenerationCost(
+		execContext: NonNullable<PipelineExecutionOptions['execContext']>,
+		facadeOptions: FacadeOptions,
+		providerConfig: Awaited<
+			ReturnType<NonNullable<PipelineExecutionOptions['execContext']>['aiFacade']['getProviderConfig']>
+		>,
+		tokenUsage: TokenUsageBreakdown
+	): Promise<number | undefined> {
+		const { parentModelName, workerModelName } = this.getExecutionModelNames(providerConfig);
+		if (!parentModelName || !workerModelName) {
+			return undefined;
+		}
+
+		const [parentModel, workerModel] = await Promise.all([
+			execContext.aiFacade.resolveModelMetadata(parentModelName, facadeOptions),
+			parentModelName === workerModelName
+				? Promise.resolve(null)
+				: execContext.aiFacade.resolveModelMetadata(workerModelName, facadeOptions)
+		]);
+
+		const parentCost = this.calculateModelUsageCost(parentModel, tokenUsage.parent);
+		const workerCost = this.calculateModelUsageCost(
+			parentModelName === workerModelName ? parentModel : workerModel,
+			tokenUsage.workers
+		);
+		const totalCost = [parentCost, workerCost].reduce<number>((sum, cost) => sum + (cost ?? 0), 0);
+
+		return totalCost > 0 ? totalCost : undefined;
+	}
+
+	private calculateModelUsageCost(
+		model: Awaited<
+			ReturnType<NonNullable<PipelineExecutionOptions['execContext']>['aiFacade']['resolveModelMetadata']>
+		>,
+		usage: AgentTokenUsage
+	): number | null {
+		if (typeof model?.inputCostPer1k !== 'number' || typeof model?.outputCostPer1k !== 'number') {
+			return null;
+		}
+
+		const inputCost = (usage.inputTokens * model.inputCostPer1k) / 1000;
+		const outputCost = (usage.outputTokens * model.outputCostPer1k) / 1000;
+		return inputCost + outputCost;
+	}
+
 	private async collectAndMergeResults(
 		workspacePath: string,
 		dataSourceItems: MutableItemData[],
@@ -802,7 +865,8 @@ export class AgentPipelinePlugin implements IPlugin, IPipelinePlugin<AgentPipeli
 		metadata: ReturnType<typeof collectMetadataFromItems>,
 		startTime: number,
 		warnings?: string[],
-		tokenUsage?: TokenUsageBreakdown
+		tokenUsage?: TokenUsageBreakdown,
+		totalCost?: number
 	): PipelineResult {
 		const duration = Date.now() - startTime;
 		return buildSuccessPipelineResult(
@@ -814,7 +878,7 @@ export class AgentPipelinePlugin implements IPlugin, IPipelinePlugin<AgentPipeli
 				collections: metadata.collections
 			},
 			{
-				metrics: buildMetrics(startTime, duration, items.length, tokenUsage),
+				metrics: buildMetrics(startTime, duration, items.length, tokenUsage, totalCost),
 				duration,
 				stepsCompleted: AGENT_PIPELINE_STEP_IDS.length,
 				totalSteps: AGENT_PIPELINE_STEP_IDS.length,

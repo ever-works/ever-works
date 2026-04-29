@@ -23,6 +23,7 @@ export interface TokenUsageBreakdown {
 // Extended PipelineMetrics with token usage
 export interface AgentPipelineMetrics extends PipelineMetrics {
 	tokenUsage?: TokenUsageBreakdown;
+	totalCost?: number;
 }
 
 // Mutable accumulator — created once per execution, passed to all workers

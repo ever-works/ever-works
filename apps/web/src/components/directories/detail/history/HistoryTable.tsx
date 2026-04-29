@@ -150,28 +150,28 @@ export function HistoryTable({ entries, locale }: HistoryTableProps) {
                 <table className="min-w-[700px] w-full divide-y divide-border dark:divide-border-dark">
                     <thead className="bg-muted/50 dark:bg-muted/20">
                         <tr>
-                            <th className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wider text-text-muted dark:text-text-muted-dark">
+                            <th className="px-3 py-3 text-left text-[11px] font-semibold uppercase tracking-wider text-text-muted dark:text-text-muted-dark">
                                 {t('table.run')}
                             </th>
-                            <th className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wider text-text-muted dark:text-text-muted-dark">
+                            <th className="px-3 py-3 text-left text-[11px] font-semibold uppercase tracking-wider text-text-muted dark:text-text-muted-dark">
                                 {t('table.startedAt')}
                             </th>
-                            <th className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wider text-text-muted dark:text-text-muted-dark">
+                            <th className="px-3 py-3 text-left text-[11px] font-semibold uppercase tracking-wider text-text-muted dark:text-text-muted-dark">
                                 {t('table.duration')}
                             </th>
-                            <th className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wider text-text-muted dark:text-text-muted-dark">
+                            <th className="px-3 py-3 text-left text-[11px] font-semibold uppercase tracking-wider text-text-muted dark:text-text-muted-dark">
                                 {t('table.newItems')}
                             </th>
-                            <th className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wider text-text-muted dark:text-text-muted-dark">
+                            <th className="px-3 py-3 text-left text-[11px] font-semibold uppercase tracking-wider text-text-muted dark:text-text-muted-dark">
                                 {t('table.updatedItems')}
                             </th>
-                            <th className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wider text-text-muted dark:text-text-muted-dark">
+                            <th className="px-3 py-3 text-left text-[11px] font-semibold uppercase tracking-wider text-text-muted dark:text-text-muted-dark">
                                 {t('table.totalItems')}
                             </th>
-                            <th className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wider text-text-muted dark:text-text-muted-dark">
+                            <th className="px-3 py-3 text-left text-[11px] font-semibold uppercase tracking-wider text-text-muted dark:text-text-muted-dark">
                                 {t('table.tokens')}
                             </th>
-                            {/* <th className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wider text-text-muted dark:text-text-muted-dark">
+                            {/* <th className="px-3 py-3 text-left text-[11px] font-semibold uppercase tracking-wider text-text-muted dark:text-text-muted-dark">
                             {t('table.cost')}
                         </th> */}
                         </tr>
@@ -225,7 +225,7 @@ export function HistoryTable({ entries, locale }: HistoryTableProps) {
                                                     ) : (
                                                         <span className="w-5" />
                                                     )}
-                                                    <div className="flex flex-col gap-2">
+                                                    <div className="flex flex-col gap-2 items-start">
                                                         <span
                                                             className={cn(
                                                                 'inline-flex w-fit items-center rounded-full px-2.5 py-0.5 text-[11px] font-medium capitalize',

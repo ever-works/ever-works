@@ -4,10 +4,11 @@
     "private": true,
     "scripts": {
         "dev": "next dev --turbopack",
-        "build": "next build",
+        "build": "next build --webpack",
         "start": "next start",
         "lint": "npx eslint .",
         "format": "prettier --write \"**/*.{ts,tsx,jsx,json,css,md}\"",
+        "translate:messages": "node scripts/translate-messages.mjs",
         "test:e2e": "npx playwright test",
         "test:e2e:ui": "npx playwright test --ui",
         "test:e2e:headed": "npx playwright test --headed",

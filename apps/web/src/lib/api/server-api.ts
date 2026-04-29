@@ -9,6 +9,7 @@ export class ApiResponseError extends Error {
         message: string,
         public readonly statusCode: number,
         public readonly code?: string,
+        public readonly details?: Record<string, unknown>,
     ) {
         super(message);
         this.name = 'ApiResponseError';
@@ -85,6 +86,7 @@ export async function serverFetch<T>(
     if (!response.ok) {
         let errorMessage: string | null = null;
         let errorCode: string | undefined;
+        let errorDetails: Record<string, unknown> | undefined;
         try {
             const errorData = await response.json();
             const hasStructuredError =
@@ -92,6 +94,10 @@ export async function serverFetch<T>(
                 typeof errorData === 'object' &&
                 !Array.isArray(errorData) &&
                 Object.keys(errorData).length > 0;
+
+            if (hasStructuredError) {
+                errorDetails = errorData as Record<string, unknown>;
+            }
 
             // Only log unexpected errors — 404s are expected for missing resources
             if (response.status !== 404 && hasStructuredError) {
@@ -130,12 +136,18 @@ export async function serverFetch<T>(
                 errorMessage || t('unauthorizedLogin'),
                 response.status,
                 errorCode,
+                errorDetails,
             );
         }
 
         // Handle forbidden errors
         if (response.status === 403) {
-            throw new ApiResponseError(errorMessage || t('forbidden'), response.status, errorCode);
+            throw new ApiResponseError(
+                errorMessage || t('forbidden'),
+                response.status,
+                errorCode,
+                errorDetails,
+            );
         }
 
         const apiErro = t('apiError', {
@@ -143,7 +155,12 @@ export async function serverFetch<T>(
             statusText: response.statusText,
         });
 
-        throw new ApiResponseError(errorMessage || apiErro, response.status, errorCode);
+        throw new ApiResponseError(
+            errorMessage || apiErro,
+            response.status,
+            errorCode,
+            errorDetails,
+        );
     }
 
     const text = await response.text();

@@ -2,51 +2,52 @@
     "auth": {
         "error": {
             "title": "인증 오류",
-            "subtitle": "사용자 인증에 문제가 발생했습니다",
+            "subtitle": "인증 과정에서 문제가 발생했습니다",
             "errorOccurred": "오류가 발생했습니다",
             "somethingWentWrong": "문제가 발생했습니다",
-            "generic": "예기치 않은 오류가 발생했습니다. 나중에 다시 시도해 주세요.",
-            "invalidCredentials": "이메일 또는 비밀번호가 올바르지 않습니다.",
-            "emailNotVerified": "로그인하기 전에 이메일 주소를 인증해 주세요.",
+            "generic": "예상치 못한 오류가 발생했습니다. 나중에 다시 시도해 주세요.",
+            "invalidCredentials": "입력한 이메일 또는 비밀번호가 올바르지 않습니다.",
+            "emailNotVerified": "로그인하기 전에 이메일 주소를 확인해 주세요.",
             "accountLocked": "보안상의 이유로 계정이 잠겼습니다.",
             "sessionExpired": "세션이 만료되었습니다. 다시 로그인해 주세요.",
             "networkError": "연결할 수 없습니다. 인터넷 연결을 확인해 주세요.",
             "oauth": {
-                "missingCode": "인증 코드가 없습니다. 다시 로그인해 주세요.",
-                "invalidState": "인증 상태가 유효하지 않습니다. 다시 로그인해 주세요.",
-                "unsupportedProvider": "이 인증 제공자는 지원되지 않습니다.",
-                "callbackFailed": "인증을 완료하지 못했습니다. 다시 시도해 주세요."
+                "missingCode": "인증 코드가 누락되었습니다. 다시 로그인해 주세요.",
+                "invalidState": "잘못된 인증 상태입니다. 다시 로그인해 주세요.",
+                "unsupportedProvider": "이 인증 제공자를 지원하지 않습니다.",
+                "providerConflict": "이 제공자 계정이 이미 다른 사용자와 연결되어 있습니다. 다른 계정을 사용하거나 예상치 못한 경우 지원팀에 문의해 주세요.",
+                "callbackFailed": "인증 완료에 실패했습니다. 다시 시도해 주세요."
             },
             "resetPassword": {
-                "missingToken": "비밀번호 재설정 링크가 유효하지 않습니다. 확인 토큰이 없습니다.",
+                "missingToken": "비밀번호 재설정 링크가 유효하지 않습니다. 검증 토큰이 누락되었습니다.",
                 "invalidToken": "비밀번호 재설정 링크가 유효하지 않거나 변조되었습니다.",
                 "expiredToken": "비밀번호 재설정 링크가 만료되었습니다. 새로 요청해 주세요.",
-                "failed": "비밀번호 재설정에 실패했습니다. 다시 시도하거나 새 재설정 링크를 요청해 주세요."
+                "failed": "비밀번호 재설정을 실패했습니다. 다시 시도하거나 새 재설정 링크를 요청해 주세요."
             },
             "verifyEmail": {
-                "missingToken": "이메일 인증 링크가 유효하지 않습니다. 확인 토큰이 없습니다.",
-                "invalidToken": "이메일 인증 링크가 유효하지 않거나 이미 사용되었습니다.",
-                "expiredToken": "이메일 인증 링크가 만료되었습니다. 새로 요청해 주세요.",
-                "failed": "이메일 인증에 실패했습니다. 다시 시도하거나 새 인증 링크를 요청해 주세요."
+                "missingToken": "이메일 확인 링크가 유효하지 않습니다. 검증 토큰이 누락되었습니다.",
+                "invalidToken": "이메일 확인 링크가 유효하지 않거나 이미 사용되었습니다.",
+                "expiredToken": "이메일 확인 링크가 만료되었습니다. 새로 요청해 주세요.",
+                "failed": "이메일 확인에 실패했습니다. 다시 시도하거나 새 확인 링크를 요청해 주세요."
             },
             "authorize": {
                 "invalidRedirectUrl": "리디렉션 URL이 유효하지 않거나 허용되지 않습니다. 오류라고 생각되면 지원팀에 문의해 주세요."
             },
             "actions": {
                 "backToLogin": "로그인으로 돌아가기",
-                "tryRegister": "회원가입 시도하기",
-                "resendVerification": "인증 이메일 재전송",
-                "contactSupport": "지원팀에 문의",
+                "tryRegister": "회원가입 시도",
+                "resendVerification": "확인 이메일 재전송",
+                "contactSupport": "지원팀 문의",
                 "requestNewReset": "새 재설정 링크 요청"
             },
-            "helpText": "문제가 지속되면 아래 도움말 자료를 확인해 주세요.",
+            "helpText": "문제가 계속 발생하면 아래 도움말 자료를 확인해 주세요.",
             "links": {
-                "help": "고객센터",
+                "help": "도움말 센터",
                 "systemStatus": "시스템 상태"
             }
         },
         "login": {
-            "title": "다시 오신 것을 환영합니다",
+            "title": "환영합니다",
             "subtitle": "계속하려면 계정에 로그인하세요",
             "form": {
                 "email": {
@@ -55,15 +56,15 @@
                 },
                 "password": {
                     "label": "비밀번호",
-                    "placeholder": "비밀번호를 입력하세요"
+                    "placeholder": "비밀번호 입력"
                 },
                 "forgotPassword": "비밀번호를 잊으셨나요?",
-                "rememberMe": "30일 동안 기억하기",
+                "rememberMe": "30일간 나를 기억하기",
                 "submit": "로그인",
                 "submitting": "로그인 중..."
             },
             "socialLogin": {
-                "divider": "또는 다음으로 계속하기",
+                "divider": "또는 다음으로 계속",
                 "google": "Google",
                 "github": "GitHub"
             },
@@ -72,33 +73,33 @@
                 "link": "회원가입"
             },
             "errors": {
-                "invalidCredentials": "이메일 또는 비밀번호가 올바르지 않습니다"
+                "invalidCredentials": "잘못된 이메일 또는 비밀번호"
             },
             "passwordReset": {
                 "success": "비밀번호 재설정 성공!",
-                "canLogin": "이제 새 비밀번호로 로그인할 수 있습니다."
+                "canLogin": "새 비밀번호로 로그인할 수 있습니다."
             }
         },
         "forgotPassword": {
             "title": "비밀번호를 잊으셨나요?",
-            "subtitle": "걱정 마세요, 재설정 안내를 보내드리겠습니다",
-            "successTitle": "이메일을 확인하세요",
-            "successSubtitle": "비밀번호 재설정 안내를 보내드렸습니다",
+            "subtitle": "걱정 마세요, 재설정 지침을 보내드리겠습니다",
+            "successTitle": "이메일 확인",
+            "successSubtitle": "비밀번호 재설정 지침을 보냈습니다",
             "form": {
                 "email": {
                     "label": "이메일 주소",
-                    "placeholder": "이메일을 입력하세요"
+                    "placeholder": "이메일 입력"
                 },
                 "submit": "재설정 링크 보내기",
                 "submitting": "전송 중..."
             },
             "success": {
                 "title": "이메일 전송 성공",
-                "message": "{email}로 비밀번호 재설정 안내를 보내드렸습니다",
-                "checkSpam": "이메일이 보이지 않으면 스팸 폴더를 확인해 주세요."
+                "message": "비밀번호 재설정 지침을 {email}로 보냈습니다",
+                "checkSpam": "이메일을 받지 못했다면 스팸 폴더를 확인해 주세요."
             },
             "errors": {
-                "failed": "재설정 이메일 전송에 실패했습니다. 다시 시도해 주세요."
+                "failed": "재설정 이메일 전송 실패. 다시 시도해 주세요."
             },
             "backToLogin": "로그인으로 돌아가기",
             "noAccount": {
@@ -108,24 +109,24 @@
         },
         "resetPassword": {
             "title": "비밀번호 재설정",
-            "subtitle": "새 비밀번호를 아래에 입력하세요",
+            "subtitle": "아래에 새 비밀번호 입력",
             "successTitle": "비밀번호 재설정 성공",
             "successSubtitle": "비밀번호가 업데이트되었습니다",
             "form": {
                 "password": {
                     "label": "새 비밀번호",
-                    "placeholder": "새 비밀번호를 입력하세요",
+                    "placeholder": "새 비밀번호 입력",
                     "helperText": "최소 6자 이상, 소문자 및 숫자/특수문자 포함",
                     "errors": {
-                        "minLength": "비밀번호는 최소 6자 이상이어야 합니다",
-                        "lowercase": "비밀번호에 최소 하나의 소문자가 포함되어야 합니다",
-                        "numberOrSpecial": "비밀번호에 최소 하나의 숫자나 특수문자가 포함되어야 합니다",
-                        "cannotStartWith": "비밀번호는 점이나 줄바꿈으로 시작할 수 없습니다"
+                        "minLength": "비밀번호는 최소 6자여야 합니다",
+                        "lowercase": "비밀번호는 최소 하나의 소문자를 포함해야 합니다",
+                        "numberOrSpecial": "비밀번호는 최소 하나의 숫자 또는 특수문자를 포함해야 합니다",
+                        "cannotStartWith": "비밀번호는 점이나 개행으로 시작할 수 없습니다"
                     }
                 },
                 "confirmPassword": {
                     "label": "새 비밀번호 확인",
-                    "placeholder": "새 비밀번호를 확인하세요",
+                    "placeholder": "새 비밀번호 확인",
                     "errors": {
                         "noMatch": "비밀번호가 일치하지 않습니다"
                     }
@@ -135,25 +136,25 @@
             },
             "success": {
                 "title": "비밀번호 재설정 성공",
-                "message": "비밀번호가 성공적으로 업데이트되었습니다. 이제 새 비밀번호로 로그인할 수 있습니다.",
+                "message": "비밀번호가 성공적으로 업데이트되었습니다. 새 비밀번호로 로그인할 수 있습니다.",
                 "loginButton": "로그인으로 이동"
             },
             "errors": {
-                "failed": "비밀번호 재설정에 실패했습니다. 다시 시도하거나 새 재설정 링크를 요청해 주세요.",
-                "noToken": "유효하지 않은 재설정 링크",
-                "invalidLink": "유효하지 않은 재설정 링크",
+                "failed": "비밀번호 재설정 실패. 다시 시도하거나 새 재설정 링크를 요청해 주세요.",
+                "noToken": "잘못된 재설정 링크",
+                "invalidLink": "잘못된 재설정 링크",
                 "missingTokenMessage": "비밀번호 재설정 링크가 유효하지 않거나 불완전합니다. 새 비밀번호 재설정을 요청해 주세요.",
                 "requestNewLink": "새 재설정 링크 요청"
             },
             "backToLogin": "로그인으로 돌아가기"
         },
         "register": {
-            "title": "계정 만들기",
-            "subtitle": "지금 바로 놀라운 디렉토리를 구축하세요",
+            "title": "계정 생성",
+            "subtitle": "오늘 놀라운 디렉토리를 만들기 시작하세요",
             "form": {
                 "name": {
                     "label": "전체 이름",
-                    "placeholder": "홍길동"
+                    "placeholder": "John Doe"
                 },
                 "email": {
                     "label": "이메일 주소",
@@ -161,24 +162,24 @@
                 },
                 "password": {
                     "label": "비밀번호",
-                    "placeholder": "강력한 비밀번호를 만드세요",
+                    "placeholder": "강력한 비밀번호 생성",
                     "hint": "최소 8자 이상이어야 합니다"
                 },
                 "confirmPassword": {
                     "label": "비밀번호 확인",
-                    "placeholder": "비밀번호를 확인하세요"
+                    "placeholder": "비밀번호 확인"
                 },
                 "terms": {
-                    "text": "다음에 동의합니다",
-                    "termsLink": "서비스 이용약관",
+                    "text": "다음에 동의합니다:",
+                    "termsLink": "이용 약관",
                     "and": "및",
                     "privacyLink": "개인정보 처리방침"
                 },
-                "submit": "계정 만들기",
+                "submit": "계정 생성",
                 "submitting": "계정 생성 중..."
             },
             "socialSignUp": {
-                "divider": "또는 다음으로 가입하기",
+                "divider": "또는 다음으로 가입",
                 "google": "Google",
                 "github": "GitHub"
             },
@@ -188,126 +189,595 @@
             },
             "errors": {
                 "passwordsDoNotMatch": "비밀번호가 일치하지 않습니다",
-                "passwordTooShort": "비밀번호는 최소 8자 이상이어야 합니다",
+                "passwordTooShort": "비밀번호는 최소 8자여야 합니다",
                 "generic": "오류가 발생했습니다. 다시 시도해 주세요."
+            }
+        }
+    },
+    "onboarding": {
+        "label": "시작하기",
+        "title": "Ever Works에 오신 것을 환영합니다",
+        "subtitle": "몇 분 만에 첫 번째 디렉토리를 빌드하고 게시하세요.",
+        "skipButton": "지금은 건너뛰기",
+        "nextButton": "다음",
+        "stepIndex": "단계 {index}",
+        "steps": {
+            "welcome": {
+                "title": "Ever Works란 무엇인가요?",
+                "description": "Ever Works는 오픈 소스 디렉토리 빌더입니다. 도구, 채용, 링크, 제품 등의 구조화된 콘텐츠 디렉토리를 생성하고 라이브 웹사이트로 게시하세요.",
+                "detail": "설정을 시작해 보세요. 아래에서 제공자를 연결한 후 첫 번째 디렉토리를 생성하세요.",
+                "feature1": {
+                    "title": "AI 기반 콘텐츠",
+                    "description": "AI 제공자를 사용하여 디렉토리 항목을 자동으로 생성하고 풍부하게 만드세요."
+                },
+                "feature2": {
+                    "title": "즉시 게시",
+                    "description": "한 번의 클릭으로 Vercel에 배포하세요 — 서버 구성이 필요 없습니다."
+                },
+                "feature3": {
+                    "title": "Git 기반",
+                    "description": "모든 디렉토리는 사용자가 소유하고 제어하는 GitHub 저장소입니다."
+                }
+            },
+            "directory": {
+                "title": "첫 번째 디렉토리 생성",
+                "description": "디렉토리는 콘텐츠 허브입니다. 항목을 추가하고 레이아웃을 구성한 후 한 번의 클릭으로 게시하세요.",
+                "detail": "모든 설정이 완료되었습니다! 콘텐츠를 빌드하고 게시하기 위해 첫 번째 디렉토리를 생성하세요.",
+                "action": "디렉토리 생성"
+            },
+            "publish": {
+                "title": "라이브로 전환",
+                "description": "Vercel 또는 GitHub를 연결하여 디렉토리를 공개 웹사이트로 배포하세요 — 호스팅 구성이 필요 없습니다.",
+                "action": "게시 설정"
+            }
+        },
+        "pluginStep": {
+            "saveButton": "설정 저장",
+            "savedSuccess": "설정이 저장되었습니다.",
+            "noSettings": "이 플러그인에 대한 구성 불필요.",
+            "getTokenPrompt": "먼저 토큰을 생성한 후 아래에 붙여넣고 저장하여 연결을 확인하세요.",
+            "loadingStatus": "연결 상태 로딩 중..."
+        },
+        "plugins": {
+            "byokDescription": "자신의 키를 연결하여 전체 구성을 해제하세요.",
+            "byokDefaultButton": "자신의 키 가져오기",
+            "setupTokenDescription": "먼저 토큰을 생성한 후 아래에 붙여넣고 저장하여 연결을 확인하세요.",
+            "wizard": {
+                "setupLabel": "설정",
+                "back": "이전",
+                "continue": "계속",
+                "errors": {
+                    "loadStatus": "디바이스 인증 상태 로드 실패.",
+                    "start": "디바이스 인증 시작 실패."
+                },
+                "steps": {
+                    "configure": {
+                        "title": "구성",
+                        "description": "{pluginName} 설정 구성."
+                    },
+                    "credentials": {
+                        "title": "자격 증명",
+                        "description": "{pluginName} 자격 증명 구성."
+                    },
+                    "verify": {
+                        "title": "확인",
+                        "description": "설정 저장 및 연결 확인.",
+                        "cardTitle": "연결 확인",
+                        "cardDescription": "현재 설정을 저장하고 플러그인 연결 검증을 실행하세요.",
+                        "action": "저장 및 확인",
+                        "successDefault": "연결이 성공적으로 확인되었습니다."
+                    }
+                },
+                "authModes": {
+                    "apiKey": {
+                        "eyebrow": "사용자 범위",
+                        "title": "API 키",
+                        "description": "이 플러그인에 사용자 범위 API 키를 사용하세요."
+                    },
+                    "deviceAuth": {
+                        "eyebrow": "사용자 범위",
+                        "title": "디바이스 인증",
+                        "description": "이 플러그인에 대한 디바이스 코드 흐름을 시작하고 브라우저에서 완료하세요."
+                    }
+                },
+                "deviceAuth": {
+                    "badges": {
+                        "connected": "연결됨",
+                        "pending": "대기 중"
+                    },
+                    "status": {
+                        "title": "디바이스 인증 상태",
+                        "fallback": "이 플러그인에 대한 디바이스 인증 시작 또는 새로고침.",
+                        "backendHint": "디바이스 인증은 사용자 계정에 대한 관리형 백엔드 작업 공간에 저장됩니다. 동일한 Ever Works 배포에서 완료하고 사용해야 합니다.",
+                        "deviceCode": "디바이스 코드",
+                        "verificationUrl": "확인 URL"
+                    },
+                    "actions": {
+                        "notInstalled": "이 머신에 필요한 CLI가 설치되지 않았습니다.",
+                        "connected": "디바이스 인증 연결됨",
+                        "start": "디바이스 인증 시작",
+                        "restart": "디바이스 인증 재시작",
+                        "refresh": "상태 새로고침"
+                    }
+                }
+            }
+        },
+        "claudeWizard": {
+            "label": "Claude Code 설정",
+            "title": "3단계로 Claude Code 설정",
+            "subtitle": "이 흐름은 권장 구성을 표시 상태로 유지하고 완료 전에 연결을 확인합니다.",
+            "stepIndex": "단계 {index}",
+            "continueButton": "계속",
+            "steps": {
+                "model": {
+                    "title": "모델 선택",
+                    "description": "Sonnet은 품질과 속도의 권장 균형으로 미리 선택되어 있지만, 지원되는 모든 모델로 전환할 수 있습니다."
+                },
+                "credentials": {
+                    "title": "자격 증명 추가",
+                    "description": "Claude Code OAuth 토큰 또는 Anthropic API 키를 붙여넣으세요. 둘 다 작동합니다."
+                },
+                "verify": {
+                    "title": "연결 확인",
+                    "description": "완료 전에 설정을 저장하고 Claude에 대한 실시간 연결 확인을 실행하세요.",
+                    "checkTitle": "실시간 Claude 검증 실행",
+                    "checkDescription": "여기서 저장하면 제공한 자격 증명에 따라 Claude API 또는 CLI 확인을 실행합니다.",
+                    "button": "확인 및 설정 완료",
+                    "successDefault": "Claude 연결 확인됨."
+                }
+            }
+        },
+        "codexWizard": {
+            "label": "Codex 설정",
+            "title": "3단계로 Codex 설정",
+            "subtitle": "이 흐름은 권장 구성을 표시 상태로 유지하고 완료 전에 연결을 확인합니다.",
+            "stepIndex": "단계 {index}",
+            "continueButton": "계속",
+            "steps": {
+                "model": {
+                    "title": "모델 선택",
+                    "description": "엔드투엔드 디렉토리 생성에 실행할 Codex 모델을 선택하세요."
+                },
+                "credentials": {
+                    "title": "자격 증명 추가",
+                    "description": "Codex가 OpenAI API 키 또는 백엔드 머신에서 사용 가능한 Codex CLI 로그인을 사용할지 선택하세요.",
+                    "api": {
+                        "title": "OpenAI API 키",
+                        "description": "Codex 실행에 OpenAI API 키 사용."
+                    },
+                    "local": {
+                        "title": "백엔드 Codex 로그인",
+                        "description": "Ever Works를 실행하는 머신에서 이미 사용 가능한 Codex CLI 세션을 재사용하세요.",
+                        "machineTitle": "백엔드 Codex CLI 인증",
+                        "machineDescription": "이것은 백엔드 머신의 `codex login status`와 로컬 Codex 인증 파일을 확인합니다.",
+                        "connected": "연결됨",
+                        "pending": "대기 중",
+                        "connectButton": "Codex CLI 연결",
+                        "retryButton": "로그인 다시 열기",
+                        "connectedButton": "백엔드 머신에서 연결됨",
+                        "notInstalled": "백엔드 머신에 Codex CLI가 설치되지 않았습니다.",
+                        "codeLabel": "디바이스 코드",
+                        "pathLabel": "인증 파일: {path}",
+                        "error": "Codex CLI 인증 상태 읽기 실패."
+                    }
+                },
+                "verify": {
+                    "title": "연결 확인",
+                    "description": "완료 전에 설정을 저장하고 Codex에 대한 실시간 연결 확인을 실행하세요.",
+                    "checkTitle": "실시간 Codex 검증 실행",
+                    "checkDescription": "여기서 저장하면 인증 구성을 따라 Codex API 키 또는 로컬 CLI 검증을 실행합니다.",
+                    "button": "확인 및 설정 완료",
+                    "successDefault": "Codex 연결 확인됨."
+                }
+            }
+        },
+        "geminiWizard": {
+            "label": "Gemini 설정",
+            "title": "3단계로 Gemini 설정",
+            "subtitle": "이 머신에서 Gemini가 인증하는 방식을 선택한 후 완료 전에 연결을 확인하세요.",
+            "stepIndex": "단계 {index}",
+            "continueButton": "계속",
+            "steps": {
+                "mode": {
+                    "title": "인증 모드 선택",
+                    "description": "이 플러그인이 사용할 Gemini 인증 흐름을 선택하고 동시에 모델을 확인하세요."
+                },
+                "credentials": {
+                    "title": "액세스 구성",
+                    "description": "선택한 Gemini 인증 흐름에 필요한 자격 증명을 추가하세요."
+                },
+                "verify": {
+                    "title": "연결 확인",
+                    "description": "완료 전에 설정을 저장하고 실시간 Gemini 검증을 실행하세요.",
+                    "checkTitle": "실시간 Gemini 검증 실행",
+                    "button": "확인 및 설정 완료",
+                    "successDefault": "Gemini 연결 확인됨."
+                }
+            },
+            "modes": {
+                "api-key": {
+                    "description": "Google AI Studio에서 Gemini API 키를 붙여넣으세요.",
+                    "verifyHint": "여기서 저장하면 선택한 모델에 대해 Gemini API 키를 확인합니다."
+                },
+                "vertex": {
+                    "description": "Gemini가 Vertex AI에 사용할 Google Cloud 프로젝트 세부 정보를 제공하세요.",
+                    "verifyHint": "여기서 저장하면 Vertex AI 구성을 사용하여 실시간 Gemini CLI 검증을 실행합니다."
+                }
+            }
+        },
+        "simWizard": {
+            "label": "SIM AI 설정",
+            "title": "2단계로 SIM AI 설정",
+            "subtitle": "SIM AI API 키를 추가하고 연결을 확인하여 디렉토리 생성을 SIM 워크플로에 위임하세요.",
+            "stepIndex": "단계 {index}",
+            "continueButton": "계속",
+            "steps": {
+                "credentials": {
+                    "title": "API 키 추가",
+                    "description": "대시보드에서 SIM AI API 키를 붙여넣으세요. 셀프 호스팅 인스턴스를 사용하는 경우 사용자 지정 기본 URL을 선택적으로 설정하세요."
+                },
+                "verify": {
+                    "title": "연결 확인",
+                    "description": "API 키를 저장하고 SIM AI에 대한 실시간 연결 확인을 실행하세요.",
+                    "checkTitle": "실시간 SIM AI 검증 실행",
+                    "checkDescription": "여기서 저장하면 API 키가 유효하고 SIM AI에 연결할 수 있는지 확인합니다.",
+                    "button": "확인 및 설정 완료",
+                    "successDefault": "SIM AI 연결 확인됨."
+                }
             }
         }
     },
     "dashboard": {
         "title": "대시보드",
+        "connectGithub": {
+            "title": "GitHub 계정 연결",
+            "description": "디렉토리 저장소를 생성하고 관리하려면 GitHub가 필요합니다. 시작하려면 계정을 연결하세요.",
+            "connect": "GitHub 연결",
+            "dismiss": "나중에 할게요"
+        },
         "toasts": {
             "newUser": {
                 "title": "{companyName}에 오신 것을 환영합니다! 🎉",
-                "description": "계정이 성공적으로 생성되었습니다. 계정을 인증하려면 이메일을 확인해 주세요."
+                "description": "계정이 성공적으로 생성되었습니다. 계정을 확인하려면 이메일을 확인하세요."
             },
             "emailVerification": {
-                "title": "이메일 인증",
-                "description": "인증 링크를 이메일 주소로 보내드렸습니다. 받은편지함과 스팸 폴더를 확인해 주세요.",
+                "title": "이메일 확인",
+                "description": "이메일 주소로 확인 링크를 보냈습니다. 받은편지함과 스팸 폴더를 확인하세요.",
                 "action": "이메일 재전송"
             },
             "verified": {
-                "title": "이메일 인증 성공! ✅",
-                "description": "이메일 주소가 인증되었습니다. 이제 모든 기능을 완전히 이용할 수 있습니다."
+                "title": "이메일이 성공적으로 확인되었습니다! ✅",
+                "description": "이메일 주소가 확인되었습니다. 이제 모든 기능에 완전한 액세스 권한이 있습니다."
             },
             "oauthConnected": {
-                "title": "GitHub 계정 연결됨",
-                "description": "계정이 GitHub에 성공적으로 연결되었습니다.",
-                "defaultProvider": "Git 제공업체"
+                "title": "계정 연결됨",
+                "description": "계정이 {provider}에 성공적으로 연결되었습니다.",
+                "defaultProvider": "Git 제공자"
+            },
+            "oauthConflict": {
+                "title": "제공자 계정이 이미 연결됨",
+                "description": "이 {provider} 계정은 이미 다른 Ever Works 사용자에게 연결되어 있습니다."
+            },
+            "oauthConnectFailed": {
+                "title": "연결 실패",
+                "description": "{provider} 계정을 연결할 수 없습니다. 다시 시도하세요."
             }
         },
         "header": {
             "welcome": "{username}님, 다시 오신 것을 환영합니다!",
             "subtitle": "AI 기반 디렉토리를 관리하고 성능을 추적하세요",
+            "onboarding": {
+                "badge": "온보딩 {currentStep}/{totalSteps}",
+                "dismiss": "온보딩 단축키 숨기기"
+            },
+            "tooltips": {
+                "openSidebar": "사이드바 열기",
+                "help": "도움말 & 문서"
+            },
             "notifications": {
                 "title": "알림",
-                "empty": "새 알림 없음"
+                "empty": "새 알림 없음",
+                "fetchFailed": "알림 로드 실패",
+                "dismissFailed": "알림 삭제 실패"
             },
             "help": {
-                "title": "도움말 및 리소스",
-                "subtitle": "빠른 팁과 유용한 링크",
+                "title": "도움말 & 자료",
+                "subtitle": "시작하는 데 도움이 되는 빠른 팁과 유용한 링크",
+                "onboarding": {
+                    "title": "온보딩",
+                    "description": "언제든지 가이드 설정을 다시 열고 중단한 곳부터 계속할 수 있습니다.",
+                    "action": "온보딩 열기 ({currentStep}/{totalSteps})"
+                },
                 "quickTips": {
                     "title": "빠른 팁",
-                    "tip1": "AI 채팅을 사용하여 자연어로 디렉토리 생성",
-                    "tip2": "기존 awesome 목록이나 데이터 저장소 가져오기",
-                    "tip3": "설정에서 디렉토리 모양 사용자 지정"
+                    "tip1": "대시보드의 '디렉토리 생성' 버튼을 클릭하여 첫 번째 디렉토리를 생성하세요.",
+                    "tip2": "AI 생성기를 사용하여 디렉토리를 관련 항목으로 자동 채우세요.",
+                    "tip3": "GitHub 계정을 연결하여 디렉토리를 저장소로 동기화하고 배포하세요."
                 },
                 "shortcuts": {
                     "title": "키보드 단축키",
-                    "search": "검색",
-                    "newDirectory": "새 디렉토리",
-                    "help": "도움말",
-                    "hint": "?를 눌러 모든 단축키 보기"
+                    "search": "디렉토리 검색",
+                    "newDirectory": "새 디렉토리 생성",
+                    "help": "도움말 열기",
+                    "hint": "Mac에서는 Cmd, Windows/Linux에서는 Ctrl 사용"
                 },
                 "links": {
-                    "title": "유용한 링크",
+                    "title": "자료",
                     "github": "GitHub 저장소",
                     "issues": "문제 보고",
                     "docs": "문서",
                     "comingSoon": "곧 출시"
                 },
-                "version": "버전 {version}"
+                "version": "Ever Works v{version}"
+            }
+        },
+        "activity": {
+            "title": "활동 로그",
+            "subtitle": "디렉토리 전반의 모든 작업 추적",
+            "loading": "로딩 중...",
+            "fetchFailed": "활동 로드 실패",
+            "exportFailed": "활동 로그 내보내기 실패",
+            "showing": "{total}개 중 {from}부터 {to}까지 표시 중",
+            "columns": {
+                "status": "상태",
+                "dateTime": "날짜 / 시간",
+                "directory": "디렉토리",
+                "type": "유형",
+                "summary": "요약"
+            },
+            "filters": {
+                "search": "활동 검색...",
+                "types": {
+                    "allTypes": "모든 유형",
+                    "generation": "생성",
+                    "comparison": "비교",
+                    "deployment": "배포",
+                    "directoryCreated": "디렉토리 생성됨",
+                    "directoryUpdated": "디렉토리 업데이트됨",
+                    "directoryDeleted": "디렉토리 삭제됨",
+                    "pluginEnabled": "플러그인 활성화됨",
+                    "pluginDisabled": "플러그인 비활성화됨",
+                    "pluginConfigured": "플러그인 설정됨",
+                    "memberInvited": "멤버 초대됨",
+                    "memberRoleChanged": "역할 변경됨",
+                    "memberRemoved": "멤버 제거됨",
+                    "scheduleCreated": "스케줄 생성됨",
+                    "scheduleExecuted": "스케줄 실행됨",
+                    "import": "가져오기",
+                    "login": "로그인",
+                    "signup": "가입",
+                    "passwordChanged": "비밀번호 변경됨"
+                },
+                "statuses": {
+                    "allStatuses": "모든 상태",
+                    "pending": "대기 중",
+                    "inProgress": "진행 중",
+                    "completed": "완료",
+                    "failed": "실패"
+                }
+            },
+            "actions": {
+                "export": "CSV 내보내기",
+                "clearFilters": "필터 지우기",
+                "stop": "중지",
+                "stopping": "중지 중...",
+                "stopRequested": "생성 취소 요청됨",
+                "stopFailed": "생성 중지 실패"
+            },
+            "empty": {
+                "title": "아직 활동 없음",
+                "description": "플랫폼을 사용하면 여기에 활동이 표시됩니다.",
+                "noResults": "일치하는 활동 없음",
+                "noResultsDescription": "현재 필터와 일치하는 활동이 없습니다. 검색 또는 필터를 조정해 보세요."
+            },
+            "detail": {
+                "title": "상세 정보",
+                "expand": "상세 정보 펼치기",
+                "collapse": "상세 정보 접기",
+                "event": "이벤트",
+                "action": "작업",
+                "status": "상태",
+                "created": "생성됨",
+                "fields": "상세 정보",
+                "liveLogs": "실시간 로그",
+                "metadata": "메타데이터",
+                "rawJson": "원시 JSON"
+            },
+            "summary": {
+                "generation": {
+                    "withChanges": "{added}개 추가. {changed}개 변경. 총계: {total}",
+                    "noChanges": "항목 변경 없음. 총계: {total}"
+                }
+            },
+            "pagination": {
+                "previous": "이전",
+                "next": "다음",
+                "pageOf": "{page}/{total} 페이지"
             }
         },
         "directories": {
             "title": "디렉토리",
-            "subtitle": "AI 기반 디렉토리를 관리하고 구성하세요",
+            "subtitle": "AI 기반 디렉토리 관리 및 정리",
+            "summary": {
+                "totalDirectories": "총 디렉토리 수",
+                "generating": "생성 중",
+                "totalItems": "총 항목 수"
+            },
             "recent": "최근 디렉토리",
             "viewAll": "모두 보기 ({count})",
             "search": "디렉토리 검색...",
-            "create": "디렉토리 만들기",
+            "create": "디렉토리 생성",
             "showing": "{total}개 디렉토리 중 {current}개 표시 중",
+            "searchFailed": "디렉토리 검색 실패. 다시 시도하세요.",
             "pagination": {
                 "previous": "이전",
                 "next": "다음"
             },
             "empty": {
-                "title": "아직 디렉토리가 없습니다",
-                "description": "첫 번째 AI 기반 디렉토리를 만들어 콘텐츠를 구성하고 선보이세요.",
-                "action": "첫 번째 디렉토리 만들기",
+                "title": "아직 디렉토리 없음",
+                "description": "콘텐츠를 정리하고 보여주기 시작하려면 첫 번째 AI 기반 디렉토리를 생성하세요.",
+                "action": "첫 번째 디렉토리 생성",
                 "notFound": {
-                    "title": "디렉토리를 찾을 수 없습니다",
+                    "title": "디렉토리 찾을 수 없음",
                     "withSearch": "검색어를 조정해 보세요",
-                    "withoutSearch": "첫 번째 AI 기반 디렉토리를 만들어 시작하세요"
+                    "withoutSearch": "시작하려면 첫 번째 AI 기반 디렉토리를 생성하세요"
                 }
             }
         },
         "settings": {
             "title": "설정",
-            "subtitle": "계정 설정과 환경설정을 관리하세요",
+            "subtitle": "계정 설정 및 환경설정을 관리하세요",
             "tabs": {
                 "profile": "프로필",
                 "security": "보안",
-                "apiTokens": "API 및 토큰",
-                "oauth": "연결된 계정",
-                "notifications": "알림",
-                "dangerZone": "위험 구역"
+                "apiKeys": "API 키",
+                "data": "데이터",
+                "gitProviders": "Git 공급자",
+                "dangerZone": "위험 영역"
+            },
+            "data": {
+                "exportTitle": "데이터 내보내기",
+                "exportDescription": "디렉터리, 플러그인 설정 및 프로필 정보를 포함한 계정 데이터를 JSON 파일로 다운로드하세요.",
+                "includeSecrets": "비밀 설정(API 키, 토큰) 포함 — 마스킹된 값으로 내보내기",
+                "secretsWarning": "비밀 설정은 마스킹된 값으로 내보내집니다. 가져오기 전에 실제 자격 증명으로 수동으로 교체해야 합니다.",
+                "exportButton": "데이터 내보내기",
+                "exporting": "내보내는 중...",
+                "exportSuccess": "데이터가 성공적으로 내보내졌습니다",
+                "exportError": "데이터 내보내기에 실패했습니다",
+                "importTitle": "데이터 가져오기",
+                "importDescription": "이전에 내보낸 JSON 파일에서 데이터를 가져오세요. 슬러그가 일치하는 디렉터리의 충돌을 해결할 수 있습니다.",
+                "importButton": "데이터 가져오기",
+                "syncTitle": "GitHub 동기화",
+                "syncDescription": "백업 및 인스턴스 간 마이그레이션을 위해 계정 구성을 개인 GitHub 저장소에 동기화하세요.",
+                "import": {
+                    "dropzone": "JSON 내보내기 파일을 여기에 드래그 앤 드롭하거나 클릭하여 탐색하세요",
+                    "selectFile": "파일 선택",
+                    "analyzing": "분석 중...",
+                    "invalidFileType": "JSON 파일을 선택하세요",
+                    "invalidJson": "잘못된 JSON 파일입니다",
+                    "previewError": "가져오기 파일 분석에 실패했습니다",
+                    "summary": "가져오기 요약",
+                    "directories": "디렉터리",
+                    "items": "항목",
+                    "userPlugins": "사용자 플러그인",
+                    "version": "포맷 버전",
+                    "missingPlugins": "설치되지 않은 플러그인은 건너뜁니다",
+                    "conflicts": "슬러그 충돌",
+                    "existingDirectory": "기존",
+                    "incoming": "가져오는 중",
+                    "strategySkip": "건너뛰기(기존 유지)",
+                    "strategyOverwrite": "기존 덮어쓰기",
+                    "strategyRename": "새 슬러그로 가져오기",
+                    "secretsIncluded": "이 내보내기는 가져올 비밀 설정을 포함합니다.",
+                    "maskedSecretsWarning": "이 파일에는 마스킹된 비밀 값(MASKED:***)이 포함되어 있습니다. 가져오기 전에 JSON 파일을 열어 모든 마스킹된 값을 실제 API 키 및 자격 증명으로 교체하세요. 마스킹된 값은 가져오기 중 건너뜁니다.",
+                    "applyImport": "가져오기 적용",
+                    "applying": "가져오는 중...",
+                    "importSuccess": "데이터가 성공적으로 가져와졌습니다",
+                    "importFailed": "오류로 가져오기가 완료되었습니다",
+                    "importError": "데이터 가져오기에 실패했습니다",
+                    "cancel": "취소",
+                    "done": "완료",
+                    "validationErrors": "유효성 검사 오류",
+                    "resultSuccess": "가져오기가 성공적으로 완료되었습니다",
+                    "resultFailed": "가져오기 실패",
+                    "directoriesCreated": "디렉터리 생성됨",
+                    "directoriesUpdated": "디렉터리 업데이트됨",
+                    "directoriesSkipped": "디렉터리 건너뜀",
+                    "pluginsImported": "플러그인 가져와짐",
+                    "warnings": "경고",
+                    "errors": "오류"
+                },
+                "sync": {
+                    "loading": "동기화 상태 로딩 중...",
+                    "connectGitHub": "GitHub 연결",
+                    "connectGitHubDescription": "동기화를 활성화하려면 Git 공급자 설정에서 GitHub 계정을 연결하세요.",
+                    "setupSync": "GitHub 동기화 설정",
+                    "createNewRepo": "새 개인 저장소 생성(ever-works-config)",
+                    "or": "또는",
+                    "repoPlaceholder": "owner/repo-name",
+                    "connect": "연결",
+                    "cancel": "취소",
+                    "configureSuccess": "동기화 저장소가 구성되었습니다",
+                    "configureError": "동기화 구성에 실패했습니다",
+                    "invalidRepoName": "유효한 저장소 이름 입력(owner/repo)",
+                    "lastPush": "마지막 푸시",
+                    "lastPull": "마지막 풀",
+                    "push": "GitHub로 푸시",
+                    "pull": "GitHub에서 풀",
+                    "disconnect": "연결 해제",
+                    "pushSuccess": "구성이 GitHub로 푸시되었습니다",
+                    "pushError": "GitHub로 푸시에 실패했습니다",
+                    "pullError": "GitHub에서 풀에 실패했습니다",
+                    "disconnectSuccess": "동기화가 연결 해제되었습니다",
+                    "disconnectError": "연결 해제에 실패했습니다",
+                    "includeSecrets": "API 키 및 비밀 포함(마스킹됨)",
+                    "secretsWarning": "비밀 값은 GitHub 저장소에 마스킹된 플레이스홀더로 저장됩니다. 실제 자격 증명은 GitHub로 푸시되지 않습니다."
+                }
+            },
+            "pluginCategories": {
+                "ai-provider": "AI 공급자",
+                "deployment": "배포",
+                "search": "검색",
+                "screenshot": "스크린샷",
+                "content-extractor": "콘텐츠 추출기",
+                "data-source": "데이터 소스",
+                "git-provider": "Git 공급자",
+                "pipeline": "파이프라인"
+            },
+            "plugins": {
+                "configure": "설정",
+                "noPluginsInCategory": "이 카테고리에 플러그인이 없습니다",
+                "requiredSettingsMissing": "필수 설정이 구성되지 않았습니다",
+                "backToCategory": "{category}으로 돌아가기",
+                "pipelineDefault": {
+                    "title": "기본 파이프라인",
+                    "description": "디렉터리 항목 생성 시 기본으로 사용되는 파이프라인을 선택하세요.",
+                    "autoLabel": "자동",
+                    "autoDescription": "각 디렉터리에 대해 시스템이 해결한 파이프라인 사용",
+                    "enforceLabel": "이 기본값 강제",
+                    "enforceDescription": "디렉터리에 자체 파이프라인이 구성되어 있어도 항상 이 파이프라인을 미리 선택합니다. 폼에서 수동으로 파이프라인을 전환할 수 있습니다.",
+                    "saveFailed": "기본 파이프라인 저장에 실패했습니다"
+                }
             },
             "profile": {
                 "title": "프로필 설정",
-                "subtitle": "프로필 정보와 아바타를 업데이트하세요",
+                "subtitle": "프로필 정보 및 아바타 업데이트",
                 "fields": {
                     "name": "이름",
-                    "username": "사용자명",
+                    "username": "사용자 이름",
                     "email": "이메일",
-                    "emailHelperText": "이메일은 변경할 수 없습니다"
+                    "emailHelperText": "이메일을 변경할 수 없습니다"
                 },
                 "placeholders": {
-                    "name": "이름을 입력하세요",
-                    "username": "사용자명을 입력하세요"
+                    "name": "이름 입력",
+                    "username": "사용자 이름 입력"
                 },
                 "actions": {
                     "save": "변경 사항 저장"
                 },
                 "messages": {
                     "success": "프로필이 성공적으로 업데이트되었습니다",
-                    "usernameRequired": "사용자명이 필요합니다",
+                    "usernameRequired": "사용자 이름이 필요합니다",
                     "error": "프로필 업데이트에 실패했습니다",
-                    "unexpectedError": "예기치 않은 오류가 발생했습니다"
+                    "unexpectedError": "예상치 못한 오류가 발생했습니다"
+                },
+                "emailVerification": {
+                    "title": "이메일이 확인되지 않았습니다",
+                    "description": "이메일 주소를 확인하세요. 받은편지함에서 확인 링크를 확인하세요.",
+                    "resend": "재전송",
+                    "sent": "확인 이메일이 발송되었습니다. 받은편지함을 확인하세요.",
+                    "sendFailed": "확인 이메일 발송에 실패했습니다. 다시 시도하세요."
+                },
+                "committer": {
+                    "title": "Git 커미터",
+                    "description": "git 커밋에 사용되는 이름과 이메일을 재정의하세요. 계정 이름({defaultName})과 이메일({defaultEmail}) 사용을 위해 비워 두세요.",
+                    "nameLabel": "커미터 이름",
+                    "emailLabel": "커미터 이메일"
                 }
             },
             "security": {
                 "title": "보안 설정",
-                "subtitle": "계정 보안과 인증을 관리하세요",
+                "subtitle": "계정 보안 및 인증 관리",
                 "changePassword": {
                     "title": "비밀번호 변경",
                     "currentPassword": "현재 비밀번호",
@@ -316,7 +786,7 @@
                     "showPasswords": "비밀번호 표시",
                     "placeholders": {
                         "current": "현재 비밀번호 입력",
-                        "new": "새 비밀번호 입력 (최소 8자)",
+                        "new": "새 비밀번호 입력(최소 8자)",
                         "confirm": "새 비밀번호 확인"
                     },
                     "actions": {
@@ -324,12 +794,12 @@
                     },
                     "messages": {
                         "success": "비밀번호가 성공적으로 업데이트되었습니다",
-                        "fillAllFields": "모든 비밀번호 필드를 입력해 주세요",
-                        "minLength": "새 비밀번호는 최소 8자 이상이어야 합니다",
+                        "fillAllFields": "모든 비밀번호 필드를 입력하세요",
+                        "minLength": "새 비밀번호는 최소 8자여야 합니다",
                         "mismatch": "새 비밀번호가 일치하지 않습니다",
                         "sameAsCurrent": "새 비밀번호는 현재 비밀번호와 달라야 합니다",
                         "error": "비밀번호 업데이트에 실패했습니다",
-                        "unexpectedError": "예기치 않은 오류가 발생했습니다"
+                        "unexpectedError": "예상치 못한 오류가 발생했습니다"
                     }
                 },
                 "twoFactor": {
@@ -339,8 +809,8 @@
                 },
                 "sessions": {
                     "title": "활성 세션",
-                    "subtitle": "기기 간 활성 세션을 관리하세요",
-                    "action": "세션 보기 (곧 출시 예정)"
+                    "subtitle": "기기 간 활성 세션 관리",
+                    "action": "세션 보기(곧 출시 예정)"
                 }
             },
             "oauth": {
@@ -348,41 +818,83 @@
                 "subtitle": "향상된 기능을 위해 외부 계정을 연결하세요",
                 "github": {
                     "name": "GitHub",
-                    "connected": "GitHub 리포지토리로 디렉토리 생성 및 관리",
-                    "disconnected": "리포지토리에서 디렉토리를 생성하려면 연결하세요",
-                    "scopes": "범위",
+                    "connected": "GitHub 저장소로 디렉터리 생성 및 관리",
+                    "disconnected": "저장소에서 디렉터리 생성을 위해 연결",
+                    "scopes": "권한 범위",
+                    "organizations": "연결된 조직",
+                    "organizationsHint": "추가 조직에 액세스 권한을 부여하려면 재연결을 사용하세요",
                     "actions": {
                         "connect": "연결",
+                        "reconnect": "재연결",
                         "disconnect": "연결 해제",
-                        "confirmDisconnect": "GitHub 계정 연결을 해제하시겠습니까?",
-                        "reconnect": "Reconnect"
+                        "confirmDisconnect": "GitHub 계정을 연결 해제하시겠습니까?"
                     },
                     "messages": {
-                        "disconnected": "GitHub 계정 연결이 해제되었습니다",
+                        "disconnected": "GitHub 계정이 연결 해제되었습니다",
                         "connectError": "GitHub 연결에 실패했습니다",
                         "disconnectError": "GitHub 연결 해제에 실패했습니다"
-                    },
-                    "organizations": "Connected Organizations",
-                    "organizationsHint": "Use Reconnect to grant access to additional organizations"
+                    }
+                }
+            },
+            "apiKeys": {
+                "title": "API 키",
+                "subtitle": "리소스에 대한 외부 액세스를 위한 API 키 관리",
+                "create": "API 키 생성",
+                "empty": "API 키가 없습니다. 시작하려면 하나 생성하세요.",
+                "neverExpires": "만료 없음",
+                "columns": {
+                    "name": "이름",
+                    "key": "키",
+                    "created": "생성됨",
+                    "lastUsed": "마지막 사용",
+                    "expires": "만료",
+                    "actions": "작업"
+                },
+                "dialog": {
+                    "title": "API 키 생성",
+                    "nameLabel": "이름",
+                    "namePlaceholder": "예: 내 통합",
+                    "expirationLabel": "만료",
+                    "cancel": "취소",
+                    "createButton": "생성",
+                    "keyCreated": "API 키가 생성되었습니다",
+                    "keyWarning": "지금 이 키를 복사하세요. 다시 볼 수 없습니다.",
+                    "done": "완료",
+                    "copy": "클립보드에 복사",
+                    "copied": "복사됨!"
+                },
+                "revoke": {
+                    "title": "API 키 취소",
+                    "description": "\"{name}\" API 키를 취소하시겠습니까? 이 작업은 취소할 수 없으며 이 키를 사용하는 모든 통합이 작동을 멈춥니다.",
+                    "cancel": "취소",
+                    "confirm": "취소"
+                },
+                "messages": {
+                    "nameRequired": "API 키 이름을 입력하세요",
+                    "createSuccess": "API 키가 성공적으로 생성되었습니다",
+                    "createError": "API 키 생성에 실패했습니다",
+                    "revokeSuccess": "API 키가 성공적으로 취소되었습니다",
+                    "revokeError": "API 키 취소에 실패했습니다",
+                    "copyError": "클립보드에 복사하는 데 실패했습니다"
                 }
             }
         },
         "stats": {
-            "totalDirectories": "총 디렉토리",
+            "totalDirectories": "총 디렉터리",
             "totalItems": "총 항목",
             "activeWebsites": "활성 웹사이트",
-            "fromLastMonth": "지난달 대비"
+            "fromLastMonth": "전월 대비"
         },
         "directoryCard": {
             "status": {
                 "active": "활성",
-                "notStarted": "시작 전",
+                "notStarted": "시작 안됨",
                 "generating": "생성 중",
                 "generated": "생성됨",
                 "error": "오류",
                 "cancelled": "취소됨",
-                "idle": "대기 중",
-                "opening": "여는 중"
+                "idle": "유휴",
+                "opening": "열기 중"
             },
             "role": {
                 "owner": "소유자",
@@ -391,23 +903,23 @@
                 "viewer": "뷰어"
             },
             "shared": {
-                "tooltip": "{role} 역할로 공유됨"
+                "tooltip": "{role}으로 공유됨"
             },
-            "noDescription": "설명 없음",
-            "items": "{count}개 항목",
-            "views": "{count}회 조회",
-            "updated": "{date}에 업데이트됨",
+            "noDescription": "설명이 제공되지 않았습니다",
+            "items": "{count} 항목",
+            "views": "{count} 조회",
+            "updated": "{date} 업데이트됨",
             "viewAction": "보기 →",
-            "openingTitle": "디렉터리를 여는 중",
-            "openingMessage": "디렉터리를 준비하고 있습니다. 잠시 후 세부 정보가 열립니다. 이 페이지에 그대로 머물러 주세요."
+            "openingTitle": "디렉터리 열기 중",
+            "openingMessage": "디렉터리를 준비 중입니다. 곧 세부 정보가 열립니다. 이 페이지를 유지하세요."
         },
         "directoryList": {
-            "title": "내 디렉토리",
-            "createButton": "디렉토리 만들기"
+            "title": "내 디렉터리",
+            "createButton": "디렉터리 생성"
         },
         "directoryDetail": {
             "failedToGenerateItems": "항목 생성에 실패했습니다. 다시 시도해 주세요.",
-            "generationCompleted": "생성이 성공적으로 완료되었습니다",
+            "generationCompleted": "생성 완료",
             "generationCancelled": "생성이 취소되었습니다",
             "role": {
                 "owner": "소유자",
@@ -416,12 +928,13 @@
                 "viewer": "뷰어"
             },
             "shared": {
-                "tooltip": "{role} 역할로 공유됨"
+                "tooltip": "{role}으로 공유됨"
             },
             "status": {
-                "notStarted": "시작 전",
+                "notStarted": "시작되지 않음",
                 "generating": "생성 중",
                 "generated": "생성됨",
+                "generatedWithWarnings": "경고와 함께 생성됨",
                 "error": "오류",
                 "cancelled": "취소됨"
             },
@@ -429,17 +942,19 @@
                 "overview": "개요",
                 "items": "항목",
                 "generator": "생성기",
-                "schedule": "일정",
-                "history": "히스토리",
+                "schedule": "스케줄",
+                "history": "기록",
+                "comparisons": "비교",
+                "plugins": "플러그인",
                 "deploy": "배포",
                 "members": "멤버",
                 "settings": "설정"
             },
             "members": {
                 "title": "팀 멤버",
-                "subtitle": "이 디렉토리에 접근할 수 있는 사람과 권한을 관리하세요.",
+                "subtitle": "이 디렉토리에 액세스할 수 있는 사용자와 권한을 관리하세요.",
                 "inviteMember": "멤버 초대",
-                "noMembers": "아직 팀 멤버가 없습니다. 협업할 사람을 초대하세요.",
+                "noMembers": "아직 팀 멤버가 없습니다. 협업할 사용자를 초대하세요.",
                 "roles": {
                     "creator": "생성자",
                     "owner": "소유자",
@@ -448,10 +963,10 @@
                     "viewer": "뷰어"
                 },
                 "roleDescriptions": {
-                    "owner": "삭제 및 멤버 관리 포함 전체 제어 권한.",
+                    "owner": "삭제 및 멤버 관리 포함 완전한 제어.",
                     "manager": "디렉토리 편집 및 멤버 관리 가능, 삭제 불가.",
                     "editor": "디렉토리 콘텐츠 편집 및 생성 실행 가능.",
-                    "viewer": "디렉토리 보기 전용 접근 권한."
+                    "viewer": "디렉토리 보기 전용 액세스."
                 },
                 "invite": {
                     "title": "팀 멤버 초대",
@@ -461,36 +976,44 @@
                     "roleLabel": "역할",
                     "submit": "초대 보내기",
                     "cancel": "취소",
-                    "success": "멤버가 성공적으로 초대되었습니다.",
+                    "success": "멤버 초대 성공.",
                     "errors": {
                         "emailRequired": "이메일 주소가 필요합니다.",
-                        "failed": "멤버 초대에 실패했습니다. 다시 시도해 주세요."
+                        "failed": "멤버 초대 실패. 다시 시도해 주세요."
                     }
                 },
                 "confirmRemove": {
                     "title": "멤버 제거",
-                    "description": "{username}님을 이 디렉토리에서 제거하시겠습니까? 모든 접근 권한을 잃게 됩니다.",
+                    "description": "이 디렉토리에서 {username}을(를) 제거하시겠습니까? 모든 액세스가 상실됩니다.",
                     "confirm": "제거",
                     "cancel": "취소"
                 },
                 "roleUpdated": "멤버 역할이 업데이트되었습니다.",
                 "memberRemoved": "멤버가 성공적으로 제거되었습니다.",
                 "errors": {
-                    "updateFailed": "멤버 역할 업데이트에 실패했습니다.",
-                    "removeFailed": "멤버 제거에 실패했습니다."
+                    "updateFailed": "멤버 역할 업데이트 실패.",
+                    "removeFailed": "멤버 제거 실패."
                 }
             },
             "schedule": {
                 "page": {
                     "title": "예약된 업데이트",
-                    "subtitle": "{name}에 대해 전용 간격과 실패 처리로 새로고침을 자동화하세요.",
-                    "fallbackName": "이 디렉토리"
+                    "subtitle": "{name}에 대한 전용 주기와 실패 처리로 새로 고침을 자동화하세요.",
+                    "fallbackName": "이 디렉토리",
+                    "loadFailed": "스케줄 설정 로드 실패.",
+                    "providerCategories": {
+                        "pipeline": "파이프라인",
+                        "ai": "AI",
+                        "search": "검색",
+                        "screenshot": "스크린샷",
+                        "contentExtractor": "추출기"
+                    }
                 },
                 "card": {
                     "title": "자동화",
                     "subtitle": {
-                        "enabled": "예약된 새로고침이 안정적으로 유지되도록 간격, 결제 및 안전장치를 조정하세요.",
-                        "disabled": "구독 제한 없이 새로고침을 자동화하세요 — 간격과 실패 방지 설정을 자유롭게 설정하세요."
+                        "enabled": "스케줄된 새로 고침이 안정적으로 유지되도록 주기, 결제 및 보호 장치를 조정하세요.",
+                        "disabled": "구독 제한 없이 새로 고침을 자동화하세요—주기와 실패 보호를 자유롭게 설정하세요."
                     },
                     "summary": {
                         "status": "상태",
@@ -501,26 +1024,32 @@
                         "never": "없음",
                         "statusMap": {
                             "active": "자동화 활성",
-                            "paused": "일시정지됨",
+                            "paused": "일시 중지",
                             "canceled": "취소됨",
-                            "disabled": "비활성화됨"
-                        },
-                        "nextSourceValidation": "다음 소스 검증"
+                            "disabled": "비활성"
+                        }
                     },
                     "fields": {
                         "automation": "자동화",
-                        "automationHelp": "향후 실행을 일시적으로 중지하려면 일시정지하세요.",
+                        "automationHelp": "미래 실행을 일시적으로 중지하려면 일시 중지하세요.",
                         "billing": "결제 모드",
-                        "billingHelp": "구독은 무제한 실행을 잠금 해제합니다. 사용량 기반은 실행당 청구됩니다.",
-                        "cadence": "간격",
-                        "cadenceHelp": "현재 요금제: {plan}",
-                        "cadenceOpen": "구독이 비활성화된 동안 모든 간격을 사용할 수 있습니다.",
+                        "billingHelp": "구독은 무제한 실행을 해제합니다. 사용량 기반은 실행당 청구됩니다.",
+                        "cadence": "주기",
+                        "cadenceHelp": "현재 플랜: {plan}",
+                        "cadenceOpen": "구독이 비활성화된 동안 모든 주기가 사용 가능합니다.",
                         "maxFailures": "실패 제한",
-                        "maxFailuresHelp": "이 횟수만큼 실패하면 자동으로 일시정지됩니다.",
-                        "createPullRequest": "Pull Request 생성",
-                        "createPullRequestHelp": "활성화하면 예약된 업데이트가 직접 커밋하는 대신 Pull Request를 생성합니다.",
-                        "sourceValidationCadence": "소스 검증 주기",
-                        "sourceValidationCadenceHelp": "기본값은 업데이트 주기와 같지만, 더 느리게 또는 더 빠르게 조정할 수 있습니다."
+                        "maxFailuresHelp": "이 수만큼 실패 발생 시 자동으로 일시 중지합니다.",
+                        "createPullRequest": "풀 리퀘스트 생성",
+                        "createPullRequestHelp": "활성화 시 스케줄된 업데이트가 직접 커밋하는 대신 풀 리퀘스트를 생성합니다.",
+                        "pipeline": "파이프라인",
+                        "pipelineHelp": "스케줄에서 실행할 파이프라인을 재정의하세요. 마지막 수동 생성과 동일한 파이프라인을 사용하려면 기본값으로 두세요."
+                    },
+                    "pipeline": {
+                        "inherit": "마지막 실행 설정 사용",
+                        "notConfigured": "설정되지 않음"
+                    },
+                    "providers": {
+                        "title": "다음 실행을 위한 활성 제공자"
                     },
                     "billing": {
                         "subscription": "구독",
@@ -528,117 +1057,213 @@
                     },
                     "cadence": {
                         "hourly": "매시간",
-                        "every_3_hours": "Every 3 hours",
-                        "every_8_hours": "Every 8 hours",
-                        "every_12_hours": "Every 12 hours",
+                        "every_3_hours": "3시간마다",
+                        "every_8_hours": "8시간마다",
+                        "every_12_hours": "12시간마다",
                         "daily": "매일",
                         "weekly": "매주",
                         "monthly": "매월"
                     },
                     "plans": {
                         "free": "무료",
+                        "pro": "Pro",
                         "standard": "스탠다드",
                         "premium": "프리미엄",
-                        "unmetered": "무제한"
+                        "unmetered": "측정 없음"
                     },
-                    "usageRequired": "이 간격을 사용하려면 사용량 기반 결제로 전환하세요.",
-                    "cadenceAllowed": "요금제에서 허용되는 간격입니다.",
+                    "usageRequired": "이 주기를 사용하려면 사용량 기반으로 전환하세요.",
+                    "cadenceAllowed": "플랜에서 허용된 주기입니다.",
                     "actions": {
                         "save": "변경 사항 저장",
                         "saving": "저장 중...",
                         "runNow": "지금 실행",
                         "starting": "시작 중...",
-                        "cancel": "일정 취소",
-                        "cancelling": "취소 중..."
+                        "cancel": "스케줄 취소",
+                        "cancelling": "취소 중...",
+                        "startAutomation": "자동화 시작",
+                        "stopAutomation": "자동화 중지"
                     },
                     "success": {
-                        "saved": "일정이 저장되었습니다.",
-                        "runStarted": "예약된 실행이 시작되었습니다.",
-                        "cancelled": "일정이 취소되었습니다."
+                        "saved": "스케줄 저장됨.",
+                        "runStarted": "스케줄 실행 시작됨.",
+                        "cancelled": "스케줄 취소됨.",
+                        "started": "자동화 시작됨.",
+                        "stopped": "자동화 중지됨."
                     },
                     "errors": {
-                        "requireUsage": "이 간격을 사용하려면 사용량 기반 결제를 활성화하세요.",
-                        "updateFailed": "일정 업데이트에 실패했습니다.",
-                        "runFailed": "실행 시작에 실패했습니다.",
-                        "cancelFailed": "일정 취소에 실패했습니다."
+                        "requireUsage": "이 주기를 사용하려면 사용량 기반 결제를 활성화하세요.",
+                        "updateFailed": "스케줄 업데이트 실패.",
+                        "runFailed": "실행 시작 실패.",
+                        "cancelFailed": "스케줄 취소 실패.",
+                        "generationRunning": "생성이 실행 중입니다. 완료될 때까지 기다려 주세요.",
+                        "scheduleInactive": "지금 실행하려면 스케줄이 활성 상태여야 합니다."
                     },
                     "empty": {
-                        "title": "먼저 수동 생성을 실행하세요",
-                        "description": "자동화된 일정 관리를 잠금 해제하려면 한 번의 성공적인 수동 실행을 완료하세요. 디렉토리에 데이터가 있으면 최신 상태로 유지해 드립니다.",
-                        "refresh": "상태 새로고침"
+                        "title": "먼저 수동 생성 실행",
+                        "description": "자동 스케줄링을 해제하려면 하나의 성공적인 수동 실행을 완료하세요. 디렉토리에 데이터가 있으면 최신 상태로 유지해 드리겠습니다.",
+                        "refresh": "상태 새로 고침"
                     },
-                    "requiresGeneration": "일정을 활성화하기 전에 최소 하나의 항목 생성을 실행하세요."
+                    "requiresGeneration": "스케줄 활성화 전에 최소 하나의 항목 생성을 실행하세요."
                 },
                 "actions": {
-                    "invalid": "유효하지 않은 데이터",
-                    "updated": "일정이 업데이트되었습니다.",
-                    "updateFailed": "일정 업데이트에 실패했습니다.",
-                    "runStarted": "예약된 실행이 시작되었습니다.",
-                    "runFailed": "실행 트리거에 실패했습니다.",
-                    "cancelled": "일정이 취소되었습니다.",
-                    "cancelFailed": "일정 취소에 실패했습니다."
+                    "invalid": "잘못된 데이터",
+                    "updated": "스케줄 업데이트됨.",
+                    "updateFailed": "스케줄 업데이트 실패.",
+                    "runStarted": "스케줄 실행 시작됨.",
+                    "runFailed": "실행 트리거 실패.",
+                    "cancelled": "스케줄 취소됨.",
+                    "cancelFailed": "스케줄 취소 실패."
                 }
             },
             "statusCard": {
                 "notStarted": {
-                    "title": "생성이 시작되지 않음",
-                    "description": "디렉토리에 콘텐츠를 채우기 위해 항목 생성을 시작하세요.",
+                    "title": "생성 시작되지 않음",
+                    "description": "디렉토리를 콘텐츠로 채우려면 항목 생성을 시작하세요.",
                     "action": "생성 시작"
                 },
                 "generating": {
                     "title": "생성 진행 중",
-                    "description": "요청을 처리 중입니다...",
-                    "processing": "처리 중..."
+                    "description": "요청 처리 중...",
+                    "processing": "처리 중...",
+                    "stop": "중지",
+                    "stopping": "중지 중...",
+                    "stopRequested": "생성 취소 요청됨",
+                    "stopFailed": "생성 중지 실패"
                 },
                 "generated": {
                     "title": "생성 완료",
-                    "description": "디렉토리가 항목으로 성공적으로 채워졌습니다.",
+                    "description": "디렉토리가 성공적으로 항목으로 채워졌습니다.",
+                    "withWarnings": "경고와 함께 완료:",
                     "viewItems": "항목 보기",
                     "regenerate": "재생성"
                 },
                 "error": {
                     "title": "생성 실패",
                     "description": "생성 중 오류가 발생했습니다.",
-                    "retry": "생성 다시 시도"
+                    "withWarnings": "오류와 함께 생성 실패:",
+                    "retry": "생성 재시도"
                 },
                 "cancelled": {
                     "title": "생성 취소됨",
-                    "description": "이전 생성이 완료되기 전에 중지되었습니다.",
+                    "description": "이전 생성이 완료 전에 중지되었습니다.",
                     "restart": "생성 재시작"
                 }
             },
             "stats": {
                 "totalItems": "총 항목",
                 "categories": "카테고리",
+                "comparisons": "비교",
                 "generationStatus": "생성 상태",
                 "daysActive": "활성 일수"
             },
-            "history": {
-                "title": "생성 히스토리",
-                "subtitle": "과거 생성 실행, 생성된 항목 및 실행 세부정보를 추적하세요.",
-                "error": "더 많은 항목 로드 실패",
+            "comparisons": {
+                "title": "비교",
+                "subtitle": "디렉토리 항목 간 A vs B 비교 페이지",
+                "vs": "vs",
+                "winner": "승자: {name}",
+                "tie": "무승부",
+                "actions": {
+                    "compareItems": "항목 비교",
+                    "generateNext": "다음 생성",
+                    "generating": "생성 중...",
+                    "generateAll": "모두 생성",
+                    "save": "저장",
+                    "stop": "중지",
+                    "generate": "생성",
+                    "cancel": "취소",
+                    "delete": "삭제"
+                },
+                "aiModel": {
+                    "title": "AI 모델",
+                    "provider": "제공자",
+                    "model": "모델",
+                    "default": "기본",
+                    "defaultSuffix": "(기본)",
+                    "loadingModels": "모델 로딩 중...",
+                    "providerDefault": "제공자 기본",
+                    "extendedAnalysisLabel": "확장 분석",
+                    "extendedAnalysisDescription": "각 비교와 함께 심층 분석을 생성합니다"
+                },
+                "manualForm": {
+                    "title": "두 항목 비교",
+                    "itemA": "항목 A",
+                    "itemB": "항목 B",
+                    "searchPlaceholder": "항목 검색...",
+                    "noItems": "항목을 찾을 수 없습니다"
+                },
+                "progress": {
+                    "generating": "비교 생성 중: {completed} / {total} 완료",
+                    "error": "{count, plural, one {# 오류} other {# 오류}}",
+                    "stopped": "중지됨. {count, plural, one {# 비교} other {# 비교}}가 {errors, plural, one {# 오류} other {# 오류}}와 함께 생성되었습니다.",
+                    "done": "완료! {count, plural, one {# 비교} other {# 비교}} 생성됨.",
+                    "stages": {
+                        "researching": "{itemA} vs {itemB} 조사 중...",
+                        "analyzing": "비교 데이터 분석 중...",
+                        "writing": "비교 기사 작성 중...",
+                        "writing_extended": "확장 분석 작성 중...",
+                        "saving": "저장 및 게시 중..."
+                    }
+                },
+                "pagination": {
+                    "showing": "{from}–{to} / {total} 표시 중"
+                },
                 "empty": {
-                    "title": "아직 히스토리가 없습니다",
-                    "description": "진행 상황과 결과를 보려면 생성을 요청하세요."
+                    "title": "아직 비교 없음",
+                    "description": "항목을 자동 선택하려면 \"다음 생성\"을 클릭하거나 특정 쌍을 선택하려면 \"항목 비교\"를 클릭하세요."
+                },
+                "deleteDialog": {
+                    "title": "비교 삭제",
+                    "confirmation": "\"{title}\"을(를) 삭제하시겠습니까? 이 작업은 실행 취소할 수 없습니다."
+                },
+                "generateAllDialog": {
+                    "title": "모든 비교 생성",
+                    "confirmation": "남은 {count} {count, plural, one {비교} other {비교}}를 생성하시겠습니까? 몇 분 정도 걸릴 수 있습니다. 언제든 중지할 수 있습니다."
+                },
+                "toast": {
+                    "selectTwo": "비교할 두 항목을 선택해 주세요",
+                    "cannotCompareSelf": "항목을 자신과 비교할 수 없습니다",
+                    "noRemaining": "생성할 남은 쌍이 없습니다",
+                    "consecutiveErrors": "3회 연속 오류 후 중지됨",
+                    "deleted": "비교 삭제됨",
+                    "aiConfigSaved": "AI 모델 설정 저장됨",
+                    "aiConfigFailed": "AI 설정 저장 실패"
+                },
+                "detail": {
+                    "backToComparisons": "비교로 돌아가기",
+                    "summary": "요약",
+                    "dimensions": "차원",
+                    "verdict": "판정",
+                    "article": "기사",
+                    "extendedAnalysis": "확장 분석",
+                    "sources": "출처"
+                }
+            },
+            "history": {
+                "title": "생성 기록",
+                "subtitle": "과거 생성 실행, 생성된 항목 및 실행 세부 정보를 추적하세요.",
+                "error": "추가 항목 로드 실패",
+                "empty": {
+                    "title": "아직 기록 없음",
+                    "description": "여기에서 진행 상황과 결과를 보려면 생성을 요청하세요."
                 },
                 "status": {
                     "generating": "진행 중",
-                    "generated": "완료됨",
+                    "generated": "완료",
                     "error": "실패",
-                    "cancelled": "취소됨"
+                    "cancelled": "취소"
                 },
                 "table": {
                     "run": "실행",
                     "status": "상태",
-                    "newItems": "새 항목",
-                    "updatedItems": "업데이트됨",
+                    "newItems": "신규 항목",
+                    "updatedItems": "업데이트",
                     "totalItems": "총계",
                     "duration": "소요 시간",
-                    "startedAt": "시작 시간",
+                    "startedAt": "시작",
                     "tokens": "토큰",
                     "cost": "비용"
                 },
-                "loadMore": "더 보기",
+                "loadMore": "더 로드",
                 "noMore": "더 이상 기록 없음",
                 "unknown": "알 수 없음",
                 "activity": {
@@ -658,8 +1283,14 @@
                     "updated": "업데이트됨",
                     "removed": "제거됨",
                     "fields": "필드",
-                    "expand": "변경 기록 세부 정보 펼치기",
-                    "collapse": "변경 기록 세부 정보 접기"
+                    "expand": "세부 정보 확장",
+                    "collapse": "세부 정보 축소",
+                    "stepLogs": "단계 로그",
+                    "changes": "변경"
+                },
+                "trigger": {
+                    "schedule": "예약",
+                    "api": "API"
                 },
                 "filters": {
                     "label": "활동",
@@ -671,7 +1302,7 @@
                     "community_pr": "커뮤니티 PR"
                 },
                 "pagination": {
-                    "showing": "{total}개 중 {from}-{to}개 표시"
+                    "showing": "{from}-{to} / {total} 표시 중"
                 }
             },
             "info": {
@@ -690,21 +1321,21 @@
                 "mainRepo": "메인 리포지토리",
                 "gitProvider": "Git 제공자",
                 "organization": "조직",
-                "created": "생성됨",
+                "created": "생성일",
                 "lastUpdated": "마지막 업데이트",
                 "readmeHeader": "README 헤더",
                 "readmeFooter": "README 푸터",
-                "custom": "사용자 정의",
-                "customOverwrite": "사용자 정의 (덮어쓰기)",
+                "custom": "사용자 지정",
+                "customOverwrite": "사용자 지정 (덮어쓰기)",
                 "yes": "예",
                 "no": "아니오",
-                "deployProvider": "Deploy Provider",
-                "notConnected": "Not connected",
-                "notConfigured": "Not configured",
-                "viewSite": "View site"
+                "deployProvider": "배포 제공자",
+                "notConnected": "연결 안 됨",
+                "notConfigured": "설정 안 됨",
+                "viewSite": "사이트 보기"
             },
             "config": {
-                "title": "구성 세부정보",
+                "title": "구성 세부 정보",
                 "initialPrompt": "초기 생성 프롬프트",
                 "companyDetails": "회사 정보",
                 "companyName": "회사 이름",
@@ -714,9 +1345,9 @@
                 "autoApproval": "자동 승인",
                 "pagingMode": "페이징 모드",
                 "contentTable": "콘텐츠 테이블",
-                "enabled": "활성화됨",
-                "disabled": "비활성화됨",
-                "pullRequestUpdate": "Pull Request 세부정보",
+                "enabled": "활성화",
+                "disabled": "비활성화",
+                "pullRequestUpdate": "풀 리퀘스트 세부 정보",
                 "branch": "브랜치",
                 "prTitle": "PR 제목",
                 "mainRepository": "메인 리포지토리",
@@ -725,24 +1356,26 @@
             "activity": {
                 "title": "최근 활동",
                 "noActivity": "아직 활동 없음",
-                "created": "디렉토리 생성됨",
+                "created": "디렉토리 생성",
                 "directoryCreated": "디렉토리가 성공적으로 생성되었습니다",
                 "justNow": "방금"
             },
             "items": {
                 "title": "디렉토리 항목",
-                "subtitle": "디렉토리의 항목을 관리하고 구성하세요",
-                "noItemsTitle": "아직 항목 없음",
-                "noItemsDescription": "디렉토리에 아직 항목이 없습니다. 디렉토리에 콘텐츠를 채우려면 항목을 생성하세요.",
+                "subtitle": "디렉토리의 항목을 관리하고 정리하세요",
+                "noItemsTitle": "아직 항목이 없습니다",
+                "noItemsDescription": "디렉토리에 아직 항목이 없습니다. 내용을 채우기 위해 항목을 생성하세요.",
                 "generateItems": "항목 생성",
                 "searchPlaceholder": "항목 검색...",
                 "allCategories": "모든 카테고리",
                 "showing": "{total}개 항목 중 {current}개 표시 중",
-                "noMatch": "검색 조건과 일치하는 항목이 없습니다",
+                "noMatch": "검색 조건에 맞는 항목이 없습니다",
                 "source": "소스",
+                "viewOnWebsite": "웹사이트에서 보기",
+                "openSourceUrl": "소스 URL 열기",
                 "addItem": "항목 추가",
                 "delete": "삭제",
-                "deleteWithPR": "Pull Request로 삭제",
+                "deleteWithPR": "풀 리퀘스트로 삭제",
                 "deleteConfirm": "\"{name}\"을(를) 삭제하시겠습니까?",
                 "deleteSuccess": "항목이 성공적으로 삭제되었습니다",
                 "deleteFailed": "항목 삭제에 실패했습니다",
@@ -751,952 +1384,1218 @@
                 "updateFailed": "항목 업데이트에 실패했습니다",
                 "updateError": "항목 업데이트 중 오류가 발생했습니다",
                 "updateItem": "항목 업데이트",
-                "loadingMore": "더 로드 중... ({total}개 중 {current}개)",
+                "loadingMore": "더 로딩 중... ({total}개 중 {current}개)",
                 "addModal": {
                     "title": "새 항목 추가",
                     "sourceUrl": "소스 URL",
                     "sourceUrlPlaceholder": "https://example.com/product",
-                    "sourceUrlHelp": "URL에서 항목 세부정보를 자동으로 가져오려면 '추출'을 클릭하세요",
+                    "sourceUrlHelp": "'추출'을 클릭하여 URL에서 항목 세부 정보를 자동으로 가져옵니다",
                     "extract": "추출",
-                    "extractSuccess": "항목 세부정보 추출 성공",
-                    "extractFailed": "항목 세부정보 추출 실패",
-                    "extractError": "세부정보 추출 중 오류 발생",
+                    "extractSuccess": "항목 세부 정보가 성공적으로 추출되었습니다",
+                    "extractFailed": "항목 세부 정보 추출에 실패했습니다",
+                    "extractError": "세부 정보 추출 중 오류가 발생했습니다",
                     "name": "이름",
                     "namePlaceholder": "항목 이름 입력",
                     "description": "설명",
-                    "descriptionPlaceholder": "항목에 대한 간단한 설명 입력",
+                    "descriptionPlaceholder": "항목의 간단한 설명 입력",
                     "category": "카테고리",
+                    "categories": "카테고리",
+                    "existingCategories": "기존에서 선택",
+                    "addNewCategory": "또는 새 카테고리 추가",
+                    "categoryPlaceholder": "카테고리 검색 또는 생성...",
+                    "addMoreCategories": "더 추가...",
+                    "createCategory": "생성",
+                    "noMatchingCategories": "일치하는 카테고리가 없습니다",
+                    "noCategories": "아직 카테고리가 없습니다. 생성하려면 입력하세요.",
+                    "categoriesRequired": "최소 하나의 카테고리를 선택하세요",
                     "tags": "태그",
-                    "tagPlaceholder": "태그 추가 후 Enter 누르기",
-                    "slug": "슬러그 (선택사항)",
+                    "tagPlaceholder": "태그 추가 후 Enter 키 누르기",
+                    "slug": "슬러그 (선택)",
                     "slugPlaceholder": "custom-item-slug",
                     "slugHelp": "URL 친화적 식별자. 비워두면 자동 생성됩니다",
-                    "brand": "브랜드 (선택사항)",
+                    "brand": "브랜드 (선택)",
                     "brandPlaceholder": "브랜드 이름 입력",
-                    "brandLogoUrl": "브랜드 로고 URL (선택사항)",
+                    "brandLogoUrl": "브랜드 로고 URL (선택)",
                     "brandLogoUrlPlaceholder": "https://example.com/logo.png",
-                    "images": "이미지 (선택사항)",
+                    "images": "이미지 (선택)",
                     "imagePlaceholder": "https://example.com/screenshot.png",
                     "imagesHelp": "이미지 URL 추가 (스크린샷, 제품 이미지)",
+                    "captureScreenshot": "스크린샷 캡처",
+                    "captureScreenshotHelp": "소스 URL에서 스크린샷 자동 캡처",
+                    "screenshotSuccess": "스크린샷이 성공적으로 캡처되었습니다",
+                    "screenshotFailed": "스크린샷 캡처에 실패했습니다",
+                    "screenshotError": "스크린샷 캡처 중 오류가 발생했습니다",
                     "featured": "추천 항목",
-                    "featuredHelp": "이 항목을 디렉토리의 추천 항목으로 표시",
-                    "updateWithPR": "Pull Request 생성",
-                    "updateWithPRHelp": "직접 커밋 대신 변경사항을 Pull Request로 제출",
+                    "featuredHelp": "디렉토리에서 이 항목을 추천 항목으로 표시",
+                    "updateWithPR": "풀 리퀘스트 생성",
+                    "updateWithPRHelp": "직접 커밋 대신 풀 리퀘스트로 변경 사항 제출",
                     "cancel": "취소",
                     "adding": "추가 중...",
                     "addItem": "항목 추가",
-                    "success": "항목 추가 성공",
+                    "success": "항목이 성공적으로 추가되었습니다",
                     "successDescription": "항목이 디렉토리에 추가되었습니다",
-                    "failed": "항목 추가 실패",
-                    "error": "항목 추가 중 오류 발생",
+                    "failed": "항목 추가에 실패했습니다",
+                    "error": "항목 추가 중 오류가 발생했습니다",
                     "errors": {
                         "urlRequired": "추출을 위해 소스 URL이 필요합니다",
-                        "invalidUrl": "http:// 또는 https://를 포함한 유효한 URL을 입력해 주세요",
-                        "invalidImageUrl": "유효한 이미지 URL을 입력해 주세요",
-                        "requiredFields": "모든 필수 필드를 입력해 주세요"
-                    },
-                    "categories": "Categories",
-                    "existingCategories": "Select from existing",
-                    "addNewCategory": "Or add new category",
-                    "categoryPlaceholder": "Search or create category...",
-                    "addMoreCategories": "Add more...",
-                    "createCategory": "Create",
-                    "noMatchingCategories": "No matching categories",
-                    "noCategories": "No categories yet. Type to create one.",
-                    "categoriesRequired": "Select at least one category",
-                    "captureScreenshot": "Capture Screenshot",
-                    "captureScreenshotHelp": "Auto-capture a screenshot from the source URL",
-                    "screenshotSuccess": "Screenshot captured successfully",
-                    "screenshotFailed": "Failed to capture screenshot",
-                    "screenshotError": "An error occurred while capturing screenshot"
+                        "invalidUrl": "http:// 또는 https://를 포함한 유효한 URL을 입력하세요",
+                        "invalidImageUrl": "유효한 이미지 URL을 입력하세요",
+                        "requiredFields": "모든 필수 필드를 입력하세요"
+                    }
                 },
                 "editDisplay": "표시 편집",
-                "editDisplayDescription": "추천 상태를 전환하고 표시 순서를 설정하세요.",
-                "orderLabel": "표시 순서 (선택사항)",
-                "orderHelp": "낮은 숫자가 추천/비추천 그룹 내에서 먼저 표시됩니다.",
+                "editDisplayDescription": "추천 상태를 토글하고 표시 순서를 설정하세요.",
+                "orderLabel": "표시 순서 (선택)",
+                "orderHelp": "숫자가 낮을수록 추천/비추천 그룹 내에서 먼저 표시됩니다.",
                 "deleteDialogTitle": "항목 삭제",
-                "deleteDialogDescription": "이 작업은 {name}을(를) 리포지토리에서 제거합니다.",
-                "createPRLabel": "Pull Request 생성",
-                "createPRHelp": "활성화하면 변경사항이 직접 커밋 대신 PR로 제안됩니다.",
-                "reasonLabel": "이유 (선택사항)",
-                "reasonPlaceholder": "이 항목을 제거하는 이유는 무엇인가요?",
-                "confirmDelete": "항목 삭제",
-                "captureScreenshot": "Capture screenshot",
+                "deleteDialogDescription": "이것은 저장소에서 {name}을(를) 제거합니다.",
+                "createPRLabel": "풀 리퀘스트 생성",
+                "createPRHelp": "활성화 시 변경 사항을 직접 커밋 대신 PR로 제안합니다.",
+                "captureScreenshot": "스크린샷 캡처",
                 "screenshot": {
-                    "noSourceUrl": "No source URL available for this item",
-                    "success": "Screenshot captured successfully",
-                    "failed": "Failed to capture screenshot",
-                    "error": "An error occurred while capturing screenshot",
-                    "notConfigured": "Screenshot service is not configured. Please add your ScreenshotOne API key in Settings.",
-                    "captureFailed": "Failed to capture image",
-                    "captureSuccess": "Image captured successfully",
-                    "captureError": "An error occurred while capturing image",
-                    "bulkCaptureComplete": "Bulk image capture completed",
-                    "bulkCaptureError": "An error occurred during bulk image capture"
+                    "noSourceUrl": "이 항목에 사용할 소스 URL이 없습니다",
+                    "success": "스크린샷이 성공적으로 캡처되었습니다",
+                    "failed": "스크린샷 캡처에 실패했습니다",
+                    "error": "스크린샷 캡처 중 오류가 발생했습니다",
+                    "notConfigured": "스크린샷 서비스가 구성되지 않았습니다",
+                    "providerLabel": "제공자",
+                    "providerRequired": "스크린샷 제공자를 선택하세요",
+                    "selectProviderTitle": "스크린샷 제공자 선택",
+                    "selectProviderDescription": "이 항목에 사용할 스크린샷 제공자를 선택하세요.",
+                    "selected": "선택됨",
+                    "confirmCapture": "스크린샷 캡처",
+                    "captureFailed": "이미지 캡처에 실패했습니다",
+                    "captureSuccess": "이미지가 성공적으로 캡처되었습니다",
+                    "captureError": "이미지 캡처 중 오류가 발생했습니다",
+                    "bulkCaptureComplete": "대량 이미지 캡처 완료",
+                    "bulkCaptureError": "대량 이미지 캡처 중 오류가 발생했습니다"
                 },
+                "reasonLabel": "사유 (선택)",
+                "reasonPlaceholder": "이 항목을 제거하는 이유는?",
+                "confirmDelete": "항목 삭제",
                 "tabs": {
-                    "browseItems": "Browse Items",
-                    "categories": "Categories",
-                    "tags": "Tags",
-                    "sourceHealth": "Source Health"
+                    "browseItems": "항목 탐색",
+                    "categories": "카테고리",
+                    "tags": "태그",
+                    "collections": "컬렉션",
+                    "sourceHealth": "소스 상태",
+                    "navigationLabel": "항목 탭"
                 },
                 "taxonomy": {
                     "categories": {
-                        "searchPlaceholder": "Search categories...",
-                        "add": "Add Category",
-                        "addFirst": "Add First Category",
-                        "showing": "Showing {current} of {total} categories",
-                        "empty": "No categories yet",
-                        "noMatch": "No categories match your search",
+                        "searchPlaceholder": "카테고리 검색...",
+                        "add": "카테고리 추가",
+                        "addFirst": "첫 번째 카테고리 추가",
+                        "showing": "{total}개 카테고리 중 {current}개 표시 중",
+                        "empty": "아직 카테고리가 없습니다",
+                        "noMatch": "검색에 맞는 카테고리가 없습니다",
                         "columns": {
-                            "name": "Name",
-                            "description": "Description",
-                            "items": "Items",
-                            "priority": "Priority",
-                            "actions": "Actions"
+                            "name": "이름",
+                            "description": "설명",
+                            "items": "항목",
+                            "priority": "우선순위",
+                            "actions": "작업"
                         },
-                        "createSuccess": "Category created successfully",
-                        "createFailed": "Failed to create category",
-                        "updateSuccess": "Category updated successfully",
-                        "updateFailed": "Failed to update category",
-                        "deleteSuccess": "Category deleted successfully",
-                        "deleteFailed": "Failed to delete category",
-                        "deleteConfirm": "Are you sure you want to delete \"{name}\"?",
-                        "deleteHasItems": "Cannot delete category with {count} items assigned",
+                        "createSuccess": "카테고리가 성공적으로 생성되었습니다",
+                        "createFailed": "카테고리 생성에 실패했습니다",
+                        "updateSuccess": "카테고리가 성공적으로 업데이트되었습니다",
+                        "updateFailed": "카테고리 업데이트에 실패했습니다",
+                        "deleteSuccess": "카테고리가 성공적으로 삭제되었습니다",
+                        "deleteFailed": "카테고리 삭제에 실패했습니다",
+                        "deleteConfirm": "\"{name}\"을(를) 삭제하시겠습니까?",
+                        "deleteHasItems": "{count}개 항목이 할당된 카테고리는 삭제할 수 없습니다",
                         "modal": {
-                            "createTitle": "Create Category",
-                            "editTitle": "Edit Category",
-                            "name": "Name",
-                            "namePlaceholder": "e.g., Monitoring Tools",
-                            "description": "Description",
-                            "descriptionPlaceholder": "Brief description of this category",
-                            "iconUrl": "Icon URL",
+                            "createTitle": "카테고리 생성",
+                            "editTitle": "카테고리 편집",
+                            "name": "이름",
+                            "namePlaceholder": "예: 모니터링 도구",
+                            "description": "설명",
+                            "descriptionPlaceholder": "이 카테고리의 간단한 설명",
+                            "iconUrl": "아이콘 URL",
                             "iconUrlPlaceholder": "https://example.com/icon.png",
-                            "iconUrlHelp": "Optional URL to an icon image",
-                            "priority": "Priority",
-                            "priorityPlaceholder": "e.g., 1",
-                            "priorityHelp": "Lower numbers appear first in lists",
-                            "cancel": "Cancel",
-                            "save": "Save",
-                            "create": "Create",
-                            "saving": "Saving...",
+                            "iconUrlHelp": "아이콘 이미지의 선택적 URL",
+                            "priority": "우선순위",
+                            "priorityPlaceholder": "예: 1",
+                            "priorityHelp": "숫자가 낮을수록 목록에서 먼저 표시됩니다",
+                            "cancel": "취소",
+                            "save": "저장",
+                            "create": "생성",
+                            "saving": "저장 중...",
                             "errors": {
-                                "nameRequired": "Category name is required",
-                                "nameExists": "A category with this name already exists"
+                                "nameRequired": "카테고리 이름이 필요합니다",
+                                "nameExists": "이 이름의 카테고리가 이미 존재합니다"
                             }
                         }
                     },
                     "tags": {
-                        "searchPlaceholder": "Search tags...",
-                        "add": "Add Tag",
-                        "addFirst": "Add First Tag",
-                        "showing": "Showing {current} of {total} tags",
-                        "empty": "No tags yet",
-                        "noMatch": "No tags match your search",
+                        "searchPlaceholder": "태그 검색...",
+                        "add": "태그 추가",
+                        "addFirst": "첫 번째 태그 추가",
+                        "showing": "{total}개 태그 중 {current}개 표시 중",
+                        "empty": "아직 태그가 없습니다",
+                        "noMatch": "검색에 맞는 태그가 없습니다",
                         "columns": {
-                            "name": "Name",
-                            "items": "Items",
-                            "actions": "Actions"
+                            "name": "이름",
+                            "items": "항목",
+                            "actions": "작업"
                         },
-                        "createSuccess": "Tag created successfully",
-                        "createFailed": "Failed to create tag",
-                        "updateSuccess": "Tag updated successfully",
-                        "updateFailed": "Failed to update tag",
-                        "deleteSuccess": "Tag deleted successfully",
-                        "deleteFailed": "Failed to delete tag",
-                        "deleteConfirm": "Are you sure you want to delete \"{name}\"?",
-                        "deleteHasItems": "Cannot delete tag with {count} items assigned",
+                        "createSuccess": "태그가 성공적으로 생성되었습니다",
+                        "createFailed": "태그 생성에 실패했습니다",
+                        "updateSuccess": "태그가 성공적으로 업데이트되었습니다",
+                        "updateFailed": "태그 업데이트에 실패했습니다",
+                        "deleteSuccess": "태그가 성공적으로 삭제되었습니다",
+                        "deleteFailed": "태그 삭제에 실패했습니다",
+                        "deleteConfirm": "\"{name}\"을(를) 삭제하시겠습니까?",
+                        "deleteHasItems": "{count}개 항목이 할당된 태그는 삭제할 수 없습니다",
                         "modal": {
-                            "createTitle": "Create Tag",
-                            "editTitle": "Edit Tag",
-                            "name": "Name",
-                            "namePlaceholder": "e.g., open-source",
-                            "nameHelp": "Use lowercase with hyphens for multi-word tags",
-                            "cancel": "Cancel",
-                            "save": "Save",
-                            "create": "Create",
-                            "saving": "Saving...",
+                            "createTitle": "태그 생성",
+                            "editTitle": "태그 편집",
+                            "name": "이름",
+                            "namePlaceholder": "예: 오픈-소스",
+                            "nameHelp": "다중 단어 태그는 하이픈으로 소문자 사용",
+                            "cancel": "취소",
+                            "save": "저장",
+                            "create": "생성",
+                            "saving": "저장 중...",
                             "errors": {
-                                "nameRequired": "Tag name is required",
-                                "nameExists": "A tag with this name already exists"
+                                "nameRequired": "태그 이름이 필요합니다",
+                                "nameExists": "이 이름의 태그가 이미 존재합니다"
+                            }
+                        }
+                    },
+                    "collections": {
+                        "searchPlaceholder": "컬렉션 검색...",
+                        "add": "컬렉션 추가",
+                        "addFirst": "첫 번째 컬렉션 추가",
+                        "showing": "{total}개 컬렉션 중 {current}개 표시 중",
+                        "empty": "아직 컬렉션이 없습니다",
+                        "noMatch": "검색에 맞는 컬렉션이 없습니다",
+                        "columns": {
+                            "name": "이름",
+                            "description": "설명",
+                            "items": "항목",
+                            "priority": "우선순위",
+                            "actions": "작업"
+                        },
+                        "createSuccess": "컬렉션이 성공적으로 생성되었습니다",
+                        "createFailed": "컬렉션 생성에 실패했습니다",
+                        "updateSuccess": "컬렉션이 성공적으로 업데이트되었습니다",
+                        "updateFailed": "컬렉션 업데이트에 실패했습니다",
+                        "deleteSuccess": "컬렉션이 성공적으로 삭제되었습니다",
+                        "deleteFailed": "컬렉션 삭제에 실패했습니다",
+                        "deleteConfirm": "\"{name}\"을(를) 삭제하시겠습니까?",
+                        "deleteHasItems": "{count}개 항목이 할당된 컬렉션은 삭제할 수 없습니다",
+                        "modal": {
+                            "createTitle": "컬렉션 생성",
+                            "editTitle": "컬렉션 편집",
+                            "name": "이름",
+                            "namePlaceholder": "예: 편집자 추천",
+                            "description": "설명",
+                            "descriptionPlaceholder": "이 컬렉션의 간단한 설명",
+                            "iconUrl": "아이콘 URL",
+                            "iconUrlPlaceholder": "https://example.com/icon.png",
+                            "iconUrlHelp": "아이콘 이미지의 선택적 URL",
+                            "priority": "우선순위",
+                            "priorityPlaceholder": "예: 1",
+                            "priorityHelp": "숫자가 낮을수록 목록에서 먼저 표시됩니다",
+                            "cancel": "취소",
+                            "save": "저장",
+                            "create": "생성",
+                            "saving": "저장 중...",
+                            "errors": {
+                                "nameRequired": "컬렉션 이름이 필요합니다",
+                                "nameExists": "이 이름의 컬렉션이 이미 존재합니다"
                             }
                         }
                     }
                 },
                 "sourceValidation": {
-                    "recheckSource": "소스 다시 확인",
-                    "checkCompleted": "소스 확인이 완료되었습니다",
-                    "checkFailed": "소스 확인에 실패했습니다",
-                    "failedToCheckSource": "항목의 소스를 확인하지 못했습니다",
-                    "brokenLink": "깨진 링크",
+                    "recheckSource": "소스 재확인",
+                    "checkCompleted": "항목 소스 확인 완료",
+                    "checkFailed": "항목 소스 확인 실패",
+                    "failedToCheckSource": "항목 소스 확인에 실패했습니다",
+                    "brokenLink": "링크 끊김",
+                    "needsReview": "검토 필요",
                     "healthy": "정상",
-                    "couldNotVerify": "확인할 수 없음",
-                    "sourceMayHaveIssues": "소스에 문제가 있을 수 있습니다",
+                    "couldNotVerify": "확인 불가",
+                    "sourceMayHaveIssues": "소스에 문제가 있을 수 있음",
                     "sourceChecked": "소스 확인됨",
-                    "reachable": "접근 가능",
-                    "reachabilityInconclusive": "자동 접근성 확인 결과가 불분명합니다",
+                    "reachable": "도달 가능",
+                    "reachabilityInconclusive": "자동 도달 가능성 확인 불확실",
                     "accurateSource": "정확한 소스",
-                    "sourceTooGeneric": "소스가 너무 일반적입니다",
+                    "sourceTooGeneric": "소스가 너무 일반적임",
                     "weakSource": "약한 소스",
-                    "sourceAccuracyUnknown": "소스 정확도를 알 수 없음",
+                    "sourceAccuracyUnknown": "소스 정확도 알 수 없음",
                     "useSuggestedSource": "제안 적용",
-                    "suggestedSourceApplied": "추천 소스를 적용했습니다",
-                    "failedToUseSuggestedSource": "추천 소스를 사용할 수 없습니다",
-                    "needsReview": "Needs review"
+                    "suggestedSourceApplied": "제안 소스가 적용되었습니다",
+                    "failedToUseSuggestedSource": "제안 소스 사용에 실패했습니다"
                 },
                 "sourceValidationSettings": {
-                    "title": "Source Health Checks",
-                    "subtitle": "Automatically check item source URLs on a recurring schedule.",
-                    "enableLabel": "Enable scheduled checks",
-                    "enableHelp": "Periodically verify that all item source URLs are reachable and accurate.",
-                    "cadenceLabel": "Check frequency",
-                    "cadenceHelp": "How often to run source validation on your items.",
-                    "save": "Save",
-                    "saving": "Saving...",
-                    "saveSuccess": "Source validation settings saved",
-                    "saveFailed": "Failed to save source validation settings"
+                    "title": "소스 상태 확인",
+                    "subtitle": "항목 소스 URL을 주기적으로 자동 확인합니다.",
+                    "enableLabel": "예약 확인 활성화",
+                    "enableHelp": "모든 항목 소스 URL이 도달 가능하고 정확한지 주기적으로 확인합니다.",
+                    "cadenceLabel": "확인 빈도",
+                    "cadenceHelp": "항목에 대한 소스 검증을 얼마나 자주 실행할지.",
+                    "save": "저장",
+                    "saving": "저장 중...",
+                    "saveSuccess": "소스 검증 설정이 저장되었습니다",
+                    "saveFailed": "소스 검증 설정 저장에 실패했습니다"
                 }
             },
             "generator": {
+                "tabs": {
+                    "generate": "생성",
+                    "schedule": "스케줄",
+                    "history": "기록",
+                    "comparisons": "비교",
+                    "navigationLabel": "생성기 탭"
+                },
                 "regenerationWarning": "재생성 경고",
-                "regenerationWarningDescription": "이 디렉토리는 이미 생성되었습니다. 새 생성을 시작하면 기존 항목이 교체됩니다.",
+                "regenerationWarningDescription": "이 디렉토리는 이미 생성되었습니다. 새 생성을 시작하면 기존 항목이 대체됩니다.",
                 "requiredInfo": "필수 정보",
                 "updateConfiguration": "구성 업데이트",
                 "promptRequired": "프롬프트가 필요합니다",
+                "unconfiguredProviders": "{providers}가 구성되지 않았습니다. 생성 전에 설정 → 플러그인으로 이동하여 설정하세요.",
                 "operationStartedSuccessfully": "작업이 성공적으로 시작되었습니다",
                 "failedToStartOperation": "작업 시작에 실패했습니다",
+                "loadingFormSchema": "양식 구성 로딩 중...",
+                "failedToLoadFormSchema": "양식 구성 로딩에 실패했습니다",
+                "selectOption": "옵션 선택",
                 "directoryName": "디렉토리 이름",
                 "generationPrompt": "생성 프롬프트",
+                "modelOverride": "AI 모델 재정의",
+                "modelOverridePlaceholder": "예: openai/gpt-4.1 또는 openrouter/openai/gpt-4.1",
+                "modelOverrideHelperText": "선택 사항입니다. 여기에 재정의하지 않으면 기본적으로 가져온 모델 또는 이전 모델을 사용합니다.",
                 "recommended": "권장",
-                "promptPlaceholder": "이 디렉토리에 생성해야 할 항목을 설명하세요...",
-                "promptHelperText": "생성하려는 콘텐츠 유형을 구체적으로 설명하세요",
+                "promptPlaceholder": "이 디렉토리에 생성할 항목을 설명하세요...",
+                "promptHelperText": "생성하려는 콘텐츠 유형에 대해 구체적으로 설명하세요",
                 "repositoryDescription": "리포지토리 설명",
-                "repositoryPlaceholder": "리포지토리 간단 설명 (선택사항)",
+                "repositoryPlaceholder": "리포지토리의 간단한 설명 (선택)",
                 "startGeneration": "생성 시작",
                 "regenerateItems": "항목 재생성",
-                "updateItems": "항목 업데이트",
+                "updateItems": "생성 실행",
                 "recreateDirectory": "디렉토리 재생성",
                 "showAdvancedOptions": "고급 옵션 표시",
                 "hideAdvancedOptions": "고급 옵션 숨기기",
                 "cancel": "취소",
                 "companyInformation": "회사 정보",
-                "companyInfoDescription": "브랜드 콘텐츠를 위한 선택적 회사 세부정보",
+                "companyInfoDescription": "브랜드 콘텐츠를 위한 선택적 회사 세부 정보",
                 "companyName": "회사 이름",
                 "companyNamePlaceholder": "회사 이름 입력",
                 "companyWebsite": "회사 웹사이트",
                 "companyWebsitePlaceholder": "https://example.com",
-                "categoriesKeywords": "카테고리 및 키워드",
-                "categoriesDescription": "콘텐츠 구성용 카테고리와 키워드 정의",
+                "categoriesKeywords": "카테고리 & 키워드",
+                "categoriesDescription": "콘텐츠 구성을 위한 카테고리와 키워드 정의",
                 "initialCategories": "초기 카테고리",
-                "priorityCategories": "우선순위 카테고리",
-                "targetKeywords": "타겟 키워드",
+                "priorityCategories": "우선 카테고리",
+                "targetKeywords": "대상 키워드",
                 "addCategoryPlaceholder": "카테고리 추가",
-                "addPriorityCategoryPlaceholder": "우선순위 카테고리 추가",
+                "addPriorityCategoryPlaceholder": "우선 카테고리 추가",
                 "addKeywordPlaceholder": "키워드 추가",
                 "add": "추가",
                 "sourceUrls": "소스 URL",
                 "sourceUrlsDescription": "콘텐츠를 추출할 특정 URL 추가",
                 "sourceUrlPlaceholder": "https://example.com/page",
                 "addUrl": "URL 추가",
-                "noSourceUrlsMessage": "소스 URL이 추가되지 않았습니다. 생성기는 콘텐츠를 찾기 위해 검색을 사용합니다.",
+                "noSourceUrlsMessage": "소스 URL이 추가되지 않았습니다. 생성기는 검색을 사용하여 콘텐츠를 찾습니다.",
                 "advancedConfig": "고급 구성",
-                "advancedConfigDescription": "생성 매개변수와 동작 미세 조정",
+                "advancedConfigDescription": "생성 매개변수와 동작을 세밀하게 조정",
                 "generationMethod": "생성 방법",
                 "methodCreateUpdate": "생성 또는 업데이트",
-                "methodRecreate": "재생성 (모두 교체)",
-                "updateWithPullRequest": "Pull Request로 업데이트",
-                "updateWithPullRequestDescription": "직접 커밋 대신 Pull Request 생성",
+                "methodRecreate": "재생성 (모두 대체)",
+                "updateWithPullRequest": "풀 리퀘스트로 업데이트",
+                "updateWithPullRequestDescription": "직접 커밋 대신 풀 리퀘스트 생성",
                 "enableBadgeEvaluation": "배지 평가 활성화",
                 "enableBadgeEvaluationDescription": "항목에 품질 배지 평가 및 추가",
+                "captureScreenshots": "항목 스크린샷 캡처",
+                "captureScreenshotsDescription": "생성 중 각 항목에 대한 스크린샷 또는 제품 이미지 자동 캡처",
                 "websiteRepositoryCreationMethod": "웹사이트 리포지토리 생성 방법",
                 "methodDuplicate": "복제",
                 "methodFork": "포크",
                 "directoryNamePlaceholder": "디렉토리 이름 입력",
                 "methodCreateFromTemplate": "템플릿에서 생성",
                 "aiProcessingConfiguration": "AI 처리 구성",
-                "maxSearchQueries": "최대 검색 쿼리",
-                "resultsPerQuery": "쿼리당 결과",
-                "maxPagesToProcess": "처리할 최대 페이지",
+                "maxSearchQueries": "최대 검색 쿼리 수",
+                "resultsPerQuery": "쿼리당 결과 수",
+                "maxPagesToProcess": "처리할 최대 페이지 수",
                 "relevanceThreshold": "관련성 임계값",
                 "aiFirstGeneration": "AI 우선 생성",
-                "aiFirstGenerationDescription": "웹 검색 전에 초기 항목의 AI 생성을 활성화합니다.",
+                "aiFirstGenerationDescription": "웹 검색 전에 초기 항목의 AI 생성 활성화.",
                 "contentFiltering": "콘텐츠 필터링",
                 "contentFilteringDescription": "콘텐츠 품질 필터링 활성화",
-                "recreateConfirmTitle": "디렉토리 데이터를 재생성하시겠습니까?",
-                "recreateConfirmDescription": "재생성은 기존 항목을 삭제하고 처음부터 다시 생성합니다. 이 작업은 취소할 수 없습니다.",
-                "confirmRecreate": "예, 재생성합니다",
+                "recreateConfirmTitle": "디렉토리 데이터 재생성?",
+                "recreateConfirmDescription": "재생성은 기존 항목을 삭제하고 처음부터 다시 생성합니다. 이 작업은 되돌릴 수 없습니다.",
+                "confirmRecreate": "예, 재생성",
                 "recreateInlineTitle": "재생성은 기존 항목을 제거합니다",
-                "recreateInlineDescription": "이 모드는 현재 항목을 삭제하고 처음부터 다시 구축합니다. 모든 것을 교체하려는 경우에만 진행하세요.",
-                "captureScreenshots": "Capture Item Screenshots",
-                "captureScreenshotsDescription": "Automatically capture screenshots or product images for each item during generation",
-                "companyNameDescription": "Used to personalize generated content with your brand identity.",
-                "companyWebsiteDescription": "AI will analyze your website to better understand your brand context.",
-                "initialCategoriesDescription": "Seed categories to organize items. The AI will use these as a starting point.",
-                "priorityCategoriesDescription": "Categories that will appear first in the generated output. Useful for highlighting important sections.",
-                "targetKeywordsDescription": "Keywords to guide the AI search and content generation. More specific keywords yield better results.",
-                "sourceUrlsFieldDescription": "Specific URLs to extract content from. If empty, the generator will search the web automatically.",
-                "generationMethodDescription": "Choose whether to update existing items or recreate everything from scratch.",
-                "websiteRepositoryCreationMethodDescription": "How the website repository is created. Template is recommended for most cases.",
-                "maxSearchQueriesDescription": "Number of search queries the AI will generate to find relevant content (1-50).",
-                "resultsPerQueryDescription": "Maximum results to retrieve per search query (1-20).",
-                "maxPagesToProcessDescription": "Maximum web pages to process for content extraction (1-100).",
-                "relevanceThresholdDescription": "Minimum relevance score (0-1) for content to be included. Higher values mean stricter filtering.",
-                "dataGeneration": "Data Generation Options",
-                "dataGenerationDescription": "Configure data volume and entity generation",
-                "dataVolumeMode": "Data Volume Mode",
-                "dataVolumeModeReal": "Real",
-                "dataVolumeModeRealDescription": "Generate full production-ready data",
-                "dataVolumeModeSample": "Sample",
-                "dataVolumeModeSampleDescription": "Generate minimal sample data (~10 items)",
-                "entityGeneration": "Entity Generation",
-                "generateCategories": "Generate Categories",
-                "generateCategoriesDescription": "Create category structure for organizing items",
-                "generateTags": "Generate Tags",
-                "generateTagsDescription": "Create tags for flexible item labeling",
-                "generateBrands": "Generate Brands",
-                "generateBrandsDescription": "Extract and create brand entities from items"
+                "recreateInlineDescription": "이 모드는 현재 항목을 삭제하고 처음부터 다시 빌드합니다. 모든 것을 대체하려는 경우에만 진행하세요.",
+                "companyNameDescription": "생성된 콘텐츠를 브랜드 아이덴티티로 개인화하는 데 사용됩니다.",
+                "companyWebsiteDescription": "AI가 브랜드 맥락을 더 잘 이해하기 위해 웹사이트를 분석합니다.",
+                "initialCategoriesDescription": "항목을 구성하기 위한 시드 카테고리. AI가 이를 시작점으로 사용합니다.",
+                "priorityCategoriesDescription": "생성된 출력에서 먼저 나타날 카테고리. 중요한 섹션을 강조하는 데 유용합니다.",
+                "targetKeywordsDescription": "AI 검색과 콘텐츠 생성을 안내하는 키워드. 더 구체적인 키워드가 더 나은 결과를 제공합니다.",
+                "sourceUrlsFieldDescription": "콘텐츠를 추출할 특정 URL. 비어 있으면 생성기가 웹을 자동 검색합니다.",
+                "generationMethodDescription": "기존 항목을 업데이트할지 모든 것을 처음부터 재생성할지 선택하세요.",
+                "websiteRepositoryCreationMethodDescription": "웹사이트 리포지토리가 생성되는 방법. 대부분의 경우 템플릿을 권장합니다.",
+                "maxSearchQueriesDescription": "관련 콘텐츠를 찾기 위해 AI가 생성할 검색 쿼리 수 (1-50).",
+                "resultsPerQueryDescription": "검색 쿼리당 검색할 최대 결과 수 (1-20).",
+                "maxPagesToProcessDescription": "콘텐츠 추출을 위해 처리할 최대 웹페이지 수 (1-100).",
+                "relevanceThresholdDescription": "포함될 콘텐츠의 최소 관련성 점수 (0-1). 높은 값은 더 엄격한 필터링을 의미합니다.",
+                "dataGeneration": "데이터 생성 옵션",
+                "dataGenerationDescription": "데이터 볼륨 및 엔티티 생성 구성",
+                "dataVolumeMode": "데이터 볼륨 모드",
+                "dataVolumeModeReal": "실제",
+                "dataVolumeModeRealDescription": "완전한 프로덕션 준비 데이터 생성",
+                "dataVolumeModeSample": "샘플",
+                "dataVolumeModeSampleDescription": "최소 샘플 데이터 생성 (~10개 항목)",
+                "entityGeneration": "엔티티 생성",
+                "generateCategories": "카테고리 생성",
+                "generateCategoriesDescription": "항목 구성을 위한 카테고리 구조 생성",
+                "generateTags": "태그 생성",
+                "generateTagsDescription": "유연한 항목 라벨링을 위한 태그 생성",
+                "generateBrands": "브랜드 생성",
+                "generateBrandsDescription": "항목에서 브랜드 엔티티 추출 및 생성",
+                "pipelineMode": "파이프라인 모드",
+                "standardPipeline": "표준 파이프라인",
+                "standardPipelineDescription": "개별 제공자 선택이 포함된 단계별 파이프라인 사용",
+                "providerSelection": "제공자 선택",
+                "providerSelectionDescription": "각 기능에 사용할 제공자 선택",
+                "searchProvider": "검색 제공자",
+                "searchProviderDescription": "웹 검색 및 콘텐츠 발견 제공자",
+                "screenshotProvider": "스크린샷 제공자",
+                "screenshotProviderDescription": "항목 스크린샷 캡처 제공자",
+                "aiProvider": "AI 제공자",
+                "aiProviderDescription": "콘텐츠 생성 및 추출을 위한 AI 모델 제공자",
+                "contentExtractorProvider": "콘텐츠 추출기",
+                "contentExtractorProviderDescription": "웹페이지에서 콘텐츠 추출 제공자",
+                "useDirectoryDefault": "디렉토리 기본값 사용",
+                "default": "기본",
+                "notConfigured": "구성되지 않음",
+                "notConfiguredTooltip": "이 제공자는 구성이 필요합니다. 설정 → 플러그인으로 이동하여 설정하세요.",
+                "jsonObjectError": "값은 JSON 객체여야 합니다",
+                "invalidJsonError": "잘못된 JSON 형식"
             },
             "progress": {
                 "title": "생성 진행 중",
-                "processingRequest": "요청을 처리 중입니다...",
+                "processingRequest": "요청 처리 중...",
                 "steps": {
-                    "promptComparison": "프롬프트 비교 중",
-                    "promptProcessing": "프롬프트 처리 중",
-                    "domainDetection": "도메인 유형 감지 중",
-                    "aiFirstItemsGeneration": "초기 AI 항목 생성 중",
-                    "searchQueriesGeneration": "검색 쿼리 생성 중",
-                    "webSearch": "웹 검색 중",
-                    "contentRetrieval": "콘텐츠 검색 중",
-                    "contentFiltering": "관련 콘텐츠 필터링 중",
-                    "itemsExtraction": "콘텐츠에서 항목 추출 중",
-                    "deduplicationDataAggregation": "중복 제거 및 데이터 집계 중",
-                    "categoriesTagsProcessing": "카테고리 및 태그 처리 중",
-                    "sourcesValidation": "소스 검증 중",
-                    "badgesProcessing": "품질 배지 처리 중",
-                    "markdownGeneration": "마크다운 콘텐츠 생성 중",
+                    "promptComparison": "프롬프트 비교",
+                    "promptProcessing": "프롬프트 처리",
+                    "domainDetection": "도메인 유형 감지",
+                    "aiFirstItemsGeneration": "초기 AI 항목 생성",
+                    "searchQueriesGeneration": "검색 쿼리 생성",
+                    "webSearch": "웹 검색",
+                    "contentRetrieval": "콘텐츠 검색",
+                    "contentFiltering": "관련 콘텐츠 필터링",
+                    "itemsExtraction": "콘텐츠에서 항목 추출",
+                    "deduplicationDataAggregation": "중복 제거 및 데이터 집계",
+                    "categoriesTagsProcessing": "카테고리 및 태그 처리",
+                    "sourcesValidation": "소스 검증",
+                    "badgesProcessing": "품질 배지 처리",
+                    "markdownGeneration": "마크다운 콘텐츠 생성",
                     "processing": "처리 중..."
                 },
-                "progress": "진행률",
-                "closeNote": "몇 분 정도 걸릴 수 있습니다. 이 페이지를 닫고 나중에 다시 오셔도 됩니다."
+                "progress": "진행 상황",
+                "closeNote": "몇 분 정도 걸릴 수 있습니다. 이 페이지를 닫고 나중에 다시 방문할 수 있습니다.",
+                "showLogs": "단계 로그 표시",
+                "hideLogs": "단계 로그 숨기기",
+                "waitingForLogs": "실시간 로그 대기 중..."
             },
             "settings": {
-                "sourceSettings": "소스 리포지토리",
+                "sourceSettings": "소스 저장소",
                 "originalSource": "원본 소스",
                 "syncEnabled": "동기화 활성화됨",
-                "syncDescription": "소스 리포지토리에서 업데이트를 자동으로 가져옵니다.",
+                "syncDescription": "소스 저장소에서 업데이트를 자동으로 가져옵니다.",
                 "syncUpdateFailed": "동기화 설정 업데이트 실패",
                 "syncDisabled": "동기화 비활성화됨",
+                "worksConfig": {
+                    "imported": "works.yml에서 가져옴",
+                    "applied": "적용됨: {value}",
+                    "enabled": "활성화됨",
+                    "disabled": "비활성화됨",
+                    "fields": {
+                        "sourceType": "소스 유형",
+                        "configName": "설정 이름",
+                        "initialPrompt": "초기 프롬프트",
+                        "model": "모델",
+                        "schedule": "스케줄",
+                        "providers": "제공자",
+                        "websiteRepo": "웹사이트 저장소",
+                        "additionalAgents": "추가 에이전트"
+                    },
+                    "sourceTypes": {
+                        "dataRepo": "데이터 저장소",
+                        "awesomeReadme": "Awesome README",
+                        "linkExisting": "연결된 기존 저장소",
+                        "worksConfig": "works.yml"
+                    }
+                },
                 "generalSettings": "일반 설정",
                 "generalTitle": "일반 설정",
                 "directoryName": "디렉토리 이름",
                 "description": "설명",
-                "organizationRepository": "조직 리포지토리",
-                "organizationHelp": "개인 계정 대신 조직 아래에 리포지토리 생성",
+                "organizationRepository": "조직 저장소",
+                "organizationHelp": "개인 계정 대신 조직 아래에 저장소를 생성합니다",
                 "organizationName": "조직 이름",
                 "organizationNamePlaceholder": "조직 이름 입력",
                 "readmeConfiguration": "README 구성",
                 "readmeTitle": "README 구성",
-                "customHeader": "사용자 정의 헤더",
-                "customHeaderPlaceholder": "README 헤더에 사용자 정의 콘텐츠 추가",
+                "customHeader": "사용자 지정 헤더",
+                "customHeaderPlaceholder": "README 헤더에 사용자 지정 콘텐츠 추가",
                 "overwriteDefaultHeader": "기본 헤더 덮어쓰기",
-                "customFooter": "사용자 정의 푸터",
+                "customFooter": "사용자 지정 푸터",
                 "cantDeleteWhileGenerating": "항목이 생성되는 동안 디렉토리를 삭제할 수 없습니다.",
-                "customFooterPlaceholder": "README 푸터에 사용자 정의 콘텐츠 추가",
+                "customFooterPlaceholder": "README 푸터에 사용자 지정 콘텐츠 추가",
                 "overwriteDefaultFooter": "기본 푸터 덮어쓰기",
                 "dangerZone": "위험 구역",
                 "dangerTitle": "위험 구역",
-                "deleteWarning": "디렉토리를 삭제하면 되돌릴 수 없습니다. 확실히 확인해 주세요.",
-                "dangerDescription": "디렉토리를 삭제하면 되돌릴 수 없습니다. 확실히 확인해 주세요.",
+                "deleteWarning": "디렉토리를 삭제하면 되돌릴 수 없습니다. 확실한지 확인하세요.",
+                "dangerDescription": "디렉토리를 삭제하면 되돌릴 수 없습니다. 확실한지 확인하세요.",
                 "deleteOptions": "삭제할 항목 선택:",
-                "deleteDataRepository": "데이터 리포지토리 삭제",
-                "deleteDataRepositoryDescription": "GitHub에서 JSON 데이터 리포지토리 제거",
-                "deleteMarkdownRepository": "마크다운 리포지토리 삭제",
-                "deleteMarkdownRepositoryDescription": "README가 포함된 마크다운 리포지토리 제거",
-                "deleteWebsiteRepository": "웹사이트 리포지토리 삭제",
-                "deleteWebsiteRepositoryDescription": "배포된 웹사이트 리포지토리 제거",
-                "deleteConfirm": "정말로 확실합니까?",
-                "deleteConfirmDetail": "이 작업은 취소할 수 없습니다. 디렉토리와 선택된 리포지토리가 영구적으로 삭제됩니다.",
+                "deleteDataRepository": "데이터 저장소 삭제",
+                "deleteDataRepositoryDescription": "GitHub에서 JSON 데이터 저장소 제거",
+                "deleteMarkdownRepository": "마크다운 저장소 삭제",
+                "deleteMarkdownRepositoryDescription": "README가 포함된 마크다운 저장소 제거",
+                "deleteWebsiteRepository": "웹사이트 저장소 삭제",
+                "deleteWebsiteRepositoryDescription": "배포된 웹사이트 저장소 제거",
+                "deleteConfirm": "정말 확실한가요?",
+                "deleteConfirmDetail": "이 작업은 취소할 수 없습니다. 디렉토리와 선택된 저장소가 영구적으로 삭제됩니다.",
                 "confirmDirectoryName": "확인을 위해 디렉토리 이름 입력",
                 "confirmDirectoryNameDescription": "삭제를 확인하려면 \"{name}\" 입력",
                 "deleteNameMismatch": "디렉토리 이름이 일치하지 않습니다",
                 "deleteButton": "디렉토리 삭제",
-                "deleteConfirmButton": "예, 삭제합니다",
+                "deleteConfirmButton": "예, 삭제",
                 "deleteSuccess": "디렉토리가 성공적으로 삭제되었습니다",
                 "deleteFailed": "디렉토리 삭제 실패",
-                "yesDelete": "예, 삭제합니다",
+                "yesDelete": "예, 삭제",
                 "cancel": "취소",
                 "saveChanges": "변경 사항 저장",
                 "updateReadme": "README 업데이트",
                 "updateSuccess": "설정이 성공적으로 업데이트되었습니다",
                 "updateFailed": "설정 업데이트 실패",
-                "visibilityUpdateFailed": "Failed to update repository visibility",
-                "visibilityWarningTitle": "Make Repository Private?",
-                "visibilityWarningDescription": "You are about to make {name} private.",
-                "visibilityWarningPermanent": "This action has permanent consequences:",
-                "visibilityWarningStars": "All stars will be permanently lost",
-                "visibilityWarningWatchers": "All watchers will be removed",
-                "visibilityWarningNotRestored": "Stars and watchers will NOT be restored if you make the repository public again",
-                "visibilityConfirmPrivate": "Yes, Make Private",
+                "deployProvider": {
+                    "title": "배포 제공자",
+                    "description": "디렉토리 웹사이트를 배포할 위치 선택",
+                    "configure": "설정",
+                    "ready": "배포 준비 완료",
+                    "notConfigured": "설정되지 않음",
+                    "deployed": "배포됨",
+                    "viewSite": "사이트 보기",
+                    "updateSuccess": "배포 제공자가 성공적으로 업데이트되었습니다",
+                    "updateFailed": "배포 제공자 업데이트 실패"
+                },
+                "visibilityUpdateFailed": "저장소 가시성 업데이트 실패",
+                "visibilityUpdated": "{name}이(가) 이제 {visibility}입니다",
+                "repositoryVisibilityTitle": "저장소 가시성",
+                "repositoryTypes": {
+                    "main": "메인",
+                    "data": "데이터",
+                    "website": "웹사이트"
+                },
+                "repositoryTypeSuffix": "저장소",
+                "visibilityWarningTitle": "저장소를 비공개로 할까요?",
+                "visibilityWarningDescription": "{name}을(를) 비공개로 설정하려 합니다.",
+                "visibilityWarningPermanent": "이 작업은 영구적인 결과를 초래합니다:",
+                "visibilityWarningStars": "모든 별표가 영구적으로 사라집니다",
+                "visibilityWarningWatchers": "모든 감시자가 제거됩니다",
+                "visibilityWarningNotRestored": "저장소를 다시 공개해도 별표와 감시자는 복원되지 않습니다",
+                "visibilityConfirmPrivate": "예, 비공개로 설정",
                 "advancedPrompts": {
-                    "title": "Advanced Prompts",
-                    "subtitle": "Customize AI prompts for directory generation. Leave empty to use defaults.",
-                    "save": "Save Prompts",
-                    "saveSuccess": "Advanced prompts saved successfully",
-                    "saveFailed": "Failed to save advanced prompts",
+                    "title": "표준 파이프라인",
+                    "subtitle": "사용자 지정 프롬프트",
+                    "comparisonTitle": "비교",
+                    "comparisonSubtitle": "사용자 지정 프롬프트",
+                    "save": "프롬프트 저장",
+                    "saveSuccess": "고급 프롬프트가 성공적으로 저장되었습니다",
+                    "saveFailed": "고급 프롬프트 저장 실패",
+                    "saveComparisonSuccess": "비교 프롬프트가 성공적으로 저장되었습니다",
                     "prompts": {
                         "relevanceAssessment": {
-                            "title": "Relevance Assessment",
-                            "description": "Additional instructions for filtering web pages by relevance to your directory topic.",
-                            "placeholder": "e.g., Only include pages that focus on open-source projects..."
+                            "title": "관련성 평가",
+                            "description": "디렉토리 주제와의 관련성에 따라 웹 페이지를 필터링하기 위한 추가 지침입니다.",
+                            "placeholder": "예: 오픈 소스 프로젝트에 중점을 둔 페이지만 포함..."
                         },
                         "itemGeneration": {
-                            "title": "Item Generation",
-                            "description": "Additional instructions for AI-generated initial items before web search.",
-                            "placeholder": "e.g., Focus on enterprise-grade solutions with active maintenance..."
+                            "title": "항목 생성",
+                            "description": "웹 검색 전에 AI가 생성한 초기 항목에 대한 추가 지침입니다.",
+                            "placeholder": "예: 활성 유지보수가 있는 엔터프라이즈급 솔루션에 중점..."
                         },
                         "itemExtraction": {
-                            "title": "Item Extraction",
-                            "description": "Additional instructions for extracting items from web page content.",
-                            "placeholder": "e.g., Prioritize tools with official documentation links..."
+                            "title": "항목 추출",
+                            "description": "웹 페이지 콘텐츠에서 항목을 추출하기 위한 추가 지침입니다.",
+                            "placeholder": "예: 공식 문서 링크가 있는 도구를 우선..."
                         },
                         "searchQuery": {
-                            "title": "Search Query Generation",
-                            "description": "Additional instructions for generating search queries to find content.",
-                            "placeholder": "e.g., Include queries targeting GitHub repositories and official docs..."
+                            "title": "검색 쿼리 생성",
+                            "description": "콘텐츠를 찾기 위한 검색 쿼리를 생성하기 위한 추가 지침입니다.",
+                            "placeholder": "예: GitHub 저장소와 공식 문서를 대상으로 한 쿼리 포함..."
                         },
                         "categorization": {
-                            "title": "Categorization",
-                            "description": "Additional instructions for categorizing and tagging extracted items.",
-                            "placeholder": "e.g., Use technical categories like 'CLI Tools', 'Libraries', 'Frameworks'..."
+                            "title": "분류",
+                            "description": "추출된 항목을 분류하고 태그를 지정하기 위한 추가 지침입니다.",
+                            "placeholder": "예: 'CLI Tools', 'Libraries', 'Frameworks' 같은 기술 카테고리 사용..."
                         },
                         "deduplication": {
-                            "title": "Deduplication",
-                            "description": "Additional instructions for identifying and removing duplicate items.",
-                            "placeholder": "e.g., Consider items with similar GitHub repos as duplicates..."
+                            "title": "중복 제거",
+                            "description": "중복 항목을 식별하고 제거하기 위한 추가 지침입니다.",
+                            "placeholder": "예: 유사한 GitHub 저장소를 가진 항목을 중복으로 간주..."
                         },
                         "sourceValidation": {
-                            "title": "Source Validation",
-                            "description": "Additional instructions for validating item source URLs.",
-                            "placeholder": "e.g., Prefer official project websites over third-party reviews..."
+                            "title": "소스 검증",
+                            "description": "항목 소스 URL을 검증하기 위한 추가 지침입니다.",
+                            "placeholder": "예: 타사 리뷰보다 공식 프로젝트 웹사이트 선호..."
+                        },
+                        "comparisonCustomPrompt": {
+                            "title": "사용자 지정 프롬프트",
+                            "description": "비교 생성 프롬프트에 추가되는 추가 지침입니다.",
+                            "placeholder": "예: \"가격 차이점에 중점\", \"캐주얼한 톤으로 작성\""
                         }
                     }
                 },
+                "communityPrProcessing": "커뮤니티 PR",
+                "communityPrEnableLabel": "커뮤니티 PR 활성화",
+                "communityPrEnableDescription": "커뮤니티에서 제출된 풀 리퀘스트를 자동으로 처리합니다.",
+                "communityPrAutoCloseLabel": "처리 후 PR 자동 닫기",
+                "communityPrAutoCloseDescription": "커뮤니티 풀 리퀘스트를 처리한 후 자동으로 닫습니다.",
+                "communityPrEnabled": "커뮤니티 PR 처리 활성화됨",
+                "communityPrDisabled": "커뮤니티 PR 처리 비활성화됨",
+                "communityPrSettingsUpdated": "커뮤니티 PR 설정이 업데이트되었습니다",
+                "communityPrUpdateFailed": "커뮤니티 PR 설정 업데이트 실패",
                 "websiteConfig": {
-                    "title": "Website Configuration",
-                    "subtitle": "Customize how your directory website looks and behaves",
-                    "loadFailed": "Failed to load website settings",
-                    "saveSuccess": "Website settings saved successfully",
-                    "saveFailed": "Failed to save website settings",
-                    "save": "Save Settings",
+                    "title": "웹사이트 구성",
+                    "subtitle": "디렉토리 웹사이트의 모양과 동작을 사용자 지정하세요",
+                    "loadFailed": "웹사이트 설정 로드 실패",
+                    "saveSuccess": "웹사이트 설정이 성공적으로 저장되었습니다",
+                    "saveFailed": "웹사이트 설정 저장 실패",
+                    "save": "설정 저장",
+                    "tabs": {
+                        "general": "일반",
+                        "header": "헤더",
+                        "homepage": "홈페이지",
+                        "footer": "푸터"
+                    },
                     "sections": {
                         "siteName": {
-                            "title": "Site Identity",
-                            "label": "Site Name",
-                            "placeholder": "My Directory",
-                            "helper": "The name displayed on your website header and browser tab"
+                            "title": "사이트 아이덴티티",
+                            "label": "사이트 이름",
+                            "placeholder": "내 디렉토리",
+                            "helper": "웹사이트 헤더와 브라우저 탭에 표시되는 이름"
+                        },
+                        "siteUrl": {
+                            "label": "사이트 URL",
+                            "placeholder": "https://example.com",
+                            "helper": "회사 또는 디렉토리 웹사이트의 URL"
                         },
                         "global": {
-                            "title": "Global Features",
-                            "categories": "Categories",
-                            "categoriesHelper": "Show category filtering and navigation",
-                            "tags": "Tags",
-                            "tagsHelper": "Show tag filtering and navigation",
-                            "companies": "Companies",
-                            "companiesHelper": "Show company information for items",
-                            "surveys": "Surveys",
-                            "surveysHelper": "Enable survey functionality"
+                            "title": "전역 기능",
+                            "categories": "카테고리",
+                            "categoriesHelper": "카테고리 필터링 및 탐색 표시",
+                            "collections": "컬렉션",
+                            "collectionsHelper": "큐레이션된 컬렉션 표시",
+                            "tags": "태그",
+                            "tagsHelper": "태그 필터링 및 탐색 표시",
+                            "companies": "회사",
+                            "companiesHelper": "항목에 대한 회사 정보 표시",
+                            "surveys": "설문조사",
+                            "surveysHelper": "설문조사 기능 활성화"
                         },
                         "header": {
-                            "title": "Header Settings",
-                            "submit": "Submit Button",
-                            "submitHelper": "Show the submit item button in header",
-                            "pricing": "Pricing Link",
-                            "pricingHelper": "Show pricing link in header navigation",
-                            "layoutSelector": "Layout Selector",
-                            "layoutSelectorHelper": "Allow users to switch between layouts",
-                            "languageSelector": "Language Selector",
-                            "languageSelectorHelper": "Allow users to change language",
-                            "themeSelector": "Theme Selector",
-                            "themeSelectorHelper": "Allow users to switch between themes",
-                            "defaultLayout": "Default Layout",
-                            "defaultTheme": "Default Theme",
-                            "themeLight": "Light",
-                            "themeDark": "Dark",
-                            "themeSystem": "System",
-                            "defaultPagination": "Default Pagination",
-                            "paginationStandard": "Standard",
-                            "paginationInfinite": "Infinite Scroll",
-                            "paginationLoadMore": "Load More"
+                            "title": "헤더 설정",
+                            "submit": "제출 버튼",
+                            "submitHelper": "헤더에 항목 제출 버튼 표시",
+                            "pricing": "가격 링크",
+                            "pricingHelper": "헤더 탐색에 가격 링크 표시",
+                            "layoutSelector": "레이아웃 선택기",
+                            "layoutSelectorHelper": "사용자가 레이아웃 간 전환 허용",
+                            "languageSelector": "언어 선택기",
+                            "languageSelectorHelper": "사용자가 언어 변경 허용",
+                            "themeSelector": "테마 선택기",
+                            "themeSelectorHelper": "사용자가 테마 간 전환 허용",
+                            "defaults": "기본값",
+                            "defaultLayout": "기본 레이아웃",
+                            "layoutHome1": "홈 1",
+                            "layoutHome2": "홈 2",
+                            "layoutHome3": "홈 3",
+                            "defaultTheme": "기본 테마",
+                            "themeLight": "라이트",
+                            "themeDark": "다크",
+                            "themeSystem": "시스템",
+                            "defaultPagination": "기본 페이지네이션",
+                            "paginationStandard": "표준",
+                            "paginationInfinite": "무한 스크롤",
+                            "paginationLoadMore": "더 보기"
                         },
                         "homepage": {
-                            "title": "Homepage Settings",
-                            "hero": "Hero Section",
-                            "heroHelper": "Show the hero section with title and description",
-                            "search": "Search Bar",
-                            "searchHelper": "Show the search bar on homepage",
-                            "defaultView": "Default View",
-                            "viewClassic": "Classic",
-                            "viewGrid": "Grid",
-                            "viewList": "List",
-                            "defaultSort": "Default Sort",
-                            "sortPopularity": "Popularity",
-                            "sortNewest": "Newest",
-                            "sortAlphabetical": "Alphabetical"
+                            "title": "홈페이지 설정",
+                            "hero": "히어로 섹션",
+                            "heroHelper": "제목과 설명이 포함된 히어로 섹션 표시",
+                            "search": "검색 바",
+                            "searchHelper": "홈페이지에 검색 바 표시",
+                            "defaults": "기본값",
+                            "defaultView": "기본 보기",
+                            "viewClassic": "클래식",
+                            "viewGrid": "그리드",
+                            "viewList": "목록",
+                            "defaultSort": "기본 정렬",
+                            "sortPopularity": "인기",
+                            "sortNewest": "최신",
+                            "sortAlphabetical": "알파벳 순"
                         },
                         "footer": {
-                            "title": "Footer Settings",
-                            "subscribe": "Newsletter Subscribe",
-                            "subscribeHelper": "Show newsletter subscription form",
-                            "version": "Version Display",
-                            "versionHelper": "Show version information in footer",
-                            "themeSelector": "Footer Theme Selector",
-                            "themeSelectorHelper": "Show theme toggle in footer"
+                            "title": "푸터 설정",
+                            "subscribe": "뉴스레터 구독",
+                            "subscribeHelper": "뉴스레터 구독 양식 표시",
+                            "version": "버전 표시",
+                            "versionHelper": "푸터에 버전 정보 표시",
+                            "themeSelector": "푸터 테마 선택기",
+                            "themeSelectorHelper": "푸터에 테마 토글 표시"
                         },
                         "customMenu": {
-                            "title": "Custom Menu Links",
-                            "description": "Add custom links to your website header and footer navigation",
-                            "headerLinks": "Header Links",
-                            "footerLinks": "Footer Links",
-                            "addLink": "Add Link",
-                            "noLinks": "No custom links added",
-                            "labelPlaceholder": "Link label",
-                            "pathPlaceholder": "/about or https://...",
-                            "targetSelf": "Same tab",
-                            "targetBlank": "New tab"
+                            "title": "사용자 지정 메뉴 링크",
+                            "description": "웹사이트 헤더와 푸터 탐색에 사용자 지정 링크 추가",
+                            "headerLinks": "헤더 링크",
+                            "footerLinks": "푸터 링크",
+                            "addLink": "링크 추가",
+                            "noLinks": "사용자 지정 링크가 추가되지 않음",
+                            "labelPlaceholder": "링크 레이블",
+                            "pathPlaceholder": "/about 또는 https://...",
+                            "targetSelf": "같은 탭",
+                            "targetBlank": "새 탭"
                         }
                     }
+                },
+                "committer": {
+                    "title": "Git 커미터",
+                    "description": "이 디렉토리의 git 커밋에 대한 커미터 이름과 이메일을 재정의합니다. 사용자 수준 설정이나 계정 기본값을 사용하려면 비워 두세요.",
+                    "nameLabel": "커미터 이름",
+                    "emailLabel": "커미터 이메일",
+                    "save": "커미터 저장",
+                    "saved": "커미터 설정이 저장되었습니다",
+                    "saveFailed": "커미터 설정 저장 실패"
                 }
             },
             "deploy": {
                 "noProviderAlert": {
-                    "title": "No Deployment Provider",
-                    "description": "Select a deployment provider to deploy your directory website.",
-                    "selectButton": "Select & Continue",
-                    "noProviders": "No deployment providers available. Install a deployment plugin first."
+                    "title": "배포 제공자 없음",
+                    "description": "디렉토리 웹사이트를 배포하려면 배포 제공자를 선택하세요.",
+                    "selectButton": "선택 & 계속",
+                    "noProviders": "사용 가능한 배포 제공자가 없습니다. 먼저 배포 플러그인을 설치하세요."
                 },
                 "noTokenAlert": {
-                    "title": "{provider} Token Required",
-                    "description": "To deploy your directory, you need to configure your {provider} API token in Plugin Settings.",
-                    "configureButton": "API 토큰 설정으로 이동",
-                    "getTokenButton": "Vercel 토큰 가져오기",
+                    "title": "{provider} 토큰 필요",
+                    "description": "디렉토리를 배포하려면 플러그인 설정에서 {provider} API 토큰을 구성해야 합니다.",
+                    "configureButton": "플러그인 설정에서 구성",
+                    "getTokenButton": "API 토큰 가져오기",
                     "howTo": {
-                        "title": "Vercel 토큰 구성 방법:",
-                        "step1": "Vercel 대시보드를 열려면 'Vercel 토큰 가져오기' 클릭",
+                        "title": "배포 구성 방법:",
+                        "step1": "'API 토큰 가져오기'를 클릭하여 제공자 대시보드를 열기",
                         "step2": "배포 권한이 있는 새 토큰 생성",
-                        "step3": "플러그인 설정 > {provider}에서 {provider} API 토큰을 구성하세요",
-                        "step4": "디렉토리를 배포하려면 여기로 돌아오세요"
+                        "step3": "플러그인 설정 > {provider}에서 {provider} API 토큰 구성",
+                        "step4": "여기로 돌아와 디렉토리 배포"
                     }
                 },
                 "sharedNoTokenAlert": {
-                    "title": "배포 불가",
-                    "description": "디렉토리 소유자가 배포를 위해 Vercel 토큰을 구성하지 않았습니다. 배포 설정을 위해 디렉토리 소유자에게 문의해 주세요.",
-                    "hint": "협업자로서 소유자가 Vercel 통합을 구성하면 배포를 트리거할 수 있습니다."
+                    "title": "배포 사용 불가",
+                    "description": "디렉토리 소유자가 배포를 구성하지 않았습니다. 디렉토리 소유자에게 배포 설정을 요청하세요.",
+                    "hint": "협력자로서, 소유자가 배포 제공자를 구성하면 배포를 시작할 수 있습니다."
                 },
                 "form": {
                     "deployment": {
-                        "title": "Vercel에 배포",
-                        "description": "디렉토리 웹사이트 리포지토리를 Vercel에 배포하세요.",
-                        "deployButton": "{provider}에 배포",
+                        "title": "웹사이트 배포",
+                        "description": "디렉토리 웹사이트 저장소를 배포하세요.",
+                        "deployButton": "{provider}로 배포",
                         "deployingButton": "배포 중...",
                         "deployingStateButton": "배포 중 ({state})...",
                         "successMessage": "웹사이트가 성공적으로 배포되었습니다!",
                         "teamSelection": {
-                            "title": "Vercel 팀 선택",
-                            "description": "이 디렉토리를 배포할 Vercel 팀을 선택하세요.",
+                            "title": "팀 선택",
+                            "description": "이 디렉토리를 배포할 팀을 선택하세요.",
                             "label": "팀",
                             "placeholder": "팀 선택",
-                            "confirmButton": "팀에 배포",
+                            "confirmButton": "팀으로 배포",
                             "cancelButton": "취소"
                         }
                     },
                     "updateRepository": {
-                        "title": "웹사이트 리포지토리 업데이트",
-                        "description": "템플릿의 최신 변경사항을 다음으로 동기화",
-                        "websiteRepository": "웹사이트 리포지토리",
-                        "updateButton": "리포지토리 업데이트",
+                        "title": "웹사이트 저장소 업데이트",
+                        "description": "템플릿의 최신 변경 사항을 다음에 동기화:",
+                        "websiteRepository": "웹사이트 저장소",
+                        "updateButton": "저장소 업데이트",
                         "updatingButton": "업데이트 중..."
                     },
                     "messages": {
                         "deploySuccess": "배포가 성공적으로 시작되었습니다",
-                        "deployPending": "배포가 대기 중이며 곧 시작됩니다",
-                        "deployFailed": "Vercel 배포 실패",
-                        "deployError": "배포 중 오류 발생",
-                        "updateSuccess": "리포지토리가 성공적으로 업데이트되었습니다",
-                        "updateFailed": "리포지토리 업데이트 실패",
-                        "updateError": "리포지토리 업데이트 중 오류 발생"
+                        "deployPending": "배포가 대기열에 추가되었으며 곧 시작됩니다",
+                        "deployFailed": "배포 실패",
+                        "deployError": "배포 중 오류가 발생했습니다",
+                        "saveSettingsFailed": "설정 저장 실패",
+                        "saveSettingsBeforeDeploymentFailed": "배포 전에 설정 저장 실패",
+                        "updateSuccess": "저장소가 성공적으로 업데이트되었습니다",
+                        "updateFailed": "저장소 업데이트 실패",
+                        "updateError": "저장소 업데이트 중 오류가 발생했습니다"
                     },
                     "info": {
-                        "deployInfo": "배포는 일반적으로 1-3분 정도 소요됩니다. 완료되면 URL을 받게 됩니다.",
-                        "updateInfo": "업데이트는 다음 배포를 위해 디렉토리 콘텐츠를 웹사이트 리포지토리에 동기화합니다."
+                        "deployInfo": "배포는 일반적으로 1-3분이 걸립니다. 완료되면 URL을 받게 됩니다.",
+                        "updateInfo": "업데이트는 다음 배포를 위해 디렉토리 콘텐츠를 웹사이트 저장소에 동기화합니다."
                     },
                     "websiteTemplate": {
                         "title": "자동 템플릿 업데이트",
-                        "description": "최신 템플릿 변경사항과 자동으로 동기화되도록 유지하세요.",
+                        "description": "웹사이트를 최신 템플릿 변경 사항과 자동으로 동기화하세요.",
                         "autoUpdate": "자동 업데이트",
-                        "autoUpdateDescription": "매시간 템플릿 업데이트를 확인하고 자동으로 적용합니다.",
+                        "autoUpdateDescription": "매시간 템플릿 업데이트를 확인하고 자동 적용",
                         "useBeta": "템플릿 베타 버전 사용",
-                        "useBetaDescription": "안정적인 메인 브랜치 대신 스테이지 브랜치를 사용합니다.",
+                        "useBetaDescription": "안정적인 main 브랜치 대신 stage 브랜치를 사용",
                         "lastUpdated": "마지막 업데이트",
                         "lastChecked": "마지막 확인",
                         "lastError": "마지막 오류",
                         "updateSuccess": "설정이 성공적으로 업데이트되었습니다",
                         "updateFailed": "설정 업데이트 실패",
-                        "githubRequired": "GitHub connection required. Please connect your GitHub account in Settings to enable automatic updates."
+                        "githubRequired": "GitHub 연결 필요. 자동 업데이트를 활성화하려면 설정에서 GitHub 계정을 연결하세요."
                     },
                     "configDialog": {
-                        "title": "Configure Before Deploy",
-                        "description": "Review and customize your website settings before deployment",
-                        "siteName": "Site Name",
-                        "siteNamePlaceholder": "My Directory",
-                        "siteNameHelper": "The name displayed on your website (default: Acme)",
-                        "advancedSettings": "Advanced Settings",
-                        "advancedSettingsDescription": "Configure additional website options",
-                        "loadFailed": "Failed to load current settings",
-                        "saveAndDeploy": "Save & Deploy",
-                        "skipAndDeploy": "Skip & Deploy",
-                        "cancel": "Cancel"
+                        "title": "배포 전 구성",
+                        "description": "배포 전에 웹사이트 설정 검토 및 사용자 지정",
+                        "siteName": "사이트 이름",
+                        "siteNamePlaceholder": "내 디렉토리",
+                        "siteNameHelper": "웹사이트에 표시되는 이름 (기본값: Acme)",
+                        "tabGeneral": "전역",
+                        "tabHeader": "헤더",
+                        "tabHomepage": "홈페이지",
+                        "tabFooter": "푸터",
+                        "featuresLabel": "활성화된 기능",
+                        "visibilityLabel": "가시성",
+                        "defaultsLabel": "기본값",
+                        "advancedSettings": "고급 설정",
+                        "advancedSettingsDescription": "추가 웹사이트 옵션 구성",
+                        "loadFailed": "현재 설정 로드 실패",
+                        "saveAndDeploy": "저장 & 배포",
+                        "skipAndDeploy": "건너뛰기 & 배포",
+                        "cancel": "취소"
                     }
+                },
+                "domains": {
+                    "title": "커스텀 도메인",
+                    "description": "배포된 웹사이트에 커스텀 도메인 추가",
+                    "placeholder": "example.com",
+                    "addButton": "추가",
+                    "loading": "도메인 로딩 중...",
+                    "loadFailed": "도메인 로드 실패",
+                    "noDomains": "구성된 커스텀 도메인이 없습니다. 위에서 하나 추가하여 시작하세요.",
+                    "added": "도메인 추가됨. 확인을 위해 DNS 구성하세요.",
+                    "addedAndVerified": "도메인 추가 및 확인됨!",
+                    "addFailed": "도메인 추가 실패",
+                    "removed": "도메인 제거됨",
+                    "removeFailed": "도메인 제거 실패",
+                    "verified": "도메인 확인 성공!",
+                    "verifyPending": "DNS가 아직 확인되지 않음. DNS 설정을 확인하고 나중에 다시 시도하세요.",
+                    "verifyFailed": "도메인 확인 실패",
+                    "copied": "클립보드에 복사됨",
+                    "autoAssigned": "자동 할당",
+                    "verifiedBadge": "확인됨",
+                    "pendingBadge": "대기 중",
+                    "verifyButton": "DNS 확인",
+                    "removeButton": "도메인 제거",
+                    "dnsInstructions": "DNS 지침 표시",
+                    "dnsTitle": "이 DNS 레코드 구성:",
+                    "dnsName": "이름:",
+                    "dnsValue": "값:",
+                    "copyButton": "복사"
                 }
             }
         },
         "directoryCreation": {
-            "title": "새 디렉토리 만들기",
-            "subtitle": "디렉토리를 만드는 방법을 선택하세요",
+            "title": "새 디렉토리 생성",
+            "subtitle": "디렉토리를 생성하는 방법을 선택하세요",
             "backToOptions": "옵션으로 돌아가기",
+            "sidebar": {
+                "selectedProvider": "Git 제공자",
+                "selectedDeployProvider": "배포 제공자"
+            },
+            "deployProvider": {
+                "title": "배포 제공자",
+                "description": "디렉토리 웹사이트를 배포할 위치를 선택하세요",
+                "noProviders": "사용 가능한 배포 제공자가 없습니다",
+                "notConfigured": "설정되지 않음",
+                "configured": "배포 준비 완료",
+                "configureLink": "설정"
+            },
             "organizationSelector": {
-                "label": "리포지토리 소유자",
-                "loading": "조직 로드 중...",
+                "label": "저장소 소유자",
+                "loading": "조직 로딩 중...",
                 "personal": "개인 계정",
-                "personalAccount": "리포지토리가 개인 계정 아래 생성됩니다",
+                "personalAccount": "저장소가 개인 계정 아래에 생성됩니다",
                 "organizations": "조직",
-                "personalHelp": "리포지토리가 개인 GitHub 계정 아래 생성됩니다",
-                "organizationHelp": "리포지토리가 {org} 조직 아래 생성됩니다",
-                "connectRequired": "저장소가 생성될 위치를 선택하려면 사이드바에서 Git 공급자를 연결하세요."
+                "personalHelp": "저장소가 개인 GitHub 계정 아래에 생성됩니다",
+                "organizationHelp": "{org} 조직 아래에 저장소가 생성됩니다",
+                "connectRequired": "저장소 생성 위치를 선택하려면 사이드바에서 Git 제공자를 연결하세요."
             },
             "ai": {
-                "title": "AI로 만들기",
-                "subtitle": "자연어로 디렉토리 아이디어를 설명하고 AI가 설정을 처리하도록 하세요",
+                "title": "AI로 생성",
+                "subtitle": "디렉토리 아이디어를 자연어로 설명하고 AI가 설정을 처리하게 하세요",
                 "getStarted": "시작하기",
-                "formTitle": "AI로 디렉토리 만들기",
-                "formSubtitle": "디렉토리 아이디어를 설명하고 AI가 설정 및 초기 콘텐츠 생성을 처리하도록 하세요",
+                "formTitle": "AI로 디렉토리 생성",
+                "formSubtitle": "디렉토리 아이디어를 설명하고 AI가 설정과 초기 콘텐츠 생성을 처리하게 하세요",
                 "directoryNameLabel": "디렉토리 이름",
-                "directoryNamePlaceholder": "예: Awesome AI Tools",
+                "directoryNamePlaceholder": "e.g., Awesome AI Tools",
                 "directoryNameHelp": "비워두면 AI가 이름을 제안합니다",
                 "promptLabel": "디렉토리 설명",
-                "githubRequired": "먼저 GitHub 계정을 연결해 주세요.",
-                "promptPlaceholder": "어떤 종류의 디렉토리를 만들고 싶은지, 어떤 항목을 포함해야 하는지, 특별한 요구사항이 있는지 설명하세요...",
-                "inspirationText": "영감이 필요하신가요? 다음 중 하나를 시도해 보세요:",
+                "githubRequired": "먼저 GitHub 계정을 연결하세요.",
+                "promptPlaceholder": "생성할 디렉토리 종류, 포함할 항목, 특정 요구사항 등을 설명하세요...",
+                "inspirationText": "영감이 필요하세요? 다음 중 하나를 시도해보세요:",
                 "examplePrompts": {
                     "0": {
                         "name": "AI 개발자 도구",
-                        "prompt": "개발자를 위한 최고의 AI 도구 디렉토리 만들기"
+                        "prompt": "개발자를 위한 최고의 AI 도구 디렉토리 생성"
                     },
                     "1": {
                         "name": "React 컴포넌트 허브",
-                        "prompt": "오픈소스 React 컴포넌트 큐레이팅 목록 구축"
+                        "prompt": "오픈소스 React 컴포넌트의 큐레이션된 목록 구축"
                     },
                     "2": {
                         "name": "원격 팀 도구",
                         "prompt": "원격 팀을 위한 생산성 앱 디렉토리 생성"
                     },
                     "3": {
-                        "name": "지속가능한 패션",
-                        "prompt": "지속가능한 패션 브랜드 컬렉션 만들기"
+                        "name": "지속 가능한 패션",
+                        "prompt": "지속 가능한 패션 브랜드 컬렉션 만들기"
                     }
                 },
-                "featuresTitle": "AI가 해줄 일:",
+                "featuresTitle": "AI가 당신을 위해 할 일:",
                 "features": {
                     "0": "적절한 이름과 설명 생성",
                     "1": "초기 카테고리와 구조 생성",
-                    "2": "관련 항목 자동으로 찾아 추가",
-                    "3": "적절한 문서로 GitHub 리포지토리 설정"
+                    "2": "관련 항목 자동으로 찾고 추가",
+                    "3": "적절한 문서와 함께 GitHub 저장소 설정"
                 },
                 "generateButton": "AI로 생성",
                 "generatingButton": "디렉토리 생성 중...",
                 "cancelButton": "취소",
                 "noteTitle": "참고:",
-                "noteText": "AI 생성은 요청의 복잡성에 따라 일반적으로 2-5분 정도 소요됩니다. 디렉토리가 준비되면 알림을 받게 됩니다.",
+                "noteText": "AI 생성은 요청 복잡도에 따라 보통 2-5분 걸립니다. 디렉토리가 준비되면 알림을 받습니다.",
                 "errors": {
-                    "promptRequired": "어떤 종류의 디렉토리를 만들고 싶은지 설명해 주세요",
+                    "promptRequired": "생성할 디렉토리 종류를 설명하세요",
+                    "unconfiguredProviders": "{providers}가 설정되지 않았습니다. 생성 전에 설정 → 플러그인으로 이동하여 설정하세요.",
                     "nameRequired": "디렉토리 이름이 필요합니다",
                     "slugRequired": "디렉토리 슬러그가 필요합니다",
-                    "descriptionRequired": "디렉토리 설명이 필요합니다"
+                    "descriptionRequired": "디렉토리 설명이 필요합니다",
+                    "githubRequired": "먼저 GitHub 계정을 연결하세요.",
+                    "createFailed": "디렉토리 생성 실패"
                 },
                 "success": {
                     "started": "디렉토리 생성 시작!",
-                    "generating": "AI가 콘텐츠를 생성 중입니다. 몇 분 정도 걸릴 수 있습니다...",
+                    "generating": "AI가 콘텐츠 생성 중입니다. 몇 분 걸릴 수 있습니다...",
                     "created": "디렉토리가 성공적으로 생성되었습니다!"
                 },
                 "advancedSettings": "고급 설정",
-                "advancedSubtitle": "조직 및 리포지토리 설정 구성",
-                "organizationLabel": "조직 리포지토리",
-                "organizationHelp": "개인 계정 대신 조직 아래에 리포지토리 생성",
+                "advancedSubtitle": "조직 및 저장소 설정 구성",
+                "organizationLabel": "조직 저장소",
+                "organizationHelp": "개인 계정 대신 조직 아래에 저장소 생성",
                 "organizationNameLabel": "조직 이름",
                 "organizationNamePlaceholder": "조직 이름 입력"
             },
             "manual": {
-                "title": "수동으로 만들기",
+                "title": "수동 생성",
                 "subtitle": "모든 설정과 옵션을 완전히 제어하며 디렉토리 구성",
-                "configureNow": "지금 구성하기",
-                "formTitle": "수동으로 디렉토리 만들기",
+                "configureNow": "지금 구성",
+                "formTitle": "디렉토리 수동 생성",
                 "formSubtitle": "모든 설정을 완전히 제어하며 디렉토리 구성",
                 "basicInfo": "기본 정보",
                 "nameLabel": "디렉토리 이름 *",
-                "namePlaceholder": "예: Awesome AI Tools",
+                "namePlaceholder": "e.g., Awesome AI Tools",
                 "slugLabel": "디렉토리 슬러그 *",
                 "slugPlaceholder": "awesome-ai-tools",
-                "githubRequired": "먼저 GitHub 계정을 연결해 주세요.",
-                "slugHelp": "URL 친화적 식별자 (소문자, 숫자, 하이픈만 가능)",
+                "githubRequired": "먼저 GitHub 계정을 연결하세요.",
+                "slugHelp": "URL 친화적 식별자 (소문자, 숫자, 하이픈만)",
                 "descriptionLabel": "설명 *",
-                "descriptionPlaceholder": "개발자를 위한 최고의 AI 도구 및 리소스 큐레이팅 목록",
+                "descriptionPlaceholder": "개발자를 위한 최고의 AI 도구와 리소스의 큐레이션된 목록",
                 "advancedSettings": "고급 설정",
-                "advancedSubtitle": "조직, 사용자 정의 헤더 등",
+                "advancedSubtitle": "조직, 사용자 지정 헤더 등",
                 "organizationLabel": "조직 아래 생성",
-                "organizationHelp": "개인 계정 대신 GitHub 조직 아래 이 디렉토리 생성",
+                "organizationHelp": "이 디렉토리를 개인 계정 대신 GitHub 조직 아래에 생성",
                 "organizationNameLabel": "조직 이름",
                 "organizationNamePlaceholder": "my-organization",
-                "headerLabel": "사용자 정의 README 헤더",
-                "headerPlaceholder": "README 파일 상단에 사용자 정의 콘텐츠 추가",
+                "headerLabel": "사용자 지정 README 헤더",
+                "headerPlaceholder": "README 파일 상단에 사용자 지정 콘텐츠 추가",
                 "headerOverwrite": "기본 헤더 완전히 교체",
-                "footerLabel": "사용자 정의 README 푸터",
-                "footerPlaceholder": "README 파일 하단에 사용자 정의 콘텐츠 추가",
+                "footerLabel": "사용자 지정 README 푸터",
+                "footerPlaceholder": "README 파일 하단에 사용자 지정 콘텐츠 추가",
                 "footerOverwrite": "기본 푸터 완전히 교체",
-                "createButton": "디렉토리 만들기",
+                "createButton": "디렉토리 생성",
                 "creatingButton": "디렉토리 생성 중...",
                 "cancelButton": "취소",
                 "nameRequired": "디렉토리 이름이 필요합니다",
                 "slugRequired": "디렉토리 슬러그가 필요합니다",
                 "descriptionRequired": "디렉토리 설명이 필요합니다",
+                "createFailed": "디렉토리 생성 실패",
                 "success": {
                     "created": "디렉토리가 성공적으로 생성되었습니다!"
                 }
             },
             "import": {
                 "title": "기존 가져오기",
-                "subtitle": "기존 GitHub 리포지토리에서 디렉토리 가져오기",
+                "subtitle": "기존 GitHub 저장소에서 디렉토리 가져오기",
                 "importNow": "지금 가져오기",
+                "aiProviderSettings": "AI 제공자",
+                "aiProviderSettingsDescription": "README 파싱에 사용할 AI 제공자 선택",
                 "formTitle": "GitHub에서 디렉토리 가져오기",
-                "formSubtitle": "기존 GitHub 리포지토리에서 항목을 가져와 디렉토리 생성",
+                "formSubtitle": "기존 GitHub 저장소에서 항목을 가져와 디렉토리 생성",
                 "sync": {
                     "title": "동기화 유지",
-                    "description": "소스 리포지토리에서 업데이트를 자동으로 가져옵니다."
+                    "description": "소스 저장소에서 업데이트 자동 가져오기."
+                },
+                "worksConfigRestore": {
+                    "title": "works.yml 설정 복원",
+                    "description": "이 저장소의 AI 제공자, 모델, 일정 및 관련 저장소 설정을 적용합니다."
                 },
                 "sourceMethod": {
                     "url": {
                         "title": "URL 붙여넣기",
-                        "description": "GitHub 리포지토리 URL 직접 입력"
+                        "description": "GitHub 저장소 URL 직접 입력"
                     },
                     "repository": {
-                        "title": "내 리포지토리",
-                        "description": "GitHub 리포지토리에서 선택"
+                        "title": "내 저장소",
+                        "description": "GitHub 저장소에서 선택"
                     }
                 },
-                "urlLabel": "GitHub 리포지토리 URL",
+                "urlLabel": "GitHub 저장소 URL",
                 "urlPlaceholder": "https://github.com/owner/repository",
-                "urlHelp": "GitHub 리포지토리의 전체 URL 입력",
+                "urlHelp": "GitHub 저장소의 전체 URL 입력",
                 "supportedFormats": {
-                    "title": "지원되는 리포지토리 형식",
+                    "title": "지원 저장소 형식",
                     "dataRepo": {
-                        "title": "데이터 리포지토리",
-                        "description": "config.yml 및 data/ 폴더 구조가 있는 리포지토리"
+                        "title": "데이터 저장소",
+                        "description": "config.yml과 data/ 폴더 구조를 가진 저장소"
                     },
                     "awesomeReadme": {
                         "title": "Awesome 목록",
-                        "description": "마크다운 README가 있는 큐레이팅 목록 리포지토리"
+                        "description": "마크다운 README를 가진 큐레이션된 목록 저장소"
                     }
                 },
                 "analyzing": {
-                    "title": "리포지토리 분석 중",
-                    "subtitle": "리포지토리 유형 및 구조 감지 중..."
+                    "title": "저장소 분석 중",
+                    "subtitle": "저장소 유형과 구조 감지 중..."
                 },
                 "detectedType": {
-                    "dataRepo": "데이터 리포지토리 감지됨",
-                    "awesomeReadme": "Awesome 목록 감지됨"
+                    "dataRepo": "데이터 저장소 감지됨",
+                    "awesomeReadme": "Awesome 목록 감지됨",
+                    "worksConfig": "Works 설정 저장소"
                 },
                 "badges": {
-                    "dataRepo": "데이터 리포지토리",
-                    "awesomeReadme": "Awesome 목록"
+                    "dataRepo": "데이터 Repo",
+                    "awesomeReadme": "Awesome 목록",
+                    "worksConfig": "works.yml"
                 },
                 "preview": {
                     "items": "항목",
-                    "categories": "카테고리"
+                    "categories": "카테고리",
+                    "schedule": "스케줄: {cadence}",
+                    "providers": "제공자: {providers}"
                 },
                 "nameLabel": "디렉토리 이름",
-                "namePlaceholder": "예: 내 Awesome 디렉토리",
+                "namePlaceholder": "e.g., My Awesome Directory",
                 "advancedSettings": "고급 설정",
-                "advancedSubtitle": "조직 및 리포지토리 설정 구성",
+                "advancedSubtitle": "조직 및 저장소 설정 구성",
                 "attribution": {
-                    "title": "소스 출처:",
-                    "text": "이 디렉토리는 소스로 {url}을(를) 참조합니다"
+                    "title": "소스 귀속:",
+                    "text": "이 디렉토리는 {url}을 소스로 참조합니다"
                 },
-                "analyzeButton": "리포지토리 분석",
+                "research": {
+                    "title": "가져오기 & 연구 모드",
+                    "description": "소스 저장소의 항목이 연구 시드로 사용됩니다. AI 파이프라인이 새 항목 발견, 설명 재작성, 분류 체계 확장.",
+                    "seedDetected": "~{count} 시드 항목 감지됨",
+                    "expansionFactor": "확장 목표",
+                    "expansionDescription": "최종 컬렉션이 소스 대비 몇 배 커야 하나요?",
+                    "recommendedMultiplier": "{value} (권장)",
+                    "preview": "~{seedCount} 시드 항목 → 목표 ~{targetCount} 최종 항목 (~{newItems} 새 항목 발견)",
+                    "enrichmentOptions": "풍부화 옵션",
+                    "enrichDescriptions": "설명 재작성",
+                    "enrichDescriptionsHint": "AI가 모든 가져온 설명을 재작성하고 확장합니다",
+                    "expandTaxonomy": "카테고리 & 태그 확장",
+                    "expandTaxonomyHint": "소스 분류 체계 너머 새로운 카테고리와 태그 생성",
+                    "parsePrIssues": "PR & 이슈 파싱",
+                    "parsePrIssuesHint": "풀 리퀘스트와 이슈에서 추가 항목 추출",
+                    "legalNote": "참고:",
+                    "legalDescription": "연구 모드는 소스 저장소를 입력 데이터로만 사용합니다. 최종 컬렉션은 주로 새로 발견된 항목과 원본 AI 생성 설명으로 구성됩니다. 소스 콘텐츠는 그대로 복사되지 않습니다.",
+                    "importButton": "가져오기 & 연구 시작",
+                    "importingButton": "연구 파이프라인 시작 중..."
+                },
+                "analyzeButton": "저장소 분석",
                 "importButton": "디렉토리 가져오기",
                 "importingButton": "가져오는 중...",
                 "backButton": "뒤로",
                 "cancelButton": "취소",
                 "importing": {
                     "title": "디렉토리 가져오는 중",
-                    "subtitle": "소스 리포지토리에서 디렉토리 설정 중..."
+                    "subtitle": "소스 저장소에서 디렉토리 설정 중..."
                 },
                 "repositorySelector": {
-                    "title": "리포지토리 선택",
-                    "searchPlaceholder": "리포지토리 검색...",
-                    "loading": "리포지토리 로드 중...",
-                    "noRepositories": "리포지토리를 찾을 수 없습니다",
-                    "noResults": "검색과 일치하는 리포지토리가 없습니다",
+                    "title": "저장소 선택",
+                    "searchPlaceholder": "저장소 검색...",
+                    "loading": "저장소 로딩 중...",
+                    "noRepositories": "저장소가 없습니다",
+                    "noResults": "검색과 일치하는 저장소가 없습니다",
                     "tryAgain": "다시 시도",
-                    "loadMore": "더 보기",
-                    "showing": "{total}개 리포지토리 중 {shown}개 표시 중",
+                    "loadMore": "더 불러오기",
+                    "showing": "{total}개 중 {shown}개 저장소 표시 중",
                     "today": "오늘",
                     "yesterday": "어제",
                     "daysAgo": "{days}일 전",
                     "weeksAgo": "{weeks}주 전",
-                    "repositoriesLoaded": "리포지토리 로드됨",
-                    "moreAvailable": "더 사용 가능",
+                    "repositoriesLoaded": "저장소 로드됨",
+                    "moreAvailable": "더 있음",
+                    "ownerLabel": "저장소 소유자",
+                    "personalAccount": "개인 계정",
+                    "organizations": "조직",
+                    "showingPersonalRepos": "개인 저장소 표시 중",
+                    "showingOrgRepos": "{org}의 저장소 표시 중",
                     "errors": {
-                        "fetchFailed": "리포지토리 로드 실패"
+                        "fetchFailed": "저장소 로드 실패"
                     }
                 },
                 "chooseMode": {
                     "title": "가져오기 방법 선택",
-                    "repository": "리포지토리: {owner}/{repo}",
-                    "repositoryWithItems": "리포지토리: {owner}/{repo} ({itemCount}개 항목)",
+                    "repository": "저장소: {owner}/{repo}",
+                    "repositoryWithItems": "저장소: {owner}/{repo} ({itemCount} 항목)",
                     "importCopy": {
-                        "title": "가져오기 및 복사",
-                        "description": "데이터 복사본으로 새 리포지토리 생성. 포크 또는 새로 시작에 최적."
+                        "title": "가져오기 & 복사",
+                        "description": "데이터 복사본으로 새 저장소 생성. 포킹이나 새로 시작에 최적."
                     },
                     "linkExisting": {
                         "title": "기존 연결",
-                        "description": "기존 리포지토리를 직접 사용합니다. 복사 없음, 변경사항이 자동으로 동기화됩니다."
+                        "description": "기존 저장소 직접 사용. 복사 없음, 변경사항 자동 동기화."
+                    },
+                    "research": {
+                        "title": "가져오기 & 연구",
+                        "description": "연구 시드로 사용, AI로 새 항목 자동 발견 및 콘텐츠 풍부화."
                     },
                     "back": "뒤로"
                 },
                 "linkConfirm": {
-                    "title": "리포지토리 연결",
-                    "descriptionMissing": "일부 리포지토리를 찾을 수 없습니다. 없이 계속하거나 지금 생성할 수 있습니다.",
-                    "descriptionReady": "모든 리포지토리를 찾았습니다. 연결할 준비가 되었습니다.",
-                    "dataRepo": "데이터 리포지토리",
-                    "markdownRepo": "마크다운 리포지토리",
-                    "websiteRepo": "웹사이트 리포지토리",
-                    "found": "찾음",
-                    "notFound": "찾을 수 없음",
+                    "title": "저장소 연결",
+                    "descriptionMissing": "일부 저장소가 발견되지 않았습니다. 없이 계속하거나 지금 생성할 수 있습니다.",
+                    "descriptionReady": "모든 저장소 발견됨. 연결 준비 완료.",
+                    "dataRepo": "데이터 저장소",
+                    "markdownRepo": "마크다운 저장소",
+                    "websiteRepo": "웹사이트 저장소",
+                    "found": "발견됨",
+                    "notFound": "미발견",
                     "cancel": "취소",
                     "continueWithout": "없이 계속",
-                    "createMissing": "누락된 항목 생성",
+                    "createMissing": "누락된 생성",
                     "creating": "생성 중...",
                     "linking": "연결 중...",
-                    "linkRepos": "리포지토리 연결"
+                    "linkRepos": "저장소 연결"
                 },
+                "detectionFailed": "형식을 자동 감지할 수 없습니다. 이 저장소를 가져오는 방법을 선택하세요.",
+                "detectionFailedMissingConfig": "지원되는 설정을 찾을 수 없습니다. 저장소에 config.yml, works.yml 또는 works_config/works.yml을 추가하거나 아래 수동 가져오기 형식을 선택하세요.",
                 "errors": {
-                    "urlRequired": "GitHub 리포지토리 URL을 입력해 주세요",
-                    "unsupportedFormat": "이 리포지토리 형식은 지원되지 않습니다. 데이터 리포지토리 또는 Awesome 목록 형식을 사용해 주세요.",
-                    "analyzeFailed": "리포지토리 분석 실패",
+                    "urlRequired": "GitHub 저장소 URL을 입력하세요",
+                    "unsupportedFormat": "이 저장소 형식을 지원하지 않습니다. 데이터 저장소 또는 Awesome 목록 형식을 사용하세요.",
+                    "analyzeFailed": "저장소 분석 실패",
                     "analyzeForLinkingFailed": "연결을 위한 분석 실패",
                     "nameRequired": "디렉토리 이름이 필요합니다",
-                    "noAnalysis": "먼저 리포지토리를 분석해 주세요",
-                    "githubRequired": "먼저 GitHub 계정을 연결해 주세요",
+                    "noAnalysis": "먼저 저장소를 분석하세요",
+                    "githubRequired": "먼저 GitHub 계정을 연결하세요",
                     "importFailed": "디렉토리 가져오기 실패",
-                    "linkFailed": "디렉토리 연결 실패"
+                    "linkFailed": "디렉토리 연결 실패",
+                    "providerNotConfigured": "{provider}가 설정되지 않았습니다. 가져오기 전에 설정 → 플러그인으로 이동하여 설정하세요."
                 },
                 "success": {
-                    "started": "가져오기 시작! 디렉토리로 리디렉션 중...",
-                    "linked": "디렉토리가 성공적으로 연결되었습니다"
+                    "started": "가져오기 시작! 디렉토리로 리다이렉트 중...",
+                    "linked": "디렉토리 성공적으로 연결됨"
                 },
-                "detectionFailed": "형식을 자동으로 감지할 수 없습니다. 이 저장소를 가져오는 방법을 선택하세요."
+                "slugConflict": {
+                    "title": "저장소 이름 충돌",
+                    "description": "이 이름의 저장소가 계정에 이미 존재합니다. 다른 이름 사용하거나 제안을 수락하세요.",
+                    "useSuggestion": "\"{slug}\" 대신 사용"
+                }
             }
         },
-        "github": {
+        "gitProvider": {
             "connection": {
                 "alert": {
-                    "title": "GitHub 연결되지 않음",
-                    "subtitle": "디렉토리 생성 및 관리를 위해 GitHub 계정 연결",
-                    "connectButton": "GitHub 연결",
+                    "title": "{provider} 연결되지 않음",
+                    "subtitle": "디렉토리를 생성하려면 {provider} 계정을 연결하세요",
+                    "connectButton": "{provider} 연결",
                     "connectingButton": "연결 중..."
-                },
-                "status": {
-                    "title": "GitHub 상태",
-                    "connected": "연결됨",
-                    "notConnected": "연결되지 않음",
-                    "connectedDescription": "디렉토리가 계정의 GitHub 리포지토리로 저장됩니다.",
-                    "notConnectedDescription": "디렉토리 생성 및 관리를 위해 GitHub 계정을 연결하세요.",
-                    "connectedAccount": "연결된 계정:",
-                    "requiredNote": "디렉토리 생성에 필요",
-                    "connectButton": "GitHub 연결",
-                    "connectingButton": "연결 중...",
-                    "failedToConnect": "GitHub 연결 실패"
                 }
+            },
+            "selector": {
+                "title": "Git 제공자 선택",
+                "noProviders": "사용 가능한 git 제공자 없음",
+                "notConnected": "연결되지 않음",
+                "connected": "연결됨",
+                "connecting": "연결 중...",
+                "connect": "연결",
+                "connectError": "연결 실패"
+            },
+            "settings": {
+                "title": "Git 제공자 연결",
+                "subtitle": "git 제공자 계정을 연결하여 저장소를 가져오고, 디렉토리를 생성하며, 프로젝트를 관리하세요.",
+                "connectedCount": "{count, plural, =0 {연결된 제공자 없음} =1 {1개 제공자 연결됨} other {#개 제공자 연결됨}}",
+                "noProvidersConnected": "연결된 제공자 없음",
+                "canImport": "저장소를 가져오고 관리할 수 있습니다",
+                "connectToStart": "시작하려면 제공자를 연결하세요",
+                "noProvidersTitle": "사용 가능한 Git 제공자 없음",
+                "noProvidersSubtitle": "현재 활성화된 git 제공자 플러그인이 없습니다. git 제공자 플러그인을 활성화하려면 관리자에게 문의하세요.",
+                "reconnect": "재연결",
+                "reconnecting": "재연결 중...",
+                "disconnect": "연결 해제",
+                "connect": "{provider} 연결",
+                "connecting": "연결 중...",
+                "organizations": "조직 ({count})",
+                "organizationsNote": "접근 권한을 부여한 조직만 표시됩니다.",
+                "connectDescription": "{provider} 계정을 연결하여 저장소를 가져오고 프로젝트를 관리하세요.",
+                "selectedProvider": "선택된 제공자",
+                "confirmDisconnect": "{provider} 연결을 해제하시겠습니까?",
+                "disconnected": "{provider} 연결 해제됨",
+                "connectError": "연결 실패",
+                "reconnectError": "재연결 실패",
+                "disconnectError": "연결 해제 실패"
             }
         },
         "apiTokens": {
             "title": "API 및 토큰",
-            "subtitle": "API 키 및 타사 통합 관리",
-            "vercel": {
-                "title": "Vercel 통합",
-                "subtitle": "Vercel 계정을 연결하여 디렉토리를 웹사이트로 배포",
+            "subtitle": "API 키와 타사 통합 관리",
+            "deployment": {
+                "title": "배포 통합",
+                "subtitle": "플러그인 설정에서 배포 제공자 구성",
                 "connected": "연결됨",
-                "notConnected": "연결되지 않음",
-                "connectedMessage": "Vercel 계정이 연결되었습니다. 이제 디렉토리를 Vercel에 배포할 수 있습니다.",
-                "disconnect": "Vercel 연결 해제",
+                "notConnected": "연결 안 됨",
+                "connectedMessage": "배포 제공자가 구성되었습니다. 이제 디렉토리를 배포할 수 있습니다.",
+                "disconnect": "연결 해제",
                 "disconnecting": "제거 중...",
-                "apiTokenLabel": "Vercel API 토큰",
-                "placeholder": "vc_...",
+                "apiTokenLabel": "API 토큰",
+                "placeholder": "API 토큰 입력",
                 "showToken": "표시",
                 "hideToken": "숨기기",
-                "getTokenHelp": "API 토큰은 다음에서 가져올 수 있습니다",
-                "vercelDashboard": "Vercel 대시보드",
+                "getTokenHelp": "제공자 대시보드에서 API 토큰을 가져올 수 있습니다",
+                "providerDashboard": "제공자 대시보드",
                 "save": "토큰 저장",
                 "saving": "저장 중...",
                 "messages": {
-                    "tokenRequired": "유효한 Vercel 토큰을 입력해 주세요",
-                    "saveSuccess": "Vercel 토큰이 성공적으로 저장되었습니다",
-                    "saveFailed": "Vercel 토큰 저장 실패",
-                    "removeSuccess": "Vercel 토큰이 성공적으로 제거되었습니다",
-                    "removeFailed": "Vercel 토큰 제거 실패",
-                    "unexpectedError": "예기치 않은 오류가 발생했습니다"
+                    "tokenRequired": "유효한 토큰을 입력하세요",
+                    "saveSuccess": "토큰이 성공적으로 저장되었습니다",
+                    "saveFailed": "토큰 저장 실패",
+                    "removeSuccess": "토큰이 성공적으로 제거되었습니다",
+                    "removeFailed": "토큰 제거 실패",
+                    "unexpectedError": "예상치 못한 오류가 발생했습니다"
                 }
             },
             "apiKeys": {
                 "title": "API 키",
-                "subtitle": "프로그래밍 방식 접근을 위한 API 키 생성 및 관리",
-                "generate": "API 키 생성 (곧 출시 예정)"
+                "subtitle": "프로그래밍 액세스를 위한 API 키 생성 및 관리",
+                "generate": "API 키 생성 (곧 출시)"
             },
             "webhooks": {
                 "title": "웹훅",
-                "subtitle": "실시간 업데이트를 받도록 웹훅 구성",
-                "configure": "웹훅 구성 (곧 출시 예정)"
-            },
-            "screenshotone": {
-                "title": "ScreenshotOne Integration",
-                "subtitle": "Automatically capture screenshots of directory items using ScreenshotOne",
-                "connected": "Connected",
-                "notConnected": "Not Connected",
-                "connectedMessage": "Your ScreenshotOne account is connected. Screenshots will be automatically captured for directory items.",
-                "disconnect": "Disconnect ScreenshotOne",
-                "disconnecting": "Removing...",
-                "accessKeyLabel": "Access Key",
-                "placeholder": "Your access key...",
-                "secretKeyLabel": "Secret Key (Optional)",
-                "secretKeyPlaceholder": "Your secret key...",
-                "showKey": "Show",
-                "hideKey": "Hide",
-                "accessKeyHelp": "Required. Used to authenticate with the ScreenshotOne API.",
-                "secretKeyHelp": "Optional. Enables signed URLs for enhanced security. Get your keys from",
-                "dashboard": "ScreenshotOne Dashboard",
-                "save": "Save Keys",
-                "saving": "Saving...",
-                "messages": {
-                    "accessKeyRequired": "Please enter a valid ScreenshotOne access key",
-                    "saveSuccess": "ScreenshotOne keys saved successfully",
-                    "saveFailed": "Failed to save ScreenshotOne keys",
-                    "removeSuccess": "ScreenshotOne keys removed successfully",
-                    "removeFailed": "Failed to remove ScreenshotOne keys",
-                    "unexpectedError": "An unexpected error occurred"
-                }
+                "subtitle": "실시간 업데이트를 받기 위해 웹훅 구성",
+                "configure": "웹훅 구성 (곧 출시)"
             }
         },
         "notifications": {
-            "title": "알림 설정",
-            "subtitle": "중요한 업데이트에 대해 어떻게 알림을 받을지 선택하세요",
+            "title": "알림 환경설정",
+            "subtitle": "중요 업데이트에 대한 알림 방식을 선택하세요",
             "email": {
                 "title": "이메일 알림",
                 "directoryUpdates": {
@@ -1709,11 +2608,11 @@
                 },
                 "weeklyDigest": {
                     "label": "주간 요약",
-                    "description": "디렉토리 활동 주간 요약 받기"
+                    "description": "디렉토리 활동에 대한 주간 요약 수신"
                 },
                 "marketing": {
                     "label": "마케팅 및 프로모션",
-                    "description": "새 기능 및 제안 업데이트 받기"
+                    "description": "새 기능 및 제안에 대한 업데이트 수신"
                 }
             },
             "app": {
@@ -1724,112 +2623,319 @@
                 },
                 "comments": {
                     "label": "댓글",
-                    "description": "디렉토리 댓글에 대한 알림 받기"
+                    "description": "디렉토리에 대한 댓글 알림 받기"
                 },
                 "mentions": {
                     "label": "멘션",
-                    "description": "누군가 멘션할 때 알림 받기"
+                    "description": "누군가 당신을 멘션할 때 알림 받기"
                 },
                 "systemUpdates": {
                     "label": "시스템 업데이트",
-                    "description": "중요한 시스템 알림 및 유지보수 알림"
+                    "description": "중요 시스템 알림 및 유지보수 경고"
                 }
             },
             "actions": {
-                "save": "설정 저장",
+                "save": "환경설정 저장",
                 "saving": "저장 중..."
             },
             "messages": {
-                "success": "알림 설정이 업데이트되었습니다",
-                "error": "설정 업데이트 실패",
-                "unexpectedError": "예기치 않은 오류가 발생했습니다"
+                "success": "알림 환경설정이 업데이트되었습니다",
+                "error": "환경설정 업데이트 실패",
+                "unexpectedError": "예상치 못한 오류가 발생했습니다"
             }
         },
         "sidebar": {
             "menu": "메뉴",
             "aiChat": "AI 채팅",
             "newDirectory": "새 디렉토리",
+            "activityIndicator": "디렉토리 생성 중",
             "navigation": {
                 "dashboard": "대시보드",
+                "activity": "활동",
                 "directories": "디렉토리",
+                "plugins": "플러그인",
                 "settings": "설정"
+            },
+            "tooltips": {
+                "expandSidebar": "사이드바 확장",
+                "collapseSidebar": "사이드바 축소"
+            },
+            "profileMenu": {
+                "accountSettings": "계정 설정",
+                "helpDocs": "도움말 및 문서",
+                "support": "지원",
+                "keyboardShortcuts": "키보드 단축키"
             },
             "signOut": "로그아웃",
             "signingOut": "로그아웃 중..."
         },
         "dangerZone": {
-            "title": "위험 구역",
-            "subtitle": "되돌릴 수 없는 파괴적 작업",
+            "title": "위험 영역",
+            "subtitle": "되돌릴 수 없고 파괴적인 작업",
             "export": {
                 "title": "데이터 내보내기",
                 "subtitle": "모든 디렉토리, 항목 및 설정 다운로드",
-                "action": "데이터 내보내기 (곧 출시 예정)"
+                "action": "데이터 내보내기 (곧 출시)"
             },
             "delete": {
                 "title": "계정 삭제",
                 "subtitle": "계정과 관련된 모든 데이터를 영구적으로 삭제합니다. 이 작업은 취소할 수 없습니다.",
                 "button": "내 계정 삭제",
-                "confirmTitle": "⚠️ 다음이 영구적으로 삭제됩니다:",
+                "confirmTitle": "⚠️ 다음을 영구적으로 삭제합니다:",
                 "confirmItems": [
                     "계정 및 프로필",
                     "모든 디렉토리",
                     "모든 디렉토리 항목 및 데이터",
                     "API 키 및 통합",
-                    "관련된 모든 웹사이트"
+                    "모든 관련 웹사이트"
                 ],
                 "confirmLabel": "확인을 위해 이메일 {email} 입력",
                 "confirmPlaceholder": "이메일 입력",
-                "confirmButton": "예, 내 계정을 삭제합니다",
+                "confirmButton": "예, 내 계정 삭제",
                 "deleting": "삭제 중...",
                 "cancel": "취소"
             },
             "messages": {
-                "confirmEmail": "확인을 위해 이메일을 정확히 입력해 주세요",
+                "confirmEmail": "확인을 위해 이메일을 정확히 입력하세요",
                 "deleteSuccess": "계정이 성공적으로 삭제되었습니다",
                 "deleteFailed": "계정 삭제 실패",
-                "unexpectedError": "예기치 않은 오류가 발생했습니다"
+                "unexpectedError": "예상치 못한 오류가 발생했습니다"
             }
         },
         "aiChat": {
             "title": "AI 어시스턴트",
-            "subtitle": "자연어로 디렉토리 만들기",
-            "welcomeMessage": "안녕하세요! 자연어를 사용하여 디렉토리를 만드는 데 도움을 드릴 수 있습니다. \"인공지능 도구 디렉토리 만들기\" 같은 질문을 해보세요.",
+            "panelTitle": "채팅",
+            "subtitle": "자연어로 디렉토리 생성",
+            "welcomeTitle": "AI 어시스턴트에 오신 것을 환영합니다 👋",
+            "welcomeSubtitle": "AI 기반 어시스턴트입니다. 디렉토리 생성, 콘텐츠 생성 또는 데이터 정리와 관련하여 무엇이든 물어보세요.",
+            "welcomeMessage": "안녕하세요! 자연어를 사용하여 디렉토리를 생성할 수 있도록 도와드리겠습니다. \"AI 도구 디렉토리 생성\" 같은 것을 요청하거나 필요한 것을 설명하세요.",
+            "capabilities": {
+                "directoryCreation": "디렉토리 생성",
+                "directoryCreationDesc": "자연어 설명으로 디렉토리 구축",
+                "webResearch": "웹 연구",
+                "webResearchDesc": "웹 전반에서 데이터 검색 및 수집",
+                "contentGeneration": "콘텐츠 생성",
+                "contentGenerationDesc": "설명, 카테고리 및 메타데이터 생성",
+                "smartSuggestions": "스마트 제안",
+                "smartSuggestionsDesc": "프로젝트를 위한 AI 기반 추천 받기"
+            },
             "newChat": "새 채팅",
-            "loadingConversation": "대화 로드 중…",
-            "inputPlaceholder": "생성하려는 디렉토리를 설명하세요...",
+            "history": "기록",
+            "loadingConversation": "대화 로딩 중…",
+            "inputPlaceholder": "무엇이든 물어보세요...",
             "sendButton": "전송",
+            "stopGenerating": "생성 중지",
             "sendHint": "Enter로 전송 · Shift+Enter로 새 줄",
-            "providerNotConfigured": "이 제공업체가 구성되지 않았습니다. 플러그인에서 설정하세요.",
+            "closeChat": "채팅 닫기",
+            "collapseChat": "채팅 축소",
+            "resizeChat": "채팅 크기 조정 드래그",
+            "expandChat": "채팅 확장",
+            "providersError": "AI 제공자 로드 실패. 채팅이 제대로 작동하지 않을 수 있습니다.",
+            "providerNotConfigured": "이 제공자가 구성되지 않았습니다. 플러그인에서 설정하세요.",
             "editMessage": "메시지 편집",
             "saveEdit": "저장 및 제출",
             "cancelEdit": "취소",
-            "edited": "(수정됨)",
-            "errors": {
-                "unableToSend": "메시지를 보낼 수 없습니다."
+            "edited": "(편집됨)",
+            "thinking": "생각 중...",
+            "toolCompleted": "완료",
+            "selectProvider": "제공자",
+            "notConfigured": "구성 안 됨",
+            "gitNotConnected": "Git 제공자 연결 안 됨",
+            "gitNotConnectedDesc": "디렉토리를 생성하고 관리하려면 git 제공자를 연결하세요.",
+            "connectGithub": "GitHub 연결",
+            "gitConnectedAs": "{provider}를 통해 {username}으로 연결됨",
+            "deployNotConfigured": "배포 제공자 구성 안 됨",
+            "deployNotConfiguredDesc": "디렉토리 웹사이트를 게시하려면 배포 제공자를 구성하세요.",
+            "configureDeployProvider": "배포 제공자 구성",
+            "deployConfigured": "배포 제공자 구성됨 ({provider})",
+            "opened": "열림",
+            "historyEmpty": "아직 대화가 없습니다. 여기서 기록을 보려면 채팅을 시작하세요.",
+            "historyUntitled": "제목 없는 대화",
+            "historyToday": "오늘",
+            "historyYesterday": "어제",
+            "historyDaysAgo": "{days}일 전",
+            "suggestions": {
+                "s1": "내 디렉토리 표시",
+                "s2": "AI 도구 디렉토리 생성",
+                "s3": "내 git 연결 확인",
+                "s4": "내 통계 표시"
             },
-            "settingsModalTitle": "Directory Settings",
-            "settingsModalDescription": "Override settings for this directory. Unset fields inherit from your user settings.",
-            "inheritedFrom": "Inherited: {value}",
-            "inheritedSecret": "Inherited: ••••••••",
-            "resetToDefaults": "Reset to Defaults",
-            "resetConfirm": "This will clear all directory-specific overrides. Settings will fall back to your user-level values.",
-            "resetSuccess": "Settings reset to defaults",
-            "cancel": "Cancel",
-            "clickToConfigure": "Click to configure"
+            "feelingLucky": "생성할 디렉토리 제안",
+            "errors": {
+                "unableToSend": "메시지 전송 불가"
+            }
         },
         "plugins": {
+            "title": "플러그인",
+            "subtitle": "설치된 플러그인 및 통합 관리",
+            "empty": "사용 가능한 플러그인이 없습니다",
+            "noDescription": "설명이 제공되지 않았습니다",
+            "enabled": "활성화됨",
+            "disabled": "비활성화됨",
+            "enable": "활성화",
+            "enableDescription": "이 플러그인이 디렉터리 전반에 걸쳐 활성화되는 방식을 구성합니다.",
+            "disable": "비활성화",
+            "settings": "설정",
+            "saveSettings": "설정 저장",
+            "settingsTitle": "플러그인 설정",
+            "settingsSaved": "설정이 성공적으로 저장되었습니다",
+            "noSettings": "이 플러그인은 구성할 수 있는 설정이 없습니다",
+            "builtIn": "내장",
+            "system": "시스템",
+            "docs": "문서",
+            "author": "작성자",
+            "documentation": "문서",
+            "about": "정보",
+            "backToPlugins": "플러그인으로 돌아가기",
+            "filters": {
+                "all": "모두",
+                "enabledOnly": "활성화된 것만",
+                "search": "플러그인 검색...",
+                "clearSearch": "검색 지우기"
+            },
+            "searchEmpty": "\"{query}\"와 일치하는 플러그인이 없습니다",
+            "categories": {
+                "git": "Git",
+                "deployment": "배포",
+                "screenshot": "스크린샷",
+                "search": "검색",
+                "content": "콘텐츠",
+                "dataSource": "데이터 소스",
+                "ai": "AI",
+                "pipeline": "파이프라인"
+            },
+            "alwaysEnabled": "항상 활성화됨",
+            "disableWarning": "이 플러그인을 비활성화하면 모든 디렉터리에서 비활성화됩니다",
+            "cannotDisableSystem": "시스템 플러그인은 비활성화할 수 없습니다",
+            "disableFailed": "플러그인 비활성화 실패",
+            "autoEnableForDirectories": "모든 디렉터리에 대해서도 활성화",
+            "autoEnableForDirectoriesDescription": "이 플러그인은 모든 디렉터리에서 자동으로 활성화됩니다. 디렉터리별로 비활성화할 수 있습니다.",
+            "confirmDisable": "비활성화 확인",
+            "cancel": "취소",
+            "missingRequiredFields": "누락된 필수 필드: {fields}",
+            "saveError": "설정 저장 실패. 다시 시도해 주세요.",
+            "enableFirstToSave": "먼저 이 플러그인을 활성화한 후 설정을 저장하세요.",
+            "goToPluginSettings": "플러그인 설정으로 이동",
+            "userLevelRequiredError": "사용자 수준의 필수 설정을 먼저 구성해야 합니다",
+            "modelSelect": {
+                "placeholder": "모델 선택...",
+                "loading": "모델 로딩 중...",
+                "loadError": "모델 로드 실패",
+                "searchPlaceholder": "모델 검색...",
+                "noModels": "모델을 찾을 수 없습니다",
+                "context": "{value} 컨텍스트",
+                "customModelPlaceholder": "모델 ID 입력...",
+                "addCustomModel": "+ 사용자 지정 모델 추가",
+                "add": "추가"
+            },
+            "settingsField": {
+                "selectPlaceholder": "선택...",
+                "fieldEncrypted": "이 필드는 암호화되었습니다",
+                "nullValue": "값이 설정되지 않음",
+                "removeItem": "제거",
+                "addItem": "추가",
+                "modify": "수정",
+                "cancel": "취소",
+                "enterNewValue": "새 값 입력..."
+            },
+            "oauth": {
+                "title": "계정 연결",
+                "connected": "연결됨",
+                "notConnected": "연결 안 됨",
+                "connect": "연결",
+                "disconnect": "연결 해제",
+                "reconnect": "재연결",
+                "connecting": "연결 중...",
+                "reconnecting": "재연결 중...",
+                "connectDescription": "{plugin} 계정을 연결하여 전체 기능을 활성화하세요",
+                "confirmDisconnect": "{plugin} 연결을 해제하시겠습니까?",
+                "disconnected": "{plugin} 연결이 성공적으로 해제되었습니다",
+                "connectError": "연결 실패. 다시 시도해 주세요.",
+                "reconnectError": "재연결 실패. 다시 시도해 주세요.",
+                "disconnectError": "연결 해제 실패. 다시 시도해 주세요."
+            },
+            "deviceAuth": {
+                "title": "디바이스 인증",
+                "connected": "연결됨",
+                "pending": "대기 중",
+                "notConnected": "연결 안 됨",
+                "description": "디바이스 코드 흐름으로 이 Ever Works 사용자에 대한 {plugin}을 연결하세요.",
+                "backendHint": "이 인증은 사용자 계정에 대한 관리형 백엔드 작업 공간에 저장되며 이 Ever Works 배포에서만 사용할 수 있습니다.",
+                "deviceCode": "디바이스 코드",
+                "verificationUrl": "검증 URL",
+                "start": "시작",
+                "restart": "재시작",
+                "refresh": "새로 고침",
+                "open": "열기",
+                "notInstalled": "이 컴퓨터에 필요한 CLI가 설치되지 않았습니다.",
+                "loadError": "디바이스 인증 상태 로드 실패.",
+                "startError": "디바이스 인증 시작 실패."
+            },
             "githubOrganizations": {
                 "title": "GitHub 조직",
                 "description": "GitHub 연결에서 사용 가능한 조직을 검토하고 Ever Works가 대상으로 할 추가 조직을 추가하세요.",
-                "noOrganizations": "아직 조직을 찾을 수 없습니다.",
+                "noOrganizations": "현재 GitHub 연결에서 사용 가능한 조직이 없습니다.",
                 "connectToLoad": "조직을 로드하려면 GitHub를 연결하세요.",
                 "placeholder": "로그인으로 조직 추가",
                 "addButton": "조직 추가",
                 "saveButton": "조직 저장",
-                "savedSuccess": "조직 접근 권한이 저장되었습니다.",
-                "saveFailed": "저장에 실패했습니다.",
+                "savedSuccess": "조직 액세스가 저장되었습니다.",
+                "saveFailed": "저장 실패.",
                 "removeLabel": "{login} 제거"
             }
+        },
+        "directoryPlugins": {
+            "title": "디렉터리 플러그인",
+            "subtitle": "이 디렉터리에 대한 플러그인 구성",
+            "active": "활성",
+            "enable": "활성화",
+            "disable": "비활성화",
+            "enableForDirectory": "이 디렉터리에 대해 활성화",
+            "disableForDirectory": "이 디렉터리에 대해 비활성화",
+            "enableAtUserLevelFirst": "먼저 설정에서 이 플러그인을 활성화하세요",
+            "disabledByUser": "사용자 수준에서 비활성화됨",
+            "systemAlwaysEnabled": "시스템 플러그인 - 항상 활성화됨",
+            "showSettings": "설정 표시",
+            "hideSettings": "설정 숨기기",
+            "directorySettingsInfo": "여기서 디렉터리별 설정을 구성하세요",
+            "save": "저장",
+            "saved": "저장됨",
+            "showInstalledOnly": "설치된 것만 표시",
+            "noInstalledPlugins": "설치된 플러그인이 없습니다. 플러그인 설정을 방문하여 플러그인을 설치하세요.",
+            "noPlugins": "사용 가능한 플러그인이 없습니다",
+            "showAllPlugins": "모든 플러그인 표시",
+            "capabilityProviders": "기능 제공자",
+            "capabilityProvidersDescription": "이 디렉터리에 대한 각 기능을 어떤 플러그인이 제공할지 선택하세요",
+            "noProvidersAvailable": "사용 가능한 제공자가 없습니다",
+            "categories": {
+                "git": "Git",
+                "deployment": "배포",
+                "screenshot": "스크린샷",
+                "search": "검색",
+                "content": "콘텐츠",
+                "dataSource": "데이터 소스",
+                "ai": "AI",
+                "pipeline": "파이프라인"
+            },
+            "missingRequiredFields": "누락된 필수 필드: {fields}",
+            "saveError": "설정 저장 실패. 다시 시도해 주세요.",
+            "sendButton": "보내기",
+            "errors": {
+                "unableToSend": "메시지 보내기 불가."
+            },
+            "settingsModalTitle": "디렉터리 설정",
+            "settingsModalDescription": "이 디렉터리에 대한 설정 재정의. 설정되지 않은 필드는 사용자 설정을 상속합니다.",
+            "inheritedFrom": "상속됨: {value}",
+            "inheritedSecret": "상속됨: ••••••••",
+            "resetToDefaults": "기본값으로 재설정",
+            "resetConfirm": "이 작업은 모든 디렉터리별 재정의를 지웁니다. 설정은 사용자 수준 값으로 되돌아갑니다.",
+            "resetSuccess": "설정이 기본값으로 재설정되었습니다",
+            "cancel": "취소",
+            "clickToConfigure": "구성 클릭",
+            "autoEnabledByUser": "사용자 설정을 통해 자동 활성화됨",
+            "toggleError": "플러그인 토글 실패",
+            "system": "시스템",
+            "goToPluginSettings": "플러그인 설정으로 이동"
         }
     },
     "layout": {
@@ -1837,11 +2943,12 @@
             "backToHome": "홈으로 돌아가기",
             "feature": {
                 "title": "AI로 디렉토리 구축",
-                "subtitle": "자연어를 사용하여 몇 분 만에 아름답고 검색 가능한 디렉토리를 생성하세요. 코딩이 필요하지 않습니다.",
+                "subtitle": "자연어로 몇 분 만에 아름답고 검색 가능한 디렉토리를 만드세요. 코딩 불필요.",
+                "badge": "AI 기반",
                 "benefits": {
                     "ai": {
                         "title": "AI 기반 생성",
-                        "description": "원하는 것을 설명하고 AI가 작업을 처리합니다"
+                        "description": "원하는 것을 설명하면 AI가 작업을 수행합니다"
                     },
                     "templates": {
                         "title": "전문 템플릿",
@@ -1849,15 +2956,14 @@
                     },
                     "management": {
                         "title": "쉬운 관리",
-                        "description": "콘텐츠를 쉽게 업데이트하고 구성하세요"
+                        "description": "콘텐츠를 쉽게 업데이트하고 정리하세요"
                     }
                 },
-                "badge": "AI 기반",
                 "howItWorks": {
-                    "step1": "아이디어 설명하기",
-                    "step2": "템플릿 선택하기",
-                    "step3": "AI가 콘텐츠를 생성합니다",
-                    "step4": "게시 및 공유하기"
+                    "step1": "아이디어 설명",
+                    "step2": "템플릿 선택",
+                    "step3": "AI가 콘텐츠 생성",
+                    "step4": "게시 및 공유"
                 }
             },
             "footer": {
@@ -1870,27 +2976,67 @@
     },
     "errors": {
         "global": {
-            "title": "문제가 발생했습니다!",
+            "title": "오류가 발생했습니다!",
+            "description": "예상치 못한 오류가 발생했습니다. 다시 시도하거나 문제가 지속되면 지원팀에 문의하세요.",
+            "errorId": "오류 ID",
+            "tryAgain": "다시 시도"
+        },
+        "notFound": {
+            "title": "페이지를 찾을 수 없습니다",
+            "description": "찾으시는 페이지가 존재하지 않거나 이동되었습니다.",
+            "backHome": "대시보드로 돌아가기",
+            "goBack": "뒤로 가기"
+        },
+        "dashboard": {
+            "title": "오류가 발생했습니다",
+            "description": "예상치 못한 오류가 발생했습니다. 다시 시도하거나 문제가 지속되면 지원팀에 문의하세요.",
+            "errorId": "오류 ID",
             "tryAgain": "다시 시도"
         }
     },
     "metadata": {
         "title": "{companyName} - 디렉토리 빌더",
-        "description": "디렉토리 구축 및 관리를 위한 SaaS 플랫폼"
+        "description": "디렉토리 구축 및 관리용 SaaS 플랫폼",
+        "pages": {
+            "signIn": "로그인",
+            "createAccount": "계정 생성",
+            "forgotPassword": "비밀번호 찾기",
+            "resetPassword": "비밀번호 재설정",
+            "authError": "인증 오류",
+            "dashboard": "대시보드",
+            "activity": "활동 로그",
+            "directories": "디렉토리",
+            "newDirectory": "새 디렉토리",
+            "directory": "디렉토리",
+            "overview": "개요",
+            "items": "항목",
+            "generator": "생성기",
+            "settings": "설정",
+            "deploy": "배포",
+            "members": "멤버",
+            "history": "역사",
+            "comparisons": "비교",
+            "plugins": "플러그인",
+            "profile": "프로필",
+            "security": "보안",
+            "apiKeys": "API 키",
+            "dangerZone": "위험 영역",
+            "pluginSettings": "플러그인 설정"
+        }
     },
     "api": {
         "errors": {
             "unauthorized": "이 작업을 수행할 권한이 없습니다",
-            "unauthorizedLogin": "권한 없음: 다시 로그인해 주세요.",
-            "forbidden": "금지됨: 이 작업을 수행할 권한이 없습니다.",
+            "unauthorizedLogin": "승인되지 않음: 다시 로그인하세요.",
+            "forbidden": "허용되지 않음: 이 작업을 수행할 권한이 없습니다.",
             "serverError": "서버 오류: {message}",
-            "unexpected": "예기치 않은 서버 오류가 발생했습니다.",
+            "unexpected": "예상치 못한 서버 오류가 발생했습니다.",
             "apiError": "API 오류: {status} {statusText}",
             "loginFailed": "로그인 실패",
             "registerFailed": "등록 실패",
-            "unsupportedProvider": "지원되지 않는 제공자",
-            "providerConnectFailed": "제공자 연결 실패",
-            "forgotPasswordFailed": "비밀번호 재설정 이메일 전송 실패",
+            "unsupportedProvider": "지원되지 않는 공급자",
+            "providerConnectFailed": "공급자 연결 실패",
+            "forgotPasswordFailed": "비밀번호 재설정 이메일 발송 실패",
             "resetPasswordFailed": "비밀번호 재설정 실패"
         }
     },
@@ -1898,7 +3044,7 @@
         "directories": {
             "slug": {
                 "required": "슬러그가 필요합니다",
-                "format": "슬러그는 소문자, 숫자, 하이픈만 가능합니다"
+                "format": "슬러그는 소문자, 숫자, 하이픈만 포함할 수 있습니다"
             },
             "name": {
                 "required": "이름이 필요합니다",
@@ -1912,15 +3058,15 @@
                 "minLength": "프롬프트는 최소 10자 이상이어야 합니다",
                 "maxLength": "프롬프트는 1000자 미만이어야 합니다"
             },
-            "oauthRequired": "OAuth 연결 필요. 먼저 {provider} 계정을 연결해 주세요.",
-            "githubRequired": "GitHub 연결 필요. 먼저 GitHub 계정을 연결해 주세요.",
+            "oauthRequired": "OAuth 연결이 필요합니다. 먼저 {provider} 계정을 연결하세요.",
+            "githubRequired": "GitHub 연결이 필요합니다. 먼저 GitHub 계정을 연결하세요.",
             "createSuccess": "디렉토리가 성공적으로 생성되었습니다!",
             "createFailed": "디렉토리 생성 실패",
             "updateSuccess": "디렉토리가 성공적으로 업데이트되었습니다!",
             "updateFailed": "디렉토리 업데이트 실패",
             "invalidGeneratedData": "유효한 디렉토리 데이터 생성 실패",
-            "aiGenerationStarted": "디렉토리 생성 시작! AI가 콘텐츠를 생성 중입니다...",
-            "invalidId": "유효하지 않은 디렉토리 ID",
+            "aiGenerationStarted": "디렉토리 생성이 시작되었습니다! AI가 콘텐츠를 생성 중입니다...",
+            "invalidId": "잘못된 디렉토리 ID",
             "deleteSuccess": "디렉토리가 성공적으로 삭제되었습니다",
             "deleteFailed": "디렉토리 삭제 실패",
             "fetchFailed": "디렉토리 가져오기 실패",
@@ -1928,7 +3074,7 @@
                 "requiredWhenOwnerProvided": "소유자가 제공된 경우 조직을 활성화해야 합니다"
             },
             "import": {
-                "invalidUrl": "유효한 URL을 입력해 주세요",
+                "invalidUrl": "유효한 URL을 입력하세요",
                 "analyzeFailed": "리포지토리 분석 실패",
                 "started": "가져오기가 성공적으로 시작되었습니다",
                 "failed": "디렉토리 가져오기 실패",
@@ -1939,18 +3085,21 @@
             "promptRequired": "프롬프트가 필요합니다",
             "nameRequired": "이름이 필요합니다",
             "generationStartedSuccessfully": "생성이 성공적으로 시작되었습니다",
+            "generationCancellationRequested": "생성 취소 요청됨",
             "updateStartedSuccessfully": "업데이트가 성공적으로 시작되었습니다",
             "failedToGenerateItems": "항목 생성 실패",
+            "failedToCancelGeneration": "생성 취소 실패",
             "failedToUpdateItems": "항목 업데이트 실패",
             "markdownRegeneratedSuccessfully": "마크다운이 성공적으로 재생성되었습니다",
             "failedToRegenerateMarkdown": "마크다운 재생성 실패",
-            "notAuthorizedToAccessOrganization": "이 조직에 접근할 권한이 없습니다. 도움이 필요하면 소유자({owner})에게 문의해 주세요."
+            "notAuthorizedToAccessOrganization": "이 조직에 접근할 권한이 없습니다. 도움을 위해 소유자({owner})에게 문의하세요.",
+            "failedToLoadFormSchema": "양식 구성 로드 실패"
         },
         "settings": {
             "profile": {
-                "usernameRequired": "사용자명이 필요합니다",
-                "usernameMaxLength": "사용자명은 50자 미만이어야 합니다",
-                "usernameFormat": "사용자명은 문자, 숫자, 대시 및 밑줄만 포함할 수 있습니다",
+                "usernameRequired": "사용자 이름이 필요합니다",
+                "usernameMaxLength": "사용자 이름은 50자 미만이어야 합니다",
+                "usernameFormat": "사용자 이름은 문자, 숫자, 대시, 밑줄만 포함할 수 있습니다",
                 "updateFailed": "프로필 업데이트 실패",
                 "notAuthenticated": "인증되지 않음"
             },
@@ -1962,78 +3111,79 @@
                 "updateSuccess": "비밀번호가 성공적으로 업데이트되었습니다",
                 "notAuthenticated": "인증되지 않음"
             },
-            "vercel": {
+            "deployment": {
                 "notAuthenticated": "인증되지 않음",
                 "tokenRequired": "토큰이 필요합니다",
-                "invalidFormat": "유효하지 않은 Vercel 토큰 형식",
-                "saveFailed": "Vercel 토큰 저장 실패",
-                "saveSuccess": "Vercel 토큰이 성공적으로 저장되었습니다",
-                "validationFailed": "제공된 Vercel 토큰이 유효하지 않습니다. 다시 확인하고 시도해 주세요.",
-                "removeFailed": "Vercel 토큰 제거 실패",
-                "removeSuccess": "Vercel 토큰이 성공적으로 제거되었습니다"
+                "invalidFormat": "잘못된 토큰 형식",
+                "saveFailed": "배포 토큰 저장 실패",
+                "saveSuccess": "배포 토큰이 성공적으로 저장되었습니다",
+                "validationFailed": "제공된 토큰이 유효하지 않습니다. 다시 확인하고 시도하세요.",
+                "removeFailed": "배포 토큰 제거 실패",
+                "removeSuccess": "배포 토큰이 성공적으로 제거되었습니다"
             },
             "github": {
                 "notAuthenticated": "인증되지 않음",
                 "disconnectFailed": "GitHub 연결 해제 실패",
-                "disconnectSuccess": "GitHub 계정 연결이 성공적으로 해제되었습니다"
+                "disconnectSuccess": "GitHub 계정이 성공적으로 연결 해제되었습니다"
             },
             "notifications": {
                 "notAuthenticated": "인증되지 않음",
-                "updateFailed": "설정 업데이트 실패",
-                "updateSuccess": "알림 설정이 성공적으로 업데이트되었습니다"
+                "updateFailed": "환경설정 업데이트 실패",
+                "updateSuccess": "알림 환경설정이 성공적으로 업데이트되었습니다"
             },
             "danger": {
                 "notAuthenticated": "인증되지 않음",
                 "deleteFailed": "계정 삭제 실패",
-                "deleteDisabled": "데모에서 계정 삭제가 비활성화되었습니다"
+                "deleteDisabled": "데모에서 계정 삭제가 비활성화되어 있습니다"
             },
-            "screenshotone": {
-                "notAuthenticated": "Not authenticated",
-                "accessKeyRequired": "Access key is required",
-                "saveFailed": "Failed to save ScreenshotOne keys",
-                "saveSuccess": "ScreenshotOne keys saved successfully",
-                "validationFailed": "The provided ScreenshotOne keys are invalid. Please double-check and try again.",
-                "removeFailed": "Failed to remove ScreenshotOne keys",
-                "removeSuccess": "ScreenshotOne keys removed successfully"
+            "emailVerification": {
+                "notAuthenticated": "인증되지 않음",
+                "sent": "인증 이메일이 발송되었습니다",
+                "sendFailed": "인증 이메일 발송 실패"
             }
         },
         "deploy": {
-            "deployVercelFailed": "Vercel 배포 실패",
+            "deployFailed": "배포 실패",
             "updateRepositoryFailed": "리포지토리 업데이트 실패",
             "updateSettingsFailed": "웹사이트 템플릿 설정 업데이트 실패"
         }
     },
     "validation": {
         "auth": {
-            "invalidCredentials": "유효하지 않은 이메일 또는 비밀번호",
+            "invalidCredentials": "잘못된 이메일 또는 비밀번호",
             "account": {
                 "suspended": "계정이 정지되었습니다"
             },
             "email": {
-                "required": "이메일을 비울 수 없습니다",
-                "invalid": "유효하지 않은 이메일",
-                "emailAlreadyRegistered": "이메일이 이미 등록되었습니다"
+                "required": "이메일은 비울 수 없습니다",
+                "invalid": "잘못된 이메일",
+                "emailAlreadyRegistered": "이메일이 이미 등록되어 있습니다"
             },
             "password": {
-                "required": "비밀번호를 비울 수 없습니다",
+                "required": "비밀번호는 비울 수 없습니다",
                 "minLength": "비밀번호는 최소 {length}자 이상이어야 합니다",
-                "lowercase": "비밀번호에 최소 하나의 소문자가 포함되어야 합니다",
-                "numberOrSpecial": "비밀번호에 최소 하나의 숫자나 특수문자가 포함되어야 합니다",
-                "cannotStartWith": "비밀번호는 점이나 줄바꿈으로 시작할 수 없습니다",
-                "digit": "비밀번호에 최소 하나의 숫자가 포함되어야 합니다"
+                "lowercase": "비밀번호는 최소 하나의 소문자를 포함해야 합니다",
+                "numberOrSpecial": "비밀번호는 최소 하나의 숫자 또는 특수문자를 포함해야 합니다",
+                "cannotStartWith": "비밀번호는 점이나 개행으로 시작할 수 없습니다",
+                "digit": "비밀번호는 최소 하나의 숫자를 포함해야 합니다"
             },
             "username": {
-                "minLength": "사용자명은 최소 {length}자 이상이어야 합니다"
+                "minLength": "사용자 이름은 최소 {length}자 이상이어야 합니다"
             }
         }
     },
     "common": {
         "ui": {
             "close": "닫기",
-            "dismiss": "닫기"
+            "dismiss": "닫기",
+            "selectLanguage": "언어 선택",
+            "increment": "증가",
+            "decrement": "감소",
+            "yes": "예",
+            "no": "아니오"
         },
         "theme": {
-            "toggle": "테마 전환",
+            "toggle": "테마 토글",
             "switchToLight": "라이트 모드로 전환",
             "switchToDark": "다크 모드로 전환"
         },
