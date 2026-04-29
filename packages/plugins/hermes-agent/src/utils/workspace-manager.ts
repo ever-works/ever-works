@@ -211,9 +211,21 @@ export async function readGeneratedResult(workspacePath: string, logger?: Logger
 	try {
 		parsed = JSON.parse(content);
 	} catch {
-		parsed = JSON.parse(jsonrepair(content));
-		repairedJson = true;
-		logger?.warn('Repaired malformed JSON in Hermes result file');
+		try {
+			parsed = JSON.parse(jsonrepair(content));
+			repairedJson = true;
+			logger?.warn('Repaired malformed JSON in Hermes result file');
+		} catch (error) {
+			const detail = error instanceof Error ? error.message : String(error);
+			const message = `Hermes result file contained invalid JSON and could not be repaired: ${detail}`;
+			logger?.warn(message);
+			return {
+				items: [],
+				errors: [message],
+				repairedJson: false,
+				resultFilePath
+			};
+		}
 	}
 
 	const rawItems = Array.isArray(parsed) ? parsed : (parsed as { items?: unknown } | null | undefined)?.items;

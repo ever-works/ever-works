@@ -231,4 +231,48 @@ describe('HermesAgentPlugin', () => {
 			duration: 0
 		});
 	});
+
+	it('rejects concurrent execute calls on the same plugin instance', async () => {
+		await plugin.onLoad(
+			createMockContext({
+				global: { profile: 'default' },
+				user: { profile: 'work' }
+			})
+		);
+
+		let resolveExecution: ((value: processRunner.ExecuteResult) => void) | undefined;
+		const executionStarted = new Promise<void>((resolve) => {
+			vi.mocked(processRunner.executeHermes).mockImplementation(() => {
+				resolve();
+				const promise = new Promise<processRunner.ExecuteResult>((innerResolve) => {
+					resolveExecution = innerResolve;
+				});
+
+				return {
+					promise,
+					kill: vi.fn()
+				};
+			});
+		});
+
+		const firstExecution = plugin.execute(directory as never, request as never, existing as never);
+		await executionStarted;
+
+		const secondResult = await plugin.execute(directory as never, request as never, existing as never);
+
+		expect(secondResult.success).toBe(false);
+		expect(
+			secondResult.error instanceof Error ? secondResult.error.message : String(secondResult.error)
+		).toBe('Hermes Agent is already running a pipeline execution on this plugin instance');
+
+		resolveExecution?.({
+			stdout: '',
+			stderr: '',
+			exitCode: null,
+			killed: true,
+			duration: 0
+		});
+
+		await firstExecution;
+	});
 });

@@ -370,6 +370,13 @@ export class HermesAgentPlugin implements IPlugin, IPipelinePlugin, IFormSchemaP
 			return this.handleError(new Error('User ID is required for Hermes generation'), startTime);
 		}
 
+		if (this.abortController || this.killProcess || this.state?.isRunning) {
+			return this.handleError(
+				new Error('Hermes Agent is already running a pipeline execution on this plugin instance'),
+				startTime
+			);
+		}
+
 		this.abortController = abortController;
 		this.state = initializeState();
 

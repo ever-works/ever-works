@@ -1,7 +1,8 @@
 import * as fs from 'fs/promises';
 import * as os from 'os';
 import * as path from 'path';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import * as pluginPackage from '@ever-works/plugin';
 import {
 	createWorkspace as createPluginWorkspace,
 	getWorkspacePath,
@@ -109,5 +110,23 @@ describe('workspace manager', () => {
 		expect(result.errors).toContain('Item 0 is missing required fields: source_url, category');
 		expect(result.errors).toContain('Item 0 has invalid tags: expected an array of strings');
 		expect(result.resultFilePath).toContain('_meta/hermes-result.json');
+	});
+
+	it('returns a friendly error when malformed JSON cannot be repaired', async () => {
+		const workspace = await createWorkspace();
+		const repairSpy = vi.spyOn(pluginPackage, 'jsonrepair').mockImplementation(() => {
+			throw new Error('repair failed');
+		});
+		await fs.writeFile(
+			path.join(workspace, '_meta', 'hermes-result.json'),
+			'{"items":[{"name":"Broken"',
+			'utf-8'
+		);
+
+		const result = await readGeneratedResult(workspace, { warn: () => {} });
+		repairSpy.mockRestore();
+		expect(result.items).toEqual([]);
+		expect(result.errors).toHaveLength(1);
+		expect(result.errors[0]).toContain('Hermes result file contained invalid JSON and could not be repaired');
 	});
 });
