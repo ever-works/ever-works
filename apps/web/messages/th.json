@@ -1820,8 +1820,7 @@
                         "model": "โมเดล",
                         "schedule": "กำหนดการ",
                         "providers": "ผู้ให้บริการ",
-                        "websiteRepo": "คลังเว็บไซต์",
-                        "additionalAgents": "ตัวแทนเพิ่มเติม"
+                        "websiteRepo": "คลังเว็บไซต์"
                     },
                     "sourceTypes": {
                         "dataRepo": "คลังข้อมูล",

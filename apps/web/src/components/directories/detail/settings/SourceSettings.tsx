@@ -24,24 +24,28 @@ export function SourceSettings() {
 
     const sourceRepository = directory.sourceRepository;
     const worksConfig = sourceRepository.worksConfig;
+    const relatedWebsiteRepository = sourceRepository.relatedRepositories?.website;
+
     const sourceTypeLabel = getSourceTypeLabel(sourceRepository.type, t);
     const fallbackOwner = directory.owner || sourceRepository.owner;
-    const websiteTarget =
-        sourceRepository.relatedRepositories?.website?.owner &&
-        sourceRepository.relatedRepositories?.website?.repo
-            ? `${sourceRepository.relatedRepositories.website.owner}/${sourceRepository.relatedRepositories.website.repo}`
-            : worksConfig?.websiteRepo || null;
-    const appliedWebsiteRepo = sourceRepository.relatedRepositories?.website
-        ? `${sourceRepository.relatedRepositories.website.owner || fallbackOwner}/${sourceRepository.relatedRepositories.website.repo}`
-        : `${fallbackOwner}/${directory.slug}-website`;
+
+    const websiteTarget = getConfiguredWebsiteTarget(
+        relatedWebsiteRepository,
+        worksConfig?.websiteRepo,
+    );
+    const appliedWebsiteRepo = getAppliedWebsiteTarget({
+        relatedWebsiteRepository,
+        fallbackOwner,
+        directorySlug: directory.slug,
+    });
+
     const appliedSchedule = directory.scheduledUpdatesEnabled
         ? directory.scheduledCadence || t('worksConfig.enabled')
         : t('worksConfig.disabled');
+
     const importedProviders = formatWorksConfigProviders(worksConfig?.providers);
     const appliedProviderOverrides =
-        directory.scheduledUpdatesEnabled && sourceRepository.type === 'works_config'
-            ? importedProviders
-            : null;
+        directory.scheduledUpdatesEnabled && worksConfig?.providers ? importedProviders : null;
 
     const metadataRows = [
         { label: t('worksConfig.fields.sourceType'), value: sourceTypeLabel },
@@ -84,12 +88,6 @@ export function SourceSettings() {
                   label: t('worksConfig.fields.websiteRepo'),
                   value: websiteTarget,
                   hint: t('worksConfig.applied', { value: appliedWebsiteRepo }),
-              }
-            : null,
-        typeof worksConfig?.additionalAgentsCount === 'number'
-            ? {
-                  label: t('worksConfig.fields.additionalAgents'),
-                  value: String(worksConfig.additionalAgentsCount),
               }
             : null,
     ].filter(Boolean) as Array<{
@@ -211,4 +209,36 @@ function getSourceTypeLabel(sourceType: string, t: ReturnType<typeof useTranslat
         default:
             return sourceType.replace(/_/g, ' ');
     }
+}
+
+type RepositoryTarget = {
+    owner?: string;
+    repo: string;
+};
+
+function getConfiguredWebsiteTarget(
+    relatedWebsiteRepository: RepositoryTarget | undefined,
+    websiteRepo: string | undefined,
+): string | null {
+    if (relatedWebsiteRepository?.owner && relatedWebsiteRepository.repo) {
+        return `${relatedWebsiteRepository.owner}/${relatedWebsiteRepository.repo}`;
+    }
+
+    return websiteRepo || null;
+}
+
+function getAppliedWebsiteTarget({
+    relatedWebsiteRepository,
+    fallbackOwner,
+    directorySlug,
+}: {
+    relatedWebsiteRepository?: RepositoryTarget;
+    fallbackOwner: string;
+    directorySlug: string;
+}): string {
+    if (relatedWebsiteRepository?.repo) {
+        return `${relatedWebsiteRepository.owner || fallbackOwner}/${relatedWebsiteRepository.repo}`;
+    }
+
+    return `${fallbackOwner}/${directorySlug}-website`;
 }

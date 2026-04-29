@@ -5,6 +5,7 @@ import {
     NotFoundException,
     Optional,
 } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { DirectorySchedule } from '@src/entities/directory-schedule.entity';
 import { DirectoryScheduleRepository } from '@src/database/repositories/directory-schedule.repository';
 import { DirectoryRepository } from '@src/database/repositories/directory.repository';
@@ -32,6 +33,7 @@ import { PluginRegistryService } from '@src/plugins/services/plugin-registry.ser
 import { Directory } from '@src/entities/directory.entity';
 import { NotificationService } from '@src/notifications/notification.service';
 import type { ScheduleRunOutcome } from './types/trigger-context.types';
+import { WorksConfigSyncRequestedEvent, type WorksConfigSyncReason } from '@src/events';
 
 type DirectoryScheduleReadiness = {
     featureEnabled: boolean;
@@ -59,6 +61,8 @@ export class DirectoryScheduleService {
         private readonly pluginRegistry: PluginRegistryService,
         @Optional()
         private readonly notificationService?: NotificationService,
+        @Optional()
+        private readonly eventEmitter?: EventEmitter2,
     ) {}
 
     async getSchedule(
@@ -142,9 +146,7 @@ export class DirectoryScheduleService {
             dto.alwaysCreatePullRequest ?? existing?.alwaysCreatePullRequest ?? false;
 
         const importedProviderOverrides =
-            directory.sourceRepository?.type === 'works_config'
-                ? (directory.sourceRepository.worksConfig?.providers ?? null)
-                : null;
+            directory.sourceRepository?.worksConfig?.providers ?? null;
 
         const providerOverrides =
             dto.providerOverrides !== undefined
@@ -200,6 +202,7 @@ export class DirectoryScheduleService {
         });
 
         await this.syncDirectory(directory.id, schedule);
+        this.requestWorksConfigSync(directory.id, user.id, 'schedule_updated');
 
         const readiness = await this.getScheduleReadiness(directory, user);
         return this.toDto(schedule, allowances, plan.code, subscriptionsEnabled, readiness);
@@ -226,6 +229,7 @@ export class DirectoryScheduleService {
         });
 
         await this.syncDirectory(directory.id, updated);
+        this.requestWorksConfigSync(directory.id, user.id, 'schedule_cancelled');
 
         const [allowances, plan] = await Promise.all([
             this.subscriptionService.getCadenceAllowances(user),
@@ -658,6 +662,17 @@ export class DirectoryScheduleService {
             scheduledNextRunAt: schedule?.nextRunAt ?? null,
             scheduledStatus: schedule?.status ?? DirectoryScheduleStatus.DISABLED,
         });
+    }
+
+    private requestWorksConfigSync(
+        directoryId: string,
+        userId: string,
+        reason: WorksConfigSyncReason,
+    ): void {
+        this.eventEmitter?.emit(
+            WorksConfigSyncRequestedEvent.EVENT_NAME,
+            new WorksConfigSyncRequestedEvent(directoryId, userId, reason),
+        );
     }
 
     private async getScheduleReadiness(

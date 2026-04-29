@@ -1820,8 +1820,7 @@
                         "model": "Model",
                         "schedule": "Jadwal",
                         "providers": "Penyedia",
-                        "websiteRepo": "Repositori Situs Web",
-                        "additionalAgents": "Agen Tambahan"
+                        "websiteRepo": "Repositori Situs Web"
                     },
                     "sourceTypes": {
                         "dataRepo": "Repositori Data",

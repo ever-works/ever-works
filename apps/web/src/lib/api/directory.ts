@@ -141,7 +141,6 @@ export interface WorksConfigSnapshot {
     websiteRepo?: string;
     scheduleCadence?: DirectoryScheduleCadence | null;
     providers?: Record<string, string>;
-    additionalAgentsCount?: number;
 }
 
 export interface RepoVisibility {
@@ -399,7 +398,6 @@ export interface AnalyzeRepositoryResponseDto {
         websiteRepo?: string;
         scheduleCadence?: string | null;
         providers?: ProvidersDto;
-        additionalAgentsCount?: number;
     };
     relatedDataRepo?: { name: string; owner: string };
     baseSlug?: string;

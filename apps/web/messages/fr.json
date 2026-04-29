@@ -1820,8 +1820,7 @@
                         "model": "Modèle",
                         "schedule": "Planification",
                         "providers": "Fournisseurs",
-                        "websiteRepo": "Dépôt du site web",
-                        "additionalAgents": "Agents supplémentaires"
+                        "websiteRepo": "Dépôt du site web"
                     },
                     "sourceTypes": {
                         "dataRepo": "Dépôt de données",

@@ -316,7 +316,6 @@ export type WorksConfigSnapshot = {
     websiteRepo?: string;
     scheduleCadence?: DirectoryScheduleCadence | null;
     providers?: ProvidersDto;
-    additionalAgentsCount?: number;
 };
 
 export interface SourceRepository {

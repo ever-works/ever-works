@@ -1,0 +1,94 @@
+import { WorksConfigRepositorySyncService } from '../services/works-config-repository-sync.service';
+
+jest.mock('@src/generators/data-generator/data-repository', () => ({
+    DataRepository: { create: jest.fn().mockResolvedValue({ dir: '/tmp/data-repo' }) },
+}));
+
+describe('WorksConfigRepositorySyncService', () => {
+    const directory = {
+        id: 'dir-1',
+        gitProvider: 'github',
+        user: { id: 'owner-1' },
+        getRepoOwner: jest.fn().mockReturnValue('ever-works'),
+        getDataRepo: jest.fn().mockReturnValue('compare-cloud-pricing-data'),
+        resolveCommitter: jest.fn().mockReturnValue({
+            name: 'User One',
+            email: 'user@example.com',
+        }),
+    };
+
+    const createService = (changes: Array<{ path: string; status: string }> = []) => {
+        const directoryRepository = { findById: jest.fn().mockResolvedValue(directory) };
+        const gitFacade = {
+            cloneOrPull: jest.fn().mockResolvedValue('/tmp/data-repo'),
+            getStatus: jest.fn().mockResolvedValue(changes),
+            addAll: jest.fn().mockResolvedValue(undefined),
+            commit: jest.fn().mockResolvedValue('commit-sha'),
+            push: jest.fn().mockResolvedValue(undefined),
+        };
+        const projection = {
+            buildWriteRequest: jest.fn().mockResolvedValue({
+                name: 'Compare Cloud Pricing',
+                providers: { ai: 'openai' },
+            }),
+        };
+        const writer = { writeToDataRepository: jest.fn().mockResolvedValue(undefined) };
+
+        return {
+            service: new WorksConfigRepositorySyncService(
+                directoryRepository as any,
+                gitFacade as any,
+                projection as any,
+                writer as any,
+            ),
+            gitFacade,
+            projection,
+            writer,
+        };
+    };
+
+    it('writes projected works.yml and skips commit when the repo is unchanged', async () => {
+        const { service, gitFacade, projection, writer } = createService();
+
+        await service.syncDirectory({
+            directoryId: 'dir-1',
+            userId: 'user-1',
+            reason: 'schedule_updated',
+        });
+
+        expect(projection.buildWriteRequest).toHaveBeenCalledWith(directory);
+        expect(writer.writeToDataRepository).toHaveBeenCalledWith({
+            directory,
+            dataRepository: { dir: '/tmp/data-repo' },
+            request: {
+                name: 'Compare Cloud Pricing',
+                providers: { ai: 'openai' },
+            },
+        });
+        expect(gitFacade.addAll).not.toHaveBeenCalled();
+        expect(gitFacade.commit).not.toHaveBeenCalled();
+        expect(gitFacade.push).not.toHaveBeenCalled();
+    });
+
+    it('commits and pushes when projected works.yml changes the data repo', async () => {
+        const { service, gitFacade } = createService([{ path: 'works.yml', status: 'modified' }]);
+
+        await service.syncDirectory({
+            directoryId: 'dir-1',
+            userId: 'user-1',
+            reason: 'provider_changed',
+        });
+
+        expect(gitFacade.addAll).toHaveBeenCalledWith('github', '/tmp/data-repo');
+        expect(gitFacade.commit).toHaveBeenCalledWith(
+            'github',
+            '/tmp/data-repo',
+            'sync works.yml after provider_changed',
+            { name: 'User One', email: 'user@example.com' },
+        );
+        expect(gitFacade.push).toHaveBeenCalledWith(
+            { dir: '/tmp/data-repo' },
+            { userId: 'user-1', providerId: 'github' },
+        );
+    });
+});

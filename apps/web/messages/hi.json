@@ -1820,8 +1820,7 @@
                         "model": "मॉडल",
                         "schedule": "अनुसूची",
                         "providers": "प्रदाता",
-                        "websiteRepo": "वेबसाइट रिपॉजिटरी",
-                        "additionalAgents": "अतिरिक्त एजेंट"
+                        "websiteRepo": "वेबसाइट रिपॉजिटरी"
                     },
                     "sourceTypes": {
                         "dataRepo": "डेटा रिपॉजिटरी",

@@ -1820,8 +1820,7 @@
                         "model": "Модель",
                         "schedule": "Розклад",
                         "providers": "Постачальники",
-                        "websiteRepo": "Репозиторій вебсайту",
-                        "additionalAgents": "Додаткові агенти"
+                        "websiteRepo": "Репозиторій вебсайту"
                     },
                     "sourceTypes": {
                         "dataRepo": "Репозиторій даних",

@@ -1820,8 +1820,7 @@
                         "model": "النموذج",
                         "schedule": "الجدولة",
                         "providers": "المزودون",
-                        "websiteRepo": "مستودع الموقع",
-                        "additionalAgents": "وكلاء إضافيون"
+                        "websiteRepo": "مستودع الموقع"
                     },
                     "sourceTypes": {
                         "dataRepo": "مستودع البيانات",

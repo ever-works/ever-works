@@ -1820,8 +1820,7 @@
                         "model": "מודל",
                         "schedule": "תזמון",
                         "providers": "ספקים",
-                        "websiteRepo": "מאגר אתר",
-                        "additionalAgents": "סוכנים נוספים"
+                        "websiteRepo": "מאגר אתר"
                     },
                     "sourceTypes": {
                         "dataRepo": "מאגר נתונים",

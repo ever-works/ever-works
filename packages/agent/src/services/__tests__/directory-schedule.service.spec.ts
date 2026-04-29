@@ -195,6 +195,59 @@ describe('DirectoryScheduleService', () => {
         );
     });
 
+    it('restores provider overrides from imported works config for any source type', async () => {
+        const directoryWithWorksConfig = {
+            ...directory,
+            sourceRepository: {
+                type: 'data_repo',
+                worksConfig: {
+                    providers: {
+                        ai: 'openrouter',
+                        pipeline: 'agent-pipeline',
+                    },
+                },
+            },
+        };
+        ownershipService.ensureCanEdit.mockResolvedValue({ directory: directoryWithWorksConfig });
+        scheduleRepository.findByDirectoryId.mockResolvedValue(null);
+        scheduleRepository.upsert.mockResolvedValue({
+            id: 'schedule-1',
+            directoryId: directory.id,
+            userId: user.id,
+            cadence: DirectoryScheduleCadence.DAILY,
+            billingMode: DirectoryScheduleBillingMode.SUBSCRIPTION,
+            status: DirectoryScheduleStatus.ACTIVE,
+            nextRunAt: new Date('2026-04-08T12:47:00.000Z'),
+            maxFailureBeforePause: 3,
+            alwaysCreatePullRequest: false,
+            providerOverrides: {
+                ai: 'openrouter',
+                pipeline: 'agent-pipeline',
+            },
+        });
+
+        await service.updateSchedule(
+            directory.id,
+            {
+                enable: true,
+                cadence: DirectoryScheduleCadence.DAILY,
+                billingMode: DirectoryScheduleBillingMode.SUBSCRIPTION,
+                maxFailureBeforePause: 3,
+            },
+            user,
+        );
+
+        expect(scheduleRepository.upsert).toHaveBeenCalledWith(
+            directory.id,
+            expect.objectContaining({
+                providerOverrides: {
+                    ai: 'openrouter',
+                    pipeline: 'agent-pipeline',
+                },
+            }),
+        );
+    });
+
     it('recalculates nextRunAt when the cadence changes on an active schedule', async () => {
         const nextRunAt = new Date('2026-04-08T12:47:00.000Z');
         const existing = {

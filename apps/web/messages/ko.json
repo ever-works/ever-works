@@ -1820,8 +1820,7 @@
                         "model": "모델",
                         "schedule": "스케줄",
                         "providers": "제공자",
-                        "websiteRepo": "웹사이트 저장소",
-                        "additionalAgents": "추가 에이전트"
+                        "websiteRepo": "웹사이트 저장소"
                     },
                     "sourceTypes": {
                         "dataRepo": "데이터 저장소",

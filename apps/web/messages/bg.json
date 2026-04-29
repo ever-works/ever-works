@@ -1820,8 +1820,7 @@
                         "model": "Модел",
                         "schedule": "Разписание",
                         "providers": "Доставчици",
-                        "websiteRepo": "Репозиторий на уебсайта",
-                        "additionalAgents": "Допълнителни агенти"
+                        "websiteRepo": "Репозиторий на уебсайта"
                     },
                     "sourceTypes": {
                         "dataRepo": "Репозиторий с данни",

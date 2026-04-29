@@ -14,9 +14,6 @@ schedule: weekly
 providers:
   ai: openrouter
   pipeline: agent-pipeline
-agents:
-  - name: comparer
-    prompt: Refresh pricing deltas
 `);
 
         expect(result.name).toBe('Compare Cloud Pricing');
@@ -30,7 +27,6 @@ agents:
             ai: 'openrouter',
             pipeline: 'agent-pipeline',
         });
-        expect(result.additionalAgentsCount).toBe(1);
     });
 
     it('supports object-based schedule config', () => {

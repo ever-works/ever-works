@@ -1820,8 +1820,7 @@
                         "model": "Model",
                         "schedule": "Zamanlama",
                         "providers": "Sağlayıcılar",
-                        "websiteRepo": "Web Sitesi Deposu",
-                        "additionalAgents": "Ek Ajanlar"
+                        "websiteRepo": "Web Sitesi Deposu"
                     },
                     "sourceTypes": {
                         "dataRepo": "Veri Deposu",

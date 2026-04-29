@@ -1820,8 +1820,7 @@
                         "model": "モデル",
                         "schedule": "スケジュール",
                         "providers": "プロバイダー",
-                        "websiteRepo": "ウェブサイトリポジトリ",
-                        "additionalAgents": "追加エージェント"
+                        "websiteRepo": "ウェブサイトリポジトリ"
                     },
                     "sourceTypes": {
                         "dataRepo": "データリポジトリ",

@@ -1820,8 +1820,7 @@
                         "model": "Model",
                         "schedule": "Schedule",
                         "providers": "Providers",
-                        "websiteRepo": "Website Repo",
-                        "additionalAgents": "Additional Agents"
+                        "websiteRepo": "Website Repo"
                     },
                     "sourceTypes": {
                         "dataRepo": "Data Repository",

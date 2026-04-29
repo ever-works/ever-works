@@ -1820,8 +1820,7 @@
                         "model": "Model",
                         "schedule": "Schema",
                         "providers": "Providers",
-                        "websiteRepo": "Website-repository",
-                        "additionalAgents": "Extra agenten"
+                        "websiteRepo": "Website-repository"
                     },
                     "sourceTypes": {
                         "dataRepo": "Gegevensrepository",

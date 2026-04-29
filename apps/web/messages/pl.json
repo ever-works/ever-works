@@ -1820,8 +1820,7 @@
                         "model": "Model",
                         "schedule": "Harmonogram",
                         "providers": "Dostawcy",
-                        "websiteRepo": "Repozytorium witryny",
-                        "additionalAgents": "Dodatkowe agenty"
+                        "websiteRepo": "Repozytorium witryny"
                     },
                     "sourceTypes": {
                         "dataRepo": "Repozytorium danych",

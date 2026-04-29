@@ -1820,8 +1820,7 @@
                         "model": "Mô hình",
                         "schedule": "Lịch trình",
                         "providers": "Nhà cung cấp",
-                        "websiteRepo": "Kho trang web",
-                        "additionalAgents": "Tác nhân bổ sung"
+                        "websiteRepo": "Kho trang web"
                     },
                     "sourceTypes": {
                         "dataRepo": "Kho dữ liệu",
