@@ -224,7 +224,7 @@ export function DashboardSidebar({
                             className="shadow-s dark:border"
                             onClick={() => onInteraction?.()}
                         >
-                            <Plus className="w-5 h-5" strokeWidth={1.3} />
+                            <Plus className="w-5 h-5"/>
                             <span className="font-medium">{t('newDirectory')}</span>
                         </Button>
                     )}
@@ -258,12 +258,12 @@ export function DashboardSidebar({
                                                     ? 'justify-center w-8 h-8 px-0'
                                                     : 'gap-3 px-4 py-2',
                                                 isActive
-                                                    ? 'border bg-surface-secondary border-surface-tertiary dark:border-transparent dark:bg-card-secondary-dark text-text dark:text-gray-300'
-                                                    : 'text-text dark:text-gray-500 hover:bg-surface-secondary dark:hover:bg-card-primary-dark hover:text-text dark:hover:text-text-dark',
+                                                    ? 'border bg-surface-secondary border-surface-tertiary dark:border-transparent dark:bg-card-secondary-dark text-text dark:text-text-dark'
+                                                    : 'text-text dark:text-text-secondary-dark/70 hover:bg-surface-secondary dark:hover:bg-card-primary-dark hover:text-text dark:hover:text-text-dark',
                                             )}
                                         >
                                             <span className="shrink-0 inline-flex">
-                                                <item.icon className="w-5 h-5" strokeWidth={1.3} />
+                                                <item.icon className="w-5 h-5" strokeWidth={1.5} />
                                             </span>
                                             {!isCollapsed && (
                                                 <span className="text-sm">{item.name}</span>

@@ -46,15 +46,23 @@ export function ChatMessages({ messages, isStreaming }: ChatMessagesProps) {
 
     return (
         <div className="flex-1 min-h-0 relative">
-            {/* Top gradient - only show when not at top */}
-            {!isAtTop && (
-                <div className="absolute top-0 left-0 right-0 h-24 bg-gradient-to-b from-white dark:from-surface-dark to-transparent pointer-events-none z-10 transition-opacity duration-200" />
-            )}
+            {/* Top gradient - fade in/out based on scroll position */}
+            <div
+                className={cn(
+                    'absolute top-0 left-0 right-0 h-16 bg-gradient-to-b from-white dark:from-surface-dark to-transparent pointer-events-none z-10',
+                    'transition-opacity duration-200',
+                    isAtTop ? 'opacity-0' : 'opacity-100',
+                )}
+            />
 
-            {/* Bottom gradient - only show when not at bottom */}
-            {!isAtBottom && (
-                <div className="absolute bottom-0 left-0 right-0 h-24 bg-gradient-to-t from-white dark:from-surface-dark to-transparent pointer-events-none z-10 transition-opacity duration-200" />
-            )}
+            {/* Bottom gradient - fade in/out based on scroll position */}
+            <div
+                className={cn(
+                    'absolute bottom-0 left-0 right-0 h-16 bg-gradient-to-t from-white dark:from-surface-dark to-transparent pointer-events-none z-10',
+                    'transition-opacity duration-200',
+                    isAtBottom ? 'opacity-0' : 'opacity-100',
+                )}
+            />
 
             <div ref={scrollRef} className="h-full overflow-y-auto">
                 <div ref={contentRef} className="px-4 py-3 space-y-3">
