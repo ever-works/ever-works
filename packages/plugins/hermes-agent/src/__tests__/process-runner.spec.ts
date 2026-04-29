@@ -7,7 +7,7 @@ vi.mock('child_process', () => ({
 }));
 
 import { spawn } from 'child_process';
-import { buildHermesEnv, executeHermes } from '../utils/process-runner.js';
+import { buildHermesArgs, buildHermesEnv, executeHermes } from '../utils/process-runner.js';
 
 function createMockChild(exitCode = 0): EventEmitter & {
 	stdout: PassThrough;
@@ -44,6 +44,20 @@ function createMockChild(exitCode = 0): EventEmitter & {
 describe('process-runner', () => {
 	beforeEach(() => {
 		vi.clearAllMocks();
+	});
+
+	it('passes Hermes profile selection with the supported short flag', () => {
+		const args = buildHermesArgs({
+			binaryPath: 'hermes',
+			prompt: 'Return JSON',
+			cwd: '/tmp/workspace',
+			profile: 'everworks-test',
+			toolsets: 'web',
+			maxTurns: 10,
+			yolo: true,
+		});
+
+		expect(args.slice(0, 3)).toEqual(['-p', 'everworks-test', 'chat']);
 	});
 
 	it('removes the abort listener when Hermes exits naturally', async () => {

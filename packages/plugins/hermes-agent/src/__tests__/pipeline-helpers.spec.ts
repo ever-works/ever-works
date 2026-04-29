@@ -53,7 +53,7 @@ describe('buildHermesArgs', () => {
 				yolo: true
 			})
 		).toEqual([
-			'--profile',
+			'-p',
 			'work',
 			'chat',
 			'--quiet',

@@ -81,7 +81,7 @@ export interface ExecuteResult {
 }
 
 export function buildHermesArgs(options: ExecuteOptions): string[] {
-	const args = ['--profile', options.profile, 'chat', '--quiet', '--toolsets', options.toolsets];
+	const args = ['-p', options.profile, 'chat', '--quiet', '--toolsets', options.toolsets];
 
 	if (options.yolo) {
 		args.push('--yolo');
