@@ -1,15 +1,17 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Optional } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { DirectoryRepository } from '@src/database/repositories/directory.repository';
 import { GitFacadeService } from '@src/facades/git.facade';
 import { DataRepository } from '@src/generators/data-generator/data-repository';
 import type { User } from '@src/entities/user.entity';
+import { WorksConfigSyncFailedEvent, type WorksConfigSyncReason } from '@src/events';
 import { WorksConfigProjectionService } from './works-config-projection.service';
 import { WorksConfigWriterService } from './works-config-writer.service';
 
 export type WorksConfigRepositorySyncOptions = {
     directoryId: string;
     userId: string;
-    reason: string;
+    reason: WorksConfigSyncReason;
 };
 
 @Injectable()
@@ -21,6 +23,8 @@ export class WorksConfigRepositorySyncService {
         private readonly gitFacade: GitFacadeService,
         private readonly projection: WorksConfigProjectionService,
         private readonly writer: WorksConfigWriterService,
+        @Optional()
+        private readonly eventEmitter?: EventEmitter2,
     ) {}
 
     async syncDirectory(options: WorksConfigRepositorySyncOptions): Promise<void> {
@@ -70,10 +74,20 @@ export class WorksConfigRepositorySyncService {
                 { userId: options.userId, providerId: directory.gitProvider },
             );
         } catch (error) {
+            const errorMessage = error instanceof Error ? error.message : String(error);
+
             this.logger.warn(
-                `Failed to sync works.yml for ${owner}/${repo}: ${
-                    error instanceof Error ? error.message : String(error)
-                }`,
+                `Failed to sync works.yml for ${owner}/${repo}: ${errorMessage}`,
+            );
+            this.eventEmitter?.emit(
+                WorksConfigSyncFailedEvent.EVENT_NAME,
+                new WorksConfigSyncFailedEvent(
+                    directory.id,
+                    options.userId,
+                    options.reason,
+                    `${owner}/${repo}`,
+                    errorMessage,
+                ),
             );
         }
     }

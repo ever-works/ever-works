@@ -1,4 +1,5 @@
 import { WorksConfigRepositorySyncService } from '../services/works-config-repository-sync.service';
+import { WorksConfigSyncFailedEvent } from '@src/events';
 
 jest.mock('@src/generators/data-generator/data-repository', () => ({
     DataRepository: { create: jest.fn().mockResolvedValue({ dir: '/tmp/data-repo' }) },
@@ -33,6 +34,7 @@ describe('WorksConfigRepositorySyncService', () => {
             }),
         };
         const writer = { writeToDataRepository: jest.fn().mockResolvedValue(undefined) };
+        const eventEmitter = { emit: jest.fn() };
 
         return {
             service: new WorksConfigRepositorySyncService(
@@ -40,10 +42,12 @@ describe('WorksConfigRepositorySyncService', () => {
                 gitFacade as any,
                 projection as any,
                 writer as any,
+                eventEmitter as any,
             ),
             gitFacade,
             projection,
             writer,
+            eventEmitter,
         };
     };
 
@@ -89,6 +93,30 @@ describe('WorksConfigRepositorySyncService', () => {
         expect(gitFacade.push).toHaveBeenCalledWith(
             { dir: '/tmp/data-repo' },
             { userId: 'user-1', providerId: 'github' },
+        );
+    });
+
+    it('emits a failure event when the non-blocking sync fails', async () => {
+        const { service, gitFacade, eventEmitter } = createService([
+            { path: 'works.yml', status: 'modified' },
+        ]);
+        gitFacade.push.mockRejectedValue(new Error('permission denied'));
+
+        await service.syncDirectory({
+            directoryId: 'dir-1',
+            userId: 'user-1',
+            reason: 'provider_changed',
+        });
+
+        expect(eventEmitter.emit).toHaveBeenCalledWith(
+            WorksConfigSyncFailedEvent.EVENT_NAME,
+            expect.objectContaining({
+                directoryId: 'dir-1',
+                userId: 'user-1',
+                reason: 'provider_changed',
+                repository: 'ever-works/compare-cloud-pricing-data',
+                errorMessage: 'permission denied',
+            }),
         );
     });
 });
