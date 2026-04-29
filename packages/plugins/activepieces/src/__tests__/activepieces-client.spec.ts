@@ -41,9 +41,7 @@ describe('ActivepiecesClient', () => {
 
 	describe('validateFlow', () => {
 		it('should fetch the flow and require ENABLED status', async () => {
-			fetchSpy.mockResolvedValue(
-				mockJsonResponse({ id: 'flow-1', status: 'ENABLED', publishedVersionId: 'v1' })
-			);
+			fetchSpy.mockResolvedValue(mockJsonResponse({ id: 'flow-1', status: 'ENABLED', publishedVersionId: 'v1' }));
 
 			const client = createClient();
 			const flow = await client.validateFlow('flow-1');
@@ -66,9 +64,7 @@ describe('ActivepiecesClient', () => {
 		});
 
 		it('should warn when flow has no published version', async () => {
-			fetchSpy.mockResolvedValue(
-				mockJsonResponse({ id: 'flow-1', status: 'ENABLED', publishedVersionId: null })
-			);
+			fetchSpy.mockResolvedValue(mockJsonResponse({ id: 'flow-1', status: 'ENABLED', publishedVersionId: null }));
 
 			const warn = vi.fn();
 			const client = new ActivepiecesClient({
@@ -81,9 +77,7 @@ describe('ActivepiecesClient', () => {
 		});
 
 		it('should map 401 to a friendly auth error', async () => {
-			fetchSpy.mockResolvedValue(
-				new Response('Unauthorized', { status: 401, statusText: 'Unauthorized' })
-			);
+			fetchSpy.mockResolvedValue(new Response('Unauthorized', { status: 401, statusText: 'Unauthorized' }));
 			await expect(createClient().validateFlow('flow-1')).rejects.toThrow(/Invalid Activepieces API key/);
 		});
 

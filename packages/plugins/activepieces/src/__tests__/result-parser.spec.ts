@@ -47,9 +47,7 @@ describe('parseActivepiecesOutput', () => {
 	});
 
 	it('should parse a JSON string', () => {
-		const result = parseActivepiecesOutput(
-			JSON.stringify({ items: [{ name: 'A', url: 'https://a.com' }] })
-		);
+		const result = parseActivepiecesOutput(JSON.stringify({ items: [{ name: 'A', url: 'https://a.com' }] }));
 
 		expect(result.items).toHaveLength(1);
 	});

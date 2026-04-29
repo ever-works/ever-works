@@ -17,7 +17,8 @@ export function getFormFields(): FormFieldDefinition[] {
 			name: 'webhook_mode',
 			type: 'select',
 			label: 'Webhook Execution Mode',
-			description: 'Sync waits for the flow to finish; async returns immediately and is not supported by this pipeline',
+			description:
+				'Sync waits for the flow to finish; async returns immediately and is not supported by this pipeline',
 			defaultValue: 'sync',
 			options: [
 				{ label: 'Synchronous (recommended)', value: 'sync' },

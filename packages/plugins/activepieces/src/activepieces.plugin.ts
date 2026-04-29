@@ -25,12 +25,7 @@ import type {
 } from '@ever-works/plugin';
 import { buildSuccessPipelineResult } from '@ever-works/plugin';
 
-import type {
-	ActivepiecesStepId,
-	ActivepiecesSettings,
-	ActivepiecesPipelineMetrics,
-	WebhookMode
-} from './types.js';
+import type { ActivepiecesStepId, ActivepiecesSettings, ActivepiecesPipelineMetrics, WebhookMode } from './types.js';
 import { ACTIVEPIECES_STEP_IDS, DEFAULT_BASE_URL } from './types.js';
 import { STEP_DEFINITIONS } from './steps.js';
 import { ActivepiecesClient } from './utils/activepieces-client.js';

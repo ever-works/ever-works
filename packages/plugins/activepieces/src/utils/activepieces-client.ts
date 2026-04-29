@@ -240,7 +240,9 @@ async function buildHttpError(response: Response, url: string): Promise<Error> {
 		return new Error('Activepieces rate limit exceeded. Please wait and try again.');
 	}
 	if (response.status >= 500) {
-		return new Error(`${baseMessage}. The Activepieces server returned an error.${detail ? ` Detail: ${detail}` : ''}`);
+		return new Error(
+			`${baseMessage}. The Activepieces server returned an error.${detail ? ` Detail: ${detail}` : ''}`
+		);
 	}
 	return new Error(`${baseMessage}${detail ? ` — ${detail}` : ''}`);
 }
