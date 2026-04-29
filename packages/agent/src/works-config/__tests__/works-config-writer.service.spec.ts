@@ -83,6 +83,44 @@ describe('WorksConfigWriterService', () => {
         await fs.rm(repoDir, { recursive: true, force: true });
     });
 
+    it('preserves existing managed fields when a sync does not provide replacements', async () => {
+        const repoDir = await fs.mkdtemp(path.join(os.tmpdir(), 'works-config-writer-'));
+        await fs.writeFile(
+            path.join(repoDir, 'works.yml'),
+            [
+                'initial_prompt: Existing prompt',
+                'model: openai/gpt-5.1',
+                'providers:',
+                '  ai: openai',
+                '  pipeline: agent-pipeline',
+                'website_repo: ever-works/custom-website',
+                '',
+            ].join('\n'),
+            'utf-8',
+        );
+
+        const service = new WorksConfigWriterService(new WorksConfigService({} as any));
+
+        await service.writeToDataRepository({
+            directory: createDirectory(),
+            dataRepository: { dir: repoDir } as any,
+        });
+
+        const written = yaml.parse(await fs.readFile(path.join(repoDir, 'works.yml'), 'utf-8'));
+
+        expect(written).toMatchObject({
+            initial_prompt: 'Existing prompt',
+            model: 'openai/gpt-5.1',
+            providers: {
+                ai: 'openai',
+                pipeline: 'agent-pipeline',
+            },
+            website_repo: 'ever-works-web/compare-cloud-pricing-site',
+        });
+
+        await fs.rm(repoDir, { recursive: true, force: true });
+    });
+
     it('writes imported works.yml-only state before schedule is applied to the directory', async () => {
         const repoDir = await fs.mkdtemp(path.join(os.tmpdir(), 'works-config-writer-'));
         const directory = {

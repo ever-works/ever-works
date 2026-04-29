@@ -40,9 +40,15 @@ export class WorksConfigWriterService {
     ): Record<string, unknown> {
         const request = options.request ?? {};
         const imported = options.importedWorksConfig;
-        const initialPrompt = request.prompt || imported?.initialPrompt || options.initialPrompt;
-        const model = request.model || imported?.model;
-        const providers = request.providers || imported?.providers;
+        const initialPrompt =
+            request.prompt ||
+            imported?.initialPrompt ||
+            options.initialPrompt ||
+            this.readString(existingRaw.initial_prompt);
+
+        const model = request.model || imported?.model || this.readString(existingRaw.model);
+        const providers =
+            request.providers || imported?.providers || this.readRecord(existingRaw.providers);
         const websiteRepo =
             imported?.websiteRepo || this.formatRepositoryTarget(options.directory, 'website');
 
@@ -143,5 +149,15 @@ export class WorksConfigWriterService {
 
     private withoutUndefined(value: Record<string, unknown>): Record<string, unknown> {
         return Object.fromEntries(Object.entries(value).filter(([, entry]) => entry !== undefined));
+    }
+
+    private readString(value: unknown): string | undefined {
+        return typeof value === 'string' && value.trim().length > 0 ? value : undefined;
+    }
+
+    private readRecord(value: unknown): Record<string, unknown> | undefined {
+        return value && typeof value === 'object' && !Array.isArray(value)
+            ? (value as Record<string, unknown>)
+            : undefined;
     }
 }
