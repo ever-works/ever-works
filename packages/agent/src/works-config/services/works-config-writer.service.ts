@@ -3,6 +3,7 @@ import * as fs from 'fs/promises';
 import * as path from 'path';
 import * as yaml from 'yaml';
 import type { CreateItemsGeneratorDto } from '@src/items-generator/dto';
+import type { ProvidersDto } from '@ever-works/contracts/api';
 import { Directory, type RepositoryTarget } from '@src/entities/directory.entity';
 import type { DataRepository } from '@src/generators/data-generator/data-repository';
 import { WorksConfigService, type ResolvedWorksConfig } from './works-config.service';
@@ -10,9 +11,10 @@ import { WorksConfigService, type ResolvedWorksConfig } from './works-config.ser
 const WORKS_CONFIG_FILENAME = 'works.yml';
 const WORKS_CONFIG_FALLBACK_FILENAMES = ['works.yml', 'works.yaml'] as const;
 
-export type WorksConfigWriteRequest = Partial<
-    Pick<CreateItemsGeneratorDto, 'name' | 'prompt' | 'model' | 'providers'>
->;
+export type WorksConfigWriteRequest = Partial<Pick<CreateItemsGeneratorDto, 'name' | 'prompt'>> & {
+    model?: string | null;
+    providers?: ProvidersDto | null;
+};
 
 export type WriteWorksConfigOptions = {
     directory: Directory;
@@ -46,9 +48,16 @@ export class WorksConfigWriterService {
             options.initialPrompt ||
             this.readString(existingRaw.initial_prompt);
 
-        const model = request.model || imported?.model || this.readString(existingRaw.model);
-        const providers =
-            request.providers || imported?.providers || this.readRecord(existingRaw.providers);
+        const model = this.resolveStringField({
+            requested: request.model,
+            imported: imported?.model,
+            existing: existingRaw.model,
+        });
+        const providers = this.resolveProviders({
+            requested: request.providers,
+            imported: imported?.providers,
+            existing: existingRaw.providers,
+        });
         const websiteRepo =
             imported?.websiteRepo || this.formatRepositoryTarget(options.directory, 'website');
 
@@ -159,5 +168,29 @@ export class WorksConfigWriterService {
         return value && typeof value === 'object' && !Array.isArray(value)
             ? (value as Record<string, unknown>)
             : undefined;
+    }
+
+    private resolveStringField(options: {
+        requested?: string | null;
+        imported?: string;
+        existing: unknown;
+    }): string | undefined {
+        if (options.requested === null) {
+            return undefined;
+        }
+
+        return options.requested || options.imported || this.readString(options.existing);
+    }
+
+    private resolveProviders(options: {
+        requested?: ProvidersDto | null;
+        imported?: ProvidersDto;
+        existing: unknown;
+    }): ProvidersDto | Record<string, unknown> | undefined {
+        if (options.requested === null) {
+            return undefined;
+        }
+
+        return options.requested || options.imported || this.readRecord(options.existing);
     }
 }

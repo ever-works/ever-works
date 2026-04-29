@@ -83,4 +83,24 @@ describe('WorksConfigProjectionService', () => {
             providers: { ai: 'openai', screenshot: 'screenshotone' },
         });
     });
+
+    it('returns an explicit providers clear signal when no providers are active', async () => {
+        const scheduleRepository = {
+            findByDirectoryId: jest.fn().mockResolvedValue({ providerOverrides: null }),
+        };
+        const directoryPluginRepository = {
+            findEnabledByDirectory: jest.fn().mockResolvedValue([]),
+            findActiveByCapability: jest.fn().mockResolvedValue(null),
+        };
+        const service = new WorksConfigProjectionService(
+            scheduleRepository as any,
+            directoryPluginRepository as any,
+        );
+
+        await expect(service.buildWriteRequest(directory)).resolves.toEqual({
+            name: 'Compare Cloud Pricing',
+            model: undefined,
+            providers: null,
+        });
+    });
 });

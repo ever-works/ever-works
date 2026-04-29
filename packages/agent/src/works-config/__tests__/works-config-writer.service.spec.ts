@@ -121,6 +121,31 @@ describe('WorksConfigWriterService', () => {
         await fs.rm(repoDir, { recursive: true, force: true });
     });
 
+    it('removes stale providers when a projection explicitly clears them', async () => {
+        const repoDir = await fs.mkdtemp(path.join(os.tmpdir(), 'works-config-writer-'));
+        await fs.writeFile(
+            path.join(repoDir, 'works.yml'),
+            ['providers:', '  ai: openai', '  pipeline: agent-pipeline', ''].join('\n'),
+            'utf-8',
+        );
+
+        const service = new WorksConfigWriterService(new WorksConfigService({} as any));
+
+        await service.writeToDataRepository({
+            directory: createDirectory(),
+            dataRepository: { dir: repoDir } as any,
+            request: {
+                providers: null,
+            },
+        });
+
+        const written = yaml.parse(await fs.readFile(path.join(repoDir, 'works.yml'), 'utf-8'));
+
+        expect(written.providers).toBeUndefined();
+
+        await fs.rm(repoDir, { recursive: true, force: true });
+    });
+
     it('writes imported works.yml-only state before schedule is applied to the directory', async () => {
         const repoDir = await fs.mkdtemp(path.join(os.tmpdir(), 'works-config-writer-'));
         const directory = {
