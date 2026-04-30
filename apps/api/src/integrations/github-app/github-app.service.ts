@@ -7,6 +7,7 @@ import {
     requestGitHubAppInstallationAccessToken,
     verifyGitHubWebhookSignature,
 } from '@ever-works/agent/utils';
+import { resolveGitHubAccountEmail } from '@src/auth/utils/github-email.utils';
 import { config } from '../../config/constants';
 import { firstValueFrom } from 'rxjs';
 
@@ -50,12 +51,6 @@ type GitHubUserResponse = {
     email?: string | null;
     avatar_url?: string | null;
     node_id?: string;
-};
-
-type GitHubEmailResponse = {
-    email: string;
-    primary?: boolean;
-    verified?: boolean;
 };
 
 @Injectable()
@@ -112,25 +107,11 @@ export class GitHubAppService {
             this.httpService.get<GitHubUserResponse>('https://api.github.com/user', { headers }),
         );
 
-        let email = data.email || null;
-        let emailVerified = true;
-
-        if (!email) {
-            const emailsResponse = await firstValueFrom(
-                this.httpService.get<GitHubEmailResponse[]>('https://api.github.com/user/emails', {
-                    headers,
-                }),
-            );
-
-            const primaryEmail =
-                emailsResponse.data.find((item) => item.primary && item.verified) ||
-                emailsResponse.data.find((item) => item.primary) ||
-                emailsResponse.data.find((item) => item.verified) ||
-                emailsResponse.data[0];
-
-            email = primaryEmail?.email || null;
-            emailVerified = primaryEmail?.verified !== false;
-        }
+        const { email, emailVerified } = await resolveGitHubAccountEmail(
+            this.httpService,
+            accessToken,
+            data.email || null,
+        );
 
         return {
             githubUserId: String(data.id),
