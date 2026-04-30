@@ -129,4 +129,4 @@ Not all context properties can be serialized:
 ## Related
 
 - [Pipeline Overview](../architecture/pipeline-overview.md)
-- [Items Generation Spec](../features/items-generation/spec.md)
+- [Data Generator Spec](../features/data-generator/spec.md)
