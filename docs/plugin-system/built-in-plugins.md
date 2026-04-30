@@ -7,7 +7,7 @@ sidebar_position: 5
 
 # Built-in Plugins
 
-The platform ships with 30 plugins. This page documents each plugin, its configuration, and environment variables.
+The platform ships with 39 plugins across the AI provider, search, content extraction, screenshot, git, deployment, pipeline, data source, and utility categories. This page documents each plugin, its configuration, and environment variables.
 
 ## AI Providers
 
@@ -389,6 +389,19 @@ AI-native multi-source search and content extraction via the Valyu API.
 | `apiKey` | string | — | Valyu API key (required, secret) |
 | `responseLength` | string | `medium` | Content volume per result: `short`, `medium`, `large`, `max` |
 
+### Linkup
+
+Web search and content extraction via the Linkup API. Optimized for AI-precision results and clean content extraction from any URL.
+
+| Field | Value |
+|-------|-------|
+| Plugin ID | `linkup` |
+| Configuration Mode | `hybrid` |
+| Auto Enable | No |
+| Capabilities | `search`, `content-extractor` |
+
+See [Linkup Plugin](./linkup-plugin.md) for setup. Refer to `packages/plugins/linkup/src/` for the current settings schema.
+
 ## Git Provider
 
 ### GitHub
@@ -709,6 +722,112 @@ Generation pipeline that uses the Claude Code CLI to autonomously research and g
 | Variable | Required | Description |
 |----------|----------|-------------|
 | `PLUGIN_CLAUDE_CODE_OAUTH_TOKEN` | No | OAuth token (can be set in user settings instead) |
+
+### Claude Managed Agent
+
+Hosted Claude Managed Agent pipeline. Delegates the full directory generation to Anthropic's managed agent runtime instead of orchestrating the steps locally.
+
+| Field | Value |
+|-------|-------|
+| Plugin ID | `claude-managed-agent` |
+| Configuration Mode | `user-required` |
+| Auto Enable | No |
+| Capabilities | `pipeline`, `form-schema-provider` |
+
+See [Claude Managed Agent Plugin](./claude-managed-agent-plugin.md) for setup, settings, and the full list of environment variables. Refer to `packages/plugins/claude-managed-agent/src/` for the latest schema.
+
+### Codex Generator
+
+Pipeline plugin that delegates the full generation to OpenAI Codex. Useful when you want Codex's tool-using behaviour to drive the entire generation flow.
+
+| Field | Value |
+|-------|-------|
+| Plugin ID | `codex` |
+| Configuration Mode | `user-required` |
+| Auto Enable | No |
+| Capabilities | `pipeline`, `form-schema-provider` |
+
+See [Codex Plugin](./codex-plugin.md) for setup. Refer to `packages/plugins/codex/src/` for the current settings schema.
+
+### Gemini Generator
+
+Pipeline plugin that delegates the full generation to the Gemini CLI agent. Distinct from the `google` AI provider plugin: Gemini Generator runs as an autonomous CLI-driven pipeline, while the `google` plugin exposes Gemini models for use as a regular AI provider in the Standard or Agent pipelines.
+
+| Field | Value |
+|-------|-------|
+| Plugin ID | `gemini` |
+| Configuration Mode | `user-required` |
+| Auto Enable | No |
+| Capabilities | `pipeline`, `form-schema-provider` |
+
+See [Gemini Plugin](./gemini-plugin.md) for setup. Refer to `packages/plugins/gemini/src/` for the current settings schema.
+
+### OpenCode Generator
+
+Pipeline plugin that delegates the full generation to OpenCode, an open-source code agent.
+
+| Field | Value |
+|-------|-------|
+| Plugin ID | `opencode` |
+| Configuration Mode | `user-required` |
+| Auto Enable | No |
+| Capabilities | `pipeline`, `form-schema-provider` |
+
+See [OpenCode Plugin](./opencode-plugin.md) for setup. Refer to `packages/plugins/opencode/src/` for the current settings schema.
+
+### Make.com Workflows
+
+Pipeline plugin that triggers Make.com (formerly Integromat) scenarios via webhooks to handle directory generation. Use this to plug in a no-code/low-code workflow as the source of generated items.
+
+| Field | Value |
+|-------|-------|
+| Plugin ID | `make` |
+| Configuration Mode | `user-required` |
+| Auto Enable | No |
+| Capabilities | `pipeline`, `form-schema-provider` |
+
+See [Make.com Plugin](./make-plugin.md) for setup. Refer to `packages/plugins/make/src/` for the current settings schema.
+
+### SIM AI Workflows
+
+Pipeline plugin that delegates directory generation to a SIM AI workflow defined in the SIM Studio platform.
+
+| Field | Value |
+|-------|-------|
+| Plugin ID | `sim-ai` |
+| Configuration Mode | `user-required` |
+| Auto Enable | No |
+| Capabilities | `pipeline`, `form-schema-provider` |
+
+See [SIM AI Workflows Plugin](./sim-ai-plugin.md) for setup. Refer to `packages/plugins/sim-ai/src/` for the current settings schema.
+
+### Zapier Automation
+
+Pipeline plugin that triggers Zapier actions during directory generation. Lets you wire generation events to any of Zapier's 7000+ integrations.
+
+| Field | Value |
+|-------|-------|
+| Plugin ID | `zapier` |
+| Configuration Mode | `user-required` |
+| Auto Enable | No |
+| Capabilities | `pipeline`, `form-schema-provider` |
+
+See [Zapier Plugin](./zapier-plugin.md) for setup. Refer to `packages/plugins/zapier/src/` for the current settings schema.
+
+## Prompt Management
+
+### Langfuse
+
+External prompt management plugin. Lets you store, version, label, and A/B-test all pipeline prompts in [Langfuse](https://langfuse.com/) instead of shipping them in-repo.
+
+| Field | Value |
+|-------|-------|
+| Plugin ID | `langfuse` |
+| Category | `utility` |
+| Auto Enable | No |
+| Capabilities | `prompt-provider` |
+
+See [Langfuse Plugin](./langfuse-plugin.md) for setup, label conventions, and fallback behaviour. Refer to `packages/plugins/langfuse/src/` for the current settings schema.
 
 ## Utility
 

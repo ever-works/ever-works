@@ -17,16 +17,21 @@ ever-works/
 │   ├── api/              # NestJS REST API (port 3100)
 │   ├── web/              # Next.js admin dashboard (port 3000)
 │   ├── cli/              # Standalone CLI (Commander.js + esbuild)
-│   └── internal-cli/     # Internal CLI (nest-commander)
+│   ├── internal-cli/     # Internal CLI (nest-commander)
+│   ├── admin/            # Admin interface
+│   ├── mcp/              # MCP (Model Context Protocol) server (port 3200)
+│   └── docs/             # Docusaurus 3 documentation site (port 3000 dev)
+├── docs/                 # Markdown content rendered by apps/docs
 ├── packages/
 │   ├── agent/            # Core business logic, plugins, pipeline, AI, database
 │   ├── contracts/        # Shared TypeScript types
 │   ├── plugin/           # Plugin SDK v1.0.0 (standalone, no NestJS deps)
-│   ├── plugins/          # 30 plugins (AI, search, deploy, pipeline, etc.)
+│   ├── plugins/          # 39 plugins (AI, search, deploy, pipeline, prompt mgmt, etc.)
 │   ├── monitoring/       # Sentry + PostHog integration
 │   ├── tasks/            # Trigger.dev background jobs
 │   └── cli-shared/       # Shared CLI utilities
-├── compose.yaml          # Docker Compose for API + Web
+├── .deploy/              # Dockerfiles & K8s manifests per app
+├── compose.yaml          # Docker Compose for the full stack
 ├── turbo.json            # Turborepo pipeline configuration
 ├── pnpm-workspace.yaml   # pnpm workspace definition
 └── package.json          # Root scripts and dev dependencies

@@ -19,6 +19,8 @@ ever-works/
     cli/                # Public CLI (Commander.js, esbuild)
     internal-cli/       # Internal NestJS CLI (nest-commander)
     admin/              # Admin interface
+    mcp/                # MCP (Model Context Protocol) server
+    docs/               # Docusaurus 3 documentation site
 
   packages/
     agent/              # Core AI agent logic (NestJS, TypeORM, LangChain)
@@ -27,27 +29,52 @@ ever-works/
     monitoring/         # Sentry + PostHog integration
     tasks/              # Trigger.dev background job definitions
     cli-shared/         # Shared utilities for CLI apps
-    plugins/            # Plugin implementations (30+ packages)
+    plugins/            # Plugin implementations (39 packages)
       openai/           # OpenAI AI provider
       anthropic/        # Anthropic AI provider
-      google/           # Google AI provider
+      google/           # Google AI provider (Gemini models)
       groq/             # Groq AI provider
       ollama/           # Ollama (local) AI provider
-      openrouter/       # OpenRouter AI provider
+      openrouter/       # OpenRouter AI gateway (default)
+      mistral/          # Mistral AI provider
+      vercel-ai-gateway/# Vercel AI Gateway provider
       exa/              # Exa search
-      tavily/           # Tavily search
+      tavily/           # Tavily search (default)
       serpapi/          # SerpAPI search
       brave/            # Brave search
-      github/           # GitHub integration
-      vercel/           # Vercel deployment
+      perplexity/       # Perplexity AI search
+      brightdata/       # Bright Data search/scraping
+      firecrawl/        # Firecrawl search/extraction
+      jina/             # Jina AI search/extraction
+      valyu/            # Valyu multi-source search
+      linkup/           # Linkup AI-precision search
+      local-content-extractor/  # Built-in HTML extractor (default)
+      notion-extractor/         # Notion page extractor
+      pdf-extractor/    # PDF text + OCR extractor
+      scrapfly/         # Scrapfly screenshots + extraction
       screenshotone/    # ScreenshotOne screenshots
-      urlbox/           # Urlbox screenshots
-      ...               # and more
+      urlbox/           # URLBox screenshots
+      github/           # GitHub git provider (default) + OAuth
+      vercel/           # Vercel deployment (default)
+      apify/            # Apify data-source / actor imports
+      standard-pipeline/         # 15-step structured pipeline (default)
+      agent-pipeline/   # Autonomous Vercel-AI-SDK agent
+      claude-code/      # Claude Code CLI generator
+      claude-managed-agent/      # Hosted Claude Managed Agent
+      codex/            # OpenAI Codex CLI generator
+      gemini/           # Gemini CLI generator (distinct from `google`)
+      opencode/         # OpenCode CLI generator
+      make/             # Make.com workflow generator
+      sim-ai/           # SIM AI workflow generator
+      zapier/           # Zapier automation triggers
+      comparison-generator/      # SEO A vs B comparison pages
+      langfuse/         # External prompt management
 
   turbo.json            # Turborepo task configuration
   pnpm-workspace.yaml   # Workspace package globs
   package.json          # Root scripts, devDependencies, Prettier config
   compose.yaml          # Docker Compose for production-like setup
+  .deploy/              # Dockerfiles & K8s manifests for each app
 ```
 
 ## pnpm Workspaces
