@@ -9,6 +9,7 @@ import { ExternalLink, Loader2 } from 'lucide-react';
 import { updateDirectorySchedule } from '@/app/actions/dashboard/directories';
 import { useRouter } from '@/i18n/navigation';
 import { toast } from 'sonner';
+import { formatWorksConfigProviders } from '../../shared/works-config';
 
 export function SourceSettings() {
     const t = useTranslations('dashboard.directoryDetail.settings');
@@ -20,6 +21,83 @@ export function SourceSettings() {
     if (!directory.sourceRepository) {
         return null;
     }
+
+    const sourceRepository = directory.sourceRepository;
+    const worksConfig = sourceRepository.worksConfig;
+    const sourceTypeLabel = getSourceTypeLabel(sourceRepository.type, t);
+    const fallbackOwner = directory.owner || sourceRepository.owner;
+    const websiteTarget =
+        sourceRepository.relatedRepositories?.website?.owner &&
+        sourceRepository.relatedRepositories?.website?.repo
+            ? `${sourceRepository.relatedRepositories.website.owner}/${sourceRepository.relatedRepositories.website.repo}`
+            : worksConfig?.websiteRepo || null;
+    const appliedWebsiteRepo = sourceRepository.relatedRepositories?.website
+        ? `${sourceRepository.relatedRepositories.website.owner || fallbackOwner}/${sourceRepository.relatedRepositories.website.repo}`
+        : `${fallbackOwner}/${directory.slug}-website`;
+    const appliedSchedule = directory.scheduledUpdatesEnabled
+        ? directory.scheduledCadence || t('worksConfig.enabled')
+        : t('worksConfig.disabled');
+    const importedProviders = formatWorksConfigProviders(worksConfig?.providers);
+    const appliedProviderOverrides =
+        directory.scheduledUpdatesEnabled && sourceRepository.type === 'works_config'
+            ? importedProviders
+            : null;
+
+    const metadataRows = [
+        { label: t('worksConfig.fields.sourceType'), value: sourceTypeLabel },
+        worksConfig?.name
+            ? { label: t('worksConfig.fields.configName'), value: worksConfig.name }
+            : null,
+        worksConfig?.initialPrompt
+            ? {
+                  label: t('worksConfig.fields.initialPrompt'),
+                  value: worksConfig.initialPrompt,
+                  multiline: true,
+              }
+            : null,
+        worksConfig?.model
+            ? {
+                  label: t('worksConfig.fields.model'),
+                  value: worksConfig.model,
+                  hint: t('worksConfig.imported'),
+              }
+            : null,
+        worksConfig?.scheduleCadence
+            ? {
+                  label: t('worksConfig.fields.schedule'),
+                  value: worksConfig.scheduleCadence,
+                  hint: t('worksConfig.applied', { value: appliedSchedule }),
+              }
+            : null,
+        importedProviders
+            ? {
+                  label: t('worksConfig.fields.providers'),
+                  value: importedProviders,
+                  hint: appliedProviderOverrides
+                      ? t('worksConfig.applied', { value: appliedProviderOverrides })
+                      : t('worksConfig.imported'),
+                  multiline: true,
+              }
+            : null,
+        websiteTarget
+            ? {
+                  label: t('worksConfig.fields.websiteRepo'),
+                  value: websiteTarget,
+                  hint: t('worksConfig.applied', { value: appliedWebsiteRepo }),
+              }
+            : null,
+        typeof worksConfig?.additionalAgentsCount === 'number'
+            ? {
+                  label: t('worksConfig.fields.additionalAgents'),
+                  value: String(worksConfig.additionalAgentsCount),
+              }
+            : null,
+    ].filter(Boolean) as Array<{
+        label: string;
+        value: string;
+        hint?: string;
+        multiline?: boolean;
+    }>;
 
     const handleSyncToggle = async (enabled: boolean) => {
         setIsSyncing(true);
@@ -71,6 +149,32 @@ export function SourceSettings() {
                     </a>
                 </div>
 
+                {metadataRows.length > 0 && (
+                    <div className="space-y-3 pt-2">
+                        {metadataRows.map((row) => (
+                            <div key={row.label} className="flex flex-col gap-1">
+                                <span className="text-xs font-medium text-text-muted dark:text-text-muted-dark">
+                                    {row.label}
+                                </span>
+                                {row.multiline ? (
+                                    <div className="rounded-md bg-surface px-3 py-2 text-sm text-text dark:bg-surface-dark dark:text-text-dark">
+                                        {row.value}
+                                    </div>
+                                ) : (
+                                    <span className="text-sm text-text dark:text-text-dark">
+                                        {row.value}
+                                    </span>
+                                )}
+                                {row.hint && (
+                                    <span className="text-xs text-text-muted dark:text-text-muted-dark">
+                                        {row.hint}
+                                    </span>
+                                )}
+                            </div>
+                        ))}
+                    </div>
+                )}
+
                 <div className="flex items-center justify-between pt-2">
                     <div>
                         <h4 className="text-xs font-medium text-text dark:text-text-dark">
@@ -92,4 +196,19 @@ export function SourceSettings() {
             </div>
         </div>
     );
+}
+
+function getSourceTypeLabel(sourceType: string, t: ReturnType<typeof useTranslations>): string {
+    switch (sourceType) {
+        case 'data_repo':
+            return t('worksConfig.sourceTypes.dataRepo');
+        case 'awesome_readme':
+            return t('worksConfig.sourceTypes.awesomeReadme');
+        case 'link_existing':
+            return t('worksConfig.sourceTypes.linkExisting');
+        case 'works_config':
+            return t('worksConfig.sourceTypes.worksConfig');
+        default:
+            return sourceType.replace(/_/g, ' ');
+    }
 }

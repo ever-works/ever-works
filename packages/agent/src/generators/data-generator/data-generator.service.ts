@@ -32,6 +32,8 @@ import type {
 import type { DirectoryHistoryChangeEntry } from '@ever-works/contracts/api';
 import type { GenerationLogCollector } from './generation-log-collector';
 import { GENERATION_CANCELLED } from '@src/constants/messages';
+import { WorksConfigWriterService } from '@src/works-config/services/works-config-writer.service';
+import type { ResolvedWorksConfig } from '@src/works-config/services/works-config.service';
 
 const PARALLEL_WRITE_CONCURRENCY = 10;
 
@@ -88,6 +90,7 @@ export class DataGeneratorService {
         private readonly gitFacade: GitFacadeService,
         private readonly pipelineOrchestrator: PipelineOrchestratorService,
         private readonly directoryOperations: DirectoryOperationsService,
+        private readonly worksConfigWriter: WorksConfigWriterService,
     ) {}
 
     private getDirectoryOwner(directory: Directory): User {
@@ -102,6 +105,7 @@ export class DataGeneratorService {
             tryResume?: boolean;
             logCollector?: GenerationLogCollector;
             signal?: AbortSignal;
+            worksConfig?: ResolvedWorksConfig | null;
         },
     ): Promise<InitializeResult> {
         this.logger.debug(
@@ -394,6 +398,15 @@ export class DataGeneratorService {
 
             // write categories, tags, readme, license, config, markdown template
             await Promise.all(promises);
+            await this.worksConfigWriter.writeToDataRepository({
+                directory,
+                dataRepository: data,
+                request: createItemsGeneratorDto,
+                importedWorksConfig: options?.worksConfig,
+                initialPrompt:
+                    existingData.existingConfig?.metadata?.initial_prompt ??
+                    createItemsGeneratorDto.prompt,
+            });
             throwIfCancelled();
 
             // Commit changes
@@ -1080,6 +1093,7 @@ export class DataGeneratorService {
         const request: GenerationRequest = {
             name: dto.name,
             prompt: dto.prompt,
+            aiModel: dto.model,
             generationMethod: dto.generation_method,
             config: dto.pluginConfig || {},
             pluginConfig: dto._processedPluginConfig || undefined,
@@ -1242,12 +1256,12 @@ export class DataGeneratorService {
 
     private getDefaultReadme(directory: Directory) {
         // Construct URL based on directory's repo provider
-        const owner = directory.getRepoOwner();
-        const repo = directory.slug;
+        const owner = directory.getRepoOwner('directory');
+        const repo = directory.getMainRepo();
         const markdownURL = this.gitFacade.getWebUrl(directory.gitProvider, owner, repo);
         return (
             `# ${directory.getDataRepo()}\n\n` +
-            `This repository holds data used to generate [${directory.slug}](${markdownURL})\n\n`
+            `This repository holds data used to generate [${repo}](${markdownURL})\n\n`
         );
     }
 
@@ -1288,6 +1302,7 @@ export class DataGeneratorService {
             tags: Identifiable[];
             collections?: Identifiable[];
             config?: Record<string, any>;
+            worksConfig?: ResolvedWorksConfig | null;
             importRequest?: {
                 sourceUrl: string;
                 sourceType: string;
@@ -1358,7 +1373,7 @@ export class DataGeneratorService {
                 version: await data.getNextVersion(),
                 metadata: {
                     ...existingMetadata,
-                    initial_prompt: initialPrompt,
+                    initial_prompt: existingMetadata.initial_prompt ?? initialPrompt,
                 },
             };
 
@@ -1367,7 +1382,7 @@ export class DataGeneratorService {
                 // Store minimal request data - plugin-specific defaults come from plugins
                 const initialRequestData: Partial<CreateItemsGeneratorDto> = {
                     name: directory.name,
-                    prompt: initialPrompt,
+                    prompt: configData.metadata.initial_prompt,
                     // pluginConfig is intentionally empty - plugins provide defaults
                     pluginConfig: {},
                 };
@@ -1375,6 +1390,13 @@ export class DataGeneratorService {
             }
 
             await data.mergeConfig(configData);
+            await this.worksConfigWriter.writeToDataRepository({
+                directory,
+                dataRepository: data,
+                request: configData.metadata.last_request_data,
+                importedWorksConfig: importedData.worksConfig,
+                initialPrompt: configData.metadata.initial_prompt,
+            });
 
             // Write README and LICENSE
             await data.writeReadme(this.getDefaultReadme(directory));
@@ -1453,6 +1475,7 @@ export class DataGeneratorService {
             tags: Identifiable[];
             collections?: Identifiable[];
             config?: Record<string, any>;
+            worksConfig?: ResolvedWorksConfig | null;
         },
         options: {
             updateWithPullRequest: boolean;
@@ -1518,6 +1541,22 @@ export class DataGeneratorService {
                 );
             }
 
+            if (importedData.config) {
+                const currentConfig = (await data.getConfig().catch(() => ({}))) as Record<
+                    string,
+                    any
+                >;
+                await data.mergeConfig({
+                    ...currentConfig,
+                    ...importedData.config,
+                    version: await data.getNextVersion(),
+                    metadata: {
+                        ...(currentConfig.metadata || {}),
+                        ...(importedData.config.metadata || {}),
+                    },
+                });
+            }
+
             // Prepare items
             const existingItemsBySlug = new Map<string, ItemData>(
                 existingItems.map((item) => [slugifyText(item.slug || item.name), item] as const),
@@ -1557,6 +1596,13 @@ export class DataGeneratorService {
             // Write items
             await pMap(itemsWithSlugs, (item) => this.writeItemToDisk(data, item), {
                 concurrency: PARALLEL_WRITE_CONCURRENCY,
+            });
+            await this.worksConfigWriter.writeToDataRepository({
+                directory,
+                dataRepository: data,
+                request: importedData.config?.metadata?.last_request_data,
+                importedWorksConfig: importedData.worksConfig,
+                initialPrompt: importedData.config?.metadata?.initial_prompt,
             });
 
             // Commit

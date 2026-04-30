@@ -1,0 +1,9 @@
+{
+	"label": "Packages",
+	"position": 10,
+	"collapsed": false,
+	"link": {
+		"type": "generated-index",
+		"description": "Documentation for the Ever Works platform packages: tasks, monitoring, CLI shared utilities, plugin modules, and contracts."
+	}
+}

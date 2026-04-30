@@ -1664,6 +1664,9 @@
                 "selectOption": "Chọn một tùy chọn",
                 "directoryName": "Tên Thư mục",
                 "generationPrompt": "Prompt Tạo",
+                "modelOverride": "Ghi đè mô hình AI",
+                "modelOverridePlaceholder": "ví dụ: openai/gpt-4.1 hoặc openrouter/openai/gpt-4.1",
+                "modelOverrideHelperText": "Tùy chọn. Mặc định sử dụng mô hình đã nhập hoặc mô hình trước đó trừ khi bạn ghi đè ở đây.",
                 "recommended": "Được khuyến nghị",
                 "promptPlaceholder": "Mô tả các mục nên được tạo cho thư mục này...",
                 "promptHelperText": "Hãy cụ thể về loại nội dung bạn muốn tạo",
@@ -1805,6 +1808,28 @@
                 "syncDescription": "Tự động kéo cập nhật từ kho lưu trữ nguồn.",
                 "syncUpdateFailed": "Cập nhật cài đặt đồng bộ thất bại",
                 "syncDisabled": "Đồng bộ đã tắt",
+                "worksConfig": {
+                    "imported": "Đã nhập từ works.yml",
+                    "applied": "Đã áp dụng: {value}",
+                    "enabled": "bật",
+                    "disabled": "tắt",
+                    "fields": {
+                        "sourceType": "Loại nguồn",
+                        "configName": "Tên cấu hình",
+                        "initialPrompt": "Lời nhắc ban đầu",
+                        "model": "Mô hình",
+                        "schedule": "Lịch trình",
+                        "providers": "Nhà cung cấp",
+                        "websiteRepo": "Kho trang web",
+                        "additionalAgents": "Tác nhân bổ sung"
+                    },
+                    "sourceTypes": {
+                        "dataRepo": "Kho dữ liệu",
+                        "awesomeReadme": "README tuyệt vời",
+                        "linkExisting": "Kho hiện có được liên kết",
+                        "worksConfig": "works.yml"
+                    }
+                },
                 "generalSettings": "Cài đặt chung",
                 "generalTitle": "Cài đặt chung",
                 "directoryName": "Tên thư mục",
@@ -2318,6 +2343,10 @@
                     "title": "Giữ Đồng Bộ",
                     "description": "Tự động kéo cập nhật từ kho nguồn."
                 },
+                "worksConfigRestore": {
+                    "title": "Khôi phục cài đặt works.yml",
+                    "description": "Áp dụng nhà cung cấp AI, mô hình, lịch và kho liên quan từ kho này."
+                },
                 "sourceMethod": {
                     "url": {
                         "title": "Dán URL",
@@ -2348,15 +2377,19 @@
                 },
                 "detectedType": {
                     "dataRepo": "Phát Hiện Kho Dữ Liệu",
-                    "awesomeReadme": "Phát Hiện Danh Sách Awesome"
+                    "awesomeReadme": "Phát Hiện Danh Sách Awesome",
+                    "worksConfig": "Kho cấu hình works"
                 },
                 "badges": {
                     "dataRepo": "Kho Dữ Liệu",
-                    "awesomeReadme": "Danh Sách Awesome"
+                    "awesomeReadme": "Danh Sách Awesome",
+                    "worksConfig": "works.yml"
                 },
                 "preview": {
                     "items": "mục",
-                    "categories": "danh mục"
+                    "categories": "danh mục",
+                    "schedule": "Lịch trình: {cadence}",
+                    "providers": "Nhà cung cấp: {providers}"
                 },
                 "nameLabel": "Tên Thư Mục",
                 "namePlaceholder": "ví dụ: Thư Mục Awesome Của Tôi",
@@ -2372,6 +2405,7 @@
                     "seedDetected": "~{count} mục hạt giống được phát hiện",
                     "expansionFactor": "Mục tiêu mở rộng",
                     "expansionDescription": "Bộ sưu tập cuối cùng nên lớn hơn nguồn bao nhiêu lần?",
+                    "recommendedMultiplier": "{value} (được đề xuất)",
                     "preview": "~{seedCount} mục hạt giống → mục tiêu ~{targetCount} mục cuối cùng (~{newItems} mục mới để khám phá)",
                     "enrichmentOptions": "Tùy chọn làm giàu",
                     "enrichDescriptions": "Viết lại mô tả",
@@ -2453,6 +2487,7 @@
                     "linkRepos": "Liên kết kho"
                 },
                 "detectionFailed": "Chúng tôi không thể tự động phát hiện định dạng. Vui lòng chọn cách nhập kho này.",
+                "detectionFailedMissingConfig": "Không tìm thấy cấu hình được hỗ trợ. Thêm config.yml, works.yml hoặc works_config/works.yml vào kho, hoặc chọn định dạng nhập thủ công bên dưới.",
                 "errors": {
                     "urlRequired": "Vui lòng nhập URL kho GitHub",
                     "unsupportedFormat": "Định dạng kho này không được hỗ trợ. Vui lòng sử dụng định dạng Kho Dữ Liệu hoặc Danh Sách Awesome.",

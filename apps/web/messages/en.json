@@ -1664,6 +1664,9 @@
                 "selectOption": "Select an option",
                 "directoryName": "Directory Name",
                 "generationPrompt": "Generation Prompt",
+                "modelOverride": "AI Model Override",
+                "modelOverridePlaceholder": "e.g. openai/gpt-4.1 or openrouter/openai/gpt-4.1",
+                "modelOverrideHelperText": "Optional. Uses the imported or previous model by default unless you override it here.",
                 "recommended": "Recommended",
                 "promptPlaceholder": "Describe what items should be generated for this directory...",
                 "promptHelperText": "Be specific about the type of content you want to generate",
@@ -1805,6 +1808,28 @@
                 "syncDescription": "Automatically pull updates from the source repository.",
                 "syncUpdateFailed": "Failed to update sync settings",
                 "syncDisabled": "Sync Disabled",
+                "worksConfig": {
+                    "imported": "Imported from works.yml",
+                    "applied": "Applied: {value}",
+                    "enabled": "enabled",
+                    "disabled": "disabled",
+                    "fields": {
+                        "sourceType": "Source Type",
+                        "configName": "Config Name",
+                        "initialPrompt": "Initial Prompt",
+                        "model": "Model",
+                        "schedule": "Schedule",
+                        "providers": "Providers",
+                        "websiteRepo": "Website Repo",
+                        "additionalAgents": "Additional Agents"
+                    },
+                    "sourceTypes": {
+                        "dataRepo": "Data Repository",
+                        "awesomeReadme": "Awesome README",
+                        "linkExisting": "Linked Existing Repositories",
+                        "worksConfig": "works.yml"
+                    }
+                },
                 "generalSettings": "General Settings",
                 "generalTitle": "General Settings",
                 "directoryName": "Directory Name",
@@ -2318,6 +2343,10 @@
                     "title": "Keep synchronized",
                     "description": "Automatically pull updates from the source repository."
                 },
+                "worksConfigRestore": {
+                    "title": "Restore works.yml settings",
+                    "description": "Apply AI provider, model, schedule, and related repository settings from this repository."
+                },
                 "sourceMethod": {
                     "url": {
                         "title": "Paste URL",
@@ -2348,15 +2377,19 @@
                 },
                 "detectedType": {
                     "dataRepo": "Data Repository Detected",
-                    "awesomeReadme": "Awesome List Detected"
+                    "awesomeReadme": "Awesome List Detected",
+                    "worksConfig": "Works config repository"
                 },
                 "badges": {
                     "dataRepo": "Data Repo",
-                    "awesomeReadme": "Awesome List"
+                    "awesomeReadme": "Awesome List",
+                    "worksConfig": "works.yml"
                 },
                 "preview": {
                     "items": "items",
-                    "categories": "categories"
+                    "categories": "categories",
+                    "schedule": "Schedule: {cadence}",
+                    "providers": "Providers: {providers}"
                 },
                 "nameLabel": "Directory Name",
                 "namePlaceholder": "e.g., My Awesome Directory",
@@ -2372,6 +2405,7 @@
                     "seedDetected": "~{count} seed items detected",
                     "expansionFactor": "Expansion target",
                     "expansionDescription": "How many times larger should the final collection be compared to the source?",
+                    "recommendedMultiplier": "{value} (recommended)",
                     "preview": "~{seedCount} seed items \u2192 target ~{targetCount} final items (~{newItems} new items to discover)",
                     "enrichmentOptions": "Enrichment options",
                     "enrichDescriptions": "Rewrite descriptions",
@@ -2453,6 +2487,7 @@
                     "linkRepos": "Link repositories"
                 },
                 "detectionFailed": "We could not automatically detect the format. Please select how to import this repository.",
+                "detectionFailedMissingConfig": "No supported config was found. Add config.yml, works.yml, or works_config/works.yml to the repository, or choose a manual import format below.",
                 "errors": {
                     "urlRequired": "Please enter a GitHub repository URL",
                     "unsupportedFormat": "This repository format is not supported. Please use a Data Repository or Awesome List format.",

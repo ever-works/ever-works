@@ -38,20 +38,22 @@ export class BranchSyncService {
         cleanupExtraBranches = false,
     ): Promise<BranchSyncSummary | null> {
         const directoryOwner = getDirectoryOwner(directory);
+        const websiteOwner = directory.getRepoOwner('website');
+        const websiteRepo = directory.getWebsiteRepo();
 
         const branchMapping = directory.websiteTemplateUseBeta
             ? { [config.websiteTemplate.getBetaBranch()]: 'main' }
             : undefined;
 
         this.logger.log(
-            `Syncing all branches from template to ${directory.getRepoOwner()}/${directory.getWebsiteRepo()}` +
+            `Syncing all branches from template to ${websiteOwner}/${websiteRepo}` +
                 (branchMapping ? ` (beta: ${Object.keys(branchMapping)[0]}→main)` : ''),
         );
 
         try {
             const result = await this.syncAllBranches({
-                targetOwner: directory.getRepoOwner(),
-                targetRepo: directory.getWebsiteRepo(),
+                targetOwner: websiteOwner,
+                targetRepo: websiteRepo,
                 userId: directoryOwner.id,
                 committer: directory.resolveCommitter(user),
                 forcePush: true,

@@ -513,6 +513,7 @@ describe('StepPipelineExecutorService', () => {
                 mockDirectory,
                 requestWithProviders.providers,
                 undefined,
+                undefined,
             );
         });
 
@@ -523,6 +524,24 @@ describe('StepPipelineExecutorService', () => {
             expect(facadeServiceMock.createStepExecutionContext).toHaveBeenCalledWith(
                 mockDirectory,
                 undefined,
+                undefined,
+                undefined,
+            );
+        });
+
+        it('should pass ai model override from request to facade service', async () => {
+            const requestWithModel: GenerationRequest = {
+                prompt: 'Generate test items',
+                config: {},
+                aiModel: 'openai/gpt-4.1',
+            };
+
+            await service.execute(standardPlugin, mockDirectory, requestWithModel, mockExisting);
+
+            expect(facadeServiceMock.createStepExecutionContext).toHaveBeenCalledWith(
+                mockDirectory,
+                undefined,
+                'openai/gpt-4.1',
                 undefined,
             );
         });

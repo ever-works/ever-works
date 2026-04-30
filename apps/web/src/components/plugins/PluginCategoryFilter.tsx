@@ -28,10 +28,10 @@ export function PluginCategoryFilter({
                 <button
                     onClick={() => onSelectCategory(null)}
                     className={cn(
-                        'px-3 py-1 rounded-full text-sm font-medium transition-colors cursor-pointer',
+                        'px-3 py-1 rounded-full text-xs transition-colors cursor-pointer',
                         selectedCategory === null
                             ? 'bg-button-primary dark:bg-button-primary-dark text-white dark:text-black'
-                            : 'bg-surface-secondary dark:bg-surface-secondary-dark/50 text-text-secondary dark:text-text-secondary-dark hover:bg-surface-tertiary dark:hover:bg-surface-tertiary-dark',
+                            : 'bg-surface-secondary dark:bg-white/9 text-text-secondary dark:text-text-secondary-dark hover:bg-surface-tertiary dark:hover:bg-white/20',
                     )}
                 >
                     {t('all')}
@@ -41,7 +41,7 @@ export function PluginCategoryFilter({
                         key={category}
                         onClick={() => onSelectCategory(category)}
                         className={cn(
-                            'px-3 py-1 rounded-full text-sm font-medium transition-colors cursor-pointer',
+                            'px-3 py-1 rounded-full text-xs transition-colors cursor-pointer',
                             selectedCategory === category
                                 ? 'bg-button-primary dark:bg-button-primary-dark text-white dark:text-black'
                                 : 'bg-surface-secondary dark:bg-white/9 text-text-secondary dark:text-text-secondary-dark hover:bg-surface-tertiary dark:hover:bg-white/20',
@@ -52,7 +52,7 @@ export function PluginCategoryFilter({
                 ))}
             </div>
 
-            <label className="flex items-center gap-2 text-sm text-text-secondary dark:text-text-secondary-dark cursor-pointer">
+            <label className="flex items-center gap-2 text-xs text-text-secondary dark:text-text-secondary-dark cursor-pointer">
                 <input
                     type="checkbox"
                     checked={showEnabledOnly}

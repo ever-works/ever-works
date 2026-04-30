@@ -62,11 +62,13 @@ export class DeleteSubCommand extends CommandRunner {
                 repositoriesToDelete.push(`${directory.getRepoOwner()}/${directory.getDataRepo()}`);
             }
             if (deleteOptions.delete_markdown_repository) {
-                repositoriesToDelete.push(`${directory.getRepoOwner()}/${directory.slug}`);
+                repositoriesToDelete.push(
+                    `${directory.getRepoOwner('directory')}/${directory.getMainRepo()}`,
+                );
             }
             if (deleteOptions.delete_website_repository) {
                 repositoriesToDelete.push(
-                    `${directory.getRepoOwner()}/${directory.getWebsiteRepo()}`,
+                    `${directory.getRepoOwner('website')}/${directory.getWebsiteRepo()}`,
                 );
             }
 

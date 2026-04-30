@@ -180,7 +180,7 @@ export async function readGeneratedItems(
 		})
 	);
 
-	return results.filter((item): item is ItemData => item !== null);
+	return results.filter((item: ItemData | null): item is ItemData => item !== null);
 }
 
 export async function cleanupWorkspace(workspacePath: string): Promise<void> {

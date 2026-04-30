@@ -230,7 +230,7 @@ export const importDirectoryTool = tool({
     inputSchema: z.object({
         sourceUrl: z.string().describe('GitHub repository URL or awesome list URL to import'),
         sourceType: z
-            .enum(['data_repo', 'awesome_readme', 'link_existing'])
+            .enum(['data_repo', 'awesome_readme', 'link_existing', 'works_config'])
             .describe('Type of import source'),
         name: z.string().describe('Directory name'),
         gitProvider: z.string().describe('Git provider ID from checkGitConnection'),
