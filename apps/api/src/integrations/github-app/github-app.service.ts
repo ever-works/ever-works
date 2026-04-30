@@ -1,7 +1,13 @@
 import { HttpService } from '@nestjs/axios';
 import { Injectable } from '@nestjs/common';
+import {
+    createGitHubAppJwt,
+    createGitHubAppHeaders,
+    createGitHubOAuthHeaders,
+    requestGitHubAppInstallationAccessToken,
+    verifyGitHubWebhookSignature,
+} from '@ever-works/agent/utils';
 import { config } from '../../config/constants';
-import { createHmac, createSign, timingSafeEqual } from 'node:crypto';
 import { firstValueFrom } from 'rxjs';
 
 type GitHubInstallationResponse = {
@@ -101,7 +107,7 @@ export class GitHubAppService {
     }
 
     async getAuthenticatedGithubUser(accessToken: string) {
-        const headers = this.createOAuthHeaders(accessToken);
+        const headers = createGitHubOAuthHeaders(accessToken);
         const { data } = await firstValueFrom(
             this.httpService.get<GitHubUserResponse>('https://api.github.com/user', { headers }),
         );
@@ -139,12 +145,12 @@ export class GitHubAppService {
     }
 
     async getInstallation(installationId: string): Promise<GitHubInstallationResponse> {
-        const jwt = this.createAppJwt();
+        const jwt = this.getAppJwt();
         const { data } = await firstValueFrom(
             this.httpService.get<GitHubInstallationResponse>(
                 `https://api.github.com/app/installations/${installationId}`,
                 {
-                    headers: this.createAppHeaders(jwt),
+                    headers: createGitHubAppHeaders(jwt),
                 },
             ),
         );
@@ -153,18 +159,7 @@ export class GitHubAppService {
     }
 
     async createInstallationAccessToken(installationId: string): Promise<string> {
-        const jwt = this.createAppJwt();
-        const { data } = await firstValueFrom(
-            this.httpService.post<{ token: string }>(
-                `https://api.github.com/app/installations/${installationId}/access_tokens`,
-                {},
-                {
-                    headers: this.createAppHeaders(jwt),
-                },
-            ),
-        );
-
-        return data.token;
+        return requestGitHubAppInstallationAccessToken(installationId, this.getCredentials());
     }
 
     async listInstallationRepositories(installationId: string) {
@@ -173,7 +168,7 @@ export class GitHubAppService {
             this.httpService.get<GitHubInstallationRepositoriesResponse>(
                 'https://api.github.com/installation/repositories',
                 {
-                    headers: this.createOAuthHeaders(accessToken),
+                    headers: createGitHubOAuthHeaders(accessToken),
                 },
             ),
         );
@@ -182,29 +177,20 @@ export class GitHubAppService {
     }
 
     verifyWebhookSignature(rawBody: string, signatureHeader?: string): boolean {
-        if (!signatureHeader || !signatureHeader.startsWith('sha256=')) {
-            return false;
-        }
-
         const secret = config.githubApp.webhookSecret();
         if (!secret) {
             return false;
         }
 
-        const receivedSignature = signatureHeader.slice('sha256='.length);
-        const expectedSignature = createHmac('sha256', secret).update(rawBody).digest('hex');
-
-        if (receivedSignature.length !== expectedSignature.length) {
-            return false;
-        }
-
-        return timingSafeEqual(
-            Buffer.from(receivedSignature, 'utf8'),
-            Buffer.from(expectedSignature, 'utf8'),
-        );
+        return verifyGitHubWebhookSignature(rawBody, secret, signatureHeader);
     }
 
-    private createAppJwt(): string {
+    private getAppJwt(): string {
+        const credentials = this.getCredentials();
+        return createGitHubAppJwt(credentials);
+    }
+
+    private getCredentials() {
         const appId = config.githubApp.appId();
         const privateKey = config.githubApp.privateKey();
 
@@ -212,42 +198,9 @@ export class GitHubAppService {
             throw new Error('GitHub App credentials are not configured');
         }
 
-        const now = Math.floor(Date.now() / 1000);
-        const header = this.base64UrlEncode({ alg: 'RS256', typ: 'JWT' });
-        const payload = this.base64UrlEncode({
-            iat: now - 60,
-            exp: now + 9 * 60,
-            iss: appId,
-        });
-        const unsignedToken = `${header}.${payload}`;
-
-        const signer = createSign('RSA-SHA256');
-        signer.update(unsignedToken);
-        signer.end();
-
-        const signature = signer.sign(privateKey).toString('base64url');
-        return `${unsignedToken}.${signature}`;
-    }
-
-    private createAppHeaders(jwt: string) {
         return {
-            Accept: 'application/vnd.github+json',
-            Authorization: `Bearer ${jwt}`,
-            'User-Agent': 'Ever Works',
-            'X-GitHub-Api-Version': '2022-11-28',
+            appId,
+            privateKey,
         };
-    }
-
-    private createOAuthHeaders(accessToken: string) {
-        return {
-            Accept: 'application/vnd.github+json',
-            Authorization: `Bearer ${accessToken}`,
-            'User-Agent': 'Ever Works',
-            'X-GitHub-Api-Version': '2022-11-28',
-        };
-    }
-
-    private base64UrlEncode(value: unknown): string {
-        return Buffer.from(JSON.stringify(value)).toString('base64url');
     }
 }

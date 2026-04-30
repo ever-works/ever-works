@@ -33,7 +33,7 @@ import { DirectoryRepository } from '../database/repositories/directory.reposito
 import type { AuthAccount } from '../entities';
 import { FacadeError } from './base.facade';
 import { config } from '@src/config';
-import { createSign } from 'node:crypto';
+import { requestGitHubAppInstallationAccessToken } from '@src/utils';
 
 // Facade-specific types that don't require token (facade resolves token internally)
 export interface FacadeCloneOptions {
@@ -925,51 +925,19 @@ export class GitFacadeService implements IGitFacade {
             return null;
         }
 
-        const jwt = this.createGitHubAppJwt(appId, privateKey);
-        const response = await fetch(
-            `https://api.github.com/app/installations/${installationId}/access_tokens`,
-            {
-                method: 'POST',
-                headers: {
-                    Accept: 'application/vnd.github+json',
-                    Authorization: `Bearer ${jwt}`,
-                    'User-Agent': 'Ever Works',
-                    'X-GitHub-Api-Version': '2022-11-28',
-                },
-            },
-        );
-
-        if (!response.ok) {
+        try {
+            return await requestGitHubAppInstallationAccessToken(installationId, {
+                appId,
+                privateKey,
+            });
+        } catch (error) {
             throw new GitFacadeError(
-                `Failed to create GitHub App installation token: ${response.status} ${response.statusText}`,
+                error instanceof Error
+                    ? error.message
+                    : 'Failed to create GitHub App installation token',
                 'createInstallationToken',
                 'github',
             );
         }
-
-        const data = (await response.json()) as { token?: string };
-        return data.token || null;
-    }
-
-    private createGitHubAppJwt(appId: string, privateKey: string): string {
-        const now = Math.floor(Date.now() / 1000);
-        const header = Buffer.from(JSON.stringify({ alg: 'RS256', typ: 'JWT' })).toString(
-            'base64url',
-        );
-        const payload = Buffer.from(
-            JSON.stringify({
-                iat: now - 60,
-                exp: now + 9 * 60,
-                iss: appId,
-            }),
-        ).toString('base64url');
-        const unsignedToken = `${header}.${payload}`;
-
-        const signer = createSign('RSA-SHA256');
-        signer.update(unsignedToken);
-        signer.end();
-
-        const signature = signer.sign(privateKey).toString('base64url');
-        return `${unsignedToken}.${signature}`;
     }
 }
