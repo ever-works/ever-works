@@ -1664,6 +1664,9 @@
                 "selectOption": "Sélectionner une option",
                 "directoryName": "Nom du répertoire",
                 "generationPrompt": "Prompt de génération",
+                "modelOverride": "Remplacement du modèle IA",
+                "modelOverridePlaceholder": "par ex. openai/gpt-4.1 ou openrouter/openai/gpt-4.1",
+                "modelOverrideHelperText": "Optionnel. Utilise par défaut le modèle importé ou précédent, sauf si vous le remplacez ici.",
                 "recommended": "Recommandé",
                 "promptPlaceholder": "Décrivez les éléments qui doivent être générés pour ce répertoire...",
                 "promptHelperText": "Soyez précis sur le type de contenu que vous souhaitez générer",
@@ -1805,6 +1808,28 @@
                 "syncDescription": "Récupérer automatiquement les mises à jour du dépôt source.",
                 "syncUpdateFailed": "Échec de la mise à jour des paramètres de synchronisation",
                 "syncDisabled": "Synchronisation désactivée",
+                "worksConfig": {
+                    "imported": "Importé depuis works.yml",
+                    "applied": "Appliqué : {value}",
+                    "enabled": "activé",
+                    "disabled": "désactivé",
+                    "fields": {
+                        "sourceType": "Type de source",
+                        "configName": "Nom de la configuration",
+                        "initialPrompt": "Invite initiale",
+                        "model": "Modèle",
+                        "schedule": "Planification",
+                        "providers": "Fournisseurs",
+                        "websiteRepo": "Dépôt du site web",
+                        "additionalAgents": "Agents supplémentaires"
+                    },
+                    "sourceTypes": {
+                        "dataRepo": "Dépôt de données",
+                        "awesomeReadme": "README Awesome",
+                        "linkExisting": "Dépôts existants liés",
+                        "worksConfig": "works.yml"
+                    }
+                },
                 "generalSettings": "Paramètres généraux",
                 "generalTitle": "Paramètres généraux",
                 "directoryName": "Nom du répertoire",
@@ -2318,6 +2343,10 @@
                     "title": "Rester synchronisé",
                     "description": "Récupérer automatiquement les mises à jour du dépôt source."
                 },
+                "worksConfigRestore": {
+                    "title": "Restaurer les paramètres works.yml",
+                    "description": "Appliquer le fournisseur IA, le modèle, la planification et les dépôts liés depuis ce dépôt."
+                },
                 "sourceMethod": {
                     "url": {
                         "title": "Coller l'URL",
@@ -2348,15 +2377,19 @@
                 },
                 "detectedType": {
                     "dataRepo": "Dépôt de données détecté",
-                    "awesomeReadme": "Liste Awesome détectée"
+                    "awesomeReadme": "Liste Awesome détectée",
+                    "worksConfig": "Dépôt de configuration Works"
                 },
                 "badges": {
                     "dataRepo": "Dépôt données",
-                    "awesomeReadme": "Liste Awesome"
+                    "awesomeReadme": "Liste Awesome",
+                    "worksConfig": "works.yml"
                 },
                 "preview": {
                     "items": "éléments",
-                    "categories": "catégories"
+                    "categories": "catégories",
+                    "schedule": "Planification : {cadence}",
+                    "providers": "Fournisseurs : {providers}"
                 },
                 "nameLabel": "Nom de l'annuaire",
                 "namePlaceholder": "p. ex., Mon annuaire Awesome",
@@ -2372,6 +2405,7 @@
                     "seedDetected": "~{count} éléments de graines détectés",
                     "expansionFactor": "Objectif d'expansion",
                     "expansionDescription": "Combien de fois plus grande doit être la collection finale par rapport à la source ?",
+                    "recommendedMultiplier": "{value} (recommandé)",
                     "preview": "~{seedCount} éléments de graines → objectif ~{targetCount} éléments finaux (~{newItems} nouveaux éléments à découvrir)",
                     "enrichmentOptions": "Options d'enrichissement",
                     "enrichDescriptions": "Réécrire les descriptions",
@@ -2453,6 +2487,7 @@
                     "linkRepos": "Lier les dépôts"
                 },
                 "detectionFailed": "Nous n'avons pas pu détecter automatiquement le format. Veuillez sélectionner comment importer ce dépôt.",
+                "detectionFailedMissingConfig": "Aucune configuration prise en charge n'a été trouvée. Ajoutez config.yml, works.yml ou works_config/works.yml dans le dépôt, ou choisissez un format d'importation manuelle ci-dessous.",
                 "errors": {
                     "urlRequired": "Veuillez saisir une URL de dépôt GitHub",
                     "unsupportedFormat": "Ce format de dépôt n'est pas pris en charge. Veuillez utiliser un format Dépôt de données ou Liste Awesome.",

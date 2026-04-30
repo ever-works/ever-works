@@ -9,46 +9,31 @@ import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { OrganizationSelector } from '../OrganizationSelector';
 import { ProviderSelectionSection } from '../shared/ProviderSelectionSection';
+import { formatWorksConfigProviders } from '../shared/works-config';
 import { SlugConflictWarning } from './SlugConflictWarning';
 import { getGlobalFormSchema } from '@/app/actions/dashboard/generator-form';
 import { useProviderSelection } from '@/lib/hooks/use-provider-selection';
-import type { GeneratorFormSchema } from '@/lib/api/types-only';
-import type { ImportEnrichmentConfig } from '@/lib/api/directory';
+import type {
+    AnalyzeRepositoryResponseDto,
+    GeneratorFormSchema,
+    ImportEnrichmentConfig,
+    ImportSourceType,
+} from '@/lib/api/types-only';
 import { Upload, CheckCircle2, FileText, Database, ArrowLeft, Sparkles } from 'lucide-react';
 
-type DetectedType = 'data_repo' | 'awesome_readme' | 'link_existing' | null;
-
-interface AnalysisResult {
-    sourceUrl: string;
-    owner: string;
-    repo: string;
-    detectedType: DetectedType;
-    isPublic: boolean;
-    requiresAuth: boolean;
-    structure?: {
-        hasConfig: boolean;
-        hasDataFolder: boolean;
-        hasReadme: boolean;
-        isMultiFile?: boolean;
-        itemCount?: number;
-        categoryCount?: number;
-    };
-    slugConflict?: {
-        hasConflict: boolean;
-        conflictingRepos: string[];
-        suggestedSlug: string;
-    };
-}
+type ManualSourceType = Extract<ImportSourceType, 'data_repo' | 'awesome_readme'>;
 
 interface ImportConfigureStepProps {
-    analysisResult: AnalysisResult | null;
+    analysisResult: AnalyzeRepositoryResponseDto | null;
     sourceUrl: string;
     directoryName: string;
     onDirectoryNameChange: (name: string) => void;
-    manualSourceType: 'data_repo' | 'awesome_readme' | null;
-    onManualSourceTypeChange: (type: 'data_repo' | 'awesome_readme' | null) => void;
+    manualSourceType: ManualSourceType | null;
+    onManualSourceTypeChange: (type: ManualSourceType | null) => void;
     sync: boolean;
     onSyncChange: (sync: boolean) => void;
+    restoreWorksConfig: boolean;
+    onRestoreWorksConfigChange: (restore: boolean) => void;
     gitProvider?: string;
     isPending: boolean;
     owner: string;
@@ -61,11 +46,11 @@ interface ImportConfigureStepProps {
 }
 
 const EXPANSION_OPTIONS = [
-    { value: 1.5, label: '1.5x' },
-    { value: 2, label: '2x' },
-    { value: 2.5, label: '2.5x (recommended)' },
-    { value: 3, label: '3x' },
-    { value: 5, label: '5x' },
+    { value: 1.5 },
+    { value: 2 },
+    { value: 2.5, recommended: true },
+    { value: 3 },
+    { value: 5 },
 ];
 
 const ALLOWED_IMPORT_PIPELINES = ['agent-pipeline', 'claude-code'];
@@ -79,6 +64,8 @@ export function ImportConfigureStep({
     onManualSourceTypeChange,
     sync,
     onSyncChange,
+    restoreWorksConfig,
+    onRestoreWorksConfigChange,
     gitProvider,
     isPending,
     owner,
@@ -105,6 +92,19 @@ export function ImportConfigureStep({
 
     const effectiveSourceType = analysisResult?.detectedType || manualSourceType;
     const isAwesomeReadme = effectiveSourceType === 'awesome_readme';
+    const canToggleWorksConfigRestore =
+        !!analysisResult?.worksConfig && effectiveSourceType !== 'works_config';
+    const isMissingSupportedConfig =
+        !!analysisResult &&
+        !analysisResult.detectedType &&
+        !analysisResult.structure?.hasConfig &&
+        !analysisResult.structure?.hasWorksConfig &&
+        !analysisResult.structure?.hasReadme &&
+        !analysisResult.structure?.hasDataFolder;
+
+    const detectionMessage = isMissingSupportedConfig
+        ? t('detectionFailedMissingConfig')
+        : t('detectionFailed');
 
     // Load form schema when pipeline changes (same pattern as DirectoryAICreator)
     useEffect(() => {
@@ -145,6 +145,32 @@ export function ImportConfigureStep({
     const seedCount = analysisResult?.structure?.itemCount ?? 0;
     const targetCount = Math.ceil(seedCount * expansionFactor);
     const newItemsTarget = targetCount - seedCount;
+    const worksConfigProviders = formatWorksConfigProviders(
+        analysisResult?.worksConfig?.providers,
+        '=',
+    );
+
+    const getDetectedTypeLabel = (sourceType: ImportSourceType) => {
+        switch (sourceType) {
+            case 'data_repo':
+                return t('detectedType.dataRepo');
+            case 'works_config':
+                return t('detectedType.worksConfig');
+            default:
+                return t('detectedType.awesomeReadme');
+        }
+    };
+
+    const getDetectedTypeBadge = (sourceType: ImportSourceType) => {
+        switch (sourceType) {
+            case 'data_repo':
+                return t('badges.dataRepo');
+            case 'works_config':
+                return t('badges.worksConfig');
+            default:
+                return t('badges.awesomeReadme');
+        }
+    };
 
     const handleImport = () => {
         if (isAwesomeReadme) {
@@ -185,9 +211,7 @@ export function ImportConfigureStep({
                         <div className="flex-1">
                             <div className="flex items-center gap-2 mb-1">
                                 <h4 className="font-medium text-text dark:text-text-dark">
-                                    {analysisResult.detectedType === 'data_repo'
-                                        ? t('detectedType.dataRepo')
-                                        : t('detectedType.awesomeReadme')}
+                                    {getDetectedTypeLabel(analysisResult.detectedType)}
                                 </h4>
                                 <span
                                     className={cn(
@@ -195,14 +219,17 @@ export function ImportConfigureStep({
                                         'bg-primary/10 text-primary',
                                     )}
                                 >
-                                    {analysisResult.detectedType === 'data_repo'
-                                        ? t('badges.dataRepo')
-                                        : t('badges.awesomeReadme')}
+                                    {getDetectedTypeBadge(analysisResult.detectedType)}
                                 </span>
                             </div>
                             <p className="text-sm text-text-secondary dark:text-text-secondary-dark">
                                 {analysisResult.owner}/{analysisResult.repo}
                             </p>
+                            {analysisResult.worksConfig?.initialPrompt && (
+                                <p className="mt-2 text-sm text-text-secondary dark:text-text-secondary-dark line-clamp-2">
+                                    {analysisResult.worksConfig.initialPrompt}
+                                </p>
+                            )}
                             {analysisResult.structure && (
                                 <div className="mt-2 flex gap-4 text-xs text-text-muted dark:text-text-muted-dark">
                                     {analysisResult.structure.itemCount !== undefined && (
@@ -217,6 +244,20 @@ export function ImportConfigureStep({
                                             {t('preview.categories')}
                                         </span>
                                     )}
+                                    {analysisResult.worksConfig?.scheduleCadence && (
+                                        <span>
+                                            {t('preview.schedule', {
+                                                cadence: analysisResult.worksConfig.scheduleCadence,
+                                            })}
+                                        </span>
+                                    )}
+                                    {worksConfigProviders && (
+                                        <span>
+                                            {t('preview.providers', {
+                                                providers: worksConfigProviders,
+                                            })}
+                                        </span>
+                                    )}
                                 </div>
                             )}
                         </div>
@@ -229,7 +270,7 @@ export function ImportConfigureStep({
                 <div className="space-y-4">
                     <div className="p-4 rounded-lg bg-info/5 border border-info/20">
                         <p className="text-sm text-text-secondary dark:text-text-secondary-dark">
-                            {t('detectionFailed')}
+                            {detectionMessage}
                         </p>
                         <p className="text-sm text-text-muted dark:text-text-muted-dark mt-1">
                             {analysisResult.owner}/{analysisResult.repo}
@@ -351,7 +392,11 @@ export function ImportConfigureStep({
                                             : 'bg-surface-secondary dark:bg-surface-secondary-dark text-text-secondary dark:text-text-secondary-dark hover:bg-primary/10',
                                     )}
                                 >
-                                    {option.label}
+                                    {option.recommended
+                                        ? t('research.recommendedMultiplier', {
+                                              value: `${option.value}x`,
+                                          })
+                                        : `${option.value}x`}
                                 </button>
                             ))}
                         </div>
@@ -380,6 +425,25 @@ export function ImportConfigureStep({
                         </p>
                     </div>
                     <Switch checked={sync} onChange={onSyncChange} disabled={isPending} />
+                </div>
+            )}
+
+            {/* works.yml restore option */}
+            {canToggleWorksConfigRestore && (
+                <div className="flex items-center justify-between gap-4 p-4 rounded-lg bg-surface dark:bg-surface-dark border border-border dark:border-border-dark">
+                    <div>
+                        <h3 className="font-medium text-text dark:text-text-dark">
+                            {t('worksConfigRestore.title')}
+                        </h3>
+                        <p className="text-sm text-text-muted dark:text-text-muted-dark">
+                            {t('worksConfigRestore.description')}
+                        </p>
+                    </div>
+                    <Switch
+                        checked={restoreWorksConfig}
+                        onChange={onRestoreWorksConfigChange}
+                        disabled={isPending}
+                    />
                 </div>
             )}
 

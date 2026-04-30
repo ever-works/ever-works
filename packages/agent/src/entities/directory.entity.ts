@@ -17,6 +17,7 @@ import type {
     GenerateStatus,
     DirectoryMemberRole,
 } from './types';
+import type { ProvidersDto } from '@ever-works/contracts/api';
 import type { PRUpdate } from '@src/generators/data-generator';
 import { DirectoryGenerationHistory } from './directory-generation-history.entity';
 import { TimestampColumn } from './_types';
@@ -199,19 +200,39 @@ export class Directory {
     updatedAt: Date;
 
     getDataRepo() {
-        return `${this.slug}-data`;
+        return this.getRelatedRepository('data').repo;
     }
 
     getWebsiteRepo() {
-        return `${this.slug}-website`;
+        return this.getRelatedRepository('website').repo;
     }
 
     getMainRepo() {
-        return this.slug;
+        return this.getRelatedRepository('directory').repo;
     }
 
-    getRepoOwner(): string {
-        return this.owner || this.user?.username || '';
+    getRepoOwner(type: RepositoryRole = 'data'): string {
+        return this.getRelatedRepository(type).owner;
+    }
+
+    private getRelatedRepository(type: RepositoryRole): Required<RepositoryTarget> {
+        const related = this.sourceRepository?.relatedRepositories?.[type];
+        const owner = related?.owner || this.owner || this.user?.username || '';
+        const repo = related?.repo || this.getDefaultRepositoryName(type);
+
+        return { owner, repo };
+    }
+
+    private getDefaultRepositoryName(type: RepositoryRole): string {
+        if (type === 'website') {
+            return `${this.slug}-website`;
+        }
+
+        if (type === 'directory') {
+            return this.slug;
+        }
+
+        return `${this.slug}-data`;
     }
 
     /**
@@ -274,7 +295,29 @@ export interface MarkdownReadmeConfig {
     overwriteDefaultFooter?: boolean;
 }
 
-export type ImportSourceType = 'data_repo' | 'awesome_readme' | 'link_existing';
+export type ImportSourceType = 'data_repo' | 'awesome_readme' | 'link_existing' | 'works_config';
+export type RepositoryRole = 'data' | 'directory' | 'website';
+
+export type RepositoryTarget = {
+    owner?: string;
+    repo: string;
+};
+
+export type RelatedRepositories = {
+    data?: RepositoryTarget;
+    directory?: RepositoryTarget;
+    website?: RepositoryTarget;
+};
+
+export type WorksConfigSnapshot = {
+    name?: string;
+    initialPrompt?: string;
+    model?: string;
+    websiteRepo?: string;
+    scheduleCadence?: DirectoryScheduleCadence | null;
+    providers?: ProvidersDto;
+    additionalAgentsCount?: number;
+};
 
 export interface SourceRepository {
     url: string;
@@ -282,6 +325,8 @@ export interface SourceRepository {
     repo: string;
     type: ImportSourceType;
     importedAt: Date;
+    relatedRepositories?: RelatedRepositories;
+    worksConfig?: WorksConfigSnapshot;
 }
 
 export interface RepoVisibility {

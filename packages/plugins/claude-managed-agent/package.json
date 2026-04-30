@@ -30,7 +30,7 @@
 		"@ever-works/plugin": "workspace:*"
 	},
 	"devDependencies": {
-		"@anthropic-ai/sdk": "0.90.0",
+		"@anthropic-ai/sdk": "0.91.1",
 		"@ever-works/plugin": "workspace:*",
 		"@types/node": "^22.0.0",
 		"tsup": "^8.0.0",

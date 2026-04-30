@@ -1664,6 +1664,9 @@
                 "selectOption": "옵션 선택",
                 "directoryName": "디렉토리 이름",
                 "generationPrompt": "생성 프롬프트",
+                "modelOverride": "AI 모델 재정의",
+                "modelOverridePlaceholder": "예: openai/gpt-4.1 또는 openrouter/openai/gpt-4.1",
+                "modelOverrideHelperText": "선택 사항입니다. 여기에 재정의하지 않으면 기본적으로 가져온 모델 또는 이전 모델을 사용합니다.",
                 "recommended": "권장",
                 "promptPlaceholder": "이 디렉토리에 생성할 항목을 설명하세요...",
                 "promptHelperText": "생성하려는 콘텐츠 유형에 대해 구체적으로 설명하세요",
@@ -1805,6 +1808,28 @@
                 "syncDescription": "소스 저장소에서 업데이트를 자동으로 가져옵니다.",
                 "syncUpdateFailed": "동기화 설정 업데이트 실패",
                 "syncDisabled": "동기화 비활성화됨",
+                "worksConfig": {
+                    "imported": "works.yml에서 가져옴",
+                    "applied": "적용됨: {value}",
+                    "enabled": "활성화됨",
+                    "disabled": "비활성화됨",
+                    "fields": {
+                        "sourceType": "소스 유형",
+                        "configName": "설정 이름",
+                        "initialPrompt": "초기 프롬프트",
+                        "model": "모델",
+                        "schedule": "스케줄",
+                        "providers": "제공자",
+                        "websiteRepo": "웹사이트 저장소",
+                        "additionalAgents": "추가 에이전트"
+                    },
+                    "sourceTypes": {
+                        "dataRepo": "데이터 저장소",
+                        "awesomeReadme": "Awesome README",
+                        "linkExisting": "연결된 기존 저장소",
+                        "worksConfig": "works.yml"
+                    }
+                },
                 "generalSettings": "일반 설정",
                 "generalTitle": "일반 설정",
                 "directoryName": "디렉토리 이름",
@@ -2318,6 +2343,10 @@
                     "title": "동기화 유지",
                     "description": "소스 저장소에서 업데이트 자동 가져오기."
                 },
+                "worksConfigRestore": {
+                    "title": "works.yml 설정 복원",
+                    "description": "이 저장소의 AI 제공자, 모델, 일정 및 관련 저장소 설정을 적용합니다."
+                },
                 "sourceMethod": {
                     "url": {
                         "title": "URL 붙여넣기",
@@ -2348,15 +2377,19 @@
                 },
                 "detectedType": {
                     "dataRepo": "데이터 저장소 감지됨",
-                    "awesomeReadme": "Awesome 목록 감지됨"
+                    "awesomeReadme": "Awesome 목록 감지됨",
+                    "worksConfig": "Works 설정 저장소"
                 },
                 "badges": {
                     "dataRepo": "데이터 Repo",
-                    "awesomeReadme": "Awesome 목록"
+                    "awesomeReadme": "Awesome 목록",
+                    "worksConfig": "works.yml"
                 },
                 "preview": {
                     "items": "항목",
-                    "categories": "카테고리"
+                    "categories": "카테고리",
+                    "schedule": "스케줄: {cadence}",
+                    "providers": "제공자: {providers}"
                 },
                 "nameLabel": "디렉토리 이름",
                 "namePlaceholder": "e.g., My Awesome Directory",
@@ -2372,6 +2405,7 @@
                     "seedDetected": "~{count} 시드 항목 감지됨",
                     "expansionFactor": "확장 목표",
                     "expansionDescription": "최종 컬렉션이 소스 대비 몇 배 커야 하나요?",
+                    "recommendedMultiplier": "{value} (권장)",
                     "preview": "~{seedCount} 시드 항목 → 목표 ~{targetCount} 최종 항목 (~{newItems} 새 항목 발견)",
                     "enrichmentOptions": "풍부화 옵션",
                     "enrichDescriptions": "설명 재작성",
@@ -2453,6 +2487,7 @@
                     "linkRepos": "저장소 연결"
                 },
                 "detectionFailed": "형식을 자동 감지할 수 없습니다. 이 저장소를 가져오는 방법을 선택하세요.",
+                "detectionFailedMissingConfig": "지원되는 설정을 찾을 수 없습니다. 저장소에 config.yml, works.yml 또는 works_config/works.yml을 추가하거나 아래 수동 가져오기 형식을 선택하세요.",
                 "errors": {
                     "urlRequired": "GitHub 저장소 URL을 입력하세요",
                     "unsupportedFormat": "이 저장소 형식을 지원하지 않습니다. 데이터 저장소 또는 Awesome 목록 형식을 사용하세요.",

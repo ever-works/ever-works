@@ -63,10 +63,11 @@ export class DeploySubCommand extends CommandRunner {
             console.log(chalk.gray('  • Update the website repository if needed'));
             console.log(chalk.gray('  • Trigger the deployment workflow'));
 
-            const websiteRepo = `${directory.slug}-website`;
+            const websiteOwner = directory.getRepoOwner('website');
+            const websiteRepo = directory.getWebsiteRepo();
             console.log(
                 chalk.gray('\nSource repository:'),
-                chalk.white(`${directory.getRepoOwner()}/${websiteRepo}`),
+                chalk.white(`${websiteOwner}/${websiteRepo}`),
             );
 
             if (team) {
@@ -111,16 +112,12 @@ export class DeploySubCommand extends CommandRunner {
                 console.log(chalk.gray('2. Push to your repository to trigger CI/CD deployment'));
 
                 const gitProvider = directory.gitProvider || 'github';
-                const cloneUrl = this.gitFacade.getCloneUrl(
-                    gitProvider,
-                    directory.getRepoOwner(),
-                    directory.getWebsiteRepo(),
-                );
+                const cloneUrl = this.gitFacade.getCloneUrl(gitProvider, websiteOwner, websiteRepo);
 
                 console.log(chalk.cyan('\n--- Repository Information ---'));
                 console.log(
                     chalk.gray('Repository:'),
-                    chalk.white(`${directory.getRepoOwner()}/${directory.getWebsiteRepo()}`),
+                    chalk.white(`${websiteOwner}/${websiteRepo}`),
                 );
                 console.log(chalk.gray('Clone command:'), chalk.white(`git clone ${cloneUrl}`));
             } catch (error) {

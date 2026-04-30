@@ -6,6 +6,7 @@ import {
     AnalyzeForLinkingResponseDto,
     RelatedRepoStatus,
 } from '@src/dto/import-directory.dto';
+import { WorksConfigService } from '@src/works-config/services/works-config.service';
 
 interface ParsedRepoUrl {
     owner: string;
@@ -37,7 +38,10 @@ const GIT_PROVIDER_PATTERNS: Array<{
 export class SourceRepoAnalyzerService {
     private readonly logger = new Logger(SourceRepoAnalyzerService.name);
 
-    constructor(private readonly gitFacade: GitFacadeService) {}
+    constructor(
+        private readonly gitFacade: GitFacadeService,
+        private readonly worksConfigService: WorksConfigService,
+    ) {}
 
     /**
      * Parse a git repository URL into owner and repo components.
@@ -207,6 +211,18 @@ export class SourceRepoAnalyzerService {
                 structure: detectionResult.structure,
             };
 
+            if (detectionResult.worksConfig) {
+                response.worksConfig = {
+                    name: detectionResult.worksConfig.name,
+                    initialPrompt: detectionResult.worksConfig.initialPrompt,
+                    model: detectionResult.worksConfig.model,
+                    websiteRepo: detectionResult.worksConfig.websiteRepo,
+                    scheduleCadence: detectionResult.worksConfig.scheduleCadence ?? null,
+                    providers: detectionResult.worksConfig.providers,
+                    additionalAgentsCount: detectionResult.worksConfig.additionalAgentsCount,
+                };
+            }
+
             if (detectionResult.type === 'data_repo') {
                 response.hasDataRepoWriteAccess = repoInfo.permissions?.push ?? true;
             } else {
@@ -245,13 +261,19 @@ export class SourceRepoAnalyzerService {
             hasConfig: boolean;
             hasDataFolder: boolean;
             hasReadme: boolean;
+            hasWorksConfig?: boolean;
             itemCount?: number;
             categoryCount?: number;
         };
+        worksConfig?: ReturnType<WorksConfigService['parse']>;
     }> {
         const hasConfig =
             contents.some((c) => c.name === 'config.yml' && c.type === 'file') ||
             contents.some((c) => c.name === 'config.yaml' && c.type === 'file');
+        const hasWorksConfig =
+            contents.some((c) => c.name === 'works.yml' && c.type === 'file') ||
+            contents.some((c) => c.name === 'works.yaml' && c.type === 'file') ||
+            contents.some((c) => c.name === 'works_config' && c.type === 'dir');
 
         const hasDataFolder = contents.some((c) => c.name === 'data' && c.type === 'dir');
 
@@ -263,12 +285,29 @@ export class SourceRepoAnalyzerService {
             hasConfig,
             hasDataFolder,
             hasReadme,
+            hasWorksConfig,
             isMultiFile: false,
             itemCount: undefined as number | undefined,
             categoryCount: undefined as number | undefined,
         };
 
-        if (hasConfig && hasDataFolder) {
+        let worksConfig: ReturnType<WorksConfigService['parse']> | undefined;
+
+        if (hasWorksConfig) {
+            try {
+                worksConfig =
+                    (await this.worksConfigService.loadFromRepository(
+                        owner,
+                        repo,
+                        provider,
+                        token,
+                    )) ?? undefined;
+            } catch (err) {
+                this.logger.warn(`Failed to parse works.yml for ${owner}/${repo}`, err);
+            }
+        }
+
+        if ((hasConfig || hasWorksConfig) && hasDataFolder) {
             try {
                 const dataContents = await this.gitFacade.getDirectoryContents(
                     owner,
@@ -326,7 +365,7 @@ export class SourceRepoAnalyzerService {
                 this.logger.warn(`Failed to count items in data folder: ${owner}/${repo}`, err);
             }
 
-            return { type: 'data_repo', structure };
+            return { type: 'data_repo', structure, worksConfig };
         }
 
         if (hasReadme) {
@@ -385,11 +424,15 @@ export class SourceRepoAnalyzerService {
                             : undefined;
                     }
 
-                    return { type: 'awesome_readme', structure };
+                    return { type: 'awesome_readme', structure, worksConfig };
                 }
             } catch (err) {
                 this.logger.warn(`Failed to analyze README: ${owner}/${repo}`, err);
             }
+        }
+
+        if (hasWorksConfig) {
+            return { type: 'works_config', structure, worksConfig };
         }
 
         return { type: null, structure };
@@ -618,12 +661,22 @@ export class SourceRepoAnalyzerService {
         slug: string,
         token: string,
         provider?: string,
+        options?: {
+            includeRepoNames?: string[];
+        },
     ): Promise<{
         hasConflict: boolean;
         conflictingRepos: string[];
         suggestedSlug: string;
     }> {
-        const repoNames = [slug, `${slug}-data`, `${slug}-website`];
+        const repoNames = Array.from(
+            new Set(
+                (options?.includeRepoNames?.length
+                    ? options.includeRepoNames
+                    : [slug, `${slug}-data`, `${slug}-website`]
+                ).filter((repoName) => typeof repoName === 'string' && repoName.length > 0),
+            ),
+        );
         const conflictingRepos: string[] = [];
 
         await Promise.all(
@@ -650,7 +703,19 @@ export class SourceRepoAnalyzerService {
         let suggestedSlug = slug;
         for (let i = 2; i <= 10; i++) {
             const candidate = `${slug}-${i}`;
-            const candidateRepos = [candidate, `${candidate}-data`, `${candidate}-website`];
+            const candidateRepos = Array.from(
+                new Set(
+                    options?.includeRepoNames?.length
+                        ? options.includeRepoNames.map((repoName) =>
+                              repoName === slug
+                                  ? candidate
+                                  : repoName.startsWith(`${slug}-`)
+                                    ? `${candidate}${repoName.slice(slug.length)}`
+                                    : repoName,
+                          )
+                        : [candidate, `${candidate}-data`, `${candidate}-website`],
+                ),
+            );
             let candidateConflicts = false;
 
             for (const repo of candidateRepos) {

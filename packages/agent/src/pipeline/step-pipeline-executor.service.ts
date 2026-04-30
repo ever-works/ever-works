@@ -471,6 +471,7 @@ export class StepPipelineExecutorService {
         const execContext = this.facadeService.createStepExecutionContext(
             context.directory,
             context.request.providers,
+            context.request.aiModel,
             options?.signal,
         );
 

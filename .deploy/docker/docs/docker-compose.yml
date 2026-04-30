@@ -1,0 +1,18 @@
+# Standalone compose for building and running just the docs site.
+#
+# From the monorepo root:
+#   docker compose -f .deploy/docker/docs/docker-compose.yml up --build
+#
+# Then open http://localhost:3000
+
+services:
+    ever-works-docs:
+        build:
+            # Build context = monorepo root so turbo prune can see the workspace
+            context: ../../..
+            dockerfile: .deploy/docker/docs/Dockerfile
+        image: ghcr.io/ever-works/ever-works-docs:latest
+        container_name: ever-works-docs
+        ports:
+            - '3000:80'
+        restart: unless-stopped

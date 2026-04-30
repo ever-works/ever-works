@@ -8,6 +8,7 @@ import { useTranslations } from 'next-intl';
 interface CoreFormData {
     name: string;
     prompt: string;
+    model?: string;
 }
 
 interface RequiredFieldsProps {
@@ -51,6 +52,16 @@ export function RequiredFields({ formData, onChange }: RequiredFieldsProps) {
                     variant="form"
                     required
                     helperText={t('promptHelperText')}
+                />
+
+                <Input
+                    label={t('modelOverride')}
+                    type="text"
+                    value={formData.model || ''}
+                    onChange={(e) => onChange({ model: e.target.value })}
+                    placeholder={t('modelOverridePlaceholder')}
+                    variant="form"
+                    helperText={t('modelOverrideHelperText')}
                 />
             </div>
         </div>

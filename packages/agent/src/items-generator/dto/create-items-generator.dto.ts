@@ -68,6 +68,13 @@ export class CreateItemsGeneratorDto implements ICreateItemsGeneratorDto {
     prompt: string;
 
     @ApiPropertyOptional({
+        description: 'Optional AI model override used for generation',
+    })
+    @IsOptional()
+    @IsString()
+    model?: string;
+
+    @ApiPropertyOptional({
         description: 'Generation method',
         enum: GenerationMethod,
         default: GenerationMethod.CREATE_UPDATE,
@@ -112,6 +119,13 @@ export class CreateItemsGeneratorDto implements ICreateItemsGeneratorDto {
 }
 
 export class UpdateItemsGeneratorDto implements IUpdateItemsGeneratorDto {
+    @ApiPropertyOptional({
+        description: 'Optional AI model override used for generation',
+    })
+    @IsOptional()
+    @IsString()
+    model?: string;
+
     @ApiPropertyOptional({
         description: 'Generation method',
         enum: GenerationMethod,

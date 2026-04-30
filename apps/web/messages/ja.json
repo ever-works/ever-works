@@ -1664,6 +1664,9 @@
                 "selectOption": "オプションを選択",
                 "directoryName": "ディレクトリ名",
                 "generationPrompt": "生成プロンプト",
+                "modelOverride": "AI モデル上書き",
+                "modelOverridePlaceholder": "例: openai/gpt-4.1 または openrouter/openai/gpt-4.1",
+                "modelOverrideHelperText": "オプションです。デフォルトではインポートされたモデルまたは以前のモデルを使用しますが、ここで上書きできます。",
                 "recommended": "おすすめ",
                 "promptPlaceholder": "このディレクトリに生成するアイテムを記述してください...",
                 "promptHelperText": "生成したいコンテンツの種類について具体的に記述してください",
@@ -1805,6 +1808,28 @@
                 "syncDescription": "ソース リポジトリから自動的に更新を引き込む。",
                 "syncUpdateFailed": "同期設定の更新に失敗しました",
                 "syncDisabled": "同期が無効",
+                "worksConfig": {
+                    "imported": "works.yml からインポート済み",
+                    "applied": "適用済み: {value}",
+                    "enabled": "有効",
+                    "disabled": "無効",
+                    "fields": {
+                        "sourceType": "ソースの種類",
+                        "configName": "設定名",
+                        "initialPrompt": "初期プロンプト",
+                        "model": "モデル",
+                        "schedule": "スケジュール",
+                        "providers": "プロバイダー",
+                        "websiteRepo": "ウェブサイトリポジトリ",
+                        "additionalAgents": "追加エージェント"
+                    },
+                    "sourceTypes": {
+                        "dataRepo": "データリポジトリ",
+                        "awesomeReadme": "素晴らしい README",
+                        "linkExisting": "リンクされた既存リポジトリ",
+                        "worksConfig": "works.yml"
+                    }
+                },
                 "generalSettings": "一般設定",
                 "generalTitle": "一般設定",
                 "directoryName": "ディレクトリ名",
@@ -2318,6 +2343,10 @@
                     "title": "同期を維持",
                     "description": "ソースリポジトリから自動的に更新を取得。"
                 },
+                "worksConfigRestore": {
+                    "title": "works.yml 設定を復元",
+                    "description": "このリポジトリから AI プロバイダー、モデル、スケジュール、関連リポジトリ設定を適用します。"
+                },
                 "sourceMethod": {
                     "url": {
                         "title": "URL を貼り付け",
@@ -2348,15 +2377,19 @@
                 },
                 "detectedType": {
                     "dataRepo": "データ リポジトリを検出",
-                    "awesomeReadme": "Awesome リストを検出"
+                    "awesomeReadme": "Awesome リストを検出",
+                    "worksConfig": "Works 設定リポジトリ"
                 },
                 "badges": {
                     "dataRepo": "データ リポ",
-                    "awesomeReadme": "Awesome リスト"
+                    "awesomeReadme": "Awesome リスト",
+                    "worksConfig": "works.yml"
                 },
                 "preview": {
                     "items": "アイテム",
-                    "categories": "カテゴリ"
+                    "categories": "カテゴリ",
+                    "schedule": "スケジュール: {cadence}",
+                    "providers": "プロバイダー: {providers}"
                 },
                 "nameLabel": "ディレクトリ名",
                 "namePlaceholder": "例: マイ Awesome ディレクトリ",
@@ -2372,6 +2405,7 @@
                     "seedDetected": "~{count} 個のシードアイテムを検出",
                     "expansionFactor": "拡張目標",
                     "expansionDescription": "最終コレクションはソースに比べて何倍大きくすべきか？",
+                    "recommendedMultiplier": "{value} (推奨)",
                     "preview": "~{seedCount} シードアイテム → 目標 ~{targetCount} 最終アイテム (~{newItems} 個の新規アイテムを発見)",
                     "enrichmentOptions": "エンハンスメント オプション",
                     "enrichDescriptions": "説明を書き直し",
@@ -2453,6 +2487,7 @@
                     "linkRepos": "リポジトリをリンク"
                 },
                 "detectionFailed": "形式を自動検出できませんでした。このリポジトリのインポート方法を選択してください。",
+                "detectionFailedMissingConfig": "サポートされている設定が見つかりませんでした。リポジトリに config.yml、works.yml、または works_config/works.yml を追加するか、以下の手動インポート形式を選択してください。",
                 "errors": {
                     "urlRequired": "GitHub リポジトリ URL を入力してください",
                     "unsupportedFormat": "このリポジトリ形式はサポートされていません。データ リポジトリまたは Awesome リスト形式を使用してください。",
