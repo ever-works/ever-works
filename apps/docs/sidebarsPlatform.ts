@@ -235,6 +235,7 @@ const sidebars: SidebarsConfig = {
 				'agent-services/directory-ownership-service',
 				'agent-services/directory-taxonomy-service',
 				'agent-services/directory-schedule-dispatcher',
+				'agent-services/distributed-task-lock',
 				'agent-services/directory-advanced-prompts',
 				'agent-services/community-pr-service',
 				'agent-services/import-system',
