@@ -154,7 +154,7 @@ body {
 }
 
 .dark * {
-    scrollbar-color: rgba(71, 85, 105, 0.5) transparent;
+    scrollbar-color: rgba(56, 56, 56, 0.5) transparent;
 }
 
 ::-webkit-scrollbar {
