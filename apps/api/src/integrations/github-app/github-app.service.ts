@@ -23,6 +23,7 @@ type GitHubInstallationResponse = {
 };
 
 type GitHubInstallationRepositoriesResponse = {
+    total_count?: number;
     repositories?: Array<{
         id: number;
         name: string;
@@ -145,16 +146,41 @@ export class GitHubAppService {
 
     async listInstallationRepositories(installationId: string) {
         const accessToken = await this.createInstallationAccessToken(installationId);
-        const { data } = await firstValueFrom(
-            this.httpService.get<GitHubInstallationRepositoriesResponse>(
-                'https://api.github.com/installation/repositories',
-                {
-                    headers: createGitHubOAuthHeaders(accessToken),
-                },
-            ),
-        );
+        const headers = createGitHubOAuthHeaders(accessToken);
+        const repositories: NonNullable<GitHubInstallationRepositoriesResponse['repositories']> =
+            [];
+        const perPage = 100;
+        let page = 1;
 
-        return data.repositories || [];
+        while (true) {
+            const { data } = await firstValueFrom(
+                this.httpService.get<GitHubInstallationRepositoriesResponse>(
+                    'https://api.github.com/installation/repositories',
+                    {
+                        headers,
+                        params: {
+                            per_page: perPage,
+                            page,
+                        },
+                    },
+                ),
+            );
+
+            const pageRepositories = data.repositories || [];
+            repositories.push(...pageRepositories);
+
+            if (pageRepositories.length < perPage) {
+                break;
+            }
+
+            if (typeof data.total_count === 'number' && repositories.length >= data.total_count) {
+                break;
+            }
+
+            page += 1;
+        }
+
+        return repositories;
     }
 
     verifyWebhookSignature(rawBody: string, signatureHeader?: string): boolean {
