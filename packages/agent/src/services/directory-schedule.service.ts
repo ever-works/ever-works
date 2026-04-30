@@ -113,12 +113,7 @@ export class DirectoryScheduleService {
         const plan = await this.subscriptionService.resolvePlanForUser(user);
         const allowances = await this.subscriptionService.getCadenceAllowances(user);
 
-        const enable =
-            dto.enable !== undefined
-                ? dto.enable
-                : existing
-                  ? existing.status === DirectoryScheduleStatus.ACTIVE
-                  : true;
+        const enable = this.resolveRequestedEnabledState(dto, existing);
 
         const cadence =
             dto.cadence || existing?.cadence || this.subscriptionService.getDefaultCadence(plan);
@@ -188,12 +183,12 @@ export class DirectoryScheduleService {
                 existing.status !== DirectoryScheduleStatus.ACTIVE ||
                 existing.cadence !== cadence);
 
-        const nextRunAt =
-            status === DirectoryScheduleStatus.ACTIVE
-                ? shouldRecalculateNextRun
-                    ? this.calculateNextRun(cadence)
-                    : (existing?.nextRunAt ?? null)
-                : (existing?.nextRunAt ?? null);
+        const nextRunAt = this.resolveNextRunAfterScheduleUpdate({
+            status,
+            cadence,
+            existing,
+            shouldRecalculateNextRun,
+        });
 
         const schedule = await this.scheduleRepository.upsert(directory.id, {
             userId: user.id,
@@ -321,11 +316,11 @@ export class DirectoryScheduleService {
         const anchorDate = this.resolveAnchorDate(schedule);
 
         const preserveExistingNextRun = this.isManualRunAheadOfSchedule(schedule);
-        const nextRunAt = preserveExistingNextRun
-            ? (schedule.nextRunAt ?? null)
-            : schedule.status === DirectoryScheduleStatus.ACTIVE && schedule.cadence
-              ? this.calculateNextRun(schedule.cadence, 0, anchorDate)
-              : null;
+        const nextRunAt = this.resolveNextRunAfterCompletedRun(
+            schedule,
+            anchorDate,
+            preserveExistingNextRun,
+        );
 
         await this.scheduleRepository.updateById(schedule.id, {
             lastRunStatus: options.status,
@@ -372,13 +367,12 @@ export class DirectoryScheduleService {
         const reachedLimit = !preserveExistingNextRun && failureCount >= maxFailures;
 
         const anchorDate = this.resolveAnchorDate(schedule);
-        const nextRunAt = preserveExistingNextRun
-            ? (schedule.nextRunAt ?? null)
-            : reachedLimit
-              ? null
-              : schedule.cadence
-                ? new Date(anchorDate.getTime() + this.RETRY_DELAY_MINUTES * 60 * 1000)
-                : null;
+        const nextRunAt = this.resolveNextRunAfterFailedRun({
+            schedule,
+            anchorDate,
+            preserveExistingNextRun,
+            reachedLimit,
+        });
         const lastRunStatus = preserveExistingNextRun ? null : GenerateStatusType.ERROR;
 
         await this.scheduleRepository.updateById(schedule.id, {
@@ -432,11 +426,11 @@ export class DirectoryScheduleService {
         const preserveExistingNextRun = this.isManualRunAheadOfSchedule(schedule);
         const anchorDate = this.resolveAnchorDate(schedule);
         const baseDate = anchorDate.getTime() > Date.now() ? anchorDate : new Date();
-        const nextRunAt = preserveExistingNextRun
-            ? (schedule.nextRunAt ?? null)
-            : schedule.status === DirectoryScheduleStatus.ACTIVE && schedule.cadence
-              ? new Date(baseDate.getTime() + this.RETRY_DELAY_MINUTES * 60 * 1000)
-              : null;
+        const nextRunAt = this.resolveNextRunAfterSkippedRun(
+            schedule,
+            baseDate,
+            preserveExistingNextRun,
+        );
 
         await this.scheduleRepository.updateById(schedule.id, {
             lastRunStatus: null,
@@ -491,6 +485,87 @@ export class DirectoryScheduleService {
         }
 
         return new Date();
+    }
+
+    private resolveRequestedEnabledState(
+        dto: UpdateDirectoryScheduleDto,
+        existing: DirectorySchedule | null,
+    ): boolean {
+        if (dto.enable !== undefined) {
+            return dto.enable;
+        }
+
+        if (!existing) {
+            return true;
+        }
+
+        return existing.status === DirectoryScheduleStatus.ACTIVE;
+    }
+
+    private resolveNextRunAfterScheduleUpdate(options: {
+        status: DirectoryScheduleStatus;
+        cadence: DirectoryScheduleCadence;
+        existing: DirectorySchedule | null;
+        shouldRecalculateNextRun: boolean;
+    }): Date | null {
+        if (options.status !== DirectoryScheduleStatus.ACTIVE) {
+            return options.existing?.nextRunAt ?? null;
+        }
+
+        if (options.shouldRecalculateNextRun) {
+            return this.calculateNextRun(options.cadence);
+        }
+
+        return options.existing?.nextRunAt ?? null;
+    }
+
+    private resolveNextRunAfterCompletedRun(
+        schedule: DirectorySchedule,
+        anchorDate: Date,
+        preserveExistingNextRun: boolean,
+    ): Date | null {
+        if (preserveExistingNextRun) {
+            return schedule.nextRunAt ?? null;
+        }
+
+        if (schedule.status !== DirectoryScheduleStatus.ACTIVE || !schedule.cadence) {
+            return null;
+        }
+
+        return this.calculateNextRun(schedule.cadence, 0, anchorDate);
+    }
+
+    private resolveNextRunAfterFailedRun(options: {
+        schedule: DirectorySchedule;
+        anchorDate: Date;
+        preserveExistingNextRun: boolean;
+        reachedLimit: boolean;
+    }): Date | null {
+        if (options.preserveExistingNextRun) {
+            return options.schedule.nextRunAt ?? null;
+        }
+
+        if (options.reachedLimit || !options.schedule.cadence) {
+            return null;
+        }
+
+        return new Date(options.anchorDate.getTime() + this.RETRY_DELAY_MINUTES * 60 * 1000);
+    }
+
+    private resolveNextRunAfterSkippedRun(
+        schedule: DirectorySchedule,
+        baseDate: Date,
+        preserveExistingNextRun: boolean,
+    ): Date | null {
+        if (preserveExistingNextRun) {
+            return schedule.nextRunAt ?? null;
+        }
+
+        if (schedule.status !== DirectoryScheduleStatus.ACTIVE || !schedule.cadence) {
+            return null;
+        }
+
+        return new Date(baseDate.getTime() + this.RETRY_DELAY_MINUTES * 60 * 1000);
     }
 
     /**
