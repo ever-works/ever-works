@@ -39,6 +39,15 @@ services:
             - ever-works-network
         env_file: .env.compose
 
+    ever-works-docs:
+        image: ghcr.io/ever-works/ever-works-docs:latest
+        container_name: ever-works-docs
+        ports:
+            - '3300:80'
+        networks:
+            - ever-works-network
+        restart: unless-stopped
+
 networks:
     ever-works-network:
         driver: bridge
