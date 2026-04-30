@@ -33,7 +33,7 @@ import { DirectoryRepository } from '../database/repositories/directory.reposito
 import type { AuthAccount } from '../entities';
 import { FacadeError } from './base.facade';
 import { config } from '@src/config';
-import { requestGitHubAppInstallationAccessToken } from '@src/utils';
+import { requestGitHubAppInstallationAccessTokenDetails } from '@src/utils';
 
 // Facade-specific types that don't require token (facade resolves token internally)
 export interface FacadeCloneOptions {
@@ -108,6 +108,14 @@ export type { GitProviderInfo };
 @Injectable()
 export class GitFacadeService implements IGitFacade {
     private readonly CAPABILITY = PLUGIN_CAPABILITIES.GIT_PROVIDER;
+    private readonly installationTokenCache = new Map<
+        string,
+        {
+            token: string;
+            expiresAtMs: number;
+        }
+    >();
+    private readonly installationTokenRequests = new Map<string, Promise<string | null>>();
 
     constructor(
         private readonly registry: PluginRegistryService,
@@ -918,6 +926,16 @@ export class GitFacadeService implements IGitFacade {
     }
 
     private async createGitHubAppInstallationToken(installationId: string): Promise<string | null> {
+        const cachedToken = this.getCachedInstallationToken(installationId);
+        if (cachedToken) {
+            return cachedToken;
+        }
+
+        const inflightRequest = this.installationTokenRequests.get(installationId);
+        if (inflightRequest) {
+            return inflightRequest;
+        }
+
         const appId = config.githubApp.getAppId();
         const privateKey = config.githubApp.getPrivateKey();
 
@@ -925,19 +943,61 @@ export class GitFacadeService implements IGitFacade {
             return null;
         }
 
-        try {
-            return await requestGitHubAppInstallationAccessToken(installationId, {
-                appId,
-                privateKey,
-            });
-        } catch (error) {
-            throw new GitFacadeError(
-                error instanceof Error
-                    ? error.message
-                    : 'Failed to create GitHub App installation token',
-                'createInstallationToken',
-                'github',
-            );
+        const request = (async () => {
+            try {
+                const tokenData = await requestGitHubAppInstallationAccessTokenDetails(
+                    installationId,
+                    {
+                        appId,
+                        privateKey,
+                    },
+                );
+                this.cacheInstallationToken(installationId, tokenData);
+                return tokenData.token;
+            } catch (error) {
+                throw new GitFacadeError(
+                    error instanceof Error
+                        ? error.message
+                        : 'Failed to create GitHub App installation token',
+                    'createInstallationToken',
+                    'github',
+                );
+            } finally {
+                this.installationTokenRequests.delete(installationId);
+            }
+        })();
+
+        this.installationTokenRequests.set(installationId, request);
+        return request;
+    }
+
+    private getCachedInstallationToken(installationId: string): string | null {
+        const cachedToken = this.installationTokenCache.get(installationId);
+        if (!cachedToken) {
+            return null;
         }
+
+        const refreshBufferMs = 60_000;
+        if (cachedToken.expiresAtMs <= Date.now() + refreshBufferMs) {
+            this.installationTokenCache.delete(installationId);
+            return null;
+        }
+
+        return cachedToken.token;
+    }
+
+    private cacheInstallationToken(
+        installationId: string,
+        tokenData: { token: string; expiresAt: string | null },
+    ): void {
+        const fallbackTtlMs = 55 * 60 * 1000;
+        const expiresAtMs = tokenData.expiresAt
+            ? Date.parse(tokenData.expiresAt)
+            : Date.now() + fallbackTtlMs;
+
+        this.installationTokenCache.set(installationId, {
+            token: tokenData.token,
+            expiresAtMs: Number.isFinite(expiresAtMs) ? expiresAtMs : Date.now() + fallbackTtlMs,
+        });
     }
 }

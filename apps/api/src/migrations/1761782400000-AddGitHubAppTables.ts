@@ -54,6 +54,14 @@ export class AddGitHubAppTables1761782400000 implements MigrationInterface {
                     this.createdAtColumn('createdAt', dateType),
                     this.createdAtColumn('updatedAt', dateType),
                 ],
+                foreignKeys: [
+                    {
+                        columnNames: ['installationEntityId'],
+                        referencedTableName: 'github_app_installations',
+                        referencedColumnNames: ['id'],
+                        onDelete: 'CASCADE',
+                    },
+                ],
             }),
             true,
         );

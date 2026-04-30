@@ -50,25 +50,31 @@ export class GitHubAppInstallationRepoRepository {
         installationEntityId: string,
         repositories: GitHubAppRepositoryRecord[],
     ): Promise<GitHubAppInstallationRepositoryEntity[]> {
-        await this.repository.delete({ installationEntityId });
+        return this.repository.manager.transaction(async (manager) => {
+            const transactionalRepository = manager.getRepository(
+                GitHubAppInstallationRepositoryEntity,
+            );
 
-        if (repositories.length === 0) {
-            return [];
-        }
+            await transactionalRepository.delete({ installationEntityId });
 
-        const entities = repositories.map((repositoryRecord) =>
-            this.repository.create({
-                installationEntityId,
-                githubRepoId: repositoryRecord.githubRepoId,
-                owner: repositoryRecord.owner,
-                repo: repositoryRecord.repo,
-                fullName: repositoryRecord.fullName,
-                isPrivate: repositoryRecord.isPrivate,
-                defaultBranch: repositoryRecord.defaultBranch ?? null,
-                selected: repositoryRecord.selected ?? true,
-            }),
-        );
+            if (repositories.length === 0) {
+                return [];
+            }
 
-        return this.repository.save(entities);
+            const entities = repositories.map((repositoryRecord) =>
+                transactionalRepository.create({
+                    installationEntityId,
+                    githubRepoId: repositoryRecord.githubRepoId,
+                    owner: repositoryRecord.owner,
+                    repo: repositoryRecord.repo,
+                    fullName: repositoryRecord.fullName,
+                    isPrivate: repositoryRecord.isPrivate,
+                    defaultBranch: repositoryRecord.defaultBranch ?? null,
+                    selected: repositoryRecord.selected ?? true,
+                }),
+            );
+
+            return transactionalRepository.save(entities);
+        });
     }
 }

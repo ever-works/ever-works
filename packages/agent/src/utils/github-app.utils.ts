@@ -5,6 +5,11 @@ export type GitHubAppCredentials = {
     privateKey: string;
 };
 
+export type GitHubAppInstallationAccessToken = {
+    token: string;
+    expiresAt: string | null;
+};
+
 export const createGitHubAppJwt = ({ appId, privateKey }: GitHubAppCredentials): string => {
     const now = Math.floor(Date.now() / 1000);
     const header = Buffer.from(JSON.stringify({ alg: 'RS256', typ: 'JWT' })).toString('base64url');
@@ -39,10 +44,10 @@ export const createGitHubOAuthHeaders = (accessToken: string) => ({
     'X-GitHub-Api-Version': '2022-11-28',
 });
 
-export const requestGitHubAppInstallationAccessToken = async (
+export const requestGitHubAppInstallationAccessTokenDetails = async (
     installationId: string,
     credentials: GitHubAppCredentials,
-): Promise<string> => {
+): Promise<GitHubAppInstallationAccessToken> => {
     const jwt = createGitHubAppJwt(credentials);
     const response = await fetch(
         `https://api.github.com/app/installations/${installationId}/access_tokens`,
@@ -58,11 +63,22 @@ export const requestGitHubAppInstallationAccessToken = async (
         );
     }
 
-    const data = (await response.json()) as { token?: string };
+    const data = (await response.json()) as { token?: string; expires_at?: string | null };
     if (!data.token) {
         throw new Error('GitHub App installation token response did not include a token');
     }
 
+    return {
+        token: data.token,
+        expiresAt: data.expires_at ?? null,
+    };
+};
+
+export const requestGitHubAppInstallationAccessToken = async (
+    installationId: string,
+    credentials: GitHubAppCredentials,
+): Promise<string> => {
+    const data = await requestGitHubAppInstallationAccessTokenDetails(installationId, credentials);
     return data.token;
 };
 

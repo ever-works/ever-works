@@ -1,4 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { requestGitHubAppInstallationAccessTokenDetails } from '@src/utils';
 import {
     GitFacadeService,
     GitFacadeError,
@@ -27,11 +28,16 @@ import type {
 } from '@ever-works/plugin';
 import { PLUGIN_CAPABILITIES } from '@ever-works/plugin';
 
+jest.mock('@src/utils', () => ({
+    requestGitHubAppInstallationAccessTokenDetails: jest.fn(),
+}));
+
 describe('GitFacadeService', () => {
     let service: GitFacadeService;
     let registry: jest.Mocked<PluginRegistryService>;
     let authAccountRepository: jest.Mocked<AuthAccountRepository>;
     let settingsService: jest.Mocked<PluginSettingsService>;
+    let directoryRepository: jest.Mocked<DirectoryRepository>;
 
     const createMockGitPlugin = (
         id: string,
@@ -291,6 +297,8 @@ describe('GitFacadeService', () => {
         registry = module.get(PluginRegistryService);
         authAccountRepository = module.get(AuthAccountRepository);
         settingsService = module.get(PluginSettingsService);
+        directoryRepository = module.get(DirectoryRepository);
+        jest.mocked(requestGitHubAppInstallationAccessTokenDetails).mockReset();
     });
 
     describe('isConfigured', () => {
@@ -610,6 +618,48 @@ describe('GitFacadeService', () => {
             });
 
             expect(result).toBeNull();
+        });
+
+        it('should cache GitHub App installation tokens for linked directories', async () => {
+            const gitPlugin = createMockGitPlugin('github', 'GitHub');
+            const registered = createRegisteredPlugin(gitPlugin, {
+                capabilities: [PLUGIN_CAPABILITIES.GIT_PROVIDER],
+            });
+            process.env.GITHUB_APP_ID = 'app-123';
+            process.env.GITHUB_APP_PRIVATE_KEY =
+                '-----BEGIN PRIVATE KEY-----\\nmock\\n-----END PRIVATE KEY-----';
+            registry.get.mockReturnValue(registered);
+            registry.getByCapability.mockReturnValue([registered]);
+            directoryRepository.findById.mockResolvedValue({
+                sourceRepository: {
+                    auth: {
+                        mode: 'github_app_installation',
+                        installationId: 'inst-123',
+                    },
+                },
+            } as any);
+            jest.mocked(requestGitHubAppInstallationAccessTokenDetails).mockResolvedValue({
+                token: 'installation-token',
+                expiresAt: new Date(Date.now() + 30 * 60 * 1000).toISOString(),
+            });
+
+            const firstToken = await service.getAccessToken({
+                providerId: 'github',
+                userId: 'user-123',
+                directoryId: 'dir-123',
+            });
+            const secondToken = await service.getAccessToken({
+                providerId: 'github',
+                userId: 'user-123',
+                directoryId: 'dir-123',
+            });
+
+            expect(firstToken).toBe('installation-token');
+            expect(secondToken).toBe('installation-token');
+            expect(requestGitHubAppInstallationAccessTokenDetails).toHaveBeenCalledTimes(1);
+
+            delete process.env.GITHUB_APP_ID;
+            delete process.env.GITHUB_APP_PRIVATE_KEY;
         });
     });
 
