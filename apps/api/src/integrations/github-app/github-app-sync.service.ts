@@ -2,6 +2,9 @@ import {
     GitHubAppInstallationRepoRepository,
     GitHubAppInstallationRepository,
 } from '@ever-works/agent/database';
+import { User } from '@ever-works/agent/entities';
+import { SourceRepoAnalyzerService } from '@ever-works/agent/import';
+import { DirectoryImportService } from '@ever-works/agent/services';
 import { Injectable } from '@nestjs/common';
 import { config } from '@src/config/constants';
 import { GitHubAppService } from './github-app.service';
@@ -12,6 +15,8 @@ export class GitHubAppSyncService {
         private readonly gitHubAppService: GitHubAppService,
         private readonly gitHubAppInstallationRepository: GitHubAppInstallationRepository,
         private readonly gitHubAppInstallationRepoRepository: GitHubAppInstallationRepoRepository,
+        private readonly sourceRepoAnalyzerService: SourceRepoAnalyzerService,
+        private readonly directoryImportService: DirectoryImportService,
     ) {}
 
     async listInstallationsForUser(userId: string) {
@@ -63,6 +68,54 @@ export class GitHubAppSyncService {
             ...installation,
             repositories: persistedRepositories,
         };
+    }
+
+    async onboardInstallationRepository(installationId: string, repositoryId: string, user: User) {
+        const installation =
+            await this.gitHubAppInstallationRepository.findByInstallationId(installationId);
+        if (!installation || installation.createdByUserId !== user.id) {
+            return null;
+        }
+
+        const repository = await this.gitHubAppInstallationRepoRepository.findById(repositoryId);
+        if (!repository || repository.installationEntityId !== installation.id) {
+            return null;
+        }
+
+        const installationToken =
+            await this.gitHubAppService.createInstallationAccessToken(installationId);
+        const sourceUrl = `https://github.com/${repository.fullName}`;
+        const analysis = await this.sourceRepoAnalyzerService.analyzeRepository(
+            sourceUrl,
+            installationToken,
+        );
+
+        if (analysis.error) {
+            return {
+                status: 'error' as const,
+                message: analysis.error,
+            };
+        }
+
+        if (analysis.detectedType !== 'data_repo') {
+            return {
+                status: 'error' as const,
+                message:
+                    'Only existing data repositories can be onboarded from GitHub App installations right now',
+            };
+        }
+
+        return this.directoryImportService.onboardLinkedRepository(
+            {
+                sourceUrl,
+                sourceOwner: repository.owner,
+                sourceRepo: repository.repo,
+                name: analysis.worksConfig?.name || repository.repo,
+                gitProvider: 'github',
+                organization: installation.targetType === 'Organization',
+            },
+            user,
+        );
     }
 
     async handleWebhook(eventName: string, payload: any) {

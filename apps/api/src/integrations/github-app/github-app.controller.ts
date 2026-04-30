@@ -1,13 +1,16 @@
 import {
+    BadRequestException,
     Controller,
     Get,
     Inject,
+    NotFoundException,
     Param,
     Post,
     Query,
     Request,
     UnauthorizedException,
 } from '@nestjs/common';
+import { AuthService } from '@src/auth';
 import { Public } from '@src/auth/decorators/public.decorator';
 import { AuthProvider } from '@src/auth/providers/auth-provider.abstract';
 import { AUTH_PROVIDER } from '@src/auth/providers/auth-provider.constants';
@@ -20,6 +23,7 @@ export class GitHubAppController {
     constructor(
         private readonly gitHubAppOnboardingService: GitHubAppOnboardingService,
         private readonly gitHubAppSyncService: GitHubAppSyncService,
+        private readonly authService: AuthService,
         @Inject(AUTH_PROVIDER)
         private readonly authProvider: AuthProvider,
     ) {}
@@ -67,5 +71,29 @@ export class GitHubAppController {
         }
 
         return installation;
+    }
+
+    @Post('installations/:installationId/repositories/:repositoryId/onboard')
+    async onboardRepository(
+        @Param('installationId') installationId: string,
+        @Param('repositoryId') repositoryId: string,
+        @Request() req,
+    ) {
+        const user = await this.authService.getUser(req.user.userId);
+        const result = await this.gitHubAppSyncService.onboardInstallationRepository(
+            installationId,
+            repositoryId,
+            user,
+        );
+
+        if (!result) {
+            throw new NotFoundException('GitHub App repository not found for this user');
+        }
+
+        if (result.status === 'error') {
+            throw new BadRequestException(result.message);
+        }
+
+        return result;
     }
 }

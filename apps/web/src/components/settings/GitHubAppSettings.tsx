@@ -1,13 +1,15 @@
 'use client';
 
 import { useState, useTransition } from 'react';
+import { useRouter } from '@/i18n/navigation';
 import { useTranslations } from 'next-intl';
 import { toast } from 'sonner';
-import { Github, RefreshCw, ShieldCheck, ShieldOff } from 'lucide-react';
+import { Github, Import, RefreshCw, ShieldCheck, ShieldOff } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { CollapsibleCard } from '@/components/ui/collapsible-card';
 import type { GitHubAppInstallationDto } from '@/lib/api/github-app';
-import { syncGitHubAppInstallation } from '@/app/actions/github-app';
+import { onboardGitHubAppRepository, syncGitHubAppInstallation } from '@/app/actions/github-app';
+import { ROUTES } from '@/lib/constants';
 
 interface GitHubAppSettingsProps {
     installations: GitHubAppInstallationDto[];
@@ -15,8 +17,10 @@ interface GitHubAppSettingsProps {
 
 export function GitHubAppSettings({ installations: initialInstallations }: GitHubAppSettingsProps) {
     const t = useTranslations('dashboard.settings.githubApp');
+    const router = useRouter();
     const [installations, setInstallations] = useState(initialInstallations);
     const [pendingInstallationId, setPendingInstallationId] = useState<string | null>(null);
+    const [pendingRepositoryId, setPendingRepositoryId] = useState<string | null>(null);
     const [isPending, startTransition] = useTransition();
 
     const handleSync = (installationId: string) => {
@@ -44,6 +48,33 @@ export function GitHubAppSettings({ installations: initialInstallations }: GitHu
                     toast.error(t('syncError'));
                 } finally {
                     setPendingInstallationId(null);
+                }
+            })();
+        });
+    };
+
+    const handleOnboard = (installationId: string, repositoryId: string) => {
+        setPendingRepositoryId(repositoryId);
+
+        startTransition(() => {
+            void (async () => {
+                try {
+                    const result = await onboardGitHubAppRepository(installationId, repositoryId);
+
+                    if (!result.success || !result.data) {
+                        toast.error(result.error || t('onboardError'));
+                        return;
+                    }
+
+                    toast.success(result.data.message || t('onboardSuccess'));
+
+                    if (result.data.directoryId) {
+                        router.push(ROUTES.DASHBOARD_DIRECTORY(result.data.directoryId));
+                    }
+                } catch {
+                    toast.error(t('onboardError'));
+                } finally {
+                    setPendingRepositoryId(null);
                 }
             })();
         });
@@ -190,11 +221,32 @@ export function GitHubAppSettings({ installations: initialInstallations }: GitHu
                                                             : t('branchUnknown')}
                                                     </p>
                                                 </div>
-                                                <span className="shrink-0 rounded-full border border-border/70 px-2.5 py-1 text-[11px] font-medium text-text-muted dark:border-border-dark/70 dark:text-text-muted-dark">
-                                                    {repository.isPrivate
-                                                        ? t('private')
-                                                        : t('public')}
-                                                </span>
+                                                <div className="flex shrink-0 items-center gap-2">
+                                                    <span className="rounded-full border border-border/70 px-2.5 py-1 text-[11px] font-medium text-text-muted dark:border-border-dark/70 dark:text-text-muted-dark">
+                                                        {repository.isPrivate
+                                                            ? t('private')
+                                                            : t('public')}
+                                                    </span>
+                                                    <Button
+                                                        type="button"
+                                                        variant="secondary"
+                                                        size="sm"
+                                                        loading={
+                                                            isPending &&
+                                                            pendingRepositoryId === repository.id
+                                                        }
+                                                        onClick={() =>
+                                                            handleOnboard(
+                                                                installation.installationId,
+                                                                repository.id,
+                                                            )
+                                                        }
+                                                        className="h-8 px-3 text-xs"
+                                                    >
+                                                        <Import className="h-3.5 w-3.5" />
+                                                        {t('onboard')}
+                                                    </Button>
+                                                </div>
                                             </div>
                                         ))}
                                     </div>

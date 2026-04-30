@@ -442,6 +442,72 @@ export class DirectoryImportService {
         }
     }
 
+    async onboardLinkedRepository(
+        input: {
+            sourceUrl: string;
+            sourceOwner: string;
+            sourceRepo: string;
+            name: string;
+            gitProvider: string;
+            organization?: boolean;
+        },
+        user: User,
+    ): Promise<ImportDirectoryResponseDto> {
+        const normalizedName = this.normalizeDirectoryName(
+            input.name,
+            ImportSourceTypeEnum.LINK_EXISTING,
+        );
+        const slug = slugifyText(normalizedName);
+
+        const existingDir = await this.directoryRepository.findByOwnerAndSlug({
+            userId: user.id,
+            owner: input.sourceOwner,
+            slug,
+        });
+
+        if (existingDir) {
+            return {
+                status: 'error',
+                directoryId: existingDir.id,
+                message: `A directory with slug "${slug}" already exists`,
+            };
+        }
+
+        const directory = await this.directoryRepository.create(
+            {
+                slug,
+                name: normalizedName,
+                description: `Imported from ${input.sourceUrl}`,
+                userId: user.id,
+                owner: input.sourceOwner,
+                organization: input.organization || false,
+                gitProvider: input.gitProvider,
+                deployProvider: undefined,
+            },
+            user,
+        );
+
+        return this.handleLinkExisting(
+            directory,
+            {
+                sourceUrl: input.sourceUrl,
+                sourceType: ImportSourceTypeEnum.LINK_EXISTING,
+                name: normalizedName,
+                owner: input.sourceOwner,
+                organization: input.organization || false,
+                createMissingRepos: false,
+                sync: false,
+                restoreWorksConfig: false,
+                gitProvider: input.gitProvider,
+            } as ImportDirectoryDto,
+            {
+                owner: input.sourceOwner,
+                repo: input.sourceRepo,
+            },
+            user,
+        );
+    }
+
     private async dispatchImportTask(
         directory: Directory,
         user: User,

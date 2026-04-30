@@ -31,6 +31,12 @@ export class GitHubAppInstallationRepoRepository {
         });
     }
 
+    async findById(id: string): Promise<GitHubAppInstallationRepositoryEntity | null> {
+        return this.repository.findOne({
+            where: { id },
+        });
+    }
+
     async findByFullName(fullName: string): Promise<GitHubAppInstallationRepositoryEntity[]> {
         return this.repository.find({
             where: { fullName },

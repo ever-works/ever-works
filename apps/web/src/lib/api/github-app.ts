@@ -31,6 +31,13 @@ export interface GitHubAppInstallationDto {
     repositories: GitHubAppInstallationRepositoryDto[];
 }
 
+export interface GitHubAppOnboardRepositoryResponseDto {
+    status: 'pending' | 'success' | 'error';
+    directoryId?: string;
+    historyId?: string;
+    message: string;
+}
+
 export const githubAppAPI = {
     listInstallations: async () => {
         return serverFetch<GitHubAppInstallationDto[]>('/github-app/installations');
@@ -39,6 +46,15 @@ export const githubAppAPI = {
     syncInstallation: async (installationId: string) => {
         return serverMutation<GitHubAppInstallationDto>({
             endpoint: `/github-app/installations/${installationId}/sync`,
+            data: {},
+            method: 'POST',
+            wrapInData: false,
+        });
+    },
+
+    onboardRepository: async (installationId: string, repositoryId: string) => {
+        return serverMutation<GitHubAppOnboardRepositoryResponseDto>({
+            endpoint: `/github-app/installations/${installationId}/repositories/${repositoryId}/onboard`,
             data: {},
             method: 'POST',
             wrapInData: false,

@@ -32,3 +32,21 @@ export async function syncGitHubAppInstallation(installationId: string) {
         };
     }
 }
+
+export async function onboardGitHubAppRepository(installationId: string, repositoryId: string) {
+    await ensureAuth();
+
+    try {
+        const data = await githubAppAPI.onboardRepository(installationId, repositoryId);
+        revalidatePath(ROUTES.DASHBOARD_SETTINGS_GITHUB_APP);
+
+        return { success: true as const, data, error: null };
+    } catch (error) {
+        return {
+            success: false as const,
+            data: null,
+            error:
+                error instanceof Error ? error.message : 'Failed to onboard GitHub App repository',
+        };
+    }
+}
