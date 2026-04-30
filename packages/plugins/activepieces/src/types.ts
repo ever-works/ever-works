@@ -91,6 +91,9 @@ export interface ActivepiecesPipelineMetrics {
 	flowRunId?: string;
 	flowDuration?: number;
 	webhookMode: WebhookMode;
+	runStatus?: string;
+	failedStepName?: string;
+	finishTime?: string;
 }
 
 /** Schema of a flow returned by the Activepieces API. */
@@ -106,6 +109,21 @@ export interface ActivepiecesFlow {
 	metadata?: Record<string, unknown>;
 }
 
+/**
+ * Terminal flow-run statuses returned by Activepieces.
+ * Reference: https://www.activepieces.com/docs/endpoints/flow-runs/schema
+ */
+export const TERMINAL_FLOW_RUN_STATUSES: readonly string[] = [
+	'SUCCEEDED',
+	'FAILED',
+	'TIMED_OUT',
+	'INTERNAL_ERROR',
+	'QUOTA_EXCEEDED',
+	'STOPPED',
+	'PAUSED',
+	'MEMORY_LIMIT_EXCEEDED'
+] as const;
+
 /** Schema of a flow run returned by the Activepieces API. */
 export interface ActivepiecesFlowRun {
 	id: string;
@@ -119,6 +137,14 @@ export interface ActivepiecesFlowRun {
 	stepsCount?: number;
 	tags?: string[];
 	steps?: Record<string, unknown>;
+	failedStep?: { name?: string; displayName?: string } | null;
+}
+
+/** Paginated response shape used by Activepieces list endpoints. */
+export interface ActivepiecesListResponse<T> {
+	data: T[];
+	next: string | null;
+	previous: string | null;
 }
 
 /** Result of executing an Activepieces flow webhook. */
@@ -126,4 +152,5 @@ export interface ActivepiecesExecutionResult {
 	output: unknown;
 	flowRunId?: string;
 	flowDuration?: number;
+	run?: ActivepiecesFlowRun;
 }

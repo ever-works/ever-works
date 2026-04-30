@@ -2,15 +2,20 @@ import type {
 	ActivepiecesExecutionResult,
 	ActivepiecesFlow,
 	ActivepiecesFlowInput,
+	ActivepiecesFlowRun,
+	ActivepiecesListResponse,
 	ActivepiecesSettings,
 	WebhookMode
 } from '../types.js';
+import { TERMINAL_FLOW_RUN_STATUSES } from '../types.js';
 
 export interface ActivepiecesClientOptions {
 	apiKey: string;
 	baseUrl: string;
 	logger: { log(...args: unknown[]): void; warn(...args: unknown[]): void };
 }
+
+const ASYNC_POLL_INTERVAL_MS = 2_000;
 
 interface RequestOptions {
 	method?: 'GET' | 'POST' | 'DELETE';
@@ -26,11 +31,15 @@ interface RequestOptions {
  * Talks directly to the public Activepieces API — no SDK is required.
  *
  * Endpoints used (paths are appended to the configured baseUrl, e.g. `/api/v1`):
- *   - GET    /flows/{id}                          — flow lookup / validation
- *   - GET    /flow-runs?projectId=...&flowId=...  — recent run lookup
- *   - POST   /webhooks/{flowId}                   — async flow trigger
- *   - POST   /webhooks/{flowId}/sync              — sync flow trigger (returns flow output)
+ *   - GET    /flows/{id}                                — flow lookup / validation
+ *   - GET    /flow-runs/{id}                            — single flow run lookup (post-execution audit)
+ *   - GET    /flow-runs?projectId=...&flowId=...        — recent run lookup (async polling)
+ *   - POST   /webhooks/{flowId}                         — async flow trigger
+ *   - POST   /webhooks/{flowId}/sync                    — sync flow trigger (returns flow output body)
  *
+ * The webhook routes correspond to the Activepieces server's
+ * `webhook-controller.ts` mounted under `/v1/webhooks` — they are how
+ * Activepieces officially executes a flow from an external system.
  */
 export class ActivepiecesClient {
 	private readonly apiKey: string;
@@ -77,14 +86,49 @@ export class ActivepiecesClient {
 		return flow;
 	}
 
+	/** Fetches a single flow run by id via `GET /flow-runs/{id}`. */
+	async getFlowRun(runId: string, signal?: AbortSignal): Promise<ActivepiecesFlowRun> {
+		return this.request<ActivepiecesFlowRun>(`/flow-runs/${encodeURIComponent(runId)}`, {
+			method: 'GET',
+			signal
+		});
+	}
+
+	/**
+	 * Returns the most recent flow run for a flow (used for async-mode polling).
+	 * Activepieces requires `projectId` on the list endpoint.
+	 */
+	async findLatestRunForFlow(
+		flowId: string,
+		projectId: string,
+		options: { createdAfter?: string; signal?: AbortSignal } = {}
+	): Promise<ActivepiecesFlowRun | undefined> {
+		const query: Record<string, string | number | boolean | undefined> = {
+			projectId,
+			flowId,
+			limit: 1
+		};
+		if (options.createdAfter) query.createdAfter = options.createdAfter;
+
+		const response = await this.request<ActivepiecesListResponse<ActivepiecesFlowRun>>('/flow-runs', {
+			method: 'GET',
+			query,
+			signal: options.signal
+		});
+
+		return Array.isArray(response?.data) && response.data.length > 0 ? response.data[0] : undefined;
+	}
+
 	/**
 	 * Triggers an Activepieces flow webhook with the prepared payload.
 	 *
-	 * In sync mode (`/sync`), Activepieces holds the request open until the flow returns
-	 * its Response action output — this is the recommended mode for pipeline use.
+	 * **Sync mode** (`/sync`): Activepieces holds the request open until the flow's
+	 * Response action fires; the response body is returned as the flow output.
 	 *
-	 * In async mode, the webhook returns immediately and the plugin cannot retrieve the
-	 * flow output. Sync is therefore the only fully supported mode.
+	 * **Async mode**: the webhook returns immediately. The client then polls
+	 * `GET /flow-runs?flowId=...&projectId=...` until the run reaches a terminal
+	 * status, and finally fetches the full run via `GET /flow-runs/{id}`.
+	 * Async mode requires `settings.projectId` to be configured.
 	 */
 	async executeFlow(
 		flowId: string,
@@ -101,6 +145,7 @@ export class ActivepiecesClient {
 
 		onProgress?.(1, 'running');
 
+		const triggerStartedAt = new Date().toISOString();
 		const response = await this.request<unknown>(path, {
 			method: 'POST',
 			body: input,
@@ -112,16 +157,91 @@ export class ActivepiecesClient {
 			includeAuth: false
 		});
 
+		// Async mode: webhook body has no flow output — poll the run instead.
+		if (settings.webhookMode === 'async') {
+			if (!settings.projectId) {
+				throw new Error(
+					'Async mode requires a Default Project ID in plugin settings so the latest flow run can be polled.'
+				);
+			}
+
+			const run = await this.pollUntilTerminal(
+				flowId,
+				settings.projectId,
+				triggerStartedAt,
+				settings.timeoutMs,
+				onProgress,
+				signal
+			);
+
+			onProgress?.(1, 'completed');
+
+			return {
+				output: run.steps ?? {},
+				flowRunId: run.id,
+				flowDuration: Date.now() - startTime,
+				run
+			};
+		}
+
+		// Sync mode: response body IS the flow output. Best-effort enrich with run record.
 		onProgress?.(1, 'completed');
 
 		const flowDuration = Date.now() - startTime;
 		const flowRunId = extractFlowRunId(response);
+		let run: ActivepiecesFlowRun | undefined;
+		if (flowRunId) {
+			try {
+				run = await this.getFlowRun(flowRunId, signal);
+			} catch (error) {
+				const reason = error instanceof Error ? error.message : 'unknown error';
+				this.logger.warn(`Could not fetch run record for "${flowRunId}": ${reason}`);
+			}
+		}
 
 		return {
 			output: response,
 			flowRunId,
-			flowDuration
+			flowDuration,
+			run
 		};
+	}
+
+	private async pollUntilTerminal(
+		flowId: string,
+		projectId: string,
+		createdAfter: string,
+		timeoutMs: number,
+		onProgress?: (attempt: number, status: string) => void,
+		signal?: AbortSignal
+	): Promise<ActivepiecesFlowRun> {
+		const deadline = Date.now() + timeoutMs;
+		let attempt = 0;
+		let lastSeenRunId: string | undefined;
+
+		while (Date.now() < deadline) {
+			if (signal?.aborted) throw new Error('Pipeline execution was cancelled');
+			attempt += 1;
+
+			const run = await this.findLatestRunForFlow(flowId, projectId, { createdAfter, signal });
+			if (run) {
+				lastSeenRunId = run.id;
+				onProgress?.(attempt, run.status);
+				if (TERMINAL_FLOW_RUN_STATUSES.includes(run.status)) {
+					// Re-fetch the run to ensure the steps payload is fully populated.
+					return await this.getFlowRun(run.id, signal);
+				}
+			} else {
+				onProgress?.(attempt, 'queued');
+			}
+
+			await sleep(ASYNC_POLL_INTERVAL_MS, signal);
+		}
+
+		throw new Error(
+			`Activepieces flow "${flowId}" did not finish within ${Math.round(timeoutMs / 1000)}s` +
+				(lastSeenRunId ? ` (last run: ${lastSeenRunId})` : '')
+		);
 	}
 
 	private async request<T>(path: string, options: RequestOptions = {}): Promise<T> {
@@ -251,4 +371,22 @@ function isAbortError(error: unknown): boolean {
 	if (!error || typeof error !== 'object') return false;
 	const name = (error as { name?: string }).name;
 	return name === 'AbortError' || name === 'TimeoutError';
+}
+
+function sleep(ms: number, signal?: AbortSignal): Promise<void> {
+	return new Promise((resolve, reject) => {
+		if (signal?.aborted) {
+			reject(new Error('Pipeline execution was cancelled'));
+			return;
+		}
+		const handle = setTimeout(() => {
+			signal?.removeEventListener('abort', onAbort);
+			resolve();
+		}, ms);
+		const onAbort = () => {
+			clearTimeout(handle);
+			reject(new Error('Pipeline execution was cancelled'));
+		};
+		signal?.addEventListener('abort', onAbort, { once: true });
+	});
 }
