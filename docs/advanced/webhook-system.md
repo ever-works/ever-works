@@ -1,7 +1,7 @@
 ---
 id: webhook-system
-title: "Event & Notification System"
-sidebar_label: "Event System"
+title: 'Event & Notification System'
+sidebar_label: 'Event System'
 sidebar_position: 5
 ---
 
@@ -10,6 +10,7 @@ sidebar_position: 5
 Ever Works uses an internal event-driven architecture powered by NestJS `EventEmitter2`. Events flow through the platform to coordinate plugin lifecycle, pipeline execution, directory generation, and system-level notifications. Plugins can subscribe to and emit events through the `PluginContext` interface.
 
 **Key sources:**
+
 - `packages/plugin/src/events/event-types.ts` -- Event type definitions
 - `packages/agent/src/plugins/plugins.constants.ts` -- Plugin event constants
 - `packages/agent/src/pipeline/step-pipeline-executor.service.ts` -- Pipeline event emission
@@ -57,17 +58,17 @@ The platform defines five categories of events, all type-safe through the `Plugi
 
 Emitted by the plugin registry and lifecycle manager when plugins change state.
 
-| Event Name | Payload | Emitter |
-|---|---|---|
-| `plugin:loaded` | `PluginLoadedPayload` | `PluginLifecycleManagerService` |
-| `plugin:unloaded` | `PluginLoadedPayload` | `PluginLifecycleManagerService` |
-| `plugin:enabled` | `PluginLoadedPayload` | Plugin system |
-| `plugin:disabled` | `PluginLoadedPayload` | Plugin system |
-| `plugin:error` | `PluginErrorPayload` | `PluginLifecycleManagerService` |
-| `plugin:settings-changed` | `PluginSettingsChangedPayload` | `PluginSettingsService` |
-| `plugin:state-changed` | -- | `PluginRegistryService` |
-| `plugin:registered` | -- | `PluginRegistryService` |
-| `plugin:unregistered` | -- | `PluginRegistryService` |
+| Event Name                | Payload                        | Emitter                         |
+| ------------------------- | ------------------------------ | ------------------------------- |
+| `plugin:loaded`           | `PluginLoadedPayload`          | `PluginLifecycleManagerService` |
+| `plugin:unloaded`         | `PluginLoadedPayload`          | `PluginLifecycleManagerService` |
+| `plugin:enabled`          | `PluginLoadedPayload`          | Plugin system                   |
+| `plugin:disabled`         | `PluginLoadedPayload`          | Plugin system                   |
+| `plugin:error`            | `PluginErrorPayload`           | `PluginLifecycleManagerService` |
+| `plugin:settings-changed` | `PluginSettingsChangedPayload` | `PluginSettingsService`         |
+| `plugin:state-changed`    | --                             | `PluginRegistryService`         |
+| `plugin:registered`       | --                             | `PluginRegistryService`         |
+| `plugin:unregistered`     | --                             | `PluginRegistryService`         |
 
 ```typescript
 // PluginLoadedPayload
@@ -94,15 +95,15 @@ Emitted by the plugin registry and lifecycle manager when plugins change state.
 
 Emitted during directory lifecycle operations.
 
-| Event Name | Payload |
-|---|---|
-| `directory:created` | `DirectoryEventPayload` |
-| `directory:updated` | `DirectoryEventPayload` |
-| `directory:deleted` | `DirectoryEventPayload` |
-| `directory:deployed` | `DirectoryEventPayload` |
-| `directory:generation-started` | `DirectoryGenerationStartedPayload` |
+| Event Name                       | Payload                               |
+| -------------------------------- | ------------------------------------- |
+| `directory:created`              | `DirectoryEventPayload`               |
+| `directory:updated`              | `DirectoryEventPayload`               |
+| `directory:deleted`              | `DirectoryEventPayload`               |
+| `directory:deployed`             | `DirectoryEventPayload`               |
+| `directory:generation-started`   | `DirectoryGenerationStartedPayload`   |
 | `directory:generation-completed` | `DirectoryGenerationCompletedPayload` |
-| `directory:generation-failed` | `DirectoryGenerationFailedPayload` |
+| `directory:generation-failed`    | `DirectoryGenerationFailedPayload`    |
 
 ```typescript
 // DirectoryGenerationCompletedPayload
@@ -121,27 +122,27 @@ Emitted during directory lifecycle operations.
 
 Emitted when directory items are created, updated, or validated.
 
-| Event Name | Payload |
-|---|---|
-| `item:created` | `ItemEventPayload` |
-| `item:updated` | `ItemEventPayload` |
-| `item:deleted` | `ItemEventPayload` |
-| `item:extracted` | `ItemEventPayload` |
+| Event Name       | Payload                |
+| ---------------- | ---------------------- |
+| `item:created`   | `ItemEventPayload`     |
+| `item:updated`   | `ItemEventPayload`     |
+| `item:deleted`   | `ItemEventPayload`     |
+| `item:extracted` | `ItemEventPayload`     |
 | `item:validated` | `ItemValidatedPayload` |
 
 ### Pipeline Events
 
 Emitted by `StepPipelineExecutorService` during pipeline execution. These provide granular progress tracking.
 
-| Event Name | Payload |
-|---|---|
-| `pipeline:started` | `PipelineEventPayload` |
-| `pipeline:step-started` | `PipelineStepEventPayload` |
+| Event Name                | Payload                        |
+| ------------------------- | ------------------------------ |
+| `pipeline:started`        | `PipelineEventPayload`         |
+| `pipeline:step-started`   | `PipelineStepEventPayload`     |
 | `pipeline:step-completed` | `PipelineStepCompletedPayload` |
-| `pipeline:step-failed` | `PipelineStepFailedPayload` |
-| `pipeline:completed` | `PipelineCompletedPayload` |
-| `pipeline:failed` | `PipelineFailedPayload` |
-| `pipeline:cancelled` | `PipelineEventPayload` |
+| `pipeline:step-failed`    | `PipelineStepFailedPayload`    |
+| `pipeline:completed`      | `PipelineCompletedPayload`     |
+| `pipeline:failed`         | `PipelineFailedPayload`        |
+| `pipeline:cancelled`      | `PipelineEventPayload`         |
 
 ```typescript
 // PipelineStepFailedPayload
@@ -160,10 +161,10 @@ Emitted by `StepPipelineExecutorService` during pipeline execution. These provid
 
 ### System Events
 
-| Event Name | Payload |
-|---|---|
-| `system:startup` | `SystemEventPayload` |
-| `system:shutdown` | `SystemEventPayload` |
+| Event Name            | Payload              |
+| --------------------- | -------------------- |
+| `system:startup`      | `SystemEventPayload` |
+| `system:shutdown`     | `SystemEventPayload` |
 | `system:health-check` | `SystemEventPayload` |
 
 ## Plugin Event Subscription
@@ -173,9 +174,7 @@ Plugins receive event access through `PluginContext`:
 ```typescript
 // Subscribe to events
 const subscription = context.onEvent('directory:generation-completed', (payload) => {
-    context.logger.log(
-        `Generation completed for ${payload.directoryId}: ${payload.itemsGenerated} items`
-    );
+	context.logger.log(`Generation completed for ${payload.directoryId}: ${payload.itemsGenerated} items`);
 });
 
 // Unsubscribe later
@@ -183,9 +182,9 @@ subscription.unsubscribe();
 
 // Emit events (for plugin-to-plugin communication)
 context.emitEvent('item:created', {
-    directoryId: 'dir-123',
-    item: itemData,
-    timestamp: new Date().toISOString()
+	directoryId: 'dir-123',
+	item: itemData,
+	timestamp: new Date().toISOString()
 });
 ```
 
@@ -195,12 +194,12 @@ When plugins emit events through `PluginContext.emitEvent()`, the platform autom
 
 ```typescript
 emitEvent: <T extends PluginEventName>(event: T, payload: unknown): void => {
-    const enrichedPayload = {
-        ...(payload as object),
-        timestamp: Date.now(),
-        correlationId: this.generateCorrelationId(),
-    };
-    this.eventEmitter.emit(event, enrichedPayload);
+	const enrichedPayload = {
+		...(payload as object),
+		timestamp: Date.now(),
+		correlationId: this.generateCorrelationId()
+	};
+	this.eventEmitter.emit(event, enrichedPayload);
 };
 ```
 
@@ -250,12 +249,12 @@ graph TD
 
 Error classification checks error messages against known patterns:
 
-| Classification | Pattern Keywords |
-|---|---|
-| `ai_credits` | `insufficient_quota`, `rate_limit`, `quota exceeded`, `credits`, `billing` |
-| `ai_provider` | `invalid_api_key`, `authentication`, `unauthorized`, `api key` |
-| `git_auth` | `git`/`github`/`gitlab` + `authentication`/`token`/`expired` |
-| `account_level` | `account`, `subscription`, `plan limit`, `not configured` |
+| Classification  | Pattern Keywords                                                           |
+| --------------- | -------------------------------------------------------------------------- |
+| `ai_credits`    | `insufficient_quota`, `rate_limit`, `quota exceeded`, `credits`, `billing` |
+| `ai_provider`   | `invalid_api_key`, `authentication`, `unauthorized`, `api key`             |
+| `git_auth`      | `git`/`github`/`gitlab` + `authentication`/`token`/`expired`               |
+| `account_level` | `account`, `subscription`, `plan limit`, `not configured`                  |
 
 The provider is auto-detected from the error message (OpenAI, Anthropic, Google, Groq, Ollama, OpenRouter).
 
@@ -264,23 +263,17 @@ The provider is auto-detected from the error message (OpenAI, Anthropic, Google,
 All events are fully typed through the `PluginEventPayloads` mapped type:
 
 ```typescript
-export type PluginEventName =
-    | PluginLifecycleEvent
-    | DirectoryEvent
-    | ItemEvent
-    | PipelineEvent
-    | SystemEvent;
+export type PluginEventName = PluginLifecycleEvent | DirectoryEvent | ItemEvent | PipelineEvent | SystemEvent;
 
 export interface PluginEventPayloads {
-    'plugin:loaded': PluginLoadedPayload;
-    'directory:generation-completed': DirectoryGenerationCompletedPayload;
-    'pipeline:step-failed': PipelineStepFailedPayload;
-    // ... all events mapped to their payload types
+	'plugin:loaded': PluginLoadedPayload;
+	'directory:generation-completed': DirectoryGenerationCompletedPayload;
+	'pipeline:step-failed': PipelineStepFailedPayload;
+	// ... all events mapped to their payload types
 }
 
 // Type-safe handler
-export type EventHandler<T extends PluginEventName> =
-    (payload: PluginEventPayloads[T]) => void | Promise<void>;
+export type EventHandler<T extends PluginEventName> = (payload: PluginEventPayloads[T]) => void | Promise<void>;
 ```
 
 This ensures that when you subscribe to `pipeline:step-failed`, your handler receives `PipelineStepFailedPayload` with the correct fields.

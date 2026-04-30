@@ -38,15 +38,15 @@ The root layout wraps every page in the application. It performs locale validati
 
 **Responsibilities**:
 
-| Concern | Implementation |
-|---------|---------------|
+| Concern           | Implementation                                                                 |
+| ----------------- | ------------------------------------------------------------------------------ | ----------- |
 | Locale validation | `hasLocale(routing.locales, locale)` -- calls `notFound()` for invalid locales |
-| Fonts | Geist Sans and Geist Mono from `next/font/google` as CSS variables |
-| Theme | Injects `themeInitScript` in `<head>` to prevent flash of wrong theme |
-| i18n | Wraps children in `NextIntlClientProvider` |
-| Toasts | Global `Toaster` from `sonner` positioned top-right with theme-aware styling |
-| Page loader | `TopLoader` component for route transition indicators |
-| Metadata | Template-based titles: `%s | {APP_NAME}` |
+| Fonts             | Geist Sans and Geist Mono from `next/font/google` as CSS variables             |
+| Theme             | Injects `themeInitScript` in `<head>` to prevent flash of wrong theme          |
+| i18n              | Wraps children in `NextIntlClientProvider`                                     |
+| Toasts            | Global `Toaster` from `sonner` positioned top-right with theme-aware styling   |
+| Page loader       | `TopLoader` component for route transition indicators                          |
+| Metadata          | Template-based titles: `%s                                                     | {APP_NAME}` |
 
 **Theme Init Script**: The `themeInitScript` runs before React hydrates, reading the theme from `localStorage` and applying the `dark` class to `<html>` immediately to prevent a flash of light theme.
 
@@ -58,8 +58,8 @@ The root layout wraps every page in the application. It performs locale validati
 
 ```typescript
 export const routing = defineRouting({
-    locales: LOCALES,           // 21 supported locales
-    defaultLocale: DEFAULT_LOCALE,  // 'en' (configurable via env)
+	locales: LOCALES, // 21 supported locales
+	defaultLocale: DEFAULT_LOCALE // 'en' (configurable via env)
 });
 ```
 
@@ -107,25 +107,25 @@ The `getAuthFromRequest()` function reads the JWT access token from cookies and 
 
 ```typescript
 export async function getAuthFromRequest(): Promise<{
-    isAuthenticated: boolean;
-    user?: JwtPayload;
-    isExpired: boolean;
-    token?: string;
+	isAuthenticated: boolean;
+	user?: JwtPayload;
+	isExpired: boolean;
+	token?: string;
 }>;
 ```
 
 The JWT payload (`JwtPayload`) extends `AuthUser` with token metadata:
 
-| Field | Type | Description |
-|-------|------|-------------|
-| `sub` | `string` | User ID |
-| `email` | `string` | User email |
-| `provider` | `string` | Auth provider |
-| `username` | `string` | Display name |
-| `emailVerified` | `boolean` | Email verification status |
-| `isActive` | `boolean` | Account active status |
-| `avatar` | `string | null` | Avatar URL |
-| `iat`, `exp` | `number` | Token issue and expiration timestamps |
+| Field           | Type      | Description                           |
+| --------------- | --------- | ------------------------------------- | ---------- |
+| `sub`           | `string`  | User ID                               |
+| `email`         | `string`  | User email                            |
+| `provider`      | `string`  | Auth provider                         |
+| `username`      | `string`  | Display name                          |
+| `emailVerified` | `boolean` | Email verification status             |
+| `isActive`      | `boolean` | Account active status                 |
+| `avatar`        | `string   | null`                                 | Avatar URL |
+| `iat`, `exp`    | `number`  | Token issue and expiration timestamps |
 
 ### Dashboard Auth Guard
 
@@ -136,7 +136,7 @@ The dashboard layout performs a server-side auth check:
 ```typescript
 const user = await getAuthFromCookie();
 if (!user) {
-    return null;  // Middleware should have already redirected
+	return null; // Middleware should have already redirected
 }
 ```
 
@@ -154,37 +154,37 @@ All routes are centralized in the `ROUTES` constant object.
 
 **Dashboard Routes**:
 
-| Constant | Path |
-|----------|------|
-| `DASHBOARD` | `/` |
-| `DASHBOARD_DIRECTORIES` | `/directories` |
-| `DASHBOARD_DIRECTORIES_NEW` | `/directories/new` |
-| `DASHBOARD_DIRECTORY(id)` | `/directories/{id}` |
-| `DASHBOARD_DIRECTORY_ITEMS(id)` | `/directories/{id}/items` |
+| Constant                            | Path                          |
+| ----------------------------------- | ----------------------------- |
+| `DASHBOARD`                         | `/`                           |
+| `DASHBOARD_DIRECTORIES`             | `/directories`                |
+| `DASHBOARD_DIRECTORIES_NEW`         | `/directories/new`            |
+| `DASHBOARD_DIRECTORY(id)`           | `/directories/{id}`           |
+| `DASHBOARD_DIRECTORY_ITEMS(id)`     | `/directories/{id}/items`     |
 | `DASHBOARD_DIRECTORY_GENERATOR(id)` | `/directories/{id}/generator` |
-| `DASHBOARD_DIRECTORY_SETTINGS(id)` | `/directories/{id}/settings` |
-| `DASHBOARD_PLUGINS` | `/plugins` |
-| `DASHBOARD_PLUGIN_DETAIL(pluginId)` | `/plugins/{pluginId}` |
-| `DASHBOARD_SETTINGS` | `/settings` |
+| `DASHBOARD_DIRECTORY_SETTINGS(id)`  | `/directories/{id}/settings`  |
+| `DASHBOARD_PLUGINS`                 | `/plugins`                    |
+| `DASHBOARD_PLUGIN_DETAIL(pluginId)` | `/plugins/{pluginId}`         |
+| `DASHBOARD_SETTINGS`                | `/settings`                   |
 
 **Auth Routes**:
 
-| Constant | Path |
-|----------|------|
-| `AUTH_LOGIN` | `/login` |
-| `AUTH_REGISTER` | `/register` |
+| Constant               | Path               |
+| ---------------------- | ------------------ |
+| `AUTH_LOGIN`           | `/login`           |
+| `AUTH_REGISTER`        | `/register`        |
 | `AUTH_FORGOT_PASSWORD` | `/forgot-password` |
-| `AUTH_RESET_PASSWORD` | `/reset-password` |
-| `AUTH_ERROR` | `/auth/error` |
+| `AUTH_RESET_PASSWORD`  | `/reset-password`  |
+| `AUTH_ERROR`           | `/auth/error`      |
 
 **API Routes**:
 
-| Constant | Path |
-|----------|------|
-| `API_AUTH_VERIFY_EMAIL` | `/api/auth/verify-email` |
-| `API_AUTH_RESET_PASSWORD` | `/api/auth/reset-password` |
+| Constant                           | Path                                |
+| ---------------------------------- | ----------------------------------- |
+| `API_AUTH_VERIFY_EMAIL`            | `/api/auth/verify-email`            |
+| `API_AUTH_RESET_PASSWORD`          | `/api/auth/reset-password`          |
 | `API_AI_CONVERSATIONS_CHAT_STREAM` | `/api/ai-conversations/chat/stream` |
-| `API_OAUTH_CALLBACK` | `/api/oauth/:providerId/callback` |
+| `API_OAUTH_CALLBACK`               | `/api/oauth/:providerId/callback`   |
 
 **Public Routes**: The `PUBLIC_ROUTES` array defines paths that do not require authentication: all auth routes plus `/about`, `/contact`, `/privacy`, `/terms`, and `/help`.
 
@@ -196,23 +196,23 @@ The client-side dashboard shell that wraps all protected pages.
 
 **Components Rendered**:
 
-| Component | Description |
-|-----------|-------------|
-| `DashboardSidebar` | Resizable sidebar with navigation, AI chat, user profile |
-| `DashboardHeader` | Top header with notification dropdown, theme toggle, help button |
-| `Footer` | Page footer |
-| `HelpDrawer` | Slide-out help panel |
-| `DashboardToasts` | Toast notification handler (wrapped in `Suspense`) |
+| Component          | Description                                                      |
+| ------------------ | ---------------------------------------------------------------- |
+| `DashboardSidebar` | Resizable sidebar with navigation, AI chat, user profile         |
+| `DashboardHeader`  | Top header with notification dropdown, theme toggle, help button |
+| `Footer`           | Page footer                                                      |
+| `HelpDrawer`       | Slide-out help panel                                             |
+| `DashboardToasts`  | Toast notification handler (wrapped in `Suspense`)               |
 
 **Sidebar Persistence**: Uses `useSidebarPersistence` hook to remember sidebar width (320-440px range) and collapsed state across sessions via `localStorage`.
 
 **Keyboard Shortcuts**: Registered via `useKeyboardShortcuts` hook:
 
-| Shortcut | Action |
-|----------|--------|
+| Shortcut       | Action                                      |
+| -------------- | ------------------------------------------- |
 | `Ctrl/Cmd + K` | Navigate to directories with search focused |
-| `C` | Navigate to new directory page |
-| `?` | Open help drawer |
+| `C`            | Navigate to new directory page              |
+| `?`            | Open help drawer                            |
 
 ## Dashboard Sidebar
 
@@ -222,14 +222,15 @@ The sidebar provides the primary navigation and houses the AI chat interface.
 
 **Navigation Items**:
 
-| Icon | Label | Route |
-|------|-------|-------|
-| `Home` | Dashboard | `/` |
-| `Folder` | Directories | `/directories` |
-| `Plug` | Plugins | `/plugins` |
-| `Settings` | Settings | `/settings` |
+| Icon       | Label       | Route          |
+| ---------- | ----------- | -------------- |
+| `Home`     | Dashboard   | `/`            |
+| `Folder`   | Directories | `/directories` |
+| `Plug`     | Plugins     | `/plugins`     |
+| `Settings` | Settings    | `/settings`    |
 
 **Modes**: The sidebar supports two modes toggled by buttons at the bottom:
+
 - **Menu mode**: Shows navigation links and directory list
 - **Chat mode**: Shows the AI chat interface (`ChatProvider` + `ChatInterface`)
 
@@ -245,12 +246,12 @@ The top navigation bar provides quick-access controls.
 
 **Elements**:
 
-| Element | Description |
-|---------|-------------|
-| Menu button | Shown when sidebar is closed (mobile only) |
+| Element               | Description                                    |
+| --------------------- | ---------------------------------------------- |
+| Menu button           | Shown when sidebar is closed (mobile only)     |
 | Notification dropdown | `NotificationDropdown` with unread count badge |
-| Theme toggle | `ThemeToggle` component (inline variant) |
-| Help button | Opens the help drawer |
+| Theme toggle          | `ThemeToggle` component (inline variant)       |
+| Help button           | Opens the help drawer                          |
 
 ## Server-Side Navigation Helpers
 
@@ -258,14 +259,14 @@ The top navigation bar provides quick-access controls.
 
 Six server action redirect helpers that use locale-aware navigation:
 
-| Function | Redirects To |
-|----------|-------------|
-| `redirectToDirectories` | `/directories` |
-| `redirectToNewDirectory` | `/directories/new` |
-| `redirectToDashboard` | `/` |
-| `redirectToSettings` | `/settings` |
-| `redirectToAnalytics` | `/analytics` |
-| `redirectToNotifications` | `/notifications` |
+| Function                  | Redirects To       |
+| ------------------------- | ------------------ |
+| `redirectToDirectories`   | `/directories`     |
+| `redirectToNewDirectory`  | `/directories/new` |
+| `redirectToDashboard`     | `/`                |
+| `redirectToSettings`      | `/settings`        |
+| `redirectToAnalytics`     | `/analytics`       |
+| `redirectToNotifications` | `/notifications`   |
 
 Each function calls `getLocale()` to determine the current locale and uses `redirect({ locale, href })` from `@/i18n/navigation`.
 
@@ -286,7 +287,7 @@ The `ALLOWED_REDIRECT_URLS` environment variable defines which hostnames are per
 
 **File**: `src/lib/constants.ts`
 
-| Function | Description |
-|----------|-------------|
+| Function                         | Description                                         |
+| -------------------------------- | --------------------------------------------------- |
 | `routeWithParams(route, params)` | Replaces `:paramName` placeholders in route strings |
-| `withAppUrl(route)` | Prepends the `WEB_URL` base to create a full URL |
+| `withAppUrl(route)`              | Prepends the `WEB_URL` base to create a full URL    |

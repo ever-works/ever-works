@@ -42,16 +42,16 @@ Most services are registered as simple class providers in their module:
 
 ```typescript
 @Module({
-    providers: [
-        AuthService,
-        LocalStrategy,
-        JwtStrategy,
-        GithubAuthStrategy,
-        GoogleAuthStrategy,
-        TokenCleanupService,
-        OAuthUrlService,
-    ],
-    exports: [AuthService],
+	providers: [
+		AuthService,
+		LocalStrategy,
+		JwtStrategy,
+		GithubAuthStrategy,
+		GoogleAuthStrategy,
+		TokenCleanupService,
+		OAuthUrlService
+	],
+	exports: [AuthService]
 })
 export class AuthModule {}
 ```
@@ -63,28 +63,28 @@ Guards and interceptors registered with `APP_GUARD` and `APP_INTERCEPTOR` tokens
 ```typescript
 // apps/api/src/api.module.ts
 @Module({
-    providers: [
-        {
-            provide: APP_GUARD,
-            useClass: JwtAuthGuard,       // Auth on every route
-        },
-        {
-            provide: APP_GUARD,
-            useClass: ThrottlerGuard,     // Rate limit on every route
-        },
-        {
-            provide: APP_INTERCEPTOR,
-            useClass: LoggingInterceptor,  // Request/response logging
-        },
-        {
-            provide: APP_INTERCEPTOR,
-            useClass: SentryInterceptor,   // Error tracking
-        },
-        {
-            provide: APP_INTERCEPTOR,
-            useClass: PostHogInterceptor,  // Analytics
-        },
-    ],
+	providers: [
+		{
+			provide: APP_GUARD,
+			useClass: JwtAuthGuard // Auth on every route
+		},
+		{
+			provide: APP_GUARD,
+			useClass: ThrottlerGuard // Rate limit on every route
+		},
+		{
+			provide: APP_INTERCEPTOR,
+			useClass: LoggingInterceptor // Request/response logging
+		},
+		{
+			provide: APP_INTERCEPTOR,
+			useClass: SentryInterceptor // Error tracking
+		},
+		{
+			provide: APP_INTERCEPTOR,
+			useClass: PostHogInterceptor // Analytics
+		}
+	]
 })
 export class ApiModule {}
 ```
@@ -97,20 +97,20 @@ Simple values or configuration objects can be injected as providers:
 // packages/monitoring/src/sentry/sentry.module.ts
 @Module({})
 export class SentryModule {
-    static forRoot(config?: SentryConfig) {
-        const isInitialized = initSentry(config);
-        return {
-            module: SentryModule,
-            global: true,
-            providers: [
-                {
-                    provide: 'SENTRY_INITIALIZED',
-                    useValue: isInitialized,
-                },
-            ],
-            exports: ['SENTRY_INITIALIZED'],
-        };
-    }
+	static forRoot(config?: SentryConfig) {
+		const isInitialized = initSentry(config);
+		return {
+			module: SentryModule,
+			global: true,
+			providers: [
+				{
+					provide: 'SENTRY_INITIALIZED',
+					useValue: isInitialized
+				}
+			],
+			exports: ['SENTRY_INITIALIZED']
+		};
+	}
 }
 ```
 
@@ -163,12 +163,10 @@ canActivate(context: ExecutionContext) {
 // apps/api/src/auth/decorators/user.decorator.ts
 import { createParamDecorator, ExecutionContext } from '@nestjs/common';
 
-export const CurrentUser = createParamDecorator(
-    (data: unknown, ctx: ExecutionContext) => {
-        const request = ctx.switchToHttp().getRequest();
-        return request.user;
-    },
-);
+export const CurrentUser = createParamDecorator((data: unknown, ctx: ExecutionContext) => {
+	const request = ctx.switchToHttp().getRequest();
+	return request.user;
+});
 ```
 
 Usage in controllers:
@@ -187,15 +185,15 @@ The facade layer demonstrates how DI enables the plugin architecture. Each facad
 ```typescript
 @Injectable()
 export class AiFacadeService extends BaseFacadeService implements IAiFacade {
-    protected readonly CAPABILITY = PLUGIN_CAPABILITIES.AI_PROVIDER;
+	protected readonly CAPABILITY = PLUGIN_CAPABILITIES.AI_PROVIDER;
 
-    constructor(
-        registry: PluginRegistryService,           // From PluginsModule (global)
-        settingsService: PluginSettingsService,     // From PluginsModule (global)
-        @Optional() directoryPluginRepository?: DirectoryPluginRepository,
-    ) {
-        super(registry, settingsService, directoryPluginRepository);
-    }
+	constructor(
+		registry: PluginRegistryService, // From PluginsModule (global)
+		settingsService: PluginSettingsService, // From PluginsModule (global)
+		@Optional() directoryPluginRepository?: DirectoryPluginRepository
+	) {
+		super(registry, settingsService, directoryPluginRepository);
+	}
 }
 ```
 
@@ -205,20 +203,20 @@ The `FacadesModule` bundles all facades together:
 
 ```typescript
 const FACADES = [
-    AiFacadeService,
-    SearchFacadeService,
-    ScreenshotFacadeService,
-    ContentExtractorFacadeService,
-    DataSourceFacadeService,
-    GitFacadeService,
-    OAuthFacadeService,
-    DeployFacadeService,
+	AiFacadeService,
+	SearchFacadeService,
+	ScreenshotFacadeService,
+	ContentExtractorFacadeService,
+	DataSourceFacadeService,
+	GitFacadeService,
+	OAuthFacadeService,
+	DeployFacadeService
 ];
 
 @Module({
-    imports: [DatabaseModule],
-    providers: FACADES,
-    exports: FACADES,
+	imports: [DatabaseModule],
+	providers: FACADES,
+	exports: FACADES
 })
 export class FacadesModule {}
 ```
@@ -227,11 +225,11 @@ export class FacadesModule {}
 
 NestJS supports three injection scopes:
 
-| Scope       | Lifecycle                         | Use Case                          |
-|-------------|-----------------------------------|-----------------------------------|
-| `DEFAULT`   | Singleton (one instance per app)  | Services, repositories, facades   |
-| `REQUEST`   | New instance per HTTP request     | Request-scoped context            |
-| `TRANSIENT` | New instance per injection        | Stateful per-consumer services    |
+| Scope       | Lifecycle                        | Use Case                        |
+| ----------- | -------------------------------- | ------------------------------- |
+| `DEFAULT`   | Singleton (one instance per app) | Services, repositories, facades |
+| `REQUEST`   | New instance per HTTP request    | Request-scoped context          |
+| `TRANSIENT` | New instance per injection       | Stateful per-consumer services  |
 
 Most platform services use the default singleton scope. Use request scope sparingly, as it forces all dependents into request scope as well.
 
@@ -239,7 +237,7 @@ Most platform services use the default singleton scope. Use request scope sparin
 // Example: Request-scoped provider (use only when necessary)
 @Injectable({ scope: Scope.REQUEST })
 export class RequestContextService {
-    constructor(@Inject(REQUEST) private readonly request: Request) {}
+	constructor(@Inject(REQUEST) private readonly request: Request) {}
 }
 ```
 
@@ -248,13 +246,15 @@ export class RequestContextService {
 The `ApiModule` uses `OnApplicationBootstrap` to initialize the plugin system after all modules are loaded:
 
 ```typescript
-@Module({ /* ... */ })
+@Module({
+	/* ... */
+})
 export class ApiModule implements OnApplicationBootstrap {
-    constructor(private readonly pluginBootstrap: PluginBootstrapService) {}
+	constructor(private readonly pluginBootstrap: PluginBootstrapService) {}
 
-    async onApplicationBootstrap(): Promise<void> {
-        await this.pluginBootstrap.bootstrap();
-    }
+	async onApplicationBootstrap(): Promise<void> {
+		await this.pluginBootstrap.bootstrap();
+	}
 }
 ```
 
@@ -274,22 +274,22 @@ NestJS `Test.createTestingModule` allows replacing real services with mocks:
 
 ```typescript
 const module = await Test.createTestingModule({
-    providers: [
-        AiFacadeService,
-        {
-            provide: PluginRegistryService,
-            useValue: {
-                getByCapability: jest.fn().mockReturnValue([]),
-                get: jest.fn(),
-            },
-        },
-        {
-            provide: PluginSettingsService,
-            useValue: {
-                getSettings: jest.fn().mockResolvedValue({}),
-            },
-        },
-    ],
+	providers: [
+		AiFacadeService,
+		{
+			provide: PluginRegistryService,
+			useValue: {
+				getByCapability: jest.fn().mockReturnValue([]),
+				get: jest.fn()
+			}
+		},
+		{
+			provide: PluginSettingsService,
+			useValue: {
+				getSettings: jest.fn().mockResolvedValue({})
+			}
+		}
+	]
 }).compile();
 
 const service = module.get(AiFacadeService);
@@ -301,11 +301,8 @@ Test that guards properly protect routes:
 
 ```typescript
 const module = await Test.createTestingModule({
-    controllers: [AuthController],
-    providers: [
-        AuthService,
-        { provide: APP_GUARD, useClass: JwtAuthGuard },
-    ],
+	controllers: [AuthController],
+	providers: [AuthService, { provide: APP_GUARD, useClass: JwtAuthGuard }]
 }).compile();
 ```
 

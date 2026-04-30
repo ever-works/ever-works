@@ -48,11 +48,12 @@ Check if the user has configured a specific deployment provider. Returns `config
 
 Deploy a directory to its configured provider. The service validates the deploy token, enables GitHub Actions workflows, sets repository secrets (`DEPLOY_TOKEN`, `DATA_REPOSITORY`, `CRON_SECRET`, and provider-specific tokens), then dispatches the deployment workflow with retry logic.
 
-| Body Parameter | Type   | Description                         |
-|----------------|--------|-------------------------------------|
-| `teamScope`    | string | Optional deployment team/scope      |
+| Body Parameter | Type   | Description                    |
+| -------------- | ------ | ------------------------------ |
+| `teamScope`    | string | Optional deployment team/scope |
 
 The deployment flow:
+
 1. Validates deploy token via `DeployFacadeService`
 2. Retrieves git access token for the directory owner
 3. Sets required and optional GitHub Actions secrets
@@ -108,10 +109,10 @@ List organizations accessible through the git provider.
 
 List repositories from the git provider.
 
-| Query Parameter | Type   | Description              |
-|-----------------|--------|--------------------------|
-| `page`          | number | Page number              |
-| `perPage`       | number | Results per page         |
+| Query Parameter | Type   | Description      |
+| --------------- | ------ | ---------------- |
+| `page`          | number | Page number      |
+| `perPage`       | number | Results per page |
 
 ### GET `/api/git-providers/:providerId/user`
 
@@ -133,11 +134,11 @@ Check OAuth connection status for a provider.
 
 Get the OAuth authorization URL to initiate the connection flow.
 
-| Query Parameter | Type    | Description                          |
-|-----------------|---------|--------------------------------------|
-| `callbackUrl`   | string  | Custom callback URL                  |
-| `state`         | string  | OAuth state parameter                |
-| `forceConsent`  | boolean | Force consent screen (`true`/`false`)|
+| Query Parameter | Type    | Description                           |
+| --------------- | ------- | ------------------------------------- |
+| `callbackUrl`   | string  | Custom callback URL                   |
+| `state`         | string  | OAuth state parameter                 |
+| `forceConsent`  | boolean | Force consent screen (`true`/`false`) |
 
 ### GET `/api/oauth/:providerId/callback/plugins`
 
@@ -163,17 +164,17 @@ Check if a screenshot provider is available and enabled.
 
 Capture a screenshot and return the result. Returns `imageUrl`, `cacheUrl`, and optionally `imageBase64`.
 
-| Body Parameter      | Type    | Default | Constraints         | Description                    |
-|---------------------|---------|---------|---------------------|--------------------------------|
-| `url`               | string  | --      | Required, valid URL | Page URL to capture            |
-| `viewportWidth`     | number  | --      | 320 - 3840          | Viewport width in pixels       |
-| `viewportHeight`    | number  | --      | 240 - 2160          | Viewport height in pixels      |
-| `format`            | string  | `png`   | `png`, `jpg`, `webp`| Image output format            |
-| `fullPage`          | boolean | `false` | --                  | Capture full scrollable page   |
-| `delay`             | number  | --      | 0 - 10000           | Delay in ms before capture     |
-| `blockAds`          | boolean | `false` | --                  | Block advertisements           |
-| `blockTrackers`     | boolean | `false` | --                  | Block tracking scripts         |
-| `blockCookieBanners`| boolean | `false` | --                  | Block cookie consent banners   |
+| Body Parameter       | Type    | Default | Constraints          | Description                  |
+| -------------------- | ------- | ------- | -------------------- | ---------------------------- |
+| `url`                | string  | --      | Required, valid URL  | Page URL to capture          |
+| `viewportWidth`      | number  | --      | 320 - 3840           | Viewport width in pixels     |
+| `viewportHeight`     | number  | --      | 240 - 2160           | Viewport height in pixels    |
+| `format`             | string  | `png`   | `png`, `jpg`, `webp` | Image output format          |
+| `fullPage`           | boolean | `false` | --                   | Capture full scrollable page |
+| `delay`              | number  | --      | 0 - 10000            | Delay in ms before capture   |
+| `blockAds`           | boolean | `false` | --                   | Block advertisements         |
+| `blockTrackers`      | boolean | `false` | --                   | Block tracking scripts       |
+| `blockCookieBanners` | boolean | `false` | --                   | Block cookie consent banners |
 
 ### POST `/api/screenshot/get-url`
 

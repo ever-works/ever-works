@@ -1,7 +1,7 @@
 ---
 id: plugin-commands
-title: "CLI Plugin Commands"
-sidebar_label: "Plugin Commands"
+title: 'CLI Plugin Commands'
+sidebar_label: 'Plugin Commands'
 sidebar_position: 6
 ---
 
@@ -19,8 +19,8 @@ ever-works plugins [options]
 
 ### Options
 
-| Option | Description |
-|---|---|
+| Option                      | Description                                                             |
+| --------------------------- | ----------------------------------------------------------------------- |
 | `-c, --category <category>` | Filter plugins by category (e.g. `search`, `ai-provider`, `deployment`) |
 
 ### Interactive Flow
@@ -47,15 +47,15 @@ The plugin list is grouped by category and supports type-ahead search. Each plug
 
 When a plugin is selected, the CLI displays:
 
-| Field | Description |
-|---|---|
-| ID | Plugin identifier |
-| Version | Semantic version |
-| Category | Plugin category (e.g. `search`, `ai-provider`) |
-| Status | `System`, `Enabled`, or `Disabled` |
-| About | Plugin description |
+| Field    | Description                                          |
+| -------- | ---------------------------------------------------- |
+| ID       | Plugin identifier                                    |
+| Version  | Semantic version                                     |
+| Category | Plugin category (e.g. `search`, `ai-provider`)       |
+| Status   | `System`, `Enabled`, or `Disabled`                   |
+| About    | Plugin description                                   |
 | Provides | Capability list (e.g. `search`, `content-extractor`) |
-| Settings | Field count and required count |
+| Settings | Field count and required count                       |
 
 ### Enable Flow
 
@@ -101,14 +101,14 @@ The `PluginSettingsPromptService` handles all interactive settings input. It ext
 
 ### Field Type Handling
 
-| Schema Type | Widget | Prompt Style |
-|---|---|---|
-| `string` + `x-secret` | -- | Password input (masked) |
-| `string` | `model-select` | Fetches models from API, presents as list with context size |
-| `string` + `enum` | -- | Select list from enum values |
-| `boolean` | -- | Yes/No confirmation |
-| `number` | -- | Numeric input with `minimum`/`maximum` validation |
-| `string` (default) | -- | Text input |
+| Schema Type           | Widget         | Prompt Style                                                |
+| --------------------- | -------------- | ----------------------------------------------------------- |
+| `string` + `x-secret` | --             | Password input (masked)                                     |
+| `string`              | `model-select` | Fetches models from API, presents as list with context size |
+| `string` + `enum`     | --             | Select list from enum values                                |
+| `boolean`             | --             | Yes/No confirmation                                         |
+| `number`              | --             | Numeric input with `minimum`/`maximum` validation           |
+| `string` (default)    | --             | Text input                                                  |
 
 ### Model Selection
 
@@ -140,8 +140,8 @@ The service supports `showIf` conditions on schema properties:
 
 ```typescript
 if (prop.showIf) {
-  const refValue = settings[prop.showIf.field] ?? secretSettings[prop.showIf.field];
-  if (refValue !== prop.showIf.value) continue; // skip this field
+	const refValue = settings[prop.showIf.field] ?? secretSettings[prop.showIf.field];
+	if (refValue !== prop.showIf.value) continue; // skip this field
 }
 ```
 
@@ -151,9 +151,9 @@ This allows plugins to show fields conditionally based on other setting values.
 
 After collecting all fields, two validations run:
 
-| Validation | Source | Behavior on Failure |
-|---|---|---|
-| `validateRequiredSettings()` | `@ever-works/plugin/api` | Lists missing fields, offers retry |
+| Validation                      | Source                   | Behavior on Failure                   |
+| ------------------------------- | ------------------------ | ------------------------------------- |
+| `validateRequiredSettings()`    | `@ever-works/plugin/api` | Lists missing fields, offers retry    |
 | `validateSettingsConstraints()` | `@ever-works/plugin/api` | Lists constraint errors, offers retry |
 
 Settings are sanitized with `sanitizeSettingsForSave()` before returning.
@@ -200,11 +200,11 @@ Before the plugin list, the command shows the current active provider for each c
 
 ### Directory Plugin Actions
 
-| Action | Description |
-|---|---|
-| Enable for directory | Enables the plugin at directory scope. If the plugin has multiple capabilities, prompts for which one to activate. |
-| Disable for directory | Disables the plugin at directory scope with confirmation. |
-| Set active capability | Shown when a plugin provides more than one capability. Switches which capability is active. |
+| Action                       | Description                                                                                                         |
+| ---------------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| Enable for directory         | Enables the plugin at directory scope. If the plugin has multiple capabilities, prompts for which one to activate.  |
+| Disable for directory        | Disables the plugin at directory scope with confirmation.                                                           |
+| Set active capability        | Shown when a plugin provides more than one capability. Switches which capability is active.                         |
 | Configure directory settings | Prompts for directory-scoped settings. Uses user-level settings as fallback defaults (shown as `Inherited: value`). |
 
 ### Settings Inheritance
@@ -214,13 +214,13 @@ Directory settings inherit from user-level settings. The prompt shows inherited 
 ```typescript
 const promptService = new PluginSettingsPromptService();
 const result = await promptService.promptSettings({
-  pluginId: plugin.pluginId,
-  schema: plugin.settingsSchema,
-  currentSettings: regular,
-  currentSecretSettings: secret,
-  scope: 'directory',
-  scopes: ['global', 'directory'],
-  fallbackSettings: userPlugin.settings,  // inherited defaults
+	pluginId: plugin.pluginId,
+	schema: plugin.settingsSchema,
+	currentSettings: regular,
+	currentSecretSettings: secret,
+	scope: 'directory',
+	scopes: ['global', 'directory'],
+	fallbackSettings: userPlugin.settings // inherited defaults
 });
 ```
 
@@ -238,37 +238,37 @@ Both plugin commands require the `editor` role or higher. The `canEdit()` functi
 
 ```typescript
 if (!canEdit(role)) {
-  console.log('You do not have permission to perform this action.');
-  console.log(`Your role: ${role}. Required: editor or higher.`);
-  return;
+	console.log('You do not have permission to perform this action.');
+	console.log(`Your role: ${role}. Required: editor or higher.`);
+	return;
 }
 ```
 
 ## API Methods Used
 
-| Method | Command | Description |
-|---|---|---|
-| `getPlugins(options?)` | `plugins` | List all plugins, optionally filtered by category |
-| `getPlugin(pluginId)` | `plugins` | Get full plugin details with settings |
-| `enablePlugin(pluginId, data)` | `plugins` | Enable a plugin with optional settings |
-| `disablePlugin(pluginId)` | `plugins` | Disable a plugin |
-| `updatePluginSettings(pluginId, data)` | `plugins` | Save plugin settings |
-| `listPluginModels(pluginId)` | `plugins` | Fetch available AI models for a plugin |
-| `getDirectoryPlugins(directoryId)` | `directory plugins` | List plugins for a specific directory |
-| `enableDirectoryPlugin(dirId, pluginId, data)` | `directory plugins` | Enable a plugin at directory scope |
-| `disableDirectoryPlugin(dirId, pluginId)` | `directory plugins` | Disable a plugin at directory scope |
-| `setDirectoryPluginCapability(dirId, pluginId, cap)` | `directory plugins` | Set the active capability for a plugin |
-| `updateDirectoryPluginSettings(dirId, pluginId, data)` | `directory plugins` | Save directory-level plugin settings |
+| Method                                                 | Command             | Description                                       |
+| ------------------------------------------------------ | ------------------- | ------------------------------------------------- |
+| `getPlugins(options?)`                                 | `plugins`           | List all plugins, optionally filtered by category |
+| `getPlugin(pluginId)`                                  | `plugins`           | Get full plugin details with settings             |
+| `enablePlugin(pluginId, data)`                         | `plugins`           | Enable a plugin with optional settings            |
+| `disablePlugin(pluginId)`                              | `plugins`           | Disable a plugin                                  |
+| `updatePluginSettings(pluginId, data)`                 | `plugins`           | Save plugin settings                              |
+| `listPluginModels(pluginId)`                           | `plugins`           | Fetch available AI models for a plugin            |
+| `getDirectoryPlugins(directoryId)`                     | `directory plugins` | List plugins for a specific directory             |
+| `enableDirectoryPlugin(dirId, pluginId, data)`         | `directory plugins` | Enable a plugin at directory scope                |
+| `disableDirectoryPlugin(dirId, pluginId)`              | `directory plugins` | Disable a plugin at directory scope               |
+| `setDirectoryPluginCapability(dirId, pluginId, cap)`   | `directory plugins` | Set the active capability for a plugin            |
+| `updateDirectoryPluginSettings(dirId, pluginId, data)` | `directory plugins` | Save directory-level plugin settings              |
 
 ## Utility Functions
 
 The CLI plugin commands rely on shared utilities from `@ever-works/plugin/api`:
 
-| Function | Purpose |
-|---|---|
-| `getVisibleProperties(schema, scopes)` | Returns schema properties visible at the given scopes, filtering out hidden and admin-only fields |
-| `getRequiredFields(schema, scopes)` | Returns field names that are required at the given scopes |
-| `validateRequiredSettings(regular, secret, schema, scopes, scope)` | Returns list of missing required field names |
-| `splitSettingsBySecret(settings, schema, scopes)` | Splits a flat settings object into `{ regular, secret }` based on `x-secret` markers |
-| `sanitizeSettingsForSave(settings, scope)` | Removes undefined values and scope-irrelevant fields |
-| `validateSettingsConstraints(merged, props)` | Validates `minimum`, `maximum`, `pattern`, and other JSON Schema constraints |
+| Function                                                           | Purpose                                                                                           |
+| ------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------- |
+| `getVisibleProperties(schema, scopes)`                             | Returns schema properties visible at the given scopes, filtering out hidden and admin-only fields |
+| `getRequiredFields(schema, scopes)`                                | Returns field names that are required at the given scopes                                         |
+| `validateRequiredSettings(regular, secret, schema, scopes, scope)` | Returns list of missing required field names                                                      |
+| `splitSettingsBySecret(settings, schema, scopes)`                  | Splits a flat settings object into `{ regular, secret }` based on `x-secret` markers              |
+| `sanitizeSettingsForSave(settings, scope)`                         | Removes undefined values and scope-irrelevant fields                                              |
+| `validateSettingsConstraints(merged, props)`                       | Validates `minimum`, `maximum`, `pattern`, and other JSON Schema constraints                      |

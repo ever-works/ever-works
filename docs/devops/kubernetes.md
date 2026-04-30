@@ -50,9 +50,9 @@ This guide covers deploying the Ever Works platform to Kubernetes, including man
 apiVersion: v1
 kind: Namespace
 metadata:
-  name: ever-works
-  labels:
-    app.kubernetes.io/name: ever-works
+    name: ever-works
+    labels:
+        app.kubernetes.io/name: ever-works
 ```
 
 ### API Deployment
@@ -61,89 +61,89 @@ metadata:
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: ever-works-api
-  namespace: ever-works
-  labels:
-    app: ever-works-api
-    component: api
-spec:
-  replicas: 3
-  selector:
-    matchLabels:
-      app: ever-works-api
-  template:
-    metadata:
-      labels:
+    name: ever-works-api
+    namespace: ever-works
+    labels:
         app: ever-works-api
         component: api
-    spec:
-      containers:
-        - name: api
-          image: ever-works/api:latest
-          ports:
-            - containerPort: 3100
-              name: http
-          env:
-            - name: NODE_ENV
-              value: "production"
-            - name: PORT
-              value: "3100"
-            - name: DATABASE_TYPE
-              value: "postgres"
-            - name: DATABASE_AUTOMIGRATE
-              value: "false"
-            - name: DATABASE_URL
-              valueFrom:
-                secretKeyRef:
-                  name: api-secrets
-                  key: DATABASE_URL
-            - name: JWT_SECRET
-              valueFrom:
-                secretKeyRef:
-                  name: api-secrets
-                  key: JWT_SECRET
-            - name: SENTRY_DSN
-              valueFrom:
-                secretKeyRef:
-                  name: monitoring-secrets
-                  key: SENTRY_DSN
-            - name: POSTHOG_API_KEY
-              valueFrom:
-                secretKeyRef:
-                  name: monitoring-secrets
-                  key: POSTHOG_API_KEY
-            - name: ALLOWED_ORIGINS
-              value: "https://app.example.com"
-          resources:
-            requests:
-              memory: "256Mi"
-              cpu: "250m"
-            limits:
-              memory: "512Mi"
-              cpu: "1000m"
-          livenessProbe:
-            httpGet:
-              path: /health
-              port: http
-            initialDelaySeconds: 30
-            periodSeconds: 10
-            timeoutSeconds: 5
-            failureThreshold: 3
-          readinessProbe:
-            httpGet:
-              path: /health
-              port: http
-            initialDelaySeconds: 10
-            periodSeconds: 5
-            timeoutSeconds: 3
-            failureThreshold: 3
-          startupProbe:
-            httpGet:
-              path: /health
-              port: http
-            initialDelaySeconds: 5
-            periodSeconds: 5
-            failureThreshold: 12
+spec:
+    replicas: 3
+    selector:
+        matchLabels:
+            app: ever-works-api
+    template:
+        metadata:
+            labels:
+                app: ever-works-api
+                component: api
+        spec:
+            containers:
+                - name: api
+                  image: ever-works/api:latest
+                  ports:
+                      - containerPort: 3100
+                        name: http
+                  env:
+                      - name: NODE_ENV
+                        value: 'production'
+                      - name: PORT
+                        value: '3100'
+                      - name: DATABASE_TYPE
+                        value: 'postgres'
+                      - name: DATABASE_AUTOMIGRATE
+                        value: 'false'
+                      - name: DATABASE_URL
+                        valueFrom:
+                            secretKeyRef:
+                                name: api-secrets
+                                key: DATABASE_URL
+                      - name: JWT_SECRET
+                        valueFrom:
+                            secretKeyRef:
+                                name: api-secrets
+                                key: JWT_SECRET
+                      - name: SENTRY_DSN
+                        valueFrom:
+                            secretKeyRef:
+                                name: monitoring-secrets
+                                key: SENTRY_DSN
+                      - name: POSTHOG_API_KEY
+                        valueFrom:
+                            secretKeyRef:
+                                name: monitoring-secrets
+                                key: POSTHOG_API_KEY
+                      - name: ALLOWED_ORIGINS
+                        value: 'https://app.example.com'
+                  resources:
+                      requests:
+                          memory: '256Mi'
+                          cpu: '250m'
+                      limits:
+                          memory: '512Mi'
+                          cpu: '1000m'
+                  livenessProbe:
+                      httpGet:
+                          path: /health
+                          port: http
+                      initialDelaySeconds: 30
+                      periodSeconds: 10
+                      timeoutSeconds: 5
+                      failureThreshold: 3
+                  readinessProbe:
+                      httpGet:
+                          path: /health
+                          port: http
+                      initialDelaySeconds: 10
+                      periodSeconds: 5
+                      timeoutSeconds: 3
+                      failureThreshold: 3
+                  startupProbe:
+                      httpGet:
+                          path: /health
+                          port: http
+                      initialDelaySeconds: 5
+                      periodSeconds: 5
+                      failureThreshold: 12
 ```
 
 ### API Service
@@ -152,17 +152,17 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: ever-works-api
-  namespace: ever-works
+    name: ever-works-api
+    namespace: ever-works
 spec:
-  type: ClusterIP
-  selector:
-    app: ever-works-api
-  ports:
-    - port: 3100
-      targetPort: http
-      protocol: TCP
-      name: http
+    type: ClusterIP
+    selector:
+        app: ever-works-api
+    ports:
+        - port: 3100
+          targetPort: http
+          protocol: TCP
+          name: http
 ```
 
 ### Secrets
@@ -171,25 +171,25 @@ spec:
 apiVersion: v1
 kind: Secret
 metadata:
-  name: api-secrets
-  namespace: ever-works
+    name: api-secrets
+    namespace: ever-works
 type: Opaque
 stringData:
-  JWT_SECRET: "your-production-jwt-secret"
-  DATABASE_URL: "postgresql://user:password@db-host:5432/ever_works?sslmode=require"
-  GH_CLIENT_SECRET: "github-oauth-secret"
-  GOOGLE_CLIENT_SECRET: "google-oauth-secret"
+    JWT_SECRET: 'your-production-jwt-secret'
+    DATABASE_URL: 'postgresql://user:password@db-host:5432/ever_works?sslmode=require'
+    GH_CLIENT_SECRET: 'github-oauth-secret'
+    GOOGLE_CLIENT_SECRET: 'google-oauth-secret'
 
 ---
 apiVersion: v1
 kind: Secret
 metadata:
-  name: monitoring-secrets
-  namespace: ever-works
+    name: monitoring-secrets
+    namespace: ever-works
 type: Opaque
 stringData:
-  SENTRY_DSN: "https://key@sentry.io/project"
-  POSTHOG_API_KEY: "phc_your_key"
+    SENTRY_DSN: 'https://key@sentry.io/project'
+    POSTHOG_API_KEY: 'phc_your_key'
 ```
 
 Create secrets from the command line (preferred over YAML for production):
@@ -208,41 +208,41 @@ kubectl create secret generic api-secrets \
 apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
 metadata:
-  name: ever-works-api-hpa
-  namespace: ever-works
+    name: ever-works-api-hpa
+    namespace: ever-works
 spec:
-  scaleTargetRef:
-    apiVersion: apps/v1
-    kind: Deployment
-    name: ever-works-api
-  minReplicas: 2
-  maxReplicas: 10
-  metrics:
-    - type: Resource
-      resource:
-        name: cpu
-        target:
-          type: Utilization
-          averageUtilization: 70
-    - type: Resource
-      resource:
-        name: memory
-        target:
-          type: Utilization
-          averageUtilization: 80
-  behavior:
-    scaleUp:
-      stabilizationWindowSeconds: 60
-      policies:
-        - type: Pods
-          value: 2
-          periodSeconds: 60
-    scaleDown:
-      stabilizationWindowSeconds: 300
-      policies:
-        - type: Pods
-          value: 1
-          periodSeconds: 120
+    scaleTargetRef:
+        apiVersion: apps/v1
+        kind: Deployment
+        name: ever-works-api
+    minReplicas: 2
+    maxReplicas: 10
+    metrics:
+        - type: Resource
+          resource:
+              name: cpu
+              target:
+                  type: Utilization
+                  averageUtilization: 70
+        - type: Resource
+          resource:
+              name: memory
+              target:
+                  type: Utilization
+                  averageUtilization: 80
+    behavior:
+        scaleUp:
+            stabilizationWindowSeconds: 60
+            policies:
+                - type: Pods
+                  value: 2
+                  periodSeconds: 60
+        scaleDown:
+            stabilizationWindowSeconds: 300
+            policies:
+                - type: Pods
+                  value: 1
+                  periodSeconds: 120
 ```
 
 ### Ingress
@@ -251,41 +251,41 @@ spec:
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
-  name: ever-works-ingress
-  namespace: ever-works
-  annotations:
-    nginx.ingress.kubernetes.io/rate-limit: "100"
-    nginx.ingress.kubernetes.io/rate-limit-window: "1m"
-    nginx.ingress.kubernetes.io/ssl-redirect: "true"
-    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    name: ever-works-ingress
+    namespace: ever-works
+    annotations:
+        nginx.ingress.kubernetes.io/rate-limit: '100'
+        nginx.ingress.kubernetes.io/rate-limit-window: '1m'
+        nginx.ingress.kubernetes.io/ssl-redirect: 'true'
+        cert-manager.io/cluster-issuer: 'letsencrypt-prod'
 spec:
-  ingressClassName: nginx
-  tls:
-    - hosts:
-        - api.example.com
-        - app.example.com
-      secretName: ever-works-tls
-  rules:
-    - host: api.example.com
-      http:
-        paths:
-          - path: /
-            pathType: Prefix
-            backend:
-              service:
-                name: ever-works-api
-                port:
-                  number: 3100
-    - host: app.example.com
-      http:
-        paths:
-          - path: /
-            pathType: Prefix
-            backend:
-              service:
-                name: ever-works-web
-                port:
-                  number: 3000
+    ingressClassName: nginx
+    tls:
+        - hosts:
+              - api.example.com
+              - app.example.com
+          secretName: ever-works-tls
+    rules:
+        - host: api.example.com
+          http:
+              paths:
+                  - path: /
+                    pathType: Prefix
+                    backend:
+                        service:
+                            name: ever-works-api
+                            port:
+                                number: 3100
+        - host: app.example.com
+          http:
+              paths:
+                  - path: /
+                    pathType: Prefix
+                    backend:
+                        service:
+                            name: ever-works-web
+                            port:
+                                number: 3000
 ```
 
 ## Health Checks
@@ -296,28 +296,28 @@ The API exposes a health endpoint used by Kubernetes probes:
 // apps/api/src/api.controller.ts
 @Controller()
 export class APIController {
-    @Public()
-    @Get('health')
-    healthCheck() {
-        return { status: 'ok', timestamp: new Date().toISOString() };
-    }
+	@Public()
+	@Get('health')
+	healthCheck() {
+		return { status: 'ok', timestamp: new Date().toISOString() };
+	}
 }
 ```
 
 ### Probe Configuration Guide
 
-| Probe      | Purpose                       | Recommended Settings              |
-|------------|-------------------------------|-----------------------------------|
-| Startup    | Wait for app to initialize    | delay: 5s, period: 5s, fail: 12  |
-| Liveness   | Restart if process is stuck   | delay: 30s, period: 10s, fail: 3 |
-| Readiness  | Remove from LB if not ready   | delay: 10s, period: 5s, fail: 3  |
+| Probe     | Purpose                     | Recommended Settings             |
+| --------- | --------------------------- | -------------------------------- |
+| Startup   | Wait for app to initialize  | delay: 5s, period: 5s, fail: 12  |
+| Liveness  | Restart if process is stuck | delay: 30s, period: 10s, fail: 3 |
+| Readiness | Remove from LB if not ready | delay: 10s, period: 5s, fail: 3  |
 
-The startup probe gives the application up to 60 seconds (12 failures * 5s period) to initialize -- enough time for database connections, plugin loading, and Sentry initialization.
+The startup probe gives the application up to 60 seconds (12 failures \* 5s period) to initialize -- enough time for database connections, plugin loading, and Sentry initialization.
 
 ## Resource Sizing
 
 | Component | CPU Request | CPU Limit | Memory Request | Memory Limit |
-|-----------|-------------|-----------|----------------|--------------|
+| --------- | ----------- | --------- | -------------- | ------------ |
 | API       | 250m        | 1000m     | 256Mi          | 512Mi        |
 | Web       | 100m        | 500m      | 128Mi          | 256Mi        |
 | Worker    | 500m        | 2000m     | 512Mi          | 1Gi          |

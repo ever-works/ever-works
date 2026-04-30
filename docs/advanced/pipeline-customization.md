@@ -43,15 +43,15 @@ flowchart TD
 
 ## Source Files
 
-| File | Purpose |
-|------|---------|
-| `packages/agent/src/pipeline/pipeline-builder.service.ts` | Compiles step definitions into an executable pipeline with sorting and grouping |
-| `packages/agent/src/pipeline/pipeline-orchestrator.service.ts` | Routes execution to step-based or full executor based on plugin type |
-| `packages/agent/src/pipeline/step-pipeline-executor.service.ts` | Engine-orchestrated execution with checkpointing, events, and concurrency |
-| `packages/agent/src/pipeline/full-pipeline-executor.service.ts` | Delegates execution entirely to a self-managed pipeline plugin |
-| `packages/agent/src/pipeline/executable-pipeline.class.ts` | Runtime state wrapper with step status tracking and event emission |
-| `packages/agent/src/pipeline/pipeline-facade.service.ts` | Creates step execution contexts for facade access |
-| `packages/agent/src/pipeline/pipeline.module.ts` | NestJS module registering all pipeline services |
+| File                                                            | Purpose                                                                         |
+| --------------------------------------------------------------- | ------------------------------------------------------------------------------- |
+| `packages/agent/src/pipeline/pipeline-builder.service.ts`       | Compiles step definitions into an executable pipeline with sorting and grouping |
+| `packages/agent/src/pipeline/pipeline-orchestrator.service.ts`  | Routes execution to step-based or full executor based on plugin type            |
+| `packages/agent/src/pipeline/step-pipeline-executor.service.ts` | Engine-orchestrated execution with checkpointing, events, and concurrency       |
+| `packages/agent/src/pipeline/full-pipeline-executor.service.ts` | Delegates execution entirely to a self-managed pipeline plugin                  |
+| `packages/agent/src/pipeline/executable-pipeline.class.ts`      | Runtime state wrapper with step status tracking and event emission              |
+| `packages/agent/src/pipeline/pipeline-facade.service.ts`        | Creates step execution contexts for facade access                               |
+| `packages/agent/src/pipeline/pipeline.module.ts`                | NestJS module registering all pipeline services                                 |
 
 ## Key Classes
 
@@ -95,12 +95,12 @@ Modifier plugins declare where their steps should be placed using the `StepPosit
 ```typescript
 // Step positioning options
 type StepPosition =
-    | { type: 'replace'; stepId: string }   // Replace an existing step
-    | { type: 'before'; stepId: string }    // Inject before a step
-    | { type: 'after'; stepId: string }     // Inject after a step
-    | { type: 'disable'; stepId: string }   // Remove a step
-    | { type: 'first' }                     // Prepend to pipeline
-    | { type: 'last' }                      // Append to pipeline
+	| { type: 'replace'; stepId: string } // Replace an existing step
+	| { type: 'before'; stepId: string } // Inject before a step
+	| { type: 'after'; stepId: string } // Inject after a step
+	| { type: 'disable'; stepId: string } // Remove a step
+	| { type: 'first' } // Prepend to pipeline
+	| { type: 'last' }; // Append to pipeline
 ```
 
 ### Topological Sort
@@ -120,18 +120,18 @@ Error classes for invalid pipelines:
 
 ```typescript
 export class CircularDependencyError extends Error {
-    constructor(public readonly cycle: string[]) {
-        super(`Circular dependency detected: ${cycle.join(' -> ')}`);
-    }
+	constructor(public readonly cycle: string[]) {
+		super(`Circular dependency detected: ${cycle.join(' -> ')}`);
+	}
 }
 
 export class MissingDependencyError extends Error {
-    constructor(
-        public readonly stepId: string,
-        public readonly missingDependency: string,
-    ) {
-        super(`Step "${stepId}" depends on missing step "${missingDependency}"`);
-    }
+	constructor(
+		public readonly stepId: string,
+		public readonly missingDependency: string
+	) {
+		super(`Step "${stepId}" depends on missing step "${missingDependency}"`);
+	}
 }
 ```
 
@@ -178,15 +178,25 @@ Wraps the compiled pipeline with runtime state management:
 
 ```typescript
 export class ExecutablePipelineRunner {
-    private state: PipelineState;
-    private stepStates: Map<string, StepState>;
+	private state: PipelineState;
+	private stepStates: Map<string, StepState>;
 
-    constructor(pipeline: ExecutablePipeline, eventEmitter?: EventEmitter2) { /* ... */ }
+	constructor(pipeline: ExecutablePipeline, eventEmitter?: EventEmitter2) {
+		/* ... */
+	}
 
-    startStep(stepId: string): void { /* sets status to 'running' */ }
-    markStepComplete(stepId: string, metrics?: StepMetrics): void { /* ... */ }
-    markStepFailed(stepId: string, error: Error): void { /* ... */ }
-    markStepSkipped(stepId: string, reason?: string): void { /* ... */ }
+	startStep(stepId: string): void {
+		/* sets status to 'running' */
+	}
+	markStepComplete(stepId: string, metrics?: StepMetrics): void {
+		/* ... */
+	}
+	markStepFailed(stepId: string, error: Error): void {
+		/* ... */
+	}
+	markStepSkipped(stepId: string, reason?: string): void {
+		/* ... */
+	}
 }
 ```
 
@@ -198,13 +208,13 @@ The step executor saves checkpoints after each step completes, enabling resume o
 
 ```typescript
 interface CheckpointData {
-    stepIndex: number;
-    stepName: string;
-    pipelineId: string;
-    timestamp: string;
-    context: unknown;           // Serialized pipeline context
-    completedSteps: string[];
-    schemaVersion: number;      // Currently version 4
+	stepIndex: number;
+	stepName: string;
+	pipelineId: string;
+	timestamp: string;
+	context: unknown; // Serialized pipeline context
+	completedSteps: string[];
+	schemaVersion: number; // Currently version 4
 }
 
 // Resume flow:
@@ -220,12 +230,12 @@ interface CheckpointData {
 
 ```typescript
 interface PipelineExecutionOptions {
-    signal?: AbortSignal;           // Cancellation support
-    timeout?: number;               // Per-step timeout
-    continueOnError?: boolean;      // Continue after non-optional step failure
-    skipSteps?: string[];           // Steps to skip
-    onlySteps?: string[];           // Execute only these steps
-    stepSettings?: Record<string, Record<string, unknown>>; // Per-step settings
+	signal?: AbortSignal; // Cancellation support
+	timeout?: number; // Per-step timeout
+	continueOnError?: boolean; // Continue after non-optional step failure
+	skipSteps?: string[]; // Steps to skip
+	onlySteps?: string[]; // Execute only these steps
+	stepSettings?: Record<string, Record<string, unknown>>; // Per-step settings
 }
 ```
 
@@ -233,16 +243,16 @@ interface PipelineExecutionOptions {
 
 The step executor emits events at every stage via `EventEmitter2`:
 
-| Event | Payload | When |
-|-------|---------|------|
-| `pipeline:started` | `PipelineEventPayload` | Pipeline execution begins |
-| `pipeline:step-started` | `PipelineStepEventPayload` | A step begins executing |
-| `pipeline:step-completed` | `PipelineStepCompletedPayload` | A step finishes successfully |
-| `pipeline:step-failed` | `PipelineStepFailedPayload` | A step fails |
-| `pipeline:step-skipped` | `PipelineStepEventPayload` | A step is skipped |
-| `pipeline:completed` | `PipelineCompletedPayload` | Pipeline finishes successfully |
-| `pipeline:failed` | `PipelineFailedPayload` | Pipeline fails |
-| `pipeline:cancelled` | `PipelineEventPayload` | Pipeline is cancelled via AbortSignal |
+| Event                     | Payload                        | When                                  |
+| ------------------------- | ------------------------------ | ------------------------------------- |
+| `pipeline:started`        | `PipelineEventPayload`         | Pipeline execution begins             |
+| `pipeline:step-started`   | `PipelineStepEventPayload`     | A step begins executing               |
+| `pipeline:step-completed` | `PipelineStepCompletedPayload` | A step finishes successfully          |
+| `pipeline:step-failed`    | `PipelineStepFailedPayload`    | A step fails                          |
+| `pipeline:step-skipped`   | `PipelineStepEventPayload`     | A step is skipped                     |
+| `pipeline:completed`      | `PipelineCompletedPayload`     | Pipeline finishes successfully        |
+| `pipeline:failed`         | `PipelineFailedPayload`        | Pipeline fails                        |
+| `pipeline:cancelled`      | `PipelineEventPayload`         | Pipeline is cancelled via AbortSignal |
 
 ## Code Examples
 
@@ -254,35 +264,35 @@ A modifier plugin injects, replaces, or disables steps in an existing pipeline:
 import type { IPipelineModifierPlugin, PipelineStepDefinition } from '@ever-works/plugin';
 
 export default class MyModifierPlugin implements IPipelineModifierPlugin {
-    id = 'my-modifier';
-    name = 'My Pipeline Modifier';
-    targetPipelines = ['standard-pipeline']; // or ['*'] for all
+	id = 'my-modifier';
+	name = 'My Pipeline Modifier';
+	targetPipelines = ['standard-pipeline']; // or ['*'] for all
 
-    getStepDefinitions(): PipelineStepDefinition[] {
-        return [
-            {
-                id: 'custom-enrichment',
-                name: 'Custom Data Enrichment',
-                position: { type: 'after', stepId: 'generate-items' },
-                parallelizable: false,
-                estimatedDuration: 30,
-                dependencies: [{ stepId: 'generate-items', required: true }],
-            },
-            {
-                id: 'replace-taxonomy',
-                name: 'Enhanced Taxonomy',
-                position: { type: 'replace', stepId: 'generate-taxonomy' },
-                parallelizable: true,
-            },
-        ];
-    }
+	getStepDefinitions(): PipelineStepDefinition[] {
+		return [
+			{
+				id: 'custom-enrichment',
+				name: 'Custom Data Enrichment',
+				position: { type: 'after', stepId: 'generate-items' },
+				parallelizable: false,
+				estimatedDuration: 30,
+				dependencies: [{ stepId: 'generate-items', required: true }]
+			},
+			{
+				id: 'replace-taxonomy',
+				name: 'Enhanced Taxonomy',
+				position: { type: 'replace', stepId: 'generate-taxonomy' },
+				parallelizable: true
+			}
+		];
+	}
 
-    async execute(context, options): Promise<void> {
-        const stepId = options.settings?.stepId;
-        if (stepId === 'custom-enrichment') {
-            // Custom enrichment logic
-        }
-    }
+	async execute(context, options): Promise<void> {
+		const stepId = options.settings?.stepId;
+		if (stepId === 'custom-enrichment') {
+			// Custom enrichment logic
+		}
+	}
 }
 ```
 
@@ -290,32 +300,26 @@ export default class MyModifierPlugin implements IPipelineModifierPlugin {
 
 ```typescript
 const result = await this.orchestrator.execute(
-    directory,
-    request,
-    existingItems,
-    {
-        skipSteps: ['generate-screenshots'],
-        continueOnError: true,
-        stepSettings: {
-            'generate-items': { maxItems: 50 },
-        },
-    },
-    (progress) => {
-        console.log(`${progress.percent}%: ${progress.currentStepName}`);
-    },
+	directory,
+	request,
+	existingItems,
+	{
+		skipSteps: ['generate-screenshots'],
+		continueOnError: true,
+		stepSettings: {
+			'generate-items': { maxItems: 50 }
+		}
+	},
+	(progress) => {
+		console.log(`${progress.percent}%: ${progress.currentStepName}`);
+	}
 );
 ```
 
 ### Resuming from Checkpoint
 
 ```typescript
-const result = await this.orchestrator.resumeOrExecute(
-    directory,
-    request,
-    existing,
-    options,
-    onProgress,
-);
+const result = await this.orchestrator.resumeOrExecute(directory, request, existing, options, onProgress);
 // Automatically resumes from last checkpoint if available,
 // otherwise runs a fresh execution
 ```

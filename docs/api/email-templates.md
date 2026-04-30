@@ -23,26 +23,26 @@ All templates share a consistent design system with a branded header, main conte
 
 ## Template Inventory
 
-| Template File | Event Class | Event Name | Trigger |
-|---|---|---|---|
-| `signup-confirmation.hbs` | `UserCreatedEvent` | `user.created` | User registers a new account |
-| `forgot-password.hbs` | `UserForgotPasswordEvent` | `user.forgot_password` | User requests password reset |
-| `password-changed.hbs` | `UserPasswordChangedEvent` | `user.password_changed` | User successfully changes password |
-| `welcome.hbs` | `UserConfirmedEvent` | `user.confirmed` | User confirms email address |
-| `new-device-login.hbs` | `UserNewDeviceLoginEvent` | `user.new_device_login` | Login detected from new device |
-| `account-deletion.hbs` | `UserAccountDeletionEvent` | `user.delete_account` | User requests account deletion |
-| `member-invitation.hbs` | `MemberInvitedEvent` | `directory.member_invited` | User is invited to a directory |
+| Template File             | Event Class                | Event Name                 | Trigger                            |
+| ------------------------- | -------------------------- | -------------------------- | ---------------------------------- |
+| `signup-confirmation.hbs` | `UserCreatedEvent`         | `user.created`             | User registers a new account       |
+| `forgot-password.hbs`     | `UserForgotPasswordEvent`  | `user.forgot_password`     | User requests password reset       |
+| `password-changed.hbs`    | `UserPasswordChangedEvent` | `user.password_changed`    | User successfully changes password |
+| `welcome.hbs`             | `UserConfirmedEvent`       | `user.confirmed`           | User confirms email address        |
+| `new-device-login.hbs`    | `UserNewDeviceLoginEvent`  | `user.new_device_login`    | Login detected from new device     |
+| `account-deletion.hbs`    | `UserAccountDeletionEvent` | `user.delete_account`      | User requests account deletion     |
+| `member-invitation.hbs`   | `MemberInvitedEvent`       | `directory.member_invited` | User is invited to a directory     |
 
 ## Global Context Variables
 
 Every template receives these branding variables from the `getBrandingContext()` helper in `MailService`:
 
-| Variable | Type | Description |
-|---|---|---|
-| `appName` | `string` | Application name (e.g., "Ever Works") |
-| `companyOwner` | `string` | Company name for copyright |
-| `platformWebsite` | `string` | Platform marketing website URL |
-| `currentYear` | `number` | Current year for copyright notice |
+| Variable          | Type     | Description                           |
+| ----------------- | -------- | ------------------------------------- |
+| `appName`         | `string` | Application name (e.g., "Ever Works") |
+| `companyOwner`    | `string` | Company name for copyright            |
+| `platformWebsite` | `string` | Platform marketing website URL        |
+| `currentYear`     | `number` | Current year for copyright notice     |
 
 ## Template Details
 
@@ -52,20 +52,21 @@ Sent when a new user registers. Contains an email verification link.
 
 **Context Variables:**
 
-| Variable | Type | Description |
-|---|---|---|
-| `firstName` | `string` | User's display name |
-| `confirmationUrl` | `string` | Email confirmation link |
+| Variable            | Type     | Description              |
+| ------------------- | -------- | ------------------------ |
+| `firstName`         | `string` | User's display name      |
+| `confirmationUrl`   | `string` | Email confirmation link  |
 | `confirmationToken` | `string` | Confirmation token value |
 
 **Handlebars Usage:**
 
 ```handlebars
-<h2 class="title">
-    Welcome to {{appName}}{{#if firstName}}, {{firstName}}{{/if}}
+<h2 class='title'>
+	Welcome to
+	{{appName}}{{#if firstName}}, {{firstName}}{{/if}}
 </h2>
-<a href="{{confirmationUrl}}" class="button">
-    Confirm Email Address
+<a href='{{confirmationUrl}}' class='button'>
+	Confirm Email Address
 </a>
 ```
 
@@ -77,18 +78,20 @@ Sent when a user requests a password reset. Contains a time-limited reset link.
 
 **Context Variables:**
 
-| Variable | Type | Description |
-|---|---|---|
-| `firstName` | `string` | User's display name |
-| `resetUrl` | `string` | Password reset link |
-| `resetToken` | `string` | Reset token value |
-| `expiresIn` | `string` | Expiry duration (e.g., "1 hour") |
+| Variable     | Type     | Description                      |
+| ------------ | -------- | -------------------------------- |
+| `firstName`  | `string` | User's display name              |
+| `resetUrl`   | `string` | Password reset link              |
+| `resetToken` | `string` | Reset token value                |
+| `expiresIn`  | `string` | Expiry duration (e.g., "1 hour") |
 
 **Handlebars Usage:**
 
 ```handlebars
 {{#if firstName}}Hi {{firstName}}, we{{else}}We{{/if}}
-received a request to reset the password for your {{appName}} account.
+received a request to reset the password for your
+{{appName}}
+account.
 ```
 
 ### 3. Password Changed (`password-changed.hbs`)
@@ -97,23 +100,23 @@ Security notification sent after a successful password change. Includes device a
 
 **Context Variables:**
 
-| Variable | Type | Description |
-|---|---|---|
-| `firstName` | `string` | User's display name |
-| `changedAt` | `string` | Formatted date/time of change |
-| `ipAddress` | `string` | IP address of the requester |
-| `location` | `string` | Geographic location |
-| `device` | `string` | Device description |
-| `browser` | `string` (optional) | Browser name |
-| `secureAccountUrl` | `string` | Link to secure the account |
+| Variable           | Type                | Description                   |
+| ------------------ | ------------------- | ----------------------------- |
+| `firstName`        | `string`            | User's display name           |
+| `changedAt`        | `string`            | Formatted date/time of change |
+| `ipAddress`        | `string`            | IP address of the requester   |
+| `location`         | `string`            | Geographic location           |
+| `device`           | `string`            | Device description            |
+| `browser`          | `string` (optional) | Browser name                  |
+| `secureAccountUrl` | `string`            | Link to secure the account    |
 
 **Conditional Rendering:**
 
 ```handlebars
 <strong>Device:</strong>
-{{device}}{{#if browser}}<br>
-<strong>Browser:</strong>
-{{browser}}{{/if}}
+{{device}}{{#if browser}}<br />
+	<strong>Browser:</strong>
+	{{browser}}{{/if}}
 ```
 
 ### 4. Welcome (`welcome.hbs`)
@@ -122,12 +125,13 @@ Sent after a user confirms their email. Includes onboarding steps and a CTA to t
 
 **Context Variables:**
 
-| Variable | Type | Description |
-|---|---|---|
-| `firstName` | `string` | User's display name |
+| Variable       | Type     | Description                    |
+| -------------- | -------- | ------------------------------ |
+| `firstName`    | `string` | User's display name            |
 | `dashboardUrl` | `string` | Link to create first directory |
 
 The template displays a three-step getting-started guide:
+
 1. Create your first directory
 2. Generate with AI
 3. Deploy your directory
@@ -138,16 +142,16 @@ Security alert sent when a login is detected from a previously unseen device.
 
 **Context Variables:**
 
-| Variable | Type | Description |
-|---|---|---|
-| `firstName` | `string` | User's display name |
-| `loginTime` | `string` | Formatted login timestamp |
-| `device` | `string` | Device name/type |
-| `browser` | `string` | Browser name |
-| `location` | `string` | Geographic location |
-| `ipAddress` | `string` | IP address |
-| `verifyUrl` | `string` | "Yes, this was me" link |
-| `verifyToken` | `string` | Verification token |
+| Variable           | Type     | Description                  |
+| ------------------ | -------- | ---------------------------- |
+| `firstName`        | `string` | User's display name          |
+| `loginTime`        | `string` | Formatted login timestamp    |
+| `device`           | `string` | Device name/type             |
+| `browser`          | `string` | Browser name                 |
+| `location`         | `string` | Geographic location          |
+| `ipAddress`        | `string` | IP address                   |
+| `verifyUrl`        | `string` | "Yes, this was me" link      |
+| `verifyToken`      | `string` | Verification token           |
 | `secureAccountUrl` | `string` | "No, secure my account" link |
 
 This template uses two CTA buttons: a primary "Yes, this was me" button and a danger-styled "No, secure my account" button.
@@ -158,15 +162,16 @@ Sent when a user requests account deletion. Requires explicit confirmation befor
 
 **Context Variables:**
 
-| Variable | Type | Description |
-|---|---|---|
-| `firstName` | `string` | User's display name |
-| `deleteUrl` | `string` | Confirm deletion link |
-| `deleteToken` | `string` | Deletion confirmation token |
-| `keepAccountUrl` | `string` | Cancel deletion link |
-| `expiresIn` | `string` | Expiry duration (e.g., "24 hours") |
+| Variable         | Type     | Description                        |
+| ---------------- | -------- | ---------------------------------- |
+| `firstName`      | `string` | User's display name                |
+| `deleteUrl`      | `string` | Confirm deletion link              |
+| `deleteToken`    | `string` | Deletion confirmation token        |
+| `keepAccountUrl` | `string` | Cancel deletion link               |
+| `expiresIn`      | `string` | Expiry duration (e.g., "24 hours") |
 
 The template includes a prominent warning box listing what will be permanently deleted:
+
 - All projects and data
 - Profile and settings
 - Access to platform services
@@ -177,13 +182,13 @@ Sent when a user is invited to collaborate on a directory.
 
 **Context Variables:**
 
-| Variable | Type | Description |
-|---|---|---|
-| `inviteeName` | `string` | Invited user's name |
-| `inviterName` | `string` | Name of the person inviting |
-| `directoryName` | `string` | Name of the directory |
-| `roleName` | `string` | Assigned role (formatted) |
-| `directoryUrl` | `string` | Link to the directory |
+| Variable        | Type     | Description                 |
+| --------------- | -------- | --------------------------- |
+| `inviteeName`   | `string` | Invited user's name         |
+| `inviterName`   | `string` | Name of the person inviting |
+| `directoryName` | `string` | Name of the directory       |
+| `roleName`      | `string` | Assigned role (formatted)   |
+| `directoryUrl`  | `string` | Link to the directory       |
 
 The template displays an info box with a table layout showing directory name, assigned role (with a styled badge), and inviter name.
 
@@ -251,18 +256,18 @@ async sendCustomEmail(data: MyCustomEvent): Promise<void> {
 
 Templates are rendered and sent through the `MailerService`, which supports:
 
-| Provider | Environment Variables |
-|---|---|
-| SMTP | `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, `SMTP_PASSWORD` |
-| Resend | `RESEND_APIKEY`, `RESEND_EMAIL_FROM` |
+| Provider | Environment Variables                                                 |
+| -------- | --------------------------------------------------------------------- |
+| SMTP     | `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, `SMTP_PASSWORD` |
+| Resend   | `RESEND_APIKEY`, `RESEND_EMAIL_FROM`                                  |
 
 The active provider is selected via `MAILER_PROVIDER` and the sender address via `EMAIL_FROM`.
 
 ## Source Files
 
-| File | Purpose |
-|---|---|
-| `apps/api/src/templates/*.hbs` | Handlebars email templates |
-| `apps/api/src/mail/mail.service.ts` | Event listeners and template rendering |
-| `apps/api/src/events/index.ts` | Event class definitions |
-| `apps/api/src/mail/providers/mailer.service.ts` | Mail transport abstraction |
+| File                                            | Purpose                                |
+| ----------------------------------------------- | -------------------------------------- |
+| `apps/api/src/templates/*.hbs`                  | Handlebars email templates             |
+| `apps/api/src/mail/mail.service.ts`             | Event listeners and template rendering |
+| `apps/api/src/events/index.ts`                  | Event class definitions                |
+| `apps/api/src/mail/providers/mailer.service.ts` | Mail transport abstraction             |

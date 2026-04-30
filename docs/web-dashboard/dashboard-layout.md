@@ -39,12 +39,12 @@ Sidebar width and collapsed state are persisted in `localStorage` via the `useSi
 
 **File:** `apps/web/src/components/dashboard/DashboardHeader.tsx`
 
-| Prop | Type | Description |
-|------|------|-------------|
-| `user` | `AuthUser` | Authenticated user object passed to child components |
-| `onMenuClick` | `() => void` | Callback to toggle the mobile sidebar |
-| `isSidebarOpen` | `boolean` (optional) | Whether the sidebar is currently open |
-| `onHelpClick` | `() => void` (optional) | Callback to open the help drawer |
+| Prop            | Type                    | Description                                          |
+| --------------- | ----------------------- | ---------------------------------------------------- |
+| `user`          | `AuthUser`              | Authenticated user object passed to child components |
+| `onMenuClick`   | `() => void`            | Callback to toggle the mobile sidebar                |
+| `isSidebarOpen` | `boolean` (optional)    | Whether the sidebar is currently open                |
+| `onHelpClick`   | `() => void` (optional) | Callback to open the help drawer                     |
 
 The header renders a fixed top bar containing:
 
@@ -55,9 +55,9 @@ The header renders a fixed top bar containing:
 
 ```tsx
 <DashboardHeader
-    user={currentUser}
-    onMenuClick={() => setMobileOpen(!mobileOpen)}
-    onHelpClick={() => setHelpOpen(true)}
+	user={currentUser}
+	onMenuClick={() => setMobileOpen(!mobileOpen)}
+	onHelpClick={() => setHelpOpen(true)}
 />
 ```
 
@@ -65,15 +65,15 @@ The header renders a fixed top bar containing:
 
 **File:** `apps/web/src/components/dashboard/DashboardSidebar.tsx`
 
-| Prop | Type | Description |
-|------|------|-------------|
-| `user` | `AuthUser` | Authenticated user object |
-| `isOpen` | `boolean` | Whether the sidebar is visible |
-| `onToggle` | `() => void` | Callback to toggle sidebar visibility |
-| `width` | `number` (optional) | Current sidebar width in pixels (default 320) |
-| `onWidthChange` | `(width: number) => void` (optional) | Callback when sidebar is resized by dragging |
-| `isCollapsed` | `boolean` (optional) | Whether the sidebar is in collapsed mode |
-| `onCollapsedChange` | `(collapsed: boolean) => void` (optional) | Callback when collapse state changes |
+| Prop                | Type                                      | Description                                   |
+| ------------------- | ----------------------------------------- | --------------------------------------------- |
+| `user`              | `AuthUser`                                | Authenticated user object                     |
+| `isOpen`            | `boolean`                                 | Whether the sidebar is visible                |
+| `onToggle`          | `() => void`                              | Callback to toggle sidebar visibility         |
+| `width`             | `number` (optional)                       | Current sidebar width in pixels (default 320) |
+| `onWidthChange`     | `(width: number) => void` (optional)      | Callback when sidebar is resized by dragging  |
+| `isCollapsed`       | `boolean` (optional)                      | Whether the sidebar is in collapsed mode      |
+| `onCollapsedChange` | `(collapsed: boolean) => void` (optional) | Callback when collapse state changes          |
 
 The sidebar is the most complex layout component. It supports two modes toggled by a button at the top:
 
@@ -88,13 +88,13 @@ The sidebar is the most complex layout component. It supports two modes toggled 
 
 ```tsx
 <DashboardSidebar
-    user={currentUser}
-    isOpen={sidebarOpen}
-    onToggle={() => setSidebarOpen(!sidebarOpen)}
-    width={sidebarWidth}
-    onWidthChange={handleSidebarWidthChange}
-    isCollapsed={sidebarCollapsed}
-    onCollapsedChange={handleSidebarCollapsedChange}
+	user={currentUser}
+	isOpen={sidebarOpen}
+	onToggle={() => setSidebarOpen(!sidebarOpen)}
+	width={sidebarWidth}
+	onWidthChange={handleSidebarWidthChange}
+	isCollapsed={sidebarCollapsed}
+	onCollapsedChange={handleSidebarCollapsedChange}
 />
 ```
 
@@ -102,10 +102,10 @@ The sidebar is the most complex layout component. It supports two modes toggled 
 
 **File:** `apps/web/src/components/dashboard/HelpDrawer.tsx`
 
-| Prop | Type | Description |
-|------|------|-------------|
-| `open` | `boolean` | Whether the drawer is visible |
-| `onClose` | `() => void` | Callback to close the drawer |
+| Prop      | Type         | Description                   |
+| --------- | ------------ | ----------------------------- |
+| `open`    | `boolean`    | Whether the drawer is visible |
+| `onClose` | `() => void` | Callback to close the drawer  |
 
 A slide-over panel built on HeadlessUI `Dialog` and `Transition`. It slides in from the right edge and contains three sections:
 
@@ -135,8 +135,8 @@ Each notification displays an icon based on its type, a title, a message body, a
 
 **File:** `apps/web/src/components/dashboard/StatsOverview.tsx`
 
-| Prop | Type | Description |
-|------|------|-------------|
+| Prop               | Type                | Description                      |
+| ------------------ | ------------------- | -------------------------------- |
 | `totalDirectories` | `number` (optional) | Number of directories to display |
 
 Renders a grid of three stat cards: Total Directories, Total Items, and Active Websites. Each card has a custom SVG icon, a decorative gradient background circle, and displays its count with a muted subtitle. The `totalItems` and `activeWebsites` values are currently computed as multiples of `totalDirectories`.
@@ -180,9 +180,9 @@ The sidebar implements drag-to-resize via pointer events:
 
 ```tsx
 useEffect(() => {
-    fetchUnreadCount();
-    const interval = setInterval(fetchUnreadCount, 30000);
-    return () => clearInterval(interval);
+	fetchUnreadCount();
+	const interval = setInterval(fetchUnreadCount, 30000);
+	return () => clearInterval(interval);
 }, []);
 ```
 
@@ -196,14 +196,14 @@ All user-facing strings use `useTranslations` from `next-intl`. Translation keys
 
 All components use Tailwind CSS 4 with the project's custom design tokens:
 
-| Token Pattern | Purpose |
-|---------------|---------|
-| `bg-surface` / `bg-surface-dark` | Primary background surfaces |
+| Token Pattern                                        | Purpose                     |
+| ---------------------------------------------------- | --------------------------- |
+| `bg-surface` / `bg-surface-dark`                     | Primary background surfaces |
 | `bg-surface-secondary` / `bg-surface-secondary-dark` | Secondary/muted backgrounds |
-| `text-text` / `text-text-dark` | Primary text color |
-| `text-text-muted` / `text-text-muted-dark` | Secondary/muted text |
-| `border-border` / `border-border-dark` | Border colors |
-| `text-primary` / `bg-primary` | Brand/accent color |
+| `text-text` / `text-text-dark`                       | Primary text color          |
+| `text-text-muted` / `text-text-muted-dark`           | Secondary/muted text        |
+| `border-border` / `border-border-dark`               | Border colors               |
+| `text-primary` / `bg-primary`                        | Brand/accent color          |
 
 Dark mode is handled via the `dark:` variant prefix. The `cn()` utility from `@/lib/utils` (wrapping `clsx` + `tailwind-merge`) is used throughout for conditional class composition.
 
@@ -223,37 +223,31 @@ import { HelpDrawer } from '@/components/dashboard/HelpDrawer';
 import { useSidebarPersistence } from '@/lib/hooks/use-sidebar-persistence';
 
 export function DashboardLayout({ user, children }) {
-    const [mobileOpen, setMobileOpen] = useState(false);
-    const [helpOpen, setHelpOpen] = useState(false);
-    const {
-        sidebarWidth,
-        sidebarCollapsed,
-        handleSidebarWidthChange,
-        handleSidebarCollapsedChange,
-    } = useSidebarPersistence();
+	const [mobileOpen, setMobileOpen] = useState(false);
+	const [helpOpen, setHelpOpen] = useState(false);
+	const { sidebarWidth, sidebarCollapsed, handleSidebarWidthChange, handleSidebarCollapsedChange } =
+		useSidebarPersistence();
 
-    return (
-        <div className="min-h-screen bg-surface dark:bg-surface-dark">
-            <DashboardHeader
-                user={user}
-                onMenuClick={() => setMobileOpen(!mobileOpen)}
-                onHelpClick={() => setHelpOpen(true)}
-            />
-            <DashboardSidebar
-                user={user}
-                isOpen={mobileOpen}
-                onToggle={() => setMobileOpen(false)}
-                width={sidebarWidth}
-                onWidthChange={handleSidebarWidthChange}
-                isCollapsed={sidebarCollapsed}
-                onCollapsedChange={handleSidebarCollapsedChange}
-            />
-            <main className="transition-all duration-300">
-                {children}
-            </main>
-            <HelpDrawer open={helpOpen} onClose={() => setHelpOpen(false)} />
-        </div>
-    );
+	return (
+		<div className="min-h-screen bg-surface dark:bg-surface-dark">
+			<DashboardHeader
+				user={user}
+				onMenuClick={() => setMobileOpen(!mobileOpen)}
+				onHelpClick={() => setHelpOpen(true)}
+			/>
+			<DashboardSidebar
+				user={user}
+				isOpen={mobileOpen}
+				onToggle={() => setMobileOpen(false)}
+				width={sidebarWidth}
+				onWidthChange={handleSidebarWidthChange}
+				isCollapsed={sidebarCollapsed}
+				onCollapsedChange={handleSidebarCollapsedChange}
+			/>
+			<main className="transition-all duration-300">{children}</main>
+			<HelpDrawer open={helpOpen} onClose={() => setHelpOpen(false)} />
+		</div>
+	);
 }
 ```
 

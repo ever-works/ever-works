@@ -1,7 +1,7 @@
 ---
 id: error-recovery
-title: "Error Recovery & Resilience"
-sidebar_label: "Error Recovery"
+title: 'Error Recovery & Resilience'
+sidebar_label: 'Error Recovery'
 sidebar_position: 7
 ---
 
@@ -10,6 +10,7 @@ sidebar_position: 7
 Ever Works implements multiple layers of error recovery to handle failures gracefully during pipeline execution, AI tool calling, and directory generation. The platform distinguishes between recoverable and non-recoverable errors, uses checkpoint-based resumption, and provides targeted user notifications based on error classification.
 
 **Key sources:**
+
 - `packages/plugins/agent-pipeline/src/utils/tool-call-resilience.ts` -- Tool call retry and repair
 - `packages/agent/src/pipeline/step-pipeline-executor.service.ts` -- Pipeline step failure handling
 - `packages/agent/src/pipeline/pipeline-orchestrator.service.ts` -- Checkpoint resume orchestration
@@ -53,26 +54,26 @@ The `isToolCallingError()` function identifies tool-calling errors by checking f
 
 ```typescript
 const TOOL_ERROR_PATTERNS = [
-    'parsing failed',
-    'failed to parse',
-    'tool call validation',
-    'not in request.tools',
-    'tool_use_failed',
-    'invalid_tool_call',
-    'failed to call a function',
-    'failed_generation'
+	'parsing failed',
+	'failed to parse',
+	'tool call validation',
+	'not in request.tools',
+	'tool_use_failed',
+	'invalid_tool_call',
+	'failed to call a function',
+	'failed_generation'
 ];
 
 function isToolCallingError(error: unknown): boolean {
-    if (NoSuchToolError.isInstance(error)) return true;
-    if (InvalidToolInputError.isInstance(error)) return true;
+	if (NoSuchToolError.isInstance(error)) return true;
+	if (InvalidToolInputError.isInstance(error)) return true;
 
-    if (error instanceof Error) {
-        const msg = error.message.toLowerCase();
-        return TOOL_ERROR_PATTERNS.some((p) => msg.includes(p));
-    }
+	if (error instanceof Error) {
+		const msg = error.message.toLowerCase();
+		return TOOL_ERROR_PATTERNS.some((p) => msg.includes(p));
+	}
 
-    return false;
+	return false;
 }
 ```
 
@@ -105,11 +106,11 @@ sequenceDiagram
     end
 ```
 
-| Setting | Value | Description |
-|---|---|---|
-| Max Retries | 2 | Up to 3 total attempts |
-| Backoff Schedule | `[1000, 3000]` ms | 1 second, then 3 seconds |
-| Non-retryable | Abort signals, non-tool errors | Thrown immediately |
+| Setting          | Value                          | Description              |
+| ---------------- | ------------------------------ | ------------------------ |
+| Max Retries      | 2                              | Up to 3 total attempts   |
+| Backoff Schedule | `[1000, 3000]` ms              | 1 second, then 3 seconds |
+| Non-retryable    | Abort signals, non-tool errors | Thrown immediately       |
 
 ### Tool Call Repair
 
@@ -119,10 +120,10 @@ The `createToolCallRepairFn()` function creates a callback for the Vercel AI SDK
 const repairFn = createToolCallRepairFn(model, logger);
 
 const result = await generateText({
-    model,
-    tools,
-    experimental_repairToolCall: repairFn,
-    // ...
+	model,
+	tools,
+	experimental_repairToolCall: repairFn
+	// ...
 });
 ```
 
@@ -144,7 +145,7 @@ Steps marked as `optional: true` in their definition do not halt the pipeline wh
 
 ```typescript
 if (!options?.continueOnError && !step.optional) {
-    throw err; // Re-throw: halts pipeline
+	throw err; // Re-throw: halts pipeline
 }
 
 // Optional step or continueOnError: log and continue
@@ -157,7 +158,7 @@ The `continueOnError` execution option forces the pipeline to continue past any 
 
 ```typescript
 const result = await orchestrator.execute(directory, request, existing, {
-    continueOnError: true
+	continueOnError: true
 });
 ```
 
@@ -176,11 +177,11 @@ graph TD
     F -->|No| H[Execute Step]
 ```
 
-| Skip Method | Source | Use Case |
-|---|---|---|
-| `skipSteps` | Execution options | Resume from checkpoint (skip completed steps) |
-| `onlySteps` | Execution options | Run specific steps only |
-| `canSkipStep()` | Pipeline plugin | Skip when data is already available |
+| Skip Method     | Source            | Use Case                                      |
+| --------------- | ----------------- | --------------------------------------------- |
+| `skipSteps`     | Execution options | Resume from checkpoint (skip completed steps) |
+| `onlySteps`     | Execution options | Run specific steps only                       |
+| `canSkipStep()` | Pipeline plugin   | Skip when data is already available           |
 
 ### Step Failure Events
 
@@ -189,13 +190,13 @@ Every step failure emits a `pipeline:step-failed` event with a `recoverable` fla
 ```typescript
 // PipelineStepFailedPayload
 {
-    stepId: string;
-    stepName: string;
-    stepIndex: number;
-    totalSteps: number;
-    error: string;
-    recoverable: boolean;  // true if step is optional
-    timestamp: string;
+	stepId: string;
+	stepName: string;
+	stepIndex: number;
+	totalSteps: number;
+	error: string;
+	recoverable: boolean; // true if step is optional
+	timestamp: string;
 }
 ```
 
@@ -209,9 +210,9 @@ After each successful step, a checkpoint is saved to the cache:
 
 ```typescript
 await this.cacheManager.set(
-    `pipeline-checkpoint-${directoryId}-${pipelineId}`,
-    superjson.stringify(checkpointData),
-    CHECKPOINT_TTL_MS  // 24 hours
+	`pipeline-checkpoint-${directoryId}-${pipelineId}`,
+	superjson.stringify(checkpointData),
+	CHECKPOINT_TTL_MS // 24 hours
 );
 ```
 
@@ -266,12 +267,12 @@ async resumeOrExecute(directory, request, existing, options): Promise<PipelineRe
 
 The pipeline plugin decides whether a checkpoint is still usable:
 
-| Check | Purpose |
-|---|---|
-| Schema version match | Ensures checkpoint format is compatible |
-| `isCheckpointViable()` | Plugin-specific validation (e.g., source data changed) |
-| `contextFromSnapshot()` | Plugin must implement this to restore context |
-| TTL (24 hours) | Stale checkpoints are automatically expired |
+| Check                   | Purpose                                                |
+| ----------------------- | ------------------------------------------------------ |
+| Schema version match    | Ensures checkpoint format is compatible                |
+| `isCheckpointViable()`  | Plugin-specific validation (e.g., source data changed) |
+| `contextFromSnapshot()` | Plugin must implement this to restore context          |
+| TTL (24 hours)          | Stale checkpoints are automatically expired            |
 
 ## Error Classification
 
@@ -293,17 +294,17 @@ graph TD
 
 The error classifier automatically detects which AI or Git provider caused the error:
 
-| Pattern | Detected Provider |
-|---|---|
-| `openai` | OpenAI |
-| `anthropic`, `claude` | Anthropic |
-| `google`, `gemini` | Google |
-| `groq` | Groq |
-| `ollama` | Ollama |
-| `openrouter` | OpenRouter |
-| `github` | GitHub |
-| `gitlab` | GitLab |
-| `bitbucket` | Bitbucket |
+| Pattern               | Detected Provider |
+| --------------------- | ----------------- |
+| `openai`              | OpenAI            |
+| `anthropic`, `claude` | Anthropic         |
+| `google`, `gemini`    | Google            |
+| `groq`                | Groq              |
+| `ollama`              | Ollama            |
+| `openrouter`          | OpenRouter        |
+| `github`              | GitHub            |
+| `gitlab`              | GitLab            |
+| `bitbucket`           | Bitbucket         |
 
 ### Notification Routing
 
@@ -311,21 +312,19 @@ Each classification maps to a specific notification method:
 
 ```typescript
 switch (classification.type) {
-    case 'ai_credits':
-        await notificationService.notifyAiCreditsDepleted(userId, provider, message);
-        break;
-    case 'ai_provider':
-        await notificationService.notifyAiProviderError(userId, provider, message);
-        break;
-    case 'git_auth':
-        await notificationService.notifyGitAuthExpired(userId, provider);
-        break;
-    case 'account_level':
-        await notificationService.notifyGenerationAccountError(
-            userId, directoryId, directoryName, message
-        );
-        break;
-    // 'unknown': no notification sent
+	case 'ai_credits':
+		await notificationService.notifyAiCreditsDepleted(userId, provider, message);
+		break;
+	case 'ai_provider':
+		await notificationService.notifyAiProviderError(userId, provider, message);
+		break;
+	case 'git_auth':
+		await notificationService.notifyGitAuthExpired(userId, provider);
+		break;
+	case 'account_level':
+		await notificationService.notifyGenerationAccountError(userId, directoryId, directoryName, message);
+		break;
+	// 'unknown': no notification sent
 }
 ```
 

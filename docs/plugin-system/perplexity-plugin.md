@@ -1,7 +1,7 @@
 ---
 id: perplexity-plugin
-title: "Perplexity Plugin"
-sidebar_label: "Perplexity"
+title: 'Perplexity Plugin'
+sidebar_label: 'Perplexity'
 sidebar_position: 29
 ---
 
@@ -13,17 +13,17 @@ The Perplexity plugin provides AI-powered web search with citations using the Pe
 
 ## Overview
 
-| Property | Value |
-|---|---|
-| Plugin ID | `perplexity` |
-| Package | `@ever-works/perplexity-plugin` |
-| Category | `search` |
-| Capabilities | `search` |
-| Version | `1.0.0` |
-| Configuration Mode | `hybrid` |
-| Auto-enable | No |
-| Built-in | Yes |
-| System Plugin | No |
+| Property           | Value                           |
+| ------------------ | ------------------------------- |
+| Plugin ID          | `perplexity`                    |
+| Package            | `@ever-works/perplexity-plugin` |
+| Category           | `search`                        |
+| Capabilities       | `search`                        |
+| Version            | `1.0.0`                         |
+| Configuration Mode | `hybrid`                        |
+| Auto-enable        | No                              |
+| Built-in           | Yes                             |
+| System Plugin      | No                              |
 
 The plugin implements both `IPlugin` and `ISearchPlugin` interfaces. It uses the official `@perplexity-ai/perplexity_ai` SDK to communicate with the Perplexity API.
 
@@ -42,14 +42,14 @@ graph TD
 
 ### Settings Schema
 
-| Setting | Type | Required | Scope | Description |
-|---|---|---|---|---|
-| `apiKey` | `string` | Yes | `user` | Perplexity API key. Secret. Env: `PLUGIN_PERPLEXITY_API_KEY` |
+| Setting  | Type     | Required | Scope  | Description                                                  |
+| -------- | -------- | -------- | ------ | ------------------------------------------------------------ |
+| `apiKey` | `string` | Yes      | `user` | Perplexity API key. Secret. Env: `PLUGIN_PERPLEXITY_API_KEY` |
 
 ### Environment Variables
 
-| Variable | Description |
-|---|---|
+| Variable                    | Description                                                         |
+| --------------------------- | ------------------------------------------------------------------- |
 | `PLUGIN_PERPLEXITY_API_KEY` | Perplexity API key (optional -- can be set via admin/user settings) |
 
 ## Search Capabilities
@@ -58,13 +58,13 @@ graph TD
 
 The `search()` method accepts the following options:
 
-| Option | Type | Description |
-|---|---|---|
-| `query` | `string` | Natural language search query |
-| `limit` | `number` | Maximum number of results (mapped to `max_results`) |
-| `includeDomains` | `string[]` | Only include results from these domains |
-| `excludeDomains` | `string[]` | Exclude results from these domains (prefixed with `-`) |
-| `timeRange` | `string` | Recency filter: `day`, `week`, `month`, `year`, or `all` |
+| Option           | Type       | Description                                              |
+| ---------------- | ---------- | -------------------------------------------------------- |
+| `query`          | `string`   | Natural language search query                            |
+| `limit`          | `number`   | Maximum number of results (mapped to `max_results`)      |
+| `includeDomains` | `string[]` | Only include results from these domains                  |
+| `excludeDomains` | `string[]` | Exclude results from these domains (prefixed with `-`)   |
+| `timeRange`      | `string`   | Recency filter: `day`, `week`, `month`, `year`, or `all` |
 
 ### Domain Filtering
 
@@ -73,12 +73,12 @@ Perplexity supports both include and exclude domain filtering through the `searc
 ```typescript
 // Include domains: passed directly
 if (options.includeDomains && options.includeDomains.length > 0) {
-    searchParams.search_domain_filter = [...options.includeDomains];
+	searchParams.search_domain_filter = [...options.includeDomains];
 }
 
 // Exclude domains: prefixed with '-'
 else if (options.excludeDomains && options.excludeDomains.length > 0) {
-    searchParams.search_domain_filter = options.excludeDomains.map((d) => `-${d}`);
+	searchParams.search_domain_filter = options.excludeDomains.map((d) => `-${d}`);
 }
 ```
 
@@ -89,12 +89,12 @@ Note that include and exclude filters are mutually exclusive -- if `includeDomai
 The plugin maps time range values to Perplexity's `search_recency_filter`:
 
 | Time Range | Perplexity Filter |
-|---|---|
-| `day` | `day` |
-| `week` | `week` |
-| `month` | `month` |
-| `year` | `year` |
-| `all` | Not applied |
+| ---------- | ----------------- |
+| `day`      | `day`             |
+| `week`     | `week`            |
+| `month`    | `month`           |
+| `year`     | `year`            |
+| `all`      | Not applied       |
 
 ### Search Response
 
@@ -102,11 +102,11 @@ Each search result includes:
 
 ```typescript
 interface SearchResult {
-    title: string;      // Result title
-    url: string;        // Full URL
-    snippet: string;    // AI-generated snippet
-    position: number;   // Result position (1-based)
-    source?: string;    // Hostname extracted from URL
+	title: string; // Result title
+	url: string; // Full URL
+	snippet: string; // AI-generated snippet
+	position: number; // Result position (1-based)
+	source?: string; // Hostname extracted from URL
 }
 ```
 
@@ -114,11 +114,11 @@ The overall response includes timing information:
 
 ```typescript
 interface SearchResponse {
-    results: SearchResult[];
-    query: string;
-    totalResults: number;
-    hasMore: false;         // Perplexity returns all results in one call
-    duration: number;       // Execution time in ms
+	results: SearchResult[];
+	query: string;
+	totalResults: number;
+	hasMore: false; // Perplexity returns all results in one call
+	duration: number; // Execution time in ms
 }
 ```
 
@@ -126,17 +126,17 @@ interface SearchResponse {
 
 ```typescript
 const results = await perplexityPlugin.search({
-    query: 'best Italian restaurants in San Francisco',
-    limit: 10,
-    includeDomains: ['yelp.com', 'tripadvisor.com'],
-    timeRange: 'month',
-    settings: { apiKey: 'pplx-...' }
+	query: 'best Italian restaurants in San Francisco',
+	limit: 10,
+	includeDomains: ['yelp.com', 'tripadvisor.com'],
+	timeRange: 'month',
+	settings: { apiKey: 'pplx-...' }
 });
 
 for (const result of results.results) {
-    console.log(`${result.position}. ${result.title}`);
-    console.log(`   ${result.url}`);
-    console.log(`   ${result.snippet}`);
+	console.log(`${result.position}. ${result.title}`);
+	console.log(`   ${result.url}`);
+	console.log(`   ${result.snippet}`);
 }
 ```
 
@@ -196,10 +196,10 @@ Note that the plugin creates a new `Perplexity` client instance for each search 
 
 ## Dependencies
 
-| Package | Version | Purpose |
-|---|---|---|
-| `@perplexity-ai/perplexity_ai` | ^0.25.0 | Official Perplexity SDK |
-| `@ever-works/plugin` | workspace | Plugin contracts (peer dependency) |
+| Package                        | Version   | Purpose                            |
+| ------------------------------ | --------- | ---------------------------------- |
+| `@perplexity-ai/perplexity_ai` | ^0.25.0   | Official Perplexity SDK            |
+| `@ever-works/plugin`           | workspace | Plugin contracts (peer dependency) |
 
 ## How It Works in Ever Works
 

@@ -48,17 +48,17 @@ flowchart TD
 
 ## Source Files
 
-| File | Purpose |
-|------|---------|
-| `apps/api/src/main.ts` | Application bootstrap: Helmet, CORS, ValidationPipe, Swagger, Scalar |
-| `apps/api/src/api.module.ts` | Root module: guards, interceptors, module imports, plugin bootstrap |
-| `apps/api/src/api.controller.ts` | Health check endpoints (`/`, `/api/health`) |
-| `apps/api/src/config/throttler.config.ts` | Tiered rate limiting configuration |
-| `apps/api/src/logging.interceptor.ts` | Debug-mode HTTP request/response logging |
-| `apps/api/src/directories/directories.controller.ts` | Primary domain controller (directories, items, taxonomy) |
-| `apps/api/src/auth/controllers/auth.controller.ts` | Authentication (login, register, password reset) |
-| `apps/api/src/auth/controllers/api-keys.controller.ts` | API key management |
-| `apps/api/src/plugins/plugins.controller.ts` | Plugin enable/disable and settings management |
+| File                                                   | Purpose                                                              |
+| ------------------------------------------------------ | -------------------------------------------------------------------- |
+| `apps/api/src/main.ts`                                 | Application bootstrap: Helmet, CORS, ValidationPipe, Swagger, Scalar |
+| `apps/api/src/api.module.ts`                           | Root module: guards, interceptors, module imports, plugin bootstrap  |
+| `apps/api/src/api.controller.ts`                       | Health check endpoints (`/`, `/api/health`)                          |
+| `apps/api/src/config/throttler.config.ts`              | Tiered rate limiting configuration                                   |
+| `apps/api/src/logging.interceptor.ts`                  | Debug-mode HTTP request/response logging                             |
+| `apps/api/src/directories/directories.controller.ts`   | Primary domain controller (directories, items, taxonomy)             |
+| `apps/api/src/auth/controllers/auth.controller.ts`     | Authentication (login, register, password reset)                     |
+| `apps/api/src/auth/controllers/api-keys.controller.ts` | API key management                                                   |
+| `apps/api/src/plugins/plugins.controller.ts`           | Plugin enable/disable and settings management                        |
 
 ## Key Classes
 
@@ -68,49 +68,57 @@ The API application configures the full middleware and documentation stack at st
 
 ```typescript
 async function bootstrap() {
-    const app = await NestFactory.create(ApiModule);
+	const app = await NestFactory.create(ApiModule);
 
-    // Body parser limits
-    app.use(json({ limit: '10mb' }));
-    app.use(urlencoded({ limit: '10mb', extended: true }));
+	// Body parser limits
+	app.use(json({ limit: '10mb' }));
+	app.use(urlencoded({ limit: '10mb', extended: true }));
 
-    // Security: Helmet with relaxed CSP for API docs
-    app.use((req, res, next) => {
-        if (req.path.startsWith('/api/docs')) {
-            return helmet({ contentSecurityPolicy: { /* relaxed */ } })(req, res, next);
-        }
-        return helmet()(req, res, next);
-    });
+	// Security: Helmet with relaxed CSP for API docs
+	app.use((req, res, next) => {
+		if (req.path.startsWith('/api/docs')) {
+			return helmet({
+				contentSecurityPolicy: {
+					/* relaxed */
+				}
+			})(req, res, next);
+		}
+		return helmet()(req, res, next);
+	});
 
-    // CORS
-    app.enableCors({
-        origin: process.env.ALLOWED_ORIGINS?.split(',') || ['http://localhost:3000'],
-        credentials: true,
-        methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-    });
+	// CORS
+	app.enableCors({
+		origin: process.env.ALLOWED_ORIGINS?.split(',') || ['http://localhost:3000'],
+		credentials: true,
+		methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS']
+	});
 
-    // Global validation
-    app.useGlobalPipes(new ValidationPipe({
-        whitelist: true,
-        transform: true,
-        forbidNonWhitelisted: true,
-    }));
+	// Global validation
+	app.useGlobalPipes(
+		new ValidationPipe({
+			whitelist: true,
+			transform: true,
+			forbidNonWhitelisted: true
+		})
+	);
 
-    // OpenAPI documentation
-    const config = new DocumentBuilder()
-        .setTitle('Ever Works API')
-        .setVersion('1.0')
-        .addBearerAuth(/* JWT config */)
-        .addTag('Health').addTag('Auth').addTag('Directories') /* ... */
-        .build();
+	// OpenAPI documentation
+	const config = new DocumentBuilder()
+		.setTitle('Ever Works API')
+		.setVersion('1.0')
+		.addBearerAuth(/* JWT config */)
+		.addTag('Health')
+		.addTag('Auth')
+		.addTag('Directories') /* ... */
+		.build();
 
-    const document = SwaggerModule.createDocument(app, config);
-    SwaggerModule.setup('api/swagger', app, document);
+	const document = SwaggerModule.createDocument(app, config);
+	SwaggerModule.setup('api/swagger', app, document);
 
-    // Scalar API Reference at /api/docs
-    app.use('/api/docs', apiReference({ url: '/api/openapi.json', theme: 'kepler' }));
+	// Scalar API Reference at /api/docs
+	app.use('/api/docs', apiReference({ url: '/api/openapi.json', theme: 'kepler' }));
 
-    await app.listen(process.env.PORT ?? 3100);
+	await app.listen(process.env.PORT ?? 3100);
 }
 ```
 
@@ -120,18 +128,18 @@ Registered in `ApiModule` via `APP_GUARD` and `APP_INTERCEPTOR` tokens:
 
 ```typescript
 @Module({
-    providers: [
-        { provide: APP_GUARD, useClass: JwtAuthGuard },       // Authentication
-        { provide: APP_GUARD, useClass: ThrottlerGuard },      // Rate limiting
-        { provide: APP_INTERCEPTOR, useClass: LoggingInterceptor },  // Debug logging
-        { provide: APP_INTERCEPTOR, useClass: SentryInterceptor },   // Error tracking
-        { provide: APP_INTERCEPTOR, useClass: PostHogInterceptor },  // Analytics
-    ],
+	providers: [
+		{ provide: APP_GUARD, useClass: JwtAuthGuard }, // Authentication
+		{ provide: APP_GUARD, useClass: ThrottlerGuard }, // Rate limiting
+		{ provide: APP_INTERCEPTOR, useClass: LoggingInterceptor }, // Debug logging
+		{ provide: APP_INTERCEPTOR, useClass: SentryInterceptor }, // Error tracking
+		{ provide: APP_INTERCEPTOR, useClass: PostHogInterceptor } // Analytics
+	]
 })
 export class ApiModule implements OnApplicationBootstrap {
-    async onApplicationBootstrap(): Promise<void> {
-        await this.pluginBootstrap.bootstrap(); // Load all plugins
-    }
+	async onApplicationBootstrap(): Promise<void> {
+		await this.pluginBootstrap.bootstrap(); // Load all plugins
+	}
 }
 ```
 
@@ -139,22 +147,22 @@ export class ApiModule implements OnApplicationBootstrap {
 
 Controllers use a flat `api/` prefix pattern with domain-specific sub-paths:
 
-| Controller | Route Prefix | Tag | Auth |
-|-----------|-------------|-----|------|
-| `APIController` | `/`, `/api/health` | Health | Public |
-| `AuthController` | `api/auth` | Auth | Mixed |
-| `ApiKeysController` | `api/auth/api-keys` | API Keys | JWT |
-| `DirectoriesController` | `api` | Directories | JWT |
-| `MembersController` | `api/directories/:directoryId/members` | Members | JWT |
-| `AiConversationController` | `api/ai-conversations` | AI Conversations | JWT |
-| `PluginsController` | `api` | Plugins | JWT |
-| `DeployController` | `api/deploy` | Deploy | JWT |
-| `GitProviderController` | `api/git-providers` | Git Providers | JWT |
-| `ScreenshotController` | `api/screenshot` | Screenshot | JWT |
-| `OAuthController` | `api/oauth` | OAuth | Mixed |
-| `SubscriptionsController` | `api/subscriptions` | Subscriptions | JWT |
-| `NotificationsController` | `api/notifications` | Notifications | JWT |
-| `TriggerInternalController` | `internal/trigger` | -- | Internal |
+| Controller                  | Route Prefix                           | Tag              | Auth     |
+| --------------------------- | -------------------------------------- | ---------------- | -------- |
+| `APIController`             | `/`, `/api/health`                     | Health           | Public   |
+| `AuthController`            | `api/auth`                             | Auth             | Mixed    |
+| `ApiKeysController`         | `api/auth/api-keys`                    | API Keys         | JWT      |
+| `DirectoriesController`     | `api`                                  | Directories      | JWT      |
+| `MembersController`         | `api/directories/:directoryId/members` | Members          | JWT      |
+| `AiConversationController`  | `api/ai-conversations`                 | AI Conversations | JWT      |
+| `PluginsController`         | `api`                                  | Plugins          | JWT      |
+| `DeployController`          | `api/deploy`                           | Deploy           | JWT      |
+| `GitProviderController`     | `api/git-providers`                    | Git Providers    | JWT      |
+| `ScreenshotController`      | `api/screenshot`                       | Screenshot       | JWT      |
+| `OAuthController`           | `api/oauth`                            | OAuth            | Mixed    |
+| `SubscriptionsController`   | `api/subscriptions`                    | Subscriptions    | JWT      |
+| `NotificationsController`   | `api/notifications`                    | Notifications    | JWT      |
+| `TriggerInternalController` | `internal/trigger`                     | --               | Internal |
 
 ### Rate Limiting (Throttler)
 
@@ -162,11 +170,11 @@ Three-tier rate limiting is applied globally:
 
 ```typescript
 export const throttlerConfig: ThrottlerModuleOptions = {
-    throttlers: [
-        { name: 'short',  ttl: 1000,  limit: 50 },    // 50 req/sec
-        { name: 'medium', ttl: 10000, limit: 300 },    // 300 req/10sec
-        { name: 'long',   ttl: 60000, limit: 1000 },   // 1000 req/min
-    ],
+	throttlers: [
+		{ name: 'short', ttl: 1000, limit: 50 }, // 50 req/sec
+		{ name: 'medium', ttl: 10000, limit: 300 }, // 300 req/10sec
+		{ name: 'long', ttl: 60000, limit: 1000 } // 1000 req/min
+	]
 };
 ```
 
@@ -177,22 +185,22 @@ Logs HTTP method, URL, status code, and response time when debug mode is enabled
 ```typescript
 @Injectable()
 export class LoggingInterceptor implements NestInterceptor {
-    intercept(context: ExecutionContext, next: CallHandler): Observable<any> {
-        if (!config.debug()) return next.handle();
+	intercept(context: ExecutionContext, next: CallHandler): Observable<any> {
+		if (!config.debug()) return next.handle();
 
-        const now = Date.now();
-        const { method, originalUrl } = context.switchToHttp().getRequest();
+		const now = Date.now();
+		const { method, originalUrl } = context.switchToHttp().getRequest();
 
-        return next.handle().pipe(
-            catchError((err) => {
-                this.logger.error(`Error Response: ${method} ${originalUrl} ${statusCode} - ${delay}ms`);
-                return throwError(() => err);
-            }),
-            tap(() => {
-                this.logger.log(`Outgoing Response: ${method} ${originalUrl} ${statusCode} - ${delay}ms`);
-            }),
-        );
-    }
+		return next.handle().pipe(
+			catchError((err) => {
+				this.logger.error(`Error Response: ${method} ${originalUrl} ${statusCode} - ${delay}ms`);
+				return throwError(() => err);
+			}),
+			tap(() => {
+				this.logger.log(`Outgoing Response: ${method} ${originalUrl} ${statusCode} - ${delay}ms`);
+			})
+		);
+	}
 }
 ```
 
@@ -200,23 +208,23 @@ export class LoggingInterceptor implements NestInterceptor {
 
 ### Environment Variables
 
-| Variable | Purpose | Default |
-|----------|---------|---------|
-| `PORT` | API server port | `3100` |
+| Variable          | Purpose                      | Default                 |
+| ----------------- | ---------------------------- | ----------------------- |
+| `PORT`            | API server port              | `3100`                  |
 | `ALLOWED_ORIGINS` | Comma-separated CORS origins | `http://localhost:3000` |
-| `JWT_SECRET` | JWT signing secret | -- |
-| `JWT_EXPIRATION` | Token expiration | `7d` |
-| `SENTRY_DSN` | Sentry error tracking DSN | -- |
-| `POSTHOG_API_KEY` | PostHog analytics key | -- |
-| `NODE_ENV` | Environment identifier | `development` |
+| `JWT_SECRET`      | JWT signing secret           | --                      |
+| `JWT_EXPIRATION`  | Token expiration             | `7d`                    |
+| `SENTRY_DSN`      | Sentry error tracking DSN    | --                      |
+| `POSTHOG_API_KEY` | PostHog analytics key        | --                      |
+| `NODE_ENV`        | Environment identifier       | `development`           |
 
 ### API Documentation Endpoints
 
-| Endpoint | Purpose |
-|----------|---------|
-| `/api/docs` | Scalar API Reference (interactive documentation) |
-| `/api/swagger` | Swagger UI |
-| `/api/openapi.json` | OpenAPI 3.0 JSON specification |
+| Endpoint            | Purpose                                          |
+| ------------------- | ------------------------------------------------ |
+| `/api/docs`         | Scalar API Reference (interactive documentation) |
+| `/api/swagger`      | Swagger UI                                       |
+| `/api/openapi.json` | OpenAPI 3.0 JSON specification                   |
 
 ## Code Examples
 
@@ -228,33 +236,30 @@ export class LoggingInterceptor implements NestInterceptor {
 @Controller('api')
 @UseGuards(JwtAuthGuard)
 export class DirectoriesController {
-    @Get('directories')
-    @ApiOperation({ summary: 'List directories' })
-    @ApiResponse({ status: 200, description: 'List of directories' })
-    async listDirectories(@CurrentUser() user: AuthenticatedUser) {
-        return this.queryService.findByUser(user.userId);
-    }
+	@Get('directories')
+	@ApiOperation({ summary: 'List directories' })
+	@ApiResponse({ status: 200, description: 'List of directories' })
+	async listDirectories(@CurrentUser() user: AuthenticatedUser) {
+		return this.queryService.findByUser(user.userId);
+	}
 
-    @Post('directories')
-    @ApiOperation({ summary: 'Create directory' })
-    @HttpCode(HttpStatus.CREATED)
-    async createDirectory(
-        @Body() dto: CreateDirectoryDto,
-        @CurrentUser() user: AuthenticatedUser,
-    ) {
-        return this.lifecycleService.create(dto, user.userId);
-    }
+	@Post('directories')
+	@ApiOperation({ summary: 'Create directory' })
+	@HttpCode(HttpStatus.CREATED)
+	async createDirectory(@Body() dto: CreateDirectoryDto, @CurrentUser() user: AuthenticatedUser) {
+		return this.lifecycleService.create(dto, user.userId);
+	}
 
-    @Put('directories/:slug')
-    @ApiOperation({ summary: 'Update directory' })
-    @ApiParam({ name: 'slug', description: 'Directory URL slug' })
-    async updateDirectory(
-        @Param('slug') slug: string,
-        @Body() dto: UpdateDirectoryDto,
-        @CurrentUser() user: AuthenticatedUser,
-    ) {
-        return this.lifecycleService.update(slug, dto, user.userId);
-    }
+	@Put('directories/:slug')
+	@ApiOperation({ summary: 'Update directory' })
+	@ApiParam({ name: 'slug', description: 'Directory URL slug' })
+	async updateDirectory(
+		@Param('slug') slug: string,
+		@Body() dto: UpdateDirectoryDto,
+		@CurrentUser() user: AuthenticatedUser
+	) {
+		return this.lifecycleService.update(slug, dto, user.userId);
+	}
 }
 ```
 
@@ -274,10 +279,10 @@ healthCheck() {
 ```typescript
 @Controller('internal/trigger')
 export class TriggerInternalController {
-    @Post('generation/:slug')
-    async triggerGeneration(@Param('slug') slug: string) {
-        // Called by Trigger.dev background jobs
-    }
+	@Post('generation/:slug')
+	async triggerGeneration(@Param('slug') slug: string) {
+		// Called by Trigger.dev background jobs
+	}
 }
 ```
 

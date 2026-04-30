@@ -3,15 +3,7 @@
 	"language": "en",
 	"caseSensitive": false,
 	"$schema": "https://raw.githubusercontent.com/streetsidesoftware/cspell/main/cspell.schema.json",
-	"words": [
-		"clsx",
-		"cmfcmf",
-		"Gitter",
-		"noopener",
-		"octicon",
-		"typecheck",
-		"Userspage"
-	],
+	"words": ["clsx", "cmfcmf", "Gitter", "noopener", "octicon", "typecheck", "Userspage"],
 	"useGitignore": true,
 	"ignorePaths": [
 		".cicleci/*",

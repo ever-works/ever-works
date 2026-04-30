@@ -11,15 +11,15 @@ The `@ever-works/agent` package is the core logic layer of the Ever Works platfo
 
 ## Overview
 
-| Property | Value |
-|---|---|
-| **Package name** | `@ever-works/agent` |
-| **Location** | `platform/packages/agent/` |
-| **Framework** | NestJS 11 (SWC compiler) |
-| **ORM** | TypeORM 0.3 |
-| **Test runner** | Jest (26 suites, 719+ tests) |
-| **License** | UNLICENSED (private) |
-| **Node.js** | >=20 |
+| Property         | Value                        |
+| ---------------- | ---------------------------- |
+| **Package name** | `@ever-works/agent`          |
+| **Location**     | `platform/packages/agent/`   |
+| **Framework**    | NestJS 11 (SWC compiler)     |
+| **ORM**          | TypeORM 0.3                  |
+| **Test runner**  | Jest (26 suites, 719+ tests) |
+| **License**      | UNLICENSED (private)         |
+| **Node.js**      | >=20                         |
 
 ## Module Structure
 
@@ -67,29 +67,29 @@ import { PipelineModule } from '@ever-works/agent/pipeline';
 
 The full list of export paths:
 
-| Export Path | Description |
-|---|---|
-| `@ever-works/agent/generators` | AI content generation engine and data generators |
-| `@ever-works/agent/database` | TypeORM module, repositories, and database configuration |
-| `@ever-works/agent/dto` | Data transfer objects with class-validator decorators |
-| `@ever-works/agent/entities` | TypeORM entity definitions for all domain models |
-| `@ever-works/agent/git` | Git operations (isomorphic-git based) |
-| `@ever-works/agent/directory-operations` | Directory generation state management |
-| `@ever-works/agent/items-generator` | Item-level content generation |
-| `@ever-works/agent/tasks` | Background task type definitions |
-| `@ever-works/agent/events` | Domain event classes |
-| `@ever-works/agent/services` | Shared business services |
-| `@ever-works/agent/subscriptions` | Subscription and usage tracking |
-| `@ever-works/agent/config` | Configuration management |
-| `@ever-works/agent/cache` | Persistent caching layer |
-| `@ever-works/agent/notifications` | Notification delivery |
-| `@ever-works/agent/import` | Directory import system |
-| `@ever-works/agent/facades` | AI facade (consumes AI provider plugins) |
-| `@ever-works/agent/plugins` | Plugin runtime infrastructure |
-| `@ever-works/agent/pipeline` | Generation pipeline orchestration |
-| `@ever-works/agent/utils` | Shared utility functions |
-| `@ever-works/agent/community-pr` | Community pull request processing |
-| `@ever-works/agent/comparison-generator` | Comparison page generation |
+| Export Path                              | Description                                              |
+| ---------------------------------------- | -------------------------------------------------------- |
+| `@ever-works/agent/generators`           | AI content generation engine and data generators         |
+| `@ever-works/agent/database`             | TypeORM module, repositories, and database configuration |
+| `@ever-works/agent/dto`                  | Data transfer objects with class-validator decorators    |
+| `@ever-works/agent/entities`             | TypeORM entity definitions for all domain models         |
+| `@ever-works/agent/git`                  | Git operations (isomorphic-git based)                    |
+| `@ever-works/agent/directory-operations` | Directory generation state management                    |
+| `@ever-works/agent/items-generator`      | Item-level content generation                            |
+| `@ever-works/agent/tasks`                | Background task type definitions                         |
+| `@ever-works/agent/events`               | Domain event classes                                     |
+| `@ever-works/agent/services`             | Shared business services                                 |
+| `@ever-works/agent/subscriptions`        | Subscription and usage tracking                          |
+| `@ever-works/agent/config`               | Configuration management                                 |
+| `@ever-works/agent/cache`                | Persistent caching layer                                 |
+| `@ever-works/agent/notifications`        | Notification delivery                                    |
+| `@ever-works/agent/import`               | Directory import system                                  |
+| `@ever-works/agent/facades`              | AI facade (consumes AI provider plugins)                 |
+| `@ever-works/agent/plugins`              | Plugin runtime infrastructure                            |
+| `@ever-works/agent/pipeline`             | Generation pipeline orchestration                        |
+| `@ever-works/agent/utils`                | Shared utility functions                                 |
+| `@ever-works/agent/community-pr`         | Community pull request processing                        |
+| `@ever-works/agent/comparison-generator` | Comparison page generation                               |
 
 ## Key Services
 
@@ -131,14 +131,14 @@ The `pipeline/` sub-module orchestrates multi-step content generation workflows.
 
 Core TypeORM entities defined in `entities/`:
 
-| Entity | Table | Description |
-|---|---|---|
-| `Directory` | `directories` | Central domain entity representing a directory project |
-| `DirectoryGenerationHistory` | `directory_generation_history` | Audit log of every generation run |
-| `DirectorySchedule` | `directory_schedules` | Scheduled update configuration |
-| `DirectoryMember` | `directory_members` | Team membership and roles |
-| `DirectoryCustomDomain` | `directory_custom_domains` | Custom domain mappings |
-| `User` | `users` | Platform user accounts |
+| Entity                       | Table                          | Description                                            |
+| ---------------------------- | ------------------------------ | ------------------------------------------------------ |
+| `Directory`                  | `directories`                  | Central domain entity representing a directory project |
+| `DirectoryGenerationHistory` | `directory_generation_history` | Audit log of every generation run                      |
+| `DirectorySchedule`          | `directory_schedules`          | Scheduled update configuration                         |
+| `DirectoryMember`            | `directory_members`            | Team membership and roles                              |
+| `DirectoryCustomDomain`      | `directory_custom_domains`     | Custom domain mappings                                 |
+| `User`                       | `users`                        | Platform user accounts                                 |
 
 ## Configuration
 
@@ -148,16 +148,16 @@ The package uses NestJS `@nestjs/config` for configuration management. Database 
 import { DatabaseModule } from '@ever-works/agent/database';
 
 @Module({
-    imports: [
-        DatabaseModule.forRoot({
-            type: 'postgres',
-            host: process.env.DB_HOST,
-            port: parseInt(process.env.DB_PORT, 10),
-            database: process.env.DB_NAME,
-            username: process.env.DB_USER,
-            password: process.env.DB_PASSWORD,
-        }),
-    ],
+	imports: [
+		DatabaseModule.forRoot({
+			type: 'postgres',
+			host: process.env.DB_HOST,
+			port: parseInt(process.env.DB_PORT, 10),
+			database: process.env.DB_NAME,
+			username: process.env.DB_USER,
+			password: process.env.DB_PASSWORD
+		})
+	]
 })
 export class AppModule {}
 ```
@@ -168,39 +168,39 @@ The package supports PostgreSQL, MySQL, and SQLite (via optional peer dependenci
 
 ### Runtime Dependencies
 
-| Package | Purpose |
-|---|---|
-| `@ever-works/contracts` | Shared TypeScript types (workspace) |
-| `@ever-works/plugin` | Plugin system contracts and utilities (workspace) |
-| `typeorm` | Database ORM |
-| `@nestjs/typeorm` | NestJS TypeORM integration |
-| `@nestjs/config` | Configuration management |
-| `@nestjs/swagger` | API documentation decorators |
-| `@nestjs/cache-manager` | Cache abstraction |
-| `@langchain/textsplitters` | Text chunking for AI operations |
-| `zod` / `ajv` | Schema validation |
-| `class-transformer` / `class-validator` | DTO transformation and validation |
-| `lodash` | Utility functions |
-| `p-map` | Concurrent async mapping |
-| `yaml` | YAML parsing |
-| `superjson` | Extended JSON serialization |
-| `github-slugger` | URL-safe slug generation |
-| `semver` | Semantic version comparison |
-| `date-fns` | Date utility functions |
+| Package                                 | Purpose                                           |
+| --------------------------------------- | ------------------------------------------------- |
+| `@ever-works/contracts`                 | Shared TypeScript types (workspace)               |
+| `@ever-works/plugin`                    | Plugin system contracts and utilities (workspace) |
+| `typeorm`                               | Database ORM                                      |
+| `@nestjs/typeorm`                       | NestJS TypeORM integration                        |
+| `@nestjs/config`                        | Configuration management                          |
+| `@nestjs/swagger`                       | API documentation decorators                      |
+| `@nestjs/cache-manager`                 | Cache abstraction                                 |
+| `@langchain/textsplitters`              | Text chunking for AI operations                   |
+| `zod` / `ajv`                           | Schema validation                                 |
+| `class-transformer` / `class-validator` | DTO transformation and validation                 |
+| `lodash`                                | Utility functions                                 |
+| `p-map`                                 | Concurrent async mapping                          |
+| `yaml`                                  | YAML parsing                                      |
+| `superjson`                             | Extended JSON serialization                       |
+| `github-slugger`                        | URL-safe slug generation                          |
+| `semver`                                | Semantic version comparison                       |
+| `date-fns`                              | Date utility functions                            |
 
 ### Peer Dependencies
 
-| Package | Version | Notes |
-|---|---|---|
-| `@nestjs/common` | ^11.1 | Required |
-| `@nestjs/core` | ^11.1 | Required |
-| `@nestjs/event-emitter` | ^3.0 | Required |
-| `@nestjs/platform-express` | ^11.1 | Required |
-| `reflect-metadata` | ^0.2 | Required |
-| `rxjs` | ^7.8 | Required |
-| `better-sqlite3` | ^12.2 | Optional -- SQLite support |
-| `pg` | ^8.16 | Optional -- PostgreSQL support |
-| `mysql2` | ^3.14 | Optional -- MySQL support |
+| Package                    | Version | Notes                          |
+| -------------------------- | ------- | ------------------------------ |
+| `@nestjs/common`           | ^11.1   | Required                       |
+| `@nestjs/core`             | ^11.1   | Required                       |
+| `@nestjs/event-emitter`    | ^3.0    | Required                       |
+| `@nestjs/platform-express` | ^11.1   | Required                       |
+| `reflect-metadata`         | ^0.2    | Required                       |
+| `rxjs`                     | ^7.8    | Required                       |
+| `better-sqlite3`           | ^12.2   | Optional -- SQLite support     |
+| `pg`                       | ^8.16   | Optional -- PostgreSQL support |
+| `mysql2`                   | ^3.14   | Optional -- MySQL support      |
 
 ## Build and Test
 
@@ -247,14 +247,14 @@ import { DirectoryOperationsModule } from '@ever-works/agent/directory-operation
 import { PluginsModule } from '@ever-works/agent/plugins';
 
 @Module({
-    imports: [
-        DatabaseModule.forRoot(/* config */),
-        DirectoryOperationsModule,
-        PluginsModule.forRoot({
-            autoLoadBuiltIn: true,
-            environment: 'production',
-        }),
-    ],
+	imports: [
+		DatabaseModule.forRoot(/* config */),
+		DirectoryOperationsModule,
+		PluginsModule.forRoot({
+			autoLoadBuiltIn: true,
+			environment: 'production'
+		})
+	]
 })
 export class ApiModule {}
 ```
@@ -267,11 +267,11 @@ import { DirectoryRepository } from '@ever-works/agent/database';
 
 @Injectable()
 export class DirectoryService {
-    constructor(private readonly directoryRepo: DirectoryRepository) {}
+	constructor(private readonly directoryRepo: DirectoryRepository) {}
 
-    async findBySlug(slug: string): Promise<Directory | null> {
-        return this.directoryRepo.findOne({ where: { slug } });
-    }
+	async findBySlug(slug: string): Promise<Directory | null> {
+		return this.directoryRepo.findOne({ where: { slug } });
+	}
 }
 ```
 
@@ -282,13 +282,13 @@ import { AiFacadeService } from '@ever-works/agent/facades';
 
 @Injectable()
 export class ContentService {
-    constructor(private readonly aiFacade: AiFacadeService) {}
+	constructor(private readonly aiFacade: AiFacadeService) {}
 
-    async generateDescription(prompt: string): Promise<string> {
-        const response = await this.aiFacade.createChatCompletion({
-            messages: [{ role: 'user', content: prompt }],
-        });
-        return response.content;
-    }
+	async generateDescription(prompt: string): Promise<string> {
+		const response = await this.aiFacade.createChatCompletion({
+			messages: [{ role: 'user', content: prompt }]
+		});
+		return response.content;
+	}
 }
 ```

@@ -1,7 +1,7 @@
 ---
 id: events-deep-dive
-title: "Event System Deep Dive"
-sidebar_label: "Event System"
+title: 'Event System Deep Dive'
+sidebar_label: 'Event System'
 sidebar_position: 9
 ---
 
@@ -44,10 +44,10 @@ The event bus is initialized in `apps/api/src/api.module.ts` by importing the Ne
 import { EventEmitterModule } from '@nestjs/event-emitter';
 
 @Module({
-    imports: [
-        EventEmitterModule.forRoot(),
-        // ... other modules
-    ],
+	imports: [
+		EventEmitterModule.forRoot()
+		// ... other modules
+	]
 })
 export class ApiModule {}
 ```
@@ -58,10 +58,10 @@ export class ApiModule {}
 
 Events are defined in two locations based on their scope:
 
-| Location | Scope | Events |
-|---|---|---|
-| `apps/api/src/events/` | API-level (user and member events) | `UserCreatedEvent`, `UserForgotPasswordEvent`, `UserPasswordChangedEvent`, `UserConfirmedEvent`, `UserNewDeviceLoginEvent`, `UserAccountDeletionEvent`, `MemberInvitedEvent` |
-| `packages/agent/src/events/` | Agent-level (directory lifecycle) | `DirectoryCreatedEvent`, `DirectoryGenerationCompletedEvent` |
+| Location                     | Scope                              | Events                                                                                                                                                                       |
+| ---------------------------- | ---------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `apps/api/src/events/`       | API-level (user and member events) | `UserCreatedEvent`, `UserForgotPasswordEvent`, `UserPasswordChangedEvent`, `UserConfirmedEvent`, `UserNewDeviceLoginEvent`, `UserAccountDeletionEvent`, `MemberInvitedEvent` |
+| `packages/agent/src/events/` | Agent-level (directory lifecycle)  | `DirectoryCreatedEvent`, `DirectoryGenerationCompletedEvent`                                                                                                                 |
 
 ### Base Event Classes
 
@@ -70,7 +70,7 @@ The agent package defines a minimal `BaseEvent` abstract class:
 ```typescript
 // packages/agent/src/events/base.ts
 export abstract class BaseEvent {
-    static EVENT_NAME: string;
+	static EVENT_NAME: string;
 }
 ```
 
@@ -79,7 +79,7 @@ The API defines a `BaseUserEvent` that requires a `user` property:
 ```typescript
 // apps/api/src/events/index.ts
 export abstract class BaseUserEvent {
-    public abstract user: User;
+	public abstract user: User;
 }
 ```
 
@@ -93,6 +93,7 @@ All events follow a dot-separated namespace pattern:
 ```
 
 Examples:
+
 - `user.created`
 - `user.forgot_password`
 - `directory.member_invited`
@@ -102,22 +103,22 @@ Examples:
 
 ### User Events (API)
 
-| Event Class | `EVENT_NAME` | Payload Properties |
-|---|---|---|
-| `UserCreatedEvent` | `user.created` | `user`, `confirmationToken`, `confirmationUrl` |
-| `UserForgotPasswordEvent` | `user.forgot_password` | `user`, `resetToken`, `resetUrl`, `expiresIn` |
-| `UserPasswordChangedEvent` | `user.password_changed` | `user`, `changedAt`, `ipAddress`, `location`, `device`, `browser`, `secureAccountUrl` |
-| `UserConfirmedEvent` | `user.confirmed` | `user`, `dashboardUrl` |
-| `UserNewDeviceLoginEvent` | `user.new_device_login` | `user`, `loginTime`, `device`, `browser`, `location`, `ipAddress`, `verifyToken`, `verifyUrl`, `secureAccountUrl` |
-| `UserAccountDeletionEvent` | `user.delete_account` | `user`, `deleteToken`, `deleteUrl`, `keepAccountUrl`, `expiresIn` |
+| Event Class                | `EVENT_NAME`            | Payload Properties                                                                                                |
+| -------------------------- | ----------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| `UserCreatedEvent`         | `user.created`          | `user`, `confirmationToken`, `confirmationUrl`                                                                    |
+| `UserForgotPasswordEvent`  | `user.forgot_password`  | `user`, `resetToken`, `resetUrl`, `expiresIn`                                                                     |
+| `UserPasswordChangedEvent` | `user.password_changed` | `user`, `changedAt`, `ipAddress`, `location`, `device`, `browser`, `secureAccountUrl`                             |
+| `UserConfirmedEvent`       | `user.confirmed`        | `user`, `dashboardUrl`                                                                                            |
+| `UserNewDeviceLoginEvent`  | `user.new_device_login` | `user`, `loginTime`, `device`, `browser`, `location`, `ipAddress`, `verifyToken`, `verifyUrl`, `secureAccountUrl` |
+| `UserAccountDeletionEvent` | `user.delete_account`   | `user`, `deleteToken`, `deleteUrl`, `keepAccountUrl`, `expiresIn`                                                 |
 
 ### Directory Events
 
-| Event Class | `EVENT_NAME` | Payload Properties | Source |
-|---|---|---|---|
-| `MemberInvitedEvent` | `directory.member_invited` | `invitee`, `inviter`, `directory`, `role`, `directoryUrl` | API |
-| `DirectoryCreatedEvent` | `directory.created` | `directory` | Agent |
-| `DirectoryGenerationCompletedEvent` | `directory.generation.completed` | `directory` | Agent |
+| Event Class                         | `EVENT_NAME`                     | Payload Properties                                        | Source |
+| ----------------------------------- | -------------------------------- | --------------------------------------------------------- | ------ |
+| `MemberInvitedEvent`                | `directory.member_invited`       | `invitee`, `inviter`, `directory`, `role`, `directoryUrl` | API    |
+| `DirectoryCreatedEvent`             | `directory.created`              | `directory`                                               | Agent  |
+| `DirectoryGenerationCompletedEvent` | `directory.generation.completed` | `directory`                                               | Agent  |
 
 ## Emitting Events
 
@@ -132,18 +133,15 @@ import { UserCreatedEvent } from '../../events';
 
 @Injectable()
 export class AuthService {
-    constructor(private eventEmitter: EventEmitter2) {}
+	constructor(private eventEmitter: EventEmitter2) {}
 
-    async sendVerificationEmail(userId: string) {
-        const user = await this.userRepository.findById(userId);
-        const verificationToken = randomBytes(32).toString('hex');
+	async sendVerificationEmail(userId: string) {
+		const user = await this.userRepository.findById(userId);
+		const verificationToken = randomBytes(32).toString('hex');
 
-        // Emit event -- MailService picks it up
-        this.eventEmitter.emit(
-            UserCreatedEvent.EVENT_NAME,
-            new UserCreatedEvent(user, verificationToken, callbackUrl),
-        );
-    }
+		// Emit event -- MailService picks it up
+		this.eventEmitter.emit(UserCreatedEvent.EVENT_NAME, new UserCreatedEvent(user, verificationToken, callbackUrl));
+	}
 }
 ```
 
@@ -179,38 +177,50 @@ The `MailService` (`apps/api/src/mail/mail.service.ts`) subscribes to all user a
 ```typescript
 @Injectable()
 export class MailService {
-    constructor(private readonly mailerService: MailerService) {}
+	constructor(private readonly mailerService: MailerService) {}
 
-    @OnEvent(UserCreatedEvent.EVENT_NAME)
-    async sendSignupConfirmation(data: UserCreatedEvent): Promise<void> {
-        await this.mailerService.sendMail({
-            to: data.user.email,
-            subject: `Confirm your ${appName} account`,
-            template: 'signup-confirmation',
-            context: {
-                firstName: data.user.username,
-                confirmationUrl: data.confirmationUrl,
-            },
-        });
-    }
+	@OnEvent(UserCreatedEvent.EVENT_NAME)
+	async sendSignupConfirmation(data: UserCreatedEvent): Promise<void> {
+		await this.mailerService.sendMail({
+			to: data.user.email,
+			subject: `Confirm your ${appName} account`,
+			template: 'signup-confirmation',
+			context: {
+				firstName: data.user.username,
+				confirmationUrl: data.confirmationUrl
+			}
+		});
+	}
 
-    @OnEvent(UserForgotPasswordEvent.EVENT_NAME)
-    async sendForgotPassword(data: UserForgotPasswordEvent) { /* ... */ }
+	@OnEvent(UserForgotPasswordEvent.EVENT_NAME)
+	async sendForgotPassword(data: UserForgotPasswordEvent) {
+		/* ... */
+	}
 
-    @OnEvent(UserPasswordChangedEvent.EVENT_NAME)
-    async sendPasswordChanged(data: UserPasswordChangedEvent) { /* ... */ }
+	@OnEvent(UserPasswordChangedEvent.EVENT_NAME)
+	async sendPasswordChanged(data: UserPasswordChangedEvent) {
+		/* ... */
+	}
 
-    @OnEvent(UserConfirmedEvent.EVENT_NAME)
-    async sendWelcomeEmail(data: UserConfirmedEvent) { /* ... */ }
+	@OnEvent(UserConfirmedEvent.EVENT_NAME)
+	async sendWelcomeEmail(data: UserConfirmedEvent) {
+		/* ... */
+	}
 
-    @OnEvent(UserNewDeviceLoginEvent.EVENT_NAME)
-    async sendNewDeviceAlert(data: UserNewDeviceLoginEvent) { /* ... */ }
+	@OnEvent(UserNewDeviceLoginEvent.EVENT_NAME)
+	async sendNewDeviceAlert(data: UserNewDeviceLoginEvent) {
+		/* ... */
+	}
 
-    @OnEvent(UserAccountDeletionEvent.EVENT_NAME)
-    async sendAccountDeletionConfirmation(data: UserAccountDeletionEvent) { /* ... */ }
+	@OnEvent(UserAccountDeletionEvent.EVENT_NAME)
+	async sendAccountDeletionConfirmation(data: UserAccountDeletionEvent) {
+		/* ... */
+	}
 
-    @OnEvent(MemberInvitedEvent.EVENT_NAME)
-    async sendMemberInvitation(data: MemberInvitedEvent) { /* ... */ }
+	@OnEvent(MemberInvitedEvent.EVENT_NAME)
+	async sendMemberInvitation(data: MemberInvitedEvent) {
+		/* ... */
+	}
 }
 ```
 
@@ -222,11 +232,10 @@ The cleanup service listens for generation completion to clear stale cache entri
 // apps/api/src/directories/tasks/directory-cleanup.service.ts
 @Injectable()
 export class DirectoryCleanupService {
-    @OnEvent(DirectoryGenerationCompletedEvent.EVENT_NAME)
-    clearDirectoryCache(data: DirectoryGenerationCompletedEvent) {
-        this.cacheRepository.typeormAdapter
-            .deleteUnscopedEntriesLike(data.directory.id);
-    }
+	@OnEvent(DirectoryGenerationCompletedEvent.EVENT_NAME)
+	clearDirectoryCache(data: DirectoryGenerationCompletedEvent) {
+		this.cacheRepository.typeormAdapter.deleteUnscopedEntriesLike(data.directory.id);
+	}
 }
 ```
 
@@ -287,8 +296,8 @@ async sendSignupConfirmation(data: UserCreatedEvent): Promise<void> {
 To add a new event to the system:
 
 1. **Define the event class** in the appropriate location:
-   - User/API scope: `apps/api/src/events/index.ts`
-   - Directory/agent scope: `packages/agent/src/events/`
+    - User/API scope: `apps/api/src/events/index.ts`
+    - Directory/agent scope: `packages/agent/src/events/`
 
 2. **Follow the naming convention**: `<domain>.<action>`
 

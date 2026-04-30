@@ -1,7 +1,7 @@
 ---
 id: firecrawl-plugin-deep-dive
-title: "Firecrawl Plugin Deep Dive"
-sidebar_label: "Firecrawl Deep Dive"
+title: 'Firecrawl Plugin Deep Dive'
+sidebar_label: 'Firecrawl Deep Dive'
 sidebar_position: 55
 ---
 
@@ -27,15 +27,15 @@ A new `FirecrawlApp` client is instantiated per-request from the settings-resolv
 
 ### Environment Variables
 
-| Variable | Required | Description |
-|----------|----------|-------------|
-| `PLUGIN_FIRECRAWL_API_KEY` | Yes | Firecrawl API key (fallback from environment) |
+| Variable                   | Required | Description                                   |
+| -------------------------- | -------- | --------------------------------------------- |
+| `PLUGIN_FIRECRAWL_API_KEY` | Yes      | Firecrawl API key (fallback from environment) |
 
 ### Settings Schema
 
 ```typescript
 interface FirecrawlSettings {
-  apiKey: string;  // Firecrawl API key (x-secret, x-envVar, user-scoped, required)
+	apiKey: string; // Firecrawl API key (x-secret, x-envVar, user-scoped, required)
 }
 ```
 
@@ -44,29 +44,29 @@ interface FirecrawlSettings {
 
 ## Capabilities
 
-| Capability | Description |
-|------------|-------------|
-| `search` | Web search returning structured results with titles, URLs, and snippets |
-| `content-extractor` | Scrapes web pages into clean markdown with metadata |
+| Capability          | Description                                                             |
+| ------------------- | ----------------------------------------------------------------------- |
+| `search`            | Web search returning structured results with titles, URLs, and snippets |
+| `content-extractor` | Scrapes web pages into clean markdown with metadata                     |
 
 ## API Reference
 
 ### Search
 
-| Method | Signature | Description |
-|--------|-----------|-------------|
-| `search` | `(options: SearchOptions) => Promise<SearchResponse>` | Searches the web via Firecrawl |
-| `getRateLimitInfo` | `() => Promise<RateLimitInfo>` | Returns rate limit info (currently returns -1 for unknown) |
+| Method             | Signature                                             | Description                                                |
+| ------------------ | ----------------------------------------------------- | ---------------------------------------------------------- |
+| `search`           | `(options: SearchOptions) => Promise<SearchResponse>` | Searches the web via Firecrawl                             |
+| `getRateLimitInfo` | `() => Promise<RateLimitInfo>`                        | Returns rate limit info (currently returns -1 for unknown) |
 
 ### Content Extraction
 
-| Method | Signature | Description |
-|--------|-----------|-------------|
-| `extract` | `(options: ContentExtractionOptions) => Promise<ContentExtractionResult>` | Scrapes a single URL to markdown |
-| `extractBatch` | `(urls: readonly string[], options?) => Promise<readonly ContentExtractionResult[]>` | Batch scrapes multiple URLs |
-| `canExtract` | `(url: string) => Promise<boolean>` | Returns `true` for HTTP/HTTPS URLs |
-| `getSupportedFormats` | `() => readonly ('text' \| 'html' \| 'markdown')[]` | Returns `['markdown']` |
-| `isAvailable` | `() => Promise<boolean>` | Always returns `true` (availability checked at API call time) |
+| Method                | Signature                                                                            | Description                                                   |
+| --------------------- | ------------------------------------------------------------------------------------ | ------------------------------------------------------------- |
+| `extract`             | `(options: ContentExtractionOptions) => Promise<ContentExtractionResult>`            | Scrapes a single URL to markdown                              |
+| `extractBatch`        | `(urls: readonly string[], options?) => Promise<readonly ContentExtractionResult[]>` | Batch scrapes multiple URLs                                   |
+| `canExtract`          | `(url: string) => Promise<boolean>`                                                  | Returns `true` for HTTP/HTTPS URLs                            |
+| `getSupportedFormats` | `() => readonly ('text' \| 'html' \| 'markdown')[]`                                  | Returns `['markdown']`                                        |
+| `isAvailable`         | `() => Promise<boolean>`                                                             | Always returns `true` (availability checked at API call time) |
 
 ## Implementation Details
 
@@ -112,25 +112,24 @@ A new `FirecrawlApp` instance is created for each operation via the `getClient(s
 ```typescript
 // Search the web
 const searchResults = await firecrawlPlugin.search({
-  query: 'best project management tools 2025',
-  limit: 10,
-  settings: { apiKey: firecrawlApiKey }
+	query: 'best project management tools 2025',
+	limit: 10,
+	settings: { apiKey: firecrawlApiKey }
 });
 
 // Extract content from a single URL
 const content = await firecrawlPlugin.extract({
-  url: 'https://example.com/article',
-  settings: { apiKey: firecrawlApiKey }
+	url: 'https://example.com/article',
+	settings: { apiKey: firecrawlApiKey }
 });
 if (content.success) {
-  console.log(content.markdown);
+	console.log(content.markdown);
 }
 
 // Batch extract multiple URLs
-const results = await firecrawlPlugin.extractBatch(
-  ['https://example.com/page1', 'https://example.com/page2'],
-  { settings: { apiKey: firecrawlApiKey } }
-);
+const results = await firecrawlPlugin.extractBatch(['https://example.com/page1', 'https://example.com/page2'], {
+	settings: { apiKey: firecrawlApiKey }
+});
 ```
 
 ## Rate Limiting & Quotas

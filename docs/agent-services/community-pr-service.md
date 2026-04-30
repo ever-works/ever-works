@@ -1,7 +1,7 @@
 ---
 id: community-pr-service
-title: "CommunityPrProcessorService Deep Dive"
-sidebar_label: "Community PR"
+title: 'CommunityPrProcessorService Deep Dive'
+sidebar_label: 'Community PR'
 sidebar_position: 17
 ---
 
@@ -57,11 +57,11 @@ Processes open PRs for all directories that have community PR processing enabled
 
 ```typescript
 interface CommunityPrProcessingResult {
-    processed: number;        // total items added across all directories
-    errors: Array<{
-        directoryId: string;
-        error: string;
-    }>;
+	processed: number; // total items added across all directories
+	errors: Array<{
+		directoryId: string;
+		error: string;
+	}>;
 }
 ```
 
@@ -69,11 +69,11 @@ interface CommunityPrProcessingResult {
 
 Processes open PRs for a single directory.
 
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| `directory` | `Directory` | The directory entity to process |
-| `state` | `CommunityPrState` (optional) | Existing processing state; loaded from directory if not provided |
-| `autoClose` | `boolean` (optional) | Whether to auto-close processed PRs; loaded from directory if not provided |
+| Parameter   | Type                          | Description                                                                |
+| ----------- | ----------------------------- | -------------------------------------------------------------------------- |
+| `directory` | `Directory`                   | The directory entity to process                                            |
+| `state`     | `CommunityPrState` (optional) | Existing processing state; loaded from directory if not provided           |
+| `autoClose` | `boolean` (optional)          | Whether to auto-close processed PRs; loaded from directory if not provided |
 
 **Returns:** `Promise<number>` -- total items added from all processed PRs.
 
@@ -85,10 +85,10 @@ The service tracks processing state in the `communityPrState` field on the direc
 
 ```typescript
 interface CommunityPrState {
-    processedPrNumbers: number[];  // PR numbers already processed
-    totalItemsAdded: number;       // running total of items added
-    lastProcessedAt?: string;      // ISO timestamp of last processing run
-    lastError?: string;            // error message from last failure
+	processedPrNumbers: number[]; // PR numbers already processed
+	totalItemsAdded: number; // running total of items added
+	lastProcessedAt?: string; // ISO timestamp of last processing run
+	lastError?: string; // error message from last failure
 }
 ```
 
@@ -107,6 +107,7 @@ For each PR, the service:
 ### AI Item Extraction
 
 The extraction prompt includes:
+
 - Directory name and description for context
 - Existing category names for proper categorization
 - PR title, body, and diff content
@@ -116,19 +117,22 @@ The output is validated against a Zod schema:
 
 ```typescript
 z.object({
-    items: z.array(z.object({
-        name: z.string(),
-        description: z.string(),
-        source_url: z.string(),
-        category: z.string(),
-        tags: z.array(z.string()),
-    })),
+	items: z.array(
+		z.object({
+			name: z.string(),
+			description: z.string(),
+			source_url: z.string(),
+			category: z.string(),
+			tags: z.array(z.string())
+		})
+	)
 });
 ```
 
 ### Data Repository Updates
 
 Extracted items are written to the data repository using slugified names as directory paths. Each item gets:
+
 - A JSON data file with structured metadata
 - A markdown file with formatted content
 
@@ -137,6 +141,7 @@ Changes are committed with a descriptive message and pushed to the remote.
 ### PR Interaction
 
 The service posts comments on PRs at multiple stages:
+
 - **No changes detected:** Informational comment asking contributor to ensure additions exist
 - **No items extracted:** Comment explaining changes appear to be non-item updates
 - **Items added:** Comment listing all added items by name
@@ -144,11 +149,11 @@ The service posts comments on PRs at multiple stages:
 
 ## Database Interactions
 
-| Repository | Method | Purpose |
-|------------|--------|---------|
-| `DirectoryRepository` | `findWithCommunityPrEnabled()` | Find all directories with community PR enabled |
-| `DirectoryRepository` | `update(id, { communityPrState })` | Persist updated processing state |
-| `DirectoryRepository` | `increment(id, 'itemsCount', count)` | Atomically increment item count |
+| Repository            | Method                               | Purpose                                        |
+| --------------------- | ------------------------------------ | ---------------------------------------------- |
+| `DirectoryRepository` | `findWithCommunityPrEnabled()`       | Find all directories with community PR enabled |
+| `DirectoryRepository` | `update(id, { communityPrState })`   | Persist updated processing state               |
+| `DirectoryRepository` | `increment(id, 'itemsCount', count)` | Atomically increment item count                |
 
 ## Event System
 
@@ -175,13 +180,13 @@ const itemsAdded = await communityPrProcessor.processDirectory(directory);
 
 ## Configuration
 
-| Setting | Value | Description |
-|---------|-------|-------------|
-| `MAX_PROCESSED_PR_NUMBERS` | 500 | Maximum tracked PR numbers before trimming |
-| `MAX_CHANGE_CONTEXT_LENGTH` | 50,000 | Maximum characters of diff context sent to AI |
-| `communityPrEnabled` | per-directory | Feature flag on the directory entity |
-| `communityPrAutoClose` | per-directory | Whether to close PRs after processing |
-| AI temperature | 0.3 | Slightly creative for extraction flexibility |
+| Setting                     | Value         | Description                                   |
+| --------------------------- | ------------- | --------------------------------------------- |
+| `MAX_PROCESSED_PR_NUMBERS`  | 500           | Maximum tracked PR numbers before trimming    |
+| `MAX_CHANGE_CONTEXT_LENGTH` | 50,000        | Maximum characters of diff context sent to AI |
+| `communityPrEnabled`        | per-directory | Feature flag on the directory entity          |
+| `communityPrAutoClose`      | per-directory | Whether to close PRs after processing         |
+| AI temperature              | 0.3           | Slightly creative for extraction flexibility  |
 
 ## Related Services
 

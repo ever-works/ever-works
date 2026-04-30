@@ -13,12 +13,12 @@ This guide walks through setting up the Ever Works Platform for local developmen
 
 Before starting, ensure you have the following tools installed:
 
-| Tool | Minimum Version | Purpose | Install |
-|------|----------------|---------|---------|
-| **Node.js** | 20.x | JavaScript runtime | [nodejs.org](https://nodejs.org) |
-| **pnpm** | 10.30+ | Package manager (workspaces) | `corepack enable && corepack prepare pnpm@latest --activate` |
-| **Git** | 2.x | Version control, isomorphic-git operations | [git-scm.com](https://git-scm.com) |
-| **Docker** *(optional)* | 24.x | Container-based setup | [docker.com](https://www.docker.com) |
+| Tool                    | Minimum Version | Purpose                                    | Install                                                      |
+| ----------------------- | --------------- | ------------------------------------------ | ------------------------------------------------------------ |
+| **Node.js**             | 20.x            | JavaScript runtime                         | [nodejs.org](https://nodejs.org)                             |
+| **pnpm**                | 10.30+          | Package manager (workspaces)               | `corepack enable && corepack prepare pnpm@latest --activate` |
+| **Git**                 | 2.x             | Version control, isomorphic-git operations | [git-scm.com](https://git-scm.com)                           |
+| **Docker** _(optional)_ | 24.x            | Container-based setup                      | [docker.com](https://www.docker.com)                         |
 
 ### Verifying Prerequisites
 
@@ -197,10 +197,10 @@ docker compose up -d
 
 This starts two services:
 
-| Service | Port | Description |
-|---------|------|-------------|
+| Service          | Port | Description                       |
+| ---------------- | ---- | --------------------------------- |
 | `ever-works-api` | 3100 | NestJS API with file-based SQLite |
-| `ever-works-web` | 3000 | Next.js web dashboard |
+| `ever-works-web` | 3000 | Next.js web dashboard             |
 
 The compose file uses published container images from `ghcr.io/ever-works/`. A named volume `api_data` persists the SQLite database between restarts.
 

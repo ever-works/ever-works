@@ -15,12 +15,12 @@ The `DirectoryLifecycleService` manages the complete lifecycle of a directory en
 
 Every directory in Ever Works maps to a set of Git repositories (data, markdown, website). The lifecycle service orchestrates creating these repositories, persisting directory metadata in the database, and tearing everything down when a directory is deleted.
 
-| Operation | Required Role | Description |
-|-----------|--------------|-------------|
-| `createDirectory` | Authenticated user | Creates a new directory and its backing repositories |
-| `updateDirectory` | Editor or higher | Modifies directory metadata and settings |
-| `syncFromDataRepository` | Editor or higher | Pulls latest state from the data repo into the database |
-| `deleteDirectory` | Owner only | Removes the directory and optionally deletes all repositories |
+| Operation                | Required Role      | Description                                                   |
+| ------------------------ | ------------------ | ------------------------------------------------------------- |
+| `createDirectory`        | Authenticated user | Creates a new directory and its backing repositories          |
+| `updateDirectory`        | Editor or higher   | Modifies directory metadata and settings                      |
+| `syncFromDataRepository` | Editor or higher   | Pulls latest state from the data repo into the database       |
+| `deleteDirectory`        | Owner only         | Removes the directory and optionally deletes all repositories |
 
 ## Dependencies
 
@@ -56,14 +56,14 @@ The `createDirectory` method accepts a `CreateDirectoryDto` and a `User` context
 
 ```typescript
 const result = await lifecycleService.createDirectory(
-    {
-        slug: 'my-tools',
-        name: 'My Tools Directory',
-        description: 'A curated list of developer tools',
-        organization: false,
-        gitProvider: 'github',
-    },
-    currentUser,
+	{
+		slug: 'my-tools',
+		name: 'My Tools Directory',
+		description: 'A curated list of developer tools',
+		organization: false,
+		gitProvider: 'github'
+	},
+	currentUser
 );
 // result.directory contains the persisted entity
 ```
@@ -76,23 +76,19 @@ When a directory is freshly created, its `generateStatus` is `null` unless pre-e
 
 The `updateDirectory` method requires at least **Editor** role. It performs validation on several optional fields:
 
-| Field | Behavior |
-|-------|----------|
-| `name`, `description`, `owner`, `organization` | Merged with current values (fallback to existing) |
-| `readmeConfig` | Replaces the existing README configuration |
-| `deployProvider` | Validated against `DeployFacadeService.getAvailableProviders()` |
-| `websiteTemplateAutoUpdate` | Toggles automatic website template updates |
-| `websiteTemplateUseBeta` | Switches between stable and beta template branches; clears `websiteTemplateLastCommit` on change |
-| `communityPrEnabled`, `communityPrAutoClose` | Controls community pull request processing |
+| Field                                          | Behavior                                                                                         |
+| ---------------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| `name`, `description`, `owner`, `organization` | Merged with current values (fallback to existing)                                                |
+| `readmeConfig`                                 | Replaces the existing README configuration                                                       |
+| `deployProvider`                               | Validated against `DeployFacadeService.getAvailableProviders()`                                  |
+| `websiteTemplateAutoUpdate`                    | Toggles automatic website template updates                                                       |
+| `websiteTemplateUseBeta`                       | Switches between stable and beta template branches; clears `websiteTemplateLastCommit` on change |
+| `communityPrEnabled`, `communityPrAutoClose`   | Controls community pull request processing                                                       |
 
 The deploy provider validation checks that the supplied provider ID exists in the list of registered deploy providers. If it does not, a `BadRequestException` is thrown.
 
 ```typescript
-await lifecycleService.updateDirectory(
-    directoryId,
-    { name: 'Updated Name', deployProvider: 'vercel' },
-    currentUser,
-);
+await lifecycleService.updateDirectory(directoryId, { name: 'Updated Name', deployProvider: 'vercel' }, currentUser);
 ```
 
 ## Syncing from Data Repository
@@ -111,11 +107,11 @@ This method is typically invoked after external changes to the data repository (
 
 The `deleteDirectory` method requires **Owner** role and accepts a `DeleteDirectoryDto` that controls which repositories are removed:
 
-| Flag | Default | Effect |
-|------|---------|--------|
-| `delete_data_repository` | `true` | Removes the data repository via `dataGenerator.removeRepository()` |
-| `delete_markdown_repository` | `true` | Removes the markdown repository via `markdownGenerator.removeRepository()` |
-| `delete_website_repository` | `true` | Removes the website repository via `websiteGenerator.removeRepository()` |
+| Flag                         | Default | Effect                                                                     |
+| ---------------------------- | ------- | -------------------------------------------------------------------------- |
+| `delete_data_repository`     | `true`  | Removes the data repository via `dataGenerator.removeRepository()`         |
+| `delete_markdown_repository` | `true`  | Removes the markdown repository via `markdownGenerator.removeRepository()` |
+| `delete_website_repository`  | `true`  | Removes the website repository via `websiteGenerator.removeRepository()`   |
 
 The deletion flow:
 
@@ -127,13 +123,13 @@ The deletion flow:
 
 ```typescript
 const result = await lifecycleService.deleteDirectory(
-    directoryId,
-    {
-        delete_data_repository: true,
-        delete_markdown_repository: true,
-        delete_website_repository: false, // keep the website repo
-    },
-    currentUser,
+	directoryId,
+	{
+		delete_data_repository: true,
+		delete_markdown_repository: true,
+		delete_website_repository: false // keep the website repo
+	},
+	currentUser
 );
 // result.deleted_repositories: ['owner/my-tools-data', 'owner/my-tools']
 ```

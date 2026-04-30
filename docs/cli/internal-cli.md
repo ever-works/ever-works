@@ -49,25 +49,25 @@ The `CLIModule` imports the full agent stack for direct database and service acc
 
 ```typescript
 @Module({
-  imports: [
-    CacheFactory.TypeORM({ isGlobal: true }),
-    DatabaseConfigurations.cli(),
-    EventEmitterModule.forRoot(),
-    AgentPluginsModule.forRoot(),
-    ConfigModule,
-    DatabaseModule,
-    DataGeneratorModule,
-    ItemsGeneratorModule,
-    MarkdownGeneratorModule,
-    WebsiteGeneratorModule,
-    FacadesModule,
-    DirectoryModule,
-  ],
+	imports: [
+		CacheFactory.TypeORM({ isGlobal: true }),
+		DatabaseConfigurations.cli(),
+		EventEmitterModule.forRoot(),
+		AgentPluginsModule.forRoot(),
+		ConfigModule,
+		DatabaseModule,
+		DataGeneratorModule,
+		ItemsGeneratorModule,
+		MarkdownGeneratorModule,
+		WebsiteGeneratorModule,
+		FacadesModule,
+		DirectoryModule
+	]
 })
 export class CLIModule implements OnApplicationBootstrap {
-  async onApplicationBootstrap(): Promise<void> {
-    await this.pluginBootstrap.bootstrap();
-  }
+	async onApplicationBootstrap(): Promise<void> {
+		await this.pluginBootstrap.bootstrap();
+	}
 }
 ```
 
@@ -79,31 +79,31 @@ On startup, `PluginBootstrapService` initializes all registered plugins before a
 
 Configuration management for the internal CLI environment.
 
-| Subcommand   | Description                                |
-|--------------|--------------------------------------------|
-| `setup`      | Interactive setup wizard for initial config|
-| `show`       | Display current configuration values       |
-| `test`       | Test database and service connectivity     |
-| `set`        | Set a specific configuration value         |
-| `unset`      | Remove a configuration value               |
-| `switch-ai`  | Switch between configured AI providers     |
+| Subcommand  | Description                                 |
+| ----------- | ------------------------------------------- |
+| `setup`     | Interactive setup wizard for initial config |
+| `show`      | Display current configuration values        |
+| `test`      | Test database and service connectivity      |
+| `set`       | Set a specific configuration value          |
+| `unset`     | Remove a configuration value                |
+| `switch-ai` | Switch between configured AI providers      |
 
 ### `directory`
 
 Directory management commands that operate directly against the database.
 
-| Subcommand            | Description                                    |
-|-----------------------|------------------------------------------------|
-| `create`              | Create a new directory                         |
-| `list`                | List all directories                           |
-| `generate`            | Generate data and create a repository          |
-| `update`              | Update a directory and its repository          |
-| `submit-item`         | Submit an item to a directory                  |
-| `remove-item`         | Remove an item from a directory                |
-| `regenerate-markdown` | Regenerate readme markdown for a directory     |
-| `update-website`      | Update the website repository                  |
-| `deploy`              | Deploy the website for a directory             |
-| `delete`              | Delete a directory and its repositories        |
+| Subcommand            | Description                                |
+| --------------------- | ------------------------------------------ |
+| `create`              | Create a new directory                     |
+| `list`                | List all directories                       |
+| `generate`            | Generate data and create a repository      |
+| `update`              | Update a directory and its repository      |
+| `submit-item`         | Submit an item to a directory              |
+| `remove-item`         | Remove an item from a directory            |
+| `regenerate-markdown` | Regenerate readme markdown for a directory |
+| `update-website`      | Update the website repository              |
+| `deploy`              | Deploy the website for a directory         |
+| `delete`              | Delete a directory and its repositories    |
 
 ### `serve`
 
@@ -111,14 +111,14 @@ Start a local development server for testing and development purposes.
 
 ## Differences from the Public CLI
 
-| Aspect             | Public CLI (`ever-works`)          | Internal CLI (`@ever-works/cli`)   |
-|--------------------|------------------------------------|------------------------------------|
-| **Framework**      | Commander.js                       | nest-commander (NestJS)            |
-| **Data access**    | REST API via HTTP                  | Direct database + agent services   |
-| **Authentication** | JWT token via OAuth                | Database connection (no auth)      |
-| **Distribution**   | Public npm package                 | Private, monorepo only             |
-| **Use case**       | End-user CLI                       | Development and admin tasks        |
-| **Dependencies**   | API service client                 | Full agent stack (TypeORM, plugins)|
+| Aspect             | Public CLI (`ever-works`) | Internal CLI (`@ever-works/cli`)    |
+| ------------------ | ------------------------- | ----------------------------------- |
+| **Framework**      | Commander.js              | nest-commander (NestJS)             |
+| **Data access**    | REST API via HTTP         | Direct database + agent services    |
+| **Authentication** | JWT token via OAuth       | Database connection (no auth)       |
+| **Distribution**   | Public npm package        | Private, monorepo only              |
+| **Use case**       | End-user CLI              | Development and admin tasks         |
+| **Dependencies**   | API service client        | Full agent stack (TypeORM, plugins) |
 
 ## Running the Internal CLI
 

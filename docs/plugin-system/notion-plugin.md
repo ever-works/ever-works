@@ -1,7 +1,7 @@
 ---
 id: notion-plugin
-title: "Notion Extractor Plugin"
-sidebar_label: "Notion Extractor"
+title: 'Notion Extractor Plugin'
+sidebar_label: 'Notion Extractor'
 sidebar_position: 27
 ---
 
@@ -13,16 +13,16 @@ The Notion Extractor plugin extracts content from Notion pages and converts it t
 
 ## Overview
 
-| Property | Value |
-|---|---|
-| Plugin ID | `notion-extractor` |
-| Category | `content-extractor` |
-| Capabilities | `content-extractor` |
-| Version | `1.0.0` |
-| Built-in | No |
-| System plugin | No |
-| Supplementary | Yes |
-| Auto-enable | No |
+| Property      | Value               |
+| ------------- | ------------------- |
+| Plugin ID     | `notion-extractor`  |
+| Category      | `content-extractor` |
+| Capabilities  | `content-extractor` |
+| Version       | `1.0.0`             |
+| Built-in      | No                  |
+| System plugin | No                  |
+| Supplementary | Yes                 |
+| Auto-enable   | No                  |
 
 The plugin implements `IPlugin` and `IContentExtractorPlugin`. It is marked as `supplementary: true`, meaning it adds to the content extraction capability rather than replacing the default extractor.
 
@@ -52,6 +52,7 @@ async canExtract(url: string): Promise<boolean> {
 ```
 
 Accepted domains:
+
 - `notion.so` and subdomains (e.g., `www.notion.so`)
 - `notion.site` and subdomains (e.g., `myworkspace.notion.site`)
 
@@ -59,18 +60,18 @@ Accepted domains:
 
 ### Settings Schema
 
-| Setting | Type | Default | Required | Description |
-|---|---|---|---|---|
-| `apiKey` | `string` | (empty) | No | Notion integration API key for private pages |
-| `useSplitbeeForPublicPages` | `boolean` | `true` | No | Use the free Splitbee API for public pages |
-| `timeout` | `number` | `30000` | No | HTTP request timeout in milliseconds (5000--120000) |
+| Setting                     | Type      | Default | Required | Description                                         |
+| --------------------------- | --------- | ------- | -------- | --------------------------------------------------- |
+| `apiKey`                    | `string`  | (empty) | No       | Notion integration API key for private pages        |
+| `useSplitbeeForPublicPages` | `boolean` | `true`  | No       | Use the free Splitbee API for public pages          |
+| `timeout`                   | `number`  | `30000` | No       | HTTP request timeout in milliseconds (5000--120000) |
 
 ### Two Extraction Modes
 
-| Mode | When Used | API Key Required | Cost |
-|---|---|---|---|
-| **Splitbee API** | Public pages when `useSplitbeeForPublicPages` is `true` (default) | No | Free |
-| **Official Notion API** | Private pages, or when `useSplitbeeForPublicPages` is `false` | Yes | Free (Notion API) |
+| Mode                    | When Used                                                         | API Key Required | Cost              |
+| ----------------------- | ----------------------------------------------------------------- | ---------------- | ----------------- |
+| **Splitbee API**        | Public pages when `useSplitbeeForPublicPages` is `true` (default) | No               | Free              |
+| **Official Notion API** | Private pages, or when `useSplitbeeForPublicPages` is `false`     | Yes              | Free (Notion API) |
 
 The extraction mode is selected automatically based on the settings:
 
@@ -114,50 +115,50 @@ sequenceDiagram
 
 The `NotionService` class (`notion-extractor/src/notion.ts`) converts Notion blocks to markdown. Supported block types include:
 
-| Block Type | Markdown Output |
-|---|---|
-| Page title | `# Title` |
-| Heading 1 | `## Heading` |
-| Heading 2 | `### Heading` |
-| Heading 3 | `#### Heading` |
-| Paragraph / Text | Plain text with formatting |
-| Bulleted list | `- Item` |
-| Numbered list | `1. Item` |
-| To-do | `- [ ] Task` or `- [x] Task` |
-| Code block | Fenced code block with language |
-| Quote | `> Quoted text` |
-| Callout | `> Callout text` |
-| Divider | `---` |
-| Toggle | Heading with nested content |
-| Bookmark | `[URL](URL)` |
-| Image | `![Image](URL)` |
-| Embed | Embed URL reference |
-| Collection view | Table markdown |
+| Block Type       | Markdown Output                 |
+| ---------------- | ------------------------------- |
+| Page title       | `# Title`                       |
+| Heading 1        | `## Heading`                    |
+| Heading 2        | `### Heading`                   |
+| Heading 3        | `#### Heading`                  |
+| Paragraph / Text | Plain text with formatting      |
+| Bulleted list    | `- Item`                        |
+| Numbered list    | `1. Item`                       |
+| To-do            | `- [ ] Task` or `- [x] Task`    |
+| Code block       | Fenced code block with language |
+| Quote            | `> Quoted text`                 |
+| Callout          | `> Callout text`                |
+| Divider          | `---`                           |
+| Toggle           | Heading with nested content     |
+| Bookmark         | `[URL](URL)`                    |
+| Image            | `![Image](URL)`                 |
+| Embed            | Embed URL reference             |
+| Collection view  | Table markdown                  |
 
 ### Rich Text Formatting
 
 The service preserves inline formatting:
 
-| Notion Format | Markdown |
-|---|---|
-| Bold | `**text**` |
-| Italic | `*text*` |
-| Strikethrough | `~~text~~` |
-| Code | `` `text` `` |
-| Link | `[text](url)` |
+| Notion Format | Markdown      |
+| ------------- | ------------- |
+| Bold          | `**text**`    |
+| Italic        | `*text*`      |
+| Strikethrough | `~~text~~`    |
+| Code          | `` `text` ``  |
+| Link          | `[text](url)` |
 
 ### Extraction Result
 
-| Field | Type | Description |
-|---|---|---|
-| `success` | `boolean` | Whether extraction succeeded |
-| `url` | `string` | The original Notion URL |
-| `title` | `string` | Page title extracted from the first `#` heading |
-| `content` | `string` | Extracted text content |
-| `markdown` | `string` | Content in markdown format |
-| `wordCount` | `number` | Number of words extracted |
-| `readingTime` | `number` | Estimated reading time in minutes (200 wpm) |
-| `duration` | `number` | Extraction time in milliseconds |
+| Field         | Type      | Description                                     |
+| ------------- | --------- | ----------------------------------------------- |
+| `success`     | `boolean` | Whether extraction succeeded                    |
+| `url`         | `string`  | The original Notion URL                         |
+| `title`       | `string`  | Page title extracted from the first `#` heading |
+| `content`     | `string`  | Extracted text content                          |
+| `markdown`    | `string`  | Content in markdown format                      |
+| `wordCount`   | `number`  | Number of words extracted                       |
+| `readingTime` | `number`  | Estimated reading time in minutes (200 wpm)     |
+| `duration`    | `number`  | Extraction time in milliseconds                 |
 
 ### Batch Extraction
 
@@ -209,11 +210,11 @@ When a directory's source URLs include Notion pages, the content extraction faca
 
 ## Troubleshooting
 
-| Issue | Cause | Solution |
-|---|---|---|
-| "Not a Notion URL" | URL is not from notion.so or notion.site | Verify the URL domain |
-| "Could not extract page ID" | Malformed Notion URL | Use a standard Notion page URL |
-| Empty content from public page | Splitbee API issue or page not public | Verify the page is published and try again |
-| "Unauthorized" from Notion API | Integration not connected to page | Share the page with your Notion integration |
-| Timeout on large pages | Page has too many blocks | Increase the timeout setting or extract a subpage |
-| Missing formatting | Unsupported Notion block type | Check the supported block types list above |
+| Issue                          | Cause                                    | Solution                                          |
+| ------------------------------ | ---------------------------------------- | ------------------------------------------------- |
+| "Not a Notion URL"             | URL is not from notion.so or notion.site | Verify the URL domain                             |
+| "Could not extract page ID"    | Malformed Notion URL                     | Use a standard Notion page URL                    |
+| Empty content from public page | Splitbee API issue or page not public    | Verify the page is published and try again        |
+| "Unauthorized" from Notion API | Integration not connected to page        | Share the page with your Notion integration       |
+| Timeout on large pages         | Page has too many blocks                 | Increase the timeout setting or extract a subpage |
+| Missing formatting             | Unsupported Notion block type            | Check the supported block types list above        |

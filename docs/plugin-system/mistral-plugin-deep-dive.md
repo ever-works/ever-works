@@ -30,42 +30,42 @@ BaseAiProvider (from @ever-works/plugin/abstract)
 
 ### Provider Configuration
 
-| Property | Value |
-|----------|-------|
-| Base URL | `https://api.mistral.ai/v1` |
-| Default Model | `mistral-small-latest` |
-| Simple Tier | *(uses default)* |
-| Medium Tier | `mistral-medium-latest` |
-| Complex Tier | `mistral-large-latest` |
-| Max Context Tokens | `128000` |
-| Supports Embeddings | `true` |
-| Supports Vision | `true` (inherited default) |
+| Property            | Value                       |
+| ------------------- | --------------------------- |
+| Base URL            | `https://api.mistral.ai/v1` |
+| Default Model       | `mistral-small-latest`      |
+| Simple Tier         | _(uses default)_            |
+| Medium Tier         | `mistral-medium-latest`     |
+| Complex Tier        | `mistral-large-latest`      |
+| Max Context Tokens  | `128000`                    |
+| Supports Embeddings | `true`                      |
+| Supports Vision     | `true` (inherited default)  |
 
 ### Model Tiers
 
-| Tier | Model | Use Case |
-|------|-------|----------|
-| **Simple/Default** | `mistral-small-latest` | Fast, efficient tasks |
-| **Medium** | `mistral-medium-latest` | Balanced capability |
-| **Complex** | `mistral-large-latest` | Complex reasoning and generation |
+| Tier               | Model                   | Use Case                         |
+| ------------------ | ----------------------- | -------------------------------- |
+| **Simple/Default** | `mistral-small-latest`  | Fast, efficient tasks            |
+| **Medium**         | `mistral-medium-latest` | Balanced capability              |
+| **Complex**        | `mistral-large-latest`  | Complex reasoning and generation |
 
 ## Configuration
 
 ### Settings Schema
 
-| Field | Type | Required | Description |
-|-------|------|----------|-------------|
-| `apiKey` | `string` | Yes | Mistral API key (`x-secret`, `x-envVar: PLUGIN_MISTRAL_API_KEY`, `x-scope: user`) |
-| `model` | `string` | No | Override default model (`default: mistral-small-latest`) |
-| `simpleModel` | `string` | No | Model for simple tasks |
-| `mediumModel` | `string` | No | Model for medium tasks (`default: mistral-medium-latest`) |
-| `complexModel` | `string` | No | Model for complex tasks (`default: mistral-large-latest`) |
-| `maxContextTokens` | `number` | No | Override max context window (`default: 128000`) |
+| Field              | Type     | Required | Description                                                                       |
+| ------------------ | -------- | -------- | --------------------------------------------------------------------------------- |
+| `apiKey`           | `string` | Yes      | Mistral API key (`x-secret`, `x-envVar: PLUGIN_MISTRAL_API_KEY`, `x-scope: user`) |
+| `model`            | `string` | No       | Override default model (`default: mistral-small-latest`)                          |
+| `simpleModel`      | `string` | No       | Model for simple tasks                                                            |
+| `mediumModel`      | `string` | No       | Model for medium tasks (`default: mistral-medium-latest`)                         |
+| `complexModel`     | `string` | No       | Model for complex tasks (`default: mistral-large-latest`)                         |
+| `maxContextTokens` | `number` | No       | Override max context window (`default: 128000`)                                   |
 
 ### Environment Variables
 
-| Variable | Maps To |
-|----------|---------|
+| Variable                 | Maps To  |
+| ------------------------ | -------- |
 | `PLUGIN_MISTRAL_API_KEY` | `apiKey` |
 
 ## Capabilities
@@ -93,16 +93,16 @@ Through `BaseAiProvider` and `AiOperations`:
 
 ```typescript
 class MistralPlugin extends BaseAiProvider {
-    readonly id = 'mistral';
-    readonly name = 'Mistral';
-    readonly version = '1.0.0';
-    readonly providerName = 'Mistral';
+	readonly id = 'mistral';
+	readonly name = 'Mistral';
+	readonly version = '1.0.0';
+	readonly providerName = 'Mistral';
 
-    // Inherited from BaseAiProvider:
-    async askText(prompt: string, options?: AiRequestOptions): Promise<AiTextResult>;
-    async askJson<T>(prompt: string, schema: ZodSchema<T>, options?: AiRequestOptions): Promise<AiJsonResult<T>>;
-    async getEmbeddings(text: string): Promise<number[]>;
-    resolveConfig(settings: PluginSettings): ProviderConfig;
+	// Inherited from BaseAiProvider:
+	async askText(prompt: string, options?: AiRequestOptions): Promise<AiTextResult>;
+	async askJson<T>(prompt: string, schema: ZodSchema<T>, options?: AiRequestOptions): Promise<AiJsonResult<T>>;
+	async getEmbeddings(text: string): Promise<number[]>;
+	resolveConfig(settings: PluginSettings): ProviderConfig;
 }
 ```
 
@@ -131,6 +131,7 @@ Note the explicit `as string` and `as number` casts -- the Mistral plugin applie
 ### OpenAI Compatibility
 
 Mistral's API at `https://api.mistral.ai/v1` is OpenAI-compatible, supporting:
+
 - Chat completions (`/chat/completions`)
 - Embeddings (`/embeddings`)
 - Function/tool calling for structured output
@@ -140,6 +141,7 @@ This compatibility means LangChain's `ChatOpenAI` class works seamlessly with a 
 ### Model Naming Convention
 
 Mistral uses a `latest` suffix for their model aliases:
+
 - `mistral-small-latest` - Points to the latest small model version
 - `mistral-medium-latest` - Points to the latest medium model version
 - `mistral-large-latest` - Points to the latest large model version
@@ -163,11 +165,11 @@ This provides an extra layer of type safety when settings come from the generic 
 
 ```typescript
 const settings = {
-    apiKey: 'your-mistral-api-key',
-    // Using defaults:
-    // default/simple: mistral-small-latest
-    // medium: mistral-medium-latest
-    // complex: mistral-large-latest
+	apiKey: 'your-mistral-api-key'
+	// Using defaults:
+	// default/simple: mistral-small-latest
+	// medium: mistral-medium-latest
+	// complex: mistral-large-latest
 };
 ```
 
@@ -175,26 +177,36 @@ const settings = {
 
 ```typescript
 // Simple tasks use mistral-small-latest (fast, cheap)
-await aiFacade.askJson(prompt, schema, {
-    routing: { complexity: 'simple', taskId: 'domain-detection' }
-}, facadeOptions);
+await aiFacade.askJson(
+	prompt,
+	schema,
+	{
+		routing: { complexity: 'simple', taskId: 'domain-detection' }
+	},
+	facadeOptions
+);
 
 // Complex tasks use mistral-large-latest (most capable)
-await aiFacade.askJson(prompt, schema, {
-    routing: { complexity: 'complex', taskId: 'ai-item-generation' }
-}, facadeOptions);
+await aiFacade.askJson(
+	prompt,
+	schema,
+	{
+		routing: { complexity: 'complex', taskId: 'ai-item-generation' }
+	},
+	facadeOptions
+);
 ```
 
 ## Error Handling
 
 ### Common Errors
 
-| Error | Cause | Resolution |
-|-------|-------|------------|
-| `401 Unauthorized` | Invalid API key | Verify key at [console.mistral.ai](https://console.mistral.ai) |
-| `429 Rate Limited` | Quota exceeded | Check rate limits, implement backoff |
-| `400 Bad Request` | Invalid model or parameters | Verify model name |
-| `Context length exceeded` | Input too large for 128K window | Reduce input or use chunking |
+| Error                     | Cause                           | Resolution                                                     |
+| ------------------------- | ------------------------------- | -------------------------------------------------------------- |
+| `401 Unauthorized`        | Invalid API key                 | Verify key at [console.mistral.ai](https://console.mistral.ai) |
+| `429 Rate Limited`        | Quota exceeded                  | Check rate limits, implement backoff                           |
+| `400 Bad Request`         | Invalid model or parameters     | Verify model name                                              |
+| `Context length exceeded` | Input too large for 128K window | Reduce input or use chunking                                   |
 
 ### Health Check
 

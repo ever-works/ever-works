@@ -1,7 +1,7 @@
 ---
 id: urlbox-plugin
-title: "Urlbox Plugin"
-sidebar_label: "Urlbox"
+title: 'Urlbox Plugin'
+sidebar_label: 'Urlbox'
 sidebar_position: 40
 ---
 
@@ -13,17 +13,17 @@ The Urlbox plugin captures website screenshots using the [Urlbox API](https://ur
 
 ## Overview
 
-| Property | Value |
-|---|---|
-| Plugin ID | `urlbox` |
-| Category | `screenshot` |
-| Capabilities | `screenshot` |
-| Version | `1.0.0` |
-| Configuration Mode | `hybrid` |
-| Auto-enable | No |
-| Built-in | No |
-| System Plugin | No |
-| Dependencies | `urlbox` |
+| Property           | Value        |
+| ------------------ | ------------ |
+| Plugin ID          | `urlbox`     |
+| Category           | `screenshot` |
+| Capabilities       | `screenshot` |
+| Version            | `1.0.0`      |
+| Configuration Mode | `hybrid`     |
+| Auto-enable        | No           |
+| Built-in           | No           |
+| System Plugin      | No           |
+| Dependencies       | `urlbox`     |
 
 The plugin implements `IPlugin` and `IScreenshotPlugin`. It uses the official `urlbox` npm package to generate render links and download the resulting images.
 
@@ -53,28 +53,28 @@ Urlbox uses a two-step approach:
 
 ### Settings Schema
 
-| Setting | Type | Required | Default | Scope | Description |
-|---|---|---|---|---|---|
-| `apiKey` | `string` | Yes | -- | `user` | Urlbox API key (secret) |
-| `apiSecret` | `string` | No | -- | `user` | API secret for signed render links (secret) |
-| `viewportWidth` | `number` | No | `1280` | -- | Viewport width in pixels (320--3840) |
-| `viewportHeight` | `number` | No | `1024` | -- | Viewport height in pixels (200--2160) |
-| `format` | `string` | No | `"png"` | -- | Image format: `png`, `jpg`, `jpeg`, or `webp` |
-| `fullPage` | `boolean` | No | `false` | -- | Capture the full scrollable page |
-| `quality` | `number` | No | `80` | -- | Image quality for lossy formats (1--100) |
-| `retina` | `boolean` | No | `false` | -- | Enable retina/HiDPI rendering (2x scale) |
-| `blockAds` | `boolean` | No | `true` | -- | Block ads during capture |
-| `hideCookieBanners` | `boolean` | No | `true` | -- | Hide cookie consent banners |
+| Setting             | Type      | Required | Default | Scope  | Description                                   |
+| ------------------- | --------- | -------- | ------- | ------ | --------------------------------------------- |
+| `apiKey`            | `string`  | Yes      | --      | `user` | Urlbox API key (secret)                       |
+| `apiSecret`         | `string`  | No       | --      | `user` | API secret for signed render links (secret)   |
+| `viewportWidth`     | `number`  | No       | `1280`  | --     | Viewport width in pixels (320--3840)          |
+| `viewportHeight`    | `number`  | No       | `1024`  | --     | Viewport height in pixels (200--2160)         |
+| `format`            | `string`  | No       | `"png"` | --     | Image format: `png`, `jpg`, `jpeg`, or `webp` |
+| `fullPage`          | `boolean` | No       | `false` | --     | Capture the full scrollable page              |
+| `quality`           | `number`  | No       | `80`    | --     | Image quality for lossy formats (1--100)      |
+| `retina`            | `boolean` | No       | `false` | --     | Enable retina/HiDPI rendering (2x scale)      |
+| `blockAds`          | `boolean` | No       | `true`  | --     | Block ads during capture                      |
+| `hideCookieBanners` | `boolean` | No       | `true`  | --     | Hide cookie consent banners                   |
 
 ### Environment Variables
 
-| Variable | Description |
-|---|---|
-| `PLUGIN_URLBOX_API_KEY` | API key fallback |
-| `PLUGIN_URLBOX_API_SECRET` | API secret fallback |
-| `PLUGIN_URLBOX_VIEWPORT_WIDTH` | Viewport width fallback |
+| Variable                        | Description              |
+| ------------------------------- | ------------------------ |
+| `PLUGIN_URLBOX_API_KEY`         | API key fallback         |
+| `PLUGIN_URLBOX_API_SECRET`      | API secret fallback      |
+| `PLUGIN_URLBOX_VIEWPORT_WIDTH`  | Viewport width fallback  |
 | `PLUGIN_URLBOX_VIEWPORT_HEIGHT` | Viewport height fallback |
-| `PLUGIN_URLBOX_FORMAT` | Image format fallback |
+| `PLUGIN_URLBOX_FORMAT`          | Image format fallback    |
 
 ### Settings Resolution
 
@@ -142,17 +142,17 @@ The maximum viewport dimensions are 3840 x 2160 pixels (4K UHD).
 
 The plugin maps `ScreenshotOptions` to Urlbox `RenderOptions`:
 
-| Plugin Option | Urlbox RenderOption | Notes |
-|---|---|---|
-| `viewportWidth` | `width` | Viewport width |
-| `viewportHeight` | `height` | Viewport height |
-| `format` | `format` | Cast to `RenderOptions['format']` |
-| `fullPage` | `full_page` | Full page capture |
-| `blockAds` | `block_ads` | Ad blocking |
-| `blockCookieBanners` | `hide_cookie_banners` | Cookie banner removal |
-| `delay` | `delay` | Milliseconds before capture |
-| `waitForSelector` | `selector` | CSS selector to wait for |
-| `userAgent` | `user_agent` | Custom user agent string |
+| Plugin Option        | Urlbox RenderOption   | Notes                             |
+| -------------------- | --------------------- | --------------------------------- |
+| `viewportWidth`      | `width`               | Viewport width                    |
+| `viewportHeight`     | `height`              | Viewport height                   |
+| `format`             | `format`              | Cast to `RenderOptions['format']` |
+| `fullPage`           | `full_page`           | Full page capture                 |
+| `blockAds`           | `block_ads`           | Ad blocking                       |
+| `blockCookieBanners` | `hide_cookie_banners` | Cookie banner removal             |
+| `delay`              | `delay`               | Milliseconds before capture       |
+| `waitForSelector`    | `selector`            | CSS selector to wait for          |
+| `userAgent`          | `user_agent`          | Custom user agent string          |
 
 ## Usage in Pipelines
 
@@ -160,18 +160,18 @@ During directory generation, the screenshot facade sends capture requests to Url
 
 ## Comparison with ScreenshotOne
 
-| Feature | Urlbox | ScreenshotOne |
-|---|---|---|
-| SDK | `urlbox` | `screenshotone-api-sdk` |
-| Default viewport | 1280 x 1024 | 1280 x 800 |
-| Quality control | Yes (1--100 slider) | No |
-| Retina rendering | Boolean toggle (2x) | Device scale factor (0.5--3) |
-| Cookie banner blocking | Default enabled | Per-request |
-| Tracker blocking | No | Yes |
-| Ad blocking | Yes | Yes |
-| Server-side caching | No | Yes (with TTL) |
-| Supported formats | PNG, JPG, JPEG, WebP | PNG, JPG, JPEG, WebP |
-| Max dimensions | 3840 x 2160 | 3840 x 2160 |
+| Feature                | Urlbox               | ScreenshotOne                |
+| ---------------------- | -------------------- | ---------------------------- |
+| SDK                    | `urlbox`             | `screenshotone-api-sdk`      |
+| Default viewport       | 1280 x 1024          | 1280 x 800                   |
+| Quality control        | Yes (1--100 slider)  | No                           |
+| Retina rendering       | Boolean toggle (2x)  | Device scale factor (0.5--3) |
+| Cookie banner blocking | Default enabled      | Per-request                  |
+| Tracker blocking       | No                   | Yes                          |
+| Ad blocking            | Yes                  | Yes                          |
+| Server-side caching    | No                   | Yes (with TTL)               |
+| Supported formats      | PNG, JPG, JPEG, WebP | PNG, JPG, JPEG, WebP         |
+| Max dimensions         | 3840 x 2160          | 3840 x 2160                  |
 
 Urlbox provides a quality slider and simple retina toggle. ScreenshotOne offers more granular device scale factor control, tracker blocking, and built-in server-side caching.
 
@@ -181,29 +181,29 @@ Urlbox provides a quality slider and simple retina toggle. ScreenshotOne offers 
 
 ```typescript
 class UrlboxPlugin implements IPlugin, IScreenshotPlugin {
-  readonly id: 'urlbox';
-  readonly category: 'screenshot';
+	readonly id: 'urlbox';
+	readonly category: 'screenshot';
 
-  capture(options: ScreenshotOptions): Promise<ScreenshotResult>;
-  getScreenshotUrl(options: ScreenshotOptions): Promise<string | null>;
-  validateCredentials(): Promise<ScreenshotValidationResult>;
-  getSupportedFormats(): readonly ScreenshotFormat[];
-  getMaxDimensions(): { width: number; height: number };
+	capture(options: ScreenshotOptions): Promise<ScreenshotResult>;
+	getScreenshotUrl(options: ScreenshotOptions): Promise<string | null>;
+	validateCredentials(): Promise<ScreenshotValidationResult>;
+	getSupportedFormats(): readonly ScreenshotFormat[];
+	getMaxDimensions(): { width: number; height: number };
 }
 ```
 
 ### ScreenshotResult Fields
 
-| Field | Description |
-|---|---|
-| `success` | Whether capture succeeded |
-| `imageBuffer` | Raw image data as a Buffer |
+| Field         | Description                 |
+| ------------- | --------------------------- |
+| `success`     | Whether capture succeeded   |
+| `imageBuffer` | Raw image data as a Buffer  |
 | `imageBase64` | Base64-encoded image string |
-| `imageUrl` | The render link URL |
-| `width` | Viewport width used |
-| `height` | Viewport height used |
-| `fileSize` | Image file size in bytes |
-| `error` | Error message (on failure) |
+| `imageUrl`    | The render link URL         |
+| `width`       | Viewport width used         |
+| `height`      | Viewport height used        |
+| `fileSize`    | Image file size in bytes    |
+| `error`       | Error message (on failure)  |
 
 ## Getting Started
 
@@ -215,11 +215,11 @@ class UrlboxPlugin implements IPlugin, IScreenshotPlugin {
 
 ## Troubleshooting
 
-| Issue | Cause | Solution |
-|---|---|---|
-| "API key not configured" | Missing credentials | Set the API key in plugin settings or via environment variable |
-| Blank or incomplete screenshots | Page loads dynamic content | Use the `delay` option or `waitForSelector` |
-| Cookie banners in screenshots | `hideCookieBanners` disabled | Set `hideCookieBanners` to `true` (default) |
-| Blurry images | Retina mode disabled | Enable `retina` for HiDPI output |
-| Large file sizes | High quality + retina | Lower `quality` value or disable `retina` |
-| Render failed with status 4xx | Invalid API key or quota exceeded | Verify credentials and check Urlbox dashboard for usage |
+| Issue                           | Cause                             | Solution                                                       |
+| ------------------------------- | --------------------------------- | -------------------------------------------------------------- |
+| "API key not configured"        | Missing credentials               | Set the API key in plugin settings or via environment variable |
+| Blank or incomplete screenshots | Page loads dynamic content        | Use the `delay` option or `waitForSelector`                    |
+| Cookie banners in screenshots   | `hideCookieBanners` disabled      | Set `hideCookieBanners` to `true` (default)                    |
+| Blurry images                   | Retina mode disabled              | Enable `retina` for HiDPI output                               |
+| Large file sizes                | High quality + retina             | Lower `quality` value or disable `retina`                      |
+| Render failed with status 4xx   | Invalid API key or quota exceeded | Verify credentials and check Urlbox dashboard for usage        |

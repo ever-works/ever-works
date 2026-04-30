@@ -29,37 +29,37 @@ Pages are located under `app/[locale]/` and are organized into two route groups:
 
 ### Authentication Pages (`(auth)`)
 
-| Route | Purpose |
-|---|---|
-| `/login` | User login |
-| `/register` | User registration |
-| `/forgot-password` | Password reset request |
-| `/reset-password` | Password reset form |
-| `/auth/error` | Authentication error display |
+| Route              | Purpose                      |
+| ------------------ | ---------------------------- |
+| `/login`           | User login                   |
+| `/register`        | User registration            |
+| `/forgot-password` | Password reset request       |
+| `/reset-password`  | Password reset form          |
+| `/auth/error`      | Authentication error display |
 
 ### Dashboard Pages (`(dashboard)`)
 
-| Route | Purpose |
-|---|---|
-| `/` | Home dashboard with stats overview |
-| `/directories` | List of user directories |
-| `/directories/new` | Create a new directory (manual or AI) |
-| `/directories/[id]` | Directory overview |
-| `/directories/[id]/items` | Browse and manage items |
-| `/directories/[id]/generator` | Run AI generation |
-| `/directories/[id]/schedule` | Configure automated schedules |
-| `/directories/[id]/deploy` | Deploy the directory website |
-| `/directories/[id]/members` | Manage team members |
-| `/directories/[id]/settings` | Directory settings |
-| `/directories/[id]/plugins` | Per-directory plugin configuration |
-| `/directories/[id]/comparisons` | Item comparison pages |
-| `/directories/[id]/history` | Generation run history |
-| `/plugins` | Global plugin marketplace |
-| `/plugins/[pluginId]` | Plugin detail and configuration |
-| `/settings` | Profile settings |
-| `/settings/security` | Security and password |
-| `/settings/danger` | Danger zone (account deletion) |
-| `/settings/plugins/[category]` | Plugin settings by category |
+| Route                           | Purpose                               |
+| ------------------------------- | ------------------------------------- |
+| `/`                             | Home dashboard with stats overview    |
+| `/directories`                  | List of user directories              |
+| `/directories/new`              | Create a new directory (manual or AI) |
+| `/directories/[id]`             | Directory overview                    |
+| `/directories/[id]/items`       | Browse and manage items               |
+| `/directories/[id]/generator`   | Run AI generation                     |
+| `/directories/[id]/schedule`    | Configure automated schedules         |
+| `/directories/[id]/deploy`      | Deploy the directory website          |
+| `/directories/[id]/members`     | Manage team members                   |
+| `/directories/[id]/settings`    | Directory settings                    |
+| `/directories/[id]/plugins`     | Per-directory plugin configuration    |
+| `/directories/[id]/comparisons` | Item comparison pages                 |
+| `/directories/[id]/history`     | Generation run history                |
+| `/plugins`                      | Global plugin marketplace             |
+| `/plugins/[pluginId]`           | Plugin detail and configuration       |
+| `/settings`                     | Profile settings                      |
+| `/settings/security`            | Security and password                 |
+| `/settings/danger`              | Danger zone (account deletion)        |
+| `/settings/plugins/[category]`  | Plugin settings by category           |
 
 ## Middleware and Proxy
 
@@ -89,14 +89,14 @@ Locale routing is configured in `i18n/routing.ts` using `next-intl`'s `defineRou
 
 ## Key Technologies
 
-| Technology | Purpose |
-|---|---|
-| Next.js 16 | Framework (App Router, React Server Components) |
-| React 19 | UI library |
-| Tailwind CSS 4 | Utility-first styling |
-| next-intl | Internationalization and locale routing |
-| path-to-regexp | Route matching in middleware |
-| shadcn/ui | Base component primitives |
+| Technology     | Purpose                                         |
+| -------------- | ----------------------------------------------- |
+| Next.js 16     | Framework (App Router, React Server Components) |
+| React 19       | UI library                                      |
+| Tailwind CSS 4 | Utility-first styling                           |
+| next-intl      | Internationalization and locale routing         |
+| path-to-regexp | Route matching in middleware                    |
+| shadcn/ui      | Base component primitives                       |
 
 ## Development
 

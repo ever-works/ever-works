@@ -31,43 +31,43 @@ Enable scheduled updates on directories where the underlying data changes freque
 
 ### Cadences
 
-| Cadence | Interval |
-|---------|----------|
-| `hourly` | Every hour |
-| `daily` | Every 24 hours |
-| `weekly` | Every 7 days |
-| `monthly` | Every 30 days |
+| Cadence   | Interval       |
+| --------- | -------------- |
+| `hourly`  | Every hour     |
+| `daily`   | Every 24 hours |
+| `weekly`  | Every 7 days   |
+| `monthly` | Every 30 days  |
 
 Available cadences may depend on your subscription plan. Cadences not included in your plan can still be used with pay-per-use billing.
 
 ### Billing Modes
 
-| Mode | Description |
-|------|-------------|
+| Mode           | Description                                               |
+| -------------- | --------------------------------------------------------- |
 | `subscription` | Counts against your plan's included scheduled directories |
-| `usage` | Pay-per-use — bypasses plan limits, any cadence available |
+| `usage`        | Pay-per-use — bypasses plan limits, any cadence available |
 
 ### Settings
 
-| Field | Type | Default | Description |
-|-------|------|---------|-------------|
-| `cadence` | string | — | `hourly`, `daily`, `weekly`, or `monthly` (required on creation) |
-| `billingMode` | string | `subscription` | `subscription` or `usage` |
-| `maxFailureBeforePause` | number | `3` | Consecutive failures before auto-pause (1–10) |
-| `alwaysCreatePullRequest` | boolean | `false` | Force a PR for every scheduled run |
-| `providerOverrides` | object | `null` | Override AI, search, screenshot, content extractor, or pipeline plugins for this schedule |
+| Field                     | Type    | Default        | Description                                                                               |
+| ------------------------- | ------- | -------------- | ----------------------------------------------------------------------------------------- |
+| `cadence`                 | string  | —              | `hourly`, `daily`, `weekly`, or `monthly` (required on creation)                          |
+| `billingMode`             | string  | `subscription` | `subscription` or `usage`                                                                 |
+| `maxFailureBeforePause`   | number  | `3`            | Consecutive failures before auto-pause (1–10)                                             |
+| `alwaysCreatePullRequest` | boolean | `false`        | Force a PR for every scheduled run                                                        |
+| `providerOverrides`       | object  | `null`         | Override AI, search, screenshot, content extractor, or pipeline plugins for this schedule |
 
 ### Provider Overrides
 
 You can override which plugins the scheduled run uses, independent of the directory's default settings:
 
-| Field | Description |
-|-------|-------------|
-| `ai` | AI provider plugin ID |
-| `search` | Search provider plugin ID |
-| `screenshot` | Screenshot provider plugin ID |
-| `contentExtractor` | Content extractor plugin ID |
-| `pipeline` | Pipeline plugin ID |
+| Field              | Description                   |
+| ------------------ | ----------------------------- |
+| `ai`               | AI provider plugin ID         |
+| `search`           | Search provider plugin ID     |
+| `screenshot`       | Screenshot provider plugin ID |
+| `contentExtractor` | Content extractor plugin ID   |
+| `pipeline`         | Pipeline plugin ID            |
 
 Each override must reference an installed and enabled plugin. Set `providerOverrides` to `null` to clear all overrides.
 
@@ -77,9 +77,9 @@ All endpoints require JWT authentication.
 
 ### Get Schedule
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| `GET` | `/api/directories/:id/schedule` | Get the current schedule and status |
+| Method | Endpoint                        | Description                         |
+| ------ | ------------------------------- | ----------------------------------- |
+| `GET`  | `/api/directories/:id/schedule` | Get the current schedule and status |
 
 ```bash
 curl http://localhost:3100/api/directories/<directory-id>/schedule \
@@ -90,34 +90,34 @@ curl http://localhost:3100/api/directories/<directory-id>/schedule \
 
 ```json
 {
-  "status": "success",
-  "directoryId": "<uuid>",
-  "schedule": {
-    "status": "active",
-    "cadence": "weekly",
-    "billingMode": "subscription",
-    "nextRunAt": "2026-02-26T10:00:00.000Z",
-    "lastRunAt": "2026-02-19T10:00:00.000Z",
-    "lastRunStatus": "generated",
-    "failureCount": 0,
-    "maxFailureBeforePause": 3,
-    "alwaysCreatePullRequest": false,
-    "allowedCadences": [
-      { "cadence": "weekly", "allowed": true },
-      { "cadence": "daily", "allowed": true },
-      { "cadence": "hourly", "allowed": false, "payPerUse": true, "reason": "Upgrade to Pro for this cadence" }
-    ],
-    "subscriptionsEnabled": true,
-    "providerOverrides": null
-  }
+	"status": "success",
+	"directoryId": "<uuid>",
+	"schedule": {
+		"status": "active",
+		"cadence": "weekly",
+		"billingMode": "subscription",
+		"nextRunAt": "2026-02-26T10:00:00.000Z",
+		"lastRunAt": "2026-02-19T10:00:00.000Z",
+		"lastRunStatus": "generated",
+		"failureCount": 0,
+		"maxFailureBeforePause": 3,
+		"alwaysCreatePullRequest": false,
+		"allowedCadences": [
+			{ "cadence": "weekly", "allowed": true },
+			{ "cadence": "daily", "allowed": true },
+			{ "cadence": "hourly", "allowed": false, "payPerUse": true, "reason": "Upgrade to Pro for this cadence" }
+		],
+		"subscriptionsEnabled": true,
+		"providerOverrides": null
+	}
 }
 ```
 
 ### Create or Update Schedule
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| `PUT` | `/api/directories/:id/schedule` | Create or update a schedule |
+| Method | Endpoint                        | Description                 |
+| ------ | ------------------------------- | --------------------------- |
+| `PUT`  | `/api/directories/:id/schedule` | Create or update a schedule |
 
 ```bash
 curl -X PUT http://localhost:3100/api/directories/<directory-id>/schedule \
@@ -133,30 +133,30 @@ curl -X PUT http://localhost:3100/api/directories/<directory-id>/schedule \
 
 **Request body — all fields optional:**
 
-| Field | Type | Description |
-|-------|------|-------------|
-| `enable` | boolean | `true` to activate, `false` to pause |
-| `cadence` | string | `hourly`, `daily`, `weekly`, or `monthly` |
-| `billingMode` | string | `subscription` or `usage` |
-| `maxFailureBeforePause` | number | 1–10 |
-| `alwaysCreatePullRequest` | boolean | Force PR on every run |
-| `providerOverrides` | object or null | Plugin overrides (set to `null` to clear) |
+| Field                     | Type           | Description                               |
+| ------------------------- | -------------- | ----------------------------------------- |
+| `enable`                  | boolean        | `true` to activate, `false` to pause      |
+| `cadence`                 | string         | `hourly`, `daily`, `weekly`, or `monthly` |
+| `billingMode`             | string         | `subscription` or `usage`                 |
+| `maxFailureBeforePause`   | number         | 1–10                                      |
+| `alwaysCreatePullRequest` | boolean        | Force PR on every run                     |
+| `providerOverrides`       | object or null | Plugin overrides (set to `null` to clear) |
 
 **Errors:**
 
-| Status | Reason |
-|--------|--------|
-| `400` | Cadence not provided and no existing schedule |
-| `400` | Cadence not available on plan and billing mode is `subscription` |
-| `400` | `maxFailureBeforePause` outside 1–10 |
-| `400` | Provider override references an uninstalled or disabled plugin |
-| `400` | Activating would exceed plan's directory limit |
-| `400` | Directory has not completed initial generation |
+| Status | Reason                                                           |
+| ------ | ---------------------------------------------------------------- |
+| `400`  | Cadence not provided and no existing schedule                    |
+| `400`  | Cadence not available on plan and billing mode is `subscription` |
+| `400`  | `maxFailureBeforePause` outside 1–10                             |
+| `400`  | Provider override references an uninstalled or disabled plugin   |
+| `400`  | Activating would exceed plan's directory limit                   |
+| `400`  | Directory has not completed initial generation                   |
 
 ### Cancel Schedule
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
+| Method   | Endpoint                        | Description         |
+| -------- | ------------------------------- | ------------------- |
 | `DELETE` | `/api/directories/:id/schedule` | Cancel the schedule |
 
 ```bash
@@ -168,8 +168,8 @@ Canceling resets the schedule to its default state (cadence cleared, billing mod
 
 ### Run Immediately
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
+| Method | Endpoint                            | Description                 |
+| ------ | ----------------------------------- | --------------------------- |
 | `POST` | `/api/directories/:id/schedule/run` | Trigger a scheduled run now |
 
 ```bash
@@ -181,12 +181,12 @@ Returns `202 Accepted`. The schedule must be in `active` status — returns `400
 
 ## Schedule Statuses
 
-| Status | Description |
-|--------|-------------|
-| `disabled` | Default state — schedule exists but was never activated |
-| `active` | Running on the configured cadence |
-| `paused` | Temporarily stopped (manually or due to exceeding failure threshold) |
-| `canceled` | Schedule was deleted and reset |
+| Status     | Description                                                          |
+| ---------- | -------------------------------------------------------------------- |
+| `disabled` | Default state — schedule exists but was never activated              |
+| `active`   | Running on the configured cadence                                    |
+| `paused`   | Temporarily stopped (manually or due to exceeding failure threshold) |
+| `canceled` | Schedule was deleted and reset                                       |
 
 ## Related
 

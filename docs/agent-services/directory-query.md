@@ -15,26 +15,23 @@ The `DirectoryQueryService` provides read-only access to directory data, items, 
 
 All query methods enforce role-based access through the `DirectoryOwnershipService`. Most queries require only **Viewer** level access, while write operations like updating website settings require **Editor** level.
 
-| Method | Required Role | Description |
-|--------|--------------|-------------|
-| `getDirectories` | Authenticated | Lists all directories accessible to the user |
-| `getDirectory` | Viewer | Gets a single directory by ID |
-| `directoryExists` | Authenticated | Checks if a directory with a given slug exists |
-| `directoryItems` | Viewer | Lists all items in a directory |
-| `directoryConfig` | Viewer | Gets the data repository configuration |
-| `directoryCount` | Viewer | Gets item, category, and tag counts |
-| `directoryCategoriesTags` | Viewer | Lists categories, tags, and collections |
-| `directoryGenerationHistory` | Viewer | Paginated generation run history |
-| `getWebsiteSettings` | Viewer | Gets website display settings |
-| `updateWebsiteSettings` | Editor | Updates website display settings |
+| Method                       | Required Role | Description                                    |
+| ---------------------------- | ------------- | ---------------------------------------------- |
+| `getDirectories`             | Authenticated | Lists all directories accessible to the user   |
+| `getDirectory`               | Viewer        | Gets a single directory by ID                  |
+| `directoryExists`            | Authenticated | Checks if a directory with a given slug exists |
+| `directoryItems`             | Viewer        | Lists all items in a directory                 |
+| `directoryConfig`            | Viewer        | Gets the data repository configuration         |
+| `directoryCount`             | Viewer        | Gets item, category, and tag counts            |
+| `directoryCategoriesTags`    | Viewer        | Lists categories, tags, and collections        |
+| `directoryGenerationHistory` | Viewer        | Paginated generation run history               |
+| `getWebsiteSettings`         | Viewer        | Gets website display settings                  |
+| `updateWebsiteSettings`      | Editor        | Updates website display settings               |
 
 ## Listing Directories
 
 ```typescript
-const result = await queryService.getDirectories(
-    { limit: 20, offset: 0, search: 'tools' },
-    user,
-);
+const result = await queryService.getDirectories({ limit: 20, offset: 0, search: 'tools' }, user);
 ```
 
 ### How It Works
@@ -50,7 +47,7 @@ const result = await queryService.getDirectories(
 
 ```typescript
 type DirectoryWithRole = Omit<Directory, DirectoryMethods> & {
-    userRole: DirectoryMemberRole;
+	userRole: DirectoryMemberRole;
 };
 ```
 
@@ -113,37 +110,35 @@ const settings = await queryService.getWebsiteSettings(directoryId, user);
 
 Returns:
 
-| Field | Type | Default | Description |
-|-------|------|---------|-------------|
-| `company_name` | `string` | `'Acme'` | Brand name displayed on the website |
-| `company_website` | `string` | `''` | Company URL |
-| `settings` | `object` | `{}` | Feature toggles and defaults |
-| `custom_menu` | `object` | `{ header: [], footer: [] }` | Custom navigation links |
+| Field             | Type     | Default                      | Description                         |
+| ----------------- | -------- | ---------------------------- | ----------------------------------- |
+| `company_name`    | `string` | `'Acme'`                     | Brand name displayed on the website |
+| `company_website` | `string` | `''`                         | Company URL                         |
+| `settings`        | `object` | `{}`                         | Feature toggles and defaults        |
+| `custom_menu`     | `object` | `{ header: [], footer: [] }` | Custom navigation links             |
 
 ### Updating Settings
 
 ```typescript
 await queryService.updateWebsiteSettings(directoryId, user, {
-    company_name: 'My Brand',
-    categories_enabled: true,
-    header: {
-        submit_enabled: true,
-        layout_enabled: true,
-        theme_default: 'dark',
-    },
-    homepage: {
-        hero_enabled: true,
-        search_enabled: true,
-        default_view: 'grid',
-    },
-    footer: {
-        subscribe_enabled: false,
-    },
-    custom_menu: {
-        header: [
-            { label: 'Blog', path: '/blog', target: '_self' },
-        ],
-    },
+	company_name: 'My Brand',
+	categories_enabled: true,
+	header: {
+		submit_enabled: true,
+		layout_enabled: true,
+		theme_default: 'dark'
+	},
+	homepage: {
+		hero_enabled: true,
+		search_enabled: true,
+		default_view: 'grid'
+	},
+	footer: {
+		subscribe_enabled: false
+	},
+	custom_menu: {
+		header: [{ label: 'Blog', path: '/blog', target: '_self' }]
+	}
 });
 ```
 
@@ -170,41 +165,37 @@ Returns the full taxonomy data including categories, tags, and collections defin
 ## Generation History
 
 ```typescript
-const history = await queryService.directoryGenerationHistory(
-    directoryId,
-    user,
-    { limit: 20, offset: 0 },
-);
+const history = await queryService.directoryGenerationHistory(directoryId, user, { limit: 20, offset: 0 });
 ```
 
 ### Response: DirectoryGenerationHistoryListDto
 
 ```typescript
 interface DirectoryGenerationHistoryListDto {
-    history: DirectoryGenerationHistoryDto[];
-    total: number;
-    limit: number;   // clamped to 1-100
-    offset: number;  // minimum 0
+	history: DirectoryGenerationHistoryDto[];
+	total: number;
+	limit: number; // clamped to 1-100
+	offset: number; // minimum 0
 }
 ```
 
 ### DirectoryGenerationHistoryDto
 
-| Field | Type | Description |
-|-------|------|-------------|
-| `id` | `string` | History record UUID |
-| `status` | `GenerateStatusType` | `GENERATING`, `GENERATED`, `ERROR` |
-| `generationMethod` | `GenerationMethod` | `CREATE_UPDATE` or `RECREATE` |
-| `startedAt` | `string` | ISO timestamp of generation start |
-| `finishedAt` | `string` | ISO timestamp of generation end |
-| `durationInSeconds` | `number` | Wall-clock duration |
-| `newItemsCount` | `number` | Items created in this run |
-| `updatedItemsCount` | `number` | Items updated in this run |
-| `totalItemsCount` | `number` | Total items after this run |
-| `metrics` | `GenerationMetrics` | Detailed pipeline metrics |
-| `errorMessage` | `string` | Error details (if status is ERROR) |
-| `parameters` | `Record<string, any>` | Generation parameters used |
-| `triggerRunId` | `string` | Trigger.dev run ID (for background tasks) |
+| Field               | Type                  | Description                               |
+| ------------------- | --------------------- | ----------------------------------------- |
+| `id`                | `string`              | History record UUID                       |
+| `status`            | `GenerateStatusType`  | `GENERATING`, `GENERATED`, `ERROR`        |
+| `generationMethod`  | `GenerationMethod`    | `CREATE_UPDATE` or `RECREATE`             |
+| `startedAt`         | `string`              | ISO timestamp of generation start         |
+| `finishedAt`        | `string`              | ISO timestamp of generation end           |
+| `durationInSeconds` | `number`              | Wall-clock duration                       |
+| `newItemsCount`     | `number`              | Items created in this run                 |
+| `updatedItemsCount` | `number`              | Items updated in this run                 |
+| `totalItemsCount`   | `number`              | Total items after this run                |
+| `metrics`           | `GenerationMetrics`   | Detailed pipeline metrics                 |
+| `errorMessage`      | `string`              | Error details (if status is ERROR)        |
+| `parameters`        | `Record<string, any>` | Generation parameters used                |
+| `triggerRunId`      | `string`              | Trigger.dev run ID (for background tasks) |
 
 ## Error Handling
 

@@ -17,22 +17,22 @@ The migration runner is configured in `apps/api/typeorm.config.ts`:
 
 ```typescript
 export default new DataSource({
-    ...(databaseConfig() as any),
-    migrationsRun: false,
-    migrationsTableName: 'migrations',
-    migrationsTransactionMode: 'all',
-    migrations: [__dirname + '/src/migrations/**/*{.js,.ts}'],
+	...(databaseConfig() as any),
+	migrationsRun: false,
+	migrationsTableName: 'migrations',
+	migrationsTransactionMode: 'all',
+	migrations: [__dirname + '/src/migrations/**/*{.js,.ts}']
 });
 ```
 
 Key settings:
 
-| Setting | Value | Purpose |
-|---|---|---|
-| `migrationsRun` | `false` | Migrations are not auto-run on startup |
-| `migrationsTableName` | `migrations` | Table tracking applied migrations |
-| `migrationsTransactionMode` | `all` | Each migration runs inside a transaction |
-| `migrations` | `src/migrations/**/*` | Glob pattern for migration files |
+| Setting                     | Value                 | Purpose                                  |
+| --------------------------- | --------------------- | ---------------------------------------- |
+| `migrationsRun`             | `false`               | Migrations are not auto-run on startup   |
+| `migrationsTableName`       | `migrations`          | Table tracking applied migrations        |
+| `migrationsTransactionMode` | `all`                 | Each migration runs inside a transaction |
+| `migrations`                | `src/migrations/**/*` | Glob pattern for migration files         |
 
 The DataSource reuses the same `databaseConfig()` function used by the application, ensuring migrations target the same database.
 
@@ -67,11 +67,11 @@ The `migration:revert` command undoes the most recently applied migration by run
 
 The platform supports three database drivers, each with different migration strategies:
 
-| Driver | Migration Strategy | When Used |
-|---|---|---|
-| `better-sqlite3` | Schema sync (`synchronize: true`) | Development, CLI, testing |
-| `postgres` | TypeORM migrations | Production |
-| `mysql` / `mariadb` | TypeORM migrations | Production (alternative) |
+| Driver              | Migration Strategy                | When Used                 |
+| ------------------- | --------------------------------- | ------------------------- |
+| `better-sqlite3`    | Schema sync (`synchronize: true`) | Development, CLI, testing |
+| `postgres`          | TypeORM migrations                | Production                |
+| `mysql` / `mariadb` | TypeORM migrations                | Production (alternative)  |
 
 ### SQLite and Schema Sync
 
@@ -79,9 +79,9 @@ SQLite environments do not use migrations. Instead, schema synchronization is en
 
 ```typescript
 const baseConfig: any = {
-    entities: ENTITIES,
-    synchronize: config.database.autoMigrate(),
-    logging: config.database.loggingEnabled(),
+	entities: ENTITIES,
+	synchronize: config.database.autoMigrate(),
+	logging: config.database.loggingEnabled()
 };
 ```
 
@@ -91,7 +91,7 @@ For CLI applications, the `DatabaseInitService` forces synchronization during mo
 
 ```typescript
 if (process.env.APP_TYPE === 'cli') {
-    await this.dataSource.synchronize();
+	await this.dataSource.synchronize();
 }
 ```
 
@@ -143,7 +143,7 @@ let dbType = config.database.getType();
 
 // Normalize sqlite variants to better-sqlite3
 if (dbType === 'sqlite' || dbType === 'sqlite3') {
-    dbType = 'better-sqlite3';
+	dbType = 'better-sqlite3';
 }
 ```
 
@@ -153,21 +153,21 @@ If an unknown type is provided, the configuration falls back to in-memory SQLite
 
 ## Environment Variables
 
-| Variable | Purpose | Default |
-|---|---|---|
-| `DATABASE_TYPE` | Driver selection | `better-sqlite3` |
-| `DATABASE_PATH` | SQLite file path | Platform-dependent |
-| `DATABASE_URL` | Connection URL (postgres/mysql) | - |
-| `DATABASE_HOST` | Database host | `localhost` |
-| `DATABASE_PORT` | Database port | `5432` (pg) / `3306` (mysql) |
-| `DATABASE_USERNAME` | Database user | `postgres` / `root` |
-| `DATABASE_PASSWORD` | Database password | - |
-| `DATABASE_NAME` | Database name | `ever_works` |
-| `DATABASE_AUTO_MIGRATE` | Enable schema sync | - |
-| `DATABASE_LOGGING` | Enable query logging | `false` |
-| `DATABASE_IN_MEMORY` | Use in-memory SQLite | - |
-| `DATABASE_SSL_MODE` | Enable SSL/TLS | `false` |
-| `DATABASE_CA_CERT` | CA certificate (base64) | - |
+| Variable                | Purpose                         | Default                      |
+| ----------------------- | ------------------------------- | ---------------------------- |
+| `DATABASE_TYPE`         | Driver selection                | `better-sqlite3`             |
+| `DATABASE_PATH`         | SQLite file path                | Platform-dependent           |
+| `DATABASE_URL`          | Connection URL (postgres/mysql) | -                            |
+| `DATABASE_HOST`         | Database host                   | `localhost`                  |
+| `DATABASE_PORT`         | Database port                   | `5432` (pg) / `3306` (mysql) |
+| `DATABASE_USERNAME`     | Database user                   | `postgres` / `root`          |
+| `DATABASE_PASSWORD`     | Database password               | -                            |
+| `DATABASE_NAME`         | Database name                   | `ever_works`                 |
+| `DATABASE_AUTO_MIGRATE` | Enable schema sync              | -                            |
+| `DATABASE_LOGGING`      | Enable query logging            | `false`                      |
+| `DATABASE_IN_MEMORY`    | Use in-memory SQLite            | -                            |
+| `DATABASE_SSL_MODE`     | Enable SSL/TLS                  | `false`                      |
+| `DATABASE_CA_CERT`      | CA certificate (base64)         | -                            |
 
 ## Migration Workflow
 
@@ -176,16 +176,16 @@ If an unknown type is provided, the configuration falls back to in-memory SQLite
 1. Modify entity files in `packages/agent/src/entities/`.
 2. If using SQLite (default for dev), schema sync handles changes automatically.
 3. For PostgreSQL testing, generate a migration:
-   ```bash
-   cd apps/api
-   DATABASE_TYPE=postgres DATABASE_URL=postgresql://... \
-     pnpm typeorm migration:generate -d typeorm.config.ts src/migrations/AddNewColumn
-   ```
+    ```bash
+    cd apps/api
+    DATABASE_TYPE=postgres DATABASE_URL=postgresql://... \
+      pnpm typeorm migration:generate -d typeorm.config.ts src/migrations/AddNewColumn
+    ```
 4. Review the generated migration file.
 5. Run the migration against the target database:
-   ```bash
-   pnpm typeorm migration:run -d typeorm.config.ts
-   ```
+    ```bash
+    pnpm typeorm migration:run -d typeorm.config.ts
+    ```
 
 ### Production
 
@@ -197,11 +197,11 @@ If an unknown type is provided, the configuration falls back to in-memory SQLite
 
 When writing entities and queries, be aware of cross-database differences:
 
-| Concern | SQLite | PostgreSQL | MySQL |
-|---|---|---|---|
-| JSON columns | `simple-json` (text serialized) | Native `json`/`jsonb` | Native `json` |
-| Timestamps | Stored as text strings | Native `timestamp` | Native `datetime` |
-| Case sensitivity | Case-insensitive by default | Case-sensitive | Depends on collation |
-| Unique partial indexes | Not supported | Supported | Not supported |
+| Concern                | SQLite                          | PostgreSQL            | MySQL                |
+| ---------------------- | ------------------------------- | --------------------- | -------------------- |
+| JSON columns           | `simple-json` (text serialized) | Native `json`/`jsonb` | Native `json`        |
+| Timestamps             | Stored as text strings          | Native `timestamp`    | Native `datetime`    |
+| Case sensitivity       | Case-insensitive by default     | Case-sensitive        | Depends on collation |
+| Unique partial indexes | Not supported                   | Supported             | Not supported        |
 
 The `TimestampColumn` decorator and `caseInsensitiveLike()` helper abstract these differences. When adding new queries, always use the `LOWER()` function for case-insensitive comparisons to ensure compatibility.

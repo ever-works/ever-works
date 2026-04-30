@@ -59,12 +59,12 @@ The `DataGeneratorService` is the primary entry point for directory content gene
 
 ### Key Methods
 
-| Method | Purpose |
-|--------|---------|
-| `initialize()` | Full directory generation: clone repo, run pipeline, write data, push |
-| `addItems()` | Add or update individual items |
-| `removeItem()` | Remove an item from the data repository |
-| `removeRepository()` | Delete the data Git repository |
+| Method               | Purpose                                                               |
+| -------------------- | --------------------------------------------------------------------- |
+| `initialize()`       | Full directory generation: clone repo, run pipeline, write data, push |
+| `addItems()`         | Add or update individual items                                        |
+| `removeItem()`       | Remove an item from the data repository                               |
+| `removeRepository()` | Delete the data Git repository                                        |
 
 ### Generation Flow
 
@@ -100,11 +100,11 @@ The `DataGeneratorService` creates a `DirectoryReference` and `GenerationRequest
 
 ```typescript
 const pipelineResult = await this.pipelineOrchestrator.execute(
-    directoryRef,
-    generationRequest,
-    existingItems,
-    { signal },
-    onProgress,
+	directoryRef,
+	generationRequest,
+	existingItems,
+	{ signal },
+	onProgress
 );
 ```
 
@@ -127,11 +127,11 @@ The `MarkdownGeneratorService` transforms data repository content into a human-r
 
 ### Key Components
 
-| Component | Purpose |
-|-----------|---------|
-| `MarkdownGeneratorService` | Orchestrates markdown generation and Git operations |
-| `MarkdownRepository` | File-system operations for the markdown repo |
-| `ReadmeBuilder` | Constructs the README.md with categories, items, and table of contents |
+| Component                  | Purpose                                                                |
+| -------------------------- | ---------------------------------------------------------------------- |
+| `MarkdownGeneratorService` | Orchestrates markdown generation and Git operations                    |
+| `MarkdownRepository`       | File-system operations for the markdown repo                           |
+| `ReadmeBuilder`            | Constructs the README.md with categories, items, and table of contents |
 
 ### README Structure
 
@@ -140,23 +140,23 @@ The `ReadmeBuilder` generates a README with:
 1. **Header** -- Custom header from the data repository's template
 2. **Table of Contents** -- Optional, configurable via `content_table` in config
 3. **Category sections** -- Items grouped by category, sorted by:
-   - Categories with featured items first
-   - Category priority (lower number = higher)
-   - Featured count descending
-   - Alphabetical by category name
+    - Categories with featured items first
+    - Category priority (lower number = higher)
+    - Featured count descending
+    - Alphabetical by category name
 4. **Item listings** -- Within each category, items sorted by:
-   - Featured items first
-   - Explicit order (ascending)
-   - Alphabetical by name
+    - Featured items first
+    - Explicit order (ascending)
+    - Alphabetical by name
 5. **Footer** -- Custom footer from the data repository's template
 
 ### Generation Modes
 
-| Mode | Behavior |
-|------|----------|
-| **RECREATE** | Switch to main branch, reset all files, regenerate everything |
-| **Incremental (PR)** | Create a feature branch, make changes, create a pull request |
-| **Direct push** | Commit and push changes directly to the main branch |
+| Mode                 | Behavior                                                      |
+| -------------------- | ------------------------------------------------------------- |
+| **RECREATE**         | Switch to main branch, reset all files, regenerate everything |
+| **Incremental (PR)** | Create a feature branch, make changes, create a pull request  |
+| **Direct push**      | Commit and push changes directly to the main branch           |
 
 ## Stage 3: Website Generator
 
@@ -173,10 +173,10 @@ The `WebsiteGeneratorService` manages the website repository that renders the di
 
 ### Creation Methods
 
-| Method | Enum Value | Behavior |
-|--------|-----------|----------|
-| **Duplicate** | `DUPLICATE` | Clone template repo, re-point remote to new repo, force push |
-| **Template** | `CREATE_USING_TEMPLATE` | Use Git provider's template repository feature; falls back to duplicate |
+| Method        | Enum Value              | Behavior                                                                |
+| ------------- | ----------------------- | ----------------------------------------------------------------------- |
+| **Duplicate** | `DUPLICATE`             | Clone template repo, re-point remote to new repo, force push            |
+| **Template**  | `CREATE_USING_TEMPLATE` | Use Git provider's template repository feature; falls back to duplicate |
 
 ### Website Template Configuration
 
@@ -266,12 +266,12 @@ sequenceDiagram
 
 The data generator defines structured error types for initialization failures:
 
-| Error Code | Description |
-|-----------|-------------|
-| `CLONE_FAILED` | Git clone operation failed |
-| `REPO_CREATE_FAILED` | Repository creation failed |
-| `DATA_REPO_FAILED` | Data repository operations failed |
-| `GENERATION_FAILED` | Pipeline execution failed |
-| `PUSH_FAILED` | Git push operation failed |
+| Error Code           | Description                       |
+| -------------------- | --------------------------------- |
+| `CLONE_FAILED`       | Git clone operation failed        |
+| `REPO_CREATE_FAILED` | Repository creation failed        |
+| `DATA_REPO_FAILED`   | Data repository operations failed |
+| `GENERATION_FAILED`  | Pipeline execution failed         |
+| `PUSH_FAILED`        | Git push operation failed         |
 
 Each generator stage catches errors independently and provides detailed logging. The `DirectoryGenerationService` tracks the overall generation status on the directory entity.

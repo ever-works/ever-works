@@ -11,12 +11,12 @@ The Plugin Keywords module (`@ever-works/plugin/keywords`) provides keyword extr
 
 ## Package Overview
 
-| Property | Value |
-|---|---|
-| **Import path** | `@ever-works/plugin/keywords` |
-| **Location** | `platform/packages/plugin/src/keywords/` |
-| **Dependencies** | None (uses only built-in `Intl.Segmenter` and regex) |
-| **Used by** | Search plugins, content generation pipeline, item deduplication |
+| Property         | Value                                                           |
+| ---------------- | --------------------------------------------------------------- |
+| **Import path**  | `@ever-works/plugin/keywords`                                   |
+| **Location**     | `platform/packages/plugin/src/keywords/`                        |
+| **Dependencies** | None (uses only built-in `Intl.Segmenter` and regex)            |
+| **Used by**      | Search plugins, content generation pipeline, item deduplication |
 
 ## Module Exports
 
@@ -56,11 +56,11 @@ Both functions follow the same multi-step extraction pipeline:
 
 The input text is normalized before tokenization:
 
-| Operation | Description |
-|---|---|
-| Lowercase conversion | All text is lowercased for consistent matching |
+| Operation                | Description                                                    |
+| ------------------------ | -------------------------------------------------------------- |
+| Lowercase conversion     | All text is lowercased for consistent matching                 |
 | Whitespace normalization | Multiple spaces, tabs, and newlines collapsed to single spaces |
-| Trimming | Leading and trailing whitespace removed |
+| Trimming                 | Leading and trailing whitespace removed                        |
 
 ### Step 2: Tokenization
 
@@ -80,9 +80,9 @@ const segmenter = new Intl.Segmenter('en', { granularity: 'word' });
 const segments = segmenter.segment(text);
 
 for (const { segment, isWordLike } of segments) {
-    if (isWordLike) {
-        tokens.push(segment);
-    }
+	if (isWordLike) {
+		tokens.push(segment);
+	}
 }
 ```
 
@@ -91,8 +91,7 @@ for (const { segment, isWordLike } of segments) {
 When `Intl.Segmenter` is unavailable, the module falls back to regex-based splitting:
 
 ```typescript
-const tokens = text.split(/[\s\-_.,;:!?'"()\[\]{}|\\/<>@#$%^&*+=~`]+/)
-    .filter(token => token.length > 0);
+const tokens = text.split(/[\s\-_.,;:!?'"()\[\]{}|\\/<>@#$%^&*+=~`]+/).filter((token) => token.length > 0);
 ```
 
 ### Step 3: Stopword Removal
@@ -101,23 +100,40 @@ Extracted tokens are filtered against a comprehensive stopword list. The stopwor
 
 **Stopword Categories:**
 
-| Category | Examples |
-|---|---|
-| Articles | the, a, an |
-| Prepositions | in, on, at, to, for, with, from, by, about, between |
-| Conjunctions | and, or, but, nor, yet, so |
-| Pronouns | i, you, he, she, it, we, they, this, that, these, those |
+| Category        | Examples                                                           |
+| --------------- | ------------------------------------------------------------------ |
+| Articles        | the, a, an                                                         |
+| Prepositions    | in, on, at, to, for, with, from, by, about, between                |
+| Conjunctions    | and, or, but, nor, yet, so                                         |
+| Pronouns        | i, you, he, she, it, we, they, this, that, these, those            |
 | Auxiliary verbs | is, are, was, were, be, been, being, have, has, had, do, does, did |
-| Common verbs | will, would, shall, should, can, could, may, might, must |
-| Adverbs | very, really, just, also, only, even, still, already, here, there |
-| Determiners | some, any, all, each, every, no, other, another |
-| Misc | not, than, then, when, where, how, what, which, who, whom |
+| Common verbs    | will, would, shall, should, can, could, may, might, must           |
+| Adverbs         | very, really, just, also, only, even, still, already, here, there  |
+| Determiners     | some, any, all, each, every, no, other, another                    |
+| Misc            | not, than, then, when, where, how, what, which, who, whom          |
 
 ```typescript
 const STOPWORDS = new Set([
-    'the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to',
-    'for', 'of', 'with', 'by', 'from', 'is', 'are', 'was', 'were',
-    // ... comprehensive list
+	'the',
+	'a',
+	'an',
+	'and',
+	'or',
+	'but',
+	'in',
+	'on',
+	'at',
+	'to',
+	'for',
+	'of',
+	'with',
+	'by',
+	'from',
+	'is',
+	'are',
+	'was',
+	'were'
+	// ... comprehensive list
 ]);
 ```
 
@@ -125,10 +141,10 @@ const STOPWORDS = new Set([
 
 After stopword removal, tokens shorter than a minimum length are discarded:
 
-| Function | Minimum Length |
-|---|---|
-| `extractKeywords` | 2 characters |
-| `extractKeywordsFromPrompt` | 2 characters |
+| Function                    | Minimum Length |
+| --------------------------- | -------------- |
+| `extractKeywords`           | 2 characters   |
+| `extractKeywordsFromPrompt` | 2 characters   |
 
 This removes single-character artifacts while preserving meaningful short terms like abbreviations and numbers.
 
@@ -148,13 +164,13 @@ const unique = [...new Set(filteredTokens)];
 import { extractKeywordsFromPrompt } from '@ever-works/plugin/keywords';
 
 async function searchItems(userQuery: string): Promise<Item[]> {
-    const keywords = extractKeywordsFromPrompt(userQuery);
+	const keywords = extractKeywordsFromPrompt(userQuery);
 
-    // Use keywords for database full-text search
-    return itemRepository.search({
-        keywords,
-        matchAny: true,
-    });
+	// Use keywords for database full-text search
+	return itemRepository.search({
+		keywords,
+		matchAny: true
+	});
 }
 ```
 
@@ -164,11 +180,11 @@ async function searchItems(userQuery: string): Promise<Item[]> {
 import { extractKeywords } from '@ever-works/plugin/keywords';
 
 function categorizeItem(item: ItemData): string[] {
-    const titleKeywords = extractKeywords(item.name);
-    const descKeywords = extractKeywords(item.description);
+	const titleKeywords = extractKeywords(item.name);
+	const descKeywords = extractKeywords(item.description);
 
-    const allKeywords = [...new Set([...titleKeywords, ...descKeywords])];
-    return matchCategories(allKeywords, categoryDefinitions);
+	const allKeywords = [...new Set([...titleKeywords, ...descKeywords])];
+	return matchCategories(allKeywords, categoryDefinitions);
 }
 ```
 
@@ -178,13 +194,13 @@ function categorizeItem(item: ItemData): string[] {
 import { extractKeywords } from '@ever-works/plugin/keywords';
 
 function calculateSimilarity(itemA: ItemData, itemB: ItemData): number {
-    const keywordsA = new Set(extractKeywords(itemA.name + ' ' + itemA.description));
-    const keywordsB = new Set(extractKeywords(itemB.name + ' ' + itemB.description));
+	const keywordsA = new Set(extractKeywords(itemA.name + ' ' + itemA.description));
+	const keywordsB = new Set(extractKeywords(itemB.name + ' ' + itemB.description));
 
-    const intersection = new Set([...keywordsA].filter(k => keywordsB.has(k)));
-    const union = new Set([...keywordsA, ...keywordsB]);
+	const intersection = new Set([...keywordsA].filter((k) => keywordsB.has(k)));
+	const union = new Set([...keywordsA, ...keywordsB]);
 
-    return intersection.size / union.size; // Jaccard similarity
+	return intersection.size / union.size; // Jaccard similarity
 }
 ```
 
@@ -192,13 +208,13 @@ function calculateSimilarity(itemA: ItemData, itemB: ItemData): number {
 
 The keywords module is used within the content generation pipeline for:
 
-| Stage | Purpose |
-|---|---|
+| Stage                   | Purpose                                                             |
+| ----------------------- | ------------------------------------------------------------------- |
 | Search query generation | Extracting core terms from user prompts to build web search queries |
-| Content filtering | Matching extracted web content against user intent keywords |
-| Deduplication | Comparing keyword overlap between items to identify duplicates |
-| Category assignment | Mapping item keywords to predefined category taxonomies |
-| Tag generation | Suggesting tags based on frequently occurring extracted keywords |
+| Content filtering       | Matching extracted web content against user intent keywords         |
+| Deduplication           | Comparing keyword overlap between items to identify duplicates      |
+| Category assignment     | Mapping item keywords to predefined category taxonomies             |
+| Tag generation          | Suggesting tags based on frequently occurring extracted keywords    |
 
 ## Design Decisions
 
@@ -206,12 +222,12 @@ The keywords module is used within the content generation pipeline for:
 
 The `Intl.Segmenter` API provides ICU-standard word boundary detection, which handles edge cases that regex cannot:
 
-| Scenario | Regex Result | Segmenter Result |
-|---|---|---|
-| `"can't"` | `['can', 't']` | `['can't']` |
-| `"state-of-the-art"` | `['state', 'of', 'the', 'art']` | `['state-of-the-art']` |
-| `"C++"` | `['C']` | `['C++']` |
-| CJK text | Incorrect splits | Correct word boundaries |
+| Scenario             | Regex Result                    | Segmenter Result        |
+| -------------------- | ------------------------------- | ----------------------- |
+| `"can't"`            | `['can', 't']`                  | `['can't']`             |
+| `"state-of-the-art"` | `['state', 'of', 'the', 'art']` | `['state-of-the-art']`  |
+| `"C++"`              | `['C']`                         | `['C++']`               |
+| CJK text             | Incorrect splits                | Correct word boundaries |
 
 ### Why No Stemming
 

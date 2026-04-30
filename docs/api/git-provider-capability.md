@@ -23,10 +23,10 @@ GitProviderModule
 
 ```typescript
 @Module({
-    imports: [FacadesModule, DatabaseModule],
-    controllers: [GitProviderController],
-    providers: [GitProviderService],
-    exports: [GitProviderService],
+	imports: [FacadesModule, DatabaseModule],
+	controllers: [GitProviderController],
+	providers: [GitProviderService],
+	exports: [GitProviderService]
 })
 export class GitProviderModule {}
 ```
@@ -48,10 +48,8 @@ Returns all available Git providers and overall configuration status.
 
 ```json
 {
-    "configured": true,
-    "providers": [
-        { "id": "github", "name": "GitHub", "enabled": true }
-    ]
+	"configured": true,
+	"providers": [{ "id": "github", "name": "GitHub", "enabled": true }]
 }
 ```
 
@@ -68,14 +66,14 @@ Checks if the current user has a valid connection to the specified Git provider.
 
 ```json
 {
-    "id": "github",
-    "name": "GitHub",
-    "enabled": true,
-    "connected": true,
-    "username": "octocat",
-    "email": "octocat@example.com",
-    "avatarUrl": "https://avatars.githubusercontent.com/...",
-    "authMethod": "oauth"
+	"id": "github",
+	"name": "GitHub",
+	"enabled": true,
+	"connected": true,
+	"username": "octocat",
+	"email": "octocat@example.com",
+	"avatarUrl": "https://avatars.githubusercontent.com/...",
+	"authMethod": "oauth"
 }
 ```
 
@@ -83,10 +81,10 @@ Checks if the current user has a valid connection to the specified Git provider.
 
 ```json
 {
-    "id": "github",
-    "name": "GitHub",
-    "enabled": true,
-    "connected": false
+	"id": "github",
+	"name": "GitHub",
+	"enabled": true,
+	"connected": false
 }
 ```
 
@@ -103,14 +101,14 @@ Lists organizations the authenticated user belongs to.
 
 ```json
 {
-    "success": true,
-    "organizations": [
-        {
-            "login": "ever-works",
-            "name": "Ever Works",
-            "avatarUrl": "https://avatars.githubusercontent.com/..."
-        }
-    ]
+	"success": true,
+	"organizations": [
+		{
+			"login": "ever-works",
+			"name": "Ever Works",
+			"avatarUrl": "https://avatars.githubusercontent.com/..."
+		}
+	]
 }
 ```
 
@@ -125,28 +123,28 @@ Lists repositories accessible to the authenticated user with pagination support.
 
 **Query Parameters:**
 
-| Parameter | Type | Required | Description |
-|---|---|---|---|
-| `page` | `number` | No | Page number (1-based) |
-| `perPage` | `number` | No | Items per page |
+| Parameter | Type     | Required | Description           |
+| --------- | -------- | -------- | --------------------- |
+| `page`    | `number` | No       | Page number (1-based) |
+| `perPage` | `number` | No       | Items per page        |
 
 **Response:**
 
 ```json
 {
-    "success": true,
-    "repositories": [
-        {
-            "name": "my-repo",
-            "fullName": "user/my-repo",
-            "private": false,
-            "permissions": {
-                "admin": true,
-                "push": true,
-                "pull": true
-            }
-        }
-    ]
+	"success": true,
+	"repositories": [
+		{
+			"name": "my-repo",
+			"fullName": "user/my-repo",
+			"private": false,
+			"permissions": {
+				"admin": true,
+				"push": true,
+				"pull": true
+			}
+		}
+	]
 }
 ```
 
@@ -163,13 +161,13 @@ Returns the authenticated user's profile from the Git provider.
 
 ```json
 {
-    "success": true,
-    "user": {
-        "login": "octocat",
-        "name": "The Octocat",
-        "email": "octocat@example.com",
-        "avatarUrl": "https://avatars.githubusercontent.com/..."
-    }
+	"success": true,
+	"user": {
+		"login": "octocat",
+		"name": "The Octocat",
+		"email": "octocat@example.com",
+		"avatarUrl": "https://avatars.githubusercontent.com/..."
+	}
 }
 ```
 
@@ -181,10 +179,10 @@ The service layer handles business logic and delegates to facades.
 
 The service supports two authentication methods, detected automatically:
 
-| Method | Priority | Description |
-|---|---|---|
-| **OAuth** | Checked first | Token obtained via OAuth flow |
-| **Personal Access Token (PAT)** | Fallback | Token configured in plugin settings |
+| Method                          | Priority      | Description                         |
+| ------------------------------- | ------------- | ----------------------------------- |
+| **OAuth**                       | Checked first | Token obtained via OAuth flow       |
+| **Personal Access Token (PAT)** | Fallback      | Token configured in plugin settings |
 
 ```typescript
 export type GitAuthMethod = 'oauth' | 'personal-access-token';
@@ -225,11 +223,11 @@ The extended provider info returned by connection checks:
 
 ```typescript
 interface GitProviderConnectionInfo extends GitProviderInfo {
-    connected: boolean;
-    username?: string;
-    email?: string;
-    avatarUrl?: string;
-    authMethod?: GitAuthMethod;
+	connected: boolean;
+	username?: string;
+	email?: string;
+	avatarUrl?: string;
+	authMethod?: GitAuthMethod;
 }
 ```
 
@@ -242,43 +240,43 @@ The service works with these types from `@ever-works/plugin`:
 ```typescript
 // Organization from the Git platform
 interface GitOrganization {
-    login: string;
-    name?: string;
-    avatarUrl?: string;
+	login: string;
+	name?: string;
+	avatarUrl?: string;
 }
 
 // User profile from the Git platform
 interface GitUser {
-    login: string;
-    name?: string;
-    email?: string;
-    avatarUrl?: string;
+	login: string;
+	name?: string;
+	email?: string;
+	avatarUrl?: string;
 }
 
 // Repository with permission details
 interface GitRepositoryWithPermissions {
-    name: string;
-    fullName: string;
-    private: boolean;
-    permissions: {
-        admin: boolean;
-        push: boolean;
-        pull: boolean;
-    };
+	name: string;
+	fullName: string;
+	private: boolean;
+	permissions: {
+		admin: boolean;
+		push: boolean;
+		pull: boolean;
+	};
 }
 ```
 
 ### Facade Methods Used
 
-| Facade Method | Purpose |
-|---|---|
-| `gitFacade.isConfigured()` | Check if any Git provider is available |
-| `gitFacade.getAvailableProviders()` | List all registered Git providers |
-| `gitFacade.hasValidCredentials(ctx)` | Check if user has any credentials |
-| `gitFacade.getUser(ctx)` | Get authenticated user profile |
-| `gitFacade.getOrganizations(ctx)` | List user's organizations |
-| `gitFacade.listRepositories(ctx, page, perPage)` | List accessible repositories |
-| `oauthFacade.hasValidCredentials(userId, providerId)` | Check OAuth-specific credentials |
+| Facade Method                                         | Purpose                                |
+| ----------------------------------------------------- | -------------------------------------- |
+| `gitFacade.isConfigured()`                            | Check if any Git provider is available |
+| `gitFacade.getAvailableProviders()`                   | List all registered Git providers      |
+| `gitFacade.hasValidCredentials(ctx)`                  | Check if user has any credentials      |
+| `gitFacade.getUser(ctx)`                              | Get authenticated user profile         |
+| `gitFacade.getOrganizations(ctx)`                     | List user's organizations              |
+| `gitFacade.listRepositories(ctx, page, perPage)`      | List accessible repositories           |
+| `oauthFacade.hasValidCredentials(userId, providerId)` | Check OAuth-specific credentials       |
 
 The context object (`ctx`) always contains `userId` and `providerId`.
 
@@ -288,9 +286,9 @@ All endpoints (except listing providers) use try-catch with graceful degradation
 
 ```json
 {
-    "success": false,
-    "repositories": [],
-    "error": "Failed to fetch repositories"
+	"success": false,
+	"repositories": [],
+	"error": "Failed to fetch repositories"
 }
 ```
 
@@ -298,16 +296,16 @@ This pattern ensures the frontend always receives a consistent response shape, e
 
 ## Supported Providers
 
-| Plugin ID | Platform | Capabilities |
-|---|---|---|
-| `github` | GitHub | Full support: repos, orgs, user, OAuth |
+| Plugin ID | Platform | Capabilities                           |
+| --------- | -------- | -------------------------------------- |
+| `github`  | GitHub   | Full support: repos, orgs, user, OAuth |
 
 Additional providers can be added by implementing the `IGitProviderPlugin` interface from `@ever-works/plugin`.
 
 ## Source Files
 
-| File | Purpose |
-|---|---|
-| `apps/api/src/plugins-capabilities/git-provider/git-provider.module.ts` | Module definition |
-| `apps/api/src/plugins-capabilities/git-provider/git-provider.controller.ts` | REST API endpoints |
-| `apps/api/src/plugins-capabilities/git-provider/git-provider.service.ts` | Business logic and facade coordination |
+| File                                                                        | Purpose                                |
+| --------------------------------------------------------------------------- | -------------------------------------- |
+| `apps/api/src/plugins-capabilities/git-provider/git-provider.module.ts`     | Module definition                      |
+| `apps/api/src/plugins-capabilities/git-provider/git-provider.controller.ts` | REST API endpoints                     |
+| `apps/api/src/plugins-capabilities/git-provider/git-provider.service.ts`    | Business logic and facade coordination |

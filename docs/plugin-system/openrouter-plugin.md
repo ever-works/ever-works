@@ -1,7 +1,7 @@
 ---
 id: openrouter-plugin
-title: "OpenRouter Plugin"
-sidebar_label: "OpenRouter"
+title: 'OpenRouter Plugin'
+sidebar_label: 'OpenRouter'
 sidebar_position: 30
 ---
 
@@ -13,20 +13,20 @@ The OpenRouter plugin is the **default AI provider** for Ever Works. It connects
 
 ## Overview
 
-| Property | Value |
-|---|---|
-| Plugin ID | `openrouter` |
-| Package | `@ever-works/openrouter-plugin` |
-| Category | `ai-provider` |
-| Capabilities | `ai-provider` |
-| Version | `1.0.0` |
-| Configuration Mode | `hybrid` |
-| Provider Type | `openrouter` |
-| Auto-enable | **Yes** |
-| Built-in | Yes |
-| System Plugin | **Yes** |
-| Default For | `ai-provider` |
-| Visibility | `public` |
+| Property           | Value                           |
+| ------------------ | ------------------------------- |
+| Plugin ID          | `openrouter`                    |
+| Package            | `@ever-works/openrouter-plugin` |
+| Category           | `ai-provider`                   |
+| Capabilities       | `ai-provider`                   |
+| Version            | `1.0.0`                         |
+| Configuration Mode | `hybrid`                        |
+| Provider Type      | `openrouter`                    |
+| Auto-enable        | **Yes**                         |
+| Built-in           | Yes                             |
+| System Plugin      | **Yes**                         |
+| Default For        | `ai-provider`                   |
+| Visibility         | `public`                        |
 
 OpenRouter is unique among AI provider plugins because it is a **system plugin** with `autoEnable: true` and `defaultForCapabilities: ['ai-provider']`. This means it is automatically enabled and selected as the default AI provider for new directories.
 
@@ -52,27 +52,27 @@ OpenRouter's API is OpenAI-compatible, so the plugin uses the same LangChain Ope
 
 ### Settings Schema
 
-| Setting | Type | Required | Default | Scope | Widget | Description |
-|---|---|---|---|---|---|---|
-| `apiKey` | `string` | Yes | -- | `user` | -- | OpenRouter API key. Secret. Env: `PLUGIN_OPENROUTER_API_KEY` |
-| `defaultModel` | `string` | Yes | `openai/gpt-5.1` | `global` | `model-select` | Default model for all AI tasks. |
-| `simpleModel` | `string` | No | `openai/gpt-5-nano` | `global` | `model-select` | Model for tags, descriptions, classifications. |
-| `mediumModel` | `string` | No | `openai/gpt-4o` | `global` | `model-select` | Model for listings, summaries, reformatting. |
-| `complexModel` | `string` | No | `openai/gpt-5.1` | `global` | `model-select` | Model for full page generation, multi-step analysis. |
-| `temperature` | `number` | No | `0.7` | -- | -- | Sampling temperature (0--2). Hidden. |
-| `maxTokens` | `number` | No | `4096` | -- | -- | Max tokens per response. Hidden. |
-| `baseUrl` | `string` | No | `https://openrouter.ai/api/v1` | -- | -- | API endpoint. Hidden. |
+| Setting        | Type     | Required | Default                        | Scope    | Widget         | Description                                                  |
+| -------------- | -------- | -------- | ------------------------------ | -------- | -------------- | ------------------------------------------------------------ |
+| `apiKey`       | `string` | Yes      | --                             | `user`   | --             | OpenRouter API key. Secret. Env: `PLUGIN_OPENROUTER_API_KEY` |
+| `defaultModel` | `string` | Yes      | `openai/gpt-5.1`               | `global` | `model-select` | Default model for all AI tasks.                              |
+| `simpleModel`  | `string` | No       | `openai/gpt-5-nano`            | `global` | `model-select` | Model for tags, descriptions, classifications.               |
+| `mediumModel`  | `string` | No       | `openai/gpt-4o`                | `global` | `model-select` | Model for listings, summaries, reformatting.                 |
+| `complexModel` | `string` | No       | `openai/gpt-5.1`               | `global` | `model-select` | Model for full page generation, multi-step analysis.         |
+| `temperature`  | `number` | No       | `0.7`                          | --       | --             | Sampling temperature (0--2). Hidden.                         |
+| `maxTokens`    | `number` | No       | `4096`                         | --       | --             | Max tokens per response. Hidden.                             |
+| `baseUrl`      | `string` | No       | `https://openrouter.ai/api/v1` | --       | --             | API endpoint. Hidden.                                        |
 
 ### Model Naming Convention
 
 OpenRouter uses a `provider/model` naming convention. Model IDs include the provider prefix:
 
-| Provider | Example Model IDs |
-|---|---|
-| OpenAI | `openai/gpt-5.1`, `openai/gpt-4o`, `openai/gpt-5-nano` |
+| Provider  | Example Model IDs                                         |
+| --------- | --------------------------------------------------------- |
+| OpenAI    | `openai/gpt-5.1`, `openai/gpt-4o`, `openai/gpt-5-nano`    |
 | Anthropic | `anthropic/claude-sonnet-4`, `anthropic/claude-haiku-3.5` |
-| Google | `google/gemini-2.5-pro`, `google/gemini-2.5-flash` |
-| Meta | `meta-llama/llama-4-scout`, `meta-llama/llama-4-maverick` |
+| Google    | `google/gemini-2.5-pro`, `google/gemini-2.5-flash`        |
+| Meta      | `meta-llama/llama-4-scout`, `meta-llama/llama-4-maverick` |
 
 ### Model Tiers
 
@@ -89,24 +89,24 @@ Users can mix and match models from different providers across tiers. For exampl
 
 ### Environment Variables
 
-| Variable | Description |
-|---|---|
-| `PLUGIN_OPENROUTER_API_KEY` | OpenRouter API key |
-| `PLUGIN_OPENROUTER_DEFAULT_MODEL` | Default model ID |
-| `PLUGIN_OPENROUTER_SIMPLE_MODEL` | Simple tier model ID |
-| `PLUGIN_OPENROUTER_MEDIUM_MODEL` | Medium tier model ID |
+| Variable                          | Description           |
+| --------------------------------- | --------------------- |
+| `PLUGIN_OPENROUTER_API_KEY`       | OpenRouter API key    |
+| `PLUGIN_OPENROUTER_DEFAULT_MODEL` | Default model ID      |
+| `PLUGIN_OPENROUTER_SIMPLE_MODEL`  | Simple tier model ID  |
+| `PLUGIN_OPENROUTER_MEDIUM_MODEL`  | Medium tier model ID  |
 | `PLUGIN_OPENROUTER_COMPLEX_MODEL` | Complex tier model ID |
-| `PLUGIN_OPENROUTER_BASE_URL` | Custom API endpoint |
+| `PLUGIN_OPENROUTER_BASE_URL`      | Custom API endpoint   |
 
 ## Capabilities
 
-| Capability | Supported |
-|---|---|
-| Structured Output | Yes |
-| Streaming | Yes |
-| Tool Calling | Yes |
-| Vision | No (depends on selected model) |
-| Max Context Length | 128,000 tokens |
+| Capability         | Supported                      |
+| ------------------ | ------------------------------ |
+| Structured Output  | Yes                            |
+| Streaming          | Yes                            |
+| Tool Calling       | Yes                            |
+| Vision             | No (depends on selected model) |
+| Max Context Length | 128,000 tokens                 |
 
 :::note
 Vision support depends on the specific model selected. While the plugin reports `supportsVision: false` at the plugin level, individual models accessed through OpenRouter (such as GPT-4o or Claude Sonnet) do support vision. The capability is determined at the model level, not the provider level.
@@ -153,11 +153,11 @@ graph TD
 
 Because OpenRouter provides access to models at different price points, the tiered model system enables cost optimization:
 
-| Tier | Recommended Strategy | Example Models |
-|---|---|---|
-| Simple | Use the cheapest/fastest model | `openai/gpt-5-nano`, `google/gemini-2.0-flash` |
-| Standard | Balance cost and quality | `openai/gpt-4o`, `anthropic/claude-haiku-3.5` |
-| Complex | Use the highest quality model | `openai/gpt-5.1`, `anthropic/claude-sonnet-4` |
+| Tier     | Recommended Strategy           | Example Models                                 |
+| -------- | ------------------------------ | ---------------------------------------------- |
+| Simple   | Use the cheapest/fastest model | `openai/gpt-5-nano`, `google/gemini-2.0-flash` |
+| Standard | Balance cost and quality       | `openai/gpt-4o`, `anthropic/claude-haiku-3.5`  |
+| Complex  | Use the highest quality model  | `openai/gpt-5.1`, `anthropic/claude-sonnet-4`  |
 
 ## Lifecycle
 
@@ -183,11 +183,11 @@ sequenceDiagram
 
 ## Dependencies
 
-| Package | Version | Purpose |
-|---|---|---|
-| `@ever-works/plugin` | workspace | Plugin contracts and base classes |
-| `@langchain/openai` | ^0.6.17 | LangChain OpenAI-compatible provider |
-| `@langchain/core` | ^0.3.80 | LangChain core abstractions |
+| Package              | Version   | Purpose                              |
+| -------------------- | --------- | ------------------------------------ |
+| `@ever-works/plugin` | workspace | Plugin contracts and base classes    |
+| `@langchain/openai`  | ^0.6.17   | LangChain OpenAI-compatible provider |
+| `@langchain/core`    | ^0.3.80   | LangChain core abstractions          |
 
 ## Getting Started
 

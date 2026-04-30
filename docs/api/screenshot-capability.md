@@ -26,8 +26,8 @@ The controller delegates all screenshot operations to the `ScreenshotFacadeServi
 
 ```typescript
 @Module({
-    imports: [FacadesModule, AuthModule],
-    controllers: [ScreenshotController],
+	imports: [FacadesModule, AuthModule],
+	controllers: [ScreenshotController]
 })
 export class ScreenshotModule {}
 ```
@@ -51,9 +51,9 @@ Returns whether any screenshot provider is configured and lists available provid
 
 ```json
 {
-    "status": "success",
-    "available": true,
-    "providers": ["screenshotone", "urlbox"]
+	"status": "success",
+	"available": true,
+	"providers": ["screenshotone", "urlbox"]
 }
 ```
 
@@ -69,30 +69,30 @@ Captures a screenshot of the specified URL and returns the result.
 
 **Request Body (CaptureScreenshotDto):**
 
-| Field | Type | Required | Validation | Description |
-|---|---|---|---|---|
-| `url` | `string` | Yes | Valid URL | URL to capture |
-| `viewportWidth` | `number` | No | 320-3840 | Viewport width in pixels |
-| `viewportHeight` | `number` | No | 240-2160 | Viewport height in pixels |
-| `format` | `string` | No | `png`, `jpg`, `webp` | Output image format |
-| `fullPage` | `boolean` | No | -- | Capture full scrollable page |
-| `delay` | `number` | No | 0-10000 | Delay in ms before capture |
-| `blockAds` | `boolean` | No | -- | Block advertisements |
-| `blockTrackers` | `boolean` | No | -- | Block tracking scripts |
-| `blockCookieBanners` | `boolean` | No | -- | Block cookie consent banners |
+| Field                | Type      | Required | Validation           | Description                  |
+| -------------------- | --------- | -------- | -------------------- | ---------------------------- |
+| `url`                | `string`  | Yes      | Valid URL            | URL to capture               |
+| `viewportWidth`      | `number`  | No       | 320-3840             | Viewport width in pixels     |
+| `viewportHeight`     | `number`  | No       | 240-2160             | Viewport height in pixels    |
+| `format`             | `string`  | No       | `png`, `jpg`, `webp` | Output image format          |
+| `fullPage`           | `boolean` | No       | --                   | Capture full scrollable page |
+| `delay`              | `number`  | No       | 0-10000              | Delay in ms before capture   |
+| `blockAds`           | `boolean` | No       | --                   | Block advertisements         |
+| `blockTrackers`      | `boolean` | No       | --                   | Block tracking scripts       |
+| `blockCookieBanners` | `boolean` | No       | --                   | Block cookie consent banners |
 
 **Example Request:**
 
 ```json
 {
-    "url": "https://example.com",
-    "viewportWidth": 1280,
-    "viewportHeight": 720,
-    "format": "png",
-    "fullPage": false,
-    "delay": 1000,
-    "blockAds": true,
-    "blockCookieBanners": true
+	"url": "https://example.com",
+	"viewportWidth": 1280,
+	"viewportHeight": 720,
+	"format": "png",
+	"fullPage": false,
+	"delay": 1000,
+	"blockAds": true,
+	"blockCookieBanners": true
 }
 ```
 
@@ -100,10 +100,10 @@ Captures a screenshot of the specified URL and returns the result.
 
 ```json
 {
-    "status": "success",
-    "imageUrl": "https://cdn.screenshotone.com/...",
-    "cacheUrl": "https://cdn.screenshotone.com/...",
-    "imageBase64": "iVBORw0KGgoAAAANSUhEUg..."
+	"status": "success",
+	"imageUrl": "https://cdn.screenshotone.com/...",
+	"cacheUrl": "https://cdn.screenshotone.com/...",
+	"imageBase64": "iVBORw0KGgoAAAANSUhEUg..."
 }
 ```
 
@@ -111,8 +111,8 @@ Captures a screenshot of the specified URL and returns the result.
 
 ```json
 {
-    "status": "error",
-    "message": "No screenshot provider configured"
+	"status": "error",
+	"message": "No screenshot provider configured"
 }
 ```
 
@@ -130,8 +130,8 @@ Generates a signed screenshot URL without performing the capture immediately. Us
 
 ```json
 {
-    "status": "success",
-    "imageUrl": "https://api.screenshotone.com/take?url=..."
+	"status": "success",
+	"imageUrl": "https://api.screenshotone.com/take?url=..."
 }
 ```
 
@@ -141,32 +141,46 @@ The `CaptureScreenshotDto` uses `class-validator` decorators for input validatio
 
 ```typescript
 export class CaptureScreenshotDto {
-    @IsUrl()
-    url: string;
+	@IsUrl()
+	url: string;
 
-    @IsOptional() @IsNumber() @Min(320) @Max(3840)
-    viewportWidth?: number;
+	@IsOptional()
+	@IsNumber()
+	@Min(320)
+	@Max(3840)
+	viewportWidth?: number;
 
-    @IsOptional() @IsNumber() @Min(240) @Max(2160)
-    viewportHeight?: number;
+	@IsOptional()
+	@IsNumber()
+	@Min(240)
+	@Max(2160)
+	viewportHeight?: number;
 
-    @IsOptional() @IsIn(['png', 'jpg', 'webp'])
-    format?: 'png' | 'jpg' | 'webp';
+	@IsOptional()
+	@IsIn(['png', 'jpg', 'webp'])
+	format?: 'png' | 'jpg' | 'webp';
 
-    @IsOptional() @IsBoolean()
-    fullPage?: boolean;
+	@IsOptional()
+	@IsBoolean()
+	fullPage?: boolean;
 
-    @IsOptional() @IsNumber() @Min(0) @Max(10000)
-    delay?: number;
+	@IsOptional()
+	@IsNumber()
+	@Min(0)
+	@Max(10000)
+	delay?: number;
 
-    @IsOptional() @IsBoolean()
-    blockAds?: boolean;
+	@IsOptional()
+	@IsBoolean()
+	blockAds?: boolean;
 
-    @IsOptional() @IsBoolean()
-    blockTrackers?: boolean;
+	@IsOptional()
+	@IsBoolean()
+	blockTrackers?: boolean;
 
-    @IsOptional() @IsBoolean()
-    blockCookieBanners?: boolean;
+	@IsOptional()
+	@IsBoolean()
+	blockCookieBanners?: boolean;
 }
 ```
 
@@ -193,10 +207,10 @@ const url = await this.screenshotFacade.getScreenshotUrl(options, { userId });
 
 ### Supported Providers
 
-| Plugin ID | Provider | Configuration |
-|---|---|---|
+| Plugin ID       | Provider      | Configuration                                                        |
+| --------------- | ------------- | -------------------------------------------------------------------- |
 | `screenshotone` | ScreenshotOne | `PLUGIN_SCREENSHOTONE_ACCESS_KEY`, `PLUGIN_SCREENSHOTONE_SECRET_KEY` |
-| `urlbox` | Urlbox | `PLUGIN_URLBOX_API_KEY`, `PLUGIN_URLBOX_API_SECRET` |
+| `urlbox`        | Urlbox        | `PLUGIN_URLBOX_API_KEY`, `PLUGIN_URLBOX_API_SECRET`                  |
 
 ### Capture Result
 
@@ -204,11 +218,11 @@ The facade returns a result object with:
 
 ```typescript
 interface CaptureResult {
-    success: boolean;
-    imageUrl?: string;     // Direct image URL
-    cacheUrl?: string;     // Cached/CDN URL (preferred)
-    imageBuffer?: Buffer;  // Raw image data
-    error?: string;        // Error message if failed
+	success: boolean;
+	imageUrl?: string; // Direct image URL
+	cacheUrl?: string; // Cached/CDN URL (preferred)
+	imageBuffer?: Buffer; // Raw image data
+	error?: string; // Error message if failed
 }
 ```
 
@@ -225,8 +239,8 @@ Both cases return a structured error response:
 
 ```json
 {
-    "status": "error",
-    "message": "descriptive error message"
+	"status": "error",
+	"message": "descriptive error message"
 }
 ```
 
@@ -240,8 +254,8 @@ Screenshots are used for:
 
 ## Source Files
 
-| File | Purpose |
-|---|---|
-| `apps/api/src/plugins-capabilities/screenshot/screenshot.module.ts` | Module definition |
-| `apps/api/src/plugins-capabilities/screenshot/screenshot.controller.ts` | REST API controller |
-| `apps/api/src/plugins-capabilities/screenshot/dto/screenshot.dto.ts` | Request validation DTOs |
+| File                                                                    | Purpose                 |
+| ----------------------------------------------------------------------- | ----------------------- |
+| `apps/api/src/plugins-capabilities/screenshot/screenshot.module.ts`     | Module definition       |
+| `apps/api/src/plugins-capabilities/screenshot/screenshot.controller.ts` | REST API controller     |
+| `apps/api/src/plugins-capabilities/screenshot/dto/screenshot.dto.ts`    | Request validation DTOs |

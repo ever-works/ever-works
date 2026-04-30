@@ -53,11 +53,11 @@ The `@Injectable()` service implementing `OnModuleInit` for automatic plan seedi
 
 On module initialization, the service seeds the database with the three default plans if they do not already exist:
 
-| Plan | Code | Description |
-|------|------|-------------|
-| **Free** | `free` | Basic access with limited features |
+| Plan         | Code       | Description                                 |
+| ------------ | ---------- | ------------------------------------------- |
+| **Free**     | `free`     | Basic access with limited features          |
 | **Standard** | `standard` | Standard features with more generous limits |
-| **Premium** | `premium` | Full access to all features |
+| **Premium**  | `premium`  | Full access to all features                 |
 
 ```typescript
 private readonly PLAN_SEED_DATA: Array<{
@@ -74,13 +74,13 @@ Each plan defines which schedule cadences it allows. For example, the Free plan 
 
 #### Key Methods
 
-| Method | Signature | Description |
-|--------|-----------|-------------|
-| `seedPlans` | `() => Promise<void>` | Creates default plans if they do not exist (called on module init) |
-| `resolvePlanForUser` | `(userId: string) => Promise<SubscriptionPlan>` | Resolves the active plan for a user. Falls back to the free plan if no active subscription is found. |
-| `getCadenceAllowances` | `(userId: string) => Promise<CadenceAllowances>` | Returns which schedule cadences the user's plan permits, used by the scheduling UI. |
-| `assignPlanToUser` | `(userId, planCode, options?) => Promise<UserSubscription>` | Creates or updates a user's subscription to a specific plan. |
-| `requiresUsageBilling` | `(userId: string) => Promise<boolean>` | Checks if the user's plan requires pay-per-use billing for scheduled updates. |
+| Method                 | Signature                                                   | Description                                                                                          |
+| ---------------------- | ----------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| `seedPlans`            | `() => Promise<void>`                                       | Creates default plans if they do not exist (called on module init)                                   |
+| `resolvePlanForUser`   | `(userId: string) => Promise<SubscriptionPlan>`             | Resolves the active plan for a user. Falls back to the free plan if no active subscription is found. |
+| `getCadenceAllowances` | `(userId: string) => Promise<CadenceAllowances>`            | Returns which schedule cadences the user's plan permits, used by the scheduling UI.                  |
+| `assignPlanToUser`     | `(userId, planCode, options?) => Promise<UserSubscription>` | Creates or updates a user's subscription to a specific plan.                                         |
+| `requiresUsageBilling` | `(userId: string) => Promise<boolean>`                      | Checks if the user's plan requires pay-per-use billing for scheduled updates.                        |
 
 #### Cadence Allowances
 
@@ -88,10 +88,10 @@ The `getCadenceAllowances` method returns an object mapping each cadence to whet
 
 ```typescript
 interface CadenceAllowances {
-    daily: boolean;
-    weekly: boolean;
-    biweekly: boolean;
-    monthly: boolean;
+	daily: boolean;
+	weekly: boolean;
+	biweekly: boolean;
+	monthly: boolean;
 }
 ```
 
@@ -103,12 +103,12 @@ Records usage-based billing events when subscriptions are configured for pay-per
 
 ```typescript
 type RecordUsageOptions = {
-    userId: string;
-    directoryId: string;
-    schedule?: DirectorySchedule | null;
-    triggerType: UsageLedgerTriggerType;
-    billingMode: DirectoryScheduleBillingMode;
-    generationHistoryId?: string;
+	userId: string;
+	directoryId: string;
+	schedule?: DirectorySchedule | null;
+	triggerType: UsageLedgerTriggerType;
+	billingMode: DirectoryScheduleBillingMode;
+	generationHistoryId?: string;
 };
 ```
 
@@ -120,12 +120,12 @@ type RecordUsageOptions = {
 
 ```typescript
 const entry = await usageLedger.recordUsage({
-    userId,
-    directoryId,
-    schedule,
-    triggerType: UsageLedgerTriggerType.SCHEDULED,
-    billingMode: DirectoryScheduleBillingMode.USAGE,
-    generationHistoryId: history.id,
+	userId,
+	directoryId,
+	schedule,
+	triggerType: UsageLedgerTriggerType.SCHEDULED,
+	billingMode: DirectoryScheduleBillingMode.USAGE,
+	generationHistoryId: history.id
 });
 ```
 
@@ -135,12 +135,12 @@ An abstract class defining the billing provider contract:
 
 ```typescript
 abstract class BillingProvider {
-    abstract getDefaultCurrency(): string;
+	abstract getDefaultCurrency(): string;
 
-    // Optional hook for forwarding charges to an external gateway
-    async recordUsageCharge(_entry: UsageLedgerEntry): Promise<void> {
-        return; // No-op by default
-    }
+	// Optional hook for forwarding charges to an external gateway
+	async recordUsageCharge(_entry: UsageLedgerEntry): Promise<void> {
+		return; // No-op by default
+	}
 }
 ```
 
@@ -151,9 +151,9 @@ The default implementation that reads currency from configuration without connec
 ```typescript
 @Injectable()
 class ManualBillingProvider extends BillingProvider {
-    getDefaultCurrency(): string {
-        return config.billing.getDefaultCurrency(); // e.g., 'usd'
-    }
+	getDefaultCurrency(): string {
+		return config.billing.getDefaultCurrency(); // e.g., 'usd'
+	}
 }
 ```
 
@@ -163,16 +163,16 @@ To integrate with an external payment gateway (e.g., Stripe), create a new class
 
 ```typescript
 @Module({
-    imports: [DatabaseModule],
-    providers: [
-        SubscriptionService,
-        UsageLedgerService,
-        {
-            provide: BillingProvider,
-            useClass: ManualBillingProvider,
-        },
-    ],
-    exports: [SubscriptionService, UsageLedgerService],
+	imports: [DatabaseModule],
+	providers: [
+		SubscriptionService,
+		UsageLedgerService,
+		{
+			provide: BillingProvider,
+			useClass: ManualBillingProvider
+		}
+	],
+	exports: [SubscriptionService, UsageLedgerService]
 })
 export class SubscriptionsModule {}
 ```
@@ -183,46 +183,46 @@ The `BillingProvider` token is bound to `ManualBillingProvider` by default. Over
 
 ### SubscriptionPlan Entity
 
-| Column | Type | Description |
-|--------|------|-------------|
-| `id` | `uuid` (PK) | Auto-generated |
-| `code` | `varchar` (unique) | Plan identifier (`free`, `standard`, `premium`) |
-| `name` | `varchar` | Display name |
-| `description` | `varchar` | Plan description |
-| `monthlyPriceCents` | `int` | Monthly price in cents |
-| `yearlyPriceCents` | `int` | Yearly price in cents |
-| `allowedCadences` | `json` | Array of allowed `DirectoryScheduleCadence` values |
-| `isActive` | `boolean` | Whether the plan is available for new subscriptions |
+| Column              | Type               | Description                                         |
+| ------------------- | ------------------ | --------------------------------------------------- |
+| `id`                | `uuid` (PK)        | Auto-generated                                      |
+| `code`              | `varchar` (unique) | Plan identifier (`free`, `standard`, `premium`)     |
+| `name`              | `varchar`          | Display name                                        |
+| `description`       | `varchar`          | Plan description                                    |
+| `monthlyPriceCents` | `int`              | Monthly price in cents                              |
+| `yearlyPriceCents`  | `int`              | Yearly price in cents                               |
+| `allowedCadences`   | `json`             | Array of allowed `DirectoryScheduleCadence` values  |
+| `isActive`          | `boolean`          | Whether the plan is available for new subscriptions |
 
 ### UserSubscription Entity
 
-| Column | Type | Description |
-|--------|------|-------------|
-| `id` | `uuid` (PK) | Auto-generated |
-| `userId` | `uuid` (FK) | Subscriber |
-| `planId` | `uuid` (FK) | References SubscriptionPlan |
-| `status` | `enum` | `active`, `cancelled`, `expired`, `past_due` |
-| `billingProvider` | `enum` | `manual`, `stripe`, `paddle` |
-| `currentPeriodStart` | `timestamp` | Billing period start |
-| `currentPeriodEnd` | `timestamp` | Billing period end |
-| `externalSubscriptionId` | `varchar` (nullable) | External provider reference |
+| Column                   | Type                 | Description                                  |
+| ------------------------ | -------------------- | -------------------------------------------- |
+| `id`                     | `uuid` (PK)          | Auto-generated                               |
+| `userId`                 | `uuid` (FK)          | Subscriber                                   |
+| `planId`                 | `uuid` (FK)          | References SubscriptionPlan                  |
+| `status`                 | `enum`               | `active`, `cancelled`, `expired`, `past_due` |
+| `billingProvider`        | `enum`               | `manual`, `stripe`, `paddle`                 |
+| `currentPeriodStart`     | `timestamp`          | Billing period start                         |
+| `currentPeriodEnd`       | `timestamp`          | Billing period end                           |
+| `externalSubscriptionId` | `varchar` (nullable) | External provider reference                  |
 
 ### UsageLedgerEntry Entity
 
-| Column | Type | Description |
-|--------|------|-------------|
-| `id` | `uuid` (PK) | Auto-generated |
-| `userId` | `varchar` | User reference |
-| `directoryId` | `varchar` | Directory reference |
-| `scheduleId` | `varchar` (nullable) | Schedule reference |
-| `triggerType` | `enum` | `manual`, `scheduled`, `api` |
-| `billingMode` | `enum` | `included`, `usage` |
-| `units` | `int` | Number of units consumed |
-| `amountCents` | `int` | Charge amount in cents |
-| `currency` | `varchar` | Currency code (e.g., `usd`) |
-| `status` | `enum` | `pending`, `charged`, `failed`, `refunded` |
-| `generationHistoryId` | `varchar` (nullable) | Links to generation run |
-| `metadata` | `json` (nullable) | Additional data (e.g., cadence) |
+| Column                | Type                 | Description                                |
+| --------------------- | -------------------- | ------------------------------------------ |
+| `id`                  | `uuid` (PK)          | Auto-generated                             |
+| `userId`              | `varchar`            | User reference                             |
+| `directoryId`         | `varchar`            | Directory reference                        |
+| `scheduleId`          | `varchar` (nullable) | Schedule reference                         |
+| `triggerType`         | `enum`               | `manual`, `scheduled`, `api`               |
+| `billingMode`         | `enum`               | `included`, `usage`                        |
+| `units`               | `int`                | Number of units consumed                   |
+| `amountCents`         | `int`                | Charge amount in cents                     |
+| `currency`            | `varchar`            | Currency code (e.g., `usd`)                |
+| `status`              | `enum`               | `pending`, `charged`, `failed`, `refunded` |
+| `generationHistoryId` | `varchar` (nullable) | Links to generation run                    |
+| `metadata`            | `json` (nullable)    | Additional data (e.g., cadence)            |
 
 ## Usage
 
@@ -233,12 +233,12 @@ import { SubscriptionService } from '@ever-works/agent/subscriptions';
 
 @Injectable()
 export class ScheduleService {
-    constructor(private readonly subscriptions: SubscriptionService) {}
+	constructor(private readonly subscriptions: SubscriptionService) {}
 
-    async canUseCadence(userId: string, cadence: DirectoryScheduleCadence) {
-        const allowances = await this.subscriptions.getCadenceAllowances(userId);
-        return allowances[cadence] === true;
-    }
+	async canUseCadence(userId: string, cadence: DirectoryScheduleCadence) {
+		const allowances = await this.subscriptions.getCadenceAllowances(userId);
+		return allowances[cadence] === true;
+	}
 }
 ```
 
@@ -249,23 +249,23 @@ import { UsageLedgerService } from '@ever-works/agent/subscriptions';
 
 @Injectable()
 export class GenerationService {
-    constructor(private readonly usageLedger: UsageLedgerService) {}
+	constructor(private readonly usageLedger: UsageLedgerService) {}
 
-    async afterGeneration(options: {
-        userId: string;
-        directoryId: string;
-        schedule: DirectorySchedule;
-        historyId: string;
-    }) {
-        await this.usageLedger.recordUsage({
-            userId: options.userId,
-            directoryId: options.directoryId,
-            schedule: options.schedule,
-            triggerType: UsageLedgerTriggerType.SCHEDULED,
-            billingMode: options.schedule.billingMode,
-            generationHistoryId: options.historyId,
-        });
-    }
+	async afterGeneration(options: {
+		userId: string;
+		directoryId: string;
+		schedule: DirectorySchedule;
+		historyId: string;
+	}) {
+		await this.usageLedger.recordUsage({
+			userId: options.userId,
+			directoryId: options.directoryId,
+			schedule: options.schedule,
+			triggerType: UsageLedgerTriggerType.SCHEDULED,
+			billingMode: options.schedule.billingMode,
+			generationHistoryId: options.historyId
+		});
+	}
 }
 ```
 

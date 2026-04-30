@@ -13,20 +13,20 @@ Ever Works uses the repository pattern to encapsulate database access logic. Eac
 
 The `DatabaseModule` provides and exports 12 repositories:
 
-| Repository | Entity | Key Responsibilities |
-|---|---|---|
-| `DirectoryRepository` | `Directory` | CRUD, search, member-aware queries, generation tracking |
-| `DirectoryAdvancedPromptsRepository` | `DirectoryAdvancedPrompts` | Per-directory custom prompt overrides |
-| `DirectoryMemberRepository` | `DirectoryMember` | Role-based membership management |
-| `UserRepository` | `User` | User CRUD, email lookup, CLI local user |
-| `RefreshTokenRepository` | `RefreshToken` | Token creation, rotation, revocation |
-| `OAuthTokenRepository` | `OAuthToken` | OAuth token storage per provider |
-| `DirectoryGenerationHistoryRepository` | `DirectoryGenerationHistory` | Generation run tracking |
-| `SubscriptionPlanRepository` | `SubscriptionPlan` | Plan lookup and upsert |
-| `UserSubscriptionRepository` | `UserSubscription` | Subscription lifecycle |
-| `DirectoryScheduleRepository` | `DirectorySchedule` | Schedule CRUD and status updates |
-| `UsageLedgerRepository` | `UsageLedgerEntry` | Usage-based billing entries |
-| `NotificationRepository` | `Notification` | Notification CRUD with deduplication |
+| Repository                             | Entity                       | Key Responsibilities                                    |
+| -------------------------------------- | ---------------------------- | ------------------------------------------------------- |
+| `DirectoryRepository`                  | `Directory`                  | CRUD, search, member-aware queries, generation tracking |
+| `DirectoryAdvancedPromptsRepository`   | `DirectoryAdvancedPrompts`   | Per-directory custom prompt overrides                   |
+| `DirectoryMemberRepository`            | `DirectoryMember`            | Role-based membership management                        |
+| `UserRepository`                       | `User`                       | User CRUD, email lookup, CLI local user                 |
+| `RefreshTokenRepository`               | `RefreshToken`               | Token creation, rotation, revocation                    |
+| `OAuthTokenRepository`                 | `OAuthToken`                 | OAuth token storage per provider                        |
+| `DirectoryGenerationHistoryRepository` | `DirectoryGenerationHistory` | Generation run tracking                                 |
+| `SubscriptionPlanRepository`           | `SubscriptionPlan`           | Plan lookup and upsert                                  |
+| `UserSubscriptionRepository`           | `UserSubscription`           | Subscription lifecycle                                  |
+| `DirectoryScheduleRepository`          | `DirectorySchedule`          | Schedule CRUD and status updates                        |
+| `UsageLedgerRepository`                | `UsageLedgerEntry`           | Usage-based billing entries                             |
+| `NotificationRepository`               | `Notification`               | Notification CRUD with deduplication                    |
 
 ## Repository Pattern
 
@@ -35,12 +35,12 @@ Each repository follows a consistent structure:
 ```typescript
 @Injectable()
 export class ExampleRepository {
-    constructor(
-        @InjectRepository(ExampleEntity)
-        private readonly repository: Repository<ExampleEntity>,
-    ) {}
+	constructor(
+		@InjectRepository(ExampleEntity)
+		private readonly repository: Repository<ExampleEntity>
+	) {}
 
-    // Domain-specific methods...
+	// Domain-specific methods...
 }
 ```
 
@@ -56,10 +56,7 @@ A key design challenge is supporting case-insensitive search across SQLite, Post
 
 ```typescript
 function caseInsensitiveLike(search: string) {
-    return Raw(
-        (alias) => `LOWER(${alias}) LIKE LOWER(:search)`,
-        { search: `%${search}%` },
-    );
+	return Raw((alias) => `LOWER(${alias}) LIKE LOWER(:search)`, { search: `%${search}%` });
 }
 ```
 
@@ -71,9 +68,9 @@ The `buildWhereConditions` private method constructs OR-based search conditions 
 
 ```typescript
 const searchConditions = [
-    { name: caseInsensitiveLike(sanitizedSearch) },
-    { description: caseInsensitiveLike(sanitizedSearch) },
-    { slug: caseInsensitiveLike(sanitizedSearch) },
+	{ name: caseInsensitiveLike(sanitizedSearch) },
+	{ description: caseInsensitiveLike(sanitizedSearch) },
+	{ slug: caseInsensitiveLike(sanitizedSearch) }
 ];
 ```
 
@@ -97,48 +94,48 @@ This method builds a WHERE clause using `Brackets` to create an OR condition: ei
 
 ### Generation State Methods
 
-| Method | Purpose |
-|---|---|
-| `updateGenerateStatus(id, status)` | Updates status JSON, deduplicates warnings, sets `generationProgressedAt` |
-| `recordGenerationStartTime(id, date)` | Sets start time, clears finish time |
-| `recordGenerationFinishTime(id, date)` | Sets completion timestamp |
-| `getUnfinishedGenerations(olderThan)` | Finds stalled generations for cleanup |
+| Method                                 | Purpose                                                                   |
+| -------------------------------------- | ------------------------------------------------------------------------- |
+| `updateGenerateStatus(id, status)`     | Updates status JSON, deduplicates warnings, sets `generationProgressedAt` |
+| `recordGenerationStartTime(id, date)`  | Sets start time, clears finish time                                       |
+| `recordGenerationFinishTime(id, date)` | Sets completion timestamp                                                 |
+| `getUnfinishedGenerations(olderThan)`  | Finds stalled generations for cleanup                                     |
 
 ### Feature-Specific Queries
 
-| Method | Purpose |
-|---|---|
-| `findWithWebsiteAutoUpdateEnabled()` | Directories needing template sync |
-| `findWithCommunityPrEnabled()` | Directories with community PR processing |
-| `findWithComparisonsEnabled()` | Directories generating comparison content |
-| `findByIdWithMembers(id)` | Loads directory with full member chain |
+| Method                               | Purpose                                   |
+| ------------------------------------ | ----------------------------------------- |
+| `findWithWebsiteAutoUpdateEnabled()` | Directories needing template sync         |
+| `findWithCommunityPrEnabled()`       | Directories with community PR processing  |
+| `findWithComparisonsEnabled()`       | Directories generating comparison content |
+| `findByIdWithMembers(id)`            | Loads directory with full member chain    |
 
 ### Standard CRUD
 
-| Method | Behavior |
-|---|---|
-| `create(dto, user)` | Creates directory, throws if slug+owner already exists |
-| `createOrUpdate(dto, user)` | Upserts based on owner+slug match |
-| `findById(id)` | Loads with `user` relation |
-| `findByOwnerAndSlug({userId, owner, slug})` | Exact match lookup |
-| `findAll(options)` | Paginated list with optional search |
-| `countAll(options)` | Count with same filtering |
-| `update(id, data)` | Partial update, returns refreshed entity |
-| `delete(id)` | Delete by ID |
-| `deleteBySlug(slug, userId)` | Delete by slug and user |
-| `exists(slug, userId)` | Boolean existence check |
-| `increment(id, column, value)` | Atomic column increment |
+| Method                                      | Behavior                                               |
+| ------------------------------------------- | ------------------------------------------------------ |
+| `create(dto, user)`                         | Creates directory, throws if slug+owner already exists |
+| `createOrUpdate(dto, user)`                 | Upserts based on owner+slug match                      |
+| `findById(id)`                              | Loads with `user` relation                             |
+| `findByOwnerAndSlug({userId, owner, slug})` | Exact match lookup                                     |
+| `findAll(options)`                          | Paginated list with optional search                    |
+| `countAll(options)`                         | Count with same filtering                              |
+| `update(id, data)`                          | Partial update, returns refreshed entity               |
+| `delete(id)`                                | Delete by ID                                           |
+| `deleteBySlug(slug, userId)`                | Delete by slug and user                                |
+| `exists(slug, userId)`                      | Boolean existence check                                |
+| `increment(id, column, value)`              | Atomic column increment                                |
 
 ## UserRepository
 
 Provides user CRUD with email-based lookup:
 
-| Method | Purpose |
-|---|---|
-| `findByEmail(email)` | Unique email lookup |
-| `findById(id)` | Standard find |
-| `create(data)` | Create new user |
-| `update(id, data)` | Partial update |
+| Method                                  | Purpose                                              |
+| --------------------------------------- | ---------------------------------------------------- |
+| `findByEmail(email)`                    | Unique email lookup                                  |
+| `findById(id)`                          | Standard find                                        |
+| `create(data)`                          | Create new user                                      |
+| `update(id, data)`                      | Partial update                                       |
 | `createOrGetLocalUser(email, username)` | For CLI usage -- creates a non-persistent local user |
 
 ## DirectoryGenerationHistoryRepository
@@ -147,13 +144,13 @@ Tracks generation runs with typed create and update parameters:
 
 ```typescript
 interface CreateHistoryParams {
-    directoryId: string;
-    userId?: string;
-    generationMethod?: GenerationMethod;
-    triggeredBy: 'user' | 'schedule' | 'api';
-    triggerRunId?: string;
-    scheduleId?: string;
-    parameters?: Record<string, any>;
+	directoryId: string;
+	userId?: string;
+	generationMethod?: GenerationMethod;
+	triggeredBy: 'user' | 'schedule' | 'api';
+	triggerRunId?: string;
+	scheduleId?: string;
+	parameters?: Record<string, any>;
 }
 ```
 
@@ -163,11 +160,11 @@ Key methods: `create(params)`, `updateStatus(id, status)`, `updateMetrics(id, me
 
 Manages subscription plans with upsert capability:
 
-| Method | Purpose |
-|---|---|
+| Method             | Purpose                                             |
+| ------------------ | --------------------------------------------------- |
 | `findByCode(code)` | Lookup by plan code (`free`, `standard`, `premium`) |
-| `findAllActive()` | Get all active plans |
-| `upsert(plan)` | Create or update plan by code |
+| `findAllActive()`  | Get all active plans                                |
+| `upsert(plan)`     | Create or update plan by code                       |
 
 ## Module Wiring
 
@@ -175,22 +172,17 @@ The `DatabaseModule` imports TypeORM configuration and registers all entities an
 
 ```typescript
 @Module({
-    imports: [
-        ConfigModule.forFeature(databaseConfig),
-        TypeOrmModule.forRootAsync({
-            imports: [ConfigModule],
-            useFactory: (configService: ConfigService) => configService.get('database'),
-            inject: [ConfigService],
-        }),
-        TypeOrmModule.forFeature(ENTITIES),
-    ],
-    providers: [
-        DirectoryRepository, UserRepository, /* ...10 more */
-    ],
-    exports: [
-        TypeOrmModule,
-        DirectoryRepository, UserRepository, /* ...10 more */
-    ],
+	imports: [
+		ConfigModule.forFeature(databaseConfig),
+		TypeOrmModule.forRootAsync({
+			imports: [ConfigModule],
+			useFactory: (configService: ConfigService) => configService.get('database'),
+			inject: [ConfigService]
+		}),
+		TypeOrmModule.forFeature(ENTITIES)
+	],
+	providers: [DirectoryRepository, UserRepository /* ...10 more */],
+	exports: [TypeOrmModule, DirectoryRepository, UserRepository /* ...10 more */]
 })
 export class DatabaseModule {}
 ```
@@ -201,14 +193,14 @@ Both `TypeOrmModule` and all repositories are exported, allowing any importing m
 
 The `DatabaseConfigurations` factory in `database-config.factory.ts` provides presets for common environments:
 
-| Preset | Database | Details |
-|---|---|---|
-| `cli` | SQLite file | Persistent at `~/.ever-works/ever-works.db` |
-| `apiDevelopment` | SQLite in-memory | With logging enabled |
-| `apiProduction` | SQLite file | Persistent at configurable path |
-| `test` | SQLite in-memory | Logging disabled |
-| `postgres` | PostgreSQL | Supports URL or host/port/credentials |
-| `mysql` | MySQL/MariaDB | Supports URL or host/port/credentials |
+| Preset           | Database         | Details                                     |
+| ---------------- | ---------------- | ------------------------------------------- |
+| `cli`            | SQLite file      | Persistent at `~/.ever-works/ever-works.db` |
+| `apiDevelopment` | SQLite in-memory | With logging enabled                        |
+| `apiProduction`  | SQLite file      | Persistent at configurable path             |
+| `test`           | SQLite in-memory | Logging disabled                            |
+| `postgres`       | PostgreSQL       | Supports URL or host/port/credentials       |
+| `mysql`          | MySQL/MariaDB    | Supports URL or host/port/credentials       |
 
 Each preset uses `createDatabaseModuleWithEnv()` to set environment variables before returning the `DatabaseModule`.
 

@@ -1,7 +1,7 @@
 ---
 id: directory-detail-service
-title: "DirectoryDetailService Deep Dive"
-sidebar_label: "Directory Detail"
+title: 'DirectoryDetailService Deep Dive'
+sidebar_label: 'Directory Detail'
 sidebar_position: 11
 ---
 
@@ -34,22 +34,22 @@ flowchart TD
 
 Extracts directory details from a name and prompt using AI, then generates a unique slug.
 
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| `name` | `string` | The directory name provided by the user |
-| `prompt` | `string` | The user prompt describing the directory's purpose |
-| `user` | `User` | The user entity creating the directory |
-| `aiProvider` | `string` (optional) | Override for the AI provider to use |
+| Parameter    | Type                | Description                                        |
+| ------------ | ------------------- | -------------------------------------------------- |
+| `name`       | `string`            | The directory name provided by the user            |
+| `prompt`     | `string`            | The user prompt describing the directory's purpose |
+| `user`       | `User`              | The user entity creating the directory             |
+| `aiProvider` | `string` (optional) | Override for the AI provider to use                |
 
 **Returns:** `Promise<DirectoryDetails>`
 
 ```typescript
 interface DirectoryDetails {
-    name: string;
-    slug: string;
-    description: string;
-    keywords: string[];
-    categories: string[];
+	name: string;
+	slug: string;
+	description: string;
+	keywords: string[];
+	categories: string[];
 }
 ```
 
@@ -86,8 +86,8 @@ All AI-generated content passes through sanitization utilities (`sanitizeDescrip
 
 ## Database Interactions
 
-| Repository | Method | Purpose |
-|------------|--------|---------|
+| Repository            | Method                              | Purpose                                                |
+| --------------------- | ----------------------------------- | ------------------------------------------------------ |
 | `DirectoryRepository` | `existsByUserAndSlug(userId, slug)` | Check for slug conflicts during unique slug generation |
 
 ## Event System
@@ -99,9 +99,9 @@ This service does not emit or consume any events. It is a stateless extraction s
 The service implements a **graceful fallback strategy**:
 
 - If the AI extraction call fails for any reason, the service falls back to basic details:
-  - Description: `"Directory for {name}"`
-  - Keywords: the directory name lowercased
-  - Categories: empty array
+    - Description: `"Directory for {name}"`
+    - Keywords: the directory name lowercased
+    - Categories: empty array
 - All errors are logged with full stack traces via the NestJS `Logger`
 - The slug generation still runs normally even in fallback mode
 
@@ -138,11 +138,11 @@ const details = await this.detailService.generateDirectoryDetails(
 
 ## Configuration
 
-| Setting | Description |
-|---------|-------------|
-| AI Provider | Configured via `AiFacadeService`; can be overridden per call with the `aiProvider` parameter |
-| Temperature | Hardcoded to `0` for deterministic, consistent output |
-| Routing Complexity | Set to `'simple'` to use cost-efficient models for this straightforward extraction task |
+| Setting            | Description                                                                                  |
+| ------------------ | -------------------------------------------------------------------------------------------- |
+| AI Provider        | Configured via `AiFacadeService`; can be overridden per call with the `aiProvider` parameter |
+| Temperature        | Hardcoded to `0` for deterministic, consistent output                                        |
+| Routing Complexity | Set to `'simple'` to use cost-efficient models for this straightforward extraction task      |
 
 ## Related Services
 

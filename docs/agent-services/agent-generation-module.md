@@ -167,12 +167,12 @@ The `generateStatus` JSON field on the Directory entity tracks progress per phas
 
 ```typescript
 interface GenerateStatus {
-    phase: 'initializing' | 'generating' | 'enriching' | 'capturing' | 'finalizing' | 'complete' | 'error';
-    progress?: number;       // 0-100 percentage
-    message?: string;        // Human-readable status message
-    error?: string;          // Error message if phase === 'error'
-    itemsProcessed?: number;
-    itemsTotal?: number;
+	phase: 'initializing' | 'generating' | 'enriching' | 'capturing' | 'finalizing' | 'complete' | 'error';
+	progress?: number; // 0-100 percentage
+	message?: string; // Human-readable status message
+	error?: string; // Error message if phase === 'error'
+	itemsProcessed?: number;
+	itemsTotal?: number;
 }
 ```
 
@@ -182,11 +182,11 @@ Generation can be dispatched to background workers via the `DIRECTORY_GENERATION
 
 ```typescript
 interface DirectoryGenerationPayload {
-    directoryId: string;
-    userId: string;
-    options?: {
-        aiProviderOverride?: string;
-    };
+	directoryId: string;
+	userId: string;
+	options?: {
+		aiProviderOverride?: string;
+	};
 }
 ```
 
@@ -196,23 +196,23 @@ The dispatcher is injected via a Symbol token, allowing the API layer to provide
 
 ```typescript
 interface BulkCaptureImagesDto {
-    overwrite?: boolean;   // Re-capture existing screenshots
-    limit?: number;        // Max items to capture
-    filter?: 'missing' | 'all';
+	overwrite?: boolean; // Re-capture existing screenshots
+	limit?: number; // Max items to capture
+	filter?: 'missing' | 'all';
 }
 ```
 
 ## Dependencies
 
-| Dependency | Purpose |
-|---|---|
-| `@ever-works/agent/pipeline` | Pipeline orchestration for generation steps |
-| `@ever-works/agent/facades` | AI, Git, Screenshot, Search, ContentExtractor facades |
-| `@ever-works/agent/database` | Directory, GenerationHistory repositories |
-| `@ever-works/agent/notifications` | Error and completion notifications |
-| `@ever-works/agent/subscriptions` | Plan-based generation limits |
-| `isomorphic-git` | Local git operations for data repositories |
-| `Trigger.dev` | Background job dispatch (via dispatcher interface) |
+| Dependency                        | Purpose                                               |
+| --------------------------------- | ----------------------------------------------------- |
+| `@ever-works/agent/pipeline`      | Pipeline orchestration for generation steps           |
+| `@ever-works/agent/facades`       | AI, Git, Screenshot, Search, ContentExtractor facades |
+| `@ever-works/agent/database`      | Directory, GenerationHistory repositories             |
+| `@ever-works/agent/notifications` | Error and completion notifications                    |
+| `@ever-works/agent/subscriptions` | Plan-based generation limits                          |
+| `isomorphic-git`                  | Local git operations for data repositories            |
+| `Trigger.dev`                     | Background job dispatch (via dispatcher interface)    |
 
 ## Usage Examples
 
@@ -223,12 +223,12 @@ import { DirectoryGenerationService } from '@ever-works/agent/services';
 
 // Dispatched to Trigger.dev (production)
 const { runId } = await generationService.generateItems(directory, user, {
-    aiProviderOverride: 'openai',
+	aiProviderOverride: 'openai'
 });
 
 // In-process execution (development)
 await generationService.generateItems(directory, user, {
-    inProcess: true,
+	inProcess: true
 });
 ```
 
@@ -236,8 +236,8 @@ await generationService.generateItems(directory, user, {
 
 ```typescript
 const result = await generationService.bulkCaptureImages(directory, user, {
-    filter: 'missing',  // Only capture items without screenshots
-    limit: 50,
+	filter: 'missing', // Only capture items without screenshots
+	limit: 50
 });
 
 console.log(`Captured: ${result.captured}, Failed: ${result.failed}`);

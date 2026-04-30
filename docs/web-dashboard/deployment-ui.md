@@ -52,13 +52,14 @@ Displays available deployment providers and lets the user select or switch betwe
 
 ```typescript
 interface DeployProviderSelectorProps {
-    directoryId: string;
-    providers: DeployProvider[];      // from plugin capabilities API
-    currentProviderId: string;
+	directoryId: string;
+	providers: DeployProvider[]; // from plugin capabilities API
+	currentProviderId: string;
 }
 ```
 
 **Behavior**:
+
 - If no provider is selected: shows a full card list with radio-style selection
 - If one provider is selected and it is the only one: hides completely
 - If multiple providers exist with one selected: shows a compact dropdown switcher
@@ -73,13 +74,14 @@ Shown when the selected deployment provider has no API token configured.
 
 ```typescript
 interface DeployTokenAlertProps {
-    providerId?: string;
-    providerName?: string;
-    providerHomepage?: string;      // e.g., Vercel token management URL
+	providerId?: string;
+	providerName?: string;
+	providerHomepage?: string; // e.g., Vercel token management URL
 }
 ```
 
 Renders:
+
 - Warning icon with title and description
 - "Configure Plugin" button linking to `ROUTES.DASHBOARD_PLUGIN_DETAIL(providerId)`
 - "Get Token" button linking to the provider's homepage URL
@@ -93,9 +95,9 @@ The main deployment form with three sections: deploy trigger, repository update,
 
 ```typescript
 interface DeployFormProps {
-    directory: Directory;
-    isDeploying?: boolean;
-    providerName?: string;
+	directory: Directory;
+	isDeploying?: boolean;
+	providerName?: string;
 }
 ```
 
@@ -119,11 +121,11 @@ A modal dialog that loads current website settings and allows editing before dep
 
 ```typescript
 interface DeployConfigDialogProps {
-    open: boolean;
-    directoryId: string;
-    isSubmitting?: boolean;
-    onConfirm: (settings: DeployConfigData | null) => void;
-    onCancel: () => void;
+	open: boolean;
+	directoryId: string;
+	isSubmitting?: boolean;
+	onConfirm: (settings: DeployConfigData | null) => void;
+	onCancel: () => void;
 }
 ```
 
@@ -137,47 +139,47 @@ Shown when the deployment provider account has multiple teams (e.g., Vercel team
 
 ```typescript
 interface DeployTeam {
-    id: string;
-    slug: string;
-    name: string | null;
+	id: string;
+	slug: string;
+	name: string | null;
 }
 
 interface TeamSelectionDialogProps {
-    open: boolean;
-    teams: DeployTeam[];
-    isSubmitting?: boolean;
-    providerName?: string;
-    onConfirm: (teamScope: string) => void;
-    onCancel: () => void;
+	open: boolean;
+	teams: DeployTeam[];
+	isSubmitting?: boolean;
+	providerName?: string;
+	onConfirm: (teamScope: string) => void;
+	onCancel: () => void;
 }
 ```
 
 ## State Management
 
-| State                    | Scope            | Source                                    |
-|--------------------------|------------------|-------------------------------------------|
-| `isDeploying`            | Page-level       | Derived from `directory.deploymentState`  |
-| `deployTeams`            | DeployForm       | Fetched via `getDeploymentTeams` action   |
-| `isConfigDialogOpen`     | DeployForm       | Local `useState`                          |
-| `isTeamDialogOpen`       | DeployForm       | Local `useState`                          |
-| `selectedProvider`       | ProviderSelector | Local `useState`, persisted via action    |
-| `autoUpdate`             | TemplateSettings | Local `useState`, synced via action       |
-| `useBeta`                | TemplateSettings | Local `useState`, synced via action       |
-| `formData`               | ConfigDialog     | `useWebsiteSettingsForm` hook             |
+| State                | Scope            | Source                                   |
+| -------------------- | ---------------- | ---------------------------------------- |
+| `isDeploying`        | Page-level       | Derived from `directory.deploymentState` |
+| `deployTeams`        | DeployForm       | Fetched via `getDeploymentTeams` action  |
+| `isConfigDialogOpen` | DeployForm       | Local `useState`                         |
+| `isTeamDialogOpen`   | DeployForm       | Local `useState`                         |
+| `selectedProvider`   | ProviderSelector | Local `useState`, persisted via action   |
+| `autoUpdate`         | TemplateSettings | Local `useState`, synced via action      |
+| `useBeta`            | TemplateSettings | Local `useState`, synced via action      |
+| `formData`           | ConfigDialog     | `useWebsiteSettingsForm` hook            |
 
 All server mutations use React `useTransition` for non-blocking updates with `isPending` states.
 
 ## Related API Endpoints
 
-| Action                           | Server Action Function                | HTTP Method |
-|----------------------------------|---------------------------------------|-------------|
-| Deploy directory                 | `deploy(directoryId, teamScope?)`     | POST        |
-| Get deployment teams             | `getDeploymentTeams(directoryId)`     | GET         |
-| Look up existing deployment      | `lookupExistingDeployment(directoryId)` | GET       |
-| Update website repository        | `updateWebsiteRepository(directoryId)` | POST       |
-| Update template settings         | `updateWebsiteTemplateSettings(directoryId, settings)` | PATCH |
-| Update deploy provider           | `updateDeployProvider(directoryId, providerId)` | PATCH |
-| Update website settings          | `updateWebsiteSettings(directoryId, settings)` | PATCH |
+| Action                      | Server Action Function                                 | HTTP Method |
+| --------------------------- | ------------------------------------------------------ | ----------- |
+| Deploy directory            | `deploy(directoryId, teamScope?)`                      | POST        |
+| Get deployment teams        | `getDeploymentTeams(directoryId)`                      | GET         |
+| Look up existing deployment | `lookupExistingDeployment(directoryId)`                | GET         |
+| Update website repository   | `updateWebsiteRepository(directoryId)`                 | POST        |
+| Update template settings    | `updateWebsiteTemplateSettings(directoryId, settings)` | PATCH       |
+| Update deploy provider      | `updateDeployProvider(directoryId, providerId)`        | PATCH       |
+| Update website settings     | `updateWebsiteSettings(directoryId, settings)`         | PATCH       |
 
 ## Internationalization
 

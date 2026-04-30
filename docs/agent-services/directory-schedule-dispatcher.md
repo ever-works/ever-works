@@ -1,7 +1,7 @@
 ---
 id: directory-schedule-dispatcher
-title: "DirectoryScheduleDispatcherService Deep Dive"
-sidebar_label: "Schedule Dispatcher"
+title: 'DirectoryScheduleDispatcherService Deep Dive'
+sidebar_label: 'Schedule Dispatcher'
 sidebar_position: 15
 ---
 
@@ -45,9 +45,9 @@ Returns: number of dispatched schedules
 
 Finds and dispatches all due scheduled directory updates.
 
-| Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `limit` | `number` | `config.subscriptions.getMaxBatch()` | Maximum number of schedules to process in this batch |
+| Parameter | Type     | Default                              | Description                                          |
+| --------- | -------- | ------------------------------------ | ---------------------------------------------------- |
+| `limit`   | `number` | `config.subscriptions.getMaxBatch()` | Maximum number of schedules to process in this batch |
 
 **Returns:** `Promise<number>` -- the count of successfully dispatched schedules.
 
@@ -79,13 +79,13 @@ Each schedule is processed inside its own try-catch block. A failure in one sche
 
 ## Database Interactions
 
-| Repository / Service | Method | Purpose |
-|---------------------|--------|---------|
-| `DirectoryScheduleRepository` | `findDue(limit)` | Query for schedules whose next run time has passed |
-| `DirectoryScheduleService` | `recoverStuckSchedules()` | Reset zombie schedules |
-| `DirectoryScheduleService` | `markRunDispatched(id)` | Atomically reserve a schedule for processing |
-| `DirectoryScheduleService` | `markRunFailed(id, message)` | Record schedule failure |
-| `DirectoryGenerationService` | `runScheduledUpdate(schedule)` | Execute the actual directory generation |
+| Repository / Service          | Method                         | Purpose                                            |
+| ----------------------------- | ------------------------------ | -------------------------------------------------- |
+| `DirectoryScheduleRepository` | `findDue(limit)`               | Query for schedules whose next run time has passed |
+| `DirectoryScheduleService`    | `recoverStuckSchedules()`      | Reset zombie schedules                             |
+| `DirectoryScheduleService`    | `markRunDispatched(id)`        | Atomically reserve a schedule for processing       |
+| `DirectoryScheduleService`    | `markRunFailed(id, message)`   | Record schedule failure                            |
+| `DirectoryGenerationService`  | `runScheduledUpdate(schedule)` | Execute the actual directory generation            |
 
 ## Event System
 
@@ -93,12 +93,12 @@ This service does not emit events directly. Events are emitted by the downstream
 
 ## Error Handling
 
-| Scenario | Behavior |
-|----------|----------|
-| Scheduled updates disabled | Returns `0`, logs warning |
-| Schedule already reserved | Logs warning, skips to next |
-| Generation failure | Calls `markRunFailed()`, continues to next schedule |
-| Repository query failure | Propagates the exception (no schedules processed) |
+| Scenario                   | Behavior                                            |
+| -------------------------- | --------------------------------------------------- |
+| Scheduled updates disabled | Returns `0`, logs warning                           |
+| Schedule already reserved  | Logs warning, skips to next                         |
+| Generation failure         | Calls `markRunFailed()`, continues to next schedule |
+| Repository query failure   | Propagates the exception (no schedules processed)   |
 
 ## Usage Examples
 
@@ -113,10 +113,10 @@ const dispatched = await schedulerDispatcher.dispatchDue(5);
 
 ## Configuration
 
-| Setting | Source | Description |
-|---------|--------|-------------|
-| `scheduledUpdatesEnabled` | `config.subscriptions` | Global feature flag for scheduled updates |
-| `getMaxBatch` | `config.subscriptions` | Default maximum batch size per dispatch cycle |
+| Setting                   | Source                 | Description                                   |
+| ------------------------- | ---------------------- | --------------------------------------------- |
+| `scheduledUpdatesEnabled` | `config.subscriptions` | Global feature flag for scheduled updates     |
+| `getMaxBatch`             | `config.subscriptions` | Default maximum batch size per dispatch cycle |
 
 ## Related Services
 

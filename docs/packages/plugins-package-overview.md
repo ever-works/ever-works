@@ -11,15 +11,15 @@ The `packages/plugins/` directory contains all first-party plugin implementation
 
 ## Overview
 
-| Property | Value |
-|---|---|
-| **Location** | `platform/packages/plugins/` |
-| **Module format** | ESM (with CJS fallback) |
-| **Build tool** | tsup |
-| **Test runner** | Vitest |
+| Property            | Value                                       |
+| ------------------- | ------------------------------------------- |
+| **Location**        | `platform/packages/plugins/`                |
+| **Module format**   | ESM (with CJS fallback)                     |
+| **Build tool**      | tsup                                        |
+| **Test runner**     | Vitest                                      |
 | **Plugin contract** | `@ever-works/plugin` (workspace dependency) |
-| **Total plugins** | 30 |
-| **License** | MIT (individual packages) |
+| **Total plugins**   | 30                                          |
+| **License**         | MIT (individual packages)                   |
 
 ## Module Structure
 
@@ -45,87 +45,87 @@ Plugins are organized by functional category, declared in the `everworks.plugin.
 
 Provide large language model access for content generation, chat completion, streaming, and embeddings.
 
-| Plugin | Package | Description |
-|---|---|---|
-| OpenAI | `@ever-works/openai-plugin` | GPT models via OpenAI API |
-| Anthropic | `@ever-works/anthropic-plugin` | Claude models via Anthropic API |
-| Google | `@ever-works/google-plugin` | Gemini models via Google AI API |
-| Groq | `@ever-works/groq-plugin` | Fast inference via Groq API |
-| Ollama | `@ever-works/ollama-plugin` | Local model inference via Ollama |
-| OpenRouter | `@ever-works/openrouter-plugin` | Multi-provider routing via OpenRouter |
-| Mistral | `@ever-works/mistral-plugin` | Mistral models via Mistral API |
+| Plugin     | Package                         | Description                            |
+| ---------- | ------------------------------- | -------------------------------------- |
+| OpenAI     | `@ever-works/openai-plugin`     | GPT models via OpenAI API              |
+| Anthropic  | `@ever-works/anthropic-plugin`  | Claude models via Anthropic API        |
+| Google     | `@ever-works/google-plugin`     | Gemini models via Google AI API        |
+| Groq       | `@ever-works/groq-plugin`       | Fast inference via Groq API            |
+| Ollama     | `@ever-works/ollama-plugin`     | Local model inference via Ollama       |
+| OpenRouter | `@ever-works/openrouter-plugin` | Multi-provider routing via OpenRouter  |
+| Mistral    | `@ever-works/mistral-plugin`    | Mistral models via Mistral API         |
 | Perplexity | `@ever-works/perplexity-plugin` | Perplexity models with built-in search |
 
 ### Search Providers
 
 Power web research during content generation by querying external search APIs.
 
-| Plugin | Package | Description |
-|---|---|---|
-| Exa | `@ever-works/exa-plugin` | Neural and keyword search via Exa API |
-| Tavily | `@ever-works/tavily-plugin` | AI-optimized search via Tavily API |
-| SerpAPI | `@ever-works/serpapi-plugin` | Google search results via SerpAPI |
-| Brave | `@ever-works/brave-plugin` | Web search via Brave Search API |
-| Valyu | `@ever-works/valyu-plugin` | Search via Valyu API |
+| Plugin  | Package                      | Description                           |
+| ------- | ---------------------------- | ------------------------------------- |
+| Exa     | `@ever-works/exa-plugin`     | Neural and keyword search via Exa API |
+| Tavily  | `@ever-works/tavily-plugin`  | AI-optimized search via Tavily API    |
+| SerpAPI | `@ever-works/serpapi-plugin` | Google search results via SerpAPI     |
+| Brave   | `@ever-works/brave-plugin`   | Web search via Brave Search API       |
+| Valyu   | `@ever-works/valyu-plugin`   | Search via Valyu API                  |
 
 ### Content Extraction
 
 Extract and process content from web pages, documents, and external services.
 
-| Plugin | Package | Description |
-|---|---|---|
-| Local Content Extractor | `@ever-works/local-content-extractor-plugin` | Built-in HTML/text extraction |
-| Notion Extractor | `@ever-works/notion-extractor-plugin` | Import content from Notion workspaces |
-| Firecrawl | `@ever-works/firecrawl-plugin` | Web scraping via Firecrawl API |
-| Jina | `@ever-works/jina-plugin` | Content extraction via Jina Reader |
-| Scrapfly | `@ever-works/scrapfly-plugin` | Web scraping via Scrapfly API |
-| BrightData | `@ever-works/brightdata-plugin` | Web data collection via Bright Data |
-| PDF Extractor | `@ever-works/pdf-extractor-plugin` | PDF document content extraction |
+| Plugin                  | Package                                      | Description                           |
+| ----------------------- | -------------------------------------------- | ------------------------------------- |
+| Local Content Extractor | `@ever-works/local-content-extractor-plugin` | Built-in HTML/text extraction         |
+| Notion Extractor        | `@ever-works/notion-extractor-plugin`        | Import content from Notion workspaces |
+| Firecrawl               | `@ever-works/firecrawl-plugin`               | Web scraping via Firecrawl API        |
+| Jina                    | `@ever-works/jina-plugin`                    | Content extraction via Jina Reader    |
+| Scrapfly                | `@ever-works/scrapfly-plugin`                | Web scraping via Scrapfly API         |
+| BrightData              | `@ever-works/brightdata-plugin`              | Web data collection via Bright Data   |
+| PDF Extractor           | `@ever-works/pdf-extractor-plugin`           | PDF document content extraction       |
 
 ### Screenshot Providers
 
 Capture website screenshots for directory item thumbnails and previews.
 
-| Plugin | Package | Description |
-|---|---|---|
+| Plugin        | Package                            | Description                       |
+| ------------- | ---------------------------------- | --------------------------------- |
 | ScreenshotOne | `@ever-works/screenshotone-plugin` | Screenshots via ScreenshotOne API |
-| URLBox | `@ever-works/urlbox-plugin` | Screenshots via URLBox API |
+| URLBox        | `@ever-works/urlbox-plugin`        | Screenshots via URLBox API        |
 
 ### Git Providers
 
 Manage repository operations for directory data storage and website deployment.
 
-| Plugin | Package | Description |
-|---|---|---|
+| Plugin | Package                     | Description                                               |
+| ------ | --------------------------- | --------------------------------------------------------- |
 | GitHub | `@ever-works/github-plugin` | Repository management, git operations, and GitHub Actions |
 
 ### Infrastructure
 
 Handle deployment and cloud resource management.
 
-| Plugin | Package | Description |
-|---|---|---|
-| Vercel | `@ever-works/vercel-plugin` | Website deployment to Vercel |
-| Apify | `@ever-works/apify-plugin` | Web scraping actors via Apify |
+| Plugin | Package                     | Description                   |
+| ------ | --------------------------- | ----------------------------- |
+| Vercel | `@ever-works/vercel-plugin` | Website deployment to Vercel  |
+| Apify  | `@ever-works/apify-plugin`  | Web scraping actors via Apify |
 
 ### Pipeline
 
 Orchestrate multi-step generation workflows.
 
-| Plugin | Package | Description |
-|---|---|---|
-| Agent Pipeline | `@ever-works/agent-pipeline-plugin` | AI agent-driven generation pipeline |
-| Standard Pipeline | `@ever-works/standard-pipeline-plugin` | Rule-based generation pipeline |
-| Comparison Generator | `@ever-works/comparison-generator-plugin` | Item comparison content generation |
+| Plugin               | Package                                   | Description                         |
+| -------------------- | ----------------------------------------- | ----------------------------------- |
+| Agent Pipeline       | `@ever-works/agent-pipeline-plugin`       | AI agent-driven generation pipeline |
+| Standard Pipeline    | `@ever-works/standard-pipeline-plugin`    | Rule-based generation pipeline      |
+| Comparison Generator | `@ever-works/comparison-generator-plugin` | Item comparison content generation  |
 
 ### AI Tools
 
 Extended AI capabilities and gateway services.
 
-| Plugin | Package | Description |
-|---|---|---|
-| Claude Code | `@ever-works/claude-code-plugin` | Claude Code integration for advanced tasks |
-| Vercel AI Gateway | `@ever-works/vercel-ai-gateway-plugin` | AI model routing via Vercel AI Gateway |
+| Plugin            | Package                                | Description                                |
+| ----------------- | -------------------------------------- | ------------------------------------------ |
+| Claude Code       | `@ever-works/claude-code-plugin`       | Claude Code integration for advanced tasks |
+| Vercel AI Gateway | `@ever-works/vercel-ai-gateway-plugin` | AI model routing via Vercel AI Gateway     |
 
 ## Plugin Manifest
 
@@ -133,35 +133,35 @@ Every plugin declares its identity and capabilities in the `everworks.plugin` fi
 
 ```json
 {
-    "everworks": {
-        "plugin": {
-            "id": "openai",
-            "name": "OpenAI",
-            "version": "1.0.0",
-            "category": "ai-provider",
-            "capabilities": ["ai-provider"],
-            "description": "OpenAI AI provider plugin for Ever Works platform",
-            "author": { "name": "Ever Works Team" },
-            "license": "MIT",
-            "builtIn": true,
-            "autoEnable": false
-        }
-    }
+	"everworks": {
+		"plugin": {
+			"id": "openai",
+			"name": "OpenAI",
+			"version": "1.0.0",
+			"category": "ai-provider",
+			"capabilities": ["ai-provider"],
+			"description": "OpenAI AI provider plugin for Ever Works platform",
+			"author": { "name": "Ever Works Team" },
+			"license": "MIT",
+			"builtIn": true,
+			"autoEnable": false
+		}
+	}
 }
 ```
 
-| Field | Type | Description |
-|---|---|---|
-| `id` | `string` | Unique plugin identifier |
-| `name` | `string` | Human-readable display name |
-| `version` | `string` | Semantic version |
-| `category` | `PluginCategory` | Functional category (`ai-provider`, `search`, `content-extraction`, `screenshot`, `git`, `infrastructure`, `pipeline`, `ai-tools`) |
-| `capabilities` | `string[]` | List of capability identifiers the plugin provides |
-| `description` | `string` | Short description |
-| `author` | `{ name: string }` | Author information |
-| `license` | `string` | License identifier |
-| `builtIn` | `boolean` | Whether the plugin ships with the platform |
-| `autoEnable` | `boolean` | Whether to enable automatically on first load |
+| Field          | Type               | Description                                                                                                                        |
+| -------------- | ------------------ | ---------------------------------------------------------------------------------------------------------------------------------- |
+| `id`           | `string`           | Unique plugin identifier                                                                                                           |
+| `name`         | `string`           | Human-readable display name                                                                                                        |
+| `version`      | `string`           | Semantic version                                                                                                                   |
+| `category`     | `PluginCategory`   | Functional category (`ai-provider`, `search`, `content-extraction`, `screenshot`, `git`, `infrastructure`, `pipeline`, `ai-tools`) |
+| `capabilities` | `string[]`         | List of capability identifiers the plugin provides                                                                                 |
+| `description`  | `string`           | Short description                                                                                                                  |
+| `author`       | `{ name: string }` | Author information                                                                                                                 |
+| `license`      | `string`           | License identifier                                                                                                                 |
+| `builtIn`      | `boolean`          | Whether the plugin ships with the platform                                                                                         |
+| `autoEnable`   | `boolean`          | Whether to enable automatically on first load                                                                                      |
 
 ## Key Classes and Interfaces
 
@@ -174,21 +174,23 @@ import { BaseAiProvider } from '@ever-works/plugin/abstract';
 import { AiOperations } from '@ever-works/plugin/ai';
 
 export class OpenAiPlugin extends BaseAiProvider {
-    readonly id = 'openai';
-    readonly name = 'OpenAI';
-    readonly version = '1.0.0';
-    readonly providerType = 'openai';
-    readonly configurationMode = 'user-required';
+	readonly id = 'openai';
+	readonly name = 'OpenAI';
+	readonly version = '1.0.0';
+	readonly providerType = 'openai';
+	readonly configurationMode = 'user-required';
 
-    async onLoad(context: PluginContext): Promise<void> {
-        await super.onLoad(context);
-        this.aiOps = new AiOperations({ /* ... */ });
-    }
+	async onLoad(context: PluginContext): Promise<void> {
+		await super.onLoad(context);
+		this.aiOps = new AiOperations({
+			/* ... */
+		});
+	}
 
-    async createChatCompletion(options: ChatCompletionOptions): Promise<ChatCompletionResponse> {
-        const resolvedConfig = this.resolveConfig(options.settings);
-        return this.aiOps.createChatCompletion(options, resolvedConfig);
-    }
+	async createChatCompletion(options: ChatCompletionOptions): Promise<ChatCompletionResponse> {
+		const resolvedConfig = this.resolveConfig(options.settings);
+		return this.aiOps.createChatCompletion(options, resolvedConfig);
+	}
 }
 ```
 
@@ -206,34 +208,34 @@ The `AiOperations` class from `@ever-works/plugin/ai` wraps LangChain and provid
 
 Plugins define their configurable settings using JSON Schema with custom extensions:
 
-| Extension | Purpose |
-|---|---|
-| `x-secret` | Marks a field as sensitive (encrypted at rest) |
-| `x-scope` | Setting scope: `user`, `global`, or `directory` |
-| `x-widget` | UI widget hint (e.g., `model-select`) |
-| `x-hidden` | Hides field from the default settings UI |
-| `x-envVar` | Maps field to an environment variable |
+| Extension  | Purpose                                         |
+| ---------- | ----------------------------------------------- |
+| `x-secret` | Marks a field as sensitive (encrypted at rest)  |
+| `x-scope`  | Setting scope: `user`, `global`, or `directory` |
+| `x-widget` | UI widget hint (e.g., `model-select`)           |
+| `x-hidden` | Hides field from the default settings UI        |
+| `x-envVar` | Maps field to an environment variable           |
 
 ### Configuration Modes
 
 Each plugin declares how it expects settings to be provided:
 
-| Mode | Description |
-|---|---|
-| `admin-only` | Platform admin provides all settings (e.g., a centrally managed API key) |
-| `user-required` | Each user must supply their own credentials (e.g., personal API key) |
-| `hybrid` | Admin provides defaults; users can override with their own values |
+| Mode            | Description                                                              |
+| --------------- | ------------------------------------------------------------------------ |
+| `admin-only`    | Platform admin provides all settings (e.g., a centrally managed API key) |
+| `user-required` | Each user must supply their own credentials (e.g., personal API key)     |
+| `hybrid`        | Admin provides defaults; users can override with their own values        |
 
 ## Dependencies
 
 All plugins share common workspace dependencies:
 
-| Package | Purpose |
-|---|---|
+| Package              | Purpose                                           |
+| -------------------- | ------------------------------------------------- |
 | `@ever-works/plugin` | Plugin contracts, base classes, and AI operations |
-| `tsup` | Build tool (dev dependency) |
-| `typescript` | Type checking (dev dependency) |
-| `vitest` | Test runner (dev dependency) |
+| `tsup`               | Build tool (dev dependency)                       |
+| `typescript`         | Type checking (dev dependency)                    |
+| `vitest`             | Test runner (dev dependency)                      |
 
 AI provider plugins additionally depend on the relevant LangChain provider package (e.g., `@langchain/openai`, `@langchain/anthropic`, `@langchain/google-genai`).
 
@@ -278,22 +280,22 @@ import { PluginsModule } from '@ever-works/agent/plugins';
 import { PluginBootstrapService } from '@ever-works/agent/plugins';
 
 @Module({
-    imports: [
-        PluginsModule.forRoot({
-            autoLoadBuiltIn: true,
-            environment: 'production',
-            encryptSecrets: true,
-            maxConcurrentLoads: 5,
-            loadTimeout: 30000,
-        }),
-    ],
+	imports: [
+		PluginsModule.forRoot({
+			autoLoadBuiltIn: true,
+			environment: 'production',
+			encryptSecrets: true,
+			maxConcurrentLoads: 5,
+			loadTimeout: 30000
+		})
+	]
 })
 export class ApiModule implements OnApplicationBootstrap {
-    constructor(private readonly pluginBootstrap: PluginBootstrapService) {}
+	constructor(private readonly pluginBootstrap: PluginBootstrapService) {}
 
-    async onApplicationBootstrap() {
-        await this.pluginBootstrap.bootstrap();
-    }
+	async onApplicationBootstrap() {
+		await this.pluginBootstrap.bootstrap();
+	}
 }
 ```
 
@@ -314,32 +316,32 @@ Example minimal plugin structure:
 import type { IPlugin, PluginContext, PluginManifest } from '@ever-works/plugin';
 
 export class MySearchPlugin implements IPlugin {
-    readonly id = 'my-search';
-    readonly name = 'My Search';
-    readonly version = '1.0.0';
-    readonly category = 'search';
-    readonly capabilities = ['search'];
+	readonly id = 'my-search';
+	readonly name = 'My Search';
+	readonly version = '1.0.0';
+	readonly category = 'search';
+	readonly capabilities = ['search'];
 
-    async onLoad(context: PluginContext): Promise<void> {
-        context.logger.log('My Search Plugin loaded');
-    }
+	async onLoad(context: PluginContext): Promise<void> {
+		context.logger.log('My Search Plugin loaded');
+	}
 
-    async onUnload(): Promise<void> {}
+	async onUnload(): Promise<void> {}
 
-    getManifest(): PluginManifest {
-        return {
-            id: this.id,
-            name: this.name,
-            version: this.version,
-            description: 'Custom search provider',
-            category: this.category,
-            capabilities: [...this.capabilities],
-            author: { name: 'Your Name' },
-            license: 'MIT',
-            builtIn: true,
-            autoEnable: false,
-        };
-    }
+	getManifest(): PluginManifest {
+		return {
+			id: this.id,
+			name: this.name,
+			version: this.version,
+			description: 'Custom search provider',
+			category: this.category,
+			capabilities: [...this.capabilities],
+			author: { name: 'Your Name' },
+			license: 'MIT',
+			builtIn: true,
+			autoEnable: false
+		};
+	}
 }
 ```
 
@@ -352,15 +354,15 @@ export { MySearchPlugin, MySearchPlugin as default } from './my-search.plugin.js
 
 The plugin runtime emits events at each lifecycle stage. Other services can listen for these:
 
-| Event | Constant | Description |
-|---|---|---|
-| `plugin:loaded` | `PluginEvents.LOADED` | Plugin successfully loaded |
-| `plugin:unloaded` | `PluginEvents.UNLOADED` | Plugin unloaded |
-| `plugin:error` | `PluginEvents.ERROR` | Plugin encountered an error |
-| `plugin:settings-changed` | `PluginEvents.SETTINGS_CHANGED` | Plugin settings were updated |
-| `plugin:state-changed` | `PluginEvents.STATE_CHANGED` | Plugin transitioned to a new state |
-| `plugin:registered` | `PluginEvents.REGISTERED` | Plugin registered in the registry |
-| `plugin:unregistered` | `PluginEvents.UNREGISTERED` | Plugin removed from the registry |
+| Event                     | Constant                        | Description                        |
+| ------------------------- | ------------------------------- | ---------------------------------- |
+| `plugin:loaded`           | `PluginEvents.LOADED`           | Plugin successfully loaded         |
+| `plugin:unloaded`         | `PluginEvents.UNLOADED`         | Plugin unloaded                    |
+| `plugin:error`            | `PluginEvents.ERROR`            | Plugin encountered an error        |
+| `plugin:settings-changed` | `PluginEvents.SETTINGS_CHANGED` | Plugin settings were updated       |
+| `plugin:state-changed`    | `PluginEvents.STATE_CHANGED`    | Plugin transitioned to a new state |
+| `plugin:registered`       | `PluginEvents.REGISTERED`       | Plugin registered in the registry  |
+| `plugin:unregistered`     | `PluginEvents.UNREGISTERED`     | Plugin removed from the registry   |
 
 ### Plugin State Machine
 
@@ -383,12 +385,12 @@ stateDiagram-v2
 
 Plugin settings are resolved through a multi-layer priority system. Higher-priority sources override lower-priority ones:
 
-| Priority | Source | Description |
-|---|---|---|
-| 1 (highest) | `directory` | Per-directory overrides |
-| 2 | `user` | User-level preferences |
-| 3 | `admin` | Platform admin defaults |
-| 4 | `env` | Environment variables (via `x-envVar`) |
-| 5 (lowest) | `default` | Schema-defined defaults |
+| Priority    | Source      | Description                            |
+| ----------- | ----------- | -------------------------------------- |
+| 1 (highest) | `directory` | Per-directory overrides                |
+| 2           | `user`      | User-level preferences                 |
+| 3           | `admin`     | Platform admin defaults                |
+| 4           | `env`       | Environment variables (via `x-envVar`) |
+| 5 (lowest)  | `default`   | Schema-defined defaults                |
 
 This allows flexible configuration where, for example, an admin can set a default AI model but individual users can override it with their own preference, and specific directories can further customize the setting.

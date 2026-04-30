@@ -38,14 +38,14 @@ flowchart TD
 
 ## Source Files
 
-| File | Purpose |
-|------|---------|
-| `packages/agent/src/services/utils/error-classification.utils.ts` | Error classification and notification routing |
-| `packages/agent/src/services/utils/error.utils.ts` | Error normalization and re-throw helper |
-| `packages/agent/src/utils/error.util.ts` | Safe error message/stack extraction |
-| `packages/agent/src/facades/base.facade.ts` | Facade-level error classes (`FacadeError`, `NoProviderError`) |
-| `packages/agent/src/facades/ai.facade.ts` | AI-specific error class (`AiFacadeError`) |
-| `packages/agent/src/pipeline/pipeline-builder.service.ts` | Pipeline errors (`CircularDependencyError`, `MissingDependencyError`) |
+| File                                                              | Purpose                                                               |
+| ----------------------------------------------------------------- | --------------------------------------------------------------------- |
+| `packages/agent/src/services/utils/error-classification.utils.ts` | Error classification and notification routing                         |
+| `packages/agent/src/services/utils/error.utils.ts`                | Error normalization and re-throw helper                               |
+| `packages/agent/src/utils/error.util.ts`                          | Safe error message/stack extraction                                   |
+| `packages/agent/src/facades/base.facade.ts`                       | Facade-level error classes (`FacadeError`, `NoProviderError`)         |
+| `packages/agent/src/facades/ai.facade.ts`                         | AI-specific error class (`AiFacadeError`)                             |
+| `packages/agent/src/pipeline/pipeline-builder.service.ts`         | Pipeline errors (`CircularDependencyError`, `MissingDependencyError`) |
 
 ## Key Classes
 
@@ -54,36 +54,31 @@ flowchart TD
 The classifier examines error messages using keyword matching and returns a typed classification:
 
 ```typescript
-export type ErrorClassificationType =
-    | 'ai_credits'
-    | 'ai_provider'
-    | 'git_auth'
-    | 'account_level'
-    | 'unknown';
+export type ErrorClassificationType = 'ai_credits' | 'ai_provider' | 'git_auth' | 'account_level' | 'unknown';
 
 export type ErrorClassification = {
-    type: ErrorClassificationType;
-    provider: string;
-    message: string;
+	type: ErrorClassificationType;
+	provider: string;
+	message: string;
 };
 
 export function classifyGenerationError(error: unknown): ErrorClassification {
-    const message = error instanceof Error ? error.message : String(error);
-    const errorLower = message.toLowerCase();
+	const message = error instanceof Error ? error.message : String(error);
+	const errorLower = message.toLowerCase();
 
-    if (isAiCreditsError(errorLower)) {
-        return { type: 'ai_credits', provider: detectAiProvider(errorLower), message };
-    }
-    if (isAiProviderError(errorLower)) {
-        return { type: 'ai_provider', provider: detectAiProvider(errorLower), message };
-    }
-    if (isGitAuthError(errorLower)) {
-        return { type: 'git_auth', provider: detectGitProvider(errorLower), message };
-    }
-    if (isAccountLevelError(errorLower)) {
-        return { type: 'account_level', provider: '', message };
-    }
-    return { type: 'unknown', provider: '', message };
+	if (isAiCreditsError(errorLower)) {
+		return { type: 'ai_credits', provider: detectAiProvider(errorLower), message };
+	}
+	if (isAiProviderError(errorLower)) {
+		return { type: 'ai_provider', provider: detectAiProvider(errorLower), message };
+	}
+	if (isGitAuthError(errorLower)) {
+		return { type: 'git_auth', provider: detectGitProvider(errorLower), message };
+	}
+	if (isAccountLevelError(errorLower)) {
+		return { type: 'account_level', provider: '', message };
+	}
+	return { type: 'unknown', provider: '', message };
 }
 ```
 
@@ -93,21 +88,17 @@ Each error type has a dedicated detector that checks for known error message pat
 
 ```typescript
 function isAiCreditsError(error: string): boolean {
-    return (
-        error.includes('insufficient_quota') ||
-        error.includes('rate_limit') ||
-        error.includes('quota exceeded') ||
-        error.includes('credits') ||
-        error.includes('billing')
-    );
+	return (
+		error.includes('insufficient_quota') ||
+		error.includes('rate_limit') ||
+		error.includes('quota exceeded') ||
+		error.includes('credits') ||
+		error.includes('billing')
+	);
 }
 
 function isAiProviderError(error: string): boolean {
-    return (
-        error.includes('invalid_api_key') ||
-        error.includes('authentication') ||
-        error.includes('unauthorized')
-    );
+	return error.includes('invalid_api_key') || error.includes('authentication') || error.includes('unauthorized');
 }
 ```
 
@@ -117,13 +108,13 @@ The system auto-detects which AI or Git provider is involved:
 
 ```typescript
 function detectAiProvider(error: string): string {
-    if (error.includes('openai')) return 'OpenAI';
-    if (error.includes('anthropic') || error.includes('claude')) return 'Anthropic';
-    if (error.includes('google') || error.includes('gemini')) return 'Google';
-    if (error.includes('groq')) return 'Groq';
-    if (error.includes('ollama')) return 'Ollama';
-    if (error.includes('openrouter')) return 'OpenRouter';
-    return 'AI Provider';
+	if (error.includes('openai')) return 'OpenAI';
+	if (error.includes('anthropic') || error.includes('claude')) return 'Anthropic';
+	if (error.includes('google') || error.includes('gemini')) return 'Google';
+	if (error.includes('groq')) return 'Groq';
+	if (error.includes('ollama')) return 'Ollama';
+	if (error.includes('openrouter')) return 'OpenRouter';
+	return 'AI Provider';
 }
 ```
 
@@ -133,22 +124,22 @@ Transforms raw errors into user-friendly messages:
 
 ```typescript
 export function normalizeGeneratorError(error: any): string {
-    let message = error?.message || error?.error || String(error);
-    const lower = message.toLowerCase();
+	let message = error?.message || error?.error || String(error);
+	const lower = message.toLowerCase();
 
-    if (lower.includes('not found')) {
-        return 'Repository not found. Please verify the repository exists.';
-    }
-    if (lower.includes('enotfound') || lower.includes('getaddrinfo')) {
-        return 'Connection failed. Please check your network.';
-    }
-    if (lower.includes('timeout') || lower.includes('timedout')) {
-        return 'Request timed out. Please try again.';
-    }
-    if (lower.includes('could not read username')) {
-        return 'Please reconnect your Git account to continue.';
-    }
-    return message;
+	if (lower.includes('not found')) {
+		return 'Repository not found. Please verify the repository exists.';
+	}
+	if (lower.includes('enotfound') || lower.includes('getaddrinfo')) {
+		return 'Connection failed. Please check your network.';
+	}
+	if (lower.includes('timeout') || lower.includes('timedout')) {
+		return 'Request timed out. Please try again.';
+	}
+	if (lower.includes('could not read username')) {
+		return 'Please reconnect your Git account to continue.';
+	}
+	return message;
 }
 ```
 
@@ -158,20 +149,20 @@ A utility that preserves NestJS HttpExceptions and normalizes everything else to
 
 ```typescript
 export function rethrowAsNormalized(
-    error: unknown,
-    logger: Logger,
-    context: string,
-    extraFields?: Record<string, unknown>,
+	error: unknown,
+	logger: Logger,
+	context: string,
+	extraFields?: Record<string, unknown>
 ): never {
-    if (error instanceof HttpException) {
-        throw error; // Pass through as-is
-    }
-    logger.error(`Error ${context}:`, error);
-    throw new BadRequestException({
-        status: 'error',
-        message: normalizeGeneratorError(error),
-        ...extraFields,
-    });
+	if (error instanceof HttpException) {
+		throw error; // Pass through as-is
+	}
+	logger.error(`Error ${context}:`, error);
+	throw new BadRequestException({
+		status: 'error',
+		message: normalizeGeneratorError(error),
+		...extraFields
+	});
 }
 ```
 
@@ -179,30 +170,30 @@ export function rethrowAsNormalized(
 
 ```typescript
 export class FacadeError extends Error {
-    constructor(
-        message: string,
-        public readonly operation: string,
-        public readonly provider?: string,
-        public readonly cause?: Error,
-    ) {
-        super(message);
-    }
+	constructor(
+		message: string,
+		public readonly operation: string,
+		public readonly provider?: string,
+		public readonly cause?: Error
+	) {
+		super(message);
+	}
 }
 
 export class NoProviderError extends FacadeError {
-    constructor(capability: string) {
-        super(`No ${capability} provider configured or available`, 'getPlugin');
-    }
+	constructor(capability: string) {
+		super(`No ${capability} provider configured or available`, 'getPlugin');
+	}
 }
 
 export class ProviderNotFoundError extends FacadeError {
-    constructor(providerId: string, capability: string) {
-        super(`${capability} provider not found: ${providerId}`, 'getPlugin', providerId);
-    }
+	constructor(providerId: string, capability: string) {
+		super(`${capability} provider not found: ${providerId}`, 'getPlugin', providerId);
+	}
 }
 
 export class AiFacadeError extends FacadeError {
-    // AI-specific errors with operation and provider context
+	// AI-specific errors with operation and provider context
 }
 ```
 
@@ -210,18 +201,18 @@ export class AiFacadeError extends FacadeError {
 
 ```typescript
 export class CircularDependencyError extends Error {
-    constructor(public readonly cycle: string[]) {
-        super(`Circular dependency detected: ${cycle.join(' -> ')}`);
-    }
+	constructor(public readonly cycle: string[]) {
+		super(`Circular dependency detected: ${cycle.join(' -> ')}`);
+	}
 }
 
 export class MissingDependencyError extends Error {
-    constructor(
-        public readonly stepId: string,
-        public readonly missingDependency: string,
-    ) {
-        super(`Step "${stepId}" depends on missing step "${missingDependency}"`);
-    }
+	constructor(
+		public readonly stepId: string,
+		public readonly missingDependency: string
+	) {
+		super(`Step "${stepId}" depends on missing step "${missingDependency}"`);
+	}
 }
 ```
 
@@ -231,13 +222,13 @@ Type-safe utilities for extracting error information from `unknown` values:
 
 ```typescript
 export function getErrorMessage(error: unknown): string {
-    if (error instanceof Error) return error.message;
-    return String(error);
+	if (error instanceof Error) return error.message;
+	return String(error);
 }
 
 export function getErrorStack(error: unknown): string | undefined {
-    if (error instanceof Error) return error.stack;
-    return undefined;
+	if (error instanceof Error) return error.stack;
+	return undefined;
 }
 ```
 
@@ -249,25 +240,21 @@ Classified errors route to the notification service, which creates user-visible 
 
 ```typescript
 export async function notifyForClassifiedError(
-    notificationService: NotificationService,
-    userId: string,
-    directoryId: string,
-    directoryName: string,
-    classification: ErrorClassification,
+	notificationService: NotificationService,
+	userId: string,
+	directoryId: string,
+	directoryName: string,
+	classification: ErrorClassification
 ): Promise<void> {
-    switch (classification.type) {
-        case 'ai_credits':
-            await notificationService.notifyAiCreditsDepleted(
-                userId, classification.provider, classification.message,
-            );
-            break;
-        case 'git_auth':
-            await notificationService.notifyGitAuthExpired(
-                userId, classification.provider,
-            );
-            break;
-        // ... other cases
-    }
+	switch (classification.type) {
+		case 'ai_credits':
+			await notificationService.notifyAiCreditsDepleted(userId, classification.provider, classification.message);
+			break;
+		case 'git_auth':
+			await notificationService.notifyGitAuthExpired(userId, classification.provider);
+			break;
+		// ... other cases
+	}
 }
 ```
 
@@ -277,20 +264,14 @@ export async function notifyForClassifiedError(
 
 ```typescript
 try {
-    await this.generateDirectory(directory, user);
+	await this.generateDirectory(directory, user);
 } catch (error) {
-    const classification = classifyGenerationError(error);
+	const classification = classifyGenerationError(error);
 
-    await notifyForClassifiedError(
-        this.notificationService,
-        user.id,
-        directory.id,
-        directory.name,
-        classification,
-    );
+	await notifyForClassifiedError(this.notificationService, user.id, directory.id, directory.name, classification);
 
-    // Re-throw as normalized HTTP exception
-    rethrowAsNormalized(error, this.logger, 'generating directory');
+	// Re-throw as normalized HTTP exception
+	rethrowAsNormalized(error, this.logger, 'generating directory');
 }
 ```
 
@@ -298,15 +279,15 @@ try {
 
 ```typescript
 try {
-    const result = await this.aiFacade.askJson(prompt, schema, options, facadeOptions);
+	const result = await this.aiFacade.askJson(prompt, schema, options, facadeOptions);
 } catch (error) {
-    if (error instanceof NoProviderError) {
-        throw new BadRequestException('No AI provider configured');
-    }
-    if (error instanceof AiFacadeError) {
-        this.logger.warn(`AI error: ${error.operation} - ${error.message}`);
-    }
-    throw error;
+	if (error instanceof NoProviderError) {
+		throw new BadRequestException('No AI provider configured');
+	}
+	if (error instanceof AiFacadeError) {
+		this.logger.warn(`AI error: ${error.operation} - ${error.message}`);
+	}
+	throw error;
 }
 ```
 

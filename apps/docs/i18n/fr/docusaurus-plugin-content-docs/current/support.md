@@ -35,16 +35,19 @@ Bienvenue dans le centre de support Ever Works. Nous sommes là pour vous aider 
 ### Problèmes courants
 
 #### Problèmes d'installation
+
 - **Version de Node.js** : Assurez-vous d'utiliser Node.js 20+
 - **Dépendances** : Exécutez `pnpm install` dans le répertoire racine
 - **Conflits de ports** : Utilisez le flag `--port` pour spécifier un port différent
 
 #### Problèmes de build
+
 - **Erreurs TypeScript** : Vérifiez votre configuration TypeScript
 - **Dépendances manquantes** : Assurez-vous que tous les packages sont correctement installés
 - **Variables d'environnement** : Vérifiez la configuration de votre fichier `.env`
 
 #### Problèmes d'exécution
+
 - **Connexion API** : Vérifiez vos variables d'environnement
 - **Authentification** : Vérifiez les identifiants de votre fournisseur OAuth
 - **Base de données** : Assurez-vous que votre connexion à la base de données fonctionne

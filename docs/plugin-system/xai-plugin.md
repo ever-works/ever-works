@@ -1,7 +1,7 @@
 ---
 id: xai-plugin
-title: "xAI Grok Models via OpenRouter"
-sidebar_label: "xAI Grok (via OpenRouter)"
+title: 'xAI Grok Models via OpenRouter'
+sidebar_label: 'xAI Grok (via OpenRouter)'
 sidebar_position: 35
 ---
 
@@ -11,9 +11,9 @@ Ever Works does not include a standalone xAI plugin. Grok models from xAI are ac
 
 **Related source files:**
 
-| File | Purpose |
-|---|---|
-| `packages/plugins/openrouter/src/openrouter.plugin.ts` | OpenRouter AI provider plugin |
+| File                                                                                 | Purpose                               |
+| ------------------------------------------------------------------------------------ | ------------------------------------- |
+| `packages/plugins/openrouter/src/openrouter.plugin.ts`                               | OpenRouter AI provider plugin         |
 | `apps/internal-cli/src/commands/config/ai-providers/ai-provider-registry.service.ts` | Provider registry listing Grok models |
 
 ## Available Grok Models
@@ -23,19 +23,19 @@ The AI provider registry includes Grok models in the OpenRouter model list:
 ```typescript
 // From ai-provider-registry.service.ts
 models: [
-    // ...
-    'x-ai/grok-3-mini-beta',
-]
+	// ...
+	'x-ai/grok-3-mini-beta'
+];
 ```
 
 Grok models available through OpenRouter use the `x-ai/` prefix:
 
-| Model ID | Description | Best For |
-|---|---|---|
-| `x-ai/grok-3` | Grok 3 full model | Complex content generation, analysis |
-| `x-ai/grok-3-mini` | Grok 3 Mini | Fast, cost-effective general tasks |
-| `x-ai/grok-3-mini-beta` | Grok 3 Mini Beta | Early access to latest capabilities |
-| `x-ai/grok-2` | Grok 2 | General purpose AI tasks |
+| Model ID                | Description       | Best For                             |
+| ----------------------- | ----------------- | ------------------------------------ |
+| `x-ai/grok-3`           | Grok 3 full model | Complex content generation, analysis |
+| `x-ai/grok-3-mini`      | Grok 3 Mini       | Fast, cost-effective general tasks   |
+| `x-ai/grok-3-mini-beta` | Grok 3 Mini Beta  | Early access to latest capabilities  |
+| `x-ai/grok-2`           | Grok 2            | General purpose AI tasks             |
 
 :::note
 Model availability on OpenRouter changes over time. Check [openrouter.ai/models](https://openrouter.ai/models) for the current list of available Grok models and their pricing.
@@ -50,12 +50,12 @@ Model availability on OpenRouter changes over time. Check [openrouter.ai/models]
 3. Enter your OpenRouter API key.
 4. Set model fields to Grok model IDs:
 
-| Setting | Value |
-|---|---|
-| Default Model | `x-ai/grok-3-mini` |
-| Simple Tasks Model | `x-ai/grok-3-mini` |
+| Setting              | Value              |
+| -------------------- | ------------------ |
+| Default Model        | `x-ai/grok-3-mini` |
+| Simple Tasks Model   | `x-ai/grok-3-mini` |
 | Standard Tasks Model | `x-ai/grok-3-mini` |
-| Complex Tasks Model | `x-ai/grok-3` |
+| Complex Tasks Model  | `x-ai/grok-3`      |
 
 ### Environment Variables
 
@@ -98,21 +98,21 @@ graph LR
 
 You can also mix Grok with other providers across tiers:
 
-| Tier | Model | Provider |
-|---|---|---|
-| Simple | `openai/gpt-5-nano` | OpenAI |
-| Standard | `x-ai/grok-3-mini` | xAI |
-| Complex | `x-ai/grok-3` | xAI |
+| Tier     | Model               | Provider |
+| -------- | ------------------- | -------- |
+| Simple   | `openai/gpt-5-nano` | OpenAI   |
+| Standard | `x-ai/grok-3-mini`  | xAI      |
+| Complex  | `x-ai/grok-3`       | xAI      |
 
 ## Capabilities
 
-| Capability | Grok 3 | Grok 3 Mini |
-|---|---|---|
-| Structured output | Yes | Yes |
-| Streaming | Yes | Yes |
-| Tool calling | Yes | Yes |
-| Vision | Model-dependent | Model-dependent |
-| Max context length | 128,000 tokens | 128,000 tokens |
+| Capability         | Grok 3          | Grok 3 Mini     |
+| ------------------ | --------------- | --------------- |
+| Structured output  | Yes             | Yes             |
+| Streaming          | Yes             | Yes             |
+| Tool calling       | Yes             | Yes             |
+| Vision             | Model-dependent | Model-dependent |
+| Max context length | 128,000 tokens  | 128,000 tokens  |
 
 :::note
 Capability details depend on the specific model version available on OpenRouter. The OpenRouter plugin reports `supportsVision: false` at the plugin level, but individual Grok models may support vision when accessed directly.
@@ -120,13 +120,13 @@ Capability details depend on the specific model version available on OpenRouter.
 
 ## Comparison with Other Providers
 
-| Aspect | Grok (via OpenRouter) | OpenAI (direct) | Groq |
-|---|---|---|---|
-| Setup | OpenRouter API key | OpenAI API key | Groq API key |
-| Model selection | `x-ai/grok-*` | `gpt-*`, `o*` | Llama, Qwen |
-| Embeddings | Depends on model | Yes | No |
-| Speed | Standard | Standard | Ultra-fast |
-| Cost | Varies by model | Per-token pricing | Free tier available |
+| Aspect          | Grok (via OpenRouter) | OpenAI (direct)   | Groq                |
+| --------------- | --------------------- | ----------------- | ------------------- |
+| Setup           | OpenRouter API key    | OpenAI API key    | Groq API key        |
+| Model selection | `x-ai/grok-*`         | `gpt-*`, `o*`     | Llama, Qwen         |
+| Embeddings      | Depends on model      | Yes               | No                  |
+| Speed           | Standard              | Standard          | Ultra-fast          |
+| Cost            | Varies by model       | Per-token pricing | Free tier available |
 
 ## Reasoning Model Handling
 
@@ -143,13 +143,13 @@ Until then, Grok models operate in standard chat completion mode.
 
 ## Troubleshooting
 
-| Issue | Cause | Solution |
-|---|---|---|
-| Model not found | Incorrect model ID or model removed from OpenRouter | Verify the model ID at [openrouter.ai/models](https://openrouter.ai/models) |
-| Authentication error | Invalid or expired OpenRouter API key | Regenerate your key at [openrouter.ai/settings/keys](https://openrouter.ai/settings/keys) |
-| Rate limit exceeded | Too many requests to xAI via OpenRouter | Wait and retry; consider upgrading your OpenRouter plan |
-| Embedding not supported | Grok may not offer embedding models | Use OpenAI or Google Gemini for embeddings alongside Grok |
-| High costs | Grok full models may be expensive | Use `grok-3-mini` for simple and standard tiers |
+| Issue                   | Cause                                               | Solution                                                                                  |
+| ----------------------- | --------------------------------------------------- | ----------------------------------------------------------------------------------------- |
+| Model not found         | Incorrect model ID or model removed from OpenRouter | Verify the model ID at [openrouter.ai/models](https://openrouter.ai/models)               |
+| Authentication error    | Invalid or expired OpenRouter API key               | Regenerate your key at [openrouter.ai/settings/keys](https://openrouter.ai/settings/keys) |
+| Rate limit exceeded     | Too many requests to xAI via OpenRouter             | Wait and retry; consider upgrading your OpenRouter plan                                   |
+| Embedding not supported | Grok may not offer embedding models                 | Use OpenAI or Google Gemini for embeddings alongside Grok                                 |
+| High costs              | Grok full models may be expensive                   | Use `grok-3-mini` for simple and standard tiers                                           |
 
 ## Cost Optimization
 

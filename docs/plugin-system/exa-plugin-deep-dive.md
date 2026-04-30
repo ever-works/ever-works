@@ -1,7 +1,7 @@
 ---
 id: exa-plugin-deep-dive
-title: "Exa Plugin Deep Dive"
-sidebar_label: "Exa Deep Dive"
+title: 'Exa Plugin Deep Dive'
+sidebar_label: 'Exa Deep Dive'
 sidebar_position: 60
 ---
 
@@ -27,18 +27,18 @@ A new `Exa` client is instantiated per-request from the settings-resolved API ke
 
 ### Environment Variables
 
-| Variable | Required | Description |
-|----------|----------|-------------|
-| `PLUGIN_EXA_API_KEY` | Yes | Exa API key (fallback from environment) |
+| Variable             | Required | Description                             |
+| -------------------- | -------- | --------------------------------------- |
+| `PLUGIN_EXA_API_KEY` | Yes      | Exa API key (fallback from environment) |
 
 ### Settings Schema
 
 ```typescript
 interface ExaSettings {
-  apiKey: string;       // Exa API key (x-secret, x-envVar, user-scoped, required)
-  searchType: string;   // Search mode: 'auto' (default), 'neural', or 'keyword'
-  maxResults: number;   // Default max results per search (default: 10, range: 1-100)
-  category: string;     // Category filter (default: '', options: company, research paper, news, tweet, personal site, github)
+	apiKey: string; // Exa API key (x-secret, x-envVar, user-scoped, required)
+	searchType: string; // Search mode: 'auto' (default), 'neural', or 'keyword'
+	maxResults: number; // Default max results per search (default: 10, range: 1-100)
+	category: string; // Category filter (default: '', options: company, research paper, news, tweet, personal site, github)
 }
 ```
 
@@ -47,29 +47,29 @@ interface ExaSettings {
 
 ## Capabilities
 
-| Capability | Description |
-|------------|-------------|
-| `search` | AI-native web search with neural, keyword, and auto modes |
-| `content-extractor` | Extracts clean text content from web page URLs |
+| Capability          | Description                                               |
+| ------------------- | --------------------------------------------------------- |
+| `search`            | AI-native web search with neural, keyword, and auto modes |
+| `content-extractor` | Extracts clean text content from web page URLs            |
 
 ## API Reference
 
 ### Search
 
-| Method | Signature | Description |
-|--------|-----------|-------------|
-| `search` | `(options: SearchOptions) => Promise<SearchResponse>` | Searches the web via Exa |
-| `isAvailable` | `() => Promise<boolean>` | Always returns `true` |
-| `getRateLimitInfo` | `() => Promise<RateLimitInfo>` | Returns `-1` (not tracked internally) |
+| Method             | Signature                                             | Description                           |
+| ------------------ | ----------------------------------------------------- | ------------------------------------- |
+| `search`           | `(options: SearchOptions) => Promise<SearchResponse>` | Searches the web via Exa              |
+| `isAvailable`      | `() => Promise<boolean>`                              | Always returns `true`                 |
+| `getRateLimitInfo` | `() => Promise<RateLimitInfo>`                        | Returns `-1` (not tracked internally) |
 
 ### Content Extraction
 
-| Method | Signature | Description |
-|--------|-----------|-------------|
-| `extract` | `(options: ContentExtractionOptions) => Promise<ContentExtractionResult>` | Extracts text content from a single URL |
-| `extractBatch` | `(urls: readonly string[], options?) => Promise<readonly ContentExtractionResult[]>` | Batch extracts text from multiple URLs |
-| `canExtract` | `(url: string) => Promise<boolean>` | Returns `true` for HTTP/HTTPS URLs |
-| `getSupportedFormats` | `() => readonly ('text' | 'html' | 'markdown')[]` | Returns `['text']` |
+| Method                | Signature                                                                            | Description                             |
+| --------------------- | ------------------------------------------------------------------------------------ | --------------------------------------- | -------------- | ------------------ |
+| `extract`             | `(options: ContentExtractionOptions) => Promise<ContentExtractionResult>`            | Extracts text content from a single URL |
+| `extractBatch`        | `(urls: readonly string[], options?) => Promise<readonly ContentExtractionResult[]>` | Batch extracts text from multiple URLs  |
+| `canExtract`          | `(url: string) => Promise<boolean>`                                                  | Returns `true` for HTTP/HTTPS URLs      |
+| `getSupportedFormats` | `() => readonly ('text'                                                              | 'html'                                  | 'markdown')[]` | Returns `['text']` |
 
 ## Implementation Details
 
@@ -87,14 +87,14 @@ The search type is passed directly to the Exa SDK as the `type` parameter.
 
 Results can be restricted to a specific category via the `category` setting:
 
-| Category | Description |
-|----------|-------------|
-| `company` | Company websites and profiles |
+| Category         | Description                        |
+| ---------------- | ---------------------------------- |
+| `company`        | Company websites and profiles      |
 | `research paper` | Academic and research publications |
-| `news` | News articles |
-| `tweet` | Twitter/X posts |
-| `personal site` | Personal websites and blogs |
-| `github` | GitHub repositories and pages |
+| `news`           | News articles                      |
+| `tweet`          | Twitter/X posts                    |
+| `personal site`  | Personal websites and blogs        |
+| `github`         | GitHub repositories and pages      |
 
 An empty string (the default) applies no category filter.
 
@@ -113,10 +113,10 @@ Time ranges are converted from human-readable values to ISO 8601 `startPublished
 
 ```typescript
 const TIME_RANGE_DAYS: Record<string, number> = {
-  day: 1,     // past 24 hours
-  week: 7,    // past 7 days
-  month: 30,  // past 30 days
-  year: 365   // past 365 days
+	day: 1, // past 24 hours
+	week: 7, // past 7 days
+	month: 30, // past 30 days
+	year: 365 // past 365 days
 };
 ```
 
@@ -169,46 +169,45 @@ A new `Exa` client is created for each operation via the `getClient(settings)` h
 ```typescript
 // Basic search
 const results = await exaPlugin.search({
-  query: 'open source directory builders',
-  limit: 10,
-  settings: { apiKey: exaApiKey }
+	query: 'open source directory builders',
+	limit: 10,
+	settings: { apiKey: exaApiKey }
 });
 
 // Neural search with category filter
 const companyResults = await exaPlugin.search({
-  query: 'AI startups building developer tools',
-  limit: 20,
-  settings: {
-    apiKey: exaApiKey,
-    searchType: 'neural',
-    category: 'company'
-  }
+	query: 'AI startups building developer tools',
+	limit: 20,
+	settings: {
+		apiKey: exaApiKey,
+		searchType: 'neural',
+		category: 'company'
+	}
 });
 
 // Search with domain and time filters
 const filteredResults = await exaPlugin.search({
-  query: 'directory software',
-  limit: 15,
-  includeDomains: ['github.com', 'producthunt.com'],
-  timeRange: 'month',
-  settings: { apiKey: exaApiKey }
+	query: 'directory software',
+	limit: 15,
+	includeDomains: ['github.com', 'producthunt.com'],
+	timeRange: 'month',
+	settings: { apiKey: exaApiKey }
 });
 
 // Extract content from a single URL
 const content = await exaPlugin.extract({
-  url: 'https://example.com/article',
-  settings: { apiKey: exaApiKey }
+	url: 'https://example.com/article',
+	settings: { apiKey: exaApiKey }
 });
 if (content.success) {
-  console.log(content.content);    // Clean text
-  console.log(content.wordCount);  // Word count
+	console.log(content.content); // Clean text
+	console.log(content.wordCount); // Word count
 }
 
 // Batch extract multiple URLs
-const batchResults = await exaPlugin.extractBatch(
-  ['https://example.com/page1', 'https://example.com/page2'],
-  { settings: { apiKey: exaApiKey } }
-);
+const batchResults = await exaPlugin.extractBatch(['https://example.com/page1', 'https://example.com/page2'], {
+	settings: { apiKey: exaApiKey }
+});
 ```
 
 ## Rate Limiting & Quotas

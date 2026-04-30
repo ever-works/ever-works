@@ -13,30 +13,30 @@ The Ever Works Platform uses AI services to power directory content generation, 
 
 AI providers are managed through the [plugin system](/plugin-system). Each provider is a plugin that implements the `ai-provider` capability. The platform ships with 8 AI provider plugins:
 
-| Provider | Plugin ID | Default Model | Configuration |
-|----------|-----------|--------------|---------------|
-| OpenAI | `openai` | `gpt-5.1` | User API key |
-| Anthropic | `anthropic` | `claude-sonnet-4-5-20250514` | User API key |
-| Google Gemini | `google` | `models/gemini-2.5-flash` | User API key |
-| Groq | `groq` | `meta-llama/llama-4-scout-17b-16e-instruct` | User API key |
-| Mistral | `mistral` | `mistral-small-latest` | User API key |
-| Ollama | `ollama` | `llama2` | Local (no key) |
-| OpenRouter | `openrouter` | `openai/gpt-5.1` | Hybrid (admin or user key) |
-| Vercel AI Gateway | `vercel-ai-gateway` | configurable | Hybrid |
+| Provider          | Plugin ID           | Default Model                               | Configuration              |
+| ----------------- | ------------------- | ------------------------------------------- | -------------------------- |
+| OpenAI            | `openai`            | `gpt-5.1`                                   | User API key               |
+| Anthropic         | `anthropic`         | `claude-sonnet-4-5-20250514`                | User API key               |
+| Google Gemini     | `google`            | `models/gemini-2.5-flash`                   | User API key               |
+| Groq              | `groq`              | `meta-llama/llama-4-scout-17b-16e-instruct` | User API key               |
+| Mistral           | `mistral`           | `mistral-small-latest`                      | User API key               |
+| Ollama            | `ollama`            | `llama2`                                    | Local (no key)             |
+| OpenRouter        | `openrouter`        | `openai/gpt-5.1`                            | Hybrid (admin or user key) |
+| Vercel AI Gateway | `vercel-ai-gateway` | configurable                                | Hybrid                     |
 
 ### Provider Capabilities
 
 All providers support chat completions and structured output. Additional capabilities vary:
 
-| Provider | Streaming | Tool Calling | Vision | Embeddings |
-|----------|:---------:|:------------:|:------:|:----------:|
-| OpenAI | Yes | Yes | Yes | Yes |
-| Anthropic | Yes | Yes | Yes | No |
-| Google Gemini | Yes | Yes | Yes | Yes |
-| Groq | Yes | Yes | No | No |
-| Mistral | Yes | Yes | Yes | No |
-| Ollama | Yes | Yes | No | No |
-| OpenRouter | Yes | Yes | No | No |
+| Provider      | Streaming | Tool Calling | Vision | Embeddings |
+| ------------- | :-------: | :----------: | :----: | :--------: |
+| OpenAI        |    Yes    |     Yes      |  Yes   |    Yes     |
+| Anthropic     |    Yes    |     Yes      |  Yes   |     No     |
+| Google Gemini |    Yes    |     Yes      |  Yes   |    Yes     |
+| Groq          |    Yes    |     Yes      |   No   |     No     |
+| Mistral       |    Yes    |     Yes      |  Yes   |     No     |
+| Ollama        |    Yes    |     Yes      |   No   |     No     |
+| OpenRouter    |    Yes    |     Yes      |   No   |     No     |
 
 ### Configuration
 
@@ -52,11 +52,11 @@ The AI service supports structured output via Zod schemas through LangChain's `w
 
 The platform supports three generation pipelines, each implemented as a plugin. Directories can select which pipeline to use.
 
-| Pipeline | Plugin ID | Approach | Best For |
-|----------|-----------|----------|----------|
-| **Standard Pipeline** | `standard-pipeline` | 15-step structured pipeline with LangChain | Full control, configurable steps, web search + AI extraction |
-| **Agent Pipeline** | `agent-pipeline` | Autonomous AI agent with tool calling (Vercel AI SDK) | Flexible, autonomous research with minimal configuration |
-| **Claude Code** | `claude-code` | Claude Code CLI subprocess | Leverages Claude Code's built-in web search and code generation |
+| Pipeline              | Plugin ID           | Approach                                              | Best For                                                        |
+| --------------------- | ------------------- | ----------------------------------------------------- | --------------------------------------------------------------- |
+| **Standard Pipeline** | `standard-pipeline` | 15-step structured pipeline with LangChain            | Full control, configurable steps, web search + AI extraction    |
+| **Agent Pipeline**    | `agent-pipeline`    | Autonomous AI agent with tool calling (Vercel AI SDK) | Flexible, autonomous research with minimal configuration        |
+| **Claude Code**       | `claude-code`       | Claude Code CLI subprocess                            | Leverages Claude Code's built-in web search and code generation |
 
 All pipelines are orchestrated by the `PipelineOrchestratorService` with checkpoint/resume support.
 
@@ -64,16 +64,16 @@ All pipelines are orchestrated by the `PipelineOrchestratorService` with checkpo
 
 The default pipeline runs a **15-step process** organized into 8 phases:
 
-| Phase | Steps | Description |
-|-------|-------|-------------|
-| **Initialization** | Prompt Comparison, Prompt Processing, Domain Detection | Validate prompt, extract subject, detect domain type |
-| **Content Generation** | AI First Items Generation | Generate initial items using AI knowledge |
-| **Web Search** | Search Queries Generation, Web Search, Content Retrieval, Content Filtering | Discover and fetch relevant web pages |
-| **Extraction** | Items Extraction | Extract structured items from web content |
-| **Aggregation** | Deduplication and Data Aggregation | Merge AI and web items, remove duplicates |
-| **Categorization** | Categories and Tags Processing, Sources Validation | Assign categories/tags, validate source URLs |
-| **Enrichment** | Badges Processing, Image Capture | Evaluate badges, capture screenshots |
-| **Output** | Markdown Generation | Generate markdown descriptions from source content |
+| Phase                  | Steps                                                                       | Description                                          |
+| ---------------------- | --------------------------------------------------------------------------- | ---------------------------------------------------- |
+| **Initialization**     | Prompt Comparison, Prompt Processing, Domain Detection                      | Validate prompt, extract subject, detect domain type |
+| **Content Generation** | AI First Items Generation                                                   | Generate initial items using AI knowledge            |
+| **Web Search**         | Search Queries Generation, Web Search, Content Retrieval, Content Filtering | Discover and fetch relevant web pages                |
+| **Extraction**         | Items Extraction                                                            | Extract structured items from web content            |
+| **Aggregation**        | Deduplication and Data Aggregation                                          | Merge AI and web items, remove duplicates            |
+| **Categorization**     | Categories and Tags Processing, Sources Validation                          | Assign categories/tags, validate source URLs         |
+| **Enrichment**         | Badges Processing, Image Capture                                            | Evaluate badges, capture screenshots                 |
+| **Output**             | Markdown Generation                                                         | Generate markdown descriptions from source content   |
 
 The pipeline uses plugins for each external operation — the active search plugin for web research, the active AI provider for content generation, the active content extractor for page parsing, and the active screenshot plugin for image capture.
 

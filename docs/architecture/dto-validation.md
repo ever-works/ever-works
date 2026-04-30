@@ -34,16 +34,16 @@ flowchart LR
 
 ## Source Files
 
-| File | Purpose |
-|------|---------|
-| `packages/agent/src/dto/create-directory.dto.ts` | Directory creation with slug validation, nested config |
-| `packages/agent/src/dto/update-directory.dto.ts` | Partial update DTO with optional fields |
-| `packages/agent/src/dto/generate-data.dto.ts` | Minimal DTO for generation requests |
-| `packages/agent/src/dto/website-settings.dto.ts` | Deeply nested DTO with header, homepage, footer sections |
-| `packages/agent/src/dto/directory-advanced-prompts.dto.ts` | Advanced prompt configuration |
-| `packages/agent/src/dto/directory-schedule.dto.ts` | Schedule cadence configuration |
-| `packages/agent/src/dto/taxonomy.dto.ts` | Category/collection/tag DTOs |
-| `packages/agent/src/dto/import-directory.dto.ts` | Import source configuration |
+| File                                                       | Purpose                                                  |
+| ---------------------------------------------------------- | -------------------------------------------------------- |
+| `packages/agent/src/dto/create-directory.dto.ts`           | Directory creation with slug validation, nested config   |
+| `packages/agent/src/dto/update-directory.dto.ts`           | Partial update DTO with optional fields                  |
+| `packages/agent/src/dto/generate-data.dto.ts`              | Minimal DTO for generation requests                      |
+| `packages/agent/src/dto/website-settings.dto.ts`           | Deeply nested DTO with header, homepage, footer sections |
+| `packages/agent/src/dto/directory-advanced-prompts.dto.ts` | Advanced prompt configuration                            |
+| `packages/agent/src/dto/directory-schedule.dto.ts`         | Schedule cadence configuration                           |
+| `packages/agent/src/dto/taxonomy.dto.ts`                   | Category/collection/tag DTOs                             |
+| `packages/agent/src/dto/import-directory.dto.ts`           | Import source configuration                              |
 
 ## Key Classes
 
@@ -53,45 +53,39 @@ Demonstrates slug regex validation, length limits, transforms, nested objects, a
 
 ```typescript
 export class CreateDirectoryDto {
-    @ApiProperty({
-        description: 'URL-friendly identifier',
-        example: 'my-awesome-directory',
-    })
-    @IsString()
-    @IsNotEmpty()
-    @Matches(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, {
-        message: 'Slug can only contain lowercase letters, numbers, and hyphens',
-    })
-    @Transform(({ value }) =>
-        typeof value === 'string' ? value.trim().toLowerCase() : value,
-    )
-    slug: string;
+	@ApiProperty({
+		description: 'URL-friendly identifier',
+		example: 'my-awesome-directory'
+	})
+	@IsString()
+	@IsNotEmpty()
+	@Matches(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, {
+		message: 'Slug can only contain lowercase letters, numbers, and hyphens'
+	})
+	@Transform(({ value }) => (typeof value === 'string' ? value.trim().toLowerCase() : value))
+	slug: string;
 
-    @ApiProperty({ maxLength: 100 })
-    @IsString()
-    @IsNotEmpty()
-    @MaxLength(100)
-    @Transform(({ value }) =>
-        typeof value === 'string' ? sanitizeName(value, 100) : value,
-    )
-    name: string;
+	@ApiProperty({ maxLength: 100 })
+	@IsString()
+	@IsNotEmpty()
+	@MaxLength(100)
+	@Transform(({ value }) => (typeof value === 'string' ? sanitizeName(value, 100) : value))
+	name: string;
 
-    @ApiProperty({ maxLength: 500 })
-    @IsString()
-    @IsNotEmpty()
-    @MaxLength(500)
-    @Transform(({ value }) =>
-        typeof value === 'string' ? sanitizeDescription(value, 500) : value,
-    )
-    description: string;
+	@ApiProperty({ maxLength: 500 })
+	@IsString()
+	@IsNotEmpty()
+	@MaxLength(500)
+	@Transform(({ value }) => (typeof value === 'string' ? sanitizeDescription(value, 500) : value))
+	description: string;
 
-    @IsBoolean()
-    organization: boolean;
+	@IsBoolean()
+	organization: boolean;
 
-    @IsOptional()
-    @ValidateNested()
-    @Type(() => MarkdownReadmeConfigDto)
-    readmeConfig?: MarkdownReadmeConfigDto;
+	@IsOptional()
+	@ValidateNested()
+	@Type(() => MarkdownReadmeConfigDto)
+	readmeConfig?: MarkdownReadmeConfigDto;
 }
 ```
 
@@ -101,22 +95,20 @@ All fields are `@IsOptional()` for PATCH-style updates:
 
 ```typescript
 export class UpdateDirectoryDto {
-    @IsString()
-    @IsOptional()
-    @MaxLength(100)
-    @Transform(({ value }) =>
-        typeof value === 'string' ? sanitizeName(value, 100) : value,
-    )
-    name?: string;
+	@IsString()
+	@IsOptional()
+	@MaxLength(100)
+	@Transform(({ value }) => (typeof value === 'string' ? sanitizeName(value, 100) : value))
+	name?: string;
 
-    @IsOptional()
-    @IsBoolean()
-    websiteTemplateAutoUpdate?: boolean;
+	@IsOptional()
+	@IsBoolean()
+	websiteTemplateAutoUpdate?: boolean;
 
-    @IsOptional()
-    @ValidateNested()
-    @Type(() => MarkdownReadmeConfigDto)
-    readmeConfig?: MarkdownReadmeConfigDto;
+	@IsOptional()
+	@ValidateNested()
+	@Type(() => MarkdownReadmeConfigDto)
+	readmeConfig?: MarkdownReadmeConfigDto;
 }
 ```
 
@@ -126,48 +118,48 @@ Demonstrates multi-level nested validation with `@ValidateNested()` and `@Type()
 
 ```typescript
 export class UpdateWebsiteSettingsDto {
-    @IsOptional()
-    @IsString()
-    @MaxLength(100)
-    company_name?: string;
+	@IsOptional()
+	@IsString()
+	@MaxLength(100)
+	company_name?: string;
 
-    @IsOptional()
-    @ValidateNested()
-    @Type(() => SettingsHeaderDto)
-    header?: SettingsHeaderDto;
+	@IsOptional()
+	@ValidateNested()
+	@Type(() => SettingsHeaderDto)
+	header?: SettingsHeaderDto;
 
-    @IsOptional()
-    @ValidateNested()
-    @Type(() => SettingsHomepageDto)
-    homepage?: SettingsHomepageDto;
+	@IsOptional()
+	@ValidateNested()
+	@Type(() => SettingsHomepageDto)
+	homepage?: SettingsHomepageDto;
 
-    @IsOptional()
-    @ValidateNested()
-    @Type(() => CustomMenuDto)
-    custom_menu?: CustomMenuDto;
+	@IsOptional()
+	@ValidateNested()
+	@Type(() => CustomMenuDto)
+	custom_menu?: CustomMenuDto;
 }
 
 export class CustomMenuDto {
-    @IsOptional()
-    @IsArray()
-    @ValidateNested({ each: true })
-    @Type(() => CustomMenuItemDto)
-    @ArrayMaxSize(10)
-    header?: CustomMenuItemDto[];
+	@IsOptional()
+	@IsArray()
+	@ValidateNested({ each: true })
+	@Type(() => CustomMenuItemDto)
+	@ArrayMaxSize(10)
+	header?: CustomMenuItemDto[];
 }
 
 export class CustomMenuItemDto {
-    @IsString()
-    @MaxLength(50)
-    label: string;
+	@IsString()
+	@MaxLength(50)
+	label: string;
 
-    @IsString()
-    @MaxLength(200)
-    path: string;
+	@IsString()
+	@MaxLength(200)
+	path: string;
 
-    @IsOptional()
-    @IsIn(['_self', '_blank'])
-    target?: '_self' | '_blank';
+	@IsOptional()
+	@IsIn(['_self', '_blank'])
+	target?: '_self' | '_blank';
 }
 ```
 
@@ -175,15 +167,15 @@ export class CustomMenuItemDto {
 
 ```typescript
 export class SettingsHeaderDto {
-    @IsOptional()
-    @IsString()
-    @IsIn(['light', 'dark', 'system'])
-    theme_default?: string;
+	@IsOptional()
+	@IsString()
+	@IsIn(['light', 'dark', 'system'])
+	theme_default?: string;
 
-    @IsOptional()
-    @IsString()
-    @MaxLength(20)
-    layout_default?: string;
+	@IsOptional()
+	@IsString()
+	@MaxLength(20)
+	layout_default?: string;
 }
 ```
 
@@ -195,14 +187,14 @@ Configured in the API application bootstrap:
 
 ```typescript
 app.useGlobalPipes(
-    new ValidationPipe({
-        whitelist: true,           // Strip unknown properties
-        forbidNonWhitelisted: true, // Reject unknown properties
-        transform: true,           // Auto-transform to DTO class instances
-        transformOptions: {
-            enableImplicitConversion: true,
-        },
-    }),
+	new ValidationPipe({
+		whitelist: true, // Strip unknown properties
+		forbidNonWhitelisted: true, // Reject unknown properties
+		transform: true, // Auto-transform to DTO class instances
+		transformOptions: {
+			enableImplicitConversion: true
+		}
+	})
 );
 ```
 
@@ -247,13 +239,13 @@ For simple request validation:
 
 ```typescript
 export class GenerateDataDto {
-    @IsString()
-    @IsNotEmpty()
-    slug: string;
+	@IsString()
+	@IsNotEmpty()
+	slug: string;
 
-    @IsString()
-    @IsNotEmpty()
-    prompt: string;
+	@IsString()
+	@IsNotEmpty()
+	prompt: string;
 }
 ```
 
@@ -263,32 +255,32 @@ DTOs can implement entity interfaces to ensure consistency:
 
 ```typescript
 export class MarkdownReadmeConfigDto implements MarkdownReadmeConfig {
-    @IsOptional()
-    @IsString()
-    header?: string;
+	@IsOptional()
+	@IsString()
+	header?: string;
 
-    @IsOptional()
-    @IsBoolean()
-    overwriteDefaultHeader?: boolean;
+	@IsOptional()
+	@IsBoolean()
+	overwriteDefaultHeader?: boolean;
 }
 ```
 
 ## Validation Decorators Used
 
-| Decorator | Purpose |
-|-----------|---------|
-| `@IsString()` | Must be a string |
-| `@IsNotEmpty()` | Cannot be empty string |
-| `@IsOptional()` | Field may be omitted |
-| `@IsBoolean()` | Must be boolean |
-| `@IsArray()` | Must be an array |
-| `@IsIn([...])` | Must be one of the listed values |
-| `@Matches(regex)` | Must match regular expression |
-| `@MaxLength(n)` | String max length |
-| `@ArrayMaxSize(n)` | Array max items |
-| `@ValidateNested()` | Validate nested object properties |
-| `@Type(() => Cls)` | Transform plain object to class instance |
-| `@Transform(fn)` | Custom transformation before validation |
+| Decorator           | Purpose                                  |
+| ------------------- | ---------------------------------------- |
+| `@IsString()`       | Must be a string                         |
+| `@IsNotEmpty()`     | Cannot be empty string                   |
+| `@IsOptional()`     | Field may be omitted                     |
+| `@IsBoolean()`      | Must be boolean                          |
+| `@IsArray()`        | Must be an array                         |
+| `@IsIn([...])`      | Must be one of the listed values         |
+| `@Matches(regex)`   | Must match regular expression            |
+| `@MaxLength(n)`     | String max length                        |
+| `@ArrayMaxSize(n)`  | Array max items                          |
+| `@ValidateNested()` | Validate nested object properties        |
+| `@Type(() => Cls)`  | Transform plain object to class instance |
+| `@Transform(fn)`    | Custom transformation before validation  |
 
 ## Best Practices
 

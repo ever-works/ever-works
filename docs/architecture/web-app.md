@@ -64,8 +64,8 @@ Supported locales are defined in `lib/constants.ts` (21 locales) and registered 
 
 ```typescript
 export const routing = defineRouting({
-    locales: LOCALES,       // ['en', 'ar', 'bg', 'de', ...]
-    defaultLocale: DEFAULT_LOCALE,  // 'en'
+	locales: LOCALES, // ['en', 'ar', 'bg', 'de', ...]
+	defaultLocale: DEFAULT_LOCALE // 'en'
 });
 ```
 
@@ -105,7 +105,7 @@ The middleware matcher ensures only page routes are processed:
 
 ```typescript
 export const config = {
-    matcher: '/((?!api|trpc|_next|_vercel|.*\\..*).*)',
+	matcher: '/((?!api|trpc|_next|_vercel|.*\\..*).*)'
 };
 ```
 
@@ -168,11 +168,11 @@ Remote image domains are whitelisted in `next.config.ts`:
 
 The `NEXT_BUILD_OUTPUT` environment variable controls the build output:
 
-| Mode | Description |
-|---|---|
-| (default) | Standard Next.js output with SSR |
+| Mode         | Description                      |
+| ------------ | -------------------------------- |
+| (default)    | Standard Next.js output with SSR |
 | `standalone` | Self-contained server for Docker |
-| `export` | Static HTML export (no SSR) |
+| `export`     | Static HTML export (no SSR)      |
 
 ## Permissions
 

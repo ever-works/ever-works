@@ -1,7 +1,7 @@
 ---
 id: claude-code-plugin
-title: "Claude Code Generator Plugin"
-sidebar_label: "Claude Code Generator"
+title: 'Claude Code Generator Plugin'
+sidebar_label: 'Claude Code Generator'
 sidebar_position: 49
 ---
 
@@ -13,16 +13,16 @@ The Claude Code Generator plugin is a full pipeline plugin that delegates the en
 
 ## Overview
 
-| Property | Value |
-|---|---|
-| Plugin ID | `claude-code` |
-| Category | `pipeline` |
-| Capabilities | `pipeline`, `form-schema-provider` |
-| Version | `1.0.0` |
-| Configuration Mode | `user-required` |
-| Auto-enable | No |
-| Built-in | Yes |
-| System Plugin | No |
+| Property           | Value                              |
+| ------------------ | ---------------------------------- |
+| Plugin ID          | `claude-code`                      |
+| Category           | `pipeline`                         |
+| Capabilities       | `pipeline`, `form-schema-provider` |
+| Version            | `1.0.0`                            |
+| Configuration Mode | `user-required`                    |
+| Auto-enable        | No                                 |
+| Built-in           | Yes                                |
+| System Plugin      | No                                 |
 
 The plugin implements `IPlugin`, `IPipelinePlugin`, and `IFormSchemaProvider`.
 
@@ -57,27 +57,27 @@ Unlike other pipeline plugins that orchestrate multiple internal steps with faca
 
 The plugin runs 6 sequential steps:
 
-| Step | ID | Description | Duration |
-|---|---|---|---|
-| 1 | `setup-claude-code` | Downloads and caches the Claude Code CLI binary for the configured version | ~5s |
-| 2 | `prepare-context` | Creates a temp workspace, seeds it with existing items and directory metadata | ~2s |
-| 3 | `generate-items` | Runs the Claude Code CLI to research and generate items as JSON files | ~60-180s |
-| 4 | `collect-results` | Reads generated JSON files from the workspace directory | ~2s |
-| 5 | `capture-screenshots` | Takes screenshots for items that need images (optional) | ~30s |
-| 6 | `cleanup` | Removes the temporary workspace directory | ~1s |
+| Step | ID                    | Description                                                                   | Duration |
+| ---- | --------------------- | ----------------------------------------------------------------------------- | -------- |
+| 1    | `setup-claude-code`   | Downloads and caches the Claude Code CLI binary for the configured version    | ~5s      |
+| 2    | `prepare-context`     | Creates a temp workspace, seeds it with existing items and directory metadata | ~2s      |
+| 3    | `generate-items`      | Runs the Claude Code CLI to research and generate items as JSON files         | ~60-180s |
+| 4    | `collect-results`     | Reads generated JSON files from the workspace directory                       | ~2s      |
+| 5    | `capture-screenshots` | Takes screenshots for items that need images (optional)                       | ~30s     |
+| 6    | `cleanup`             | Removes the temporary workspace directory                                     | ~1s      |
 
 ## Configuration
 
 ### Settings Schema
 
-| Setting | Type | Default | Description |
-|---|---|---|---|
-| `oauthToken` | `string` | -- | Claude Code OAuth token (from `claude setup-token`) |
-| `apiKey` | `string` | -- | Anthropic API key (from console.anthropic.com) |
-| `version` | `string` | Latest | Claude Code CLI version to use (hidden) |
-| `maxTurns` | `integer` | Default | Maximum number of agentic turns (1--100, hidden) |
-| `maxBudgetUsd` | `number` | -- | Maximum budget in USD per generation (hidden) |
-| `model` | `string` | -- | Model alias (`sonnet`, `opus`) or full name |
+| Setting        | Type      | Default | Description                                         |
+| -------------- | --------- | ------- | --------------------------------------------------- |
+| `oauthToken`   | `string`  | --      | Claude Code OAuth token (from `claude setup-token`) |
+| `apiKey`       | `string`  | --      | Anthropic API key (from console.anthropic.com)      |
+| `version`      | `string`  | Latest  | Claude Code CLI version to use (hidden)             |
+| `maxTurns`     | `integer` | Default | Maximum number of agentic turns (1--100, hidden)    |
+| `maxBudgetUsd` | `number`  | --      | Maximum budget in USD per generation (hidden)       |
+| `model`        | `string`  | --      | Model alias (`sonnet`, `opus`) or full name         |
 
 ### Authentication
 
@@ -95,8 +95,8 @@ Get one from [console.anthropic.com](https://console.anthropic.com).
 
 ### Environment Variables
 
-| Variable | Description |
-|---|---|
+| Variable                         | Description          |
+| -------------------------------- | -------------------- |
 | `PLUGIN_CLAUDE_CODE_OAUTH_TOKEN` | OAuth token fallback |
 
 ## Features
@@ -157,34 +157,34 @@ The Claude Code Generator only allows selecting a `screenshot` provider. All oth
 
 ```typescript
 class ClaudeCodePlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvider {
-  readonly id: 'claude-code';
-  readonly category: 'pipeline';
+	readonly id: 'claude-code';
+	readonly category: 'pipeline';
 
-  execute(directory, request, existing, options?, onProgress?): Promise<PipelineResult>;
-  cancel(): Promise<void>;
-  getState(): PipelineState<ClaudeCodeStepId> | null;
-  getStepDefinitions(): readonly PipelineStepDefinition[];
-  getFormFields(): FormFieldDefinition[];
-  getFormGroups(): FormFieldGroup[];
-  validateFormInput(values): ValidationResult;
-  getDefaultValues(): Record<string, unknown>;
+	execute(directory, request, existing, options?, onProgress?): Promise<PipelineResult>;
+	cancel(): Promise<void>;
+	getState(): PipelineState<ClaudeCodeStepId> | null;
+	getStepDefinitions(): readonly PipelineStepDefinition[];
+	getFormFields(): FormFieldDefinition[];
+	getFormGroups(): FormFieldGroup[];
+	validateFormInput(values): ValidationResult;
+	getDefaultValues(): Record<string, unknown>;
 }
 ```
 
 ### Key Types
 
-| Type | Purpose |
-|---|---|
-| `ClaudeCodeStepId` | Union of the 6 step IDs |
-| `ExecuteResult` | Result from the CLI process (exitCode, stdout, stderr, killed) |
+| Type               | Purpose                                                        |
+| ------------------ | -------------------------------------------------------------- |
+| `ClaudeCodeStepId` | Union of the 6 step IDs                                        |
+| `ExecuteResult`    | Result from the CLI process (exitCode, stdout, stderr, killed) |
 
 ## Comparison with Other Pipelines
 
-| Aspect | Claude Code Generator | Agent Pipeline | Standard Pipeline |
-|---|---|---|---|
-| Execution model | External CLI subprocess | In-process AI agent | Engine-orchestrated steps |
-| Search | Built-in Claude Code tools | Configurable search facade | Configurable search facade |
-| AI provider | Anthropic only | Any OpenAI-compatible | Any provider |
-| Authentication | OAuth token or Anthropic API key | Via AI provider plugin | Via AI provider plugin |
-| Budget control | Built-in USD budget limit | Token limit via maxSteps | No built-in limit |
-| Steps | 6 | 5 | 15 |
+| Aspect          | Claude Code Generator            | Agent Pipeline             | Standard Pipeline          |
+| --------------- | -------------------------------- | -------------------------- | -------------------------- |
+| Execution model | External CLI subprocess          | In-process AI agent        | Engine-orchestrated steps  |
+| Search          | Built-in Claude Code tools       | Configurable search facade | Configurable search facade |
+| AI provider     | Anthropic only                   | Any OpenAI-compatible      | Any provider               |
+| Authentication  | OAuth token or Anthropic API key | Via AI provider plugin     | Via AI provider plugin     |
+| Budget control  | Built-in USD budget limit        | Token limit via maxSteps   | No built-in limit          |
+| Steps           | 6                                | 5                          | 15                         |

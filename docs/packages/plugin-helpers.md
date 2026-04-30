@@ -11,22 +11,27 @@ The Plugin Helpers module (`@ever-works/plugin/helpers`) provides essential util
 
 ## Package Overview
 
-| Property | Value |
-|---|---|
-| **Import path** | `@ever-works/plugin/helpers` |
-| **Location** | `platform/packages/plugin/src/helpers/` |
+| Property         | Value                                                   |
+| ---------------- | ------------------------------------------------------- |
+| **Import path**  | `@ever-works/plugin/helpers`                            |
+| **Location**     | `platform/packages/plugin/src/helpers/`                 |
 | **Dependencies** | None (uses only Node.js built-ins and plugin contracts) |
-| **Used by** | All plugin implementations |
+| **Used by**      | All plugin implementations                              |
 
 ## Module Exports
 
 ```typescript
 export { resolveSettings, type ResolvedSettings } from './settings-resolver.js';
 export {
-    assertPluginContext,
-    getLogger, getCache, getHttpClient, getEnvVars,
-    createScopedLogger, createScopedCache,
-    isProduction, isDevelopment,
+	assertPluginContext,
+	getLogger,
+	getCache,
+	getHttpClient,
+	getEnvVars,
+	createScopedLogger,
+	createScopedCache,
+	isProduction,
+	isDevelopment
 } from './context-helpers.js';
 export { getCurrentDateString } from './date-helpers.js';
 ```
@@ -43,8 +48,8 @@ Validates that the plugin context is properly initialized. Throws descriptive er
 import { assertPluginContext } from '@ever-works/plugin/helpers';
 
 function onActivate(context: PluginContext) {
-    assertPluginContext(context);
-    // Safe to use context.logger, context.cache, etc.
+	assertPluginContext(context);
+	// Safe to use context.logger, context.cache, etc.
 }
 ```
 
@@ -52,12 +57,12 @@ function onActivate(context: PluginContext) {
 
 Each getter retrieves a service from the context with a descriptive error if the service is unavailable.
 
-| Function | Returns | Description |
-|---|---|---|
-| `getLogger(context)` | `PluginLogger` | Logger instance from context |
-| `getCache(context)` | `PluginCache` | Cache service from context |
-| `getHttpClient(context)` | `PluginHttpClient` | HTTP client from context |
-| `getEnvVars(context)` | `Record<string, string>` | Environment variables map |
+| Function                 | Returns                  | Description                  |
+| ------------------------ | ------------------------ | ---------------------------- |
+| `getLogger(context)`     | `PluginLogger`           | Logger instance from context |
+| `getCache(context)`      | `PluginCache`            | Cache service from context   |
+| `getHttpClient(context)` | `PluginHttpClient`       | HTTP client from context     |
+| `getEnvVars(context)`    | `Record<string, string>` | Environment variables map    |
 
 ```typescript
 import { getLogger, getCache } from '@ever-works/plugin/helpers';
@@ -77,11 +82,11 @@ Create child instances scoped to a specific operation or module name. Scoped log
 import { createScopedLogger, createScopedCache } from '@ever-works/plugin/helpers';
 
 const logger = createScopedLogger(context, 'git-sync');
-logger.info('Starting sync');  // => "[git-sync] Starting sync"
+logger.info('Starting sync'); // => "[git-sync] Starting sync"
 
 const cache = createScopedCache(context, 'github');
-await cache.set('repos', data);  // key stored as "github:repos"
-await cache.get('repos');         // retrieves "github:repos"
+await cache.set('repos', data); // key stored as "github:repos"
+await cache.get('repos'); // retrieves "github:repos"
 ```
 
 ### Environment Checks
@@ -92,11 +97,11 @@ Simple boolean checks for the current runtime environment.
 import { isProduction, isDevelopment } from '@ever-works/plugin/helpers';
 
 if (isProduction(context)) {
-    // Production-only logic
+	// Production-only logic
 }
 
 if (isDevelopment(context)) {
-    // Development-only debug logging
+	// Development-only debug logging
 }
 ```
 
@@ -108,13 +113,13 @@ The `settings-resolver.ts` module implements a layered settings resolution strat
 
 Settings are resolved from highest to lowest priority. The first non-null, non-undefined value wins:
 
-| Priority | Source | Description |
-|---|---|---|
-| 1 (highest) | User settings | Per-user configuration |
-| 2 | Directory settings | Per-directory overrides |
-| 3 | Admin settings | Organization-wide defaults |
-| 4 | Environment variables | `x-envVar` mapped values |
-| 5 (lowest) | Schema defaults | Default values from JSON Schema |
+| Priority    | Source                | Description                     |
+| ----------- | --------------------- | ------------------------------- |
+| 1 (highest) | User settings         | Per-user configuration          |
+| 2           | Directory settings    | Per-directory overrides         |
+| 3           | Admin settings        | Organization-wide defaults      |
+| 4           | Environment variables | `x-envVar` mapped values        |
+| 5 (lowest)  | Schema defaults       | Default values from JSON Schema |
 
 ### resolveSettings
 
@@ -122,11 +127,11 @@ Settings are resolved from highest to lowest priority. The first non-null, non-u
 import { resolveSettings } from '@ever-works/plugin/helpers';
 
 const resolved = resolveSettings({
-    schema: pluginSettingsSchema,
-    userSettings: { model: 'gpt-4', temperature: 0.7 },
-    directorySettings: { model: 'gpt-3.5-turbo' },
-    adminSettings: {},
-    envVars: { OPENAI_API_KEY: 'sk-...' },
+	schema: pluginSettingsSchema,
+	userSettings: { model: 'gpt-4', temperature: 0.7 },
+	directorySettings: { model: 'gpt-3.5-turbo' },
+	adminSettings: {},
+	envVars: { OPENAI_API_KEY: 'sk-...' }
 });
 
 // resolved.model => 'gpt-4' (user takes priority over directory)
@@ -158,11 +163,11 @@ The resolver reads `x-envVar` annotations from the plugin's JSON Schema to map e
 
 The resolver automatically parses environment variable string values into their appropriate types based on the schema:
 
-| Schema Type | Parsing Behavior |
-|---|---|
-| `number` | `parseFloat(value)`, skipped if `NaN` |
-| `boolean` | `'true'` / `'1'` become `true`, `'false'` / `'0'` become `false` |
-| `string` | Used as-is |
+| Schema Type | Parsing Behavior                                                 |
+| ----------- | ---------------------------------------------------------------- |
+| `number`    | `parseFloat(value)`, skipped if `NaN`                            |
+| `boolean`   | `'true'` / `'1'` become `true`, `'false'` / `'0'` become `false` |
+| `string`    | Used as-is                                                       |
 
 ### Deep Equality Check
 
@@ -194,29 +199,32 @@ The format uses the `en-US` locale with `{ weekday: 'long', year: 'numeric', mon
 
 ```typescript
 import {
-    assertPluginContext, getLogger, getCache,
-    resolveSettings, createScopedLogger,
+	assertPluginContext,
+	getLogger,
+	getCache,
+	resolveSettings,
+	createScopedLogger
 } from '@ever-works/plugin/helpers';
 
 class MyPlugin implements IPlugin {
-    private logger!: PluginLogger;
-    private cache!: PluginCache;
+	private logger!: PluginLogger;
+	private cache!: PluginCache;
 
-    async onActivate(context: PluginContext): Promise<void> {
-        assertPluginContext(context);
-        this.logger = createScopedLogger(context, 'my-plugin');
-        this.cache = getCache(context);
+	async onActivate(context: PluginContext): Promise<void> {
+		assertPluginContext(context);
+		this.logger = createScopedLogger(context, 'my-plugin');
+		this.cache = getCache(context);
 
-        const settings = resolveSettings({
-            schema: this.settingsSchema,
-            userSettings: context.settings,
-            directorySettings: context.directorySettings,
-            adminSettings: context.adminSettings,
-            envVars: context.envVars,
-        });
+		const settings = resolveSettings({
+			schema: this.settingsSchema,
+			userSettings: context.settings,
+			directorySettings: context.directorySettings,
+			adminSettings: context.adminSettings,
+			envVars: context.envVars
+		});
 
-        this.logger.info('Plugin activated with resolved settings');
-    }
+		this.logger.info('Plugin activated with resolved settings');
+	}
 }
 ```
 

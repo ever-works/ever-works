@@ -37,25 +37,25 @@ apps/web/src/lib/hooks/
 
 ```typescript
 function useAIStream(options: {
-    onChunk?: (chunk: unknown) => void;
-    onComplete?: (content: string) => void;
-    onError?: (error: Error) => void;
+	onChunk?: (chunk: unknown) => void;
+	onComplete?: (content: string) => void;
+	onError?: (error: Error) => void;
 }): {
-    streamMessage: (url: string, body: unknown) => Promise<void>;
-    isStreaming: boolean;
-    content: string;
-    error: Error | null;
-    reset: () => void;
+	streamMessage: (url: string, body: unknown) => Promise<void>;
+	isStreaming: boolean;
+	content: string;
+	error: Error | null;
+	reset: () => void;
 };
 ```
 
-| Return Value | Type | Description |
-|-------------|------|-------------|
-| `streamMessage` | `(url: string, body: unknown) => Promise<void>` | Initiates a streaming request |
-| `isStreaming` | `boolean` | Whether a stream is currently active |
-| `content` | `string` | Accumulated content from all chunks so far |
-| `error` | `Error \| null` | Error if the stream failed |
-| `reset` | `() => void` | Resets content, error, and streaming state |
+| Return Value    | Type                                            | Description                                |
+| --------------- | ----------------------------------------------- | ------------------------------------------ |
+| `streamMessage` | `(url: string, body: unknown) => Promise<void>` | Initiates a streaming request              |
+| `isStreaming`   | `boolean`                                       | Whether a stream is currently active       |
+| `content`       | `string`                                        | Accumulated content from all chunks so far |
+| `error`         | `Error \| null`                                 | Error if the stream failed                 |
+| `reset`         | `() => void`                                    | Resets content, error, and streaming state |
 
 This hook handles NDJSON (newline-delimited JSON) streaming responses. When `streamMessage` is called:
 
@@ -69,15 +69,15 @@ This hook handles NDJSON (newline-delimited JSON) streaming responses. When `str
 
 ```tsx
 const { streamMessage, isStreaming, content, reset } = useAIStream({
-    onChunk: (chunk) => console.log('Received:', chunk),
-    onComplete: (fullContent) => saveMessage(fullContent),
-    onError: (err) => toast.error(err.message),
+	onChunk: (chunk) => console.log('Received:', chunk),
+	onComplete: (fullContent) => saveMessage(fullContent),
+	onError: (err) => toast.error(err.message)
 });
 
 // Start streaming
 await streamMessage('/api/ai-conversations/chat/stream', {
-    messages: conversationHistory,
-    providerId: selectedProvider,
+	messages: conversationHistory,
+	providerId: selectedProvider
 });
 ```
 
@@ -89,23 +89,23 @@ await streamMessage('/api/ai-conversations/chat/stream', {
 
 ```typescript
 function useChatHistory(): {
-    messages: ChatMessage[];
-    error: string | null;
-    isLoading: boolean;
-    setMessages: (msgs: ChatMessage[]) => void;
-    loadHistory: () => Promise<void>;
-    resetHistory: () => void;
+	messages: ChatMessage[];
+	error: string | null;
+	isLoading: boolean;
+	setMessages: (msgs: ChatMessage[]) => void;
+	loadHistory: () => Promise<void>;
+	resetHistory: () => void;
 };
 ```
 
-| Return Value | Type | Description |
-|-------------|------|-------------|
-| `messages` | `ChatMessage[]` | Current conversation messages |
-| `error` | `string \| null` | Error message if loading failed |
-| `isLoading` | `boolean` | Whether history is being loaded |
-| `setMessages` | `(msgs: ChatMessage[]) => void` | Replace the entire message list |
-| `loadHistory` | `() => Promise<void>` | Fetch conversation history from the server |
-| `resetHistory` | `() => void` | Clear all messages and start fresh |
+| Return Value   | Type                            | Description                                |
+| -------------- | ------------------------------- | ------------------------------------------ |
+| `messages`     | `ChatMessage[]`                 | Current conversation messages              |
+| `error`        | `string \| null`                | Error message if loading failed            |
+| `isLoading`    | `boolean`                       | Whether history is being loaded            |
+| `setMessages`  | `(msgs: ChatMessage[]) => void` | Replace the entire message list            |
+| `loadHistory`  | `() => Promise<void>`           | Fetch conversation history from the server |
+| `resetHistory` | `() => void`                    | Clear all messages and start fresh         |
 
 **Types:**
 
@@ -113,10 +113,10 @@ function useChatHistory(): {
 type ChatMessageRole = 'user' | 'assistant' | 'system';
 
 interface ChatMessage {
-    id: string;
-    role: ChatMessageRole;
-    content: string;
-    createdAt?: string;
+	id: string;
+	role: ChatMessageRole;
+	content: string;
+	createdAt?: string;
 }
 ```
 
@@ -127,7 +127,7 @@ const { messages, setMessages, loadHistory, resetHistory } = useChatHistory();
 
 // Load existing conversation
 useEffect(() => {
-    loadHistory();
+	loadHistory();
 }, []);
 
 // Add a new user message
@@ -142,10 +142,10 @@ setMessages([...messages, { id: nanoid(), role: 'user', content: userInput }]);
 
 ```typescript
 function useSidebarPersistence(): {
-    sidebarWidth: number;
-    sidebarCollapsed: boolean;
-    handleSidebarWidthChange: (width: number) => void;
-    handleSidebarCollapsedChange: (collapsed: boolean) => void;
+	sidebarWidth: number;
+	sidebarCollapsed: boolean;
+	handleSidebarWidthChange: (width: number) => void;
+	handleSidebarCollapsedChange: (collapsed: boolean) => void;
 };
 ```
 
@@ -153,15 +153,15 @@ function useSidebarPersistence(): {
 
 ```typescript
 const SIDEBAR_WIDTH_DEFAULT = 320;
-const SIDEBAR_WIDTH_MIN = 320;  // exported
-const SIDEBAR_WIDTH_MAX = 440;  // exported
+const SIDEBAR_WIDTH_MIN = 320; // exported
+const SIDEBAR_WIDTH_MAX = 440; // exported
 ```
 
-| Return Value | Type | Description |
-|-------------|------|-------------|
-| `sidebarWidth` | `number` | Current sidebar width in pixels |
-| `sidebarCollapsed` | `boolean` | Whether the sidebar is collapsed |
-| `handleSidebarWidthChange` | `(width: number) => void` | Update and persist width |
+| Return Value                   | Type                           | Description                        |
+| ------------------------------ | ------------------------------ | ---------------------------------- |
+| `sidebarWidth`                 | `number`                       | Current sidebar width in pixels    |
+| `sidebarCollapsed`             | `boolean`                      | Whether the sidebar is collapsed   |
+| `handleSidebarWidthChange`     | `(width: number) => void`      | Update and persist width           |
 | `handleSidebarCollapsedChange` | `(collapsed: boolean) => void` | Update and persist collapsed state |
 
 Wraps `useLocalStorage` with custom serializers:
@@ -172,12 +172,8 @@ Wraps `useLocalStorage` with custom serializers:
 Both setters are wrapped in `useCallback` for stable references.
 
 ```tsx
-const {
-    sidebarWidth,
-    sidebarCollapsed,
-    handleSidebarWidthChange,
-    handleSidebarCollapsedChange,
-} = useSidebarPersistence();
+const { sidebarWidth, sidebarCollapsed, handleSidebarWidthChange, handleSidebarCollapsedChange } =
+	useSidebarPersistence();
 ```
 
 ### useKeyboardShortcuts
@@ -187,24 +183,22 @@ const {
 **Signature:**
 
 ```typescript
-function useKeyboardShortcuts(options: {
-    onOpenHelp?: () => void;
-}): void;
+function useKeyboardShortcuts(options: { onOpenHelp?: () => void }): void;
 ```
 
 Registers global keyboard event listeners on mount. The registered shortcuts are:
 
-| Shortcut | Action |
-|----------|--------|
-| `Ctrl+K` (or `Cmd+K`) | Open search |
-| `C` | Create new directory (only when no input is focused) |
-| `?` | Open help drawer (calls `onOpenHelp`) |
+| Shortcut              | Action                                               |
+| --------------------- | ---------------------------------------------------- |
+| `Ctrl+K` (or `Cmd+K`) | Open search                                          |
+| `C`                   | Create new directory (only when no input is focused) |
+| `?`                   | Open help drawer (calls `onOpenHelp`)                |
 
 The hook checks `document.activeElement` to avoid triggering shortcuts while the user is typing in an input, textarea, or contenteditable element. Listeners are cleaned up on unmount.
 
 ```tsx
 useKeyboardShortcuts({
-    onOpenHelp: () => setHelpDrawerOpen(true),
+	onOpenHelp: () => setHelpDrawerOpen(true)
 });
 ```
 
@@ -216,32 +210,32 @@ useKeyboardShortcuts({
 
 ```typescript
 function usePluginSettings(options: {
-    schema: JSONSchema;
-    initialSettings: Record<string, unknown>;
-    scopes?: string[];
-    onSave: (settings: Record<string, unknown>) => Promise<void>;
-    fallbackSettings?: Record<string, unknown>;
-    scope?: string;
+	schema: JSONSchema;
+	initialSettings: Record<string, unknown>;
+	scopes?: string[];
+	onSave: (settings: Record<string, unknown>) => Promise<void>;
+	fallbackSettings?: Record<string, unknown>;
+	scope?: string;
 }): {
-    settings: Record<string, unknown>;
-    errors: Record<string, string>;
-    isDirty: boolean;
-    isSaving: boolean;
-    handleFieldChange: (field: string, value: unknown) => void;
-    handleSave: () => Promise<void>;
-    resetSettings: () => void;
+	settings: Record<string, unknown>;
+	errors: Record<string, string>;
+	isDirty: boolean;
+	isSaving: boolean;
+	handleFieldChange: (field: string, value: unknown) => void;
+	handleSave: () => Promise<void>;
+	resetSettings: () => void;
 };
 ```
 
-| Return Value | Type | Description |
-|-------------|------|-------------|
-| `settings` | `Record<string, unknown>` | Current settings values |
-| `errors` | `Record<string, string>` | Validation errors per field |
-| `isDirty` | `boolean` | Whether settings have been modified |
-| `isSaving` | `boolean` | Whether a save operation is in progress |
-| `handleFieldChange` | `(field: string, value: unknown) => void` | Update a single field |
-| `handleSave` | `() => Promise<void>` | Validate and save settings |
-| `resetSettings` | `() => void` | Reset to initial values |
+| Return Value        | Type                                      | Description                             |
+| ------------------- | ----------------------------------------- | --------------------------------------- |
+| `settings`          | `Record<string, unknown>`                 | Current settings values                 |
+| `errors`            | `Record<string, string>`                  | Validation errors per field             |
+| `isDirty`           | `boolean`                                 | Whether settings have been modified     |
+| `isSaving`          | `boolean`                                 | Whether a save operation is in progress |
+| `handleFieldChange` | `(field: string, value: unknown) => void` | Update a single field                   |
+| `handleSave`        | `() => Promise<void>`                     | Validate and save settings              |
+| `resetSettings`     | `() => void`                              | Reset to initial values                 |
 
 This hook manages a dynamic form generated from a JSON Schema. It:
 
@@ -252,18 +246,12 @@ This hook manages a dynamic form generated from a JSON Schema. It:
 5. Supports scoped settings where fields belong to specific capability scopes.
 
 ```tsx
-const {
-    settings,
-    errors,
-    isDirty,
-    handleFieldChange,
-    handleSave,
-} = usePluginSettings({
-    schema: plugin.settingsSchema,
-    initialSettings: currentSettings,
-    onSave: async (newSettings) => {
-        await updatePluginSettings(plugin.id, newSettings);
-    },
+const { settings, errors, isDirty, handleFieldChange, handleSave } = usePluginSettings({
+	schema: plugin.settingsSchema,
+	initialSettings: currentSettings,
+	onSave: async (newSettings) => {
+		await updatePluginSettings(plugin.id, newSettings);
+	}
 });
 ```
 
@@ -274,24 +262,22 @@ const {
 **Signature:**
 
 ```typescript
-function useProviderSelection(
-    initial?: ProviderSelectionState
-): {
-    providers: ProviderSelectionState;
-    handleProviderChange: (field: string, value: string) => void;
-    buildSelectedProviders: () => SelectedProviders;
-    getUnconfiguredProviders: () => string[];
-    syncResolvedPipeline: (pipeline: ResolvedPipeline) => void;
+function useProviderSelection(initial?: ProviderSelectionState): {
+	providers: ProviderSelectionState;
+	handleProviderChange: (field: string, value: string) => void;
+	buildSelectedProviders: () => SelectedProviders;
+	getUnconfiguredProviders: () => string[];
+	syncResolvedPipeline: (pipeline: ResolvedPipeline) => void;
 };
 ```
 
-| Return Value | Type | Description |
-|-------------|------|-------------|
-| `providers` | `ProviderSelectionState` | Current provider selections |
-| `handleProviderChange` | `(field: string, value: string) => void` | Update a provider selection |
-| `buildSelectedProviders` | `() => SelectedProviders` | Build the final provider config object |
-| `getUnconfiguredProviders` | `() => string[]` | List providers that need configuration |
-| `syncResolvedPipeline` | `(pipeline: ResolvedPipeline) => void` | Sync state with a server-resolved pipeline |
+| Return Value               | Type                                     | Description                                |
+| -------------------------- | ---------------------------------------- | ------------------------------------------ |
+| `providers`                | `ProviderSelectionState`                 | Current provider selections                |
+| `handleProviderChange`     | `(field: string, value: string) => void` | Update a provider selection                |
+| `buildSelectedProviders`   | `() => SelectedProviders`                | Build the final provider config object     |
+| `getUnconfiguredProviders` | `() => string[]`                         | List providers that need configuration     |
+| `syncResolvedPipeline`     | `(pipeline: ResolvedPipeline) => void`   | Sync state with a server-resolved pipeline |
 
 Manages the state for selecting AI providers, search providers, and screenshot providers. Used by `ChatProvider` and the generator configuration form. The `buildSelectedProviders` method assembles the final object sent to the backend when starting a generation or chat session.
 
@@ -303,19 +289,19 @@ Manages the state for selecting AI providers, search providers, and screenshot p
 
 ```typescript
 function useTheme(): {
-    theme: 'light' | 'dark';
-    isDark: boolean;
-    toggleTheme: () => void;
-    mounted: boolean;
+	theme: 'light' | 'dark';
+	isDark: boolean;
+	toggleTheme: () => void;
+	mounted: boolean;
 };
 ```
 
-| Return Value | Type | Description |
-|-------------|------|-------------|
-| `theme` | `'light' \| 'dark'` | Current theme |
-| `isDark` | `boolean` | Convenience boolean for dark mode checks |
-| `toggleTheme` | `() => void` | Switch between light and dark |
-| `mounted` | `boolean` | Whether the component has mounted (for SSR safety) |
+| Return Value  | Type                | Description                                        |
+| ------------- | ------------------- | -------------------------------------------------- |
+| `theme`       | `'light' \| 'dark'` | Current theme                                      |
+| `isDark`      | `boolean`           | Convenience boolean for dark mode checks           |
+| `toggleTheme` | `() => void`        | Switch between light and dark                      |
+| `mounted`     | `boolean`           | Whether the component has mounted (for SSR safety) |
 
 Manages the theme state with three layers:
 
@@ -330,11 +316,7 @@ const { isDark, toggleTheme, mounted } = useTheme();
 
 if (!mounted) return null; // Prevent hydration flash
 
-return (
-    <button onClick={toggleTheme}>
-        {isDark ? <Sun /> : <Moon />}
-    </button>
-);
+return <button onClick={toggleTheme}>{isDark ? <Sun /> : <Moon />}</button>;
 ```
 
 ### usePluginToggle
@@ -344,26 +326,22 @@ return (
 **Signature:**
 
 ```typescript
-function usePluginToggle(options: {
-    pluginId: string;
-    enabled: boolean;
-    visibility?: 'public' | 'private';
-}): {
-    isEnabled: boolean;
-    isPending: boolean;
-    handleToggle: (newState: boolean) => void;
-    showEnablePanel: boolean;
-    showDisableWarning: boolean;
+function usePluginToggle(options: { pluginId: string; enabled: boolean; visibility?: 'public' | 'private' }): {
+	isEnabled: boolean;
+	isPending: boolean;
+	handleToggle: (newState: boolean) => void;
+	showEnablePanel: boolean;
+	showDisableWarning: boolean;
 };
 ```
 
-| Return Value | Type | Description |
-|-------------|------|-------------|
-| `isEnabled` | `boolean` | Current enabled state (optimistic) |
-| `isPending` | `boolean` | Whether a toggle operation is in progress |
-| `handleToggle` | `(newState: boolean) => void` | Toggle the plugin on/off |
-| `showEnablePanel` | `boolean` | Whether to show the enable confirmation panel |
-| `showDisableWarning` | `boolean` | Whether to show the disable warning |
+| Return Value         | Type                          | Description                                   |
+| -------------------- | ----------------------------- | --------------------------------------------- |
+| `isEnabled`          | `boolean`                     | Current enabled state (optimistic)            |
+| `isPending`          | `boolean`                     | Whether a toggle operation is in progress     |
+| `handleToggle`       | `(newState: boolean) => void` | Toggle the plugin on/off                      |
+| `showEnablePanel`    | `boolean`                     | Whether to show the enable confirmation panel |
+| `showDisableWarning` | `boolean`                     | Whether to show the disable warning           |
 
 Implements optimistic UI updates for plugin enable/disable:
 
@@ -388,13 +366,13 @@ Several hooks (`useSidebarPersistence`, `useTheme`) build on `useLocalStorage`:
 
 ```typescript
 function useLocalStorage<T>(
-    key: string,
-    defaultValue: T,
-    options?: {
-        serialize?: (value: T) => string;
-        deserialize?: (raw: string) => T;
-        validate?: (value: T) => boolean;
-    }
+	key: string,
+	defaultValue: T,
+	options?: {
+		serialize?: (value: T) => string;
+		deserialize?: (raw: string) => T;
+		validate?: (value: T) => boolean;
+	}
 ): [T, (value: T) => void];
 ```
 
@@ -443,23 +421,21 @@ import { useKeyboardShortcuts } from '@/lib/hooks/use-keyboard-shortcuts';
 import { useSidebarPersistence } from '@/lib/hooks/use-sidebar-persistence';
 
 export function AppShell({ children }) {
-    const { isDark, toggleTheme, mounted } = useTheme();
-    const { sidebarWidth, sidebarCollapsed } = useSidebarPersistence();
+	const { isDark, toggleTheme, mounted } = useTheme();
+	const { sidebarWidth, sidebarCollapsed } = useSidebarPersistence();
 
-    useKeyboardShortcuts({
-        onOpenHelp: () => setHelpOpen(true),
-    });
+	useKeyboardShortcuts({
+		onOpenHelp: () => setHelpOpen(true)
+	});
 
-    if (!mounted) return null;
+	if (!mounted) return null;
 
-    return (
-        <div className={isDark ? 'dark' : ''}>
-            <aside style={{ width: sidebarCollapsed ? 64 : sidebarWidth }}>
-                {/* sidebar content */}
-            </aside>
-            <main>{children}</main>
-        </div>
-    );
+	return (
+		<div className={isDark ? 'dark' : ''}>
+			<aside style={{ width: sidebarCollapsed ? 64 : sidebarWidth }}>{/* sidebar content */}</aside>
+			<main>{children}</main>
+		</div>
+	);
 }
 ```
 
@@ -472,32 +448,29 @@ import { useState } from 'react';
 import { useAIStream } from '@/lib/hooks/use-ai-stream';
 
 export function SimpleChat() {
-    const [messages, setMessages] = useState([]);
-    const { streamMessage, isStreaming, content, reset } = useAIStream({
-        onComplete: (fullContent) => {
-            setMessages((prev) => [
-                ...prev,
-                { role: 'assistant', content: fullContent },
-            ]);
-            reset();
-        },
-    });
+	const [messages, setMessages] = useState([]);
+	const { streamMessage, isStreaming, content, reset } = useAIStream({
+		onComplete: (fullContent) => {
+			setMessages((prev) => [...prev, { role: 'assistant', content: fullContent }]);
+			reset();
+		}
+	});
 
-    const handleSend = async (text: string) => {
-        setMessages((prev) => [...prev, { role: 'user', content: text }]);
-        await streamMessage('/api/ai-conversations/chat/stream', {
-            messages: [...messages, { role: 'user', content: text }],
-        });
-    };
+	const handleSend = async (text: string) => {
+		setMessages((prev) => [...prev, { role: 'user', content: text }]);
+		await streamMessage('/api/ai-conversations/chat/stream', {
+			messages: [...messages, { role: 'user', content: text }]
+		});
+	};
 
-    return (
-        <div>
-            {messages.map((msg, i) => (
-                <div key={i}>{msg.content}</div>
-            ))}
-            {isStreaming && <div>{content}</div>}
-        </div>
-    );
+	return (
+		<div>
+			{messages.map((msg, i) => (
+				<div key={i}>{msg.content}</div>
+			))}
+			{isStreaming && <div>{content}</div>}
+		</div>
+	);
 }
 ```
 

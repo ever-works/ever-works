@@ -27,12 +27,13 @@ apps/cli/src/commands/auth/
 
 Authenticate with the Ever Works API. Defaults to browser-based OAuth; use `--manual` for direct token entry.
 
-| Option              | Default                        | Description                |
-|---------------------|--------------------------------|----------------------------|
-| `--api-url <url>`   | `https://api.ever-works.com`   | API server URL             |
-| `--manual`          | `false`                        | Skip OAuth, enter token manually |
+| Option            | Default                      | Description                      |
+| ----------------- | ---------------------------- | -------------------------------- |
+| `--api-url <url>` | `https://api.ever-works.com` | API server URL                   |
+| `--manual`        | `false`                      | Skip OAuth, enter token manually |
 
 **OAuth flow (default):**
+
 1. Starts a local HTTP server on a dynamically assigned port (default: 44663)
 2. Opens the browser to `{WEB_URL}/api/auth/authorize` with `redirect_uri`, `response_type=token`, and `client_id=cli`
 3. User authenticates in the browser
@@ -44,6 +45,7 @@ Authenticate with the Ever Works API. Defaults to browser-based OAuth; use `--ma
 The OAuth flow has a 5-minute timeout. If the browser does not open automatically, the authorization URL is printed to the terminal.
 
 **Manual flow (`--manual`):**
+
 1. Prompts for the API URL and an API token
 2. Saves credentials without profile verification
 
@@ -71,32 +73,33 @@ If the stored token is expired or malformed, the credentials file is automatical
 
 ```typescript
 interface Credentials {
-  token: string;        // JWT token
-  apiUrl: string;       // API base URL
-  email?: string;       // From JWT or profile
-  username?: string;    // From JWT claims
-  provider?: string;    // Auth provider
-  emailVerified?: boolean;
-  isActive?: boolean;
-  avatar?: string | null;
-  expiresAt?: string;   // ISO 8601 expiration
+	token: string; // JWT token
+	apiUrl: string; // API base URL
+	email?: string; // From JWT or profile
+	username?: string; // From JWT claims
+	provider?: string; // Auth provider
+	emailVerified?: boolean;
+	isActive?: boolean;
+	avatar?: string | null;
+	expiresAt?: string; // ISO 8601 expiration
 }
 ```
 
 ### Key Methods
 
-| Method                  | Description                                              |
-|-------------------------|----------------------------------------------------------|
-| `get()`                 | Load and validate credentials; auto-removes if expired   |
-| `save(credentials)`     | Write credentials to disk                                |
-| `remove()`              | Delete the credentials file                              |
-| `requireAuth()`         | Load credentials or exit with error message              |
-| `createWithExpiry()`    | Build credentials from JWT token with extracted claims   |
-| `getTokenExpiryInfo()`  | Calculate remaining time from JWT `exp` claim            |
+| Method                 | Description                                            |
+| ---------------------- | ------------------------------------------------------ |
+| `get()`                | Load and validate credentials; auto-removes if expired |
+| `save(credentials)`    | Write credentials to disk                              |
+| `remove()`             | Delete the credentials file                            |
+| `requireAuth()`        | Load credentials or exit with error message            |
+| `createWithExpiry()`   | Build credentials from JWT token with extracted claims |
+| `getTokenExpiryInfo()` | Calculate remaining time from JWT `exp` claim          |
 
 ### Validation on Load
 
 When `get()` is called, the service validates:
+
 1. File exists and contains a valid JSON object
 2. Token is present and non-empty
 3. Token has valid JWT structure (three dot-separated parts)

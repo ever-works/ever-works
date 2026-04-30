@@ -11,12 +11,12 @@ Ever Works uses a dual testing framework approach: **Jest** for the core agent p
 
 ## Test Suite Overview
 
-| Package | Framework | Suites | Tests | Config |
-|---|---|---|---|---|
-| `@ever-works/agent` | Jest + ts-jest | ~26 | ~719 | `packages/agent/jest.config.js` |
-| `apps/api` | Jest | varies | varies | `apps/api/jest.config.js` |
-| Each plugin (`packages/plugins/*`) | Vitest | 1-3 per plugin | varies | `vitest.config.ts` per plugin |
-| `@ever-works/plugin` | Vitest | varies | varies | `packages/plugin/vitest.config.ts` |
+| Package                            | Framework      | Suites         | Tests  | Config                             |
+| ---------------------------------- | -------------- | -------------- | ------ | ---------------------------------- |
+| `@ever-works/agent`                | Jest + ts-jest | ~26            | ~719   | `packages/agent/jest.config.js`    |
+| `apps/api`                         | Jest           | varies         | varies | `apps/api/jest.config.js`          |
+| Each plugin (`packages/plugins/*`) | Vitest         | 1-3 per plugin | varies | `vitest.config.ts` per plugin      |
+| `@ever-works/plugin`               | Vitest         | varies         | varies | `packages/plugin/vitest.config.ts` |
 
 ## Running Tests
 
@@ -62,23 +62,26 @@ The agent Jest config in `packages/agent/jest.config.js` has several important s
 
 ```javascript
 module.exports = {
-    moduleFileExtensions: ['js', 'json', 'ts'],
-    rootDir: 'src',
-    testRegex: '.*\\.spec\\.ts$',
-    transform: {
-        '^.+\\.(t|j)s$': ['ts-jest', {
-            diagnostics: { ignoreCodes: [151002] },
-        }],
-    },
-    testEnvironment: 'node',
-    moduleNameMapper: {
-        '^@src/(.*)$': '<rootDir>/$1',
-        '^@ever-works/plugin$': '<rootDir>/../../plugin/src/index.ts',
-        '^@ever-works/plugin/(.*)$': '<rootDir>/../../plugin/src/$1/index.ts',
-        '^@ever-works/contracts$': '<rootDir>/../../contracts/src/index.ts',
-        '^@ever-works/contracts/(.*)$': '<rootDir>/../../contracts/src/$1/index.ts',
-        '^(\\.{1,2}/.*)\\.js$': '$1',
-    },
+	moduleFileExtensions: ['js', 'json', 'ts'],
+	rootDir: 'src',
+	testRegex: '.*\\.spec\\.ts$',
+	transform: {
+		'^.+\\.(t|j)s$': [
+			'ts-jest',
+			{
+				diagnostics: { ignoreCodes: [151002] }
+			}
+		]
+	},
+	testEnvironment: 'node',
+	moduleNameMapper: {
+		'^@src/(.*)$': '<rootDir>/$1',
+		'^@ever-works/plugin$': '<rootDir>/../../plugin/src/index.ts',
+		'^@ever-works/plugin/(.*)$': '<rootDir>/../../plugin/src/$1/index.ts',
+		'^@ever-works/contracts$': '<rootDir>/../../contracts/src/index.ts',
+		'^@ever-works/contracts/(.*)$': '<rootDir>/../../contracts/src/$1/index.ts',
+		'^(\\.{1,2}/.*)\\.js$': '$1'
+	}
 };
 ```
 
@@ -97,15 +100,15 @@ Each plugin has a `vitest.config.ts`:
 import { defineConfig } from 'vitest/config';
 
 export default defineConfig({
-    test: {
-        environment: 'node',
-        globals: true,
-        include: ['src/**/*.{test,spec}.ts'],
-        coverage: {
-            provider: 'v8',
-            reporter: ['text', 'json', 'html'],
-        },
-    },
+	test: {
+		environment: 'node',
+		globals: true,
+		include: ['src/**/*.{test,spec}.ts'],
+		coverage: {
+			provider: 'v8',
+			reporter: ['text', 'json', 'html']
+		}
+	}
 });
 ```
 

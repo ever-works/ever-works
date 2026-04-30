@@ -55,33 +55,34 @@ Feature modules encapsulate a domain area with its controllers, services, and DT
 ```typescript
 // apps/api/src/auth/auth.module.ts
 @Module({
-    imports: [
-        PassportModule,
-        DatabaseModule,
-        HttpModule,
-        JwtModule.registerAsync({
-            useFactory: () => ({
-                secret: jwtConstants.secret(),
-                signOptions: { expiresIn: jwtConstants.accessTokenExpiration() },
-            }),
-        }),
-    ],
-    providers: [
-        AuthService,
-        LocalStrategy,
-        JwtStrategy,
-        GithubAuthStrategy,
-        GoogleAuthStrategy,
-        TokenCleanupService,
-        OAuthUrlService,
-    ],
-    controllers: [OAuthController, AuthController],
-    exports: [AuthService],
+	imports: [
+		PassportModule,
+		DatabaseModule,
+		HttpModule,
+		JwtModule.registerAsync({
+			useFactory: () => ({
+				secret: jwtConstants.secret(),
+				signOptions: { expiresIn: jwtConstants.accessTokenExpiration() }
+			})
+		})
+	],
+	providers: [
+		AuthService,
+		LocalStrategy,
+		JwtStrategy,
+		GithubAuthStrategy,
+		GoogleAuthStrategy,
+		TokenCleanupService,
+		OAuthUrlService
+	],
+	controllers: [OAuthController, AuthController],
+	exports: [AuthService]
 })
 export class AuthModule {}
 ```
 
 Key characteristics:
+
 - Declares its own controllers
 - Imports only the modules it needs
 - Exports only the services other modules need
@@ -93,24 +94,26 @@ Shared modules provide reusable services with no controllers. They are imported 
 ```typescript
 // packages/agent/src/database/database.module.ts
 @Module({
-    imports: [
-        ConfigModule.forFeature(databaseConfig),
-        TypeOrmModule.forRootAsync({ /* ... */ }),
-        TypeOrmModule.forFeature(ENTITIES),
-    ],
-    providers: [
-        DirectoryRepository,
-        UserRepository,
-        RefreshTokenRepository,
-        // ... all repositories
-    ],
-    exports: [
-        TypeOrmModule,
-        DirectoryRepository,
-        UserRepository,
-        RefreshTokenRepository,
-        // ... all repositories
-    ],
+	imports: [
+		ConfigModule.forFeature(databaseConfig),
+		TypeOrmModule.forRootAsync({
+			/* ... */
+		}),
+		TypeOrmModule.forFeature(ENTITIES)
+	],
+	providers: [
+		DirectoryRepository,
+		UserRepository,
+		RefreshTokenRepository
+		// ... all repositories
+	],
+	exports: [
+		TypeOrmModule,
+		DirectoryRepository,
+		UserRepository,
+		RefreshTokenRepository
+		// ... all repositories
+	]
 })
 export class DatabaseModule {}
 ```
@@ -126,18 +129,15 @@ Modules decorated with `@Global()` are available everywhere without explicit imp
 @Global()
 @Module({})
 export class MonitoringModule {
-    static forRoot(config?: MonitoringConfig) {
-        return {
-            module: MonitoringModule,
-            global: true,
-            imports: [
-                SentryModule.forRoot(config?.sentry),
-                PostHogModule.forRoot(config?.posthog),
-            ],
-            providers: [AnalyticsService, SentryService],
-            exports: [AnalyticsService, SentryService],
-        };
-    }
+	static forRoot(config?: MonitoringConfig) {
+		return {
+			module: MonitoringModule,
+			global: true,
+			imports: [SentryModule.forRoot(config?.sentry), PostHogModule.forRoot(config?.posthog)],
+			providers: [AnalyticsService, SentryService],
+			exports: [AnalyticsService, SentryService]
+		};
+	}
 }
 ```
 
@@ -171,20 +171,20 @@ The `FacadesModule` demonstrates the pattern of bundling related services:
 
 ```typescript
 const FACADES = [
-    AiFacadeService,
-    SearchFacadeService,
-    ScreenshotFacadeService,
-    ContentExtractorFacadeService,
-    DataSourceFacadeService,
-    GitFacadeService,
-    OAuthFacadeService,
-    DeployFacadeService,
+	AiFacadeService,
+	SearchFacadeService,
+	ScreenshotFacadeService,
+	ContentExtractorFacadeService,
+	DataSourceFacadeService,
+	GitFacadeService,
+	OAuthFacadeService,
+	DeployFacadeService
 ];
 
 @Module({
-    imports: [DatabaseModule],
-    providers: FACADES,
-    exports: FACADES,
+	imports: [DatabaseModule],
+	providers: FACADES,
+	exports: FACADES
 })
 export class FacadesModule {}
 ```
@@ -196,13 +196,15 @@ Note that the `FacadesModule` relies on `PluginsModule` being registered globall
 The `ApiModule` uses `OnApplicationBootstrap` to run post-initialization logic:
 
 ```typescript
-@Module({ /* imports, providers */ })
+@Module({
+	/* imports, providers */
+})
 export class ApiModule implements OnApplicationBootstrap {
-    constructor(private readonly pluginBootstrap: PluginBootstrapService) {}
+	constructor(private readonly pluginBootstrap: PluginBootstrapService) {}
 
-    async onApplicationBootstrap(): Promise<void> {
-        await this.pluginBootstrap.bootstrap();
-    }
+	async onApplicationBootstrap(): Promise<void> {
+		await this.pluginBootstrap.bootstrap();
+	}
 }
 ```
 
@@ -251,7 +253,7 @@ ModuleB --> SharedModule
 
 ```typescript
 @Module({
-    imports: [forwardRef(() => ModuleB)],
+	imports: [forwardRef(() => ModuleB)]
 })
 export class ModuleA {}
 ```

@@ -119,11 +119,13 @@ Implements `IGitFacade` and provides comprehensive Git operations (~813 lines):
 **Token resolution:**
 
 Git credentials are resolved in priority order:
+
 1. Explicit `token` parameter in `GitFacadeOptions`
 2. OAuth token from `OAuthTokenRepository` (for the user and provider)
 3. Personal access token (PAT) from plugin settings
 
 **Custom errors:**
+
 - `NoGitProviderError` -- no git provider configured
 - `GitProviderNotFoundError` -- specified provider not found
 - `NoGitCredentialsError` -- no valid git credentials available
@@ -202,12 +204,12 @@ OAuth tokens are stored separately in the `OAuthToken` entity and take priority 
 
 ## Dependencies
 
-| Dependency | Purpose |
-|---|---|
-| `@ever-works/plugin` | `IDeployPlugin`, `IGitPlugin` interfaces, `PLUGIN_CAPABILITIES` |
-| `@ever-works/agent/plugins` | `PluginRegistryService`, `PluginSettingsService` |
-| `@ever-works/agent/database` | `DirectoryCustomDomain`, `OAuthTokenRepository` |
-| `isomorphic-git` | Local git clone, commit, push operations |
+| Dependency                   | Purpose                                                         |
+| ---------------------------- | --------------------------------------------------------------- |
+| `@ever-works/plugin`         | `IDeployPlugin`, `IGitPlugin` interfaces, `PLUGIN_CAPABILITIES` |
+| `@ever-works/agent/plugins`  | `PluginRegistryService`, `PluginSettingsService`                |
+| `@ever-works/agent/database` | `DirectoryCustomDomain`, `OAuthTokenRepository`                 |
+| `isomorphic-git`             | Local git clone, commit, push operations                        |
 
 ## Usage Examples
 
@@ -217,7 +219,7 @@ OAuth tokens are stored separately in the `OAuthToken` entity and take priority 
 import { DeployFacadeService } from '@ever-works/agent/facades';
 
 const result = await deployFacade.deploy(directory, user, {
-    teamId: 'team_abc123',
+	teamId: 'team_abc123'
 });
 
 // Check deployment status
@@ -232,7 +234,7 @@ await deployFacade.addDomain(directory, 'tools.example.com');
 
 const verification = await deployFacade.verifyDomain(directory, 'tools.example.com');
 if (!verification.verified) {
-    console.log('DNS records needed:', verification.requiredRecords);
+	console.log('DNS records needed:', verification.requiredRecords);
 }
 ```
 
@@ -243,16 +245,16 @@ import { GitFacadeService } from '@ever-works/agent/facades';
 
 // Create a repository
 const repo = await gitFacade.createRepository('my-directory-data', {
-    userId: user.id,
-    providerId: 'github',
-    isPrivate: true,
-    description: 'Data repository for My Directory',
+	userId: user.id,
+	providerId: 'github',
+	isPrivate: true,
+	description: 'Data repository for My Directory'
 });
 
 // Clone locally, make changes, commit, push
 const localPath = await gitFacade.cloneOrPull(
-    { owner: 'my-org', repo: 'my-directory-data', committer: user.asCommitter() },
-    { userId: user.id, providerId: 'github' },
+	{ owner: 'my-org', repo: 'my-directory-data', committer: user.asCommitter() },
+	{ userId: user.id, providerId: 'github' }
 );
 
 await gitFacade.addAll('github', localPath);

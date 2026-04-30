@@ -33,11 +33,11 @@ Enable comparisons on directories where users naturally compare alternatives —
 
 Items are grouped by their primary category. Within each category, items are sorted by selection priority:
 
-| Priority | Criteria |
-|----------|----------|
-| 1 | Featured items first |
-| 2 | Lower `order` value |
-| 3 | Alphabetical by name |
+| Priority | Criteria             |
+| -------- | -------------------- |
+| 1        | Featured items first |
+| 2        | Lower `order` value  |
+| 3        | Alphabetical by name |
 
 All C(n,2) pairs are generated from the sorted list. Previously generated pairs are skipped. The pair key is order-independent — `netlify--vercel` is the same pair regardless of which item is A or B.
 
@@ -45,32 +45,32 @@ All C(n,2) pairs are generated from the sorted list. Previously generated pairs 
 
 Each comparison produces a `ComparisonData` object:
 
-| Field | Type | Description |
-|-------|------|-------------|
-| `id` / `slug` | string | Canonical pair key, e.g., `netlify--vercel` |
-| `title` | string | SEO-optimized comparison title |
-| `item_a_slug` | string | Slug of the first item |
-| `item_b_slug` | string | Slug of the second item |
-| `item_a_name` | string | Display name of item A |
-| `item_b_name` | string | Display name of item B |
-| `category` | string | Shared category |
-| `summary` | string | 2–3 sentence overview |
-| `verdict` | string | AI recommendation (2–4 sentences) |
-| `verdict_winner` | string | `item_a`, `item_b`, or `tie` |
-| `dimensions` | array | 3–8 scored comparison dimensions |
-| `sources` | array | URLs used during research |
-| `generated_at` | string | ISO 8601 timestamp |
+| Field            | Type   | Description                                 |
+| ---------------- | ------ | ------------------------------------------- |
+| `id` / `slug`    | string | Canonical pair key, e.g., `netlify--vercel` |
+| `title`          | string | SEO-optimized comparison title              |
+| `item_a_slug`    | string | Slug of the first item                      |
+| `item_b_slug`    | string | Slug of the second item                     |
+| `item_a_name`    | string | Display name of item A                      |
+| `item_b_name`    | string | Display name of item B                      |
+| `category`       | string | Shared category                             |
+| `summary`        | string | 2–3 sentence overview                       |
+| `verdict`        | string | AI recommendation (2–4 sentences)           |
+| `verdict_winner` | string | `item_a`, `item_b`, or `tie`                |
+| `dimensions`     | array  | 3–8 scored comparison dimensions            |
+| `sources`        | array  | URLs used during research                   |
+| `generated_at`   | string | ISO 8601 timestamp                          |
 
 Each entry in `dimensions` follows this shape:
 
-| Field | Type | Description |
-|-------|------|-------------|
-| `name` | string | Dimension name (e.g., "Performance") |
-| `item_a_summary` | string | Summary for item A |
-| `item_b_summary` | string | Summary for item B |
-| `item_a_score` | number | Score 1–10 |
-| `item_b_score` | number | Score 1–10 |
-| `winner` | string | `item_a`, `item_b`, or `tie` |
+| Field            | Type   | Description                          |
+| ---------------- | ------ | ------------------------------------ |
+| `name`           | string | Dimension name (e.g., "Performance") |
+| `item_a_summary` | string | Summary for item A                   |
+| `item_b_summary` | string | Summary for item B                   |
+| `item_a_score`   | number | Score 1–10                           |
+| `item_b_score`   | number | Score 1–10                           |
+| `winner`         | string | `item_a`, `item_b`, or `tie`         |
 
 ## Enabling Comparisons
 
@@ -80,27 +80,27 @@ Comparisons are configured at two levels:
 
 These fields appear on the directory generator settings form (provided by the Comparison Generator plugin's form schema):
 
-| Field | Type | Default | Description |
-|-------|------|---------|-------------|
-| `comparison_enabled` | boolean | `false` | Master switch for comparisons |
-| `comparison_cadence` | select | `use_directory` | Cadence: Use Directory Schedule, Daily, Weekly, Monthly |
-| `comparison_max_mode` | select | `custom` | Custom Limit or All Pairs |
-| `comparison_max` | number | `50` | Max comparisons (1–500, only shown in Custom mode) |
+| Field                 | Type    | Default         | Description                                             |
+| --------------------- | ------- | --------------- | ------------------------------------------------------- |
+| `comparison_enabled`  | boolean | `false`         | Master switch for comparisons                           |
+| `comparison_cadence`  | select  | `use_directory` | Cadence: Use Directory Schedule, Daily, Weekly, Monthly |
+| `comparison_max_mode` | select  | `custom`        | Custom Limit or All Pairs                               |
+| `comparison_max`      | number  | `50`            | Max comparisons (1–500, only shown in Custom mode)      |
 
 ### 2. Plugin Settings
 
 The **Comparison Generator** plugin (`comparison-generator`) provides additional configuration. See [Built-in Plugins](/plugin-system/built-in-plugins#comparison-generator) for the full settings table.
 
-| Setting | Type | Default | Description |
-|---------|------|---------|-------------|
-| `cadence_override` | string | `use_directory` | `use_directory`, `daily`, `weekly`, `monthly` |
-| `max_comparisons_mode` | string | `custom` | `custom` or `unlimited` |
-| `max_comparisons` | number | `50` | Max total comparisons (1–500) |
-| `min_items_for_comparison` | number | `3` | Min items in category before generating (2–20) |
-| `ai_provider` | string | — | Override AI provider for comparison generation |
-| `ai_model` | string | — | Override AI model for comparison generation |
-| `custom_prompt` | string | — | Additional instructions appended to comparison prompts |
-| `extended_analysis` | boolean | `false` | Enable 7-section deep-dive extended analysis |
+| Setting                    | Type    | Default         | Description                                            |
+| -------------------------- | ------- | --------------- | ------------------------------------------------------ |
+| `cadence_override`         | string  | `use_directory` | `use_directory`, `daily`, `weekly`, `monthly`          |
+| `max_comparisons_mode`     | string  | `custom`        | `custom` or `unlimited`                                |
+| `max_comparisons`          | number  | `50`            | Max total comparisons (1–500)                          |
+| `min_items_for_comparison` | number  | `3`             | Min items in category before generating (2–20)         |
+| `ai_provider`              | string  | —               | Override AI provider for comparison generation         |
+| `ai_model`                 | string  | —               | Override AI model for comparison generation            |
+| `custom_prompt`            | string  | —               | Additional instructions appended to comparison prompts |
+| `extended_analysis`        | boolean | `false`         | Enable 7-section deep-dive extended analysis           |
 
 ## Scheduling
 
@@ -144,6 +144,7 @@ You can provide custom instructions that are appended to all comparison generati
 The custom prompt is managed in the **Advanced Prompts** settings page under the "Comparison" section. Maximum length: 2,000 characters.
 
 Examples:
+
 - "Focus on pricing differences and value for money"
 - "Write in a casual, developer-friendly tone"
 - "Emphasize open-source vs proprietary trade-offs"
@@ -156,14 +157,14 @@ This is separate from the [Advanced Prompts](./advanced-prompts) that customize 
 
 All endpoints require JWT authentication. Base path: `/api/directories/:id/comparisons`.
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| `GET` | `/api/directories/:id/comparisons` | List all comparisons |
-| `GET` | `/api/directories/:id/comparisons/remaining-count` | Count remaining un-generated pairs |
-| `GET` | `/api/directories/:id/comparisons/:slug` | Get a comparison with markdown |
-| `POST` | `/api/directories/:id/comparisons/generate` | Auto-generate next comparison |
-| `POST` | `/api/directories/:id/comparisons/generate-manual` | Generate comparison for a specific pair |
-| `DELETE` | `/api/directories/:id/comparisons/:slug` | Delete a comparison |
+| Method   | Endpoint                                           | Description                             |
+| -------- | -------------------------------------------------- | --------------------------------------- |
+| `GET`    | `/api/directories/:id/comparisons`                 | List all comparisons                    |
+| `GET`    | `/api/directories/:id/comparisons/remaining-count` | Count remaining un-generated pairs      |
+| `GET`    | `/api/directories/:id/comparisons/:slug`           | Get a comparison with markdown          |
+| `POST`   | `/api/directories/:id/comparisons/generate`        | Auto-generate next comparison           |
+| `POST`   | `/api/directories/:id/comparisons/generate-manual` | Generate comparison for a specific pair |
+| `DELETE` | `/api/directories/:id/comparisons/:slug`           | Delete a comparison                     |
 
 ### List All Comparisons
 
@@ -185,9 +186,9 @@ Response:
 
 ```json
 {
-  "comparison": { "slug": "netlify--vercel", "title": "...", "..." : "..." },
-  "markdown": "## Introduction\n...",
-  "extendedAnalysisMarkdown": "## Detailed Feature Breakdown\n..."
+	"comparison": { "slug": "netlify--vercel", "title": "...", "...": "..." },
+	"markdown": "## Introduction\n...",
+	"extendedAnalysisMarkdown": "## Detailed Feature Breakdown\n..."
 }
 ```
 
@@ -261,12 +262,12 @@ The `config.yml` metadata tracks comparison state:
 
 ```yaml
 metadata:
-  comparison_state:
-    generated_pairs:
-      - netlify--vercel
-      - figma--sketch
-    last_generated_at: "2025-01-15T10:30:00Z"
-    total_generated: 2
+    comparison_state:
+        generated_pairs:
+            - netlify--vercel
+            - figma--sketch
+        last_generated_at: '2025-01-15T10:30:00Z'
+        total_generated: 2
 ```
 
 ## Related

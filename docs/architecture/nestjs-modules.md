@@ -41,16 +41,16 @@ graph TD
 
 ## Source Files
 
-| File | Purpose |
-|------|---------|
-| `packages/agent/src/database/database.module.ts` | Database layer with all entities and repositories |
-| `packages/agent/src/plugins/plugins.module.ts` | Global plugin system with dynamic module pattern |
-| `packages/agent/src/facades/facades.module.ts` | Facade services for AI, Search, Git, Deploy, etc. |
-| `packages/agent/src/pipeline/pipeline.module.ts` | Pipeline builder, executors, orchestrator |
-| `packages/agent/src/services/directory.module.ts` | Core directory business logic services |
-| `packages/agent/src/generators/*/` | Generator modules (data, markdown, website) |
-| `packages/agent/src/notifications/notifications.module.ts` | Notification system |
-| `packages/agent/src/subscriptions/subscriptions.module.ts` | Subscription and billing |
+| File                                                       | Purpose                                           |
+| ---------------------------------------------------------- | ------------------------------------------------- |
+| `packages/agent/src/database/database.module.ts`           | Database layer with all entities and repositories |
+| `packages/agent/src/plugins/plugins.module.ts`             | Global plugin system with dynamic module pattern  |
+| `packages/agent/src/facades/facades.module.ts`             | Facade services for AI, Search, Git, Deploy, etc. |
+| `packages/agent/src/pipeline/pipeline.module.ts`           | Pipeline builder, executors, orchestrator         |
+| `packages/agent/src/services/directory.module.ts`          | Core directory business logic services            |
+| `packages/agent/src/generators/*/`                         | Generator modules (data, markdown, website)       |
+| `packages/agent/src/notifications/notifications.module.ts` | Notification system                               |
+| `packages/agent/src/subscriptions/subscriptions.module.ts` | Subscription and billing                          |
 
 ## Key Classes
 
@@ -60,17 +60,17 @@ Registers all TypeORM entities and provides repository services. Every module th
 
 ```typescript
 @Module({
-    imports: [
-        ConfigModule.forFeature(databaseConfig),
-        TypeOrmModule.forRootAsync({
-            imports: [ConfigModule],
-            useFactory: (configService: ConfigService) => configService.get('database'),
-            inject: [ConfigService],
-        }),
-        TypeOrmModule.forFeature(ENTITIES),
-    ],
-    providers: [DirectoryRepository, UserRepository, /* ... */],
-    exports: [TypeOrmModule, DirectoryRepository, UserRepository, /* ... */],
+	imports: [
+		ConfigModule.forFeature(databaseConfig),
+		TypeOrmModule.forRootAsync({
+			imports: [ConfigModule],
+			useFactory: (configService: ConfigService) => configService.get('database'),
+			inject: [ConfigService]
+		}),
+		TypeOrmModule.forFeature(ENTITIES)
+	],
+	providers: [DirectoryRepository, UserRepository /* ... */],
+	exports: [TypeOrmModule, DirectoryRepository, UserRepository /* ... */]
 })
 export class DatabaseModule {}
 ```
@@ -83,27 +83,24 @@ The plugin system uses NestJS's `@Global()` and `DynamicModule` patterns so that
 @Global()
 @Module({})
 export class PluginsModule implements OnModuleDestroy {
-    static forRoot(options: PluginsModuleOptions = {}): DynamicModule {
-        return {
-            module: PluginsModule,
-            imports: [
-                TypeOrmModule.forFeature(PLUGIN_ENTITIES),
-                EventEmitterModule.forRoot(),
-            ],
-            providers: [
-                {
-                    provide: PLUGINS_MODULE_OPTIONS,
-                    useValue: { platformVersion: '1.0.0', ...options },
-                },
-                ...PROVIDERS,
-            ],
-            exports: [...EXPORTS, PLUGINS_MODULE_OPTIONS],
-        };
-    }
+	static forRoot(options: PluginsModuleOptions = {}): DynamicModule {
+		return {
+			module: PluginsModule,
+			imports: [TypeOrmModule.forFeature(PLUGIN_ENTITIES), EventEmitterModule.forRoot()],
+			providers: [
+				{
+					provide: PLUGINS_MODULE_OPTIONS,
+					useValue: { platformVersion: '1.0.0', ...options }
+				},
+				...PROVIDERS
+			],
+			exports: [...EXPORTS, PLUGINS_MODULE_OPTIONS]
+		};
+	}
 
-    static forRootAsync(options: PluginsModuleAsyncOptions): DynamicModule {
-        // Supports useFactory, useClass, useExisting patterns
-    }
+	static forRootAsync(options: PluginsModuleAsyncOptions): DynamicModule {
+		// Supports useFactory, useClass, useExisting patterns
+	}
 }
 ```
 
@@ -128,9 +125,9 @@ Provides unified access to plugin capabilities without direct plugin imports. Th
  * 4. Plugin defaults
  */
 @Module({
-    imports: [DatabaseModule],
-    providers: FACADES,
-    exports: FACADES,
+	imports: [DatabaseModule],
+	providers: FACADES,
+	exports: FACADES
 })
 export class FacadesModule {}
 ```
@@ -141,15 +138,17 @@ Builds and executes generation pipelines using plugin-contributed steps:
 
 ```typescript
 @Module({
-    imports: [FacadesModule, EventEmitterModule.forRoot()],
-    providers: [
-        PipelineBuilderService,
-        StepPipelineExecutorService,
-        FullPipelineExecutorService,
-        PipelineOrchestratorService,
-        PipelineFacadeService,
-    ],
-    exports: [/* all providers */],
+	imports: [FacadesModule, EventEmitterModule.forRoot()],
+	providers: [
+		PipelineBuilderService,
+		StepPipelineExecutorService,
+		FullPipelineExecutorService,
+		PipelineOrchestratorService,
+		PipelineFacadeService
+	],
+	exports: [
+		/* all providers */
+	]
 })
 export class PipelineModule {}
 ```
@@ -162,29 +161,29 @@ The NestJS dependency injection container resolves modules in import order. The 
 
 ```typescript
 @Module({
-    imports: [
-        // 1. Configuration
-        ConfigModule.forRoot(),
+	imports: [
+		// 1. Configuration
+		ConfigModule.forRoot(),
 
-        // 2. Database (foundation)
-        DatabaseModule,
+		// 2. Database (foundation)
+		DatabaseModule,
 
-        // 3. Plugin system (global, must be before consumers)
-        PluginsModule.forRoot(),
+		// 3. Plugin system (global, must be before consumers)
+		PluginsModule.forRoot(),
 
-        // 4. Feature modules (consume plugins via facades)
-        FacadesModule,
-        PipelineModule,
-        DirectoryServicesModule,
-        // ...
-    ],
+		// 4. Feature modules (consume plugins via facades)
+		FacadesModule,
+		PipelineModule,
+		DirectoryServicesModule
+		// ...
+	]
 })
 export class ApiModule implements OnApplicationBootstrap {
-    constructor(private readonly pluginBootstrap: PluginBootstrapService) {}
+	constructor(private readonly pluginBootstrap: PluginBootstrapService) {}
 
-    async onApplicationBootstrap() {
-        await this.pluginBootstrap.bootstrap();
-    }
+	async onApplicationBootstrap() {
+		await this.pluginBootstrap.bootstrap();
+	}
 }
 ```
 
@@ -194,11 +193,11 @@ The codebase follows a consistent pattern of declaring `PROVIDERS` and `EXPORTS`
 
 ```typescript
 const PROVIDERS = [
-    PipelineBuilderService,
-    StepPipelineExecutorService,
-    FullPipelineExecutorService,
-    PipelineOrchestratorService,
-    PipelineFacadeService,
+	PipelineBuilderService,
+	StepPipelineExecutorService,
+	FullPipelineExecutorService,
+	PipelineOrchestratorService,
+	PipelineFacadeService
 ];
 
 const EXPORTS = [...PROVIDERS]; // Export everything for consumer modules
@@ -210,13 +209,13 @@ const EXPORTS = [...PROVIDERS]; // Export everything for consumer modules
 
 ```typescript
 PluginsModule.forRootAsync({
-    imports: [ConfigModule],
-    useFactory: async (configService: ConfigService) => ({
-        platformVersion: configService.get('PLATFORM_VERSION'),
-        environment: configService.get('NODE_ENV'),
-        autoLoadBuiltIn: true,
-    }),
-    inject: [ConfigService],
+	imports: [ConfigModule],
+	useFactory: async (configService: ConfigService) => ({
+		platformVersion: configService.get('PLATFORM_VERSION'),
+		environment: configService.get('NODE_ENV'),
+		autoLoadBuiltIn: true
+	}),
+	inject: [ConfigService]
 });
 ```
 
@@ -225,13 +224,13 @@ PluginsModule.forRootAsync({
 ```typescript
 @Injectable()
 export class DatabaseInitService implements OnModuleInit {
-    constructor(@InjectDataSource() private dataSource: DataSource) {}
+	constructor(@InjectDataSource() private dataSource: DataSource) {}
 
-    async onModuleInit() {
-        if (!this.dataSource.isInitialized) {
-            await this.dataSource.initialize();
-        }
-    }
+	async onModuleInit() {
+		if (!this.dataSource.isInitialized) {
+			await this.dataSource.initialize();
+		}
+	}
 }
 ```
 

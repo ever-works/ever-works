@@ -37,12 +37,12 @@ The complete form schema returned to the frontend:
 
 ```typescript
 interface GeneratorFormSchema {
-    resolvedPipelineId: string | undefined;
-    providers: Record<string, ProviderOption[]>;
-    pluginFields: FormFieldDefinition[];
-    pluginGroups?: FormFieldGroup[];
-    handledConfigFields: readonly string[];
-    defaultValues?: Record<string, unknown>;
+	resolvedPipelineId: string | undefined;
+	providers: Record<string, ProviderOption[]>;
+	pluginFields: FormFieldDefinition[];
+	pluginGroups?: FormFieldGroup[];
+	handledConfigFields: readonly string[];
+	defaultValues?: Record<string, unknown>;
 }
 ```
 
@@ -52,12 +52,12 @@ Each selectable provider in the form:
 
 ```typescript
 interface ProviderOption {
-    id: string;
-    name: string;
-    description: string;
-    configured: boolean;
-    isDefault: boolean;
-    icon?: string;
+	id: string;
+	name: string;
+	description: string;
+	configured: boolean;
+	isDefault: boolean;
+	icon?: string;
 }
 ```
 
@@ -67,8 +67,8 @@ The primary method `getFormSchema()` orchestrates the full schema resolution:
 
 ```typescript
 const schema = await formSchemaService.getFormSchema(
-    'agent-pipeline',           // pipelineId (optional)
-    { directoryId, userId },    // scope options
+	'agent-pipeline', // pipelineId (optional)
+	{ directoryId, userId } // scope options
 );
 ```
 
@@ -85,12 +85,12 @@ const schema = await formSchemaService.getFormSchema(
 
 The service resolves the pipeline plugin through a priority chain:
 
-| Priority | Source | Description |
-|----------|--------|-------------|
-| 1 | Explicit `pipelineId` parameter | User-selected pipeline |
-| 2 | Directory's `activeCapability` for `'pipeline'` | Directory-level default |
-| 3 | Plugin with `defaultForCapabilities: ['pipeline']` | System-level default |
-| 4 | First loaded pipeline plugin | Fallback |
+| Priority | Source                                             | Description             |
+| -------- | -------------------------------------------------- | ----------------------- |
+| 1        | Explicit `pipelineId` parameter                    | User-selected pipeline  |
+| 2        | Directory's `activeCapability` for `'pipeline'`    | Directory-level default |
+| 3        | Plugin with `defaultForCapabilities: ['pipeline']` | System-level default    |
+| 4        | First loaded pipeline plugin                       | Fallback                |
 
 ### Provider Filtering
 
@@ -111,11 +111,7 @@ A provider is marked as `isDefault` when:
 ## Validating Form Values
 
 ```typescript
-const result = await formSchemaService.validateFormValues(
-    pipelineId,
-    formValues,
-    { directoryId, userId },
-);
+const result = await formSchemaService.validateFormValues(pipelineId, formValues, { directoryId, userId });
 // result: { valid: true } or { valid: false, errors: [...] }
 ```
 
@@ -129,11 +125,10 @@ Validation runs in two phases:
 The `processFormConfig()` method transforms raw form values into structured configuration:
 
 ```typescript
-const { config, pluginConfig } = await formSchemaService.processFormConfig(
-    pipelineId,
-    rawFormValues,
-    { directoryId, userId },
-);
+const { config, pluginConfig } = await formSchemaService.processFormConfig(pipelineId, rawFormValues, {
+	directoryId,
+	userId
+});
 ```
 
 ### Transformation Steps
@@ -168,6 +163,7 @@ await formSchemaService.validateFormSchemaPlugins({ directoryId, userId });
 ```
 
 For each enabled plugin:
+
 1. Checks if required settings are configured via `getResolvedSettings()`.
 2. Validates `required` fields from the JSON Schema.
 3. Validates `x-requiredGroups` -- at least one field in each group must have a value.
@@ -178,10 +174,7 @@ Throws `BadRequestException` with a list of errors if any plugins are misconfigu
 ## Validating Selected Providers
 
 ```typescript
-await formSchemaService.validateSelectedProviders(
-    { ai: 'openai', search: 'exa' },
-    { directoryId, userId },
-);
+await formSchemaService.validateSelectedProviders({ ai: 'openai', search: 'exa' }, { directoryId, userId });
 ```
 
 Validates each provider through the chain: **exists** -> **loaded** -> **enabled** -> **configured**. If a provider field is empty, validates the default provider for that category instead.

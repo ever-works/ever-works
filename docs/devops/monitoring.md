@@ -17,18 +17,15 @@ The monitoring package provides a global NestJS module with a `forRoot()` config
 @Global()
 @Module({})
 export class MonitoringModule {
-    static forRoot(config?: MonitoringConfig) {
-        return {
-            module: MonitoringModule,
-            global: true,
-            imports: [
-                SentryModule.forRoot(config?.sentry),
-                PostHogModule.forRoot(config?.posthog),
-            ],
-            providers: [AnalyticsService, SentryService],
-            exports: [AnalyticsService, SentryService],
-        };
-    }
+	static forRoot(config?: MonitoringConfig) {
+		return {
+			module: MonitoringModule,
+			global: true,
+			imports: [SentryModule.forRoot(config?.sentry), PostHogModule.forRoot(config?.posthog)],
+			providers: [AnalyticsService, SentryService],
+			exports: [AnalyticsService, SentryService]
+		};
+	}
 }
 ```
 
@@ -40,11 +37,11 @@ The `@Global()` decorator makes `AnalyticsService` and `SentryService` available
 
 Sentry is initialized in `sentry/sentry.config.ts` with environment-aware defaults:
 
-| Setting | Production | Development |
-|---|---|---|
-| `tracesSampleRate` | `0.1` (10%) | `1.0` (100%) |
+| Setting              | Production  | Development  |
+| -------------------- | ----------- | ------------ |
+| `tracesSampleRate`   | `0.1` (10%) | `1.0` (100%) |
 | `profilesSampleRate` | `0.1` (10%) | `1.0` (100%) |
-| `enableLogs` | `true` | `true` |
+| `enableLogs`         | `true`      | `true`       |
 
 The configuration includes `nodeProfilingIntegration()` for server-side performance profiling.
 
@@ -74,11 +71,13 @@ Both `beforeSend` (errors) and `beforeSendTransaction` (performance) filters dro
 The `SentryInterceptor` is a NestJS interceptor that enriches error reports with request context:
 
 **On every request**:
+
 - Sets the Sentry user context (`id`, `email`, `username`) if authenticated.
 - Sets request context (`method`, `url`, sanitized headers, sanitized body).
 - Tags the transaction with the endpoint pattern.
 
 **On error**:
+
 - Captures the exception with additional tags (`endpoint`, `statusCode`) and extras (`requestBody`, `userAgent`).
 
 ### Data Sanitization
@@ -108,14 +107,14 @@ private sanitizeBody(body) {
 
 The `SentryService` wraps Sentry's logging API with standard log levels:
 
-| Method | Sentry Level |
-|---|---|
-| `trace(message)` | `trace` |
-| `debug(message)` | `debug` |
-| `info(message)` | `info` |
-| `warn(message)` | `warning` |
-| `error(message)` | `error` |
-| `fatal(message)` | `fatal` |
+| Method           | Sentry Level |
+| ---------------- | ------------ |
+| `trace(message)` | `trace`      |
+| `debug(message)` | `debug`      |
+| `info(message)`  | `info`       |
+| `warn(message)`  | `warning`    |
+| `error(message)` | `error`      |
+| `fatal(message)` | `fatal`      |
 
 ## PostHog Integration
 
@@ -123,11 +122,11 @@ The `SentryService` wraps Sentry's logging API with standard log levels:
 
 PostHog is initialized in `posthog/posthog.config.ts` with the `POSTHOG_API_KEY` and optional `POSTHOG_HOST` environment variables. The client exposes three functions:
 
-| Function | Purpose |
-|---|---|
-| `trackEvent(distinctId, event, properties, groups)` | Track a custom event |
-| `identifyUser(distinctId, properties)` | Identify a user with properties |
-| `setUserProperties(distinctId, properties)` | Update user properties |
+| Function                                            | Purpose                         |
+| --------------------------------------------------- | ------------------------------- |
+| `trackEvent(distinctId, event, properties, groups)` | Track a custom event            |
+| `identifyUser(distinctId, properties)`              | Identify a user with properties |
+| `setUserProperties(distinctId, properties)`         | Update user properties          |
 
 ### PostHog Interceptor
 
@@ -143,12 +142,12 @@ The `AnalyticsService` is the high-level API for product analytics. It wraps Pos
 
 ### Event Categories
 
-| Category | Method | Events |
-|---|---|---|
-| **Generic** | `track(distinctId, event, properties)` | Any custom event |
-| **API Usage** | `trackApiUsage(distinctId, endpoint, method, statusCode, duration)` | Endpoint performance |
-| **Auth** | `trackAuth(distinctId, event, properties)` | `login`, `logout`, `register`, `password_reset` |
-| **Business** | `trackBusinessEvent(distinctId, event, properties)` | Business-specific metrics |
+| Category      | Method                                                              | Events                                          |
+| ------------- | ------------------------------------------------------------------- | ----------------------------------------------- |
+| **Generic**   | `track(distinctId, event, properties)`                              | Any custom event                                |
+| **API Usage** | `trackApiUsage(distinctId, endpoint, method, statusCode, duration)` | Endpoint performance                            |
+| **Auth**      | `trackAuth(distinctId, event, properties)`                          | `login`, `logout`, `register`, `password_reset` |
+| **Business**  | `trackBusinessEvent(distinctId, event, properties)`                 | Business-specific metrics                       |
 
 ### Typed Event Interfaces
 
@@ -160,11 +159,11 @@ analytics.trackApiUsage(userId, '/api/directories', 'GET', 200, 150);
 
 // Typed object
 analytics.trackApiUsageEvent({
-    distinctId: userId,
-    endpoint: '/api/directories',
-    method: 'GET',
-    statusCode: 200,
-    duration: 150,
+	distinctId: userId,
+	endpoint: '/api/directories',
+	method: 'GET',
+	statusCode: 200,
+	duration: 150
 });
 ```
 
@@ -178,12 +177,12 @@ Returns `true` if PostHog is configured and available. This allows callers to sk
 
 ## Environment Variables
 
-| Variable | Service | Purpose |
-|---|---|---|
-| `SENTRY_DSN` | Sentry | Data Source Name for error reporting |
-| `NODE_ENV` | Sentry | Controls sample rates (production vs development) |
-| `POSTHOG_API_KEY` | PostHog | API key for event tracking |
-| `POSTHOG_HOST` | PostHog | Custom PostHog instance URL (optional) |
+| Variable          | Service | Purpose                                           |
+| ----------------- | ------- | ------------------------------------------------- |
+| `SENTRY_DSN`      | Sentry  | Data Source Name for error reporting              |
+| `NODE_ENV`        | Sentry  | Controls sample rates (production vs development) |
+| `POSTHOG_API_KEY` | PostHog | API key for event tracking                        |
+| `POSTHOG_HOST`    | PostHog | Custom PostHog instance URL (optional)            |
 
 ## Module Structure
 

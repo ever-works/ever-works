@@ -1,7 +1,7 @@
 ---
 id: openai-plugin
-title: "OpenAI Plugin"
-sidebar_label: "OpenAI"
+title: 'OpenAI Plugin'
+sidebar_label: 'OpenAI'
 sidebar_position: 21
 ---
 
@@ -13,16 +13,16 @@ The OpenAI plugin connects Ever Works to OpenAI's API, providing access to model
 
 ## Overview
 
-| Property | Value |
-|---|---|
-| Plugin ID | `openai` |
-| Category | `ai-provider` |
-| Capabilities | `ai-provider` |
-| Version | `1.0.0` |
+| Property           | Value           |
+| ------------------ | --------------- |
+| Plugin ID          | `openai`        |
+| Category           | `ai-provider`   |
+| Capabilities       | `ai-provider`   |
+| Version            | `1.0.0`         |
 | Configuration Mode | `user-required` |
-| Provider Type | `openai` |
-| Auto-enable | No |
-| Visibility | `public` |
+| Provider Type      | `openai`        |
+| Auto-enable        | No              |
+| Visibility         | `public`        |
 
 The plugin extends `BaseAiProvider` from `@ever-works/plugin/abstract` and creates an `AiOperations` instance from `@ever-works/plugin/ai` to handle all AI operations through a unified LangChain-based abstraction.
 
@@ -41,16 +41,16 @@ graph TD
 
 ### Settings Schema
 
-| Setting | Type | Required | Default | Scope | Widget | Description |
-|---|---|---|---|---|---|---|
-| `apiKey` | `string` | Yes | -- | `user` | -- | OpenAI API key. Secret. |
-| `defaultModel` | `string` | Yes | `gpt-5.1` | `global` | `model-select` | Default model for all AI tasks. |
-| `simpleModel` | `string` | No | `gpt-5-nano` | `global` | `model-select` | Model for tags, descriptions, classifications. |
-| `mediumModel` | `string` | No | `gpt-4o-mini` | `global` | `model-select` | Model for listings, summaries, reformatting. |
-| `complexModel` | `string` | No | `gpt-5.1` | `global` | `model-select` | Model for full page generation, multi-step analysis. |
-| `temperature` | `number` | No | `0.7` | -- | -- | Sampling temperature (0--2). Hidden. |
-| `maxTokens` | `number` | No | `4096` | -- | -- | Max tokens per response. Hidden. |
-| `baseUrl` | `string` | No | `https://api.openai.com/v1` | -- | -- | API endpoint. Hidden. |
+| Setting        | Type     | Required | Default                     | Scope    | Widget         | Description                                          |
+| -------------- | -------- | -------- | --------------------------- | -------- | -------------- | ---------------------------------------------------- |
+| `apiKey`       | `string` | Yes      | --                          | `user`   | --             | OpenAI API key. Secret.                              |
+| `defaultModel` | `string` | Yes      | `gpt-5.1`                   | `global` | `model-select` | Default model for all AI tasks.                      |
+| `simpleModel`  | `string` | No       | `gpt-5-nano`                | `global` | `model-select` | Model for tags, descriptions, classifications.       |
+| `mediumModel`  | `string` | No       | `gpt-4o-mini`               | `global` | `model-select` | Model for listings, summaries, reformatting.         |
+| `complexModel` | `string` | No       | `gpt-5.1`                   | `global` | `model-select` | Model for full page generation, multi-step analysis. |
+| `temperature`  | `number` | No       | `0.7`                       | --       | --             | Sampling temperature (0--2). Hidden.                 |
+| `maxTokens`    | `number` | No       | `4096`                      | --       | --             | Max tokens per response. Hidden.                     |
+| `baseUrl`      | `string` | No       | `https://api.openai.com/v1` | --       | --             | API endpoint. Hidden.                                |
 
 ### Model Tiers
 
@@ -79,13 +79,13 @@ getCapabilities(): AiModelCapabilities {
 }
 ```
 
-| Capability | Supported | Description |
-|---|---|---|
-| Structured Output | Yes | JSON mode and function calling for typed responses |
-| Streaming | Yes | Server-sent events for real-time token delivery |
-| Tool Calling | Yes | Function calling for agent-based workflows |
-| Vision | Yes | Image understanding (GPT-4o and later models) |
-| Max Context | 128,000 | Maximum tokens in a single context window |
+| Capability        | Supported | Description                                        |
+| ----------------- | --------- | -------------------------------------------------- |
+| Structured Output | Yes       | JSON mode and function calling for typed responses |
+| Streaming         | Yes       | Server-sent events for real-time token delivery    |
+| Tool Calling      | Yes       | Function calling for agent-based workflows         |
+| Vision            | Yes       | Image understanding (GPT-4o and later models)      |
+| Max Context       | 128,000   | Maximum tokens in a single context window          |
 
 ## Core Methods
 
@@ -136,12 +136,12 @@ The `resolveConfig()` method (from `BaseAiProvider`) merges settings into a fina
 ```typescript
 // Conceptual flow
 const resolvedConfig = {
-  apiKey: settings.apiKey,
-  model: options.model || settings.defaultModel || 'gpt-5-nano',
-  temperature: settings.temperature || 0.7,
-  maxTokens: settings.maxTokens || 4096,
-  baseURL: settings.baseUrl || 'https://api.openai.com/v1',
-  providerType: 'openai'
+	apiKey: settings.apiKey,
+	model: options.model || settings.defaultModel || 'gpt-5-nano',
+	temperature: settings.temperature || 0.7,
+	maxTokens: settings.maxTokens || 4096,
+	baseURL: settings.baseUrl || 'https://api.openai.com/v1',
+	providerType: 'openai'
 };
 ```
 
@@ -149,11 +149,11 @@ The tier-specific models (`simpleModel`, `mediumModel`, `complexModel`) are used
 
 ## Lifecycle
 
-| Method | Behavior |
-|---|---|
+| Method            | Behavior                                                                     |
+| ----------------- | ---------------------------------------------------------------------------- |
 | `onLoad(context)` | Calls `super.onLoad()`, creates `AiOperations` instance with default config. |
-| `onUnload()` | Sets `aiOps` to `null`, calls `super.onUnload()`. |
-| `healthCheck()` | Returns `healthy` (actual connectivity depends on API key). |
+| `onUnload()`      | Sets `aiOps` to `null`, calls `super.onUnload()`.                            |
+| `healthCheck()`   | Returns `healthy` (actual connectivity depends on API key).                  |
 
 ### Initial AiOperations Configuration
 
@@ -161,12 +161,12 @@ On load, the plugin creates an `AiOperations` instance with placeholder values:
 
 ```typescript
 this.aiOps = new AiOperations({
-  apiKey: '',              // Provided per-request from user settings
-  model: 'gpt-5-nano',
-  temperature: 0.7,
-  baseURL: 'https://api.openai.com/v1',
-  maxTokens: 4096,
-  providerType: 'openai'
+	apiKey: '', // Provided per-request from user settings
+	model: 'gpt-5-nano',
+	temperature: 0.7,
+	baseURL: 'https://api.openai.com/v1',
+	maxTokens: 4096,
+	providerType: 'openai'
 });
 ```
 
@@ -208,11 +208,11 @@ sequenceDiagram
 
 ## Comparison with Other AI Providers
 
-| Feature | OpenAI | Anthropic |
-|---|---|---|
-| Max Context | 128K tokens | 200K tokens |
-| Embeddings | Yes | No |
-| Streaming | Yes | Yes |
-| Tool Calling | Yes | Yes |
-| Vision | Yes | Yes |
-| Default Model | gpt-5.1 | claude-sonnet-4-5 |
+| Feature       | OpenAI      | Anthropic         |
+| ------------- | ----------- | ----------------- |
+| Max Context   | 128K tokens | 200K tokens       |
+| Embeddings    | Yes         | No                |
+| Streaming     | Yes         | Yes               |
+| Tool Calling  | Yes         | Yes               |
+| Vision        | Yes         | Yes               |
+| Default Model | gpt-5.1     | claude-sonnet-4-5 |

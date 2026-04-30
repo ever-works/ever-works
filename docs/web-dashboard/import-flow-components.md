@@ -49,11 +49,11 @@ The parent page component orchestrates step transitions, holding the current ste
 
 **File:** `apps/web/src/components/directories/import/ImportSourceStep.tsx`
 
-| Prop | Type | Description |
-|------|------|-------------|
-| `onAnalyze` | `(result: AnalyzeResult) => void` | Callback with analysis results |
-| `connections` | `OAuthConnectionDto[]` | Available git provider connections |
-| `isAnalyzing` | `boolean` | Whether analysis is in progress |
+| Prop          | Type                              | Description                        |
+| ------------- | --------------------------------- | ---------------------------------- |
+| `onAnalyze`   | `(result: AnalyzeResult) => void` | Callback with analysis results     |
+| `connections` | `OAuthConnectionDto[]`            | Available git provider connections |
+| `isAnalyzing` | `boolean`                         | Whether analysis is in progress    |
 
 The first step in the import flow. It presents two source methods in a two-column layout:
 
@@ -64,12 +64,12 @@ When the user clicks "Analyze", the component calls either `analyzeRepository` (
 
 ```tsx
 <ImportSourceStep
-    onAnalyze={(result) => {
-        setAnalysisResult(result);
-        setStep(2);
-    }}
-    connections={userConnections}
-    isAnalyzing={isPending}
+	onAnalyze={(result) => {
+		setAnalysisResult(result);
+		setStep(2);
+	}}
+	connections={userConnections}
+	isAnalyzing={isPending}
 />
 ```
 
@@ -77,17 +77,17 @@ When the user clicks "Analyze", the component calls either `analyzeRepository` (
 
 **File:** `apps/web/src/components/directories/import/ImportModeSelector.tsx`
 
-| Prop | Type | Description |
-|------|------|-------------|
-| `onSelect` | `(mode: ImportMode) => void` | Callback when a mode is chosen |
-| `analysisResult` | `AnalyzeResult` | Results from the analysis step |
+| Prop             | Type                         | Description                    |
+| ---------------- | ---------------------------- | ------------------------------ |
+| `onSelect`       | `(mode: ImportMode) => void` | Callback when a mode is chosen |
+| `analysisResult` | `AnalyzeResult`              | Results from the analysis step |
 
 Presents two mode cards side by side:
 
-| Mode | Value | Description |
-|------|-------|-------------|
-| Import Copy | `'import'` | Creates a new Ever Works repository with the imported data. The original source is copied. |
-| Link Existing | `'link_existing'` | Connects to an existing Ever Works repository structure without copying data. |
+| Mode          | Value             | Description                                                                                |
+| ------------- | ----------------- | ------------------------------------------------------------------------------------------ |
+| Import Copy   | `'import'`        | Creates a new Ever Works repository with the imported data. The original source is copied. |
+| Link Existing | `'link_existing'` | Connects to an existing Ever Works repository structure without copying data.              |
 
 Each mode is rendered as a `ModeOption` card with an icon, title, description, and a list of what the mode includes. The cards are styled as selectable options with a border highlight on hover.
 
@@ -99,11 +99,11 @@ type ImportMode = 'import' | 'link_existing';
 
 ```tsx
 <ImportModeSelector
-    onSelect={(mode) => {
-        setImportMode(mode);
-        setStep(3);
-    }}
-    analysisResult={analysisResult}
+	onSelect={(mode) => {
+		setImportMode(mode);
+		setStep(3);
+	}}
+	analysisResult={analysisResult}
 />
 ```
 
@@ -111,12 +111,12 @@ type ImportMode = 'import' | 'link_existing';
 
 **File:** `apps/web/src/components/directories/import/ImportConfigureStep.tsx`
 
-| Prop | Type | Description |
-|------|------|-------------|
-| `analysisResult` | `AnalyzeResult` | Results from the analysis step |
-| `mode` | `ImportMode` | Selected import mode |
-| `onImport` | `(config: ImportConfig) => void` | Callback when import is confirmed |
-| `isPending` | `boolean` | Whether import is in progress |
+| Prop             | Type                             | Description                       |
+| ---------------- | -------------------------------- | --------------------------------- |
+| `analysisResult` | `AnalyzeResult`                  | Results from the analysis step    |
+| `mode`           | `ImportMode`                     | Selected import mode              |
+| `onImport`       | `(config: ImportConfig) => void` | Callback when import is confirmed |
+| `isPending`      | `boolean`                        | Whether import is in progress     |
 
 The configuration step for the "import" mode. It renders multiple sections:
 
@@ -137,23 +137,18 @@ The configuration step for the "import" mode. It renders multiple sections:
 8. **Import button** - Triggers the `importDirectory` server action with the configured options.
 
 ```tsx
-<ImportConfigureStep
-    analysisResult={analysisResult}
-    mode="import"
-    onImport={handleImport}
-    isPending={isPending}
-/>
+<ImportConfigureStep analysisResult={analysisResult} mode="import" onImport={handleImport} isPending={isPending} />
 ```
 
 ### SlugConflictWarning
 
 **File:** `apps/web/src/components/directories/import/SlugConflictWarning.tsx`
 
-| Prop | Type | Description |
-|------|------|-------------|
-| `conflicts` | `string[]` | List of conflicting repository names/slugs |
-| `suggestedSlug` | `string` | Automatically generated alternative slug |
-| `onUseSuggested` | `() => void` | Callback to apply the suggested slug |
+| Prop             | Type         | Description                                |
+| ---------------- | ------------ | ------------------------------------------ |
+| `conflicts`      | `string[]`   | List of conflicting repository names/slugs |
+| `suggestedSlug`  | `string`     | Automatically generated alternative slug   |
+| `onUseSuggested` | `() => void` | Callback to apply the suggested slug       |
 
 An amber-colored warning banner displayed when the desired directory slug already exists. It shows:
 
@@ -163,9 +158,9 @@ An amber-colored warning banner displayed when the desired directory slug alread
 
 ```tsx
 <SlugConflictWarning
-    conflicts={['my-directory', 'my-directory-data']}
-    suggestedSlug="my-directory-2"
-    onUseSuggested={() => setSlug('my-directory-2')}
+	conflicts={['my-directory', 'my-directory-data']}
+	suggestedSlug="my-directory-2"
+	onUseSuggested={() => setSlug('my-directory-2')}
 />
 ```
 
@@ -173,20 +168,20 @@ An amber-colored warning banner displayed when the desired directory slug alread
 
 **File:** `apps/web/src/components/directories/import/LinkExistingConfirm.tsx`
 
-| Prop | Type | Description |
-|------|------|-------------|
-| `analysisResult` | `AnalyzeResult` | Results from the analysis step |
-| `onConfirm` | `(config: LinkConfig) => void` | Callback when link is confirmed |
-| `onCancel` | `() => void` | Callback to go back |
-| `isPending` | `boolean` | Whether linking is in progress |
+| Prop             | Type                           | Description                     |
+| ---------------- | ------------------------------ | ------------------------------- |
+| `analysisResult` | `AnalyzeResult`                | Results from the analysis step  |
+| `onConfirm`      | `(config: LinkConfig) => void` | Callback when link is confirmed |
+| `onCancel`       | `() => void`                   | Callback to go back             |
+| `isPending`      | `boolean`                      | Whether linking is in progress  |
 
 A confirmation dialog for the "link existing" mode. It displays the status of each repository type:
 
-| Repository | Status Indicators |
-|------------|-------------------|
-| Data repo | Found (green check) or Missing (amber warning) |
+| Repository    | Status Indicators                              |
+| ------------- | ---------------------------------------------- |
+| Data repo     | Found (green check) or Missing (amber warning) |
 | Markdown repo | Found (green check) or Missing (amber warning) |
-| Website repo | Found (green check) or Missing (amber warning) |
+| Website repo  | Found (green check) or Missing (amber warning) |
 
 If any repositories are missing, the dialog offers two options:
 
@@ -195,10 +190,10 @@ If any repositories are missing, the dialog offers two options:
 
 ```tsx
 <LinkExistingConfirm
-    analysisResult={analysisResult}
-    onConfirm={handleLink}
-    onCancel={() => setStep(2)}
-    isPending={isPending}
+	analysisResult={analysisResult}
+	onConfirm={handleLink}
+	onCancel={() => setStep(2)}
+	isPending={isPending}
 />
 ```
 
@@ -215,17 +210,17 @@ The analysis result contains:
 
 ```typescript
 interface AnalyzeResult {
-    type: string;           // e.g., 'awesome_readme', 'json_list', 'csv'
-    name: string;           // Suggested directory name
-    slug: string;           // Generated slug
-    itemCount: number;      // Detected number of items
-    repoUrl: string;        // Source repository URL
-    hasExistingStructure: boolean;  // Whether link_existing is available
-    repos: {
-        data: RepoStatus;
-        markdown: RepoStatus;
-        website: RepoStatus;
-    };
+	type: string; // e.g., 'awesome_readme', 'json_list', 'csv'
+	name: string; // Suggested directory name
+	slug: string; // Generated slug
+	itemCount: number; // Detected number of items
+	repoUrl: string; // Source repository URL
+	hasExistingStructure: boolean; // Whether link_existing is available
+	repos: {
+		data: RepoStatus;
+		markdown: RepoStatus;
+		website: RepoStatus;
+	};
 }
 ```
 
@@ -242,16 +237,16 @@ Directory slugs are auto-generated from the directory name using a kebab-case tr
 
 ## Styling & Theming
 
-| Element | Classes |
-|---------|---------|
-| Step container | `space-y-6` with card-like sections |
+| Element             | Classes                                                                   |
+| ------------------- | ------------------------------------------------------------------------- |
+| Step container      | `space-y-6` with card-like sections                                       |
 | Source method cards | `border border-border rounded-lg p-6 cursor-pointer hover:border-primary` |
-| Active source card | `border-primary bg-primary/5` |
-| Mode option cards | `border-2 rounded-xl p-6` with hover and selection states |
-| Selected mode | `border-primary bg-primary/5` |
-| Warning banner | `bg-warning/10 border border-warning/20 rounded-lg p-3` with amber text |
-| Status indicators | Green check (`text-success`) or amber warning (`text-warning`) |
-| Section dividers | `border-t border-border dark:border-border-dark` |
+| Active source card  | `border-primary bg-primary/5`                                             |
+| Mode option cards   | `border-2 rounded-xl p-6` with hover and selection states                 |
+| Selected mode       | `border-primary bg-primary/5`                                             |
+| Warning banner      | `bg-warning/10 border border-warning/20 rounded-lg p-3` with amber text   |
+| Status indicators   | Green check (`text-success`) or amber warning (`text-warning`)            |
+| Section dividers    | `border-t border-border dark:border-border-dark`                          |
 
 The import flow uses generous spacing (`space-y-6`, `gap-6`) for readability and clear visual separation between configuration sections.
 
@@ -264,58 +259,58 @@ The import flow uses generous spacing (`space-y-6`, `gap-6`) for readability and
 
 import { useState, useTransition } from 'react';
 import {
-    ImportSourceStep,
-    ImportModeSelector,
-    ImportConfigureStep,
-    LinkExistingConfirm,
+	ImportSourceStep,
+	ImportModeSelector,
+	ImportConfigureStep,
+	LinkExistingConfirm
 } from '@/components/directories/import';
 import type { ImportMode } from '@/components/directories/import';
 
 export function ImportPage({ connections }) {
-    const [step, setStep] = useState(1);
-    const [analysisResult, setAnalysisResult] = useState(null);
-    const [importMode, setImportMode] = useState<ImportMode>('import');
-    const [isPending, startTransition] = useTransition();
+	const [step, setStep] = useState(1);
+	const [analysisResult, setAnalysisResult] = useState(null);
+	const [importMode, setImportMode] = useState<ImportMode>('import');
+	const [isPending, startTransition] = useTransition();
 
-    return (
-        <div className="max-w-3xl mx-auto">
-            {step === 1 && (
-                <ImportSourceStep
-                    onAnalyze={(result) => {
-                        setAnalysisResult(result);
-                        setStep(result.hasExistingStructure ? 2 : 3);
-                    }}
-                    connections={connections}
-                    isAnalyzing={isPending}
-                />
-            )}
-            {step === 2 && (
-                <ImportModeSelector
-                    onSelect={(mode) => {
-                        setImportMode(mode);
-                        setStep(3);
-                    }}
-                    analysisResult={analysisResult}
-                />
-            )}
-            {step === 3 && importMode === 'import' && (
-                <ImportConfigureStep
-                    analysisResult={analysisResult}
-                    mode={importMode}
-                    onImport={handleImport}
-                    isPending={isPending}
-                />
-            )}
-            {step === 3 && importMode === 'link_existing' && (
-                <LinkExistingConfirm
-                    analysisResult={analysisResult}
-                    onConfirm={handleLink}
-                    onCancel={() => setStep(2)}
-                    isPending={isPending}
-                />
-            )}
-        </div>
-    );
+	return (
+		<div className="max-w-3xl mx-auto">
+			{step === 1 && (
+				<ImportSourceStep
+					onAnalyze={(result) => {
+						setAnalysisResult(result);
+						setStep(result.hasExistingStructure ? 2 : 3);
+					}}
+					connections={connections}
+					isAnalyzing={isPending}
+				/>
+			)}
+			{step === 2 && (
+				<ImportModeSelector
+					onSelect={(mode) => {
+						setImportMode(mode);
+						setStep(3);
+					}}
+					analysisResult={analysisResult}
+				/>
+			)}
+			{step === 3 && importMode === 'import' && (
+				<ImportConfigureStep
+					analysisResult={analysisResult}
+					mode={importMode}
+					onImport={handleImport}
+					isPending={isPending}
+				/>
+			)}
+			{step === 3 && importMode === 'link_existing' && (
+				<LinkExistingConfirm
+					analysisResult={analysisResult}
+					onConfirm={handleLink}
+					onCancel={() => setStep(2)}
+					isPending={isPending}
+				/>
+			)}
+		</div>
+	);
 }
 ```
 

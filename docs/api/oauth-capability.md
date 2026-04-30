@@ -24,10 +24,10 @@ OAuthModule
 
 ```typescript
 @Module({
-    imports: [FacadesModule, DatabaseModule],
-    controllers: [OAuthController],
-    providers: [OAuthService],
-    exports: [OAuthService],
+	imports: [FacadesModule, DatabaseModule],
+	controllers: [OAuthController],
+	providers: [OAuthService],
+	exports: [OAuthService]
 })
 export class OAuthModule {}
 ```
@@ -77,10 +77,8 @@ Returns all available OAuth providers and configuration status.
 
 ```json
 {
-    "configured": true,
-    "providers": [
-        { "id": "github", "name": "GitHub", "enabled": true }
-    ]
+	"configured": true,
+	"providers": [{ "id": "github", "name": "GitHub", "enabled": true }]
 }
 ```
 
@@ -97,13 +95,13 @@ Checks if the current user has a valid OAuth connection.
 
 ```json
 {
-    "id": "github",
-    "name": "GitHub",
-    "enabled": true,
-    "connected": true,
-    "username": "octocat",
-    "email": "octocat@example.com",
-    "avatarUrl": "https://avatars.githubusercontent.com/..."
+	"id": "github",
+	"name": "GitHub",
+	"enabled": true,
+	"connected": true,
+	"username": "octocat",
+	"email": "octocat@example.com",
+	"avatarUrl": "https://avatars.githubusercontent.com/..."
 }
 ```
 
@@ -118,18 +116,18 @@ Generates the OAuth authorization URL for the specified provider.
 
 **Query Parameters:**
 
-| Parameter | Type | Required | Description |
-|---|---|---|---|
-| `callbackUrl` | `string` | No | Custom redirect URI after authorization |
-| `state` | `string` | No | Custom state parameter (auto-generated if omitted) |
-| `forceConsent` | `string` | No | Set to `"true"` to force re-authorization |
+| Parameter      | Type     | Required | Description                                        |
+| -------------- | -------- | -------- | -------------------------------------------------- |
+| `callbackUrl`  | `string` | No       | Custom redirect URI after authorization            |
+| `state`        | `string` | No       | Custom state parameter (auto-generated if omitted) |
+| `forceConsent` | `string` | No       | Set to `"true"` to force re-authorization          |
 
 **Response:**
 
 ```json
 {
-    "url": "https://github.com/login/oauth/authorize?client_id=...&state=abc123&scope=repo,user",
-    "state": "abc123def456..."
+	"url": "https://github.com/login/oauth/authorize?client_id=...&state=abc123&scope=repo,user",
+	"state": "abc123def456..."
 }
 ```
 
@@ -144,22 +142,22 @@ Processes the OAuth callback after user authorization.
 
 **Query Parameters:**
 
-| Parameter | Type | Required | Description |
-|---|---|---|---|
-| `code` | `string` | Yes | Authorization code from provider |
-| `state` | `string` | No | State parameter for CSRF verification |
+| Parameter | Type     | Required | Description                           |
+| --------- | -------- | -------- | ------------------------------------- |
+| `code`    | `string` | Yes      | Authorization code from provider      |
+| `state`   | `string` | No       | State parameter for CSRF verification |
 
 **Response:**
 
 ```json
 {
-    "id": "github",
-    "name": "GitHub",
-    "enabled": true,
-    "connected": true,
-    "username": "octocat",
-    "email": "octocat@example.com",
-    "avatarUrl": "https://avatars.githubusercontent.com/..."
+	"id": "github",
+	"name": "GitHub",
+	"enabled": true,
+	"connected": true,
+	"username": "octocat",
+	"email": "octocat@example.com",
+	"avatarUrl": "https://avatars.githubusercontent.com/..."
 }
 ```
 
@@ -220,20 +218,20 @@ When handling the callback, the service:
 
 ```typescript
 await this.oauthTokenRepository.upsert({
-    userId,
-    provider: providerId,
-    accessToken: token.accessToken,
-    refreshToken: token.refreshToken,
-    tokenType: token.tokenType,
-    scope: token.scope,
-    expiresAt,                          // Computed from token.expiresIn
-    email: user.email || null,
-    username: user.username,
-    metadata: {
-        oauthUserId: user.id,
-        name: user.name,
-        avatarUrl: user.avatarUrl,
-    },
+	userId,
+	provider: providerId,
+	accessToken: token.accessToken,
+	refreshToken: token.refreshToken,
+	tokenType: token.tokenType,
+	scope: token.scope,
+	expiresAt, // Computed from token.expiresIn
+	email: user.email || null,
+	username: user.username,
+	metadata: {
+		oauthUserId: user.id,
+		name: user.name,
+		avatarUrl: user.avatarUrl
+	}
 });
 ```
 
@@ -262,47 +260,47 @@ This means OAuth credentials are configured as plugin settings, not hardcoded.
 
 ```typescript
 interface OAuthConnectionInfo extends OAuthProviderInfo {
-    connected: boolean;
-    username?: string;
-    email?: string;
-    avatarUrl?: string;
+	connected: boolean;
+	username?: string;
+	email?: string;
+	avatarUrl?: string;
 }
 ```
 
 ## Error Handling
 
-| Scenario | Exception | Message |
-|---|---|---|
-| Missing authorization code | `BadRequestException` | "Authorization code is required" |
-| Invalid state parameter | `BadRequestException` | "Invalid state parameter" |
-| Missing OAuth credentials | `BadRequestException` | "OAuth credentials not configured for provider: `{id}`" |
-| No valid token | `BadRequestException` | "No valid token for provider `{id}`" |
-| Provider not found | Graceful return | `{ connected: false }` |
+| Scenario                   | Exception             | Message                                                 |
+| -------------------------- | --------------------- | ------------------------------------------------------- |
+| Missing authorization code | `BadRequestException` | "Authorization code is required"                        |
+| Invalid state parameter    | `BadRequestException` | "Invalid state parameter"                               |
+| Missing OAuth credentials  | `BadRequestException` | "OAuth credentials not configured for provider: `{id}`" |
+| No valid token             | `BadRequestException` | "No valid token for provider `{id}`"                    |
+| Provider not found         | Graceful return       | `{ connected: false }`                                  |
 
 ## Configuration
 
 OAuth providers require these plugin settings:
 
-| Setting | Description |
-|---|---|
-| `clientId` | OAuth application client ID |
-| `clientSecret` | OAuth application client secret |
-| `scopes` | Requested permission scopes (array) |
+| Setting        | Description                         |
+| -------------- | ----------------------------------- |
+| `clientId`     | OAuth application client ID         |
+| `clientSecret` | OAuth application client secret     |
+| `scopes`       | Requested permission scopes (array) |
 
 These are configured per-provider through the plugin settings system, typically via environment variables prefixed with `PLUGIN_`.
 
 ## Supported Providers
 
-| Plugin ID | Provider | Scopes |
-|---|---|---|
-| `github` | GitHub | `repo`, `user`, configurable |
+| Plugin ID | Provider | Scopes                       |
+| --------- | -------- | ---------------------------- |
+| `github`  | GitHub   | `repo`, `user`, configurable |
 
 Additional OAuth providers can be added by implementing the `IOAuthPlugin` interface from `@ever-works/plugin`.
 
 ## Source Files
 
-| File | Purpose |
-|---|---|
-| `apps/api/src/plugins-capabilities/oauth/oauth.module.ts` | Module definition |
-| `apps/api/src/plugins-capabilities/oauth/oauth.controller.ts` | REST API endpoints |
-| `apps/api/src/plugins-capabilities/oauth/oauth.service.ts` | OAuth flow orchestration |
+| File                                                          | Purpose                  |
+| ------------------------------------------------------------- | ------------------------ |
+| `apps/api/src/plugins-capabilities/oauth/oauth.module.ts`     | Module definition        |
+| `apps/api/src/plugins-capabilities/oauth/oauth.controller.ts` | REST API endpoints       |
+| `apps/api/src/plugins-capabilities/oauth/oauth.service.ts`    | OAuth flow orchestration |

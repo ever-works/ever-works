@@ -20,13 +20,13 @@ The platform uses JSON Web Tokens (JWT) for API authentication. The implementati
 ```typescript
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy) {
-    constructor() {
-        super({
-            jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
-            ignoreExpiration: false,
-            secretOrKey: jwtConstants.secret,
-        });
-    }
+	constructor() {
+		super({
+			jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
+			ignoreExpiration: false,
+			secretOrKey: jwtConstants.secret
+		});
+	}
 }
 ```
 
@@ -39,16 +39,16 @@ The `JwtAuthGuard` is applied globally and protects all routes by default:
 ```typescript
 @Injectable()
 export class JwtAuthGuard extends AuthGuard('jwt') {
-    canActivate(context: ExecutionContext) {
-        const isPublic = this.reflector.getAllAndOverride<boolean>(
-            IS_PUBLIC_KEY,
-            [context.getHandler(), context.getClass()],
-        );
-        if (isPublic) {
-            return true;
-        }
-        return super.canActivate(context);
-    }
+	canActivate(context: ExecutionContext) {
+		const isPublic = this.reflector.getAllAndOverride<boolean>(IS_PUBLIC_KEY, [
+			context.getHandler(),
+			context.getClass()
+		]);
+		if (isPublic) {
+			return true;
+		}
+		return super.canActivate(context);
+	}
 }
 ```
 
@@ -81,16 +81,17 @@ healthCheck() { return { status: 'ok' }; }
 
 The `RefreshToken` entity supports secure token rotation:
 
-| Field | Purpose |
-|---|---|
-| `token` | Unique token string (indexed) |
-| `family` | Groups tokens for rotation detection |
-| `revoked` | Whether the token has been revoked |
-| `revokedReason` | Why the token was revoked |
-| `userAgent`, `ipAddress` | Device fingerprinting |
-| `expiresAt` | Token expiration (indexed) |
+| Field                    | Purpose                              |
+| ------------------------ | ------------------------------------ |
+| `token`                  | Unique token string (indexed)        |
+| `family`                 | Groups tokens for rotation detection |
+| `revoked`                | Whether the token has been revoked   |
+| `revokedReason`          | Why the token was revoked            |
+| `userAgent`, `ipAddress` | Device fingerprinting                |
+| `expiresAt`              | Token expiration (indexed)           |
 
 **Token rotation flow**:
+
 1. Client sends a refresh token.
 2. Server validates the token, checks it is not revoked, and verifies expiry.
 3. The old token is revoked.
@@ -129,9 +130,9 @@ The password reset flow:
 
 ### Supported Providers
 
-| Provider | Environment Variables |
-|---|---|
-| **GitHub** | `GH_CLIENT_ID`, `GH_CLIENT_SECRET`, `GH_CALLBACK_URL` |
+| Provider   | Environment Variables                                             |
+| ---------- | ----------------------------------------------------------------- |
+| **GitHub** | `GH_CLIENT_ID`, `GH_CLIENT_SECRET`, `GH_CALLBACK_URL`             |
 | **Google** | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_CALLBACK_URL` |
 
 ### OAuth Flow
@@ -148,11 +149,11 @@ The password reset flow:
 ```typescript
 @Entity({ name: 'oauth_tokens' })
 export class OAuthToken {
-    provider: string;        // 'github', 'google'
-    accessToken: string;     // Provider access token
-    refreshToken: string;    // Provider refresh token
-    scope: string;           // Granted scopes
-    metadata: Record<string, any>;  // Provider-specific data
+	provider: string; // 'github', 'google'
+	accessToken: string; // Provider access token
+	refreshToken: string; // Provider refresh token
+	scope: string; // Granted scopes
+	metadata: Record<string, any>; // Provider-specific data
 }
 ```
 
@@ -164,19 +165,19 @@ The API uses `@nestjs/throttler` with three concurrent tiers:
 
 ```typescript
 export const throttlerConfig: ThrottlerModuleOptions = {
-    throttlers: [
-        { name: 'short',  ttl: 1000,  limit: 50 },
-        { name: 'medium', ttl: 10000, limit: 300 },
-        { name: 'long',   ttl: 60000, limit: 1000 },
-    ],
+	throttlers: [
+		{ name: 'short', ttl: 1000, limit: 50 },
+		{ name: 'medium', ttl: 10000, limit: 300 },
+		{ name: 'long', ttl: 60000, limit: 1000 }
+	]
 };
 ```
 
-| Tier | Window | Limit | Purpose |
-|---|---|---|---|
-| **short** | 1 second | 50 | Burst protection |
-| **medium** | 10 seconds | 300 | Sustained load |
-| **long** | 1 minute | 1000 | Per-minute ceiling |
+| Tier       | Window     | Limit | Purpose            |
+| ---------- | ---------- | ----- | ------------------ |
+| **short**  | 1 second   | 50    | Burst protection   |
+| **medium** | 10 seconds | 300   | Sustained load     |
+| **long**   | 1 minute   | 1000  | Per-minute ceiling |
 
 All tiers are evaluated simultaneously. A request is rejected if it exceeds any tier's limit.
 
@@ -196,12 +197,12 @@ In production, only the web application and API domains are allowed. Development
 
 The `DirectoryMemberRole` enum defines four access levels:
 
-| Role | Level | Capabilities |
-|---|---|---|
-| **OWNER** | 4 | Full access (implicit for directory creator) |
-| **MANAGER** | 3 | Edit content, manage members |
-| **EDITOR** | 2 | Edit content |
-| **VIEWER** | 1 | Read-only |
+| Role        | Level | Capabilities                                 |
+| ----------- | ----- | -------------------------------------------- |
+| **OWNER**   | 4     | Full access (implicit for directory creator) |
+| **MANAGER** | 3     | Edit content, manage members                 |
+| **EDITOR**  | 2     | Edit content                                 |
+| **VIEWER**  | 1     | Read-only                                    |
 
 The OWNER role is never directly assigned to a member. It is inferred from `directory.userId`. Only MANAGER, EDITOR, and VIEWER can be assigned to members.
 
@@ -239,14 +240,14 @@ All `/auth` endpoints are excluded from Sentry error and performance tracking to
 
 ### Production Environment Variables
 
-| Variable | Purpose |
-|---|---|
-| `JWT_SECRET` | Signing key for JWT tokens |
-| `JWT_EXPIRATION_TIME` | Token lifetime (e.g., `3600s`) |
-| `AUTH_SECRET` | General auth secret (used by Next.js Auth) |
-| `ALLOWED_ORIGINS` | CORS whitelist |
-| `DATABASE_SSL_MODE` | Require TLS for database connections |
-| `DATABASE_CA_CERT` | Certificate authority for database TLS |
+| Variable              | Purpose                                    |
+| --------------------- | ------------------------------------------ |
+| `JWT_SECRET`          | Signing key for JWT tokens                 |
+| `JWT_EXPIRATION_TIME` | Token lifetime (e.g., `3600s`)             |
+| `AUTH_SECRET`         | General auth secret (used by Next.js Auth) |
+| `ALLOWED_ORIGINS`     | CORS whitelist                             |
+| `DATABASE_SSL_MODE`   | Require TLS for database connections       |
+| `DATABASE_CA_CERT`    | Certificate authority for database TLS     |
 
 ### Docker Security
 
@@ -263,11 +264,11 @@ All sensitive configuration is stored as Kubernetes secrets and injected via env
 
 The `User` entity includes status tracking:
 
-| Field | Purpose |
-|---|---|
-| `isActive` | Soft-disable user accounts (default `true`) |
-| `emailVerified` | Email confirmation status |
-| `lastLoginAt` | Last successful login timestamp |
-| `lastLoginIp` | IP address of last login |
+| Field           | Purpose                                     |
+| --------------- | ------------------------------------------- |
+| `isActive`      | Soft-disable user accounts (default `true`) |
+| `emailVerified` | Email confirmation status                   |
+| `lastLoginAt`   | Last successful login timestamp             |
+| `lastLoginIp`   | IP address of last login                    |
 
 The `AuthService.ensureUserIsActive()` method checks `isActive` before allowing login, enabling administrators to disable accounts without deleting data.

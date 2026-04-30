@@ -13,11 +13,11 @@ Ever Works uses [Trigger.dev](https://trigger.dev/) for background job processin
 
 The Trigger.dev integration lives in `packages/tasks/` and consists of three layers:
 
-| Layer | Location | Purpose |
-|---|---|---|
-| **Task definitions** | `packages/tasks/src/tasks/trigger/` | Trigger.dev task configurations with handlers |
-| **Dispatcher** | `packages/tasks/src/trigger/trigger.service.ts` | NestJS service that dispatches tasks |
-| **Worker utilities** | `packages/tasks/src/trigger/worker/` | Context bootstrapping and orchestration |
+| Layer                | Location                                        | Purpose                                       |
+| -------------------- | ----------------------------------------------- | --------------------------------------------- |
+| **Task definitions** | `packages/tasks/src/tasks/trigger/`             | Trigger.dev task configurations with handlers |
+| **Dispatcher**       | `packages/tasks/src/trigger/trigger.service.ts` | NestJS service that dispatches tasks          |
+| **Worker utilities** | `packages/tasks/src/trigger/worker/`            | Context bootstrapping and orchestration       |
 
 ## TriggerService
 
@@ -25,9 +25,8 @@ The `TriggerService` is the main NestJS service that dispatches background jobs.
 
 ```typescript
 @Injectable()
-export class TriggerService
-    implements DirectoryGenerationDispatcher, DirectoryImportDispatcher {
-    // ...
+export class TriggerService implements DirectoryGenerationDispatcher, DirectoryImportDispatcher {
+	// ...
 }
 ```
 
@@ -77,6 +76,7 @@ async dispatchDirectoryGeneration(
 ```
 
 Dispatches a directory generation task with tags for filtering:
+
 - `directory-generation` (task type)
 - Generation mode (e.g., `recreate`, `append`)
 - Directory ID
@@ -92,6 +92,7 @@ async dispatchDirectoryImport(
 ```
 
 Dispatches a directory import task with tags:
+
 - `directory-import` (task type)
 - Source type (e.g., `data_repo`, `awesome_readme`)
 - Directory ID
@@ -108,11 +109,11 @@ This is the primary background task for AI-powered directory content generation.
 
 #### Lifecycle Handlers
 
-| Handler | Purpose |
-|---|---|
-| `run` | Main execution: bootstraps NestJS context, runs the generation orchestrator |
-| `onFailure` | Captures error, updates directory state, marks scheduled run as failed |
-| `onCancel` | Updates directory state to cancelled, marks scheduled run as failed |
+| Handler     | Purpose                                                                     |
+| ----------- | --------------------------------------------------------------------------- |
+| `run`       | Main execution: bootstraps NestJS context, runs the generation orchestrator |
+| `onFailure` | Captures error, updates directory state, marks scheduled run as failed      |
+| `onCancel`  | Updates directory state to cancelled, marks scheduled run as failed         |
 
 #### Run Handler
 
@@ -143,6 +144,7 @@ run: async (payload: DirectoryGenerationPayload) => {
 #### Failure Handler
 
 On failure, the handler:
+
 1. Boots a new NestJS context (the original context may be corrupted).
 2. Normalizes the error message.
 3. Updates the generation history with the error.
@@ -163,10 +165,7 @@ A cron-triggered task that checks for schedules that need to run and dispatches 
 The `withWorkerContext()` utility bootstraps a standalone NestJS application context for Trigger.dev workers:
 
 ```typescript
-async function withWorkerContext<T>(
-    name: string,
-    fn: (appContext: INestApplicationContext) => Promise<T>,
-): Promise<T>
+async function withWorkerContext<T>(name: string, fn: (appContext: INestApplicationContext) => Promise<T>): Promise<T>;
 ```
 
 This creates a full NestJS module tree with database access, facades, and services, then executes the provided function with the application context.
@@ -177,21 +176,21 @@ The `createTaskContext()` utility resolves the directory, user, and orchestrator
 
 ```typescript
 async function createTaskContext<T>(
-    appContext: INestApplicationContext,
-    payload: DirectoryGenerationPayload,
-    OrchestratorClass: Type<T>,
-): Promise<{ orchestrator: T; directory: Directory; user: User }>
+	appContext: INestApplicationContext,
+	payload: DirectoryGenerationPayload,
+	OrchestratorClass: Type<T>
+): Promise<{ orchestrator: T; directory: Directory; user: User }>;
 ```
 
 ## Environment Variables
 
-| Variable | Purpose | Default |
-|---|---|---|
-| `TRIGGER_ENABLED` | Enable Trigger.dev integration | `false` |
-| `TRIGGER_SECRET_KEY` | API secret key for authentication | - |
-| `TRIGGER_API_URL` | Trigger.dev API URL | Trigger.dev cloud |
-| `TRIGGER_MACHINE` | Machine size for task execution | Default (no preference) |
-| `TRIGGER_INTERNAL_SECRET` | Internal secret for webhook validation | - |
+| Variable                  | Purpose                                | Default                 |
+| ------------------------- | -------------------------------------- | ----------------------- |
+| `TRIGGER_ENABLED`         | Enable Trigger.dev integration         | `false`                 |
+| `TRIGGER_SECRET_KEY`      | API secret key for authentication      | -                       |
+| `TRIGGER_API_URL`         | Trigger.dev API URL                    | Trigger.dev cloud       |
+| `TRIGGER_MACHINE`         | Machine size for task execution        | Default (no preference) |
+| `TRIGGER_INTERNAL_SECRET` | Internal secret for webhook validation | -                       |
 
 ## Deployment
 

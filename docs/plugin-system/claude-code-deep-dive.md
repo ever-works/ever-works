@@ -25,14 +25,14 @@ The plugin creates a temporary workspace directory, seeds it with existing item 
 
 The Claude Code plugin defines 6 steps:
 
-| Step ID | Step Name | Est. Duration | Description |
-|---------|-----------|---------------|-------------|
-| `setup-claude-code` | Setup Claude Code | 10s | Download CLI binary, verify installation |
-| `prepare-context` | Prepare Context | 5s | Create workspace, seed existing data |
-| `generate-items` | Generate Items | 120s | Execute Claude Code CLI |
-| `collect-results` | Collect Results | 5s | Read generated JSON from workspace |
-| `capture-screenshots` | Capture Screenshots | 30s | Capture images for items |
-| `cleanup` | Cleanup | 2s | Remove temp files, finalize metrics |
+| Step ID               | Step Name           | Est. Duration | Description                              |
+| --------------------- | ------------------- | ------------- | ---------------------------------------- |
+| `setup-claude-code`   | Setup Claude Code   | 10s           | Download CLI binary, verify installation |
+| `prepare-context`     | Prepare Context     | 5s            | Create workspace, seed existing data     |
+| `generate-items`      | Generate Items      | 120s          | Execute Claude Code CLI                  |
+| `collect-results`     | Collect Results     | 5s            | Read generated JSON from workspace       |
+| `capture-screenshots` | Capture Screenshots | 30s           | Capture images for items                 |
+| `cleanup`             | Cleanup             | 2s            | Remove temp files, finalize metrics      |
 
 Step dependencies follow a linear chain: each step requires the previous one.
 
@@ -67,24 +67,24 @@ The binary is cached locally and reused across generations. Version can be overr
 
 ### Settings Schema
 
-| Field | Type | Default | Description |
-|-------|------|---------|-------------|
-| `oauthToken` | `string` | - | OAuth token for Claude Code authentication (`x-secret`, `x-scope: user`) |
-| `apiKey` | `string` | - | API key alternative for authentication (`x-secret`, `x-scope: user`) |
-| `version` | `string` | `'2.1.37'` | Claude Code CLI version to use |
-| `maxTurns` | `number` | `500` | Maximum conversation turns for the CLI |
-| `maxBudgetUsd` | `number` | - | Maximum budget in USD for the generation |
-| `model` | `string` | - | Model to use (overrides CLI default) |
+| Field          | Type     | Default    | Description                                                              |
+| -------------- | -------- | ---------- | ------------------------------------------------------------------------ |
+| `oauthToken`   | `string` | -          | OAuth token for Claude Code authentication (`x-secret`, `x-scope: user`) |
+| `apiKey`       | `string` | -          | API key alternative for authentication (`x-secret`, `x-scope: user`)     |
+| `version`      | `string` | `'2.1.37'` | Claude Code CLI version to use                                           |
+| `maxTurns`     | `number` | `500`      | Maximum conversation turns for the CLI                                   |
+| `maxBudgetUsd` | `number` | -          | Maximum budget in USD for the generation                                 |
+| `model`        | `string` | -          | Model to use (overrides CLI default)                                     |
 
 ### Constants
 
-| Constant | Value | Description |
-|----------|-------|-------------|
-| `BASE_TEMP_DIR` | `'/tmp/claude-code-generator'` | Root directory for workspaces |
-| `DEFAULT_CLI_VERSION` | `'2.1.37'` | Default CLI binary version |
-| `DEFAULT_MAX_TURNS` | `500` | Default max conversation turns |
-| `MAX_BUFFER_SIZE` | `10 * 1024 * 1024` (10 MB) | Max stdout/stderr buffer size |
-| `KILL_TIMEOUT_MS` | `5000` | Timeout for graceful CLI shutdown |
+| Constant              | Value                          | Description                       |
+| --------------------- | ------------------------------ | --------------------------------- |
+| `BASE_TEMP_DIR`       | `'/tmp/claude-code-generator'` | Root directory for workspaces     |
+| `DEFAULT_CLI_VERSION` | `'2.1.37'`                     | Default CLI binary version        |
+| `DEFAULT_MAX_TURNS`   | `500`                          | Default max conversation turns    |
+| `MAX_BUFFER_SIZE`     | `10 * 1024 * 1024` (10 MB)     | Max stdout/stderr buffer size     |
+| `KILL_TIMEOUT_MS`     | `5000`                         | Timeout for graceful CLI shutdown |
 
 ## Capabilities
 
@@ -108,31 +108,27 @@ Unlike the Standard and Agent pipelines that use the facade system for AI calls:
 ### Plugin Class
 
 ```typescript
-class ClaudeCodePlugin implements
-    IPlugin,
-    IPipelinePlugin<ClaudeCodeStepId>,
-    IFormSchemaProvider
-{
-    readonly id = 'claude-code';
-    readonly name = 'Claude Code';
-    readonly version = '1.0.0';
-    readonly category: PluginCategory = 'ai-tools';
-    readonly capabilities = ['pipeline', 'form-schema'];
-    readonly executionMode = 'engine-orchestrated';
+class ClaudeCodePlugin implements IPlugin, IPipelinePlugin<ClaudeCodeStepId>, IFormSchemaProvider {
+	readonly id = 'claude-code';
+	readonly name = 'Claude Code';
+	readonly version = '1.0.0';
+	readonly category: PluginCategory = 'ai-tools';
+	readonly capabilities = ['pipeline', 'form-schema'];
+	readonly executionMode = 'engine-orchestrated';
 
-    async executeStep(
-        stepId: ClaudeCodeStepId,
-        context: PipelineContext,
-        execContext: StepExecutionContext
-    ): Promise<PipelineContext>;
+	async executeStep(
+		stepId: ClaudeCodeStepId,
+		context: PipelineContext,
+		execContext: StepExecutionContext
+	): Promise<PipelineContext>;
 
-    getSteps(): PipelineStepDefinition<ClaudeCodeStepId>[];
-    getFormSchema(): PluginFormSchema;
+	getSteps(): PipelineStepDefinition<ClaudeCodeStepId>[];
+	getFormSchema(): PluginFormSchema;
 
-    async onLoad(context: PluginContext): Promise<void>;
-    async onUnload(): Promise<void>;
-    async healthCheck(): Promise<PluginHealthCheck>;
-    getManifest(): PluginManifest;
+	async onLoad(context: PluginContext): Promise<void>;
+	async onUnload(): Promise<void>;
+	async healthCheck(): Promise<PluginHealthCheck>;
+	getManifest(): PluginManifest;
 }
 ```
 
@@ -140,12 +136,12 @@ class ClaudeCodePlugin implements
 
 ```typescript
 type ClaudeCodeStepId =
-    | 'setup-claude-code'
-    | 'prepare-context'
-    | 'generate-items'
-    | 'collect-results'
-    | 'capture-screenshots'
-    | 'cleanup';
+	| 'setup-claude-code'
+	| 'prepare-context'
+	| 'generate-items'
+	| 'collect-results'
+	| 'capture-screenshots'
+	| 'cleanup';
 ```
 
 ## Implementation Details
@@ -158,12 +154,12 @@ The system prompt is built with these sections:
 2. **Workspace Structure** - Describes the `_meta/` directory and file conventions
 3. **Item JSON Schema** - Full schema for item files with all required and optional fields
 4. **Rules** (6 rules):
-   - Always write items as individual JSON files in the workspace
-   - Update `taxonomy.json` after each batch of items
-   - Never invent items without verifiable sources
-   - Respect the target item count
-   - Use the provided schema for validation
-   - Handle errors gracefully
+    - Always write items as individual JSON files in the workspace
+    - Update `taxonomy.json` after each batch of items
+    - Never invent items without verifiable sources
+    - Respect the target item count
+    - Use the provided schema for validation
+    - Handle errors gracefully
 5. **Category & Tag Rules** - Naming and assignment constraints
 6. **Markdown Rules** - Formatting requirements for item descriptions
 7. **Dedup Instructions** - How to avoid duplicating existing items
@@ -215,18 +211,18 @@ After CLI execution, the `collect-results` step:
 
 ```typescript
 const request = {
-    prompt: "Create a directory of Kubernetes tools and operators",
-    config: {
-        target_items: 40,
-        capture_screenshots: true
-    }
+	prompt: 'Create a directory of Kubernetes tools and operators',
+	config: {
+		target_items: 40,
+		capture_screenshots: true
+	}
 };
 
 // Plugin settings (configured per-user)
 const settings = {
-    oauthToken: 'user-oauth-token',  // or apiKey
-    maxTurns: 500,
-    maxBudgetUsd: 5.00
+	oauthToken: 'user-oauth-token', // or apiKey
+	maxTurns: 500,
+	maxBudgetUsd: 5.0
 };
 ```
 
@@ -234,10 +230,10 @@ const settings = {
 
 ```typescript
 const settings = {
-    apiKey: 'sk-ant-...',
-    model: 'claude-sonnet-4-20250514',
-    maxTurns: 300,
-    maxBudgetUsd: 3.00
+	apiKey: 'sk-ant-...',
+	model: 'claude-sonnet-4-20250514',
+	maxTurns: 300,
+	maxBudgetUsd: 3.0
 };
 ```
 
@@ -245,32 +241,34 @@ const settings = {
 
 ### CLI Process Errors
 
-| Error | Handling |
-|-------|----------|
-| Binary download failure | Step fails with descriptive error, suggests checking network |
-| CLI spawn failure | Logs error, reports to user, cleanup runs |
-| CLI timeout | Process killed after `KILL_TIMEOUT_MS`, partial results collected |
-| Buffer overflow | Process killed when stdout exceeds `MAX_BUFFER_SIZE` |
-| Non-zero exit code | Logs stderr, attempts to collect partial results |
+| Error                   | Handling                                                          |
+| ----------------------- | ----------------------------------------------------------------- |
+| Binary download failure | Step fails with descriptive error, suggests checking network      |
+| CLI spawn failure       | Logs error, reports to user, cleanup runs                         |
+| CLI timeout             | Process killed after `KILL_TIMEOUT_MS`, partial results collected |
+| Buffer overflow         | Process killed when stdout exceeds `MAX_BUFFER_SIZE`              |
+| Non-zero exit code      | Logs stderr, attempts to collect partial results                  |
 
 ### Workspace Errors
 
-| Error | Handling |
-|-------|----------|
-| Directory creation failure | Step fails with filesystem error |
-| File read failure | Individual items skipped, valid items collected |
-| Invalid JSON in item files | Item skipped with warning, others processed |
-| Missing taxonomy.json | Falls back to items-only collection without categories |
+| Error                      | Handling                                               |
+| -------------------------- | ------------------------------------------------------ |
+| Directory creation failure | Step fails with filesystem error                       |
+| File read failure          | Individual items skipped, valid items collected        |
+| Invalid JSON in item files | Item skipped with warning, others processed            |
+| Missing taxonomy.json      | Falls back to items-only collection without categories |
 
 ### Authentication Errors
 
 The plugin requires either `oauthToken` or `apiKey`. If neither is configured:
+
 - `healthCheck()` returns unhealthy status
 - `setup-claude-code` step fails with a clear message directing user to configure credentials
 
 ### Cleanup
 
 The `cleanup` step always runs, even after failures:
+
 - Removes the temporary workspace directory
 - Kills any lingering CLI processes
 - Finalizes and reports metrics

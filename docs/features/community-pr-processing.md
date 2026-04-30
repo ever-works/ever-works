@@ -36,10 +36,10 @@ Processing runs **automatically every hour** for all directories that have the f
 
 Community PR Processing is configured per-directory through the Settings page or the `PUT /api/directories/:id` endpoint.
 
-| Setting | Type | Default | Description |
-|---------|------|---------|-------------|
-| `communityPrEnabled` | boolean | `false` | Master switch — enables automatic PR processing |
-| `communityPrAutoClose` | boolean | `true` | Automatically close PRs after items are extracted |
+| Setting                | Type    | Default | Description                                       |
+| ---------------------- | ------- | ------- | ------------------------------------------------- |
+| `communityPrEnabled`   | boolean | `false` | Master switch — enables automatic PR processing   |
+| `communityPrAutoClose` | boolean | `true`  | Automatically close PRs after items are extracted |
 
 ## API
 
@@ -47,30 +47,30 @@ Community PR Processing is configured per-directory through the Settings page or
 
 Process all unhandled community PRs for a directory on demand.
 
-| Method | Endpoint | Auth |
-|--------|----------|------|
-| `POST` | `/api/directories/:id/process-community-prs` | JWT |
+| Method | Endpoint                                     | Auth |
+| ------ | -------------------------------------------- | ---- |
+| `POST` | `/api/directories/:id/process-community-prs` | JWT  |
 
 **Path parameters:**
 
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| `id` | string | Directory UUID |
+| Parameter | Type   | Description    |
+| --------- | ------ | -------------- |
+| `id`      | string | Directory UUID |
 
 **Response** (`200 OK`):
 
 ```json
 {
-  "itemsAdded": 3
+	"itemsAdded": 3
 }
 ```
 
 **Errors:**
 
-| Status | Reason |
-|--------|--------|
-| `400` | Community PR processing is not enabled for this directory |
-| `404` | Directory not found |
+| Status | Reason                                                    |
+| ------ | --------------------------------------------------------- |
+| `400`  | Community PR processing is not enabled for this directory |
+| `404`  | Directory not found                                       |
 
 **Example:**
 

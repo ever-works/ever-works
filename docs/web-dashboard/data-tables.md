@@ -1,7 +1,7 @@
 ---
 id: data-tables
-title: "Data Tables and Lists"
-sidebar_label: "Data Tables"
+title: 'Data Tables and Lists'
+sidebar_label: 'Data Tables'
 sidebar_position: 15
 ---
 
@@ -11,13 +11,13 @@ The Ever Works dashboard uses several patterns for displaying collections of dat
 
 ## Component Overview
 
-| Component | Pattern | Virtualized | Source |
-|---|---|---|---|
-| `ItemsList` | Card grid / list with search and filters | Yes | `components/directories/detail/items/ItemsList.tsx` |
-| `HistoryTable` | HTML table with status badges | No | `components/directories/detail/history/HistoryTable.tsx` |
-| `PluginGrid` | Card grid with category grouping | No | `components/plugins/PluginGrid.tsx` |
-| `DirectoryPluginsList` | Card list with capability selectors | No | `components/directories/detail/plugins/DirectoryPluginsList.tsx` |
-| `MembersList` | Divided list with role badges | No | `components/directories/detail/members/MembersList.tsx` |
+| Component              | Pattern                                  | Virtualized | Source                                                           |
+| ---------------------- | ---------------------------------------- | ----------- | ---------------------------------------------------------------- |
+| `ItemsList`            | Card grid / list with search and filters | Yes         | `components/directories/detail/items/ItemsList.tsx`              |
+| `HistoryTable`         | HTML table with status badges            | No          | `components/directories/detail/history/HistoryTable.tsx`         |
+| `PluginGrid`           | Card grid with category grouping         | No          | `components/plugins/PluginGrid.tsx`                              |
+| `DirectoryPluginsList` | Card list with capability selectors      | No          | `components/directories/detail/plugins/DirectoryPluginsList.tsx` |
+| `MembersList`          | Divided list with role badges            | No          | `components/directories/detail/members/MembersList.tsx`          |
 
 ## ItemsList -- Virtualized Item Grid
 
@@ -40,8 +40,8 @@ graph TD
 
 ```typescript
 interface ItemsListProps {
-    items: ItemData[];
-    addItemRef?: React.RefObject<((item: ItemData) => void) | null>;
+	items: ItemData[];
+	addItemRef?: React.RefObject<((item: ItemData) => void) | null>;
 }
 ```
 
@@ -49,27 +49,27 @@ The `addItemRef` allows parent components to imperatively add new items to the l
 
 ### Features
 
-| Feature | Description |
-|---|---|
-| **Text search** | Filters items by name and description |
-| **Category filter** | Dropdown to filter by category |
-| **View toggle** | Switch between grid and list views |
-| **Virtualization** | Only renders visible rows plus 5 overscan rows |
-| **Responsive columns** | 1 column on mobile, 2 on tablet, 3 on desktop |
-| **Memoized cards** | `React.memo` wrapper prevents unnecessary re-renders |
-| **Sort order** | Featured items first, then by `order` field, then alphabetical |
-| **Duplicate prevention** | New items are checked by slug to prevent duplicates |
+| Feature                  | Description                                                    |
+| ------------------------ | -------------------------------------------------------------- |
+| **Text search**          | Filters items by name and description                          |
+| **Category filter**      | Dropdown to filter by category                                 |
+| **View toggle**          | Switch between grid and list views                             |
+| **Virtualization**       | Only renders visible rows plus 5 overscan rows                 |
+| **Responsive columns**   | 1 column on mobile, 2 on tablet, 3 on desktop                  |
+| **Memoized cards**       | `React.memo` wrapper prevents unnecessary re-renders           |
+| **Sort order**           | Featured items first, then by `order` field, then alphabetical |
+| **Duplicate prevention** | New items are checked by slug to prevent duplicates            |
 
 ### Responsive Column Layout
 
 The `useColumnCount` hook adjusts the grid column count based on viewport width:
 
-| Viewport Width | View Mode | Columns |
-|---|---|---|
-| < 640px | Grid | 1 |
-| 640px -- 1023px | Grid | 2 |
-| >= 1024px | Grid | 3 |
-| Any | List | 1 |
+| Viewport Width  | View Mode | Columns |
+| --------------- | --------- | ------- |
+| < 640px         | Grid      | 1       |
+| 640px -- 1023px | Grid      | 2       |
+| >= 1024px       | Grid      | 3       |
+| Any             | List      | 1       |
 
 ### Virtualization Details
 
@@ -77,21 +77,22 @@ The virtualizer is configured with these parameters:
 
 ```typescript
 const rowVirtualizer = useVirtualizer({
-    count: rows.length,
-    getScrollElement: () => scrollContainerRef.current,
-    estimateSize: () => viewMode === 'list'
-        ? LIST_ITEM_HEIGHT + GAP   // 80 + 16 = 96px
-        : GRID_ROW_HEIGHT + GAP,   // 200 + 16 = 216px
-    overscan: 5,
-    scrollMargin,
+	count: rows.length,
+	getScrollElement: () => scrollContainerRef.current,
+	estimateSize: () =>
+		viewMode === 'list'
+			? LIST_ITEM_HEIGHT + GAP // 80 + 16 = 96px
+			: GRID_ROW_HEIGHT + GAP, // 200 + 16 = 216px
+	overscan: 5,
+	scrollMargin
 });
 ```
 
-| Parameter | Value | Description |
-|---|---|---|
-| `estimateSize` | 96px (list) / 216px (grid) | Estimated row height |
-| `overscan` | 5 | Extra rows rendered above and below the viewport |
-| `scrollMargin` | Calculated | Offset from the scroll container to the list component |
+| Parameter      | Value                      | Description                                            |
+| -------------- | -------------------------- | ------------------------------------------------------ |
+| `estimateSize` | 96px (list) / 216px (grid) | Estimated row height                                   |
+| `overscan`     | 5                          | Extra rows rendered above and below the viewport       |
+| `scrollMargin` | Calculated                 | Offset from the scroll container to the list component |
 
 Items are grouped into rows based on the column count. In grid mode with 3 columns, every 3 items form one virtual row.
 
@@ -105,13 +106,13 @@ Items are sorted in this priority order:
 
 ```typescript
 function sortItems(items: ItemData[]): ItemData[] {
-    return [...items].sort((a, b) => {
-        if (!!a.featured !== !!b.featured) return a.featured ? -1 : 1;
-        const orderA = typeof a.order === 'number' ? a.order : Infinity;
-        const orderB = typeof b.order === 'number' ? b.order : Infinity;
-        if (orderA !== orderB) return orderA - orderB;
-        return a.name.localeCompare(b.name);
-    });
+	return [...items].sort((a, b) => {
+		if (!!a.featured !== !!b.featured) return a.featured ? -1 : 1;
+		const orderA = typeof a.order === 'number' ? a.order : Infinity;
+		const orderB = typeof b.order === 'number' ? b.order : Infinity;
+		if (orderA !== orderB) return orderA - orderB;
+		return a.name.localeCompare(b.name);
+	});
 }
 ```
 
@@ -123,24 +124,24 @@ The `HistoryTable` displays directory generation run history as an HTML table wi
 
 ### Columns
 
-| Column | Field | Description |
-|---|---|---|
-| Run | `status` | Status badge with color coding |
-| Started At | `startedAt` / `createdAt` | Timestamp rendered by `ShowDateTime` |
-| Duration | `durationInSeconds` | Formatted as `Xh Ym`, `Xm Ys`, or `Xs` |
-| New Items | `newItemsCount` | Items created in this run |
-| Updated Items | `updatedItemsCount` | Items updated in this run |
-| Total Items | `totalItemsCount` | Total items after this run |
-| Tokens | `metrics.total_tokens_used` | Formatted as `X.XK` or `X.XM` |
+| Column        | Field                       | Description                            |
+| ------------- | --------------------------- | -------------------------------------- |
+| Run           | `status`                    | Status badge with color coding         |
+| Started At    | `startedAt` / `createdAt`   | Timestamp rendered by `ShowDateTime`   |
+| Duration      | `durationInSeconds`         | Formatted as `Xh Ym`, `Xm Ys`, or `Xs` |
+| New Items     | `newItemsCount`             | Items created in this run              |
+| Updated Items | `updatedItemsCount`         | Items updated in this run              |
+| Total Items   | `totalItemsCount`           | Total items after this run             |
+| Tokens        | `metrics.total_tokens_used` | Formatted as `X.XK` or `X.XM`          |
 
 ### Status Color Coding
 
-| Status | Color | CSS Classes |
-|---|---|---|
-| `generating` | Blue | `bg-blue-100 text-blue-800` / dark variants |
-| `generated` | Green | `bg-emerald-100 text-emerald-800` / dark variants |
-| `error` | Red | `bg-red-100 text-red-800` / dark variants |
-| `cancelled` | Gray | `bg-gray-200 text-gray-800` / dark variants |
+| Status       | Color | CSS Classes                                       |
+| ------------ | ----- | ------------------------------------------------- |
+| `generating` | Blue  | `bg-blue-100 text-blue-800` / dark variants       |
+| `generated`  | Green | `bg-emerald-100 text-emerald-800` / dark variants |
+| `error`      | Red   | `bg-red-100 text-red-800` / dark variants         |
+| `cancelled`  | Gray  | `bg-gray-200 text-gray-800` / dark variants       |
 
 ### Formatting Utilities
 
@@ -148,17 +149,17 @@ The component includes three formatting functions:
 
 ```typescript
 // Duration: seconds -> human-readable
-formatDuration(3661)    // "1h 1m"
-formatDuration(125)     // "2m 5s"
-formatDuration(45)      // "45s"
+formatDuration(3661); // "1h 1m"
+formatDuration(125); // "2m 5s"
+formatDuration(45); // "45s"
 
 // Tokens: number -> abbreviated
-formatTokens(1500000)   // "1.5M"
-formatTokens(12500)     // "12.5K"
-formatTokens(500)       // "500"
+formatTokens(1500000); // "1.5M"
+formatTokens(12500); // "12.5K"
+formatTokens(500); // "500"
 
 // Cost: number -> USD
-formatCost(0.0523)      // "$0.0523"
+formatCost(0.0523); // "$0.0523"
 ```
 
 ### Trigger.dev Link
@@ -175,19 +176,19 @@ The `PluginGrid` renders plugin cards in a responsive grid layout with optional 
 
 ```typescript
 interface PluginGridProps {
-    plugins: UserPlugin[];
-    grouped: boolean;        // Group by category or flat grid
-    searchQuery: string;     // Current search (for empty state)
-    onClearSearch: () => void;
+	plugins: UserPlugin[];
+	grouped: boolean; // Group by category or flat grid
+	searchQuery: string; // Current search (for empty state)
+	onClearSearch: () => void;
 }
 ```
 
 ### Layout Modes
 
-| Mode | `grouped` | Description |
-|---|---|---|
-| Flat grid | `false` | All plugins in a single responsive grid |
-| Grouped | `true` | Plugins organized under category headings |
+| Mode      | `grouped` | Description                               |
+| --------- | --------- | ----------------------------------------- |
+| Flat grid | `false`   | All plugins in a single responsive grid   |
+| Grouped   | `true`    | Plugins organized under category headings |
 
 Both modes use the same responsive grid: `grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4`.
 
@@ -197,10 +198,13 @@ When `grouped` is `true`, plugins are organized using `groupByCategory()`:
 
 ```typescript
 function groupByCategory(plugins: UserPlugin[]): Record<string, UserPlugin[]> {
-    return plugins.reduce((acc, plugin) => {
-        (acc[plugin.category] ??= []).push(plugin);
-        return acc;
-    }, {} as Record<string, UserPlugin[]>);
+	return plugins.reduce(
+		(acc, plugin) => {
+			(acc[plugin.category] ??= []).push(plugin);
+			return acc;
+		},
+		{} as Record<string, UserPlugin[]>
+	);
 }
 ```
 
@@ -247,25 +251,25 @@ Each `MemberRow` component receives a `canManage` prop determined by `canManageM
 
 ```typescript
 interface MembersListProps {
-    directory: Directory;
-    members: DirectoryMember[];
-    owner: DirectoryOwner;
-    onMemberRemoved: (memberId: string) => void;
-    onMemberUpdated: (member: DirectoryMember) => void;
+	directory: Directory;
+	members: DirectoryMember[];
+	owner: DirectoryOwner;
+	onMemberRemoved: (memberId: string) => void;
+	onMemberUpdated: (member: DirectoryMember) => void;
 }
 ```
 
 ## Pattern Comparison
 
-| Concern | ItemsList | HistoryTable | PluginGrid | MembersList |
-|---|---|---|---|---|
-| Data volume | Hundreds to thousands | Tens | Tens | Small (< 20) |
-| Virtualization | Yes (`@tanstack/react-virtual`) | No | No | No |
-| Search/filter | Yes (text + category) | No | Via parent | No |
-| View modes | Grid + List toggle | Table only | Flat + Grouped | List only |
-| Responsive | 1/2/3 columns | Horizontal scroll | 1/2/3 columns | Single column |
-| Memoization | `React.memo` on cards | No | No | No |
-| Sorting | Featured > order > alpha | Chronological (server-side) | By category | Owner first |
+| Concern        | ItemsList                       | HistoryTable                | PluginGrid     | MembersList   |
+| -------------- | ------------------------------- | --------------------------- | -------------- | ------------- |
+| Data volume    | Hundreds to thousands           | Tens                        | Tens           | Small (< 20)  |
+| Virtualization | Yes (`@tanstack/react-virtual`) | No                          | No             | No            |
+| Search/filter  | Yes (text + category)           | No                          | Via parent     | No            |
+| View modes     | Grid + List toggle              | Table only                  | Flat + Grouped | List only     |
+| Responsive     | 1/2/3 columns                   | Horizontal scroll           | 1/2/3 columns  | Single column |
+| Memoization    | `React.memo` on cards           | No                          | No             | No            |
+| Sorting        | Featured > order > alpha        | Chronological (server-side) | By category    | Owner first   |
 
 ## When to Use Each Pattern
 

@@ -11,42 +11,42 @@ The `@ever-works/agent` package is the core business logic layer of the Ever Wor
 
 ## Package Overview
 
-| Property | Value |
-|----------|-------|
-| **Package name** | `@ever-works/agent` |
-| **Framework** | NestJS 11 with SWC compiler |
-| **Build** | `nest build -b swc` + `tsc -p tsconfig.types.json` for declarations |
-| **Test framework** | Jest (26 suites, 719+ tests) |
-| **Workspace deps** | `@ever-works/contracts`, `@ever-works/plugin` |
-| **Key libraries** | TypeORM, Zod, LangChain, Ajv, superjson, isomorphic-git |
+| Property           | Value                                                               |
+| ------------------ | ------------------------------------------------------------------- |
+| **Package name**   | `@ever-works/agent`                                                 |
+| **Framework**      | NestJS 11 with SWC compiler                                         |
+| **Build**          | `nest build -b swc` + `tsc -p tsconfig.types.json` for declarations |
+| **Test framework** | Jest (26 suites, 719+ tests)                                        |
+| **Workspace deps** | `@ever-works/contracts`, `@ever-works/plugin`                       |
+| **Key libraries**  | TypeORM, Zod, LangChain, Ajv, superjson, isomorphic-git             |
 
 ## Module Areas
 
 The agent package exposes **20 sub-module entry points** via the `exports` field in `package.json`. Each export maps to a distinct module area within `src/`:
 
-| Export Path | Source Directory | Purpose |
-|-------------|-----------------|---------|
-| `./generators` | `src/generators/` | Three-stage content generation (data, markdown, website) |
-| `./database` | `src/database/` | TypeORM entities, repositories, and database module |
-| `./dto` | `src/dto/` | Data Transfer Objects for API validation |
-| `./entities` | `src/entities/` | TypeORM entity definitions (Directory, User, etc.) |
-| `./git` | `src/git/` | Git operations abstraction layer |
-| `./directory-operations` | `src/directory-operations/` | Low-level directory CRUD operations |
-| `./items-generator` | `src/items-generator/` | Item generation DTOs and utilities |
-| `./tasks` | `src/tasks/` | Background task definitions |
-| `./events` | `src/events/` | Domain event classes (NestJS EventEmitter) |
-| `./services` | `src/services/` | Directory service layer (14 services) |
-| `./subscriptions` | `src/subscriptions/` | Subscription and billing logic |
-| `./config` | `src/config/` | Configuration constants and helpers |
-| `./cache` | `src/cache/` | Cache management utilities |
-| `./notifications` | `src/notifications/` | Notification system |
-| `./import` | `src/import/` | Data import functionality |
-| `./facades` | `src/facades/` | Facade services for plugin capabilities |
-| `./plugins` | `src/plugins/` | Plugin registry, loader, and settings |
-| `./pipeline` | `src/pipeline/` | Pipeline builder, orchestrator, and executors |
-| `./utils` | `src/utils/` | Shared utility functions |
-| `./community-pr` | `src/community-pr/` | Community pull request management |
-| `./comparison-generator` | `src/comparison-generator/` | A-vs-B comparison page generation |
+| Export Path              | Source Directory            | Purpose                                                  |
+| ------------------------ | --------------------------- | -------------------------------------------------------- |
+| `./generators`           | `src/generators/`           | Three-stage content generation (data, markdown, website) |
+| `./database`             | `src/database/`             | TypeORM entities, repositories, and database module      |
+| `./dto`                  | `src/dto/`                  | Data Transfer Objects for API validation                 |
+| `./entities`             | `src/entities/`             | TypeORM entity definitions (Directory, User, etc.)       |
+| `./git`                  | `src/git/`                  | Git operations abstraction layer                         |
+| `./directory-operations` | `src/directory-operations/` | Low-level directory CRUD operations                      |
+| `./items-generator`      | `src/items-generator/`      | Item generation DTOs and utilities                       |
+| `./tasks`                | `src/tasks/`                | Background task definitions                              |
+| `./events`               | `src/events/`               | Domain event classes (NestJS EventEmitter)               |
+| `./services`             | `src/services/`             | Directory service layer (14 services)                    |
+| `./subscriptions`        | `src/subscriptions/`        | Subscription and billing logic                           |
+| `./config`               | `src/config/`               | Configuration constants and helpers                      |
+| `./cache`                | `src/cache/`                | Cache management utilities                               |
+| `./notifications`        | `src/notifications/`        | Notification system                                      |
+| `./import`               | `src/import/`               | Data import functionality                                |
+| `./facades`              | `src/facades/`              | Facade services for plugin capabilities                  |
+| `./plugins`              | `src/plugins/`              | Plugin registry, loader, and settings                    |
+| `./pipeline`             | `src/pipeline/`             | Pipeline builder, orchestrator, and executors            |
+| `./utils`                | `src/utils/`                | Shared utility functions                                 |
+| `./community-pr`         | `src/community-pr/`         | Community pull request management                        |
+| `./comparison-generator` | `src/comparison-generator/` | A-vs-B comparison page generation                        |
 
 ## Directory Structure
 
@@ -136,21 +136,21 @@ The API provides HTTP controllers that delegate to agent services. For example, 
 
 The `services/` directory contains 14 specialized services that form the domain logic layer:
 
-| Service | Responsibility |
-|---------|---------------|
-| `DirectoryLifecycleService` | Create, update, delete directories |
-| `DirectoryGenerationService` | Orchestrate full generation flow |
-| `DirectoryQueryService` | Query and list directories |
-| `DirectoryDetailService` | Manage directory details and metadata |
-| `DirectoryOwnershipService` | Handle ownership and permissions |
-| `DirectoryMemberService` | Manage directory members |
-| `DirectoryScheduleService` | CRON-based scheduled regeneration |
-| `DirectoryScheduleDispatcherService` | Dispatch scheduled jobs |
-| `DirectoryImportService` | Import data from external sources |
-| `DirectoryAdvancedPromptsService` | Custom AI prompt management |
-| `DirectoryTaxonomyService` | Category and tag management |
-| `RepositoryManagementService` | Git repository lifecycle |
-| `GeneratorFormSchemaService` | Dynamic form schema generation |
+| Service                              | Responsibility                        |
+| ------------------------------------ | ------------------------------------- |
+| `DirectoryLifecycleService`          | Create, update, delete directories    |
+| `DirectoryGenerationService`         | Orchestrate full generation flow      |
+| `DirectoryQueryService`              | Query and list directories            |
+| `DirectoryDetailService`             | Manage directory details and metadata |
+| `DirectoryOwnershipService`          | Handle ownership and permissions      |
+| `DirectoryMemberService`             | Manage directory members              |
+| `DirectoryScheduleService`           | CRON-based scheduled regeneration     |
+| `DirectoryScheduleDispatcherService` | Dispatch scheduled jobs               |
+| `DirectoryImportService`             | Import data from external sources     |
+| `DirectoryAdvancedPromptsService`    | Custom AI prompt management           |
+| `DirectoryTaxonomyService`           | Category and tag management           |
+| `RepositoryManagementService`        | Git repository lifecycle              |
+| `GeneratorFormSchemaService`         | Dynamic form schema generation        |
 
 ## Dependencies
 
@@ -161,15 +161,15 @@ The agent package depends on two workspace packages:
 
 ### External Dependencies
 
-| Category | Packages |
-|----------|----------|
-| **Framework** | `@nestjs/common`, `@nestjs/core`, `@nestjs/config`, `@nestjs/swagger` |
-| **Database** | `@nestjs/typeorm`, `typeorm`, `better-sqlite3`, `pg`, `mysql2` |
+| Category       | Packages                                                                                  |
+| -------------- | ----------------------------------------------------------------------------------------- |
+| **Framework**  | `@nestjs/common`, `@nestjs/core`, `@nestjs/config`, `@nestjs/swagger`                     |
+| **Database**   | `@nestjs/typeorm`, `typeorm`, `better-sqlite3`, `pg`, `mysql2`                            |
 | **Validation** | `zod`, `zod-to-json-schema`, `ajv`, `ajv-formats`, `class-validator`, `class-transformer` |
-| **AI** | `@langchain/textsplitters` |
-| **Caching** | `@nestjs/cache-manager`, `cache-manager` |
-| **Events** | `@nestjs/event-emitter` |
-| **Utilities** | `lodash`, `date-fns`, `github-slugger`, `semver`, `superjson`, `yaml`, `p-map` |
+| **AI**         | `@langchain/textsplitters`                                                                |
+| **Caching**    | `@nestjs/cache-manager`, `cache-manager`                                                  |
+| **Events**     | `@nestjs/event-emitter`                                                                   |
+| **Utilities**  | `lodash`, `date-fns`, `github-slugger`, `semver`, `superjson`, `yaml`, `p-map`            |
 
 ## Build and Test
 

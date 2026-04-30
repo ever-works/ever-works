@@ -7,13 +7,13 @@ sidebar_position: 71
 
 # Langfuse Plugin
 
-| Field              | Value                          |
-| ------------------ | ------------------------------ |
-| Plugin ID          | `langfuse`                     |
-| Package            | `@ever-works/langfuse-plugin`  |
-| Category           | `utility`                      |
-| Capabilities       | `prompt-provider`              |
-| Auto Enable        | No                             |
+| Field        | Value                         |
+| ------------ | ----------------------------- |
+| Plugin ID    | `langfuse`                    |
+| Package      | `@ever-works/langfuse-plugin` |
+| Category     | `utility`                     |
+| Capabilities | `prompt-provider`             |
+| Auto Enable  | No                            |
 
 ## Overview
 

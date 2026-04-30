@@ -44,15 +44,15 @@ The `createMockPluginContext()` function creates a fully functional mock of the 
 import { createMockPluginContext } from '@ever-works/plugin/testing';
 
 const context = createMockPluginContext({
-  pluginId: 'my-plugin',
-  settings: {
-    apiKey: 'test-key-123',
-    defaultModel: 'test-model'
-  },
-  envVars: {
-    NODE_ENV: 'test',
-    PLUGIN_MY_API_KEY: 'env-key-456'
-  }
+	pluginId: 'my-plugin',
+	settings: {
+		apiKey: 'test-key-123',
+		defaultModel: 'test-model'
+	},
+	envVars: {
+		NODE_ENV: 'test',
+		PLUGIN_MY_API_KEY: 'env-key-456'
+	}
 });
 
 // Use in tests
@@ -63,14 +63,14 @@ await myPlugin.onLoad(context);
 
 ```typescript
 interface MockPluginContextOptions {
-  pluginId?: string;                          // Plugin ID (default: 'test-plugin')
-  settings?: PluginSettings;                  // Pre-configured settings
-  env?: MockPluginEnvironmentOptions;         // Environment overrides
-  envVars?: Record<string, string>;           // Environment variables
-  directories?: Map<string, DirectoryInfo>;   // Mock directory data
-  users?: Map<string, UserInfo>;              // Mock user data
-  currentUser?: UserInfo;                     // Current user for the session
-  httpResponses?: Map<string, HttpResponse>;  // Pre-configured HTTP responses
+	pluginId?: string; // Plugin ID (default: 'test-plugin')
+	settings?: PluginSettings; // Pre-configured settings
+	env?: MockPluginEnvironmentOptions; // Environment overrides
+	envVars?: Record<string, string>; // Environment variables
+	directories?: Map<string, DirectoryInfo>; // Mock directory data
+	users?: Map<string, UserInfo>; // Mock user data
+	currentUser?: UserInfo; // Current user for the session
+	httpResponses?: Map<string, HttpResponse>; // Pre-configured HTTP responses
 }
 ```
 
@@ -78,18 +78,18 @@ interface MockPluginContextOptions {
 
 The mock context includes functional implementations of every platform service:
 
-| Service | Mock Behavior |
-|---|---|
-| **Logger** | Records all log calls; accessible via `context.logger.log.mock.calls` |
-| **Cache** | In-memory `Map` with TTL support |
-| **HTTP Client** | Returns pre-configured responses by method + URL key |
-| **Environment** | Configurable platform version, environment flags, paths |
-| **Environment Variables** | In-memory variable store |
-| **Directory Service** | Lookup by ID or slug from provided `Map` |
-| **User Service** | Lookup by ID; returns configurable current user |
-| **Events** | Working event subscription and emission |
-| **Custom Capabilities** | Full registration and retrieval |
-| **Settings** | Returns configured settings for any scope |
+| Service                   | Mock Behavior                                                         |
+| ------------------------- | --------------------------------------------------------------------- |
+| **Logger**                | Records all log calls; accessible via `context.logger.log.mock.calls` |
+| **Cache**                 | In-memory `Map` with TTL support                                      |
+| **HTTP Client**           | Returns pre-configured responses by method + URL key                  |
+| **Environment**           | Configurable platform version, environment flags, paths               |
+| **Environment Variables** | In-memory variable store                                              |
+| **Directory Service**     | Lookup by ID or slug from provided `Map`                              |
+| **User Service**          | Lookup by ID; returns configurable current user                       |
+| **Events**                | Working event subscription and emission                               |
+| **Custom Capabilities**   | Full registration and retrieval                                       |
+| **Settings**              | Returns configured settings for any scope                             |
 
 ### Testing Event Handlers
 
@@ -101,8 +101,8 @@ await myPlugin.onLoad(context);
 
 // Simulate an event from outside the plugin
 context._triggerEvent('directory.created', {
-  directoryId: 'dir-123',
-  timestamp: new Date().toISOString()
+	directoryId: 'dir-123',
+	timestamp: new Date().toISOString()
 });
 
 // Inspect registered handlers
@@ -116,18 +116,24 @@ Pre-configure HTTP responses for specific endpoints:
 
 ```typescript
 const httpResponses = new Map([
-  ['GET:https://api.example.com/models', {
-    status: 200,
-    statusText: 'OK',
-    headers: {},
-    data: { models: [{ id: 'model-1', name: 'Test Model' }] }
-  }],
-  ['POST:https://api.example.com/chat', {
-    status: 200,
-    statusText: 'OK',
-    headers: {},
-    data: { id: 'resp-1', choices: [{ message: { content: 'Hello' } }] }
-  }]
+	[
+		'GET:https://api.example.com/models',
+		{
+			status: 200,
+			statusText: 'OK',
+			headers: {},
+			data: { models: [{ id: 'model-1', name: 'Test Model' }] }
+		}
+	],
+	[
+		'POST:https://api.example.com/chat',
+		{
+			status: 200,
+			statusText: 'OK',
+			headers: {},
+			data: { id: 'resp-1', choices: [{ message: { content: 'Hello' } }] }
+		}
+	]
 ]);
 
 const context = createMockPluginContext({ httpResponses });
@@ -139,9 +145,9 @@ Create environment configurations for different testing scenarios:
 
 ```typescript
 import {
-  createMockPluginEnvironment,
-  createProductionEnvironment,
-  createDevelopmentEnvironment
+	createMockPluginEnvironment,
+	createProductionEnvironment,
+	createDevelopmentEnvironment
 } from '@ever-works/plugin/testing';
 
 // Default test environment
@@ -158,12 +164,12 @@ const devEnv = createDevelopmentEnvironment();
 
 // Custom environment
 const customEnv = createMockPluginEnvironment({
-  platform: 'ever-works',
-  platformVersion: '2.0.0',
-  isProduction: false,
-  features: new Set(['feature-flag-a', 'feature-flag-b']),
-  baseUrl: 'http://localhost:3000',
-  tempDir: '/tmp/test'
+	platform: 'ever-works',
+	platformVersion: '2.0.0',
+	isProduction: false,
+	features: new Set(['feature-flag-a', 'feature-flag-b']),
+	baseUrl: 'http://localhost:3000',
+	tempDir: '/tmp/test'
 });
 ```
 
@@ -177,21 +183,21 @@ import { MyPlugin } from '../my-plugin.plugin';
 
 const plugin = new MyPlugin();
 const harness = createTestHarness(plugin, {
-  settings: { apiKey: 'test-key' }
+	settings: { apiKey: 'test-key' }
 });
 
 // Lifecycle
-await harness.load();     // Calls plugin.onLoad(mockContext)
-await harness.unload();   // Calls plugin.onUnload()
-harness.isLoaded;         // Check load state
+await harness.load(); // Calls plugin.onLoad(mockContext)
+await harness.unload(); // Calls plugin.onUnload()
+harness.isLoaded; // Check load state
 
 // Health check
 const health = await harness.healthCheck();
 
 // Run a named test
 const result = await harness.test('should process items', async (h) => {
-  h.assert(h.isLoaded, 'Plugin must be loaded');
-  // ... test logic ...
+	h.assert(h.isLoaded, 'Plugin must be loaded');
+	// ... test logic ...
 });
 
 // Built-in lifecycle tests
@@ -207,10 +213,10 @@ const suite = harness.getResults();
 The harness provides assertion methods that work without a test framework:
 
 ```typescript
-harness.assert(condition, 'message');           // Boolean assertion
-harness.assertEqual(actual, expected, 'msg');   // Strict equality
-harness.assertDeepEqual(actual, expected);      // JSON deep equality
-await harness.assertRejects(asyncFn, 'msg');    // Assert promise rejects
+harness.assert(condition, 'message'); // Boolean assertion
+harness.assertEqual(actual, expected, 'msg'); // Strict equality
+harness.assertDeepEqual(actual, expected); // JSON deep equality
+await harness.assertRejects(asyncFn, 'msg'); // Assert promise rejects
 ```
 
 ## Contract Tests
@@ -219,15 +225,15 @@ Contract test suites verify that a plugin correctly implements its capability in
 
 ```typescript
 import {
-  testBasePluginContract,
-  testAiProviderContract,
-  testSearchContract,
-  testGitProviderContract,
-  testDeploymentContract,
-  testScreenshotContract,
-  testPipelineContract,
-  testPipelineModifierContract,
-  runContractTests           // Auto-detects capabilities and runs all applicable suites
+	testBasePluginContract,
+	testAiProviderContract,
+	testSearchContract,
+	testGitProviderContract,
+	testDeploymentContract,
+	testScreenshotContract,
+	testPipelineContract,
+	testPipelineModifierContract,
+	runContractTests // Auto-detects capabilities and runs all applicable suites
 } from '@ever-works/plugin/testing';
 ```
 
@@ -249,22 +255,26 @@ Every plugin is tested for:
 Each capability adds additional checks:
 
 **AI Provider** (`testAiProviderContract`):
+
 - Has `ai-provider` capability
 - Has `providerType` and `providerName` properties
 - Implements `createChatCompletion()`, `listModels()`, `getCapabilities()`
 
 **Search** (`testSearchContract`):
+
 - Has `search` capability
 - Has `providerName` property
 - Implements `search()`, `isAvailable()`
 
 **Pipeline** (`testPipelineContract`):
+
 - Has `pipeline` capability
 - Implements `getStepDefinitions()` returning a non-empty array
 - Implements `execute()`
 - Step definitions have valid `id`, `name`, and `position` fields
 
 **Pipeline Modifier** (`testPipelineModifierContract`):
+
 - Has `pipeline-modifier` capability
 - Has non-empty `targetPipelines` array
 - Implements `execute()`
@@ -279,12 +289,12 @@ import { runContractTests } from '@ever-works/plugin/testing';
 import { MyPlugin } from '../my-plugin.plugin';
 
 describe('MyPlugin contracts', () => {
-  it('should pass all contract tests', async () => {
-    const plugin = new MyPlugin();
-    const results = await runContractTests(plugin);
-    const failures = results.filter(r => !r.passed);
-    expect(failures).toEqual([]);
-  });
+	it('should pass all contract tests', async () => {
+		const plugin = new MyPlugin();
+		const results = await runContractTests(plugin);
+		const failures = results.filter((r) => !r.passed);
+		expect(failures).toEqual([]);
+	});
 });
 ```
 
@@ -298,50 +308,50 @@ import { createMockPluginContext } from '@ever-works/plugin/testing';
 import { MySearchPlugin } from '../my-search.plugin';
 
 describe('MySearchPlugin', () => {
-  let plugin: MySearchPlugin;
+	let plugin: MySearchPlugin;
 
-  beforeEach(async () => {
-    plugin = new MySearchPlugin();
-    const context = createMockPluginContext({
-      settings: { apiKey: 'test-key' }
-    });
-    await plugin.onLoad(context);
-  });
+	beforeEach(async () => {
+		plugin = new MySearchPlugin();
+		const context = createMockPluginContext({
+			settings: { apiKey: 'test-key' }
+		});
+		await plugin.onLoad(context);
+	});
 
-  afterEach(async () => {
-    await plugin.onUnload();
-  });
+	afterEach(async () => {
+		await plugin.onUnload();
+	});
 
-  it('should have correct metadata', () => {
-    expect(plugin.id).toBe('my-search');
-    expect(plugin.category).toBe('search');
-    expect(plugin.capabilities).toContain('search');
-  });
+	it('should have correct metadata', () => {
+		expect(plugin.id).toBe('my-search');
+		expect(plugin.category).toBe('search');
+		expect(plugin.capabilities).toContain('search');
+	});
 
-  it('should return search results', async () => {
-    const response = await plugin.search({
-      query: 'test query',
-      limit: 5,
-      settings: { apiKey: 'test-key' }
-    });
+	it('should return search results', async () => {
+		const response = await plugin.search({
+			query: 'test query',
+			limit: 5,
+			settings: { apiKey: 'test-key' }
+		});
 
-    expect(response.results).toBeDefined();
-    expect(response.query).toBe('test query');
-    expect(response.hasMore).toBeDefined();
-  });
+		expect(response.results).toBeDefined();
+		expect(response.query).toBe('test query');
+		expect(response.hasMore).toBeDefined();
+	});
 
-  it('should report availability', async () => {
-    const available = await plugin.isAvailable();
-    expect(typeof available).toBe('boolean');
-  });
+	it('should report availability', async () => {
+		const available = await plugin.isAvailable();
+		expect(typeof available).toBe('boolean');
+	});
 
-  it('should pass contract tests', async () => {
-    const { runContractTests } = await import('@ever-works/plugin/testing');
-    const results = await runContractTests(plugin);
-    for (const result of results) {
-      expect(result.passed).toBe(true);
-    }
-  });
+	it('should pass contract tests', async () => {
+		const { runContractTests } = await import('@ever-works/plugin/testing');
+		const results = await runContractTests(plugin);
+		for (const result of results) {
+			expect(result.passed).toBe(true);
+		}
+	});
 });
 ```
 
@@ -357,10 +367,10 @@ const modifier = new MyPipelineModifier();
 await modifier.onLoad(createMockPluginContext());
 
 const mockContext = {
-  prompt: 'Test prompt',
-  subject: 'test-subject',
-  searchResults: [{ title: 'Result 1', url: 'https://example.com' }],
-  shouldStop: false
+	prompt: 'Test prompt',
+	subject: 'test-subject',
+	searchResults: [{ title: 'Result 1', url: 'https://example.com' }],
+	shouldStop: false
 };
 
 const result = await modifier.execute(mockContext as any);

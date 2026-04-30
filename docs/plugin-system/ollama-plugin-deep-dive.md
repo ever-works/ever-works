@@ -1,7 +1,7 @@
 ---
 id: ollama-plugin-deep-dive
-title: "Ollama Plugin Deep Dive"
-sidebar_label: "Ollama Deep Dive"
+title: 'Ollama Plugin Deep Dive'
+sidebar_label: 'Ollama Deep Dive'
 sidebar_position: 59
 ---
 
@@ -28,22 +28,22 @@ On `onLoad`, the plugin creates an `AiOperations` instance configured with `prov
 
 ### Environment Variables
 
-| Variable | Required | Description |
-|----------|----------|-------------|
-| N/A | -- | No environment-variable fallbacks; users configure the server URL directly |
+| Variable | Required | Description                                                                |
+| -------- | -------- | -------------------------------------------------------------------------- |
+| N/A      | --       | No environment-variable fallbacks; users configure the server URL directly |
 
 ### Settings Schema
 
 ```typescript
 interface OllamaSettings {
-  baseUrl: string;          // Ollama server URL (user-scoped, required, e.g. 'http://localhost:11434/v1')
-  apiKey: string;           // API key, usually not needed (default: 'ollama', user-scoped)
-  defaultModel: string;     // Default model (default: 'ministral-3:8b', global scope)
-  simpleModel: string;      // Simple tasks model (default: 'ministral-3:8b', global scope)
-  mediumModel: string;      // Standard tasks model (default: 'ministral-3:8b', global scope)
-  complexModel: string;     // Complex tasks model (default: 'ministral-3:8b', global scope)
-  temperature: number;      // Response randomness, 0-2 (default: 0.7, hidden)
-  maxTokens: number;        // Max response length (default: 4096, hidden)
+	baseUrl: string; // Ollama server URL (user-scoped, required, e.g. 'http://localhost:11434/v1')
+	apiKey: string; // API key, usually not needed (default: 'ollama', user-scoped)
+	defaultModel: string; // Default model (default: 'ministral-3:8b', global scope)
+	simpleModel: string; // Simple tasks model (default: 'ministral-3:8b', global scope)
+	mediumModel: string; // Standard tasks model (default: 'ministral-3:8b', global scope)
+	complexModel: string; // Complex tasks model (default: 'ministral-3:8b', global scope)
+	temperature: number; // Response randomness, 0-2 (default: 0.7, hidden)
+	maxTokens: number; // Max response length (default: 4096, hidden)
 }
 ```
 
@@ -54,14 +54,14 @@ interface OllamaSettings {
 
 ## Capabilities
 
-| Capability | Supported | Details |
-|------------|-----------|---------|
-| Structured output | Yes | JSON mode and tool use |
-| Streaming | Yes | Async iterables via AiOperations |
-| Tool calling | Yes | Depends on the model's support |
-| Vision | Yes | Depends on the model's support (e.g., LLaVA) |
-| Embeddings | Yes | Models like `nomic-embed-text` |
-| Max context | 128,000 tokens | Reported via `getCapabilities()` |
+| Capability        | Supported      | Details                                      |
+| ----------------- | -------------- | -------------------------------------------- |
+| Structured output | Yes            | JSON mode and tool use                       |
+| Streaming         | Yes            | Async iterables via AiOperations             |
+| Tool calling      | Yes            | Depends on the model's support               |
+| Vision            | Yes            | Depends on the model's support (e.g., LLaVA) |
+| Embeddings        | Yes            | Models like `nomic-embed-text`               |
+| Max context       | 128,000 tokens | Reported via `getCapabilities()`             |
 
 **Note**: Actual capability support depends on the specific Ollama model being used. The plugin reports all capabilities as supported, but models that lack vision, tool calling, or embedding support will fail gracefully at the model level.
 
@@ -69,24 +69,24 @@ interface OllamaSettings {
 
 ### Chat Completion
 
-| Method | Signature | Description |
-|--------|-----------|-------------|
-| `createChatCompletion` | `(options: ChatCompletionOptions) => Promise<ChatCompletionResponse>` | Single-shot completion |
+| Method                          | Signature                                                                | Description                              |
+| ------------------------------- | ------------------------------------------------------------------------ | ---------------------------------------- |
+| `createChatCompletion`          | `(options: ChatCompletionOptions) => Promise<ChatCompletionResponse>`    | Single-shot completion                   |
 | `createStreamingChatCompletion` | `(options: ChatCompletionOptions) => AsyncIterable<ChatCompletionChunk>` | Streaming completion via async generator |
 
 ### Embeddings
 
-| Method | Signature | Description |
-|--------|-----------|-------------|
+| Method            | Signature                                                   | Description                                               |
+| ----------------- | ----------------------------------------------------------- | --------------------------------------------------------- |
 | `createEmbedding` | `(options: EmbeddingOptions) => Promise<EmbeddingResponse>` | Generate embeddings (requires an embedding-capable model) |
 
 ### Model Management
 
-| Method | Signature | Description |
-|--------|-----------|-------------|
-| `listModels` | `(settings?) => Promise<readonly AiModel[]>` | Lists models available on the Ollama server |
-| `isAvailable` | `(settings?) => Promise<boolean>` | Tests connection to the Ollama server |
-| `getCapabilities` | `() => AiModelCapabilities` | Returns static capability flags |
+| Method            | Signature                                    | Description                                 |
+| ----------------- | -------------------------------------------- | ------------------------------------------- |
+| `listModels`      | `(settings?) => Promise<readonly AiModel[]>` | Lists models available on the Ollama server |
+| `isAvailable`     | `(settings?) => Promise<boolean>`            | Tests connection to the Ollama server       |
+| `getCapabilities` | `() => AiModelCapabilities`                  | Returns static capability flags             |
 
 ## Implementation Details
 
@@ -122,41 +122,41 @@ The `healthCheck` method always returns `{ status: 'healthy' }` as a simple read
 ```typescript
 // Non-streaming chat completion with Ollama
 const response = await ollamaPlugin.createChatCompletion({
-  messages: [
-    { role: 'system', content: 'You are a directory content writer.' },
-    { role: 'user', content: 'Write a description for Acme Corp.' }
-  ],
-  settings: {
-    baseUrl: 'http://localhost:11434/v1',
-    defaultModel: 'llama3.1:8b'
-  }
+	messages: [
+		{ role: 'system', content: 'You are a directory content writer.' },
+		{ role: 'user', content: 'Write a description for Acme Corp.' }
+	],
+	settings: {
+		baseUrl: 'http://localhost:11434/v1',
+		defaultModel: 'llama3.1:8b'
+	}
 });
 
 // Streaming chat completion
 for await (const chunk of ollamaPlugin.createStreamingChatCompletion({
-  messages: [{ role: 'user', content: 'Summarize this company...' }],
-  settings: { baseUrl: 'http://localhost:11434/v1' }
+	messages: [{ role: 'user', content: 'Summarize this company...' }],
+	settings: { baseUrl: 'http://localhost:11434/v1' }
 })) {
-  process.stdout.write(chunk.content || '');
+	process.stdout.write(chunk.content || '');
 }
 
 // Generate embeddings
 const embedding = await ollamaPlugin.createEmbedding({
-  input: 'AI-powered directory builder',
-  settings: {
-    baseUrl: 'http://localhost:11434/v1',
-    defaultModel: 'nomic-embed-text'
-  }
+	input: 'AI-powered directory builder',
+	settings: {
+		baseUrl: 'http://localhost:11434/v1',
+		defaultModel: 'nomic-embed-text'
+	}
 });
 
 // List available models
 const models = await ollamaPlugin.listModels({
-  baseUrl: 'http://localhost:11434/v1'
+	baseUrl: 'http://localhost:11434/v1'
 });
 
 // Check server availability
 const available = await ollamaPlugin.isAvailable({
-  baseUrl: 'http://localhost:11434/v1'
+	baseUrl: 'http://localhost:11434/v1'
 });
 ```
 

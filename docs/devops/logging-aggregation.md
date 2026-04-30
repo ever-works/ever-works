@@ -35,14 +35,14 @@ Ever Works uses a multi-layer logging strategy that spans the NestJS API, backgr
 
 The platform supports six structured log levels, consistent across both the `SentryService` and the `TriggerLogger`:
 
-| Level     | Purpose                                      | Sentry Severity | Trigger.dev Method  |
-|-----------|----------------------------------------------|-----------------|---------------------|
-| `trace`   | Fine-grained debugging (rarely enabled)       | debug           | `logger.debug`      |
-| `debug`   | Diagnostic information during development     | debug           | `logger.debug`      |
-| `info`    | Normal operational events                     | info            | `logger.log`        |
-| `warn`    | Unexpected but non-critical conditions         | warning         | `logger.warn`       |
-| `error`   | Failures that affect a single request/task    | error           | `logger.error`      |
-| `fatal`   | System-wide failures requiring attention      | fatal           | `logger.error`      |
+| Level   | Purpose                                    | Sentry Severity | Trigger.dev Method |
+| ------- | ------------------------------------------ | --------------- | ------------------ |
+| `trace` | Fine-grained debugging (rarely enabled)    | debug           | `logger.debug`     |
+| `debug` | Diagnostic information during development  | debug           | `logger.debug`     |
+| `info`  | Normal operational events                  | info            | `logger.log`       |
+| `warn`  | Unexpected but non-critical conditions     | warning         | `logger.warn`      |
+| `error` | Failures that affect a single request/task | error           | `logger.error`     |
+| `fatal` | System-wide failures requiring attention   | fatal           | `logger.error`     |
 
 ## SentryService (API Layer)
 
@@ -50,23 +50,23 @@ The `SentryService` in `packages/monitoring/src/services/sentry.service.ts` wrap
 
 ```typescript
 interface SentryService {
-    // Structured logging methods
-    trace(message: string, context?: Record<string, any>): void;
-    debug(message: string, context?: Record<string, any>): void;
-    info(message: string, context?: Record<string, any>): void;
-    warn(message: string, context?: Record<string, any>): void;
-    error(message: string, context?: Record<string, any>): void;
-    fatal(message: string, context?: Record<string, any>): void;
+	// Structured logging methods
+	trace(message: string, context?: Record<string, any>): void;
+	debug(message: string, context?: Record<string, any>): void;
+	info(message: string, context?: Record<string, any>): void;
+	warn(message: string, context?: Record<string, any>): void;
+	error(message: string, context?: Record<string, any>): void;
+	fatal(message: string, context?: Record<string, any>): void;
 
-    // Exception capture
-    captureException(exception: any, context?: any): string;
-    captureMessage(message: string, level?: any): string;
+	// Exception capture
+	captureException(exception: any, context?: any): string;
+	captureMessage(message: string, level?: any): string;
 
-    // Context enrichment
-    setUser(user: { id?: string; email?: string; username?: string }): void;
-    setContext(name: string, context: Record<string, any>): void;
-    setTag(key: string, value: string): void;
-    setTags(tags: Record<string, string>): void;
+	// Context enrichment
+	setUser(user: { id?: string; email?: string; username?: string }): void;
+	setContext(name: string, context: Record<string, any>): void;
+	setTag(key: string, value: string): void;
+	setTags(tags: Record<string, string>): void;
 }
 ```
 
@@ -75,19 +75,19 @@ interface SentryService {
 ```typescript
 @Injectable()
 export class DirectoryService {
-    constructor(private readonly sentryService: SentryService) {}
+	constructor(private readonly sentryService: SentryService) {}
 
-    async generate(directoryId: string) {
-        this.sentryService.info('Generation started', { directoryId });
-        try {
-            // ... generation logic
-            this.sentryService.info('Generation completed', { directoryId, itemCount: 42 });
-        } catch (error) {
-            this.sentryService.error('Generation failed', { directoryId, error: error.message });
-            this.sentryService.captureException(error);
-            throw error;
-        }
-    }
+	async generate(directoryId: string) {
+		this.sentryService.info('Generation started', { directoryId });
+		try {
+			// ... generation logic
+			this.sentryService.info('Generation completed', { directoryId, itemCount: 42 });
+		} catch (error) {
+			this.sentryService.error('Generation failed', { directoryId, error: error.message });
+			this.sentryService.captureException(error);
+			throw error;
+		}
+	}
 }
 ```
 
@@ -103,10 +103,10 @@ The `SentryInterceptor` in `packages/monitoring/src/interceptors/sentry.intercep
 ```typescript
 // Automatically applied via APP_INTERCEPTOR in the API module
 Sentry.setContext('request', {
-    method,
-    url: originalUrl,
-    headers: sanitizedHeaders,
-    body: sanitizedBody,
+	method,
+	url: originalUrl,
+	headers: sanitizedHeaders,
+	body: sanitizedBody
 });
 ```
 
@@ -117,7 +117,7 @@ Background tasks run inside Trigger.dev workers where standard stdout is not vis
 ```typescript
 // Creating a logger for a Trigger.dev task
 const appContext = await NestFactory.createApplicationContext(TriggerInternalModule, {
-    logger: createTriggerLogger('ScheduleDispatcher'),
+	logger: createTriggerLogger('ScheduleDispatcher')
 });
 ```
 
@@ -133,12 +133,12 @@ Sentry is initialized via `packages/monitoring/src/sentry/sentry.config.ts`:
 
 ```typescript
 interface SentryConfig {
-    dsn?: string;                    // SENTRY_DSN env var
-    environment?: string;            // NODE_ENV
-    tracesSampleRate?: number;       // 0.1 in production, 1.0 in development
-    profilesSampleRate?: number;     // 0.1 in production, 1.0 in development
-    enableLogs?: boolean;            // true by default
-    beforeSend?: (event) => any;     // Filters auth-related events
+	dsn?: string; // SENTRY_DSN env var
+	environment?: string; // NODE_ENV
+	tracesSampleRate?: number; // 0.1 in production, 1.0 in development
+	profilesSampleRate?: number; // 0.1 in production, 1.0 in development
+	enableLogs?: boolean; // true by default
+	beforeSend?: (event) => any; // Filters auth-related events
 }
 ```
 
@@ -176,12 +176,12 @@ Configure Sentry alerts for critical conditions:
 
 ## Environment Variables
 
-| Variable              | Description                          | Default           |
-|-----------------------|--------------------------------------|-------------------|
-| `SENTRY_DSN`          | Sentry Data Source Name              | (disabled if unset)|
-| `NODE_ENV`            | Environment identifier               | `development`     |
-| `POSTHOG_API_KEY`     | PostHog analytics key                | (disabled if unset)|
-| `POSTHOG_HOST`        | PostHog instance URL                 | `https://app.posthog.com` |
+| Variable          | Description             | Default                   |
+| ----------------- | ----------------------- | ------------------------- |
+| `SENTRY_DSN`      | Sentry Data Source Name | (disabled if unset)       |
+| `NODE_ENV`        | Environment identifier  | `development`             |
+| `POSTHOG_API_KEY` | PostHog analytics key   | (disabled if unset)       |
+| `POSTHOG_HOST`    | PostHog instance URL    | `https://app.posthog.com` |
 
 ## Cross-References
 

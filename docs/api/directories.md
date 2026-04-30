@@ -13,33 +13,33 @@ All endpoints require JWT authentication.
 
 ## Directory CRUD
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| `GET` | `/api/directories` | List directories (supports `?search=` and pagination) |
-| `POST` | `/api/directories` | Create a new directory |
-| `GET` | `/api/directories/:id` | Get a directory by ID |
-| `PUT` | `/api/directories/:id` | Update a directory |
-| `POST` | `/api/directories/:id/delete` | Delete a directory and its repositories |
+| Method | Endpoint                      | Description                                           |
+| ------ | ----------------------------- | ----------------------------------------------------- |
+| `GET`  | `/api/directories`            | List directories (supports `?search=` and pagination) |
+| `POST` | `/api/directories`            | Create a new directory                                |
+| `GET`  | `/api/directories/:id`        | Get a directory by ID                                 |
+| `PUT`  | `/api/directories/:id`        | Update a directory                                    |
+| `POST` | `/api/directories/:id/delete` | Delete a directory and its repositories               |
 
 ## Directory Data
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| `GET` | `/api/directories/:id/items` | Get directory items (cached) |
-| `GET` | `/api/directories/:id/config` | Get directory config (cached) |
-| `GET` | `/api/directories/:id/website-settings` | Get website settings |
-| `PUT` | `/api/directories/:id/website-settings` | Update website settings |
-| `GET` | `/api/directories/:id/count` | Get item count and status (cached) |
-| `GET` | `/api/directories/:id/categories-tags` | Get categories and tags (cached) |
-| `GET` | `/api/directories/:id/history` | Get generation history (paginated) |
+| Method | Endpoint                                | Description                        |
+| ------ | --------------------------------------- | ---------------------------------- |
+| `GET`  | `/api/directories/:id/items`            | Get directory items (cached)       |
+| `GET`  | `/api/directories/:id/config`           | Get directory config (cached)      |
+| `GET`  | `/api/directories/:id/website-settings` | Get website settings               |
+| `PUT`  | `/api/directories/:id/website-settings` | Update website settings            |
+| `GET`  | `/api/directories/:id/count`            | Get item count and status (cached) |
+| `GET`  | `/api/directories/:id/categories-tags`  | Get categories and tags (cached)   |
+| `GET`  | `/api/directories/:id/history`          | Get generation history (paginated) |
 
 ## AI Generation
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| `POST` | `/api/directories/generate-details` | Generate directory details from a prompt |
-| `POST` | `/api/directories/:id/generate` | Start AI-powered item generation |
-| `POST` | `/api/directories/:id/update` | Update the generation config and regenerate |
+| Method | Endpoint                            | Description                                 |
+| ------ | ----------------------------------- | ------------------------------------------- |
+| `POST` | `/api/directories/generate-details` | Generate directory details from a prompt    |
+| `POST` | `/api/directories/:id/generate`     | Start AI-powered item generation            |
+| `POST` | `/api/directories/:id/update`       | Update the generation config and regenerate |
 
 ### Generate Details
 
@@ -63,45 +63,45 @@ curl -X POST http://localhost:3100/api/directories/:id/generate \
 
 ## Item Management
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| `POST` | `/api/directories/:id/submit-item` | Add a new item to the directory |
-| `POST` | `/api/directories/:id/remove-item` | Remove an item |
-| `POST` | `/api/directories/:id/update-item` | Update item metadata |
-| `POST` | `/api/extract-item-details` | Extract item details from a URL |
+| Method | Endpoint                                   | Description                           |
+| ------ | ------------------------------------------ | ------------------------------------- |
+| `POST` | `/api/directories/:id/submit-item`         | Add a new item to the directory       |
+| `POST` | `/api/directories/:id/remove-item`         | Remove an item                        |
+| `POST` | `/api/directories/:id/update-item`         | Update item metadata                  |
+| `POST` | `/api/extract-item-details`                | Extract item details from a URL       |
 | `POST` | `/api/directories/:id/bulk-capture-images` | Capture screenshots for items in bulk |
 
 ## Repository Operations
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| `POST` | `/api/directories/:id/regenerate-markdown` | Regenerate markdown for all items |
-| `POST` | `/api/directories/:id/update-readme` | Update the directory README |
-| `POST` | `/api/directories/:id/update-website` | Update the website repository |
-| `POST` | `/api/directories/:id/sync-data` | Sync data from the data repository |
-| `GET` | `/api/directories/:id/repositories/visibility` | Get repo visibility settings |
-| `PUT` | `/api/directories/:id/repositories/visibility` | Update repo visibility |
+| Method | Endpoint                                       | Description                        |
+| ------ | ---------------------------------------------- | ---------------------------------- |
+| `POST` | `/api/directories/:id/regenerate-markdown`     | Regenerate markdown for all items  |
+| `POST` | `/api/directories/:id/update-readme`           | Update the directory README        |
+| `POST` | `/api/directories/:id/update-website`          | Update the website repository      |
+| `POST` | `/api/directories/:id/sync-data`               | Sync data from the data repository |
+| `GET`  | `/api/directories/:id/repositories/visibility` | Get repo visibility settings       |
+| `PUT`  | `/api/directories/:id/repositories/visibility` | Update repo visibility             |
 
 ## Domain Type
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| `PUT` | `/api/directories/:id/domain-type` | Set domain type (software, ecommerce, services, general) |
+| Method | Endpoint                           | Description                                              |
+| ------ | ---------------------------------- | -------------------------------------------------------- |
+| `PUT`  | `/api/directories/:id/domain-type` | Set domain type (software, ecommerce, services, general) |
 
 The domain type affects image routing and badge generation strategies.
 
 ## Categories, Tags & Collections
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| `POST` | `/api/directories/:id/categories` | Create a category |
-| `PUT` | `/api/directories/:id/categories/:categoryId` | Update a category |
-| `DELETE` | `/api/directories/:id/categories/:categoryId` | Delete a category |
-| `POST` | `/api/directories/:id/tags` | Create a tag |
-| `PUT` | `/api/directories/:id/tags/:tagId` | Update a tag |
-| `DELETE` | `/api/directories/:id/tags/:tagId` | Delete a tag |
-| `POST` | `/api/directories/:id/collections` | Create a collection |
-| `PUT` | `/api/directories/:id/collections/:collectionId` | Update a collection |
+| Method   | Endpoint                                         | Description         |
+| -------- | ------------------------------------------------ | ------------------- |
+| `POST`   | `/api/directories/:id/categories`                | Create a category   |
+| `PUT`    | `/api/directories/:id/categories/:categoryId`    | Update a category   |
+| `DELETE` | `/api/directories/:id/categories/:categoryId`    | Delete a category   |
+| `POST`   | `/api/directories/:id/tags`                      | Create a tag        |
+| `PUT`    | `/api/directories/:id/tags/:tagId`               | Update a tag        |
+| `DELETE` | `/api/directories/:id/tags/:tagId`               | Delete a tag        |
+| `POST`   | `/api/directories/:id/collections`               | Create a collection |
+| `PUT`    | `/api/directories/:id/collections/:collectionId` | Update a collection |
 | `DELETE` | `/api/directories/:id/collections/:collectionId` | Delete a collection |
 
 :::note
@@ -110,28 +110,28 @@ The `GET /api/directories/:id/categories-tags` endpoint (listed under [Directory
 
 ## Advanced Prompts
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| `GET` | `/api/directories/:id/advanced-prompts` | Get custom prompt overrides |
-| `PUT` | `/api/directories/:id/advanced-prompts` | Set custom prompt overrides |
+| Method | Endpoint                                | Description                 |
+| ------ | --------------------------------------- | --------------------------- |
+| `GET`  | `/api/directories/:id/advanced-prompts` | Get custom prompt overrides |
+| `PUT`  | `/api/directories/:id/advanced-prompts` | Set custom prompt overrides |
 
 Advanced prompts let you customize the AI's behavior for specific pipeline steps (relevance assessment, item generation, extraction, search queries, categorization, deduplication, source validation).
 
 ## Scheduled Updates
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| `GET` | `/api/directories/:id/schedule` | Get the update schedule |
-| `PUT` | `/api/directories/:id/schedule` | Create or update a schedule |
-| `DELETE` | `/api/directories/:id/schedule` | Cancel scheduled updates |
-| `POST` | `/api/directories/:id/schedule/run` | Run a scheduled update immediately |
+| Method   | Endpoint                            | Description                        |
+| -------- | ----------------------------------- | ---------------------------------- |
+| `GET`    | `/api/directories/:id/schedule`     | Get the update schedule            |
+| `PUT`    | `/api/directories/:id/schedule`     | Create or update a schedule        |
+| `DELETE` | `/api/directories/:id/schedule`     | Cancel scheduled updates           |
+| `POST`   | `/api/directories/:id/schedule/run` | Run a scheduled update immediately |
 
 ## Community PR Processing
 
 Manually trigger processing of community-submitted pull requests for a directory. See the [Community PR Processing feature doc](/features/community-pr-processing) for details on configuration and workflow.
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
+| Method | Endpoint                                     | Description                     |
+| ------ | -------------------------------------------- | ------------------------------- |
 | `POST` | `/api/directories/:id/process-community-prs` | Process unhandled community PRs |
 
 ```bash
@@ -145,55 +145,55 @@ Returns `{ "itemsAdded": <number> }`. Returns `400` if community PR processing i
 
 Generate and manage A vs B comparison pages. See the [Comparisons feature doc](/features/comparisons) for full details.
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| `GET` | `/api/directories/:id/comparisons` | List all comparisons |
-| `GET` | `/api/directories/:id/comparisons/remaining-count` | Count remaining un-generated pairs |
-| `GET` | `/api/directories/:id/comparisons/:slug` | Get a comparison with markdown |
-| `POST` | `/api/directories/:id/comparisons/generate` | Auto-generate next comparison |
-| `POST` | `/api/directories/:id/comparisons/generate-manual` | Generate comparison for specific pair |
-| `DELETE` | `/api/directories/:id/comparisons/:slug` | Delete a comparison |
+| Method   | Endpoint                                           | Description                           |
+| -------- | -------------------------------------------------- | ------------------------------------- |
+| `GET`    | `/api/directories/:id/comparisons`                 | List all comparisons                  |
+| `GET`    | `/api/directories/:id/comparisons/remaining-count` | Count remaining un-generated pairs    |
+| `GET`    | `/api/directories/:id/comparisons/:slug`           | Get a comparison with markdown        |
+| `POST`   | `/api/directories/:id/comparisons/generate`        | Auto-generate next comparison         |
+| `POST`   | `/api/directories/:id/comparisons/generate-manual` | Generate comparison for specific pair |
+| `DELETE` | `/api/directories/:id/comparisons/:slug`           | Delete a comparison                   |
 
 ## Import
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| `POST` | `/api/directories/import/analyze` | Analyze a repository for import |
-| `POST` | `/api/directories/import/analyze-for-linking` | Analyze a repo for linking |
-| `POST` | `/api/directories/import` | Import a directory from a repository |
-| `GET` | `/api/directories/import/repositories` | List user's repositories available for import |
+| Method | Endpoint                                      | Description                                   |
+| ------ | --------------------------------------------- | --------------------------------------------- |
+| `POST` | `/api/directories/import/analyze`             | Analyze a repository for import               |
+| `POST` | `/api/directories/import/analyze-for-linking` | Analyze a repo for linking                    |
+| `POST` | `/api/directories/import`                     | Import a directory from a repository          |
+| `GET`  | `/api/directories/import/repositories`        | List user's repositories available for import |
 
 ## Deployment
 
 Deploy a directory website. See the [Deployment API](/api/deployment) for full details.
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| `POST` | `/api/deploy/directories/:id` | Deploy a directory |
-| `POST` | `/api/deploy/directories/:id/check` | Check deployment capability |
-| `POST` | `/api/deploy/directories/:id/lookup` | Lookup existing deployment |
-| `POST` | `/api/deploy/validate-token` | Validate deployment token |
-| `POST` | `/api/deploy/teams` | List deployment teams |
-| `POST` | `/api/deploy/batch` | Batch deploy multiple directories |
+| Method | Endpoint                             | Description                       |
+| ------ | ------------------------------------ | --------------------------------- |
+| `POST` | `/api/deploy/directories/:id`        | Deploy a directory                |
+| `POST` | `/api/deploy/directories/:id/check`  | Check deployment capability       |
+| `POST` | `/api/deploy/directories/:id/lookup` | Lookup existing deployment        |
+| `POST` | `/api/deploy/validate-token`         | Validate deployment token         |
+| `POST` | `/api/deploy/teams`                  | List deployment teams             |
+| `POST` | `/api/deploy/batch`                  | Batch deploy multiple directories |
 
 ## Members
 
 Manage directory collaborators:
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| `GET` | `/api/directories/:id/members` | List all members |
-| `POST` | `/api/directories/:id/members` | Invite a member |
-| `GET` | `/api/directories/:id/members/:memberId` | Get member details |
-| `PUT` | `/api/directories/:id/members/:memberId` | Update member role |
-| `DELETE` | `/api/directories/:id/members/:memberId` | Remove a member |
-| `POST` | `/api/directories/:id/members/leave` | Leave a directory |
+| Method   | Endpoint                                 | Description        |
+| -------- | ---------------------------------------- | ------------------ |
+| `GET`    | `/api/directories/:id/members`           | List all members   |
+| `POST`   | `/api/directories/:id/members`           | Invite a member    |
+| `GET`    | `/api/directories/:id/members/:memberId` | Get member details |
+| `PUT`    | `/api/directories/:id/members/:memberId` | Update member role |
+| `DELETE` | `/api/directories/:id/members/:memberId` | Remove a member    |
+| `POST`   | `/api/directories/:id/members/leave`     | Leave a directory  |
 
 ### Member Roles
 
-| Role | Permissions |
-|------|------------|
-| **Owner** | Full access (reserved for directory creator) |
+| Role        | Permissions                                          |
+| ----------- | ---------------------------------------------------- |
+| **Owner**   | Full access (reserved for directory creator)         |
 | **Manager** | Can manage members, edit content, trigger generation |
-| **Editor** | Can edit content and items |
-| **Viewer** | Read-only access |
+| **Editor**  | Can edit content and items                           |
+| **Viewer**  | Read-only access                                     |

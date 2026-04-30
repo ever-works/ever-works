@@ -19,30 +19,30 @@ Get all available plugins with the current user's installation status.
 
 **Query Parameters:**
 
-| Parameter | Type | Description |
-|-----------|------|-------------|
+| Parameter  | Type   | Description                                        |
+| ---------- | ------ | -------------------------------------------------- |
 | `category` | string | Filter by category (e.g., `ai-provider`, `search`) |
 
 **Response:**
 
 ```json
 {
-    "plugins": [
-        {
-            "id": "openai",
-            "name": "OpenAI",
-            "version": "1.0.0",
-            "description": "Use OpenAI models like GPT-4o for content generation",
-            "category": "ai-provider",
-            "capabilities": ["ai-provider"],
-            "icon": { "type": "svg", "value": "<svg>...</svg>" },
-            "enabled": true,
-            "configured": true,
-            "autoEnable": false,
-            "systemPlugin": false,
-            "builtIn": true
-        }
-    ]
+	"plugins": [
+		{
+			"id": "openai",
+			"name": "OpenAI",
+			"version": "1.0.0",
+			"description": "Use OpenAI models like GPT-4o for content generation",
+			"category": "ai-provider",
+			"capabilities": ["ai-provider"],
+			"icon": { "type": "svg", "value": "<svg>...</svg>" },
+			"enabled": true,
+			"configured": true,
+			"autoEnable": false,
+			"systemPlugin": false,
+			"builtIn": true
+		}
+	]
 }
 ```
 
@@ -56,20 +56,20 @@ Get plugins grouped by category for the settings navigation UI. Only returns plu
 
 ```json
 {
-    "categories": [
-        {
-            "id": "ai-provider",
-            "label": "AI Providers",
-            "plugins": [
-                {
-                    "id": "openai",
-                    "name": "OpenAI",
-                    "icon": { "type": "svg", "value": "..." },
-                    "configured": true
-                }
-            ]
-        }
-    ]
+	"categories": [
+		{
+			"id": "ai-provider",
+			"label": "AI Providers",
+			"plugins": [
+				{
+					"id": "openai",
+					"name": "OpenAI",
+					"icon": { "type": "svg", "value": "..." },
+					"configured": true
+				}
+			]
+		}
+	]
 }
 ```
 
@@ -83,30 +83,30 @@ Get detailed information about a specific plugin, including its settings schema 
 
 ```json
 {
-    "id": "tavily",
-    "name": "Tavily",
-    "version": "1.0.0",
-    "description": "Web search and content extraction using Tavily API",
-    "category": "search",
-    "capabilities": ["search", "content-extractor"],
-    "settingsSchema": {
-        "type": "object",
-        "properties": {
-            "apiKey": {
-                "type": "string",
-                "title": "API Key",
-                "x-secret": true,
-                "x-envVar": "PLUGIN_TAVILY_API_KEY"
-            }
-        }
-    },
-    "settings": {
-        "searchDepth": "basic",
-        "maxResults": 10
-    },
-    "enabled": true,
-    "configured": true,
-    "readme": "## What does Tavily do?\n\n..."
+	"id": "tavily",
+	"name": "Tavily",
+	"version": "1.0.0",
+	"description": "Web search and content extraction using Tavily API",
+	"category": "search",
+	"capabilities": ["search", "content-extractor"],
+	"settingsSchema": {
+		"type": "object",
+		"properties": {
+			"apiKey": {
+				"type": "string",
+				"title": "API Key",
+				"x-secret": true,
+				"x-envVar": "PLUGIN_TAVILY_API_KEY"
+			}
+		}
+	},
+	"settings": {
+		"searchDepth": "basic",
+		"maxResults": 10
+	},
+	"enabled": true,
+	"configured": true,
+	"readme": "## What does Tavily do?\n\n..."
 }
 ```
 
@@ -124,21 +124,21 @@ For AI provider plugins, fetch the list of available models. The plugin must be 
 
 ```json
 [
-    {
-        "id": "gpt-4o",
-        "name": "GPT-4o",
-        "contextLength": 128000,
-        "capabilities": {
-            "supportsStreaming": true,
-            "supportsToolCalling": true,
-            "supportsVision": true
-        }
-    },
-    {
-        "id": "gpt-4o-mini",
-        "name": "GPT-4o Mini",
-        "contextLength": 128000
-    }
+	{
+		"id": "gpt-4o",
+		"name": "GPT-4o",
+		"contextLength": 128000,
+		"capabilities": {
+			"supportsStreaming": true,
+			"supportsToolCalling": true,
+			"supportsVision": true
+		}
+	},
+	{
+		"id": "gpt-4o-mini",
+		"name": "GPT-4o Mini",
+		"contextLength": 128000
+	}
 ]
 ```
 
@@ -154,20 +154,20 @@ Enable a plugin for the current user. Optionally provide initial settings.
 
 ```json
 {
-    "settings": {
-        "maxResults": 20
-    },
-    "secretSettings": {
-        "apiKey": "sk-..."
-    },
-    "autoEnableForDirectories": true
+	"settings": {
+		"maxResults": 20
+	},
+	"secretSettings": {
+		"apiKey": "sk-..."
+	},
+	"autoEnableForDirectories": true
 }
 ```
 
-| Field | Type | Description |
-|-------|------|-------------|
-| `settings` | object | Non-secret settings to apply |
-| `secretSettings` | object | Secret settings (API keys, tokens) |
+| Field                      | Type    | Description                                 |
+| -------------------------- | ------- | ------------------------------------------- |
+| `settings`                 | object  | Non-secret settings to apply                |
+| `secretSettings`           | object  | Secret settings (API keys, tokens)          |
 | `autoEnableForDirectories` | boolean | Auto-enable this plugin for all directories |
 
 ### Disable Plugin
@@ -186,31 +186,31 @@ Update user-specific settings for an enabled plugin.
 
 ```json
 {
-    "settings": {
-        "searchDepth": "advanced",
-        "maxResults": 20
-    },
-    "secretSettings": {
-        "apiKey": "new-key-..."
-    },
-    "metadata": {
-        "lastConfigured": "2025-01-15"
-    }
+	"settings": {
+		"searchDepth": "advanced",
+		"maxResults": 20
+	},
+	"secretSettings": {
+		"apiKey": "new-key-..."
+	},
+	"metadata": {
+		"lastConfigured": "2025-01-15"
+	}
 }
 ```
 
-| Field | Type | Description |
-|-------|------|-------------|
-| `settings` | object | Non-secret settings to update (merged with existing) |
-| `secretSettings` | object | Secret settings to update |
-| `metadata` | object | Arbitrary metadata to store with the plugin |
+| Field            | Type   | Description                                          |
+| ---------------- | ------ | ---------------------------------------------------- |
+| `settings`       | object | Non-secret settings to update (merged with existing) |
+| `secretSettings` | object | Secret settings to update                            |
+| `metadata`       | object | Arbitrary metadata to store with the plugin          |
 
 **Errors:**
 
-| Status | Description |
-|--------|-------------|
-| 400 | Plugin not enabled for this user |
-| 404 | Plugin not found |
+| Status | Description                      |
+| ------ | -------------------------------- |
+| 400    | Plugin not enabled for this user |
+| 404    | Plugin not found                 |
 
 ## Directory Plugin Management
 
@@ -226,19 +226,19 @@ Get all plugins with their directory-specific configuration.
 
 ```json
 {
-    "plugins": [
-        {
-            "id": "openai",
-            "name": "OpenAI",
-            "category": "ai-provider",
-            "enabled": true,
-            "activeCapability": "ai-provider",
-            "priority": 1,
-            "settings": {
-                "defaultModel": "gpt-4o"
-            }
-        }
-    ]
+	"plugins": [
+		{
+			"id": "openai",
+			"name": "OpenAI",
+			"category": "ai-provider",
+			"enabled": true,
+			"activeCapability": "ai-provider",
+			"priority": 1,
+			"settings": {
+				"defaultModel": "gpt-4o"
+			}
+		}
+	]
 }
 ```
 
@@ -252,26 +252,26 @@ Enable a plugin for a specific directory. The plugin must already be enabled at 
 
 ```json
 {
-    "settings": {
-        "defaultModel": "gpt-4o-mini"
-    },
-    "activeCapability": "ai-provider",
-    "priority": 1
+	"settings": {
+		"defaultModel": "gpt-4o-mini"
+	},
+	"activeCapability": "ai-provider",
+	"priority": 1
 }
 ```
 
-| Field | Type | Description |
-|-------|------|-------------|
-| `settings` | object | Directory-specific settings overrides |
+| Field              | Type   | Description                                                |
+| ------------------ | ------ | ---------------------------------------------------------- |
+| `settings`         | object | Directory-specific settings overrides                      |
 | `activeCapability` | string | Set this plugin as the active provider for this capability |
-| `priority` | number | Priority when multiple plugins provide the same capability |
+| `priority`         | number | Priority when multiple plugins provide the same capability |
 
 **Errors:**
 
-| Status | Description |
-|--------|-------------|
-| 400 | Plugin not enabled at user level |
-| 404 | Plugin or directory not found |
+| Status | Description                      |
+| ------ | -------------------------------- |
+| 400    | Plugin not enabled at user level |
+| 404    | Plugin or directory not found    |
 
 ### Disable Plugin for Directory
 
@@ -289,21 +289,21 @@ Update directory-specific settings for a plugin. These settings take highest pri
 
 ```json
 {
-    "settings": {
-        "defaultModel": "gpt-4o-mini",
-        "temperature": 0.5
-    },
-    "secretSettings": {
-        "apiKey": "directory-specific-key"
-    }
+	"settings": {
+		"defaultModel": "gpt-4o-mini",
+		"temperature": 0.5
+	},
+	"secretSettings": {
+		"apiKey": "directory-specific-key"
+	}
 }
 ```
 
 **Errors:**
 
-| Status | Description |
-|--------|-------------|
-| 400 | Plugin not enabled for this directory |
+| Status | Description                           |
+| ------ | ------------------------------------- |
+| 400    | Plugin not enabled for this directory |
 
 ### Set Active Capability
 
@@ -315,7 +315,7 @@ Designate a plugin as the active provider for a specific capability in this dire
 
 ```json
 {
-    "capability": "ai-provider"
+	"capability": "ai-provider"
 }
 ```
 
@@ -323,23 +323,23 @@ Only one plugin can be active per capability per directory. Setting a new active
 
 **Errors:**
 
-| Status | Description |
-|--------|-------------|
-| 400 | Plugin does not have the specified capability |
+| Status | Description                                   |
+| ------ | --------------------------------------------- |
+| 400    | Plugin does not have the specified capability |
 
 ## Endpoint Summary
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| `GET` | `/api/plugins` | List all plugins |
-| `GET` | `/api/plugins/settings-menu` | Plugins for settings navigation |
-| `GET` | `/api/plugins/:pluginId` | Plugin details |
-| `GET` | `/api/plugins/:pluginId/models` | AI models for plugin |
-| `POST` | `/api/plugins/:pluginId/enable` | Enable for user |
-| `POST` | `/api/plugins/:pluginId/disable` | Disable for user |
-| `PATCH` | `/api/plugins/:pluginId/settings` | Update user settings |
-| `GET` | `/api/directories/:directoryId/plugins` | Directory plugins |
-| `POST` | `/api/directories/:directoryId/plugins/:pluginId/enable` | Enable for directory |
-| `POST` | `/api/directories/:directoryId/plugins/:pluginId/disable` | Disable for directory |
-| `PATCH` | `/api/directories/:directoryId/plugins/:pluginId/settings` | Update directory settings |
-| `POST` | `/api/directories/:directoryId/plugins/:pluginId/capability` | Set active capability |
+| Method  | Endpoint                                                     | Description                     |
+| ------- | ------------------------------------------------------------ | ------------------------------- |
+| `GET`   | `/api/plugins`                                               | List all plugins                |
+| `GET`   | `/api/plugins/settings-menu`                                 | Plugins for settings navigation |
+| `GET`   | `/api/plugins/:pluginId`                                     | Plugin details                  |
+| `GET`   | `/api/plugins/:pluginId/models`                              | AI models for plugin            |
+| `POST`  | `/api/plugins/:pluginId/enable`                              | Enable for user                 |
+| `POST`  | `/api/plugins/:pluginId/disable`                             | Disable for user                |
+| `PATCH` | `/api/plugins/:pluginId/settings`                            | Update user settings            |
+| `GET`   | `/api/directories/:directoryId/plugins`                      | Directory plugins               |
+| `POST`  | `/api/directories/:directoryId/plugins/:pluginId/enable`     | Enable for directory            |
+| `POST`  | `/api/directories/:directoryId/plugins/:pluginId/disable`    | Disable for directory           |
+| `PATCH` | `/api/directories/:directoryId/plugins/:pluginId/settings`   | Update directory settings       |
+| `POST`  | `/api/directories/:directoryId/plugins/:pluginId/capability` | Set active capability           |

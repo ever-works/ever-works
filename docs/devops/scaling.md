@@ -39,11 +39,11 @@ This offloads heavy AI pipeline processing from the API servers entirely.
 
 Ever Works supports three database backends with different scaling characteristics:
 
-| Driver | Best For | Scaling Path |
-|---|---|---|
-| `better-sqlite3` | Development, CLI, single-instance | Vertical only (single writer) |
-| `postgres` | Production | Connection pooling, read replicas |
-| `mysql` / `mariadb` | Production (alternative) | Connection pooling, read replicas |
+| Driver              | Best For                          | Scaling Path                      |
+| ------------------- | --------------------------------- | --------------------------------- |
+| `better-sqlite3`    | Development, CLI, single-instance | Vertical only (single writer)     |
+| `postgres`          | Production                        | Connection pooling, read replicas |
+| `mysql` / `mariadb` | Production (alternative)          | Connection pooling, read replicas |
 
 ### PostgreSQL Connection Management
 
@@ -75,7 +75,7 @@ Production PostgreSQL connections use SSL with a CA certificate:
 
 ```typescript
 if (config.database.sslMode()) {
-    baseConfig.ssl = getTlsOptions(true, config.database.databaseCaCert());
+	baseConfig.ssl = getTlsOptions(true, config.database.databaseCaCert());
 }
 ```
 
@@ -90,15 +90,15 @@ The `CacheEntry` entity provides a simple key-value cache with TTL support:
 ```typescript
 @Entity({ name: 'cache_entries' })
 export class CacheEntry {
-    @PrimaryColumn('varchar')
-    key: string;
+	@PrimaryColumn('varchar')
+	key: string;
 
-    @Column('text')
-    value: string;
+	@Column('text')
+	value: string;
 
-    @Column({ type: 'bigint', nullable: true })
-    @Index()
-    expiresAt: number | null;
+	@Column({ type: 'bigint', nullable: true })
+	@Index()
+	expiresAt: number | null;
 }
 ```
 
@@ -122,7 +122,7 @@ Item writing uses controlled concurrency to prevent filesystem and database over
 ```typescript
 const PARALLEL_WRITE_CONCURRENCY = 10;
 await pMap(items, (item) => dataRepo.writeItem(item), {
-    concurrency: PARALLEL_WRITE_CONCURRENCY,
+	concurrency: PARALLEL_WRITE_CONCURRENCY
 });
 ```
 
@@ -140,11 +140,11 @@ Parallel syncs to the same template repository would corrupt the local working d
 
 The API uses three-tier rate limiting via `@nestjs/throttler`:
 
-| Tier | Window | Limit | Purpose |
-|---|---|---|---|
-| `short` | 1 second | 50 requests | Burst protection |
-| `medium` | 10 seconds | 300 requests | Sustained load protection |
-| `long` | 60 seconds | 1000 requests | Per-minute cap |
+| Tier     | Window     | Limit         | Purpose                   |
+| -------- | ---------- | ------------- | ------------------------- |
+| `short`  | 1 second   | 50 requests   | Burst protection          |
+| `medium` | 10 seconds | 300 requests  | Sustained load protection |
+| `long`   | 60 seconds | 1000 requests | Per-minute cap            |
 
 All three tiers are applied simultaneously. A request must pass all three checks to proceed.
 
@@ -180,12 +180,14 @@ CI workflows run on `ubicloud-standard-8` runners (8 cores), providing faster bu
 ### Sentry Performance
 
 Sentry captures transaction traces with configurable sample rates:
+
 - **Production**: 10% of transactions and profiles.
 - **Development**: 100% (full visibility).
 
 ### PostHog API Tracking
 
 The PostHog interceptor tracks every API request with:
+
 - Response time (duration in milliseconds).
 - Endpoint pattern (normalized for grouping).
 - Status code distribution.
@@ -197,6 +199,7 @@ This data is available in PostHog dashboards for performance analysis.
 ### Git Operations
 
 Git clone and push operations are I/O intensive and can be bottlenecks at scale:
+
 - Each generation run clones up to 3 repositories (data, markdown, website template).
 - The `/tmp/ever-works-repos` volume caches clones to reduce re-cloning.
 - For high-volume deployments, consider network-attached storage with high IOPS.
@@ -204,6 +207,7 @@ Git clone and push operations are I/O intensive and can be bottlenecks at scale:
 ### AI API Rate Limits
 
 Generation tasks call external AI APIs (OpenAI, Anthropic, etc.) which have their own rate limits:
+
 - The pipeline system handles retries and backoff internally.
 - The circuit breaker pattern in the pipeline can degrade gracefully when providers are unavailable.
 - Consider multiple AI provider accounts for high-throughput generation.
@@ -212,10 +216,10 @@ Generation tasks call external AI APIs (OpenAI, Anthropic, etc.) which have thei
 
 Key indexes are defined on entities to optimize common queries:
 
-| Entity | Index | Query Pattern |
-|---|---|---|
+| Entity                       | Index                   | Query Pattern                   |
+| ---------------------------- | ----------------------- | ------------------------------- |
 | `DirectoryGenerationHistory` | `[directoryId, status]` | History by directory and status |
-| `DirectorySchedule` | `[status, nextRunAt]` | Finding due schedules |
-| `UserSubscription` | `[userId, status]` | Active subscription lookup |
-| `Notification` | `[userId, isRead]` | Unread notification count |
-| `UsageLedgerEntry` | `[userId, status]` | Billing aggregation |
+| `DirectorySchedule`          | `[status, nextRunAt]`   | Finding due schedules           |
+| `UserSubscription`           | `[userId, status]`      | Active subscription lookup      |
+| `Notification`               | `[userId, isRead]`      | Unread notification count       |
+| `UsageLedgerEntry`           | `[userId, status]`      | Billing aggregation             |

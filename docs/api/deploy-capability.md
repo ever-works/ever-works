@@ -58,10 +58,8 @@ Returns all available deployment providers and their configuration status.
 
 ```json
 {
-    "status": "success",
-    "providers": [
-        { "id": "vercel", "name": "Vercel", "enabled": true }
-    ]
+	"status": "success",
+	"providers": [{ "id": "vercel", "name": "Vercel", "enabled": true }]
 }
 ```
 
@@ -83,9 +81,9 @@ Deploys a directory to its configured deployment provider. This is the primary d
 
 **Request Body (DeployDirectoryDto):**
 
-| Field | Type | Required | Description |
-|---|---|---|---|
-| `teamScope` | `string` | No | Team/org scope for the deployment |
+| Field       | Type     | Required | Description                       |
+| ----------- | -------- | -------- | --------------------------------- |
+| `teamScope` | `string` | No       | Team/org scope for the deployment |
 
 **Deployment Flow:**
 
@@ -99,11 +97,11 @@ Deploys a directory to its configured deployment provider. This is the primary d
 
 ```json
 {
-    "status": "pending",
-    "slug": "my-directory",
-    "owner": "username",
-    "repository": "username/my-directory-website",
-    "message": "Deployment started"
+	"status": "pending",
+	"slug": "my-directory",
+	"owner": "username",
+	"repository": "username/my-directory-website",
+	"message": "Deployment started"
 }
 ```
 
@@ -133,11 +131,11 @@ Returns detailed deployment capability status:
 
 ```json
 {
-    "status": "success",
-    "canDeploy": true,
-    "isShared": false,
-    "ownerHasToken": true,
-    "userHasToken": true
+	"status": "success",
+	"canDeploy": true,
+	"isShared": false,
+	"ownerHasToken": true,
+	"userHasToken": true
 }
 ```
 
@@ -161,11 +159,8 @@ Deploy multiple directories in a single request.
 
 ```json
 {
-    "directories": [
-        { "directoryId": "uuid-1", "teamScope": "team-slug" },
-        { "directoryId": "uuid-2" }
-    ],
-    "teamScope": "default-team"
+	"directories": [{ "directoryId": "uuid-1", "teamScope": "team-slug" }, { "directoryId": "uuid-2" }],
+	"teamScope": "default-team"
 }
 ```
 
@@ -173,16 +168,16 @@ Deploy multiple directories in a single request.
 
 ```json
 {
-    "status": "partial",
-    "message": "Batch deployment: 2 started, 1 failed",
-    "totalRequested": 3,
-    "successfullyStarted": 2,
-    "failed": 1,
-    "results": [
-        { "directoryId": "uuid-1", "slug": "dir-1", "status": "pending", "message": "Deployment started" },
-        { "directoryId": "uuid-2", "slug": "dir-2", "status": "pending", "message": "Deployment started" },
-        { "directoryId": "uuid-3", "slug": "unknown", "status": "error", "message": "Directory not found" }
-    ]
+	"status": "partial",
+	"message": "Batch deployment: 2 started, 1 failed",
+	"totalRequested": 3,
+	"successfullyStarted": 2,
+	"failed": 1,
+	"results": [
+		{ "directoryId": "uuid-1", "slug": "dir-1", "status": "pending", "message": "Deployment started" },
+		{ "directoryId": "uuid-2", "slug": "dir-2", "status": "pending", "message": "Deployment started" },
+		{ "directoryId": "uuid-3", "slug": "unknown", "status": "error", "message": "Directory not found" }
+	]
 }
 ```
 
@@ -209,14 +204,14 @@ The `DeployService` orchestrates the full deployment pipeline:
 
 The service sets these secrets on the target repository:
 
-| Secret | Description |
-|---|---|
-| `DATA_REPOSITORY` | Name of the data repository (e.g., `my-dir-data`) |
-| `{PROVIDER}_TOKEN` | Provider-specific token (e.g., `VERCEL_TOKEN`) |
-| `DEPLOY_TOKEN` | Generic deployment token |
-| `DEPLOY_TEAM_SCOPE` | Team/org scope (optional) |
-| `GH_TOKEN` | GitHub token for repo operations (optional) |
-| `CRON_SECRET` | Randomly generated 32-byte hex secret for cron jobs |
+| Secret              | Description                                         |
+| ------------------- | --------------------------------------------------- |
+| `DATA_REPOSITORY`   | Name of the data repository (e.g., `my-dir-data`)   |
+| `{PROVIDER}_TOKEN`  | Provider-specific token (e.g., `VERCEL_TOKEN`)      |
+| `DEPLOY_TOKEN`      | Generic deployment token                            |
+| `DEPLOY_TEAM_SCOPE` | Team/org scope (optional)                           |
+| `GH_TOKEN`          | GitHub token for repo operations (optional)         |
+| `CRON_SECRET`       | Randomly generated 32-byte hex secret for cron jobs |
 
 Additionally, a `DEPLOY_PROVIDER` repository **variable** is set (not a secret).
 
@@ -251,23 +246,23 @@ flowchart TD
 
 ### Deployment States
 
-| State | Description |
-|---|---|
-| `INITIALIZING` | Deployment just started |
-| `QUEUED` | Waiting in provider queue |
-| `BUILDING` | Build in progress |
-| `READY` | Deployment successful (terminal) |
-| `ERROR` | Deployment failed (terminal) |
-| `CANCELED` | Deployment was cancelled (terminal) |
-| `TIMEOUT` | Verification timed out (terminal) |
+| State          | Description                         |
+| -------------- | ----------------------------------- |
+| `INITIALIZING` | Deployment just started             |
+| `QUEUED`       | Waiting in provider queue           |
+| `BUILDING`     | Build in progress                   |
+| `READY`        | Deployment successful (terminal)    |
+| `ERROR`        | Deployment failed (terminal)        |
+| `CANCELED`     | Deployment was cancelled (terminal) |
+| `TIMEOUT`      | Verification timed out (terminal)   |
 
 ### Timing Configuration
 
-| Parameter | Value | Description |
-|---|---|---|
-| `POLL_INTERVAL` | 10 seconds | Time between status checks |
-| `FETCH_LIMIT` | 18 attempts | Max polls before marking not-found as timeout |
-| `TIMEOUT` | 13 minutes | Absolute timeout for verification |
+| Parameter       | Value       | Description                                   |
+| --------------- | ----------- | --------------------------------------------- |
+| `POLL_INTERVAL` | 10 seconds  | Time between status checks                    |
+| `FETCH_LIMIT`   | 18 attempts | Max polls before marking not-found as timeout |
+| `TIMEOUT`       | 13 minutes  | Absolute timeout for verification             |
 
 ### Queue Management
 
@@ -284,8 +279,9 @@ startVerification(directory, userId, teamScope);
 
 ```typescript
 class DeployDirectoryDto {
-    @IsString() @IsOptional()
-    teamScope?: string;
+	@IsString()
+	@IsOptional()
+	teamScope?: string;
 }
 ```
 
@@ -293,19 +289,22 @@ class DeployDirectoryDto {
 
 ```typescript
 class BatchDeployDto {
-    @IsArray() @ValidateNested({ each: true })
-    directories: BatchDeployItemDto[];
+	@IsArray()
+	@ValidateNested({ each: true })
+	directories: BatchDeployItemDto[];
 
-    @IsString() @IsOptional()
-    teamScope?: string;  // Default for all items
+	@IsString()
+	@IsOptional()
+	teamScope?: string; // Default for all items
 }
 
 class BatchDeployItemDto {
-    @IsString()
-    directoryId: string;
+	@IsString()
+	directoryId: string;
 
-    @IsString() @IsOptional()
-    teamScope?: string;  // Override per-item
+	@IsString()
+	@IsOptional()
+	teamScope?: string; // Override per-item
 }
 ```
 
@@ -313,12 +312,12 @@ class BatchDeployItemDto {
 
 ```typescript
 class BatchDeployResponseDto {
-    status: 'success' | 'partial' | 'error';
-    message: string;
-    totalRequested: number;
-    successfullyStarted: number;
-    failed: number;
-    results: BatchDeployItemResultDto[];
+	status: 'success' | 'partial' | 'error';
+	message: string;
+	totalRequested: number;
+	successfullyStarted: number;
+	failed: number;
+	results: BatchDeployItemResultDto[];
 }
 ```
 
@@ -332,11 +331,11 @@ The deploy capability supports shared directories. When a non-owner collaborator
 
 ## Source Files
 
-| File | Purpose |
-|---|---|
-| `apps/api/src/plugins-capabilities/deploy/deploy.module.ts` | Module definition |
-| `apps/api/src/plugins-capabilities/deploy/deploy.controller.ts` | REST API endpoints |
-| `apps/api/src/plugins-capabilities/deploy/deploy.service.ts` | Deployment orchestration |
-| `apps/api/src/plugins-capabilities/deploy/tasks/deployment-verifier.service.ts` | Async polling |
-| `apps/api/src/plugins-capabilities/deploy/dto/deploy.dto.ts` | Single deploy DTOs |
-| `apps/api/src/plugins-capabilities/deploy/dto/batch-deploy.dto.ts` | Batch deploy DTOs |
+| File                                                                            | Purpose                  |
+| ------------------------------------------------------------------------------- | ------------------------ |
+| `apps/api/src/plugins-capabilities/deploy/deploy.module.ts`                     | Module definition        |
+| `apps/api/src/plugins-capabilities/deploy/deploy.controller.ts`                 | REST API endpoints       |
+| `apps/api/src/plugins-capabilities/deploy/deploy.service.ts`                    | Deployment orchestration |
+| `apps/api/src/plugins-capabilities/deploy/tasks/deployment-verifier.service.ts` | Async polling            |
+| `apps/api/src/plugins-capabilities/deploy/dto/deploy.dto.ts`                    | Single deploy DTOs       |
+| `apps/api/src/plugins-capabilities/deploy/dto/batch-deploy.dto.ts`              | Batch deploy DTOs        |

@@ -1,7 +1,7 @@
 ---
 id: brave-plugin-deep-dive
-title: "Brave Search Plugin Deep Dive"
-sidebar_label: "Brave Search Deep Dive"
+title: 'Brave Search Plugin Deep Dive'
+sidebar_label: 'Brave Search Deep Dive'
 sidebar_position: 56
 ---
 
@@ -27,16 +27,16 @@ No persistent client or SDK instance is maintained. Each search request construc
 
 ### Environment Variables
 
-| Variable | Required | Description |
-|----------|----------|-------------|
-| `PLUGIN_BRAVE_API_KEY` | Yes | Brave Search API subscription token |
+| Variable               | Required | Description                         |
+| ---------------------- | -------- | ----------------------------------- |
+| `PLUGIN_BRAVE_API_KEY` | Yes      | Brave Search API subscription token |
 
 ### Settings Schema
 
 ```typescript
 interface BraveSearchSettings {
-  apiKey: string;       // Brave Search API key (x-secret, x-envVar, user-scoped, required)
-  maxResults: number;   // Default max results per search (default: 10, max: 20)
+	apiKey: string; // Brave Search API key (x-secret, x-envVar, user-scoped, required)
+	maxResults: number; // Default max results per search (default: 10, max: 20)
 }
 ```
 
@@ -45,31 +45,31 @@ interface BraveSearchSettings {
 
 ## Capabilities
 
-| Capability | Description |
-|------------|-------------|
-| `search` | Privacy-focused web search with filtering and pagination |
+| Capability | Description                                              |
+| ---------- | -------------------------------------------------------- |
+| `search`   | Privacy-focused web search with filtering and pagination |
 
 ## API Reference
 
 ### Search
 
-| Method | Signature | Description |
-|--------|-----------|-------------|
-| `search` | `(options: SearchOptions) => Promise<SearchResponse>` | Searches the web via Brave Search |
-| `isAvailable` | `() => Promise<boolean>` | Always returns `true` |
-| `getRateLimitInfo` | `() => Promise<RateLimitInfo>` | Returns `-1` (not tracked internally) |
+| Method             | Signature                                             | Description                           |
+| ------------------ | ----------------------------------------------------- | ------------------------------------- |
+| `search`           | `(options: SearchOptions) => Promise<SearchResponse>` | Searches the web via Brave Search     |
+| `isAvailable`      | `() => Promise<boolean>`                              | Always returns `true`                 |
+| `getRateLimitInfo` | `() => Promise<RateLimitInfo>`                        | Returns `-1` (not tracked internally) |
 
 ### SearchOptions Support
 
-| Option | Brave API Parameter | Description |
-|--------|---------------------|-------------|
-| `query` | `q` | Search query string |
-| `limit` | `count` | Results per page (max 20) |
-| `page` | `offset` | Pagination (max 9 pages) |
-| `region` | `country` | Country code filter |
-| `language` | `search_lang` | Language filter |
-| `safeSearch` | `safesearch` | `off`, `moderate`, or `strict` |
-| `timeRange` | `freshness` | `day` -> `pd`, `week` -> `pw`, `month` -> `pm`, `year` -> `py` |
+| Option       | Brave API Parameter | Description                                                    |
+| ------------ | ------------------- | -------------------------------------------------------------- |
+| `query`      | `q`                 | Search query string                                            |
+| `limit`      | `count`             | Results per page (max 20)                                      |
+| `page`       | `offset`            | Pagination (max 9 pages)                                       |
+| `region`     | `country`           | Country code filter                                            |
+| `language`   | `search_lang`       | Language filter                                                |
+| `safeSearch` | `safesearch`        | `off`, `moderate`, or `strict`                                 |
+| `timeRange`  | `freshness`         | `day` -> `pd`, `week` -> `pw`, `month` -> `pm`, `year` -> `py` |
 
 ## Implementation Details
 
@@ -78,15 +78,12 @@ interface BraveSearchSettings {
 Each search builds a `URLSearchParams` object with the query, result count, and optional filters. The request is sent to `https://api.search.brave.com/res/v1/web/search` with the API key passed as the `X-Subscription-Token` header.
 
 ```typescript
-const response = await fetch(
-  `https://api.search.brave.com/res/v1/web/search?${params.toString()}`,
-  {
-    headers: {
-      'X-Subscription-Token': apiKey,
-      Accept: 'application/json'
-    }
-  }
-);
+const response = await fetch(`https://api.search.brave.com/res/v1/web/search?${params.toString()}`, {
+	headers: {
+		'X-Subscription-Token': apiKey,
+		Accept: 'application/json'
+	}
+});
 ```
 
 ### Pagination
@@ -106,10 +103,10 @@ Time ranges are mapped from human-readable values to Brave's `freshness` paramet
 
 ```typescript
 const FRESHNESS_MAP: Record<string, string> = {
-  day: 'pd',    // past day
-  week: 'pw',   // past week
-  month: 'pm',  // past month
-  year: 'py'    // past year
+	day: 'pd', // past day
+	week: 'pw', // past week
+	month: 'pm', // past month
+	year: 'py' // past year
 };
 ```
 
@@ -128,28 +125,28 @@ Each web result is mapped to a `SearchResult` with:
 ```typescript
 // Basic search
 const results = await bravePlugin.search({
-  query: 'open source directory builders',
-  limit: 10,
-  settings: { apiKey: braveApiKey }
+	query: 'open source directory builders',
+	limit: 10,
+	settings: { apiKey: braveApiKey }
 });
 
 // Search with filters
 const filteredResults = await bravePlugin.search({
-  query: 'AI startups',
-  limit: 15,
-  region: 'US',
-  language: 'en',
-  safeSearch: 'moderate',
-  timeRange: 'month',
-  settings: { apiKey: braveApiKey }
+	query: 'AI startups',
+	limit: 15,
+	region: 'US',
+	language: 'en',
+	safeSearch: 'moderate',
+	timeRange: 'month',
+	settings: { apiKey: braveApiKey }
 });
 
 // Paginated search
 const page2 = await bravePlugin.search({
-  query: 'AI startups',
-  limit: 10,
-  page: 2,
-  settings: { apiKey: braveApiKey }
+	query: 'AI startups',
+	limit: 10,
+	page: 2,
+	settings: { apiKey: braveApiKey }
 });
 ```
 

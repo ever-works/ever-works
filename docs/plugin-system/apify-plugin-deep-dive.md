@@ -1,7 +1,7 @@
 ---
 id: apify-plugin-deep-dive
-title: "Apify Plugin Deep Dive"
-sidebar_label: "Apify Deep Dive"
+title: 'Apify Plugin Deep Dive'
+sidebar_label: 'Apify Deep Dive'
 sidebar_position: 58
 ---
 
@@ -34,22 +34,22 @@ The plugin operates at three configuration levels:
 
 ### Environment Variables
 
-| Variable | Required | Description |
-|----------|----------|-------------|
-| N/A | -- | No environment-variable fallbacks |
+| Variable | Required | Description                       |
+| -------- | -------- | --------------------------------- |
+| N/A      | --       | No environment-variable fallbacks |
 
 ### Settings Schema
 
 ```typescript
 interface ApifySettings {
-  apiToken: string;                   // Apify API token (x-secret, user-scoped)
-  defaultFieldMapping?: {
-    name: string;                     // Apify field for item name (default: 'title')
-    description: string;              // Apify field for description (default: 'description')
-    source_url: string;               // Apify field for source URL (default: 'url')
-    category: string;                 // Apify field for category (default: 'category')
-    image_url: string;                // Apify field for image URL (default: 'image')
-  };
+	apiToken: string; // Apify API token (x-secret, user-scoped)
+	defaultFieldMapping?: {
+		name: string; // Apify field for item name (default: 'title')
+		description: string; // Apify field for description (default: 'description')
+		source_url: string; // Apify field for source URL (default: 'url')
+		category: string; // Apify field for category (default: 'category')
+		image_url: string; // Apify field for image URL (default: 'image')
+	};
 }
 ```
 
@@ -58,39 +58,39 @@ interface ApifySettings {
 
 ## Capabilities
 
-| Capability | Description |
-|------------|-------------|
-| `data-source` | Queries items from Apify datasets and actor runs |
+| Capability             | Description                                              |
+| ---------------------- | -------------------------------------------------------- |
+| `data-source`          | Queries items from Apify datasets and actor runs         |
 | `form-schema-provider` | Contributes form fields to the directory generation form |
 
 ## API Reference
 
 ### Data Source
 
-| Method | Signature | Description |
-|--------|-----------|-------------|
-| `query` | `(options?: DataSourceQueryOptions) => Promise<DataSourceQueryResult>` | Fetches and transforms items from an Apify dataset |
-| `getMetadata` | `() => Promise<DataSourceMetadata>` | Returns `{ name: 'Apify', description: '...' }` |
-| `isAvailable` | `() => Promise<boolean>` | Always returns `true` (token checked at query time) |
+| Method        | Signature                                                              | Description                                         |
+| ------------- | ---------------------------------------------------------------------- | --------------------------------------------------- |
+| `query`       | `(options?: DataSourceQueryOptions) => Promise<DataSourceQueryResult>` | Fetches and transforms items from an Apify dataset  |
+| `getMetadata` | `() => Promise<DataSourceMetadata>`                                    | Returns `{ name: 'Apify', description: '...' }`     |
+| `isAvailable` | `() => Promise<boolean>`                                               | Always returns `true` (token checked at query time) |
 
 ### Form Schema Provider
 
-| Method | Signature | Description |
-|--------|-----------|-------------|
-| `getFormFields` | `() => FormFieldDefinition[]` | Returns 4 form fields for the GeneratorForm |
-| `getFormGroups` | `() => FormFieldGroup[]` | Returns the "Apify" collapsible group definition |
-| `validateFormInput` | `(values: Record<string, unknown>) => ValidationResult` | Validates that dataset ID or actor run ID is provided |
-| `transformFormValues` | `(values: Record<string, unknown>) => Record<string, unknown>` | Transforms flat form values to nested `apify` object |
-| `getDefaultValues` | `() => Record<string, unknown>` | Returns `{ apify_maxItems: 100, apify_filterByRelevance: true }` |
+| Method                | Signature                                                      | Description                                                      |
+| --------------------- | -------------------------------------------------------------- | ---------------------------------------------------------------- |
+| `getFormFields`       | `() => FormFieldDefinition[]`                                  | Returns 4 form fields for the GeneratorForm                      |
+| `getFormGroups`       | `() => FormFieldGroup[]`                                       | Returns the "Apify" collapsible group definition                 |
+| `validateFormInput`   | `(values: Record<string, unknown>) => ValidationResult`        | Validates that dataset ID or actor run ID is provided            |
+| `transformFormValues` | `(values: Record<string, unknown>) => Record<string, unknown>` | Transforms flat form values to nested `apify` object             |
+| `getDefaultValues`    | `() => Record<string, unknown>`                                | Returns `{ apify_maxItems: 100, apify_filterByRelevance: true }` |
 
 ### Form Fields
 
-| Field Name | Type | Default | Description |
-|------------|------|---------|-------------|
-| `apify_datasetId` | text | -- | Apify dataset ID to import from |
-| `apify_actorRunId` | text | -- | Actor run ID (alternative to dataset ID) |
-| `apify_maxItems` | number | 100 | Maximum items to import (0-10000) |
-| `apify_filterByRelevance` | boolean | true | Filter items by directory topic relevance |
+| Field Name                | Type    | Default | Description                               |
+| ------------------------- | ------- | ------- | ----------------------------------------- |
+| `apify_datasetId`         | text    | --      | Apify dataset ID to import from           |
+| `apify_actorRunId`        | text    | --      | Actor run ID (alternative to dataset ID)  |
+| `apify_maxItems`          | number  | 100     | Maximum items to import (0-10000)         |
+| `apify_filterByRelevance` | boolean | true    | Filter items by directory topic relevance |
 
 ## Implementation Details
 
@@ -107,14 +107,14 @@ The response is expected to be a JSON array of objects.
 
 Each Apify item is transformed to the `ItemData` format using configurable field mapping. The default mapping is:
 
-| ItemData Field | Apify Field | Fallbacks |
-|---------------|-------------|-----------|
-| `name` | `title` | `item.title`, `item.name`, `'Untitled'` |
-| `description` | `description` | `''` |
-| `source_url` | `url` | `''` |
-| `category` | `category` | `undefined` |
-| `images` | `image` | `[]` (wrapped in array if present) |
-| `slug` | (generated) | Slugified from `name`, max 100 chars |
+| ItemData Field | Apify Field   | Fallbacks                               |
+| -------------- | ------------- | --------------------------------------- |
+| `name`         | `title`       | `item.title`, `item.name`, `'Untitled'` |
+| `description`  | `description` | `''`                                    |
+| `source_url`   | `url`         | `''`                                    |
+| `category`     | `category`    | `undefined`                             |
+| `images`       | `image`       | `[]` (wrapped in array if present)      |
+| `slug`         | (generated)   | Slugified from `name`, max 100 chars    |
 
 ### Relevance Filtering
 
@@ -148,28 +148,28 @@ Slugs are generated by lowercasing the name, replacing non-alphanumeric characte
 ```typescript
 // Query items from an Apify dataset
 const result = await apifyPlugin.query({
-  settings: {
-    apiToken: 'apify_api_...',
-    datasetId: '5uxB4x3zYjV5S7nFd',
-    maxItems: 50,
-    filterByRelevance: true
-  },
-  filterContext: {
-    prompt: 'AI tools for developers',
-    subject: 'developer tools',
-    keywords: ['AI', 'developer', 'tools']
-  }
+	settings: {
+		apiToken: 'apify_api_...',
+		datasetId: '5uxB4x3zYjV5S7nFd',
+		maxItems: 50,
+		filterByRelevance: true
+	},
+	filterContext: {
+		prompt: 'AI tools for developers',
+		subject: 'developer tools',
+		keywords: ['AI', 'developer', 'tools']
+	}
 });
 
 console.log(`Imported ${result.items.length} items`);
 for (const item of result.items) {
-  console.log(`- ${item.name}: ${item.source_url}`);
+	console.log(`- ${item.name}: ${item.source_url}`);
 }
 
 // Validate form input
 const validation = apifyPlugin.validateFormInput({
-  apify_datasetId: '',
-  apify_actorRunId: ''
+	apify_datasetId: '',
+	apify_actorRunId: ''
 });
 // { valid: false, errors: [{ path: 'apify_datasetId', message: 'Either Dataset ID or Actor Run ID is required' }] }
 ```
