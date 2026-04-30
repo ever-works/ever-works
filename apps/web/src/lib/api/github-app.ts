@@ -25,6 +25,7 @@ export interface GitHubAppInstallationDto {
     createdByUserId: string | null;
     createdByGithubUserId: string | null;
     suspendedAt: string | null;
+    deletedAt: string | null;
     rawPayload?: Record<string, unknown> | null;
     createdAt: string;
     updatedAt: string;

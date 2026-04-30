@@ -25,5 +25,16 @@ export async function GET(request: NextRequest) {
         return NextResponse.redirect(new URL('/auth/error?error=oauth_callback', request.url));
     }
 
-    return NextResponse.redirect(data.url);
+    let redirectUrl: URL;
+    try {
+        redirectUrl = new URL(data.url);
+    } catch {
+        return NextResponse.redirect(new URL('/auth/error?error=oauth_callback', request.url));
+    }
+
+    if (redirectUrl.protocol !== 'https:' || redirectUrl.hostname !== 'github.com') {
+        return NextResponse.redirect(new URL('/auth/error?error=oauth_callback', request.url));
+    }
+
+    return NextResponse.redirect(redirectUrl);
 }

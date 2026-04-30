@@ -38,6 +38,9 @@ export class GitHubAppInstallation {
     @PortableDateColumn({ nullable: true })
     suspendedAt?: Date | null;
 
+    @PortableDateColumn({ nullable: true })
+    deletedAt?: Date | null;
+
     @Column({ type: 'simple-json', nullable: true })
     rawPayload?: Record<string, unknown> | null;
 

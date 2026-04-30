@@ -9,6 +9,29 @@ import { Injectable } from '@nestjs/common';
 import { config } from '@src/config/constants';
 import { GitHubAppService } from './github-app.service';
 
+type InstallationWebhookPayload = {
+    action?: string;
+    installation?: {
+        id?: number;
+        app_slug?: string;
+        target_type?: string;
+        suspended_at?: string | null;
+        account?: {
+            login?: string;
+            type?: string;
+        };
+    };
+    sender?: {
+        id?: number;
+    };
+};
+
+type InstallationRepositoriesWebhookPayload = {
+    installation?: {
+        id?: number;
+    };
+};
+
 @Injectable()
 export class GitHubAppSyncService {
     constructor(
@@ -37,6 +60,10 @@ export class GitHubAppSyncService {
         const installation =
             await this.gitHubAppInstallationRepository.findByInstallationId(installationId);
         if (!installation) {
+            return null;
+        }
+
+        if (installation.deletedAt) {
             return null;
         }
 
@@ -125,16 +152,20 @@ export class GitHubAppSyncService {
         );
     }
 
-    async handleWebhook(eventName: string, payload: any) {
+    async handleWebhook(
+        eventName: string,
+        payload: InstallationWebhookPayload | InstallationRepositoriesWebhookPayload,
+    ) {
         if (eventName === 'installation') {
-            const action = payload?.action;
-            const installationPayload = payload?.installation;
+            const installationPayloadWrapper = payload as InstallationWebhookPayload;
+            const action = installationPayloadWrapper.action;
+            const installationPayload = installationPayloadWrapper.installation;
             if (!installationPayload?.id) {
                 return;
             }
 
             if (action === 'deleted') {
-                await this.gitHubAppInstallationRepository.markSuspended(
+                await this.gitHubAppInstallationRepository.markDeleted(
                     String(installationPayload.id),
                     new Date(),
                 );
@@ -147,7 +178,10 @@ export class GitHubAppSyncService {
                 accountLogin: installationPayload.account?.login || '',
                 accountType: installationPayload.account?.type || 'User',
                 targetType: installationPayload.target_type || 'User',
-                createdByGithubUserId: payload?.sender?.id ? String(payload.sender.id) : null,
+                createdByGithubUserId: installationPayloadWrapper.sender?.id
+                    ? String(installationPayloadWrapper.sender.id)
+                    : null,
+                deletedAt: null,
                 suspendedAt:
                     action === 'suspend'
                         ? new Date()
@@ -169,7 +203,8 @@ export class GitHubAppSyncService {
         }
 
         if (eventName === 'installation_repositories') {
-            const installationId = payload?.installation?.id;
+            const installationId = (payload as InstallationRepositoriesWebhookPayload)?.installation
+                ?.id;
             if (!installationId) {
                 return;
             }

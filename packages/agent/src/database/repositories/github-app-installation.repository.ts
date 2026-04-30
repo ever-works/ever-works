@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { IsNull, Repository } from 'typeorm';
 import { GitHubAppInstallation } from '../../entities';
 
 export type UpsertGitHubAppInstallationData = {
@@ -12,6 +12,7 @@ export type UpsertGitHubAppInstallationData = {
     createdByUserId?: string | null;
     createdByGithubUserId?: string | null;
     suspendedAt?: Date | null;
+    deletedAt?: Date | null;
     rawPayload?: Record<string, unknown> | null;
 };
 
@@ -40,7 +41,7 @@ export class GitHubAppInstallationRepository {
 
     async listByCreatedByUserId(createdByUserId: string): Promise<GitHubAppInstallation[]> {
         return this.repository.find({
-            where: { createdByUserId },
+            where: { createdByUserId, deletedAt: IsNull() },
             order: {
                 createdAt: 'DESC',
             },
@@ -68,6 +69,22 @@ export class GitHubAppInstallationRepository {
         }
 
         await this.repository.update(existing.id, { suspendedAt });
+        return this.repository.findOne({ where: { id: existing.id } });
+    }
+
+    async markDeleted(
+        installationId: string,
+        deletedAt: Date | null,
+    ): Promise<GitHubAppInstallation | null> {
+        const existing = await this.findByInstallationId(installationId);
+        if (!existing) {
+            return null;
+        }
+
+        await this.repository.update(existing.id, {
+            deletedAt,
+            suspendedAt: null,
+        });
         return this.repository.findOne({ where: { id: existing.id } });
     }
 }

@@ -21,6 +21,7 @@ export class AddGitHubAppTables1761782400000 implements MigrationInterface {
                     { name: 'createdByUserId', type: 'varchar', isNullable: true },
                     { name: 'createdByGithubUserId', type: 'varchar', isNullable: true },
                     { name: 'suspendedAt', type: dateType, isNullable: true },
+                    { name: 'deletedAt', type: dateType, isNullable: true },
                     { name: 'rawPayload', type: 'text', isNullable: true },
                     this.createdAtColumn('createdAt', dateType),
                     this.createdAtColumn('updatedAt', dateType),

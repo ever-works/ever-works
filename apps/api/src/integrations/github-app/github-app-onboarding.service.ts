@@ -36,6 +36,7 @@ export class GitHubAppOnboardingService {
             accountLogin: installation.account?.login || '',
             accountType: installation.account?.type || 'User',
             targetType: installation.target_type || 'User',
+            deletedAt: null,
             suspendedAt: installation.suspended_at ? new Date(installation.suspended_at) : null,
             rawPayload: installation as unknown as Record<string, unknown>,
         });
@@ -92,6 +93,7 @@ export class GitHubAppOnboardingService {
             targetType: installationDetails.target_type || 'User',
             createdByUserId: user.id,
             createdByGithubUserId: githubUser.githubUserId,
+            deletedAt: null,
             suspendedAt: installationDetails.suspended_at
                 ? new Date(installationDetails.suspended_at)
                 : null,

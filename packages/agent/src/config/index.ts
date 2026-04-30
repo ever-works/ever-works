@@ -98,7 +98,7 @@ export const config = {
             return process.env.GITHUB_APP_ID;
         },
         getPrivateKey() {
-            return process.env.GITHUB_APP_PRIVATE_KEY;
+            return process.env.GITHUB_APP_PRIVATE_KEY?.replace(/\\n/g, '\n');
         },
     },
 
