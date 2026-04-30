@@ -200,7 +200,6 @@ interface DirectoryGenerationPayload {
 
 ## See Also
 
-- [Items Generation Spec](../features/items-generation/spec.md)
 - [Data Generator Spec](../features/data-generator/spec.md)
 - [Markdown Generator Spec](../features/markdown-generator/spec.md)
 - [Website Generator Spec](../features/website-generator/spec.md)
