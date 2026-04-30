@@ -1,12 +1,7 @@
 import type { ProvidersDto } from '../generator/providers.dto.js';
 import type { DirectoryScheduleCadence } from './schedule.enum.js';
 
-export const IMPORT_SOURCE_TYPES = [
-	'data_repo',
-	'awesome_readme',
-	'link_existing',
-	'works_config'
-] as const;
+export const IMPORT_SOURCE_TYPES = ['data_repo', 'awesome_readme', 'link_existing', 'works_config'] as const;
 
 export type ImportSourceType = (typeof IMPORT_SOURCE_TYPES)[number];
 
