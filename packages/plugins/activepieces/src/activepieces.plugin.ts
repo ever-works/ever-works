@@ -344,8 +344,29 @@ export class ActivepiecesPlugin implements IPlugin, IPipelinePlugin, IFormSchema
 
 			logger.log(
 				`Activepieces flow completed. duration: ${execResult.flowDuration ?? 'unknown'}ms` +
-					(execResult.flowRunId ? `, runId: ${execResult.flowRunId}` : '')
+					(execResult.flowRunId ? `, runId: ${execResult.flowRunId}` : '') +
+					(execResult.run?.status ? `, status: ${execResult.run.status}` : '')
 			);
+
+			// In async mode we have no response body, so the run record is authoritative.
+			// In sync mode the HTTP 200 already proves the Return Response action fired —
+			// trust the body and only log a warning if the run record disagrees.
+			if (execResult.run?.status && execResult.run.status !== 'SUCCEEDED') {
+				const failedStep = execResult.run.failedStep?.displayName ?? execResult.run.failedStep?.name;
+				const reason = failedStep
+					? `failed at step "${failedStep}" (status: ${execResult.run.status})`
+					: `did not succeed (status: ${execResult.run.status})`;
+
+				if (apSettings.webhookMode === 'async') {
+					throw new Error(
+						`Activepieces flow run ${reason}. Inspect the run in the Activepieces dashboard.`
+					);
+				}
+				logger.warn(
+					`Activepieces sync flow returned a body but the run record ${reason}. ` +
+						'Proceeding with the response body — verify the items below are correct.'
+				);
+			}
 			setState('execute-flow', 'completed');
 
 			if (signal.aborted) return handleCancel();
@@ -396,7 +417,10 @@ export class ActivepiecesPlugin implements IPlugin, IPipelinePlugin, IFormSchema
 				flowId,
 				flowRunId: execResult.flowRunId,
 				flowDuration: execResult.flowDuration,
-				webhookMode: apSettings.webhookMode
+				webhookMode: apSettings.webhookMode,
+				runStatus: execResult.run?.status,
+				failedStepName: execResult.run?.failedStep?.name,
+				finishTime: execResult.run?.finishTime
 			};
 			state = finalizeCompletedState(state);
 			this._lastState = state;
