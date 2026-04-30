@@ -9,6 +9,11 @@ import { getDirectoryOwner } from '../../utils/directory.utils';
 import * as fs from 'node:fs/promises';
 import { cloneFreshRepository } from '../../utils/fresh-repository-clone.utils';
 import { assertCreatedRepositoryTarget } from '../../utils/git-repository.utils';
+import { throwIfGenerationCancelled } from '../../utils/generation-cancellation.utils';
+
+type WebsiteGenerationOptions = {
+    signal?: AbortSignal;
+};
 
 @Injectable()
 export class WebsiteGeneratorService {
@@ -24,7 +29,10 @@ export class WebsiteGeneratorService {
         user: User,
         owner: string,
         repo: string,
+        options: WebsiteGenerationOptions = {},
     ) {
+        throwIfGenerationCancelled(options.signal);
+
         const directoryOwner = getDirectoryOwner(directory);
         const committer = directory.resolveCommitter(user);
 
@@ -39,6 +47,7 @@ export class WebsiteGeneratorService {
             },
             this.logger,
         );
+        throwIfGenerationCancelled(options.signal);
 
         await fs.rm(repoDir, { recursive: true, force: true }).catch(() => {});
     }
@@ -74,11 +83,18 @@ export class WebsiteGeneratorService {
         }
     }
 
-    private async duplicate(directory: Directory, user: User) {
+    private async duplicate(
+        directory: Directory,
+        user: User,
+        options: WebsiteGenerationOptions = {},
+    ) {
+        throwIfGenerationCancelled(options.signal);
+
         const directoryOwner = getDirectoryOwner(directory);
         const committer = directory.resolveCommitter(user);
 
         await this.cleanup(directory);
+        throwIfGenerationCancelled(options.signal);
 
         // Clone template repo
         const templateDir = await this.gitFacade.cloneOrPull(
@@ -90,6 +106,7 @@ export class WebsiteGeneratorService {
             },
             { userId: directoryOwner.id, providerId: directory.gitProvider },
         );
+        throwIfGenerationCancelled(options.signal);
 
         // Create target repo
         const websiteOwner = directory.getRepoOwner('website');
@@ -114,7 +131,9 @@ export class WebsiteGeneratorService {
             user,
             websiteRepository.owner,
             websiteRepository.name,
+            options,
         );
+        throwIfGenerationCancelled(options.signal);
 
         // Push template to target repo
         const targetCloneUrl = this.gitFacade.getCloneUrl(
@@ -136,13 +155,20 @@ export class WebsiteGeneratorService {
             { dir: templateDir, force: true },
             { userId: directoryOwner.id, providerId: directory.gitProvider },
         );
+        throwIfGenerationCancelled(options.signal);
 
         await this.ensureTemplateDefaultBranch(directory, directoryOwner.id);
 
         return templateDir;
     }
 
-    private async createUsingTemplate(directory: Directory, user: User) {
+    private async createUsingTemplate(
+        directory: Directory,
+        user: User,
+        options: WebsiteGenerationOptions = {},
+    ) {
+        throwIfGenerationCancelled(options.signal);
+
         const directoryOwner = getDirectoryOwner(directory);
         const websiteOwner = directory.getRepoOwner('website');
         const websiteRepo = directory.getWebsiteRepo();
@@ -157,6 +183,7 @@ export class WebsiteGeneratorService {
             },
             { userId: directoryOwner.id, providerId: directory.gitProvider },
         );
+        throwIfGenerationCancelled(options.signal);
 
         if (createdWebsiteRepository) {
             assertCreatedRepositoryTarget(
@@ -171,6 +198,7 @@ export class WebsiteGeneratorService {
                 user,
                 createdWebsiteRepository.owner,
                 createdWebsiteRepository.name,
+                options,
             );
         }
     }
@@ -179,24 +207,30 @@ export class WebsiteGeneratorService {
         directory: Directory,
         user: User,
         operation: WebsiteRepositoryCreationMethod = WebsiteRepositoryCreationMethod.DUPLICATE,
+        options: WebsiteGenerationOptions = {},
     ) {
         let path: string | undefined;
         const directoryOwner = getDirectoryOwner(directory);
 
         try {
+            throwIfGenerationCancelled(options.signal);
+
             if (operation === WebsiteRepositoryCreationMethod.DUPLICATE) {
-                path = await this.duplicate(directory, user);
+                path = await this.duplicate(directory, user, options);
             } else if (operation === WebsiteRepositoryCreationMethod.CREATE_USING_TEMPLATE) {
                 try {
-                    await this.createUsingTemplate(directory, user);
+                    await this.createUsingTemplate(directory, user, options);
                 } catch {
-                    path = await this.duplicate(directory, user);
+                    throwIfGenerationCancelled(options.signal);
+                    path = await this.duplicate(directory, user, options);
                 }
             } else {
-                path = await this.duplicate(directory, user);
+                path = await this.duplicate(directory, user, options);
             }
 
+            throwIfGenerationCancelled(options.signal);
             await this.syncAllBranchesFromTemplate(directory, user, true);
+            throwIfGenerationCancelled(options.signal);
             await this.ensureTemplateDefaultBranch(directory, directoryOwner.id);
         } finally {
             if (path) {

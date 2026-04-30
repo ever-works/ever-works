@@ -31,7 +31,7 @@ import type {
 } from '@ever-works/plugin';
 import type { DirectoryHistoryChangeEntry } from '@ever-works/contracts/api';
 import type { GenerationLogCollector } from './generation-log-collector';
-import { GENERATION_CANCELLED } from '@src/constants/messages';
+import { throwIfGenerationCancelled } from '@src/utils';
 import { WorksConfigWriterService } from '@src/works-config/services/works-config-writer.service';
 import type { ResolvedWorksConfig } from '@src/works-config/services/works-config.service';
 
@@ -112,18 +112,7 @@ export class DataGeneratorService {
             `Initializing data repository for directory: ${JSON.stringify(createItemsGeneratorDto)}`,
         );
 
-        const throwIfCancelled = () => {
-            if (options?.signal?.aborted) {
-                const reason = options.signal.reason;
-                if (reason instanceof Error) {
-                    throw reason;
-                }
-
-                const error = new Error(GENERATION_CANCELLED);
-                error.name = 'AbortError';
-                throw error;
-            }
-        };
+        const throwIfCancelled = () => throwIfGenerationCancelled(options?.signal);
 
         let existingData = {
             existingItems: [],

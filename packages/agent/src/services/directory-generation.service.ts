@@ -78,6 +78,11 @@ import {
 import { buildDirectoryChangelog } from '../utils/directory-changelog.utils';
 import { GenerationLogCollector } from '@src/generators/data-generator/generation-log-collector';
 import { GENERATION_CANCELLED } from '@src/constants/messages';
+import {
+    createGenerationCancelledError,
+    isGenerationCancelledError,
+    throwIfGenerationCancelled,
+} from '@src/utils';
 
 export interface BulkCaptureImagesDto {
     itemSlugs?: string[];
@@ -386,7 +391,7 @@ export class DirectoryGenerationService {
 
         const controller = this.generationAbortControllers.get(directoryId);
         if (controller) {
-            controller.abort(this.createGenerationCancelledError());
+            controller.abort(createGenerationCancelledError());
             return {
                 status: 'success',
                 message: 'Cancellation requested. The generation will stop shortly.',
@@ -1395,6 +1400,10 @@ Only include image URLs that are absolute URLs (starting with http).`;
         );
 
         if (generationError) {
+            if (isGenerationCancelledError(generationError)) {
+                return;
+            }
+
             this.logger.error('Error during generation:', generationError);
             await this.handleErrorNotification(generationError, user, directory);
 
@@ -1435,20 +1444,17 @@ Only include image URLs that are absolute URLs (starting with http).`;
         const newItemsCount = generated.stats?.newItemsCount ?? 0;
         const updatedItemsCount = generated.stats?.updatedItemsCount ?? 0;
 
-        if (signal?.aborted) {
-            throw this.createGenerationCancelledError();
-        }
+        throwIfGenerationCancelled(signal);
 
         if (newItemsCount > 0 || updatedItemsCount > 0) {
             await this.markdownGenerator.initialize(directory, user, {
                 generation_method: dto.generation_method,
                 pr_update: generated.prUpdate,
+                signal,
             });
         }
 
-        if (signal?.aborted) {
-            throw this.createGenerationCancelledError();
-        }
+        throwIfGenerationCancelled(signal);
 
         if (generated.hasExistingItems || newItemsCount > 0) {
             try {
@@ -1456,6 +1462,7 @@ Only include image URLs that are absolute URLs (starting with http).`;
                     directory,
                     user,
                     dto.website_repository_creation_method,
+                    { signal },
                 );
             } catch (error) {
                 if (
@@ -1520,25 +1527,15 @@ Only include image URLs that are absolute URLs (starting with http).`;
         const { directoryId, startTime, history, error, stats, warnings, context } = params;
         const endTime = new Date();
         const durationInSeconds = calculateDurationSeconds(startTime, endTime);
-        const wasCancelled = this.isGenerationCancelledError(error);
-        const finalStatus = wasCancelled
-            ? GenerateStatusType.CANCELLED
-            : error
-              ? GenerateStatusType.ERROR
-              : GenerateStatusType.GENERATED;
+        const finalStatus = this.resolveGenerationFinalStatus(error);
+        const errorMessage = this.resolveGenerationErrorMessage(error);
 
         // 1. Finalize directory status
         await Promise.all([
             this.directoryRepository.recordGenerationFinishTime(directoryId, endTime),
             this.directoryRepository.updateGenerateStatus(directoryId, {
                 status: finalStatus,
-                ...(error
-                    ? {
-                          error: wasCancelled
-                              ? GENERATION_CANCELLED
-                              : normalizeGeneratorError(error),
-                      }
-                    : { step: null }),
+                ...(errorMessage ? { error: errorMessage } : { step: null }),
                 warnings,
             }),
         ]);
@@ -1549,43 +1546,52 @@ Only include image URLs that are absolute URLs (starting with http).`;
                 status: finalStatus,
                 finishedAt: endTime,
                 durationInSeconds,
-                ...(error
-                    ? {
-                          errorMessage: wasCancelled
-                              ? GENERATION_CANCELLED
-                              : normalizeGeneratorError(error),
-                      }
-                    : {}),
+                ...(errorMessage ? { errorMessage } : {}),
                 ...buildStatsUpdate(stats),
             });
         }
 
         // 3. Finalize schedule
         if (context.triggeredBy === 'schedule' && context.scheduleId) {
-            const outcome: ScheduleRunOutcome = error
-                ? { status: 'failed', reason: normalizeGeneratorError(error) }
-                : { status: 'completed', historyId: history?.id };
-            await this.directoryScheduleService.finalizeScheduleRun(context.scheduleId, outcome);
+            await this.directoryScheduleService.finalizeScheduleRun(
+                context.scheduleId,
+                this.buildScheduleRunOutcome(error, history?.id),
+            );
         }
     }
 
-    private createGenerationCancelledError(): Error {
-        const error = new Error(GENERATION_CANCELLED);
-        error.name = 'AbortError';
-        return error;
+    private resolveGenerationFinalStatus(error: unknown): GenerateStatusType {
+        if (isGenerationCancelledError(error)) {
+            return GenerateStatusType.CANCELLED;
+        }
+
+        if (error) {
+            return GenerateStatusType.ERROR;
+        }
+
+        return GenerateStatusType.GENERATED;
     }
 
-    private isGenerationCancelledError(error: unknown): boolean {
+    private resolveGenerationErrorMessage(error: unknown): string | undefined {
         if (!error) {
-            return false;
+            return undefined;
         }
 
-        if (error instanceof Error) {
-            const message = error.message.toLowerCase();
-            return error.name === 'AbortError' || message === GENERATION_CANCELLED.toLowerCase();
+        if (isGenerationCancelledError(error)) {
+            return GENERATION_CANCELLED;
         }
 
-        return false;
+        return normalizeGeneratorError(error);
+    }
+
+    private buildScheduleRunOutcome(error: unknown, historyId?: string): ScheduleRunOutcome {
+        const reason = this.resolveGenerationErrorMessage(error);
+
+        if (reason) {
+            return { status: 'failed', reason };
+        }
+
+        return { status: 'completed', historyId };
     }
 
     private async finalizeCancelledGeneration(

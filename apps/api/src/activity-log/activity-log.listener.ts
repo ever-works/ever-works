@@ -44,19 +44,13 @@ export class ActivityLogListener {
     async onGenerationCompleted(event: DirectoryGenerationCompletedEvent) {
         try {
             const directory = event.directory;
-            const generateStatus = directory.generateStatus?.status;
             const latestHistory =
                 await this.generationHistoryRepository.findLatestCompletedByDirectory(directory.id);
-            const status =
-                generateStatus === 'error' || generateStatus === 'cancelled'
-                    ? ActivityStatus.FAILED
-                    : ActivityStatus.COMPLETED;
-            const summary =
-                generateStatus === 'cancelled'
-                    ? `Generation cancelled for ${directory.name}`
-                    : status === ActivityStatus.FAILED
-                      ? `Generation failed for ${directory.name}`
-                      : this.activityLogService.formatGenerationSummary(latestHistory);
+            const status = this.activityLogService.resolveGenerationActivityStatus(directory);
+            const summary = this.activityLogService.formatGenerationCompletionSummary(
+                directory,
+                latestHistory,
+            );
 
             const details = {
                 itemsCount: latestHistory?.totalItemsCount ?? directory.itemsCount ?? 0,

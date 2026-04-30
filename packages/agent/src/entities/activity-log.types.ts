@@ -60,6 +60,7 @@ export enum ActivityStatus {
     IN_PROGRESS = 'in_progress',
     COMPLETED = 'completed',
     FAILED = 'failed',
+    CANCELLED = 'cancelled',
 }
 
 export interface CreateActivityLogDto {

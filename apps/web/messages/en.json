@@ -553,7 +553,8 @@
                     "pending": "Pending",
                     "inProgress": "In Progress",
                     "completed": "Completed",
-                    "failed": "Failed"
+                    "failed": "Failed",
+                    "cancelled": "Cancelled"
                 }
             },
             "actions": {
