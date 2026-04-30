@@ -41,9 +41,9 @@
 	},
 	"keywords": [],
 	"devDependencies": {
-		"@types/node": "^22.19.11",
 		"@commitlint/cli": "^19.8.1",
 		"@commitlint/config-conventional": "^19.8.1",
+		"@types/node": "^22.19.11",
 		"husky": "^9.1.7",
 		"prettier": "^3.7.4",
 		"prettier-eslint-cli": "^8.0.1",
@@ -54,7 +54,7 @@
 		"node": ">=20",
 		"pnpm": ">=9.9.0"
 	},
-	"packageManager": "pnpm@10.33.0",
+	"packageManager": "pnpm@10.33.2",
 	"prettier": {
 		"printWidth": 120,
 		"singleQuote": true,
