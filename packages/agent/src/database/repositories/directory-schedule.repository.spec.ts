@@ -5,6 +5,7 @@ import { DirectoryScheduleStatus, GenerateStatusType } from '@src/entities/types
 describe('DirectoryScheduleRepository', () => {
     let repository: {
         findOne: jest.Mock;
+        upsert: jest.Mock;
         createQueryBuilder: jest.Mock;
     };
     let queryBuilder: {
@@ -27,6 +28,7 @@ describe('DirectoryScheduleRepository', () => {
 
         repository = {
             findOne: jest.fn(),
+            upsert: jest.fn(),
             createQueryBuilder: jest.fn().mockReturnValue(queryBuilder),
         };
 
@@ -63,7 +65,9 @@ describe('DirectoryScheduleRepository', () => {
         expect(queryBuilder.andWhere).toHaveBeenNthCalledWith(1, 'status = :status', {
             status: DirectoryScheduleStatus.ACTIVE,
         });
-        expect(queryBuilder.andWhere).toHaveBeenNthCalledWith(2, 'nextRunAt IS NOT NULL');
+        expect(queryBuilder.andWhere).toHaveBeenNthCalledWith(2, 'nextRunAt = :nextRunAt', {
+            nextRunAt,
+        });
         expect(result).toBe(nextRunAt);
     });
 
@@ -77,5 +81,24 @@ describe('DirectoryScheduleRepository', () => {
         const result = await scheduleRepository.tryMarkDispatched('schedule-1');
 
         expect(result).toBeNull();
+    });
+
+    it('uses database-native upsert by directoryId', async () => {
+        repository.upsert.mockResolvedValue(undefined);
+        repository.findOne.mockResolvedValue({ id: 'schedule-1', directoryId: 'dir-1' });
+
+        await scheduleRepository.upsert('dir-1', {
+            userId: 'user-1',
+            status: DirectoryScheduleStatus.ACTIVE,
+        } as any);
+
+        expect(repository.upsert).toHaveBeenCalledWith(
+            {
+                directoryId: 'dir-1',
+                userId: 'user-1',
+                status: DirectoryScheduleStatus.ACTIVE,
+            },
+            ['directoryId'],
+        );
     });
 });
