@@ -7,7 +7,7 @@ sidebar_position: 4
 
 # Scheduled Updates
 
-Scheduled Updates let you keep a directory's content fresh by re-running the AI generation pipeline on a recurring basis. You can choose from hourly, daily, weekly, or monthly cadences, and the platform handles retries, failure tracking, and billing automatically.
+Scheduled Updates let you keep a directory's content fresh by re-running the AI generation pipeline on a recurring basis. You can choose from seven cadences ranging from hourly to monthly, and the platform handles retries, failure tracking, and billing automatically.
 
 :::tip When to use this
 Enable scheduled updates on directories where the underlying data changes frequently — for example, a directory of trending open-source projects that should reflect new entries every week.
@@ -31,12 +31,15 @@ Enable scheduled updates on directories where the underlying data changes freque
 
 ### Cadences
 
-| Cadence   | Interval       |
-| --------- | -------------- |
-| `hourly`  | Every hour     |
-| `daily`   | Every 24 hours |
-| `weekly`  | Every 7 days   |
-| `monthly` | Every 30 days  |
+| Cadence          | Interval       |
+| ---------------- | -------------- |
+| `hourly`         | Every hour     |
+| `every_3_hours`  | Every 3 hours  |
+| `every_8_hours`  | Every 8 hours  |
+| `every_12_hours` | Every 12 hours |
+| `daily`          | Every 24 hours |
+| `weekly`         | Every 7 days   |
+| `monthly`        | Every 30 days  |
 
 Available cadences may depend on your subscription plan. Cadences not included in your plan can still be used with pay-per-use billing.
 
@@ -49,13 +52,13 @@ Available cadences may depend on your subscription plan. Cadences not included i
 
 ### Settings
 
-| Field                     | Type    | Default        | Description                                                                               |
-| ------------------------- | ------- | -------------- | ----------------------------------------------------------------------------------------- |
-| `cadence`                 | string  | —              | `hourly`, `daily`, `weekly`, or `monthly` (required on creation)                          |
-| `billingMode`             | string  | `subscription` | `subscription` or `usage`                                                                 |
-| `maxFailureBeforePause`   | number  | `3`            | Consecutive failures before auto-pause (1–10)                                             |
-| `alwaysCreatePullRequest` | boolean | `false`        | Force a PR for every scheduled run                                                        |
-| `providerOverrides`       | object  | `null`         | Override AI, search, screenshot, content extractor, or pipeline plugins for this schedule |
+| Field                     | Type    | Default        | Description                                                                                                          |
+| ------------------------- | ------- | -------------- | -------------------------------------------------------------------------------------------------------------------- |
+| `cadence`                 | string  | —              | `hourly`, `every_3_hours`, `every_8_hours`, `every_12_hours`, `daily`, `weekly`, or `monthly` (required on creation) |
+| `billingMode`             | string  | `subscription` | `subscription` or `usage`                                                                                            |
+| `maxFailureBeforePause`   | number  | `3`            | Consecutive failures before auto-pause (1–10)                                                                        |
+| `alwaysCreatePullRequest` | boolean | `false`        | Force a PR for every scheduled run                                                                                   |
+| `providerOverrides`       | object  | `null`         | Override AI, search, screenshot, content extractor, or pipeline plugins for this schedule                            |
 
 ### Provider Overrides
 
@@ -133,14 +136,14 @@ curl -X PUT http://localhost:3100/api/directories/<directory-id>/schedule \
 
 **Request body — all fields optional:**
 
-| Field                     | Type           | Description                               |
-| ------------------------- | -------------- | ----------------------------------------- |
-| `enable`                  | boolean        | `true` to activate, `false` to pause      |
-| `cadence`                 | string         | `hourly`, `daily`, `weekly`, or `monthly` |
-| `billingMode`             | string         | `subscription` or `usage`                 |
-| `maxFailureBeforePause`   | number         | 1–10                                      |
-| `alwaysCreatePullRequest` | boolean        | Force PR on every run                     |
-| `providerOverrides`       | object or null | Plugin overrides (set to `null` to clear) |
+| Field                     | Type           | Description                                                                                   |
+| ------------------------- | -------------- | --------------------------------------------------------------------------------------------- |
+| `enable`                  | boolean        | `true` to activate, `false` to pause                                                          |
+| `cadence`                 | string         | `hourly`, `every_3_hours`, `every_8_hours`, `every_12_hours`, `daily`, `weekly`, or `monthly` |
+| `billingMode`             | string         | `subscription` or `usage`                                                                     |
+| `maxFailureBeforePause`   | number         | 1–10                                                                                          |
+| `alwaysCreatePullRequest` | boolean        | Force PR on every run                                                                         |
+| `providerOverrides`       | object or null | Plugin overrides (set to `null` to clear)                                                     |
 
 **Errors:**
 

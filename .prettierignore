@@ -4,3 +4,13 @@
 /coverage
 **/.next
 **/next-env.d.ts
+
+# Docusaurus generated artifacts
+**/.docusaurus
+apps/docs/build
+**/build/assets/**
+**/search-index.json
+
+# Generic build outputs
+**/build
+

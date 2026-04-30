@@ -16,6 +16,8 @@ This section covers individual capabilities built into the Ever Works Platform b
 | [Collections](./collections)                         | Curate items into named groups like "Editor's Picks" or "Best for Beginners"                                |
 | [Item Source Validation](./item-source-validation)   | Validate whether item source URLs are both reachable and actually good sources for the item                 |
 | [Scheduled Updates](./scheduled-updates)             | Re-run the AI generation pipeline on a recurring cadence to keep content fresh                              |
+| [Generation Cancellation](./generation-cancellation) | Cancel an in-flight generation and roll back to a clean state from the dashboard or API                     |
+| [works.yml Config](./works-config)                   | Source-controlled directory configuration in the data repo — used for onboarding existing repos and sync    |
 | [Directory Import](./directory-import)               | Bootstrap a directory from an existing data repo or Awesome List README                                     |
 | [Directory Members](./directory-members)             | Invite collaborators with role-based access (Manager, Editor, Viewer)                                       |
 | [Comparisons](./comparisons)                         | Automatically generate A vs B comparison pages between directory items with AI-powered research and scoring |

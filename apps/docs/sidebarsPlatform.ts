@@ -46,6 +46,8 @@ const sidebars: SidebarsConfig = {
 				'features/collections',
 				'features/item-source-validation',
 				'features/scheduled-updates',
+				'features/generation-cancellation',
+				'features/works-config',
 				'features/directory-import',
 				'features/directory-members',
 				'features/comparisons',
