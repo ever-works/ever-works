@@ -5,7 +5,7 @@ import {
     UserRepository,
 } from '@ever-works/agent/database';
 import { GitHubAppInstallation, User } from '@ever-works/agent/entities';
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable, UnauthorizedException } from '@nestjs/common';
 import { config } from '@src/config/constants';
 import * as bcrypt from 'bcrypt';
 import { createHmac, randomUUID, timingSafeEqual } from 'node:crypto';
@@ -136,6 +136,11 @@ export class GitHubAppOnboardingService {
 
         if (!user && input.email) {
             user = await this.userRepository.findByEmail(input.email);
+            if (user && !input.emailVerified) {
+                throw new UnauthorizedException(
+                    'Unable to link this GitHub App user because the provider email is not verified',
+                );
+            }
         }
 
         if (!user) {
