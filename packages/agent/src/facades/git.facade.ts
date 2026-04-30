@@ -29,8 +29,11 @@ import {
     AuthAccountRepository,
     buildPluginProviderId,
 } from '../database/repositories/auth-account.repository';
+import { DirectoryRepository } from '../database/repositories/directory.repository';
 import type { AuthAccount } from '../entities';
 import { FacadeError } from './base.facade';
+import { config } from '@src/config';
+import { createSign } from 'node:crypto';
 
 // Facade-specific types that don't require token (facade resolves token internally)
 export interface FacadeCloneOptions {
@@ -110,6 +113,7 @@ export class GitFacadeService implements IGitFacade {
         private readonly registry: PluginRegistryService,
         private readonly authAccountRepository: AuthAccountRepository,
         private readonly settingsService: PluginSettingsService,
+        private readonly directoryRepository: DirectoryRepository,
     ) {}
 
     private getRequiredOAuthScopes(providerId: string): readonly string[] {
@@ -206,6 +210,11 @@ export class GitFacadeService implements IGitFacade {
         if (!options.userId || !options.providerId) return false;
 
         try {
+            const linkedToken = await this.getInstallationTokenForDirectory(options);
+            if (linkedToken) {
+                return true;
+            }
+
             const plugin = await this.resolvePlugin(
                 options.providerId,
                 options.userId,
@@ -235,6 +244,11 @@ export class GitFacadeService implements IGitFacade {
         if (!options.userId || !options.providerId) return null;
 
         try {
+            const linkedToken = await this.getInstallationTokenForDirectory(options);
+            if (linkedToken) {
+                return linkedToken;
+            }
+
             const plugin = await this.resolvePlugin(
                 options.providerId,
                 options.userId,
@@ -815,6 +829,11 @@ export class GitFacadeService implements IGitFacade {
             );
         }
 
+        const linkedToken = await this.getInstallationTokenForDirectory(options);
+        if (linkedToken) {
+            return { plugin, token: linkedToken };
+        }
+
         // 1. Try the connected provider account first (for OAuth-based plugins like GitHub)
         const account = await this.findUsableGitProviderAccount(options.userId, plugin.id);
         if (account?.accessToken) {
@@ -879,5 +898,78 @@ export class GitFacadeService implements IGitFacade {
             }
         }
         throw new GitProviderNotFoundError(providerId);
+    }
+
+    private async getInstallationTokenForDirectory(
+        options: GitFacadeOptions,
+    ): Promise<string | null> {
+        if (!options.directoryId || options.providerId !== 'github') {
+            return null;
+        }
+
+        const directory = await this.directoryRepository.findById(options.directoryId);
+        const auth = directory?.sourceRepository?.auth;
+
+        if (!auth || auth.mode !== 'github_app_installation' || !auth.installationId) {
+            return null;
+        }
+
+        return this.createGitHubAppInstallationToken(auth.installationId);
+    }
+
+    private async createGitHubAppInstallationToken(installationId: string): Promise<string | null> {
+        const appId = config.githubApp.getAppId();
+        const privateKey = config.githubApp.getPrivateKey();
+
+        if (!appId || !privateKey) {
+            return null;
+        }
+
+        const jwt = this.createGitHubAppJwt(appId, privateKey);
+        const response = await fetch(
+            `https://api.github.com/app/installations/${installationId}/access_tokens`,
+            {
+                method: 'POST',
+                headers: {
+                    Accept: 'application/vnd.github+json',
+                    Authorization: `Bearer ${jwt}`,
+                    'User-Agent': 'Ever Works',
+                    'X-GitHub-Api-Version': '2022-11-28',
+                },
+            },
+        );
+
+        if (!response.ok) {
+            throw new GitFacadeError(
+                `Failed to create GitHub App installation token: ${response.status} ${response.statusText}`,
+                'createInstallationToken',
+                'github',
+            );
+        }
+
+        const data = (await response.json()) as { token?: string };
+        return data.token || null;
+    }
+
+    private createGitHubAppJwt(appId: string, privateKey: string): string {
+        const now = Math.floor(Date.now() / 1000);
+        const header = Buffer.from(JSON.stringify({ alg: 'RS256', typ: 'JWT' })).toString(
+            'base64url',
+        );
+        const payload = Buffer.from(
+            JSON.stringify({
+                iat: now - 60,
+                exp: now + 9 * 60,
+                iss: appId,
+            }),
+        ).toString('base64url');
+        const unsignedToken = `${header}.${payload}`;
+
+        const signer = createSign('RSA-SHA256');
+        signer.update(unsignedToken);
+        signer.end();
+
+        const signature = signer.sign(privateKey).toString('base64url');
+        return `${unsignedToken}.${signature}`;
     }
 }

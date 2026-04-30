@@ -37,6 +37,7 @@ export class RepositoryManagementService {
                     const data = await this.gitFacade.getRepository(owner, repo.name, {
                         userId: user.id,
                         providerId: directory.gitProvider,
+                        directoryId: directory.id,
                     });
                     if (data) {
                         return {
@@ -110,7 +111,7 @@ export class RepositoryManagementService {
             owner,
             repoName,
             { isPrivate },
-            { userId: user.id, providerId: directory.gitProvider },
+            { userId: user.id, providerId: directory.gitProvider, directoryId: directory.id },
         );
 
         // Update DB cache

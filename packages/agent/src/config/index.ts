@@ -93,6 +93,15 @@ export const config = {
         },
     },
 
+    githubApp: {
+        getAppId() {
+            return process.env.GITHUB_APP_ID;
+        },
+        getPrivateKey() {
+            return process.env.GITHUB_APP_PRIVATE_KEY;
+        },
+    },
+
     // Git configuration
     git: {
         getName() {

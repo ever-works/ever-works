@@ -113,6 +113,13 @@ export class GitHubAppSyncService {
                 name: analysis.worksConfig?.name || repository.repo,
                 gitProvider: 'github',
                 organization: installation.targetType === 'Organization',
+                auth: {
+                    mode: 'github_app_installation',
+                    providerId: 'github',
+                    installationId,
+                    installationRepositoryId: repository.id,
+                    repoFullName: repository.fullName,
+                },
             },
             user,
         );

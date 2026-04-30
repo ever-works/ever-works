@@ -50,7 +50,11 @@ export class ItemSubmissionService {
                     repo,
                     committer,
                 },
-                { userId: directoryOwner.id, providerId: directory.gitProvider },
+                {
+                    userId: directoryOwner.id,
+                    providerId: directory.gitProvider,
+                    directoryId: directory.id,
+                },
             );
 
             const data = await DataRepository.create(dest);
@@ -182,7 +186,11 @@ export class ItemSubmissionService {
             // Push changes
             await this.gitFacade.push(
                 { dir: dest },
-                { userId: directoryOwner.id, providerId: directory.gitProvider },
+                {
+                    userId: directoryOwner.id,
+                    providerId: directory.gitProvider,
+                    directoryId: directory.id,
+                },
             );
 
             // If direct commit, return success without PR
@@ -240,7 +248,11 @@ export class ItemSubmissionService {
                     title: prTitle,
                     body: prBody,
                 },
-                { userId: directoryOwner.id, providerId: directory.gitProvider },
+                {
+                    userId: directoryOwner.id,
+                    providerId: directory.gitProvider,
+                    directoryId: directory.id,
+                },
             );
 
             this.logger.log(`PR #${pr.number} created for item "${itemWithMarkdown.name}"`);
@@ -295,7 +307,11 @@ export class ItemSubmissionService {
                     repo,
                     committer,
                 },
-                { userId: directoryOwner.id, providerId: directory.gitProvider },
+                {
+                    userId: directoryOwner.id,
+                    providerId: directory.gitProvider,
+                    directoryId: directory.id,
+                },
             );
 
             const data = await DataRepository.create(dest);
@@ -372,7 +388,11 @@ export class ItemSubmissionService {
             // Push changes
             await this.gitFacade.push(
                 { dir: dest },
-                { userId: directoryOwner.id, providerId: directory.gitProvider },
+                {
+                    userId: directoryOwner.id,
+                    providerId: directory.gitProvider,
+                    directoryId: directory.id,
+                },
             );
 
             if (shouldCreatePR && branchName && defaultBranch) {
@@ -394,7 +414,11 @@ export class ItemSubmissionService {
                         title: prTitle,
                         body: prBody,
                     },
-                    { userId: directoryOwner.id, providerId: directory.gitProvider },
+                    {
+                        userId: directoryOwner.id,
+                        providerId: directory.gitProvider,
+                        directoryId: directory.id,
+                    },
                 );
 
                 return {
@@ -454,7 +478,11 @@ export class ItemSubmissionService {
                     repo,
                     committer,
                 },
-                { userId: directoryOwner.id, providerId: directory.gitProvider },
+                {
+                    userId: directoryOwner.id,
+                    providerId: directory.gitProvider,
+                    directoryId: directory.id,
+                },
             );
 
             const data = await DataRepository.create(dest);
@@ -543,7 +571,11 @@ export class ItemSubmissionService {
             );
             await this.gitFacade.push(
                 { dir: dest },
-                { userId: directoryOwner.id, providerId: directory.gitProvider },
+                {
+                    userId: directoryOwner.id,
+                    providerId: directory.gitProvider,
+                    directoryId: directory.id,
+                },
             );
 
             if (shouldCreatePR && branchName && defaultBranch) {
@@ -565,7 +597,11 @@ export class ItemSubmissionService {
                         title: prTitle,
                         body: prBody,
                     },
-                    { userId: directoryOwner.id, providerId: directory.gitProvider },
+                    {
+                        userId: directoryOwner.id,
+                        providerId: directory.gitProvider,
+                        directoryId: directory.id,
+                    },
                 );
 
                 return {

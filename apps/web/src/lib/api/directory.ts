@@ -121,6 +121,17 @@ export interface SourceRepository {
     importedAt: string;
     relatedRepositories?: RelatedRepositories;
     worksConfig?: WorksConfigSnapshot;
+    auth?:
+        | {
+              mode: 'github_app_installation';
+              providerId: 'github';
+              installationId: string;
+              installationRepositoryId?: string;
+              repoFullName?: string;
+          }
+        | {
+              mode: 'none';
+          };
 }
 
 export interface RepositoryTarget {

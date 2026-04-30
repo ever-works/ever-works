@@ -319,6 +319,18 @@ export type WorksConfigSnapshot = {
     additionalAgentsCount?: number;
 };
 
+export type SourceRepositoryAuth =
+    | {
+          mode: 'github_app_installation';
+          providerId: 'github';
+          installationId: string;
+          installationRepositoryId?: string;
+          repoFullName?: string;
+      }
+    | {
+          mode: 'none';
+      };
+
 export interface SourceRepository {
     url: string;
     owner: string;
@@ -327,6 +339,7 @@ export interface SourceRepository {
     importedAt: Date;
     relatedRepositories?: RelatedRepositories;
     worksConfig?: WorksConfigSnapshot;
+    auth?: SourceRepositoryAuth;
 }
 
 export interface RepoVisibility {

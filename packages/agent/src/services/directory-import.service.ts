@@ -450,6 +450,7 @@ export class DirectoryImportService {
             name: string;
             gitProvider: string;
             organization?: boolean;
+            auth?: SourceRepository['auth'];
         },
         user: User,
     ): Promise<ImportDirectoryResponseDto> {
@@ -505,6 +506,7 @@ export class DirectoryImportService {
                 repo: input.sourceRepo,
             },
             user,
+            input.auth,
         );
     }
 
@@ -754,7 +756,11 @@ export class DirectoryImportService {
         user: User,
         source: { owner: string; repo: string },
     ): Promise<DirectoryImportResult> {
-        const options = { userId: user.id, providerId: directory.gitProvider };
+        const options = {
+            userId: user.id,
+            providerId: directory.gitProvider,
+            directoryId: directory.id,
+        };
         const hasCredentials = await this.gitFacade.hasValidCredentials(options);
 
         if (!hasCredentials) {
@@ -780,7 +786,7 @@ export class DirectoryImportService {
                     repo: source.repo,
                     committer: directory.resolveCommitter(user),
                 },
-                { userId: user.id, providerId: directory.gitProvider },
+                { userId: user.id, providerId: directory.gitProvider, directoryId: directory.id },
             );
 
             const sourceData = await DataRepository.create(sourceDir);
@@ -1037,6 +1043,7 @@ export class DirectoryImportService {
         dto: ImportDirectoryDto,
         parsed: { owner: string; repo: string },
         user: User,
+        auth?: SourceRepository['auth'],
     ): Promise<ImportDirectoryResponseDto> {
         const now = new Date();
 
@@ -1051,6 +1058,7 @@ export class DirectoryImportService {
                 repo: parsed.repo,
                 type: ImportSourceTypeEnum.LINK_EXISTING as ImportSourceType,
                 importedAt: now,
+                auth,
             },
         });
 

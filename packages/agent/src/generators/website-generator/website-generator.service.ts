@@ -36,6 +36,7 @@ export class WebsiteGeneratorService {
                 committer,
                 userId: directoryOwner.id,
                 providerId: directory.gitProvider,
+                directoryId: directory.id,
             },
             this.logger,
         );
@@ -52,6 +53,7 @@ export class WebsiteGeneratorService {
             const branches = await this.gitFacade.listBranches(websiteOwner, websiteRepo, {
                 userId,
                 providerId: directory.gitProvider,
+                directoryId: directory.id,
             });
 
             if (!branches.some((branch) => branch.name === targetBranch)) {
@@ -65,7 +67,7 @@ export class WebsiteGeneratorService {
                 websiteOwner,
                 websiteRepo,
                 { defaultBranch: targetBranch },
-                { userId, providerId: directory.gitProvider },
+                { userId, providerId: directory.gitProvider, directoryId: directory.id },
             );
         } catch (error) {
             this.logger.warn(
@@ -88,7 +90,11 @@ export class WebsiteGeneratorService {
                 branch: WEBSITE_TEMPLATE_CONFIG.branch,
                 committer,
             },
-            { userId: directoryOwner.id, providerId: directory.gitProvider },
+            {
+                userId: directoryOwner.id,
+                providerId: directory.gitProvider,
+                directoryId: directory.id,
+            },
         );
 
         // Create target repo
@@ -102,7 +108,11 @@ export class WebsiteGeneratorService {
                     organization: directory.organization ? websiteOwner : undefined,
                     isPrivate: true,
                 },
-                { userId: directoryOwner.id, providerId: directory.gitProvider },
+                {
+                    userId: directoryOwner.id,
+                    providerId: directory.gitProvider,
+                    directoryId: directory.id,
+                },
             ),
             websiteOwner,
             websiteRepo,
@@ -134,7 +144,11 @@ export class WebsiteGeneratorService {
         // Push to target
         await this.gitFacade.push(
             { dir: templateDir, force: true },
-            { userId: directoryOwner.id, providerId: directory.gitProvider },
+            {
+                userId: directoryOwner.id,
+                providerId: directory.gitProvider,
+                directoryId: directory.id,
+            },
         );
 
         await this.ensureTemplateDefaultBranch(directory, directoryOwner.id);
@@ -155,7 +169,11 @@ export class WebsiteGeneratorService {
                 organization: directory.organization ? websiteOwner : undefined,
                 isPrivate: true,
             },
-            { userId: directoryOwner.id, providerId: directory.gitProvider },
+            {
+                userId: directoryOwner.id,
+                providerId: directory.gitProvider,
+                directoryId: directory.id,
+            },
         );
 
         if (createdWebsiteRepository) {
@@ -223,6 +241,7 @@ export class WebsiteGeneratorService {
             {
                 userId: directoryOwner.id,
                 providerId: directory.gitProvider,
+                directoryId: directory.id,
             },
         );
     }
