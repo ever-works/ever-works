@@ -358,9 +358,7 @@ export class ActivepiecesPlugin implements IPlugin, IPipelinePlugin, IFormSchema
 					: `did not succeed (status: ${execResult.run.status})`;
 
 				if (apSettings.webhookMode === 'async') {
-					throw new Error(
-						`Activepieces flow run ${reason}. Inspect the run in the Activepieces dashboard.`
-					);
+					throw new Error(`Activepieces flow run ${reason}. Inspect the run in the Activepieces dashboard.`);
 				}
 				logger.warn(
 					`Activepieces sync flow returned a body but the run record ${reason}. ` +
