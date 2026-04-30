@@ -1,7 +1,7 @@
 ---
 id: anthropic-plugin
-title: "Anthropic Plugin"
-sidebar_label: "Anthropic"
+title: 'Anthropic Plugin'
+sidebar_label: 'Anthropic'
 sidebar_position: 22
 ---
 
@@ -13,16 +13,16 @@ The Anthropic plugin connects Ever Works to Anthropic's Claude API. Claude is re
 
 ## Overview
 
-| Property | Value |
-|---|---|
-| Plugin ID | `anthropic` |
-| Category | `ai-provider` |
-| Capabilities | `ai-provider` |
-| Version | `1.0.0` |
+| Property           | Value           |
+| ------------------ | --------------- |
+| Plugin ID          | `anthropic`     |
+| Category           | `ai-provider`   |
+| Capabilities       | `ai-provider`   |
+| Version            | `1.0.0`         |
 | Configuration Mode | `user-required` |
-| Provider Type | `anthropic` |
-| Auto-enable | No |
-| Visibility | `public` |
+| Provider Type      | `anthropic`     |
+| Auto-enable        | No              |
+| Visibility         | `public`        |
 
 Like the OpenAI plugin, the Anthropic plugin extends `BaseAiProvider` and uses `AiOperations` for all AI interactions. The `AiOperations` layer abstracts away the differences between providers using LangChain.
 
@@ -41,26 +41,26 @@ graph TD
 
 ### Settings Schema
 
-| Setting | Type | Required | Default | Scope | Widget | Description |
-|---|---|---|---|---|---|---|
-| `apiKey` | `string` | Yes | -- | `user` | -- | Anthropic API key. Secret. |
-| `defaultModel` | `string` | Yes | `claude-sonnet-4-5-20250514` | `global` | `model-select` | Default model for all AI tasks. |
-| `simpleModel` | `string` | No | `claude-haiku-4-5-20251001` | `global` | `model-select` | Model for tags, descriptions, classifications. |
-| `mediumModel` | `string` | No | `claude-sonnet-4-5-20250929` | `global` | `model-select` | Model for listings, summaries, reformatting. |
-| `complexModel` | `string` | No | `claude-sonnet-4-5-20250514` | `global` | `model-select` | Model for full page generation, multi-step analysis. |
-| `baseUrl` | `string` | No | `https://api.anthropic.com/v1/` | -- | -- | Custom API endpoint for proxies. Hidden. |
-| `temperature` | `number` | No | `0.7` | -- | -- | Sampling temperature (0--2). Hidden. |
-| `maxTokens` | `number` | No | `4096` | -- | -- | Max tokens per response. Hidden. |
+| Setting        | Type     | Required | Default                         | Scope    | Widget         | Description                                          |
+| -------------- | -------- | -------- | ------------------------------- | -------- | -------------- | ---------------------------------------------------- |
+| `apiKey`       | `string` | Yes      | --                              | `user`   | --             | Anthropic API key. Secret.                           |
+| `defaultModel` | `string` | Yes      | `claude-sonnet-4-5-20250514`    | `global` | `model-select` | Default model for all AI tasks.                      |
+| `simpleModel`  | `string` | No       | `claude-haiku-4-5-20251001`     | `global` | `model-select` | Model for tags, descriptions, classifications.       |
+| `mediumModel`  | `string` | No       | `claude-sonnet-4-5-20250929`    | `global` | `model-select` | Model for listings, summaries, reformatting.         |
+| `complexModel` | `string` | No       | `claude-sonnet-4-5-20250514`    | `global` | `model-select` | Model for full page generation, multi-step analysis. |
+| `baseUrl`      | `string` | No       | `https://api.anthropic.com/v1/` | --       | --             | Custom API endpoint for proxies. Hidden.             |
+| `temperature`  | `number` | No       | `0.7`                           | --       | --             | Sampling temperature (0--2). Hidden.                 |
+| `maxTokens`    | `number` | No       | `4096`                          | --       | --             | Max tokens per response. Hidden.                     |
 
 ### Model Tiers
 
 The Anthropic plugin maps Claude model families to task complexity tiers:
 
-| Tier | Default Model | Use Case |
-|---|---|---|
-| Simple | Claude 4.5 Haiku | Tags, short descriptions, quick classifications |
-| Standard | Claude 4.5 Sonnet | Listings, summaries, content reformatting |
-| Complex | Claude 4.5 Sonnet | Full page generation, multi-step analysis |
+| Tier     | Default Model     | Use Case                                        |
+| -------- | ----------------- | ----------------------------------------------- |
+| Simple   | Claude 4.5 Haiku  | Tags, short descriptions, quick classifications |
+| Standard | Claude 4.5 Sonnet | Listings, summaries, content reformatting       |
+| Complex  | Claude 4.5 Sonnet | Full page generation, multi-step analysis       |
 
 ```mermaid
 graph LR
@@ -83,13 +83,13 @@ getCapabilities(): AiModelCapabilities {
 }
 ```
 
-| Capability | Supported | Description |
-|---|---|---|
-| Structured Output | Yes | JSON mode and tool use for typed responses |
-| Streaming | Yes | Server-sent events for real-time token delivery |
-| Tool Calling | Yes | Tool use for agent-based workflows |
-| Vision | Yes | Image understanding with Claude's vision capabilities |
-| Max Context | 200,000 | Maximum tokens in a single context window |
+| Capability        | Supported | Description                                           |
+| ----------------- | --------- | ----------------------------------------------------- |
+| Structured Output | Yes       | JSON mode and tool use for typed responses            |
+| Streaming         | Yes       | Server-sent events for real-time token delivery       |
+| Tool Calling      | Yes       | Tool use for agent-based workflows                    |
+| Vision            | Yes       | Image understanding with Claude's vision capabilities |
+| Max Context       | 200,000   | Maximum tokens in a single context window             |
 
 The 200K context window is the largest among the platform's AI providers, allowing Claude to process significantly more source material per request.
 
@@ -139,22 +139,22 @@ Tests the connection by calling `aiOps.testConnection()` with the resolved confi
 
 ## Lifecycle
 
-| Method | Behavior |
-|---|---|
+| Method            | Behavior                                                                |
+| ----------------- | ----------------------------------------------------------------------- |
 | `onLoad(context)` | Calls `super.onLoad()`, creates `AiOperations` with Anthropic defaults. |
-| `onUnload()` | Sets `aiOps` to `null`, calls `super.onUnload()`. |
-| `healthCheck()` | Returns `healthy`. |
+| `onUnload()`      | Sets `aiOps` to `null`, calls `super.onUnload()`.                       |
+| `healthCheck()`   | Returns `healthy`.                                                      |
 
 ### Initial Configuration
 
 ```typescript
 this.aiOps = new AiOperations({
-  apiKey: '',
-  model: 'claude-sonnet-4-5-20250514',
-  baseURL: 'https://api.anthropic.com/v1/',
-  temperature: 0.7,
-  maxTokens: 4096,
-  providerType: 'anthropic'
+	apiKey: '',
+	model: 'claude-sonnet-4-5-20250514',
+	baseURL: 'https://api.anthropic.com/v1/',
+	temperature: 0.7,
+	maxTokens: 4096,
+	providerType: 'anthropic'
 });
 ```
 
@@ -162,23 +162,23 @@ The `providerType: 'anthropic'` tells `AiOperations` (and the underlying LangCha
 
 ## Error Handling
 
-| Scenario | Behavior |
-|---|---|
-| Plugin not loaded | Throws `Error('Anthropic plugin not loaded')` |
-| Embedding request | Throws `Error('Embeddings not supported by Anthropic')` |
-| API errors | Propagated from `AiOperations` / LangChain |
-| Connection test failure | `isAvailable()` returns `false` |
+| Scenario                | Behavior                                                |
+| ----------------------- | ------------------------------------------------------- |
+| Plugin not loaded       | Throws `Error('Anthropic plugin not loaded')`           |
+| Embedding request       | Throws `Error('Embeddings not supported by Anthropic')` |
+| API errors              | Propagated from `AiOperations` / LangChain              |
+| Connection test failure | `isAvailable()` returns `false`                         |
 
 ## Differences from OpenAI Plugin
 
-| Aspect | Anthropic | OpenAI |
-|---|---|---|
-| Context window | 200K tokens | 128K tokens |
-| Embeddings | Not supported | Supported |
-| Default model | Claude Sonnet 4.5 | GPT-5.1 |
-| Base URL | `api.anthropic.com/v1/` | `api.openai.com/v1` |
-| Provider type | `anthropic` | `openai` |
-| API format | Messages API | Chat Completions API |
+| Aspect         | Anthropic               | OpenAI               |
+| -------------- | ----------------------- | -------------------- |
+| Context window | 200K tokens             | 128K tokens          |
+| Embeddings     | Not supported           | Supported            |
+| Default model  | Claude Sonnet 4.5       | GPT-5.1              |
+| Base URL       | `api.anthropic.com/v1/` | `api.openai.com/v1`  |
+| Provider type  | `anthropic`             | `openai`             |
+| API format     | Messages API            | Chat Completions API |
 
 Both plugins share the same `BaseAiProvider` base class and `AiOperations` abstraction, making them interchangeable from the platform's perspective. The `AiFacadeService` can switch between them based on user configuration.
 
@@ -211,9 +211,9 @@ sequenceDiagram
 
 ## Choosing Between AI Providers
 
-| Consider Anthropic when... | Consider OpenAI when... |
-|---|---|
-| You need a large context window (200K) | You need embedding support |
-| You value precise instruction following | You want the latest GPT models |
-| You prefer Claude's writing style | You need multi-modal capabilities beyond vision |
-| You want consistent formatting output | You want a wider selection of model sizes |
+| Consider Anthropic when...              | Consider OpenAI when...                         |
+| --------------------------------------- | ----------------------------------------------- |
+| You need a large context window (200K)  | You need embedding support                      |
+| You value precise instruction following | You want the latest GPT models                  |
+| You prefer Claude's writing style       | You need multi-modal capabilities beyond vision |
+| You want consistent formatting output   | You want a wider selection of model sizes       |

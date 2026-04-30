@@ -53,24 +53,24 @@ The directory detail page can contain around 70 files across all sub-folders. Th
 
 This component is a React Context provider that wraps the entire directory detail page. It accepts the directory's core data as props and makes it available to all descendant components via two hooks:
 
-| Hook | Returns | Purpose |
-|------|---------|---------|
-| `useDirectoryDetail()` | Full context value | Access directory, config, OAuth, repo links |
-| `useDirectoryPermissions()` | `PermissionsMap` | Check specific permissions for the current user |
+| Hook                        | Returns            | Purpose                                         |
+| --------------------------- | ------------------ | ----------------------------------------------- |
+| `useDirectoryDetail()`      | Full context value | Access directory, config, OAuth, repo links     |
+| `useDirectoryPermissions()` | `PermissionsMap`   | Check specific permissions for the current user |
 
 **Context value shape:**
 
 ```typescript
 interface DirectoryDetailContextValue {
-    directory: DirectoryDto;
-    oauthConnection: OAuthConnectionDto | null;
-    config: DirectoryConfigDto;
-    repoLinks: {
-        main: string | null;
-        dataRepo: string | null;
-        websiteRepo: string | null;
-    };
-    permissions: PermissionsMap;
+	directory: DirectoryDto;
+	oauthConnection: OAuthConnectionDto | null;
+	config: DirectoryConfigDto;
+	repoLinks: {
+		main: string | null;
+		dataRepo: string | null;
+		websiteRepo: string | null;
+	};
+	permissions: PermissionsMap;
 }
 ```
 
@@ -86,22 +86,18 @@ interface DirectoryDetailContextValue {
 import { DirectoryDetailProvider, useDirectoryDetail } from './DirectoryDetailContext';
 
 // Provider wraps the entire detail page
-<DirectoryDetailProvider
-    directory={directoryData}
-    oauthConnection={oauthConn}
-    config={dirConfig}
->
-    <DirectoryHeader />
-    <DirectoryTabs />
-</DirectoryDetailProvider>
+<DirectoryDetailProvider directory={directoryData} oauthConnection={oauthConn} config={dirConfig}>
+	<DirectoryHeader />
+	<DirectoryTabs />
+</DirectoryDetailProvider>;
 
 // Consumer hook in any child component
 function SomeChildComponent() {
-    const { directory, repoLinks } = useDirectoryDetail();
-    const permissions = useDirectoryPermissions();
+	const { directory, repoLinks } = useDirectoryDetail();
+	const permissions = useDirectoryPermissions();
 
-    if (!permissions.canEdit) return <p>Read-only access</p>;
-    return <p>{directory.name}</p>;
+	if (!permissions.canEdit) return <p>Read-only access</p>;
+	return <p>{directory.name}</p>;
 }
 ```
 
@@ -109,23 +105,23 @@ function SomeChildComponent() {
 
 **File:** `apps/web/src/components/directories/detail/DirectoryHeader.tsx`
 
-| Prop | Type | Description |
-|------|------|-------------|
+| Prop          | Type     | Description               |
+| ------------- | -------- | ------------------------- |
 | `directoryId` | `string` | The directory's unique ID |
 
 This component consumes `useDirectoryDetail()` and renders the directory's header section with:
 
 1. **Title row:**
-   - Directory name as an `h1`.
-   - Shared role badge (if the directory is shared with the current user, shows their role: admin, editor, viewer).
-   - Generation status badge showing the current generation state. If generation is in progress, it shows a step indicator (e.g., "Step 2/5: Generating items") with a progress animation.
+    - Directory name as an `h1`.
+    - Shared role badge (if the directory is shared with the current user, shows their role: admin, editor, viewer).
+    - Generation status badge showing the current generation state. If generation is in progress, it shows a step indicator (e.g., "Step 2/5: Generating items") with a progress animation.
 
 2. **Metadata row:**
-   - Slug displayed as a code-formatted span.
-   - Owner name.
-   - Git provider link (opens the repository in a new tab) with the provider icon.
-   - Creation date formatted with `toLocaleDateString`.
-   - Website link (if deployed) opening in a new tab.
+    - Slug displayed as a code-formatted span.
+    - Owner name.
+    - Git provider link (opens the repository in a new tab) with the provider icon.
+    - Creation date formatted with `toLocaleDateString`.
+    - Website link (if deployed) opening in a new tab.
 
 3. **Action buttons:** Context-dependent actions like sync, edit, or generate, shown based on the user's permissions from `useDirectoryPermissions()`.
 
@@ -137,25 +133,25 @@ This component consumes `useDirectoryDetail()` and renders the directory's heade
 
 **File:** `apps/web/src/components/directories/detail/DirectoryTabs.tsx`
 
-| Prop | Type | Description |
-|------|------|-------------|
-| `directoryId` | `string` | The directory's unique ID |
-| `activeTab` | `string` | Currently active tab identifier |
+| Prop          | Type     | Description                     |
+| ------------- | -------- | ------------------------------- |
+| `directoryId` | `string` | The directory's unique ID       |
+| `activeTab`   | `string` | Currently active tab identifier |
 
 Renders a horizontal tab navigation bar. Each tab is a link that navigates to a different section of the directory detail page. The available tabs are:
 
-| Tab ID | Label | Visibility |
-|--------|-------|------------|
-| `overview` | Overview | Always |
-| `items` | Items | Always |
-| `generator` | Generator | Always |
-| `schedule` | Schedule | Always |
-| `history` | History | Always |
-| `comparisons` | Comparisons | Always |
-| `plugins` | Plugins | Always |
-| `deploy` | Deploy | Always |
-| `members` | Members | Permission-gated (hidden for viewers) |
-| `settings` | Settings | Always |
+| Tab ID        | Label       | Visibility                            |
+| ------------- | ----------- | ------------------------------------- |
+| `overview`    | Overview    | Always                                |
+| `items`       | Items       | Always                                |
+| `generator`   | Generator   | Always                                |
+| `schedule`    | Schedule    | Always                                |
+| `history`     | History     | Always                                |
+| `comparisons` | Comparisons | Always                                |
+| `plugins`     | Plugins     | Always                                |
+| `deploy`      | Deploy      | Always                                |
+| `members`     | Members     | Permission-gated (hidden for viewers) |
+| `settings`    | Settings    | Always                                |
 
 The active tab is visually indicated with a primary-colored bottom border and text. Inactive tabs use muted text with a hover effect. The tab bar scrolls horizontally on small screens.
 
@@ -174,21 +170,17 @@ The directory detail context uses the standard React Context pattern with a prov
 ```tsx
 // Server component (page.tsx)
 export default async function DirectoryPage({ params }) {
-    const directory = await getDirectory(params.id);
-    const config = await getDirectoryConfig(params.id);
-    const oauth = await getOAuthConnection(params.id);
+	const directory = await getDirectory(params.id);
+	const config = await getDirectoryConfig(params.id);
+	const oauth = await getOAuthConnection(params.id);
 
-    return (
-        <DirectoryDetailProvider
-            directory={directory}
-            oauthConnection={oauth}
-            config={config}
-        >
-            <DirectoryHeader directoryId={params.id} />
-            <DirectoryTabs directoryId={params.id} activeTab="overview" />
-            {/* Tab content */}
-        </DirectoryDetailProvider>
-    );
+	return (
+		<DirectoryDetailProvider directory={directory} oauthConnection={oauth} config={config}>
+			<DirectoryHeader directoryId={params.id} />
+			<DirectoryTabs directoryId={params.id} activeTab="overview" />
+			{/* Tab content */}
+		</DirectoryDetailProvider>
+	);
 }
 ```
 
@@ -208,10 +200,10 @@ The badge polls or receives real-time updates to reflect generation progress.
 
 Repository links are computed based on the git provider type:
 
-| Provider | URL Pattern |
-|----------|-------------|
-| GitHub | `https://github.com/{owner}/{repo}` |
-| GitLab | `https://gitlab.com/{owner}/{repo}` |
+| Provider  | URL Pattern                            |
+| --------- | -------------------------------------- |
+| GitHub    | `https://github.com/{owner}/{repo}`    |
+| GitLab    | `https://gitlab.com/{owner}/{repo}`    |
 | Bitbucket | `https://bitbucket.org/{owner}/{repo}` |
 
 Each of the three repo types (main, data, website) can be null if the repository has not been created or linked yet.
@@ -233,14 +225,14 @@ The `activeTab` prop is derived from the current URL segment and used to highlig
 
 The directory detail components follow the standard design token patterns:
 
-| Element | Classes |
-|---------|---------|
-| Header background | `bg-surface dark:bg-surface-dark` |
-| Tab bar | `border-b border-border dark:border-border-dark` |
-| Active tab | `text-primary border-b-2 border-primary` |
-| Inactive tab | `text-text-muted dark:text-text-muted-dark hover:text-text` |
-| Status badges | Variant-specific: `bg-primary/10 text-primary`, `bg-success/10 text-success`, `bg-danger/10 text-danger` |
-| Role badges | `bg-surface-secondary dark:bg-surface-secondary-dark text-text-muted` |
+| Element           | Classes                                                                                                  |
+| ----------------- | -------------------------------------------------------------------------------------------------------- |
+| Header background | `bg-surface dark:bg-surface-dark`                                                                        |
+| Tab bar           | `border-b border-border dark:border-border-dark`                                                         |
+| Active tab        | `text-primary border-b-2 border-primary`                                                                 |
+| Inactive tab      | `text-text-muted dark:text-text-muted-dark hover:text-text`                                              |
+| Status badges     | Variant-specific: `bg-primary/10 text-primary`, `bg-success/10 text-success`, `bg-danger/10 text-danger` |
+| Role badges       | `bg-surface-secondary dark:bg-surface-secondary-dark text-text-muted`                                    |
 
 The generation status badge uses Tailwind's `animate-pulse` for the in-progress state.
 
@@ -254,28 +246,24 @@ import { DirectoryHeader } from '@/components/directories/detail/DirectoryHeader
 import { DirectoryTabs } from '@/components/directories/detail/DirectoryTabs';
 
 export default async function DirectoryDetailPage({ params, searchParams }) {
-    const { id } = params;
-    const activeTab = searchParams.tab || 'overview';
+	const { id } = params;
+	const activeTab = searchParams.tab || 'overview';
 
-    const [directory, config, oauth] = await Promise.all([
-        getDirectory(id),
-        getDirectoryConfig(id),
-        getOAuthConnection(id),
-    ]);
+	const [directory, config, oauth] = await Promise.all([
+		getDirectory(id),
+		getDirectoryConfig(id),
+		getOAuthConnection(id)
+	]);
 
-    return (
-        <DirectoryDetailProvider
-            directory={directory}
-            oauthConnection={oauth}
-            config={config}
-        >
-            <div className="space-y-6">
-                <DirectoryHeader directoryId={id} />
-                <DirectoryTabs directoryId={id} activeTab={activeTab} />
-                {/* Render active tab content */}
-            </div>
-        </DirectoryDetailProvider>
-    );
+	return (
+		<DirectoryDetailProvider directory={directory} oauthConnection={oauth} config={config}>
+			<div className="space-y-6">
+				<DirectoryHeader directoryId={id} />
+				<DirectoryTabs directoryId={id} activeTab={activeTab} />
+				{/* Render active tab content */}
+			</div>
+		</DirectoryDetailProvider>
+	);
 }
 ```
 
@@ -287,20 +275,20 @@ export default async function DirectoryDetailPage({ params, searchParams }) {
 import { useDirectoryDetail, useDirectoryPermissions } from '../DirectoryDetailContext';
 
 export function OverviewTab() {
-    const { directory, config, repoLinks } = useDirectoryDetail();
-    const permissions = useDirectoryPermissions();
+	const { directory, config, repoLinks } = useDirectoryDetail();
+	const permissions = useDirectoryPermissions();
 
-    return (
-        <div>
-            <h2>{directory.name}</h2>
-            {repoLinks.main && (
-                <a href={repoLinks.main} target="_blank" rel="noopener">
-                    View Repository
-                </a>
-            )}
-            {permissions.canEdit && <Button>Edit Directory</Button>}
-        </div>
-    );
+	return (
+		<div>
+			<h2>{directory.name}</h2>
+			{repoLinks.main && (
+				<a href={repoLinks.main} target="_blank" rel="noopener">
+					View Repository
+				</a>
+			)}
+			{permissions.canEdit && <Button>Edit Directory</Button>}
+		</div>
+	);
 }
 ```
 

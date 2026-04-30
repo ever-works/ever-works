@@ -1,7 +1,7 @@
 ---
 id: fireworks-plugin
-title: "Fireworks AI Models via OpenRouter"
-sidebar_label: "Fireworks AI (via OpenRouter)"
+title: 'Fireworks AI Models via OpenRouter'
+sidebar_label: 'Fireworks AI (via OpenRouter)'
 sidebar_position: 37
 ---
 
@@ -11,10 +11,10 @@ Ever Works does not ship a standalone Fireworks AI plugin. Fireworks AI is one o
 
 **Related source files:**
 
-| File | Purpose |
-|---|---|
-| `packages/plugins/openrouter/src/openrouter.plugin.ts` | OpenRouter AI provider plugin |
-| `packages/plugin/src/ai/reasoning.utils.ts` | Reasoning configuration utilities |
+| File                                                   | Purpose                           |
+| ------------------------------------------------------ | --------------------------------- |
+| `packages/plugins/openrouter/src/openrouter.plugin.ts` | OpenRouter AI provider plugin     |
+| `packages/plugin/src/ai/reasoning.utils.ts`            | Reasoning configuration utilities |
 
 ## What is Fireworks AI?
 
@@ -51,12 +51,12 @@ These preferences are applied at the OpenRouter level, outside of Ever Works con
 
 Fireworks AI typically serves open-source models. Common models that may be routed to Fireworks AI include:
 
-| Model ID (OpenRouter) | Description |
-|---|---|
+| Model ID (OpenRouter)               | Description        |
+| ----------------------------------- | ------------------ |
 | `meta-llama/llama-3.3-70b-instruct` | Meta Llama 3.3 70B |
-| `meta-llama/llama-4-scout` | Meta Llama 4 Scout |
-| `mistralai/mistral-large` | Mistral Large |
-| `qwen/qwen-2.5-72b-instruct` | Qwen 2.5 72B |
+| `meta-llama/llama-4-scout`          | Meta Llama 4 Scout |
+| `mistralai/mistral-large`           | Mistral Large      |
+| `qwen/qwen-2.5-72b-instruct`        | Qwen 2.5 72B       |
 
 ## Configuration in Ever Works
 
@@ -77,20 +77,20 @@ PLUGIN_OPENROUTER_DEFAULT_MODEL=meta-llama/llama-3.3-70b-instruct
 
 Fireworks AI is known for fast inference times. This benefits Ever Works in several ways:
 
-| Benefit | Description |
-|---|---|
+| Benefit                         | Description                                                |
+| ------------------------------- | ---------------------------------------------------------- |
 | **Faster directory generation** | Items are processed more quickly during pipeline execution |
-| **Lower latency AI chat** | Conversational responses arrive faster |
-| **Better throughput** | More items can be processed in parallel |
+| **Lower latency AI chat**       | Conversational responses arrive faster                     |
+| **Better throughput**           | More items can be processed in parallel                    |
 
 ### Speed Comparison
 
-| Provider | Relative Speed | Cost |
-|---|---|---|
-| Fireworks AI (via OpenRouter) | Fast | Per-token, varies |
-| Groq (direct) | Very fast (custom hardware) | Free tier + paid |
-| Ollama (local) | Depends on hardware | Free |
-| OpenAI (direct) | Standard | Per-token |
+| Provider                      | Relative Speed              | Cost              |
+| ----------------------------- | --------------------------- | ----------------- |
+| Fireworks AI (via OpenRouter) | Fast                        | Per-token, varies |
+| Groq (direct)                 | Very fast (custom hardware) | Free tier + paid  |
+| Ollama (local)                | Depends on hardware         | Free              |
+| OpenAI (direct)               | Standard                    | Per-token         |
 
 If raw inference speed is your top priority and you want open-source models, consider the **Groq** plugin as a direct alternative. Groq uses custom LPU hardware and offers the fastest inference for supported models.
 
@@ -105,44 +105,44 @@ graph LR
     end
 ```
 
-| Tier | Model | Why |
-|---|---|---|
-| Simple | `meta-llama/llama-3.3-70b-instruct:free` | Zero cost for tags and classifications |
-| Standard | `meta-llama/llama-3.3-70b-instruct` | Good quality, fast via Fireworks AI |
-| Complex | `meta-llama/llama-4-maverick` | Best open-source quality for full pages |
+| Tier     | Model                                    | Why                                     |
+| -------- | ---------------------------------------- | --------------------------------------- |
+| Simple   | `meta-llama/llama-3.3-70b-instruct:free` | Zero cost for tags and classifications  |
+| Standard | `meta-llama/llama-3.3-70b-instruct`      | Good quality, fast via Fireworks AI     |
+| Complex  | `meta-llama/llama-4-maverick`            | Best open-source quality for full pages |
 
 ## Capabilities
 
 Models served by Fireworks AI through OpenRouter support standard capabilities:
 
-| Capability | Supported |
-|---|---|
-| Structured output (JSON) | Yes |
-| Streaming | Yes |
-| Tool calling | Model-dependent |
-| Vision | Model-dependent |
-| Embeddings | Generally no |
+| Capability               | Supported       |
+| ------------------------ | --------------- |
+| Structured output (JSON) | Yes             |
+| Streaming                | Yes             |
+| Tool calling             | Model-dependent |
+| Vision                   | Model-dependent |
+| Embeddings               | Generally no    |
 
 ## Comparison: Fireworks AI vs Groq vs Ollama
 
-| Aspect | Fireworks AI (via OpenRouter) | Groq (direct plugin) | Ollama (direct plugin) |
-|---|---|---|---|
-| Access method | Transparent via OpenRouter | Dedicated plugin | Dedicated plugin |
-| API key | OpenRouter key | Groq key | None required |
-| Speed | Fast | Very fast | Hardware-dependent |
-| Cost | Per-token | Free tier available | Free |
-| Privacy | Cloud-hosted | Cloud-hosted | Local |
-| Model control | OpenRouter selects provider | Fixed to Groq | Full local control |
-| Embeddings | No | No | Yes |
+| Aspect        | Fireworks AI (via OpenRouter) | Groq (direct plugin) | Ollama (direct plugin) |
+| ------------- | ----------------------------- | -------------------- | ---------------------- |
+| Access method | Transparent via OpenRouter    | Dedicated plugin     | Dedicated plugin       |
+| API key       | OpenRouter key                | Groq key             | None required          |
+| Speed         | Fast                          | Very fast            | Hardware-dependent     |
+| Cost          | Per-token                     | Free tier available  | Free                   |
+| Privacy       | Cloud-hosted                  | Cloud-hosted         | Local                  |
+| Model control | OpenRouter selects provider   | Fixed to Groq        | Full local control     |
+| Embeddings    | No                            | No                   | Yes                    |
 
 ## Troubleshooting
 
-| Issue | Cause | Solution |
-|---|---|---|
-| Cannot select Fireworks directly | OpenRouter handles routing | Use OpenRouter provider preferences for routing control |
-| Slow response times | Not routed to Fireworks AI | Check OpenRouter provider preferences |
-| Rate limit errors | Provider-level rate limits | Upgrade your OpenRouter plan or switch providers |
-| Model quality varies | Different providers may serve slightly different quantizations | Pin provider preferences in your OpenRouter account |
+| Issue                            | Cause                                                          | Solution                                                |
+| -------------------------------- | -------------------------------------------------------------- | ------------------------------------------------------- |
+| Cannot select Fireworks directly | OpenRouter handles routing                                     | Use OpenRouter provider preferences for routing control |
+| Slow response times              | Not routed to Fireworks AI                                     | Check OpenRouter provider preferences                   |
+| Rate limit errors                | Provider-level rate limits                                     | Upgrade your OpenRouter plan or switch providers        |
+| Model quality varies             | Different providers may serve slightly different quantizations | Pin provider preferences in your OpenRouter account     |
 
 ## Further Reading
 

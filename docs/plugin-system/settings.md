@@ -54,14 +54,14 @@ readonly settingsSchema: JsonSchema = {
 
 The platform extends JSON Schema with `x-*` properties that control security, scoping, and UI behavior:
 
-| Extension | Type | Description |
-|-----------|------|-------------|
-| `x-secret` | `boolean` | Field is encrypted at rest and masked in API responses. Use for API keys, tokens, passwords. |
-| `x-envVar` | `string` | Environment variable name to check as a fallback when no setting is stored. |
-| `x-scope` | `'global' \| 'user' \| 'directory'` | Which scope level can set this field. |
-| `x-widget` | `string` | UI rendering hint (e.g., `model-select` renders a model picker dropdown). |
-| `x-hidden` | `boolean` | Hide from the settings UI. Used for advanced/internal settings. |
-| `x-adminOnly` | `boolean` | Only visible to admin users. |
+| Extension     | Type                                | Description                                                                                  |
+| ------------- | ----------------------------------- | -------------------------------------------------------------------------------------------- |
+| `x-secret`    | `boolean`                           | Field is encrypted at rest and masked in API responses. Use for API keys, tokens, passwords. |
+| `x-envVar`    | `string`                            | Environment variable name to check as a fallback when no setting is stored.                  |
+| `x-scope`     | `'global' \| 'user' \| 'directory'` | Which scope level can set this field.                                                        |
+| `x-widget`    | `string`                            | UI rendering hint (e.g., `model-select` renders a model picker dropdown).                    |
+| `x-hidden`    | `boolean`                           | Hide from the settings UI. Used for advanced/internal settings.                              |
+| `x-adminOnly` | `boolean`                           | Only visible to admin users.                                                                 |
 
 ### x-secret
 
@@ -84,6 +84,7 @@ apiKey: {
 ```
 
 With this schema, the API key is resolved as:
+
 1. Directory setting (if in directory context)
 2. User setting
 3. Admin setting
@@ -129,10 +130,10 @@ The `getResolvedSettings()` method returns each field with its source:
 
 ```typescript
 interface ResolvedSetting<T = unknown> {
-    readonly key: string;
-    readonly value: T;
-    readonly source: 'default' | 'env' | 'admin' | 'directory' | 'user';
-    readonly isFallback: boolean;
+	readonly key: string;
+	readonly value: T;
+	readonly source: 'default' | 'env' | 'admin' | 'directory' | 'user';
+	readonly isFallback: boolean;
 }
 ```
 
@@ -142,11 +143,11 @@ This is useful for the UI to show where each value comes from and whether it's a
 
 Each plugin declares a `configurationMode` that controls the user experience:
 
-| Mode | Behavior |
-|------|----------|
-| `admin-only` | Only admins can configure the plugin. Users see it but cannot change settings. Suitable for system infrastructure. |
+| Mode            | Behavior                                                                                                             |
+| --------------- | -------------------------------------------------------------------------------------------------------------------- |
+| `admin-only`    | Only admins can configure the plugin. Users see it but cannot change settings. Suitable for system infrastructure.   |
 | `user-required` | Users **must** provide their own configuration (e.g., API keys). The plugin won't work until the user configures it. |
-| `hybrid` | Admins set defaults, users can optionally override. Most common mode. |
+| `hybrid`        | Admins set defaults, users can optionally override. Most common mode.                                                |
 
 Example scenarios:
 
@@ -178,15 +179,15 @@ Validation runs when settings are saved through the API. The `ValidationResult` 
 
 ```typescript
 interface ValidationResult {
-    readonly valid: boolean;
-    readonly errors?: readonly ValidationError[];
-    readonly warnings?: readonly ValidationError[];
+	readonly valid: boolean;
+	readonly errors?: readonly ValidationError[];
+	readonly warnings?: readonly ValidationError[];
 }
 
 interface ValidationError {
-    readonly path: string;     // Field path (e.g., 'apiKey')
-    readonly message: string;  // Human-readable error
-    readonly code?: string;    // Machine-readable error code
+	readonly path: string; // Field path (e.g., 'apiKey')
+	readonly message: string; // Human-readable error
+	readonly code?: string; // Machine-readable error code
 }
 ```
 
@@ -194,11 +195,11 @@ interface ValidationError {
 
 Settings are persisted in three tables, one per scope:
 
-| Table | Scope | Settings Column | Secrets Column |
-|-------|-------|-----------------|----------------|
-| `PluginEntity` | Admin/system | `settings` | `secretSettings` |
-| `UserPluginEntity` | Per user | `settings` | `secretSettings` |
-| `DirectoryPluginEntity` | Per directory | `settings` | `secretSettings` |
+| Table                   | Scope         | Settings Column | Secrets Column   |
+| ----------------------- | ------------- | --------------- | ---------------- |
+| `PluginEntity`          | Admin/system  | `settings`      | `secretSettings` |
+| `UserPluginEntity`      | Per user      | `settings`      | `secretSettings` |
+| `DirectoryPluginEntity` | Per directory | `settings`      | `secretSettings` |
 
 Secret fields (marked with `x-secret`) are stored in a separate `secretSettings` column at every scope level. During resolution, the system checks directory secrets first, then user secrets, then admin secrets, following the same cascading hierarchy as regular settings.
 
@@ -213,6 +214,7 @@ The settings UI is automatically generated from the `settingsSchema`:
 - **Scope indicators** show where each value comes from (admin default, user override, etc.)
 
 Settings pages are available at:
+
 - `/settings/plugins/[category]` — User-level settings by category
 - `/plugins/[pluginId]` — Plugin detail page with settings
 - `/directories/[id]/plugins` — Directory-level plugin management

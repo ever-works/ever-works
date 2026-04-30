@@ -94,14 +94,14 @@ Formatting is enforced via Prettier. The configuration lives in the root `packag
 
 ```json
 {
-  "printWidth": 120,
-  "singleQuote": true,
-  "semi": true,
-  "useTabs": true,
-  "tabWidth": 4,
-  "arrowParens": "always",
-  "trailingComma": "none",
-  "quoteProps": "as-needed"
+	"printWidth": 120,
+	"singleQuote": true,
+	"semi": true,
+	"useTabs": true,
+	"tabWidth": 4,
+	"arrowParens": "always",
+	"trailingComma": "none",
+	"quoteProps": "as-needed"
 }
 ```
 

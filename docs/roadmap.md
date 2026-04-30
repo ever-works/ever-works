@@ -134,12 +134,12 @@ Feature prioritization is based on several factors:
 
 ### Impact Assessment
 
-| Factor | Weight | Description |
-|---|---|---|
-| **User demand** | High | Number of requests, upvotes, and community interest |
-| **Strategic alignment** | High | How well the feature aligns with the product vision |
-| **Implementation effort** | Medium | Complexity, time investment, and maintenance burden |
-| **Breaking change risk** | Medium | Potential to disrupt existing users |
+| Factor                       | Weight | Description                                             |
+| ---------------------------- | ------ | ------------------------------------------------------- |
+| **User demand**              | High   | Number of requests, upvotes, and community interest     |
+| **Strategic alignment**      | High   | How well the feature aligns with the product vision     |
+| **Implementation effort**    | Medium | Complexity, time investment, and maintenance burden     |
+| **Breaking change risk**     | Medium | Potential to disrupt existing users                     |
 | **Contributor availability** | Medium | Whether maintainers or community members can take it on |
 
 ### Priority Tiers
@@ -153,18 +153,18 @@ Feature prioritization is based on several factors:
 
 GitHub issues use labels to indicate priority and status:
 
-| Label | Meaning |
-|---|---|
-| `enhancement` | Feature request or improvement |
-| `bug` | Something is not working correctly |
-| `good first issue` | Suitable for new contributors |
-| `help wanted` | Community contributions welcome |
-| `priority: critical` | Must be addressed immediately |
-| `priority: high` | Planned for next release |
-| `priority: medium` | Planned for a future release |
-| `priority: low` | Accepted, not yet scheduled |
-| `needs discussion` | Requires more input before implementation |
-| `wontfix` | Decided against implementing |
+| Label                | Meaning                                   |
+| -------------------- | ----------------------------------------- |
+| `enhancement`        | Feature request or improvement            |
+| `bug`                | Something is not working correctly        |
+| `good first issue`   | Suitable for new contributors             |
+| `help wanted`        | Community contributions welcome           |
+| `priority: critical` | Must be addressed immediately             |
+| `priority: high`     | Planned for next release                  |
+| `priority: medium`   | Planned for a future release              |
+| `priority: low`      | Accepted, not yet scheduled               |
+| `needs discussion`   | Requires more input before implementation |
+| `wontfix`            | Decided against implementing              |
 
 ## Contributing to the Roadmap
 

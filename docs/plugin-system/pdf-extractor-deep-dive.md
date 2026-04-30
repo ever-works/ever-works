@@ -61,18 +61,18 @@ Where "meaningful characters" are non-whitespace characters in the extracted tex
 
 ### Settings Schema
 
-| Field | Type | Default | Description |
-|-------|------|---------|-------------|
-| `mistralApiKey` | `string` | - | Mistral AI API key for OCR fallback (`x-secret`, `x-envVar: PLUGIN_PDF_EXTRACTOR_MISTRAL_API_KEY`) |
-| `ocrModel` | `string` | `'mistral-ocr-latest'` | Mistral OCR model name |
-| `textDensityThreshold` | `number` | `100` | Minimum chars/page for text extraction to be considered sufficient |
-| `maxPages` | `number` | `50` | Maximum pages to process |
-| `timeout` | `number` | `60000` | Request timeout in milliseconds |
+| Field                  | Type     | Default                | Description                                                                                        |
+| ---------------------- | -------- | ---------------------- | -------------------------------------------------------------------------------------------------- |
+| `mistralApiKey`        | `string` | -                      | Mistral AI API key for OCR fallback (`x-secret`, `x-envVar: PLUGIN_PDF_EXTRACTOR_MISTRAL_API_KEY`) |
+| `ocrModel`             | `string` | `'mistral-ocr-latest'` | Mistral OCR model name                                                                             |
+| `textDensityThreshold` | `number` | `100`                  | Minimum chars/page for text extraction to be considered sufficient                                 |
+| `maxPages`             | `number` | `50`                   | Maximum pages to process                                                                           |
+| `timeout`              | `number` | `60000`                | Request timeout in milliseconds                                                                    |
 
 ### Environment Variables
 
-| Variable | Maps To |
-|----------|---------|
+| Variable                               | Maps To         |
+| -------------------------------------- | --------------- |
 | `PLUGIN_PDF_EXTRACTOR_MISTRAL_API_KEY` | `mistralApiKey` |
 
 ## Capabilities
@@ -97,23 +97,20 @@ The plugin implements `IContentExtractorPlugin` with two key methods:
 
 ```typescript
 class PdfExtractorPlugin implements IPlugin, IContentExtractorPlugin {
-    readonly id = 'pdf-extractor';
-    readonly name = 'PDF Extractor';
-    readonly version = '1.0.0';
-    readonly category: PluginCategory = 'content-extraction';
-    readonly capabilities = ['content-extraction'];
+	readonly id = 'pdf-extractor';
+	readonly name = 'PDF Extractor';
+	readonly version = '1.0.0';
+	readonly category: PluginCategory = 'content-extraction';
+	readonly capabilities = ['content-extraction'];
 
-    canExtract(url: string): boolean;
+	canExtract(url: string): boolean;
 
-    async extract(
-        url: string,
-        options?: ContentExtractionOptions
-    ): Promise<ContentExtractionResult>;
+	async extract(url: string, options?: ContentExtractionOptions): Promise<ContentExtractionResult>;
 
-    async onLoad(context: PluginContext): Promise<void>;
-    async onUnload(): Promise<void>;
-    async healthCheck(): Promise<PluginHealthCheck>;
-    getManifest(): PluginManifest;
+	async onLoad(context: PluginContext): Promise<void>;
+	async onUnload(): Promise<void>;
+	async healthCheck(): Promise<PluginHealthCheck>;
+	getManifest(): PluginManifest;
 }
 ```
 
@@ -121,15 +118,13 @@ class PdfExtractorPlugin implements IPlugin, IContentExtractorPlugin {
 
 ```typescript
 class PdfTextExtractor {
-    async extractText(
-        pdfBuffer: Buffer
-    ): Promise<PdfTextResult>;
+	async extractText(pdfBuffer: Buffer): Promise<PdfTextResult>;
 }
 
 interface PdfTextResult {
-    text: string;
-    numPages: number;
-    metadata?: Record<string, unknown>;
+	text: string;
+	numPages: number;
+	metadata?: Record<string, unknown>;
 }
 ```
 
@@ -137,12 +132,9 @@ interface PdfTextResult {
 
 ```typescript
 class MistralOcrService {
-    constructor(apiKey: string, model?: string);
+	constructor(apiKey: string, model?: string);
 
-    async extractFromUrl(
-        url: string,
-        maxPages?: number
-    ): Promise<string>;
+	async extractFromUrl(url: string, maxPages?: number): Promise<string>;
 }
 ```
 
@@ -150,22 +142,22 @@ class MistralOcrService {
 
 ```typescript
 interface MistralOcrRequest {
-    model: string;
-    document: {
-        type: 'document_url';
-        document_url: string;
-    };
+	model: string;
+	document: {
+		type: 'document_url';
+		document_url: string;
+	};
 }
 
 interface MistralOcrPage {
-    index: number;
-    markdown: string;
-    images: unknown[];
-    dimensions: { width: number; height: number };
+	index: number;
+	markdown: string;
+	images: unknown[];
+	dimensions: { width: number; height: number };
 }
 
 interface MistralOcrResponse {
-    pages: MistralOcrPage[];
+	pages: MistralOcrPage[];
 }
 ```
 
@@ -192,12 +184,12 @@ Calls the Mistral AI OCR API at `https://api.mistral.ai/v1/ocr`:
 
 The service handles specific HTTP error codes:
 
-| Status | Handling |
-|--------|----------|
-| 401 | Throws "Invalid Mistral API key" |
-| 400 | Throws "Bad request" with detail message |
-| 429 | Throws "Rate limit exceeded" |
-| Other | Throws generic error with status code |
+| Status | Handling                                 |
+| ------ | ---------------------------------------- |
+| 401    | Throws "Invalid Mistral API key"         |
+| 400    | Throws "Bad request" with detail message |
+| 429    | Throws "Rate limit exceeded"             |
+| Other  | Throws generic error with status code    |
 
 ### Extraction Flow
 
@@ -238,9 +230,9 @@ The PDF Extractor is typically invoked automatically by the `ContentExtractorFac
 ```typescript
 // ContentExtractorFacade routes to PDF Extractor when URL ends in .pdf
 const result = await contentExtractorFacade.extractContent(
-    'https://example.com/whitepaper.pdf',
-    undefined,
-    facadeOptions
+	'https://example.com/whitepaper.pdf',
+	undefined,
+	facadeOptions
 );
 // result.rawContent contains the extracted text
 ```
@@ -252,8 +244,8 @@ const plugin = new PdfExtractorPlugin();
 await plugin.onLoad(context);
 
 if (plugin.canExtract('https://example.com/report.pdf')) {
-    const result = await plugin.extract('https://example.com/report.pdf');
-    console.log(result.rawContent); // Extracted text content
+	const result = await plugin.extract('https://example.com/report.pdf');
+	console.log(result.rawContent); // Extracted text content
 }
 ```
 
@@ -261,15 +253,15 @@ if (plugin.canExtract('https://example.com/report.pdf')) {
 
 ### Extraction Errors
 
-| Error | Cause | Handling |
-|-------|-------|----------|
-| Fetch timeout | PDF download exceeds `timeout` | `AbortSignal.timeout` triggers, error propagated |
-| Invalid PDF | Corrupted or non-PDF binary | `unpdf` parse error, logged and propagated |
-| Empty text layer | PDF has no text (image-only) | Falls back to OCR if configured |
-| OCR API failure | Mistral API error | Specific error messages for 401/400/429, falls back to text layer |
-| OCR rate limit | Too many requests | Error propagated, text layer used as fallback |
-| Max pages exceeded | PDF has more pages than limit | Only first `maxPages` pages processed |
-| Buffer too large | Very large PDF | May cause memory issues, mitigated by `maxPages` |
+| Error              | Cause                          | Handling                                                          |
+| ------------------ | ------------------------------ | ----------------------------------------------------------------- |
+| Fetch timeout      | PDF download exceeds `timeout` | `AbortSignal.timeout` triggers, error propagated                  |
+| Invalid PDF        | Corrupted or non-PDF binary    | `unpdf` parse error, logged and propagated                        |
+| Empty text layer   | PDF has no text (image-only)   | Falls back to OCR if configured                                   |
+| OCR API failure    | Mistral API error              | Specific error messages for 401/400/429, falls back to text layer |
+| OCR rate limit     | Too many requests              | Error propagated, text layer used as fallback                     |
+| Max pages exceeded | PDF has more pages than limit  | Only first `maxPages` pages processed                             |
+| Buffer too large   | Very large PDF                 | May cause memory issues, mitigated by `maxPages`                  |
 
 ### Graceful Degradation
 

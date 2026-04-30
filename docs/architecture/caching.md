@@ -13,11 +13,11 @@ The Ever Works platform implements caching through a TypeORM-backed cache adapte
 
 The cache system is located in `packages/agent/src/cache/` and consists of three components:
 
-| File | Purpose |
-|---|---|
-| `cache.factory.ts` | Factory for creating cache module instances |
+| File                      | Purpose                                                      |
+| ------------------------- | ------------------------------------------------------------ |
+| `cache.factory.ts`        | Factory for creating cache module instances                  |
 | `typeorm-keyv.adapter.ts` | TypeORM-backed adapter implementing the Keyv store interface |
-| `repository.ts` | TypeORM repository for the CacheEntry entity |
+| `repository.ts`           | TypeORM repository for the CacheEntry entity                 |
 
 ## CacheFactory
 
@@ -28,7 +28,7 @@ The `CacheFactory` provides two cache strategies:
 A simple in-memory cache suitable for development or single-instance deployments:
 
 ```typescript
-CacheFactory.InMemory()
+CacheFactory.InMemory();
 // Returns: CacheModule.register()
 ```
 
@@ -38,10 +38,10 @@ A database-backed cache that persists across application restarts and works in m
 
 ```typescript
 CacheFactory.TypeORM({
-    ttl: 60000,              // Default TTL in milliseconds
-    namespace: 'my-cache',   // Namespace prefix for cache keys
-    isGlobal: true,          // Register as global NestJS module
-})
+	ttl: 60000, // Default TTL in milliseconds
+	namespace: 'my-cache', // Namespace prefix for cache keys
+	isGlobal: true // Register as global NestJS module
+});
 ```
 
 The TypeORM strategy:
@@ -113,8 +113,8 @@ TTL values are stored as absolute timestamps (`Date.now() + ttl`). The adapter c
 
 ```typescript
 if (entry.expiresAt && Date.now() > entry.expiresAt) {
-    await this.delete(key);
-    return undefined;
+	await this.delete(key);
+	return undefined;
 }
 ```
 
@@ -150,9 +150,13 @@ async wrap<T>(key: string, fn: () => T | Promise<T>, options?: { ttl?: number })
 Usage:
 
 ```typescript
-const data = await cache.wrap('my-key', async () => {
-    return await expensiveComputation();
-}, { ttl: 300000 }); // Cache for 5 minutes
+const data = await cache.wrap(
+	'my-key',
+	async () => {
+		return await expensiveComputation();
+	},
+	{ ttl: 300000 }
+); // Cache for 5 minutes
 ```
 
 ### Namespace Isolation
@@ -190,10 +194,10 @@ Returns `true` only if all deletions succeeded.
 
 The `CacheEntry` entity (in `entities/cache.entity.ts`) stores cache data:
 
-| Column | Type | Description |
-|---|---|---|
-| `key` | string (primary) | Namespaced cache key |
-| `value` | text | JSON-serialized cached value |
+| Column      | Type              | Description                          |
+| ----------- | ----------------- | ------------------------------------ |
+| `key`       | string (primary)  | Namespaced cache key                 |
+| `value`     | text              | JSON-serialized cached value         |
 | `expiresAt` | bigint (nullable) | Expiration timestamp in milliseconds |
 
 ## Error Handling
@@ -202,10 +206,10 @@ All adapter operations catch errors and emit them via the `EventEmitter` pattern
 
 ```typescript
 try {
-    // cache operation
+	// cache operation
 } catch (error) {
-    this.emit('error', error);
-    return undefined; // Graceful fallback
+	this.emit('error', error);
+	return undefined; // Graceful fallback
 }
 ```
 

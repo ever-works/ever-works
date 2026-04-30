@@ -1,7 +1,7 @@
 ---
 id: agent-pipeline-plugin
-title: "Agent Pipeline Plugin"
-sidebar_label: "Agent Pipeline"
+title: 'Agent Pipeline Plugin'
+sidebar_label: 'Agent Pipeline'
 sidebar_position: 46
 ---
 
@@ -13,17 +13,17 @@ The Agent Pipeline plugin is an autonomous, tool-based generation pipeline that 
 
 ## Overview
 
-| Property | Value |
-|---|---|
-| Plugin ID | `agent-pipeline` |
-| Category | `pipeline` |
-| Capabilities | `pipeline`, `form-schema-provider` |
-| Version | `1.0.0` |
-| Configuration Mode | `hybrid` |
-| Auto-enable | No |
-| Built-in | Yes |
-| System Plugin | No |
-| Key Dependencies | `ai` (Vercel AI SDK), `@ai-sdk/openai-compatible`, `zod`, `fuse.js`, `tokenx` |
+| Property           | Value                                                                         |
+| ------------------ | ----------------------------------------------------------------------------- |
+| Plugin ID          | `agent-pipeline`                                                              |
+| Category           | `pipeline`                                                                    |
+| Capabilities       | `pipeline`, `form-schema-provider`                                            |
+| Version            | `1.0.0`                                                                       |
+| Configuration Mode | `hybrid`                                                                      |
+| Auto-enable        | No                                                                            |
+| Built-in           | Yes                                                                           |
+| System Plugin      | No                                                                            |
+| Key Dependencies   | `ai` (Vercel AI SDK), `@ai-sdk/openai-compatible`, `zod`, `fuse.js`, `tokenx` |
 
 The plugin implements `IPlugin`, `IPipelinePlugin`, and `IFormSchemaProvider`.
 
@@ -54,9 +54,9 @@ graph TD
 
 The Agent Pipeline uses a dual-model setup:
 
-| Role | Resolution | Purpose |
-|---|---|---|
-| **Parent model** | `complexModel` or `defaultModel` | Orchestrates the generation, decides which tools to call |
+| Role             | Resolution                       | Purpose                                                    |
+| ---------------- | -------------------------------- | ---------------------------------------------------------- |
+| **Parent model** | `complexModel` or `defaultModel` | Orchestrates the generation, decides which tools to call   |
 | **Worker model** | `defaultModel` or `complexModel` | Handles content extraction and item parsing from web pages |
 
 Both models are resolved from the same AI provider but can be different model sizes (e.g., the parent can be a large reasoning model while the worker is a smaller, faster model).
@@ -65,13 +65,13 @@ Both models are resolved from the same AI provider but can be different model si
 
 The Agent Pipeline runs 5 sequential steps:
 
-| Step | ID | Description | Duration |
-|---|---|---|---|
-| 1 | `prepare-context` | Load existing items, resolve AI provider, query data sources, create workspace | ~2s |
-| 2 | `generate-items` | Run the AI agent with tool calling to research and create items | ~120s |
-| 3 | `collect-results` | Read generated JSON files from the workspace, merge with data source items, deduplicate | ~2s |
-| 4 | `capture-screenshots` | Capture screenshots for items with source URLs (optional) | ~30s |
-| 5 | `cleanup` | Remove the temporary workspace directory | ~1s |
+| Step | ID                    | Description                                                                             | Duration |
+| ---- | --------------------- | --------------------------------------------------------------------------------------- | -------- |
+| 1    | `prepare-context`     | Load existing items, resolve AI provider, query data sources, create workspace          | ~2s      |
+| 2    | `generate-items`      | Run the AI agent with tool calling to research and create items                         | ~120s    |
+| 3    | `collect-results`     | Read generated JSON files from the workspace, merge with data source items, deduplicate | ~2s      |
+| 4    | `capture-screenshots` | Capture screenshots for items with source URLs (optional)                               | ~30s     |
+| 5    | `cleanup`             | Remove the temporary workspace directory                                                | ~1s      |
 
 ## Agent Tools
 
@@ -96,9 +96,9 @@ The worker model is used internally by the parent tools (particularly `processUr
 
 ### Settings Schema
 
-| Setting | Type | Default | Description |
-|---|---|---|---|
-| `maxSteps` | `integer` | `50` | Maximum number of agent tool-calling steps (10--2000, hidden) |
+| Setting    | Type      | Default | Description                                                   |
+| ---------- | --------- | ------- | ------------------------------------------------------------- |
+| `maxSteps` | `integer` | `50`    | Maximum number of agent tool-calling steps (10--2000, hidden) |
 
 ### Selectable Provider Categories
 
@@ -161,36 +161,36 @@ Before the agent runs, the pipeline queries configured data sources (via `dataSo
 
 ```typescript
 class AgentPipelinePlugin implements IPlugin, IPipelinePlugin<AgentPipelineStepId>, IFormSchemaProvider {
-  readonly id: 'agent-pipeline';
-  readonly category: 'pipeline';
+	readonly id: 'agent-pipeline';
+	readonly category: 'pipeline';
 
-  execute(directory, request, existing, options?, onProgress?): Promise<PipelineResult>;
-  cancel(): Promise<void>;
-  getState(): PipelineState<AgentPipelineStepId> | null;
-  getStepDefinitions(): readonly PipelineStepDefinition<AgentPipelineStepId>[];
-  getFormFields(): FormFieldDefinition[];
-  getFormGroups(): FormFieldGroup[];
-  validateFormInput(values): ValidationResult;
-  getDefaultValues(): Record<string, unknown>;
+	execute(directory, request, existing, options?, onProgress?): Promise<PipelineResult>;
+	cancel(): Promise<void>;
+	getState(): PipelineState<AgentPipelineStepId> | null;
+	getStepDefinitions(): readonly PipelineStepDefinition<AgentPipelineStepId>[];
+	getFormFields(): FormFieldDefinition[];
+	getFormGroups(): FormFieldGroup[];
+	validateFormInput(values): ValidationResult;
+	getDefaultValues(): Record<string, unknown>;
 }
 ```
 
 ### Key Types
 
-| Type | Purpose |
-|---|---|
-| `AgentPipelineStepId` | Union of the 5 step IDs |
-| `TokenUsageBreakdown` | Parent, worker, and total token usage |
+| Type                    | Purpose                                   |
+| ----------------------- | ----------------------------------------- |
+| `AgentPipelineStepId`   | Union of the 5 step IDs                   |
+| `TokenUsageBreakdown`   | Parent, worker, and total token usage     |
 | `TokenUsageAccumulator` | Mutable accumulator passed to all workers |
 
 ## Comparison with Standard Pipeline
 
-| Aspect | Agent Pipeline | Standard Pipeline |
-|---|---|---|
-| Approach | Autonomous AI agent with tools | Fixed 15-step sequence |
-| Steps | 5 high-level steps | 15 granular steps |
-| Search strategy | Agent decides queries dynamically | Predetermined search queries |
-| Checkpoint resume | No | Yes |
-| Step-level customization | No | Steps can be injected/replaced/disabled |
-| Model requirements | Must support tool calling | Any AI model |
-| Engine orchestration | Self-orchestrated | Engine-orchestrated |
+| Aspect                   | Agent Pipeline                    | Standard Pipeline                       |
+| ------------------------ | --------------------------------- | --------------------------------------- |
+| Approach                 | Autonomous AI agent with tools    | Fixed 15-step sequence                  |
+| Steps                    | 5 high-level steps                | 15 granular steps                       |
+| Search strategy          | Agent decides queries dynamically | Predetermined search queries            |
+| Checkpoint resume        | No                                | Yes                                     |
+| Step-level customization | No                                | Steps can be injected/replaced/disabled |
+| Model requirements       | Must support tool calling         | Any AI model                            |
+| Engine orchestration     | Self-orchestrated                 | Engine-orchestrated                     |

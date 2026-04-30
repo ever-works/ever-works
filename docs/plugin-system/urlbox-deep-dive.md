@@ -32,6 +32,7 @@ IPlugin (lifecycle, manifest)
 ### SDK Integration
 
 The plugin uses the `urlbox` npm package which provides:
+
 - `Urlbox(apiKey, apiSecret)` factory function for client creation
 - `generateRenderLink(options)` for URL generation
 - `RenderOptions` type for screenshot parameters
@@ -42,36 +43,36 @@ The Urlbox SDK generates render links (URLs) that, when fetched, trigger the scr
 
 ### Settings Schema
 
-| Field | Type | Default | Description |
-|-------|------|---------|-------------|
-| `apiKey` | `string` | - | Urlbox API key (`x-secret`, `x-envVar: PLUGIN_URLBOX_API_KEY`, `x-scope: user`) |
-| `apiSecret` | `string` | - | API secret for signed render links (`x-secret`, `x-envVar: PLUGIN_URLBOX_API_SECRET`, `x-scope: user`) |
-| `viewportWidth` | `number` | `1280` | Default viewport width (320-3840 px) |
-| `viewportHeight` | `number` | `1024` | Default viewport height (200-2160 px) |
-| `format` | `string` | `'png'` | Image format (png, jpg, jpeg, webp) |
-| `fullPage` | `boolean` | `false` | Capture full page scroll height |
-| `quality` | `number` | `80` | Image quality for lossy formats (1-100) |
-| `retina` | `boolean` | `false` | Enable 2x device scale factor |
-| `blockAds` | `boolean` | `true` | Block advertisements |
-| `hideCookieBanners` | `boolean` | `true` | Hide cookie consent banners |
+| Field               | Type      | Default | Description                                                                                            |
+| ------------------- | --------- | ------- | ------------------------------------------------------------------------------------------------------ |
+| `apiKey`            | `string`  | -       | Urlbox API key (`x-secret`, `x-envVar: PLUGIN_URLBOX_API_KEY`, `x-scope: user`)                        |
+| `apiSecret`         | `string`  | -       | API secret for signed render links (`x-secret`, `x-envVar: PLUGIN_URLBOX_API_SECRET`, `x-scope: user`) |
+| `viewportWidth`     | `number`  | `1280`  | Default viewport width (320-3840 px)                                                                   |
+| `viewportHeight`    | `number`  | `1024`  | Default viewport height (200-2160 px)                                                                  |
+| `format`            | `string`  | `'png'` | Image format (png, jpg, jpeg, webp)                                                                    |
+| `fullPage`          | `boolean` | `false` | Capture full page scroll height                                                                        |
+| `quality`           | `number`  | `80`    | Image quality for lossy formats (1-100)                                                                |
+| `retina`            | `boolean` | `false` | Enable 2x device scale factor                                                                          |
+| `blockAds`          | `boolean` | `true`  | Block advertisements                                                                                   |
+| `hideCookieBanners` | `boolean` | `true`  | Hide cookie consent banners                                                                            |
 
 ### Environment Variables
 
-| Variable | Maps To |
-|----------|---------|
-| `PLUGIN_URLBOX_API_KEY` | `apiKey` |
+| Variable                   | Maps To     |
+| -------------------------- | ----------- |
+| `PLUGIN_URLBOX_API_KEY`    | `apiKey`    |
 | `PLUGIN_URLBOX_API_SECRET` | `apiSecret` |
 
 ### Comparison with ScreenshotOne
 
-| Feature | Urlbox | ScreenshotOne |
-|---------|--------|---------------|
-| Default Viewport | 1280x1024 | 1280x800 |
-| Quality Control | Yes (1-100) | No |
-| Retina Mode | Explicit toggle | Device scale factor (1-3) |
-| Cookie Banner Hiding | Yes | No (has tracker blocking) |
-| Signed URLs | Via API secret | Via secret key |
-| SDK | `urlbox` | `screenshotone-api-sdk` |
+| Feature              | Urlbox          | ScreenshotOne             |
+| -------------------- | --------------- | ------------------------- |
+| Default Viewport     | 1280x1024       | 1280x800                  |
+| Quality Control      | Yes (1-100)     | No                        |
+| Retina Mode          | Explicit toggle | Device scale factor (1-3) |
+| Cookie Banner Hiding | Yes             | No (has tracker blocking) |
+| Signed URLs          | Via API secret  | Via secret key            |
+| SDK                  | `urlbox`        | `screenshotone-api-sdk`   |
 
 ## Capabilities
 
@@ -89,11 +90,11 @@ The Urlbox SDK generates render links (URLs) that, when fetched, trigger the scr
 ### Supported Formats
 
 | Format | Extension |
-|--------|-----------|
-| PNG | `.png` |
-| JPG | `.jpg` |
-| JPEG | `.jpeg` |
-| WebP | `.webp` |
+| ------ | --------- |
+| PNG    | `.png`    |
+| JPG    | `.jpg`    |
+| JPEG   | `.jpeg`   |
+| WebP   | `.webp`   |
 
 ### Maximum Dimensions
 
@@ -106,24 +107,24 @@ The Urlbox SDK generates render links (URLs) that, when fetched, trigger the scr
 
 ```typescript
 class UrlboxPlugin implements IPlugin, IScreenshotPlugin {
-    readonly id = 'urlbox';
-    readonly name = 'Urlbox';
-    readonly version = '1.0.0';
-    readonly category: PluginCategory = 'screenshot';
-    readonly capabilities = ['screenshot'];
-    readonly providerName = 'Urlbox';
+	readonly id = 'urlbox';
+	readonly name = 'Urlbox';
+	readonly version = '1.0.0';
+	readonly category: PluginCategory = 'screenshot';
+	readonly capabilities = ['screenshot'];
+	readonly providerName = 'Urlbox';
 
-    async capture(options: ScreenshotOptions): Promise<ScreenshotResult>;
-    async getScreenshotUrl(options: ScreenshotOptions): Promise<string | null>;
-    async isAvailable(): Promise<boolean>;
-    async validateCredentials(): Promise<ScreenshotValidationResult>;
-    getSupportedFormats(): readonly ScreenshotFormat[];
-    getMaxDimensions(): { width: number; height: number };
+	async capture(options: ScreenshotOptions): Promise<ScreenshotResult>;
+	async getScreenshotUrl(options: ScreenshotOptions): Promise<string | null>;
+	async isAvailable(): Promise<boolean>;
+	async validateCredentials(): Promise<ScreenshotValidationResult>;
+	getSupportedFormats(): readonly ScreenshotFormat[];
+	getMaxDimensions(): { width: number; height: number };
 
-    async onLoad(context: PluginContext): Promise<void>;
-    async onUnload(): Promise<void>;
-    async healthCheck(): Promise<PluginHealthCheck>;
-    getManifest(): PluginManifest;
+	async onLoad(context: PluginContext): Promise<void>;
+	async onUnload(): Promise<void>;
+	async healthCheck(): Promise<PluginHealthCheck>;
+	getManifest(): PluginManifest;
 }
 ```
 
@@ -262,24 +263,24 @@ const plugin = new UrlboxPlugin();
 await plugin.onLoad(context);
 
 const result = await plugin.capture({
-    url: 'https://example.com',
-    viewportWidth: 1440,
-    viewportHeight: 900,
-    format: 'webp',
-    blockAds: true,
-    settings: {
-        apiKey: 'your-api-key',
-        apiSecret: 'your-api-secret',
-        quality: 90,
-        retina: true,
-        hideCookieBanners: true
-    }
+	url: 'https://example.com',
+	viewportWidth: 1440,
+	viewportHeight: 900,
+	format: 'webp',
+	blockAds: true,
+	settings: {
+		apiKey: 'your-api-key',
+		apiSecret: 'your-api-secret',
+		quality: 90,
+		retina: true,
+		hideCookieBanners: true
+	}
 });
 
 if (result.success) {
-    console.log(`Captured: ${result.width}x${result.height}, ${result.fileSize} bytes`);
-    // result.imageBase64 contains the base64-encoded image
-    // result.imageUrl contains the render link
+	console.log(`Captured: ${result.width}x${result.height}, ${result.fileSize} bytes`);
+	// result.imageBase64 contains the base64-encoded image
+	// result.imageUrl contains the render link
 }
 ```
 
@@ -287,9 +288,9 @@ if (result.success) {
 
 ```typescript
 const url = await plugin.getScreenshotUrl({
-    url: 'https://example.com',
-    format: 'png',
-    settings: { apiKey: 'key', apiSecret: 'secret' }
+	url: 'https://example.com',
+	format: 'png',
+	settings: { apiKey: 'key', apiSecret: 'secret' }
 });
 // Returns: https://api.urlbox.com/v1/...?url=https%3A%2F%2Fexample.com&...
 ```
@@ -298,12 +299,12 @@ const url = await plugin.getScreenshotUrl({
 
 ### Capture Errors
 
-| Error | Cause | Handling |
-|-------|-------|---------|
-| `API key not configured` | Missing `apiKey` | Throws error in `createClient()` |
-| `Render failed with status X` | Urlbox API error | Returns `{ success: false, error: '...' }` |
-| `Network error` | API unreachable | Caught, logged, returns failure result |
-| `URL generation failed` | Invalid options | Caught in `getScreenshotUrl()`, returns `null` |
+| Error                         | Cause            | Handling                                       |
+| ----------------------------- | ---------------- | ---------------------------------------------- |
+| `API key not configured`      | Missing `apiKey` | Throws error in `createClient()`               |
+| `Render failed with status X` | Urlbox API error | Returns `{ success: false, error: '...' }`     |
+| `Network error`               | API unreachable  | Caught, logged, returns failure result         |
+| `URL generation failed`       | Invalid options  | Caught in `getScreenshotUrl()`, returns `null` |
 
 ### Graceful Failure
 

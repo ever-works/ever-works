@@ -18,31 +18,31 @@ Tests frequently need mock entities (directories, users, plugins). The conventio
 ```typescript
 // Factory for mock items
 function makeItem(slug: string, category: string, opts: Partial<ItemData> = {}): ItemData {
-    return {
-        name: slug.charAt(0).toUpperCase() + slug.slice(1),
-        description: `Description of ${slug}`,
-        source_url: `https://${slug}.example.com`,
-        category,
-        slug,
-        tags: [],
-        ...opts,
-    };
+	return {
+		name: slug.charAt(0).toUpperCase() + slug.slice(1),
+		description: `Description of ${slug}`,
+		source_url: `https://${slug}.example.com`,
+		category,
+		slug,
+		tags: [],
+		...opts
+	};
 }
 
 // Factory for mock directories
 function makeDirectory(overrides: Partial<Directory> = {}): Directory {
-    return {
-        id: 'dir-123',
-        name: 'Test Directory',
-        slug: 'test-directory',
-        description: 'A test directory',
-        userId: 'user-123',
-        gitProvider: 'github',
-        getRepoOwner: () => 'test-owner',
-        getDataRepo: () => 'test-directory-data',
-        getMainRepo: () => 'test-directory',
-        ...overrides,
-    } as Directory;
+	return {
+		id: 'dir-123',
+		name: 'Test Directory',
+		slug: 'test-directory',
+		description: 'A test directory',
+		userId: 'user-123',
+		gitProvider: 'github',
+		getRepoOwner: () => 'test-owner',
+		getDataRepo: () => 'test-directory-data',
+		getMainRepo: () => 'test-directory',
+		...overrides
+	} as Directory;
 }
 ```
 
@@ -53,12 +53,12 @@ The agent package uses consistent patterns for mocking NestJS services:
 ```typescript
 // Partial mock with only the methods needed
 const createMockService = <T>(methods: Partial<Record<keyof T, jest.Mock>>): jest.Mocked<T> =>
-    methods as unknown as jest.Mocked<T>;
+	methods as unknown as jest.Mocked<T>;
 
 // Usage
 const gitFacade = createMockService<GitFacadeService>({
-    cloneOrPull: jest.fn(),
-    push: jest.fn(),
+	cloneOrPull: jest.fn(),
+	push: jest.fn()
 });
 ```
 
@@ -68,13 +68,13 @@ The `@nestjs/testing` package provides `Test.createTestingModule()` for construc
 
 ```typescript
 const module: TestingModule = await Test.createTestingModule({
-    providers: [
-        // The service under test (real implementation)
-        MyService,
-        // Mocked dependencies
-        { provide: SomeDependency, useValue: mockDependency },
-        { provide: AnotherDependency, useFactory: () => createMock() },
-    ],
+	providers: [
+		// The service under test (real implementation)
+		MyService,
+		// Mocked dependencies
+		{ provide: SomeDependency, useValue: mockDependency },
+		{ provide: AnotherDependency, useFactory: () => createMock() }
+	]
 }).compile();
 
 const service = module.get<MyService>(MyService);
@@ -109,10 +109,7 @@ Load fixtures in tests:
 import { readFileSync } from 'fs';
 import { join } from 'path';
 
-const fixture = readFileSync(
-    join(__dirname, 'fixtures', 'sample-readme.md'),
-    'utf-8'
-);
+const fixture = readFileSync(join(__dirname, 'fixtures', 'sample-readme.md'), 'utf-8');
 ```
 
 ### Dynamic Fixtures
@@ -122,8 +119,8 @@ Use factory functions for entities that need unique IDs or timestamps:
 ```typescript
 let counter = 0;
 function uniqueItem(category: string): ItemData {
-    counter++;
-    return makeItem(`item-${counter}`, category);
+	counter++;
+	return makeItem(`item-${counter}`, category);
 }
 ```
 
@@ -169,6 +166,7 @@ pnpm test:cov
 ```
 
 Output:
+
 - **Console** -- summary table showing statement, branch, function, and line coverage.
 - **`coverage/`** -- directory containing JSON data and an HTML report.
 
@@ -220,13 +218,13 @@ Then attach your IDE debugger (VS Code, WebStorm) to the Node.js inspector on po
 
 ### Common Failures and Fixes
 
-| Symptom | Cause | Fix |
-|---|---|---|
-| `Cannot find module '@ever-works/plugin'` | Workspace package not built | Run `pnpm build` from root |
-| `TypeError: X is not a function` | Mock missing a method | Add the method to your mock object |
-| Test passes alone but fails in suite | Shared mutable state | Add `afterEach` cleanup or use `jest.restoreAllMocks()` |
-| Timeout on async test | Missing `await` or unresolved promise | Check all async paths return/resolve |
-| `ts-jest` diagnostic errors | TypeScript strict mode conflicts | Check `diagnostics.ignoreCodes` in jest config |
+| Symptom                                   | Cause                                 | Fix                                                     |
+| ----------------------------------------- | ------------------------------------- | ------------------------------------------------------- |
+| `Cannot find module '@ever-works/plugin'` | Workspace package not built           | Run `pnpm build` from root                              |
+| `TypeError: X is not a function`          | Mock missing a method                 | Add the method to your mock object                      |
+| Test passes alone but fails in suite      | Shared mutable state                  | Add `afterEach` cleanup or use `jest.restoreAllMocks()` |
+| Timeout on async test                     | Missing `await` or unresolved promise | Check all async paths return/resolve                    |
+| `ts-jest` diagnostic errors               | TypeScript strict mode conflicts      | Check `diagnostics.ignoreCodes` in jest config          |
 
 ## Test Organization Summary
 

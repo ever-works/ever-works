@@ -11,11 +11,11 @@ Ever Works uses GitHub Actions for continuous integration and deployment. The pi
 
 ## Workflow Overview
 
-| Workflow | File | Trigger | Purpose |
-|---|---|---|---|
-| **CI** | `ci.yml` | Push/PR to `main`, `develop`, `stage` | Lint, build, test |
-| **Docker Build & Publish** | `docker-build-publish-prod.yml` | Push to `main` | Build and push Docker images |
-| **Deploy to DO Prod** | `deploy-do-prod.yml` | After Docker Build completes on `main` | Deploy to Kubernetes |
+| Workflow                   | File                            | Trigger                                | Purpose                      |
+| -------------------------- | ------------------------------- | -------------------------------------- | ---------------------------- |
+| **CI**                     | `ci.yml`                        | Push/PR to `main`, `develop`, `stage`  | Lint, build, test            |
+| **Docker Build & Publish** | `docker-build-publish-prod.yml` | Push to `main`                         | Build and push Docker images |
+| **Deploy to DO Prod**      | `deploy-do-prod.yml`            | After Docker Build completes on `main` | Deploy to Kubernetes         |
 
 ## CI Workflow
 
@@ -25,11 +25,11 @@ Ever Works uses GitHub Actions for continuous integration and deployment. The pi
 
 ```yaml
 on:
-  push:
-    branches: [main, develop, stage]
-  pull_request:
-    branches: [main, develop, stage]
-  workflow_dispatch:
+    push:
+        branches: [main, develop, stage]
+    pull_request:
+        branches: [main, develop, stage]
+    workflow_dispatch:
 ```
 
 The CI workflow runs on every push and pull request to the three main branches, plus manual dispatch.
@@ -38,8 +38,8 @@ The CI workflow runs on every push and pull request to the three main branches, 
 
 ```yaml
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+    group: ${{ github.workflow }}-${{ github.ref }}
+    cancel-in-progress: true
 ```
 
 Only one CI run per branch at a time. New pushes cancel in-progress runs on the same branch.
@@ -54,19 +54,19 @@ Uses Ubicloud runners (8-core) for faster builds compared to standard GitHub-hos
 
 ### Steps
 
-| Step | Command | Purpose |
-|---|---|---|
-| 1. Checkout | `actions/checkout@v4` | Clone repository |
-| 2. Install pnpm | `pnpm/action-setup@v3` (v10.13.1) | Set up package manager |
-| 3. Setup Node.js | `actions/setup-node@v4` (20.x) | Configure Node with pnpm cache |
-| 4. Install deps | `pnpm install --frozen-lockfile` | Reproducible dependency install |
-| 5. Format check | `pnpm format:check` | Verify Prettier formatting |
-| 6. Build | `pnpm build` | Build all packages via Turborepo |
-| 7. Test | `pnpm test` | Run all test suites |
-| 8. Build Internal CLI | `pnpm build:cli` (apps/internal-cli) | Build internal CLI binary |
-| 9. Build External CLI | `pnpm build:cli` (apps/cli) | Build public CLI binary |
-| 10. Test Internal CLI | `pnpm test:cli` | Verify internal CLI |
-| 11. Test External CLI | `pnpm test:cli` | Verify public CLI |
+| Step                  | Command                              | Purpose                          |
+| --------------------- | ------------------------------------ | -------------------------------- |
+| 1. Checkout           | `actions/checkout@v4`                | Clone repository                 |
+| 2. Install pnpm       | `pnpm/action-setup@v3` (v10.13.1)    | Set up package manager           |
+| 3. Setup Node.js      | `actions/setup-node@v4` (20.x)       | Configure Node with pnpm cache   |
+| 4. Install deps       | `pnpm install --frozen-lockfile`     | Reproducible dependency install  |
+| 5. Format check       | `pnpm format:check`                  | Verify Prettier formatting       |
+| 6. Build              | `pnpm build`                         | Build all packages via Turborepo |
+| 7. Test               | `pnpm test`                          | Run all test suites              |
+| 8. Build Internal CLI | `pnpm build:cli` (apps/internal-cli) | Build internal CLI binary        |
+| 9. Build External CLI | `pnpm build:cli` (apps/cli)          | Build public CLI binary          |
+| 10. Test Internal CLI | `pnpm test:cli`                      | Verify internal CLI              |
+| 11. Test External CLI | `pnpm test:cli`                      | Verify public CLI                |
 
 The CLI build steps inject `API_URL` and `WEB_URL` secrets to embed production endpoints.
 
@@ -78,9 +78,9 @@ The CLI build steps inject `API_URL` and `WEB_URL` secrets to embed production e
 
 ```yaml
 on:
-  push:
-    branches: [main]
-  workflow_dispatch:
+    push:
+        branches: [main]
+    workflow_dispatch:
 ```
 
 Builds run on every push to `main` and can be manually triggered.
@@ -89,16 +89,16 @@ Builds run on every push to `main` and can be manually triggered.
 
 ```yaml
 concurrency:
-  group: ${{ github.ref }}-${{ github.workflow }}
-  cancel-in-progress: true
+    group: ${{ github.ref }}-${{ github.workflow }}
+    cancel-in-progress: true
 ```
 
 ### Permissions
 
 ```yaml
 permissions:
-  contents: read
-  packages: write
+    contents: read
+    packages: write
 ```
 
 The `packages: write` permission is required for pushing to GitHub Container Registry (GHCR).
@@ -119,11 +119,11 @@ Each job follows the same pattern:
 
 Each image is tagged for three registries:
 
-| Registry | Tag Pattern | Priority |
-|---|---|---|
-| GitHub Container Registry | `ghcr.io/ever-works/ever-works-api:latest` | Primary (always succeeds) |
-| Docker Hub | `everco/ever-works-api:latest` | Secondary (`continue-on-error: true`) |
-| DigitalOcean Registry | `registry.digitalocean.com/ever/ever-works-api:latest` | Deployment target (`continue-on-error`) |
+| Registry                  | Tag Pattern                                            | Priority                                |
+| ------------------------- | ------------------------------------------------------ | --------------------------------------- |
+| GitHub Container Registry | `ghcr.io/ever-works/ever-works-api:latest`             | Primary (always succeeds)               |
+| Docker Hub                | `everco/ever-works-api:latest`                         | Secondary (`continue-on-error: true`)   |
+| DigitalOcean Registry     | `registry.digitalocean.com/ever/ever-works-api:latest` | Deployment target (`continue-on-error`) |
 
 GHCR is the primary registry (authentication via `GITHUB_TOKEN`). Docker Hub and DigitalOcean registries use `continue-on-error: true` so builds succeed even if one push fails.
 
@@ -152,11 +152,11 @@ Currently builds for `linux/amd64` only. The QEMU setup enables future multi-arc
 
 ```yaml
 on:
-  workflow_run:
-    workflows: ['Build and Publish Docker Images Prod']
-    branches: [main]
-    types:
-      - completed
+    workflow_run:
+        workflows: ['Build and Publish Docker Images Prod']
+        branches: [main]
+        types:
+            - completed
 ```
 
 This workflow runs automatically after the Docker build workflow completes on `main`. This creates a sequential pipeline: CI validates, Docker builds images, then deployment applies them.
@@ -165,23 +165,23 @@ This workflow runs automatically after the Docker build workflow completes on `m
 
 ```yaml
 environment:
-  name: prod
-  url: https://app.ever.works
+    name: prod
+    url: https://app.ever.works
 ```
 
 Uses GitHub's environment feature for deployment protection rules and secrets isolation.
 
 ### Deployment Steps
 
-| Step | Purpose |
-|---|---|
-| 1. Checkout | Access K8s manifests |
-| 2. Install doctl | DigitalOcean CLI for cluster access |
-| 3. Save kubeconfig | Get short-lived (600s) K8s credentials |
-| 4. Write PostgreSQL certificate | Decode and write the database CA certificate |
-| 5. Generate TLS secrets | Create Kubernetes TLS secrets for API and Web ingress |
-| 6. Apply K8s manifests | Use `envsubst` to inject secrets into manifests, then `kubectl apply` |
-| 7. Restart pods | Rolling restart to pick up the new `:latest` images |
+| Step                            | Purpose                                                               |
+| ------------------------------- | --------------------------------------------------------------------- |
+| 1. Checkout                     | Access K8s manifests                                                  |
+| 2. Install doctl                | DigitalOcean CLI for cluster access                                   |
+| 3. Save kubeconfig              | Get short-lived (600s) K8s credentials                                |
+| 4. Write PostgreSQL certificate | Decode and write the database CA certificate                          |
+| 5. Generate TLS secrets         | Create Kubernetes TLS secrets for API and Web ingress                 |
+| 6. Apply K8s manifests          | Use `envsubst` to inject secrets into manifests, then `kubectl apply` |
+| 7. Restart pods                 | Rolling restart to pick up the new `:latest` images                   |
 
 ### TLS Secret Management
 
@@ -238,14 +238,14 @@ flowchart TD
 
 ## Required Secrets
 
-| Category | Secrets |
-|---|---|
-| **Docker Hub** | `DOCKERHUB_USERNAME`, `DOCKERHUB_TOKEN` |
-| **DigitalOcean** | `DIGITALOCEAN_ACCESS_TOKEN` |
-| **TLS** | `INGRESS_API_CERT`, `INGRESS_API_CERT_KEY`, `INGRESS_WEBAPP_CERT`, `INGRESS_WEBAPP_CERT_KEY` |
-| **Database** | `DATABASE_TYPE`, `DATABASE_URL`, `DATABASE_HOST`, `DATABASE_PORT`, `DATABASE_USERNAME`, `DATABASE_PASSWORD`, `DATABASE_NAME`, `DATABASE_SSL_MODE`, `DATABASE_CA_CERT` |
-| **Auth** | `JWT_SECRET`, `AUTH_SECRET`, `GH_CLIENT_ID`, `GH_CLIENT_SECRET`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` |
-| **Plugins** | `PLUGIN_OPENROUTER_API_KEY`, `PLUGIN_GITHUB_CLIENT_ID`, `PLUGIN_TAVILY_API_KEY`, etc. |
-| **Mail** | `MAILER_PROVIDER`, `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`, `RESEND_APIKEY` |
-| **Trigger.dev** | `TRIGGER_ENABLED`, `TRIGGER_SECRET_KEY`, `TRIGGER_INTERNAL_SECRET` |
-| **CLI** | `API_URL`, `WEB_URL` |
+| Category         | Secrets                                                                                                                                                               |
+| ---------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Docker Hub**   | `DOCKERHUB_USERNAME`, `DOCKERHUB_TOKEN`                                                                                                                               |
+| **DigitalOcean** | `DIGITALOCEAN_ACCESS_TOKEN`                                                                                                                                           |
+| **TLS**          | `INGRESS_API_CERT`, `INGRESS_API_CERT_KEY`, `INGRESS_WEBAPP_CERT`, `INGRESS_WEBAPP_CERT_KEY`                                                                          |
+| **Database**     | `DATABASE_TYPE`, `DATABASE_URL`, `DATABASE_HOST`, `DATABASE_PORT`, `DATABASE_USERNAME`, `DATABASE_PASSWORD`, `DATABASE_NAME`, `DATABASE_SSL_MODE`, `DATABASE_CA_CERT` |
+| **Auth**         | `JWT_SECRET`, `AUTH_SECRET`, `GH_CLIENT_ID`, `GH_CLIENT_SECRET`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`                                                           |
+| **Plugins**      | `PLUGIN_OPENROUTER_API_KEY`, `PLUGIN_GITHUB_CLIENT_ID`, `PLUGIN_TAVILY_API_KEY`, etc.                                                                                 |
+| **Mail**         | `MAILER_PROVIDER`, `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`, `RESEND_APIKEY`                                                                            |
+| **Trigger.dev**  | `TRIGGER_ENABLED`, `TRIGGER_SECRET_KEY`, `TRIGGER_INTERNAL_SECRET`                                                                                                    |
+| **CLI**          | `API_URL`, `WEB_URL`                                                                                                                                                  |

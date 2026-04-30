@@ -15,15 +15,15 @@ Every search plugin must implement these core methods:
 
 ```typescript
 interface ISearchPlugin extends IPlugin {
-  readonly providerName: string;
+	readonly providerName: string;
 
-  search(options: SearchOptions): Promise<SearchResponse>;
-  isAvailable(): Promise<boolean>;
+	search(options: SearchOptions): Promise<SearchResponse>;
+	isAvailable(): Promise<boolean>;
 
-  // Optional
-  getRateLimitInfo?(): Promise<RateLimitInfo>;
-  getSupportedRegions?(): readonly string[];
-  getSupportedLanguages?(): readonly string[];
+	// Optional
+	getRateLimitInfo?(): Promise<RateLimitInfo>;
+	getSupportedRegions?(): readonly string[];
+	getSupportedLanguages?(): readonly string[];
 }
 ```
 
@@ -33,18 +33,18 @@ All search plugins accept the same `SearchOptions` interface, ensuring consisten
 
 ```typescript
 interface SearchOptions {
-  query: string;              // Search query string
-  limit?: number;             // Number of results (default varies by plugin)
-  page?: number;              // Pagination
-  language?: string;          // Language/locale filter
-  region?: string;            // Country/region for results
-  safeSearch?: 'off' | 'moderate' | 'strict';
-  timeRange?: 'day' | 'week' | 'month' | 'year' | 'all';
-  site?: string;              // Restrict to a specific site
-  fileType?: string;          // File type filter
-  excludeDomains?: string[];  // Domains to exclude
-  includeDomains?: string[];  // Domains to include
-  settings?: PluginSettings;  // Resolved plugin settings (API keys, etc.)
+	query: string; // Search query string
+	limit?: number; // Number of results (default varies by plugin)
+	page?: number; // Pagination
+	language?: string; // Language/locale filter
+	region?: string; // Country/region for results
+	safeSearch?: 'off' | 'moderate' | 'strict';
+	timeRange?: 'day' | 'week' | 'month' | 'year' | 'all';
+	site?: string; // Restrict to a specific site
+	fileType?: string; // File type filter
+	excludeDomains?: string[]; // Domains to exclude
+	includeDomains?: string[]; // Domains to include
+	settings?: PluginSettings; // Resolved plugin settings (API keys, etc.)
 }
 ```
 
@@ -54,25 +54,25 @@ Results follow a standardized format:
 
 ```typescript
 interface SearchResponse {
-  results: SearchResult[];     // Array of results
-  totalResults?: number;       // Estimated total
-  query: string;               // Original query
-  duration?: number;           // Search duration in ms
-  nextPage?: number | string;  // Pagination token
-  hasMore: boolean;            // Whether more results exist
-  relatedSearches?: string[];  // Related query suggestions
+	results: SearchResult[]; // Array of results
+	totalResults?: number; // Estimated total
+	query: string; // Original query
+	duration?: number; // Search duration in ms
+	nextPage?: number | string; // Pagination token
+	hasMore: boolean; // Whether more results exist
+	relatedSearches?: string[]; // Related query suggestions
 }
 
 interface SearchResult {
-  title: string;
-  url: string;
-  snippet?: string;
-  displayUrl?: string;
-  faviconUrl?: string;
-  publishedDate?: string;
-  position: number;
-  source?: string;
-  metadata?: Record<string, unknown>;
+	title: string;
+	url: string;
+	snippet?: string;
+	displayUrl?: string;
+	faviconUrl?: string;
+	publishedDate?: string;
+	position: number;
+	source?: string;
+	metadata?: Record<string, unknown>;
 }
 ```
 
@@ -80,12 +80,12 @@ interface SearchResult {
 
 ### Exa
 
-| Property | Value |
-|---|---|
-| Package | `@ever-works/exa-plugin` |
-| Capabilities | `search`, `content-extractor` |
-| SDK | `exa-js` |
-| Configuration Mode | `hybrid` |
+| Property           | Value                         |
+| ------------------ | ----------------------------- |
+| Package            | `@ever-works/exa-plugin`      |
+| Capabilities       | `search`, `content-extractor` |
+| SDK                | `exa-js`                      |
+| Configuration Mode | `hybrid`                      |
 
 Exa is an AI-native search engine offering three search modes:
 
@@ -94,6 +94,7 @@ Exa is an AI-native search engine offering three search modes:
 - **keyword** -- traditional keyword matching
 
 **Unique features:**
+
 - Category filtering: restrict results to `company`, `research paper`, `news`, `tweet`, `personal site`, or `github`
 - Domain inclusion/exclusion lists
 - Time range filtering via `startPublishedDate`
@@ -101,25 +102,26 @@ Exa is an AI-native search engine offering three search modes:
 
 **Settings:**
 
-| Setting | Type | Default | Description |
-|---|---|---|---|
-| `apiKey` | string (secret) | -- | Exa API key |
-| `searchType` | enum | `auto` | Search mode: auto, neural, keyword |
-| `maxResults` | number | `10` | Default result count per query |
-| `category` | enum | `""` | Optional category filter |
+| Setting      | Type            | Default | Description                        |
+| ------------ | --------------- | ------- | ---------------------------------- |
+| `apiKey`     | string (secret) | --      | Exa API key                        |
+| `searchType` | enum            | `auto`  | Search mode: auto, neural, keyword |
+| `maxResults` | number          | `10`    | Default result count per query     |
+| `category`   | enum            | `""`    | Optional category filter           |
 
 ### Tavily
 
-| Property | Value |
-|---|---|
-| Package | `@ever-works/tavily-plugin` |
-| Capabilities | `search`, `content-extractor` |
-| SDK | `@tavily/core` |
-| Configuration Mode | `hybrid` |
+| Property           | Value                         |
+| ------------------ | ----------------------------- |
+| Package            | `@ever-works/tavily-plugin`   |
+| Capabilities       | `search`, `content-extractor` |
+| SDK                | `@tavily/core`                |
+| Configuration Mode | `hybrid`                      |
 
 Tavily is a search API built specifically for AI agents and RAG applications. It returns clean, relevant results optimized for LLM consumption.
 
 **Unique features:**
+
 - Search depth control (`basic` or `advanced`)
 - Built-in content extraction alongside search results
 - Domain include/exclude filtering
@@ -127,71 +129,73 @@ Tavily is a search API built specifically for AI agents and RAG applications. It
 
 **Settings:**
 
-| Setting | Type | Default | Description |
-|---|---|---|---|
-| `apiKey` | string (secret) | -- | Tavily API key |
-| `searchDepth` | enum | `basic` | Search depth: basic or advanced |
-| `maxResults` | number | `10` | Default result count |
+| Setting       | Type            | Default | Description                     |
+| ------------- | --------------- | ------- | ------------------------------- |
+| `apiKey`      | string (secret) | --      | Tavily API key                  |
+| `searchDepth` | enum            | `basic` | Search depth: basic or advanced |
+| `maxResults`  | number          | `10`    | Default result count            |
 
 ### SerpAPI
 
-| Property | Value |
-|---|---|
-| Package | `@ever-works/serpapi-plugin` |
-| Capabilities | `search` |
-| SDK | Direct HTTP API |
-| Configuration Mode | `hybrid` |
+| Property           | Value                        |
+| ------------------ | ---------------------------- |
+| Package            | `@ever-works/serpapi-plugin` |
+| Capabilities       | `search`                     |
+| SDK                | Direct HTTP API              |
+| Configuration Mode | `hybrid`                     |
 
 SerpAPI provides access to multiple search engines (Google, Bing, Yahoo, and more) through a unified API. It returns structured data extracted from real search engine result pages.
 
 **Unique features:**
+
 - Multi-engine support (Google, Bing, Yahoo, Baidu, etc.)
 - Rich snippet data (knowledge graph, local results, shopping)
 - Geographic targeting with `gl` (country) and `hl` (language) parameters
 
 **Settings:**
 
-| Setting | Type | Default | Description |
-|---|---|---|---|
-| `apiKey` | string (secret) | -- | SerpAPI key |
-| `engine` | string | `google` | Search engine to use |
+| Setting  | Type            | Default  | Description          |
+| -------- | --------------- | -------- | -------------------- |
+| `apiKey` | string (secret) | --       | SerpAPI key          |
+| `engine` | string          | `google` | Search engine to use |
 
 ### Brave
 
-| Property | Value |
-|---|---|
-| Package | `@ever-works/brave-plugin` |
-| Capabilities | `search` |
-| SDK | Direct HTTP API |
-| Configuration Mode | `hybrid` |
+| Property           | Value                      |
+| ------------------ | -------------------------- |
+| Package            | `@ever-works/brave-plugin` |
+| Capabilities       | `search`                   |
+| SDK                | Direct HTTP API            |
+| Configuration Mode | `hybrid`                   |
 
 Brave Search is a privacy-focused search engine with its own independent index (not proxied from other engines).
 
 **Unique features:**
+
 - Independent search index (not based on Google/Bing)
 - Privacy-first approach with no user tracking
 - Goggles for custom re-ranking of results
 
 **Settings:**
 
-| Setting | Type | Default | Description |
-|---|---|---|---|
-| `apiKey` | string (secret) | -- | Brave Search API key |
-| `maxResults` | number | `10` | Default result count |
+| Setting      | Type            | Default | Description          |
+| ------------ | --------------- | ------- | -------------------- |
+| `apiKey`     | string (secret) | --      | Brave Search API key |
+| `maxResults` | number          | `10`    | Default result count |
 
 ## Provider Comparison
 
-| Feature | Exa | Tavily | SerpAPI | Brave |
-|---|:---:|:---:|:---:|:---:|
-| Neural/semantic search | Yes | No | No | No |
-| Content extraction | Yes | Yes | No | No |
-| Category filtering | Yes | No | No | No |
-| Multi-engine support | No | No | Yes | No |
-| Privacy focus | No | No | No | Yes |
-| Domain filtering | Yes | Yes | Limited | Limited |
-| Time range filtering | Yes | Yes | Yes | Yes |
-| AI-optimized results | Yes | Yes | No | No |
-| Free tier | Limited | Yes | Yes | Yes |
+| Feature                |   Exa   | Tavily | SerpAPI |  Brave  |
+| ---------------------- | :-----: | :----: | :-----: | :-----: |
+| Neural/semantic search |   Yes   |   No   |   No    |   No    |
+| Content extraction     |   Yes   |  Yes   |   No    |   No    |
+| Category filtering     |   Yes   |   No   |   No    |   No    |
+| Multi-engine support   |   No    |   No   |   Yes   |   No    |
+| Privacy focus          |   No    |   No   |   No    |   Yes   |
+| Domain filtering       |   Yes   |  Yes   | Limited | Limited |
+| Time range filtering   |   Yes   |  Yes   |   Yes   |   Yes   |
+| AI-optimized results   |   Yes   |  Yes   |   No    |   No    |
+| Free tier              | Limited |  Yes   |   Yes   |   Yes   |
 
 ## How Search Plugins Are Used
 
@@ -210,10 +214,10 @@ Search plugins can optionally report rate limit information:
 
 ```typescript
 interface RateLimitInfo {
-  remaining: number;    // Requests remaining
-  limit: number;        // Total limit
-  resetsAt?: number;    // Unix timestamp for reset
-  period?: string;      // Limit period (e.g., 'day', 'month')
+	remaining: number; // Requests remaining
+	limit: number; // Total limit
+	resetsAt?: number; // Unix timestamp for reset
+	period?: string; // Limit period (e.g., 'day', 'month')
 }
 ```
 

@@ -56,35 +56,35 @@ From `apps/api/src/main.ts`:
 ```typescript
 // Relaxed CSP for API docs (Scalar requires inline scripts)
 app.use((req, res, next) => {
-    if (req.path.startsWith('/api/docs')) {
-        return helmet({
-            contentSecurityPolicy: {
-                directives: {
-                    defaultSrc: ["'self'"],
-                    scriptSrc: ["'self'", "'unsafe-inline'"],
-                    styleSrc: ["'self'", "'unsafe-inline'"],
-                    imgSrc: ["'self'", 'data:', 'https:'],
-                },
-            },
-        })(req, res, next);
-    }
-    // Strict defaults for all other routes
-    return helmet()(req, res, next);
+	if (req.path.startsWith('/api/docs')) {
+		return helmet({
+			contentSecurityPolicy: {
+				directives: {
+					defaultSrc: ["'self'"],
+					scriptSrc: ["'self'", "'unsafe-inline'"],
+					styleSrc: ["'self'", "'unsafe-inline'"],
+					imgSrc: ["'self'", 'data:', 'https:']
+				}
+			}
+		})(req, res, next);
+	}
+	// Strict defaults for all other routes
+	return helmet()(req, res, next);
 });
 ```
 
 ### Headers Set by Helmet
 
-| Header                    | Value                    | Purpose                            |
-|---------------------------|--------------------------|------------------------------------|
-| `X-Content-Type-Options`  | `nosniff`                | Prevent MIME type sniffing         |
-| `X-Frame-Options`         | `SAMEORIGIN`             | Prevent clickjacking               |
-| `X-XSS-Protection`        | `0`                      | Disable legacy XSS auditor        |
-| `Strict-Transport-Security`| `max-age=15552000`      | Force HTTPS (production)           |
-| `Content-Security-Policy` | Strict defaults           | Prevent XSS, injection            |
-| `X-DNS-Prefetch-Control`  | `off`                    | Disable DNS prefetching            |
-| `X-Download-Options`      | `noopen`                 | Prevent auto-open downloads (IE)   |
-| `X-Permitted-Cross-Domain-Policies` | `none`        | Restrict Flash/Acrobat access      |
+| Header                              | Value              | Purpose                          |
+| ----------------------------------- | ------------------ | -------------------------------- |
+| `X-Content-Type-Options`            | `nosniff`          | Prevent MIME type sniffing       |
+| `X-Frame-Options`                   | `SAMEORIGIN`       | Prevent clickjacking             |
+| `X-XSS-Protection`                  | `0`                | Disable legacy XSS auditor       |
+| `Strict-Transport-Security`         | `max-age=15552000` | Force HTTPS (production)         |
+| `Content-Security-Policy`           | Strict defaults    | Prevent XSS, injection           |
+| `X-DNS-Prefetch-Control`            | `off`              | Disable DNS prefetching          |
+| `X-Download-Options`                | `noopen`           | Prevent auto-open downloads (IE) |
+| `X-Permitted-Cross-Domain-Policies` | `none`             | Restrict Flash/Acrobat access    |
 
 ## CORS Configuration
 
@@ -92,10 +92,10 @@ CORS is configured with an explicit allowlist of origins:
 
 ```typescript
 app.enableCors({
-    origin: process.env.ALLOWED_ORIGINS?.split(',') || ['http://localhost:3000'],
-    credentials: true,
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization'],
+	origin: process.env.ALLOWED_ORIGINS?.split(',') || ['http://localhost:3000'],
+	credentials: true,
+	methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+	allowedHeaders: ['Content-Type', 'Authorization']
 });
 ```
 
@@ -114,21 +114,21 @@ The global `ValidationPipe` is the primary defense against malformed or maliciou
 
 ```typescript
 app.useGlobalPipes(
-    new ValidationPipe({
-        whitelist: true,           // Strip properties not in DTO
-        transform: true,           // Auto-transform types
-        forbidNonWhitelisted: true, // Throw on unknown properties
-    }),
+	new ValidationPipe({
+		whitelist: true, // Strip properties not in DTO
+		transform: true, // Auto-transform types
+		forbidNonWhitelisted: true // Throw on unknown properties
+	})
 );
 ```
 
 ### How It Protects
 
-| Setting                  | Protection                                          |
-|--------------------------|-----------------------------------------------------|
-| `whitelist: true`        | Removes any properties not defined in the DTO class |
-| `transform: true`        | Converts string "123" to number 123 per DTO types   |
-| `forbidNonWhitelisted`   | Returns 400 if unknown properties are sent          |
+| Setting                | Protection                                          |
+| ---------------------- | --------------------------------------------------- |
+| `whitelist: true`      | Removes any properties not defined in the DTO class |
+| `transform: true`      | Converts string "123" to number 123 per DTO types   |
+| `forbidNonWhitelisted` | Returns 400 if unknown properties are sent          |
 
 ### DTO Validation Example
 
@@ -136,18 +136,18 @@ app.useGlobalPipes(
 import { IsString, IsEmail, MinLength, MaxLength } from 'class-validator';
 
 export class RegisterDto {
-    @IsString()
-    @MinLength(2)
-    @MaxLength(50)
-    username: string;
+	@IsString()
+	@MinLength(2)
+	@MaxLength(50)
+	username: string;
 
-    @IsEmail()
-    email: string;
+	@IsEmail()
+	email: string;
 
-    @IsString()
-    @MinLength(8)
-    @MaxLength(128)
-    password: string;
+	@IsString()
+	@MinLength(8)
+	@MaxLength(128)
+	password: string;
 }
 ```
 
@@ -160,18 +160,18 @@ The `JwtAuthGuard` is registered as `APP_GUARD`, meaning every route requires au
 ```typescript
 @Injectable()
 export class JwtAuthGuard extends AuthGuard('jwt') {
-    constructor(private reflector: Reflector) {
-        super();
-    }
+	constructor(private reflector: Reflector) {
+		super();
+	}
 
-    canActivate(context: ExecutionContext) {
-        const isPublic = this.reflector.getAllAndOverride<boolean>(
-            IS_PUBLIC_KEY,
-            [context.getHandler(), context.getClass()],
-        );
-        if (isPublic) return true;
-        return super.canActivate(context);
-    }
+	canActivate(context: ExecutionContext) {
+		const isPublic = this.reflector.getAllAndOverride<boolean>(IS_PUBLIC_KEY, [
+			context.getHandler(),
+			context.getClass()
+		]);
+		if (isPublic) return true;
+		return super.canActivate(context);
+	}
 }
 ```
 
@@ -190,12 +190,9 @@ The platform implements refresh token rotation with family tracking to detect to
 ```typescript
 // Token reuse detection (security: compromised token detection)
 if (tokenData.revoked) {
-    // Revoke ALL tokens in the family
-    await this.refreshTokenRepository.revokeTokenFamily(
-        tokenData.family,
-        'Token reuse detected',
-    );
-    throw new UnauthorizedException('Token reuse detected');
+	// Revoke ALL tokens in the family
+	await this.refreshTokenRepository.revokeTokenFamily(tokenData.family, 'Token reuse detected');
+	throw new UnauthorizedException('Token reuse detected');
 }
 ```
 
@@ -205,12 +202,12 @@ The JWT includes essential claims with issuer and audience validation:
 
 ```typescript
 const payload: JwtPayload = {
-    sub: user.id,
-    email: user.email,
-    provider: user.registrationProvider,
-    iat: Math.floor(Date.now() / 1000),
-    iss: 'ever-works-api',
-    aud: 'ever-works-users',
+	sub: user.id,
+	email: user.email,
+	provider: user.registrationProvider,
+	iat: Math.floor(Date.now() / 1000),
+	iss: 'ever-works-api',
+	aud: 'ever-works-users'
 };
 ```
 

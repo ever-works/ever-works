@@ -43,14 +43,14 @@ Both services are initialized before the NestJS application starts, in `apps/api
 import { initSentry, initPostHog } from '@ever-works/monitoring';
 
 async function bootstrap() {
-    configDotenv({ path: path.resolve(process.cwd(), '.env') });
+	configDotenv({ path: path.resolve(process.cwd(), '.env') });
 
-    // Initialize monitoring before app creation
-    initSentry();
-    initPostHog();
+	// Initialize monitoring before app creation
+	initSentry();
+	initPostHog();
 
-    const app = await NestFactory.create(ApiModule);
-    // ...
+	const app = await NestFactory.create(ApiModule);
+	// ...
 }
 ```
 
@@ -75,30 +75,30 @@ The Sentry config in `packages/monitoring/src/sentry/sentry.config.ts` includes 
 
 ```typescript
 const defaultConfig = {
-    dsn: process.env.SENTRY_DSN,
-    environment: process.env.NODE_ENV || 'development',
-    tracesSampleRate: process.env.NODE_ENV === 'production' ? 0.1 : 1.0,
-    profilesSampleRate: process.env.NODE_ENV === 'production' ? 0.1 : 1.0,
-    enableLogs: true,
-    integrations: [nodeProfilingIntegration()],
-    beforeSend(event) {
-        // Filter out auth-related events to avoid logging credentials
-        if (event.request?.url?.includes('/auth')) {
-            return null;
-        }
-        return event;
-    },
+	dsn: process.env.SENTRY_DSN,
+	environment: process.env.NODE_ENV || 'development',
+	tracesSampleRate: process.env.NODE_ENV === 'production' ? 0.1 : 1.0,
+	profilesSampleRate: process.env.NODE_ENV === 'production' ? 0.1 : 1.0,
+	enableLogs: true,
+	integrations: [nodeProfilingIntegration()],
+	beforeSend(event) {
+		// Filter out auth-related events to avoid logging credentials
+		if (event.request?.url?.includes('/auth')) {
+			return null;
+		}
+		return event;
+	}
 };
 ```
 
 ### Key Configuration Options
 
-| Option               | Dev Value | Prod Value | Purpose                                    |
-|----------------------|-----------|------------|--------------------------------------------|
-| `tracesSampleRate`   | 1.0       | 0.1        | Percentage of transactions to trace        |
-| `profilesSampleRate` | 1.0       | 0.1        | Percentage of transactions to profile      |
-| `enableLogs`         | true      | true       | Enable Sentry structured logging           |
-| `beforeSend`         | --        | Filter     | Drop sensitive auth events                 |
+| Option               | Dev Value | Prod Value | Purpose                               |
+| -------------------- | --------- | ---------- | ------------------------------------- |
+| `tracesSampleRate`   | 1.0       | 0.1        | Percentage of transactions to trace   |
+| `profilesSampleRate` | 1.0       | 0.1        | Percentage of transactions to profile |
+| `enableLogs`         | true      | true       | Enable Sentry structured logging      |
+| `beforeSend`         | --        | Filter     | Drop sensitive auth events            |
 
 ## Sentry Interceptor
 
@@ -107,35 +107,35 @@ The `SentryInterceptor` (registered as `APP_INTERCEPTOR`) runs on every request:
 ```typescript
 @Injectable()
 export class SentryInterceptor implements NestInterceptor {
-    intercept(context: ExecutionContext, next: CallHandler): Observable<any> {
-        const request = context.switchToHttp().getRequest();
+	intercept(context: ExecutionContext, next: CallHandler): Observable<any> {
+		const request = context.switchToHttp().getRequest();
 
-        // Set user context for all Sentry events
-        if (request.user) {
-            Sentry.setUser({
-                id: request.user.id,
-                email: request.user.email,
-                username: request.user.username,
-            });
-        }
+		// Set user context for all Sentry events
+		if (request.user) {
+			Sentry.setUser({
+				id: request.user.id,
+				email: request.user.email,
+				username: request.user.username
+			});
+		}
 
-        // Set request metadata
-        Sentry.setContext('request', {
-            method,
-            url: originalUrl,
-            headers: this.sanitizeHeaders(headers),
-            body: this.sanitizeBody(body),
-        });
+		// Set request metadata
+		Sentry.setContext('request', {
+			method,
+			url: originalUrl,
+			headers: this.sanitizeHeaders(headers),
+			body: this.sanitizeBody(body)
+		});
 
-        return next.handle().pipe(
-            catchError((error) => {
-                Sentry.captureException(error, {
-                    tags: { endpoint, statusCode: error.status || 500 },
-                });
-                return throwError(() => error);
-            }),
-        );
-    }
+		return next.handle().pipe(
+			catchError((error) => {
+				Sentry.captureException(error, {
+					tags: { endpoint, statusCode: error.status || 500 }
+				});
+				return throwError(() => error);
+			})
+		);
+	}
 }
 ```
 
@@ -147,14 +147,14 @@ PostHog is configured in `packages/monitoring/src/posthog/posthog.config.ts`:
 
 ```typescript
 export const initPostHog = (config?: PostHogConfig) => {
-    const apiKey = config?.apiKey || process.env.POSTHOG_API_KEY;
-    const host = config?.host || process.env.POSTHOG_HOST;
-    const flushAt = config?.flushAt || 20;          // Batch size
-    const flushInterval = config?.flushInterval || 10000;  // 10 seconds
+	const apiKey = config?.apiKey || process.env.POSTHOG_API_KEY;
+	const host = config?.host || process.env.POSTHOG_HOST;
+	const flushAt = config?.flushAt || 20; // Batch size
+	const flushInterval = config?.flushInterval || 10000; // 10 seconds
 
-    if (apiKey) {
-        posthogClient = new PostHog(apiKey, { host, flushAt, flushInterval });
-    }
+	if (apiKey) {
+		posthogClient = new PostHog(apiKey, { host, flushAt, flushInterval });
+	}
 };
 ```
 
@@ -165,18 +165,20 @@ The `PostHogInterceptor` tracks every API request as an analytics event:
 ```typescript
 @Injectable()
 export class PostHogInterceptor implements NestInterceptor {
-    intercept(context: ExecutionContext, next: CallHandler): Observable<any> {
-        const startTime = Date.now();
+	intercept(context: ExecutionContext, next: CallHandler): Observable<any> {
+		const startTime = Date.now();
 
-        return next.handle().pipe(
-            tap(() => {
-                trackEvent(user?.id || 'anonymous', 'api_request', {
-                    method, endpoint: originalUrl, statusCode,
-                    duration: Date.now() - startTime,
-                });
-            }),
-        );
-    }
+		return next.handle().pipe(
+			tap(() => {
+				trackEvent(user?.id || 'anonymous', 'api_request', {
+					method,
+					endpoint: originalUrl,
+					statusCode,
+					duration: Date.now() - startTime
+				});
+			})
+		);
+	}
 }
 ```
 
@@ -189,31 +191,31 @@ import { AnalyticsService } from '@ever-works/monitoring';
 
 @Injectable()
 export class DirectoryService {
-    constructor(private readonly analytics: AnalyticsService) {}
+	constructor(private readonly analytics: AnalyticsService) {}
 
-    async createDirectory(userId: string, data: CreateDirectoryDto) {
-        const directory = await this.repo.create(data);
+	async createDirectory(userId: string, data: CreateDirectoryDto) {
+		const directory = await this.repo.create(data);
 
-        // Track business event
-        this.analytics.trackBusinessEvent(userId, 'directory_created', {
-            directoryId: directory.id,
-            directoryName: directory.name,
-        });
+		// Track business event
+		this.analytics.trackBusinessEvent(userId, 'directory_created', {
+			directoryId: directory.id,
+			directoryName: directory.name
+		});
 
-        return directory;
-    }
+		return directory;
+	}
 }
 ```
 
 ### Available Tracking Methods
 
-| Method                  | Purpose                                    |
-|-------------------------|--------------------------------------------|
-| `track()`               | Custom event with arbitrary properties     |
-| `identify()`            | Associate user properties                  |
-| `trackApiUsage()`       | API endpoint metrics                       |
-| `trackAuth()`           | Login, logout, register, password_reset    |
-| `trackBusinessEvent()`  | Business-specific events                   |
+| Method                 | Purpose                                 |
+| ---------------------- | --------------------------------------- |
+| `track()`              | Custom event with arbitrary properties  |
+| `identify()`           | Associate user properties               |
+| `trackApiUsage()`      | API endpoint metrics                    |
+| `trackAuth()`          | Login, logout, register, password_reset |
+| `trackBusinessEvent()` | Business-specific events                |
 
 ## SentryService
 
@@ -224,31 +226,31 @@ import { SentryService } from '@ever-works/monitoring';
 
 @Injectable()
 export class GenerationService {
-    constructor(private readonly sentry: SentryService) {}
+	constructor(private readonly sentry: SentryService) {}
 
-    async generateContent(directoryId: string) {
-        this.sentry.info('Generation started', { directoryId });
+	async generateContent(directoryId: string) {
+		this.sentry.info('Generation started', { directoryId });
 
-        try {
-            // ... generation logic
-            this.sentry.info('Generation completed', { directoryId, duration });
-        } catch (error) {
-            this.sentry.error('Generation failed', { directoryId });
-            this.sentry.captureException(error);
-            throw error;
-        }
-    }
+		try {
+			// ... generation logic
+			this.sentry.info('Generation completed', { directoryId, duration });
+		} catch (error) {
+			this.sentry.error('Generation failed', { directoryId });
+			this.sentry.captureException(error);
+			throw error;
+		}
+	}
 }
 ```
 
 ## Environment Variables
 
-| Variable            | Required | Default                     | Description                 |
-|---------------------|----------|-----------------------------|-----------------------------|
-| `SENTRY_DSN`        | No       | --                          | Sentry project DSN          |
-| `POSTHOG_API_KEY`   | No       | --                          | PostHog project API key     |
-| `POSTHOG_HOST`      | No       | `https://app.posthog.com`   | PostHog instance URL        |
-| `NODE_ENV`          | No       | `development`               | Controls sample rates       |
+| Variable          | Required | Default                   | Description             |
+| ----------------- | -------- | ------------------------- | ----------------------- |
+| `SENTRY_DSN`      | No       | --                        | Sentry project DSN      |
+| `POSTHOG_API_KEY` | No       | --                        | PostHog project API key |
+| `POSTHOG_HOST`    | No       | `https://app.posthog.com` | PostHog instance URL    |
+| `NODE_ENV`        | No       | `development`             | Controls sample rates   |
 
 Both services gracefully degrade when credentials are not provided -- no errors, just no-ops.
 

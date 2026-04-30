@@ -1,7 +1,7 @@
 ---
 id: form-system
-title: "Form System"
-sidebar_label: "Form System"
+title: 'Form System'
+sidebar_label: 'Form System'
 sidebar_position: 14
 ---
 
@@ -27,10 +27,10 @@ graph TD
     F --> G
 ```
 
-| Form System | Source Component | Schema Source | Used By |
-|---|---|---|---|
-| Dynamic Plugin Fields | `DynamicPluginFields.tsx` | `FormFieldDefinition[]` from `IFormSchemaProvider` | Generator form (per-directory pipeline config) |
-| Plugin Settings Fields | `PluginSettingsFormFields.tsx` | `JsonSchema` from plugin `settingsSchema` | Plugin settings page, directory plugin settings modal |
+| Form System            | Source Component               | Schema Source                                      | Used By                                               |
+| ---------------------- | ------------------------------ | -------------------------------------------------- | ----------------------------------------------------- |
+| Dynamic Plugin Fields  | `DynamicPluginFields.tsx`      | `FormFieldDefinition[]` from `IFormSchemaProvider` | Generator form (per-directory pipeline config)        |
+| Plugin Settings Fields | `PluginSettingsFormFields.tsx` | `JsonSchema` from plugin `settingsSchema`          | Plugin settings page, directory plugin settings modal |
 
 ## DynamicPluginFields
 
@@ -42,25 +42,25 @@ This component renders form fields defined by pipeline plugins that implement `I
 
 ```typescript
 interface DynamicPluginFieldsProps {
-    fields: FormFieldDefinition[];
-    groups?: FormFieldGroup[];
-    values: Record<string, unknown>;
-    onChange: (values: Record<string, unknown>) => void;
+	fields: FormFieldDefinition[];
+	groups?: FormFieldGroup[];
+	values: Record<string, unknown>;
+	onChange: (values: Record<string, unknown>) => void;
 }
 ```
 
 ### Supported Field Types
 
-| Type | Renders | Value Type |
-|---|---|---|
-| `text` | Text input | `string` |
-| `url` | URL input | `string` |
-| `password` | Password input (masked) | `string` |
-| `number` | Number input with min/max | `number` |
-| `textarea` | Multi-line text area (4 rows) | `string` |
-| `boolean` | Toggle switch | `boolean` |
-| `select` | Dropdown select | `string` |
-| `tags` | Tag input (Enter/comma to add) | `string[]` |
+| Type       | Renders                        | Value Type |
+| ---------- | ------------------------------ | ---------- |
+| `text`     | Text input                     | `string`   |
+| `url`      | URL input                      | `string`   |
+| `password` | Password input (masked)        | `string`   |
+| `number`   | Number input with min/max      | `number`   |
+| `textarea` | Multi-line text area (4 rows)  | `string`   |
+| `boolean`  | Toggle switch                  | `boolean`  |
+| `select`   | Dropdown select                | `string`   |
+| `tags`     | Tag input (Enter/comma to add) | `string[]` |
 
 ### Field Grouping
 
@@ -68,12 +68,12 @@ Fields can be organized into collapsible groups using `FormFieldGroup`:
 
 ```typescript
 interface FormFieldGroup {
-    name: string;       // Group identifier (matches field.group)
-    title: string;      // Display title
-    description?: string;
-    collapsible?: boolean;
-    collapsed?: boolean; // Initial collapsed state
-    order?: number;      // Sort order (lower = first)
+	name: string; // Group identifier (matches field.group)
+	title: string; // Display title
+	description?: string;
+	collapsible?: boolean;
+	collapsed?: boolean; // Initial collapsed state
+	order?: number; // Sort order (lower = first)
 }
 ```
 
@@ -96,25 +96,25 @@ Fields can be conditionally shown based on other field values using the `showIf`
 
 ```typescript
 interface ShowIfCondition {
-    field: string;     // Name of the field to check
-    operator: string;  // Comparison operator
-    value: unknown;    // Expected value
+	field: string; // Name of the field to check
+	operator: string; // Comparison operator
+	value: unknown; // Expected value
 }
 ```
 
 Supported operators:
 
-| Operator | Description | Example |
-|---|---|---|
-| `eq` | Equal | `{ field: 'mode', operator: 'eq', value: 'advanced' }` |
-| `neq` / `ne` | Not equal | `{ field: 'enabled', operator: 'neq', value: false }` |
-| `gt` | Greater than | `{ field: 'count', operator: 'gt', value: 5 }` |
-| `gte` | Greater than or equal | `{ field: 'count', operator: 'gte', value: 10 }` |
-| `lt` | Less than | `{ field: 'count', operator: 'lt', value: 100 }` |
-| `lte` | Less than or equal | `{ field: 'count', operator: 'lte', value: 50 }` |
-| `contains` | String contains | `{ field: 'url', operator: 'contains', value: 'github' }` |
+| Operator       | Description             | Example                                                     |
+| -------------- | ----------------------- | ----------------------------------------------------------- |
+| `eq`           | Equal                   | `{ field: 'mode', operator: 'eq', value: 'advanced' }`      |
+| `neq` / `ne`   | Not equal               | `{ field: 'enabled', operator: 'neq', value: false }`       |
+| `gt`           | Greater than            | `{ field: 'count', operator: 'gt', value: 5 }`              |
+| `gte`          | Greater than or equal   | `{ field: 'count', operator: 'gte', value: 10 }`            |
+| `lt`           | Less than               | `{ field: 'count', operator: 'lt', value: 100 }`            |
+| `lte`          | Less than or equal      | `{ field: 'count', operator: 'lte', value: 50 }`            |
+| `contains`     | String contains         | `{ field: 'url', operator: 'contains', value: 'github' }`   |
 | `not_contains` | String does not contain | `{ field: 'url', operator: 'not_contains', value: 'test' }` |
-| `in` | Value is in array | `{ field: 'type', operator: 'in', value: ['a', 'b'] }` |
+| `in`           | Value is in array       | `{ field: 'type', operator: 'in', value: ['a', 'b'] }`      |
 
 When `showIf` is an array, all conditions must be true (AND logic).
 
@@ -141,13 +141,13 @@ This component renders plugin configuration forms from the plugin's `settingsSch
 
 ```typescript
 interface PluginSettingsFormFieldsProps {
-    visibleProperties: Record<string, PluginSettingsSchemaProperty>;
-    getFieldValue: (key: string, propSchema: PluginSettingsSchemaProperty) => unknown;
-    handleFieldChange: (key: string, value: unknown, isSecret: boolean) => void;
-    settingsSchema?: PluginSettingsSchema;
-    pluginId: string;
-    validationError: string | null;
-    renderFieldExtra?: (key: string, propSchema: PluginSettingsSchemaProperty) => ReactNode;
+	visibleProperties: Record<string, PluginSettingsSchemaProperty>;
+	getFieldValue: (key: string, propSchema: PluginSettingsSchemaProperty) => unknown;
+	handleFieldChange: (key: string, value: unknown, isSecret: boolean) => void;
+	settingsSchema?: PluginSettingsSchema;
+	pluginId: string;
+	validationError: string | null;
+	renderFieldExtra?: (key: string, propSchema: PluginSettingsSchemaProperty) => ReactNode;
 }
 ```
 
@@ -157,8 +157,8 @@ Plugin settings also support `showIf` conditions, but with a simpler equality ch
 
 ```typescript
 if (propSchema.showIf) {
-    const depValue = getFieldValue(propSchema.showIf.field, depSchema);
-    if (depValue !== propSchema.showIf.value) return null;
+	const depValue = getFieldValue(propSchema.showIf.field, depSchema);
+	if (depValue !== propSchema.showIf.value) return null;
 }
 ```
 
@@ -174,16 +174,16 @@ This is the individual field renderer for plugin settings. It reads the JSON Sch
 
 ### Supported Schema Types
 
-| Schema Type / Extension | Renders | Notes |
-|---|---|---|
-| `object` | `PluginSettingsObjectField` | Nested object with sub-fields |
-| `array` | `PluginSettingsArrayField` | Array of items |
-| `boolean` | Toggle switch | Uses checkbox with custom styling |
-| `enum` (any type) | Dropdown select | Options from `schema.enum` |
-| `number` / `integer` | Number input | Respects `minimum`, `maximum`, `step` |
-| `string` with `x-widget: model-select` | `PluginModelSelect` | Model dropdown populated from provider |
-| `string` (default) | Text input | With secret masking support |
-| `null` | Disabled display | Shows "null" placeholder |
+| Schema Type / Extension                | Renders                     | Notes                                  |
+| -------------------------------------- | --------------------------- | -------------------------------------- |
+| `object`                               | `PluginSettingsObjectField` | Nested object with sub-fields          |
+| `array`                                | `PluginSettingsArrayField`  | Array of items                         |
+| `boolean`                              | Toggle switch               | Uses checkbox with custom styling      |
+| `enum` (any type)                      | Dropdown select             | Options from `schema.enum`             |
+| `number` / `integer`                   | Number input                | Respects `minimum`, `maximum`, `step`  |
+| `string` with `x-widget: model-select` | `PluginModelSelect`         | Model dropdown populated from provider |
+| `string` (default)                     | Text input                  | With secret masking support            |
+| `null`                                 | Disabled display            | Shows "null" placeholder               |
 
 ### Secret Field Handling
 
@@ -203,12 +203,12 @@ The toggle uses the `Eye` and `EyeOff` icons from Lucide React.
 
 Both form systems use custom JSON Schema extensions (prefixed with `x-`) to control rendering:
 
-| Extension | Applies To | Description |
-|---|---|---|
-| `x-secret` | Settings fields | Renders as masked password input with toggle |
-| `x-widget` | Settings fields | Custom widget type (`model-select`) |
-| `x-scope` | Settings fields | Setting scope: `user` or `global` |
-| `x-hidden` | Settings fields | Hides the field from the UI |
+| Extension  | Applies To      | Description                                          |
+| ---------- | --------------- | ---------------------------------------------------- |
+| `x-secret` | Settings fields | Renders as masked password input with toggle         |
+| `x-widget` | Settings fields | Custom widget type (`model-select`)                  |
+| `x-scope`  | Settings fields | Setting scope: `user` or `global`                    |
+| `x-hidden` | Settings fields | Hides the field from the UI                          |
 | `x-envVar` | Settings fields | Maps the setting to an environment variable fallback |
 
 ## Form Data Flow

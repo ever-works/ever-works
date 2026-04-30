@@ -42,7 +42,7 @@ The abstract base class that all domain events extend:
 
 ```typescript
 export abstract class BaseEvent {
-    static EVENT_NAME: string;
+	static EVENT_NAME: string;
 }
 ```
 
@@ -54,23 +54,23 @@ Emitted when a new directory is created.
 
 ```typescript
 export class DirectoryCreatedEvent extends BaseEvent {
-    static EVENT_NAME = 'directory.created';
+	static EVENT_NAME = 'directory.created';
 
-    constructor(
-        public readonly directoryId: string,
-        public readonly userId: string,
-        public readonly slug: string,
-    ) {
-        super();
-    }
+	constructor(
+		public readonly directoryId: string,
+		public readonly userId: string,
+		public readonly slug: string
+	) {
+		super();
+	}
 }
 ```
 
-| Property | Type | Description |
-|----------|------|-------------|
+| Property      | Type     | Description                         |
+| ------------- | -------- | ----------------------------------- |
 | `directoryId` | `string` | UUID of the newly created directory |
-| `userId` | `string` | UUID of the user who created it |
-| `slug` | `string` | URL slug of the directory |
+| `userId`      | `string` | UUID of the user who created it     |
+| `slug`        | `string` | URL slug of the directory           |
 
 **Typical subscribers**: Notification services, analytics, default setup workflows.
 
@@ -80,25 +80,25 @@ Emitted when a directory generation run finishes (successfully or with an error)
 
 ```typescript
 export class DirectoryGenerationCompletedEvent extends BaseEvent {
-    static EVENT_NAME = 'directory.generation.completed';
+	static EVENT_NAME = 'directory.generation.completed';
 
-    constructor(
-        public readonly directoryId: string,
-        public readonly userId: string,
-        public readonly success: boolean,
-        public readonly error?: string,
-    ) {
-        super();
-    }
+	constructor(
+		public readonly directoryId: string,
+		public readonly userId: string,
+		public readonly success: boolean,
+		public readonly error?: string
+	) {
+		super();
+	}
 }
 ```
 
-| Property | Type | Description |
-|----------|------|-------------|
-| `directoryId` | `string` | UUID of the directory |
-| `userId` | `string` | UUID of the user who triggered generation |
-| `success` | `boolean` | Whether generation completed without errors |
-| `error` | `string` (optional) | Error message if `success` is `false` |
+| Property      | Type                | Description                                 |
+| ------------- | ------------------- | ------------------------------------------- |
+| `directoryId` | `string`            | UUID of the directory                       |
+| `userId`      | `string`            | UUID of the user who triggered generation   |
+| `success`     | `boolean`           | Whether generation completed without errors |
+| `error`       | `string` (optional) | Error message if `success` is `false`       |
 
 **Typical subscribers**: Notification services, history recording, schedule advancement, deployment triggers.
 
@@ -112,18 +112,18 @@ import { DirectoryCreatedEvent } from '@ever-works/agent/events';
 
 @Injectable()
 export class DirectoryService {
-    constructor(private readonly eventEmitter: EventEmitter2) {}
+	constructor(private readonly eventEmitter: EventEmitter2) {}
 
-    async createDirectory(dto: CreateDirectoryDto, userId: string) {
-        const directory = await this.save(dto);
+	async createDirectory(dto: CreateDirectoryDto, userId: string) {
+		const directory = await this.save(dto);
 
-        this.eventEmitter.emit(
-            DirectoryCreatedEvent.EVENT_NAME,
-            new DirectoryCreatedEvent(directory.id, userId, directory.slug),
-        );
+		this.eventEmitter.emit(
+			DirectoryCreatedEvent.EVENT_NAME,
+			new DirectoryCreatedEvent(directory.id, userId, directory.slug)
+		);
 
-        return directory;
-    }
+		return directory;
+	}
 }
 ```
 
@@ -135,12 +135,12 @@ import { DirectoryGenerationCompletedEvent } from '@ever-works/agent/events';
 
 @Injectable()
 export class NotificationHandler {
-    @OnEvent(DirectoryGenerationCompletedEvent.EVENT_NAME)
-    async handleGenerationCompleted(event: DirectoryGenerationCompletedEvent) {
-        if (!event.success) {
-            await this.notifyUser(event.userId, `Generation failed: ${event.error}`);
-        }
-    }
+	@OnEvent(DirectoryGenerationCompletedEvent.EVENT_NAME)
+	async handleGenerationCompleted(event: DirectoryGenerationCompletedEvent) {
+		if (!event.success) {
+			await this.notifyUser(event.userId, `Generation failed: ${event.error}`);
+		}
+	}
 }
 ```
 

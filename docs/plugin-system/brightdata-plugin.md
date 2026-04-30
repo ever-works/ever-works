@@ -1,7 +1,7 @@
 ---
 id: brightdata-plugin
-title: "Bright Data Plugin"
-sidebar_label: "Bright Data"
+title: 'Bright Data Plugin'
+sidebar_label: 'Bright Data'
 sidebar_position: 32
 ---
 
@@ -13,17 +13,17 @@ The Bright Data plugin provides web search via its SERP API and content extracti
 
 ## Overview
 
-| Property | Value |
-|---|---|
-| Plugin ID | `brightdata` |
-| Package | `@ever-works/brightdata-plugin` |
-| Category | `search` |
-| Capabilities | `search`, `content-extractor` |
-| Version | `1.0.0` |
-| Configuration Mode | `hybrid` |
-| Auto-enable | No |
-| Built-in | Yes |
-| System Plugin | No |
+| Property           | Value                           |
+| ------------------ | ------------------------------- |
+| Plugin ID          | `brightdata`                    |
+| Package            | `@ever-works/brightdata-plugin` |
+| Category           | `search`                        |
+| Capabilities       | `search`, `content-extractor`   |
+| Version            | `1.0.0`                         |
+| Configuration Mode | `hybrid`                        |
+| Auto-enable        | No                              |
+| Built-in           | Yes                             |
+| System Plugin      | No                              |
 
 The plugin implements `IPlugin`, `ISearchPlugin`, and `IContentExtractorPlugin`. It uses the official `@brightdata/sdk` package to interact with the Bright Data API for both SERP search and web scraping.
 
@@ -48,14 +48,14 @@ graph TD
 
 ### Settings Schema
 
-| Setting | Type | Required | Scope | Description |
-|---|---|---|---|---|
-| `apiKey` | `string` | Yes | `user` | Bright Data API key. Secret. Env: `PLUGIN_BRIGHTDATA_API_KEY` |
+| Setting  | Type     | Required | Scope  | Description                                                   |
+| -------- | -------- | -------- | ------ | ------------------------------------------------------------- |
+| `apiKey` | `string` | Yes      | `user` | Bright Data API key. Secret. Env: `PLUGIN_BRIGHTDATA_API_KEY` |
 
 ### Environment Variables
 
-| Variable | Description |
-|---|---|
+| Variable                    | Description                                                          |
+| --------------------------- | -------------------------------------------------------------------- |
 | `PLUGIN_BRIGHTDATA_API_KEY` | Bright Data API key (optional -- can be set via admin/user settings) |
 
 ## Search Capability (SERP API)
@@ -66,12 +66,12 @@ The `search()` method queries the Bright Data SERP API and returns structured re
 
 ```typescript
 const results = await brightDataPlugin.search({
-    query: 'best coffee shops downtown',
-    limit: 10,
-    includeDomains: ['yelp.com'],
-    excludeDomains: ['spam-site.com'],
-    region: 'us',
-    settings: { apiKey: 'your-key' }
+	query: 'best coffee shops downtown',
+	limit: 10,
+	includeDomains: ['yelp.com'],
+	excludeDomains: ['spam-site.com'],
+	region: 'us',
+	settings: { apiKey: 'your-key' }
 });
 ```
 
@@ -82,14 +82,14 @@ Domain filtering is implemented using search operator syntax appended to the que
 ```typescript
 // Include: adds site:domain operators
 if (options.includeDomains?.length > 0) {
-    const siteFilter = options.includeDomains.map((d) => `site:${d}`).join(' OR ');
-    query = `${query} (${siteFilter})`;
+	const siteFilter = options.includeDomains.map((d) => `site:${d}`).join(' OR ');
+	query = `${query} (${siteFilter})`;
 }
 
 // Exclude: adds -site:domain operators
 if (options.excludeDomains?.length > 0) {
-    const excludeFilter = options.excludeDomains.map((d) => `-site:${d}`).join(' ');
-    query = `${query} ${excludeFilter}`;
+	const excludeFilter = options.excludeDomains.map((d) => `-site:${d}`).join(' ');
+	query = `${query} ${excludeFilter}`;
 }
 ```
 
@@ -123,13 +123,13 @@ Each result is mapped to the standard `SearchResult` format:
 
 ### Search Options
 
-| Option | Type | Description |
-|---|---|---|
-| `query` | `string` | Search query |
-| `limit` | `number` | Max results (default: 20) |
-| `includeDomains` | `string[]` | Filter to specific domains |
-| `excludeDomains` | `string[]` | Exclude specific domains |
-| `region` | `string` | Country code for geo-targeted results |
+| Option           | Type       | Description                           |
+| ---------------- | ---------- | ------------------------------------- |
+| `query`          | `string`   | Search query                          |
+| `limit`          | `number`   | Max results (default: 20)             |
+| `includeDomains` | `string[]` | Filter to specific domains            |
+| `excludeDomains` | `string[]` | Exclude specific domains              |
+| `region`         | `string`   | Country code for geo-targeted results |
 
 ## Content Extraction Capability
 
@@ -137,16 +137,16 @@ Each result is mapped to the standard `SearchResult` format:
 
 ```typescript
 const result = await brightDataPlugin.extract({
-    url: 'https://example.com/article',
-    settings: { apiKey: 'your-key' }
+	url: 'https://example.com/article',
+	settings: { apiKey: 'your-key' }
 });
 
 if (result.success) {
-    console.log(result.content);      // Raw content
-    console.log(result.markdown);     // Markdown formatted
-    console.log(result.wordCount);    // Word count
-    console.log(result.readingTime);  // Estimated minutes
-    console.log(result.duration);     // Extraction time (ms)
+	console.log(result.content); // Raw content
+	console.log(result.markdown); // Markdown formatted
+	console.log(result.wordCount); // Word count
+	console.log(result.readingTime); // Estimated minutes
+	console.log(result.duration); // Extraction time (ms)
 }
 ```
 
@@ -157,10 +157,9 @@ The extraction uses `dataFormat: 'markdown'` to get clean markdown output direct
 Bright Data supports true batch scraping through its SDK, processing multiple URLs in a single API call:
 
 ```typescript
-const results = await brightDataPlugin.extractBatch(
-    ['https://example.com/page1', 'https://example.com/page2'],
-    { settings: { apiKey: 'your-key' } }
-);
+const results = await brightDataPlugin.extractBatch(['https://example.com/page1', 'https://example.com/page2'], {
+	settings: { apiKey: 'your-key' }
+});
 ```
 
 ```mermaid
@@ -218,14 +217,14 @@ async getRateLimitInfo(): Promise<RateLimitInfo> {
 
 Both plugins provide content extraction, but they serve different strengths:
 
-| Feature | Bright Data | Scrapfly |
-|---|---|---|
-| Search (SERP) | Yes | No |
-| Screenshots | No | Yes |
-| Content Extraction | Yes | Yes |
-| Batch Scraping | Native batch API | Sequential batches (5 at a time) |
-| Output Formats | text, html, markdown | markdown |
-| Bot Bypass | Yes | Yes (ASP) |
+| Feature            | Bright Data          | Scrapfly                         |
+| ------------------ | -------------------- | -------------------------------- |
+| Search (SERP)      | Yes                  | No                               |
+| Screenshots        | No                   | Yes                              |
+| Content Extraction | Yes                  | Yes                              |
+| Batch Scraping     | Native batch API     | Sequential batches (5 at a time) |
+| Output Formats     | text, html, markdown | markdown                         |
+| Bot Bypass         | Yes                  | Yes (ASP)                        |
 
 ## Lifecycle
 
@@ -252,9 +251,9 @@ sequenceDiagram
 
 ## Dependencies
 
-| Package | Version | Purpose |
-|---|---|---|
-| `@brightdata/sdk` | ^0.2.0 | Official Bright Data SDK |
+| Package              | Version   | Purpose                            |
+| -------------------- | --------- | ---------------------------------- |
+| `@brightdata/sdk`    | ^0.2.0    | Official Bright Data SDK           |
 | `@ever-works/plugin` | workspace | Plugin contracts (peer dependency) |
 
 ## Getting Started

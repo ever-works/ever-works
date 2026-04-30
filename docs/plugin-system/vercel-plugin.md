@@ -1,7 +1,7 @@
 ---
 id: vercel-plugin
-title: "Vercel Deployment Plugin"
-sidebar_label: "Vercel"
+title: 'Vercel Deployment Plugin'
+sidebar_label: 'Vercel'
 sidebar_position: 20
 ---
 
@@ -13,17 +13,17 @@ The Vercel plugin enables one-click publishing of directories as live websites o
 
 ## Overview
 
-| Property | Value |
-|---|---|
-| Plugin ID | `vercel` |
-| Category | `deployment` |
-| Capabilities | `deployment` |
-| Version | `1.0.0` |
-| Configuration Mode | `user-required` |
-| System Plugin | Yes |
-| Auto-enable | Yes |
-| Visibility | `user-only` |
-| Default for | `deployment` capability |
+| Property           | Value                   |
+| ------------------ | ----------------------- |
+| Plugin ID          | `vercel`                |
+| Category           | `deployment`            |
+| Capabilities       | `deployment`            |
+| Version            | `1.0.0`                 |
+| Configuration Mode | `user-required`         |
+| System Plugin      | Yes                     |
+| Auto-enable        | Yes                     |
+| Visibility         | `user-only`             |
+| Default for        | `deployment` capability |
 
 The plugin implements `IPlugin` and `IDeploymentPlugin`. It is the default deployment provider and is automatically enabled for all users.
 
@@ -45,10 +45,10 @@ The Vercel plugin does not directly deploy code. Instead, deployment is orchestr
 
 ### Settings Schema
 
-| Setting | Type | Required | Scope | Description |
-|---|---|---|---|---|
-| `apiToken` | `string` | Yes | `user` | Personal Vercel API token. Marked as secret. |
-| `defaultTeamScope` | `string` | No | `user` | Default Vercel team for deployments. Leave empty for personal account. |
+| Setting            | Type     | Required | Scope  | Description                                                            |
+| ------------------ | -------- | -------- | ------ | ---------------------------------------------------------------------- |
+| `apiToken`         | `string` | Yes      | `user` | Personal Vercel API token. Marked as secret.                           |
+| `defaultTeamScope` | `string` | No       | `user` | Default Vercel team for deployments. Leave empty for personal account. |
 
 ### Obtaining a Token
 
@@ -99,10 +99,10 @@ Returns the teams the authenticated user belongs to:
 
 ```typescript
 interface VercelTeam {
-  id: string;
-  slug: string;
-  name: string | null;
-  createdAt?: number;
+	id: string;
+	slug: string;
+	name: string | null;
+	createdAt?: number;
 }
 ```
 
@@ -140,26 +140,19 @@ Lists deployments for a project, each with:
 
 ```typescript
 interface VercelDeployment {
-  uid: string;
-  name: string;
-  url?: string;
-  readyState?: VercelDeploymentState;
-  createdAt?: number;
-  alias?: string[];
+	uid: string;
+	name: string;
+	url?: string;
+	readyState?: VercelDeploymentState;
+	createdAt?: number;
+	alias?: string[];
 }
 ```
 
 ### Deployment States
 
 ```typescript
-type VercelDeploymentState =
-  | 'BUILDING'
-  | 'ERROR'
-  | 'INITIALIZING'
-  | 'QUEUED'
-  | 'READY'
-  | 'CANCELED'
-  | 'TIMEOUT';
+type VercelDeploymentState = 'BUILDING' | 'ERROR' | 'INITIALIZING' | 'QUEUED' | 'READY' | 'CANCELED' | 'TIMEOUT';
 ```
 
 ### Deployment Lookup
@@ -189,16 +182,16 @@ Searches the personal account and all teams the user belongs to, returning the f
 
 ### IDeploymentPlugin Interface
 
-| Method | Description |
-|---|---|
-| `deploy(config, token)` | Returns a pending deployment result. Actual deployment is via GitHub Actions. |
-| `getDeploymentStatus(id, token)` | Returns pending status. Actual tracking is done by the verifier service. |
-| `validateToken(token)` | Validates the Vercel API token. |
-| `getTeams(token)` | Lists user's Vercel teams. |
-| `listProjects(token)` | Lists projects under the default team scope. |
-| `getProject(projectId, token)` | Gets a specific project by ID. |
-| `lookupExistingDeployment(name, token, teamScope?)` | Finds existing deployment for a directory. |
-| `getAuthenticatedUser(token)` | Returns username and email for the token. |
+| Method                                              | Description                                                                   |
+| --------------------------------------------------- | ----------------------------------------------------------------------------- |
+| `deploy(config, token)`                             | Returns a pending deployment result. Actual deployment is via GitHub Actions. |
+| `getDeploymentStatus(id, token)`                    | Returns pending status. Actual tracking is done by the verifier service.      |
+| `validateToken(token)`                              | Validates the Vercel API token.                                               |
+| `getTeams(token)`                                   | Lists user's Vercel teams.                                                    |
+| `listProjects(token)`                               | Lists projects under the default team scope.                                  |
+| `getProject(projectId, token)`                      | Gets a specific project by ID.                                                |
+| `lookupExistingDeployment(name, token, teamScope?)` | Finds existing deployment for a directory.                                    |
+| `getAuthenticatedUser(token)`                       | Returns username and email for the token.                                     |
 
 ### Direct API Access
 
@@ -222,17 +215,17 @@ The API service handles errors gracefully:
 
 ```typescript
 interface VercelProject {
-  id: string;
-  name: string;
-  link?: {
-    type?: string;
-    repo?: string;
-    org?: string;
-    repoId?: number;
-    deployHooks?: unknown[];
-    productionBranch?: string;
-  };
-  latestDeployments?: VercelDeployment[];
+	id: string;
+	name: string;
+	link?: {
+		type?: string;
+		repo?: string;
+		org?: string;
+		repoId?: number;
+		deployHooks?: unknown[];
+		productionBranch?: string;
+	};
+	latestDeployments?: VercelDeployment[];
 }
 ```
 

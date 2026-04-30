@@ -46,6 +46,7 @@ Constructs executable pipelines from plugin-contributed steps through a 9-step b
 11. **Build executor map** -- create the final step-to-executor mapping
 
 **Custom errors:**
+
 - `CircularDependencyError` -- raised when step dependencies form a cycle
 - `MissingDependencyError` -- raised when a step declares a dependency that does not exist
 
@@ -63,6 +64,7 @@ The main entry point for pipeline execution. Routes execution to the appropriate
 - **Self-managed execution** (`FullPipelineExecutorService`) -- the pipeline plugin itself controls the entire execution flow. Used by `standard-pipeline` plugin.
 
 **Plugin resolution priority:**
+
 1. Explicit `pipelineId` parameter
 2. Plugin with `defaultForCapabilities` matching the requested capability
 3. First loaded and enabled pipeline plugin
@@ -83,23 +85,24 @@ A runtime wrapper around `ExecutablePipeline` that manages execution state:
 
 ```typescript
 interface PipelineState {
-    status: 'pending' | 'running' | 'completed' | 'failed' | 'cancelled';
-    steps: Map<string, StepState>;
-    startedAt?: Date;
-    completedAt?: Date;
-    error?: string;
+	status: 'pending' | 'running' | 'completed' | 'failed' | 'cancelled';
+	steps: Map<string, StepState>;
+	startedAt?: Date;
+	completedAt?: Date;
+	error?: string;
 }
 
 interface StepState {
-    status: 'pending' | 'running' | 'completed' | 'failed' | 'skipped';
-    startedAt?: Date;
-    completedAt?: Date;
-    error?: string;
-    result?: unknown;
+	status: 'pending' | 'running' | 'completed' | 'failed' | 'skipped';
+	startedAt?: Date;
+	completedAt?: Date;
+	error?: string;
+	result?: unknown;
 }
 ```
 
 Emits events via `PipelineRuntimeEvents`:
+
 - `STATE_CHANGED` -- overall pipeline state transition
 - `STEP_STATUS_CHANGED` -- individual step status change
 
@@ -111,15 +114,15 @@ Creates bound facade instances for pipeline step execution. Each step receives a
 
 ```typescript
 interface StepExecutionContext {
-    ai: IAiFacade;             // Bound AI facade
-    search: ISearchFacade;     // Bound search facade
-    screenshot: IScreenshotFacade;
-    contentExtractor: IContentExtractorFacade;
-    dataSource: IDataSourceFacade;
-    logger: Logger;
-    directory: Directory;
-    user: User;
-    signal?: AbortSignal;      // Cancellation support
+	ai: IAiFacade; // Bound AI facade
+	search: ISearchFacade; // Bound search facade
+	screenshot: IScreenshotFacade;
+	contentExtractor: IContentExtractorFacade;
+	dataSource: IDataSourceFacade;
+	logger: Logger;
+	directory: Directory;
+	user: User;
+	signal?: AbortSignal; // Cancellation support
 }
 ```
 
@@ -182,17 +185,17 @@ Pipeline plugins declare steps via the `IPipelinePlugin` interface:
 
 ```typescript
 interface IPipelinePlugin {
-    getSteps(): IPipelineStep[];
-    // For self-managed mode:
-    execute?(context: FullPipelineContext): Promise<PipelineResult>;
+	getSteps(): IPipelineStep[];
+	// For self-managed mode:
+	execute?(context: FullPipelineContext): Promise<PipelineResult>;
 }
 
 interface IPipelineStep {
-    id: string;
-    name: string;
-    dependsOn?: string[];     // Step IDs this step depends on
-    parallel?: boolean;       // Can run in parallel with siblings
-    executor: StepExecutor;   // The execution function
+	id: string;
+	name: string;
+	dependsOn?: string[]; // Step IDs this step depends on
+	parallel?: boolean; // Can run in parallel with siblings
+	executor: StepExecutor; // The execution function
 }
 ```
 
@@ -202,25 +205,25 @@ Modifier plugins can alter the pipeline at build time:
 
 ```typescript
 interface IPipelineModifier {
-    getModifications(): PipelineModification[];
+	getModifications(): PipelineModification[];
 }
 
 interface PipelineModification {
-    targetStepId: string;       // Which step to modify
-    position: StepPosition;     // 'replace' | 'before' | 'after' | 'disable' | 'first' | 'last'
-    step?: IPipelineStep;       // The replacement/injected step (not needed for 'disable')
+	targetStepId: string; // Which step to modify
+	position: StepPosition; // 'replace' | 'before' | 'after' | 'disable' | 'first' | 'last'
+	step?: IPipelineStep; // The replacement/injected step (not needed for 'disable')
 }
 ```
 
 ## Dependencies
 
-| Dependency | Purpose |
-|---|---|
-| `@ever-works/plugin` | `IPipelinePlugin`, `IPipelineModifier` interfaces |
-| `@ever-works/agent/plugins` | `PluginRegistryService` for pipeline plugin resolution |
-| `@ever-works/agent/facades` | All facade services for step execution context |
-| `@ever-works/agent/database` | Directory repository for checkpoint persistence |
-| `EventEmitter2` | Pipeline runtime event emission |
+| Dependency                   | Purpose                                                |
+| ---------------------------- | ------------------------------------------------------ |
+| `@ever-works/plugin`         | `IPipelinePlugin`, `IPipelineModifier` interfaces      |
+| `@ever-works/agent/plugins`  | `PluginRegistryService` for pipeline plugin resolution |
+| `@ever-works/agent/facades`  | All facade services for step execution context         |
+| `@ever-works/agent/database` | Directory repository for checkpoint persistence        |
+| `EventEmitter2`              | Pipeline runtime event emission                        |
 
 ## Usage Examples
 
@@ -231,12 +234,12 @@ import { PipelineOrchestratorService } from '@ever-works/agent/pipeline';
 
 // Auto-detect execution mode
 const result = await orchestrator.execute(directory, user, {
-    aiProviderOverride: 'anthropic',
+	aiProviderOverride: 'anthropic'
 });
 
 // Explicit step-based mode
 const result = await orchestrator.executeWithMode(directory, user, 'step', {
-    signal: abortController.signal,
+	signal: abortController.signal
 });
 ```
 
@@ -245,7 +248,7 @@ const result = await orchestrator.executeWithMode(directory, user, 'step', {
 ```typescript
 // If a previous run was interrupted, resume from where it left off
 const result = await orchestrator.resumeOrExecute(directory, user, {
-    pipelineId: 'agent-pipeline',
+	pipelineId: 'agent-pipeline'
 });
 ```
 
@@ -255,9 +258,9 @@ const result = await orchestrator.resumeOrExecute(directory, user, {
 import { PipelineBuilderService } from '@ever-works/agent/pipeline';
 
 const pipeline = builder.build(pipelinePlugin, modifierPlugins, {
-    directory,
-    user,
-    options: { aiProviderOverride: 'openai' },
+	directory,
+	user,
+	options: { aiProviderOverride: 'openai' }
 });
 
 // Inspect the execution plan

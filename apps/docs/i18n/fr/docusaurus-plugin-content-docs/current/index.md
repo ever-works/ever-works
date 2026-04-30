@@ -12,15 +12,15 @@ La Plateforme Ever Works est l'infrastructure backend qui alimente les sites web
 
 ## Composants
 
-| Composant | Technologie | Description |
-|-----------|------------|-------------|
-| **API** | NestJS 11 | API REST avec auth JWT, gestion des annuaires, conversations IA, déploiement |
-| **Tableau de bord web** | Next.js 16 | Interface d'administration pour la gestion des annuaires et du contenu |
-| **CLI** | Commander.js + esbuild | Outil en ligne de commande autonome pour les opérations d'annuaires |
-| **CLI interne** | nest-commander | Outillage interne pour les tâches de maintenance |
-| **@packages/agent** | LangChain, TypeORM | Agents IA, génération de données, base de données, opérations git, déploiement |
-| **@packages/monitoring** | Sentry, PostHog | Suivi des erreurs et analyses produit |
-| **@packages/tasks** | Trigger.dev | Traitement des tâches en arrière-plan |
+| Composant                | Technologie            | Description                                                                    |
+| ------------------------ | ---------------------- | ------------------------------------------------------------------------------ |
+| **API**                  | NestJS 11              | API REST avec auth JWT, gestion des annuaires, conversations IA, déploiement   |
+| **Tableau de bord web**  | Next.js 16             | Interface d'administration pour la gestion des annuaires et du contenu         |
+| **CLI**                  | Commander.js + esbuild | Outil en ligne de commande autonome pour les opérations d'annuaires            |
+| **CLI interne**          | nest-commander         | Outillage interne pour les tâches de maintenance                               |
+| **@packages/agent**      | LangChain, TypeORM     | Agents IA, génération de données, base de données, opérations git, déploiement |
+| **@packages/monitoring** | Sentry, PostHog        | Suivi des erreurs et analyses produit                                          |
+| **@packages/tasks**      | Trigger.dev            | Traitement des tâches en arrière-plan                                          |
 
 ## Documentation
 

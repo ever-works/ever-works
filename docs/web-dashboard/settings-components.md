@@ -56,8 +56,8 @@ Settings Page
 
 **File:** `apps/web/src/components/settings/ProfileSettings.tsx`
 
-| Prop | Type | Description |
-|------|------|-------------|
+| Prop             | Type                                                          | Description               |
+| ---------------- | ------------------------------------------------------------- | ------------------------- |
 | `initialProfile` | `{ username: string; email: string; emailVerified: boolean }` | Current user profile data |
 
 Renders two sections:
@@ -67,11 +67,11 @@ Renders two sections:
 
 ```tsx
 <ProfileSettings
-    initialProfile={{
-        username: 'janedoe',
-        email: 'jane@example.com',
-        emailVerified: true,
-    }}
+	initialProfile={{
+		username: 'janedoe',
+		email: 'jane@example.com',
+		emailVerified: true
+	}}
 />
 ```
 
@@ -79,8 +79,8 @@ Renders two sections:
 
 **File:** `apps/web/src/components/settings/SecuritySettings.tsx`
 
-| Prop | Type | Description |
-|------|------|-------------|
+| Prop          | Type      | Description                                                    |
+| ------------- | --------- | -------------------------------------------------------------- |
 | `hasPassword` | `boolean` | Whether the user has a password set (OAuth-only users may not) |
 
 Renders a password change form with three fields:
@@ -99,8 +99,8 @@ Each field has a show/hide toggle button (Eye / EyeOff icons). The form calls th
 
 **File:** `apps/web/src/components/settings/ApiKeysSettings.tsx`
 
-| Prop | Type | Description |
-|------|------|-------------|
+| Prop          | Type               | Description               |
+| ------------- | ------------------ | ------------------------- |
 | `initialKeys` | `ApiKeyListItem[]` | List of existing API keys |
 
 Provides full CRUD for API keys:
@@ -108,6 +108,7 @@ Provides full CRUD for API keys:
 **Keys table** displays columns: Name, Key (prefix only, e.g., `ew_abc1...`), Created date, Last Used date, Expires date, and a revoke (trash) action button. Columns are responsively hidden on smaller screens using `hidden sm:table-cell` / `hidden md:table-cell`.
 
 **Create dialog** contains:
+
 - A name input (max 100 characters).
 - An expiration dropdown with options: Never, 30 days, 90 days, 1 year.
 - On successful creation, transitions to a "key created" view showing the full key with a copy button and a warning that the key will not be shown again.
@@ -120,10 +121,10 @@ The expiration options are defined as a constant:
 
 ```typescript
 const EXPIRATION_OPTIONS = [
-    { value: '', label: 'Never' },
-    { value: '30', label: '30 days' },
-    { value: '90', label: '90 days' },
-    { value: '365', label: '1 year' },
+	{ value: '', label: 'Never' },
+	{ value: '30', label: '30 days' },
+	{ value: '90', label: '90 days' },
+	{ value: '365', label: '1 year' }
 ] as const;
 ```
 
@@ -135,8 +136,8 @@ const EXPIRATION_OPTIONS = [
 
 **File:** `apps/web/src/components/settings/GitProviderConnections.tsx`
 
-| Prop | Type | Description |
-|------|------|-------------|
+| Prop          | Type                   | Description                               |
+| ------------- | ---------------------- | ----------------------------------------- |
 | `connections` | `OAuthConnectionDto[]` | Array of current git provider connections |
 
 Renders a card for each supported git provider (GitHub, GitLab, Bitbucket). Each card shows:
@@ -157,11 +158,11 @@ Server actions used: `connectOAuthProvider` (returns an OAuth URL for redirect),
 
 **File:** `apps/web/src/components/settings/PluginSettingsInline.tsx`
 
-| Prop | Type | Description |
-|------|------|-------------|
-| `plugin` | `PluginRegistryEntry` | Plugin metadata (id, name, version, capabilities, settings schema) |
-| `settings` | `Record<string, unknown>` | Current plugin settings values |
-| `oauthConnection` | `OAuthConnectionDto \| null` | OAuth connection for this plugin if applicable |
+| Prop              | Type                         | Description                                                        |
+| ----------------- | ---------------------------- | ------------------------------------------------------------------ |
+| `plugin`          | `PluginRegistryEntry`        | Plugin metadata (id, name, version, capabilities, settings schema) |
+| `settings`        | `Record<string, unknown>`    | Current plugin settings values                                     |
+| `oauthConnection` | `OAuthConnectionDto \| null` | OAuth connection for this plugin if applicable                     |
 
 Wraps each plugin in a `CollapsibleCard` showing:
 
@@ -172,21 +173,17 @@ Wraps each plugin in a `CollapsibleCard` showing:
 The `usePluginSettings` hook handles validation, change tracking, and sanitization before calling the `updatePluginSettings` server action.
 
 ```tsx
-<PluginSettingsInline
-    plugin={openaiPlugin}
-    settings={{ apiKey: 'sk-...', model: 'gpt-4o' }}
-    oauthConnection={null}
-/>
+<PluginSettingsInline plugin={openaiPlugin} settings={{ apiKey: 'sk-...', model: 'gpt-4o' }} oauthConnection={null} />
 ```
 
 ### PluginOAuthConnection
 
 **File:** `apps/web/src/components/settings/PluginOAuthConnection.tsx`
 
-| Prop | Type | Description |
-|------|------|-------------|
-| `pluginId` | `string` | The plugin's unique identifier |
-| `connection` | `OAuthConnectionDto \| null` | Current connection state |
+| Prop         | Type                         | Description                    |
+| ------------ | ---------------------------- | ------------------------------ |
+| `pluginId`   | `string`                     | The plugin's unique identifier |
+| `connection` | `OAuthConnectionDto \| null` | Current connection state       |
 
 Displays the OAuth connection status for a plugin with three possible states:
 
@@ -200,15 +197,15 @@ Server actions used: `connectOAuthProvider`, `disconnectOAuthProvider`.
 
 **File:** `apps/web/src/components/settings/SettingsNavItem.tsx`
 
-| Prop | Type | Description |
-|------|------|-------------|
-| `label` | `string` | Display text for the nav item |
-| `href` | `string` (optional) | Link destination (renders as Next.js Link) |
-| `icon` | `ReactNode` (optional) | Icon element to show before the label |
-| `isActive` | `boolean` (optional) | Whether this item is currently active |
-| `children` | `ReactNode` (optional) | Expandable child nav items |
-| `indicator` | `ReactNode` (optional) | Right-side slot (e.g., badge, count) |
-| `onClick` | `() => void` (optional) | Click handler for non-link items |
+| Prop        | Type                    | Description                                |
+| ----------- | ----------------------- | ------------------------------------------ |
+| `label`     | `string`                | Display text for the nav item              |
+| `href`      | `string` (optional)     | Link destination (renders as Next.js Link) |
+| `icon`      | `ReactNode` (optional)  | Icon element to show before the label      |
+| `isActive`  | `boolean` (optional)    | Whether this item is currently active      |
+| `children`  | `ReactNode` (optional)  | Expandable child nav items                 |
+| `indicator` | `ReactNode` (optional)  | Right-side slot (e.g., badge, count)       |
+| `onClick`   | `() => void` (optional) | Click handler for non-link items           |
 
 A flexible navigation item component that supports:
 
@@ -218,12 +215,9 @@ A flexible navigation item component that supports:
 - **Indicator slot** - Arbitrary content on the right side (useful for count badges).
 
 ```tsx
-<SettingsNavItem
-    label="Plugins"
-    icon={<Puzzle className="w-4 h-4" />}
->
-    <SettingsNavItem label="OpenAI" href="/settings/plugins/openai" />
-    <SettingsNavItem label="Anthropic" href="/settings/plugins/anthropic" />
+<SettingsNavItem label="Plugins" icon={<Puzzle className="w-4 h-4" />}>
+	<SettingsNavItem label="OpenAI" href="/settings/plugins/openai" />
+	<SettingsNavItem label="Anthropic" href="/settings/plugins/anthropic" />
 </SettingsNavItem>
 ```
 
@@ -231,8 +225,8 @@ A flexible navigation item component that supports:
 
 **File:** `apps/web/src/components/settings/DangerZone.tsx`
 
-| Prop | Type | Description |
-|------|------|-------------|
+| Prop        | Type     | Description                                      |
+| ----------- | -------- | ------------------------------------------------ |
 | `userEmail` | `string` | The user's email, used for deletion confirmation |
 
 Renders two sections:
@@ -280,14 +274,14 @@ In `ProfileSettings`, if the email is not verified:
 
 Settings components use consistent patterns:
 
-| Pattern | Classes |
-|---------|---------|
-| Section heading | `text-xl font-semibold text-text dark:text-text-dark` |
-| Section description | `text-text-muted dark:text-text-muted-dark text-sm` |
+| Pattern                | Classes                                                   |
+| ---------------------- | --------------------------------------------------------- |
+| Section heading        | `text-xl font-semibold text-text dark:text-text-dark`     |
+| Section description    | `text-text-muted dark:text-text-muted-dark text-sm`       |
 | Card/section container | `border border-border dark:border-border-dark rounded-lg` |
-| Table header | `bg-surface-secondary dark:bg-surface-secondary-dark` |
-| Danger elements | `text-danger`, `border-danger/50`, `variant="danger"` |
-| Success indicator | `text-success` with green dot |
+| Table header           | `bg-surface-secondary dark:bg-surface-secondary-dark`     |
+| Danger elements        | `text-danger`, `border-danger/50`, `variant="danger"`     |
+| Success indicator      | `text-success` with green dot                             |
 
 The `DangerZone` section uses `border-danger/20` for its container border and `bg-danger/5` for its background, making it visually distinct as a destructive action area.
 
@@ -303,21 +297,21 @@ import { GitProviderConnections } from '@/components/settings/GitProviderConnect
 import { DangerZone } from '@/components/settings/DangerZone';
 
 export function SettingsPage({ user, apiKeys, connections }) {
-    return (
-        <div className="max-w-3xl mx-auto space-y-12">
-            <ProfileSettings
-                initialProfile={{
-                    username: user.username,
-                    email: user.email,
-                    emailVerified: user.emailVerified,
-                }}
-            />
-            <SecuritySettings hasPassword={user.hasPassword} />
-            <ApiKeysSettings initialKeys={apiKeys} />
-            <GitProviderConnections connections={connections} />
-            <DangerZone userEmail={user.email} />
-        </div>
-    );
+	return (
+		<div className="max-w-3xl mx-auto space-y-12">
+			<ProfileSettings
+				initialProfile={{
+					username: user.username,
+					email: user.email,
+					emailVerified: user.emailVerified
+				}}
+			/>
+			<SecuritySettings hasPassword={user.hasPassword} />
+			<ApiKeysSettings initialKeys={apiKeys} />
+			<GitProviderConnections connections={connections} />
+			<DangerZone userEmail={user.email} />
+		</div>
+	);
 }
 ```
 

@@ -40,10 +40,12 @@ Directories are the core domain object in Ever Works. The web dashboard provides
 The list page displays all directories owned by or shared with the current user.
 
 **Server Component** (`page.tsx`):
+
 - Fetches directories via the `getDirectories` server action
 - Passes data to `DirectoriesClient` component
 
 **Client Component** (`directories-client.tsx`):
+
 - Search input with debounced filtering
 - Grid/list view toggle
 - Directory cards showing name, description, item count, status
@@ -56,15 +58,16 @@ The list page displays all directories owned by or shared with the current user.
 
 The creation page supports three flows:
 
-| Flow | Description |
-|------|-------------|
+| Flow               | Description                                                                                |
+| ------------------ | ------------------------------------------------------------------------------------------ |
 | **Create with AI** | User provides a name and prompt; AI generates directory details and starts item generation |
-| **Manual Create** | User fills in slug, name, description, and provider selections manually |
-| **Import** | User provides a repository URL or selects from existing repos to import |
+| **Manual Create**  | User fills in slug, name, description, and provider selections manually                    |
+| **Import**         | User provides a repository URL or selects from existing repos to import                    |
 
 All flows require a connected git provider. If none is connected, the page shows a prompt to connect one via the OAuth flow.
 
 **AI Creation Flow**:
+
 1. User enters a directory name and natural language prompt
 2. Selects AI provider and optional providers (search, screenshot, content extractor, pipeline)
 3. Calls `createDirectoryWithAI` server action
@@ -72,6 +75,7 @@ All flows require a connected git provider. If none is connected, the page shows
 5. Redirects to the new directory's generator page to track progress
 
 **Import Flow**:
+
 1. User pastes a repository URL or browses their repositories via `getUserRepositories`
 2. System analyzes the repository via `analyzeRepository` or `analyzeForLinking`
 3. Supports three import source types: `data_repo`, `awesome_readme`, `link_existing`
@@ -90,18 +94,18 @@ The detail layout wraps all sub-pages with shared navigation:
 
 **Sub-Navigation Tabs**:
 
-| Tab | Route | Description |
-|-----|-------|-------------|
-| Overview | `/directories/[id]` | Directory stats and quick actions |
-| Items | `/directories/[id]/items` | Manage directory items |
-| Generator | `/directories/[id]/generator` | Run item generation |
-| Comparisons | `/directories/[id]/comparisons` | Item comparison pages |
-| History | `/directories/[id]/history` | Generation run history |
-| Members | `/directories/[id]/members` | Team access management |
-| Plugins | `/directories/[id]/plugins` | Directory-level plugin config |
-| Schedule | `/directories/[id]/schedule` | Auto-generation scheduling |
-| Deploy | `/directories/[id]/deploy` | Website deployment |
-| Settings | `/directories/[id]/settings` | Directory configuration |
+| Tab         | Route                           | Description                       |
+| ----------- | ------------------------------- | --------------------------------- |
+| Overview    | `/directories/[id]`             | Directory stats and quick actions |
+| Items       | `/directories/[id]/items`       | Manage directory items            |
+| Generator   | `/directories/[id]/generator`   | Run item generation               |
+| Comparisons | `/directories/[id]/comparisons` | Item comparison pages             |
+| History     | `/directories/[id]/history`     | Generation run history            |
+| Members     | `/directories/[id]/members`     | Team access management            |
+| Plugins     | `/directories/[id]/plugins`     | Directory-level plugin config     |
+| Schedule    | `/directories/[id]/schedule`    | Auto-generation scheduling        |
+| Deploy      | `/directories/[id]/deploy`      | Website deployment                |
+| Settings    | `/directories/[id]/settings`    | Directory configuration           |
 
 ## Directory Overview Page
 
@@ -166,12 +170,12 @@ Displays generation run history with:
 
 Team management interface:
 
-| Action | Server Action | Role Required |
-|--------|--------------|---------------|
-| Invite member by email | `inviteMember` | OWNER, MANAGER |
-| Change member role | `updateMemberRole` | OWNER, MANAGER |
-| Remove member | `removeMember` | OWNER, MANAGER |
-| Leave directory | `leaveDirectory` | Any member (not OWNER) |
+| Action                 | Server Action      | Role Required          |
+| ---------------------- | ------------------ | ---------------------- |
+| Invite member by email | `inviteMember`     | OWNER, MANAGER         |
+| Change member role     | `updateMemberRole` | OWNER, MANAGER         |
+| Remove member          | `removeMember`     | OWNER, MANAGER         |
+| Leave directory        | `leaveDirectory`   | Any member (not OWNER) |
 
 **Assignable Roles**: MANAGER, EDITOR, VIEWER (OWNER is implicit and cannot be assigned).
 

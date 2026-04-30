@@ -13,12 +13,12 @@ The Website Generation system creates and maintains static websites for each dir
 
 Located in `packages/agent/src/generators/website-generator/`, the system includes:
 
-| Component | File | Purpose |
-|---|---|---|
-| `WebsiteGeneratorService` | `website-generator.service.ts` | Creates website repositories from templates |
-| `WebsiteUpdateService` | `website-update.service.ts` | Updates existing websites with template changes |
-| `BranchSyncService` | `branch-sync.service.ts` | Synchronizes branches from template to target |
-| `WEBSITE_TEMPLATE_CONFIG` | `config/website-template.config.ts` | Template repository configuration |
+| Component                 | File                                | Purpose                                         |
+| ------------------------- | ----------------------------------- | ----------------------------------------------- |
+| `WebsiteGeneratorService` | `website-generator.service.ts`      | Creates website repositories from templates     |
+| `WebsiteUpdateService`    | `website-update.service.ts`         | Updates existing websites with template changes |
+| `BranchSyncService`       | `branch-sync.service.ts`            | Synchronizes branches from template to target   |
+| `WEBSITE_TEMPLATE_CONFIG` | `config/website-template.config.ts` | Template repository configuration               |
 
 ## Template Configuration
 
@@ -26,10 +26,10 @@ The website template source is defined in a static config:
 
 ```typescript
 export const WEBSITE_TEMPLATE_CONFIG = {
-    owner: 'ever-works',
-    repo: 'ever-works-website-template',
-    branch: 'main',
-    syncBranches: ['main', 'stage', 'develop'],
+	owner: 'ever-works',
+	repo: 'ever-works-website-template',
+	branch: 'main',
+	syncBranches: ['main', 'stage', 'develop']
 } as const;
 ```
 
@@ -39,11 +39,11 @@ This means every generated website is based on the `ever-works-website-template`
 
 For a directory with slug `my-directory`:
 
-| Repository | Purpose |
-|---|---|
-| `my-directory-data` | YAML data repository (items, categories, config) |
-| `my-directory` | Markdown README repository |
-| `my-directory-website` | Static website repository |
+| Repository             | Purpose                                          |
+| ---------------------- | ------------------------------------------------ |
+| `my-directory-data`    | YAML data repository (items, categories, config) |
+| `my-directory`         | Markdown README repository                       |
+| `my-directory-website` | Static website repository                        |
 
 ## Creation Methods
 
@@ -66,14 +66,14 @@ The `createUsingTemplate` method uses the Git provider's native template feature
 
 ```typescript
 await this.gitFacade.createRepositoryFromTemplate(
-    WEBSITE_TEMPLATE_CONFIG.owner,
-    WEBSITE_TEMPLATE_CONFIG.repo,
-    {
-        name: directory.getWebsiteRepo(),
-        organization: directory.organization ? directory.getRepoOwner() : undefined,
-        isPrivate: true,
-    },
-    { userId: directoryOwner.id, providerId: directory.gitProvider },
+	WEBSITE_TEMPLATE_CONFIG.owner,
+	WEBSITE_TEMPLATE_CONFIG.repo,
+	{
+		name: directory.getWebsiteRepo(),
+		organization: directory.organization ? directory.getRepoOwner() : undefined,
+		isPrivate: true
+	},
+	{ userId: directoryOwner.id, providerId: directory.gitProvider }
 );
 ```
 
@@ -109,8 +109,8 @@ Directories that opt into beta templates use branch mapping:
 
 ```typescript
 const branchMapping = directory.websiteTemplateUseBeta
-    ? { [config.websiteTemplate.getBetaBranch()]: 'main' }
-    : undefined;
+	? { [config.websiteTemplate.getBetaBranch()]: 'main' }
+	: undefined;
 ```
 
 This maps the beta branch (e.g., `stage`) to `main` on the target, so users on the beta channel receive staging template updates as their production content.
@@ -121,11 +121,11 @@ Each sync operation returns a detailed summary:
 
 ```typescript
 interface BranchSyncSummary {
-    totalBranches: number;
-    synced: number;
-    skipped: number;
-    errors: number;
-    results: BranchSyncResult[];
+	totalBranches: number;
+	synced: number;
+	skipped: number;
+	errors: number;
+	results: BranchSyncResult[];
 }
 ```
 
@@ -135,7 +135,7 @@ After initial creation via `CREATE_USING_TEMPLATE`, the target repository may ha
 
 ```typescript
 if (cleanupExtraBranches) {
-    await this.deleteExtraBranches({ targetOwner, targetRepo, userId, providerId });
+	await this.deleteExtraBranches({ targetOwner, targetRepo, userId, providerId });
 }
 ```
 
@@ -180,12 +180,12 @@ This compares the template's latest commit SHA against the directory's `websiteT
 
 ```typescript
 interface UpdateWebsiteRepositoryResponseDto {
-    status: 'success' | 'error';
-    slug: string;
-    owner: string;
-    repository: string;
-    message: string;
-    method_used?: string;
+	status: 'success' | 'error';
+	slug: string;
+	owner: string;
+	repository: string;
+	message: string;
+	method_used?: string;
 }
 ```
 
@@ -193,14 +193,14 @@ interface UpdateWebsiteRepositoryResponseDto {
 
 Directories can enable automatic template updates via the `websiteTemplateAutoUpdate` flag on the directory entity. When enabled, a scheduled task checks for template changes and applies updates automatically. Relevant entity fields:
 
-| Field | Type | Purpose |
-|---|---|---|
-| `websiteTemplateAutoUpdate` | `boolean` | Enable automatic updates |
-| `websiteTemplateUseBeta` | `boolean` | Use beta/staging template branch |
-| `websiteTemplateLastCommit` | `string` | Last applied template commit SHA |
-| `websiteTemplateLastError` | `string` | Last update error message |
-| `websiteTemplateLastUpdatedAt` | `Date` | Timestamp of last successful update |
-| `websiteTemplateLastCheckedAt` | `Date` | Timestamp of last check |
+| Field                          | Type      | Purpose                             |
+| ------------------------------ | --------- | ----------------------------------- |
+| `websiteTemplateAutoUpdate`    | `boolean` | Enable automatic updates            |
+| `websiteTemplateUseBeta`       | `boolean` | Use beta/staging template branch    |
+| `websiteTemplateLastCommit`    | `string`  | Last applied template commit SHA    |
+| `websiteTemplateLastError`     | `string`  | Last update error message           |
+| `websiteTemplateLastUpdatedAt` | `Date`    | Timestamp of last successful update |
+| `websiteTemplateLastCheckedAt` | `Date`    | Timestamp of last check             |
 
 ## Module Dependencies
 

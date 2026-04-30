@@ -7,17 +7,17 @@ sidebar_position: 3
 
 # Collections
 
-Collections let you curate directory items into named groups like "Editor's Picks", "Best for Beginners", or "Top Open Source". Unlike categories (which classify what an item *is*) and tags (which describe its features), collections are editorial groupings that cut across categories.
+Collections let you curate directory items into named groups like "Editor's Picks", "Best for Beginners", or "Top Open Source". Unlike categories (which classify what an item _is_) and tags (which describe its features), collections are editorial groupings that cut across categories.
 
 ## Taxonomy Overview
 
 The platform supports three taxonomy dimensions for organizing items:
 
-| Taxonomy | Purpose | Cardinality | Example |
-|----------|---------|-------------|---------|
-| **Category** | Primary functional grouping | 1 per item (required) | "Design Tools", "Databases" |
-| **Tag** | Descriptive keywords | 0–3 per item | "open-source", "free-tier", "self-hosted" |
-| **Collection** | Curated editorial group | 0–1 per item (optional) | "Editor's Picks", "Best for Beginners" |
+| Taxonomy       | Purpose                     | Cardinality             | Example                                   |
+| -------------- | --------------------------- | ----------------------- | ----------------------------------------- |
+| **Category**   | Primary functional grouping | 1 per item (required)   | "Design Tools", "Databases"               |
+| **Tag**        | Descriptive keywords        | 0–3 per item            | "open-source", "free-tier", "self-hosted" |
+| **Collection** | Curated editorial group     | 0–1 per item (optional) | "Editor's Picks", "Best for Beginners"    |
 
 An item belongs to exactly one category, can have multiple tags, and may optionally belong to one collection.
 
@@ -25,10 +25,10 @@ An item belongs to exactly one category, can have multiple tags, and may optiona
 
 Collections are controlled by two independent toggles:
 
-| Toggle | Where | Effect |
-|--------|-------|--------|
-| **`collections_enabled`** | Website Settings (`PUT /api/directories/:id/website-settings`) | Controls whether collections are displayed on the deployed website |
-| **`generate_collections`** | Standard Pipeline plugin settings | Controls whether the AI assigns collections during generation |
+| Toggle                     | Where                                                          | Effect                                                             |
+| -------------------------- | -------------------------------------------------------------- | ------------------------------------------------------------------ |
+| **`collections_enabled`**  | Website Settings (`PUT /api/directories/:id/website-settings`) | Controls whether collections are displayed on the deployed website |
+| **`generate_collections`** | Standard Pipeline plugin settings                              | Controls whether the AI assigns collections during generation      |
 
 Both default to `true`. You can disable AI-generated collections while still managing collections manually, or vice versa.
 
@@ -38,12 +38,12 @@ Collections can be created and managed from the **Items** page in the Web Dashbo
 
 ### Collection Fields
 
-| Field | Type | Required | Description |
-|-------|------|----------|-------------|
-| `name` | string | Yes | Display name (max 100 characters), e.g. "Editor's Picks" |
-| `description` | string | No | Short description (max 500 characters) |
-| `icon_url` | string | No | URL to an icon image (max 500 characters) |
-| `priority` | number | No | Display order — lower numbers appear first (min 0) |
+| Field         | Type   | Required | Description                                              |
+| ------------- | ------ | -------- | -------------------------------------------------------- |
+| `name`        | string | Yes      | Display name (max 100 characters), e.g. "Editor's Picks" |
+| `description` | string | No       | Short description (max 500 characters)                   |
+| `icon_url`    | string | No       | URL to an icon image (max 500 characters)                |
+| `priority`    | number | No       | Display order — lower numbers appear first (min 0)       |
 
 :::info
 The collection **ID** is generated automatically from the name by slugifying it. For example, a collection named "Editor's Picks" gets the ID `editors-picks`. You cannot set the ID manually.
@@ -55,8 +55,8 @@ All collection endpoints require JWT authentication.
 
 ### Create a Collection
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
+| Method | Endpoint                           | Description             |
+| ------ | ---------------------------------- | ----------------------- |
 | `POST` | `/api/directories/:id/collections` | Create a new collection |
 
 ```bash
@@ -72,9 +72,9 @@ curl -X POST http://localhost:3100/api/directories/<directory-id>/collections \
 
 ### Update a Collection
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| `PUT` | `/api/directories/:id/collections/:collectionId` | Update an existing collection |
+| Method | Endpoint                                         | Description                   |
+| ------ | ------------------------------------------------ | ----------------------------- |
+| `PUT`  | `/api/directories/:id/collections/:collectionId` | Update an existing collection |
 
 ```bash
 curl -X PUT http://localhost:3100/api/directories/<directory-id>/collections/editors-picks \
@@ -88,8 +88,8 @@ curl -X PUT http://localhost:3100/api/directories/<directory-id>/collections/edi
 
 ### Delete a Collection
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
+| Method   | Endpoint                                         | Description         |
+| -------- | ------------------------------------------------ | ------------------- |
 | `DELETE` | `/api/directories/:id/collections/:collectionId` | Delete a collection |
 
 ```bash
@@ -105,9 +105,9 @@ Deleting a collection does not remove items — it only removes the grouping. It
 
 Collections are returned as part of the existing categories-tags endpoint:
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| `GET` | `/api/directories/:id/categories-tags` | Returns categories, tags, and collections |
+| Method | Endpoint                               | Description                               |
+| ------ | -------------------------------------- | ----------------------------------------- |
+| `GET`  | `/api/directories/:id/categories-tags` | Returns categories, tags, and collections |
 
 ```bash
 curl http://localhost:3100/api/directories/<directory-id>/categories-tags \

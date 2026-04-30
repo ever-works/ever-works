@@ -13,12 +13,12 @@ Deployment and git plugins handle the full lifecycle of publishing a generated d
 
 The GitHub plugin is the platform's git provider, handling both remote API operations (via the GitHub REST API) and local git operations (via `isomorphic-git`).
 
-| Property | Value |
-|---|---|
-| Package | `@ever-works/github-plugin` |
-| Category | `git-provider` |
-| Capabilities | `git-provider`, `oauth` |
-| SDK | `octokit` |
+| Property           | Value                                    |
+| ------------------ | ---------------------------------------- |
+| Package            | `@ever-works/github-plugin`              |
+| Category           | `git-provider`                           |
+| Capabilities       | `git-provider`, `oauth`                  |
+| SDK                | `octokit`                                |
 | Configuration Mode | `hybrid` (admin OAuth app + user tokens) |
 
 ### Architecture
@@ -37,40 +37,40 @@ The git provider interface is extensive, covering authentication, repositories, 
 
 ```typescript
 interface IGitProviderPlugin extends IPlugin, IGitOperations {
-  readonly providerName: string;
+	readonly providerName: string;
 
-  // Authentication
-  getAuth(token: string): GitAuth;
-  getCloneUrl(owner: string, repo: string): string;
-  getWebUrl(owner: string, repo: string): string;
+	// Authentication
+	getAuth(token: string): GitAuth;
+	getCloneUrl(owner: string, repo: string): string;
+	getWebUrl(owner: string, repo: string): string;
 
-  // Repository operations
-  createRepository(options: CreateRepoOptions, token: string): Promise<GitRepository>;
-  getRepository(owner: string, repo: string, token: string): Promise<GitRepository | null>;
-  deleteRepository(owner: string, repo: string, token: string): Promise<void>;
-  listRepositories?(token: string, page?, perPage?, options?): Promise<GitRepositoryWithPermissions[]>;
+	// Repository operations
+	createRepository(options: CreateRepoOptions, token: string): Promise<GitRepository>;
+	getRepository(owner: string, repo: string, token: string): Promise<GitRepository | null>;
+	deleteRepository(owner: string, repo: string, token: string): Promise<void>;
+	listRepositories?(token: string, page?, perPage?, options?): Promise<GitRepositoryWithPermissions[]>;
 
-  // User & organizations
-  getUser(token: string): Promise<GitUser>;
-  getOrganizations(token: string): Promise<GitOrganization[]>;
+	// User & organizations
+	getUser(token: string): Promise<GitUser>;
+	getOrganizations(token: string): Promise<GitOrganization[]>;
 
-  // Branch operations
-  listBranches(owner: string, repo: string, token: string): Promise<GitBranch[]>;
-  createBranch?(owner, repo, name, fromRef, token): Promise<GitBranch>;
+	// Branch operations
+	listBranches(owner: string, repo: string, token: string): Promise<GitBranch[]>;
+	createBranch?(owner, repo, name, fromRef, token): Promise<GitBranch>;
 
-  // Pull request operations
-  createPullRequest(options: CreatePROptions, token: string): Promise<GitPullRequest>;
-  mergePullRequest(owner, repo, prNumber, options, token): Promise<MergeResult>;
-  listPullRequests?(owner, repo, options, token): Promise<GitPullRequest[]>;
+	// Pull request operations
+	createPullRequest(options: CreatePROptions, token: string): Promise<GitPullRequest>;
+	mergePullRequest(owner, repo, prNumber, options, token): Promise<MergeResult>;
+	listPullRequests?(owner, repo, options, token): Promise<GitPullRequest[]>;
 
-  // Fork & template operations
-  forkRepository?(owner, repo, options, token): Promise<GitRepository | null>;
-  createRepositoryFromTemplate?(templateOwner, templateRepo, options, token): Promise<GitRepository | null>;
+	// Fork & template operations
+	forkRepository?(owner, repo, options, token): Promise<GitRepository | null>;
+	createRepositoryFromTemplate?(templateOwner, templateRepo, options, token): Promise<GitRepository | null>;
 
-  // Content access
-  getFileContent?(owner, repo, path, ref?, token?): Promise<{ content, encoding } | null>;
-  getReadme?(owner, repo, ref?, token?): Promise<{ content, path } | null>;
-  getDirectoryContents?(owner, repo, path, token): Promise<Array<{ name, type, path }> | null>;
+	// Content access
+	getFileContent?(owner, repo, path, ref?, token?): Promise<{ content; encoding } | null>;
+	getReadme?(owner, repo, ref?, token?): Promise<{ content; path } | null>;
+	getDirectoryContents?(owner, repo, path, token): Promise<Array<{ name; type; path }> | null>;
 }
 ```
 
@@ -78,20 +78,20 @@ interface IGitProviderPlugin extends IPlugin, IGitOperations {
 
 These operations use `isomorphic-git` and are the same for all git providers -- only the authentication differs:
 
-| Method | Description |
-|---|---|
-| `cloneOrPull(options)` | Clone a repo or pull if already cloned |
-| `pull(dir, token, committer?)` | Pull latest changes |
-| `add(dir, paths)` | Stage specific files |
-| `addAll(dir)` | Stage all changes |
-| `commit(dir, message, committer?)` | Create a commit |
-| `push(options)` | Push to remote (with retry support) |
-| `getCurrentBranch(dir)` | Get the current branch name |
-| `getMainBranch(dir)` | Detect the main/master branch |
-| `switchBranch(dir, branch, create?)` | Switch or create a branch |
-| `getStatus(dir)` | Get file change status |
-| `getLocalDir(owner, repo)` | Get local clone directory path |
-| `removeLocalDir(owner, repo)` | Clean up local clone |
+| Method                               | Description                            |
+| ------------------------------------ | -------------------------------------- |
+| `cloneOrPull(options)`               | Clone a repo or pull if already cloned |
+| `pull(dir, token, committer?)`       | Pull latest changes                    |
+| `add(dir, paths)`                    | Stage specific files                   |
+| `addAll(dir)`                        | Stage all changes                      |
+| `commit(dir, message, committer?)`   | Create a commit                        |
+| `push(options)`                      | Push to remote (with retry support)    |
+| `getCurrentBranch(dir)`              | Get the current branch name            |
+| `getMainBranch(dir)`                 | Detect the main/master branch          |
+| `switchBranch(dir, branch, create?)` | Switch or create a branch              |
+| `getStatus(dir)`                     | Get file change status                 |
+| `getLocalDir(owner, repo)`           | Get local clone directory path         |
+| `removeLocalDir(owner, repo)`        | Clean up local clone                   |
 
 ### OAuth Integration
 
@@ -100,8 +100,14 @@ The GitHub plugin implements `IOAuthPlugin` for GitHub OAuth App authentication:
 ```typescript
 // Default OAuth scopes
 const DEFAULT_SCOPES = [
-  'user:email', 'read:user', 'repo', 'delete_repo',
-  'workflow', 'write:repo_hook', 'read:org', 'project'
+	'user:email',
+	'read:user',
+	'repo',
+	'delete_repo',
+	'workflow',
+	'write:repo_hook',
+	'read:org',
+	'project'
 ];
 ```
 
@@ -117,41 +123,41 @@ The `GitHubActionsService` handles:
 
 ### Settings
 
-| Setting | Scope | Description |
-|---|---|---|
-| `clientId` | global (admin) | GitHub OAuth App Client ID |
-| `clientSecret` | user (admin, secret) | GitHub OAuth App Client Secret |
-| `apiBaseUrl` | global | GitHub API base URL (for GitHub Enterprise) |
-| `webBaseUrl` | global | GitHub web base URL (for GitHub Enterprise) |
+| Setting        | Scope                | Description                                 |
+| -------------- | -------------------- | ------------------------------------------- |
+| `clientId`     | global (admin)       | GitHub OAuth App Client ID                  |
+| `clientSecret` | user (admin, secret) | GitHub OAuth App Client Secret              |
+| `apiBaseUrl`   | global               | GitHub API base URL (for GitHub Enterprise) |
+| `webBaseUrl`   | global               | GitHub web base URL (for GitHub Enterprise) |
 
 ## Vercel Plugin
 
 The Vercel plugin handles deployment of generated directories to the Vercel hosting platform.
 
-| Property | Value |
-|---|---|
-| Package | `@ever-works/vercel-plugin` |
-| Category | `deployment` |
-| Capabilities | `deployment` |
-| SDK | `@vercel/sdk` |
-| Configuration Mode | `user-required` |
+| Property           | Value                       |
+| ------------------ | --------------------------- |
+| Package            | `@ever-works/vercel-plugin` |
+| Category           | `deployment`                |
+| Capabilities       | `deployment`                |
+| SDK                | `@vercel/sdk`               |
+| Configuration Mode | `user-required`             |
 
 ### IDeploymentPlugin Interface
 
 ```typescript
 interface IDeploymentPlugin extends IPlugin {
-  readonly providerName: string;
+	readonly providerName: string;
 
-  deploy(config: DeploymentConfig, token: string): Promise<DeploymentResult>;
-  getDeploymentStatus(deploymentId: string, token: string): Promise<DeploymentResult>;
+	deploy(config: DeploymentConfig, token: string): Promise<DeploymentResult>;
+	getDeploymentStatus(deploymentId: string, token: string): Promise<DeploymentResult>;
 
-  // Optional
-  validateToken?(token: string): Promise<boolean>;
-  getTeams?(token: string): Promise<Array<{ id, slug, name }>>;
-  lookupExistingDeployment?(projectName, token, teamScope?): Promise<{ found, website?, projectId? }>;
-  getAuthenticatedUser?(token: string): Promise<{ username, email? } | null>;
-  getProject?(projectId: string, token: string): Promise<DeploymentProject | null>;
-  listProjects?(token: string): Promise<DeploymentProject[]>;
+	// Optional
+	validateToken?(token: string): Promise<boolean>;
+	getTeams?(token: string): Promise<Array<{ id; slug; name }>>;
+	lookupExistingDeployment?(projectName, token, teamScope?): Promise<{ found; website?; projectId? }>;
+	getAuthenticatedUser?(token: string): Promise<{ username; email? } | null>;
+	getProject?(projectId: string, token: string): Promise<DeploymentProject | null>;
+	listProjects?(token: string): Promise<DeploymentProject[]>;
 }
 ```
 
@@ -168,13 +174,13 @@ The Vercel plugin works with the GitHub plugin for a git-based deployment workfl
 
 ```typescript
 interface DeploymentConfig {
-  projectName: string;      // Vercel project name
-  sourceDir: string;        // Directory containing the code
-  buildCommand?: string;    // Custom build command
-  outputDir?: string;       // Build output directory
-  env?: Record<string, string>;  // Environment variables
-  domain?: string;          // Custom domain
-  options?: Record<string, unknown>;
+	projectName: string; // Vercel project name
+	sourceDir: string; // Directory containing the code
+	buildCommand?: string; // Custom build command
+	outputDir?: string; // Build output directory
+	env?: Record<string, string>; // Environment variables
+	domain?: string; // Custom domain
+	options?: Record<string, unknown>;
 }
 ```
 
@@ -186,10 +192,10 @@ type DeploymentStatus = 'pending' | 'building' | 'deploying' | 'ready' | 'error'
 
 ### Settings
 
-| Setting | Scope | Description |
-|---|---|---|
-| `apiToken` | user (secret) | Vercel API token |
-| `defaultTeamScope` | user | Default Vercel team for deployments |
+| Setting            | Scope         | Description                         |
+| ------------------ | ------------- | ----------------------------------- |
+| `apiToken`         | user (secret) | Vercel API token                    |
+| `defaultTeamScope` | user          | Default Vercel team for deployments |
 
 ### Vercel API Service
 

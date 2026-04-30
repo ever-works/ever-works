@@ -15,19 +15,19 @@ The `DirectoryGenerationService` is the central orchestrator for all content gen
 
 This service handles both initial generation (creating items from scratch) and incremental updates (adding new items or refreshing existing ones). It supports both synchronous (in-process) and asynchronous (dispatched to Trigger.dev) execution modes.
 
-| Operation | Required Role | Description |
-|-----------|--------------|-------------|
-| `generateItems` | Editor | Triggers initial item generation from a prompt |
-| `updateItemsGenerator` | Editor | Re-runs generation with updated parameters |
-| `submitItem` | Editor | Submits a single item to the directory |
-| `removeItem` | Editor | Removes a single item from the directory |
-| `updateItemMetadata` | Editor | Updates metadata (featured, order) on an existing item |
-| `regenerateMarkdown` | Editor | Recreates the markdown repository from data |
-| `updateReadme` | Editor | Updates the README from markdown templates |
-| `updateWebsiteRepository` | Editor | Pushes latest changes to the website repository |
-| `bulkCaptureImages` | Editor | Captures screenshots for items missing images |
-| `updateDomainType` | Editor | Sets the domain classification for a directory |
-| `runScheduledUpdate` | System | Executes a scheduled generation run |
+| Operation                 | Required Role | Description                                            |
+| ------------------------- | ------------- | ------------------------------------------------------ |
+| `generateItems`           | Editor        | Triggers initial item generation from a prompt         |
+| `updateItemsGenerator`    | Editor        | Re-runs generation with updated parameters             |
+| `submitItem`              | Editor        | Submits a single item to the directory                 |
+| `removeItem`              | Editor        | Removes a single item from the directory               |
+| `updateItemMetadata`      | Editor        | Updates metadata (featured, order) on an existing item |
+| `regenerateMarkdown`      | Editor        | Recreates the markdown repository from data            |
+| `updateReadme`            | Editor        | Updates the README from markdown templates             |
+| `updateWebsiteRepository` | Editor        | Pushes latest changes to the website repository        |
+| `bulkCaptureImages`       | Editor        | Captures screenshots for items missing images          |
+| `updateDomainType`        | Editor        | Sets the domain classification for a directory         |
+| `runScheduledUpdate`      | System        | Executes a scheduled generation run                    |
 
 ## Generation Pipeline
 
@@ -43,15 +43,15 @@ The `generateItems` method performs these steps:
 
 ```typescript
 const result = await generationService.generateItems(
-    directoryId,
-    {
-        name: 'AI Tools Directory',
-        prompt: 'Find the best AI developer tools',
-        generation_method: GenerationMethod.CREATE_UPDATE,
-        providers: { ai: 'openai', search: 'exa' },
-    },
-    user,
-    true, // awaitCompletion
+	directoryId,
+	{
+		name: 'AI Tools Directory',
+		prompt: 'Find the best AI developer tools',
+		generation_method: GenerationMethod.CREATE_UPDATE,
+		providers: { ai: 'openai', search: 'exa' }
+	},
+	user,
+	true // awaitCompletion
 );
 ```
 
@@ -71,9 +71,9 @@ Every generation carries a `GenerationTriggerContext`:
 
 ```typescript
 interface GenerationTriggerContext {
-    triggeredBy: 'user' | 'api' | 'schedule';
-    scheduleId?: string;
-    billingMode?: DirectoryScheduleBillingMode;
+	triggeredBy: 'user' | 'api' | 'schedule';
+	scheduleId?: string;
+	billingMode?: DirectoryScheduleBillingMode;
 }
 ```
 
@@ -101,14 +101,14 @@ When `awaitCompletion` is `false`:
 
 ```typescript
 interface DirectoryGenerationPayload {
-    directoryId: string;
-    userId: string;
-    mode: 'create' | 'update';
-    dto: CreateItemsGeneratorDto;
-    historyId: string;
-    historyStartedAt: string;
-    triggerSource: string;
-    scheduleId?: string;
+	directoryId: string;
+	userId: string;
+	mode: 'create' | 'update';
+	dto: CreateItemsGeneratorDto;
+	historyId: string;
+	historyStartedAt: string;
+	triggerSource: string;
+	scheduleId?: string;
 }
 ```
 
@@ -130,20 +130,20 @@ Delegates to `ItemSubmissionService.updateItem()` for changing `featured` status
 
 The `bulkCaptureImages` method processes multiple items to capture screenshots:
 
-| Mode | Behavior |
-|------|----------|
+| Mode      | Behavior                                     |
+| --------- | -------------------------------------------- |
 | `missing` | Only processes items without existing images |
-| `all` | Processes all items with source URLs |
+| `all`     | Processes all items with source URLs         |
 
 Items can be filtered by `itemSlugs`. The method returns aggregated statistics:
 
 ```typescript
 interface BulkCaptureImagesResponseDto {
-    status: 'success' | 'partial' | 'error';
-    results: BulkCaptureResultDto[];
-    totalProcessed: number;
-    successCount: number;
-    errorCount: number;
+	status: 'success' | 'partial' | 'error';
+	results: BulkCaptureResultDto[];
+	totalProcessed: number;
+	successCount: number;
+	errorCount: number;
 }
 ```
 
@@ -173,10 +173,7 @@ Generation errors are classified using `classifyGenerationError()` and, for acco
 On generation completion (success or failure), the service emits:
 
 ```typescript
-this.eventEmitter.emit(
-    DirectoryGenerationCompletedEvent.EVENT_NAME,
-    new DirectoryGenerationCompletedEvent(directory),
-);
+this.eventEmitter.emit(DirectoryGenerationCompletedEvent.EVENT_NAME, new DirectoryGenerationCompletedEvent(directory));
 ```
 
 Downstream listeners can use this event to trigger post-generation workflows such as deployment or cache invalidation.

@@ -39,10 +39,10 @@ Global guards are registered in `ApiModule` using the `APP_GUARD` token:
 
 ```typescript
 @Module({
-    providers: [
-        { provide: APP_GUARD, useClass: JwtAuthGuard },
-        { provide: APP_GUARD, useClass: ThrottlerGuard },
-    ],
+	providers: [
+		{ provide: APP_GUARD, useClass: JwtAuthGuard },
+		{ provide: APP_GUARD, useClass: ThrottlerGuard }
+	]
 })
 export class ApiModule {}
 ```
@@ -56,30 +56,30 @@ The primary authentication guard, applied globally to all routes. It extends Pas
 ```typescript
 @Injectable()
 export class JwtAuthGuard extends AuthGuard('jwt') {
-    constructor(private reflector: Reflector) {
-        super();
-    }
+	constructor(private reflector: Reflector) {
+		super();
+	}
 
-    canActivate(context: ExecutionContext) {
-        const isPublic = this.reflector.getAllAndOverride<boolean>(IS_PUBLIC_KEY, [
-            context.getHandler(),
-            context.getClass(),
-        ]);
-        if (isPublic) {
-            return true;
-        }
-        return super.canActivate(context);
-    }
+	canActivate(context: ExecutionContext) {
+		const isPublic = this.reflector.getAllAndOverride<boolean>(IS_PUBLIC_KEY, [
+			context.getHandler(),
+			context.getClass()
+		]);
+		if (isPublic) {
+			return true;
+		}
+		return super.canActivate(context);
+	}
 }
 ```
 
 **Behavior:**
 
-| Scenario | Result |
-|---|---|
-| Valid JWT in `Authorization: Bearer` header | Request proceeds; `request.user` populated |
-| Missing or invalid JWT | `401 Unauthorized` |
-| Route decorated with `@Public()` | Guard skipped; request proceeds without auth |
+| Scenario                                    | Result                                       |
+| ------------------------------------------- | -------------------------------------------- |
+| Valid JWT in `Authorization: Bearer` header | Request proceeds; `request.user` populated   |
+| Missing or invalid JWT                      | `401 Unauthorized`                           |
+| Route decorated with `@Public()`            | Guard skipped; request proceeds without auth |
 
 **Key Feature:** The guard checks both the handler method and the controller class for the `IS_PUBLIC_KEY` metadata using `getAllAndOverride`, meaning `@Public()` can be applied at either level.
 
@@ -87,11 +87,11 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
 
 The global rate limiter from `@nestjs/throttler`, configured with three tiers:
 
-| Tier | Time Window | Max Requests |
-|---|---|---|
-| `short` | 1 second | 50 |
-| `medium` | 10 seconds | 300 |
-| `long` | 1 minute | 1000 |
+| Tier     | Time Window | Max Requests |
+| -------- | ----------- | ------------ |
+| `short`  | 1 second    | 50           |
+| `medium` | 10 seconds  | 300          |
+| `long`   | 1 minute    | 1000         |
 
 When any tier limit is exceeded, the guard returns `429 Too Many Requests`.
 
@@ -125,30 +125,30 @@ A feature-flag guard that blocks CRM-related requests when the integration is di
 ```typescript
 @Injectable()
 export class CrmSyncGuard implements CanActivate {
-    constructor(private readonly configService: CrmConfigService) {}
+	constructor(private readonly configService: CrmConfigService) {}
 
-    canActivate(context: ExecutionContext): boolean {
-        if (!this.configService.isEnabled) {
-            this.logger.warn('CRM integration is disabled - request blocked');
-            return false;
-        }
+	canActivate(context: ExecutionContext): boolean {
+		if (!this.configService.isEnabled) {
+			this.logger.warn('CRM integration is disabled - request blocked');
+			return false;
+		}
 
-        try {
-            this.configService.validateConfig();
-            return true;
-        } catch (error) {
-            this.logger.error('CRM configuration validation failed:', error);
-            return false;
-        }
-    }
+		try {
+			this.configService.validateConfig();
+			return true;
+		} catch (error) {
+			this.logger.error('CRM configuration validation failed:', error);
+			return false;
+		}
+	}
 }
 ```
 
-| Check | Failure Result |
-|---|---|
-| `isEnabled` is false | `403 Forbidden` with warning log |
-| `validateConfig()` throws | `403 Forbidden` with error log |
-| Both pass | Request proceeds |
+| Check                     | Failure Result                   |
+| ------------------------- | -------------------------------- |
+| `isEnabled` is false      | `403 Forbidden` with warning log |
+| `validateConfig()` throws | `403 Forbidden` with error log   |
+| Both pass                 | Request proceeds                 |
 
 ## Global Interceptors
 
@@ -173,30 +173,30 @@ Logs HTTP request/response details when debug mode is enabled.
 ```typescript
 @Injectable()
 export class LoggingInterceptor implements NestInterceptor {
-    private logger = new Logger('HTTP');
+	private logger = new Logger('HTTP');
 
-    intercept(context: ExecutionContext, next: CallHandler): Observable<any> {
-        if (!config.debug()) {
-            return next.handle(); // No-op when debug disabled
-        }
+	intercept(context: ExecutionContext, next: CallHandler): Observable<any> {
+		if (!config.debug()) {
+			return next.handle(); // No-op when debug disabled
+		}
 
-        const now = Date.now();
-        const { method, originalUrl } = request;
+		const now = Date.now();
+		const { method, originalUrl } = request;
 
-        this.logger.log(`Incoming Request: ${method} ${originalUrl}`);
+		this.logger.log(`Incoming Request: ${method} ${originalUrl}`);
 
-        return next.handle().pipe(
-            catchError((err) => {
-                const delay = Date.now() - now;
-                this.logger.error(`Error Response: ${method} ${originalUrl} ${statusCode} - ${delay}ms`);
-                return throwError(() => err);
-            }),
-            tap(() => {
-                const delay = Date.now() - now;
-                this.logger.log(`Outgoing Response: ${method} ${originalUrl} ${statusCode} - ${delay}ms`);
-            }),
-        );
-    }
+		return next.handle().pipe(
+			catchError((err) => {
+				const delay = Date.now() - now;
+				this.logger.error(`Error Response: ${method} ${originalUrl} ${statusCode} - ${delay}ms`);
+				return throwError(() => err);
+			}),
+			tap(() => {
+				const delay = Date.now() - now;
+				this.logger.log(`Outgoing Response: ${method} ${originalUrl} ${statusCode} - ${delay}ms`);
+			})
+		);
+	}
 }
 ```
 
@@ -216,11 +216,11 @@ Captures unhandled exceptions and forwards them to Sentry for real-time error tr
 
 ```typescript
 MonitoringModule.forRoot({
-    sentry: {
-        dsn: process.env.SENTRY_DSN,
-        environment: process.env.NODE_ENV || 'development',
-    },
-})
+	sentry: {
+		dsn: process.env.SENTRY_DSN,
+		environment: process.env.NODE_ENV || 'development'
+	}
+});
 ```
 
 ### PostHogInterceptor
@@ -231,11 +231,11 @@ Tracks API usage events and errors in PostHog for product analytics. Configured 
 
 ```typescript
 MonitoringModule.forRoot({
-    posthog: {
-        apiKey: process.env.POSTHOG_API_KEY,
-        host: process.env.POSTHOG_HOST || 'https://app.posthog.com',
-    },
-})
+	posthog: {
+		apiKey: process.env.POSTHOG_API_KEY,
+		host: process.env.POSTHOG_HOST || 'https://app.posthog.com'
+	}
+});
 ```
 
 ## Custom Decorators
@@ -268,12 +268,10 @@ healthCheck() {
 Parameter decorator that extracts the authenticated user from the request.
 
 ```typescript
-export const CurrentUser = createParamDecorator(
-    (data: unknown, ctx: ExecutionContext) => {
-        const request = ctx.switchToHttp().getRequest();
-        return request.user;
-    },
-);
+export const CurrentUser = createParamDecorator((data: unknown, ctx: ExecutionContext) => {
+	const request = ctx.switchToHttp().getRequest();
+	return request.user;
+});
 ```
 
 **Usage:**
@@ -307,18 +305,18 @@ Security headers middleware applied in `main.ts`. Uses a relaxed Content Securit
 ```typescript
 // Documentation routes: relaxed CSP
 helmet({
-    contentSecurityPolicy: {
-        directives: {
-            defaultSrc: ["'self'"],
-            scriptSrc: ["'self'", "'unsafe-inline'"],
-            styleSrc: ["'self'", "'unsafe-inline'"],
-            imgSrc: ["'self'", 'data:', 'https:'],
-        },
-    },
-})
+	contentSecurityPolicy: {
+		directives: {
+			defaultSrc: ["'self'"],
+			scriptSrc: ["'self'", "'unsafe-inline'"],
+			styleSrc: ["'self'", "'unsafe-inline'"],
+			imgSrc: ["'self'", 'data:', 'https:']
+		}
+	}
+});
 
 // All other routes: strict defaults
-helmet()
+helmet();
 ```
 
 ### CORS
@@ -327,10 +325,10 @@ Cross-Origin Resource Sharing configured for the web frontend:
 
 ```typescript
 app.enableCors({
-    origin: process.env.ALLOWED_ORIGINS?.split(',') || ['http://localhost:3000'],
-    credentials: true,
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization'],
+	origin: process.env.ALLOWED_ORIGINS?.split(',') || ['http://localhost:3000'],
+	credentials: true,
+	methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+	allowedHeaders: ['Content-Type', 'Authorization']
 });
 ```
 
@@ -369,15 +367,15 @@ async login() { ... }
 
 ## Source Files
 
-| File | Purpose |
-|---|---|
-| `apps/api/src/auth/guards/jwt-auth.guard.ts` | JWT authentication guard |
-| `apps/api/src/auth/guards/local-auth.guard.ts` | Username/password auth guard |
-| `apps/api/src/auth/decorators/public.decorator.ts` | `@Public()` decorator |
-| `apps/api/src/auth/decorators/user.decorator.ts` | `@CurrentUser()` decorator |
-| `apps/api/src/logging.interceptor.ts` | HTTP logging interceptor |
-| `apps/api/src/api.module.ts` | Global guard/interceptor registration |
-| `apps/api/src/main.ts` | Middleware and pipe configuration |
-| `apps/api/src/config/throttler.config.ts` | Rate limiter configuration |
-| `apps/api/src/integrations/twenty-crm/guards/crm-sync.guard.ts` | CRM feature guard |
-| `apps/api/src/integrations/twenty-crm/decorators/crm-sync.decorator.ts` | CRM sync decorator |
+| File                                                                    | Purpose                               |
+| ----------------------------------------------------------------------- | ------------------------------------- |
+| `apps/api/src/auth/guards/jwt-auth.guard.ts`                            | JWT authentication guard              |
+| `apps/api/src/auth/guards/local-auth.guard.ts`                          | Username/password auth guard          |
+| `apps/api/src/auth/decorators/public.decorator.ts`                      | `@Public()` decorator                 |
+| `apps/api/src/auth/decorators/user.decorator.ts`                        | `@CurrentUser()` decorator            |
+| `apps/api/src/logging.interceptor.ts`                                   | HTTP logging interceptor              |
+| `apps/api/src/api.module.ts`                                            | Global guard/interceptor registration |
+| `apps/api/src/main.ts`                                                  | Middleware and pipe configuration     |
+| `apps/api/src/config/throttler.config.ts`                               | Rate limiter configuration            |
+| `apps/api/src/integrations/twenty-crm/guards/crm-sync.guard.ts`         | CRM feature guard                     |
+| `apps/api/src/integrations/twenty-crm/decorators/crm-sync.decorator.ts` | CRM sync decorator                    |

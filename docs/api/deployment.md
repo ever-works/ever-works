@@ -13,17 +13,17 @@ All endpoints require JWT authentication.
 
 ## Endpoints
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| `GET` | `/api/deploy/providers` | List available deployment providers |
-| `GET` | `/api/deploy/providers/:providerId/configured` | Check if a provider is configured for the current user |
-| `POST` | `/api/deploy/directories/:id` | Deploy a directory |
-| `POST` | `/api/deploy/directories/:id/check` | Check if a directory can be deployed |
-| `POST` | `/api/deploy/directories/:id/lookup` | Look up existing deployment status |
-| `POST` | `/api/deploy/directories/:id/teams` | List deployment teams for a directory |
-| `POST` | `/api/deploy/validate-token` | Validate the current user's deployment token |
-| `POST` | `/api/deploy/teams` | List available deployment teams |
-| `POST` | `/api/deploy/batch` | Deploy multiple directories at once |
+| Method | Endpoint                                       | Description                                            |
+| ------ | ---------------------------------------------- | ------------------------------------------------------ |
+| `GET`  | `/api/deploy/providers`                        | List available deployment providers                    |
+| `GET`  | `/api/deploy/providers/:providerId/configured` | Check if a provider is configured for the current user |
+| `POST` | `/api/deploy/directories/:id`                  | Deploy a directory                                     |
+| `POST` | `/api/deploy/directories/:id/check`            | Check if a directory can be deployed                   |
+| `POST` | `/api/deploy/directories/:id/lookup`           | Look up existing deployment status                     |
+| `POST` | `/api/deploy/directories/:id/teams`            | List deployment teams for a directory                  |
+| `POST` | `/api/deploy/validate-token`                   | Validate the current user's deployment token           |
+| `POST` | `/api/deploy/teams`                            | List available deployment teams                        |
+| `POST` | `/api/deploy/batch`                            | Deploy multiple directories at once                    |
 
 ## Deploy a Directory
 
@@ -38,9 +38,9 @@ curl -X POST http://localhost:3100/api/deploy/directories/:id \
 
 **Body:**
 
-| Field | Type | Required | Description |
-|-------|------|----------|-------------|
-| `teamScope` | string | No | Deploy under a specific team |
+| Field       | Type   | Required | Description                  |
+| ----------- | ------ | -------- | ---------------------------- |
+| `teamScope` | string | No       | Deploy under a specific team |
 
 ## Check Deployment Capability
 

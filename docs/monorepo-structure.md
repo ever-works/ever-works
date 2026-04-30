@@ -83,20 +83,20 @@ The `pnpm-workspace.yaml` defines three workspace roots:
 
 ```yaml
 packages:
-  - apps/*
-  - packages/*
-  - packages/plugins/*
+    - apps/*
+    - packages/*
+    - packages/plugins/*
 ```
 
 This means pnpm treats every directory matching these globs as a workspace package. Each has its own `package.json` and can depend on other workspace packages using the `workspace:*` protocol:
 
 ```json
 {
-  "dependencies": {
-    "@ever-works/agent": "workspace:*",
-    "@ever-works/plugin": "workspace:*",
-    "@ever-works/contracts": "workspace:*"
-  }
+	"dependencies": {
+		"@ever-works/agent": "workspace:*",
+		"@ever-works/plugin": "workspace:*",
+		"@ever-works/contracts": "workspace:*"
+	}
 }
 ```
 
@@ -106,18 +106,18 @@ The workspace configuration also restricts which packages can run postinstall sc
 
 ```yaml
 onlyBuiltDependencies:
-  - '@nestjs/core'
-  - '@sentry-internal/node-cpu-profiler'
-  - '@swc/core'
-  - '@tailwindcss/oxide'
-  - bcrypt
-  - better-sqlite3
-  - core-js
-  - esbuild
-  - msgpackr-extract
-  - protobufjs
-  - sharp
-  - sqlite3
+    - '@nestjs/core'
+    - '@sentry-internal/node-cpu-profiler'
+    - '@swc/core'
+    - '@tailwindcss/oxide'
+    - bcrypt
+    - better-sqlite3
+    - core-js
+    - esbuild
+    - msgpackr-extract
+    - protobufjs
+    - sharp
+    - sqlite3
 ```
 
 Only these packages are allowed to execute build scripts during `pnpm install`. This prevents arbitrary code execution from transitive dependencies.
@@ -128,50 +128,50 @@ The `turbo.json` file defines the task pipeline:
 
 ```json
 {
-  "$schema": "https://turbo.build/schema.json",
-  "tasks": {
-    "build": {
-      "dependsOn": ["^build"],
-      "outputs": ["dist/**", "build/**", ".next/**"]
-    },
-    "start": {
-      "dependsOn": ["^build"],
-      "cache": false
-    },
-    "start:dev": {
-      "dependsOn": ["^build"],
-      "persistent": true,
-      "cache": false
-    },
-    "dev": {
-      "outputs": [],
-      "cache": false
-    },
-    "dev:trigger": {
-      "outputs": [],
-      "cache": false
-    },
-    "lint": { "outputs": [] },
-    "test": { "outputs": [] },
-    "type-check": { "outputs": [] },
-    "clean": { "outputs": [] }
-  }
+	"$schema": "https://turbo.build/schema.json",
+	"tasks": {
+		"build": {
+			"dependsOn": ["^build"],
+			"outputs": ["dist/**", "build/**", ".next/**"]
+		},
+		"start": {
+			"dependsOn": ["^build"],
+			"cache": false
+		},
+		"start:dev": {
+			"dependsOn": ["^build"],
+			"persistent": true,
+			"cache": false
+		},
+		"dev": {
+			"outputs": [],
+			"cache": false
+		},
+		"dev:trigger": {
+			"outputs": [],
+			"cache": false
+		},
+		"lint": { "outputs": [] },
+		"test": { "outputs": [] },
+		"type-check": { "outputs": [] },
+		"clean": { "outputs": [] }
+	}
 }
 ```
 
 ### Task Definitions Explained
 
-| Task | `dependsOn` | `outputs` | `cache` | Purpose |
-|------|-------------|-----------|---------|---------|
-| `build` | `^build` (build deps first) | `dist/`, `build/`, `.next/` | Yes | Production build |
-| `start` | `^build` | -- | No | Start in production mode |
-| `start:dev` | `^build` | -- | No (persistent) | Start with watch mode |
-| `dev` | -- | -- | No | Development server |
-| `dev:trigger` | -- | -- | No | Trigger.dev dev server |
-| `lint` | -- | -- | Yes | ESLint checks |
-| `test` | -- | -- | Yes | Run test suites |
-| `type-check` | -- | -- | Yes | TypeScript compilation checks |
-| `clean` | -- | -- | Yes | Remove build artifacts |
+| Task          | `dependsOn`                 | `outputs`                   | `cache`         | Purpose                       |
+| ------------- | --------------------------- | --------------------------- | --------------- | ----------------------------- |
+| `build`       | `^build` (build deps first) | `dist/`, `build/`, `.next/` | Yes             | Production build              |
+| `start`       | `^build`                    | --                          | No              | Start in production mode      |
+| `start:dev`   | `^build`                    | --                          | No (persistent) | Start with watch mode         |
+| `dev`         | --                          | --                          | No              | Development server            |
+| `dev:trigger` | --                          | --                          | No              | Trigger.dev dev server        |
+| `lint`        | --                          | --                          | Yes             | ESLint checks                 |
+| `test`        | --                          | --                          | Yes             | Run test suites               |
+| `type-check`  | --                          | --                          | Yes             | TypeScript compilation checks |
+| `clean`       | --                          | --                          | Yes             | Remove build artifacts        |
 
 The `^build` syntax means "build all workspace dependencies first." This ensures `@ever-works/contracts` is compiled before `@ever-works/plugin`, which is compiled before `@ever-works/agent`, which is compiled before `ever-works-api`.
 
@@ -225,26 +225,26 @@ graph TD
 
 These are the final runnable applications. Each has its own build toolchain:
 
-| App | Package Name | Framework | Build Tool | Port |
-|-----|-------------|-----------|------------|------|
-| `api` | `ever-works-api` | NestJS 11 | SWC (`nest build -b swc`) | 3100 |
-| `web` | `ever-works-web` | Next.js 16 | Turbopack (dev) / Webpack (build) | 3000 |
-| `cli` | `ever-works-cli` | Commander.js | esbuild | -- |
-| `internal-cli` | `ever-works-internal-cli` | nest-commander | SWC | -- |
-| `admin` | -- | -- | -- | -- |
+| App            | Package Name              | Framework      | Build Tool                        | Port |
+| -------------- | ------------------------- | -------------- | --------------------------------- | ---- |
+| `api`          | `ever-works-api`          | NestJS 11      | SWC (`nest build -b swc`)         | 3100 |
+| `web`          | `ever-works-web`          | Next.js 16     | Turbopack (dev) / Webpack (build) | 3000 |
+| `cli`          | `ever-works-cli`          | Commander.js   | esbuild                           | --   |
+| `internal-cli` | `ever-works-internal-cli` | nest-commander | SWC                               | --   |
+| `admin`        | --                        | --             | --                                | --   |
 
 ### `packages/` -- Shared Libraries
 
 Reusable libraries consumed by apps and other packages:
 
-| Package | Scope Name | Build | Test | Description |
-|---------|-----------|-------|------|-------------|
-| `agent` | `@ever-works/agent` | NestJS SWC + tsc (types) | Jest | Core AI generation, database, git, pipelines |
-| `contracts` | `@ever-works/contracts` | tsup (ESM) | -- | Shared TypeScript interfaces and types |
-| `plugin` | `@ever-works/plugin` | tsup (ESM) | Vitest | Plugin system contracts, base classes, utilities |
-| `monitoring` | `@ever-works/monitoring` | tsup | -- | Sentry error tracking + PostHog analytics |
-| `tasks` | `@ever-works/trigger-tasks` | tsup | -- | Trigger.dev background job definitions |
-| `cli-shared` | `@ever-works/cli-shared` | tsup | -- | Shared CLI utilities |
+| Package      | Scope Name                  | Build                    | Test   | Description                                      |
+| ------------ | --------------------------- | ------------------------ | ------ | ------------------------------------------------ |
+| `agent`      | `@ever-works/agent`         | NestJS SWC + tsc (types) | Jest   | Core AI generation, database, git, pipelines     |
+| `contracts`  | `@ever-works/contracts`     | tsup (ESM)               | --     | Shared TypeScript interfaces and types           |
+| `plugin`     | `@ever-works/plugin`        | tsup (ESM)               | Vitest | Plugin system contracts, base classes, utilities |
+| `monitoring` | `@ever-works/monitoring`    | tsup                     | --     | Sentry error tracking + PostHog analytics        |
+| `tasks`      | `@ever-works/trigger-tasks` | tsup                     | --     | Trigger.dev background job definitions           |
+| `cli-shared` | `@ever-works/cli-shared`    | tsup                     | --     | Shared CLI utilities                             |
 
 ### `packages/plugins/` -- Plugin Implementations
 
@@ -252,29 +252,29 @@ Each plugin is a standalone ESM package built with tsup and tested with Vitest. 
 
 ```json
 {
-  "everworks": {
-    "plugin": {
-      "id": "openai",
-      "name": "OpenAI",
-      "category": "ai-provider",
-      "capabilities": ["text-generation", "embeddings"]
-    }
-  }
+	"everworks": {
+		"plugin": {
+			"id": "openai",
+			"name": "OpenAI",
+			"category": "ai-provider",
+			"capabilities": ["text-generation", "embeddings"]
+		}
+	}
 }
 ```
 
 **Plugin categories:**
 
-| Category | Plugins |
-|----------|---------|
-| AI Provider | openai, anthropic, google, groq, ollama, openrouter, mistral, perplexity |
-| Search | exa, tavily, serpapi, brave, valyu |
+| Category           | Plugins                                                                                         |
+| ------------------ | ----------------------------------------------------------------------------------------------- |
+| AI Provider        | openai, anthropic, google, groq, ollama, openrouter, mistral, perplexity                        |
+| Search             | exa, tavily, serpapi, brave, valyu                                                              |
 | Content Extraction | local-content-extractor, notion-extractor, pdf-extractor, firecrawl, jina, scrapfly, brightdata |
-| Screenshot | screenshotone, urlbox |
-| Git | github |
-| Infrastructure | vercel, apify |
-| Pipeline | agent-pipeline, standard-pipeline, comparison-generator |
-| AI Tools | claude-code, vercel-ai-gateway |
+| Screenshot         | screenshotone, urlbox                                                                           |
+| Git                | github                                                                                          |
+| Infrastructure     | vercel, apify                                                                                   |
+| Pipeline           | agent-pipeline, standard-pipeline, comparison-generator                                         |
+| AI Tools           | claude-code, vercel-ai-gateway                                                                  |
 
 ## Caching Strategy
 
@@ -322,88 +322,88 @@ Once linked, build artifacts are shared across team members and CI runners, sign
 
 1. Create the package directory:
 
-   ```bash
-   mkdir packages/my-new-package
-   cd packages/my-new-package
-   ```
+    ```bash
+    mkdir packages/my-new-package
+    cd packages/my-new-package
+    ```
 
 2. Initialize `package.json`:
 
-   ```json
-   {
-     "name": "@ever-works/my-new-package",
-     "version": "0.0.1",
-     "private": true,
-     "type": "module",
-     "main": "./dist/index.js",
-     "types": "./dist/index.d.ts",
-     "scripts": {
-       "build": "tsup src/index.ts --format esm --dts",
-       "dev": "tsup src/index.ts --format esm --dts --watch",
-       "test": "vitest run",
-       "clean": "rm -rf dist"
-     }
-   }
-   ```
+    ```json
+    {
+    	"name": "@ever-works/my-new-package",
+    	"version": "0.0.1",
+    	"private": true,
+    	"type": "module",
+    	"main": "./dist/index.js",
+    	"types": "./dist/index.d.ts",
+    	"scripts": {
+    		"build": "tsup src/index.ts --format esm --dts",
+    		"dev": "tsup src/index.ts --format esm --dts --watch",
+    		"test": "vitest run",
+    		"clean": "rm -rf dist"
+    	}
+    }
+    ```
 
 3. Add it as a dependency in consuming packages:
 
-   ```bash
-   cd apps/api
-   pnpm add @ever-works/my-new-package@workspace:*
-   ```
+    ```bash
+    cd apps/api
+    pnpm add @ever-works/my-new-package@workspace:*
+    ```
 
 4. Build from root to verify the dependency chain:
 
-   ```bash
-   pnpm build
-   ```
+    ```bash
+    pnpm build
+    ```
 
 ### Adding a New Plugin
 
 1. Create the plugin directory under `packages/plugins/`:
 
-   ```bash
-   mkdir packages/plugins/my-plugin
-   ```
+    ```bash
+    mkdir packages/plugins/my-plugin
+    ```
 
 2. Initialize with plugin metadata in `package.json`:
 
-   ```json
-   {
-     "name": "@ever-works/plugin-my-plugin",
-     "version": "0.0.1",
-     "private": true,
-     "type": "module",
-     "everworks": {
-       "plugin": {
-         "id": "my-plugin",
-         "name": "My Plugin",
-         "category": "ai-provider",
-         "capabilities": ["text-generation"]
-       }
-     },
-     "dependencies": {
-       "@ever-works/plugin": "workspace:*"
-     }
-   }
-   ```
+    ```json
+    {
+    	"name": "@ever-works/plugin-my-plugin",
+    	"version": "0.0.1",
+    	"private": true,
+    	"type": "module",
+    	"everworks": {
+    		"plugin": {
+    			"id": "my-plugin",
+    			"name": "My Plugin",
+    			"category": "ai-provider",
+    			"capabilities": ["text-generation"]
+    		}
+    	},
+    	"dependencies": {
+    		"@ever-works/plugin": "workspace:*"
+    	}
+    }
+    ```
 
 3. Implement the plugin by extending `BaseAiProvider` from `@ever-works/plugin/abstract`.
 
 4. Build the plugin system to verify:
 
-   ```bash
-   pnpm build:plugins
-   ```
+    ```bash
+    pnpm build:plugins
+    ```
 
 ### Adding a New App
 
 1. Create under `apps/`:
 
-   ```bash
-   mkdir apps/my-app
-   ```
+    ```bash
+    mkdir apps/my-app
+    ```
 
 2. Set up the `package.json` with a unique `name` field.
 
@@ -415,37 +415,37 @@ Once linked, build artifacts are shared across team members and CI runners, sign
 
 All scripts from the root `package.json`:
 
-| Script | Command | Description |
-|--------|---------|-------------|
-| `dev` | `turbo dev` | Start all packages in dev/watch mode |
-| `dev:api` | `turbo dev --filter=ever-works-api` | Start API only |
-| `dev:web` | `turbo dev --filter=ever-works-web` | Start Web only |
-| `dev:trigger` | `turbo dev:trigger --filter=@ever-works/trigger-tasks` | Start Trigger.dev dev server |
-| `build` | `turbo build` | Build all packages |
-| `build:apps` | `turbo build --filter=./apps/*` | Build apps only |
-| `build:packages` | `turbo build --filter=./packages/*` | Build shared packages only |
-| `build:plugins` | `turbo build --filter=./packages/plugin --filter=./packages/plugins/*` | Build plugin system + all plugins |
-| `build:api` | `turbo build --filter=ever-works-api` | Build API only |
-| `build:web` | `turbo build --filter=ever-works-web` | Build Web only |
-| `lint` | `turbo lint` | ESLint all packages |
-| `test` | `turbo test` | Run all test suites |
-| `type-check` | `turbo type-check` | TypeScript checks across all packages |
-| `clean` | `turbo clean` | Remove build artifacts |
-| `format` | `prettier --write "**/*.{ts,tsx,jsx,json,css,md}"` | Format all source files |
-| `format:check` | `prettier --check "**/*.{ts,tsx,jsx,json,css,md}"` | Check formatting without changes |
-| `deploy:trigger` | `turbo deploy:trigger --filter=@ever-works/trigger-tasks` | Deploy Trigger.dev tasks |
+| Script           | Command                                                                | Description                           |
+| ---------------- | ---------------------------------------------------------------------- | ------------------------------------- |
+| `dev`            | `turbo dev`                                                            | Start all packages in dev/watch mode  |
+| `dev:api`        | `turbo dev --filter=ever-works-api`                                    | Start API only                        |
+| `dev:web`        | `turbo dev --filter=ever-works-web`                                    | Start Web only                        |
+| `dev:trigger`    | `turbo dev:trigger --filter=@ever-works/trigger-tasks`                 | Start Trigger.dev dev server          |
+| `build`          | `turbo build`                                                          | Build all packages                    |
+| `build:apps`     | `turbo build --filter=./apps/*`                                        | Build apps only                       |
+| `build:packages` | `turbo build --filter=./packages/*`                                    | Build shared packages only            |
+| `build:plugins`  | `turbo build --filter=./packages/plugin --filter=./packages/plugins/*` | Build plugin system + all plugins     |
+| `build:api`      | `turbo build --filter=ever-works-api`                                  | Build API only                        |
+| `build:web`      | `turbo build --filter=ever-works-web`                                  | Build Web only                        |
+| `lint`           | `turbo lint`                                                           | ESLint all packages                   |
+| `test`           | `turbo test`                                                           | Run all test suites                   |
+| `type-check`     | `turbo type-check`                                                     | TypeScript checks across all packages |
+| `clean`          | `turbo clean`                                                          | Remove build artifacts                |
+| `format`         | `prettier --write "**/*.{ts,tsx,jsx,json,css,md}"`                     | Format all source files               |
+| `format:check`   | `prettier --check "**/*.{ts,tsx,jsx,json,css,md}"`                     | Check formatting without changes      |
+| `deploy:trigger` | `turbo deploy:trigger --filter=@ever-works/trigger-tasks`              | Deploy Trigger.dev tasks              |
 
 ## Code Quality Tooling
 
-| Tool | Purpose | Config Location |
-|------|---------|-----------------|
-| **Turborepo** | Task orchestration and caching | `turbo.json` |
-| **pnpm** | Package management and workspaces | `pnpm-workspace.yaml` |
-| **Prettier** | Code formatting | Root `package.json` (`"prettier"` key) |
-| **ESLint** | Linting | Per-package `.eslintrc.js` / `eslint.config.mjs` |
-| **Husky** | Git hooks (pre-commit, commit-msg) | `.husky/` |
-| **commitlint** | Conventional commit enforcement | Root `package.json` (`"commitlint"` key) |
-| **TypeScript** | Type checking (5.9.3) | Per-package `tsconfig.json` |
+| Tool           | Purpose                            | Config Location                                  |
+| -------------- | ---------------------------------- | ------------------------------------------------ |
+| **Turborepo**  | Task orchestration and caching     | `turbo.json`                                     |
+| **pnpm**       | Package management and workspaces  | `pnpm-workspace.yaml`                            |
+| **Prettier**   | Code formatting                    | Root `package.json` (`"prettier"` key)           |
+| **ESLint**     | Linting                            | Per-package `.eslintrc.js` / `eslint.config.mjs` |
+| **Husky**      | Git hooks (pre-commit, commit-msg) | `.husky/`                                        |
+| **commitlint** | Conventional commit enforcement    | Root `package.json` (`"commitlint"` key)         |
+| **TypeScript** | Type checking (5.9.3)              | Per-package `tsconfig.json`                      |
 
 ## Next Steps
 

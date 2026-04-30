@@ -65,10 +65,10 @@ A React context that shares common state across all items components:
 
 ```typescript
 interface ItemsContextType {
-    directoryId: string;
-    canEdit: boolean;
-    directoryWebsite?: string;
-    screenshotAvailable: boolean;
+	directoryId: string;
+	canEdit: boolean;
+	directoryWebsite?: string;
+	screenshotAvailable: boolean;
 }
 ```
 
@@ -84,17 +84,18 @@ The top-level client component managing tab state and coordinating all sub-views
 
 ```typescript
 interface ItemsPageClientProps {
-    items: ItemData[];
-    directoryId: string;
-    categories?: Category[];
-    tags?: Tag[];
-    collections?: Collection[];
+	items: ItemData[];
+	directoryId: string;
+	categories?: Category[];
+	tags?: Tag[];
+	collections?: Collection[];
 }
 ```
 
 **Tab Types**: `'items' | 'categories' | 'tags' | 'collections'`
 
 Each tab is rendered with an icon from `lucide-react`:
+
 - Items: `Package`
 - Categories: `FolderTree`
 - Tags: `Tags`
@@ -108,12 +109,13 @@ The main items browsing view with search, filtering, and virtualized rendering u
 
 ```typescript
 interface ItemsListProps {
-    items: ItemData[];
-    addItemRef?: React.RefObject<((item: ItemData) => void) | null>;
+	items: ItemData[];
+	addItemRef?: React.RefObject<((item: ItemData) => void) | null>;
 }
 ```
 
 **Features**:
+
 - **Search**: Filters by item name and description
 - **Category filter**: Dropdown populated from unique item categories
 - **View modes**: Grid (responsive 1-3 columns) or List view
@@ -122,11 +124,11 @@ interface ItemsListProps {
 
 **Virtualization Config**:
 
-| Parameter        | Grid Mode           | List Mode           |
-|------------------|---------------------|---------------------|
-| Row height       | ~200px + 16px gap   | ~80px + 16px gap    |
-| Overscan         | 5 rows              | 5 rows              |
-| Columns          | 1 (mobile), 2 (sm), 3 (lg) | 1            |
+| Parameter  | Grid Mode                  | List Mode        |
+| ---------- | -------------------------- | ---------------- |
+| Row height | ~200px + 16px gap          | ~80px + 16px gap |
+| Overscan   | 5 rows                     | 5 rows           |
+| Columns    | 1 (mobile), 2 (sm), 3 (lg) | 1                |
 
 **Responsive column detection** uses a `useColumnCount` hook that listens to window resize events.
 
@@ -138,17 +140,17 @@ A comprehensive form for creating new directory items with AI-powered extraction
 
 ```typescript
 interface ItemFormData {
-    name: string;
-    description: string;
-    source_url: string;
-    categories: string[];
-    tags: string[];
-    featured: boolean;
-    pay_and_publish_now: boolean;
-    slug: string;
-    brand: string;
-    brand_logo_url: string;
-    images: string[];
+	name: string;
+	description: string;
+	source_url: string;
+	categories: string[];
+	tags: string[];
+	featured: boolean;
+	pay_and_publish_now: boolean;
+	slug: string;
+	brand: string;
+	brand_logo_url: string;
+	images: string[];
 }
 ```
 
@@ -164,10 +166,10 @@ Manages directory categories with a searchable table and CRUD modal.
 
 ```typescript
 interface CategoriesTabProps {
-    directoryId: string;
-    initialCategories: Category[];
-    items: ItemData[];              // used to compute item counts per category
-    canEdit: boolean;
+	directoryId: string;
+	initialCategories: Category[];
+	items: ItemData[]; // used to compute item counts per category
+	canEdit: boolean;
 }
 ```
 
@@ -183,10 +185,10 @@ Manages directory tags with a searchable table and CRUD modal.
 
 ```typescript
 interface TagsTabProps {
-    directoryId: string;
-    initialTags: Tag[];
-    items: ItemData[];
-    canEdit: boolean;
+	directoryId: string;
+	initialTags: Tag[];
+	items: ItemData[];
+	canEdit: boolean;
 }
 ```
 
@@ -200,10 +202,10 @@ Manages directory collections with a searchable table and CRUD modal.
 
 ```typescript
 interface CollectionsTabProps {
-    directoryId: string;
-    initialCollections: Collection[];
-    items: ItemData[];
-    canEdit: boolean;
+	directoryId: string;
+	initialCollections: Collection[];
+	items: ItemData[];
+	canEdit: boolean;
 }
 ```
 
@@ -236,20 +238,20 @@ All taxonomy operations (create, update, delete) are performed via server action
 
 ## Related API Endpoints
 
-| Action                   | Server Action Function                           | HTTP Method |
-|--------------------------|--------------------------------------------------|-------------|
-| Extract item details     | `extractItemDetails(url, categories)`            | POST        |
-| Capture screenshot       | `captureScreenshot(url)`                         | POST        |
-| Check screenshot availability | `checkScreenshotAvailability()`             | GET         |
-| Create category          | `createCategory(directoryId, data)`              | POST        |
-| Update category          | `updateCategory(directoryId, categoryId, data)`  | PATCH       |
-| Delete category          | `deleteCategory(directoryId, categoryId)`        | DELETE      |
-| Create tag               | `createTag(directoryId, data)`                   | POST        |
-| Update tag               | `updateTag(directoryId, tagId, data)`            | PATCH       |
-| Delete tag               | `deleteTag(directoryId, tagId)`                  | DELETE      |
-| Create collection        | `createCollection(directoryId, data)`            | POST        |
-| Update collection        | `updateCollection(directoryId, collectionId, data)` | PATCH    |
-| Delete collection        | `deleteCollection(directoryId, collectionId)`    | DELETE      |
+| Action                        | Server Action Function                              | HTTP Method |
+| ----------------------------- | --------------------------------------------------- | ----------- |
+| Extract item details          | `extractItemDetails(url, categories)`               | POST        |
+| Capture screenshot            | `captureScreenshot(url)`                            | POST        |
+| Check screenshot availability | `checkScreenshotAvailability()`                     | GET         |
+| Create category               | `createCategory(directoryId, data)`                 | POST        |
+| Update category               | `updateCategory(directoryId, categoryId, data)`     | PATCH       |
+| Delete category               | `deleteCategory(directoryId, categoryId)`           | DELETE      |
+| Create tag                    | `createTag(directoryId, data)`                      | POST        |
+| Update tag                    | `updateTag(directoryId, tagId, data)`               | PATCH       |
+| Delete tag                    | `deleteTag(directoryId, tagId)`                     | DELETE      |
+| Create collection             | `createCollection(directoryId, data)`               | POST        |
+| Update collection             | `updateCollection(directoryId, collectionId, data)` | PATCH       |
+| Delete collection             | `deleteCollection(directoryId, collectionId)`       | DELETE      |
 
 ## Internationalization
 

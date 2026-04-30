@@ -13,10 +13,10 @@ The comparison generator creates structured "X vs Y" comparison pages for items 
 
 The comparison system spans two packages:
 
-| Location | Purpose |
-|---|---|
-| `packages/agent/src/comparison-generator/` | Core service and generation logic |
-| `packages/plugins/comparison-generator/` | Plugin manifest and settings schema |
+| Location                                   | Purpose                             |
+| ------------------------------------------ | ----------------------------------- |
+| `packages/agent/src/comparison-generator/` | Core service and generation logic   |
+| `packages/plugins/comparison-generator/`   | Plugin manifest and settings schema |
 
 ### Core Service
 
@@ -31,11 +31,11 @@ The comparison system spans two packages:
 
 The `comparison/` subdirectory contains pure functions and focused modules:
 
-| Module | Purpose |
-|---|---|
-| `pair-selector.ts` | Selects the next uncompared pair of items |
+| Module                     | Purpose                                            |
+| -------------------------- | -------------------------------------------------- |
+| `pair-selector.ts`         | Selects the next uncompared pair of items          |
 | `comparison-researcher.ts` | Researches two items via web search and extraction |
-| `comparison-writer.ts` | Generates comparison content via AI |
+| `comparison-writer.ts`     | Generates comparison content via AI                |
 
 ## Comparison Workflow
 
@@ -99,27 +99,27 @@ Results are written to the data repository:
 
 The comparison generator is controlled via the `comparison-generator` plugin, which provides these settings:
 
-| Setting | Default | Description |
-|---|---|---|
-| `max_comparisons_mode` | `limited` | `limited` or `unlimited` |
-| `max_comparisons` | 10 | Maximum comparison count when limited |
-| `min_items_for_comparison` | 3 | Minimum items in a category to enable comparisons |
-| `ai_provider` | (default) | Override the AI provider for comparison generation |
-| `ai_model` | (default) | Override the AI model |
-| `custom_prompt` | (none) | Custom instructions appended to the comparison prompt |
-| `extended_analysis` | false | Generate extended analysis content |
+| Setting                    | Default   | Description                                           |
+| -------------------------- | --------- | ----------------------------------------------------- |
+| `max_comparisons_mode`     | `limited` | `limited` or `unlimited`                              |
+| `max_comparisons`          | 10        | Maximum comparison count when limited                 |
+| `min_items_for_comparison` | 3         | Minimum items in a category to enable comparisons     |
+| `ai_provider`              | (default) | Override the AI provider for comparison generation    |
+| `ai_model`                 | (default) | Override the AI model                                 |
+| `custom_prompt`            | (none)    | Custom instructions appended to the comparison prompt |
+| `extended_analysis`        | false     | Generate extended analysis content                    |
 
 ## API Operations
 
 The service exposes five operations:
 
-| Method | Purpose |
-|---|---|
-| `generateNextComparison(directoryId, userId)` | Auto-select and generate the next comparison |
-| `generateManualComparison(directoryId, userId, itemA, itemB)` | Generate comparison for two specific items |
-| `listComparisons(directoryId, userId)` | List all comparisons for a directory |
-| `getComparison(directoryId, userId, slug)` | Get a single comparison with markdown |
-| `deleteComparison(directoryId, userId, slug)` | Delete a comparison and update state |
+| Method                                                        | Purpose                                      |
+| ------------------------------------------------------------- | -------------------------------------------- |
+| `generateNextComparison(directoryId, userId)`                 | Auto-select and generate the next comparison |
+| `generateManualComparison(directoryId, userId, itemA, itemB)` | Generate comparison for two specific items   |
+| `listComparisons(directoryId, userId)`                        | List all comparisons for a directory         |
+| `getComparison(directoryId, userId, slug)`                    | Get a single comparison with markdown        |
+| `deleteComparison(directoryId, userId, slug)`                 | Delete a comparison and update state         |
 
 ## Manual vs Automatic Comparisons
 
@@ -134,12 +134,12 @@ Comparison state is persisted in the data repository's `config.yml` under `metad
 
 ```yaml
 metadata:
-  comparison_state:
-    generated_pairs:
-      - "netlify--vercel"
-      - "angular--react"
-    last_generated_at: "2025-01-15T10:30:00.000Z"
-    total_generated: 2
+    comparison_state:
+        generated_pairs:
+            - 'netlify--vercel'
+            - 'angular--react'
+        last_generated_at: '2025-01-15T10:30:00.000Z'
+        total_generated: 2
 ```
 
 This prevents re-generating existing comparisons and enables the `countRemainingPairs()` function to report how many comparisons are left to generate.

@@ -29,11 +29,11 @@ packages/agent/src/subscriptions/
 
 Plans are seeded automatically on module initialization via `SubscriptionService.onModuleInit()`. Three tiers are defined:
 
-| Plan       | Code       | Max Directories | Allowed Cadences                  | Monthly Price | Overage/Run |
-|------------|------------|-----------------|-----------------------------------|---------------|-------------|
-| **Free**   | `free`     | 1               | Monthly, Weekly, Daily, Hourly *  | $0            | $10         |
-| **Standard** | `standard` | 5             | Monthly, Weekly, Daily            | $29           | $8          |
-| **Premium** | `premium` | 15              | Monthly, Weekly, Daily, Hourly    | $99           | $0          |
+| Plan         | Code       | Max Directories | Allowed Cadences                  | Monthly Price | Overage/Run |
+| ------------ | ---------- | --------------- | --------------------------------- | ------------- | ----------- |
+| **Free**     | `free`     | 1               | Monthly, Weekly, Daily, Hourly \* | $0            | $10         |
+| **Standard** | `standard` | 5               | Monthly, Weekly, Daily            | $29           | $8          |
+| **Premium**  | `premium`  | 15              | Monthly, Weekly, Daily, Hourly    | $99           | $0          |
 
 > \* Currently all cadences are enabled for the Free plan during the early-access period.
 
@@ -51,18 +51,18 @@ Retrieve the current user's subscription plan and cadence allowances.
 
 ```json
 {
-  "status": "success",
-  "enabled": true,
-  "plan": {
-    "code": "free",
-    "name": "Free",
-    "allowedCadences": [
-      { "cadence": "monthly", "allowed": true, "payPerUse": false },
-      { "cadence": "weekly", "allowed": true, "payPerUse": false },
-      { "cadence": "daily", "allowed": true, "payPerUse": false },
-      { "cadence": "hourly", "allowed": true, "payPerUse": false }
-    ]
-  }
+	"status": "success",
+	"enabled": true,
+	"plan": {
+		"code": "free",
+		"name": "Free",
+		"allowedCadences": [
+			{ "cadence": "monthly", "allowed": true, "payPerUse": false },
+			{ "cadence": "weekly", "allowed": true, "payPerUse": false },
+			{ "cadence": "daily", "allowed": true, "payPerUse": false },
+			{ "cadence": "hourly", "allowed": true, "payPerUse": false }
+		]
+	}
 }
 ```
 
@@ -70,9 +70,9 @@ Retrieve the current user's subscription plan and cadence allowances.
 
 ```json
 {
-  "status": "success",
-  "enabled": false,
-  "plan": null
+	"status": "success",
+	"enabled": false,
+	"plan": null
 }
 ```
 
@@ -84,7 +84,7 @@ Update the user's subscription plan.
 
 ```json
 {
-  "planCode": "standard"
+	"planCode": "standard"
 }
 ```
 
@@ -110,16 +110,16 @@ Returns `400 Bad Request` if subscriptions are disabled.
 
 The core service in `packages/agent/src/subscriptions/subscription.service.ts` provides:
 
-| Method                       | Description                                                        |
-|------------------------------|--------------------------------------------------------------------|
-| `isEnabled()`                | Checks the global `config.subscriptions.isEnabled()` flag          |
-| `resolvePlanForUser(user)`   | Returns the active plan: subscription > user default > global default |
-| `getCadenceAllowances(user)` | Returns all cadences with `allowed`, `payPerUse`, and upgrade `reason` |
-| `assignPlanToUser(user, code)` | Sets the user's `defaultPlanId` to the matching plan             |
-| `summarizePlan(user)`        | Combines plan + allowances + enabled flag into one response        |
-| `requiresUsageBilling()`     | Determines if a cadence/plan combo requires pay-per-use billing    |
-| `getDefaultCadence(plan)`    | Returns the highest-frequency cadence allowed by the plan          |
-| `seedPlans()`                | Upserts all plan definitions on startup                            |
+| Method                         | Description                                                            |
+| ------------------------------ | ---------------------------------------------------------------------- |
+| `isEnabled()`                  | Checks the global `config.subscriptions.isEnabled()` flag              |
+| `resolvePlanForUser(user)`     | Returns the active plan: subscription > user default > global default  |
+| `getCadenceAllowances(user)`   | Returns all cadences with `allowed`, `payPerUse`, and upgrade `reason` |
+| `assignPlanToUser(user, code)` | Sets the user's `defaultPlanId` to the matching plan                   |
+| `summarizePlan(user)`          | Combines plan + allowances + enabled flag into one response            |
+| `requiresUsageBilling()`       | Determines if a cadence/plan combo requires pay-per-use billing        |
+| `getDefaultCadence(plan)`      | Returns the highest-frequency cadence allowed by the plan              |
+| `seedPlans()`                  | Upserts all plan definitions on startup                                |
 
 ### Plan Resolution Order
 
@@ -134,16 +134,17 @@ The core service in `packages/agent/src/subscriptions/subscription.service.ts` p
 
 ```typescript
 await usageLedgerService.recordUsage({
-  userId: 'user-123',
-  directoryId: 'dir-456',
-  schedule: directorySchedule,
-  triggerType: UsageLedgerTriggerType.SCHEDULED,
-  billingMode: DirectoryScheduleBillingMode.USAGE,
-  generationHistoryId: 'gen-789',
+	userId: 'user-123',
+	directoryId: 'dir-456',
+	schedule: directorySchedule,
+	triggerType: UsageLedgerTriggerType.SCHEDULED,
+	billingMode: DirectoryScheduleBillingMode.USAGE,
+	generationHistoryId: 'gen-789'
 });
 ```
 
 The service:
+
 1. Checks if subscriptions are enabled and billing mode is `USAGE`
 2. Reads the per-use price from `config.subscriptions.getPayPerUsePriceCents()`
 3. Records an entry in the `UsageLedgerRepository`
@@ -153,9 +154,9 @@ The service:
 
 The `BillingProvider` is an abstract class with two methods:
 
-| Method                  | Description                                              |
-|-------------------------|----------------------------------------------------------|
-| `getDefaultCurrency()`  | Returns the default currency string (e.g., `"usd"`)     |
+| Method                     | Description                                                       |
+| -------------------------- | ----------------------------------------------------------------- |
+| `getDefaultCurrency()`     | Returns the default currency string (e.g., `"usd"`)               |
 | `recordUsageCharge(entry)` | Optional hook for forwarding charges to Stripe or another gateway |
 
 The default `ManualBillingProvider` reads the currency from `config.billing.getDefaultCurrency()` and does not forward charges externally. To integrate Stripe or another payment gateway, extend `BillingProvider` and override `recordUsageCharge()`.
@@ -164,12 +165,12 @@ The default `ManualBillingProvider` reads the currency from `config.billing.getD
 
 The subscriptions system reads from the application config:
 
-| Config Key                            | Description                                  |
-|---------------------------------------|----------------------------------------------|
-| `config.subscriptions.isEnabled()`    | Master toggle for the subscription system    |
-| `config.subscriptions.getDefaultPlanCode()` | Default plan code for new users        |
-| `config.subscriptions.getPayPerUsePriceCents()` | Cost per overage run in cents       |
-| `config.billing.getDefaultCurrency()` | Currency for all billing operations          |
+| Config Key                                      | Description                               |
+| ----------------------------------------------- | ----------------------------------------- |
+| `config.subscriptions.isEnabled()`              | Master toggle for the subscription system |
+| `config.subscriptions.getDefaultPlanCode()`     | Default plan code for new users           |
+| `config.subscriptions.getPayPerUsePriceCents()` | Cost per overage run in cents             |
+| `config.billing.getDefaultCurrency()`           | Currency for all billing operations       |
 
 ## Module Registration
 
@@ -177,8 +178,8 @@ The API module imports `AgentSubscriptionsModule` and `AuthModule`:
 
 ```typescript
 @Module({
-  imports: [AuthModule, AgentSubscriptionsModule],
-  controllers: [SubscriptionsController],
+	imports: [AuthModule, AgentSubscriptionsModule],
+	controllers: [SubscriptionsController]
 })
 export class SubscriptionsModule {}
 ```

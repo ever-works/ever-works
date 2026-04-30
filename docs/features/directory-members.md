@@ -11,28 +11,28 @@ Directory Members lets you invite collaborators to work on a directory together.
 
 ## Roles
 
-| Role | Description | Assignable? |
-|------|-------------|-------------|
-| **Owner** | Full access — reserved for the directory creator | No (implicit) |
-| **Manager** | Can invite/remove members, edit content, trigger generation | Yes |
-| **Editor** | Can edit content and items, cannot manage members | Yes |
-| **Viewer** | Read-only access | Yes |
+| Role        | Description                                                 | Assignable?   |
+| ----------- | ----------------------------------------------------------- | ------------- |
+| **Owner**   | Full access — reserved for the directory creator            | No (implicit) |
+| **Manager** | Can invite/remove members, edit content, trigger generation | Yes           |
+| **Editor**  | Can edit content and items, cannot manage members           | Yes           |
+| **Viewer**  | Read-only access                                            | Yes           |
 
 The directory creator is always the Owner and does not appear in the members list. Ownership cannot be transferred.
 
 ### Permission Matrix
 
-| Action | Owner | Manager | Editor | Viewer |
-|--------|:-----:|:-------:|:------:|:------:|
-| View directory, items, and taxonomy | Yes | Yes | Yes | Yes |
-| View member list | Yes | Yes | Yes | Yes |
-| Edit content (items, taxonomy, settings) | Yes | Yes | Yes | — |
-| Trigger AI generation | Yes | Yes | Yes | — |
-| Manage schedules and advanced prompts | Yes | Yes | Yes | — |
-| Invite and remove members | Yes | Yes | — | — |
-| Update member roles | Yes | Yes | — | — |
-| Delete the directory | Yes | — | — | — |
-| Leave the directory | — | Yes | Yes | Yes |
+| Action                                   | Owner | Manager | Editor | Viewer |
+| ---------------------------------------- | :---: | :-----: | :----: | :----: |
+| View directory, items, and taxonomy      |  Yes  |   Yes   |  Yes   |  Yes   |
+| View member list                         |  Yes  |   Yes   |  Yes   |  Yes   |
+| Edit content (items, taxonomy, settings) |  Yes  |   Yes   |  Yes   |   —    |
+| Trigger AI generation                    |  Yes  |   Yes   |  Yes   |   —    |
+| Manage schedules and advanced prompts    |  Yes  |   Yes   |  Yes   |   —    |
+| Invite and remove members                |  Yes  |   Yes   |   —    |   —    |
+| Update member roles                      |  Yes  |   Yes   |   —    |   —    |
+| Delete the directory                     |  Yes  |    —    |   —    |   —    |
+| Leave the directory                      |   —   |   Yes   |  Yes   |  Yes   |
 
 ## How Invitation Works
 
@@ -51,9 +51,9 @@ All endpoints require JWT authentication. Base path: `/api/directories/:director
 
 ### List Members
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| `GET` | `/api/directories/:id/members` | List all members and the owner |
+| Method | Endpoint                       | Description                    |
+| ------ | ------------------------------ | ------------------------------ |
+| `GET`  | `/api/directories/:id/members` | List all members and the owner |
 
 ```bash
 curl http://localhost:3100/api/directories/<directory-id>/members \
@@ -64,23 +64,23 @@ curl http://localhost:3100/api/directories/<directory-id>/members \
 
 ```json
 {
-  "status": "success",
-  "members": [
-    {
-      "id": "<membership-uuid>",
-      "userId": "<user-uuid>",
-      "username": "alice",
-      "email": "alice@example.com",
-      "role": "editor",
-      "invitedBy": { "id": "<user-uuid>", "username": "bob" },
-      "createdAt": "2026-02-15T10:00:00.000Z"
-    }
-  ],
-  "owner": {
-    "id": "<user-uuid>",
-    "username": "bob",
-    "email": "bob@example.com"
-  }
+	"status": "success",
+	"members": [
+		{
+			"id": "<membership-uuid>",
+			"userId": "<user-uuid>",
+			"username": "alice",
+			"email": "alice@example.com",
+			"role": "editor",
+			"invitedBy": { "id": "<user-uuid>", "username": "bob" },
+			"createdAt": "2026-02-15T10:00:00.000Z"
+		}
+	],
+	"owner": {
+		"id": "<user-uuid>",
+		"username": "bob",
+		"email": "bob@example.com"
+	}
 }
 ```
 
@@ -88,8 +88,8 @@ The `owner` field always shows the directory creator. The `members` array contai
 
 ### Invite a Member
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
+| Method | Endpoint                       | Description            |
+| ------ | ------------------------------ | ---------------------- |
 | `POST` | `/api/directories/:id/members` | Invite a user by email |
 
 **Required role:** Manager or Owner
@@ -106,31 +106,31 @@ curl -X POST http://localhost:3100/api/directories/<directory-id>/members \
 
 **Request body:**
 
-| Field | Type | Required | Description |
-|-------|------|----------|-------------|
-| `email` | string | Yes | Email of the user to invite (must have an existing account) |
-| `role` | string | Yes | `manager`, `editor`, or `viewer` |
+| Field   | Type   | Required | Description                                                 |
+| ------- | ------ | -------- | ----------------------------------------------------------- |
+| `email` | string | Yes      | Email of the user to invite (must have an existing account) |
+| `role`  | string | Yes      | `manager`, `editor`, or `viewer`                            |
 
 **Errors:**
 
-| Status | Reason |
-|--------|--------|
-| `400` | Role is `owner` or invalid |
-| `400` | Email belongs to the directory creator |
-| `400` | User is already a member |
-| `404` | No registered user found for that email |
+| Status | Reason                                  |
+| ------ | --------------------------------------- |
+| `400`  | Role is `owner` or invalid              |
+| `400`  | Email belongs to the directory creator  |
+| `400`  | User is already a member                |
+| `404`  | No registered user found for that email |
 
 ### Get Member
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| `GET` | `/api/directories/:id/members/:memberId` | Get a single member's details |
+| Method | Endpoint                                 | Description                   |
+| ------ | ---------------------------------------- | ----------------------------- |
+| `GET`  | `/api/directories/:id/members/:memberId` | Get a single member's details |
 
 ### Update Member Role
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| `PUT` | `/api/directories/:id/members/:memberId` | Change a member's role |
+| Method | Endpoint                                 | Description            |
+| ------ | ---------------------------------------- | ---------------------- |
+| `PUT`  | `/api/directories/:id/members/:memberId` | Change a member's role |
 
 **Required role:** Manager or Owner
 
@@ -143,8 +143,8 @@ curl -X PUT http://localhost:3100/api/directories/<directory-id>/members/<member
 
 ### Remove a Member
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
+| Method   | Endpoint                                 | Description                        |
+| -------- | ---------------------------------------- | ---------------------------------- |
 | `DELETE` | `/api/directories/:id/members/:memberId` | Remove a member from the directory |
 
 **Required role:** Manager or Owner
@@ -156,8 +156,8 @@ curl -X DELETE http://localhost:3100/api/directories/<directory-id>/members/<mem
 
 ### Leave a Directory
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
+| Method | Endpoint                             | Description                           |
+| ------ | ------------------------------------ | ------------------------------------- |
 | `POST` | `/api/directories/:id/members/leave` | Leave a directory you are a member of |
 
 ```bash

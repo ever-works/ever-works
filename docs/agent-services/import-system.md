@@ -1,7 +1,7 @@
 ---
 id: import-system
-title: "Import System Deep Dive"
-sidebar_label: "Import System"
+title: 'Import System Deep Dive'
+sidebar_label: 'Import System'
 sidebar_position: 18
 ---
 
@@ -51,10 +51,10 @@ ImportModule
 
 The `parseGitUrl()` method supports multiple git providers:
 
-| Provider | URL Pattern |
-|----------|-------------|
-| GitHub | `https://github.com/{owner}/{repo}` |
-| GitLab | `https://gitlab.com/{owner}/{repo}` |
+| Provider  | URL Pattern                            |
+| --------- | -------------------------------------- |
+| GitHub    | `https://github.com/{owner}/{repo}`    |
+| GitLab    | `https://gitlab.com/{owner}/{repo}`    |
 | Bitbucket | `https://bitbucket.org/{owner}/{repo}` |
 
 All patterns handle optional `.git` suffixes and trailing slashes.
@@ -63,12 +63,12 @@ All patterns handle optional `.git` suffixes and trailing slashes.
 
 The `analyzeRepository()` method inspects repository contents to determine the source type:
 
-| Detection | Criteria | Result Type |
-|-----------|----------|-------------|
-| Data Repository | Has `config.yml`/`config.yaml` AND `data/` directory | `data_repo` |
-| Awesome List | Has `README.md` with section headers + list links (5+ items) | `awesome_readme` |
-| Multi-file Awesome | Has `README.md` with 3+ internal directory links | `awesome_readme` |
-| Unrecognized | None of the above | `null` |
+| Detection          | Criteria                                                     | Result Type      |
+| ------------------ | ------------------------------------------------------------ | ---------------- |
+| Data Repository    | Has `config.yml`/`config.yaml` AND `data/` directory         | `data_repo`      |
+| Awesome List       | Has `README.md` with section headers + list links (5+ items) | `awesome_readme` |
+| Multi-file Awesome | Has `README.md` with 3+ internal directory links             | `awesome_readme` |
+| Unrecognized       | None of the above                                            | `null`           |
 
 ### Ecosystem Detection
 
@@ -85,18 +85,21 @@ For non-data repos, the service detects the "directory ecosystem" by looking for
 The parser processes Awesome List READMEs in three stages:
 
 **Stage 1: Category Extraction**
+
 - Splits large READMEs into chunks (8,000 chars each) if needed
 - Sends each chunk to AI with the `CATEGORY_EXTRACTION_PROMPT`
 - Deduplicates categories by ID across chunks
 - Falls back to regex-based header extraction if AI fails
 
 **Stage 2: Item Extraction**
+
 - Splits README into sections based on extracted categories
 - For each section, sends content to AI with the `ITEM_EXTRACTION_PROMPT`
 - Large sections are further chunked (6,000 chars with 200-char overlap)
 - Processes chunks with a 500ms delay between batches to avoid rate limiting
 
 **Stage 3: Finalization**
+
 - Extracts unique tags from all items
 - Deduplicates items by name + source URL combination
 - Merges tags from duplicate items
@@ -107,8 +110,8 @@ The parser tracks AI token usage and cost through an accumulator pattern:
 
 ```typescript
 interface MetricsAccumulator {
-    total_tokens_used: number;
-    total_cost: number;
+	total_tokens_used: number;
+	total_cost: number;
 }
 ```
 
@@ -117,6 +120,7 @@ These metrics are returned in the `ParsedAwesomeData` response for billing and m
 ### Fallback Category Extraction
 
 If AI-based category extraction fails, the service falls back to regex-based extraction that:
+
 - Finds all H2/H3 markdown headers
 - Filters out meta sections (Contents, Contributing, License, Authors, etc.)
 - Generates slugified IDs from header text
@@ -127,11 +131,11 @@ If AI-based category extraction fails, the service falls back to regex-based ext
 
 The `executeBySourceType()` method routes to the appropriate import strategy based on `ImportSourceType`:
 
-| Source Type | Strategy Method | Requires Token |
-|-------------|----------------|----------------|
-| `data_repo` | `importFromDataRepo()` | Yes |
-| `awesome_readme` | `importFromAwesomeReadme()` | Optional |
-| `link_existing` | `linkExistingDataRepo()` | Yes |
+| Source Type      | Strategy Method             | Requires Token |
+| ---------------- | --------------------------- | -------------- |
+| `data_repo`      | `importFromDataRepo()`      | Yes            |
+| `awesome_readme` | `importFromAwesomeReadme()` | Optional       |
+| `link_existing`  | `linkExistingDataRepo()`    | Yes            |
 
 ### Data Repo Import Flow
 
@@ -157,14 +161,14 @@ The `executeBySourceType()` method routes to the appropriate import strategy bas
 
 All import strategies return `DirectoryImportResult` with typed error codes:
 
-| Error Code | Meaning |
-|------------|---------|
-| `PARSE_FAILED` | Could not parse README or no items found |
-| `CLONE_FAILED` | Git clone/pull operation failed |
-| `REPO_ACCESS_DENIED` | Token missing or insufficient permissions |
-| `CREATE_REPO_FAILED` | Failed to initialize data repository |
-| `AI_EXTRACTION_FAILED` | AI-based extraction failed |
-| `GENERATION_FAILED` | Data generation step failed |
+| Error Code             | Meaning                                   |
+| ---------------------- | ----------------------------------------- |
+| `PARSE_FAILED`         | Could not parse README or no items found  |
+| `CLONE_FAILED`         | Git clone/pull operation failed           |
+| `REPO_ACCESS_DENIED`   | Token missing or insufficient permissions |
+| `CREATE_REPO_FAILED`   | Failed to initialize data repository      |
+| `AI_EXTRACTION_FAILED` | AI-based extraction failed                |
+| `GENERATION_FAILED`    | Data generation step failed               |
 
 ## Database Interactions
 
@@ -184,44 +188,38 @@ The Import System does not emit events directly. Events are emitted by the orche
 
 ```typescript
 // Analyze a repository
-const analysis = await sourceRepoAnalyzer.analyzeRepository(
-    'https://github.com/sindresorhus/awesome-nodejs',
-    token,
-);
+const analysis = await sourceRepoAnalyzer.analyzeRepository('https://github.com/sindresorhus/awesome-nodejs', token);
 // analysis.detectedType === 'awesome_readme'
 // analysis.structure.itemCount === 150
 
 // Parse an awesome readme
-const parsed = await awesomeReadmeParser.parseReadme(
-    readmeContent,
-    { userId: user.id, directoryId: directory.id },
-);
+const parsed = await awesomeReadmeParser.parseReadme(readmeContent, { userId: user.id, directoryId: directory.id });
 // parsed.items.length === 150
 // parsed.categories.length === 20
 // parsed.metrics.total_tokens_used === 45000
 
 // Execute a full import
 const result = await importExecutor.executeBySourceType({
-    directory,
-    user,
-    sourceType: 'awesome_readme',
-    sourceOwner: 'sindresorhus',
-    sourceRepo: 'awesome-nodejs',
-    sourceUrl: 'https://github.com/sindresorhus/awesome-nodejs',
-    token,
+	directory,
+	user,
+	sourceType: 'awesome_readme',
+	sourceOwner: 'sindresorhus',
+	sourceRepo: 'awesome-nodejs',
+	sourceUrl: 'https://github.com/sindresorhus/awesome-nodejs',
+	token
 });
 // result.success === true, result.itemsImported === 150
 ```
 
 ## Configuration
 
-| Setting | Value | Description |
-|---------|-------|-------------|
-| `MAX_CHUNK_SIZE` | 6,000 chars | Maximum size for item extraction chunks |
-| `CHUNK_OVERLAP` | 200 chars | Overlap between adjacent chunks |
-| `CATEGORY_CHUNK_SIZE` | 8,000 chars | Maximum size for category extraction chunks |
-| `BATCH_DELAY_MS` | 500ms | Delay between AI calls to avoid rate limiting |
-| AI temperature | 0.1 | Low temperature for consistent extraction results |
+| Setting               | Value       | Description                                       |
+| --------------------- | ----------- | ------------------------------------------------- |
+| `MAX_CHUNK_SIZE`      | 6,000 chars | Maximum size for item extraction chunks           |
+| `CHUNK_OVERLAP`       | 200 chars   | Overlap between adjacent chunks                   |
+| `CATEGORY_CHUNK_SIZE` | 8,000 chars | Maximum size for category extraction chunks       |
+| `BATCH_DELAY_MS`      | 500ms       | Delay between AI calls to avoid rate limiting     |
+| AI temperature        | 0.1         | Low temperature for consistent extraction results |
 
 ## Related Services
 

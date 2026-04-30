@@ -19,27 +19,27 @@ The Ever Works Platform provides the backend infrastructure for building, genera
 
 ## Technology Stack
 
-| Layer | Technology | Version |
-|-------|-----------|---------|
-| Runtime | Node.js, TypeScript | 20+ |
-| API Framework | NestJS | 11 |
-| Web Dashboard | Next.js (App Router), React, Tailwind CSS | 16 |
-| Database ORM | TypeORM | 0.3.28 |
-| AI / LLM | LangChain (@langchain/openai, @langchain/core) | 0.3.80 |
-| Monorepo | Turborepo | 2.x |
-| Package Manager | pnpm | 10.x (requires 9.9.0+) |
-| Background Jobs | Trigger.dev | — |
-| Monitoring | Sentry, PostHog | — |
-| Git Operations | isomorphic-git, Octokit | — |
-| Search | Tavily | — |
+| Layer           | Technology                                     | Version                |
+| --------------- | ---------------------------------------------- | ---------------------- |
+| Runtime         | Node.js, TypeScript                            | 20+                    |
+| API Framework   | NestJS                                         | 11                     |
+| Web Dashboard   | Next.js (App Router), React, Tailwind CSS      | 16                     |
+| Database ORM    | TypeORM                                        | 0.3.28                 |
+| AI / LLM        | LangChain (@langchain/openai, @langchain/core) | 0.3.80                 |
+| Monorepo        | Turborepo                                      | 2.x                    |
+| Package Manager | pnpm                                           | 10.x (requires 9.9.0+) |
+| Background Jobs | Trigger.dev                                    | —                      |
+| Monitoring      | Sentry, PostHog                                | —                      |
+| Git Operations  | isomorphic-git, Octokit                        | —                      |
+| Search          | Tavily                                         | —                      |
 
 ## Key Repositories
 
-| Repository | Description |
-|-----------|-------------|
-| `ever-works` | Platform monorepo — API, web dashboard, CLI, AI agents, shared packages |
-| `ever-works-website-template` | Next.js template used by generated directory websites |
-| `ever-works-docs` | This documentation site |
+| Repository                    | Description                                                             |
+| ----------------------------- | ----------------------------------------------------------------------- |
+| `ever-works`                  | Platform monorepo — API, web dashboard, CLI, AI agents, shared packages |
+| `ever-works-website-template` | Next.js template used by generated directory websites                   |
+| `ever-works-docs`             | This documentation site                                                 |
 
 ## AI Providers
 
@@ -58,4 +58,4 @@ See [AI & Generation](/ai-agents) for details.
 
 ## Plugin System
 
-The platform uses a **capability-driven plugin architecture**. All external integrations — AI providers, search engines, deployment, screenshots, and more — are implemented as plugins. The platform ships with **30 plugins** across multiple categories, and new plugins can be added without modifying core code. See [Plugin System](/plugin-system) for details.
+The platform uses a **capability-driven plugin architecture**. All external integrations — AI providers, search engines, deployment, screenshots, and more — are implemented as plugins. The platform ships with **39 plugins** across multiple categories, and new plugins can be added without modifying core code. See [Plugin System](/plugin-system) for details.

@@ -1,7 +1,7 @@
 ---
 id: valyu-plugin
-title: "Valyu Plugin"
-sidebar_label: "Valyu"
+title: 'Valyu Plugin'
+sidebar_label: 'Valyu'
 sidebar_position: 42
 ---
 
@@ -13,17 +13,17 @@ The Valyu plugin provides AI-native search and content extraction across web and
 
 ## Overview
 
-| Property | Value |
-|---|---|
-| Plugin ID | `valyu` |
-| Category | `search` |
-| Capabilities | `search`, `content-extractor` |
-| Version | `1.0.0` |
-| Configuration Mode | `hybrid` |
-| Auto-enable | No |
-| Built-in | Yes |
-| System Plugin | No |
-| Dependencies | `valyu-js` |
+| Property           | Value                         |
+| ------------------ | ----------------------------- |
+| Plugin ID          | `valyu`                       |
+| Category           | `search`                      |
+| Capabilities       | `search`, `content-extractor` |
+| Version            | `1.0.0`                       |
+| Configuration Mode | `hybrid`                      |
+| Auto-enable        | No                            |
+| Built-in           | Yes                           |
+| System Plugin      | No                            |
+| Dependencies       | `valyu-js`                    |
 
 The plugin implements `IPlugin`, `ISearchPlugin`, and `IContentExtractorPlugin`. This dual-capability design means a single Valyu API key provides both search and content extraction, reducing the number of services you need to configure.
 
@@ -54,24 +54,24 @@ Both capabilities share the same API client and credentials.
 
 ### Settings Schema
 
-| Setting | Type | Required | Default | Scope | Description |
-|---|---|---|---|---|---|
-| `apiKey` | `string` | Yes | -- | `user` | Valyu API key (secret) |
-| `responseLength` | `string` | No | `"medium"` | -- | Content volume per result |
+| Setting          | Type     | Required | Default    | Scope  | Description               |
+| ---------------- | -------- | -------- | ---------- | ------ | ------------------------- |
+| `apiKey`         | `string` | Yes      | --         | `user` | Valyu API key (secret)    |
+| `responseLength` | `string` | No       | `"medium"` | --     | Content volume per result |
 
 ### Response Length Options
 
-| Value | Approximate Characters |
-|---|---|
-| `short` | ~25,000 |
-| `medium` | ~50,000 |
-| `large` | ~100,000 |
-| `max` | Unlimited |
+| Value    | Approximate Characters |
+| -------- | ---------------------- |
+| `short`  | ~25,000                |
+| `medium` | ~50,000                |
+| `large`  | ~100,000               |
+| `max`    | Unlimited              |
 
 ### Environment Variables
 
-| Variable | Description |
-|---|---|
+| Variable               | Description      |
+| ---------------------- | ---------------- |
 | `PLUGIN_VALYU_API_KEY` | API key fallback |
 
 ## Search
@@ -88,41 +88,41 @@ Searches across all Valyu data sources (web, proprietary, and news) using `searc
 
 The plugin maps standard `SearchOptions` to Valyu-specific parameters:
 
-| SearchOptions Field | Valyu Parameter | Description |
-|---|---|---|
-| `query` | First argument | The search query string |
-| `limit` | `maxNumResults` | Maximum results (default: 20) |
-| `includeDomains` | `includedSources` | Restrict to specific domains |
-| `excludeDomains` | `excludeSources` | Exclude specific domains |
-| `region` | `countryCode` | Country code filter (uppercased) |
-| `timeRange` | `startDate` / `endDate` | Date range filter |
+| SearchOptions Field | Valyu Parameter         | Description                      |
+| ------------------- | ----------------------- | -------------------------------- |
+| `query`             | First argument          | The search query string          |
+| `limit`             | `maxNumResults`         | Maximum results (default: 20)    |
+| `includeDomains`    | `includedSources`       | Restrict to specific domains     |
+| `excludeDomains`    | `excludeSources`        | Exclude specific domains         |
+| `region`            | `countryCode`           | Country code filter (uppercased) |
+| `timeRange`         | `startDate` / `endDate` | Date range filter                |
 
 ### Time Range Filtering
 
 The plugin converts the standard `timeRange` values to date ranges:
 
-| Time Range | Start Date |
-|---|---|
-| `day` | 1 day ago |
-| `week` | 7 days ago |
-| `month` | 1 month ago |
-| `year` | 1 year ago |
-| `all` | No filter |
+| Time Range | Start Date  |
+| ---------- | ----------- |
+| `day`      | 1 day ago   |
+| `week`     | 7 days ago  |
+| `month`    | 1 month ago |
+| `year`     | 1 year ago  |
+| `all`      | No filter   |
 
 ### Search Result Fields
 
 Each result includes:
 
-| Field | Description |
-|---|---|
-| `title` | Page title |
-| `url` | Source URL |
-| `snippet` | Content excerpt |
-| `position` | Result ranking (1-based) |
-| `publishedDate` | Publication date |
-| `metadata.relevanceScore` | Valyu relevance score |
-| `metadata.source` | Source identifier |
-| `metadata.description` | Source description |
+| Field                     | Description              |
+| ------------------------- | ------------------------ |
+| `title`                   | Page title               |
+| `url`                     | Source URL               |
+| `snippet`                 | Content excerpt          |
+| `position`                | Result ranking (1-based) |
+| `publishedDate`           | Publication date         |
+| `metadata.relevanceScore` | Valyu relevance score    |
+| `metadata.source`         | Source identifier        |
+| `metadata.description`    | Source description       |
 
 ## Content Extraction
 
@@ -161,18 +161,18 @@ Valyu is particularly useful when your directory covers academic or specialized 
 
 ## Comparison with Other Search Plugins
 
-| Feature | Valyu | Tavily | Exa | SerpAPI |
-|---|---|---|---|---|
-| Search | Yes | Yes | Yes | Yes |
-| Content extraction | Yes (dual) | Yes (dual) | No | No |
-| Proprietary data sources | Yes | No | No | No |
-| News search | Yes (included) | No | Yes (category) | Yes (engine) |
-| AI-optimized results | Yes | Yes | Yes | No |
-| Response length control | Yes (4 levels) | No | No | No |
-| Domain filtering | Include or exclude | Include only | Include or exclude | Site prefix |
-| Date filtering | Date range | No | No | No |
-| Relevance scoring | Yes | Yes | Yes | No |
-| Batch extraction | Yes (groups of 10) | No | No | No |
+| Feature                  | Valyu              | Tavily       | Exa                | SerpAPI      |
+| ------------------------ | ------------------ | ------------ | ------------------ | ------------ |
+| Search                   | Yes                | Yes          | Yes                | Yes          |
+| Content extraction       | Yes (dual)         | Yes (dual)   | No                 | No           |
+| Proprietary data sources | Yes                | No           | No                 | No           |
+| News search              | Yes (included)     | No           | Yes (category)     | Yes (engine) |
+| AI-optimized results     | Yes                | Yes          | Yes                | No           |
+| Response length control  | Yes (4 levels)     | No           | No                 | No           |
+| Domain filtering         | Include or exclude | Include only | Include or exclude | Site prefix  |
+| Date filtering           | Date range         | No           | No                 | No           |
+| Relevance scoring        | Yes                | Yes          | Yes                | No           |
+| Batch extraction         | Yes (groups of 10) | No           | No                 | No           |
 
 Valyu stands out with its multi-source search across web, proprietary, and news data, along with configurable response length. Tavily offers a similar dual-capability design but without proprietary data access.
 
@@ -182,15 +182,18 @@ Valyu stands out with its multi-source search across web, proprietary, and news 
 
 ```typescript
 class ValyuSearchPlugin implements IPlugin, ISearchPlugin, IContentExtractorPlugin {
-  readonly id: 'valyu';
-  readonly category: 'search';
+	readonly id: 'valyu';
+	readonly category: 'search';
 
-  search(options: SearchOptions): Promise<SearchResponse>;
-  extract(options: ContentExtractionOptions): Promise<ContentExtractionResult>;
-  extractBatch(urls: readonly string[], options?: Partial<ContentExtractionOptions>): Promise<readonly ContentExtractionResult[]>;
-  canExtract(url: string): Promise<boolean>;
-  getSupportedFormats(): readonly ('text' | 'html' | 'markdown')[];
-  getRateLimitInfo(): Promise<RateLimitInfo>;
+	search(options: SearchOptions): Promise<SearchResponse>;
+	extract(options: ContentExtractionOptions): Promise<ContentExtractionResult>;
+	extractBatch(
+		urls: readonly string[],
+		options?: Partial<ContentExtractionOptions>
+	): Promise<readonly ContentExtractionResult[]>;
+	canExtract(url: string): Promise<boolean>;
+	getSupportedFormats(): readonly ('text' | 'html' | 'markdown')[];
+	getRateLimitInfo(): Promise<RateLimitInfo>;
 }
 ```
 
@@ -204,10 +207,10 @@ class ValyuSearchPlugin implements IPlugin, ISearchPlugin, IContentExtractorPlug
 
 ## Troubleshooting
 
-| Issue | Cause | Solution |
-|---|---|---|
-| "API key not configured" | Missing credentials | Set the API key in plugin settings or via environment variable |
-| No search results | Query too specific or restrictive filters | Broaden the query or remove domain/date filters |
-| Empty content extraction | Target page blocks automated access | Try a different content extractor (e.g., Firecrawl) |
-| Batch extraction partial failures | Some URLs are inaccessible | Check individual result `success` fields for per-URL status |
-| Large response sizes | `responseLength` set too high | Use `"short"` or `"medium"` for faster responses |
+| Issue                             | Cause                                     | Solution                                                       |
+| --------------------------------- | ----------------------------------------- | -------------------------------------------------------------- |
+| "API key not configured"          | Missing credentials                       | Set the API key in plugin settings or via environment variable |
+| No search results                 | Query too specific or restrictive filters | Broaden the query or remove domain/date filters                |
+| Empty content extraction          | Target page blocks automated access       | Try a different content extractor (e.g., Firecrawl)            |
+| Batch extraction partial failures | Some URLs are inaccessible                | Check individual result `success` fields for per-URL status    |
+| Large response sizes              | `responseLength` set too high             | Use `"short"` or `"medium"` for faster responses               |

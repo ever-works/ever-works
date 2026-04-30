@@ -1,7 +1,7 @@
 ---
 id: cohere-plugin
-title: "Cohere Models via OpenRouter"
-sidebar_label: "Cohere (via OpenRouter)"
+title: 'Cohere Models via OpenRouter'
+sidebar_label: 'Cohere (via OpenRouter)'
 sidebar_position: 38
 ---
 
@@ -11,10 +11,10 @@ Ever Works does not ship a standalone Cohere plugin. Cohere models, including th
 
 **Related source files:**
 
-| File | Purpose |
-|---|---|
-| `packages/plugins/openrouter/src/openrouter.plugin.ts` | OpenRouter AI provider plugin |
-| `packages/plugin/src/ai/reasoning.utils.ts` | Reasoning configuration utilities |
+| File                                                   | Purpose                           |
+| ------------------------------------------------------ | --------------------------------- |
+| `packages/plugins/openrouter/src/openrouter.plugin.ts` | OpenRouter AI provider plugin     |
+| `packages/plugin/src/ai/reasoning.utils.ts`            | Reasoning configuration utilities |
 
 ## What is Cohere?
 
@@ -24,12 +24,12 @@ Cohere is an enterprise AI platform that offers models optimized for business ap
 
 Cohere models are available on OpenRouter with the `cohere/` prefix:
 
-| Model ID (OpenRouter) | Description | Strengths |
-|---|---|---|
-| `cohere/command-r-plus` | Command R+ | Highest quality, RAG-optimized |
-| `cohere/command-r` | Command R | Balanced quality and cost |
-| `cohere/command` | Command | Cost-effective for simpler tasks |
-| `cohere/command-light` | Command Light | Fastest, lowest cost |
+| Model ID (OpenRouter)   | Description   | Strengths                        |
+| ----------------------- | ------------- | -------------------------------- |
+| `cohere/command-r-plus` | Command R+    | Highest quality, RAG-optimized   |
+| `cohere/command-r`      | Command R     | Balanced quality and cost        |
+| `cohere/command`        | Command       | Cost-effective for simpler tasks |
+| `cohere/command-light`  | Command Light | Fastest, lowest cost             |
 
 :::note
 Model availability on OpenRouter changes over time. Check [openrouter.ai/models](https://openrouter.ai/models) for the current list of available Cohere models and pricing.
@@ -39,13 +39,13 @@ Model availability on OpenRouter changes over time. Check [openrouter.ai/models]
 
 Cohere models have specific strengths relevant to directory generation:
 
-| Strength | Benefit for Ever Works |
-|---|---|
-| **RAG optimization** | Excels at generating content from source material |
-| **Multilingual support** | Strong performance across many languages |
-| **Structured output** | Reliable JSON generation for item data |
-| **Grounding** | Can cite sources when generating content |
-| **Enterprise focus** | Consistent, reliable output quality |
+| Strength                 | Benefit for Ever Works                            |
+| ------------------------ | ------------------------------------------------- |
+| **RAG optimization**     | Excels at generating content from source material |
+| **Multilingual support** | Strong performance across many languages          |
+| **Structured output**    | Reliable JSON generation for item data            |
+| **Grounding**            | Can cite sources when generating content          |
+| **Enterprise focus**     | Consistent, reliable output quality               |
 
 ## Configuration
 
@@ -56,12 +56,12 @@ Cohere models have specific strengths relevant to directory generation:
 3. Enter your OpenRouter API key.
 4. Set model fields to Cohere model IDs:
 
-| Setting | Recommended Value |
-|---|---|
-| Default Model | `cohere/command-r` |
-| Simple Tasks Model | `cohere/command-light` |
-| Standard Tasks Model | `cohere/command-r` |
-| Complex Tasks Model | `cohere/command-r-plus` |
+| Setting              | Recommended Value       |
+| -------------------- | ----------------------- |
+| Default Model        | `cohere/command-r`      |
+| Simple Tasks Model   | `cohere/command-light`  |
+| Standard Tasks Model | `cohere/command-r`      |
+| Complex Tasks Model  | `cohere/command-r-plus` |
 
 ### Environment Variables
 
@@ -105,22 +105,22 @@ graph LR
 
 Combine Cohere with other providers for optimal cost-quality balance:
 
-| Tier | Model | Provider | Rationale |
-|---|---|---|---|
-| Simple | `openai/gpt-5-nano` | OpenAI | Fastest for tags |
-| Standard | `cohere/command-r` | Cohere | Strong at structured content |
-| Complex | `cohere/command-r-plus` | Cohere | RAG-optimized for source-based generation |
+| Tier     | Model                   | Provider | Rationale                                 |
+| -------- | ----------------------- | -------- | ----------------------------------------- |
+| Simple   | `openai/gpt-5-nano`     | OpenAI   | Fastest for tags                          |
+| Standard | `cohere/command-r`      | Cohere   | Strong at structured content              |
+| Complex  | `cohere/command-r-plus` | Cohere   | RAG-optimized for source-based generation |
 
 ## Capabilities
 
-| Capability | Command R+ | Command R | Command Light |
-|---|---|---|---|
-| Structured output | Yes | Yes | Yes |
-| Streaming | Yes | Yes | Yes |
-| Tool calling | Yes | Yes | Limited |
-| Vision | No | No | No |
-| Embeddings | No (via OpenRouter) | No (via OpenRouter) | No |
-| Multilingual | Strong | Strong | Good |
+| Capability        | Command R+          | Command R           | Command Light |
+| ----------------- | ------------------- | ------------------- | ------------- |
+| Structured output | Yes                 | Yes                 | Yes           |
+| Streaming         | Yes                 | Yes                 | Yes           |
+| Tool calling      | Yes                 | Yes                 | Limited       |
+| Vision            | No                  | No                  | No            |
+| Embeddings        | No (via OpenRouter) | No (via OpenRouter) | No            |
+| Multilingual      | Strong              | Strong              | Good          |
 
 ### Embedding Limitation
 
@@ -132,15 +132,15 @@ Cohere offers embedding models (e.g., `embed-english-v3.0`), but these are not c
 
 ## Comparison with Other Providers
 
-| Aspect | Cohere (via OpenRouter) | OpenAI (direct) | Anthropic (direct) |
-|---|---|---|---|
-| Setup | OpenRouter key | OpenAI key | Anthropic key |
-| RAG optimization | Strong | Good | Good |
-| Multilingual | Very strong | Good | Good |
-| Structured output | Reliable | Very reliable | Reliable |
-| Vision | No | Yes (GPT-4o+) | Yes (Claude) |
-| Embeddings | Not via OpenRouter | Yes | No |
-| Cost | Moderate | Varies by model | Varies by model |
+| Aspect            | Cohere (via OpenRouter) | OpenAI (direct) | Anthropic (direct) |
+| ----------------- | ----------------------- | --------------- | ------------------ |
+| Setup             | OpenRouter key          | OpenAI key      | Anthropic key      |
+| RAG optimization  | Strong                  | Good            | Good               |
+| Multilingual      | Very strong             | Good            | Good               |
+| Structured output | Reliable                | Very reliable   | Reliable           |
+| Vision            | No                      | Yes (GPT-4o+)   | Yes (Claude)       |
+| Embeddings        | Not via OpenRouter      | Yes             | No                 |
+| Cost              | Moderate                | Varies by model | Varies by model    |
 
 ## Use Cases for Cohere in Directories
 
@@ -158,14 +158,14 @@ Cohere models reliably produce structured JSON output, which is critical for gen
 
 ## Troubleshooting
 
-| Issue | Cause | Solution |
-|---|---|---|
-| Model not found | Model ID incorrect or model discontinued | Verify at openrouter.ai/models |
-| Authentication error | Invalid OpenRouter API key | Regenerate key at openrouter.ai |
-| Rate limit exceeded | Too many requests | Check OpenRouter plan limits |
-| Poor multilingual output | Wrong model selected | Use Command R or Command R+ for multilingual |
-| Embedding request fails | Cohere embeddings not available via OpenRouter | Use OpenAI or Ollama for embeddings |
-| JSON parsing errors | Structured output not enforced | Ensure pipeline uses structured output mode |
+| Issue                    | Cause                                          | Solution                                     |
+| ------------------------ | ---------------------------------------------- | -------------------------------------------- |
+| Model not found          | Model ID incorrect or model discontinued       | Verify at openrouter.ai/models               |
+| Authentication error     | Invalid OpenRouter API key                     | Regenerate key at openrouter.ai              |
+| Rate limit exceeded      | Too many requests                              | Check OpenRouter plan limits                 |
+| Poor multilingual output | Wrong model selected                           | Use Command R or Command R+ for multilingual |
+| Embedding request fails  | Cohere embeddings not available via OpenRouter | Use OpenAI or Ollama for embeddings          |
+| JSON parsing errors      | Structured output not enforced                 | Ensure pipeline uses structured output mode  |
 
 ## Further Reading
 

@@ -1,7 +1,7 @@
 ---
 id: ollama-plugin
-title: "Ollama Plugin"
-sidebar_label: "Ollama"
+title: 'Ollama Plugin'
+sidebar_label: 'Ollama'
 sidebar_position: 23
 ---
 
@@ -13,17 +13,17 @@ The Ollama plugin connects Ever Works to a local or remote [Ollama](https://olla
 
 ## Overview
 
-| Property | Value |
-|---|---|
-| Plugin ID | `ollama` |
-| Category | `ai-provider` |
-| Capabilities | `ai-provider` |
-| Version | `1.0.0` |
+| Property           | Value           |
+| ------------------ | --------------- |
+| Plugin ID          | `ollama`        |
+| Category           | `ai-provider`   |
+| Capabilities       | `ai-provider`   |
+| Version            | `1.0.0`         |
 | Configuration Mode | `user-required` |
-| Provider Type | `ollama` |
-| Auto-enable | No |
-| Built-in | Yes |
-| Visibility | `public` |
+| Provider Type      | `ollama`        |
+| Auto-enable        | No              |
+| Built-in           | Yes             |
+| Visibility         | `public`        |
 
 The plugin extends `BaseAiProvider` from `@ever-works/plugin/abstract` and creates an `AiOperations` instance from `@ever-works/plugin/ai` to handle all AI operations through a unified LangChain-based abstraction. Unlike cloud-hosted providers, Ollama typically does not require an API key.
 
@@ -44,16 +44,16 @@ The plugin talks to Ollama through its OpenAI-compatible `/v1` API endpoint. Thi
 
 ### Settings Schema
 
-| Setting | Type | Default | Scope | Description |
-|---|---|---|---|---|
-| `baseUrl` | `string` | `http://localhost:11434/v1` | `user` | Address of the Ollama instance |
-| `apiKey` | `string` | `ollama` | `user` | Only needed for secured Ollama instances |
-| `defaultModel` | `string` | `ministral-3:8b` | `global` | Used for all AI tasks unless a tier-specific model is set |
-| `simpleModel` | `string` | `ministral-3:8b` | `global` | Handles tags, short descriptions, and quick classifications |
-| `mediumModel` | `string` | `ministral-3:8b` | `global` | Handles listings, summaries, and content reformatting |
-| `complexModel` | `string` | `ministral-3:8b` | `global` | Handles full page generation and multi-step analysis |
-| `temperature` | `number` | `0.7` | hidden | Controls output randomness (0 = deterministic, 2 = creative) |
-| `maxTokens` | `number` | `4096` | hidden | Maximum length of each AI-generated response |
+| Setting        | Type     | Default                     | Scope    | Description                                                  |
+| -------------- | -------- | --------------------------- | -------- | ------------------------------------------------------------ |
+| `baseUrl`      | `string` | `http://localhost:11434/v1` | `user`   | Address of the Ollama instance                               |
+| `apiKey`       | `string` | `ollama`                    | `user`   | Only needed for secured Ollama instances                     |
+| `defaultModel` | `string` | `ministral-3:8b`            | `global` | Used for all AI tasks unless a tier-specific model is set    |
+| `simpleModel`  | `string` | `ministral-3:8b`            | `global` | Handles tags, short descriptions, and quick classifications  |
+| `mediumModel`  | `string` | `ministral-3:8b`            | `global` | Handles listings, summaries, and content reformatting        |
+| `complexModel` | `string` | `ministral-3:8b`            | `global` | Handles full page generation and multi-step analysis         |
+| `temperature`  | `number` | `0.7`                       | hidden   | Controls output randomness (0 = deterministic, 2 = creative) |
+| `maxTokens`    | `number` | `4096`                      | hidden   | Maximum length of each AI-generated response                 |
 
 Model fields use the `x-widget: model-select` extension, which renders the model-select dropdown in the dashboard UI. The dropdown is populated by calling `listModels()` against the configured Ollama instance.
 
@@ -66,13 +66,13 @@ Model fields use the `x-widget: model-select` extension, which renders the model
 
 ```json
 {
-    "defaultModel": {
-        "type": "string",
-        "title": "Default Model",
-        "default": "ministral-3:8b",
-        "x-widget": "model-select",
-        "x-scope": "global"
-    }
+	"defaultModel": {
+		"type": "string",
+		"title": "Default Model",
+		"default": "ministral-3:8b",
+		"x-widget": "model-select",
+		"x-scope": "global"
+	}
 }
 ```
 
@@ -92,14 +92,14 @@ getCapabilities(): AiModelCapabilities {
 }
 ```
 
-| Capability | Supported |
-|---|---|
-| Structured output (JSON mode) | Yes |
-| Streaming responses | Yes |
-| Tool calling | Yes |
-| Vision (image input) | Yes |
-| Embeddings | Yes |
-| Max context length | 128,000 tokens |
+| Capability                    | Supported      |
+| ----------------------------- | -------------- |
+| Structured output (JSON mode) | Yes            |
+| Streaming responses           | Yes            |
+| Tool calling                  | Yes            |
+| Vision (image input)          | Yes            |
+| Embeddings                    | Yes            |
+| Max context length            | 128,000 tokens |
 
 Ollama supports embeddings through models such as `nomic-embed-text`. The `createEmbedding()` method delegates to `AiOperations.createEmbedding()`.
 
@@ -126,10 +126,10 @@ flowchart LR
     C --> CM
 ```
 
-| Tier | Use Cases | Recommended Models |
-|---|---|---|
-| Simple | Tags, short descriptions, classifications | `ministral-3:8b`, `gemma2:2b` |
-| Medium | Listings, summaries, content reformatting | `ministral-3:8b`, `llama3.1:8b` |
+| Tier    | Use Cases                                 | Recommended Models              |
+| ------- | ----------------------------------------- | ------------------------------- |
+| Simple  | Tags, short descriptions, classifications | `ministral-3:8b`, `gemma2:2b`   |
+| Medium  | Listings, summaries, content reformatting | `ministral-3:8b`, `llama3.1:8b` |
 | Complex | Full page generation, multi-step analysis | `llama3.1:70b`, `mistral-large` |
 
 If a tier-specific model is not set, the `defaultModel` is used for all tiers.
@@ -160,15 +160,15 @@ The `isAvailable()` method calls `AiOperations.testConnection()` with the resolv
 
 ## API Methods
 
-| Method | Description |
-|---|---|
-| `createChatCompletion(options)` | Single chat completion request |
-| `createStreamingChatCompletion(options)` | Streaming chat completion (async generator) |
-| `createEmbedding(options)` | Generate text embeddings |
-| `listModels(settings)` | List available models from the Ollama instance |
-| `isAvailable(settings)` | Test connection to the Ollama server |
-| `getCapabilities()` | Return supported capabilities |
-| `healthCheck()` | Return plugin health status |
+| Method                                   | Description                                    |
+| ---------------------------------------- | ---------------------------------------------- |
+| `createChatCompletion(options)`          | Single chat completion request                 |
+| `createStreamingChatCompletion(options)` | Streaming chat completion (async generator)    |
+| `createEmbedding(options)`               | Generate text embeddings                       |
+| `listModels(settings)`                   | List available models from the Ollama instance |
+| `isAvailable(settings)`                  | Test connection to the Ollama server           |
+| `getCapabilities()`                      | Return supported capabilities                  |
+| `healthCheck()`                          | Return plugin health status                    |
 
 ## Getting Started
 
@@ -181,10 +181,10 @@ The `isAvailable()` method calls `AiOperations.testConnection()` with the resolv
 
 ## Troubleshooting
 
-| Issue | Cause | Solution |
-|---|---|---|
-| Plugin shows unavailable | Ollama server not running | Start Ollama with `ollama serve` |
-| No models in dropdown | No models pulled | Run `ollama pull <model-name>` |
-| Connection refused | Wrong base URL | Verify the URL includes `/v1` (e.g., `http://localhost:11434/v1`) |
-| Slow responses | Model too large for hardware | Use a smaller model or increase available RAM/VRAM |
-| Embedding errors | Model does not support embeddings | Switch to an embedding model like `nomic-embed-text` |
+| Issue                    | Cause                             | Solution                                                          |
+| ------------------------ | --------------------------------- | ----------------------------------------------------------------- |
+| Plugin shows unavailable | Ollama server not running         | Start Ollama with `ollama serve`                                  |
+| No models in dropdown    | No models pulled                  | Run `ollama pull <model-name>`                                    |
+| Connection refused       | Wrong base URL                    | Verify the URL includes `/v1` (e.g., `http://localhost:11434/v1`) |
+| Slow responses           | Model too large for hardware      | Use a smaller model or increase available RAM/VRAM                |
+| Embedding errors         | Model does not support embeddings | Switch to an embedding model like `nomic-embed-text`              |

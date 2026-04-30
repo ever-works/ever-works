@@ -11,31 +11,41 @@ The Plugin Testing Framework (`@ever-works/plugin/testing`) provides a complete 
 
 ## Package Overview
 
-| Property | Value |
-|---|---|
-| **Import path** | `@ever-works/plugin/testing` |
-| **Location** | `platform/packages/plugin/src/testing/` |
+| Property         | Value                                    |
+| ---------------- | ---------------------------------------- |
+| **Import path**  | `@ever-works/plugin/testing`             |
+| **Location**     | `platform/packages/plugin/src/testing/`  |
 | **Dependencies** | Plugin contracts, plugin lifecycle types |
-| **Used by** | All plugin test suites |
+| **Used by**      | All plugin test suites                   |
 
 ## Module Exports
 
 ```typescript
 export { PluginTestHarness } from './plugin-test-harness.js';
 export {
-    createMockPluginContext, createMockLogger, createMockCache,
-    createMockHttpClient, createMockServices, createMockFn,
+	createMockPluginContext,
+	createMockLogger,
+	createMockCache,
+	createMockHttpClient,
+	createMockServices,
+	createMockFn
 } from './mock-plugin-context.js';
 export {
-    createMockPluginEnvironment, createMockEnvVars,
-    createProductionEnvironment, createDevelopmentEnvironment,
+	createMockPluginEnvironment,
+	createMockEnvVars,
+	createProductionEnvironment,
+	createDevelopmentEnvironment
 } from './mock-plugin-environment.js';
 export {
-    testBasePluginContract, testGitProviderContract,
-    testDeploymentContract, testScreenshotContract,
-    testSearchContract, testAiProviderContract,
-    testPipelineContract, testPipelineModifierContract,
-    runContractTests,
+	testBasePluginContract,
+	testGitProviderContract,
+	testDeploymentContract,
+	testScreenshotContract,
+	testSearchContract,
+	testAiProviderContract,
+	testPipelineContract,
+	testPipelineModifierContract,
+	runContractTests
 } from './contract-tests.js';
 ```
 
@@ -54,11 +64,11 @@ const harness = new PluginTestHarness(MyPlugin);
 
 ### Lifecycle Methods
 
-| Method | Description |
-|---|---|
-| `load(context?)` | Instantiate the plugin and call `onLoad` |
-| `unload()` | Call `onDeactivate` and clean up |
-| `healthCheck()` | Run the plugin's health check and return result |
+| Method           | Description                                     |
+| ---------------- | ----------------------------------------------- |
+| `load(context?)` | Instantiate the plugin and call `onLoad`        |
+| `unload()`       | Call `onDeactivate` and clean up                |
+| `healthCheck()`  | Run the plugin's health check and return result |
 
 ```typescript
 // Full lifecycle test
@@ -77,23 +87,20 @@ The harness includes a built-in test runner that executes named test cases and c
 
 ```typescript
 const results = await harness.runTests([
-    {
-        name: 'should activate successfully',
-        fn: async (plugin) => {
-            await plugin.onActivate(mockContext);
-            harness.assert(plugin.isActive(), 'Plugin should be active');
-        },
-    },
-    {
-        name: 'should handle missing settings',
-        fn: async (plugin) => {
-            const ctx = createMockPluginContext({ settings: {} });
-            await harness.assertRejects(
-                () => plugin.onActivate(ctx),
-                'Should throw on missing settings'
-            );
-        },
-    },
+	{
+		name: 'should activate successfully',
+		fn: async (plugin) => {
+			await plugin.onActivate(mockContext);
+			harness.assert(plugin.isActive(), 'Plugin should be active');
+		}
+	},
+	{
+		name: 'should handle missing settings',
+		fn: async (plugin) => {
+			const ctx = createMockPluginContext({ settings: {} });
+			await harness.assertRejects(() => plugin.onActivate(ctx), 'Should throw on missing settings');
+		}
+	}
 ]);
 
 // results => [
@@ -104,12 +111,12 @@ const results = await harness.runTests([
 
 ### Built-in Assertions
 
-| Assertion | Description |
-|---|---|
-| `assert(condition, message?)` | Assert a boolean condition is truthy |
-| `assertEqual(actual, expected, message?)` | Assert strict equality (`===`) |
+| Assertion                                     | Description                                  |
+| --------------------------------------------- | -------------------------------------------- |
+| `assert(condition, message?)`                 | Assert a boolean condition is truthy         |
+| `assertEqual(actual, expected, message?)`     | Assert strict equality (`===`)               |
 | `assertDeepEqual(actual, expected, message?)` | Assert structural equality (deep comparison) |
-| `assertRejects(fn, message?)` | Assert an async function throws an error |
+| `assertRejects(fn, message?)`                 | Assert an async function throws an error     |
 
 ```typescript
 harness.assert(result !== null, 'Result should not be null');
@@ -139,16 +146,16 @@ Creates a complete mock `PluginContext` with all services pre-configured.
 import { createMockPluginContext } from '@ever-works/plugin/testing';
 
 const context = createMockPluginContext({
-    settings: {
-        apiKey: 'test-key',
-        model: 'gpt-4',
-    },
-    directorySettings: {
-        model: 'gpt-3.5-turbo',
-    },
-    envVars: {
-        NODE_ENV: 'test',
-    },
+	settings: {
+		apiKey: 'test-key',
+		model: 'gpt-4'
+	},
+	directorySettings: {
+		model: 'gpt-3.5-turbo'
+	},
+	envVars: {
+		NODE_ENV: 'test'
+	}
 });
 
 // context.logger => mock logger
@@ -192,14 +199,14 @@ const deleted = await cache.get('key');
 
 **Cache Features:**
 
-| Feature | Behavior |
-|---|---|
-| Storage | In-memory `Map<string, { value, expiry }>` |
-| TTL | Stored as `Date.now() + ttlSeconds * 1000` |
+| Feature      | Behavior                                        |
+| ------------ | ----------------------------------------------- |
+| Storage      | In-memory `Map<string, { value, expiry }>`      |
+| TTL          | Stored as `Date.now() + ttlSeconds * 1000`      |
 | Expiry check | `get()` returns `undefined` for expired entries |
-| `has()` | Checks existence and expiry |
-| `delete()` | Removes entry from map |
-| `clear()` | Clears entire map |
+| `has()`      | Checks existence and expiry                     |
+| `delete()`   | Removes entry from map                          |
+| `clear()`    | Clears entire map                               |
 
 ### createMockHttpClient
 
@@ -251,9 +258,9 @@ Creates a complete mock environment with configurable properties.
 import { createMockPluginEnvironment } from '@ever-works/plugin/testing';
 
 const env = createMockPluginEnvironment({
-    nodeEnv: 'production',
-    platform: 'linux',
-    version: '1.5.0',
+	nodeEnv: 'production',
+	platform: 'linux',
+	version: '1.5.0'
 });
 ```
 
@@ -265,18 +272,18 @@ Creates a mock environment variables object with common defaults.
 import { createMockEnvVars } from '@ever-works/plugin/testing';
 
 const envVars = createMockEnvVars({
-    OPENAI_API_KEY: 'sk-test-key',
-    DATABASE_URL: 'postgres://localhost/test',
+	OPENAI_API_KEY: 'sk-test-key',
+	DATABASE_URL: 'postgres://localhost/test'
 });
 // Also includes NODE_ENV: 'test' by default
 ```
 
 ### Preset Environments
 
-| Function | NODE_ENV | Debug | Description |
-|---|---|---|---|
-| `createProductionEnvironment()` | `production` | `false` | Simulates production deployment |
-| `createDevelopmentEnvironment()` | `development` | `true` | Simulates local development |
+| Function                         | NODE_ENV      | Debug   | Description                     |
+| -------------------------------- | ------------- | ------- | ------------------------------- |
+| `createProductionEnvironment()`  | `production`  | `false` | Simulates production deployment |
+| `createDevelopmentEnvironment()` | `development` | `true`  | Simulates local development     |
 
 ## Contract Tests
 
@@ -284,16 +291,16 @@ The `contract-tests.ts` module provides reusable test suites that validate plugi
 
 ### Available Contract Test Suites
 
-| Function | Tests | Description |
-|---|---|---|
-| `testBasePluginContract(plugin)` | `onLoad`, `onActivate`, `onDeactivate`, manifest | Core plugin lifecycle |
-| `testGitProviderContract(plugin)` | clone, push, pull, branch, PR operations | Git provider capability |
-| `testDeploymentContract(plugin)` | deploy, status, rollback | Deployment capability |
-| `testScreenshotContract(plugin)` | capture, format options | Screenshot capability |
-| `testSearchContract(plugin)` | search, results format, pagination | Search capability |
-| `testAiProviderContract(plugin)` | chat, streaming, embeddings, models | AI provider capability |
-| `testPipelineContract(plugin)` | execute, step handling, status reporting | Pipeline capability |
-| `testPipelineModifierContract(plugin)` | modify, transform, validate | Pipeline modifier capability |
+| Function                               | Tests                                            | Description                  |
+| -------------------------------------- | ------------------------------------------------ | ---------------------------- |
+| `testBasePluginContract(plugin)`       | `onLoad`, `onActivate`, `onDeactivate`, manifest | Core plugin lifecycle        |
+| `testGitProviderContract(plugin)`      | clone, push, pull, branch, PR operations         | Git provider capability      |
+| `testDeploymentContract(plugin)`       | deploy, status, rollback                         | Deployment capability        |
+| `testScreenshotContract(plugin)`       | capture, format options                          | Screenshot capability        |
+| `testSearchContract(plugin)`           | search, results format, pagination               | Search capability            |
+| `testAiProviderContract(plugin)`       | chat, streaming, embeddings, models              | AI provider capability       |
+| `testPipelineContract(plugin)`         | execute, step handling, status reporting         | Pipeline capability          |
+| `testPipelineModifierContract(plugin)` | modify, transform, validate                      | Pipeline modifier capability |
 
 ### Running Contract Tests
 
@@ -301,11 +308,11 @@ The `contract-tests.ts` module provides reusable test suites that validate plugi
 import { testBasePluginContract, testAiProviderContract } from '@ever-works/plugin/testing';
 
 describe('MyAiPlugin', () => {
-    const plugin = new MyAiPlugin();
-    const context = createMockPluginContext({ settings: testSettings });
+	const plugin = new MyAiPlugin();
+	const context = createMockPluginContext({ settings: testSettings });
 
-    testBasePluginContract(plugin);
-    testAiProviderContract(plugin);
+	testBasePluginContract(plugin);
+	testAiProviderContract(plugin);
 });
 ```
 
@@ -326,35 +333,31 @@ const results = await runContractTests(plugin, mockContext);
 ### Full Plugin Integration Test
 
 ```typescript
-import {
-    PluginTestHarness,
-    createMockPluginContext,
-    testBasePluginContract,
-} from '@ever-works/plugin/testing';
+import { PluginTestHarness, createMockPluginContext, testBasePluginContract } from '@ever-works/plugin/testing';
 
 describe('GitHubPlugin', () => {
-    let harness: PluginTestHarness;
-    let context: PluginContext;
+	let harness: PluginTestHarness;
+	let context: PluginContext;
 
-    beforeEach(() => {
-        harness = new PluginTestHarness(GitHubPlugin);
-        context = createMockPluginContext({
-            settings: { token: 'ghp_test', defaultOrg: 'test-org' },
-        });
-    });
+	beforeEach(() => {
+		harness = new PluginTestHarness(GitHubPlugin);
+		context = createMockPluginContext({
+			settings: { token: 'ghp_test', defaultOrg: 'test-org' }
+		});
+	});
 
-    afterEach(async () => {
-        await harness.unload();
-    });
+	afterEach(async () => {
+		await harness.unload();
+	});
 
-    testBasePluginContract(new GitHubPlugin());
+	testBasePluginContract(new GitHubPlugin());
 
-    it('should clone a repository', async () => {
-        await harness.load(context);
-        const plugin = harness.getPlugin();
-        const dir = await plugin.cloneRepository('owner', 'repo');
-        harness.assert(dir !== null, 'Should return directory path');
-    });
+	it('should clone a repository', async () => {
+		await harness.load(context);
+		const plugin = harness.getPlugin();
+		const dir = await plugin.cloneRepository('owner', 'repo');
+		harness.assert(dir !== null, 'Should return directory path');
+	});
 });
 ```
 

@@ -13,11 +13,11 @@ The Data Generation system is the core engine behind Ever Works' AI-powered dire
 
 The data generation pipeline lives in `packages/agent/src/generators/data-generator/` and is composed of three main components:
 
-| Component | File | Purpose |
-|---|---|---|
-| `DataGeneratorService` | `data-generator.service.ts` | Orchestrates the full generation workflow |
-| `DataRepository` | `data-repository.ts` | YAML-based file I/O for the data repository |
-| `DataGeneratorModule` | `data-generator.module.ts` | NestJS module wiring and dependency injection |
+| Component              | File                        | Purpose                                       |
+| ---------------------- | --------------------------- | --------------------------------------------- |
+| `DataGeneratorService` | `data-generator.service.ts` | Orchestrates the full generation workflow     |
+| `DataRepository`       | `data-repository.ts`        | YAML-based file I/O for the data repository   |
+| `DataGeneratorModule`  | `data-generator.module.ts`  | NestJS module wiring and dependency injection |
 
 ```
 DataGeneratorModule
@@ -80,12 +80,12 @@ interface IDataConfig {
 
 The settings object controls feature availability on the generated website:
 
-| Setting Group | Options | Defaults |
-|---|---|---|
-| **Root** | `categories_enabled`, `companies_enabled`, `tags_enabled`, `collections_enabled`, `surveys_enabled`, `comparisons_enabled` | All `true` |
-| **Header** | `submit_enabled`, `pricing_enabled`, `layout_enabled`, `language_enabled`, `theme_enabled`, `layout_default`, `pagination_default`, `theme_default` | All enabled, layout=`home1`, theme=`light` |
-| **Homepage** | `hero_enabled`, `search_enabled`, `default_view`, `default_sort` | Enabled, view=`classic`, sort=`popularity` |
-| **Footer** | `subscribe_enabled`, `version_enabled`, `theme_selector_enabled` | All `true` |
+| Setting Group | Options                                                                                                                                             | Defaults                                   |
+| ------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------ |
+| **Root**      | `categories_enabled`, `companies_enabled`, `tags_enabled`, `collections_enabled`, `surveys_enabled`, `comparisons_enabled`                          | All `true`                                 |
+| **Header**    | `submit_enabled`, `pricing_enabled`, `layout_enabled`, `language_enabled`, `theme_enabled`, `layout_default`, `pagination_default`, `theme_default` | All enabled, layout=`home1`, theme=`light` |
+| **Homepage**  | `hero_enabled`, `search_enabled`, `default_view`, `default_sort`                                                                                    | Enabled, view=`classic`, sort=`popularity` |
+| **Footer**    | `subscribe_enabled`, `version_enabled`, `theme_selector_enabled`                                                                                    | All `true`                                 |
 
 ### Configuration Deep Merge
 
@@ -93,12 +93,12 @@ Configuration updates use a custom merge strategy that deduplicates arrays by co
 
 ```typescript
 const mergeDataConfig = (base: IDataConfig, incoming: Partial<IDataConfig>): IDataConfig =>
-    mergeWith({}, base, incoming, (objValue, srcValue) => {
-        if (Array.isArray(objValue) && Array.isArray(srcValue)) {
-            return mergeUniqueArray(objValue, srcValue);
-        }
-        return undefined;
-    });
+	mergeWith({}, base, incoming, (objValue, srcValue) => {
+		if (Array.isArray(objValue) && Array.isArray(srcValue)) {
+			return mergeUniqueArray(objValue, srcValue);
+		}
+		return undefined;
+	});
 ```
 
 ## Generation Workflow
@@ -124,6 +124,7 @@ For subsequent generations, the service supports three modes controlled by `Gene
 - **UPDATE** -- Refreshes existing items with new data.
 
 When using PR-based updates, the service:
+
 1. Creates or checks out a feature branch (`pr_update.branch`).
 2. Runs the pipeline with existing items as context.
 3. Pushes changes to the branch.
@@ -137,7 +138,7 @@ Items are written with controlled concurrency to avoid filesystem overload:
 const PARALLEL_WRITE_CONCURRENCY = 10;
 
 await pMap(items, (item) => dataRepo.writeItem(item), {
-    concurrency: PARALLEL_WRITE_CONCURRENCY,
+	concurrency: PARALLEL_WRITE_CONCURRENCY
 });
 ```
 
@@ -172,9 +173,9 @@ description: A brief description of the tool
 source_url: https://example.com
 category: open-source
 tags:
-  - id: javascript
-    name: JavaScript
-updated_at: "2025-01-15 14:30"
+    - id: javascript
+      name: JavaScript
+updated_at: '2025-01-15 14:30'
 ```
 
 ## Comparison Generation

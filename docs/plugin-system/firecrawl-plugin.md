@@ -1,7 +1,7 @@
 ---
 id: firecrawl-plugin
-title: "Firecrawl Plugin"
-sidebar_label: "Firecrawl"
+title: 'Firecrawl Plugin'
+sidebar_label: 'Firecrawl'
 sidebar_position: 18
 ---
 
@@ -13,15 +13,15 @@ The Firecrawl plugin provides web search and content extraction through the [Fir
 
 ## Overview
 
-| Property | Value |
-|---|---|
-| Plugin ID | `firecrawl` |
-| Category | `search` |
-| Capabilities | `search`, `content-extractor` |
-| Version | `1.0.0` |
-| Configuration Mode | `hybrid` |
-| Auto-enable | No |
-| SDK | `@mendable/firecrawl-js` |
+| Property           | Value                         |
+| ------------------ | ----------------------------- |
+| Plugin ID          | `firecrawl`                   |
+| Category           | `search`                      |
+| Capabilities       | `search`, `content-extractor` |
+| Version            | `1.0.0`                       |
+| Configuration Mode | `hybrid`                      |
+| Auto-enable        | No                            |
+| SDK                | `@mendable/firecrawl-js`      |
 
 The plugin implements `IPlugin`, `ISearchPlugin`, and `IContentExtractorPlugin`.
 
@@ -48,9 +48,9 @@ graph TD
 
 ### Settings Schema
 
-| Setting | Type | Required | Env Variable | Description |
-|---|---|---|---|---|
-| `apiKey` | `string` | Yes | `PLUGIN_FIRECRAWL_API_KEY` | Your Firecrawl API key. Marked as secret. |
+| Setting  | Type     | Required | Env Variable               | Description                               |
+| -------- | -------- | -------- | -------------------------- | ----------------------------------------- |
+| `apiKey` | `string` | Yes      | `PLUGIN_FIRECRAWL_API_KEY` | Your Firecrawl API key. Marked as secret. |
 
 ### Obtaining an API Key
 
@@ -64,7 +64,7 @@ The search method uses the Firecrawl SDK's `search()` function:
 
 ```typescript
 const response = await client.search(options.query, {
-  limit: options.limit
+	limit: options.limit
 });
 ```
 
@@ -72,13 +72,13 @@ const response = await client.search(options.query, {
 
 Results are extracted from the `response.web` array and mapped to `SearchResult`:
 
-| Field | Source | Fallback |
-|---|---|---|
-| `title` | `item.title` | `""` |
-| `url` | `item.url` | `""` |
-| `snippet` | `item.description` | `item.markdown` |
-| `position` | 1-based index | -- |
-| `source` | Hostname from `item.url` | `undefined` |
+| Field      | Source                   | Fallback        |
+| ---------- | ------------------------ | --------------- |
+| `title`    | `item.title`             | `""`            |
+| `url`      | `item.url`               | `""`            |
+| `snippet`  | `item.description`       | `item.markdown` |
+| `position` | 1-based index            | --              |
+| `source`   | Hostname from `item.url` | `undefined`     |
 
 The search response always sets `hasMore: false` since Firecrawl does not provide pagination information.
 
@@ -90,20 +90,20 @@ The `extract()` method scrapes a single URL using Firecrawl's `scrape()` functio
 
 ```typescript
 const doc = await client.scrape(options.url, {
-  formats: ['markdown']
+	formats: ['markdown']
 });
 ```
 
 #### Extraction Result
 
-| Field | Description |
-|---|---|
-| `content` | Clean markdown extracted from the page |
-| `markdown` | Same as `content` |
-| `title` | From `doc.metadata.title` |
-| `finalUrl` | Resolved URL from `doc.metadata.url` (if different from input) |
-| `wordCount` | Word count from splitting markdown on whitespace |
-| `readingTime` | `Math.ceil(wordCount / 200)` minutes |
+| Field         | Description                                                    |
+| ------------- | -------------------------------------------------------------- |
+| `content`     | Clean markdown extracted from the page                         |
+| `markdown`    | Same as `content`                                              |
+| `title`       | From `doc.metadata.title`                                      |
+| `finalUrl`    | Resolved URL from `doc.metadata.url` (if different from input) |
+| `wordCount`   | Word count from splitting markdown on whitespace               |
+| `readingTime` | `Math.ceil(wordCount / 200)` minutes                           |
 
 If the scrape returns empty markdown, the method returns `{ success: false }` with an appropriate error message.
 
@@ -117,19 +117,17 @@ The `extractBatch()` method attempts two strategies:
 ```typescript
 // Strategy 1: Batch API
 try {
-  const job = await client.batchScrape([...urls], {
-    options: { formats: ['markdown'] }
-  });
-  if (job.data && job.data.length > 0) {
-    return job.data.map(/* ... */);
-  }
+	const job = await client.batchScrape([...urls], {
+		options: { formats: ['markdown'] }
+	});
+	if (job.data && job.data.length > 0) {
+		return job.data.map(/* ... */);
+	}
 } catch {
-  // Strategy 2: Sequential fallback
+	// Strategy 2: Sequential fallback
 }
 
-const results = await Promise.allSettled(
-  urls.map((url) => this.extract({ url, ...options }))
-);
+const results = await Promise.allSettled(urls.map((url) => this.extract({ url, ...options })));
 ```
 
 The sequential fallback uses `Promise.allSettled()` instead of `Promise.all()` to ensure that individual failures do not prevent other URLs from being processed.
@@ -146,13 +144,13 @@ Firecrawl returns markdown only. This is its primary strength -- it handles Java
 
 ## Key Advantages
 
-| Feature | Description |
-|---|---|
-| JavaScript rendering | Handles dynamic/SPA pages that simple HTTP fetches miss |
-| Anti-bot bypass | Automatically handles common protections like CAPTCHAs |
-| Clean output | Returns well-structured markdown, stripping ads and navigation |
-| Metadata extraction | Captures page title, description, and final URL |
-| Batch processing | Native batch API for efficient multi-URL extraction |
+| Feature              | Description                                                    |
+| -------------------- | -------------------------------------------------------------- |
+| JavaScript rendering | Handles dynamic/SPA pages that simple HTTP fetches miss        |
+| Anti-bot bypass      | Automatically handles common protections like CAPTCHAs         |
+| Clean output         | Returns well-structured markdown, stripping ads and navigation |
+| Metadata extraction  | Captures page title, description, and final URL                |
+| Batch processing     | Native batch API for efficient multi-URL extraction            |
 
 ## Client Instantiation
 
@@ -170,33 +168,33 @@ private getClient(settings?: PluginSettings): FirecrawlApp {
 
 ## Error Handling
 
-| Scenario | Behavior |
-|---|---|
-| Missing API key | Throws `Error` with descriptive message. |
-| Search failure | Logs error, re-throws to caller. |
-| Single extraction failure | Returns `{ success: false, error: '...' }`. |
-| Batch API failure | Falls back to sequential extraction. |
+| Scenario                      | Behavior                                                                 |
+| ----------------------------- | ------------------------------------------------------------------------ |
+| Missing API key               | Throws `Error` with descriptive message.                                 |
+| Search failure                | Logs error, re-throws to caller.                                         |
+| Single extraction failure     | Returns `{ success: false, error: '...' }`.                              |
+| Batch API failure             | Falls back to sequential extraction.                                     |
 | Sequential extraction failure | Uses `Promise.allSettled()` -- individual failures return error results. |
-| Empty content | Returns `{ success: false, error: 'No content extracted' }`. |
+| Empty content                 | Returns `{ success: false, error: 'No content extracted' }`.             |
 
 ## Rate Limits
 
 Rate limit tracking is not performed client-side (`getRateLimitInfo()` returns `-1`). Firecrawl enforces limits at the API level. Typical plan limits:
 
-| Plan | Credits/Month | Pages/Scrape |
-|---|---|---|
-| Free | 500 | 1 |
-| Starter | 3,000 | Configurable |
-| Standard | 100,000 | Configurable |
+| Plan     | Credits/Month | Pages/Scrape |
+| -------- | ------------- | ------------ |
+| Free     | 500           | 1            |
+| Starter  | 3,000         | Configurable |
+| Standard | 100,000       | Configurable |
 
 ## Lifecycle
 
-| Method | Behavior |
-|---|---|
-| `onLoad(context)` | Stores plugin context. |
-| `onUnload()` | Clears context. |
-| `healthCheck()` | Returns `healthy`. |
-| `isAvailable()` | Returns `true`. |
+| Method            | Behavior                                      |
+| ----------------- | --------------------------------------------- |
+| `onLoad(context)` | Stores plugin context.                        |
+| `onUnload()`      | Clears context.                               |
+| `healthCheck()`   | Returns `healthy`.                            |
+| `isAvailable()`   | Returns `true`.                               |
 | `canExtract(url)` | Returns `true` for `http:` and `https:` URLs. |
 
 ## Usage in the Platform

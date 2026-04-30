@@ -1,7 +1,7 @@
 ---
 id: serpapi-plugin
-title: "SerpAPI Plugin"
-sidebar_label: "SerpAPI"
+title: 'SerpAPI Plugin'
+sidebar_label: 'SerpAPI'
 sidebar_position: 39
 ---
 
@@ -13,17 +13,17 @@ The SerpAPI plugin provides web search capabilities through the [SerpAPI](https:
 
 ## Overview
 
-| Property | Value |
-|---|---|
-| Plugin ID | `serpapi` |
-| Category | `search` |
-| Capabilities | `search` |
-| Version | `1.0.0` |
-| Configuration Mode | `hybrid` |
-| Auto-enable | No |
-| Built-in | Yes |
-| System Plugin | No |
-| SDK | None (plain `fetch`) |
+| Property           | Value                |
+| ------------------ | -------------------- |
+| Plugin ID          | `serpapi`            |
+| Category           | `search`             |
+| Capabilities       | `search`             |
+| Version            | `1.0.0`              |
+| Configuration Mode | `hybrid`             |
+| Auto-enable        | No                   |
+| Built-in           | Yes                  |
+| System Plugin      | No                   |
+| SDK                | None (plain `fetch`) |
 
 The plugin implements `IPlugin` and `ISearchPlugin`.
 
@@ -53,27 +53,27 @@ The plugin constructs a query URL with parameters, sends a single HTTP request t
 
 ### Settings Schema
 
-| Setting | Type | Default | Description |
-|---|---|---|---|
-| `apiKey` | `string` | -- | **Required.** Your SerpAPI key |
-| `engine` | `string` | `"google"` | Search engine to use |
-| `maxResults` | `number` | `10` | Default maximum results per search (1--100) |
+| Setting      | Type     | Default    | Description                                 |
+| ------------ | -------- | ---------- | ------------------------------------------- |
+| `apiKey`     | `string` | --         | **Required.** Your SerpAPI key              |
+| `engine`     | `string` | `"google"` | Search engine to use                        |
+| `maxResults` | `number` | `10`       | Default maximum results per search (1--100) |
 
 ### Supported Engines
 
-| Engine | Value | Description |
-|---|---|---|
-| Google | `google` | Default. Most comprehensive results |
-| Bing | `bing` | Microsoft search engine |
-| Yahoo | `yahoo` | Yahoo search |
-| DuckDuckGo | `duckduckgo` | Privacy-focused search |
-| Baidu | `baidu` | Chinese search engine |
-| Yandex | `yandex` | Russian search engine |
+| Engine     | Value        | Description                         |
+| ---------- | ------------ | ----------------------------------- |
+| Google     | `google`     | Default. Most comprehensive results |
+| Bing       | `bing`       | Microsoft search engine             |
+| Yahoo      | `yahoo`      | Yahoo search                        |
+| DuckDuckGo | `duckduckgo` | Privacy-focused search              |
+| Baidu      | `baidu`      | Chinese search engine               |
+| Yandex     | `yandex`     | Russian search engine               |
 
 ### Environment Variables
 
-| Variable | Description |
-|---|---|
+| Variable                 | Description          |
+| ------------------------ | -------------------- |
 | `PLUGIN_SERPAPI_API_KEY` | SerpAPI key fallback |
 
 ### Settings Resolution
@@ -95,16 +95,16 @@ SerpAPI is unique among Ever Works search plugins in supporting six different se
 
 The `search()` method supports these options:
 
-| Option | SerpAPI Parameter | Description |
-|---|---|---|
-| `query` | `q` | The search query string |
-| `limit` | `num` | Maximum results to return |
-| `page` | `start` | Page number for pagination (converted to offset) |
-| `region` | `gl` | Country code for localized results |
-| `language` | `hl` | Language code for result language |
-| `safeSearch` | `safe` | Safe search level: `off`, `moderate`, or `strict` |
-| `site` | Query prefix | Restricts results to a specific domain |
-| `fileType` | Query prefix | Restricts results to a specific file type |
+| Option       | SerpAPI Parameter | Description                                       |
+| ------------ | ----------------- | ------------------------------------------------- |
+| `query`      | `q`               | The search query string                           |
+| `limit`      | `num`             | Maximum results to return                         |
+| `page`       | `start`           | Page number for pagination (converted to offset)  |
+| `region`     | `gl`              | Country code for localized results                |
+| `language`   | `hl`              | Language code for result language                 |
+| `safeSearch` | `safe`            | Safe search level: `off`, `moderate`, or `strict` |
+| `site`       | Query prefix      | Restricts results to a specific domain            |
+| `fileType`   | Query prefix      | Restricts results to a specific file type         |
 
 ### Query Prefixes
 
@@ -120,25 +120,25 @@ filetype:pdf my search query
 SerpAPI uses different safe search values than the plugin interface:
 
 | Plugin Value | SerpAPI Value |
-|---|---|
-| `off` | `off` |
-| `moderate` | `medium` |
-| `strict` | `active` |
+| ------------ | ------------- |
+| `off`        | `off`         |
+| `moderate`   | `medium`      |
+| `strict`     | `active`      |
 
 ### Search Results
 
 Each result in the response includes:
 
-| Field | Description |
-|---|---|
-| `title` | The page title |
-| `url` | The destination URL (from `link`) |
-| `snippet` | Text excerpt from the page |
-| `displayUrl` | The displayed URL format |
-| `faviconUrl` | The site's favicon URL |
-| `source` | The source attribution |
-| `position` | The result's position in the search page |
-| `publishedDate` | Publication date when available |
+| Field           | Description                              |
+| --------------- | ---------------------------------------- |
+| `title`         | The page title                           |
+| `url`           | The destination URL (from `link`)        |
+| `snippet`       | Text excerpt from the page               |
+| `displayUrl`    | The displayed URL format                 |
+| `faviconUrl`    | The site's favicon URL                   |
+| `source`        | The source attribution                   |
+| `position`      | The result's position in the search page |
+| `publishedDate` | Publication date when available          |
 
 ### Related Searches
 
@@ -178,33 +178,33 @@ SerpAPI is a good choice when:
 
 ```typescript
 class SerpApiSearchPlugin implements IPlugin, ISearchPlugin {
-  readonly id: 'serpapi';
-  readonly category: 'search';
+	readonly id: 'serpapi';
+	readonly category: 'search';
 
-  search(options: SearchOptions): Promise<SearchResponse>;
-  isAvailable(): Promise<boolean>;
-  getRateLimitInfo(): Promise<RateLimitInfo>;
+	search(options: SearchOptions): Promise<SearchResponse>;
+	isAvailable(): Promise<boolean>;
+	getRateLimitInfo(): Promise<RateLimitInfo>;
 }
 ```
 
 ### Key Interfaces
 
-| Interface | Purpose |
-|---|---|
-| `SearchOptions` | Input for a search (query, limit, region, engine, etc.) |
-| `SearchResponse` | Array of results with pagination and related searches |
-| `SearchResult` | Individual result with title, URL, snippet, and metadata |
-| `RateLimitInfo` | Rate limit status (SerpAPI returns -1 for unknown limits) |
+| Interface        | Purpose                                                   |
+| ---------------- | --------------------------------------------------------- |
+| `SearchOptions`  | Input for a search (query, limit, region, engine, etc.)   |
+| `SearchResponse` | Array of results with pagination and related searches     |
+| `SearchResult`   | Individual result with title, URL, snippet, and metadata  |
+| `RateLimitInfo`  | Rate limit status (SerpAPI returns -1 for unknown limits) |
 
 ## Comparison with Other Search Plugins
 
-| Feature | SerpAPI | Brave | Exa | Tavily | Valyu |
-|---|---|---|---|---|---|
-| Engines | 6 (Google, Bing, Yahoo, etc.) | 1 (Brave) | 1 (Exa) | 1 (Tavily) | Multi-source |
-| Content extraction | No | No | Yes | Yes | Yes |
-| Site filtering | Yes (query prefix) | No | Domain filter | Domain filter | Domain filter |
-| File type filtering | Yes (query prefix) | No | No | No | No |
-| Pagination | Yes | Yes | No | No | No |
-| Related searches | Yes | Yes | No | No | No |
-| Safe search | Yes (3 levels) | Yes | No | No | No |
-| SDK required | No (plain fetch) | No (plain fetch) | Yes | Yes | Yes |
+| Feature             | SerpAPI                       | Brave            | Exa           | Tavily        | Valyu         |
+| ------------------- | ----------------------------- | ---------------- | ------------- | ------------- | ------------- |
+| Engines             | 6 (Google, Bing, Yahoo, etc.) | 1 (Brave)        | 1 (Exa)       | 1 (Tavily)    | Multi-source  |
+| Content extraction  | No                            | No               | Yes           | Yes           | Yes           |
+| Site filtering      | Yes (query prefix)            | No               | Domain filter | Domain filter | Domain filter |
+| File type filtering | Yes (query prefix)            | No               | No            | No            | No            |
+| Pagination          | Yes                           | Yes              | No            | No            | No            |
+| Related searches    | Yes                           | Yes              | No            | No            | No            |
+| Safe search         | Yes (3 levels)                | Yes              | No            | No            | No            |
+| SDK required        | No (plain fetch)              | No (plain fetch) | Yes           | Yes           | Yes           |

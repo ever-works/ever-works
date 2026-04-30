@@ -105,17 +105,18 @@ Implements `IDataSourceFacade`. Aggregates items from external data source plugi
 **Per-plugin enablement:**
 
 Data source plugins can be enabled at the directory level. The facade checks both:
+
 1. Request-level plugin config overrides (`pluginConfig[pluginId].enabled === true`)
 2. Registry scope resolution (`isPluginEnabledForScope`)
 
 ```typescript
 interface DataSourceFacadeResult {
-    items: MutableItemData[];
-    sourceMap: Map<string, string>;  // item slug -> plugin ID
-    errors: Array<{ sourceId: string; error: string }>;
-    categories?: Category[];
-    tags?: Tag[];
-    brands?: Brand[];
+	items: MutableItemData[];
+	sourceMap: Map<string, string>; // item slug -> plugin ID
+	errors: Array<{ sourceId: string; error: string }>;
+	categories?: Category[];
+	tags?: Tag[];
+	brands?: Brand[];
 }
 ```
 
@@ -196,48 +197,48 @@ All content provider plugins define their settings via JSON Schema with custom e
 
 ```json
 {
-    "everworks.plugin": {
-        "settings": {
-            "apiKey": {
-                "type": "string",
-                "x-secret": true,
-                "x-envVar": "EXA_API_KEY",
-                "description": "API key for the service"
-            },
-            "maxResults": {
-                "type": "number",
-                "default": 10,
-                "x-widget": "slider"
-            }
-        }
-    }
+	"everworks.plugin": {
+		"settings": {
+			"apiKey": {
+				"type": "string",
+				"x-secret": true,
+				"x-envVar": "EXA_API_KEY",
+				"description": "API key for the service"
+			},
+			"maxResults": {
+				"type": "number",
+				"default": 10,
+				"x-widget": "slider"
+			}
+		}
+	}
 }
 ```
 
 **Custom JSON Schema extensions:**
 
-| Extension | Purpose |
-|---|---|
+| Extension  | Purpose                                                        |
+| ---------- | -------------------------------------------------------------- |
 | `x-secret` | Marks the field as sensitive (encrypted storage, masked in UI) |
-| `x-envVar` | Environment variable name for fallback value |
-| `x-widget` | UI widget hint (`slider`, `toggle`, `textarea`, `select`) |
+| `x-envVar` | Environment variable name for fallback value                   |
+| `x-widget` | UI widget hint (`slider`, `toggle`, `textarea`, `select`)      |
 
 ### Available Providers by Capability
 
-| Capability | Plugins |
-|---|---|
-| `search` | exa, tavily, serpapi, brave |
-| `screenshot` | screenshotone, urlbox |
-| `content-extraction` | local-content-extractor, notion-extractor |
-| `data-source` | Any plugin implementing `IDataSourcePlugin` |
+| Capability           | Plugins                                     |
+| -------------------- | ------------------------------------------- |
+| `search`             | exa, tavily, serpapi, brave                 |
+| `screenshot`         | screenshotone, urlbox                       |
+| `content-extraction` | local-content-extractor, notion-extractor   |
+| `data-source`        | Any plugin implementing `IDataSourcePlugin` |
 
 ## Dependencies
 
-| Dependency | Purpose |
-|---|---|
-| `@ever-works/plugin` | Facade interfaces, capability constants, plugin types |
-| `@ever-works/agent/plugins` | `PluginRegistryService`, `PluginSettingsService`, `DirectoryPluginRepository` |
-| `@ever-works/agent/database` | `DirectoryPluginRepository` for directory-level plugin config |
+| Dependency                   | Purpose                                                                       |
+| ---------------------------- | ----------------------------------------------------------------------------- |
+| `@ever-works/plugin`         | Facade interfaces, capability constants, plugin types                         |
+| `@ever-works/agent/plugins`  | `PluginRegistryService`, `PluginSettingsService`, `DirectoryPluginRepository` |
+| `@ever-works/agent/database` | `DirectoryPluginRepository` for directory-level plugin config                 |
 
 ## Usage Examples
 
@@ -247,13 +248,13 @@ All content provider plugins define their settings via JSON Schema with custom e
 import { SearchFacadeService } from '@ever-works/agent/facades';
 
 const results = await searchFacade.search(
-    'best open source code editors 2025',
-    { maxResults: 10, includeContent: true },
-    { userId: user.id, directoryId: directory.id },
+	'best open source code editors 2025',
+	{ maxResults: 10, includeContent: true },
+	{ userId: user.id, directoryId: directory.id }
 );
 
 results.forEach((r) => {
-    console.log(`${r.title}: ${r.url}`);
+	console.log(`${r.title}: ${r.url}`);
 });
 ```
 
@@ -263,9 +264,9 @@ results.forEach((r) => {
 import { ScreenshotFacadeService } from '@ever-works/agent/facades';
 
 const screenshot = await screenshotFacade.capture(
-    'https://example.com',
-    { width: 1280, height: 720, format: 'png' },
-    { userId: user.id },
+	'https://example.com',
+	{ width: 1280, height: 720, format: 'png' },
+	{ userId: user.id }
 );
 ```
 
@@ -274,11 +275,7 @@ const screenshot = await screenshotFacade.capture(
 ```typescript
 import { ContentExtractorFacadeService } from '@ever-works/agent/facades';
 
-const content = await contentExtractorFacade.extract(
-    'https://example.com/product',
-    {},
-    { userId: user.id },
-);
+const content = await contentExtractorFacade.extract('https://example.com/product', {}, { userId: user.id });
 
 console.log(content.title);
 console.log(content.mainText);
@@ -290,16 +287,16 @@ console.log(content.mainText);
 import { DataSourceFacadeService } from '@ever-works/agent/facades';
 
 const result = await dataSourceFacade.queryAll({
-    directoryId: directory.id,
-    userId: user.id,
-    limit: 100,
-    pluginConfig: {
-        'my-data-source': { enabled: true },
-    },
+	directoryId: directory.id,
+	userId: user.id,
+	limit: 100,
+	pluginConfig: {
+		'my-data-source': { enabled: true }
+	}
 });
 
 console.log(`Collected ${result.items.length} items from data sources`);
 result.errors.forEach((e) => {
-    console.warn(`Source ${e.sourceId} failed: ${e.error}`);
+	console.warn(`Source ${e.sourceId} failed: ${e.error}`);
 });
 ```

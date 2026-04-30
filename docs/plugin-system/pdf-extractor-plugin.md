@@ -1,7 +1,7 @@
 ---
 id: pdf-extractor-plugin
-title: "PDF Extractor Plugin"
-sidebar_label: "PDF Extractor"
+title: 'PDF Extractor Plugin'
+sidebar_label: 'PDF Extractor'
 sidebar_position: 43
 ---
 
@@ -13,18 +13,18 @@ The PDF Extractor plugin extracts text content from PDF files and converts it to
 
 ## Overview
 
-| Property | Value |
-|---|---|
-| Plugin ID | `pdf-extractor` |
-| Category | `content-extractor` |
-| Capabilities | `content-extractor` |
-| Version | `1.0.0` |
-| Configuration Mode | Default |
-| Auto-enable | No |
-| Built-in | Yes |
-| System Plugin | No |
-| Supplementary | Yes |
-| Dependencies | `unpdf`, `axios` |
+| Property           | Value               |
+| ------------------ | ------------------- |
+| Plugin ID          | `pdf-extractor`     |
+| Category           | `content-extractor` |
+| Capabilities       | `content-extractor` |
+| Version            | `1.0.0`             |
+| Configuration Mode | Default             |
+| Auto-enable        | No                  |
+| Built-in           | Yes                 |
+| System Plugin      | No                  |
+| Supplementary      | Yes                 |
+| Dependencies       | `unpdf`, `axios`    |
 
 The plugin implements `IPlugin` and `IContentExtractorPlugin`. It acts as a supplementary content extractor -- the content extractor facade delegates to it only when a URL points to a `.pdf` file.
 
@@ -49,27 +49,27 @@ graph TD
 
 The plugin initializes two internal services on load:
 
-| Service | File | Purpose |
-|---|---|---|
-| `PdfTextExtractor` | `pdf-text-extractor.ts` | Extracts text from PDF text layers using `unpdf` |
-| `MistralOcrService` | `mistral-ocr.service.ts` | Falls back to Mistral AI OCR for scanned PDFs |
+| Service             | File                     | Purpose                                          |
+| ------------------- | ------------------------ | ------------------------------------------------ |
+| `PdfTextExtractor`  | `pdf-text-extractor.ts`  | Extracts text from PDF text layers using `unpdf` |
+| `MistralOcrService` | `mistral-ocr.service.ts` | Falls back to Mistral AI OCR for scanned PDFs    |
 
 ## Configuration
 
 ### Settings Schema
 
-| Setting | Type | Required | Default | Description |
-|---|---|---|---|---|
-| `mistralApiKey` | `string` | No | -- | Mistral AI API key for OCR fallback (secret, user scope) |
-| `ocrModel` | `string` | No | `"mistral-ocr-latest"` | Mistral OCR model ID (hidden) |
-| `textDensityThreshold` | `number` | No | `100` | Characters per page below which OCR is triggered (0--10000, hidden) |
-| `maxPages` | `number` | No | `50` | Maximum pages to process (1--500, hidden) |
-| `timeout` | `number` | No | `60000` | HTTP request timeout in milliseconds (5000--300000, hidden) |
+| Setting                | Type     | Required | Default                | Description                                                         |
+| ---------------------- | -------- | -------- | ---------------------- | ------------------------------------------------------------------- |
+| `mistralApiKey`        | `string` | No       | --                     | Mistral AI API key for OCR fallback (secret, user scope)            |
+| `ocrModel`             | `string` | No       | `"mistral-ocr-latest"` | Mistral OCR model ID (hidden)                                       |
+| `textDensityThreshold` | `number` | No       | `100`                  | Characters per page below which OCR is triggered (0--10000, hidden) |
+| `maxPages`             | `number` | No       | `50`                   | Maximum pages to process (1--500, hidden)                           |
+| `timeout`              | `number` | No       | `60000`                | HTTP request timeout in milliseconds (5000--300000, hidden)         |
 
 ### Environment Variables
 
-| Variable | Description |
-|---|---|
+| Variable                       | Description              |
+| ------------------------------ | ------------------------ |
 | `PLUGIN_PDF_EXTRACTOR_API_KEY` | Mistral API key fallback |
 
 ## Features
@@ -124,14 +124,14 @@ When a source URL in a directory item points to a PDF file, the content extracto
 
 ## Comparison with Other Content Extractors
 
-| Feature | PDF Extractor | Local Extractor | Firecrawl | Jina |
-|---|---|---|---|---|
-| PDF support | Yes (primary) | No | Limited | Limited |
-| API key required | No (text) / Yes (OCR) | No | Yes | Yes |
-| OCR support | Yes (via Mistral) | No | No | No |
-| HTML extraction | No | Yes | Yes | Yes |
-| Cost | Free (text) / Paid (OCR) | Free | Paid | Paid |
-| Supplementary | Yes | No (default) | No | No |
+| Feature          | PDF Extractor            | Local Extractor | Firecrawl | Jina    |
+| ---------------- | ------------------------ | --------------- | --------- | ------- |
+| PDF support      | Yes (primary)            | No              | Limited   | Limited |
+| API key required | No (text) / Yes (OCR)    | No              | Yes       | Yes     |
+| OCR support      | Yes (via Mistral)        | No              | No        | No      |
+| HTML extraction  | No                       | Yes             | Yes       | Yes     |
+| Cost             | Free (text) / Paid (OCR) | Free            | Paid      | Paid    |
+| Supplementary    | Yes                      | No (default)    | No        | No      |
 
 The PDF Extractor is the only content extraction plugin designed specifically for PDF files. It works alongside the default HTML extractor rather than replacing it.
 
@@ -141,54 +141,57 @@ The PDF Extractor is the only content extraction plugin designed specifically fo
 
 ```typescript
 class PdfExtractorPlugin implements IPlugin, IContentExtractorPlugin {
-  readonly id: 'pdf-extractor';
-  readonly category: 'content-extractor';
+	readonly id: 'pdf-extractor';
+	readonly category: 'content-extractor';
 
-  canExtract(url: string): Promise<boolean>;
-  extract(options: ContentExtractionOptions): Promise<ContentExtractionResult>;
-  extractBatch(urls: readonly string[], options?: Partial<ContentExtractionOptions>): Promise<readonly ContentExtractionResult[]>;
-  getSupportedFormats(): readonly ('text' | 'html' | 'markdown')[];
+	canExtract(url: string): Promise<boolean>;
+	extract(options: ContentExtractionOptions): Promise<ContentExtractionResult>;
+	extractBatch(
+		urls: readonly string[],
+		options?: Partial<ContentExtractionOptions>
+	): Promise<readonly ContentExtractionResult[]>;
+	getSupportedFormats(): readonly ('text' | 'html' | 'markdown')[];
 }
 ```
 
 ### Result Fields
 
-| Field | Description |
-|---|---|
-| `success` | Whether extraction succeeded |
-| `url` | The requested URL |
-| `title` | Extracted or inferred title |
-| `content` | Extracted text content |
-| `markdown` | Content in markdown format |
-| `wordCount` | Number of words extracted |
+| Field         | Description                       |
+| ------------- | --------------------------------- |
+| `success`     | Whether extraction succeeded      |
+| `url`         | The requested URL                 |
+| `title`       | Extracted or inferred title       |
+| `content`     | Extracted text content            |
+| `markdown`    | Content in markdown format        |
+| `wordCount`   | Number of words extracted         |
 | `readingTime` | Estimated reading time in minutes |
-| `duration` | Processing time in milliseconds |
+| `duration`    | Processing time in milliseconds   |
 
 ## Getting Started
 
 1. Enable the PDF Content Extractor plugin on the Plugins page
 2. For text-based PDFs, no additional configuration is needed
 3. For scanned/image-based PDFs:
-   - Get a Mistral AI API key from [console.mistral.ai](https://console.mistral.ai)
-   - Enter the key in the plugin settings
+    - Get a Mistral AI API key from [console.mistral.ai](https://console.mistral.ai)
+    - Enter the key in the plugin settings
 4. Add PDF URLs as source material when generating your directory
 
 ## Error Handling
 
-| Scenario | Behavior |
-|---|---|
-| PDF download fails | Returns `success: false` with HTTP error details |
-| Text extraction fails | Returns `success: false` with error message |
-| OCR fails | Logs a warning and falls back to text-layer content |
-| No Mistral key for scanned PDF | Logs a warning, returns sparse text-layer content |
-| Plugin not initialized | Returns `success: false` with initialization error |
+| Scenario                       | Behavior                                            |
+| ------------------------------ | --------------------------------------------------- |
+| PDF download fails             | Returns `success: false` with HTTP error details    |
+| Text extraction fails          | Returns `success: false` with error message         |
+| OCR fails                      | Logs a warning and falls back to text-layer content |
+| No Mistral key for scanned PDF | Logs a warning, returns sparse text-layer content   |
+| Plugin not initialized         | Returns `success: false` with initialization error  |
 
 ## Troubleshooting
 
-| Issue | Cause | Solution |
-|---|---|---|
-| "Services not initialized" | `onLoad` not called | Restart the plugin or server |
-| Low-quality text output | PDF is scanned/image-based | Configure a Mistral API key for OCR |
-| Timeout errors | Large PDF or slow server | Increase the `timeout` setting |
-| Truncated content | PDF exceeds `maxPages` | Increase the `maxPages` setting |
+| Issue                      | Cause                      | Solution                                          |
+| -------------------------- | -------------------------- | ------------------------------------------------- |
+| "Services not initialized" | `onLoad` not called        | Restart the plugin or server                      |
+| Low-quality text output    | PDF is scanned/image-based | Configure a Mistral API key for OCR               |
+| Timeout errors             | Large PDF or slow server   | Increase the `timeout` setting                    |
+| Truncated content          | PDF exceeds `maxPages`     | Increase the `maxPages` setting                   |
 | "Unsupported content type" | URL does not end in `.pdf` | Ensure the URL path includes the `.pdf` extension |

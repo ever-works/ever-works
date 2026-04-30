@@ -25,23 +25,23 @@ Unlike the Agent Pipeline (which uses autonomous tool calling), the Standard Pip
 
 The 15 built-in steps are organized into 8 logical phases:
 
-| Phase | Step ID | Step Name | Est. Duration |
-|-------|---------|-----------|---------------|
-| **1. Initialization** | `prompt-comparison` | Prompt Comparison | 5s |
-| | `prompt-processing` | Prompt Processing | 5s |
-| | `domain-detection` | Domain Detection | 5s |
-| **2. Content Generation** | `ai-first-items-generation` | AI First Items Generation | 30s |
-| **3. Search** | `search-queries-generation` | Search Queries Generation | 10s |
-| | `web-search` | Web Search | 30s |
-| **4. Extraction** | `content-retrieval` | Content Retrieval | 30s |
-| | `content-filtering` | Content Filtering | 10s |
-| | `items-extraction` | Items Extraction | 30s |
-| **5. Aggregation** | `deduplication-and-data-aggregation` | Deduplication & Data Aggregation | 15s |
-| **6. Categorization** | `categories-tags-processing` | Categories & Tags Processing | 15s |
-| **7. Enrichment** | `sources-validation` | Sources Validation | 20s |
-| | `badges-processing` | Badges Processing | 10s |
-| | `image-capture` | Image Capture | 30s |
-| **8. Output** | `markdown-generation` | Markdown Generation | 30s |
+| Phase                     | Step ID                              | Step Name                        | Est. Duration |
+| ------------------------- | ------------------------------------ | -------------------------------- | ------------- |
+| **1. Initialization**     | `prompt-comparison`                  | Prompt Comparison                | 5s            |
+|                           | `prompt-processing`                  | Prompt Processing                | 5s            |
+|                           | `domain-detection`                   | Domain Detection                 | 5s            |
+| **2. Content Generation** | `ai-first-items-generation`          | AI First Items Generation        | 30s           |
+| **3. Search**             | `search-queries-generation`          | Search Queries Generation        | 10s           |
+|                           | `web-search`                         | Web Search                       | 30s           |
+| **4. Extraction**         | `content-retrieval`                  | Content Retrieval                | 30s           |
+|                           | `content-filtering`                  | Content Filtering                | 10s           |
+|                           | `items-extraction`                   | Items Extraction                 | 30s           |
+| **5. Aggregation**        | `deduplication-and-data-aggregation` | Deduplication & Data Aggregation | 15s           |
+| **6. Categorization**     | `categories-tags-processing`         | Categories & Tags Processing     | 15s           |
+| **7. Enrichment**         | `sources-validation`                 | Sources Validation               | 20s           |
+|                           | `badges-processing`                  | Badges Processing                | 10s           |
+|                           | `image-capture`                      | Image Capture                    | 30s           |
+| **8. Output**             | `markdown-generation`                | Markdown Generation              | 30s           |
 
 ### Step Dependencies
 
@@ -114,36 +114,41 @@ The `TypedGenerationContext` supports serialization via `toSnapshot()` which cap
 The Standard Pipeline provides a comprehensive form schema through the `IFormSchemaProvider` interface. Key configuration groups:
 
 #### Sources & Content
-| Field | Type | Default | Description |
-|-------|------|---------|-------------|
-| `source_urls` | `string[]` | `[]` | Seed URLs to extract content from |
-| `initial_categories` | `string[]` | `[]` | Pre-defined categories |
-| `priority_categories` | `string[]` | `[]` | Categories that appear first |
+
+| Field                 | Type       | Default | Description                       |
+| --------------------- | ---------- | ------- | --------------------------------- |
+| `source_urls`         | `string[]` | `[]`    | Seed URLs to extract content from |
+| `initial_categories`  | `string[]` | `[]`    | Pre-defined categories            |
+| `priority_categories` | `string[]` | `[]`    | Categories that appear first      |
 
 #### Search Settings
-| Field | Type | Default | Description |
-|-------|------|---------|-------------|
-| `max_search_queries` | `number` | `10` | Maximum search queries to execute |
-| `max_results_per_query` | `number` | `10` | Results per search query |
-| `max_pages_to_process` | `number` | `50` | Maximum pages to extract content from |
+
+| Field                   | Type     | Default | Description                           |
+| ----------------------- | -------- | ------- | ------------------------------------- |
+| `max_search_queries`    | `number` | `10`    | Maximum search queries to execute     |
+| `max_results_per_query` | `number` | `10`    | Results per search query              |
+| `max_pages_to_process`  | `number` | `50`    | Maximum pages to extract content from |
 
 #### Volume Settings
-| Field | Type | Default | Description |
-|-------|------|---------|-------------|
-| `max_items` | `number` | `50` | Target number of directory items |
+
+| Field       | Type     | Default | Description                      |
+| ----------- | -------- | ------- | -------------------------------- |
+| `max_items` | `number` | `50`    | Target number of directory items |
 
 #### Feature Toggles
-| Field | Type | Default | Description |
-|-------|------|---------|-------------|
-| `enable_badges` | `boolean` | `true` | Enable badge processing |
-| `enable_screenshots` | `boolean` | `true` | Enable image capture |
-| `capture_screenshots` | `boolean` | `false` | Capture screenshots for items |
-| `generation_method` | `string` | `'CREATE'` | `CREATE` or `CREATE_UPDATE` |
+
+| Field                 | Type      | Default    | Description                   |
+| --------------------- | --------- | ---------- | ----------------------------- |
+| `enable_badges`       | `boolean` | `true`     | Enable badge processing       |
+| `enable_screenshots`  | `boolean` | `true`     | Enable image capture          |
+| `capture_screenshots` | `boolean` | `false`    | Capture screenshots for items |
+| `generation_method`   | `string`  | `'CREATE'` | `CREATE` or `CREATE_UPDATE`   |
 
 #### Advanced Settings
-| Field | Type | Default | Description |
-|-------|------|---------|-------------|
-| `advanced_prompts` | `object` | `{}` | Per-step prompt overrides |
+
+| Field              | Type     | Default | Description               |
+| ------------------ | -------- | ------- | ------------------------- |
+| `advanced_prompts` | `object` | `{}`    | Per-step prompt overrides |
 
 ### Form Schema Provider
 
@@ -191,42 +196,35 @@ The pipeline outputs a complete `PipelineResult` containing:
 ### Plugin Class
 
 ```typescript
-class StandardPipelinePlugin implements
-    IPlugin,
-    IPipelinePlugin<BuiltInStepId>,
-    IFormSchemaProvider
-{
-    readonly id = 'standard-pipeline';
-    readonly name = 'Standard Pipeline';
-    readonly version = '1.0.0';
-    readonly category: PluginCategory = 'pipeline';
-    readonly capabilities = ['pipeline', 'form-schema'];
-    readonly executionMode = 'engine-orchestrated';
+class StandardPipelinePlugin implements IPlugin, IPipelinePlugin<BuiltInStepId>, IFormSchemaProvider {
+	readonly id = 'standard-pipeline';
+	readonly name = 'Standard Pipeline';
+	readonly version = '1.0.0';
+	readonly category: PluginCategory = 'pipeline';
+	readonly capabilities = ['pipeline', 'form-schema'];
+	readonly executionMode = 'engine-orchestrated';
 
-    // Step execution (called by engine)
-    async executeStep(
-        stepId: BuiltInStepId,
-        context: PipelineContext,
-        execContext: StepExecutionContext
-    ): Promise<PipelineContext>;
+	// Step execution (called by engine)
+	async executeStep(
+		stepId: BuiltInStepId,
+		context: PipelineContext,
+		execContext: StepExecutionContext
+	): Promise<PipelineContext>;
 
-    // Step definitions
-    getSteps(): PipelineStepDefinition<BuiltInStepId>[];
+	// Step definitions
+	getSteps(): PipelineStepDefinition<BuiltInStepId>[];
 
-    // Checkpoint viability
-    isCheckpointViable(
-        stepId: BuiltInStepId,
-        context: PipelineContext
-    ): boolean;
+	// Checkpoint viability
+	isCheckpointViable(stepId: BuiltInStepId, context: PipelineContext): boolean;
 
-    // Form schema
-    getFormSchema(): PluginFormSchema;
+	// Form schema
+	getFormSchema(): PluginFormSchema;
 
-    // Lifecycle
-    async onLoad(context: PluginContext): Promise<void>;
-    async onUnload(): Promise<void>;
-    async healthCheck(): Promise<PluginHealthCheck>;
-    getManifest(): PluginManifest;
+	// Lifecycle
+	async onLoad(context: PluginContext): Promise<void>;
+	async onUnload(): Promise<void>;
+	async healthCheck(): Promise<PluginHealthCheck>;
+	getManifest(): PluginManifest;
 }
 ```
 
@@ -236,33 +234,23 @@ Each step extends `BasePipelineStep`:
 
 ```typescript
 abstract class BasePipelineStep implements IBuiltInStepExecutor {
-    abstract readonly stepId: string;
-    abstract readonly name: string;
+	abstract readonly stepId: string;
+	abstract readonly name: string;
 
-    // Called by engine
-    async run(
-        context: PipelineContext,
-        execContext: StepExecutionContext
-    ): Promise<PipelineContext>;
+	// Called by engine
+	async run(context: PipelineContext, execContext: StepExecutionContext): Promise<PipelineContext>;
 
-    // Implemented by each step
-    abstract execute(
-        context: MutableGenerationContext,
-        execContext: StepExecutionContext
-    ): Promise<MutableGenerationContext>;
+	// Implemented by each step
+	abstract execute(
+		context: MutableGenerationContext,
+		execContext: StepExecutionContext
+	): Promise<MutableGenerationContext>;
 
-    // Metric accumulation
-    protected accumulateMetrics(
-        metrics: StandardPipelineMetrics,
-        usage: TokenUsage,
-        cost?: CostBreakdown
-    ): void;
+	// Metric accumulation
+	protected accumulateMetrics(metrics: StandardPipelineMetrics, usage: TokenUsage, cost?: CostBreakdown): void;
 
-    // Warning helper
-    protected addWarning(
-        context: MutableGenerationContext,
-        message: string
-    ): void;
+	// Warning helper
+	protected addWarning(context: MutableGenerationContext, message: string): void;
 }
 ```
 
@@ -270,31 +258,31 @@ abstract class BasePipelineStep implements IBuiltInStepExecutor {
 
 ```typescript
 type BuiltInStepId =
-    | 'prompt-comparison'
-    | 'prompt-processing'
-    | 'domain-detection'
-    | 'ai-first-items-generation'
-    | 'search-queries-generation'
-    | 'web-search'
-    | 'content-retrieval'
-    | 'content-filtering'
-    | 'items-extraction'
-    | 'deduplication-and-data-aggregation'
-    | 'categories-tags-processing'
-    | 'sources-validation'
-    | 'badges-processing'
-    | 'image-capture'
-    | 'markdown-generation';
+	| 'prompt-comparison'
+	| 'prompt-processing'
+	| 'domain-detection'
+	| 'ai-first-items-generation'
+	| 'search-queries-generation'
+	| 'web-search'
+	| 'content-retrieval'
+	| 'content-filtering'
+	| 'items-extraction'
+	| 'deduplication-and-data-aggregation'
+	| 'categories-tags-processing'
+	| 'sources-validation'
+	| 'badges-processing'
+	| 'image-capture'
+	| 'markdown-generation';
 ```
 
 ### Metrics
 
 ```typescript
 interface StandardPipelineMetrics extends PipelineMetrics {
-    urlsExtracted: number;
-    pagesRetrieved: number;
-    itemsExtracted: number;
-    itemsAfterDedup: number;
+	urlsExtracted: number;
+	pagesRetrieved: number;
+	itemsExtracted: number;
+	itemsAfterDedup: number;
 }
 ```
 
@@ -306,9 +294,9 @@ Compares a new prompt with the existing directory's previous prompt (for `CREATE
 
 ```typescript
 const schema = z.object({
-    areRelated: z.boolean(),
-    confidence: z.number().min(0).max(1),
-    reasoning: z.string()
+	areRelated: z.boolean(),
+	confidence: z.number().min(0).max(1),
+	reasoning: z.string()
 });
 ```
 
@@ -333,12 +321,12 @@ Classifies the directory's domain to optimize downstream extraction:
 
 ```typescript
 interface DomainAnalysis {
-    domain_type: 'software' | 'ecommerce' | 'services' | 'general';
-    confidence: number;
-    item_noun: string;
-    expected_attributes: string[];
-    official_source_patterns: string[];
-    aggregator_domains: string[];
+	domain_type: 'software' | 'ecommerce' | 'services' | 'general';
+	confidence: number;
+	item_noun: string;
+	expected_attributes: string[];
+	official_source_patterns: string[];
+	aggregator_domains: string[];
 }
 ```
 
@@ -433,15 +421,15 @@ Generates markdown descriptions for each item using the content cache populated 
 // Configuration is passed through the generation request:
 
 const request = {
-    prompt: "Create a directory of the best React component libraries",
-    config: {
-        max_items: 30,
-        max_search_queries: 8,
-        max_results_per_query: 10,
-        enable_badges: true,
-        enable_screenshots: true,
-        generation_method: 'CREATE'
-    }
+	prompt: 'Create a directory of the best React component libraries',
+	config: {
+		max_items: 30,
+		max_search_queries: 8,
+		max_results_per_query: 10,
+		enable_badges: true,
+		enable_screenshots: true,
+		generation_method: 'CREATE'
+	}
 };
 ```
 
@@ -449,12 +437,12 @@ const request = {
 
 ```typescript
 const request = {
-    prompt: "Add more animation and charting libraries",
-    config: {
-        generation_method: 'CREATE_UPDATE',
-        max_items: 50,
-        source_urls: ['https://github.com/topics/react-components']
-    }
+	prompt: 'Add more animation and charting libraries',
+	config: {
+		generation_method: 'CREATE_UPDATE',
+		max_items: 50,
+		source_urls: ['https://github.com/topics/react-components']
+	}
 };
 ```
 
@@ -462,11 +450,11 @@ const request = {
 
 ```typescript
 const request = {
-    prompt: "Create a directory of DevOps tools. Categories: CI/CD, Monitoring, Infrastructure. Start with CI/CD.",
-    config: {
-        initial_categories: ['CI/CD', 'Monitoring', 'Infrastructure'],
-        priority_categories: ['CI/CD']
-    }
+	prompt: 'Create a directory of DevOps tools. Categories: CI/CD, Monitoring, Infrastructure. Start with CI/CD.',
+	config: {
+		initial_categories: ['CI/CD', 'Monitoring', 'Infrastructure'],
+		priority_categories: ['CI/CD']
+	}
 };
 ```
 
@@ -482,14 +470,14 @@ Each step wraps its execution in try/catch blocks. Errors are handled in three w
 
 ### Common Error Patterns
 
-| Error | Step | Handling |
-|-------|------|----------|
-| AI call failure | prompt-processing | Falls back to regex URL extraction |
-| Search provider error | web-search | Adds warning with provider name, continues |
-| Content extraction failure | web-search | Logs warning, skips URL, continues batch |
-| Screenshot capture failure | image-capture | Logs error, item remains without image |
-| Domain detection failure | domain-detection | Falls back to 'software' domain type |
-| Prompt comparison failure | prompt-comparison | Falls back to Jaccard word similarity |
+| Error                      | Step              | Handling                                   |
+| -------------------------- | ----------------- | ------------------------------------------ |
+| AI call failure            | prompt-processing | Falls back to regex URL extraction         |
+| Search provider error      | web-search        | Adds warning with provider name, continues |
+| Content extraction failure | web-search        | Logs warning, skips URL, continues batch   |
+| Screenshot capture failure | image-capture     | Logs error, item remains without image     |
+| Domain detection failure   | domain-detection  | Falls back to 'software' domain type       |
+| Prompt comparison failure  | prompt-comparison | Falls back to Jaccard word similarity      |
 
 ### Metrics Tracking
 

@@ -11,14 +11,14 @@ The `@ever-works/trigger-tasks` package provides background task execution for t
 
 ## Package Overview
 
-| Property | Value |
-|---|---|
-| **Package name** | `@ever-works/trigger-tasks` |
-| **Location** | `platform/packages/tasks/` |
-| **Runtime** | Node.js (Trigger.dev worker) |
-| **Max duration** | 5 hours (generation), 2 hours (import) |
-| **Default machine** | `medium-1x` |
-| **Retry strategy** | Up to 3 attempts with exponential backoff (configurable) |
+| Property            | Value                                                    |
+| ------------------- | -------------------------------------------------------- |
+| **Package name**    | `@ever-works/trigger-tasks`                              |
+| **Location**        | `platform/packages/tasks/`                               |
+| **Runtime**         | Node.js (Trigger.dev worker)                             |
+| **Max duration**    | 5 hours (generation), 2 hours (import)                   |
+| **Default machine** | `medium-1x`                                              |
+| **Retry strategy**  | Up to 3 attempts with exponential backoff (configurable) |
 
 ## Architecture
 
@@ -47,23 +47,31 @@ The primary task that orchestrates AI-powered directory content generation.
 ```typescript
 // src/tasks/trigger/directory-generation.task.ts
 export const directoryGenerationTask = task({
-    id: 'directory-generation',
-    maxDuration: 3600 * 5, // 5 hours
-    onFailure: async ({ payload, error }) => { /* ... */ },
-    onCancel: async ({ payload }) => { /* ... */ },
-    run: async (payload: DirectoryGenerationPayload) => {
-        return withWorkerContext('DirectoryGeneration', async (appContext) => {
-            const { orchestrator, directory, user } = await createTaskContext(
-                appContext, payload, TriggerGenerationOrchestrator
-            );
-            await orchestrator.run({
-                directory, user, dto: payload.dto,
-                historyId: payload.historyId,
-                historyStartedAt: payload.historyStartedAt,
-            });
-            return { status: 'completed', directoryId: payload.directoryId };
-        });
-    },
+	id: 'directory-generation',
+	maxDuration: 3600 * 5, // 5 hours
+	onFailure: async ({ payload, error }) => {
+		/* ... */
+	},
+	onCancel: async ({ payload }) => {
+		/* ... */
+	},
+	run: async (payload: DirectoryGenerationPayload) => {
+		return withWorkerContext('DirectoryGeneration', async (appContext) => {
+			const { orchestrator, directory, user } = await createTaskContext(
+				appContext,
+				payload,
+				TriggerGenerationOrchestrator
+			);
+			await orchestrator.run({
+				directory,
+				user,
+				dto: payload.dto,
+				historyId: payload.historyId,
+				historyStartedAt: payload.historyStartedAt
+			});
+			return { status: 'completed', directoryId: payload.directoryId };
+		});
+	}
 });
 ```
 
@@ -73,17 +81,19 @@ Handles importing directory content from external sources such as GitHub reposit
 
 ```typescript
 export const directoryImportTask = task({
-    id: 'directory-import',
-    maxDuration: 3600 * 2, // 2 hours
-    run: async (payload: DirectoryImportPayload) => {
-        return withWorkerContext('DirectoryImport', async (appContext) => {
-            const { orchestrator, directory, user, gitToken } = await createTaskContext(
-                appContext, payload, TriggerImportOrchestrator
-            );
-            await orchestrator.run({ directory, user, payload, gitToken });
-            return { status: 'completed', directoryId: payload.directoryId };
-        });
-    },
+	id: 'directory-import',
+	maxDuration: 3600 * 2, // 2 hours
+	run: async (payload: DirectoryImportPayload) => {
+		return withWorkerContext('DirectoryImport', async (appContext) => {
+			const { orchestrator, directory, user, gitToken } = await createTaskContext(
+				appContext,
+				payload,
+				TriggerImportOrchestrator
+			);
+			await orchestrator.run({ directory, user, payload, gitToken });
+			return { status: 'completed', directoryId: payload.directoryId };
+		});
+	}
 });
 ```
 
@@ -93,14 +103,14 @@ A cron-based task that polls for due scheduled directory generations and dispatc
 
 ```typescript
 export const directoryScheduleDispatcherTask = schedules.task({
-    id: 'directory-schedule-dispatcher',
-    cron: `*/${interval} * * * *`, // configurable interval
-    run: async () => {
-        const appContext = await NestFactory.createApplicationContext(TriggerInternalModule);
-        const dispatcher = appContext.get(DirectoryScheduleDispatcherService);
-        const dispatched = await dispatcher.dispatchDue();
-        return { dispatched, intervalMinutes: interval };
-    },
+	id: 'directory-schedule-dispatcher',
+	cron: `*/${interval} * * * *`, // configurable interval
+	run: async () => {
+		const appContext = await NestFactory.createApplicationContext(TriggerInternalModule);
+		const dispatcher = appContext.get(DirectoryScheduleDispatcherService);
+		const dispatched = await dispatcher.dispatchDue();
+		return { dispatched, intervalMinutes: interval };
+	}
 });
 ```
 
@@ -108,10 +118,10 @@ export const directoryScheduleDispatcherTask = schedules.task({
 
 The `TriggerService` runs in the NestJS API and implements both `DirectoryGenerationDispatcher` and `DirectoryImportDispatcher` interfaces. It lazily configures the Trigger.dev SDK on first use.
 
-| Method | Description |
-|---|---|
+| Method                                 | Description                                       |
+| -------------------------------------- | ------------------------------------------------- |
 | `dispatchDirectoryGeneration(payload)` | Triggers a generation task with tags for tracking |
-| `dispatchDirectoryImport(payload)` | Triggers an import task with source-type tags |
+| `dispatchDirectoryImport(payload)`     | Triggers an import task with source-type tags     |
 
 The service supports configurable machine sizes: `micro`, `small-1x`, `small-2x`, `medium-1x`, `medium-2x`, `large-1x`, `large-2x`.
 
@@ -123,10 +133,10 @@ Bootstraps a full NestJS application context inside the Trigger.dev worker, exec
 
 ```typescript
 async function withWorkerContext<T>(
-    loggerName: string,
-    fn: (appContext: INestApplicationContext) => Promise<T>,
-    module: Type<any> = TriggerWorkerModule
-): Promise<T>
+	loggerName: string,
+	fn: (appContext: INestApplicationContext) => Promise<T>,
+	module: Type<any> = TriggerWorkerModule
+): Promise<T>;
 ```
 
 ### `createTaskContext`
@@ -135,10 +145,10 @@ Shared bootstrap logic that hydrates plugins, fetches directory context from the
 
 ```typescript
 async function createTaskContext<T>(
-    appContext: INestApplicationContext,
-    payload: { directoryId: string; userId: string },
-    orchestratorClass: Type<T>
-): Promise<{ user: User; directory: Directory; orchestrator: T; gitToken?: string }>
+	appContext: INestApplicationContext,
+	payload: { directoryId: string; userId: string },
+	orchestratorClass: Type<T>
+): Promise<{ user: User; directory: Directory; orchestrator: T; gitToken?: string }>;
 ```
 
 ## Orchestrators
@@ -149,11 +159,11 @@ Orchestrators manage the execution lifecycle of tasks including status tracking,
 
 Abstract base class providing common functionality:
 
-| Method | Description |
-|---|---|
-| `handleFailure(options)` | Records error state, updates history, emits completion |
-| `handleCancellation(options)` | Records cancelled state with duration calculation |
-| `handleErrorNotification(error, user, directory)` | Classifies errors and sends notifications |
+| Method                                            | Description                                            |
+| ------------------------------------------------- | ------------------------------------------------------ |
+| `handleFailure(options)`                          | Records error state, updates history, emits completion |
+| `handleCancellation(options)`                     | Records cancelled state with duration calculation      |
+| `handleErrorNotification(error, user, directory)` | Classifies errors and sends notifications              |
 
 ### TriggerGenerationOrchestrator
 
@@ -181,10 +191,10 @@ Coordinates directory imports from external sources:
 
 HTTP client for communication between the Trigger.dev worker and the main API. Uses shared secret authentication and SuperJSON serialization.
 
-| Method | Description |
-|---|---|
-| `fetchDirectoryContext(directoryId, userId)` | Fetches directory and user data from the API |
-| `callRemote(name, method, args)` | Forwards method calls to API-side services via RPC |
+| Method                                       | Description                                        |
+| -------------------------------------------- | -------------------------------------------------- |
+| `fetchDirectoryContext(directoryId, userId)` | Fetches directory and user data from the API       |
+| `callRemote(name, method, args)`             | Forwards method calls to API-side services via RPC |
 
 Features automatic retry with exponential backoff (3 attempts, 500ms base delay) for 5xx errors and network failures.
 
@@ -215,11 +225,11 @@ A custom `LoggerService` implementation that forwards NestJS logs to Trigger.dev
 
 ## Module Structure
 
-| Module | Purpose |
-|---|---|
-| `TriggerWorkerModule` | Root module for worker context |
-| `TriggerInternalModule` | Minimal module for schedule dispatcher |
-| `TriggerFacadesModule` | Facade services with remote proxies |
-| `TriggerPipelineModule` | Pipeline execution services |
-| `TriggerPluginsModule` | Plugin system with local store |
-| `TriggerRemoteCacheModule` | Cache services via remote proxy |
+| Module                     | Purpose                                |
+| -------------------------- | -------------------------------------- |
+| `TriggerWorkerModule`      | Root module for worker context         |
+| `TriggerInternalModule`    | Minimal module for schedule dispatcher |
+| `TriggerFacadesModule`     | Facade services with remote proxies    |
+| `TriggerPipelineModule`    | Pipeline execution services            |
+| `TriggerPluginsModule`     | Plugin system with local store         |
+| `TriggerRemoteCacheModule` | Cache services via remote proxy        |

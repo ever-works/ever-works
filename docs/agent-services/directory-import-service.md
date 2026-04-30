@@ -1,7 +1,7 @@
 ---
 id: directory-import-service
-title: "DirectoryImportService Deep Dive"
-sidebar_label: "Directory Import"
+title: 'DirectoryImportService Deep Dive'
+sidebar_label: 'Directory Import'
 sidebar_position: 12
 ---
 
@@ -46,10 +46,10 @@ DirectoryImportService
 
 Analyzes a repository URL to detect its type (data repo, awesome list, etc.) and structure.
 
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| `dto` | `AnalyzeRepositoryDto` | Contains `sourceUrl` and optional `gitProvider` |
-| `user` | `User` | The requesting user |
+| Parameter | Type                   | Description                                     |
+| --------- | ---------------------- | ----------------------------------------------- |
+| `dto`     | `AnalyzeRepositoryDto` | Contains `sourceUrl` and optional `gitProvider` |
+| `user`    | `User`                 | The requesting user                             |
 
 **Returns:** `Promise<AnalyzeRepositoryResponseDto>` -- includes detected type, repository structure, slug conflicts, and related repos.
 
@@ -57,10 +57,10 @@ Analyzes a repository URL to detect its type (data repo, awesome list, etc.) and
 
 Checks if a repository can be linked as an existing directory (verifies write access, related repos).
 
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| `dto` | `AnalyzeRepositoryDto` | Contains `sourceUrl` and optional `gitProvider` |
-| `user` | `User` | The requesting user |
+| Parameter | Type                   | Description                                     |
+| --------- | ---------------------- | ----------------------------------------------- |
+| `dto`     | `AnalyzeRepositoryDto` | Contains `sourceUrl` and optional `gitProvider` |
+| `user`    | `User`                 | The requesting user                             |
 
 **Returns:** `Promise<AnalyzeForLinkingResponseDto>` -- includes `canLink`, `hasWriteAccess`, and `relatedRepos` status.
 
@@ -68,10 +68,10 @@ Checks if a repository can be linked as an existing directory (verifies write ac
 
 Lists repositories from the user's connected git provider account with pagination and search.
 
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| `dto` | `GetUserRepositoriesDto` | Pagination, search, and filter options |
-| `user` | `User` | The requesting user |
+| Parameter | Type                     | Description                            |
+| --------- | ------------------------ | -------------------------------------- |
+| `dto`     | `GetUserRepositoriesDto` | Pagination, search, and filter options |
+| `user`    | `User`                   | The requesting user                    |
 
 **Returns:** `Promise<GetUserRepositoriesResponseDto>` -- paginated list of `GitRepoDto` objects.
 
@@ -79,11 +79,11 @@ Lists repositories from the user's connected git provider account with paginatio
 
 Creates a new directory and starts the import process.
 
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| `dto` | `ImportDirectoryDto` | Import configuration (source URL, type, name, providers) |
-| `user` | `User` | The requesting user |
-| `context` | `OperationTriggerContext` (optional) | Trigger context (user, schedule, or API) |
+| Parameter | Type                                 | Description                                              |
+| --------- | ------------------------------------ | -------------------------------------------------------- |
+| `dto`     | `ImportDirectoryDto`                 | Import configuration (source URL, type, name, providers) |
+| `user`    | `User`                               | The requesting user                                      |
+| `context` | `OperationTriggerContext` (optional) | Trigger context (user, schedule, or API)                 |
 
 **Returns:** `Promise<ImportDirectoryResponseDto>` -- includes status, directory ID, and history ID.
 
@@ -91,10 +91,10 @@ Creates a new directory and starts the import process.
 
 Re-syncs an existing directory from its original source repository.
 
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| `directory` | `Directory` | The directory entity to sync |
-| `user` | `User` | The user performing the sync |
+| Parameter   | Type                | Description                        |
+| ----------- | ------------------- | ---------------------------------- |
+| `directory` | `Directory`         | The directory entity to sync       |
+| `user`      | `User`              | The user performing the sync       |
 | `historyId` | `string` (optional) | Generation history entry to update |
 
 **Returns:** `Promise<DirectoryImportResult>` -- sync outcome with item counts and error codes.
@@ -123,8 +123,8 @@ The `dispatchImportTask()` method uses a two-tier approach:
 
 1. **Trigger.dev dispatch** (preferred) -- sends the import payload to a background worker via the `DirectoryImportDispatcher`
 2. **In-process fallback** -- if Trigger.dev dispatch fails:
-   - Schedule-triggered imports run `await` (synchronous) to prevent concurrency explosion
-   - User/API-triggered imports run fire-and-forget (`void`)
+    - Schedule-triggered imports run `await` (synchronous) to prevent concurrency explosion
+    - User/API-triggered imports run fire-and-forget (`void`)
 
 ### Sync Scheduling
 
@@ -132,20 +132,20 @@ For `awesome_readme` imports, the service automatically creates a weekly sync sc
 
 ## Database Interactions
 
-| Repository | Methods Used | Purpose |
-|------------|-------------|---------|
-| `DirectoryRepository` | `findByOwnerAndSlug`, `create`, `update`, `updateGenerateStatus`, `recordGenerationStartTime`, `recordGenerationFinishTime` | Directory CRUD and status tracking |
-| `DirectoryGenerationHistoryRepository` | `createEntry`, `updateEntry`, `deleteEntry` | Generation history lifecycle |
+| Repository                             | Methods Used                                                                                                                | Purpose                            |
+| -------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- | ---------------------------------- |
+| `DirectoryRepository`                  | `findByOwnerAndSlug`, `create`, `update`, `updateGenerateStatus`, `recordGenerationStartTime`, `recordGenerationFinishTime` | Directory CRUD and status tracking |
+| `DirectoryGenerationHistoryRepository` | `createEntry`, `updateEntry`, `deleteEntry`                                                                                 | Generation history lifecycle       |
 
 ## Event System
 
 ### Events Emitted
 
-| Event | When |
-|-------|------|
-| `DirectoryGenerationCompletedEvent` | After successful import completion |
+| Event                               | When                                            |
+| ----------------------------------- | ----------------------------------------------- |
+| `DirectoryGenerationCompletedEvent` | After successful import completion              |
 | `DirectoryGenerationCompletedEvent` | After import failure (for cleanup/notification) |
-| `DirectoryGenerationCompletedEvent` | After linking existing repos |
+| `DirectoryGenerationCompletedEvent` | After linking existing repos                    |
 
 ## Error Handling
 
@@ -161,21 +161,21 @@ For `awesome_readme` imports, the service automatically creates a weekly sync sc
 ```typescript
 // Analyze a repository before importing
 const analysis = await importService.analyzeRepository(
-    { sourceUrl: 'https://github.com/sindresorhus/awesome-nodejs' },
-    currentUser,
+	{ sourceUrl: 'https://github.com/sindresorhus/awesome-nodejs' },
+	currentUser
 );
 // analysis.detectedType === 'awesome_readme'
 
 // Import from an awesome list
 const result = await importService.initiateImport(
-    {
-        sourceUrl: 'https://github.com/sindresorhus/awesome-nodejs',
-        sourceType: ImportSourceTypeEnum.AWESOME_README,
-        name: 'Awesome Node.js',
-        gitProvider: 'github',
-        sync: true,
-    },
-    currentUser,
+	{
+		sourceUrl: 'https://github.com/sindresorhus/awesome-nodejs',
+		sourceType: ImportSourceTypeEnum.AWESOME_README,
+		name: 'Awesome Node.js',
+		gitProvider: 'github',
+		sync: true
+	},
+	currentUser
 );
 // result.status === 'success', result.directoryId === '...'
 
@@ -186,12 +186,12 @@ const syncResult = await importService.syncDirectory(existingDirectory, currentU
 
 ## Configuration
 
-| Setting | Description |
-|---------|-------------|
-| Git Provider | Required for all import operations; specified in the DTO |
-| Deploy Provider | Optional; used when generating website repos |
-| AI Provider | Optional override via `providers.ai` in the DTO |
-| Sync Schedule | Automatically set to `WEEKLY` for awesome_readme imports |
+| Setting         | Description                                              |
+| --------------- | -------------------------------------------------------- |
+| Git Provider    | Required for all import operations; specified in the DTO |
+| Deploy Provider | Optional; used when generating website repos             |
+| AI Provider     | Optional override via `providers.ai` in the DTO          |
+| Sync Schedule   | Automatically set to `WEEKLY` for awesome_readme imports |
 
 ## Related Services
 

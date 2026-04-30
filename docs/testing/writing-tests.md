@@ -28,46 +28,46 @@ import { DirectoryPluginRepository } from '../repositories/directory-plugin.repo
 import { UserPluginRepository } from '../repositories/user-plugin.repository';
 
 describe('PluginRegistryService', () => {
-    let service: PluginRegistryService;
-    let eventEmitter: EventEmitter2;
-    let directoryPluginRepository: jest.Mocked<DirectoryPluginRepository>;
+	let service: PluginRegistryService;
+	let eventEmitter: EventEmitter2;
+	let directoryPluginRepository: jest.Mocked<DirectoryPluginRepository>;
 
-    beforeEach(async () => {
-        directoryPluginRepository = {
-            findByDirectoryAndPlugin: jest.fn(),
-        } as unknown as jest.Mocked<DirectoryPluginRepository>;
+	beforeEach(async () => {
+		directoryPluginRepository = {
+			findByDirectoryAndPlugin: jest.fn()
+		} as unknown as jest.Mocked<DirectoryPluginRepository>;
 
-        const module: TestingModule = await Test.createTestingModule({
-            providers: [
-                PluginRegistryService,
-                {
-                    provide: EventEmitter2,
-                    useValue: { emit: jest.fn(), on: jest.fn(), off: jest.fn() },
-                },
-                {
-                    provide: DirectoryPluginRepository,
-                    useValue: directoryPluginRepository,
-                },
-                {
-                    provide: UserPluginRepository,
-                    useValue: { findByUserAndPlugin: jest.fn() },
-                },
-            ],
-        }).compile();
+		const module: TestingModule = await Test.createTestingModule({
+			providers: [
+				PluginRegistryService,
+				{
+					provide: EventEmitter2,
+					useValue: { emit: jest.fn(), on: jest.fn(), off: jest.fn() }
+				},
+				{
+					provide: DirectoryPluginRepository,
+					useValue: directoryPluginRepository
+				},
+				{
+					provide: UserPluginRepository,
+					useValue: { findByUserAndPlugin: jest.fn() }
+				}
+			]
+		}).compile();
 
-        service = module.get<PluginRegistryService>(PluginRegistryService);
-        eventEmitter = module.get<EventEmitter2>(EventEmitter2);
-    });
+		service = module.get<PluginRegistryService>(PluginRegistryService);
+		eventEmitter = module.get<EventEmitter2>(EventEmitter2);
+	});
 
-    afterEach(() => {
-        service.clear();
-    });
+	afterEach(() => {
+		service.clear();
+	});
 
-    it('should register a plugin', () => {
-        const plugin = createMockPlugin('test-plugin');
-        service.register(plugin, createMockManifest('test-plugin'));
-        expect(service.get('test-plugin')).toBe(plugin);
-    });
+	it('should register a plugin', () => {
+		const plugin = createMockPlugin('test-plugin');
+		service.register(plugin, createMockManifest('test-plugin'));
+		expect(service.get('test-plugin')).toBe(plugin);
+	});
 });
 ```
 
@@ -85,59 +85,51 @@ Functions without NestJS dependencies are tested directly without the testing mo
 ### Example: Testing Pair Selection
 
 ```typescript
-import {
-    selectNextPair,
-    buildPairKey,
-    countRemainingPairs,
-} from '../pair-selector';
+import { selectNextPair, buildPairKey, countRemainingPairs } from '../pair-selector';
 import type { ItemData } from '@ever-works/contracts';
 
 function makeItem(slug: string, category: string): ItemData {
-    return {
-        name: slug.charAt(0).toUpperCase() + slug.slice(1),
-        description: `Description of ${slug}`,
-        source_url: `https://${slug}.example.com`,
-        category,
-        slug,
-        tags: [],
-    };
+	return {
+		name: slug.charAt(0).toUpperCase() + slug.slice(1),
+		description: `Description of ${slug}`,
+		source_url: `https://${slug}.example.com`,
+		category,
+		slug,
+		tags: []
+	};
 }
 
 describe('buildPairKey', () => {
-    it('should produce consistent order-independent keys', () => {
-        expect(buildPairKey('vercel', 'netlify')).toBe('netlify--vercel');
-        expect(buildPairKey('netlify', 'vercel')).toBe('netlify--vercel');
-    });
+	it('should produce consistent order-independent keys', () => {
+		expect(buildPairKey('vercel', 'netlify')).toBe('netlify--vercel');
+		expect(buildPairKey('netlify', 'vercel')).toBe('netlify--vercel');
+	});
 });
 
 describe('selectNextPair', () => {
-    const items = [
-        makeItem('vercel', 'hosting'),
-        makeItem('netlify', 'hosting'),
-        makeItem('cloudflare', 'hosting'),
-    ];
+	const items = [makeItem('vercel', 'hosting'), makeItem('netlify', 'hosting'), makeItem('cloudflare', 'hosting')];
 
-    it('should return the first available pair when none generated', () => {
-        const result = selectNextPair({
-            items,
-            generatedPairs: [],
-            minItemsForComparison: 3,
-            maxComparisons: 50,
-        });
-        expect(result).not.toBeNull();
-        expect(result!.itemA.slug).toBeDefined();
-    });
+	it('should return the first available pair when none generated', () => {
+		const result = selectNextPair({
+			items,
+			generatedPairs: [],
+			minItemsForComparison: 3,
+			maxComparisons: 50
+		});
+		expect(result).not.toBeNull();
+		expect(result!.itemA.slug).toBeDefined();
+	});
 
-    it('should skip already-generated pairs', () => {
-        const first = selectNextPair({
-            items,
-            generatedPairs: ['cloudflare--vercel'],
-            minItemsForComparison: 3,
-            maxComparisons: 50,
-        });
-        const key = buildPairKey(first!.itemA.slug, first!.itemB.slug);
-        expect(key).not.toBe('cloudflare--vercel');
-    });
+	it('should skip already-generated pairs', () => {
+		const first = selectNextPair({
+			items,
+			generatedPairs: ['cloudflare--vercel'],
+			minItemsForComparison: 3,
+			maxComparisons: 50
+		});
+		const key = buildPairKey(first!.itemA.slug, first!.itemB.slug);
+		expect(key).not.toBe('cloudflare--vercel');
+	});
 });
 ```
 
@@ -146,25 +138,26 @@ describe('selectNextPair', () => {
 Define reusable factory functions for test entities:
 
 ```typescript
-const createMockPlugin = (id: string, category = 'utility'): IPlugin => ({
-    id,
-    name: `Plugin ${id}`,
-    version: '1.0.0',
-    category,
-    capabilities: ['test-capability'],
-    settingsSchema: { type: 'object', properties: {} },
-    configurationMode: 'hybrid',
-    onLoad: jest.fn(),
-    onUnload: jest.fn(),
-}) as unknown as IPlugin;
+const createMockPlugin = (id: string, category = 'utility'): IPlugin =>
+	({
+		id,
+		name: `Plugin ${id}`,
+		version: '1.0.0',
+		category,
+		capabilities: ['test-capability'],
+		settingsSchema: { type: 'object', properties: {} },
+		configurationMode: 'hybrid',
+		onLoad: jest.fn(),
+		onUnload: jest.fn()
+	}) as unknown as IPlugin;
 
 const createMockManifest = (id: string, category = 'utility'): PluginManifest => ({
-    id,
-    name: `Plugin ${id}`,
-    version: '1.0.0',
-    description: 'Test plugin',
-    category,
-    capabilities: ['test-capability'],
+	id,
+	name: `Plugin ${id}`,
+	version: '1.0.0',
+	description: 'Test plugin',
+	category,
+	capabilities: ['test-capability']
 });
 ```
 
@@ -177,29 +170,29 @@ The agent package uses the facade pattern to abstract external services. Tests m
 ```typescript
 // Mock GitFacadeService
 const mockGitFacade = {
-    cloneOrPull: jest.fn().mockResolvedValue('/tmp/repo'),
-    add: jest.fn().mockResolvedValue(undefined),
-    commit: jest.fn().mockResolvedValue(undefined),
-    push: jest.fn().mockResolvedValue(undefined),
+	cloneOrPull: jest.fn().mockResolvedValue('/tmp/repo'),
+	add: jest.fn().mockResolvedValue(undefined),
+	commit: jest.fn().mockResolvedValue(undefined),
+	push: jest.fn().mockResolvedValue(undefined)
 };
 
 // Mock AiFacadeService
 const mockAiFacade = {
-    askJson: jest.fn().mockResolvedValue({
-        result: { items: [] },
-        usage: { totalTokens: 100 },
-        cost: 0.001,
-    }),
-    createChatCompletion: jest.fn().mockResolvedValue({
-        choices: [{ message: { content: 'AI response' } }],
-    }),
+	askJson: jest.fn().mockResolvedValue({
+		result: { items: [] },
+		usage: { totalTokens: 100 },
+		cost: 0.001
+	}),
+	createChatCompletion: jest.fn().mockResolvedValue({
+		choices: [{ message: { content: 'AI response' } }]
+	})
 };
 
 // Mock Repository
 const mockDirectoryRepository = {
-    findById: jest.fn().mockResolvedValue(mockDirectory),
-    update: jest.fn().mockResolvedValue(undefined),
-    increment: jest.fn().mockResolvedValue(undefined),
+	findById: jest.fn().mockResolvedValue(mockDirectory),
+	update: jest.fn().mockResolvedValue(undefined),
+	increment: jest.fn().mockResolvedValue(undefined)
 };
 ```
 
@@ -233,10 +226,10 @@ Plugin tests use Vitest with the `globals: true` option, so `describe`, `it`, an
 ```typescript
 // packages/plugins/openai/src/openai.spec.ts
 describe('OpenAI Plugin', () => {
-    it('should have correct metadata', () => {
-        expect(plugin.id).toBe('openai');
-        expect(plugin.category).toBe('ai-provider');
-    });
+	it('should have correct metadata', () => {
+		expect(plugin.id).toBe('openai');
+		expect(plugin.category).toBe('ai-provider');
+	});
 });
 ```
 

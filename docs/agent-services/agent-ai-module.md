@@ -60,6 +60,7 @@ askJson<T>(
 ```
 
 Features:
+
 - Renders prompt templates with variable substitution
 - Sends to the resolved AI provider with JSON output mode
 - Parses and validates the response against the provided Zod schema
@@ -95,11 +96,12 @@ Returns an `AsyncGenerator` that yields response chunks as they arrive from the 
 The facade implements intelligent model routing based on task complexity:
 
 **Resolution priority:**
+
 1. `modelOverride` in request options (explicit model selection)
 2. Complexity-based routing from `options.complexity`:
-   - `simple` -- uses the provider's cheapest/fastest model
-   - `medium` -- uses the provider's default model
-   - `complex` -- uses the provider's most capable model
+    - `simple` -- uses the provider's cheapest/fastest model
+    - `medium` -- uses the provider's default model
+    - `complex` -- uses the provider's most capable model
 3. Provider's `defaultModel` setting
 4. Plugin's built-in default model
 
@@ -110,6 +112,7 @@ When an `askJson` call fails validation (the AI returns malformed JSON or the re
 ### OpenRouter Model Lookup
 
 For the OpenRouter provider, a dedicated `OpenRouterModelLookup` service resolves model metadata (context length, pricing) with a 1-hour in-memory cache. This is used for:
+
 - Determining maximum context length for prompt truncation
 - Cost estimation based on input/output token pricing
 
@@ -176,9 +179,9 @@ estimateCost(
 
 ```typescript
 interface FacadeOptions {
-    userId?: string;
-    directoryId?: string;
-    providerId?: string;      // Explicit provider override
+	userId?: string;
+	directoryId?: string;
+	providerId?: string; // Explicit provider override
 }
 ```
 
@@ -186,9 +189,9 @@ interface FacadeOptions {
 
 ```typescript
 interface TokenUsage {
-    promptTokens: number;
-    completionTokens: number;
-    totalTokens: number;
+	promptTokens: number;
+	completionTokens: number;
+	totalTokens: number;
 }
 ```
 
@@ -200,29 +203,29 @@ Each AI provider plugin defines its settings via JSON Schema in `package.json`:
 
 ```json
 {
-    "everworks.plugin": {
-        "settings": {
-            "apiKey": {
-                "type": "string",
-                "x-secret": true,
-                "x-envVar": "OPENAI_API_KEY",
-                "description": "API key for the provider"
-            },
-            "defaultModel": {
-                "type": "string",
-                "default": "gpt-4o",
-                "description": "Default model for completions"
-            },
-            "simpleModel": {
-                "type": "string",
-                "default": "gpt-4o-mini"
-            },
-            "complexModel": {
-                "type": "string",
-                "default": "gpt-4o"
-            }
-        }
-    }
+	"everworks.plugin": {
+		"settings": {
+			"apiKey": {
+				"type": "string",
+				"x-secret": true,
+				"x-envVar": "OPENAI_API_KEY",
+				"description": "API key for the provider"
+			},
+			"defaultModel": {
+				"type": "string",
+				"default": "gpt-4o",
+				"description": "Default model for completions"
+			},
+			"simpleModel": {
+				"type": "string",
+				"default": "gpt-4o-mini"
+			},
+			"complexModel": {
+				"type": "string",
+				"default": "gpt-4o"
+			}
+		}
+	}
 }
 ```
 
@@ -237,24 +240,24 @@ Settings are resolved using the 4-level hierarchy (highest priority first):
 
 ### Supported Providers
 
-| Provider | Plugin ID | Models |
-|---|---|---|
-| OpenAI | `openai` | GPT-4o, GPT-4o-mini, GPT-4-turbo, o1, o3 |
-| Anthropic | `anthropic` | Claude Opus, Claude Sonnet, Claude Haiku |
-| Google | `google` | Gemini Pro, Gemini Flash |
-| Groq | `groq` | Llama, Mixtral (fast inference) |
-| Ollama | `ollama` | Any locally hosted model |
-| OpenRouter | `openrouter` | Multi-provider gateway (200+ models) |
+| Provider   | Plugin ID    | Models                                   |
+| ---------- | ------------ | ---------------------------------------- |
+| OpenAI     | `openai`     | GPT-4o, GPT-4o-mini, GPT-4-turbo, o1, o3 |
+| Anthropic  | `anthropic`  | Claude Opus, Claude Sonnet, Claude Haiku |
+| Google     | `google`     | Gemini Pro, Gemini Flash                 |
+| Groq       | `groq`       | Llama, Mixtral (fast inference)          |
+| Ollama     | `ollama`     | Any locally hosted model                 |
+| OpenRouter | `openrouter` | Multi-provider gateway (200+ models)     |
 
 ## Dependencies
 
-| Dependency | Purpose |
-|---|---|
-| `@ever-works/plugin` | `IAiProvider`, `PLUGIN_CAPABILITIES.AI_PROVIDER` |
-| `@ever-works/plugin/ai` | `AiOperations` wrapper around LangChain |
-| `@langchain/core` | Chat models, messages, streaming |
-| `@langchain/openai` | OpenAI-compatible provider integration |
-| `zod` | Schema validation for structured AI output |
+| Dependency                  | Purpose                                          |
+| --------------------------- | ------------------------------------------------ |
+| `@ever-works/plugin`        | `IAiProvider`, `PLUGIN_CAPABILITIES.AI_PROVIDER` |
+| `@ever-works/plugin/ai`     | `AiOperations` wrapper around LangChain          |
+| `@langchain/core`           | Chat models, messages, streaming                 |
+| `@langchain/openai`         | OpenAI-compatible provider integration           |
+| `zod`                       | Schema validation for structured AI output       |
 | `@ever-works/agent/plugins` | `PluginRegistryService`, `PluginSettingsService` |
 
 ## Usage Examples
@@ -266,21 +269,21 @@ import { AiFacadeService } from '@ever-works/agent/facades';
 import { z } from 'zod';
 
 const schema = z.object({
-    name: z.string(),
-    description: z.string(),
-    category: z.string(),
-    tags: z.array(z.string()),
+	name: z.string(),
+	description: z.string(),
+	category: z.string(),
+	tags: z.array(z.string())
 });
 
 const { result, model } = await aiFacade.askJson(
-    'Extract information about this tool: VS Code is a code editor by Microsoft...',
-    schema,
-    { temperature: 0.3, complexity: 'simple' },
-    { userId: user.id, directoryId: directory.id },
+	'Extract information about this tool: VS Code is a code editor by Microsoft...',
+	schema,
+	{ temperature: 0.3, complexity: 'simple' },
+	{ userId: user.id, directoryId: directory.id }
 );
 
-console.log(result.name);       // 'VS Code'
-console.log(result.category);   // 'Developer Tools'
+console.log(result.name); // 'VS Code'
+console.log(result.category); // 'Developer Tools'
 console.log(`Used model: ${model}`);
 ```
 
@@ -288,14 +291,14 @@ console.log(`Used model: ${model}`);
 
 ```typescript
 const stream = aiFacade.createStreamingChatCompletion(
-    [{ role: 'user', content: 'Write a detailed review of this tool...' }],
-    { complexity: 'medium' },
-    { userId: user.id },
+	[{ role: 'user', content: 'Write a detailed review of this tool...' }],
+	{ complexity: 'medium' },
+	{ userId: user.id }
 );
 
 for await (const chunk of stream) {
-    process.stdout.write(chunk.content);
-    if (chunk.done) break;
+	process.stdout.write(chunk.content);
+	if (chunk.done) break;
 }
 ```
 
@@ -304,9 +307,9 @@ for await (const chunk of stream) {
 ```typescript
 // Force a specific provider
 const result = await aiFacade.askJson(
-    prompt,
-    schema,
-    { modelOverride: 'claude-sonnet-4-20250514' },
-    { userId: user.id, providerId: 'anthropic' },
+	prompt,
+	schema,
+	{ modelOverride: 'claude-sonnet-4-20250514' },
+	{ userId: user.id, providerId: 'anthropic' }
 );
 ```

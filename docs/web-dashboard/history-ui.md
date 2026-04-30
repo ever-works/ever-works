@@ -43,29 +43,30 @@ The client-side container that manages paginated history loading.
 
 ```typescript
 interface DirectoryHistoryPageClientProps {
-    directoryId: string;
-    initialHistory: DirectoryGenerationHistoryResponse | null;
+	directoryId: string;
+	initialHistory: DirectoryGenerationHistoryResponse | null;
 }
 
 interface DirectoryGenerationHistoryResponse {
-    history: DirectoryGenerationHistoryEntry[];
-    total: number;
-    limit: number;
-    offset: number;
+	history: DirectoryGenerationHistoryEntry[];
+	total: number;
+	limit: number;
+	offset: number;
 }
 ```
 
 **State Management**:
 
-| State     | Type                                | Purpose                                   |
-|-----------|-------------------------------------|-------------------------------------------|
-| `entries` | `DirectoryGenerationHistoryEntry[]` | Accumulated history entries               |
-| `total`   | `number`                            | Total count from server                   |
-| `limit`   | `number`                            | Page size (default: 20)                   |
-| `offset`  | `number`                            | Current cursor position                   |
-| `isPending` | `boolean`                         | Loading state via `useTransition`         |
+| State       | Type                                | Purpose                           |
+| ----------- | ----------------------------------- | --------------------------------- |
+| `entries`   | `DirectoryGenerationHistoryEntry[]` | Accumulated history entries       |
+| `total`     | `number`                            | Total count from server           |
+| `limit`     | `number`                            | Page size (default: 20)           |
+| `offset`    | `number`                            | Current cursor position           |
+| `isPending` | `boolean`                           | Loading state via `useTransition` |
 
 **Pagination Flow**:
+
 1. Initial data is provided by the server component via `initialHistory` prop
 2. `hasMore` is computed as `entries.length < total`
 3. Clicking "Load More" calls `fetchDirectoryGenerationHistory(directoryId, { limit, offset })`
@@ -80,48 +81,48 @@ A data table displaying generation run details with formatted metrics.
 
 ```typescript
 interface HistoryTableProps {
-    entries: DirectoryGenerationHistoryEntry[];
-    locale: string;
+	entries: DirectoryGenerationHistoryEntry[];
+	locale: string;
 }
 ```
 
 **Table Columns**:
 
-| Column         | Field                          | Formatting                          |
-|----------------|--------------------------------|-------------------------------------|
-| Run            | `status`, `triggerRunId`       | Color-coded badge + Trigger.dev link|
-| Started At     | `startedAt` or `createdAt`     | `ShowDateTime` component            |
-| Duration       | `durationInSeconds`            | `formatDuration()` (h/m/s)          |
-| New Items      | `newItemsCount`                | Raw number                          |
-| Updated Items  | `updatedItemsCount`            | Raw number                          |
-| Total Items    | `totalItemsCount`              | Raw number                          |
-| Tokens         | `metrics.total_tokens_used`    | `formatTokens()` (K/M suffix)      |
+| Column        | Field                       | Formatting                           |
+| ------------- | --------------------------- | ------------------------------------ |
+| Run           | `status`, `triggerRunId`    | Color-coded badge + Trigger.dev link |
+| Started At    | `startedAt` or `createdAt`  | `ShowDateTime` component             |
+| Duration      | `durationInSeconds`         | `formatDuration()` (h/m/s)           |
+| New Items     | `newItemsCount`             | Raw number                           |
+| Updated Items | `updatedItemsCount`         | Raw number                           |
+| Total Items   | `totalItemsCount`           | Raw number                           |
+| Tokens        | `metrics.total_tokens_used` | `formatTokens()` (K/M suffix)        |
 
 **Status Color Mapping**:
 
-| Status       | Badge Colors                                                    |
-|--------------|-----------------------------------------------------------------|
-| `generating` | Blue background, blue text                                      |
-| `generated`  | Emerald/green background, emerald text                          |
-| `error`      | Red background, red text                                        |
-| `cancelled`  | Gray background, gray text                                      |
+| Status       | Badge Colors                           |
+| ------------ | -------------------------------------- |
+| `generating` | Blue background, blue text             |
+| `generated`  | Emerald/green background, emerald text |
+| `error`      | Red background, red text               |
+| `cancelled`  | Gray background, gray text             |
 
 **Formatting Utilities**:
 
 ```typescript
 // Duration: seconds -> human-readable
-formatDuration(3661)  // "1h 1m"
-formatDuration(125)   // "2m 5s"
-formatDuration(45)    // "45s"
-formatDuration(0)     // "---"
+formatDuration(3661); // "1h 1m"
+formatDuration(125); // "2m 5s"
+formatDuration(45); // "45s"
+formatDuration(0); // "---"
 
 // Tokens: number -> compact notation
-formatTokens(1500000) // "1.5M"
-formatTokens(45000)   // "45.0K"
-formatTokens(500)     // "500"
+formatTokens(1500000); // "1.5M"
+formatTokens(45000); // "45.0K"
+formatTokens(500); // "500"
 
 // Cost: number -> USD format (currently hidden in UI)
-formatCost(0.0234)    // "$0.0234"
+formatCost(0.0234); // "$0.0234"
 ```
 
 ### HistoryEmptyState
@@ -136,19 +137,19 @@ The data model for each history row:
 
 ```typescript
 interface DirectoryGenerationHistoryEntry {
-    id: string;
-    status: 'generating' | 'generated' | 'error' | 'cancelled';
-    startedAt?: string;              // ISO datetime
-    createdAt: string;               // ISO datetime
-    durationInSeconds?: number;
-    newItemsCount: number;
-    updatedItemsCount: number;
-    totalItemsCount: number;
-    triggerRunId?: string;           // Links to Trigger.dev dashboard
-    metrics?: {
-        total_tokens_used?: number;
-        total_cost?: number;         // USD, currently hidden in UI
-    };
+	id: string;
+	status: 'generating' | 'generated' | 'error' | 'cancelled';
+	startedAt?: string; // ISO datetime
+	createdAt: string; // ISO datetime
+	durationInSeconds?: number;
+	newItemsCount: number;
+	updatedItemsCount: number;
+	totalItemsCount: number;
+	triggerRunId?: string; // Links to Trigger.dev dashboard
+	metrics?: {
+		total_tokens_used?: number;
+		total_cost?: number; // USD, currently hidden in UI
+	};
 }
 ```
 
@@ -161,6 +162,7 @@ https://cloud.trigger.dev/runs/{triggerRunId}
 ```
 
 This provides deep observability into the generation pipeline:
+
 - Step-by-step task execution timeline
 - Structured log output from `TriggerLogger`
 - Error details and stack traces for failed runs
@@ -185,9 +187,9 @@ The component uses an append-only pattern for pagination: new entries are concat
 
 ## Related API Endpoints
 
-| Action                  | Server Action Function                                       | HTTP Method |
-|-------------------------|--------------------------------------------------------------|-------------|
-| Fetch history (paginated)| `fetchDirectoryGenerationHistory(directoryId, { limit, offset })` | GET    |
+| Action                    | Server Action Function                                            | HTTP Method |
+| ------------------------- | ----------------------------------------------------------------- | ----------- |
+| Fetch history (paginated) | `fetchDirectoryGenerationHistory(directoryId, { limit, offset })` | GET         |
 
 ## Internationalization
 

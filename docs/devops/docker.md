@@ -11,9 +11,9 @@ Ever Works provides Docker images for both the API and Web applications. The bui
 
 ## Dockerfile Locations
 
-| Application | Dockerfile | Image |
-|---|---|---|
-| API (NestJS) | `.deploy/docker/api/Dockerfile` | `ever-works-api` |
+| Application   | Dockerfile                      | Image            |
+| ------------- | ------------------------------- | ---------------- |
+| API (NestJS)  | `.deploy/docker/api/Dockerfile` | `ever-works-api` |
 | Web (Next.js) | `.deploy/docker/web/Dockerfile` | `ever-works-web` |
 
 ## API Dockerfile
@@ -68,6 +68,7 @@ RUN node scripts/prepare-docker-plugins.js
 ```
 
 Key steps:
+
 1. **Install dependencies** with `shamefully-hoist=true` for compatibility.
 2. **Build the API** and all upstream workspace dependencies (`...` suffix).
 3. **Build all plugins** separately.
@@ -96,6 +97,7 @@ ENTRYPOINT ["/app/entrypoint.sh"]
 ```
 
 The production image:
+
 - Runs as the non-root `node` user for security.
 - Copies only the built `dist/`, `node_modules/`, `package.json`, and `plugins/`.
 - Declares a volume at `/tmp/ever-works-repos` for Git repository cloning.
@@ -112,9 +114,9 @@ The Web Dockerfile follows a similar three-stage pattern optimized for Next.js s
 
 1. **Builder**: Copies the monorepo and runs `turbo prune --scope=ever-works-web --docker`.
 2. **Installer**: Installs system dependencies (Python, Cairo, Pango for canvas support), then:
-   - Installs npm dependencies with `pnpm install --frozen-lockfile`
-   - Builds with `pnpm build --filter=ever-works-web...`
-   - Prunes dev dependencies
+    - Installs npm dependencies with `pnpm install --frozen-lockfile`
+    - Builds with `pnpm build --filter=ever-works-web...`
+    - Prunes dev dependencies
 3. **Production**: Copies the Next.js standalone output:
 
 ```dockerfile
@@ -185,16 +187,16 @@ The `api_data` named volume persists the SQLite database file at `/app/apps/api/
 
 The `.env.compose` file provides all application configuration. Key variable groups:
 
-| Group | Examples |
-|---|---|
-| **Auth** | `JWT_SECRET`, `JWT_EXPIRATION_TIME`, `AUTH_SECRET` |
-| **OAuth** | `GH_CLIENT_ID`, `GH_CLIENT_SECRET`, `GOOGLE_CLIENT_ID`, etc. |
-| **Database** | `DATABASE_TYPE`, `DATABASE_PATH`, `DATABASE_URL` |
-| **Trigger.dev** | `TRIGGER_ENABLED`, `TRIGGER_SECRET_KEY`, `TRIGGER_API_URL` |
-| **Plugins** | `PLUGIN_OPENROUTER_API_KEY`, `PLUGIN_GITHUB_CLIENT_ID`, etc. |
-| **Mail** | `MAILER_PROVIDER`, `SMTP_HOST`, `RESEND_APIKEY` |
-| **Monitoring** | `SENTRY_DSN`, `POSTHOG_API_KEY` |
-| **Billing** | `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` |
+| Group           | Examples                                                     |
+| --------------- | ------------------------------------------------------------ |
+| **Auth**        | `JWT_SECRET`, `JWT_EXPIRATION_TIME`, `AUTH_SECRET`           |
+| **OAuth**       | `GH_CLIENT_ID`, `GH_CLIENT_SECRET`, `GOOGLE_CLIENT_ID`, etc. |
+| **Database**    | `DATABASE_TYPE`, `DATABASE_PATH`, `DATABASE_URL`             |
+| **Trigger.dev** | `TRIGGER_ENABLED`, `TRIGGER_SECRET_KEY`, `TRIGGER_API_URL`   |
+| **Plugins**     | `PLUGIN_OPENROUTER_API_KEY`, `PLUGIN_GITHUB_CLIENT_ID`, etc. |
+| **Mail**        | `MAILER_PROVIDER`, `SMTP_HOST`, `RESEND_APIKEY`              |
+| **Monitoring**  | `SENTRY_DSN`, `POSTHOG_API_KEY`                              |
+| **Billing**     | `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`                 |
 
 ## Running with Docker Compose
 

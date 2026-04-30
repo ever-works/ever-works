@@ -65,16 +65,20 @@ app.use(urlencoded({ limit: '10mb', extended: true }));
 
 // Security headers (conditional CSP)
 app.use((req, res, next) => {
-    if (req.path.startsWith('/api/docs')) {
-        return helmet({ contentSecurityPolicy: { /* relaxed */ } })(req, res, next);
-    }
-    return helmet()(req, res, next);
+	if (req.path.startsWith('/api/docs')) {
+		return helmet({
+			contentSecurityPolicy: {
+				/* relaxed */
+			}
+		})(req, res, next);
+	}
+	return helmet()(req, res, next);
 });
 
 // CORS
 app.enableCors({
-    origin: process.env.ALLOWED_ORIGINS?.split(',') || ['http://localhost:3000'],
-    credentials: true,
+	origin: process.env.ALLOWED_ORIGINS?.split(',') || ['http://localhost:3000'],
+	credentials: true
 });
 ```
 
@@ -109,14 +113,14 @@ Validates the JWT token (unless the route is `@Public()`):
 ```typescript
 @Injectable()
 export class JwtAuthGuard extends AuthGuard('jwt') {
-    canActivate(context: ExecutionContext) {
-        const isPublic = this.reflector.getAllAndOverride<boolean>(
-            IS_PUBLIC_KEY,
-            [context.getHandler(), context.getClass()],
-        );
-        if (isPublic) return true;
-        return super.canActivate(context);
-    }
+	canActivate(context: ExecutionContext) {
+		const isPublic = this.reflector.getAllAndOverride<boolean>(IS_PUBLIC_KEY, [
+			context.getHandler(),
+			context.getClass()
+		]);
+		if (isPublic) return true;
+		return super.canActivate(context);
+	}
 }
 ```
 
@@ -133,21 +137,21 @@ Logs the incoming request (only when `HTTP_DEBUG=true`):
 ```typescript
 @Injectable()
 export class LoggingInterceptor implements NestInterceptor {
-    intercept(context: ExecutionContext, next: CallHandler): Observable<any> {
-        if (!config.debug()) {
-            return next.handle();  // Skip entirely in production
-        }
+	intercept(context: ExecutionContext, next: CallHandler): Observable<any> {
+		if (!config.debug()) {
+			return next.handle(); // Skip entirely in production
+		}
 
-        const now = Date.now();
-        this.logger.log(`Incoming Request: ${method} ${originalUrl}`);
+		const now = Date.now();
+		this.logger.log(`Incoming Request: ${method} ${originalUrl}`);
 
-        return next.handle().pipe(
-            tap(() => {
-                const delay = Date.now() - now;
-                this.logger.log(`Outgoing Response: ${method} ${originalUrl} ${statusCode} - ${delay}ms`);
-            }),
-        );
-    }
+		return next.handle().pipe(
+			tap(() => {
+				const delay = Date.now() - now;
+				this.logger.log(`Outgoing Response: ${method} ${originalUrl} ${statusCode} - ${delay}ms`);
+			})
+		);
+	}
 }
 ```
 
@@ -157,7 +161,7 @@ Sets Sentry user context and request metadata:
 
 ```typescript
 if (request.user) {
-    Sentry.setUser({ id: request.user.id, email: request.user.email });
+	Sentry.setUser({ id: request.user.id, email: request.user.email });
 }
 Sentry.setContext('request', { method, url, headers: sanitized, body: sanitized });
 Sentry.setTag('transaction', `${method} ${originalUrl}`);
@@ -172,7 +176,10 @@ const startTime = Date.now();
 // ... handler executes ...
 // After handler:
 trackEvent(user?.id || 'anonymous', 'api_request', {
-    method, endpoint, statusCode, duration: Date.now() - startTime,
+	method,
+	endpoint,
+	statusCode,
+	duration: Date.now() - startTime
 });
 ```
 
@@ -182,11 +189,11 @@ The global `ValidationPipe` runs after guards and interceptors but before the ha
 
 ```typescript
 app.useGlobalPipes(
-    new ValidationPipe({
-        whitelist: true,            // Strip unknown properties
-        transform: true,            // Type coercion
-        forbidNonWhitelisted: true, // Reject unknown properties with 400
-    }),
+	new ValidationPipe({
+		whitelist: true, // Strip unknown properties
+		transform: true, // Type coercion
+		forbidNonWhitelisted: true // Reject unknown properties with 400
+	})
 );
 ```
 
@@ -225,13 +232,13 @@ After the handler returns, interceptors run in **reverse** order through RxJS op
 
 If an error escapes all interceptors, NestJS built-in exception filters convert it to an HTTP response:
 
-| Exception Type              | Status Code | Response Body                          |
-|----------------------------|-------------|----------------------------------------|
-| `BadRequestException`       | 400         | `{ statusCode: 400, message: [...] }` |
-| `UnauthorizedException`     | 401         | `{ statusCode: 401, message: "..." }` |
-| `ConflictException`         | 409         | `{ statusCode: 409, message: "..." }` |
-| `ThrottlerException`        | 429         | `{ statusCode: 429, message: "..." }` |
-| Unhandled Error             | 500         | `{ statusCode: 500, message: "..." }` |
+| Exception Type          | Status Code | Response Body                         |
+| ----------------------- | ----------- | ------------------------------------- |
+| `BadRequestException`   | 400         | `{ statusCode: 400, message: [...] }` |
+| `UnauthorizedException` | 401         | `{ statusCode: 401, message: "..." }` |
+| `ConflictException`     | 409         | `{ statusCode: 409, message: "..." }` |
+| `ThrottlerException`    | 429         | `{ statusCode: 429, message: "..." }` |
+| Unhandled Error         | 500         | `{ statusCode: 500, message: "..." }` |
 
 ## Execution Order Summary
 
@@ -250,13 +257,13 @@ If an error escapes all interceptors, NestJS built-in exception filters convert 
 ### Per-Module Middleware
 
 ```typescript
-@Module({ /* ... */ })
+@Module({
+	/* ... */
+})
 export class DirectoriesModule implements NestModule {
-    configure(consumer: MiddlewareConsumer) {
-        consumer
-            .apply(RequestLoggerMiddleware)
-            .forRoutes('directories');
-    }
+	configure(consumer: MiddlewareConsumer) {
+		consumer.apply(RequestLoggerMiddleware).forRoutes('directories');
+	}
 }
 ```
 
@@ -266,7 +273,7 @@ export class DirectoriesModule implements NestModule {
 @Controller('admin')
 @UseGuards(AdminRoleGuard)
 export class AdminController {
-    // AdminRoleGuard runs after the global guards
+	// AdminRoleGuard runs after the global guards
 }
 ```
 

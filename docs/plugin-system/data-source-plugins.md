@@ -13,17 +13,17 @@ Data source plugins import pre-existing items from external APIs and data servic
 
 ```typescript
 interface IDataSourcePlugin extends IPlugin {
-  readonly sourceName: string;
+	readonly sourceName: string;
 
-  query(options?: DataSourceQueryOptions): Promise<DataSourceQueryResult>;
-  isAvailable(): Promise<boolean>;
+	query(options?: DataSourceQueryOptions): Promise<DataSourceQueryResult>;
+	isAvailable(): Promise<boolean>;
 
-  // Optional
-  getItem?(id: string): Promise<ItemData | null>;
-  sync?(): Promise<DataSourceSyncResult>;
-  getMetadata?(): Promise<DataSourceMetadata>;
-  validateConnection?(): Promise<boolean>;
-  getSupportedFilters?(): readonly string[];
+	// Optional
+	getItem?(id: string): Promise<ItemData | null>;
+	sync?(): Promise<DataSourceSyncResult>;
+	getMetadata?(): Promise<DataSourceMetadata>;
+	validateConnection?(): Promise<boolean>;
+	getSupportedFilters?(): readonly string[];
 }
 ```
 
@@ -31,16 +31,16 @@ interface IDataSourcePlugin extends IPlugin {
 
 ```typescript
 interface DataSourceQueryOptions {
-  query?: string;                   // Search query within the data source
-  limit?: number;                   // Number of items to return
-  offset?: number;                  // Pagination offset
-  category?: string;                // Category filter
-  tags?: string[];                  // Tag filters
-  sortBy?: string;                  // Sort field
-  sortOrder?: 'asc' | 'desc';
-  filters?: Record<string, unknown>;  // Custom provider-specific filters
-  settings?: PluginSettings;        // Resolved plugin settings (API keys, etc.)
-  filterContext?: DataSourceFilterContext;  // Relevance filtering context
+	query?: string; // Search query within the data source
+	limit?: number; // Number of items to return
+	offset?: number; // Pagination offset
+	category?: string; // Category filter
+	tags?: string[]; // Tag filters
+	sortBy?: string; // Sort field
+	sortOrder?: 'asc' | 'desc';
+	filters?: Record<string, unknown>; // Custom provider-specific filters
+	settings?: PluginSettings; // Resolved plugin settings (API keys, etc.)
+	filterContext?: DataSourceFilterContext; // Relevance filtering context
 }
 ```
 
@@ -50,9 +50,9 @@ Data source plugins receive a `DataSourceFilterContext` that helps them return o
 
 ```typescript
 interface DataSourceFilterContext {
-  prompt?: string;      // Directory description/prompt
-  subject?: string;     // Directory subject/topic
-  keywords?: string[];  // Keywords extracted from prompt
+	prompt?: string; // Directory description/prompt
+	subject?: string; // Directory subject/topic
+	keywords?: string[]; // Keywords extracted from prompt
 }
 ```
 
@@ -62,12 +62,12 @@ Plugins should use this context to filter their results, ensuring that only rele
 
 ```typescript
 interface DataSourceQueryResult {
-  items: ItemData[];           // Items in the standard platform format
-  total?: number;              // Total available items
-  hasMore: boolean;            // Whether pagination has more results
-  categories?: Category[];     // Categories from the data source
-  tags?: Tag[];                // Tags from the data source
-  brands?: Brand[];            // Brands from the data source
+	items: ItemData[]; // Items in the standard platform format
+	total?: number; // Total available items
+	hasMore: boolean; // Whether pagination has more results
+	categories?: Category[]; // Categories from the data source
+	tags?: Tag[]; // Tags from the data source
+	brands?: Brand[]; // Brands from the data source
 }
 ```
 
@@ -77,17 +77,18 @@ Data sources return items alongside any taxonomy data (categories, tags, brands)
 
 ### Apify
 
-| Property | Value |
-|---|---|
-| Package | `@ever-works/apify-plugin` |
-| Category | `data-source` |
-| Capabilities | `data-source` |
-| Dependencies | `stopword` |
-| Configuration Mode | `hybrid` |
+| Property           | Value                      |
+| ------------------ | -------------------------- |
+| Package            | `@ever-works/apify-plugin` |
+| Category           | `data-source`              |
+| Capabilities       | `data-source`              |
+| Dependencies       | `stopword`                 |
+| Configuration Mode | `hybrid`                   |
 
 Apify is a web scraping and automation platform with a marketplace of pre-built "Actors" (scraping templates). The Apify plugin imports items from Apify datasets into Ever Works directories.
 
 **How it works:**
+
 1. Users configure an Apify dataset ID or Actor run ID
 2. The plugin fetches results from the Apify dataset API
 3. Items are transformed from the Apify format into `ItemData`
@@ -95,24 +96,25 @@ Apify is a web scraping and automation platform with a marketplace of pre-built 
 
 **Settings:**
 
-| Setting | Type | Description |
-|---|---|---|
-| `apiKey` | string (secret) | Apify API token |
-| `datasetId` | string | Apify dataset ID to import from |
+| Setting     | Type            | Description                     |
+| ----------- | --------------- | ------------------------------- |
+| `apiKey`    | string (secret) | Apify API token                 |
+| `datasetId` | string          | Apify dataset ID to import from |
 
 ### Bright Data
 
-| Property | Value |
-|---|---|
-| Package | `@ever-works/brightdata-plugin` |
-| Category | `data-source` |
-| Capabilities | `search`, `content-extractor` |
-| SDK | `@brightdata/sdk` |
-| Configuration Mode | `hybrid` |
+| Property           | Value                           |
+| ------------------ | ------------------------------- |
+| Package            | `@ever-works/brightdata-plugin` |
+| Category           | `data-source`                   |
+| Capabilities       | `search`, `content-extractor`   |
+| SDK                | `@brightdata/sdk`               |
+| Configuration Mode | `hybrid`                        |
 
 Bright Data provides web data collection infrastructure including proxy networks, browser automation, and pre-built data collection templates. The plugin provides both search and content extraction capabilities.
 
 **Key features:**
+
 - Web Scraper API for structured data extraction
 - Proxy network integration for reliable scraping
 - SERP API for search engine results
@@ -120,24 +122,25 @@ Bright Data provides web data collection infrastructure including proxy networks
 
 **Settings:**
 
-| Setting | Type | Description |
-|---|---|---|
-| `apiKey` | string (secret) | Bright Data API token |
-| `zone` | string | Proxy zone for requests |
+| Setting  | Type            | Description             |
+| -------- | --------------- | ----------------------- |
+| `apiKey` | string (secret) | Bright Data API token   |
+| `zone`   | string          | Proxy zone for requests |
 
 ### Scrapfly
 
-| Property | Value |
-|---|---|
-| Package | `@ever-works/scrapfly-plugin` |
-| Category | `data-source` |
-| Capabilities | `screenshot`, `content-extractor` |
-| SDK | `scrapfly-sdk` |
-| Configuration Mode | `hybrid` |
+| Property           | Value                             |
+| ------------------ | --------------------------------- |
+| Package            | `@ever-works/scrapfly-plugin`     |
+| Category           | `data-source`                     |
+| Capabilities       | `screenshot`, `content-extractor` |
+| SDK                | `scrapfly-sdk`                    |
+| Configuration Mode | `hybrid`                          |
 
 Scrapfly provides web scraping infrastructure with anti-bot bypass, JavaScript rendering, and screenshot capabilities. It implements both screenshot and content extraction interfaces.
 
 **Key features:**
+
 - Anti-bot bypass technology
 - JavaScript rendering for dynamic pages
 - Screenshot capture alongside extraction
@@ -146,26 +149,26 @@ Scrapfly provides web scraping infrastructure with anti-bot bypass, JavaScript r
 
 **Settings:**
 
-| Setting | Type | Description |
-|---|---|---|
+| Setting  | Type            | Description      |
+| -------- | --------------- | ---------------- |
 | `apiKey` | string (secret) | Scrapfly API key |
 
 ### Valyu
 
-| Property | Value |
-|---|---|
-| Package | `@ever-works/valyu-plugin` |
-| Category | `data-source` |
-| Capabilities | `search`, `content-extractor` |
-| SDK | `valyu-js` |
-| Configuration Mode | `hybrid` |
+| Property           | Value                         |
+| ------------------ | ----------------------------- |
+| Package            | `@ever-works/valyu-plugin`    |
+| Category           | `data-source`                 |
+| Capabilities       | `search`, `content-extractor` |
+| SDK                | `valyu-js`                    |
+| Configuration Mode | `hybrid`                      |
 
 Valyu provides web search and content extraction through its unified API, offering both data discovery and retrieval capabilities.
 
 **Settings:**
 
-| Setting | Type | Description |
-|---|---|---|
+| Setting  | Type            | Description   |
+| -------- | --------------- | ------------- |
 | `apiKey` | string (secret) | Valyu API key |
 
 ## Data Synchronization
@@ -174,13 +177,13 @@ Data source plugins can optionally implement a `sync()` method for periodic data
 
 ```typescript
 interface DataSourceSyncResult {
-  status: 'idle' | 'syncing' | 'completed' | 'failed';
-  itemsAdded: number;
-  itemsUpdated: number;
-  itemsRemoved: number;
-  duration: number;       // Sync duration in ms
-  error?: string;
-  syncedAt: string;       // ISO timestamp
+	status: 'idle' | 'syncing' | 'completed' | 'failed';
+	itemsAdded: number;
+	itemsUpdated: number;
+	itemsRemoved: number;
+	duration: number; // Sync duration in ms
+	error?: string;
+	syncedAt: string; // ISO timestamp
 }
 ```
 
@@ -192,13 +195,13 @@ Plugins can expose metadata about their data source:
 
 ```typescript
 interface DataSourceMetadata {
-  name: string;
-  description?: string;
-  totalItems?: number;        // How many items are available
-  categories?: string[];
-  tags?: string[];
-  lastUpdated?: string;
-  sourceUrl?: string;
+	name: string;
+	description?: string;
+	totalItems?: number; // How many items are available
+	categories?: string[];
+	tags?: string[];
+	lastUpdated?: string;
+	sourceUrl?: string;
 }
 ```
 
@@ -223,24 +226,24 @@ import type { IDataSourcePlugin, DataSourceQueryOptions, DataSourceQueryResult }
 import { BasePlugin } from '@ever-works/plugin/abstract';
 
 export class MyDataSourcePlugin extends BasePlugin implements IDataSourcePlugin {
-  readonly id = 'my-data-source';
-  readonly name = 'My Data Source';
-  readonly version = '1.0.0';
-  readonly category = 'data-source' as const;
-  readonly capabilities = ['data-source'] as const;
-  readonly sourceName = 'my-source';
+	readonly id = 'my-data-source';
+	readonly name = 'My Data Source';
+	readonly version = '1.0.0';
+	readonly category = 'data-source' as const;
+	readonly capabilities = ['data-source'] as const;
+	readonly sourceName = 'my-source';
 
-  async query(options?: DataSourceQueryOptions): Promise<DataSourceQueryResult> {
-    const apiKey = options?.settings?.apiKey as string;
-    // Fetch data from your external API
-    // Transform into ItemData format
-    // Apply filterContext for relevance
-    return { items: [], hasMore: false };
-  }
+	async query(options?: DataSourceQueryOptions): Promise<DataSourceQueryResult> {
+		const apiKey = options?.settings?.apiKey as string;
+		// Fetch data from your external API
+		// Transform into ItemData format
+		// Apply filterContext for relevance
+		return { items: [], hasMore: false };
+	}
 
-  async isAvailable(): Promise<boolean> {
-    return true;
-  }
+	async isAvailable(): Promise<boolean> {
+		return true;
+	}
 }
 ```
 

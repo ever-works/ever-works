@@ -44,18 +44,20 @@ The top-level container that manages the members list state and coordinates the 
 
 ```typescript
 interface MembersPageProps {
-    directory: Directory;
-    members: DirectoryMember[];
-    owner: DirectoryOwner;
+	directory: Directory;
+	members: DirectoryMember[];
+	owner: DirectoryOwner;
 }
 ```
 
 **State Management**:
+
 - `members` state is initialized from `initialMembers` prop and updated locally on add/remove/update
 - `inviteDialogOpen` controls the invite modal visibility
 - `canInvite` is derived from `canManageMembers(directory.userRole)`
 
 **Callback Handlers**:
+
 - `handleMemberAdded(member)` -- appends the new member to the list
 - `handleMemberRemoved(memberId)` -- filters the member from the list
 - `handleMemberUpdated(updated)` -- replaces the member entry in the list
@@ -68,11 +70,11 @@ Renders the owner row followed by all member rows in a bordered card with divide
 
 ```typescript
 interface MembersListProps {
-    directory: Directory;
-    members: DirectoryMember[];
-    owner: DirectoryOwner;
-    onMemberRemoved: (memberId: string) => void;
-    onMemberUpdated: (member: DirectoryMember) => void;
+	directory: Directory;
+	members: DirectoryMember[];
+	owner: DirectoryOwner;
+	onMemberRemoved: (memberId: string) => void;
+	onMemberUpdated: (member: DirectoryMember) => void;
 }
 ```
 
@@ -86,21 +88,23 @@ Renders a single member with inline role management and removal capabilities.
 
 ```typescript
 interface MemberRowProps {
-    directoryId: string;
-    member: DirectoryMember;
-    canManage: boolean;
-    onRemoved: () => void;
-    onUpdated: (member: DirectoryMember) => void;
+	directoryId: string;
+	member: DirectoryMember;
+	canManage: boolean;
+	onRemoved: () => void;
+	onUpdated: (member: DirectoryMember) => void;
 }
 ```
 
 **Role Change Flow**:
+
 1. Manager selects a new role from the inline `Select` dropdown
 2. `updateMemberRole(directoryId, memberId, newRole)` server action is called
 3. On success, `onUpdated` callback propagates the change to `MembersPage`
 4. Toast notification confirms the update
 
 **Member Removal Flow**:
+
 1. Manager clicks the trash icon button
 2. A confirmation `Dialog` opens with the member's username
 3. On confirm, `removeMember(directoryId, memberId)` server action is called
@@ -115,31 +119,32 @@ A modal form for inviting new members by email with a role assignment.
 
 ```typescript
 interface InviteMemberDialogProps {
-    directoryId: string;
-    open: boolean;
-    onOpenChange: (open: boolean) => void;
-    onMemberAdded: (member: DirectoryMember) => void;
+	directoryId: string;
+	open: boolean;
+	onOpenChange: (open: boolean) => void;
+	onMemberAdded: (member: DirectoryMember) => void;
 }
 ```
 
 **Form Fields**:
 
-| Field | Type   | Validation                    |
-|-------|--------|-------------------------------|
-| Email | Input  | Required, email format        |
-| Role  | Select | Default: `VIEWER`             |
+| Field | Type   | Validation             |
+| ----- | ------ | ---------------------- |
+| Email | Input  | Required, email format |
+| Role  | Select | Default: `VIEWER`      |
 
 **Available Roles**:
 
-| Role      | Label    | Description                                              |
-|-----------|----------|----------------------------------------------------------|
-| `VIEWER`  | Viewer   | Can view directory content and settings (read-only)      |
-| `EDITOR`  | Editor   | Can edit items, categories, and content                  |
-| `MANAGER` | Manager  | Can manage members, settings, and all directory features |
+| Role      | Label   | Description                                              |
+| --------- | ------- | -------------------------------------------------------- |
+| `VIEWER`  | Viewer  | Can view directory content and settings (read-only)      |
+| `EDITOR`  | Editor  | Can edit items, categories, and content                  |
+| `MANAGER` | Manager | Can manage members, settings, and all directory features |
 
 The dialog displays a contextual description panel below the role selector that updates dynamically based on the selected role.
 
 **Submission Flow**:
+
 1. User enters email and selects role
 2. Form validation checks for non-empty email
 3. `inviteMember(directoryId, email, role)` server action is called
@@ -150,12 +155,12 @@ The dialog displays a contextual description panel below the role selector that 
 
 The `canManageMembers` utility from `@/lib/permissions` determines whether the current user can manage team members:
 
-| User Role  | Can Invite | Can Change Roles | Can Remove Members | Sees Role Selector |
-|------------|------------|------------------|--------------------|--------------------|
-| Owner      | Yes        | Yes              | Yes                | Yes (Select)       |
-| Manager    | Yes        | Yes              | Yes                | Yes (Select)       |
-| Editor     | No         | No               | No                 | No (badge only)    |
-| Viewer     | No         | No               | No                 | No (badge only)    |
+| User Role | Can Invite | Can Change Roles | Can Remove Members | Sees Role Selector |
+| --------- | ---------- | ---------------- | ------------------ | ------------------ |
+| Owner     | Yes        | Yes              | Yes                | Yes (Select)       |
+| Manager   | Yes        | Yes              | Yes                | Yes (Select)       |
+| Editor    | No         | No               | No                 | No (badge only)    |
+| Viewer    | No         | No               | No                 | No (badge only)    |
 
 When `canManage` is `false`, the role is displayed as a static badge rather than an interactive selector, and the remove button is hidden.
 
@@ -178,11 +183,11 @@ All server mutations go through Next.js server actions. Optimistic updates are a
 
 ## Related API Endpoints
 
-| Action             | Server Action Function                          | HTTP Method |
-|--------------------|------------------------------------------------|-------------|
-| Invite member      | `inviteMember(directoryId, email, role)`        | POST        |
-| Update role        | `updateMemberRole(directoryId, memberId, role)` | PATCH       |
-| Remove member      | `removeMember(directoryId, memberId)`           | DELETE      |
+| Action        | Server Action Function                          | HTTP Method |
+| ------------- | ----------------------------------------------- | ----------- |
+| Invite member | `inviteMember(directoryId, email, role)`        | POST        |
+| Update role   | `updateMemberRole(directoryId, memberId, role)` | PATCH       |
+| Remove member | `removeMember(directoryId, memberId)`           | DELETE      |
 
 ## Internationalization
 

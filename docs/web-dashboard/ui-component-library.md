@@ -39,35 +39,35 @@ All components use `forwardRef` where applicable and spread remaining props onto
 
 **File:** `apps/web/src/components/ui/button.tsx`
 
-| Prop | Type | Default | Description |
-|------|------|---------|-------------|
-| `variant` | `'primary' \| 'secondary' \| 'ghost' \| 'danger' \| 'unstyled'` | `'primary'` | Visual style variant |
-| `size` | `'sm' \| 'md' \| 'lg' \| 'icon'` | `'md'` | Button size |
-| `href` | `string` (optional) | - | Renders as Next.js `Link` instead of `<button>` |
-| `loading` | `boolean` (optional) | `false` | Shows a spinner and disables the button |
-| `fullWidth` | `boolean` (optional) | `false` | Stretches to full container width |
-| `className` | `string` (optional) | - | Additional CSS classes |
+| Prop        | Type                                                            | Default     | Description                                     |
+| ----------- | --------------------------------------------------------------- | ----------- | ----------------------------------------------- |
+| `variant`   | `'primary' \| 'secondary' \| 'ghost' \| 'danger' \| 'unstyled'` | `'primary'` | Visual style variant                            |
+| `size`      | `'sm' \| 'md' \| 'lg' \| 'icon'`                                | `'md'`      | Button size                                     |
+| `href`      | `string` (optional)                                             | -           | Renders as Next.js `Link` instead of `<button>` |
+| `loading`   | `boolean` (optional)                                            | `false`     | Shows a spinner and disables the button         |
+| `fullWidth` | `boolean` (optional)                                            | `false`     | Stretches to full container width               |
+| `className` | `string` (optional)                                             | -           | Additional CSS classes                          |
 
 Plus all standard `ButtonHTMLAttributes`.
 
 **Variants:**
 
-| Variant | Appearance |
-|---------|------------|
-| `primary` | Solid primary brand color background, white text |
-| `secondary` | Bordered with surface background, muted text |
-| `ghost` | Transparent background, subtle hover effect |
-| `danger` | Red background, white text for destructive actions |
-| `unstyled` | No default styles, fully custom |
+| Variant     | Appearance                                         |
+| ----------- | -------------------------------------------------- |
+| `primary`   | Solid primary brand color background, white text   |
+| `secondary` | Bordered with surface background, muted text       |
+| `ghost`     | Transparent background, subtle hover effect        |
+| `danger`    | Red background, white text for destructive actions |
+| `unstyled`  | No default styles, fully custom                    |
 
 **Sizes:**
 
-| Size | Padding | Text |
-|------|---------|------|
-| `sm` | `px-3 py-1.5` | `text-xs` |
-| `md` | `px-4 py-2` | `text-sm` |
-| `lg` | `px-6 py-3` | `text-base` |
-| `icon` | `p-2` | Square button for icon-only |
+| Size   | Padding       | Text                        |
+| ------ | ------------- | --------------------------- |
+| `sm`   | `px-3 py-1.5` | `text-xs`                   |
+| `md`   | `px-4 py-2`   | `text-sm`                   |
+| `lg`   | `px-6 py-3`   | `text-base`                 |
+| `icon` | `p-2`         | Square button for icon-only |
 
 When `href` is provided, the button renders as a Next.js `Link` component with the same visual styling. When `loading` is true, a spinning SVG replaces the button content and the button is disabled.
 
@@ -86,15 +86,15 @@ import { Button } from '@/components/ui/button';
 
 Built on HeadlessUI's `Dialog` component, this module exports several sub-components:
 
-| Export | Description |
-|--------|-------------|
-| `Dialog` | Root dialog wrapper (controls open/close state) |
-| `DialogContent` | Centered modal panel with backdrop, scale transition, and rounded corners |
-| `DialogHeader` | Flex container for the title area |
-| `DialogTitle` | Re-exported HeadlessUI `DialogTitle` |
-| `DialogDescription` | Muted text below the title |
-| `DialogFooter` | Right-aligned flex container for action buttons |
-| `DialogClose` | Close button (X icon) in the top-right corner |
+| Export              | Description                                                               |
+| ------------------- | ------------------------------------------------------------------------- |
+| `Dialog`            | Root dialog wrapper (controls open/close state)                           |
+| `DialogContent`     | Centered modal panel with backdrop, scale transition, and rounded corners |
+| `DialogHeader`      | Flex container for the title area                                         |
+| `DialogTitle`       | Re-exported HeadlessUI `DialogTitle`                                      |
+| `DialogDescription` | Muted text below the title                                                |
+| `DialogFooter`      | Right-aligned flex container for action buttons                           |
+| `DialogClose`       | Close button (X icon) in the top-right corner                             |
 
 **DialogContent** applies a scale + fade transition on open/close using HeadlessUI's `Transition`:
 
@@ -103,59 +103,54 @@ Built on HeadlessUI's `Dialog` component, this module exports several sub-compon
 
 The backdrop is a semi-transparent black overlay (`bg-black/50`).
 
-| Prop (DialogContent) | Type | Description |
-|------|------|-------------|
-| `children` | `ReactNode` | Dialog body content |
-| `className` | `string` (optional) | Additional classes for the panel |
+| Prop (DialogContent) | Type                | Description                      |
+| -------------------- | ------------------- | -------------------------------- |
+| `children`           | `ReactNode`         | Dialog body content              |
+| `className`          | `string` (optional) | Additional classes for the panel |
 
-| Prop (DialogClose) | Type | Description |
-|------|------|-------------|
-| `onClose` | `() => void` | Callback when close button is clicked |
+| Prop (DialogClose) | Type         | Description                           |
+| ------------------ | ------------ | ------------------------------------- |
+| `onClose`          | `() => void` | Callback when close button is clicked |
 
 ```tsx
-import {
-    Dialog,
-    DialogContent,
-    DialogHeader,
-    DialogTitle,
-    DialogFooter,
-    DialogClose,
-} from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose } from '@/components/ui/dialog';
 
 <Dialog open={isOpen} onOpenChange={setIsOpen}>
-    <DialogContent>
-        <DialogClose onClose={() => setIsOpen(false)} />
-        <DialogHeader>
-            <DialogTitle>Confirm Action</DialogTitle>
-        </DialogHeader>
-        <p>Are you sure you want to proceed?</p>
-        <DialogFooter>
-            <Button variant="secondary" onClick={() => setIsOpen(false)}>Cancel</Button>
-            <Button onClick={handleConfirm}>Confirm</Button>
-        </DialogFooter>
-    </DialogContent>
-</Dialog>
+	<DialogContent>
+		<DialogClose onClose={() => setIsOpen(false)} />
+		<DialogHeader>
+			<DialogTitle>Confirm Action</DialogTitle>
+		</DialogHeader>
+		<p>Are you sure you want to proceed?</p>
+		<DialogFooter>
+			<Button variant="secondary" onClick={() => setIsOpen(false)}>
+				Cancel
+			</Button>
+			<Button onClick={handleConfirm}>Confirm</Button>
+		</DialogFooter>
+	</DialogContent>
+</Dialog>;
 ```
 
 ### Input
 
 **File:** `apps/web/src/components/ui/input.tsx`
 
-| Prop | Type | Default | Description |
-|------|------|---------|-------------|
-| `label` | `string` (optional) | - | Label text above the input |
-| `error` | `string` (optional) | - | Error message below the input |
-| `helperText` | `string` (optional) | - | Helper text (hidden when error is present) |
-| `variant` | `'default' \| 'form'` | `'default'` | Style variant |
+| Prop         | Type                  | Default     | Description                                |
+| ------------ | --------------------- | ----------- | ------------------------------------------ |
+| `label`      | `string` (optional)   | -           | Label text above the input                 |
+| `error`      | `string` (optional)   | -           | Error message below the input              |
+| `helperText` | `string` (optional)   | -           | Helper text (hidden when error is present) |
+| `variant`    | `'default' \| 'form'` | `'default'` | Style variant                              |
 
 Plus all standard `InputHTMLAttributes`.
 
 **Variants:**
 
-| Variant | Characteristics |
-|---------|-----------------|
+| Variant   | Characteristics                                                                         |
+| --------- | --------------------------------------------------------------------------------------- |
 | `default` | Larger padding (`py-3`), focus ring (`ring-2 ring-primary/20`), hover border transition |
-| `form` | Compact padding (`py-2`), no focus ring, minimal styling for dense forms |
+| `form`    | Compact padding (`py-2`), no focus ring, minimal styling for dense forms                |
 
 The component auto-generates an `id` via React's `useId` hook if none is provided, ensuring the `<label>` is properly associated with the `<input>`. Error state changes the border to `border-danger/50` and the focus ring to `ring-danger/20`.
 
@@ -176,11 +171,11 @@ import { Input } from '@/components/ui/input';
 
 **File:** `apps/web/src/components/ui/tooltip.tsx`
 
-| Prop | Type | Default | Description |
-|------|------|---------|-------------|
-| `content` | `string` | - | Tooltip text |
+| Prop       | Type                                     | Default | Description                          |
+| ---------- | ---------------------------------------- | ------- | ------------------------------------ |
+| `content`  | `string`                                 | -       | Tooltip text                         |
 | `position` | `'top' \| 'bottom' \| 'left' \| 'right'` | `'top'` | Tooltip position relative to trigger |
-| `children` | `ReactNode` | - | Trigger element |
+| `children` | `ReactNode`                              | -       | Trigger element                      |
 
 A pure CSS tooltip that requires no JavaScript for show/hide. It uses Tailwind's `group` and `group-hover` utilities:
 
@@ -190,32 +185,34 @@ A pure CSS tooltip that requires no JavaScript for show/hide. It uses Tailwind's
 
 Position classes:
 
-| Position | Placement |
-|----------|-----------|
-| `top` | Above, centered horizontally |
-| `bottom` | Below, centered horizontally |
-| `left` | Left side, centered vertically |
-| `right` | Right side, centered vertically |
+| Position | Placement                       |
+| -------- | ------------------------------- |
+| `top`    | Above, centered horizontally    |
+| `bottom` | Below, centered horizontally    |
+| `left`   | Left side, centered vertically  |
+| `right`  | Right side, centered vertically |
 
 ```tsx
 import { Tooltip } from '@/components/ui/tooltip';
 
 <Tooltip content="Create new directory" position="bottom">
-    <Button variant="icon"><Plus className="w-4 h-4" /></Button>
-</Tooltip>
+	<Button variant="icon">
+		<Plus className="w-4 h-4" />
+	</Button>
+</Tooltip>;
 ```
 
 ### CollapsibleCard
 
 **File:** `apps/web/src/components/ui/collapsible-card.tsx`
 
-| Prop | Type | Default | Description |
-|------|------|---------|-------------|
-| `title` | `string` | - | Card header text |
-| `defaultOpen` | `boolean` (optional) | `false` | Whether the card starts expanded |
-| `headerContent` | `ReactNode` (optional) | - | Additional content in the header row |
-| `actions` | `ReactNode` (optional) | - | Action buttons in the header (click propagation stopped) |
-| `children` | `ReactNode` | - | Collapsible body content |
+| Prop            | Type                   | Default | Description                                              |
+| --------------- | ---------------------- | ------- | -------------------------------------------------------- |
+| `title`         | `string`               | -       | Card header text                                         |
+| `defaultOpen`   | `boolean` (optional)   | `false` | Whether the card starts expanded                         |
+| `headerContent` | `ReactNode` (optional) | -       | Additional content in the header row                     |
+| `actions`       | `ReactNode` (optional) | -       | Action buttons in the header (click propagation stopped) |
+| `children`      | `ReactNode`            | -       | Collapsible body content                                 |
 
 A card with a clickable header that toggles the visibility of its body content. The chevron icon rotates 180 degrees when expanded. The `actions` slot uses `stopPropagation` so clicking action buttons does not toggle the card.
 
@@ -223,16 +220,16 @@ A card with a clickable header that toggles the visibility of its body content. 
 import { CollapsibleCard } from '@/components/ui/collapsible-card';
 
 <CollapsibleCard
-    title="OpenAI Settings"
-    headerContent={<span className="text-xs text-text-muted">v1.2.0</span>}
-    actions={<Switch checked={enabled} onChange={toggle} />}
-    defaultOpen
+	title="OpenAI Settings"
+	headerContent={<span className="text-xs text-text-muted">v1.2.0</span>}
+	actions={<Switch checked={enabled} onChange={toggle} />}
+	defaultOpen
 >
-    <div className="space-y-4">
-        <Input label="API Key" type="password" />
-        <Input label="Model" value="gpt-4o" />
-    </div>
-</CollapsibleCard>
+	<div className="space-y-4">
+		<Input label="API Key" type="password" />
+		<Input label="Model" value="gpt-4o" />
+	</div>
+</CollapsibleCard>;
 ```
 
 ## Implementation Details
@@ -246,7 +243,7 @@ import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 
 export function cn(...inputs: ClassValue[]) {
-    return twMerge(clsx(inputs));
+	return twMerge(clsx(inputs));
 }
 ```
 
@@ -257,11 +254,9 @@ This combines `clsx` (for conditional classes) with `tailwind-merge` (for dedupl
 `Button` and `Input` use `React.forwardRef` so parent components can attach refs for focus management or form libraries:
 
 ```tsx
-const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
-    ({ variant, size, ...props }, ref) => {
-        return <button ref={ref} {...props} />;
-    }
-);
+const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(({ variant, size, ...props }, ref) => {
+	return <button ref={ref} {...props} />;
+});
 ```
 
 ### HeadlessUI Integration
@@ -279,23 +274,24 @@ The `Transition` component handles enter/leave animations with configurable dura
 
 ### Design Token Reference
 
-| Token | Light | Dark | Usage |
-|-------|-------|------|-------|
-| `surface` | White | Dark gray | Primary backgrounds |
-| `surface-secondary` | Light gray | Darker gray | Card/section backgrounds |
-| `surface-tertiary` | Lightest gray | Darkest gray | Disabled backgrounds |
-| `text` | Near black | Near white | Primary text |
-| `text-muted` | Medium gray | Light gray | Secondary text |
-| `border` | Light gray | Dark gray | Borders and dividers |
-| `primary` | Brand blue | Brand blue | Accent/action color |
-| `danger` | Red | Red | Destructive actions |
-| `warning` | Amber | Amber | Warning states |
-| `success` | Green | Green | Success states |
-| `input-bg-dark` | - | Specific dark input bg | Input backgrounds in dark mode |
+| Token               | Light         | Dark                   | Usage                          |
+| ------------------- | ------------- | ---------------------- | ------------------------------ |
+| `surface`           | White         | Dark gray              | Primary backgrounds            |
+| `surface-secondary` | Light gray    | Darker gray            | Card/section backgrounds       |
+| `surface-tertiary`  | Lightest gray | Darkest gray           | Disabled backgrounds           |
+| `text`              | Near black    | Near white             | Primary text                   |
+| `text-muted`        | Medium gray   | Light gray             | Secondary text                 |
+| `border`            | Light gray    | Dark gray              | Borders and dividers           |
+| `primary`           | Brand blue    | Brand blue             | Accent/action color            |
+| `danger`            | Red           | Red                    | Destructive actions            |
+| `warning`           | Amber         | Amber                  | Warning states                 |
+| `success`           | Green         | Green                  | Success states                 |
+| `input-bg-dark`     | -             | Specific dark input bg | Input backgrounds in dark mode |
 
 ### Consistent Patterns
 
 All form inputs follow this border pattern:
+
 - Default: `border-primary/30 dark:border-primary/10`
 - Focus: `focus:border-primary`
 - Error: `border-danger/50 focus:border-danger`
@@ -315,26 +311,17 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 
 export function SettingsForm() {
-    const [errors, setErrors] = useState<Record<string, string>>({});
+	const [errors, setErrors] = useState<Record<string, string>>({});
 
-    return (
-        <form className="space-y-4">
-            <Input
-                label="Display Name"
-                error={errors.name}
-                helperText="This will be shown publicly"
-            />
-            <Input
-                variant="form"
-                label="Website URL"
-                type="url"
-                error={errors.url}
-            />
-            <Button type="submit" fullWidth>
-                Save Settings
-            </Button>
-        </form>
-    );
+	return (
+		<form className="space-y-4">
+			<Input label="Display Name" error={errors.name} helperText="This will be shown publicly" />
+			<Input variant="form" label="Website URL" type="url" error={errors.url} />
+			<Button type="submit" fullWidth>
+				Save Settings
+			</Button>
+		</form>
+	);
 }
 ```
 
@@ -344,45 +331,36 @@ export function SettingsForm() {
 'use client';
 
 import { useState } from 'react';
-import {
-    Dialog,
-    DialogContent,
-    DialogHeader,
-    DialogTitle,
-    DialogFooter,
-    DialogClose,
-} from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 
 export function DeleteConfirmation({ onConfirm }) {
-    const [open, setOpen] = useState(false);
+	const [open, setOpen] = useState(false);
 
-    return (
-        <>
-            <Button variant="danger" onClick={() => setOpen(true)}>
-                Delete
-            </Button>
-            <Dialog open={open} onOpenChange={setOpen}>
-                <DialogContent>
-                    <DialogClose onClose={() => setOpen(false)} />
-                    <DialogHeader>
-                        <DialogTitle>Delete Item</DialogTitle>
-                    </DialogHeader>
-                    <p className="text-sm text-text-muted">
-                        This action cannot be undone.
-                    </p>
-                    <DialogFooter>
-                        <Button variant="secondary" onClick={() => setOpen(false)}>
-                            Cancel
-                        </Button>
-                        <Button variant="danger" onClick={onConfirm}>
-                            Delete
-                        </Button>
-                    </DialogFooter>
-                </DialogContent>
-            </Dialog>
-        </>
-    );
+	return (
+		<>
+			<Button variant="danger" onClick={() => setOpen(true)}>
+				Delete
+			</Button>
+			<Dialog open={open} onOpenChange={setOpen}>
+				<DialogContent>
+					<DialogClose onClose={() => setOpen(false)} />
+					<DialogHeader>
+						<DialogTitle>Delete Item</DialogTitle>
+					</DialogHeader>
+					<p className="text-sm text-text-muted">This action cannot be undone.</p>
+					<DialogFooter>
+						<Button variant="secondary" onClick={() => setOpen(false)}>
+							Cancel
+						</Button>
+						<Button variant="danger" onClick={onConfirm}>
+							Delete
+						</Button>
+					</DialogFooter>
+				</DialogContent>
+			</Dialog>
+		</>
+	);
 }
 ```
 

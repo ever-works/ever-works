@@ -13,11 +13,11 @@ The import system allows users to populate directories from external sources rat
 
 The import system is implemented in `packages/agent/src/import/` with three key services:
 
-| Service | Purpose |
-|---|---|
-| `ImportExecutorService` | Orchestrates import by source type, delegates to specialized methods |
+| Service                      | Purpose                                                               |
+| ---------------------------- | --------------------------------------------------------------------- |
+| `ImportExecutorService`      | Orchestrates import by source type, delegates to specialized methods  |
 | `AwesomeReadmeParserService` | Parses Awesome List README files using AI to extract structured items |
-| `SourceRepoAnalyzerService` | Analyzes repository structure, detects source type, validates access |
+| `SourceRepoAnalyzerService`  | Analyzes repository structure, detects source type, validates access  |
 
 ## Import Source Types
 
@@ -57,9 +57,9 @@ Imports from any GitHub "Awesome List" -- a curated README with categorized link
 1. Fetch the README content via `SourceRepoAnalyzerService.getReadmeContent()`.
 2. Pass the markdown content to `AwesomeReadmeParserService.parseReadme()`.
 3. The parser uses AI in three phases:
-   - **Phase 1**: Extract category structure from headings.
-   - **Phase 2**: Extract items from each category section.
-   - **Phase 3**: Deduplicate items and extract unique tags.
+    - **Phase 1**: Extract category structure from headings.
+    - **Phase 2**: Extract items from each category section.
+    - **Phase 3**: Deduplicate items and extract unique tags.
 4. Initialize the target directory with the parsed data.
 5. Initialize markdown and website generators.
 
@@ -136,12 +136,12 @@ For non-data repos, the analyzer checks if companion repositories exist followin
 
 The import system defines typed error codes in `DirectoryImportErrorCode`:
 
-| Error Code | When |
-|---|---|
-| `PARSE_FAILED` | No items found or README not parseable |
-| `CLONE_FAILED` | Git clone operation failed |
-| `CREATE_REPO_FAILED` | Failed to initialize the data repository |
-| `REPO_ACCESS_DENIED` | User lacks access to the source repository |
+| Error Code             | When                                       |
+| ---------------------- | ------------------------------------------ |
+| `PARSE_FAILED`         | No items found or README not parseable     |
+| `CLONE_FAILED`         | Git clone operation failed                 |
+| `CREATE_REPO_FAILED`   | Failed to initialize the data repository   |
+| `REPO_ACCESS_DENIED`   | User lacks access to the source repository |
 | `AI_EXTRACTION_FAILED` | AI-powered extraction encountered an error |
 
 Each import method returns a `DirectoryImportResult` with `success`, `directoryId`, item/category/tag counts on success, or `error` and `errorCode` on failure.

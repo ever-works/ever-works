@@ -34,10 +34,10 @@ pnpm dev:trigger
 
 Under the hood, these map to Turborepo filters:
 
-| Command | Turborepo Equivalent |
-|---------|---------------------|
-| `pnpm dev:api` | `turbo dev --filter=ever-works-api` |
-| `pnpm dev:web` | `turbo dev --filter=ever-works-web` |
+| Command            | Turborepo Equivalent                                   |
+| ------------------ | ------------------------------------------------------ |
+| `pnpm dev:api`     | `turbo dev --filter=ever-works-api`                    |
+| `pnpm dev:web`     | `turbo dev --filter=ever-works-web`                    |
 | `pnpm dev:trigger` | `turbo dev:trigger --filter=@ever-works/trigger-tasks` |
 
 ### Building
@@ -103,10 +103,12 @@ The Web app uses `next dev --turbopack` for development:
 When editing a shared package (e.g., `@ever-works/contracts`) while apps are running:
 
 1. **Option A** -- Rebuild the package manually:
-   ```bash
-   turbo build --filter=@ever-works/contracts
-   ```
-   Then restart the consuming app.
+
+    ```bash
+    turbo build --filter=@ever-works/contracts
+    ```
+
+    Then restart the consuming app.
 
 2. **Option B** -- Run everything with `pnpm dev`, which starts all packages in dev/watch mode simultaneously.
 
@@ -127,36 +129,36 @@ Create or update `.vscode/launch.json`:
 
 ```json
 {
-  "version": "0.2.0",
-  "configurations": [
-    {
-      "name": "Attach to API",
-      "type": "node",
-      "request": "attach",
-      "port": 9229,
-      "restart": true,
-      "sourceMaps": true,
-      "skipFiles": ["<node_internals>/**"]
-    },
-    {
-      "name": "Debug API Tests",
-      "type": "node",
-      "request": "launch",
-      "runtimeExecutable": "pnpm",
-      "runtimeArgs": ["test:debug"],
-      "cwd": "${workspaceFolder}/apps/api",
-      "console": "integratedTerminal"
-    },
-    {
-      "name": "Debug Agent Tests",
-      "type": "node",
-      "request": "launch",
-      "runtimeExecutable": "npx",
-      "runtimeArgs": ["jest", "--runInBand", "${relativeFile}"],
-      "cwd": "${workspaceFolder}/packages/agent",
-      "console": "integratedTerminal"
-    }
-  ]
+	"version": "0.2.0",
+	"configurations": [
+		{
+			"name": "Attach to API",
+			"type": "node",
+			"request": "attach",
+			"port": 9229,
+			"restart": true,
+			"sourceMaps": true,
+			"skipFiles": ["<node_internals>/**"]
+		},
+		{
+			"name": "Debug API Tests",
+			"type": "node",
+			"request": "launch",
+			"runtimeExecutable": "pnpm",
+			"runtimeArgs": ["test:debug"],
+			"cwd": "${workspaceFolder}/apps/api",
+			"console": "integratedTerminal"
+		},
+		{
+			"name": "Debug Agent Tests",
+			"type": "node",
+			"request": "launch",
+			"runtimeExecutable": "npx",
+			"runtimeArgs": ["jest", "--runInBand", "${relativeFile}"],
+			"cwd": "${workspaceFolder}/packages/agent",
+			"console": "integratedTerminal"
+		}
+	]
 }
 ```
 
@@ -166,11 +168,11 @@ Next.js debugging works through the browser DevTools or VS Code:
 
 ```json
 {
-  "name": "Debug Web (Chrome)",
-  "type": "chrome",
-  "request": "launch",
-  "url": "http://localhost:3000",
-  "webRoot": "${workspaceFolder}/apps/web/src"
+	"name": "Debug Web (Chrome)",
+	"type": "chrome",
+	"request": "launch",
+	"url": "http://localhost:3000",
+	"webRoot": "${workspaceFolder}/apps/web/src"
 }
 ```
 
@@ -178,13 +180,13 @@ Next.js debugging works through the browser DevTools or VS Code:
 
 Environment files are scoped per app:
 
-| File | Purpose | Committed? |
-|------|---------|-----------|
-| `apps/api/.env.example` | API template with all variables | Yes |
-| `apps/api/.env` | Active API configuration | No |
-| `apps/web/.env.example` | Web template with all variables | Yes |
-| `apps/web/.env.local` | Active Web configuration | No |
-| `.env.compose` | Docker Compose shared config | Yes (template) |
+| File                    | Purpose                         | Committed?     |
+| ----------------------- | ------------------------------- | -------------- |
+| `apps/api/.env.example` | API template with all variables | Yes            |
+| `apps/api/.env`         | Active API configuration        | No             |
+| `apps/web/.env.example` | Web template with all variables | Yes            |
+| `apps/web/.env.local`   | Active Web configuration        | No             |
+| `.env.compose`          | Docker Compose shared config    | Yes (template) |
 
 ### Variable Precedence
 
@@ -255,11 +257,11 @@ cd packages/plugins/openai && npx vitest run src/openai.spec.ts
 
 ### Test Frameworks by Package
 
-| Package | Framework | Config |
-|---------|-----------|--------|
-| `apps/api` | Jest | `jest.config.js` |
-| `packages/agent` | Jest | `jest.config.js` with module name mappings |
-| `packages/plugins/*` | Vitest | `vitest.config.ts` |
+| Package              | Framework | Config                                     |
+| -------------------- | --------- | ------------------------------------------ |
+| `apps/api`           | Jest      | `jest.config.js`                           |
+| `packages/agent`     | Jest      | `jest.config.js` with module name mappings |
+| `packages/plugins/*` | Vitest    | `vitest.config.ts`                         |
 
 :::note
 Some packages require their workspace dependencies to be built first. If you get import resolution errors, run `pnpm build` from the root before testing.

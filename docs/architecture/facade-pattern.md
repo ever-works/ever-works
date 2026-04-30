@@ -69,14 +69,14 @@ All facades extend `BaseFacadeService`, which provides common provider resolutio
 
 ```typescript
 abstract class BaseFacadeService {
-    protected abstract readonly CAPABILITY: string;
-    protected abstract readonly logger: Logger;
+	protected abstract readonly CAPABILITY: string;
+	protected abstract readonly logger: Logger;
 
-    constructor(
-        protected readonly registry: PluginRegistryService,
-        protected readonly settingsService: PluginSettingsService | undefined,
-        protected readonly directoryPluginRepository?: DirectoryPluginRepository,
-    ) {}
+	constructor(
+		protected readonly registry: PluginRegistryService,
+		protected readonly settingsService: PluginSettingsService | undefined,
+		protected readonly directoryPluginRepository?: DirectoryPluginRepository
+	) {}
 }
 ```
 
@@ -84,41 +84,41 @@ abstract class BaseFacadeService {
 
 The `resolvePlugin<T>()` method follows a four-level priority chain:
 
-| Priority | Source | Description |
-|----------|--------|-------------|
-| 1 | `providerOverride` | Explicit provider ID from the request |
-| 2 | Directory default | Active provider set for the specific directory |
-| 3 | `defaultForCapabilities` | Plugin declaring itself as the default for a capability |
-| 4 | First enabled | First loaded and enabled plugin with the required capability |
+| Priority | Source                   | Description                                                  |
+| -------- | ------------------------ | ------------------------------------------------------------ |
+| 1        | `providerOverride`       | Explicit provider ID from the request                        |
+| 2        | Directory default        | Active provider set for the specific directory               |
+| 3        | `defaultForCapabilities` | Plugin declaring itself as the default for a capability      |
+| 4        | First enabled            | First loaded and enabled plugin with the required capability |
 
 ### Settings Hierarchy
 
 Plugin settings are resolved through a four-level hierarchy via `PluginSettingsService`:
 
-| Level | Scope | Description |
-|-------|-------|-------------|
-| 1 | Directory | Settings specific to a directory |
-| 2 | User | Settings specific to a user |
-| 3 | Admin | Global admin-configured settings |
-| 4 | Plugin defaults | Default values from the plugin's JSON Schema |
+| Level | Scope           | Description                                  |
+| ----- | --------------- | -------------------------------------------- |
+| 1     | Directory       | Settings specific to a directory             |
+| 2     | User            | Settings specific to a user                  |
+| 3     | Admin           | Global admin-configured settings             |
+| 4     | Plugin defaults | Default values from the plugin's JSON Schema |
 
 ### Setting Utilities
 
 The base facade provides typed setting accessors:
 
-| Method | Behavior |
-|--------|----------|
-| `getSettingTyped<T>(settings, key, type)` | Returns typed value or `undefined` |
-| `getSettingRequired<T>(settings, key, type)` | Returns typed value or throws |
-| `getSettingWithDefault<T>(settings, key, type, default)` | Returns typed value or default |
+| Method                                                   | Behavior                           |
+| -------------------------------------------------------- | ---------------------------------- |
+| `getSettingTyped<T>(settings, key, type)`                | Returns typed value or `undefined` |
+| `getSettingRequired<T>(settings, key, type)`             | Returns typed value or throws      |
+| `getSettingWithDefault<T>(settings, key, type, default)` | Returns typed value or default     |
 
 ### Error Classes
 
-| Error Class | Description |
-|-------------|-------------|
-| `FacadeError` | Base error with operation name and provider context |
-| `NoProviderError` | No provider configured for the capability |
-| `ProviderNotFoundError` | Requested provider ID not found in registry |
+| Error Class             | Description                                         |
+| ----------------------- | --------------------------------------------------- |
+| `FacadeError`           | Base error with operation name and provider context |
+| `NoProviderError`       | No provider configured for the capability           |
+| `ProviderNotFoundError` | Requested provider ID not found in registry         |
 
 ## Facade Services
 
@@ -130,17 +130,18 @@ The most complex facade, providing AI completion and structured output capabilit
 
 **Key methods:**
 
-| Method | Description |
-|--------|-------------|
-| `askJson<T>(prompt, schema, options, facadeOptions)` | Structured output with Zod validation |
-| `createChatCompletion(options, facadeOptions)` | Standard chat completion |
-| `createStreamingChatCompletion(options, facadeOptions)` | Streaming chat (AsyncGenerator) |
-| `testConnection(facadeOptions)` | Verify provider availability |
-| `getAvailableModels(facadeOptions)` | List models from the active provider |
-| `getProviderConfig(facadeOptions)` | Get full provider configuration |
-| `resolveModelContextLength(modelId, facadeOptions)` | Resolve context window size |
+| Method                                                  | Description                           |
+| ------------------------------------------------------- | ------------------------------------- |
+| `askJson<T>(prompt, schema, options, facadeOptions)`    | Structured output with Zod validation |
+| `createChatCompletion(options, facadeOptions)`          | Standard chat completion              |
+| `createStreamingChatCompletion(options, facadeOptions)` | Streaming chat (AsyncGenerator)       |
+| `testConnection(facadeOptions)`                         | Verify provider availability          |
+| `getAvailableModels(facadeOptions)`                     | List models from the active provider  |
+| `getProviderConfig(facadeOptions)`                      | Get full provider configuration       |
+| `resolveModelContextLength(modelId, facadeOptions)`     | Resolve context window size           |
 
 **Model routing:** The AI facade resolves models through a priority chain:
+
 1. `modelOverride` from routing options
 2. Complexity-based model (`simpleModel`, `mediumModel`, `complexModel` from settings)
 3. `defaultModel` from settings
@@ -182,18 +183,20 @@ Wraps deployment provider plugins (Vercel) for website deployment.
 
 ```typescript
 @Module({
-    imports: [DatabaseModule],
-    providers: [
-        AiFacadeService,
-        SearchFacadeService,
-        ScreenshotFacadeService,
-        ContentExtractorFacadeService,
-        DataSourceFacadeService,
-        GitFacadeService,
-        OAuthFacadeService,
-        DeployFacadeService,
-    ],
-    exports: [/* all providers */],
+	imports: [DatabaseModule],
+	providers: [
+		AiFacadeService,
+		SearchFacadeService,
+		ScreenshotFacadeService,
+		ContentExtractorFacadeService,
+		DataSourceFacadeService,
+		GitFacadeService,
+		OAuthFacadeService,
+		DeployFacadeService
+	],
+	exports: [
+		/* all providers */
+	]
 })
 export class FacadesModule {}
 ```
@@ -207,9 +210,9 @@ Pipeline steps receive pre-bound facades through the `PipelineFacadeService`. In
 ```typescript
 // Unbound (direct service call)
 await aiFacade.askJson(prompt, schema, options, {
-    directoryId: 'dir-123',
-    userId: 'user-456',
-    providerOverride: 'openai',
+	directoryId: 'dir-123',
+	userId: 'user-456',
+	providerOverride: 'openai'
 });
 
 // Bound (inside pipeline step via StepExecutionContext)
@@ -226,6 +229,7 @@ Beyond facades, the agent package employs a service layer pattern for directory 
 ### Single Responsibility
 
 Each service handles a specific domain concern:
+
 - `DirectoryLifecycleService` for create/update/delete
 - `DirectoryGenerationService` for orchestrating generation
 - `DirectoryScheduleService` for scheduled regeneration
@@ -237,12 +241,12 @@ All services use NestJS constructor injection:
 ```typescript
 @Injectable()
 export class DirectoryGenerationService {
-    constructor(
-        private readonly dataGenerator: DataGeneratorService,
-        private readonly markdownGenerator: MarkdownGeneratorService,
-        private readonly websiteGenerator: WebsiteGeneratorService,
-        private readonly pipelineOrchestrator: PipelineOrchestratorService,
-    ) {}
+	constructor(
+		private readonly dataGenerator: DataGeneratorService,
+		private readonly markdownGenerator: MarkdownGeneratorService,
+		private readonly websiteGenerator: WebsiteGeneratorService,
+		private readonly pipelineOrchestrator: PipelineOrchestratorService
+	) {}
 }
 ```
 

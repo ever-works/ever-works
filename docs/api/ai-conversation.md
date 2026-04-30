@@ -13,8 +13,8 @@ All endpoints require JWT authentication.
 
 ## Endpoint
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
+| Method | Endpoint                            | Description                                          |
+| ------ | ----------------------------------- | ---------------------------------------------------- |
 | `POST` | `/api/ai-conversations/chat/stream` | Send a chat message and receive a streaming response |
 
 ## Chat Stream
@@ -35,13 +35,13 @@ curl -X POST http://localhost:3100/api/ai-conversations/chat/stream \
 
 ### Request Body
 
-| Field | Type | Required | Description |
-|-------|------|----------|-------------|
-| `messages` | array | Yes | Array of chat messages (`{ role, content }`) |
-| `model` | string | No | Override the AI model |
-| `temperature` | number | No | Override the temperature |
-| `directoryId` | string | No | Scope the conversation to a specific directory |
-| `providerOverride` | string | No | Override the AI provider plugin |
+| Field              | Type   | Required | Description                                    |
+| ------------------ | ------ | -------- | ---------------------------------------------- |
+| `messages`         | array  | Yes      | Array of chat messages (`{ role, content }`)   |
+| `model`            | string | No       | Override the AI model                          |
+| `temperature`      | number | No       | Override the temperature                       |
+| `directoryId`      | string | No       | Scope the conversation to a specific directory |
+| `providerOverride` | string | No       | Override the AI provider plugin                |
 
 ### Response
 
@@ -56,8 +56,8 @@ The response is a stream of newline-delimited JSON (NDJSON). Each line is a JSON
 {"done":true}
 ```
 
-| Field | Type | Description |
-|-------|------|-------------|
-| `content` | string | A chunk of the AI response text |
-| `done` | boolean | `true` when the response is complete |
-| `error` | string | Error message if something went wrong |
+| Field     | Type    | Description                           |
+| --------- | ------- | ------------------------------------- |
+| `content` | string  | A chunk of the AI response text       |
+| `done`    | boolean | `true` when the response is complete  |
+| `error`   | string  | Error message if something went wrong |

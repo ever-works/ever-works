@@ -11,21 +11,21 @@ The subscription system manages plan tiers, cadence allowances, and usage-based 
 
 ## Architecture
 
-| Service | Purpose |
-|---|---|
-| `SubscriptionService` | Plan resolution, cadence allowances, plan assignment |
-| `UsageLedgerService` | Records per-run usage charges |
-| `BillingProvider` | Abstract billing gateway (extensible for Stripe, etc.) |
+| Service               | Purpose                                                |
+| --------------------- | ------------------------------------------------------ |
+| `SubscriptionService` | Plan resolution, cadence allowances, plan assignment   |
+| `UsageLedgerService`  | Records per-run usage charges                          |
+| `BillingProvider`     | Abstract billing gateway (extensible for Stripe, etc.) |
 
 ## Subscription Plans
 
 Three plans are seeded on application startup via `OnModuleInit`:
 
-| Plan | Code | Max Directories | Allowed Cadences | Monthly Price |
-|---|---|---|---|---|
-| Free | `free` | 1 | All (currently) | $0 |
-| Standard | `standard` | 5 | Monthly, Weekly, Daily | $29 |
-| Premium | `premium` | 15 | Monthly, Weekly, Daily, Hourly | $99 |
+| Plan     | Code       | Max Directories | Allowed Cadences               | Monthly Price |
+| -------- | ---------- | --------------- | ------------------------------ | ------------- |
+| Free     | `free`     | 1               | All (currently)                | $0            |
+| Standard | `standard` | 5               | Monthly, Weekly, Daily         | $29           |
+| Premium  | `premium`  | 15              | Monthly, Weekly, Daily, Hourly | $99           |
 
 Each plan defines:
 
@@ -66,10 +66,10 @@ The `getCadenceAllowances(user)` method returns a list of all cadences with thei
 
 ```typescript
 interface DirectoryScheduleAllowedCadence {
-    cadence: DirectoryScheduleCadence;
-    allowed: boolean;
-    payPerUse: boolean;
-    reason?: string;
+	cadence: DirectoryScheduleCadence;
+	allowed: boolean;
+	payPerUse: boolean;
+	reason?: string;
 }
 ```
 
@@ -96,18 +96,18 @@ Usage is recorded only when:
 
 Each ledger entry captures:
 
-| Field | Description |
-|---|---|
-| `userId` | User who triggered the run |
-| `directoryId` | Directory being generated |
-| `scheduleId` | Associated schedule (if applicable) |
-| `triggerType` | How the run was triggered (manual, scheduled) |
-| `billingMode` | `USAGE` for pay-per-use runs |
-| `units` | Number of units (always 1 per run) |
-| `amountCents` | Charge amount in cents |
-| `currency` | Currency code (from billing provider) |
-| `generationHistoryId` | Link to the generation history record |
-| `metadata` | Additional context (cadence, etc.) |
+| Field                 | Description                                   |
+| --------------------- | --------------------------------------------- |
+| `userId`              | User who triggered the run                    |
+| `directoryId`         | Directory being generated                     |
+| `scheduleId`          | Associated schedule (if applicable)           |
+| `triggerType`         | How the run was triggered (manual, scheduled) |
+| `billingMode`         | `USAGE` for pay-per-use runs                  |
+| `units`               | Number of units (always 1 per run)            |
+| `amountCents`         | Charge amount in cents                        |
+| `currency`            | Currency code (from billing provider)         |
+| `generationHistoryId` | Link to the generation history record         |
+| `metadata`            | Additional context (cadence, etc.)            |
 
 After recording the ledger entry, the charge is forwarded to the billing provider:
 
@@ -121,10 +121,10 @@ The `BillingProvider` is an abstract class that defines the billing gateway inte
 
 ```typescript
 abstract class BillingProvider {
-    abstract getDefaultCurrency(): string;
-    async recordUsageCharge(_entry: UsageLedgerEntry): Promise<void> {
-        return; // No-op by default
-    }
+	abstract getDefaultCurrency(): string;
+	async recordUsageCharge(_entry: UsageLedgerEntry): Promise<void> {
+		return; // No-op by default
+	}
 }
 ```
 
@@ -139,28 +139,28 @@ To integrate with Stripe (or another payment gateway), create a custom provider:
 ```typescript
 @Injectable()
 export class StripeBillingProvider extends BillingProvider {
-    getDefaultCurrency(): string {
-        return 'usd';
-    }
+	getDefaultCurrency(): string {
+		return 'usd';
+	}
 
-    async recordUsageCharge(entry: UsageLedgerEntry): Promise<void> {
-        // Forward the charge to Stripe's usage-based billing API
-        await stripe.usageRecords.create(subscriptionItemId, {
-            quantity: entry.units,
-            timestamp: Math.floor(Date.now() / 1000),
-        });
-    }
+	async recordUsageCharge(entry: UsageLedgerEntry): Promise<void> {
+		// Forward the charge to Stripe's usage-based billing API
+		await stripe.usageRecords.create(subscriptionItemId, {
+			quantity: entry.units,
+			timestamp: Math.floor(Date.now() / 1000)
+		});
+	}
 }
 ```
 
 ## Feature Flags
 
-| Config Key | Purpose |
-|---|---|
-| `config.subscriptions.isEnabled()` | Master toggle for the subscription system |
-| `config.subscriptions.getDefaultPlanCode()` | Default plan when no subscription exists |
-| `config.subscriptions.getPayPerUsePriceCents()` | Per-run overage charge in cents |
-| `config.billing.getDefaultCurrency()` | Default currency code |
+| Config Key                                      | Purpose                                   |
+| ----------------------------------------------- | ----------------------------------------- |
+| `config.subscriptions.isEnabled()`              | Master toggle for the subscription system |
+| `config.subscriptions.getDefaultPlanCode()`     | Default plan when no subscription exists  |
+| `config.subscriptions.getPayPerUsePriceCents()` | Per-run overage charge in cents           |
+| `config.billing.getDefaultCurrency()`           | Default currency code                     |
 
 When subscriptions are disabled, all users get full access to all features with no billing.
 

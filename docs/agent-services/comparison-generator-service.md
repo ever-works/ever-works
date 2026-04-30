@@ -1,7 +1,7 @@
 ---
 id: comparison-generator-service
-title: "ComparisonGenerationService Deep Dive"
-sidebar_label: "Comparison Generator"
+title: 'ComparisonGenerationService Deep Dive'
+sidebar_label: 'Comparison Generator'
 sidebar_position: 19
 ---
 
@@ -48,18 +48,18 @@ ComparisonGenerationService (NestJS service)
 
 Automatically selects and generates the next comparison pair.
 
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| `directoryId` | `string` | The directory ID |
-| `userId` | `string` | The requesting user's ID |
+| Parameter     | Type     | Description              |
+| ------------- | -------- | ------------------------ |
+| `directoryId` | `string` | The directory ID         |
+| `userId`      | `string` | The requesting user's ID |
 
 **Returns:** `Promise<ComparisonResult>`
 
 ```typescript
 interface ComparisonResult {
-    status: 'success' | 'skipped' | 'error';
-    slug?: string;
-    message: string;
+	status: 'success' | 'skipped' | 'error';
+	slug?: string;
+	message: string;
 }
 ```
 
@@ -132,6 +132,7 @@ The `generateComparison()` function makes two (optionally three) AI calls:
 ### Dimension Scoring
 
 Each comparison dimension includes:
+
 - Per-item summaries
 - Scores from 1-10 for each item
 - A winner designation (`item_a`, `item_b`, or `tie`)
@@ -142,23 +143,23 @@ The overall verdict also designates a winner.
 
 Comparison behavior is configurable per-directory via the `comparison-generator` plugin:
 
-| Setting | Default | Description |
-|---------|---------|-------------|
-| `max_comparisons_mode` | `custom` | `custom` (uses max_comparisons) or `unlimited` |
-| `max_comparisons` | 50 | Maximum total comparisons to generate |
-| `min_items_for_comparison` | 3 | Minimum items in a category to enable comparisons |
-| `ai_provider` | (default) | Override AI provider for comparisons |
-| `ai_model` | (default) | Override AI model for comparisons |
-| `custom_prompt` | (none) | Additional instructions appended to all prompts |
-| `extended_analysis` | `false` | Whether to generate extended analysis markdown |
+| Setting                    | Default   | Description                                       |
+| -------------------------- | --------- | ------------------------------------------------- |
+| `max_comparisons_mode`     | `custom`  | `custom` (uses max_comparisons) or `unlimited`    |
+| `max_comparisons`          | 50        | Maximum total comparisons to generate             |
+| `min_items_for_comparison` | 3         | Minimum items in a category to enable comparisons |
+| `ai_provider`              | (default) | Override AI provider for comparisons              |
+| `ai_model`                 | (default) | Override AI model for comparisons                 |
+| `custom_prompt`            | (none)    | Additional instructions appended to all prompts   |
+| `extended_analysis`        | `false`   | Whether to generate extended analysis markdown    |
 
 ## Database Interactions
 
-| Repository | Method | Purpose |
-|------------|--------|---------|
-| `DirectoryRepository` | `findById` | Load directory entity |
-| `DirectoryPluginRepository` | `findByDirectoryAndPlugin` | Load comparison plugin settings |
-| `DataRepository` | `getItems`, `getConfig`, `getComparisons`, `writeComparison`, `writeComparisonMarkdown`, `removeComparison`, `mergeConfig` | Git-backed data operations |
+| Repository                  | Method                                                                                                                     | Purpose                         |
+| --------------------------- | -------------------------------------------------------------------------------------------------------------------------- | ------------------------------- |
+| `DirectoryRepository`       | `findById`                                                                                                                 | Load directory entity           |
+| `DirectoryPluginRepository` | `findByDirectoryAndPlugin`                                                                                                 | Load comparison plugin settings |
+| `DataRepository`            | `getItems`, `getConfig`, `getComparisons`, `writeComparison`, `writeComparisonMarkdown`, `removeComparison`, `mergeConfig` | Git-backed data operations      |
 
 ## Event System
 
@@ -166,15 +167,15 @@ This service does not emit domain events. Comparison state is tracked in the dat
 
 ## Error Handling
 
-| Scenario | Result |
-|----------|--------|
-| Directory not found | `NotFoundException` |
-| No pairs available | `{ status: 'skipped', message: 'No more pairs available' }` |
-| Item slugs not found | `{ status: 'error', message: 'Could not find items...' }` |
-| Comparison already exists | `{ status: 'skipped' }` with existing slug |
-| Comparison not found on delete | `{ status: 'error' }` |
-| Search/extraction failures | Silently degraded -- continues with available snippets |
-| Missing item slugs | Throws `Error` during generation |
+| Scenario                       | Result                                                      |
+| ------------------------------ | ----------------------------------------------------------- |
+| Directory not found            | `NotFoundException`                                         |
+| No pairs available             | `{ status: 'skipped', message: 'No more pairs available' }` |
+| Item slugs not found           | `{ status: 'error', message: 'Could not find items...' }`   |
+| Comparison already exists      | `{ status: 'skipped' }` with existing slug                  |
+| Comparison not found on delete | `{ status: 'error' }`                                       |
+| Search/extraction failures     | Silently degraded -- continues with available snippets      |
+| Missing item slugs             | Throws `Error` during generation                            |
 
 ## Usage Examples
 
@@ -184,12 +185,7 @@ const result = await comparisonService.generateNextComparison(directoryId, userI
 // { status: 'success', slug: 'netlify--vercel', message: 'Generated comparison: ...' }
 
 // Generate a specific comparison
-const result = await comparisonService.generateManualComparison(
-    directoryId,
-    userId,
-    'react',
-    'vue',
-);
+const result = await comparisonService.generateManualComparison(directoryId, userId, 'react', 'vue');
 
 // Check remaining pairs
 const remaining = await comparisonService.getRemainingCount(directoryId, userId);
@@ -207,12 +203,12 @@ await comparisonService.deleteComparison(directoryId, userId, 'netlify--vercel')
 
 ## Configuration
 
-| Setting | Source | Description |
-|---------|--------|-------------|
-| Plugin settings | `DirectoryPluginRepository` | Per-directory comparison configuration |
+| Setting           | Source                            | Description                             |
+| ----------------- | --------------------------------- | --------------------------------------- |
+| Plugin settings   | `DirectoryPluginRepository`       | Per-directory comparison configuration  |
 | AI provider/model | Plugin settings or system default | Controls which AI generates comparisons |
-| Search facade | System configuration | Web search provider for research |
-| Content extractor | System configuration | Web content extraction provider |
+| Search facade     | System configuration              | Web search provider for research        |
+| Content extractor | System configuration              | Web content extraction provider         |
 
 ## Related Services
 

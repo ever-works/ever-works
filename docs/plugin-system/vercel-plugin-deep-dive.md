@@ -1,7 +1,7 @@
 ---
 id: vercel-plugin-deep-dive
-title: "Vercel Plugin Deep Dive"
-sidebar_label: "Vercel Deep Dive"
+title: 'Vercel Plugin Deep Dive'
+sidebar_label: 'Vercel Deep Dive'
 sidebar_position: 52
 ---
 
@@ -30,16 +30,16 @@ The actual deployment flow is indirect: the platform pushes code to GitHub and t
 
 ### Environment Variables
 
-| Variable | Required | Description |
-|----------|----------|-------------|
-| N/A | -- | No environment-variable fallbacks; users provide their own token |
+| Variable | Required | Description                                                      |
+| -------- | -------- | ---------------------------------------------------------------- |
+| N/A      | --       | No environment-variable fallbacks; users provide their own token |
 
 ### Settings Schema
 
 ```typescript
 interface VercelSettings {
-  apiToken?: string;          // Vercel API token (x-secret, user-scoped, required)
-  defaultTeamScope?: string;  // Default Vercel team slug for deployments (optional)
+	apiToken?: string; // Vercel API token (x-secret, user-scoped, required)
+	defaultTeamScope?: string; // Default Vercel team slug for deployments (optional)
 }
 ```
 
@@ -49,8 +49,8 @@ interface VercelSettings {
 
 ## Capabilities
 
-| Capability | Description |
-|------------|-------------|
+| Capability   | Description                                   |
+| ------------ | --------------------------------------------- |
 | `deployment` | Deploy directories as live websites on Vercel |
 
 This plugin is the default for the `deployment` capability (`defaultForCapabilities: ['deployment']`).
@@ -59,40 +59,40 @@ This plugin is the default for the `deployment` capability (`defaultForCapabilit
 
 ### Deployment
 
-| Method | Signature | Description |
-|--------|-----------|-------------|
-| `deploy` | `(config: DeploymentConfig, token: string) => Promise<DeploymentResult>` | Returns a pending placeholder; actual deploy is via GitHub Actions |
-| `getDeploymentStatus` | `(deploymentId: string, token: string) => Promise<DeploymentResult>` | Returns current deployment status |
+| Method                | Signature                                                                | Description                                                        |
+| --------------------- | ------------------------------------------------------------------------ | ------------------------------------------------------------------ |
+| `deploy`              | `(config: DeploymentConfig, token: string) => Promise<DeploymentResult>` | Returns a pending placeholder; actual deploy is via GitHub Actions |
+| `getDeploymentStatus` | `(deploymentId: string, token: string) => Promise<DeploymentResult>`     | Returns current deployment status                                  |
 
 ### Token & User
 
-| Method | Signature | Description |
-|--------|-----------|-------------|
-| `validateToken` | `(token: string) => Promise<boolean>` | Validates token by calling the Vercel user API |
+| Method                 | Signature                                                  | Description                                    |
+| ---------------------- | ---------------------------------------------------------- | ---------------------------------------------- |
+| `validateToken`        | `(token: string) => Promise<boolean>`                      | Validates token by calling the Vercel user API |
 | `getAuthenticatedUser` | `(token: string) => Promise<{ username; email? } \| null>` | Returns username and email for the token owner |
-| `getTeams` | `(token: string) => Promise<Array<{ id; slug; name }>>` | Lists teams accessible to the token |
+| `getTeams`             | `(token: string) => Promise<Array<{ id; slug; name }>>`    | Lists teams accessible to the token            |
 
 ### Project Management
 
-| Method | Signature | Description |
-|--------|-----------|-------------|
-| `listProjects` | `(token: string) => Promise<DeploymentProject[]>` | Lists projects in the default team scope |
-| `getProject` | `(projectId: string, token: string) => Promise<DeploymentProject \| null>` | Retrieves a specific project |
+| Method                     | Signature                                                                                        | Description                                       |
+| -------------------------- | ------------------------------------------------------------------------------------------------ | ------------------------------------------------- |
+| `listProjects`             | `(token: string) => Promise<DeploymentProject[]>`                                                | Lists projects in the default team scope          |
+| `getProject`               | `(projectId: string, token: string) => Promise<DeploymentProject \| null>`                       | Retrieves a specific project                      |
 | `lookupExistingDeployment` | `(projectName, token, teamScope?) => Promise<{ found; website?; deploymentState?; projectId? }>` | Searches for an existing deployment across scopes |
 
 ### Domain Management
 
-| Method | Signature | Description |
-|--------|-----------|-------------|
-| `getDomains` | `(projectId, token, teamScope?) => Promise<DeploymentDomain[]>` | Lists domains for a project |
-| `addDomain` | `(projectId, domain, token, teamScope?) => Promise<AddDomainResult>` | Adds a custom domain |
-| `removeDomain` | `(projectId, domain, token, teamScope?) => Promise<boolean>` | Removes a domain |
+| Method         | Signature                                                             | Description                            |
+| -------------- | --------------------------------------------------------------------- | -------------------------------------- |
+| `getDomains`   | `(projectId, token, teamScope?) => Promise<DeploymentDomain[]>`       | Lists domains for a project            |
+| `addDomain`    | `(projectId, domain, token, teamScope?) => Promise<AddDomainResult>`  | Adds a custom domain                   |
+| `removeDomain` | `(projectId, domain, token, teamScope?) => Promise<boolean>`          | Removes a domain                       |
 | `verifyDomain` | `(projectId, domain, token, teamScope?) => Promise<DeploymentDomain>` | Triggers DNS verification for a domain |
 
 ### Service Access
 
-| Method | Signature | Description |
-|--------|-----------|-------------|
+| Method          | Signature                | Description                                                  |
+| --------------- | ------------------------ | ------------------------------------------------------------ |
 | `getApiService` | `() => VercelApiService` | Exposes the underlying API service for direct use by facades |
 
 ## Implementation Details
@@ -121,9 +121,7 @@ async createSDK(token: string): Promise<Vercel> {
 The plugin tracks these Vercel deployment states:
 
 ```typescript
-type VercelDeploymentState =
-  | 'BUILDING' | 'ERROR' | 'INITIALIZING'
-  | 'QUEUED' | 'READY' | 'CANCELED' | 'TIMEOUT';
+type VercelDeploymentState = 'BUILDING' | 'ERROR' | 'INITIALIZING' | 'QUEUED' | 'READY' | 'CANCELED' | 'TIMEOUT';
 ```
 
 ### Error Handling in SDK Responses
@@ -137,25 +135,19 @@ The Vercel SDK sometimes throws errors that contain valid data in `error.rawValu
 const isValid = await vercelPlugin.validateToken(userToken);
 
 // Look up an existing deployment
-const result = await vercelPlugin.lookupExistingDeployment(
-  'my-directory-site', userToken, 'my-team-slug'
-);
+const result = await vercelPlugin.lookupExistingDeployment('my-directory-site', userToken, 'my-team-slug');
 if (result.found) {
-  console.log(`Live at: ${result.website}`);
+	console.log(`Live at: ${result.website}`);
 }
 
 // Add a custom domain
-const domainResult = await vercelPlugin.addDomain(
-  projectId, 'directory.example.com', userToken, teamScope
-);
+const domainResult = await vercelPlugin.addDomain(projectId, 'directory.example.com', userToken, teamScope);
 if (!domainResult.verified) {
-  console.log('DNS verification required:', domainResult.domain.verification);
+	console.log('DNS verification required:', domainResult.domain.verification);
 }
 
 // Verify domain DNS
-const verified = await vercelPlugin.verifyDomain(
-  projectId, 'directory.example.com', userToken, teamScope
-);
+const verified = await vercelPlugin.verifyDomain(projectId, 'directory.example.com', userToken, teamScope);
 ```
 
 ## Rate Limiting & Quotas

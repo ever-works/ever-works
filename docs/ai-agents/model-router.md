@@ -13,21 +13,21 @@ The model router is an optional feature that routes AI tasks to different model 
 
 Each AI task can be assigned a complexity level:
 
-| Level | Use Case |
-|-------|----------|
-| `SIMPLE` | Straightforward extraction, formatting, short responses |
-| `MEDIUM` | Multi-step reasoning, moderate context |
+| Level     | Use Case                                                       |
+| --------- | -------------------------------------------------------------- |
+| `SIMPLE`  | Straightforward extraction, formatting, short responses        |
+| `MEDIUM`  | Multi-step reasoning, moderate context                         |
 | `COMPLEX` | Large context windows, nuanced analysis, structured generation |
 
 ## Model Tiers
 
 Complexity levels map to model tiers:
 
-| Tier | Default Mapping | Description |
-|------|----------------|-------------|
-| `ECONOMY` | SIMPLE tasks | Cheapest models, fastest inference |
-| `STANDARD` | MEDIUM tasks | Balanced cost and capability |
-| `PREMIUM` | COMPLEX tasks | Most capable models |
+| Tier       | Default Mapping | Description                        |
+| ---------- | --------------- | ---------------------------------- |
+| `ECONOMY`  | SIMPLE tasks    | Cheapest models, fastest inference |
+| `STANDARD` | MEDIUM tasks    | Balanced cost and capability       |
+| `PREMIUM`  | COMPLEX tasks   | Most capable models                |
 
 ## Auto-Escalation
 
@@ -78,11 +78,11 @@ The model router includes a pricing database with cost information for models ac
 
 Beyond complexity-based routing, the AI service supports additional selection strategies:
 
-| Strategy | Behavior |
-|----------|----------|
-| **Cost-effective** | Selects the provider with the lowest per-token cost |
-| **Fastest** | Prefers Groq when available, otherwise falls back to default |
-| **Most capable** | Selects the provider with the largest context window |
+| Strategy           | Behavior                                                     |
+| ------------------ | ------------------------------------------------------------ |
+| **Cost-effective** | Selects the provider with the lowest per-token cost          |
+| **Fastest**        | Prefers Groq when available, otherwise falls back to default |
+| **Most capable**   | Selects the provider with the largest context window         |
 
 These strategies are used internally by the platform for different types of operations.
 

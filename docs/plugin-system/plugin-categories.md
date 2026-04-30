@@ -15,18 +15,18 @@ Categories are defined as a single source of truth in `@ever-works/plugin` via t
 
 ```typescript
 const PLUGIN_CATEGORIES = [
-  'git-provider',
-  'deployment',
-  'screenshot',
-  'search',
-  'content-extractor',
-  'data-source',
-  'ai-provider',
-  'pipeline',
-  'form',
-  'integration',
-  'utility',
-  'theme'
+	'git-provider',
+	'deployment',
+	'screenshot',
+	'search',
+	'content-extractor',
+	'data-source',
+	'ai-provider',
+	'pipeline',
+	'form',
+	'integration',
+	'utility',
+	'theme'
 ] as const;
 
 type PluginCategory = (typeof PLUGIN_CATEGORIES)[number];
@@ -36,20 +36,20 @@ Each plugin declares exactly one category. The category is set on the plugin cla
 
 ### Category Overview
 
-| Category | Description | Example Plugins |
-|---|---|---|
-| `ai-provider` | Provides AI model access for content generation | OpenAI, Anthropic, Google, Groq, Ollama, Mistral, OpenRouter, Perplexity, Vercel AI Gateway |
-| `search` | Web search for discovering directory items | Exa, Tavily, SerpAPI, Brave |
-| `content-extractor` | Extracts structured content from URLs | Jina, Firecrawl, Local Content Extractor, Notion Extractor, PDF Extractor |
-| `screenshot` | Captures website screenshots | ScreenshotOne, Urlbox, Scrapfly |
-| `git-provider` | Git hosting API operations and local git | GitHub |
-| `deployment` | Deploys generated directories to hosting platforms | Vercel |
-| `data-source` | Imports items from external data APIs | Apify, Bright Data, Scrapfly, Valyu |
-| `pipeline` | Defines the generation workflow | Standard Pipeline (15 steps), Agent Pipeline (5 steps), Claude Code |
-| `form` | Provides custom form fields for the generator UI | (used by pipeline plugins via `IFormSchemaProvider`) |
-| `integration` | Third-party service integrations | (extensible) |
-| `utility` | General-purpose utilities | Comparison Generator |
-| `theme` | Visual theme customization | (extensible) |
+| Category            | Description                                        | Example Plugins                                                                             |
+| ------------------- | -------------------------------------------------- | ------------------------------------------------------------------------------------------- |
+| `ai-provider`       | Provides AI model access for content generation    | OpenAI, Anthropic, Google, Groq, Ollama, Mistral, OpenRouter, Perplexity, Vercel AI Gateway |
+| `search`            | Web search for discovering directory items         | Exa, Tavily, SerpAPI, Brave                                                                 |
+| `content-extractor` | Extracts structured content from URLs              | Jina, Firecrawl, Local Content Extractor, Notion Extractor, PDF Extractor                   |
+| `screenshot`        | Captures website screenshots                       | ScreenshotOne, Urlbox, Scrapfly                                                             |
+| `git-provider`      | Git hosting API operations and local git           | GitHub                                                                                      |
+| `deployment`        | Deploys generated directories to hosting platforms | Vercel                                                                                      |
+| `data-source`       | Imports items from external data APIs              | Apify, Bright Data, Scrapfly, Valyu                                                         |
+| `pipeline`          | Defines the generation workflow                    | Standard Pipeline (15 steps), Agent Pipeline (5 steps), Claude Code                         |
+| `form`              | Provides custom form fields for the generator UI   | (used by pipeline plugins via `IFormSchemaProvider`)                                        |
+| `integration`       | Third-party service integrations                   | (extensible)                                                                                |
+| `utility`           | General-purpose utilities                          | Comparison Generator                                                                        |
+| `theme`             | Visual theme customization                         | (extensible)                                                                                |
 
 ## Plugin Capabilities
 
@@ -59,17 +59,17 @@ Capabilities are the functional interfaces a plugin implements. A plugin can dec
 
 ```typescript
 const PLUGIN_CAPABILITIES = {
-  AI_PROVIDER: 'ai-provider',
-  SEARCH: 'search',
-  SCREENSHOT: 'screenshot',
-  CONTENT_EXTRACTOR: 'content-extractor',
-  DATA_SOURCE: 'data-source',
-  PIPELINE: 'pipeline',
-  PIPELINE_MODIFIER: 'pipeline-modifier',
-  FORM_SCHEMA_PROVIDER: 'form-schema-provider',
-  DEPLOYMENT: 'deployment',
-  GIT_PROVIDER: 'git-provider',
-  OAUTH: 'oauth'
+	AI_PROVIDER: 'ai-provider',
+	SEARCH: 'search',
+	SCREENSHOT: 'screenshot',
+	CONTENT_EXTRACTOR: 'content-extractor',
+	DATA_SOURCE: 'data-source',
+	PIPELINE: 'pipeline',
+	PIPELINE_MODIFIER: 'pipeline-modifier',
+	FORM_SCHEMA_PROVIDER: 'form-schema-provider',
+	DEPLOYMENT: 'deployment',
+	GIT_PROVIDER: 'git-provider',
+	OAUTH: 'oauth'
 } as const;
 ```
 
@@ -77,19 +77,19 @@ const PLUGIN_CAPABILITIES = {
 
 Each capability maps to a TypeScript interface that the plugin must implement:
 
-| Capability | Interface | Required Methods |
-|---|---|---|
-| `ai-provider` | `IAiProviderPlugin` | `createChatCompletion()`, `listModels()`, `getModel()`, `isAvailable()`, `getCapabilities()` |
-| `search` | `ISearchPlugin` | `search()`, `isAvailable()` |
-| `content-extractor` | `IContentExtractorPlugin` | `extract()`, `isAvailable()` |
-| `screenshot` | `IScreenshotPlugin` | `capture()`, `isAvailable()` |
-| `data-source` | `IDataSourcePlugin` | `query()`, `isAvailable()` |
-| `pipeline` | `IPipelinePlugin` | `getStepDefinitions()`, `execute()` |
-| `pipeline-modifier` | `IPipelineModifierPlugin` | `execute()`, `targetPipelines` |
-| `git-provider` | `IGitProviderPlugin` | `getAuth()`, `getCloneUrl()`, `createRepository()`, `getRepository()`, `createPullRequest()`, `mergePullRequest()` + `IGitOperations` |
-| `deployment` | `IDeploymentPlugin` | `deploy()`, `getDeploymentStatus()` |
-| `oauth` | `IOAuthPlugin` | `getOAuthConfig()`, `exchangeCode()`, `getUser()` |
-| `form-schema-provider` | `IFormSchemaProvider` | `getFormFields()`, `getFormGroups()` |
+| Capability             | Interface                 | Required Methods                                                                                                                      |
+| ---------------------- | ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| `ai-provider`          | `IAiProviderPlugin`       | `createChatCompletion()`, `listModels()`, `getModel()`, `isAvailable()`, `getCapabilities()`                                          |
+| `search`               | `ISearchPlugin`           | `search()`, `isAvailable()`                                                                                                           |
+| `content-extractor`    | `IContentExtractorPlugin` | `extract()`, `isAvailable()`                                                                                                          |
+| `screenshot`           | `IScreenshotPlugin`       | `capture()`, `isAvailable()`                                                                                                          |
+| `data-source`          | `IDataSourcePlugin`       | `query()`, `isAvailable()`                                                                                                            |
+| `pipeline`             | `IPipelinePlugin`         | `getStepDefinitions()`, `execute()`                                                                                                   |
+| `pipeline-modifier`    | `IPipelineModifierPlugin` | `execute()`, `targetPipelines`                                                                                                        |
+| `git-provider`         | `IGitProviderPlugin`      | `getAuth()`, `getCloneUrl()`, `createRepository()`, `getRepository()`, `createPullRequest()`, `mergePullRequest()` + `IGitOperations` |
+| `deployment`           | `IDeploymentPlugin`       | `deploy()`, `getDeploymentStatus()`                                                                                                   |
+| `oauth`                | `IOAuthPlugin`            | `getOAuthConfig()`, `exchangeCode()`, `getUser()`                                                                                     |
+| `form-schema-provider` | `IFormSchemaProvider`     | `getFormFields()`, `getFormGroups()`                                                                                                  |
 
 ### Type Guards
 
@@ -97,20 +97,20 @@ The plugin system provides type guard functions for each capability:
 
 ```typescript
 import {
-  isAiProviderPlugin,
-  isSearchPlugin,
-  isContentExtractorPlugin,
-  isScreenshotPlugin,
-  isDataSourcePlugin,
-  isPipelinePlugin,
-  isPipelineModifierPlugin,
-  isGitProviderPlugin,
-  isDeploymentPlugin
+	isAiProviderPlugin,
+	isSearchPlugin,
+	isContentExtractorPlugin,
+	isScreenshotPlugin,
+	isDataSourcePlugin,
+	isPipelinePlugin,
+	isPipelineModifierPlugin,
+	isGitProviderPlugin,
+	isDeploymentPlugin
 } from '@ever-works/plugin';
 
 // Usage in facade or platform code
 if (isSearchPlugin(plugin)) {
-  const results = await plugin.search({ query: 'example' });
+	const results = await plugin.search({ query: 'example' });
 }
 ```
 
@@ -120,11 +120,11 @@ Certain capabilities are selectable in the generator form UI. These are defined 
 
 ```typescript
 const SELECTABLE_PROVIDER_CATEGORIES = {
-  search:           { capability: 'search',            uiKey: 'search',           selectableInForm: true },
-  screenshot:       { capability: 'screenshot',        uiKey: 'screenshot',       selectableInForm: true },
-  ai:               { capability: 'ai-provider',       uiKey: 'ai',              selectableInForm: true },
-  contentExtractor: { capability: 'content-extractor', uiKey: 'contentExtractor', selectableInForm: true },
-  pipeline:         { capability: 'pipeline',          uiKey: 'pipeline',         selectableInForm: true }
+	search: { capability: 'search', uiKey: 'search', selectableInForm: true },
+	screenshot: { capability: 'screenshot', uiKey: 'screenshot', selectableInForm: true },
+	ai: { capability: 'ai-provider', uiKey: 'ai', selectableInForm: true },
+	contentExtractor: { capability: 'content-extractor', uiKey: 'contentExtractor', selectableInForm: true },
+	pipeline: { capability: 'pipeline', uiKey: 'pipeline', selectableInForm: true }
 } as const;
 ```
 
@@ -134,11 +134,11 @@ When a user creates a directory, they can select which plugin to use for each se
 
 Each plugin can set a visibility level in its manifest:
 
-| Visibility | Behavior |
-|---|---|
-| `public` | Shown to all users in all plugin lists (default) |
-| `hidden` | Never shown in the plugin UI; used for internal infrastructure plugins |
-| `user-only` | Shown in user plugin settings but not in directory plugin lists |
+| Visibility  | Behavior                                                               |
+| ----------- | ---------------------------------------------------------------------- |
+| `public`    | Shown to all users in all plugin lists (default)                       |
+| `hidden`    | Never shown in the plugin UI; used for internal infrastructure plugins |
+| `user-only` | Shown in user plugin settings but not in directory plugin lists        |
 
 ### Supplementary Plugins
 
@@ -148,16 +148,16 @@ Plugins with `supplementary: true` in their manifest are excluded from manual pr
 
 A single plugin can implement multiple capabilities. This is common for search and content extraction:
 
-| Plugin | Capabilities |
-|---|---|
-| Exa | `search`, `content-extractor` |
-| Tavily | `search`, `content-extractor` |
-| Firecrawl | `search`, `content-extractor` |
-| Bright Data | `search`, `content-extractor` |
-| Scrapfly | `screenshot`, `content-extractor` |
-| GitHub | `git-provider`, `oauth` |
+| Plugin            | Capabilities                       |
+| ----------------- | ---------------------------------- |
+| Exa               | `search`, `content-extractor`      |
+| Tavily            | `search`, `content-extractor`      |
+| Firecrawl         | `search`, `content-extractor`      |
+| Bright Data       | `search`, `content-extractor`      |
+| Scrapfly          | `screenshot`, `content-extractor`  |
+| GitHub            | `git-provider`, `oauth`            |
 | Standard Pipeline | `pipeline`, `form-schema-provider` |
-| Agent Pipeline | `pipeline`, `form-schema-provider` |
+| Agent Pipeline    | `pipeline`, `form-schema-provider` |
 
 When a plugin provides multiple capabilities, the manifest's `defaultForCapabilities` array specifies which capabilities it should be the default provider for:
 
@@ -173,10 +173,10 @@ When a plugin provides multiple capabilities, the manifest's `defaultForCapabili
 
 Every plugin declares a `configurationMode` that determines how its settings are managed:
 
-| Mode | Description |
-|---|---|
-| `admin-only` | Only platform admins can configure the plugin |
-| `user-required` | Each user must provide their own credentials (e.g., API keys) |
-| `hybrid` | Admins set global defaults; users can override with their own values |
+| Mode            | Description                                                          |
+| --------------- | -------------------------------------------------------------------- |
+| `admin-only`    | Only platform admins can configure the plugin                        |
+| `user-required` | Each user must provide their own credentials (e.g., API keys)        |
+| `hybrid`        | Admins set global defaults; users can override with their own values |
 
 Most AI provider plugins use `user-required` since users provide their own API keys. Infrastructure plugins like GitHub use `hybrid` with admin-level OAuth app credentials and user-level tokens.

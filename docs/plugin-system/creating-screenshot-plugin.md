@@ -1,7 +1,7 @@
 ---
 id: creating-screenshot-plugin
-title: "Creating a Screenshot Plugin"
-sidebar_label: "Screenshot Plugin"
+title: 'Creating a Screenshot Plugin'
+sidebar_label: 'Screenshot Plugin'
 sidebar_position: 7
 ---
 
@@ -58,112 +58,112 @@ The `everworks.plugin` field is how the platform discovers your plugin at startu
 
 ```json
 {
-    "name": "@ever-works/my-screenshot-plugin",
-    "version": "1.0.0",
-    "description": "My custom screenshot plugin for Ever Works",
-    "private": true,
-    "type": "module",
-    "main": "./dist/index.cjs",
-    "module": "./dist/index.js",
-    "types": "./dist/index.d.ts",
-    "exports": {
-        ".": {
-            "types": "./dist/index.d.ts",
-            "import": "./dist/index.js",
-            "require": "./dist/index.cjs"
-        }
-    },
-    "scripts": {
-        "build": "tsup",
-        "dev": "tsup --watch",
-        "type-check": "tsc --noEmit",
-        "clean": "rm -rf dist",
-        "test": "vitest run --passWithNoTests",
-        "test:watch": "vitest",
-        "test:coverage": "vitest run --coverage"
-    },
-    "dependencies": {
-        "my-screenshot-sdk": "^1.0.0"
-    },
-    "peerDependencies": {
-        "@ever-works/plugin": "workspace:*"
-    },
-    "devDependencies": {
-        "@ever-works/plugin": "workspace:*",
-        "@types/node": "^22.0.0",
-        "tsup": "^8.4.0",
-        "typescript": "^5.7.3",
-        "vitest": "^3.0.0"
-    },
-    "everworks": {
-        "plugin": {
-            "id": "my-screenshot",
-            "name": "My Screenshot",
-            "version": "1.0.0",
-            "category": "screenshot",
-            "capabilities": ["screenshot"],
-            "description": "Capture website screenshots using My Screenshot API.",
-            "author": {
-                "name": "Your Name"
-            },
-            "license": "MIT",
-            "builtIn": true,
-            "autoEnable": false,
-            "envVars": [
-                {
-                    "name": "PLUGIN_MY_SCREENSHOT_API_KEY",
-                    "required": false,
-                    "secret": true,
-                    "description": "API key for My Screenshot (optional - can be set via admin/user settings)"
-                },
-                {
-                    "name": "PLUGIN_MY_SCREENSHOT_API_SECRET",
-                    "required": false,
-                    "secret": true,
-                    "description": "API secret for signed URLs (optional)"
-                }
-            ]
-        }
-    }
+	"name": "@ever-works/my-screenshot-plugin",
+	"version": "1.0.0",
+	"description": "My custom screenshot plugin for Ever Works",
+	"private": true,
+	"type": "module",
+	"main": "./dist/index.cjs",
+	"module": "./dist/index.js",
+	"types": "./dist/index.d.ts",
+	"exports": {
+		".": {
+			"types": "./dist/index.d.ts",
+			"import": "./dist/index.js",
+			"require": "./dist/index.cjs"
+		}
+	},
+	"scripts": {
+		"build": "tsup",
+		"dev": "tsup --watch",
+		"type-check": "tsc --noEmit",
+		"clean": "rm -rf dist",
+		"test": "vitest run --passWithNoTests",
+		"test:watch": "vitest",
+		"test:coverage": "vitest run --coverage"
+	},
+	"dependencies": {
+		"my-screenshot-sdk": "^1.0.0"
+	},
+	"peerDependencies": {
+		"@ever-works/plugin": "workspace:*"
+	},
+	"devDependencies": {
+		"@ever-works/plugin": "workspace:*",
+		"@types/node": "^22.0.0",
+		"tsup": "^8.4.0",
+		"typescript": "^5.7.3",
+		"vitest": "^3.0.0"
+	},
+	"everworks": {
+		"plugin": {
+			"id": "my-screenshot",
+			"name": "My Screenshot",
+			"version": "1.0.0",
+			"category": "screenshot",
+			"capabilities": ["screenshot"],
+			"description": "Capture website screenshots using My Screenshot API.",
+			"author": {
+				"name": "Your Name"
+			},
+			"license": "MIT",
+			"builtIn": true,
+			"autoEnable": false,
+			"envVars": [
+				{
+					"name": "PLUGIN_MY_SCREENSHOT_API_KEY",
+					"required": false,
+					"secret": true,
+					"description": "API key for My Screenshot (optional - can be set via admin/user settings)"
+				},
+				{
+					"name": "PLUGIN_MY_SCREENSHOT_API_SECRET",
+					"required": false,
+					"secret": true,
+					"description": "API secret for signed URLs (optional)"
+				}
+			]
+		}
+	}
 }
 ```
 
 Key fields in `everworks.plugin`:
 
-| Field | Description |
-|-------|-------------|
-| `id` | Unique plugin identifier. Must match the `id` property in your plugin class. |
-| `category` | Must be `"screenshot"` for screenshot plugins. |
-| `capabilities` | Must include `"screenshot"`. |
-| `builtIn` | Set to `true` for plugins shipped with the platform. |
-| `autoEnable` | If `true`, the plugin is enabled by default for new installations. |
-| `envVars` | Environment variables the plugin uses (for `.env.example` documentation). |
+| Field          | Description                                                                  |
+| -------------- | ---------------------------------------------------------------------------- |
+| `id`           | Unique plugin identifier. Must match the `id` property in your plugin class. |
+| `category`     | Must be `"screenshot"` for screenshot plugins.                               |
+| `capabilities` | Must include `"screenshot"`.                                                 |
+| `builtIn`      | Set to `true` for plugins shipped with the platform.                         |
+| `autoEnable`   | If `true`, the plugin is enabled by default for new installations.           |
+| `envVars`      | Environment variables the plugin uses (for `.env.example` documentation).    |
 
 ### tsconfig.json
 
 ```json
 {
-    "compilerOptions": {
-        "module": "ESNext",
-        "moduleResolution": "bundler",
-        "target": "ES2021",
-        "types": ["node"],
-        "strict": true,
-        "strictNullChecks": true,
-        "noImplicitAny": true,
-        "declaration": true,
-        "declarationMap": true,
-        "sourceMap": true,
-        "outDir": "./dist",
-        "rootDir": "./src",
-        "esModuleInterop": true,
-        "skipLibCheck": true,
-        "forceConsistentCasingInFileNames": true,
-        "isolatedModules": true,
-        "noEmit": true
-    },
-    "include": ["src/**/*"],
-    "exclude": ["node_modules", "dist", "**/*.test.ts", "**/*.spec.ts"]
+	"compilerOptions": {
+		"module": "ESNext",
+		"moduleResolution": "bundler",
+		"target": "ES2021",
+		"types": ["node"],
+		"strict": true,
+		"strictNullChecks": true,
+		"noImplicitAny": true,
+		"declaration": true,
+		"declarationMap": true,
+		"sourceMap": true,
+		"outDir": "./dist",
+		"rootDir": "./src",
+		"esModuleInterop": true,
+		"skipLibCheck": true,
+		"forceConsistentCasingInFileNames": true,
+		"isolatedModules": true,
+		"noEmit": true
+	},
+	"include": ["src/**/*"],
+	"exclude": ["node_modules", "dist", "**/*.test.ts", "**/*.spec.ts"]
 }
 ```
 
@@ -173,14 +173,14 @@ Key fields in `everworks.plugin`:
 import { defineConfig } from 'tsup';
 
 export default defineConfig({
-    entry: ['src/index.ts'],
-    noExternal: ['@ever-works/plugin'],
-    format: ['cjs', 'esm'],
-    dts: true,
-    clean: true,
-    sourcemap: false,
-    splitting: false,
-    treeshake: true,
+	entry: ['src/index.ts'],
+	noExternal: ['@ever-works/plugin'],
+	format: ['cjs', 'esm'],
+	dts: true,
+	clean: true,
+	sourcemap: false,
+	splitting: false,
+	treeshake: true
 });
 ```
 
@@ -190,15 +190,15 @@ export default defineConfig({
 import { defineConfig } from 'vitest/config';
 
 export default defineConfig({
-    test: {
-        globals: true,
-        environment: 'node',
-        include: ['src/**/*.{test,spec}.ts'],
-        coverage: {
-            reporter: ['text', 'json', 'html'],
-            exclude: ['node_modules/', 'dist/'],
-        },
-    },
+	test: {
+		globals: true,
+		environment: 'node',
+		include: ['src/**/*.{test,spec}.ts'],
+		coverage: {
+			reporter: ['text', 'json', 'html'],
+			exclude: ['node_modules/', 'dist/']
+		}
+	}
 });
 ```
 
@@ -221,26 +221,26 @@ Screenshot plugins implement two interfaces: `IPlugin` (base lifecycle) and `ISc
 
 ```typescript
 interface IScreenshotPlugin extends IPlugin {
-    /** Provider name for facade identification (e.g., 'ScreenshotOne', 'Urlbox') */
-    readonly providerName: string;
+	/** Provider name for facade identification (e.g., 'ScreenshotOne', 'Urlbox') */
+	readonly providerName: string;
 
-    /** Capture a screenshot and return the image data */
-    capture(options: ScreenshotOptions): Promise<ScreenshotResult>;
+	/** Capture a screenshot and return the image data */
+	capture(options: ScreenshotOptions): Promise<ScreenshotResult>;
 
-    /** Generate a screenshot URL without downloading the image (optional) */
-    getScreenshotUrl?(options: ScreenshotOptions): Promise<string | null>;
+	/** Generate a screenshot URL without downloading the image (optional) */
+	getScreenshotUrl?(options: ScreenshotOptions): Promise<string | null>;
 
-    /** Check if the service is available (API key configured, etc.) */
-    isAvailable(): Promise<boolean>;
+	/** Check if the service is available (API key configured, etc.) */
+	isAvailable(): Promise<boolean>;
 
-    /** Validate API credentials (optional) */
-    validateCredentials?(): Promise<ScreenshotValidationResult>;
+	/** Validate API credentials (optional) */
+	validateCredentials?(): Promise<ScreenshotValidationResult>;
 
-    /** Return the list of supported image formats (optional) */
-    getSupportedFormats?(): readonly ScreenshotFormat[];
+	/** Return the list of supported image formats (optional) */
+	getSupportedFormats?(): readonly ScreenshotFormat[];
 
-    /** Return maximum supported viewport dimensions (optional) */
-    getMaxDimensions?(): { width: number; height: number };
+	/** Return maximum supported viewport dimensions (optional) */
+	getMaxDimensions?(): { width: number; height: number };
 }
 ```
 
@@ -250,25 +250,25 @@ Options passed to `capture()` and `getScreenshotUrl()`:
 
 ```typescript
 interface ScreenshotOptions {
-    readonly url: string;                              // URL to capture
-    readonly viewportWidth?: number;                   // Viewport width in pixels
-    readonly viewportHeight?: number;                  // Viewport height in pixels
-    readonly format?: ScreenshotFormat;                // 'png' | 'jpg' | 'jpeg' | 'webp'
-    readonly fullPage?: boolean;                       // Capture the full scrollable page
-    readonly delay?: number;                           // Delay in ms before capture
-    readonly blockAds?: boolean;                       // Block advertisements
-    readonly blockTrackers?: boolean;                  // Block tracking scripts
-    readonly blockCookieBanners?: boolean;             // Block cookie consent banners
-    readonly cache?: boolean;                          // Enable caching
-    readonly cacheTtl?: number;                        // Cache TTL in seconds
-    readonly deviceScaleFactor?: number;               // 1 = normal, 2 = retina
-    readonly clip?: ScreenshotClip;                    // Crop to a region
-    readonly waitForSelector?: string;                 // Wait for a CSS selector
-    readonly waitForNavigation?: boolean;              // Wait for navigation to complete
-    readonly userAgent?: string;                       // Custom user agent
-    readonly headers?: Record<string, string>;         // Custom HTTP headers
-    readonly cookies?: readonly ScreenshotCookie[];    // Cookies to set
-    readonly settings?: PluginSettings;                // Resolved plugin settings
+	readonly url: string; // URL to capture
+	readonly viewportWidth?: number; // Viewport width in pixels
+	readonly viewportHeight?: number; // Viewport height in pixels
+	readonly format?: ScreenshotFormat; // 'png' | 'jpg' | 'jpeg' | 'webp'
+	readonly fullPage?: boolean; // Capture the full scrollable page
+	readonly delay?: number; // Delay in ms before capture
+	readonly blockAds?: boolean; // Block advertisements
+	readonly blockTrackers?: boolean; // Block tracking scripts
+	readonly blockCookieBanners?: boolean; // Block cookie consent banners
+	readonly cache?: boolean; // Enable caching
+	readonly cacheTtl?: number; // Cache TTL in seconds
+	readonly deviceScaleFactor?: number; // 1 = normal, 2 = retina
+	readonly clip?: ScreenshotClip; // Crop to a region
+	readonly waitForSelector?: string; // Wait for a CSS selector
+	readonly waitForNavigation?: boolean; // Wait for navigation to complete
+	readonly userAgent?: string; // Custom user agent
+	readonly headers?: Record<string, string>; // Custom HTTP headers
+	readonly cookies?: readonly ScreenshotCookie[]; // Cookies to set
+	readonly settings?: PluginSettings; // Resolved plugin settings
 }
 ```
 
@@ -282,15 +282,15 @@ The return type from `capture()`:
 
 ```typescript
 interface ScreenshotResult {
-    readonly success: boolean;           // Whether capture succeeded
-    readonly imageUrl?: string;          // Direct URL to the image (may expire)
-    readonly cacheUrl?: string;          // Permanent cached URL
-    readonly imageBuffer?: Buffer;       // Raw image data
-    readonly imageBase64?: string;       // Base64-encoded image data
-    readonly error?: string;             // Error message on failure
-    readonly width?: number;             // Image width in pixels
-    readonly height?: number;            // Image height in pixels
-    readonly fileSize?: number;          // Image file size in bytes
+	readonly success: boolean; // Whether capture succeeded
+	readonly imageUrl?: string; // Direct URL to the image (may expire)
+	readonly cacheUrl?: string; // Permanent cached URL
+	readonly imageBuffer?: Buffer; // Raw image data
+	readonly imageBase64?: string; // Base64-encoded image data
+	readonly error?: string; // Error message on failure
+	readonly width?: number; // Image width in pixels
+	readonly height?: number; // Image height in pixels
+	readonly fileSize?: number; // Image file size in bytes
 }
 ```
 
@@ -300,34 +300,34 @@ Below is a full screenshot plugin. Replace the API-specific calls with your prov
 
 ```typescript
 import type {
-    IPlugin,
-    IScreenshotPlugin,
-    PluginContext,
-    PluginCategory,
-    PluginManifest,
-    PluginHealthCheck,
-    JsonSchema,
-    PluginSettings,
-    ScreenshotOptions,
-    ScreenshotResult,
-    ScreenshotFormat,
-    ScreenshotValidationResult,
-    ConnectionValidationResult,
+	IPlugin,
+	IScreenshotPlugin,
+	PluginContext,
+	PluginCategory,
+	PluginManifest,
+	PluginHealthCheck,
+	JsonSchema,
+	PluginSettings,
+	ScreenshotOptions,
+	ScreenshotResult,
+	ScreenshotFormat,
+	ScreenshotValidationResult,
+	ConnectionValidationResult
 } from '@ever-works/plugin';
 
 // ─── Local settings interface ───────────────────────────────────
 // Typed wrapper around the raw PluginSettings dictionary.
 interface MyScreenshotSettings {
-    readonly apiKey?: string;
-    readonly apiSecret?: string;
-    readonly viewportWidth?: number;
-    readonly viewportHeight?: number;
-    readonly format?: ScreenshotFormat;
-    readonly fullPage?: boolean;
-    readonly deviceScaleFactor?: number;
-    readonly blockAds?: boolean;
-    readonly hideCookieBanners?: boolean;
-    readonly quality?: number;
+	readonly apiKey?: string;
+	readonly apiSecret?: string;
+	readonly viewportWidth?: number;
+	readonly viewportHeight?: number;
+	readonly format?: ScreenshotFormat;
+	readonly fullPage?: boolean;
+	readonly deviceScaleFactor?: number;
+	readonly blockAds?: boolean;
+	readonly hideCookieBanners?: boolean;
+	readonly quality?: number;
 }
 
 /**
@@ -345,395 +345,389 @@ interface MyScreenshotSettings {
  * Configuration mode: hybrid - admin-level defaults with user/directory overrides.
  */
 export class MyScreenshotPlugin implements IPlugin, IScreenshotPlugin {
-    // ════════════════════════════════════════════════════════════
-    // IPlugin Properties
-    // ════════════════════════════════════════════════════════════
+	// ════════════════════════════════════════════════════════════
+	// IPlugin Properties
+	// ════════════════════════════════════════════════════════════
 
-    readonly id = 'my-screenshot';
-    readonly name = 'My Screenshot';
-    readonly version = '1.0.0';
-    readonly category: PluginCategory = 'screenshot';
-    readonly capabilities: readonly string[] = ['screenshot'];
+	readonly id = 'my-screenshot';
+	readonly name = 'My Screenshot';
+	readonly version = '1.0.0';
+	readonly category: PluginCategory = 'screenshot';
+	readonly capabilities: readonly string[] = ['screenshot'];
 
-    /** Provider name used by the screenshot facade for identification */
-    readonly providerName = 'My Screenshot';
+	/** Provider name used by the screenshot facade for identification */
+	readonly providerName = 'My Screenshot';
 
-    /** Settings schema — defines the admin/user configuration UI */
-    readonly settingsSchema: JsonSchema = {
-        type: 'object',
-        properties: {
-            apiKey: {
-                type: 'string',
-                title: 'API Key',
-                description: 'Your My Screenshot API key',
-                'x-secret': true,
-                'x-envVar': 'PLUGIN_MY_SCREENSHOT_API_KEY',
-                'x-scope': 'user',
-            },
-            apiSecret: {
-                type: 'string',
-                title: 'API Secret',
-                description: 'API secret for signed URLs (recommended for security)',
-                'x-secret': true,
-                'x-envVar': 'PLUGIN_MY_SCREENSHOT_API_SECRET',
-                'x-scope': 'user',
-            },
-            viewportWidth: {
-                type: 'number',
-                title: 'Viewport Width',
-                description: 'Default viewport width in pixels',
-                default: 1280,
-                minimum: 320,
-                maximum: 3840,
-                'x-envVar': 'PLUGIN_MY_SCREENSHOT_VIEWPORT_WIDTH',
-            },
-            viewportHeight: {
-                type: 'number',
-                title: 'Viewport Height',
-                description: 'Default viewport height in pixels',
-                default: 800,
-                minimum: 200,
-                maximum: 2160,
-                'x-envVar': 'PLUGIN_MY_SCREENSHOT_VIEWPORT_HEIGHT',
-            },
-            format: {
-                type: 'string',
-                title: 'Image Format',
-                description: 'Default output image format',
-                enum: ['png', 'jpg', 'jpeg', 'webp'],
-                default: 'png',
-                'x-envVar': 'PLUGIN_MY_SCREENSHOT_FORMAT',
-            },
-            fullPage: {
-                type: 'boolean',
-                title: 'Full Page',
-                description: 'Capture full scrollable page by default',
-                default: false,
-            },
-            deviceScaleFactor: {
-                type: 'number',
-                title: 'Device Scale Factor',
-                description: 'Device scale factor (1 = normal, 2 = retina)',
-                default: 1,
-                minimum: 0.5,
-                maximum: 3,
-            },
-            quality: {
-                type: 'number',
-                title: 'Image Quality',
-                description: 'Quality for lossy formats like JPG/WebP (1-100)',
-                default: 80,
-                minimum: 1,
-                maximum: 100,
-            },
-            blockAds: {
-                type: 'boolean',
-                title: 'Block Ads',
-                description: 'Block ads when capturing screenshots',
-                default: true,
-            },
-            hideCookieBanners: {
-                type: 'boolean',
-                title: 'Hide Cookie Banners',
-                description: 'Hide cookie consent banners when capturing',
-                default: true,
-            },
-        },
-        required: ['apiKey'],
-    };
+	/** Settings schema — defines the admin/user configuration UI */
+	readonly settingsSchema: JsonSchema = {
+		type: 'object',
+		properties: {
+			apiKey: {
+				type: 'string',
+				title: 'API Key',
+				description: 'Your My Screenshot API key',
+				'x-secret': true,
+				'x-envVar': 'PLUGIN_MY_SCREENSHOT_API_KEY',
+				'x-scope': 'user'
+			},
+			apiSecret: {
+				type: 'string',
+				title: 'API Secret',
+				description: 'API secret for signed URLs (recommended for security)',
+				'x-secret': true,
+				'x-envVar': 'PLUGIN_MY_SCREENSHOT_API_SECRET',
+				'x-scope': 'user'
+			},
+			viewportWidth: {
+				type: 'number',
+				title: 'Viewport Width',
+				description: 'Default viewport width in pixels',
+				default: 1280,
+				minimum: 320,
+				maximum: 3840,
+				'x-envVar': 'PLUGIN_MY_SCREENSHOT_VIEWPORT_WIDTH'
+			},
+			viewportHeight: {
+				type: 'number',
+				title: 'Viewport Height',
+				description: 'Default viewport height in pixels',
+				default: 800,
+				minimum: 200,
+				maximum: 2160,
+				'x-envVar': 'PLUGIN_MY_SCREENSHOT_VIEWPORT_HEIGHT'
+			},
+			format: {
+				type: 'string',
+				title: 'Image Format',
+				description: 'Default output image format',
+				enum: ['png', 'jpg', 'jpeg', 'webp'],
+				default: 'png',
+				'x-envVar': 'PLUGIN_MY_SCREENSHOT_FORMAT'
+			},
+			fullPage: {
+				type: 'boolean',
+				title: 'Full Page',
+				description: 'Capture full scrollable page by default',
+				default: false
+			},
+			deviceScaleFactor: {
+				type: 'number',
+				title: 'Device Scale Factor',
+				description: 'Device scale factor (1 = normal, 2 = retina)',
+				default: 1,
+				minimum: 0.5,
+				maximum: 3
+			},
+			quality: {
+				type: 'number',
+				title: 'Image Quality',
+				description: 'Quality for lossy formats like JPG/WebP (1-100)',
+				default: 80,
+				minimum: 1,
+				maximum: 100
+			},
+			blockAds: {
+				type: 'boolean',
+				title: 'Block Ads',
+				description: 'Block ads when capturing screenshots',
+				default: true
+			},
+			hideCookieBanners: {
+				type: 'boolean',
+				title: 'Hide Cookie Banners',
+				description: 'Hide cookie consent banners when capturing',
+				default: true
+			}
+		},
+		required: ['apiKey']
+	};
 
-    /** hybrid: admin sets defaults, users and directories can override */
-    readonly configurationMode: 'admin-only' | 'user-required' | 'hybrid' = 'hybrid';
+	/** hybrid: admin sets defaults, users and directories can override */
+	readonly configurationMode: 'admin-only' | 'user-required' | 'hybrid' = 'hybrid';
 
-    private context?: PluginContext;
+	private context?: PluginContext;
 
-    // ════════════════════════════════════════════════════════════
-    // IScreenshotPlugin — capture()
-    // ════════════════════════════════════════════════════════════
+	// ════════════════════════════════════════════════════════════
+	// IScreenshotPlugin — capture()
+	// ════════════════════════════════════════════════════════════
 
-    async capture(options: ScreenshotOptions): Promise<ScreenshotResult> {
-        const settings = this.mergeSettings(options.settings);
+	async capture(options: ScreenshotOptions): Promise<ScreenshotResult> {
+		const settings = this.mergeSettings(options.settings);
 
-        try {
-            // 1. Build the API URL with query parameters
-            const apiUrl = this.buildApiUrl(options, settings);
+		try {
+			// 1. Build the API URL with query parameters
+			const apiUrl = this.buildApiUrl(options, settings);
 
-            // 2. Call the screenshot API
-            const response = await fetch(apiUrl, {
-                headers: this.buildHeaders(settings),
-            });
+			// 2. Call the screenshot API
+			const response = await fetch(apiUrl, {
+				headers: this.buildHeaders(settings)
+			});
 
-            if (!response.ok) {
-                throw new Error(`Screenshot API returned status ${response.status}`);
-            }
+			if (!response.ok) {
+				throw new Error(`Screenshot API returned status ${response.status}`);
+			}
 
-            // 3. Read the image data into a buffer
-            const arrayBuffer = await response.arrayBuffer();
-            const buffer = Buffer.from(arrayBuffer);
+			// 3. Read the image data into a buffer
+			const arrayBuffer = await response.arrayBuffer();
+			const buffer = Buffer.from(arrayBuffer);
 
-            return {
-                success: true,
-                imageBuffer: buffer,
-                imageBase64: buffer.toString('base64'),
-                imageUrl: apiUrl,
-                width: options.viewportWidth ?? settings.viewportWidth ?? 1280,
-                height: options.viewportHeight ?? settings.viewportHeight ?? 800,
-                fileSize: buffer.length,
-            };
-        } catch (error) {
-            const errorMessage = error instanceof Error ? error.message : String(error);
-            this.context?.logger.error(`My Screenshot capture failed: ${errorMessage}`);
+			return {
+				success: true,
+				imageBuffer: buffer,
+				imageBase64: buffer.toString('base64'),
+				imageUrl: apiUrl,
+				width: options.viewportWidth ?? settings.viewportWidth ?? 1280,
+				height: options.viewportHeight ?? settings.viewportHeight ?? 800,
+				fileSize: buffer.length
+			};
+		} catch (error) {
+			const errorMessage = error instanceof Error ? error.message : String(error);
+			this.context?.logger.error(`My Screenshot capture failed: ${errorMessage}`);
 
-            return {
-                success: false,
-                error: errorMessage,
-            };
-        }
-    }
+			return {
+				success: false,
+				error: errorMessage
+			};
+		}
+	}
 
-    // ════════════════════════════════════════════════════════════
-    // IScreenshotPlugin — getScreenshotUrl()
-    // ════════════════════════════════════════════════════════════
+	// ════════════════════════════════════════════════════════════
+	// IScreenshotPlugin — getScreenshotUrl()
+	// ════════════════════════════════════════════════════════════
 
-    async getScreenshotUrl(options: ScreenshotOptions): Promise<string | null> {
-        const settings = this.mergeSettings(options.settings);
+	async getScreenshotUrl(options: ScreenshotOptions): Promise<string | null> {
+		const settings = this.mergeSettings(options.settings);
 
-        try {
-            return this.buildApiUrl(options, settings);
-        } catch (error) {
-            this.context?.logger.error(
-                `My Screenshot URL generation failed: ${error instanceof Error ? error.message : String(error)}`
-            );
-            return null;
-        }
-    }
+		try {
+			return this.buildApiUrl(options, settings);
+		} catch (error) {
+			this.context?.logger.error(
+				`My Screenshot URL generation failed: ${error instanceof Error ? error.message : String(error)}`
+			);
+			return null;
+		}
+	}
 
-    // ════════════════════════════════════════════════════════════
-    // IScreenshotPlugin — isAvailable()
-    // ════════════════════════════════════════════════════════════
+	// ════════════════════════════════════════════════════════════
+	// IScreenshotPlugin — isAvailable()
+	// ════════════════════════════════════════════════════════════
 
-    async isAvailable(): Promise<boolean> {
-        if (!this.context) return false;
-        const settings = await this.context.getSettings();
-        return Boolean(settings?.apiKey);
-    }
+	async isAvailable(): Promise<boolean> {
+		if (!this.context) return false;
+		const settings = await this.context.getSettings();
+		return Boolean(settings?.apiKey);
+	}
 
-    // ════════════════════════════════════════════════════════════
-    // IPlugin — validateConnection()
-    // ════════════════════════════════════════════════════════════
+	// ════════════════════════════════════════════════════════════
+	// IPlugin — validateConnection()
+	// ════════════════════════════════════════════════════════════
 
-    async validateConnection(settings: Record<string, unknown>): Promise<ConnectionValidationResult> {
-        const apiKey = settings.apiKey as string | undefined;
-        if (!apiKey) {
-            return { success: false, message: 'API key is not configured.' };
-        }
+	async validateConnection(settings: Record<string, unknown>): Promise<ConnectionValidationResult> {
+		const apiKey = settings.apiKey as string | undefined;
+		if (!apiKey) {
+			return { success: false, message: 'API key is not configured.' };
+		}
 
-        try {
-            // Generate a test URL to verify the credentials format
-            const resolvedSettings = this.mergeSettings(settings);
-            const testUrl = this.buildApiUrl(
-                { url: 'https://example.com' },
-                resolvedSettings
-            );
+		try {
+			// Generate a test URL to verify the credentials format
+			const resolvedSettings = this.mergeSettings(settings);
+			const testUrl = this.buildApiUrl({ url: 'https://example.com' }, resolvedSettings);
 
-            // Some APIs let you verify credentials without capturing
-            const response = await fetch(testUrl, {
-                method: 'HEAD',
-                headers: this.buildHeaders(resolvedSettings),
-            });
+			// Some APIs let you verify credentials without capturing
+			const response = await fetch(testUrl, {
+				method: 'HEAD',
+				headers: this.buildHeaders(resolvedSettings)
+			});
 
-            if (response.ok || response.status === 402) {
-                // 402 = valid key but no credits — still a valid connection
-                return { success: true, message: 'Connection verified.' };
-            }
+			if (response.ok || response.status === 402) {
+				// 402 = valid key but no credits — still a valid connection
+				return { success: true, message: 'Connection verified.' };
+			}
 
-            return { success: false, message: `Connection failed with status ${response.status}.` };
-        } catch (error) {
-            return {
-                success: false,
-                message: `Connection failed: ${error instanceof Error ? error.message : String(error)}`,
-            };
-        }
-    }
+			return { success: false, message: `Connection failed with status ${response.status}.` };
+		} catch (error) {
+			return {
+				success: false,
+				message: `Connection failed: ${error instanceof Error ? error.message : String(error)}`
+			};
+		}
+	}
 
-    // ════════════════════════════════════════════════════════════
-    // IScreenshotPlugin — validateCredentials()
-    // ════════════════════════════════════════════════════════════
+	// ════════════════════════════════════════════════════════════
+	// IScreenshotPlugin — validateCredentials()
+	// ════════════════════════════════════════════════════════════
 
-    async validateCredentials(): Promise<ScreenshotValidationResult> {
-        if (!this.context) {
-            return { valid: false, message: 'Plugin not initialized' };
-        }
+	async validateCredentials(): Promise<ScreenshotValidationResult> {
+		if (!this.context) {
+			return { valid: false, message: 'Plugin not initialized' };
+		}
 
-        try {
-            const settings = await this.context.getSettings();
-            const resolvedSettings = this.mergeSettings(settings);
+		try {
+			const settings = await this.context.getSettings();
+			const resolvedSettings = this.mergeSettings(settings);
 
-            if (!resolvedSettings.apiKey) {
-                return { valid: false, message: 'API key is not configured' };
-            }
+			if (!resolvedSettings.apiKey) {
+				return { valid: false, message: 'API key is not configured' };
+			}
 
-            // Attempt a lightweight API call to verify
-            const testUrl = this.buildApiUrl(
-                { url: 'https://example.com' },
-                resolvedSettings
-            );
+			// Attempt a lightweight API call to verify
+			const testUrl = this.buildApiUrl({ url: 'https://example.com' }, resolvedSettings);
 
-            if (testUrl && testUrl.includes('api.myscreenshot.com')) {
-                return { valid: true, message: 'Credentials are valid' };
-            }
+			if (testUrl && testUrl.includes('api.myscreenshot.com')) {
+				return { valid: true, message: 'Credentials are valid' };
+			}
 
-            return { valid: false, message: 'Invalid credentials format' };
-        } catch (error) {
-            return {
-                valid: false,
-                message: error instanceof Error ? error.message : 'Unknown error',
-            };
-        }
-    }
+			return { valid: false, message: 'Invalid credentials format' };
+		} catch (error) {
+			return {
+				valid: false,
+				message: error instanceof Error ? error.message : 'Unknown error'
+			};
+		}
+	}
 
-    // ════════════════════════════════════════════════════════════
-    // IScreenshotPlugin — format and dimension metadata
-    // ════════════════════════════════════════════════════════════
+	// ════════════════════════════════════════════════════════════
+	// IScreenshotPlugin — format and dimension metadata
+	// ════════════════════════════════════════════════════════════
 
-    getSupportedFormats(): readonly ScreenshotFormat[] {
-        return ['png', 'jpg', 'jpeg', 'webp'] as const;
-    }
+	getSupportedFormats(): readonly ScreenshotFormat[] {
+		return ['png', 'jpg', 'jpeg', 'webp'] as const;
+	}
 
-    getMaxDimensions(): { width: number; height: number } {
-        return { width: 3840, height: 2160 };
-    }
+	getMaxDimensions(): { width: number; height: number } {
+		return { width: 3840, height: 2160 };
+	}
 
-    // ════════════════════════════════════════════════════════════
-    // IPlugin Lifecycle
-    // ════════════════════════════════════════════════════════════
+	// ════════════════════════════════════════════════════════════
+	// IPlugin Lifecycle
+	// ════════════════════════════════════════════════════════════
 
-    async onLoad(context: PluginContext): Promise<void> {
-        this.context = context;
-        context.logger.log('My Screenshot Plugin loaded');
-    }
+	async onLoad(context: PluginContext): Promise<void> {
+		this.context = context;
+		context.logger.log('My Screenshot Plugin loaded');
+	}
 
-    async onUnload(): Promise<void> {
-        this.context = undefined;
-    }
+	async onUnload(): Promise<void> {
+		this.context = undefined;
+	}
 
-    async healthCheck(): Promise<PluginHealthCheck> {
-        return {
-            status: 'healthy',
-            message: 'My Screenshot plugin is ready (API key required for operations)',
-            checkedAt: Date.now(),
-        };
-    }
+	async healthCheck(): Promise<PluginHealthCheck> {
+		return {
+			status: 'healthy',
+			message: 'My Screenshot plugin is ready (API key required for operations)',
+			checkedAt: Date.now()
+		};
+	}
 
-    getManifest(): PluginManifest {
-        return {
-            id: this.id,
-            name: this.name,
-            version: this.version,
-            description: 'Capture website screenshots for directory items',
-            category: this.category,
-            capabilities: [...this.capabilities],
-            author: { name: 'Your Name' },
-            license: 'MIT',
-            builtIn: true,
-            systemPlugin: false,
-            readme: [
-                '## What does My Screenshot do?',
-                '',
-                'Automatically captures website screenshots for directory items.',
-                '',
-                '## Getting started',
-                '',
-                '1. Sign up at [myscreenshot.com](https://myscreenshot.com)',
-                '2. Copy your API key',
-                '3. Enable the plugin and enter your credentials below',
-            ].join('\n'),
-            homepage: 'https://myscreenshot.com',
-            icon: {
-                type: 'lucide',
-                value: 'Camera',
-                backgroundColor: '#4f46e5',
-            },
-        };
-    }
+	getManifest(): PluginManifest {
+		return {
+			id: this.id,
+			name: this.name,
+			version: this.version,
+			description: 'Capture website screenshots for directory items',
+			category: this.category,
+			capabilities: [...this.capabilities],
+			author: { name: 'Your Name' },
+			license: 'MIT',
+			builtIn: true,
+			systemPlugin: false,
+			readme: [
+				'## What does My Screenshot do?',
+				'',
+				'Automatically captures website screenshots for directory items.',
+				'',
+				'## Getting started',
+				'',
+				'1. Sign up at [myscreenshot.com](https://myscreenshot.com)',
+				'2. Copy your API key',
+				'3. Enable the plugin and enter your credentials below'
+			].join('\n'),
+			homepage: 'https://myscreenshot.com',
+			icon: {
+				type: 'lucide',
+				value: 'Camera',
+				backgroundColor: '#4f46e5'
+			}
+		};
+	}
 
-    // ════════════════════════════════════════════════════════════
-    // Private Helpers
-    // ════════════════════════════════════════════════════════════
+	// ════════════════════════════════════════════════════════════
+	// Private Helpers
+	// ════════════════════════════════════════════════════════════
 
-    /**
-     * Merge raw PluginSettings into a typed settings object with defaults.
-     */
-    private mergeSettings(settings?: PluginSettings): MyScreenshotSettings {
-        return {
-            apiKey: settings?.apiKey as string | undefined,
-            apiSecret: settings?.apiSecret as string | undefined,
-            viewportWidth: (settings?.viewportWidth as number | undefined) ?? 1280,
-            viewportHeight: (settings?.viewportHeight as number | undefined) ?? 800,
-            format: (settings?.format as ScreenshotFormat | undefined) ?? 'png',
-            fullPage: (settings?.fullPage as boolean | undefined) ?? false,
-            deviceScaleFactor: (settings?.deviceScaleFactor as number | undefined) ?? 1,
-            quality: (settings?.quality as number | undefined) ?? 80,
-            blockAds: (settings?.blockAds as boolean | undefined) ?? true,
-            hideCookieBanners: (settings?.hideCookieBanners as boolean | undefined) ?? true,
-        };
-    }
+	/**
+	 * Merge raw PluginSettings into a typed settings object with defaults.
+	 */
+	private mergeSettings(settings?: PluginSettings): MyScreenshotSettings {
+		return {
+			apiKey: settings?.apiKey as string | undefined,
+			apiSecret: settings?.apiSecret as string | undefined,
+			viewportWidth: (settings?.viewportWidth as number | undefined) ?? 1280,
+			viewportHeight: (settings?.viewportHeight as number | undefined) ?? 800,
+			format: (settings?.format as ScreenshotFormat | undefined) ?? 'png',
+			fullPage: (settings?.fullPage as boolean | undefined) ?? false,
+			deviceScaleFactor: (settings?.deviceScaleFactor as number | undefined) ?? 1,
+			quality: (settings?.quality as number | undefined) ?? 80,
+			blockAds: (settings?.blockAds as boolean | undefined) ?? true,
+			hideCookieBanners: (settings?.hideCookieBanners as boolean | undefined) ?? true
+		};
+	}
 
-    /**
-     * Build the screenshot API URL with all parameters.
-     */
-    private buildApiUrl(options: ScreenshotOptions, settings: MyScreenshotSettings): string {
-        if (!settings.apiKey) {
-            throw new Error(
-                'API key not configured. '
-                + 'Set it in plugin settings or via PLUGIN_MY_SCREENSHOT_API_KEY environment variable.'
-            );
-        }
+	/**
+	 * Build the screenshot API URL with all parameters.
+	 */
+	private buildApiUrl(options: ScreenshotOptions, settings: MyScreenshotSettings): string {
+		if (!settings.apiKey) {
+			throw new Error(
+				'API key not configured. ' +
+					'Set it in plugin settings or via PLUGIN_MY_SCREENSHOT_API_KEY environment variable.'
+			);
+		}
 
-        const params = new URLSearchParams();
-        params.set('url', options.url);
-        params.set('access_key', settings.apiKey);
-        params.set('viewport_width', String(options.viewportWidth ?? settings.viewportWidth ?? 1280));
-        params.set('viewport_height', String(options.viewportHeight ?? settings.viewportHeight ?? 800));
-        params.set('format', options.format ?? settings.format ?? 'png');
-        params.set('full_page', String(options.fullPage ?? settings.fullPage ?? false));
-        params.set('device_scale_factor', String(options.deviceScaleFactor ?? settings.deviceScaleFactor ?? 1));
-        params.set('block_ads', String(options.blockAds ?? settings.blockAds ?? true));
-        params.set('hide_cookie_banners', String(options.blockCookieBanners ?? settings.hideCookieBanners ?? true));
+		const params = new URLSearchParams();
+		params.set('url', options.url);
+		params.set('access_key', settings.apiKey);
+		params.set('viewport_width', String(options.viewportWidth ?? settings.viewportWidth ?? 1280));
+		params.set('viewport_height', String(options.viewportHeight ?? settings.viewportHeight ?? 800));
+		params.set('format', options.format ?? settings.format ?? 'png');
+		params.set('full_page', String(options.fullPage ?? settings.fullPage ?? false));
+		params.set('device_scale_factor', String(options.deviceScaleFactor ?? settings.deviceScaleFactor ?? 1));
+		params.set('block_ads', String(options.blockAds ?? settings.blockAds ?? true));
+		params.set('hide_cookie_banners', String(options.blockCookieBanners ?? settings.hideCookieBanners ?? true));
 
-        if (settings.quality && settings.format !== 'png') {
-            params.set('quality', String(settings.quality));
-        }
+		if (settings.quality && settings.format !== 'png') {
+			params.set('quality', String(settings.quality));
+		}
 
-        if (options.delay !== undefined) {
-            params.set('delay', String(options.delay));
-        }
+		if (options.delay !== undefined) {
+			params.set('delay', String(options.delay));
+		}
 
-        if (options.waitForSelector) {
-            params.set('selector', options.waitForSelector);
-        }
+		if (options.waitForSelector) {
+			params.set('selector', options.waitForSelector);
+		}
 
-        if (options.userAgent) {
-            params.set('user_agent', options.userAgent);
-        }
+		if (options.userAgent) {
+			params.set('user_agent', options.userAgent);
+		}
 
-        return `https://api.myscreenshot.com/capture?${params.toString()}`;
-    }
+		return `https://api.myscreenshot.com/capture?${params.toString()}`;
+	}
 
-    /**
-     * Build HTTP headers for API requests.
-     */
-    private buildHeaders(settings: MyScreenshotSettings): Record<string, string> {
-        const headers: Record<string, string> = {
-            Accept: 'image/*',
-        };
+	/**
+	 * Build HTTP headers for API requests.
+	 */
+	private buildHeaders(settings: MyScreenshotSettings): Record<string, string> {
+		const headers: Record<string, string> = {
+			Accept: 'image/*'
+		};
 
-        if (settings.apiSecret) {
-            headers['X-API-Secret'] = settings.apiSecret;
-        }
+		if (settings.apiSecret) {
+			headers['X-API-Secret'] = settings.apiSecret;
+		}
 
-        return headers;
-    }
+		return headers;
+	}
 }
 
 export default MyScreenshotPlugin;
@@ -800,12 +794,12 @@ PNG is lossless and the safest default. When the `quality` setting only applies 
 
 Screenshot APIs typically offer several content blocking options. Choose the ones your API supports:
 
-| Setting | ScreenshotOne | Urlbox | Description |
-|---------|:---:|:---:|-------------|
-| `blockAds` | Yes | Yes | Block ad networks |
-| `blockTrackers` | Yes | No | Block tracking scripts |
-| `hideCookieBanners` | Via option | Yes | Hide GDPR/cookie consent banners |
-| `blockCookieBanners` | Yes | No | Block cookie banners entirely |
+| Setting              | ScreenshotOne | Urlbox | Description                      |
+| -------------------- | :-----------: | :----: | -------------------------------- |
+| `blockAds`           |      Yes      |  Yes   | Block ad networks                |
+| `blockTrackers`      |      Yes      |   No   | Block tracking scripts           |
+| `hideCookieBanners`  |  Via option   |  Yes   | Hide GDPR/cookie consent banners |
+| `blockCookieBanners` |      Yes      |   No   | Block cookie banners entirely    |
 
 ### Configuration Mode
 
@@ -815,11 +809,11 @@ All built-in screenshot plugins use `hybrid` configuration mode:
 readonly configurationMode: 'admin-only' | 'user-required' | 'hybrid' = 'hybrid';
 ```
 
-| Mode | Behavior |
-|------|----------|
-| `admin-only` | Only admins configure the plugin. All users share the same API key. |
-| `user-required` | Each user must provide their own API key. |
-| `hybrid` | Admin sets defaults (viewport, format). Users can override and provide their own keys. |
+| Mode            | Behavior                                                                               |
+| --------------- | -------------------------------------------------------------------------------------- |
+| `admin-only`    | Only admins configure the plugin. All users share the same API key.                    |
+| `user-required` | Each user must provide their own API key.                                              |
+| `hybrid`        | Admin sets defaults (viewport, format). Users can override and provide their own keys. |
 
 ## 5. Implementing capture() and getScreenshotUrl()
 
@@ -986,255 +980,255 @@ const mockFetch = vi.fn();
 vi.stubGlobal('fetch', mockFetch);
 
 describe('MyScreenshotPlugin', () => {
-    let plugin: MyScreenshotPlugin;
-    let mockContext: PluginContext;
+	let plugin: MyScreenshotPlugin;
+	let mockContext: PluginContext;
 
-    beforeEach(() => {
-        plugin = new MyScreenshotPlugin();
-        mockContext = {
-            pluginId: 'my-screenshot',
-            logger: {
-                log: vi.fn(),
-                error: vi.fn(),
-                warn: vi.fn(),
-                debug: vi.fn(),
-            },
-            cache: {} as any,
-            http: {} as any,
-            env: {} as any,
-            envVars: {} as any,
-            services: {} as any,
-            getSettings: vi.fn().mockResolvedValue({}),
-            getResolvedSettings: vi.fn().mockResolvedValue({}),
-            onEvent: vi.fn(),
-            emitEvent: vi.fn(),
-            registerCustomCapability: vi.fn(),
-            getCustomCapability: vi.fn(),
-            hasCustomCapability: vi.fn(),
-            listCustomCapabilities: vi.fn(),
-        };
-    });
+	beforeEach(() => {
+		plugin = new MyScreenshotPlugin();
+		mockContext = {
+			pluginId: 'my-screenshot',
+			logger: {
+				log: vi.fn(),
+				error: vi.fn(),
+				warn: vi.fn(),
+				debug: vi.fn()
+			},
+			cache: {} as any,
+			http: {} as any,
+			env: {} as any,
+			envVars: {} as any,
+			services: {} as any,
+			getSettings: vi.fn().mockResolvedValue({}),
+			getResolvedSettings: vi.fn().mockResolvedValue({}),
+			onEvent: vi.fn(),
+			emitEvent: vi.fn(),
+			registerCustomCapability: vi.fn(),
+			getCustomCapability: vi.fn(),
+			hasCustomCapability: vi.fn(),
+			listCustomCapabilities: vi.fn()
+		};
+	});
 
-    afterEach(() => {
-        vi.clearAllMocks();
-    });
+	afterEach(() => {
+		vi.clearAllMocks();
+	});
 
-    // ── Metadata ────────────────────────────────────────────
+	// ── Metadata ────────────────────────────────────────────
 
-    describe('Plugin Metadata', () => {
-        it('should have correct plugin metadata', () => {
-            expect(plugin.id).toBe('my-screenshot');
-            expect(plugin.name).toBe('My Screenshot');
-            expect(plugin.version).toBe('1.0.0');
-            expect(plugin.category).toBe('screenshot');
-        });
+	describe('Plugin Metadata', () => {
+		it('should have correct plugin metadata', () => {
+			expect(plugin.id).toBe('my-screenshot');
+			expect(plugin.name).toBe('My Screenshot');
+			expect(plugin.version).toBe('1.0.0');
+			expect(plugin.category).toBe('screenshot');
+		});
 
-        it('should have screenshot capability', () => {
-            expect(plugin.capabilities).toContain('screenshot');
-        });
+		it('should have screenshot capability', () => {
+			expect(plugin.capabilities).toContain('screenshot');
+		});
 
-        it('should have hybrid configuration mode', () => {
-            expect(plugin.configurationMode).toBe('hybrid');
-        });
-    });
+		it('should have hybrid configuration mode', () => {
+			expect(plugin.configurationMode).toBe('hybrid');
+		});
+	});
 
-    // ── Settings Schema ─────────────────────────────────────
+	// ── Settings Schema ─────────────────────────────────────
 
-    describe('Settings Schema', () => {
-        it('should require apiKey', () => {
-            expect(plugin.settingsSchema.required).toContain('apiKey');
-        });
+	describe('Settings Schema', () => {
+		it('should require apiKey', () => {
+			expect(plugin.settingsSchema.required).toContain('apiKey');
+		});
 
-        it('should mark apiKey as secret with env var fallback', () => {
-            const properties = plugin.settingsSchema.properties as Record<string, any>;
-            expect(properties.apiKey['x-secret']).toBe(true);
-            expect(properties.apiKey['x-envVar']).toBe('PLUGIN_MY_SCREENSHOT_API_KEY');
-        });
+		it('should mark apiKey as secret with env var fallback', () => {
+			const properties = plugin.settingsSchema.properties as Record<string, any>;
+			expect(properties.apiKey['x-secret']).toBe(true);
+			expect(properties.apiKey['x-envVar']).toBe('PLUGIN_MY_SCREENSHOT_API_KEY');
+		});
 
-        it('should have default viewport values', () => {
-            const properties = plugin.settingsSchema.properties as Record<string, any>;
-            expect(properties.viewportWidth.default).toBe(1280);
-            expect(properties.viewportHeight.default).toBe(800);
-        });
+		it('should have default viewport values', () => {
+			const properties = plugin.settingsSchema.properties as Record<string, any>;
+			expect(properties.viewportWidth.default).toBe(1280);
+			expect(properties.viewportHeight.default).toBe(800);
+		});
 
-        it('should support all standard formats', () => {
-            const properties = plugin.settingsSchema.properties as Record<string, any>;
-            expect(properties.format.enum).toEqual(['png', 'jpg', 'jpeg', 'webp']);
-        });
-    });
+		it('should support all standard formats', () => {
+			const properties = plugin.settingsSchema.properties as Record<string, any>;
+			expect(properties.format.enum).toEqual(['png', 'jpg', 'jpeg', 'webp']);
+		});
+	});
 
-    // ── capture() ───────────────────────────────────────────
+	// ── capture() ───────────────────────────────────────────
 
-    describe('capture', () => {
-        it('should capture screenshot successfully', async () => {
-            await plugin.onLoad(mockContext);
+	describe('capture', () => {
+		it('should capture screenshot successfully', async () => {
+			await plugin.onLoad(mockContext);
 
-            mockFetch.mockResolvedValueOnce({
-                ok: true,
-                arrayBuffer: vi.fn().mockResolvedValue(new ArrayBuffer(100)),
-            });
+			mockFetch.mockResolvedValueOnce({
+				ok: true,
+				arrayBuffer: vi.fn().mockResolvedValue(new ArrayBuffer(100))
+			});
 
-            const options: ScreenshotOptions = {
-                url: 'https://example.com',
-                settings: { apiKey: 'test-key' },
-            };
+			const options: ScreenshotOptions = {
+				url: 'https://example.com',
+				settings: { apiKey: 'test-key' }
+			};
 
-            const result = await plugin.capture(options);
+			const result = await plugin.capture(options);
 
-            expect(result.success).toBe(true);
-            expect(result.imageBuffer).toBeDefined();
-            expect(result.imageBase64).toBeDefined();
-            expect(result.width).toBe(1280);
-            expect(result.height).toBe(800);
-        });
+			expect(result.success).toBe(true);
+			expect(result.imageBuffer).toBeDefined();
+			expect(result.imageBase64).toBeDefined();
+			expect(result.width).toBe(1280);
+			expect(result.height).toBe(800);
+		});
 
-        it('should return error result when API key is missing', async () => {
-            await plugin.onLoad(mockContext);
+		it('should return error result when API key is missing', async () => {
+			await plugin.onLoad(mockContext);
 
-            const options: ScreenshotOptions = {
-                url: 'https://example.com',
-                settings: {},
-            };
+			const options: ScreenshotOptions = {
+				url: 'https://example.com',
+				settings: {}
+			};
 
-            const result = await plugin.capture(options);
+			const result = await plugin.capture(options);
 
-            expect(result.success).toBe(false);
-            expect(result.error).toContain('API key not configured');
-        });
+			expect(result.success).toBe(false);
+			expect(result.error).toContain('API key not configured');
+		});
 
-        it('should use custom viewport dimensions', async () => {
-            await plugin.onLoad(mockContext);
+		it('should use custom viewport dimensions', async () => {
+			await plugin.onLoad(mockContext);
 
-            mockFetch.mockResolvedValueOnce({
-                ok: true,
-                arrayBuffer: vi.fn().mockResolvedValue(new ArrayBuffer(50)),
-            });
+			mockFetch.mockResolvedValueOnce({
+				ok: true,
+				arrayBuffer: vi.fn().mockResolvedValue(new ArrayBuffer(50))
+			});
 
-            const options: ScreenshotOptions = {
-                url: 'https://example.com',
-                viewportWidth: 1920,
-                viewportHeight: 1080,
-                settings: { apiKey: 'test-key' },
-            };
+			const options: ScreenshotOptions = {
+				url: 'https://example.com',
+				viewportWidth: 1920,
+				viewportHeight: 1080,
+				settings: { apiKey: 'test-key' }
+			};
 
-            const result = await plugin.capture(options);
+			const result = await plugin.capture(options);
 
-            expect(result.success).toBe(true);
-            expect(result.width).toBe(1920);
-            expect(result.height).toBe(1080);
-        });
+			expect(result.success).toBe(true);
+			expect(result.width).toBe(1920);
+			expect(result.height).toBe(1080);
+		});
 
-        it('should handle API errors gracefully', async () => {
-            await plugin.onLoad(mockContext);
+		it('should handle API errors gracefully', async () => {
+			await plugin.onLoad(mockContext);
 
-            mockFetch.mockResolvedValueOnce({
-                ok: false,
-                status: 500,
-            });
+			mockFetch.mockResolvedValueOnce({
+				ok: false,
+				status: 500
+			});
 
-            const options: ScreenshotOptions = {
-                url: 'https://example.com',
-                settings: { apiKey: 'test-key' },
-            };
+			const options: ScreenshotOptions = {
+				url: 'https://example.com',
+				settings: { apiKey: 'test-key' }
+			};
 
-            const result = await plugin.capture(options);
+			const result = await plugin.capture(options);
 
-            expect(result.success).toBe(false);
-            expect(result.error).toContain('status 500');
-        });
-    });
+			expect(result.success).toBe(false);
+			expect(result.error).toContain('status 500');
+		});
+	});
 
-    // ── getScreenshotUrl() ──────────────────────────────────
+	// ── getScreenshotUrl() ──────────────────────────────────
 
-    describe('getScreenshotUrl', () => {
-        it('should generate URL with settings', async () => {
-            await plugin.onLoad(mockContext);
+	describe('getScreenshotUrl', () => {
+		it('should generate URL with settings', async () => {
+			await plugin.onLoad(mockContext);
 
-            const options: ScreenshotOptions = {
-                url: 'https://example.com',
-                settings: { apiKey: 'test-key' },
-            };
+			const options: ScreenshotOptions = {
+				url: 'https://example.com',
+				settings: { apiKey: 'test-key' }
+			};
 
-            const url = await plugin.getScreenshotUrl(options);
+			const url = await plugin.getScreenshotUrl(options);
 
-            expect(url).toBeDefined();
-            expect(url).toContain('api.myscreenshot.com');
-            expect(url).toContain('example.com');
-        });
+			expect(url).toBeDefined();
+			expect(url).toContain('api.myscreenshot.com');
+			expect(url).toContain('example.com');
+		});
 
-        it('should return null when API key is missing', async () => {
-            await plugin.onLoad(mockContext);
+		it('should return null when API key is missing', async () => {
+			await plugin.onLoad(mockContext);
 
-            const url = await plugin.getScreenshotUrl({
-                url: 'https://example.com',
-                settings: {},
-            });
+			const url = await plugin.getScreenshotUrl({
+				url: 'https://example.com',
+				settings: {}
+			});
 
-            expect(url).toBeNull();
-        });
-    });
+			expect(url).toBeNull();
+		});
+	});
 
-    // ── isAvailable() ───────────────────────────────────────
+	// ── isAvailable() ───────────────────────────────────────
 
-    describe('isAvailable', () => {
-        it('should return true when API key is configured', async () => {
-            vi.mocked(mockContext.getSettings).mockResolvedValue({ apiKey: 'key' });
-            await plugin.onLoad(mockContext);
+	describe('isAvailable', () => {
+		it('should return true when API key is configured', async () => {
+			vi.mocked(mockContext.getSettings).mockResolvedValue({ apiKey: 'key' });
+			await plugin.onLoad(mockContext);
 
-            expect(await plugin.isAvailable()).toBe(true);
-        });
+			expect(await plugin.isAvailable()).toBe(true);
+		});
 
-        it('should return false when not loaded', async () => {
-            expect(await plugin.isAvailable()).toBe(false);
-        });
-    });
+		it('should return false when not loaded', async () => {
+			expect(await plugin.isAvailable()).toBe(false);
+		});
+	});
 
-    // ── Lifecycle ───────────────────────────────────────────
+	// ── Lifecycle ───────────────────────────────────────────
 
-    describe('Lifecycle', () => {
-        it('should log on load', async () => {
-            await plugin.onLoad(mockContext);
-            expect(mockContext.logger.log).toHaveBeenCalledWith('My Screenshot Plugin loaded');
-        });
+	describe('Lifecycle', () => {
+		it('should log on load', async () => {
+			await plugin.onLoad(mockContext);
+			expect(mockContext.logger.log).toHaveBeenCalledWith('My Screenshot Plugin loaded');
+		});
 
-        it('should clear context on unload', async () => {
-            await plugin.onLoad(mockContext);
-            await plugin.onUnload();
+		it('should clear context on unload', async () => {
+			await plugin.onLoad(mockContext);
+			await plugin.onUnload();
 
-            const result = await plugin.validateCredentials();
-            expect(result.valid).toBe(false);
-            expect(result.message).toContain('not initialized');
-        });
-    });
+			const result = await plugin.validateCredentials();
+			expect(result.valid).toBe(false);
+			expect(result.message).toContain('not initialized');
+		});
+	});
 
-    // ── Format & Dimension Metadata ─────────────────────────
+	// ── Format & Dimension Metadata ─────────────────────────
 
-    describe('getSupportedFormats', () => {
-        it('should return all standard formats', () => {
-            expect(plugin.getSupportedFormats()).toEqual(['png', 'jpg', 'jpeg', 'webp']);
-        });
-    });
+	describe('getSupportedFormats', () => {
+		it('should return all standard formats', () => {
+			expect(plugin.getSupportedFormats()).toEqual(['png', 'jpg', 'jpeg', 'webp']);
+		});
+	});
 
-    describe('getMaxDimensions', () => {
-        it('should return maximum viewport dimensions', () => {
-            const dims = plugin.getMaxDimensions();
-            expect(dims.width).toBe(3840);
-            expect(dims.height).toBe(2160);
-        });
-    });
+	describe('getMaxDimensions', () => {
+		it('should return maximum viewport dimensions', () => {
+			const dims = plugin.getMaxDimensions();
+			expect(dims.width).toBe(3840);
+			expect(dims.height).toBe(2160);
+		});
+	});
 
-    // ── getManifest() ───────────────────────────────────────
+	// ── getManifest() ───────────────────────────────────────
 
-    describe('getManifest', () => {
-        it('should return correct manifest', () => {
-            const manifest = plugin.getManifest();
+	describe('getManifest', () => {
+		it('should return correct manifest', () => {
+			const manifest = plugin.getManifest();
 
-            expect(manifest.id).toBe('my-screenshot');
-            expect(manifest.category).toBe('screenshot');
-            expect(manifest.capabilities).toContain('screenshot');
-            expect(manifest.icon?.type).toBe('lucide');
-        });
-    });
+			expect(manifest.id).toBe('my-screenshot');
+			expect(manifest.category).toBe('screenshot');
+			expect(manifest.capabilities).toContain('screenshot');
+			expect(manifest.icon?.type).toBe('lucide');
+		});
+	});
 });
 ```
 
@@ -1286,16 +1280,16 @@ Only one screenshot plugin is active at a time per directory.
 
 Understanding the differences between the two built-in plugins helps you decide which patterns to follow:
 
-| Aspect | ScreenshotOne | Urlbox |
-|--------|---------------|--------|
-| SDK | `screenshotone-api-sdk` | `urlbox` npm package |
-| Default viewport | 1280 x 800 | 1280 x 1024 |
-| Retina support | `deviceScaleFactor` (0.5-3) | `retina` boolean (2x) |
-| Content blocking | `blockAds` + `blockTrackers` | `blockAds` + `hideCookieBanners` |
-| Image quality | N/A (PNG default) | `quality` (1-100) |
-| Signed URLs | Via `secretKey` | Via `apiSecret` |
-| URL generation | `client.generateTakeURL()` / `generateSignedTakeURL()` | `client.generateRenderLink()` |
-| Capture method | `client.take()` returns Blob | `fetch(renderUrl)` returns Response |
+| Aspect           | ScreenshotOne                                          | Urlbox                              |
+| ---------------- | ------------------------------------------------------ | ----------------------------------- |
+| SDK              | `screenshotone-api-sdk`                                | `urlbox` npm package                |
+| Default viewport | 1280 x 800                                             | 1280 x 1024                         |
+| Retina support   | `deviceScaleFactor` (0.5-3)                            | `retina` boolean (2x)               |
+| Content blocking | `blockAds` + `blockTrackers`                           | `blockAds` + `hideCookieBanners`    |
+| Image quality    | N/A (PNG default)                                      | `quality` (1-100)                   |
+| Signed URLs      | Via `secretKey`                                        | Via `apiSecret`                     |
+| URL generation   | `client.generateTakeURL()` / `generateSignedTakeURL()` | `client.generateRenderLink()`       |
+| Capture method   | `client.take()` returns Blob                           | `fetch(renderUrl)` returns Response |
 
 ## 10. Checklist
 

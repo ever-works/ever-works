@@ -20,20 +20,21 @@ Instead of hardcoding providers, the platform asks "give me a plugin that can do
 
 ## Built-in Plugins
 
-The platform ships with **30 plugins** across multiple categories:
+The platform ships with **39 plugins** across multiple categories:
 
-| Category | Plugins | Capability |
-|----------|---------|------------|
-| AI Providers | OpenAI, Anthropic, Google Gemini, Groq, Mistral, Ollama | `ai-provider` |
-| AI Gateways | OpenRouter, Vercel AI Gateway | `ai-provider` |
-| Search | Brave, Tavily, SerpAPI, Exa, Perplexity, Bright Data, Firecrawl, Valyu | `search` |
-| Git Provider | GitHub | `git-provider` |
-| Deployment | Vercel | `deployment` |
-| Screenshot | ScreenshotOne, URLBox, Scrapfly | `screenshot` |
-| Content Extractor | Local HTML, Notion, Jina, PDF Extractor | `content-extractor` |
-| Data Source | Apify | `data-source` |
-| Pipeline | Standard Pipeline, Agent Pipeline, Claude Code | `pipeline` |
-| Utility | Comparison Generator | `form-schema-provider` |
+| Category          | Plugins                                                                                                                           | Capability             |
+| ----------------- | --------------------------------------------------------------------------------------------------------------------------------- | ---------------------- |
+| AI Providers      | OpenAI, Anthropic, Google Gemini, Groq, Mistral, Ollama                                                                           | `ai-provider`          |
+| AI Gateways       | OpenRouter, Vercel AI Gateway                                                                                                     | `ai-provider`          |
+| Search            | Brave, Tavily, SerpAPI, Exa, Perplexity, Bright Data, Firecrawl, Valyu, Linkup                                                    | `search`               |
+| Git Provider      | GitHub                                                                                                                            | `git-provider`         |
+| Deployment        | Vercel                                                                                                                            | `deployment`           |
+| Screenshot        | ScreenshotOne, URLBox, Scrapfly                                                                                                   | `screenshot`           |
+| Content Extractor | Local HTML, Notion, Jina, PDF Extractor                                                                                           | `content-extractor`    |
+| Data Source       | Apify                                                                                                                             | `data-source`          |
+| Pipeline          | Standard Pipeline, Agent Pipeline, Claude Code, Claude Managed Agent, Codex, Gemini Generator, OpenCode, Make.com, SIM AI, Zapier | `pipeline`             |
+| Prompt Management | Langfuse                                                                                                                          | `prompt-provider`      |
+| Utility           | Comparison Generator                                                                                                              | `form-schema-provider` |
 
 See [Built-in Plugins](./built-in-plugins) for details on each plugin and its configuration.
 
@@ -57,18 +58,19 @@ A capability is a specific function a plugin can perform. One plugin can provide
 
 Available capabilities:
 
-| Capability | Description |
-|------------|-------------|
-| `ai-provider` | Chat completions, embeddings, structured output |
-| `search` | Web search queries |
-| `git-provider` | Repository management, cloning, pushing |
-| `deployment` | Site deployment and status |
-| `screenshot` | Website screenshot capture |
-| `content-extractor` | URL content extraction |
-| `data-source` | External data querying |
-| `oauth` | OAuth authentication flows |
-| `pipeline` | Generation pipeline (Standard, Agent, or Claude Code) |
-| `form-schema-provider` | Dynamic form schema generation for plugin UIs |
+| Capability             | Description                                                                                                                 |
+| ---------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| `ai-provider`          | Chat completions, embeddings, structured output                                                                             |
+| `search`               | Web search queries                                                                                                          |
+| `git-provider`         | Repository management, cloning, pushing                                                                                     |
+| `deployment`           | Site deployment and status                                                                                                  |
+| `screenshot`           | Website screenshot capture                                                                                                  |
+| `content-extractor`    | URL content extraction                                                                                                      |
+| `data-source`          | External data querying                                                                                                      |
+| `oauth`                | OAuth authentication flows                                                                                                  |
+| `pipeline`             | Generation pipeline (Standard, Agent, Claude Code, Claude Managed Agent, Codex, Gemini, OpenCode, Make.com, SIM AI, Zapier) |
+| `prompt-provider`      | External prompt management (e.g. Langfuse)                                                                                  |
+| `form-schema-provider` | Dynamic form schema generation for plugin UIs                                                                               |
 
 ### Configuration Modes
 
@@ -81,6 +83,7 @@ Each plugin declares how it should be configured:
 ### Scoped Resolution
 
 Each directory can use a different plugin per capability. For example:
+
 - Directory A uses **OpenAI** for AI and **Brave** for search
 - Directory B uses **Anthropic** for AI and **Tavily** for search
 
@@ -88,10 +91,10 @@ This is managed through the [Settings System](./settings) and the directory-leve
 
 ## Documentation
 
-| Page | Description |
-|------|-------------|
-| [Architecture](./architecture) | Plugin SDK, interfaces, lifecycle, bootstrap, facades |
-| [Settings](./settings) | Three-tier settings, JSON Schema extensions, resolution |
-| [Creating a Plugin](./creating-a-plugin) | Step-by-step guide for building a new plugin |
-| [Built-in Plugins](./built-in-plugins) | All 30 plugins with configuration details |
-| [API Reference](./api-reference) | REST endpoints for plugin management |
+| Page                                     | Description                                             |
+| ---------------------------------------- | ------------------------------------------------------- |
+| [Architecture](./architecture)           | Plugin SDK, interfaces, lifecycle, bootstrap, facades   |
+| [Settings](./settings)                   | Three-tier settings, JSON Schema extensions, resolution |
+| [Creating a Plugin](./creating-a-plugin) | Step-by-step guide for building a new plugin            |
+| [Built-in Plugins](./built-in-plugins)   | All 39 plugins with configuration details               |
+| [API Reference](./api-reference)         | REST endpoints for plugin management                    |

@@ -42,8 +42,8 @@ curl -X POST http://localhost:3100/api/auth/login \
 
 ```json
 {
-  "accessToken": "eyJhbG...",
-  "refreshToken": "eyJhbG..."
+	"accessToken": "eyJhbG...",
+	"refreshToken": "eyJhbG..."
 }
 ```
 
@@ -85,28 +85,28 @@ curl -X POST http://localhost:3100/api/auth/logout-all \
 
 ## Profile
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| `GET` | `/api/auth/profile` | Get profile from JWT payload |
-| `GET` | `/api/auth/profile/fresh` | Get fresh profile from database |
-| `PUT` | `/api/auth/profile` | Update profile information |
+| Method | Endpoint                  | Description                     |
+| ------ | ------------------------- | ------------------------------- |
+| `GET`  | `/api/auth/profile`       | Get profile from JWT payload    |
+| `GET`  | `/api/auth/profile/fresh` | Get fresh profile from database |
+| `PUT`  | `/api/auth/profile`       | Update profile information      |
 
 ## Password Management
 
-| Method | Endpoint | Auth | Description |
-|--------|----------|------|-------------|
-| `POST` | `/api/auth/update-password` | Required | Change password (requires current password) |
-| `POST` | `/api/auth/forgot-password` | Public | Request password reset email |
-| `POST` | `/api/auth/reset-password` | Public | Reset password with token from email |
-| `GET` | `/api/auth/validate-reset-token` | Public | Check if a reset token is valid |
+| Method | Endpoint                         | Auth     | Description                                 |
+| ------ | -------------------------------- | -------- | ------------------------------------------- |
+| `POST` | `/api/auth/update-password`      | Required | Change password (requires current password) |
+| `POST` | `/api/auth/forgot-password`      | Public   | Request password reset email                |
+| `POST` | `/api/auth/reset-password`       | Public   | Reset password with token from email        |
+| `GET`  | `/api/auth/validate-reset-token` | Public   | Check if a reset token is valid             |
 
 ## Email Verification
 
-| Method | Endpoint | Auth | Description |
-|--------|----------|------|-------------|
-| `POST` | `/api/auth/send-verification` | Required | Send verification email |
-| `POST` | `/api/auth/verify-email` | Public | Verify email with token |
-| `GET` | `/api/auth/validate-email-token` | Public | Check if a verification token is valid |
+| Method | Endpoint                         | Auth     | Description                            |
+| ------ | -------------------------------- | -------- | -------------------------------------- |
+| `POST` | `/api/auth/send-verification`    | Required | Send verification email                |
+| `POST` | `/api/auth/verify-email`         | Public   | Verify email with token                |
+| `GET`  | `/api/auth/validate-email-token` | Public   | Check if a verification token is valid |
 
 ## OAuth
 
@@ -128,18 +128,18 @@ curl "http://localhost:3100/api/oauth/google/url?callbackUrl=http://localhost:30
 
 ```json
 {
-  "url": "https://github.com/login/oauth/authorize?client_id=..."
+	"url": "https://github.com/login/oauth/authorize?client_id=..."
 }
 ```
 
 ### OAuth Callbacks
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| `GET` | `/api/oauth/github` | Initiate GitHub OAuth flow |
-| `GET` | `/api/oauth/github/callback` | GitHub OAuth callback — returns tokens |
-| `GET` | `/api/oauth/google` | Initiate Google OAuth flow |
-| `GET` | `/api/oauth/google/callback` | Google OAuth callback — returns tokens |
+| Method | Endpoint                     | Description                            |
+| ------ | ---------------------------- | -------------------------------------- |
+| `GET`  | `/api/oauth/github`          | Initiate GitHub OAuth flow             |
+| `GET`  | `/api/oauth/github/callback` | GitHub OAuth callback — returns tokens |
+| `GET`  | `/api/oauth/google`          | Initiate Google OAuth flow             |
+| `GET`  | `/api/oauth/google/callback` | Google OAuth callback — returns tokens |
 
 ### Plugin OAuth Connections
 
@@ -149,12 +149,12 @@ Plugins that require OAuth (e.g., GitHub for repository access) use a separate p
 
 JWT settings are configured via environment variables:
 
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `JWT_SECRET` | — | **Required.** Secret key for signing tokens |
-| `JWT_ACCESS_TOKEN_EXPIRATION` | `7d` | Access token TTL (e.g., `15m`, `1h`, `7d`, `never`) |
-| `JWT_REFRESH_TOKEN_EXPIRATION_DAYS` | `14` | Refresh token TTL in days (or `never`) |
-| `GH_CLIENT_ID` | — | GitHub OAuth client ID |
-| `GH_CLIENT_SECRET` | — | GitHub OAuth client secret |
-| `GOOGLE_CLIENT_ID` | — | Google OAuth client ID |
-| `GOOGLE_CLIENT_SECRET` | — | Google OAuth client secret |
+| Variable                            | Default | Description                                         |
+| ----------------------------------- | ------- | --------------------------------------------------- |
+| `JWT_SECRET`                        | —       | **Required.** Secret key for signing tokens         |
+| `JWT_ACCESS_TOKEN_EXPIRATION`       | `7d`    | Access token TTL (e.g., `15m`, `1h`, `7d`, `never`) |
+| `JWT_REFRESH_TOKEN_EXPIRATION_DAYS` | `14`    | Refresh token TTL in days (or `never`)              |
+| `GH_CLIENT_ID`                      | —       | GitHub OAuth client ID                              |
+| `GH_CLIENT_SECRET`                  | —       | GitHub OAuth client secret                          |
+| `GOOGLE_CLIENT_ID`                  | —       | Google OAuth client ID                              |
+| `GOOGLE_CLIENT_SECRET`              | —       | Google OAuth client secret                          |

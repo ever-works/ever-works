@@ -17,11 +17,11 @@ http://localhost:3100    # Local development
 
 ## Interactive Documentation
 
-| URL | Description |
-|-----|-------------|
-| `/api/swagger` | Swagger UI — interactive endpoint explorer |
-| `/api/docs` | Scalar API Reference — modern API docs UI |
-| `/api/openapi.json` | OpenAPI 3.0 JSON specification |
+| URL                 | Description                                |
+| ------------------- | ------------------------------------------ |
+| `/api/swagger`      | Swagger UI — interactive endpoint explorer |
+| `/api/docs`         | Scalar API Reference — modern API docs UI  |
+| `/api/openapi.json` | OpenAPI 3.0 JSON specification             |
 
 ## Authentication
 
@@ -39,31 +39,31 @@ See [Authentication](/api/authentication) for the full auth flow.
 
 The API uses three rate-limiting tiers applied globally via NestJS Throttler:
 
-| Tier | Requests | Window |
-|------|----------|--------|
-| **Short** | 50 | 1 second |
-| **Medium** | 300 | 10 seconds |
-| **Long** | 1,000 | 60 seconds |
+| Tier       | Requests | Window     |
+| ---------- | -------- | ---------- |
+| **Short**  | 50       | 1 second   |
+| **Medium** | 300      | 10 seconds |
+| **Long**   | 1,000    | 60 seconds |
 
 All tiers apply simultaneously. If any tier's limit is exceeded, the API returns `429 Too Many Requests`.
 
 ## Endpoint Groups
 
-| Tag | Prefix | Description | Details |
-|-----|--------|-------------|---------|
-| **Health** | `/api` | Health check | `GET /api` returns API status |
-| **Auth** | `/api/auth` | Registration, login, email verification | [Authentication](/api/authentication) |
-| **OAuth** | `/api/oauth` | OAuth flows (GitHub, Google), plugin connections | [Authentication](/api/authentication), [Other Modules](/api/other-modules#plugin-oauth) |
-| **Directories** | `/api/directories` | Directory CRUD, items, categories, generation, import | [Directories](/api/directories) |
-| **Deploy** | `/api/deploy` | Provider-agnostic deployment | [Deployment](/api/deployment) |
-| **AI Conversation** | `/api/ai-conversations` | Streaming AI chat | [AI Conversation](/api/ai-conversation) |
-| **Git Providers** | `/api/git-providers` | Git provider connections, repos, orgs | [Other Modules](/api/other-modules#git-provider-api) |
-| **Generator Form** | `/api/generator-form` | Dynamic pipeline form schemas | [Other Modules](/api/other-modules#generator-form-schema) |
-| **Screenshot** | `/api/screenshot` | Screenshot capture | [Other Modules](/api/other-modules#screenshot-api) |
-| **Subscriptions** | `/api/subscriptions` | Plans, billing, usage tracking | [Other Modules](/api/other-modules#subscriptions-api) |
-| **Notifications** | `/api/notifications` | User notifications | [Other Modules](/api/other-modules#notifications-api) |
-| **Members** | `/api/directories/:id/members` | Directory member management | [Directories](/api/directories) |
-| **Comparisons** | `/api/directories/:id/comparisons` | A vs B comparison page generation and management | [Directories](/api/directories) |
+| Tag                 | Prefix                             | Description                                           | Details                                                                                 |
+| ------------------- | ---------------------------------- | ----------------------------------------------------- | --------------------------------------------------------------------------------------- |
+| **Health**          | `/api`                             | Health check                                          | `GET /api` returns API status                                                           |
+| **Auth**            | `/api/auth`                        | Registration, login, email verification               | [Authentication](/api/authentication)                                                   |
+| **OAuth**           | `/api/oauth`                       | OAuth flows (GitHub, Google), plugin connections      | [Authentication](/api/authentication), [Other Modules](/api/other-modules#plugin-oauth) |
+| **Directories**     | `/api/directories`                 | Directory CRUD, items, categories, generation, import | [Directories](/api/directories)                                                         |
+| **Deploy**          | `/api/deploy`                      | Provider-agnostic deployment                          | [Deployment](/api/deployment)                                                           |
+| **AI Conversation** | `/api/ai-conversations`            | Streaming AI chat                                     | [AI Conversation](/api/ai-conversation)                                                 |
+| **Git Providers**   | `/api/git-providers`               | Git provider connections, repos, orgs                 | [Other Modules](/api/other-modules#git-provider-api)                                    |
+| **Generator Form**  | `/api/generator-form`              | Dynamic pipeline form schemas                         | [Other Modules](/api/other-modules#generator-form-schema)                               |
+| **Screenshot**      | `/api/screenshot`                  | Screenshot capture                                    | [Other Modules](/api/other-modules#screenshot-api)                                      |
+| **Subscriptions**   | `/api/subscriptions`               | Plans, billing, usage tracking                        | [Other Modules](/api/other-modules#subscriptions-api)                                   |
+| **Notifications**   | `/api/notifications`               | User notifications                                    | [Other Modules](/api/other-modules#notifications-api)                                   |
+| **Members**         | `/api/directories/:id/members`     | Directory member management                           | [Directories](/api/directories)                                                         |
+| **Comparisons**     | `/api/directories/:id/comparisons` | A vs B comparison page generation and management      | [Directories](/api/directories)                                                         |
 
 ## Request Format
 
@@ -77,21 +77,21 @@ Errors follow a standard format:
 
 ```json
 {
-  "statusCode": 400,
-  "message": ["field must be a string"],
-  "error": "Bad Request"
+	"statusCode": 400,
+	"message": ["field must be a string"],
+	"error": "Bad Request"
 }
 ```
 
 Common status codes:
 
-| Code | Meaning |
-|------|---------|
-| `200` | Success |
-| `201` | Created |
-| `400` | Validation error |
-| `401` | Not authenticated |
-| `403` | Forbidden |
-| `404` | Not found |
-| `429` | Rate limit exceeded |
+| Code  | Meaning               |
+| ----- | --------------------- |
+| `200` | Success               |
+| `201` | Created               |
+| `400` | Validation error      |
+| `401` | Not authenticated     |
+| `403` | Forbidden             |
+| `404` | Not found             |
+| `429` | Rate limit exceeded   |
 | `500` | Internal server error |

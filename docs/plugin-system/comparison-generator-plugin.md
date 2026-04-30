@@ -1,7 +1,7 @@
 ---
 id: comparison-generator-plugin
-title: "Comparison Generator Plugin"
-sidebar_label: "Comparison Generator"
+title: 'Comparison Generator Plugin'
+sidebar_label: 'Comparison Generator'
 sidebar_position: 48
 ---
 
@@ -13,16 +13,16 @@ The Comparison Generator plugin automatically creates detailed A vs B comparison
 
 ## Overview
 
-| Property | Value |
-|---|---|
-| Plugin ID | `comparison-generator` |
-| Category | `utility` |
-| Capabilities | `form-schema-provider` |
-| Version | `1.0.0` |
-| Configuration Mode | `hybrid` |
-| Auto-enable | No |
-| Built-in | Yes |
-| System Plugin | Yes |
+| Property           | Value                  |
+| ------------------ | ---------------------- |
+| Plugin ID          | `comparison-generator` |
+| Category           | `utility`              |
+| Capabilities       | `form-schema-provider` |
+| Version            | `1.0.0`                |
+| Configuration Mode | `hybrid`               |
+| Auto-enable        | No                     |
+| Built-in           | Yes                    |
+| System Plugin      | Yes                    |
 
 The plugin implements `IPlugin`. It provides a settings schema for configuring comparison generation behavior and serves as the metadata/configuration entry point for the comparison generation feature.
 
@@ -58,16 +58,16 @@ graph TD
 
 ### Settings Schema
 
-| Setting | Type | Default | Description |
-|---|---|---|---|
-| `cadence_override` | `string` | `"use_directory"` | How often to auto-generate: `use_directory`, `daily`, `weekly`, or `monthly` |
-| `max_comparisons_mode` | `string` | `"custom"` | Cap mode: `custom` (use limit) or `unlimited` (all possible pairs) |
-| `max_comparisons` | `number` | `50` | Maximum total comparisons (1--500, only in Custom mode) |
-| `min_items_for_comparison` | `number` | `3` | Minimum items in a category before generating comparisons (2--20) |
-| `ai_provider` | `string` | -- | Override AI provider for comparison generation (hidden) |
-| `ai_model` | `string` | -- | Override AI model for comparison generation (hidden) |
-| `custom_prompt` | `string` | -- | Additional instructions for comparison prompts (hidden) |
-| `extended_analysis` | `boolean` | `false` | Generate deeper analysis alongside the standard comparison (hidden) |
+| Setting                    | Type      | Default           | Description                                                                  |
+| -------------------------- | --------- | ----------------- | ---------------------------------------------------------------------------- |
+| `cadence_override`         | `string`  | `"use_directory"` | How often to auto-generate: `use_directory`, `daily`, `weekly`, or `monthly` |
+| `max_comparisons_mode`     | `string`  | `"custom"`        | Cap mode: `custom` (use limit) or `unlimited` (all possible pairs)           |
+| `max_comparisons`          | `number`  | `50`              | Maximum total comparisons (1--500, only in Custom mode)                      |
+| `min_items_for_comparison` | `number`  | `3`               | Minimum items in a category before generating comparisons (2--20)            |
+| `ai_provider`              | `string`  | --                | Override AI provider for comparison generation (hidden)                      |
+| `ai_model`                 | `string`  | --                | Override AI model for comparison generation (hidden)                         |
+| `custom_prompt`            | `string`  | --                | Additional instructions for comparison prompts (hidden)                      |
+| `extended_analysis`        | `boolean` | `false`           | Generate deeper analysis alongside the standard comparison (hidden)          |
 
 ### Conditional Visibility
 
@@ -79,12 +79,12 @@ The `max_comparisons` field is only shown when `max_comparisons_mode` is set to 
 
 Comparisons can be generated automatically based on a configurable cadence:
 
-| Cadence | Behavior |
-|---|---|
+| Cadence         | Behavior                                        |
+| --------------- | ----------------------------------------------- |
 | `use_directory` | Follows the directory's own generation schedule |
-| `daily` | Generates a new comparison every day |
-| `weekly` | Generates a new comparison every week |
-| `monthly` | Generates a new comparison every month |
+| `daily`         | Generates a new comparison every day            |
+| `weekly`        | Generates a new comparison every week           |
+| `monthly`       | Generates a new comparison every month          |
 
 Each scheduled run generates one high-quality comparison per pass to maintain quality and manage API costs.
 
@@ -116,12 +116,12 @@ Comparisons are generated between items within the same category, ensuring that 
 
 Two modes control how many comparisons are generated:
 
-| Mode | Behavior |
-|---|---|
-| **Custom** | Caps total comparisons at `max_comparisons` (default: 50) |
-| **Unlimited** | Generates all possible pairs within eligible categories |
+| Mode          | Behavior                                                  |
+| ------------- | --------------------------------------------------------- |
+| **Custom**    | Caps total comparisons at `max_comparisons` (default: 50) |
+| **Unlimited** | Generates all possible pairs within eligible categories   |
 
-For a category with N items, the maximum number of pairs is N * (N - 1) / 2. With many items, unlimited mode can generate a large number of comparisons.
+For a category with N items, the maximum number of pairs is N \* (N - 1) / 2. With many items, unlimited mode can generate a large number of comparisons.
 
 ## Usage
 
@@ -144,13 +144,13 @@ For a category with N items, the maximum number of pairs is N * (N - 1) / 2. Wit
 
 ```typescript
 class ComparisonGeneratorPlugin implements IPlugin {
-  readonly id: 'comparison-generator';
-  readonly category: 'utility';
+	readonly id: 'comparison-generator';
+	readonly category: 'utility';
 
-  onLoad(context: PluginContext): Promise<void>;
-  onUnload(): Promise<void>;
-  healthCheck(): Promise<PluginHealthCheck>;
-  getManifest(): PluginManifest;
+	onLoad(context: PluginContext): Promise<void>;
+	onUnload(): Promise<void>;
+	healthCheck(): Promise<PluginHealthCheck>;
+	getManifest(): PluginManifest;
 }
 ```
 
@@ -158,13 +158,13 @@ class ComparisonGeneratorPlugin implements IPlugin {
 
 Each generated comparison typically includes:
 
-| Field | Description |
-|---|---|
-| Item A / Item B | The two items being compared |
-| Dimensions | Array of comparison dimensions with per-item scores and summaries |
-| Verdict | Overall winner and reasoning |
-| Article | Full markdown article for SEO publishing |
-| Sources | References used during research |
+| Field           | Description                                                       |
+| --------------- | ----------------------------------------------------------------- |
+| Item A / Item B | The two items being compared                                      |
+| Dimensions      | Array of comparison dimensions with per-item scores and summaries |
+| Verdict         | Overall winner and reasoning                                      |
+| Article         | Full markdown article for SEO publishing                          |
+| Sources         | References used during research                                   |
 
 ## SEO Benefits
 

@@ -7,14 +7,14 @@ sidebar_position: 26
 
 # Linkup Plugin
 
-| Field              | Value                              |
-| ------------------ | ---------------------------------- |
-| Plugin ID          | `linkup`                           |
-| Package            | `@ever-works/linkup-plugin`        |
-| Category           | `search`                           |
-| Capabilities       | `search`, `content-extractor`      |
-| Configuration Mode | `hybrid`                           |
-| Auto Enable        | No                                 |
+| Field              | Value                         |
+| ------------------ | ----------------------------- |
+| Plugin ID          | `linkup`                      |
+| Package            | `@ever-works/linkup-plugin`   |
+| Category           | `search`                      |
+| Capabilities       | `search`, `content-extractor` |
+| Configuration Mode | `hybrid`                      |
+| Auto Enable        | No                            |
 
 ## Overview
 
