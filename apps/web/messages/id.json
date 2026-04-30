@@ -2495,6 +2495,7 @@
                     "nameRequired": "Nama direktori wajib",
                     "noAnalysis": "Harap analisis repositori terlebih dahulu",
                     "githubRequired": "Harap hubungkan akun GitHub Anda terlebih dahulu",
+                    "providerRequired": "Silakan pilih penyedia git terlebih dahulu",
                     "importFailed": "Gagal mengimpor direktori",
                     "linkFailed": "Gagal menghubungkan direktori",
                     "providerNotConfigured": "{provider} belum dikonfigurasi. Kunjungi Pengaturan → Plugin untuk menyiapkannya sebelum mengimpor."

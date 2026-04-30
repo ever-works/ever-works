@@ -76,9 +76,7 @@ export class WorksConfigRepositorySyncService {
         } catch (error) {
             const errorMessage = error instanceof Error ? error.message : String(error);
 
-            this.logger.warn(
-                `Failed to sync works.yml for ${owner}/${repo}: ${errorMessage}`,
-            );
+            this.logger.warn(`Failed to sync works.yml for ${owner}/${repo}: ${errorMessage}`);
             this.eventEmitter?.emit(
                 WorksConfigSyncFailedEvent.EVENT_NAME,
                 new WorksConfigSyncFailedEvent(

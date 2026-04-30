@@ -2495,6 +2495,7 @@
                     "nameRequired": "Le nom de l'annuaire est requis",
                     "noAnalysis": "Veuillez analyser un dépôt en premier",
                     "githubRequired": "Veuillez connecter votre compte GitHub en premier",
+                    "providerRequired": "Veuillez d'abord sélectionner un fournisseur git",
                     "importFailed": "Échec de l'import de l'annuaire",
                     "linkFailed": "Échec de la liaison de l'annuaire",
                     "providerNotConfigured": "{provider} n'est pas configuré. Visitez Paramètres → Plugins pour le configurer avant d'importer."

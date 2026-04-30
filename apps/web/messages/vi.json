@@ -2495,6 +2495,7 @@
                     "nameRequired": "Tên thư mục là bắt buộc",
                     "noAnalysis": "Vui lòng phân tích kho trước",
                     "githubRequired": "Vui lòng kết nối tài khoản GitHub của bạn trước",
+                    "providerRequired": "Vui lòng chọn nhà cung cấp Git trước",
                     "importFailed": "Nhập thư mục thất bại",
                     "linkFailed": "Liên kết thư mục thất bại",
                     "providerNotConfigured": "{provider} chưa được cấu hình. Truy cập Cài Đặt → Plugins để thiết lập trước khi nhập."

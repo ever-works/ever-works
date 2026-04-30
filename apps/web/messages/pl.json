@@ -2495,6 +2495,7 @@
                     "nameRequired": "Nazwa katalogu jest wymagana",
                     "noAnalysis": "Najpierw przeanalizuj repozytorium",
                     "githubRequired": "Najpierw połącz konto GitHub",
+                    "providerRequired": "Najpierw wybierz dostawcę Git",
                     "importFailed": "Nie udało się zaimportować katalogu",
                     "linkFailed": "Nie udało się połączyć katalogu",
                     "providerNotConfigured": "{provider} nie jest skonfigurowany. Odwiedź Ustawienia → Wtyczki, aby go skonfigurować przed importem."

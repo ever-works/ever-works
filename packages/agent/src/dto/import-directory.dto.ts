@@ -1,7 +1,6 @@
 import { Transform, Type } from 'class-transformer';
 import {
     IsBoolean,
-    IsEnum,
     IsIn,
     IsNotEmpty,
     IsNumber,
@@ -13,15 +12,17 @@ import {
     ValidateNested,
 } from 'class-validator';
 import { sanitizeName } from '../utils/sanitize.util';
-import { ImportSourceType } from '../entities/directory.entity';
+import { IMPORT_SOURCE_TYPES, type ImportSourceType } from '@ever-works/contracts/api';
 import { ProvidersDto } from '../items-generator/dto';
 
-export enum ImportSourceTypeEnum {
-    DATA_REPO = 'data_repo',
-    AWESOME_README = 'awesome_readme',
-    LINK_EXISTING = 'link_existing',
-    WORKS_CONFIG = 'works_config',
-}
+export const ImportSourceTypeEnum = {
+    DATA_REPO: IMPORT_SOURCE_TYPES[0],
+    AWESOME_README: IMPORT_SOURCE_TYPES[1],
+    LINK_EXISTING: IMPORT_SOURCE_TYPES[2],
+    WORKS_CONFIG: IMPORT_SOURCE_TYPES[3],
+} as const satisfies Record<string, ImportSourceType>;
+
+export type ImportSourceTypeEnum = (typeof ImportSourceTypeEnum)[keyof typeof ImportSourceTypeEnum];
 
 export class ImportEnrichmentConfigDto {
     @IsOptional()
@@ -79,8 +80,8 @@ export class ImportDirectoryDto {
     @IsNotEmpty()
     sourceUrl: string;
 
-    @IsEnum(ImportSourceTypeEnum)
-    sourceType: ImportSourceTypeEnum;
+    @IsIn(IMPORT_SOURCE_TYPES)
+    sourceType: ImportSourceType;
 
     @IsString()
     @IsNotEmpty()

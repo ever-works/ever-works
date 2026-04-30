@@ -3,6 +3,7 @@ jest.mock('@src/generators/data-generator/data-generator.service', () => ({
 }));
 
 import { DirectoryScheduleService } from '../directory-schedule.service';
+import { ImportSourceTypeEnum } from '@src/dto/import-directory.dto';
 import {
     DirectoryScheduleBillingMode,
     DirectoryScheduleCadence,
@@ -137,6 +138,58 @@ describe('DirectoryScheduleService', () => {
                 blockingReason: 'Scheduled updates are currently disabled.',
             }),
         );
+    });
+
+    it('does not allow scheduled source sync for linked existing directories', async () => {
+        const linkedDirectory = {
+            ...directory,
+            sourceRepository: {
+                type: ImportSourceTypeEnum.LINK_EXISTING,
+            },
+        };
+
+        ownershipService.ensureCanView.mockResolvedValue({ directory: linkedDirectory });
+        scheduleRepository.findByDirectoryId.mockResolvedValue(null);
+
+        const result = await service.getSchedule(directory.id, user);
+
+        expect(result.schedule).toEqual(
+            expect.objectContaining({
+                status: DirectoryScheduleStatus.DISABLED,
+                featureEnabled: true,
+                canEnable: false,
+                blockingCode: 'SOURCE_SYNC_UNSUPPORTED',
+                blockingReason:
+                    'Linked directories use existing repositories directly and cannot be synced from an import source.',
+            }),
+        );
+    });
+
+    it('rejects enabling scheduled source sync for linked existing directories', async () => {
+        const linkedDirectory = {
+            ...directory,
+            sourceRepository: {
+                type: ImportSourceTypeEnum.LINK_EXISTING,
+            },
+        };
+
+        ownershipService.ensureCanEdit.mockResolvedValue({ directory: linkedDirectory });
+        scheduleRepository.findByDirectoryId.mockResolvedValue(null);
+
+        await expect(
+            service.updateSchedule(
+                directory.id,
+                {
+                    enable: true,
+                    cadence: DirectoryScheduleCadence.DAILY,
+                },
+                user,
+            ),
+        ).rejects.toMatchObject({
+            response: expect.objectContaining({
+                code: 'SOURCE_SYNC_UNSUPPORTED',
+            }),
+        });
     });
 
     it('returns config-unavailable metadata when readiness inspection fails', async () => {

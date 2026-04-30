@@ -56,6 +56,7 @@ import { DirectorySchedule } from '@src/entities/directory-schedule.entity';
 import { DirectoryScheduleService } from './directory-schedule.service';
 import { UserRepository } from '@src/database/repositories/user.repository';
 import { DirectoryImportService } from './directory-import.service';
+import { supportsDirectorySourceSync } from '@src/import/source-sync-support';
 import { NotificationService } from '@src/notifications/notification.service';
 import {
     ScreenshotFacadeService,
@@ -982,8 +983,11 @@ Only include image URLs that are absolute URLs (starting with http).`;
                 (schedule.directory as Directory) ||
                 (await this.directoryRepository.findById(schedule.directoryId));
 
-            // Handle sync for directories with a source repository
-            if (directory?.sourceRepository) {
+            // Handle sync for directories imported from a separate source repository.
+            if (
+                directory?.sourceRepository &&
+                supportsDirectorySourceSync(directory.sourceRepository.type)
+            ) {
                 return await this.runScheduledSync(directory, user, schedule);
             }
 

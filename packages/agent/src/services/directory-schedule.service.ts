@@ -34,6 +34,10 @@ import { Directory } from '@src/entities/directory.entity';
 import { NotificationService } from '@src/notifications/notification.service';
 import type { ScheduleRunOutcome } from './types/trigger-context.types';
 import { WorksConfigSyncRequestedEvent, type WorksConfigSyncReason } from '@src/events';
+import {
+    LINKED_DIRECTORY_SYNC_UNSUPPORTED_MESSAGE,
+    supportsDirectorySourceSync,
+} from '@src/import/source-sync-support';
 
 type DirectoryScheduleReadiness = {
     featureEnabled: boolean;
@@ -41,6 +45,7 @@ type DirectoryScheduleReadiness = {
     blockingCode?:
         | 'SCHEDULED_UPDATES_DISABLED'
         | 'INITIAL_DIRECTORY_SETUP_REQUIRED'
+        | 'SOURCE_SYNC_UNSUPPORTED'
         | 'CONFIG_UNAVAILABLE';
     blockingReason?: string;
 };
@@ -688,8 +693,17 @@ export class DirectoryScheduleService {
             };
         }
 
-        // Sync directories do not rely on saved generation request data.
         if (directory.sourceRepository) {
+            if (!supportsDirectorySourceSync(directory.sourceRepository.type)) {
+                return {
+                    featureEnabled: true,
+                    canEnable: false,
+                    blockingCode: 'SOURCE_SYNC_UNSUPPORTED',
+                    blockingReason: LINKED_DIRECTORY_SYNC_UNSUPPORTED_MESSAGE,
+                };
+            }
+
+            // Import-backed sync directories do not rely on saved generation request data.
             return {
                 featureEnabled: true,
                 canEnable: true,

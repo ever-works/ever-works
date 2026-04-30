@@ -2495,6 +2495,7 @@
                     "nameRequired": "Directory-naam is verplicht",
                     "noAnalysis": "Analyseer eerst een repository",
                     "githubRequired": "Verbind eerst je GitHub-account",
+                    "providerRequired": "Selecteer eerst een git-provider",
                     "importFailed": "Fout bij importeren directory",
                     "linkFailed": "Fout bij koppelen directory",
                     "providerNotConfigured": "{provider} is niet geconfigureerd. Ga naar Instellingen → Plugins om in te stellen voor importeren."

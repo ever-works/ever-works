@@ -2495,6 +2495,7 @@
                     "nameRequired": "Verzeichnisname ist erforderlich",
                     "noAnalysis": "Bitte analysieren Sie zuerst ein Repository",
                     "githubRequired": "Bitte verbinden Sie zuerst Ihr GitHub-Konto",
+                    "providerRequired": "Bitte wählen Sie zuerst einen Git-Provider aus",
                     "importFailed": "Fehler beim Importieren des Verzeichnisses",
                     "linkFailed": "Fehler beim Verknüpfen des Verzeichnisses",
                     "providerNotConfigured": "{provider} ist nicht konfiguriert. Besuchen Sie Einstellungen → Plugins, um es vor dem Import einzurichten."

@@ -2495,6 +2495,7 @@
                     "nameRequired": "Dizin adı gerekli",
                     "noAnalysis": "Lütfen önce bir depo analiz edin",
                     "githubRequired": "Lütfen önce GitHub hesabınızı bağlayın",
+                    "providerRequired": "Lütfen önce bir git sağlayıcısı seçin",
                     "importFailed": "Dizin içe aktarılamadı",
                     "linkFailed": "Dizin bağlanamadı",
                     "providerNotConfigured": "{provider} yapılandırılmamış. İçe aktarmadan önce Ayarlar → Eklentiler'e gidin."
