@@ -268,4 +268,4 @@ pnpm deploy:trigger
 ## See Also
 
 - [Pipeline Overview](./pipeline-overview.md)
-- [Items Generation Spec](../features/items-generation/spec.md)
+- [Data Generator Spec](../features/data-generator/spec.md)

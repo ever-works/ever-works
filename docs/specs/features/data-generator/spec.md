@@ -366,6 +366,6 @@ function mergeItems(existing: ItemData[], newItems: ItemData[]): ItemData[] {
 
 ## See Also
 
-- [Items Generation Spec](../items-generation/spec.md)
 - [Markdown Generator Spec](../markdown-generator/spec.md)
+- [Website Generator Spec](../website-generator/spec.md)
 - [Pipeline Overview](../../architecture/pipeline-overview.md)

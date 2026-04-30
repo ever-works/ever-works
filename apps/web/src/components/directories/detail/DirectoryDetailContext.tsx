@@ -80,10 +80,14 @@ function repoLink(directory: Directory, oauthConnection: GitProviderConnectionIn
 
     // Strip trailing slash from homepage URL
     const baseUrl = providerUrl.replace(/\/$/, '');
+    const relatedRepositories = directory.sourceRepository?.relatedRepositories;
+    const mainRepository = relatedRepositories?.directory;
+    const dataRepository = relatedRepositories?.data;
+    const websiteRepository = relatedRepositories?.website;
 
     return {
-        main: `${baseUrl}/${owner}/${directory.slug}`,
-        dataRepo: `${baseUrl}/${owner}/${directory.slug}-data`,
-        websiteRepo: `${baseUrl}/${owner}/${directory.slug}-website`,
+        main: `${baseUrl}/${mainRepository?.owner || owner}/${mainRepository?.repo || directory.slug}`,
+        dataRepo: `${baseUrl}/${dataRepository?.owner || owner}/${dataRepository?.repo || `${directory.slug}-data`}`,
+        websiteRepo: `${baseUrl}/${websiteRepository?.owner || owner}/${websiteRepository?.repo || `${directory.slug}-website`}`,
     };
 }

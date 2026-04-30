@@ -60,12 +60,14 @@ export function GeneratorForm({ directoryId, directory, config }: GeneratorFormP
     const [coreData, setCoreData] = useState<{
         name: string;
         prompt: string;
+        model?: string;
         generation_method?: GenerationMethod;
         update_with_pull_request?: boolean;
         website_repository_creation_method?: WebsiteRepositoryCreationMethod;
     }>({
         name: directory.name,
         prompt: initialPrompt,
+        model: lastRequestData?.model || directory.sourceRepository?.worksConfig?.model || '',
         generation_method: GenerationMethod.CREATE_UPDATE,
         update_with_pull_request: false,
         website_repository_creation_method:
@@ -213,6 +215,7 @@ export function GeneratorForm({ directoryId, directory, config }: GeneratorFormP
                 const updateData: UpdateItemsGeneratorDto = {
                     generation_method: coreData.generation_method,
                     update_with_pull_request: coreData.update_with_pull_request,
+                    model: coreData.model?.trim() || undefined,
                     providers: selectedProviders,
                 };
                 result = await updateItems(directoryId, updateData);
@@ -226,6 +229,7 @@ export function GeneratorForm({ directoryId, directory, config }: GeneratorFormP
                 const generateData: CreateItemsGeneratorDto = {
                     name: coreData.name,
                     prompt: coreData.prompt,
+                    model: coreData.model?.trim() || undefined,
                     generation_method: coreData.generation_method,
                     update_with_pull_request: coreData.update_with_pull_request,
                     website_repository_creation_method: coreData.website_repository_creation_method,

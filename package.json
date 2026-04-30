@@ -21,6 +21,7 @@
 		"dev:apps": "turbo dev --filter=./apps/*",
 		"dev:api": "turbo dev --filter=ever-works-api",
 		"dev:web": "turbo dev --filter=ever-works-web",
+		"dev:docs": "turbo dev --filter=ever-works-docs",
 		"dev:trigger": "turbo dev:trigger --filter=@ever-works/trigger-tasks",
 		"deploy:trigger": "turbo deploy:trigger --filter=@ever-works/trigger-tasks",
 		"build": "turbo build",
@@ -29,6 +30,7 @@
 		"build:plugins": "turbo build --filter=./packages/plugin --filter=./packages/plugins/*",
 		"build:api": "turbo build --filter=ever-works-api",
 		"build:web": "turbo build --filter=ever-works-web",
+		"build:docs": "turbo build --filter=ever-works-docs",
 		"prepare:husky": "npx husky install .husky",
 		"prepare": "husky",
 		"lint": "turbo lint",
@@ -41,6 +43,7 @@
 	},
 	"keywords": [],
 	"devDependencies": {
+		"@types/node": "^22.19.11",
 		"@commitlint/cli": "^19.8.1",
 		"@commitlint/config-conventional": "^19.8.1",
 		"husky": "^9.1.7",

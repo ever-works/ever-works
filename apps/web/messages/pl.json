@@ -1664,6 +1664,9 @@
                 "selectOption": "Wybierz opcję",
                 "directoryName": "Nazwa katalogu",
                 "generationPrompt": "Prompt generacji",
+                "modelOverride": "Nadpisanie modelu AI",
+                "modelOverridePlaceholder": "np. openai/gpt-4.1 lub openrouter/openai/gpt-4.1",
+                "modelOverrideHelperText": "Opcjonalne. Domyślnie używa importowanego lub poprzedniego modelu, chyba że nadpiszesz go tutaj.",
                 "recommended": "Zalecane",
                 "promptPlaceholder": "Opisz, jakie elementy powinny być wygenerowane dla tego katalogu...",
                 "promptHelperText": "Bądź precyzyjny co do typu treści, którą chcesz wygenerować",
@@ -1805,6 +1808,28 @@
                 "syncDescription": "Automatycznie pobieraj aktualizacje z repozytorium źródłowego.",
                 "syncUpdateFailed": "Nie udało się zaktualizować ustawień synchronizacji",
                 "syncDisabled": "Synchronizacja wyłączona",
+                "worksConfig": {
+                    "imported": "Zaimportowane z works.yml",
+                    "applied": "Zastosowane: {value}",
+                    "enabled": "włączone",
+                    "disabled": "wyłączone",
+                    "fields": {
+                        "sourceType": "Typ źródła",
+                        "configName": "Nazwa konfiguracji",
+                        "initialPrompt": "Początkowy prompt",
+                        "model": "Model",
+                        "schedule": "Harmonogram",
+                        "providers": "Dostawcy",
+                        "websiteRepo": "Repozytorium witryny",
+                        "additionalAgents": "Dodatkowe agenty"
+                    },
+                    "sourceTypes": {
+                        "dataRepo": "Repozytorium danych",
+                        "awesomeReadme": "Świetny README",
+                        "linkExisting": "Połączone istniejące repozytoria",
+                        "worksConfig": "works.yml"
+                    }
+                },
                 "generalSettings": "Ustawienia ogólne",
                 "generalTitle": "Ustawienia ogólne",
                 "directoryName": "Nazwa katalogu",
@@ -2318,6 +2343,10 @@
                     "title": "Utrzymuj synchronizację",
                     "description": "Automatycznie pobieraj aktualizacje z repozytorium źródłowego."
                 },
+                "worksConfigRestore": {
+                    "title": "Przywróć ustawienia works.yml",
+                    "description": "Zastosuj dostawcę AI, model, harmonogram i powiązane repozytoria z tego repozytorium."
+                },
                 "sourceMethod": {
                     "url": {
                         "title": "Wklej URL",
@@ -2348,15 +2377,19 @@
                 },
                 "detectedType": {
                     "dataRepo": "Wykryto repozytorium danych",
-                    "awesomeReadme": "Wykryto listę Awesome"
+                    "awesomeReadme": "Wykryto listę Awesome",
+                    "worksConfig": "Repozytorium konfiguracji works"
                 },
                 "badges": {
                     "dataRepo": "Repo danych",
-                    "awesomeReadme": "Lista Awesome"
+                    "awesomeReadme": "Lista Awesome",
+                    "worksConfig": "works.yml"
                 },
                 "preview": {
                     "items": "elementów",
-                    "categories": "kategorii"
+                    "categories": "kategorii",
+                    "schedule": "Harmonogram: {cadence}",
+                    "providers": "Dostawcy: {providers}"
                 },
                 "nameLabel": "Nazwa katalogu",
                 "namePlaceholder": "np. Mój świetny katalog",
@@ -2372,6 +2405,7 @@
                     "seedDetected": "~{count} elementów bazowych wykrytych",
                     "expansionFactor": "Cel rozszerzenia",
                     "expansionDescription": "Ile razy większa powinna być ostateczna kolekcja w porównaniu do źródła?",
+                    "recommendedMultiplier": "{value} (zalecane)",
                     "preview": "~{seedCount} elementów bazowych → cel ~{targetCount} elementów końcowych (~{newItems} nowych elementów do odkrycia)",
                     "enrichmentOptions": "Opcje wzbogacania",
                     "enrichDescriptions": "Przepisz opisy",
@@ -2453,6 +2487,7 @@
                     "linkRepos": "Połącz repozytoria"
                 },
                 "detectionFailed": "Nie mogliśmy automatycznie wykryć formatu. Wybierz, jak zaimportować to repozytorium.",
+                "detectionFailedMissingConfig": "Nie znaleziono obsługiwanej konfiguracji. Dodaj config.yml, works.yml lub works_config/works.yml do repozytorium lub wybierz format importu ręcznego poniżej.",
                 "errors": {
                     "urlRequired": "Wprowadź URL repozytorium GitHub",
                     "unsupportedFormat": "Ten format repozytorium nie jest obsługiwany. Użyj formatu Repozytorium danych lub Lista Awesome.",

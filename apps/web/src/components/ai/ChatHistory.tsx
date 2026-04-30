@@ -104,8 +104,8 @@ export function ChatHistory({ onClose }: ChatHistoryProps) {
                                         'flex items-center gap-2 w-full px-3 py-2.5 rounded-lg text-left group',
                                         'transition-colors duration-75 cursor-pointer',
                                         isActive
-                                            ? 'bg-primary/8 dark:bg-primary/12'
-                                            : 'hover:bg-surface-secondary dark:hover:bg-white/[0.04]',
+                                            ? 'bg-primary/8 dark:bg-white/4'
+                                            : 'hover:bg-surface-secondary dark:hover:bg-white/4',
                                         isDeleting && 'opacity-50 pointer-events-none',
                                     )}
                                 >

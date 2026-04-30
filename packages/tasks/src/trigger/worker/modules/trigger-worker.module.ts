@@ -6,6 +6,7 @@ import { DataGeneratorService } from '@ever-works/agent/generators';
 import { MarkdownGeneratorService } from '@ever-works/agent/generators';
 import { WebsiteGeneratorService, BranchSyncService } from '@ever-works/agent/generators';
 import { SourceRepoAnalyzerService, ImportExecutorService } from '@ever-works/agent/import';
+import { WorksConfigService, WorksConfigWriterService } from '@ever-works/agent/works-config';
 import { TriggerPluginsModule } from './trigger-plugins.module';
 import { TriggerFacadesModule } from './trigger-facades.module';
 import { TriggerPipelineModule } from './trigger-pipeline.module';
@@ -47,6 +48,8 @@ import { TriggerImportOrchestrator } from '../orchestrators/trigger-import.orche
         MarkdownGeneratorService,
         WebsiteGeneratorService,
         BranchSyncService,
+        WorksConfigService,
+        WorksConfigWriterService,
         SourceRepoAnalyzerService,
         ImportExecutorService,
         TriggerGenerationOrchestrator,

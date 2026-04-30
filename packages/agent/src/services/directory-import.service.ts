@@ -17,6 +17,12 @@ import { GitFacadeService } from '@src/facades/git.facade';
 import { SourceRepoAnalyzerService } from '@src/import/source-repo-analyzer.service';
 import { ImportExecutorService } from '@src/import/import-executor.service';
 import {
+    WorksConfigService,
+    type ParsedWorksConfig,
+    type ResolvedWorksConfig,
+} from '@src/works-config/services/works-config.service';
+import { WorksConfigRestoreService } from '@src/works-config/services/works-config-restore.service';
+import {
     AnalyzeRepositoryDto,
     AnalyzeRepositoryResponseDto,
     AnalyzeForLinkingResponseDto,
@@ -62,6 +68,8 @@ export class DirectoryImportService {
         private readonly gitFacade: GitFacadeService,
         private readonly sourceRepoAnalyzer: SourceRepoAnalyzerService,
         private readonly importExecutor: ImportExecutorService,
+        private readonly worksConfigService: WorksConfigService,
+        private readonly worksConfigRestoreService: WorksConfigRestoreService,
         private readonly directoryScheduleService: DirectoryScheduleService,
         private readonly generatorFormSchemaService: GeneratorFormSchemaService,
         private readonly eventEmitter: EventEmitter2,
@@ -81,20 +89,36 @@ export class DirectoryImportService {
         const token = await this.getProviderToken(user, providerId);
         const result = await this.sourceRepoAnalyzer.analyzeRepository(dto.sourceUrl, token);
 
-        if (!result.error && result.repo && token) {
-            const repoOwner = user.username || result.owner;
+        if (!result.error && result.repo && token && result.detectedType) {
+            const repoOwner = result.owner || user.username;
             const baseSlug = result.baseSlug || result.repo;
             const slug = slugifyText(
                 this.normalizeDirectoryName(baseSlug, ImportSourceTypeEnum.LINK_EXISTING),
             );
 
             try {
-                const conflict = await this.sourceRepoAnalyzer.checkSlugConflicts(
+                const rawConflict = await this.sourceRepoAnalyzer.checkSlugConflicts(
                     repoOwner,
                     slug,
                     token,
                     providerId,
+                    result.worksConfig
+                        ? {
+                              includeRepoNames: this.worksConfigRestoreService.getConflictRepoNames(
+                                  slug,
+                                  result.repo,
+                                  result.worksConfig,
+                              ),
+                          }
+                        : undefined,
                 );
+                const conflict = result.worksConfig
+                    ? this.worksConfigRestoreService.sanitizeConflict(
+                          rawConflict,
+                          result.repo,
+                          result.worksConfig,
+                      )
+                    : rawConflict;
                 if (conflict.hasConflict) {
                     result.slugConflict = conflict;
                 }
@@ -225,11 +249,45 @@ export class DirectoryImportService {
                 };
             }
 
-            // Validate AI provider is configured before creating directory
+            // Validate selected providers are configured before creating directory
             if (dto.sourceType === ImportSourceTypeEnum.AWESOME_README) {
                 await this.generatorFormSchemaService.validateSelectedProviders(dto.providers, {
                     userId: user.id,
                 });
+            }
+
+            const shouldRestoreWorksConfig =
+                dto.sourceType === ImportSourceTypeEnum.WORKS_CONFIG ||
+                dto.restoreWorksConfig !== false;
+
+            let worksConfig: ParsedWorksConfig | null = null;
+            if (
+                shouldRestoreWorksConfig &&
+                (dto.sourceType === ImportSourceTypeEnum.WORKS_CONFIG ||
+                    dto.sourceType === ImportSourceTypeEnum.DATA_REPO ||
+                    dto.sourceType === ImportSourceTypeEnum.AWESOME_README)
+            ) {
+                const token = await this.getProviderToken(user, dto.gitProvider);
+                worksConfig = await this.worksConfigService.loadFromRepository(
+                    parsed.owner,
+                    parsed.repo,
+                    dto.gitProvider,
+                    token,
+                );
+
+                if (dto.sourceType === ImportSourceTypeEnum.WORKS_CONFIG) {
+                    await this.worksConfigRestoreService.validateForImport(worksConfig, user.id);
+                } else {
+                    await this.worksConfigRestoreService.validateProviderSettings(
+                        worksConfig,
+                        user.id,
+                    );
+                }
+
+                this.worksConfigRestoreService.validateRepositoryTargets(
+                    { owner: parsed.owner, repo: parsed.repo },
+                    worksConfig,
+                );
             }
 
             if (dto.sourceType !== ImportSourceTypeEnum.LINK_EXISTING) {
@@ -238,6 +296,13 @@ export class DirectoryImportService {
                     dto.owner || user.username,
                     user,
                     dto.gitProvider,
+                    worksConfig
+                        ? this.worksConfigRestoreService.getConflictRepoNames(
+                              slug,
+                              parsed.repo,
+                              worksConfig,
+                          )
+                        : undefined,
                 );
             }
 
@@ -264,6 +329,14 @@ export class DirectoryImportService {
                 return this.handleLinkExisting(directory, dto, parsed, user);
             }
 
+            if (worksConfig) {
+                await this.worksConfigRestoreService.applyPipelineSettings(
+                    directory.id,
+                    user.id,
+                    worksConfig,
+                );
+            }
+
             const updateData: Partial<Directory> = {
                 generateStatus: {
                     status: GenerateStatusType.GENERATING,
@@ -272,16 +345,35 @@ export class DirectoryImportService {
             };
 
             if (dto.sourceType === ImportSourceTypeEnum.AWESOME_README) {
-                updateData.sourceRepository = {
-                    url: dto.sourceUrl,
-                    owner: parsed.owner,
-                    repo: parsed.repo,
-                    type: dto.sourceType as ImportSourceType,
-                    importedAt: new Date(),
-                };
+                updateData.sourceRepository = this.worksConfigRestoreService.buildSourceRepository({
+                    sourceUrl: dto.sourceUrl,
+                    sourceOwner: parsed.owner,
+                    sourceRepo: parsed.repo,
+                    sourceType: dto.sourceType as ImportSourceType,
+                    sourceRole: null,
+                    worksConfig,
+                });
+            } else if (dto.sourceType === ImportSourceTypeEnum.DATA_REPO) {
+                updateData.sourceRepository = this.worksConfigRestoreService.buildSourceRepository({
+                    sourceUrl: dto.sourceUrl,
+                    sourceOwner: parsed.owner,
+                    sourceRepo: parsed.repo,
+                    sourceType: dto.sourceType as ImportSourceType,
+                    sourceRole: 'data',
+                    worksConfig,
+                });
+            } else if (dto.sourceType === ImportSourceTypeEnum.WORKS_CONFIG) {
+                updateData.sourceRepository = this.worksConfigRestoreService.buildSourceRepository({
+                    sourceUrl: dto.sourceUrl,
+                    sourceOwner: parsed.owner,
+                    sourceRepo: parsed.repo,
+                    sourceType: dto.sourceType as ImportSourceType,
+                    worksConfig,
+                });
             }
 
             await this.directoryRepository.update(directory.id, updateData);
+            Object.assign(directory, updateData);
 
             const history = await this.generationHistoryRepository.createEntry({
                 directoryId: directory.id,
@@ -300,7 +392,15 @@ export class DirectoryImportService {
             });
 
             // Dispatch to Trigger.dev or run in-process with fallback
-            await this.dispatchImportTask(directory, user, dto, parsed, history, context);
+            await this.dispatchImportTask(
+                directory,
+                user,
+                dto,
+                parsed,
+                history,
+                context,
+                this.worksConfigRestoreService.toResolved(worksConfig),
+            );
 
             // Enable sync schedule only for awesome_readme imports
             if (dto.sync !== false && dto.sourceType === ImportSourceTypeEnum.AWESOME_README) {
@@ -349,6 +449,7 @@ export class DirectoryImportService {
         parsed: { owner: string; repo: string },
         history: DirectoryGenerationHistory,
         context: OperationTriggerContext,
+        worksConfig?: ResolvedWorksConfig | null,
     ): Promise<void> {
         await Promise.all([
             this.directoryRepository.recordGenerationStartTime(directory.id, new Date()),
@@ -376,6 +477,7 @@ export class DirectoryImportService {
             },
             providers: dto.providers,
             enrichmentConfig: dto.enrichmentConfig,
+            worksConfig: worksConfig ?? null,
         };
 
         const dispatchedId = this.importDispatcher
@@ -396,9 +498,9 @@ export class DirectoryImportService {
         // If triggered by schedule, await to prevent concurrency explosion
         // For user/api triggers, fire-and-forget
         if (context.triggeredBy === 'schedule') {
-            await this.processImport(directory, user, dto, parsed, history);
+            await this.processImport(directory, user, dto, parsed, history, worksConfig);
         } else {
-            void this.processImport(directory, user, dto, parsed, history);
+            void this.processImport(directory, user, dto, parsed, history, worksConfig);
         }
     }
 
@@ -411,6 +513,7 @@ export class DirectoryImportService {
         dto: ImportDirectoryDto,
         parsed: { owner: string; repo: string },
         history: DirectoryGenerationHistory,
+        worksConfig?: ResolvedWorksConfig | null,
     ): Promise<void> {
         const startTime = new Date();
 
@@ -442,6 +545,7 @@ export class DirectoryImportService {
                 createMissingRepos: dto.createMissingRepos,
                 expansionFactor: dto.enrichmentConfig?.expansionFactor,
                 providers: dto.providers,
+                worksConfig,
             });
 
             if (!result.success) {
@@ -466,6 +570,14 @@ export class DirectoryImportService {
                 durationInSeconds: calculateDurationSeconds(startTime, endTime),
                 ...buildImportStatsUpdate(result),
             });
+
+            if (worksConfig) {
+                await this.worksConfigRestoreService.applyInitialSchedule(
+                    directory.id,
+                    user,
+                    worksConfig,
+                );
+            }
 
             this.eventEmitter.emit(
                 DirectoryGenerationCompletedEvent.EVENT_NAME,
@@ -530,6 +642,11 @@ export class DirectoryImportService {
                 });
             } else if (sourceRepo.type === ImportSourceTypeEnum.AWESOME_README) {
                 result = await this.syncFromAwesomeReadme(directory, user, sourceRepo.url);
+            } else if (sourceRepo.type === ImportSourceTypeEnum.WORKS_CONFIG) {
+                result = await this.syncFromWorksConfig(directory, user, {
+                    owner: sourceRepo.owner,
+                    repo: sourceRepo.repo,
+                });
             } else {
                 // For LINK_EXISTING or others, we assume it's up to date via direct git operations
                 return {
@@ -584,6 +701,13 @@ export class DirectoryImportService {
         }
 
         try {
+            const worksConfig = await this.loadAndApplySourceWorksConfig(directory, user, {
+                owner: source.owner,
+                repo: source.repo,
+                url: this.gitFacade.getWebUrl(directory.gitProvider, source.owner, source.repo),
+                type: ImportSourceTypeEnum.DATA_REPO as ImportSourceType,
+                role: 'data',
+            });
             const sourceDir = await this.gitFacade.cloneOrPull(
                 {
                     owner: source.owner,
@@ -597,11 +721,12 @@ export class DirectoryImportService {
             const items = await sourceData.getItems();
             const categories = await sourceData.getCategories().catch(() => []);
             const tags = await sourceData.getTags().catch(() => []);
+            const config = await sourceData.getConfig().catch(() => ({}));
 
             const syncResult = await this.dataGenerator.updateWithImportedData(
                 directory,
                 user,
-                { items, categories, tags },
+                { items, categories, tags, config: config as Record<string, any>, worksConfig },
                 { updateWithPullRequest: true },
             );
 
@@ -650,11 +775,74 @@ export class DirectoryImportService {
         user: User,
         sourceUrl: string,
     ): Promise<DirectoryImportResult> {
+        const source = this.sourceRepoAnalyzer.parseGitUrl(sourceUrl);
+        const worksConfig = source
+            ? await this.loadAndApplySourceWorksConfig(directory, user, {
+                  owner: source.owner,
+                  repo: source.repo,
+                  url: sourceUrl,
+                  type: ImportSourceTypeEnum.AWESOME_README as ImportSourceType,
+                  role: null,
+              })
+            : null;
+
         return this.importExecutor.importFromAwesomeReadme({
             directory,
             user,
             sourceUrl,
             updateWithPullRequest: true,
+            worksConfig,
+        });
+    }
+
+    private async syncFromWorksConfig(
+        directory: Directory,
+        user: User,
+        source: { owner: string; repo: string },
+    ): Promise<DirectoryImportResult> {
+        const token = await this.getProviderToken(user, directory.gitProvider);
+        const worksConfig = await this.worksConfigService.loadFromRepository(
+            source.owner,
+            source.repo,
+            directory.gitProvider,
+            token,
+        );
+        const previousSourceRepository =
+            directory.sourceRepository ||
+            ({
+                url: this.gitFacade.getWebUrl(directory.gitProvider, source.owner, source.repo),
+                owner: source.owner,
+                repo: source.repo,
+                type: ImportSourceTypeEnum.WORKS_CONFIG as ImportSourceType,
+                importedAt: new Date(),
+            } as SourceRepository);
+        const updatedSourceRepository = this.worksConfigRestoreService.buildSourceRepository({
+            sourceUrl: previousSourceRepository.url,
+            sourceOwner: source.owner,
+            sourceRepo: source.repo,
+            sourceType: ImportSourceTypeEnum.WORKS_CONFIG as ImportSourceType,
+            previous: previousSourceRepository,
+            worksConfig,
+        });
+
+        await this.directoryRepository.update(directory.id, {
+            sourceRepository: updatedSourceRepository,
+        });
+        directory.sourceRepository = updatedSourceRepository;
+
+        await this.worksConfigRestoreService.applyScheduleOverrides(directory, user, worksConfig);
+        await this.worksConfigRestoreService.applyPipelineSettings(
+            directory.id,
+            user.id,
+            worksConfig,
+        );
+
+        return this.importExecutor.importFromWorksConfig({
+            directory,
+            user,
+            source,
+            token,
+            worksConfig: this.worksConfigRestoreService.toResolved(worksConfig),
         });
     }
 
@@ -666,6 +854,58 @@ export class DirectoryImportService {
         } catch (error) {
             this.logger.error(`Failed to cleanup after import failure: ${error.message}`);
         }
+    }
+
+    private async loadAndApplySourceWorksConfig(
+        directory: Directory,
+        user: User,
+        source: {
+            owner: string;
+            repo: string;
+            url: string;
+            type: ImportSourceType;
+            role: 'data' | 'directory' | null;
+        },
+    ): Promise<ResolvedWorksConfig | null> {
+        const token = await this.getProviderToken(user, directory.gitProvider);
+        const parsedWorksConfig = await this.worksConfigService.loadFromRepository(
+            source.owner,
+            source.repo,
+            directory.gitProvider,
+            token,
+        );
+
+        if (!parsedWorksConfig) {
+            return null;
+        }
+
+        const updatedSourceRepository = this.worksConfigRestoreService.buildSourceRepository({
+            sourceUrl: source.url,
+            sourceOwner: source.owner,
+            sourceRepo: source.repo,
+            sourceType: source.type,
+            sourceRole: source.role,
+            previous: directory.sourceRepository,
+            worksConfig: parsedWorksConfig,
+        });
+
+        await this.directoryRepository.update(directory.id, {
+            sourceRepository: updatedSourceRepository,
+        });
+        directory.sourceRepository = updatedSourceRepository;
+
+        await this.worksConfigRestoreService.applyScheduleOverrides(
+            directory,
+            user,
+            parsedWorksConfig,
+        );
+        await this.worksConfigRestoreService.applyPipelineSettings(
+            directory.id,
+            user.id,
+            parsedWorksConfig,
+        );
+
+        return this.worksConfigRestoreService.toResolved(parsedWorksConfig);
     }
 
     private async getProviderToken(user: User, providerId?: string): Promise<string | undefined> {
@@ -686,6 +926,7 @@ export class DirectoryImportService {
         repoOwner: string,
         user: User,
         gitProvider: string,
+        includeRepoNames?: string[],
     ): Promise<string> {
         const token = await this.getProviderToken(user, gitProvider);
         if (!token) {
@@ -697,6 +938,7 @@ export class DirectoryImportService {
             slug,
             token,
             gitProvider,
+            includeRepoNames ? { includeRepoNames } : undefined,
         );
 
         if (!conflict.hasConflict) {

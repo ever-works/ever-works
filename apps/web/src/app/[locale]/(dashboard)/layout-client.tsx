@@ -432,7 +432,7 @@ export function DashboardLayoutClient({
                                 </button>
                                 <div
                                     onPointerDown={startDrag}
-                                    className="w-2.5 h-5 -ml-1 my-1.5 flex text-text-muted dark:text-text-muted-dark hover:text-text dark:hover:text-white items-center justify-center cursor-col-resize dark:bg-surface-dark"
+                                    className="w-2.5 h-5 -ml-1 my-1.5 flex text-text-muted dark:text-text-muted-dark hover:text-text dark:hover:text-white items-center justify-center cursor-col-resize bg-white dark:bg-surface-dark rounded"
                                     title={tChat('resizeChat')}
                                 >
                                     <GripVertical className="w-full h-4 text-text-muted/70" />

@@ -47,7 +47,7 @@ export function ChatPanel({
                     open ? 'opacity-100' : 'opacity-0 pointer-events-none',
                 )}
             >
-                <div className="flex-1 flex flex-col min-h-0 w-full">
+                <div className="flex-1 flex flex-col min-h-0 w-full max-w-[60rem] mx-auto">
                     <ChatInterface />
                 </div>
             </div>

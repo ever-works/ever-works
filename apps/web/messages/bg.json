@@ -1664,6 +1664,9 @@
                 "selectOption": "Изберете опция",
                 "directoryName": "Име на директорията",
                 "generationPrompt": "Подсказка за генериране",
+                "modelOverride": "Презаписване на AI модел",
+                "modelOverridePlaceholder": "нпр. openai/gpt-4.1 или openrouter/openai/gpt-4.1",
+                "modelOverrideHelperText": "Не задължително. По подразбиране използва импортирания или предишния модел, освен ако не го презапишете тук.",
                 "recommended": "Препоръчително",
                 "promptPlaceholder": "Опишете какви елементи трябва да се генерират за тази директория...",
                 "promptHelperText": "Бъдете конкретни относно типа съдържание, което искате да генерирате",
@@ -1805,6 +1808,28 @@
                 "syncDescription": "Автоматично извличане на актуализации от изходния репозиторий.",
                 "syncUpdateFailed": "Грешка при актуализиране на настройките за синхронизация",
                 "syncDisabled": "Синхронизацията е деактивирана",
+                "worksConfig": {
+                    "imported": "Импортирано от works.yml",
+                    "applied": "Приложено: {value}",
+                    "enabled": "включен",
+                    "disabled": "изключен",
+                    "fields": {
+                        "sourceType": "Тип източник",
+                        "configName": "Име на конфигурация",
+                        "initialPrompt": "Начална подсказка",
+                        "model": "Модел",
+                        "schedule": "Разписание",
+                        "providers": "Доставчици",
+                        "websiteRepo": "Репозиторий на уебсайта",
+                        "additionalAgents": "Допълнителни агенти"
+                    },
+                    "sourceTypes": {
+                        "dataRepo": "Репозиторий с данни",
+                        "awesomeReadme": "Awesome README",
+                        "linkExisting": "Свързани съществуващи репозитории",
+                        "worksConfig": "works.yml"
+                    }
+                },
                 "generalSettings": "Общи настройки",
                 "generalTitle": "Общи настройки",
                 "directoryName": "Име на директория",
@@ -2318,6 +2343,10 @@
                     "title": "Поддържай синхронизирано",
                     "description": "Автоматично тегли актуализации от изходното хранилище."
                 },
+                "worksConfigRestore": {
+                    "title": "Възстановяване на настройките от works.yml",
+                    "description": "Прилагане на AI доставчик, модел, график и свързани хранилища от това хранилище."
+                },
                 "sourceMethod": {
                     "url": {
                         "title": "Постави URL",
@@ -2348,15 +2377,19 @@
                 },
                 "detectedType": {
                     "dataRepo": "Открито хранилище с данни",
-                    "awesomeReadme": "Открит Awesome списък"
+                    "awesomeReadme": "Открит Awesome списък",
+                    "worksConfig": "Репозиторий с works конфигурация"
                 },
                 "badges": {
                     "dataRepo": "Хранилище с данни",
-                    "awesomeReadme": "Awesome списък"
+                    "awesomeReadme": "Awesome списък",
+                    "worksConfig": "works.yml"
                 },
                 "preview": {
                     "items": "елемента",
-                    "categories": "категории"
+                    "categories": "категории",
+                    "schedule": "Разписание: {cadence}",
+                    "providers": "Доставчици: {providers}"
                 },
                 "nameLabel": "Име на директория",
                 "namePlaceholder": "нпр. My Awesome Directory",
@@ -2372,6 +2405,7 @@
                     "seedDetected": "Открити ~{count} семенни елемента",
                     "expansionFactor": "Цел за разширяване",
                     "expansionDescription": "Колко пъти по-голяма трябва да бъде крайната колекция в сравнение с източника?",
+                    "recommendedMultiplier": "{value} (препоръчително)",
                     "preview": "~{seedCount} семенни елемента → цел ~{targetCount} крайни елемента (~{newItems} нови елемента за откриване)",
                     "enrichmentOptions": "Опции за обогатяване",
                     "enrichDescriptions": "Препиши описанията",
@@ -2453,6 +2487,7 @@
                     "linkRepos": "Свържи хранилища"
                 },
                 "detectionFailed": "Не можахме автоматично да открием формата. Моля, изберете как да импортирате това хранилище.",
+                "detectionFailedMissingConfig": "Не беше намерена поддържана конфигурация. Добавете config.yml, works.yml или works_config/works.yml в репозиторито или изберете ръчен формат за импортиране по-долу.",
                 "errors": {
                     "urlRequired": "Моля, въведете GitHub URL на хранилище",
                     "unsupportedFormat": "Този формат на хранилище не се поддържа. Моля, използвайте формат Хранилище с данни или Awesome списък.",

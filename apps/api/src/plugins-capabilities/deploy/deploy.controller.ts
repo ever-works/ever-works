@@ -181,8 +181,8 @@ export class DeployController {
         return {
             status: 'pending',
             slug: directory.slug,
-            owner: directory.getRepoOwner(),
-            repository: `${directory.getRepoOwner()}/${directory.getWebsiteRepo()}`,
+            owner: directory.getRepoOwner('website'),
+            repository: `${directory.getRepoOwner('website')}/${directory.getWebsiteRepo()}`,
             message: 'Deployment started',
         };
     }

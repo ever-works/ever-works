@@ -58,11 +58,9 @@ export class DeployService {
             throw new Error('Git provider token not available');
         }
 
-        const ctx = await this.createRepoContext(
-            directory.getRepoOwner(),
-            directory.getWebsiteRepo(),
-            gitToken,
-        );
+        const websiteOwner = directory.getRepoOwner('website');
+        const websiteRepo = directory.getWebsiteRepo();
+        const ctx = await this.createRepoContext(websiteOwner, websiteRepo, gitToken);
 
         await this.enableWorkflows({
             owner: ctx.owner,
@@ -164,8 +162,8 @@ export class DeployService {
                 slug: directory.slug,
                 status: success ? 'pending' : 'error',
                 message: success ? 'Deployment started' : 'Failed to initiate deployment',
-                owner: directory.getRepoOwner(),
-                repository: `${directory.getRepoOwner()}/${directory.getWebsiteRepo()}`,
+                owner: directory.getRepoOwner('website'),
+                repository: `${directory.getRepoOwner('website')}/${directory.getWebsiteRepo()}`,
             };
         } catch (error) {
             return {
@@ -210,7 +208,7 @@ export class DeployService {
 
         await Promise.all([
             this.setSecret(ctx, 'TENANT_ID', directory.id),
-            this.setSecret(ctx, 'DATA_REPOSITORY', `${directory.slug}-data`),
+            this.setSecret(ctx, 'DATA_REPOSITORY', directory.getDataRepo()),
             this.setSecret(ctx, `${provider.toUpperCase()}_TOKEN`, deployToken),
             this.setSecret(ctx, 'DEPLOY_TOKEN', deployToken),
         ]);
@@ -248,7 +246,7 @@ export class DeployService {
         gitToken: string,
     ): Promise<boolean> {
         const workflowFilesToTry = ['deploy_vercel.yaml', 'deploy_prod.yaml'];
-        const owner = directory.getRepoOwner();
+        const owner = directory.getRepoOwner('website');
         const repo = directory.getWebsiteRepo();
 
         const tryDispatch = async (): Promise<boolean> => {
@@ -316,12 +314,14 @@ export class DeployService {
 
     private async createTriggerCommit(directory: Directory, user: User): Promise<void> {
         const directoryOwner = directory.user as User;
+        const websiteOwner = directory.getRepoOwner('website');
+        const websiteRepo = directory.getWebsiteRepo();
 
         try {
             const repoDir = await this.gitFacade.cloneOrPull(
                 {
-                    owner: directory.getRepoOwner(),
-                    repo: directory.getWebsiteRepo(),
+                    owner: websiteOwner,
+                    repo: websiteRepo,
                     branch: WEBSITE_TEMPLATE_CONFIG.branch,
                     committer: directory.resolveCommitter(user),
                 },
@@ -347,12 +347,10 @@ export class DeployService {
                 { userId: directoryOwner.id, providerId: directory.gitProvider },
             );
 
-            this.logger.log(
-                `Created trigger commit for ${directory.getRepoOwner()}/${directory.getWebsiteRepo()}`,
-            );
+            this.logger.log(`Created trigger commit for ${websiteOwner}/${websiteRepo}`);
         } catch (error) {
             this.logger.warn(
-                `Failed to create trigger commit for ${directory.getRepoOwner()}/${directory.getWebsiteRepo()}: ${error.message}`,
+                `Failed to create trigger commit for ${websiteOwner}/${websiteRepo}: ${error.message}`,
             );
         }
     }

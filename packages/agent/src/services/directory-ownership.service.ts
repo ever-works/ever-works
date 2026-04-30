@@ -1,9 +1,4 @@
-import {
-    BadRequestException,
-    ForbiddenException,
-    Injectable,
-    NotFoundException,
-} from '@nestjs/common';
+import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { DirectoryRepository } from '@src/database/repositories/directory.repository';
 import { DirectoryMemberRepository } from '@src/database/repositories/directory-member.repository';
 import { Directory } from '@src/entities/directory.entity';
