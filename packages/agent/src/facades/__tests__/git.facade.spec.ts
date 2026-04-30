@@ -12,6 +12,7 @@ import {
 } from '../../plugins/services/plugin-registry.service';
 import { PluginSettingsService } from '../../plugins/services/plugin-settings.service';
 import { AuthAccountRepository } from '../../database/repositories/auth-account.repository';
+import { DirectoryRepository } from '../../database/repositories/directory.repository';
 import type { ResolvedSettings } from '@ever-works/plugin';
 import type {
     IGitProviderPlugin,
@@ -275,6 +276,12 @@ describe('GitFacadeService', () => {
                     provide: PluginSettingsService,
                     useValue: {
                         getResolvedSettings: jest.fn().mockResolvedValue({}),
+                    },
+                },
+                {
+                    provide: DirectoryRepository,
+                    useValue: {
+                        findById: jest.fn().mockResolvedValue(null),
                     },
                 },
             ],
