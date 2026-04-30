@@ -66,7 +66,7 @@ describe('DirectoryScheduleRepository', () => {
             status: DirectoryScheduleStatus.ACTIVE,
         });
         expect(queryBuilder.andWhere).toHaveBeenNthCalledWith(2, 'nextRunAt = :nextRunAt', {
-            nextRunAt,
+            nextRunAt: nextRunAt.getTime(),
         });
         expect(result).toBe(nextRunAt);
     });

@@ -112,6 +112,7 @@ export class DirectoryScheduleRepository {
         }
 
         const originalNextRunAt = schedule.nextRunAt;
+        const originalNextRunAtMs = originalNextRunAt.getTime();
         const dispatchedAt = new Date();
 
         const result = await this.repository
@@ -126,7 +127,7 @@ export class DirectoryScheduleRepository {
             })
             .where('id = :id', { id: scheduleId })
             .andWhere('status = :status', { status: DirectoryScheduleStatus.ACTIVE })
-            .andWhere('nextRunAt = :nextRunAt', { nextRunAt: originalNextRunAt })
+            .andWhere('nextRunAt = :nextRunAt', { nextRunAt: originalNextRunAtMs })
             .execute();
 
         return (result.affected ?? 0) > 0 ? originalNextRunAt : null;
