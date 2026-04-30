@@ -1,7 +1,7 @@
 ---
 id: deepseek-plugin
-title: "DeepSeek Models via OpenRouter"
-sidebar_label: "DeepSeek (via OpenRouter)"
+title: 'DeepSeek Models via OpenRouter'
+sidebar_label: 'DeepSeek (via OpenRouter)'
 sidebar_position: 34
 ---
 
@@ -11,11 +11,11 @@ Ever Works does not ship a standalone DeepSeek plugin. DeepSeek models are acces
 
 **Related source files:**
 
-| File | Purpose |
-|---|---|
-| `packages/plugins/openrouter/src/openrouter.plugin.ts` | OpenRouter AI provider plugin |
-| `packages/plugin/src/ai/reasoning.utils.ts` | Reasoning configuration for DeepSeek models |
-| `apps/internal-cli/src/commands/config/ai-providers/ai-provider-registry.service.ts` | AI provider registry with model lists |
+| File                                                                                 | Purpose                                     |
+| ------------------------------------------------------------------------------------ | ------------------------------------------- |
+| `packages/plugins/openrouter/src/openrouter.plugin.ts`                               | OpenRouter AI provider plugin               |
+| `packages/plugin/src/ai/reasoning.utils.ts`                                          | Reasoning configuration for DeepSeek models |
+| `apps/internal-cli/src/commands/config/ai-providers/ai-provider-registry.service.ts` | AI provider registry with model lists       |
 
 ## Available DeepSeek Models
 
@@ -25,27 +25,27 @@ DeepSeek models are available through two providers in Ever Works:
 
 OpenRouter lists DeepSeek models with the `deepseek/` prefix:
 
-| Model ID | Description | Best For |
-|---|---|---|
-| `deepseek/deepseek-r1` | DeepSeek R1 reasoning model | Complex analysis, multi-step reasoning |
-| `deepseek/deepseek-chat` | DeepSeek Chat | General-purpose content generation |
-| `deepseek/deepseek-coder` | DeepSeek Coder | Technical content, code-related directories |
+| Model ID                  | Description                 | Best For                                    |
+| ------------------------- | --------------------------- | ------------------------------------------- |
+| `deepseek/deepseek-r1`    | DeepSeek R1 reasoning model | Complex analysis, multi-step reasoning      |
+| `deepseek/deepseek-chat`  | DeepSeek Chat               | General-purpose content generation          |
+| `deepseek/deepseek-coder` | DeepSeek Coder              | Technical content, code-related directories |
 
 ### Via Ollama (Local)
 
 DeepSeek models can also be run locally through the Ollama plugin:
 
-| Model ID | Description |
-|---|---|
-| `deepseek-r1` | Local DeepSeek R1 (various quantizations) |
-| `deepseek-coder-v2` | Local DeepSeek Coder V2 |
+| Model ID            | Description                               |
+| ------------------- | ----------------------------------------- |
+| `deepseek-r1`       | Local DeepSeek R1 (various quantizations) |
+| `deepseek-coder-v2` | Local DeepSeek Coder V2                   |
 
 ### Via Groq
 
 Groq provides distilled DeepSeek models with ultra-fast inference:
 
-| Model ID | Description |
-|---|---|
+| Model ID                       | Description                       |
+| ------------------------------ | --------------------------------- |
 | `deepseek-r1-distill-qwen-32b` | DeepSeek R1 distilled to Qwen 32B |
 
 ## Reasoning Model Configuration
@@ -91,12 +91,12 @@ The `extractModelName` function strips the provider prefix (`deepseek/deepseek-r
 3. Enter your OpenRouter API key if not already configured.
 4. Set the model fields to DeepSeek models:
 
-| Setting | Recommended Value |
-|---|---|
-| Default Model | `deepseek/deepseek-chat` |
-| Simple Tasks Model | `deepseek/deepseek-chat` |
+| Setting              | Recommended Value        |
+| -------------------- | ------------------------ |
+| Default Model        | `deepseek/deepseek-chat` |
+| Simple Tasks Model   | `deepseek/deepseek-chat` |
 | Standard Tasks Model | `deepseek/deepseek-chat` |
-| Complex Tasks Model | `deepseek/deepseek-r1` |
+| Complex Tasks Model  | `deepseek/deepseek-r1`   |
 
 ### Option 2: Through Ollama (Local, Free)
 
@@ -135,21 +135,21 @@ graph LR
     end
 ```
 
-| Tier | Recommended Model | Reasoning |
-|---|---|---|
-| Simple | `deepseek/deepseek-chat` | Fast responses for tags and short descriptions |
-| Standard | `deepseek/deepseek-chat` | Solid quality for summaries and listings |
-| Complex | `deepseek/deepseek-r1` | Chain-of-thought reasoning for detailed pages |
+| Tier     | Recommended Model        | Reasoning                                      |
+| -------- | ------------------------ | ---------------------------------------------- |
+| Simple   | `deepseek/deepseek-chat` | Fast responses for tags and short descriptions |
+| Standard | `deepseek/deepseek-chat` | Solid quality for summaries and listings       |
+| Complex  | `deepseek/deepseek-r1`   | Chain-of-thought reasoning for detailed pages  |
 
 ## Mixing DeepSeek with Other Providers
 
 Because OpenRouter aggregates multiple providers, you can mix DeepSeek models with models from other providers across tiers:
 
-| Tier | Model | Provider |
-|---|---|---|
-| Simple | `openai/gpt-5-nano` | OpenAI |
+| Tier     | Model                    | Provider |
+| -------- | ------------------------ | -------- |
+| Simple   | `openai/gpt-5-nano`      | OpenAI   |
 | Standard | `deepseek/deepseek-chat` | DeepSeek |
-| Complex | `deepseek/deepseek-r1` | DeepSeek |
+| Complex  | `deepseek/deepseek-r1`   | DeepSeek |
 
 This is configured through the OpenRouter plugin settings -- no additional plugins are needed.
 
@@ -157,13 +157,13 @@ This is configured through the OpenRouter plugin settings -- no additional plugi
 
 DeepSeek models accessed through OpenRouter support:
 
-| Capability | DeepSeek Chat | DeepSeek R1 |
-|---|---|---|
-| Structured output | Yes | Yes |
-| Streaming | Yes | Yes |
-| Tool calling | Yes | Limited |
-| Vision | No | No |
-| Embeddings | No | No |
+| Capability        | DeepSeek Chat | DeepSeek R1 |
+| ----------------- | ------------- | ----------- |
+| Structured output | Yes           | Yes         |
+| Streaming         | Yes           | Yes         |
+| Tool calling      | Yes           | Limited     |
+| Vision            | No            | No          |
+| Embeddings        | No            | No          |
 
 :::note
 DeepSeek models do not currently support embeddings. If your workflow requires semantic search, pair DeepSeek with a provider that supports embeddings (OpenAI, Google Gemini, or Ollama).
@@ -171,13 +171,13 @@ DeepSeek models do not currently support embeddings. If your workflow requires s
 
 ## Troubleshooting
 
-| Issue | Cause | Solution |
-|---|---|---|
-| Verbose reasoning output | Reasoning effort not applied | Verify the model ID matches `deepseek-r1` or `deepseek-reasoner` pattern |
-| Model not found | Incorrect model ID | Use the `deepseek/` prefix when using OpenRouter |
-| Slow responses with R1 | Reasoning models are slower | Use `deepseek-chat` for simple tasks; reserve R1 for complex ones |
-| Rate limits | OpenRouter rate limiting | Check your OpenRouter plan; add billing credits if needed |
-| Embedding error | DeepSeek does not support embeddings | Switch to OpenAI or Ollama for embedding tasks |
+| Issue                    | Cause                                | Solution                                                                 |
+| ------------------------ | ------------------------------------ | ------------------------------------------------------------------------ |
+| Verbose reasoning output | Reasoning effort not applied         | Verify the model ID matches `deepseek-r1` or `deepseek-reasoner` pattern |
+| Model not found          | Incorrect model ID                   | Use the `deepseek/` prefix when using OpenRouter                         |
+| Slow responses with R1   | Reasoning models are slower          | Use `deepseek-chat` for simple tasks; reserve R1 for complex ones        |
+| Rate limits              | OpenRouter rate limiting             | Check your OpenRouter plan; add billing credits if needed                |
+| Embedding error          | DeepSeek does not support embeddings | Switch to OpenAI or Ollama for embedding tasks                           |
 
 ## Cost Considerations
 

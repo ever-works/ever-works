@@ -10,6 +10,7 @@ sidebar_position: 8
 The member and ownership services implement role-based access control (RBAC) for directories. Together, `DirectoryMemberService` and `DirectoryOwnershipService` manage who can access a directory and what they can do.
 
 **Sources:**
+
 - `packages/agent/src/services/directory-member.service.ts`
 - `packages/agent/src/services/directory-ownership.service.ts`
 
@@ -17,12 +18,12 @@ The member and ownership services implement role-based access control (RBAC) for
 
 Ever Works uses a four-level role hierarchy:
 
-| Role | Level | Permissions |
-|------|-------|-------------|
-| `OWNER` | 4 | Full control: delete directory, manage members, edit, view |
-| `MANAGER` | 3 | Manage members (invite, update roles, remove), edit, view |
-| `EDITOR` | 2 | Edit content (generate items, update settings, manage repos), view |
-| `VIEWER` | 1 | Read-only access to all directory data |
+| Role      | Level | Permissions                                                        |
+| --------- | ----- | ------------------------------------------------------------------ |
+| `OWNER`   | 4     | Full control: delete directory, manage members, edit, view         |
+| `MANAGER` | 3     | Manage members (invite, update roles, remove), edit, view          |
+| `EDITOR`  | 2     | Edit content (generate items, update settings, manage repos), view |
+| `VIEWER`  | 1     | Read-only access to all directory data                             |
 
 The directory **creator** always has `OWNER` level access, even without an explicit membership record. This is enforced at the service level, not via database records.
 
@@ -32,13 +33,13 @@ This service provides the authorization layer used by all other directory servic
 
 ### Access Check Methods
 
-| Method | Minimum Role | Used By |
-|--------|-------------|---------|
-| `ensureAccess(directoryId, userId, minimumRole?)` | Configurable | Base method |
-| `ensureCanView(directoryId, userId)` | VIEWER | Query operations |
-| `ensureCanEdit(directoryId, userId)` | EDITOR | Generation, updates |
-| `ensureCanManageMembers(directoryId, userId)` | MANAGER | Member management |
-| `ensureIsOwner(directoryId, userId)` | OWNER | Directory deletion |
+| Method                                            | Minimum Role | Used By             |
+| ------------------------------------------------- | ------------ | ------------------- |
+| `ensureAccess(directoryId, userId, minimumRole?)` | Configurable | Base method         |
+| `ensureCanView(directoryId, userId)`              | VIEWER       | Query operations    |
+| `ensureCanEdit(directoryId, userId)`              | EDITOR       | Generation, updates |
+| `ensureCanManageMembers(directoryId, userId)`     | MANAGER      | Member management   |
+| `ensureIsOwner(directoryId, userId)`              | OWNER        | Directory deletion  |
 
 ### DirectoryAccessResult
 
@@ -46,10 +47,10 @@ Every access check returns a detailed result:
 
 ```typescript
 interface DirectoryAccessResult {
-    directory: Directory;      // The directory entity
-    member: DirectoryMember | null;  // Membership record (null for creators)
-    role: DirectoryMemberRole; // Resolved role
-    isCreator: boolean;        // Whether user created the directory
+	directory: Directory; // The directory entity
+	member: DirectoryMember | null; // Membership record (null for creators)
+	role: DirectoryMemberRole; // Resolved role
+	isCreator: boolean; // Whether user created the directory
 }
 ```
 
@@ -96,17 +97,17 @@ Requires **Viewer** access. Returns an array of `DirectoryMemberDto`:
 
 ```typescript
 interface DirectoryMemberDto {
-    id: string;
-    userId: string;
-    username: string;
-    email: string;
-    avatar?: string;
-    role: DirectoryMemberRole;
-    invitedBy?: {
-        id: string;
-        username: string;
-    };
-    createdAt: string;
+	id: string;
+	userId: string;
+	username: string;
+	email: string;
+	avatar?: string;
+	role: DirectoryMemberRole;
+	invitedBy?: {
+		id: string;
+		username: string;
+	};
+	createdAt: string;
 }
 ```
 
@@ -114,8 +115,8 @@ interface DirectoryMemberDto {
 
 ```typescript
 const result = await memberService.inviteMember(directoryId, userId, {
-    email: 'collaborator@example.com',
-    role: DirectoryMemberRole.EDITOR,
+	email: 'collaborator@example.com',
+	role: DirectoryMemberRole.EDITOR
 });
 ```
 
@@ -130,22 +131,19 @@ Requires **Manager** access. The invitation flow:
 
 ```typescript
 interface InviteMemberResult {
-    member: DirectoryMemberDto;
-    invitee: User;
-    inviter: User;
-    directory: Directory;
+	member: DirectoryMemberDto;
+	invitee: User;
+	inviter: User;
+	directory: Directory;
 }
 ```
 
 ### Updating Member Roles
 
 ```typescript
-const updated = await memberService.updateMemberRole(
-    directoryId,
-    userId,
-    memberId,
-    { role: DirectoryMemberRole.MANAGER },
-);
+const updated = await memberService.updateMemberRole(directoryId, userId, memberId, {
+	role: DirectoryMemberRole.MANAGER
+});
 ```
 
 Requires **Manager** access. Validates the new role is assignable (viewer, editor, or manager).
@@ -187,35 +185,35 @@ Returns the directory creator's basic profile information.
 
 Here is how the role system integrates across the agent services:
 
-| Service | Operation | Required Role |
-|---------|-----------|--------------|
-| DirectoryLifecycleService | `createDirectory` | Authenticated user |
-| DirectoryLifecycleService | `updateDirectory` | Editor |
-| DirectoryLifecycleService | `syncFromDataRepository` | Editor |
-| DirectoryLifecycleService | `deleteDirectory` | Owner |
-| DirectoryGenerationService | `generateItems` | Editor |
-| DirectoryGenerationService | `submitItem` | Editor |
-| DirectoryGenerationService | `removeItem` | Editor |
-| DirectoryQueryService | `getDirectories` | Authenticated |
-| DirectoryQueryService | `getDirectory` | Viewer |
-| DirectoryQueryService | `directoryItems` | Viewer |
-| DirectoryQueryService | `updateWebsiteSettings` | Editor |
-| DirectoryScheduleService | `getSchedule` | Viewer |
-| DirectoryScheduleService | `updateSchedule` | Editor |
-| DirectoryScheduleService | `cancelSchedule` | Editor |
-| DirectoryMemberService | `listMembers` | Viewer |
-| DirectoryMemberService | `inviteMember` | Manager |
-| DirectoryMemberService | `updateMemberRole` | Manager |
-| DirectoryMemberService | `removeMember` | Manager |
+| Service                    | Operation                | Required Role      |
+| -------------------------- | ------------------------ | ------------------ |
+| DirectoryLifecycleService  | `createDirectory`        | Authenticated user |
+| DirectoryLifecycleService  | `updateDirectory`        | Editor             |
+| DirectoryLifecycleService  | `syncFromDataRepository` | Editor             |
+| DirectoryLifecycleService  | `deleteDirectory`        | Owner              |
+| DirectoryGenerationService | `generateItems`          | Editor             |
+| DirectoryGenerationService | `submitItem`             | Editor             |
+| DirectoryGenerationService | `removeItem`             | Editor             |
+| DirectoryQueryService      | `getDirectories`         | Authenticated      |
+| DirectoryQueryService      | `getDirectory`           | Viewer             |
+| DirectoryQueryService      | `directoryItems`         | Viewer             |
+| DirectoryQueryService      | `updateWebsiteSettings`  | Editor             |
+| DirectoryScheduleService   | `getSchedule`            | Viewer             |
+| DirectoryScheduleService   | `updateSchedule`         | Editor             |
+| DirectoryScheduleService   | `cancelSchedule`         | Editor             |
+| DirectoryMemberService     | `listMembers`            | Viewer             |
+| DirectoryMemberService     | `inviteMember`           | Manager            |
+| DirectoryMemberService     | `updateMemberRole`       | Manager            |
+| DirectoryMemberService     | `removeMember`           | Manager            |
 
 ## Error Responses
 
-| Condition | Exception | Message |
-|-----------|-----------|---------|
-| Directory not found | `NotFoundException` | Directory with id 'X' not found |
-| No access (not creator, not member) | `ForbiddenException` | You do not have permission to access this directory |
-| Insufficient role | `ForbiddenException` | You do not have the required permission level for this action |
-| User not found (invite) | `NotFoundException` | User with email 'X' not found |
-| Duplicate member | `BadRequestException` | User is already a member of this directory |
-| Invalid role assignment | `BadRequestException` | Invalid role. Members can only be assigned: viewer, editor, or manager |
-| Creator trying to leave | `BadRequestException` | Directory creator cannot leave the directory |
+| Condition                           | Exception             | Message                                                                |
+| ----------------------------------- | --------------------- | ---------------------------------------------------------------------- |
+| Directory not found                 | `NotFoundException`   | Directory with id 'X' not found                                        |
+| No access (not creator, not member) | `ForbiddenException`  | You do not have permission to access this directory                    |
+| Insufficient role                   | `ForbiddenException`  | You do not have the required permission level for this action          |
+| User not found (invite)             | `NotFoundException`   | User with email 'X' not found                                          |
+| Duplicate member                    | `BadRequestException` | User is already a member of this directory                             |
+| Invalid role assignment             | `BadRequestException` | Invalid role. Members can only be assigned: viewer, editor, or manager |
+| Creator trying to leave             | `BadRequestException` | Directory creator cannot leave the directory                           |

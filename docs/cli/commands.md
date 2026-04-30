@@ -22,10 +22,12 @@ ever-works auth login [options]
 ```
 
 **Options:**
+
 - `--api-url <url>`: The API URL to connect to (default: `http://localhost:3100`)
 - `--manual`: Skip the browser-based OAuth flow and manually enter an API token.
 
 **Example:**
+
 ```bash
 # Standard login (opens browser)
 ever-works auth login
@@ -66,6 +68,7 @@ ever-works directory create
 ```
 
 **What it does:**
+
 1. Checks for GitHub connection.
 2. Prompts for directory details.
 3. Creates the directory entry in the platform database.
@@ -88,6 +91,7 @@ ever-works directory generate
 ```
 
 **Interactive Flow:**
+
 1. Select a directory from the list.
 2. Confirm or edit the prompt/topic.
 3. (Optional) Configure advanced settings like company info, domain type, or custom configuration.

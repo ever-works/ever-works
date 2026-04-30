@@ -1,7 +1,7 @@
 ---
 id: local-extractor-plugin
-title: "Local Content Extractor Plugin"
-sidebar_label: "Local Content Extractor"
+title: 'Local Content Extractor Plugin'
+sidebar_label: 'Local Content Extractor'
 sidebar_position: 44
 ---
 
@@ -13,18 +13,18 @@ The Local Content Extractor is the default system plugin for extracting web page
 
 ## Overview
 
-| Property | Value |
-|---|---|
-| Plugin ID | `local-content-extractor` |
-| Category | `content-extractor` |
-| Capabilities | `content-extractor` |
-| Version | `1.0.0` |
-| Configuration Mode | Default |
-| Auto-enable | Yes |
-| Built-in | Yes |
-| System Plugin | Yes |
-| Default For | `content-extractor` capability |
-| Dependencies | `@mozilla/readability`, `axios`, `linkedom`, `turndown` |
+| Property           | Value                                                   |
+| ------------------ | ------------------------------------------------------- |
+| Plugin ID          | `local-content-extractor`                               |
+| Category           | `content-extractor`                                     |
+| Capabilities       | `content-extractor`                                     |
+| Version            | `1.0.0`                                                 |
+| Configuration Mode | Default                                                 |
+| Auto-enable        | Yes                                                     |
+| Built-in           | Yes                                                     |
+| System Plugin      | Yes                                                     |
+| Default For        | `content-extractor` capability                          |
+| Dependencies       | `@mozilla/readability`, `axios`, `linkedom`, `turndown` |
 
 The plugin implements `IPlugin` and `IContentExtractorPlugin`.
 
@@ -49,22 +49,22 @@ graph TD
 
 ### Library Stack
 
-| Library | Purpose |
-|---|---|
-| `axios` | HTTP client for fetching web pages |
-| `linkedom` | Server-side HTML parser (lightweight DOM) |
+| Library                | Purpose                                       |
+| ---------------------- | --------------------------------------------- |
+| `axios`                | HTTP client for fetching web pages            |
+| `linkedom`             | Server-side HTML parser (lightweight DOM)     |
 | `@mozilla/readability` | Extracts the main article content from a page |
-| `turndown` | Converts HTML to clean markdown |
+| `turndown`             | Converts HTML to clean markdown               |
 
 ## Configuration
 
 ### Settings Schema
 
-| Setting | Type | Default | Description |
-|---|---|---|---|
-| `timeout` | `number` | `15000` | HTTP request timeout in milliseconds (hidden) |
-| `minContentLength` | `number` | `200` | Minimum characters for Readability to accept content (hidden) |
-| `userAgent` | `string` | Chrome UA | Custom user agent string for HTTP requests (hidden) |
+| Setting            | Type     | Default   | Description                                                   |
+| ------------------ | -------- | --------- | ------------------------------------------------------------- |
+| `timeout`          | `number` | `15000`   | HTTP request timeout in milliseconds (hidden)                 |
+| `minContentLength` | `number` | `200`     | Minimum characters for Readability to accept content (hidden) |
+| `userAgent`        | `string` | Chrome UA | Custom user agent string for HTTP requests (hidden)           |
 
 All settings are marked as hidden (`x-hidden: true`) since they are internal tuning parameters that most users should not need to change.
 
@@ -143,22 +143,25 @@ Other content extraction plugins (Firecrawl, Scrapfly, Jina) can be enabled as a
 
 ```typescript
 class LocalContentExtractorPlugin implements IPlugin, IContentExtractorPlugin {
-  readonly id: 'local-content-extractor';
-  readonly category: 'content-extractor';
+	readonly id: 'local-content-extractor';
+	readonly category: 'content-extractor';
 
-  extract(options: ContentExtractionOptions): Promise<ContentExtractionResult>;
-  extractBatch(urls: readonly string[], options?: Partial<ContentExtractionOptions>): Promise<readonly ContentExtractionResult[]>;
-  canExtract(url: string): Promise<boolean>;
-  getSupportedFormats(): readonly ('text' | 'html' | 'markdown')[];
+	extract(options: ContentExtractionOptions): Promise<ContentExtractionResult>;
+	extractBatch(
+		urls: readonly string[],
+		options?: Partial<ContentExtractionOptions>
+	): Promise<readonly ContentExtractionResult[]>;
+	canExtract(url: string): Promise<boolean>;
+	getSupportedFormats(): readonly ('text' | 'html' | 'markdown')[];
 }
 ```
 
 ### Key Interfaces
 
-| Interface | Purpose |
-|---|---|
-| `ContentExtractionOptions` | URL, settings, and flags for extraction |
-| `ContentExtractionResult` | Extracted content with title, HTML, markdown, images, links, and metadata |
-| `ExtractedImage` | Image data: src, alt, title, dimensions |
-| `ExtractedLink` | Link data: href, text, title, rel, isExternal |
-| `PageMetadata` | Open Graph, Twitter Card, author, dates, favicon, and more |
+| Interface                  | Purpose                                                                   |
+| -------------------------- | ------------------------------------------------------------------------- |
+| `ContentExtractionOptions` | URL, settings, and flags for extraction                                   |
+| `ContentExtractionResult`  | Extracted content with title, HTML, markdown, images, links, and metadata |
+| `ExtractedImage`           | Image data: src, alt, title, dimensions                                   |
+| `ExtractedLink`            | Link data: href, text, title, rel, isExternal                             |
+| `PageMetadata`             | Open Graph, Twitter Card, author, dates, favicon, and more                |

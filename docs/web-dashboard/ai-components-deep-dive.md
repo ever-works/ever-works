@@ -35,8 +35,8 @@ The `ChatProvider` wraps the entire AI chat experience in a React Context, makin
 
 **File:** `apps/web/src/components/ai/ChatProvider.tsx`
 
-| Prop | Type | Description |
-|------|------|-------------|
+| Prop       | Type        | Description                                    |
+| ---------- | ----------- | ---------------------------------------------- |
 | `children` | `ReactNode` | Child components that consume the chat context |
 
 `ChatProvider` is a React Context provider that composes two hooks:
@@ -50,14 +50,14 @@ The context value exposes:
 
 ```typescript
 interface ChatContextValue {
-    messages: ChatMessage[];
-    setMessages: (msgs: ChatMessage[]) => void;
-    loadHistory: () => Promise<void>;
-    resetHistory: () => void;
-    isLoading: boolean;
-    error: string | null;
-    providers: ProviderSelectionState;
-    handleProviderChange: (field: string, value: string) => void;
+	messages: ChatMessage[];
+	setMessages: (msgs: ChatMessage[]) => void;
+	loadHistory: () => Promise<void>;
+	resetHistory: () => void;
+	isLoading: boolean;
+	error: string | null;
+	providers: ProviderSelectionState;
+	handleProviderChange: (field: string, value: string) => void;
 }
 ```
 
@@ -65,8 +65,8 @@ interface ChatContextValue {
 import { ChatProvider } from '@/components/ai/ChatProvider';
 
 <ChatProvider>
-    <ChatInterface />
-</ChatProvider>
+	<ChatInterface />
+</ChatProvider>;
 ```
 
 ### ChatInterface
@@ -96,8 +96,8 @@ import { ChatInterface } from '@/components/ai/ChatInterface';
 
 // Must be wrapped in ChatProvider
 <ChatProvider>
-    <ChatInterface />
-</ChatProvider>
+	<ChatInterface />
+</ChatProvider>;
 ```
 
 ## Implementation Details
@@ -140,10 +140,10 @@ This is implemented with a `useEffect` that watches the messages array and strea
 type ChatMessageRole = 'user' | 'assistant' | 'system';
 
 interface ChatMessage {
-    id: string;
-    role: ChatMessageRole;
-    content: string;
-    createdAt?: string;
+	id: string;
+	role: ChatMessageRole;
+	content: string;
+	createdAt?: string;
 }
 ```
 
@@ -151,12 +151,12 @@ interface ChatMessage {
 
 The chat interface follows the project's design token system:
 
-| Element | Light Mode | Dark Mode |
-|---------|-----------|-----------|
-| User message bubble | `bg-primary text-white` | Same |
-| Assistant message bubble | `bg-surface-secondary` | `bg-surface-secondary-dark` |
-| Input area | `bg-white border-border` | `bg-surface-dark border-border-dark` |
-| Streaming dots | `bg-text-muted` with bounce animation | `bg-text-muted-dark` |
+| Element                  | Light Mode                            | Dark Mode                            |
+| ------------------------ | ------------------------------------- | ------------------------------------ |
+| User message bubble      | `bg-primary text-white`               | Same                                 |
+| Assistant message bubble | `bg-surface-secondary`                | `bg-surface-secondary-dark`          |
+| Input area               | `bg-white border-border`              | `bg-surface-dark border-border-dark` |
+| Streaming dots           | `bg-text-muted` with bounce animation | `bg-text-muted-dark`                 |
 
 The streaming indicator uses a CSS animation with staggered delays on three dots to create a bouncing effect. The auto-resize textarea grows vertically as the user types, up to a maximum height, then switches to scrollable overflow.
 
@@ -171,13 +171,13 @@ import { ChatProvider } from '@/components/ai/ChatProvider';
 import { ChatInterface } from '@/components/ai/ChatInterface';
 
 export function AIChatPanel() {
-    return (
-        <div className="h-full flex flex-col">
-            <ChatProvider>
-                <ChatInterface />
-            </ChatProvider>
-        </div>
-    );
+	return (
+		<div className="h-full flex flex-col">
+			<ChatProvider>
+				<ChatInterface />
+			</ChatProvider>
+		</div>
+	);
 }
 ```
 
@@ -189,8 +189,8 @@ export function AIChatPanel() {
 import { useChatContext } from '@/components/ai/ChatProvider';
 
 export function ChatMessageCount() {
-    const { messages } = useChatContext();
-    return <span>{messages.length} messages</span>;
+	const { messages } = useChatContext();
+	return <span>{messages.length} messages</span>;
 }
 ```
 

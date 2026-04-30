@@ -1,7 +1,7 @@
 ---
 id: vercel-ai-gateway-plugin
-title: "Vercel AI Gateway Plugin"
-sidebar_label: "Vercel AI Gateway"
+title: 'Vercel AI Gateway Plugin'
+sidebar_label: 'Vercel AI Gateway'
 sidebar_position: 50
 ---
 
@@ -13,17 +13,17 @@ The Vercel AI Gateway plugin provides AI capabilities through the [Vercel AI Gat
 
 ## Overview
 
-| Property | Value |
-|---|---|
-| Plugin ID | `vercel-ai-gateway` |
-| Category | `ai-provider` |
-| Capabilities | `ai-provider` |
-| Version | `1.0.0` |
-| Configuration Mode | `hybrid` |
-| Auto-enable | No |
-| System plugin | No |
-| Visibility | `public` |
-| Dependencies | `@langchain/openai`, `@langchain/core` |
+| Property           | Value                                  |
+| ------------------ | -------------------------------------- |
+| Plugin ID          | `vercel-ai-gateway`                    |
+| Category           | `ai-provider`                          |
+| Capabilities       | `ai-provider`                          |
+| Version            | `1.0.0`                                |
+| Configuration Mode | `hybrid`                               |
+| Auto-enable        | No                                     |
+| System plugin      | No                                     |
+| Visibility         | `public`                               |
+| Dependencies       | `@langchain/openai`, `@langchain/core` |
 
 The plugin extends `BaseAiProvider` from `@ever-works/plugin/abstract` and uses `AiOperations` from `@ever-works/plugin/ai` for all AI operations. It communicates through the OpenAI-compatible protocol, which means it works with any model accessible through the Vercel AI Gateway.
 
@@ -53,37 +53,37 @@ The Vercel AI Gateway exposes an OpenAI-compatible API at `https://ai-gateway.ve
 
 ### Settings Schema
 
-| Setting | Type | Required | Default | Scope | Description |
-|---|---|---|---|---|---|
-| `apiKey` | `string` | Yes | -- | `user` | Vercel AI Gateway API key (secret) |
-| `defaultModel` | `string` | Yes | `openai/gpt-5.1` | `global` | Model for all AI tasks (unless tier-specific) |
-| `simpleModel` | `string` | No | `openai/gpt-5-nano` | `global` | Model for tags, short descriptions |
-| `mediumModel` | `string` | No | `openai/gpt-4o` | `global` | Model for listings, summaries |
-| `complexModel` | `string` | No | `openai/gpt-5.1` | `global` | Model for full page generation |
-| `baseUrl` | `string` | No | `https://ai-gateway.vercel.sh/v1` | -- | Custom endpoint (hidden) |
-| `temperature` | `number` | No | `0.7` | -- | Generation temperature 0--2 (hidden) |
-| `maxTokens` | `number` | No | `4096` | -- | Max response tokens (hidden) |
+| Setting        | Type     | Required | Default                           | Scope    | Description                                   |
+| -------------- | -------- | -------- | --------------------------------- | -------- | --------------------------------------------- |
+| `apiKey`       | `string` | Yes      | --                                | `user`   | Vercel AI Gateway API key (secret)            |
+| `defaultModel` | `string` | Yes      | `openai/gpt-5.1`                  | `global` | Model for all AI tasks (unless tier-specific) |
+| `simpleModel`  | `string` | No       | `openai/gpt-5-nano`               | `global` | Model for tags, short descriptions            |
+| `mediumModel`  | `string` | No       | `openai/gpt-4o`                   | `global` | Model for listings, summaries                 |
+| `complexModel` | `string` | No       | `openai/gpt-5.1`                  | `global` | Model for full page generation                |
+| `baseUrl`      | `string` | No       | `https://ai-gateway.vercel.sh/v1` | --       | Custom endpoint (hidden)                      |
+| `temperature`  | `number` | No       | `0.7`                             | --       | Generation temperature 0--2 (hidden)          |
+| `maxTokens`    | `number` | No       | `4096`                            | --       | Max response tokens (hidden)                  |
 
 ### Environment Variables
 
-| Variable | Description |
-|---|---|
-| `PLUGIN_VERCEL_AI_GATEWAY_API_KEY` | API key fallback |
+| Variable                                 | Description            |
+| ---------------------------------------- | ---------------------- |
+| `PLUGIN_VERCEL_AI_GATEWAY_API_KEY`       | API key fallback       |
 | `PLUGIN_VERCEL_AI_GATEWAY_DEFAULT_MODEL` | Default model fallback |
-| `PLUGIN_VERCEL_AI_GATEWAY_SIMPLE_MODEL` | Simple model fallback |
-| `PLUGIN_VERCEL_AI_GATEWAY_MEDIUM_MODEL` | Medium model fallback |
+| `PLUGIN_VERCEL_AI_GATEWAY_SIMPLE_MODEL`  | Simple model fallback  |
+| `PLUGIN_VERCEL_AI_GATEWAY_MEDIUM_MODEL`  | Medium model fallback  |
 | `PLUGIN_VERCEL_AI_GATEWAY_COMPLEX_MODEL` | Complex model fallback |
-| `PLUGIN_VERCEL_AI_GATEWAY_BASE_URL` | Base URL fallback |
+| `PLUGIN_VERCEL_AI_GATEWAY_BASE_URL`      | Base URL fallback      |
 
 ### Three-Tier Model System
 
 The plugin supports assigning different models to different task complexities, optimizing cost and quality:
 
-| Tier | Setting | Handles | Recommended Model |
-|---|---|---|---|
-| **Simple** | `simpleModel` | Tags, short descriptions, classifications | Fast, inexpensive model |
-| **Standard** | `mediumModel` | Listings, summaries, content reformatting | Balanced model |
-| **Complex** | `complexModel` | Full page generation, multi-step analysis | Most capable model |
+| Tier         | Setting        | Handles                                   | Recommended Model       |
+| ------------ | -------------- | ----------------------------------------- | ----------------------- |
+| **Simple**   | `simpleModel`  | Tags, short descriptions, classifications | Fast, inexpensive model |
+| **Standard** | `mediumModel`  | Listings, summaries, content reformatting | Balanced model          |
+| **Complex**  | `complexModel` | Full page generation, multi-step analysis | Most capable model      |
 
 If a tier-specific model is not set, the `defaultModel` is used as a fallback for all tasks.
 
@@ -91,14 +91,14 @@ If a tier-specific model is not set, the `defaultModel` is used as a fallback fo
 
 ### Supported Features
 
-| Capability | Supported |
-|---|---|
-| Chat completion | Yes |
-| Streaming | Yes |
-| Structured output | Yes |
-| Tool calling | Yes |
-| Vision | No |
-| Embeddings | Yes |
+| Capability         | Supported      |
+| ------------------ | -------------- |
+| Chat completion    | Yes            |
+| Streaming          | Yes            |
+| Structured output  | Yes            |
+| Tool calling       | Yes            |
+| Vision             | No             |
+| Embeddings         | Yes            |
 | Max context length | 128,000 tokens |
 
 ### Chat Completion
@@ -143,15 +143,15 @@ Tests whether the AI Gateway is reachable and the API key is valid by making a t
 
 ## Comparison with Other AI Providers
 
-| Feature | Vercel AI Gateway | OpenAI | Anthropic | Google AI |
-|---|---|---|---|---|
-| Multi-provider access | Yes (unified) | OpenAI only | Anthropic only | Google only |
-| API compatibility | OpenAI-compatible | Native | Native | Native |
-| Model switching | Change model name | Change provider | Change provider | Change provider |
-| Account management | Single API key | Per-provider | Per-provider | Per-provider |
-| Vercel integration | Native | Manual | Manual | Manual |
-| Vision support | Depends on model | Yes | Yes | Yes |
-| Custom endpoints | Yes (`baseUrl`) | Yes | No | No |
+| Feature               | Vercel AI Gateway | OpenAI          | Anthropic       | Google AI       |
+| --------------------- | ----------------- | --------------- | --------------- | --------------- |
+| Multi-provider access | Yes (unified)     | OpenAI only     | Anthropic only  | Google only     |
+| API compatibility     | OpenAI-compatible | Native          | Native          | Native          |
+| Model switching       | Change model name | Change provider | Change provider | Change provider |
+| Account management    | Single API key    | Per-provider    | Per-provider    | Per-provider    |
+| Vercel integration    | Native            | Manual          | Manual          | Manual          |
+| Vision support        | Depends on model  | Yes             | Yes             | Yes             |
+| Custom endpoints      | Yes (`baseUrl`)   | Yes             | No              | No              |
 
 The Vercel AI Gateway is ideal when you want to experiment with models from different providers without managing separate accounts. Dedicated provider plugins (OpenAI, Anthropic, Google) offer deeper integration with provider-specific features like vision and advanced tool calling.
 
@@ -183,10 +183,10 @@ This ensures that only valid, typed values are forwarded to the underlying LangC
 
 ## Troubleshooting
 
-| Issue | Cause | Solution |
-|---|---|---|
-| "Plugin not loaded" | `onLoad` not called | Restart the plugin or server |
-| Connection test fails | Invalid API key or network issue | Verify the key and check connectivity to `ai-gateway.vercel.sh` |
-| Model not found | Invalid model name format | Use `provider/model` format (e.g., `openai/gpt-4o`) |
-| Slow responses | Large `maxTokens` or complex model | Reduce `maxTokens` or use a faster model for simple tasks |
-| Unexpected model behavior | Temperature too high | Lower `temperature` toward 0 for more consistent output |
+| Issue                     | Cause                              | Solution                                                        |
+| ------------------------- | ---------------------------------- | --------------------------------------------------------------- |
+| "Plugin not loaded"       | `onLoad` not called                | Restart the plugin or server                                    |
+| Connection test fails     | Invalid API key or network issue   | Verify the key and check connectivity to `ai-gateway.vercel.sh` |
+| Model not found           | Invalid model name format          | Use `provider/model` format (e.g., `openai/gpt-4o`)             |
+| Slow responses            | Large `maxTokens` or complex model | Reduce `maxTokens` or use a faster model for simple tasks       |
+| Unexpected model behavior | Temperature too high               | Lower `temperature` toward 0 for more consistent output         |

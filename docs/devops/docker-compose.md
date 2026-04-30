@@ -1,7 +1,7 @@
 ---
 id: docker-compose
-title: "Docker Compose Setup"
-sidebar_label: "Docker Compose"
+title: 'Docker Compose Setup'
+sidebar_label: 'Docker Compose'
 sidebar_position: 9
 ---
 
@@ -75,13 +75,13 @@ volumes:
 
 The NestJS REST API backend.
 
-| Property | Value | Description |
-|---|---|---|
-| **Image** | `ghcr.io/ever-works/ever-works-api:latest` | Pre-built API image from GitHub Container Registry |
-| **Port** | `3100:3100` | API listens on port 3100 |
-| **Database** | SQLite (default) | Persisted to a named volume |
-| **Volume** | `api_data:/app/apps/api/data` | Persists the SQLite database and generated assets |
-| **Network** | `ever-works-network` | Bridge network for inter-service communication |
+| Property     | Value                                      | Description                                        |
+| ------------ | ------------------------------------------ | -------------------------------------------------- |
+| **Image**    | `ghcr.io/ever-works/ever-works-api:latest` | Pre-built API image from GitHub Container Registry |
+| **Port**     | `3100:3100`                                | API listens on port 3100                           |
+| **Database** | SQLite (default)                           | Persisted to a named volume                        |
+| **Volume**   | `api_data:/app/apps/api/data`              | Persists the SQLite database and generated assets  |
+| **Network**  | `ever-works-network`                       | Bridge network for inter-service communication     |
 
 The API service uses SQLite by default with the database file stored at `/app/apps/api/data/database.db` inside the container. The `api_data` named volume ensures data persists across container restarts.
 
@@ -89,13 +89,13 @@ The API service uses SQLite by default with the database file stored at `/app/ap
 
 The Next.js web dashboard frontend.
 
-| Property | Value | Description |
-|---|---|---|
-| **Image** | `ghcr.io/ever-works/ever-works-web:latest` | Pre-built web image from GitHub Container Registry |
-| **Port** | `3000:3000` | Dashboard listens on port 3000 |
-| **Dependency** | `ever-works-api` | Waits for the API service to start first |
-| **API_URL** | `http://ever-works-api:3100` | Internal Docker network URL to reach the API |
-| **Network** | `ever-works-network` | Same bridge network as the API |
+| Property       | Value                                      | Description                                        |
+| -------------- | ------------------------------------------ | -------------------------------------------------- |
+| **Image**      | `ghcr.io/ever-works/ever-works-web:latest` | Pre-built web image from GitHub Container Registry |
+| **Port**       | `3000:3000`                                | Dashboard listens on port 3000                     |
+| **Dependency** | `ever-works-api`                           | Waits for the API service to start first           |
+| **API_URL**    | `http://ever-works-api:3100`               | Internal Docker network URL to reach the API       |
+| **Network**    | `ever-works-network`                       | Same bridge network as the API                     |
 
 The `API_URL` environment variable is set to the Docker-internal hostname `ever-works-api` so that server-side rendering can reach the API without going through the host network.
 
@@ -122,8 +122,8 @@ Both services share the `ever-works-network` bridge network, allowing them to co
 
 ## Volumes
 
-| Volume | Mount Point | Purpose |
-|---|---|---|
+| Volume     | Mount Point          | Purpose                                     |
+| ---------- | -------------------- | ------------------------------------------- |
 | `api_data` | `/app/apps/api/data` | SQLite database file and any generated data |
 
 The named volume `api_data` is managed by Docker and survives `docker compose down`. To completely reset data, remove the volume explicitly:
@@ -144,15 +144,15 @@ Both services load environment variables from the `.env.compose` file via the `e
 
 ### Key Variables
 
-| Variable | Service | Default | Description |
-|---|---|---|---|
-| `DATABASE_TYPE` | API | `sqlite` | Database engine (`sqlite`, `postgres`, `mysql`) |
-| `DATABASE_PATH` | API | `/app/apps/api/data/database.db` | Path to the SQLite database file |
-| `API_URL` | Web | `http://ever-works-api:3100` | API endpoint for server-side requests |
-| `WEB_URL` | Both | `http://localhost:3000` | Public URL of the web dashboard |
-| `PORT` | API | `3100` | Port the API listens on |
-| `JWT_SECRET` | API | (required) | Secret key for JWT token signing |
-| `AUTH_SECRET` | Web | (required) | Secret for cookie encryption |
+| Variable        | Service | Default                          | Description                                     |
+| --------------- | ------- | -------------------------------- | ----------------------------------------------- |
+| `DATABASE_TYPE` | API     | `sqlite`                         | Database engine (`sqlite`, `postgres`, `mysql`) |
+| `DATABASE_PATH` | API     | `/app/apps/api/data/database.db` | Path to the SQLite database file                |
+| `API_URL`       | Web     | `http://ever-works-api:3100`     | API endpoint for server-side requests           |
+| `WEB_URL`       | Both    | `http://localhost:3000`          | Public URL of the web dashboard                 |
+| `PORT`          | API     | `3100`                           | Port the API listens on                         |
+| `JWT_SECRET`    | API     | (required)                       | Secret key for JWT token signing                |
+| `AUTH_SECRET`   | Web     | (required)                       | Secret for cookie encryption                    |
 
 See the [Environment Management](./environment-management.md) page for the complete variable reference.
 
@@ -224,34 +224,37 @@ For production deployments, apply these changes:
 2. **Use a persistent database**: Switch from SQLite to PostgreSQL for better concurrency and reliability.
 
 3. **Pin image versions**: Replace `latest` with specific version tags:
-   ```yaml
-   image: ghcr.io/ever-works/ever-works-api:v1.2.3
-   ```
+
+    ```yaml
+    image: ghcr.io/ever-works/ever-works-api:v1.2.3
+    ```
 
 4. **Add health checks**:
-   ```yaml
-   ever-works-api:
-       healthcheck:
-           test: ["CMD", "curl", "-f", "http://localhost:3100/api/health"]
-           interval: 30s
-           timeout: 10s
-           retries: 3
-   ```
+
+    ```yaml
+    ever-works-api:
+        healthcheck:
+            test: ['CMD', 'curl', '-f', 'http://localhost:3100/api/health']
+            interval: 30s
+            timeout: 10s
+            retries: 3
+    ```
 
 5. **Configure restart policies**:
-   ```yaml
-   ever-works-api:
-       restart: unless-stopped
-   ```
+
+    ```yaml
+    ever-works-api:
+        restart: unless-stopped
+    ```
 
 6. **Use a reverse proxy**: Place Nginx or Traefik in front for TLS termination:
-   ```yaml
-   reverse-proxy:
-       image: traefik:v3
-       ports:
-           - '80:80'
-           - '443:443'
-   ```
+    ```yaml
+    reverse-proxy:
+        image: traefik:v3
+        ports:
+            - '80:80'
+            - '443:443'
+    ```
 
 ## Common Operations
 
@@ -286,10 +289,10 @@ docker compose exec ever-works-api cat /app/apps/api/data/database.db | sqlite3
 
 ## Troubleshooting
 
-| Issue | Cause | Solution |
-|---|---|---|
-| Web shows "Unable to connect to API" | API not yet ready | Check API logs with `docker compose logs ever-works-api` |
-| Port 3000 already in use | Another process on port 3000 | Change the port mapping: `'3001:3000'` |
-| Database is empty after restart | Volume not mounted | Ensure `api_data` volume is defined and mapped |
-| Container exits immediately | Missing required env vars | Check `.env.compose` has `JWT_SECRET` set |
-| Permission denied on volume | Docker file permissions | Run `docker compose down -v` and restart |
+| Issue                                | Cause                        | Solution                                                 |
+| ------------------------------------ | ---------------------------- | -------------------------------------------------------- |
+| Web shows "Unable to connect to API" | API not yet ready            | Check API logs with `docker compose logs ever-works-api` |
+| Port 3000 already in use             | Another process on port 3000 | Change the port mapping: `'3001:3000'`                   |
+| Database is empty after restart      | Volume not mounted           | Ensure `api_data` volume is defined and mapped           |
+| Container exits immediately          | Missing required env vars    | Check `.env.compose` has `JWT_SECRET` set                |
+| Permission denied on volume          | Docker file permissions      | Run `docker compose down -v` and restart                 |

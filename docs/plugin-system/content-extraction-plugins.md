@@ -13,15 +13,15 @@ Content extraction plugins retrieve and clean web page content for use during di
 
 ```typescript
 interface IContentExtractorPlugin extends IPlugin {
-  readonly providerName: string;
+	readonly providerName: string;
 
-  extract(options: ContentExtractionOptions): Promise<ContentExtractionResult>;
-  isAvailable(): Promise<boolean>;
+	extract(options: ContentExtractionOptions): Promise<ContentExtractionResult>;
+	isAvailable(): Promise<boolean>;
 
-  // Optional
-  extractBatch?(urls: string[], options?: Partial<ContentExtractionOptions>): Promise<ContentExtractionResult[]>;
-  canExtract?(url: string): Promise<boolean>;
-  getSupportedFormats?(): readonly ('text' | 'html' | 'markdown')[];
+	// Optional
+	extractBatch?(urls: string[], options?: Partial<ContentExtractionOptions>): Promise<ContentExtractionResult[]>;
+	canExtract?(url: string): Promise<boolean>;
+	getSupportedFormats?(): readonly ('text' | 'html' | 'markdown')[];
 }
 ```
 
@@ -29,19 +29,19 @@ interface IContentExtractorPlugin extends IPlugin {
 
 ```typescript
 interface ContentExtractionOptions {
-  url: string;                    // URL to extract from
-  includeImages?: boolean;        // Extract image references
-  includeLinks?: boolean;         // Extract link references
-  includeMetadata?: boolean;      // Extract page metadata (OG, Twitter cards)
-  maxLength?: number;             // Maximum content length
-  timeout?: number;               // Timeout in ms
-  waitForJs?: boolean;            // Wait for JavaScript rendering
-  waitForSelector?: string;       // Wait for a specific DOM selector
-  headers?: Record<string, string>;
-  userAgent?: string;
-  selectors?: string[];           // Extract specific CSS selectors
-  removeSelectors?: string[];     // Remove specific elements before extraction
-  settings?: PluginSettings;      // Resolved plugin settings
+	url: string; // URL to extract from
+	includeImages?: boolean; // Extract image references
+	includeLinks?: boolean; // Extract link references
+	includeMetadata?: boolean; // Extract page metadata (OG, Twitter cards)
+	maxLength?: number; // Maximum content length
+	timeout?: number; // Timeout in ms
+	waitForJs?: boolean; // Wait for JavaScript rendering
+	waitForSelector?: string; // Wait for a specific DOM selector
+	headers?: Record<string, string>;
+	userAgent?: string;
+	selectors?: string[]; // Extract specific CSS selectors
+	removeSelectors?: string[]; // Remove specific elements before extraction
+	settings?: PluginSettings; // Resolved plugin settings
 }
 ```
 
@@ -49,20 +49,20 @@ interface ContentExtractionOptions {
 
 ```typescript
 interface ContentExtractionResult {
-  success: boolean;
-  url: string;
-  finalUrl?: string;        // URL after redirects
-  title?: string;
-  content?: string;         // Plain text
-  html?: string;            // Raw HTML
-  markdown?: string;        // Markdown conversion
-  images?: ExtractedImage[];
-  links?: ExtractedLink[];
-  metadata?: PageMetadata;  // Title, description, OG tags, Twitter cards
-  error?: string;
-  duration?: number;        // Extraction time in ms
-  wordCount?: number;
-  readingTime?: number;     // Estimated minutes
+	success: boolean;
+	url: string;
+	finalUrl?: string; // URL after redirects
+	title?: string;
+	content?: string; // Plain text
+	html?: string; // Raw HTML
+	markdown?: string; // Markdown conversion
+	images?: ExtractedImage[];
+	links?: ExtractedLink[];
+	metadata?: PageMetadata; // Title, description, OG tags, Twitter cards
+	error?: string;
+	duration?: number; // Extraction time in ms
+	wordCount?: number;
+	readingTime?: number; // Estimated minutes
 }
 ```
 
@@ -70,13 +70,13 @@ interface ContentExtractionResult {
 
 ### Local Content Extractor
 
-| Property | Value |
-|---|---|
-| Package | `@ever-works/local-content-extractor-plugin` |
-| Dependencies | `@mozilla/readability`, `axios`, `linkedom`, `turndown` |
-| API Key Required | No |
-| JavaScript Rendering | No |
-| Output Formats | text, markdown |
+| Property             | Value                                                   |
+| -------------------- | ------------------------------------------------------- |
+| Package              | `@ever-works/local-content-extractor-plugin`            |
+| Dependencies         | `@mozilla/readability`, `axios`, `linkedom`, `turndown` |
+| API Key Required     | No                                                      |
+| JavaScript Rendering | No                                                      |
+| Output Formats       | text, markdown                                          |
 
 The local content extractor is a **system plugin** that requires no external API. It fetches pages with `axios`, parses HTML with `linkedom`, extracts readable content using Mozilla's Readability algorithm, and converts to markdown with Turndown.
 
@@ -86,19 +86,19 @@ The local content extractor is a **system plugin** that requires no external API
 
 **Settings:**
 
-| Setting | Type | Default | Description |
-|---|---|---|---|
-| (none required) | -- | -- | Works out of the box |
+| Setting         | Type | Default | Description          |
+| --------------- | ---- | ------- | -------------------- |
+| (none required) | --   | --      | Works out of the box |
 
 ### Jina
 
-| Property | Value |
-|---|---|
-| Package | `@ever-works/jina-plugin` |
-| Capabilities | `search`, `content-extractor` |
-| API Key Required | Yes |
-| JavaScript Rendering | Yes |
-| Output Formats | text, markdown |
+| Property             | Value                         |
+| -------------------- | ----------------------------- |
+| Package              | `@ever-works/jina-plugin`     |
+| Capabilities         | `search`, `content-extractor` |
+| API Key Required     | Yes                           |
+| JavaScript Rendering | Yes                           |
+| Output Formats       | text, markdown                |
 
 Jina AI provides both web search and content extraction through its Reader API. It renders JavaScript and returns clean content from any URL.
 
@@ -106,20 +106,20 @@ Jina AI provides both web search and content extraction through its Reader API. 
 
 **Settings:**
 
-| Setting | Type | Default | Description |
-|---|---|---|---|
-| `apiKey` | string (secret) | -- | Jina API key |
+| Setting  | Type            | Default | Description  |
+| -------- | --------------- | ------- | ------------ |
+| `apiKey` | string (secret) | --      | Jina API key |
 
 ### Firecrawl
 
-| Property | Value |
-|---|---|
-| Package | `@ever-works/firecrawl-plugin` |
-| Capabilities | `search`, `content-extractor` |
-| SDK | `@mendable/firecrawl-js` |
-| API Key Required | Yes |
-| JavaScript Rendering | Yes |
-| Output Formats | text, html, markdown |
+| Property             | Value                          |
+| -------------------- | ------------------------------ |
+| Package              | `@ever-works/firecrawl-plugin` |
+| Capabilities         | `search`, `content-extractor`  |
+| SDK                  | `@mendable/firecrawl-js`       |
+| API Key Required     | Yes                            |
+| JavaScript Rendering | Yes                            |
+| Output Formats       | text, html, markdown           |
 
 Firecrawl provides advanced web scraping with JavaScript rendering, content extraction, and search capabilities. It handles dynamic pages, anti-bot challenges, and returns structured content.
 
@@ -127,22 +127,23 @@ Firecrawl provides advanced web scraping with JavaScript rendering, content extr
 
 **Settings:**
 
-| Setting | Type | Default | Description |
-|---|---|---|---|
-| `apiKey` | string (secret) | -- | Firecrawl API key |
+| Setting  | Type            | Default | Description       |
+| -------- | --------------- | ------- | ----------------- |
+| `apiKey` | string (secret) | --      | Firecrawl API key |
 
 ### Notion Extractor
 
-| Property | Value |
-|---|---|
-| Package | `@ever-works/notion-extractor-plugin` |
-| SDK | `@notionhq/client` |
-| API Key Required | Yes (Notion integration token) |
-| Supplementary | Yes |
+| Property         | Value                                 |
+| ---------------- | ------------------------------------- |
+| Package          | `@ever-works/notion-extractor-plugin` |
+| SDK              | `@notionhq/client`                    |
+| API Key Required | Yes (Notion integration token)        |
+| Supplementary    | Yes                                   |
 
 The Notion extractor is a **supplementary plugin** -- it does not appear in the content extractor dropdown. Instead, it auto-activates when the platform encounters a `notion.so` URL through the `canExtract()` method.
 
 It supports two extraction strategies:
+
 1. **Notion API** -- uses an official integration token for authenticated access to private pages
 2. **Splitbee** -- uses the public Notion API proxy for publicly shared pages
 
@@ -150,19 +151,19 @@ It supports two extraction strategies:
 
 **Settings:**
 
-| Setting | Type | Default | Description |
-|---|---|---|---|
-| `notionToken` | string (secret) | -- | Notion integration token |
-| `strategy` | enum | `splitbee` | Extraction strategy: `api` or `splitbee` |
+| Setting       | Type            | Default    | Description                              |
+| ------------- | --------------- | ---------- | ---------------------------------------- |
+| `notionToken` | string (secret) | --         | Notion integration token                 |
+| `strategy`    | enum            | `splitbee` | Extraction strategy: `api` or `splitbee` |
 
 ### PDF Extractor
 
-| Property | Value |
-|---|---|
-| Package | `@ever-works/pdf-extractor-plugin` |
-| Dependencies | `unpdf`, `axios` |
+| Property         | Value                               |
+| ---------------- | ----------------------------------- |
+| Package          | `@ever-works/pdf-extractor-plugin`  |
+| Dependencies     | `unpdf`, `axios`                    |
 | API Key Required | Optional (Mistral for OCR fallback) |
-| Supplementary | Yes |
+| Supplementary    | Yes                                 |
 
 The PDF extractor is another **supplementary plugin** that auto-activates for `.pdf` URLs. It downloads PDF files and extracts text content using the `unpdf` library. For scanned PDFs or image-based content, it falls back to OCR via Mistral AI's vision capabilities.
 
@@ -170,24 +171,24 @@ The PDF extractor is another **supplementary plugin** that auto-activates for `.
 
 **Settings:**
 
-| Setting | Type | Default | Description |
-|---|---|---|---|
-| `mistralApiKey` | string (secret) | -- | Optional Mistral API key for OCR fallback |
+| Setting         | Type            | Default | Description                               |
+| --------------- | --------------- | ------- | ----------------------------------------- |
+| `mistralApiKey` | string (secret) | --      | Optional Mistral API key for OCR fallback |
 
 ## Plugin Comparison
 
-| Feature | Local | Jina | Firecrawl | Notion | PDF |
-|---|:---:|:---:|:---:|:---:|:---:|
-| API key required | No | Yes | Yes | Yes | Optional |
-| JavaScript rendering | No | Yes | Yes | N/A | N/A |
-| Batch extraction | No | Yes | Yes | No | No |
-| Auto-activates for URLs | No | No | No | notion.so | .pdf |
-| Anti-bot handling | No | Yes | Yes | N/A | N/A |
-| Output: text | Yes | Yes | Yes | Yes | Yes |
-| Output: markdown | Yes | Yes | Yes | Yes | No |
-| Output: HTML | No | No | Yes | No | No |
-| Rate limiting | None | API-based | API-based | API-based | None |
-| Cost | Free | Pay per use | Pay per use | Free | Free/Pay |
+| Feature                 | Local |    Jina     |  Firecrawl  |  Notion   |   PDF    |
+| ----------------------- | :---: | :---------: | :---------: | :-------: | :------: |
+| API key required        |  No   |     Yes     |     Yes     |    Yes    | Optional |
+| JavaScript rendering    |  No   |     Yes     |     Yes     |    N/A    |   N/A    |
+| Batch extraction        |  No   |     Yes     |     Yes     |    No     |    No    |
+| Auto-activates for URLs |  No   |     No      |     No      | notion.so |   .pdf   |
+| Anti-bot handling       |  No   |     Yes     |     Yes     |    N/A    |   N/A    |
+| Output: text            |  Yes  |     Yes     |     Yes     |    Yes    |   Yes    |
+| Output: markdown        |  Yes  |     Yes     |     Yes     |    Yes    |    No    |
+| Output: HTML            |  No   |     No      |     Yes     |    No     |    No    |
+| Rate limiting           | None  |  API-based  |  API-based  | API-based |   None   |
+| Cost                    | Free  | Pay per use | Pay per use |   Free    | Free/Pay |
 
 ## URL-Based Auto-Routing
 
@@ -205,23 +206,23 @@ All content extractors can optionally return rich page metadata:
 
 ```typescript
 interface PageMetadata {
-  title?: string;
-  description?: string;
-  author?: string;
-  publishedDate?: string;
-  modifiedDate?: string;
-  language?: string;
-  keywords?: string[];
-  ogTitle?: string;
-  ogDescription?: string;
-  ogImage?: string;
-  ogType?: string;
-  twitterCard?: string;
-  twitterTitle?: string;
-  twitterDescription?: string;
-  twitterImage?: string;
-  canonicalUrl?: string;
-  favicon?: string;
+	title?: string;
+	description?: string;
+	author?: string;
+	publishedDate?: string;
+	modifiedDate?: string;
+	language?: string;
+	keywords?: string[];
+	ogTitle?: string;
+	ogDescription?: string;
+	ogImage?: string;
+	ogType?: string;
+	twitterCard?: string;
+	twitterTitle?: string;
+	twitterDescription?: string;
+	twitterImage?: string;
+	canonicalUrl?: string;
+	favicon?: string;
 }
 ```
 

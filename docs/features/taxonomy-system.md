@@ -13,11 +13,11 @@ The taxonomy system manages the organizational structure of directory items thro
 
 Every directory can organize its items using:
 
-| Entity | Purpose | Example |
-|---|---|---|
-| **Categories** | Primary classification buckets | "Frontend Frameworks", "DevOps Tools" |
-| **Tags** | Cross-cutting labels | "open-source", "typescript", "free-tier" |
-| **Collections** | Curated item groupings | "Editor's Picks", "Getting Started" |
+| Entity          | Purpose                        | Example                                  |
+| --------------- | ------------------------------ | ---------------------------------------- |
+| **Categories**  | Primary classification buckets | "Frontend Frameworks", "DevOps Tools"    |
+| **Tags**        | Cross-cutting labels           | "open-source", "typescript", "free-tier" |
+| **Collections** | Curated item groupings         | "Editor's Picks", "Getting Started"      |
 
 Categories and tags are the primary taxonomy mechanisms used during AI generation. Collections provide an additional manual curation layer.
 
@@ -37,11 +37,11 @@ Categories are the primary organizational axis. Each item belongs to exactly one
 
 ```typescript
 interface Category {
-    id: string;          // URL-friendly slug (e.g., "frontend-frameworks")
-    name: string;        // Display name (e.g., "Frontend Frameworks")
-    description?: string; // Optional description
-    icon_url?: string;   // Optional category icon URL
-    priority?: number;   // Optional sort priority
+	id: string; // URL-friendly slug (e.g., "frontend-frameworks")
+	name: string; // Display name (e.g., "Frontend Frameworks")
+	description?: string; // Optional description
+	icon_url?: string; // Optional category icon URL
+	priority?: number; // Optional sort priority
 }
 ```
 
@@ -92,8 +92,8 @@ Tags provide a flexible labeling system. Each item can have zero or more tags.
 
 ```typescript
 interface Tag {
-    id: string;    // URL-friendly slug (e.g., "open-source")
-    name: string;  // Display name (e.g., "Open Source")
+	id: string; // URL-friendly slug (e.g., "open-source")
+	name: string; // Display name (e.g., "Open Source")
 }
 ```
 
@@ -133,11 +133,11 @@ Collections are curated groups of items, independent of the category/tag taxonom
 
 ```typescript
 interface Collection {
-    id: string;          // URL-friendly slug
-    name: string;        // Display name
-    description?: string; // Optional description
-    icon_url?: string;   // Optional collection icon
-    priority?: number;   // Sort priority
+	id: string; // URL-friendly slug
+	name: string; // Display name
+	description?: string; // Optional description
+	icon_url?: string; // Optional collection icon
+	priority?: number; // Sort priority
 }
 ```
 
@@ -193,9 +193,9 @@ name: React
 slug: react
 category: frontend-frameworks
 tags:
-  - open-source
-  - typescript
-  - meta
+    - open-source
+    - typescript
+    - meta
 ```
 
 ## Slug Generation
@@ -204,8 +204,8 @@ All taxonomy entity IDs are auto-generated using `slugifyText()`:
 
 ```typescript
 const newCategory: Category = {
-    id: slugifyText(dto.name.trim()),  // "My Category" -> "my-category"
-    name: dto.name.trim(),
+	id: slugifyText(dto.name.trim()), // "My Category" -> "my-category"
+	name: dto.name.trim()
 };
 ```
 
@@ -213,12 +213,12 @@ This ensures IDs are URL-friendly and consistent with item references.
 
 ## Access Control
 
-| Operation | Required Role |
-|---|---|
-| List (categories, tags, collections) | Viewer |
-| Create | Editor |
-| Update | Editor |
-| Delete | Editor |
+| Operation                            | Required Role |
+| ------------------------------------ | ------------- |
+| List (categories, tags, collections) | Viewer        |
+| Create                               | Editor        |
+| Update                               | Editor        |
+| Delete                               | Editor        |
 
 Access is checked via `DirectoryOwnershipService`:
 

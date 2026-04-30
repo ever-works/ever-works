@@ -54,6 +54,7 @@ The pipeline system supports two distinct execution modes:
 The default mode where the platform controls step ordering and execution. Pipeline plugins define individual steps, and the `StepPipelineExecutorService` executes them in topological order.
 
 **Features**:
+
 - Platform-managed step ordering via topological sort
 - Parallel execution of independent steps
 - Checkpointing between steps for crash recovery
@@ -66,6 +67,7 @@ The default mode where the platform controls step ordering and execution. Pipeli
 An alternative mode where a pipeline plugin takes full control. The `FullPipelineExecutorService` delegates the entire execution to the plugin's `execute()` method.
 
 **Features**:
+
 - Plugin controls all execution logic
 - Suitable for pipelines that need custom ordering or complex branching
 - Result validation by the platform
@@ -79,12 +81,12 @@ The entry point that routes pipeline execution to the appropriate executor.
 
 ```typescript
 interface PipelineExecutionOptions {
-    directoryId: string;
-    userId: string;
-    pipelinePluginId?: string;     // Explicit plugin override
-    skipSteps?: string[];          // Steps to skip
-    onlySteps?: string[];          // Run only these steps
-    resumeFromCheckpoint?: boolean; // Resume from last checkpoint
+	directoryId: string;
+	userId: string;
+	pipelinePluginId?: string; // Explicit plugin override
+	skipSteps?: string[]; // Steps to skip
+	onlySteps?: string[]; // Run only these steps
+	resumeFromCheckpoint?: boolean; // Resume from last checkpoint
 }
 ```
 
@@ -113,14 +115,14 @@ flowchart TD
 
 **Step modification positions**: Modifier plugins can alter the pipeline using these position directives:
 
-| Position | Description |
-|----------|-------------|
-| `replace` | Replaces an existing step entirely |
-| `before` | Injects a step before a target step |
-| `after` | Injects a step after a target step |
-| `disable` | Removes a step from the pipeline |
-| `first` | Prepends a step to the beginning |
-| `last` | Appends a step to the end |
+| Position  | Description                         |
+| --------- | ----------------------------------- |
+| `replace` | Replaces an existing step entirely  |
+| `before`  | Injects a step before a target step |
+| `after`   | Injects a step after a target step  |
+| `disable` | Removes a step from the pipeline    |
+| `first`   | Prepends a step to the beginning    |
+| `last`    | Appends a step to the end           |
 
 **Dependency resolution**: Steps declare dependencies on other steps. The builder performs a topological sort to determine execution order and detects circular dependencies (`CircularDependencyError`) and missing dependencies (`MissingDependencyError`).
 
@@ -143,16 +145,16 @@ stateDiagram-v2
 
 **Events emitted** (`PipelineRuntimeEvents`):
 
-| Event | Payload | When |
-|-------|---------|------|
-| `execution:started` | `{ directoryId, totalSteps }` | Pipeline begins |
-| `execution:completed` | `{ directoryId, result }` | Pipeline finishes |
-| `execution:cancelled` | `{ directoryId, reason }` | User cancels |
-| `step:started` | `{ stepId, stepIndex }` | Step begins |
-| `step:completed` | `{ stepId, stepIndex, result }` | Step finishes |
-| `step:failed` | `{ stepId, stepIndex, error }` | Step errors |
-| `step:skipped` | `{ stepId, reason }` | Step skipped |
-| `state:changed` | `{ from, to }` | State transition |
+| Event                 | Payload                         | When              |
+| --------------------- | ------------------------------- | ----------------- |
+| `execution:started`   | `{ directoryId, totalSteps }`   | Pipeline begins   |
+| `execution:completed` | `{ directoryId, result }`       | Pipeline finishes |
+| `execution:cancelled` | `{ directoryId, reason }`       | User cancels      |
+| `step:started`        | `{ stepId, stepIndex }`         | Step begins       |
+| `step:completed`      | `{ stepId, stepIndex, result }` | Step finishes     |
+| `step:failed`         | `{ stepId, stepIndex, error }`  | Step errors       |
+| `step:skipped`        | `{ stepId, reason }`            | Step skipped      |
+| `state:changed`       | `{ from, to }`                  | State transition  |
 
 ### StepPipelineExecutorService
 
@@ -162,12 +164,12 @@ Executes pipeline steps one by one (or in parallel groups) with checkpointing.
 
 ```typescript
 interface CheckpointData {
-    directoryId: string;
-    pipelinePluginId: string;
-    completedStepIds: string[];
-    stepResults: Record<string, unknown>;
-    savedAt: string;           // ISO timestamp
-    schemaVersion: number;     // For migration compatibility
+	directoryId: string;
+	pipelinePluginId: string;
+	completedStepIds: string[];
+	stepResults: Record<string, unknown>;
+	savedAt: string; // ISO timestamp
+	schemaVersion: number; // For migration compatibility
 }
 ```
 
@@ -191,21 +193,21 @@ Creates pre-bound facade instances for use within pipeline steps. Each facade is
 
 ```typescript
 interface FacadeBindingContext {
-    directoryId: string;
-    userId: string;
-    providerOverrides?: Record<string, string>;
+	directoryId: string;
+	userId: string;
+	providerOverrides?: Record<string, string>;
 }
 ```
 
 **Bound facades created**:
 
-| Facade | Purpose |
-|--------|---------|
-| AI Facade | AI operations (generate, classify, extract) |
-| Search Facade | Web search during generation |
-| Screenshot Facade | Capture item screenshots |
-| Content Extractor Facade | Extract content from URLs |
-| Data Source Facade | Query external data sources |
+| Facade                   | Purpose                                     |
+| ------------------------ | ------------------------------------------- |
+| AI Facade                | AI operations (generate, classify, extract) |
+| Search Facade            | Web search during generation                |
+| Screenshot Facade        | Capture item screenshots                    |
+| Content Extractor Facade | Extract content from URLs                   |
+| Data Source Facade       | Query external data sources                 |
 
 Pipeline steps receive these bound facades so they never need to manually pass `userId` and `directoryId` on every call.
 
@@ -216,10 +218,12 @@ Handles self-managed pipeline execution by delegating to the plugin's `execute()
 ```typescript
 // The plugin receives full control
 await pipelinePlugin.execute({
-    directory,
-    facades: boundFacades,
-    abortSignal,
-    onProgress: (progress) => { /* update status */ },
+	directory,
+	facades: boundFacades,
+	abortSignal,
+	onProgress: (progress) => {
+		/* update status */
+	}
 });
 ```
 
@@ -229,15 +233,15 @@ The executor validates the result after the plugin returns and emits completion 
 
 ```typescript
 @Module({
-    imports: [PluginsModule, FacadesModule, DatabaseModule, CacheModule],
-    providers: [
-        PipelineOrchestratorService,
-        PipelineBuilderService,
-        PipelineFacadeService,
-        StepPipelineExecutorService,
-        FullPipelineExecutorService,
-    ],
-    exports: [PipelineOrchestratorService],
+	imports: [PluginsModule, FacadesModule, DatabaseModule, CacheModule],
+	providers: [
+		PipelineOrchestratorService,
+		PipelineBuilderService,
+		PipelineFacadeService,
+		StepPipelineExecutorService,
+		FullPipelineExecutorService
+	],
+	exports: [PipelineOrchestratorService]
 })
 export class PipelineModule {}
 ```
@@ -251,33 +255,33 @@ import { PipelineOrchestratorService } from '@ever-works/agent/pipeline';
 
 @Injectable()
 export class GenerationService {
-    constructor(private readonly orchestrator: PipelineOrchestratorService) {}
+	constructor(private readonly orchestrator: PipelineOrchestratorService) {}
 
-    async generateDirectory(directoryId: string, userId: string) {
-        const result = await this.orchestrator.execute({
-            directoryId,
-            userId,
-        });
-        return result;
-    }
+	async generateDirectory(directoryId: string, userId: string) {
+		const result = await this.orchestrator.execute({
+			directoryId,
+			userId
+		});
+		return result;
+	}
 
-    async resumeGeneration(directoryId: string, userId: string) {
-        const result = await this.orchestrator.execute({
-            directoryId,
-            userId,
-            resumeFromCheckpoint: true,
-        });
-        return result;
-    }
+	async resumeGeneration(directoryId: string, userId: string) {
+		const result = await this.orchestrator.execute({
+			directoryId,
+			userId,
+			resumeFromCheckpoint: true
+		});
+		return result;
+	}
 
-    async runSpecificSteps(directoryId: string, userId: string) {
-        const result = await this.orchestrator.execute({
-            directoryId,
-            userId,
-            onlySteps: ['search', 'extract', 'generate-items'],
-        });
-        return result;
-    }
+	async runSpecificSteps(directoryId: string, userId: string) {
+		const result = await this.orchestrator.execute({
+			directoryId,
+			userId,
+			onlySteps: ['search', 'extract', 'generate-items']
+		});
+		return result;
+	}
 }
 ```
 
@@ -287,16 +291,16 @@ Pipeline plugins implement the `IPipelinePlugin` interface from `@ever-works/plu
 
 ```typescript
 interface IPipelinePlugin {
-    // Step-based mode
-    getSteps(context: PipelineContext): PipelineStep[];
+	// Step-based mode
+	getSteps(context: PipelineContext): PipelineStep[];
 
-    // Self-managed mode (optional)
-    execute?(context: PipelineExecutionContext): Promise<PipelineResult>;
+	// Self-managed mode (optional)
+	execute?(context: PipelineExecutionContext): Promise<PipelineResult>;
 
-    // Result extraction from step outputs
-    extractResult?(stepResults: Record<string, unknown>): PipelineResult;
+	// Result extraction from step outputs
+	extractResult?(stepResults: Record<string, unknown>): PipelineResult;
 
-    // Execution mode declaration
-    getExecutionMode?(): 'step' | 'full';
+	// Execution mode declaration
+	getExecutionMode?(): 'step' | 'full';
 }
 ```

@@ -11,15 +11,15 @@ Advanced prompts let you customize the AI's behavior for specific pipeline steps
 
 ## Available Prompt Fields
 
-| Field | Pipeline Step | Description |
-|-------|--------------|-------------|
-| `relevanceAssessment` | Relevance check | Custom criteria for deciding if a discovered item belongs in the directory |
-| `itemGeneration` | Content generation | Additional instructions for generating item descriptions and content |
-| `itemExtraction` | Content extraction | Guidelines for extracting structured data from web pages |
-| `searchQuery` | Search queries | Custom instructions for how search queries are constructed |
-| `categorization` | Categorization | Rules for assigning categories and tags to items |
-| `deduplication` | Deduplication | Custom logic for identifying and merging duplicate items |
-| `sourceValidation` | Source validation | Criteria for validating whether a source URL is acceptable |
+| Field                 | Pipeline Step      | Description                                                                |
+| --------------------- | ------------------ | -------------------------------------------------------------------------- |
+| `relevanceAssessment` | Relevance check    | Custom criteria for deciding if a discovered item belongs in the directory |
+| `itemGeneration`      | Content generation | Additional instructions for generating item descriptions and content       |
+| `itemExtraction`      | Content extraction | Guidelines for extracting structured data from web pages                   |
+| `searchQuery`         | Search queries     | Custom instructions for how search queries are constructed                 |
+| `categorization`      | Categorization     | Rules for assigning categories and tags to items                           |
+| `deduplication`       | Deduplication      | Custom logic for identifying and merging duplicate items                   |
+| `sourceValidation`    | Source validation  | Criteria for validating whether a source URL is acceptable                 |
 
 :::info
 All prompt fields are optional. Set a field to `null` or omit it to use only the system's default prompt for that step. Maximum length: 2,000 characters per field.
@@ -31,9 +31,9 @@ All endpoints require JWT authentication.
 
 ### Get Advanced Prompts
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| `GET` | `/api/directories/:id/advanced-prompts` | Get current prompt overrides |
+| Method | Endpoint                                | Description                  |
+| ------ | --------------------------------------- | ---------------------------- |
+| `GET`  | `/api/directories/:id/advanced-prompts` | Get current prompt overrides |
 
 ```bash
 curl http://localhost:3100/api/directories/:id/advanced-prompts \
@@ -44,23 +44,23 @@ Response:
 
 ```json
 {
-  "directoryId": "uuid",
-  "relevanceAssessment": "Only include tools that are actively maintained and have >100 GitHub stars",
-  "itemGeneration": null,
-  "itemExtraction": null,
-  "searchQuery": "Focus on developer tools and SaaS platforms",
-  "categorization": null,
-  "deduplication": null,
-  "sourceValidation": null,
-  "updatedAt": "2025-01-15T10:30:00Z"
+	"directoryId": "uuid",
+	"relevanceAssessment": "Only include tools that are actively maintained and have >100 GitHub stars",
+	"itemGeneration": null,
+	"itemExtraction": null,
+	"searchQuery": "Focus on developer tools and SaaS platforms",
+	"categorization": null,
+	"deduplication": null,
+	"sourceValidation": null,
+	"updatedAt": "2025-01-15T10:30:00Z"
 }
 ```
 
 ### Update Advanced Prompts
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| `PUT` | `/api/directories/:id/advanced-prompts` | Set prompt overrides |
+| Method | Endpoint                                | Description          |
+| ------ | --------------------------------------- | -------------------- |
+| `PUT`  | `/api/directories/:id/advanced-prompts` | Set prompt overrides |
 
 ```bash
 curl -X PUT http://localhost:3100/api/directories/:id/advanced-prompts \
@@ -99,13 +99,13 @@ Every AI operation in the generation pipeline uses a hardcoded base prompt optim
 
 The system is implemented across several layers:
 
-| File | Purpose |
-|---|---|
-| `entities/directory-advanced-prompts.entity.ts` | TypeORM entity with nullable text columns per prompt type |
-| `database/repositories/directory-advanced-prompts.repository.ts` | CRUD operations for the entity |
-| `services/directory-advanced-prompts.service.ts` | Business logic with access control |
-| `dto/directory-advanced-prompts.dto.ts` | Request/response DTOs |
-| `utils/prompt.util.ts` | Utility for appending custom prompts to base prompts |
+| File                                                             | Purpose                                                   |
+| ---------------------------------------------------------------- | --------------------------------------------------------- |
+| `entities/directory-advanced-prompts.entity.ts`                  | TypeORM entity with nullable text columns per prompt type |
+| `database/repositories/directory-advanced-prompts.repository.ts` | CRUD operations for the entity                            |
+| `services/directory-advanced-prompts.service.ts`                 | Business logic with access control                        |
+| `dto/directory-advanced-prompts.dto.ts`                          | Request/response DTOs                                     |
+| `utils/prompt.util.ts`                                           | Utility for appending custom prompts to base prompts      |
 
 ## Prompt Types
 
@@ -188,29 +188,29 @@ The `DirectoryAdvancedPrompts` entity uses a one-to-one relationship with the `D
 ```typescript
 @Entity({ name: 'directory_advanced_prompts' })
 export class DirectoryAdvancedPrompts {
-    @PrimaryGeneratedColumn('uuid')
-    id: string;
+	@PrimaryGeneratedColumn('uuid')
+	id: string;
 
-    @Column({ unique: true })
-    directoryId: string;
+	@Column({ unique: true })
+	directoryId: string;
 
-    @OneToOne(() => Directory, { onDelete: 'CASCADE' })
-    @JoinColumn({ name: 'directoryId' })
-    directory: Directory;
+	@OneToOne(() => Directory, { onDelete: 'CASCADE' })
+	@JoinColumn({ name: 'directoryId' })
+	directory: Directory;
 
-    @Column({ type: 'text', nullable: true })
-    relevanceAssessment?: string | null;
+	@Column({ type: 'text', nullable: true })
+	relevanceAssessment?: string | null;
 
-    @Column({ type: 'text', nullable: true })
-    itemGeneration?: string | null;
+	@Column({ type: 'text', nullable: true })
+	itemGeneration?: string | null;
 
-    // ... other prompt columns (all nullable text)
+	// ... other prompt columns (all nullable text)
 
-    @CreateDateColumn()
-    createdAt: Date;
+	@CreateDateColumn()
+	createdAt: Date;
 
-    @UpdateDateColumn()
-    updatedAt: Date;
+	@UpdateDateColumn()
+	updatedAt: Date;
 }
 ```
 
@@ -270,10 +270,7 @@ During generation, the `ItemsGeneratorService` loads custom prompts and appends 
 ```typescript
 const customPrompts = await advancedPromptsService.getPromptsForGeneration(directoryId);
 
-const effectivePrompt = appendCustomPrompt(
-    BASE_RELEVANCE_PROMPT,
-    customPrompts?.relevanceAssessment
-);
+const effectivePrompt = appendCustomPrompt(BASE_RELEVANCE_PROMPT, customPrompts?.relevanceAssessment);
 ```
 
 The `appendCustomPrompt` function:
@@ -295,15 +292,14 @@ The response DTO returns all prompt values along with metadata:
 
 ```typescript
 interface DirectoryAdvancedPromptsResponseDto {
-    directoryId: string;
-    relevanceAssessment: string | null;
-    itemGeneration: string | null;
-    itemExtraction: string | null;
-    searchQuery: string | null;
-    categorization: string | null;
-    deduplication: string | null;
-    sourceValidation: string | null;
-    updatedAt: string | null;
+	directoryId: string;
+	relevanceAssessment: string | null;
+	itemGeneration: string | null;
+	itemExtraction: string | null;
+	searchQuery: string | null;
+	categorization: string | null;
+	deduplication: string | null;
+	sourceValidation: string | null;
+	updatedAt: string | null;
 }
 ```
-

@@ -1,7 +1,7 @@
 ---
 id: standard-pipeline-plugin
-title: "Standard Pipeline Plugin"
-sidebar_label: "Standard Pipeline"
+title: 'Standard Pipeline Plugin'
+sidebar_label: 'Standard Pipeline'
 sidebar_position: 47
 ---
 
@@ -13,17 +13,17 @@ The Standard Pipeline is the default generation pipeline for Ever Works. It runs
 
 ## Overview
 
-| Property | Value |
-|---|---|
-| Plugin ID | `standard-pipeline` |
-| Category | `pipeline` |
-| Capabilities | `pipeline`, `form-schema-provider` |
-| Version | `1.0.0` |
-| Auto-enable | Yes |
-| Built-in | Yes |
-| System Plugin | Yes |
-| Default For | `pipeline` capability |
-| Dependencies | `@langchain/textsplitters`, `zod`, `string-similarity-js`, `stopword` |
+| Property      | Value                                                                 |
+| ------------- | --------------------------------------------------------------------- |
+| Plugin ID     | `standard-pipeline`                                                   |
+| Category      | `pipeline`                                                            |
+| Capabilities  | `pipeline`, `form-schema-provider`                                    |
+| Version       | `1.0.0`                                                               |
+| Auto-enable   | Yes                                                                   |
+| Built-in      | Yes                                                                   |
+| System Plugin | Yes                                                                   |
+| Default For   | `pipeline` capability                                                 |
+| Dependencies  | `@langchain/textsplitters`, `zod`, `string-similarity-js`, `stopword` |
 
 The plugin implements `IPipelinePlugin` and `IFormSchemaProvider`.
 
@@ -67,58 +67,58 @@ The 15 steps are organized into 8 phases:
 
 ### Phase 1: Initialization
 
-| Step | ID | Description |
-|---|---|---|
-| 1 | `prompt-comparison` | Compares the current prompt against the previous generation to determine if regeneration is needed |
-| 2 | `prompt-processing` | Extracts the subject and featured item hints from the user prompt |
-| 3 | `domain-detection` | Analyzes the prompt to detect the domain type for specialized handling |
+| Step | ID                  | Description                                                                                        |
+| ---- | ------------------- | -------------------------------------------------------------------------------------------------- |
+| 1    | `prompt-comparison` | Compares the current prompt against the previous generation to determine if regeneration is needed |
+| 2    | `prompt-processing` | Extracts the subject and featured item hints from the user prompt                                  |
+| 3    | `domain-detection`  | Analyzes the prompt to detect the domain type for specialized handling                             |
 
 ### Phase 2: AI Generation
 
-| Step | ID | Description |
-|---|---|---|
-| 4 | `ai-first-items-generation` | Generates initial items using AI based on the prompt and domain analysis |
+| Step | ID                          | Description                                                              |
+| ---- | --------------------------- | ------------------------------------------------------------------------ |
+| 4    | `ai-first-items-generation` | Generates initial items using AI based on the prompt and domain analysis |
 
 ### Phase 3: Web Search
 
-| Step | ID | Description |
-|---|---|---|
-| 5 | `search-queries-generation` | Generates search queries based on the prompt and existing items |
-| 6 | `web-search` | Executes search queries to find relevant URLs |
-| 7 | `content-retrieval` | Retrieves web page content from discovered URLs |
-| 8 | `content-filtering` | Filters retrieved content for relevance |
+| Step | ID                          | Description                                                     |
+| ---- | --------------------------- | --------------------------------------------------------------- |
+| 5    | `search-queries-generation` | Generates search queries based on the prompt and existing items |
+| 6    | `web-search`                | Executes search queries to find relevant URLs                   |
+| 7    | `content-retrieval`         | Retrieves web page content from discovered URLs                 |
+| 8    | `content-filtering`         | Filters retrieved content for relevance                         |
 
 ### Phase 4: Extraction
 
-| Step | ID | Description |
-|---|---|---|
-| 9 | `items-extraction` | Extracts structured items from filtered web content |
+| Step | ID                 | Description                                         |
+| ---- | ------------------ | --------------------------------------------------- |
+| 9    | `items-extraction` | Extracts structured items from filtered web content |
 
 ### Phase 5: Aggregation
 
-| Step | ID | Description |
-|---|---|---|
-| 10 | `deduplication-and-data-aggregation` | Merges AI and web items, removes duplicates, aggregates data |
+| Step | ID                                   | Description                                                  |
+| ---- | ------------------------------------ | ------------------------------------------------------------ |
+| 10   | `deduplication-and-data-aggregation` | Merges AI and web items, removes duplicates, aggregates data |
 
 ### Phase 6: Categorization
 
-| Step | ID | Description |
-|---|---|---|
-| 11 | `categories-tags-processing` | Processes and assigns categories, tags, brands, and collections |
-| 12 | `sources-validation` | Validates source URLs and ensures they are accessible (optional) |
+| Step | ID                           | Description                                                      |
+| ---- | ---------------------------- | ---------------------------------------------------------------- |
+| 11   | `categories-tags-processing` | Processes and assigns categories, tags, brands, and collections  |
+| 12   | `sources-validation`         | Validates source URLs and ensures they are accessible (optional) |
 
 ### Phase 7: Enrichment
 
-| Step | ID | Description |
-|---|---|---|
-| 13 | `badges-processing` | Evaluates and assigns badges to items (optional) |
-| 14 | `image-capture` | Captures screenshots or fetches images for items (optional) |
+| Step | ID                  | Description                                                 |
+| ---- | ------------------- | ----------------------------------------------------------- |
+| 13   | `badges-processing` | Evaluates and assigns badges to items (optional)            |
+| 14   | `image-capture`     | Captures screenshots or fetches images for items (optional) |
 
 ### Phase 8: Output
 
-| Step | ID | Description |
-|---|---|---|
-| 15 | `markdown-generation` | Generates markdown descriptions using source content (optional) |
+| Step | ID                    | Description                                                     |
+| ---- | --------------------- | --------------------------------------------------------------- |
+| 15   | `markdown-generation` | Generates markdown descriptions using source content (optional) |
 
 ## Configuration
 
@@ -128,53 +128,53 @@ The Standard Pipeline exposes a rich set of configuration options through `IForm
 
 #### Data Sources Group
 
-| Field | Type | Default | Description |
-|---|---|---|---|
-| `source_urls` | `tags` | -- | URLs to extract items from directly (bypasses search) |
+| Field         | Type   | Default | Description                                           |
+| ------------- | ------ | ------- | ----------------------------------------------------- |
+| `source_urls` | `tags` | --      | URLs to extract items from directly (bypasses search) |
 
 #### Categories and Keywords Group
 
-| Field | Type | Default | Description |
-|---|---|---|---|
-| `initial_categories` | `tags` | -- | Suggested categories for the directory |
-| `priority_categories` | `tags` | -- | Categories to prioritize and show first |
-| `target_keywords` | `tags` | -- | Keywords to guide search and extraction |
+| Field                 | Type   | Default | Description                             |
+| --------------------- | ------ | ------- | --------------------------------------- |
+| `initial_categories`  | `tags` | --      | Suggested categories for the directory  |
+| `priority_categories` | `tags` | --      | Categories to prioritize and show first |
+| `target_keywords`     | `tags` | --      | Keywords to guide search and extraction |
 
 #### Generation Features Group
 
-| Field | Type | Default | Description |
-|---|---|---|---|
+| Field                         | Type      | Default | Description                                       |
+| ----------------------------- | --------- | ------- | ------------------------------------------------- |
 | `ai_first_generation_enabled` | `boolean` | `false` | Generate initial items using AI before web search |
-| `generate_categories` | `boolean` | `true` | Automatically generate categories from content |
-| `generate_tags` | `boolean` | `true` | Automatically generate tags for items |
-| `generate_collections` | `boolean` | `true` | Automatically generate collections |
-| `generate_brands` | `boolean` | `true` | Extract and categorize brands |
-| `capture_screenshots` | `boolean` | `false` | Take screenshots for items |
-| `badge_evaluation_enabled` | `boolean` | `false` | Evaluate and assign badges |
+| `generate_categories`         | `boolean` | `true`  | Automatically generate categories from content    |
+| `generate_tags`               | `boolean` | `true`  | Automatically generate tags for items             |
+| `generate_collections`        | `boolean` | `true`  | Automatically generate collections                |
+| `generate_brands`             | `boolean` | `true`  | Extract and categorize brands                     |
+| `capture_screenshots`         | `boolean` | `false` | Take screenshots for items                        |
+| `badge_evaluation_enabled`    | `boolean` | `false` | Evaluate and assign badges                        |
 
 #### Search Configuration Group
 
-| Field | Type | Default | Description |
-|---|---|---|---|
-| `max_search_queries` | `number` | `10` | Number of search queries to generate (1--100) |
-| `max_results_per_query` | `number` | `5` | Results to retrieve per query (1--100) |
-| `max_pages_to_process` | `number` | `10` | Maximum web pages to process (1--1000) |
+| Field                   | Type     | Default | Description                                   |
+| ----------------------- | -------- | ------- | --------------------------------------------- |
+| `max_search_queries`    | `number` | `10`    | Number of search queries to generate (1--100) |
+| `max_results_per_query` | `number` | `5`     | Results to retrieve per query (1--100)        |
+| `max_pages_to_process`  | `number` | `10`    | Maximum web pages to process (1--1000)        |
 
 #### Volume Control Group
 
-| Field | Type | Default | Description |
-|---|---|---|---|
-| `data_volume_mode` | `select` | `"real"` | `real` (production) or `sample` (testing) |
-| `max_items` | `number` | -- | Optional limit on generated items (1--1000) |
+| Field              | Type     | Default  | Description                                 |
+| ------------------ | -------- | -------- | ------------------------------------------- |
+| `data_volume_mode` | `select` | `"real"` | `real` (production) or `sample` (testing)   |
+| `max_items`        | `number` | --       | Optional limit on generated items (1--1000) |
 
 #### Advanced Settings Group
 
-| Field | Type | Default | Description |
-|---|---|---|---|
-| `content_filtering_enabled` | `boolean` | `true` | Filter irrelevant content before extraction |
-| `relevance_threshold_content` | `number` | `0.6` | Minimum relevance score (0--1) |
-| `min_content_length_for_extraction` | `number` | `100` | Minimum characters for extraction |
-| `prompt_comparison_confidence_threshold` | `number` | `0.5` | Prompt similarity threshold (0--1) |
+| Field                                    | Type      | Default | Description                                 |
+| ---------------------------------------- | --------- | ------- | ------------------------------------------- |
+| `content_filtering_enabled`              | `boolean` | `true`  | Filter irrelevant content before extraction |
+| `relevance_threshold_content`            | `number`  | `0.6`   | Minimum relevance score (0--1)              |
+| `min_content_length_for_extraction`      | `number`  | `100`   | Minimum characters for extraction           |
+| `prompt_comparison_confidence_threshold` | `number`  | `0.5`   | Prompt similarity threshold (0--1)          |
 
 ### Selectable Provider Categories
 
@@ -216,19 +216,19 @@ The Standard Pipeline is enabled by default and requires no additional configura
 
 ```typescript
 class StandardPipelinePlugin implements IPipelinePlugin<BuiltInStepId>, IFormSchemaProvider {
-  readonly id: 'standard-pipeline';
-  readonly category: 'pipeline';
+	readonly id: 'standard-pipeline';
+	readonly category: 'pipeline';
 
-  executeStep(stepId, context, execContext, options?, onProgress?): Promise<IPipelineContext>;
-  getStepDefinitions(): PipelineStepDefinition<BuiltInStepId>[];
-  registerStepExecutor(stepId, executor): void;
-  createContext(directory, request, existing): IPipelineContext;
-  extractResult(context, meta): PipelineResult;
-  isCheckpointViable(snapshot, completedSteps): boolean;
-  canSkipStep(stepId, context): boolean;
-  getFormFields(): FormFieldDefinition[];
-  getFormGroups(): FormFieldGroup[];
-  validateFormInput(values): ValidationResult;
-  getDefaultValues(): Record<string, unknown>;
+	executeStep(stepId, context, execContext, options?, onProgress?): Promise<IPipelineContext>;
+	getStepDefinitions(): PipelineStepDefinition<BuiltInStepId>[];
+	registerStepExecutor(stepId, executor): void;
+	createContext(directory, request, existing): IPipelineContext;
+	extractResult(context, meta): PipelineResult;
+	isCheckpointViable(snapshot, completedSteps): boolean;
+	canSkipStep(stepId, context): boolean;
+	getFormFields(): FormFieldDefinition[];
+	getFormGroups(): FormFieldGroup[];
+	validateFormInput(values): ValidationResult;
+	getDefaultValues(): Record<string, unknown>;
 }
 ```

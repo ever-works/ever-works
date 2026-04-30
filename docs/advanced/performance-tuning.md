@@ -25,10 +25,10 @@ SWC is configured in the NestJS app via `nest-cli.json`:
 
 ```json
 {
-    "compilerOptions": {
-        "builder": "swc",
-        "typeCheck": false
-    }
+	"compilerOptions": {
+		"builder": "swc",
+		"typeCheck": false
+	}
 }
 ```
 
@@ -36,10 +36,10 @@ The agent package also uses SWC for compilation with a separate tsc pass for typ
 
 ```json
 {
-    "scripts": {
-        "build": "nest build && tsc -p tsconfig.types.json",
-        "dev": "nest start --watch"
-    }
+	"scripts": {
+		"build": "nest build && tsc -p tsconfig.types.json",
+		"dev": "nest start --watch"
+	}
 }
 ```
 
@@ -65,11 +65,11 @@ Each plugin package uses tsup for fast ESM builds:
 ```typescript
 // packages/plugins/openai/tsup.config.ts
 export default defineConfig({
-    entry: ['src/index.ts'],
-    format: ['esm'],
-    dts: true,
-    clean: true,
-    external: ['@ever-works/plugin'],
+	entry: ['src/index.ts'],
+	format: ['esm'],
+	dts: true,
+	clean: true,
+	external: ['@ever-works/plugin']
 });
 ```
 
@@ -82,25 +82,25 @@ The platform uses a TypeORM-based cache (not Redis by default) for simplicity in
 ```typescript
 // packages/agent/src/cache/cache.factory.ts
 export const CacheFactory = {
-    InMemory() {
-        return CacheModule.register();
-    },
+	InMemory() {
+		return CacheModule.register();
+	},
 
-    TypeORM(options?: CacheOptions) {
-        return CacheModule.registerAsync({
-            imports: [TypeOrmModule.forFeature([CacheEntry])],
-            inject: [DataSource],
-            useFactory: async (dataSource: DataSource) => {
-                const repository = dataSource.getRepository(CacheEntry);
-                const typeormAdapter = new TypeORMKeyvAdapter({
-                    repository,
-                    namespace: options?.namespace,
-                    ttl: options?.ttl,
-                });
-                return { stores: [typeormAdapter] };
-            },
-        });
-    },
+	TypeORM(options?: CacheOptions) {
+		return CacheModule.registerAsync({
+			imports: [TypeOrmModule.forFeature([CacheEntry])],
+			inject: [DataSource],
+			useFactory: async (dataSource: DataSource) => {
+				const repository = dataSource.getRepository(CacheEntry);
+				const typeormAdapter = new TypeORMKeyvAdapter({
+					repository,
+					namespace: options?.namespace,
+					ttl: options?.ttl
+				});
+				return { stores: [typeormAdapter] };
+			}
+		});
+	}
 };
 ```
 
@@ -116,26 +116,25 @@ The `AiFacadeService` implements in-memory caching for expensive external API ca
 
 ```typescript
 export class AiFacadeService extends BaseFacadeService {
-    private static readonly CACHE_TTL = 3_600_000;  // 1 hour
-    private openRouterModels: readonly OpenRouterModelEntry[] | null = null;
-    private openRouterCacheTime = 0;
+	private static readonly CACHE_TTL = 3_600_000; // 1 hour
+	private openRouterModels: readonly OpenRouterModelEntry[] | null = null;
+	private openRouterCacheTime = 0;
 
-    private async getCachedOpenRouterModels() {
-        const now = Date.now();
-        if (this.openRouterModels &&
-            now - this.openRouterCacheTime < AiFacadeService.CACHE_TTL) {
-            return this.openRouterModels;  // Serve from cache
-        }
+	private async getCachedOpenRouterModels() {
+		const now = Date.now();
+		if (this.openRouterModels && now - this.openRouterCacheTime < AiFacadeService.CACHE_TTL) {
+			return this.openRouterModels; // Serve from cache
+		}
 
-        const fresh = await fetchOpenRouterModels();
-        if (fresh) {
-            this.openRouterModels = fresh;
-            this.openRouterCacheTime = now;
-        }
+		const fresh = await fetchOpenRouterModels();
+		if (fresh) {
+			this.openRouterModels = fresh;
+			this.openRouterCacheTime = now;
+		}
 
-        // Stale-while-revalidate: return old data if fresh fetch failed
-        return this.openRouterModels;
-    }
+		// Stale-while-revalidate: return old data if fresh fetch failed
+		return this.openRouterModels;
+	}
 }
 ```
 
@@ -150,12 +149,12 @@ The `LoggingInterceptor` only activates when `HTTP_DEBUG=true`, avoiding any ove
 ```typescript
 @Injectable()
 export class LoggingInterceptor implements NestInterceptor {
-    intercept(context: ExecutionContext, next: CallHandler): Observable<any> {
-        if (!config.debug()) {
-            return next.handle();  // Zero overhead when disabled
-        }
-        // ... logging logic
-    }
+	intercept(context: ExecutionContext, next: CallHandler): Observable<any> {
+		if (!config.debug()) {
+			return next.handle(); // Zero overhead when disabled
+		}
+		// ... logging logic
+	}
 }
 ```
 
@@ -165,11 +164,14 @@ The orchestrator uses `Promise.all` for independent database updates:
 
 ```typescript
 await Promise.all([
-    this.directoryOperations.recordGenerationFinishTime(directoryId, finishedAt),
-    this.directoryOperations.updateGenerateStatus(directoryId, { status, error }),
-    this.directoryOperations.updateGenerationHistory(directoryId, historyId, {
-        status, finishedAt, durationInSeconds, errorMessage,
-    }),
+	this.directoryOperations.recordGenerationFinishTime(directoryId, finishedAt),
+	this.directoryOperations.updateGenerateStatus(directoryId, { status, error }),
+	this.directoryOperations.updateGenerationHistory(directoryId, historyId, {
+		status,
+		finishedAt,
+		durationInSeconds,
+		errorMessage
+	})
 ]);
 ```
 
@@ -220,8 +222,8 @@ Sentry profiling is enabled via the Node.js profiling integration:
 import { nodeProfilingIntegration } from '@sentry/profiling-node';
 
 const config = {
-    integrations: [nodeProfilingIntegration()],
-    profilesSampleRate: process.env.NODE_ENV === 'production' ? 0.1 : 1.0,
+	integrations: [nodeProfilingIntegration()],
+	profilesSampleRate: process.env.NODE_ENV === 'production' ? 0.1 : 1.0
 };
 ```
 
@@ -229,12 +231,12 @@ In development, 100% of transactions are profiled. In production, 10% sampling k
 
 ### What to Look For
 
-| Metric                    | Healthy Range   | Action if Exceeded                      |
-|---------------------------|-----------------|------------------------------------------|
-| API response time (p95)   | < 500ms         | Check DB queries, add indexes            |
-| Memory usage              | < 512MB         | Check for leaks, reduce cache sizes      |
-| Event loop lag            | < 50ms          | Offload CPU work to workers              |
-| DB query time (p95)       | < 100ms         | Add indexes, optimize queries            |
+| Metric                  | Healthy Range | Action if Exceeded                  |
+| ----------------------- | ------------- | ----------------------------------- |
+| API response time (p95) | < 500ms       | Check DB queries, add indexes       |
+| Memory usage            | < 512MB       | Check for leaks, reduce cache sizes |
+| Event loop lag          | < 50ms        | Offload CPU work to workers         |
+| DB query time (p95)     | < 100ms       | Add indexes, optimize queries       |
 
 ## TypeScript Compilation Optimization
 
@@ -244,12 +246,12 @@ Path aliases reduce import complexity and enable faster module resolution:
 
 ```json
 {
-    "compilerOptions": {
-        "paths": {
-            "@src/*": ["./src/*"],
-            "@ever-works/*": ["../../packages/*/src"]
-        }
-    }
+	"compilerOptions": {
+		"paths": {
+			"@src/*": ["./src/*"],
+			"@ever-works/*": ["../../packages/*/src"]
+		}
+	}
 }
 ```
 

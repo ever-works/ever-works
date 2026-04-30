@@ -55,9 +55,9 @@ The main schedule management component. If no schedule exists, it shows an empty
 
 ```typescript
 type DirectoryScheduleCardProps = {
-    schedule: DirectoryScheduleDto | null;
-    pipelineProviders?: ProviderOption[];
-    activeProviders?: ResolvedProvider[];
+	schedule: DirectoryScheduleDto | null;
+	pipelineProviders?: ProviderOption[];
+	activeProviders?: ResolvedProvider[];
 };
 ```
 
@@ -69,18 +69,18 @@ The core form component (internal to `DirectoryScheduleCard`) that manages all s
 
 ```typescript
 interface DirectoryScheduleDto {
-    status: DirectoryScheduleStatus;       // ACTIVE | PAUSED | CANCELLED
-    cadence?: DirectoryScheduleCadence;    // HOURLY | DAILY | WEEKLY | MONTHLY
-    billingMode?: DirectoryScheduleBillingMode;  // SUBSCRIPTION | USAGE
-    nextRunAt?: string;                    // ISO datetime
-    lastRunAt?: string;                    // ISO datetime
-    failureCount: number;
-    maxFailureBeforePause: number;         // default: 3
-    alwaysCreatePullRequest: boolean;
-    providerOverrides?: { pipeline?: string };
-    allowedCadences?: { cadence: string; allowed: boolean }[];
-    subscriptionsEnabled: boolean;
-    planCode?: 'free' | 'standard' | 'premium';
+	status: DirectoryScheduleStatus; // ACTIVE | PAUSED | CANCELLED
+	cadence?: DirectoryScheduleCadence; // HOURLY | DAILY | WEEKLY | MONTHLY
+	billingMode?: DirectoryScheduleBillingMode; // SUBSCRIPTION | USAGE
+	nextRunAt?: string; // ISO datetime
+	lastRunAt?: string; // ISO datetime
+	failureCount: number;
+	maxFailureBeforePause: number; // default: 3
+	alwaysCreatePullRequest: boolean;
+	providerOverrides?: { pipeline?: string };
+	allowedCadences?: { cadence: string; allowed: boolean }[];
+	subscriptionsEnabled: boolean;
+	planCode?: 'free' | 'standard' | 'premium';
 }
 ```
 
@@ -90,12 +90,12 @@ interface DirectoryScheduleDto {
 
 Four read-only summary cards displayed at the top of the form:
 
-| Chip          | Value Source                                          |
-|---------------|-------------------------------------------------------|
-| Status        | `schedule.status` mapped to localized label           |
-| Next Run      | `schedule.nextRunAt` rendered via `ShowDateTime`      |
-| Last Run      | `schedule.lastRunAt` rendered via `ShowDateTime`      |
-| Failures      | `failureCount / maxFailureBeforePause` ratio          |
+| Chip     | Value Source                                     |
+| -------- | ------------------------------------------------ |
+| Status   | `schedule.status` mapped to localized label      |
+| Next Run | `schedule.nextRunAt` rendered via `ShowDateTime` |
+| Last Run | `schedule.lastRunAt` rendered via `ShowDateTime` |
+| Failures | `failureCount / maxFailureBeforePause` ratio     |
 
 ### Automation Toggle
 
@@ -105,12 +105,12 @@ A `Switch` component that enables or disables the schedule. When enabled, the sc
 
 A `Select` dropdown with four options:
 
-| Cadence   | Cron Equivalent | Description            |
-|-----------|-----------------|------------------------|
-| `HOURLY`  | `0 * * * *`     | Every hour             |
-| `DAILY`   | `0 0 * * *`     | Once per day           |
-| `WEEKLY`  | `0 0 * * 0`     | Once per week          |
-| `MONTHLY` | `0 0 1 * *`     | Once per month         |
+| Cadence   | Cron Equivalent | Description    |
+| --------- | --------------- | -------------- |
+| `HOURLY`  | `0 * * * *`     | Every hour     |
+| `DAILY`   | `0 0 * * *`     | Once per day   |
+| `WEEKLY`  | `0 0 * * 0`     | Once per week  |
+| `MONTHLY` | `0 0 1 * *`     | Once per month |
 
 When subscriptions are enabled, cadence options are restricted by the user's plan. Disallowed cadences are rendered as disabled options. A `HelperPill` displays whether the selected cadence is allowed on the current plan or requires usage-based billing.
 
@@ -118,10 +118,10 @@ When subscriptions are enabled, cadence options are restricted by the user's pla
 
 Visible only when `subscriptionsEnabled` is `true`:
 
-| Mode           | Description                                        |
-|----------------|----------------------------------------------------|
+| Mode           | Description                                          |
+| -------------- | ---------------------------------------------------- |
 | `SUBSCRIPTION` | Runs are included in the subscription plan allowance |
-| `USAGE`        | Runs are billed per execution (pay-as-you-go)       |
+| `USAGE`        | Runs are billed per execution (pay-as-you-go)        |
 
 If the selected cadence is not allowed on the current plan, the billing mode must be set to `USAGE`.
 
@@ -135,9 +135,9 @@ Visible when multiple pipeline providers are configured. Allows overriding the d
 
 ```typescript
 interface ProviderOption {
-    id: string;
-    name: string;
-    configured: boolean;
+	id: string;
+	name: string;
+	configured: boolean;
 }
 ```
 
@@ -149,11 +149,11 @@ A `Switch` controlling whether scheduled generation runs create a git pull reque
 
 ## Action Buttons
 
-| Button   | Action                             | Disabled When                                |
-|----------|------------------------------------|----------------------------------------------|
-| Run Now  | `runDirectorySchedule(directoryId)`| Loading, or schedule status is not ACTIVE    |
-| Save     | `updateDirectorySchedule(directoryId, formData)` | Loading                      |
-| Cancel   | `cancelDirectorySchedule(directoryId)` | Loading                                 |
+| Button  | Action                                           | Disabled When                             |
+| ------- | ------------------------------------------------ | ----------------------------------------- |
+| Run Now | `runDirectorySchedule(directoryId)`              | Loading, or schedule status is not ACTIVE |
+| Save    | `updateDirectorySchedule(directoryId, formData)` | Loading                                   |
+| Cancel  | `cancelDirectorySchedule(directoryId)`           | Loading                                   |
 
 Each action uses a separate `useTransition` for independent loading states: `isSaving`, `isRunning`, `isCancelling`.
 
@@ -182,13 +182,13 @@ The schedule dispatcher runs as a Trigger.dev cron task defined in `packages/tas
 
 ```typescript
 export const directoryScheduleDispatcherTask = schedules.task({
-    id: 'directory-schedule-dispatcher',
-    cron: `*/${interval} * * * *`,   // configurable interval
-    run: async () => {
-        const dispatcher = appContext.get(DirectoryScheduleDispatcherService);
-        const dispatched = await dispatcher.dispatchDue();
-        return { dispatched, intervalMinutes: interval };
-    },
+	id: 'directory-schedule-dispatcher',
+	cron: `*/${interval} * * * *`, // configurable interval
+	run: async () => {
+		const dispatcher = appContext.get(DirectoryScheduleDispatcherService);
+		const dispatched = await dispatcher.dispatchDue();
+		return { dispatched, intervalMinutes: interval };
+	}
 });
 ```
 
@@ -196,11 +196,11 @@ This cron task checks for due schedules and dispatches generation tasks at the c
 
 ## Related API Endpoints
 
-| Action              | Server Action Function                             | HTTP Method |
-|---------------------|---------------------------------------------------|-------------|
-| Update schedule     | `updateDirectorySchedule(directoryId, formData)`   | PATCH       |
-| Run immediately     | `runDirectorySchedule(directoryId)`                | POST        |
-| Cancel schedule     | `cancelDirectorySchedule(directoryId)`             | POST        |
+| Action          | Server Action Function                           | HTTP Method |
+| --------------- | ------------------------------------------------ | ----------- |
+| Update schedule | `updateDirectorySchedule(directoryId, formData)` | PATCH       |
+| Run immediately | `runDirectorySchedule(directoryId)`              | POST        |
+| Cancel schedule | `cancelDirectorySchedule(directoryId)`           | POST        |
 
 ## Internationalization
 

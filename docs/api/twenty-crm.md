@@ -34,14 +34,14 @@ apps/api/src/integrations/twenty-crm/
 
 The module reads configuration from environment variables via `CrmConfigService`:
 
-| Environment Variable       | Default  | Description                     |
-|----------------------------|----------|---------------------------------|
-| `TWENTY_CRM_BASE_URL`     | --       | Twenty CRM API base URL         |
-| `TWENTY_CRM_API_KEY`      | --       | API key for authentication      |
-| `TWENTY_CRM_WORKSPACE_ID` | --       | Workspace identifier            |
-| `TWENTY_CRM_TIMEOUT_MS`   | `30000`  | Request timeout in milliseconds |
-| `TWENTY_CRM_MAX_RETRIES`  | `3`      | Maximum retry attempts          |
-| `TWENTY_CRM_RETRY_DELAY_MS`| `1000`  | Base retry delay in milliseconds|
+| Environment Variable        | Default | Description                      |
+| --------------------------- | ------- | -------------------------------- |
+| `TWENTY_CRM_BASE_URL`       | --      | Twenty CRM API base URL          |
+| `TWENTY_CRM_API_KEY`        | --      | API key for authentication       |
+| `TWENTY_CRM_WORKSPACE_ID`   | --      | Workspace identifier             |
+| `TWENTY_CRM_TIMEOUT_MS`     | `30000` | Request timeout in milliseconds  |
+| `TWENTY_CRM_MAX_RETRIES`    | `3`     | Maximum retry attempts           |
+| `TWENTY_CRM_RETRY_DELAY_MS` | `1000`  | Base retry delay in milliseconds |
 
 The `isEnabled` getter returns `true` only when all three required variables (`BASE_URL`, `API_KEY`, `WORKSPACE_ID`) are set.
 
@@ -58,12 +58,12 @@ The `isEnabled` getter returns `true` only when all three required variables (`B
 
 `ClientService` wraps `TwentyCrmService` with typed methods for each entity:
 
-| Entity         | Create           | Read (one)    | Read (all)     | Update           | Delete           |
-|----------------|------------------|---------------|----------------|------------------|------------------|
-| **Companies**  | `createCompany`  | `getCompany`  | `getCompanies` | `updateCompany`  | `deleteCompany`  |
-| **Contacts**   | `createContact`  | `getContact`  | `getContacts`  | `updateContact`  | `deleteContact`  |
-| **Deals**      | `createDeal`     | `getDeal`     | `getDeals`     | `updateDeal`     | `deleteDeal`     |
-| **Products**   | `createProduct`  | `getProduct`  | `getProducts`  | `updateProduct`  | `deleteProduct`  |
+| Entity        | Create          | Read (one)   | Read (all)     | Update          | Delete          |
+| ------------- | --------------- | ------------ | -------------- | --------------- | --------------- |
+| **Companies** | `createCompany` | `getCompany` | `getCompanies` | `updateCompany` | `deleteCompany` |
+| **Contacts**  | `createContact` | `getContact` | `getContacts`  | `updateContact` | `deleteContact` |
+| **Deals**     | `createDeal`    | `getDeal`    | `getDeals`     | `updateDeal`    | `deleteDeal`    |
+| **Products**  | `createProduct` | `getProduct` | `getProducts`  | `updateProduct` | `deleteProduct` |
 
 ## CRM Entity Types
 
@@ -71,14 +71,14 @@ The `isEnabled` getter returns `true` only when all three required variables (`B
 
 ```typescript
 interface TwentyContact {
-  id?: string;
-  firstName?: string;
-  lastName?: string;
-  email?: string;
-  phone?: string;
-  companyId?: string;
-  position?: string;
-  avatarUrl?: string;
+	id?: string;
+	firstName?: string;
+	lastName?: string;
+	email?: string;
+	phone?: string;
+	companyId?: string;
+	position?: string;
+	avatarUrl?: string;
 }
 ```
 
@@ -86,14 +86,14 @@ interface TwentyContact {
 
 ```typescript
 interface TwentyOrganization {
-  id?: string;
-  name: string;
-  domainName?: string;
-  address?: string;
-  employees?: number;
-  linkedinUrl?: string;
-  annualRecurringRevenue?: number;
-  idealCustomerProfile?: boolean;
+	id?: string;
+	name: string;
+	domainName?: string;
+	address?: string;
+	employees?: number;
+	linkedinUrl?: string;
+	annualRecurringRevenue?: number;
+	idealCustomerProfile?: boolean;
 }
 ```
 
@@ -105,12 +105,12 @@ Products have `name`, `description`, `price`, `currency`, and `category`. Deals 
 
 `MappingUtils` provides static methods to convert between Ever Works entities and Twenty CRM entities:
 
-| Method                       | From                | To                    |
-|------------------------------|---------------------|-----------------------|
-| `mapClientToContact()`       | `EverWorksClient`   | `TwentyContact`       |
-| `mapCompanyToOrganization()` | `EverWorksCompany`  | `TwentyOrganization`  |
-| `mapItemToProduct()`         | `EverWorksItem`     | `TwentyProduct`       |
-| `mapItemToDeal()`            | `EverWorksItem`     | `TwentyDeal`          |
+| Method                       | From               | To                   |
+| ---------------------------- | ------------------ | -------------------- |
+| `mapClientToContact()`       | `EverWorksClient`  | `TwentyContact`      |
+| `mapCompanyToOrganization()` | `EverWorksCompany` | `TwentyOrganization` |
+| `mapItemToProduct()`         | `EverWorksItem`    | `TwentyProduct`      |
+| `mapItemToDeal()`            | `EverWorksItem`    | `TwentyDeal`         |
 
 Validation helpers (`validateContactData`, `validateOrganizationData`, `validateProductData`, `validateDealData`) return arrays of error messages for missing required fields.
 
@@ -127,14 +127,14 @@ Validation helpers (`validateContactData`, `validateOrganizationData`, `validate
 ```typescript
 // Static configuration
 TwentyCrmModule.forRoot({
-  twentyCrmConfig: { apiKey: '...', apiUrl: '...', workspaceId: '...' }
-})
+	twentyCrmConfig: { apiKey: '...', apiUrl: '...', workspaceId: '...' }
+});
 
 // Async configuration
 TwentyCrmModule.forRootAsync({
-  useFactory: (configService) => configService.getCrmConfig(),
-  inject: [ConfigService],
-})
+	useFactory: (configService) => configService.getCrmConfig(),
+	inject: [ConfigService]
+});
 ```
 
 The module is decorated with `@Global()`, making `TwentyCrmService`, `ClientService`, `CrmTenantService`, and `CrmConfigService` available application-wide.

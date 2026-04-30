@@ -35,15 +35,16 @@ Both models are instantiated via `createOpenAICompatible` from `@ai-sdk/openai-c
 
 The Agent Pipeline defines 5 steps (compared to Standard Pipeline's 15):
 
-| Step ID | Step Name | Est. Duration | Description |
-|---------|-----------|---------------|-------------|
-| `prepare-context` | Prepare Context | 5s | Initialize context, compact existing data |
-| `generate-items` | Generate Items | 120s | Autonomous tool-calling generation loop |
-| `collect-results` | Collect Results | 5s | Collect and structure final items |
-| `capture-screenshots` | Capture Screenshots | 30s | Capture images for items |
-| `cleanup` | Cleanup | 2s | Finalize metrics and clean up resources |
+| Step ID               | Step Name           | Est. Duration | Description                               |
+| --------------------- | ------------------- | ------------- | ----------------------------------------- |
+| `prepare-context`     | Prepare Context     | 5s            | Initialize context, compact existing data |
+| `generate-items`      | Generate Items      | 120s          | Autonomous tool-calling generation loop   |
+| `collect-results`     | Collect Results     | 5s            | Collect and structure final items         |
+| `capture-screenshots` | Capture Screenshots | 30s           | Capture images for items                  |
+| `cleanup`             | Cleanup             | 2s            | Finalize metrics and clean up resources   |
 
 Step dependencies:
+
 - `generate-items` requires `prepare-context`
 - `collect-results` requires `generate-items`
 - `capture-screenshots` requires `collect-results`
@@ -75,9 +76,9 @@ The `TokenUsageAccumulator` class tracks token usage across parent and worker mo
 
 ```typescript
 interface TokenUsageBreakdown {
-    parent: { promptTokens: number; completionTokens: number; totalTokens: number };
-    workers: { promptTokens: number; completionTokens: number; totalTokens: number };
-    total: { promptTokens: number; completionTokens: number; totalTokens: number };
+	parent: { promptTokens: number; completionTokens: number; totalTokens: number };
+	workers: { promptTokens: number; completionTokens: number; totalTokens: number };
+	total: { promptTokens: number; completionTokens: number; totalTokens: number };
 }
 ```
 
@@ -87,23 +88,23 @@ interface TokenUsageBreakdown {
 
 The Agent Pipeline's form schema is defined in `form-schema.ts`:
 
-| Field | Type | Default | Min | Max | Description |
-|-------|------|---------|-----|-----|-------------|
-| `target_items` | `number` | `50` | `1` | `500` | Target number of items to generate |
-| `max_pages_to_process` | `number` | `10` | `1` | `1000` | Maximum pages to extract content from |
-| `capture_screenshots` | `boolean` | `false` | - | - | Whether to capture screenshots |
+| Field                  | Type      | Default | Min | Max    | Description                           |
+| ---------------------- | --------- | ------- | --- | ------ | ------------------------------------- |
+| `target_items`         | `number`  | `50`    | `1` | `500`  | Target number of items to generate    |
+| `max_pages_to_process` | `number`  | `10`    | `1` | `1000` | Maximum pages to extract content from |
+| `capture_screenshots`  | `boolean` | `false` | -   | -      | Whether to capture screenshots        |
 
 ### Constants
 
 Key constants defined in `types.ts`:
 
-| Constant | Value | Description |
-|----------|-------|-------------|
-| `DEFAULT_MAX_STEPS` | `50` | Maximum tool-calling iterations |
-| `DEFAULT_CONTEXT_BUDGET_RATIO` | `0.8` | Fraction of context window to use |
-| `MAX_URLS_PER_BATCH` | `10` | Maximum URLs processed per `processUrls` call |
-| `WORKER_PROMPT_OVERHEAD_TOKENS` | `2000` | Token overhead reserved for worker prompts |
-| `MIN_CHUNK_CHARS` | `4000` | Minimum characters for content chunks |
+| Constant                        | Value  | Description                                   |
+| ------------------------------- | ------ | --------------------------------------------- |
+| `DEFAULT_MAX_STEPS`             | `50`   | Maximum tool-calling iterations               |
+| `DEFAULT_CONTEXT_BUDGET_RATIO`  | `0.8`  | Fraction of context window to use             |
+| `MAX_URLS_PER_BATCH`            | `10`   | Maximum URLs processed per `processUrls` call |
+| `WORKER_PROMPT_OVERHEAD_TOKENS` | `2000` | Token overhead reserved for worker prompts    |
+| `MIN_CHUNK_CHARS`               | `4000` | Minimum characters for content chunks         |
 
 ### Worker Content Budget
 
@@ -125,59 +126,68 @@ The `getWorkerContentBudgetRatio()` function dynamically adjusts how much of the
 The parent agent has access to 6 tools:
 
 #### 1. `search`
+
 Executes web search queries via `SearchFacade`.
 
 ```typescript
 parameters: {
-    queries: z.array(z.string()).min(1).max(5)
-        .describe('Search queries (1-5)')
+	queries: z.array(z.string()).min(1).max(5).describe('Search queries (1-5)');
 }
 ```
 
 #### 2. `findItems`
+
 Extracts directory items from search result content using the worker model.
 
 ```typescript
 parameters: {
-    searchResults: z.array(z.object({
-        url: z.string(),
-        title: z.string().optional(),
-        snippet: z.string().optional()
-    }))
+	searchResults: z.array(
+		z.object({
+			url: z.string(),
+			title: z.string().optional(),
+			snippet: z.string().optional()
+		})
+	);
 }
 ```
 
 #### 3. `processUrls`
+
 Extracts content from specific URLs and finds directory items. Processes 1-10 URLs with concurrency of 2 (via `p-map`).
 
 ```typescript
 parameters: {
-    urls: z.array(z.string().url()).min(1).max(10)
-        .describe('URLs to process (1-10)')
+	urls: z.array(z.string().url()).min(1).max(10).describe('URLs to process (1-10)');
 }
 ```
 
 #### 4. `modifyItems`
+
 Modifies existing items in the workspace (update, remove, merge, or set featured status).
 
 ```typescript
 parameters: {
-    operations: z.array(z.object({
-        action: z.enum(['update', 'remove', 'merge', 'set-featured']),
-        slug: z.string(),
-        data: z.record(z.unknown()).optional()
-    }))
+	operations: z.array(
+		z.object({
+			action: z.enum(['update', 'remove', 'merge', 'set-featured']),
+			slug: z.string(),
+			data: z.record(z.unknown()).optional()
+		})
+	);
 }
 ```
 
 #### 5. `getWorkspaceOverview`
+
 Returns a summary of the current workspace state: item count, categories, and items list.
 
 ```typescript
-parameters: {} // No parameters
+parameters: {
+} // No parameters
 ```
 
 #### 6. `reportProgress`
+
 Reports progress updates that are forwarded to the user interface.
 
 ```typescript
@@ -192,53 +202,44 @@ parameters: {
 ### Plugin Class
 
 ```typescript
-class AgentPipelinePlugin implements
-    IPlugin,
-    IPipelinePlugin<AgentPipelineStepId>,
-    IFormSchemaProvider
-{
-    readonly id = 'agent-pipeline';
-    readonly name = 'Agent Pipeline';
-    readonly version = '1.0.0';
-    readonly category: PluginCategory = 'pipeline';
-    readonly capabilities = ['pipeline', 'form-schema'];
-    readonly executionMode = 'engine-orchestrated';
+class AgentPipelinePlugin implements IPlugin, IPipelinePlugin<AgentPipelineStepId>, IFormSchemaProvider {
+	readonly id = 'agent-pipeline';
+	readonly name = 'Agent Pipeline';
+	readonly version = '1.0.0';
+	readonly category: PluginCategory = 'pipeline';
+	readonly capabilities = ['pipeline', 'form-schema'];
+	readonly executionMode = 'engine-orchestrated';
 
-    async executeStep(
-        stepId: AgentPipelineStepId,
-        context: PipelineContext,
-        execContext: StepExecutionContext
-    ): Promise<PipelineContext>;
+	async executeStep(
+		stepId: AgentPipelineStepId,
+		context: PipelineContext,
+		execContext: StepExecutionContext
+	): Promise<PipelineContext>;
 
-    getSteps(): PipelineStepDefinition<AgentPipelineStepId>[];
-    getFormSchema(): PluginFormSchema;
+	getSteps(): PipelineStepDefinition<AgentPipelineStepId>[];
+	getFormSchema(): PluginFormSchema;
 
-    async onLoad(context: PluginContext): Promise<void>;
-    async onUnload(): Promise<void>;
-    async healthCheck(): Promise<PluginHealthCheck>;
-    getManifest(): PluginManifest;
+	async onLoad(context: PluginContext): Promise<void>;
+	async onUnload(): Promise<void>;
+	async healthCheck(): Promise<PluginHealthCheck>;
+	getManifest(): PluginManifest;
 }
 ```
 
 ### Step IDs
 
 ```typescript
-type AgentPipelineStepId =
-    | 'prepare-context'
-    | 'generate-items'
-    | 'collect-results'
-    | 'capture-screenshots'
-    | 'cleanup';
+type AgentPipelineStepId = 'prepare-context' | 'generate-items' | 'collect-results' | 'capture-screenshots' | 'cleanup';
 ```
 
 ### TokenUsageAccumulator
 
 ```typescript
 class TokenUsageAccumulator {
-    addParentUsage(usage: LanguageModelUsage): void;
-    addWorkerUsage(usage: LanguageModelUsage): void;
-    getBreakdown(): TokenUsageBreakdown;
-    getTotalTokens(): number;
+	addParentUsage(usage: LanguageModelUsage): void;
+	addWorkerUsage(usage: LanguageModelUsage): void;
+	getBreakdown(): TokenUsageBreakdown;
+	getTotalTokens(): number;
 }
 ```
 
@@ -258,6 +259,7 @@ The system prompt is built dynamically from the generation context with these se
 8. **Directory Context** - Directory name, description, domain analysis
 
 Critical rules embedded in the system prompt:
+
 - Never invent items without a source URL
 - URL budget enforcement (respects `max_pages_to_process`)
 - Deduplication is enforced by the pipeline (agent should not duplicate)
@@ -268,17 +270,18 @@ The `ToolCircuitBreaker` prevents cascading failures when tools fail repeatedly:
 
 ```typescript
 class ToolCircuitBreaker {
-    constructor(threshold: number = 3);
+	constructor(threshold: number = 3);
 
-    recordFailure(toolName: string): void;
-    recordSuccess(toolName: string): void;
-    isTripped(toolName: string): boolean;
-    getUnavailableMessage(toolName: string): string;
-    getFailedTools(): string[];
+	recordFailure(toolName: string): void;
+	recordSuccess(toolName: string): void;
+	isTripped(toolName: string): boolean;
+	getUnavailableMessage(toolName: string): string;
+	getFailedTools(): string[];
 }
 ```
 
 Key behaviors:
+
 - Trips after `threshold` (default: 3) consecutive failures for a tool
 - Successful calls reset the failure counter
 - No half-open state (sessions are short-lived, recovery is not needed)
@@ -332,12 +335,12 @@ Concurrency is limited to 2 simultaneous URL processes via `p-map` to avoid over
 
 ```typescript
 const request = {
-    prompt: "Create a directory of machine learning frameworks",
-    config: {
-        target_items: 30,
-        max_pages_to_process: 20,
-        capture_screenshots: true
-    }
+	prompt: 'Create a directory of machine learning frameworks',
+	config: {
+		target_items: 30,
+		max_pages_to_process: 20,
+		capture_screenshots: true
+	}
 };
 ```
 
@@ -345,12 +348,12 @@ const request = {
 
 ```typescript
 const request = {
-    prompt: "Add more deep learning and NLP frameworks",
-    config: {
-        generation_method: 'CREATE_UPDATE',
-        target_items: 50,
-        max_pages_to_process: 15
-    }
+	prompt: 'Add more deep learning and NLP frameworks',
+	config: {
+		generation_method: 'CREATE_UPDATE',
+		target_items: 50,
+		max_pages_to_process: 15
+	}
 };
 ```
 
@@ -391,6 +394,7 @@ The 4-layer compaction strategy prevents context overflow:
 ### Worker Extraction Failures
 
 Individual URL processing failures in `processUrls` are isolated:
+
 - Each URL is processed independently
 - Failed URLs are logged and skipped
 - Successfully extracted items from the batch are still returned
@@ -399,20 +403,21 @@ Individual URL processing failures in `processUrls` are isolated:
 ### Token Budget Management
 
 The `TokenUsageAccumulator` tracks all token usage. If the budget is exhausted:
+
 - Parent model stops generating
 - Final results are collected from whatever items were discovered
 - Metrics reflect actual usage vs. budget
 
 ### Error Propagation
 
-| Error Type | Handling |
-|------------|----------|
+| Error Type             | Handling                                                               |
+| ---------------------- | ---------------------------------------------------------------------- |
 | Tool execution failure | Logged, circuit breaker updated, agent retries with different approach |
-| API rate limit | Retry with backoff via `withToolCallingRetry` |
-| Context overflow | Progressive compaction, then oldest message dropping |
-| Circuit breaker trip | Tool becomes unavailable, agent uses remaining tools |
-| Max steps reached | Generation stops, results collected from current state |
-| Worker model failure | Individual URL skipped, batch continues |
+| API rate limit         | Retry with backoff via `withToolCallingRetry`                          |
+| Context overflow       | Progressive compaction, then oldest message dropping                   |
+| Circuit breaker trip   | Tool becomes unavailable, agent uses remaining tools                   |
+| Max steps reached      | Generation stops, results collected from current state                 |
+| Worker model failure   | Individual URL skipped, batch continues                                |
 
 ## Related Plugins
 

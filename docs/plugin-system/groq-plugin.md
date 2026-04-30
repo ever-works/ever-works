@@ -1,7 +1,7 @@
 ---
 id: groq-plugin
-title: "Groq Plugin"
-sidebar_label: "Groq"
+title: 'Groq Plugin'
+sidebar_label: 'Groq'
 sidebar_position: 24
 ---
 
@@ -13,17 +13,17 @@ The Groq plugin provides ultra-fast AI inference through [Groq's](https://groq.c
 
 ## Overview
 
-| Property | Value |
-|---|---|
-| Plugin ID | `groq` |
-| Category | `ai-provider` |
-| Capabilities | `ai-provider` |
-| Version | `1.0.0` |
+| Property           | Value           |
+| ------------------ | --------------- |
+| Plugin ID          | `groq`          |
+| Category           | `ai-provider`   |
+| Capabilities       | `ai-provider`   |
+| Version            | `1.0.0`         |
 | Configuration Mode | `user-required` |
-| Provider Type | `groq` |
-| Auto-enable | No |
-| Built-in | Yes |
-| Visibility | `public` |
+| Provider Type      | `groq`          |
+| Auto-enable        | No              |
+| Built-in           | Yes             |
+| Visibility         | `public`        |
 
 Groq runs open-source models such as Llama and Qwen at significantly higher speeds than conventional cloud providers, making it well suited for directories with many items where generation speed is a priority.
 
@@ -44,16 +44,16 @@ Groq exposes an OpenAI-compatible API endpoint, so the plugin uses the same `AiO
 
 ### Settings Schema
 
-| Setting | Type | Default | Scope | Description |
-|---|---|---|---|---|
-| `apiKey` | `string` | (required) | `user` | Groq API key (marked as secret) |
-| `defaultModel` | `string` | `qwen/qwen3-32b` | `global` | Used for all AI tasks unless a tier-specific model is set |
-| `simpleModel` | `string` | `qwen/qwen3-32b` | `global` | Handles tags, short descriptions, and quick classifications |
-| `mediumModel` | `string` | `qwen/qwen3-32b` | `global` | Handles listings, summaries, and content reformatting |
-| `complexModel` | `string` | `qwen/qwen3-32b` | `global` | Handles full page generation and multi-step analysis |
-| `baseUrl` | `string` | `https://api.groq.com/openai/v1` | hidden | Custom API endpoint for proxies or compatible services |
-| `temperature` | `number` | `0.7` | hidden | Controls output randomness (0--2) |
-| `maxTokens` | `number` | `4096` | hidden | Maximum response length |
+| Setting        | Type     | Default                          | Scope    | Description                                                 |
+| -------------- | -------- | -------------------------------- | -------- | ----------------------------------------------------------- |
+| `apiKey`       | `string` | (required)                       | `user`   | Groq API key (marked as secret)                             |
+| `defaultModel` | `string` | `qwen/qwen3-32b`                 | `global` | Used for all AI tasks unless a tier-specific model is set   |
+| `simpleModel`  | `string` | `qwen/qwen3-32b`                 | `global` | Handles tags, short descriptions, and quick classifications |
+| `mediumModel`  | `string` | `qwen/qwen3-32b`                 | `global` | Handles listings, summaries, and content reformatting       |
+| `complexModel` | `string` | `qwen/qwen3-32b`                 | `global` | Handles full page generation and multi-step analysis        |
+| `baseUrl`      | `string` | `https://api.groq.com/openai/v1` | hidden   | Custom API endpoint for proxies or compatible services      |
+| `temperature`  | `number` | `0.7`                            | hidden   | Controls output randomness (0--2)                           |
+| `maxTokens`    | `number` | `4096`                           | hidden   | Maximum response length                                     |
 
 ### Required Fields
 
@@ -66,12 +66,12 @@ The API key field uses `x-secret: true` to render a masked password input with a
 
 ```json
 {
-    "apiKey": {
-        "type": "string",
-        "title": "Groq API Key",
-        "x-secret": true,
-        "x-scope": "user"
-    }
+	"apiKey": {
+		"type": "string",
+		"title": "Groq API Key",
+		"x-secret": true,
+		"x-scope": "user"
+	}
 }
 ```
 
@@ -79,14 +79,14 @@ The `baseUrl` field uses `x-hidden: true` to keep it out of the standard setting
 
 ## Model Capabilities
 
-| Capability | Supported |
-|---|---|
-| Structured output (JSON mode) | Yes |
-| Streaming responses | Yes |
-| Tool calling | Yes |
-| Vision (image input) | Yes |
-| Embeddings | **No** |
-| Max context length | 128,000 tokens |
+| Capability                    | Supported      |
+| ----------------------------- | -------------- |
+| Structured output (JSON mode) | Yes            |
+| Streaming responses           | Yes            |
+| Tool calling                  | Yes            |
+| Vision (image input)          | Yes            |
+| Embeddings                    | **No**         |
+| Max context length            | 128,000 tokens |
 
 ### Embedding Limitation
 
@@ -121,10 +121,10 @@ flowchart LR
     C --> CM
 ```
 
-| Tier | Use Cases | Recommended Models |
-|---|---|---|
-| Simple | Tags, short descriptions, classifications | `llama-3.1-8b-instant`, `gemma2-9b-it` |
-| Medium | Listings, summaries, content reformatting | `qwen/qwen3-32b`, `llama-3.3-70b-versatile` |
+| Tier    | Use Cases                                 | Recommended Models                          |
+| ------- | ----------------------------------------- | ------------------------------------------- |
+| Simple  | Tags, short descriptions, classifications | `llama-3.1-8b-instant`, `gemma2-9b-it`      |
+| Medium  | Listings, summaries, content reformatting | `qwen/qwen3-32b`, `llama-3.3-70b-versatile` |
 | Complex | Full page generation, multi-step analysis | `qwen/qwen3-32b`, `llama-3.3-70b-versatile` |
 
 If a tier-specific model is not set, the `defaultModel` is used for all tiers.
@@ -155,27 +155,27 @@ The `apiKey` is intentionally empty at load time. It is merged from the user's s
 
 ## API Methods
 
-| Method | Description |
-|---|---|
-| `createChatCompletion(options)` | Single chat completion request |
+| Method                                   | Description                                 |
+| ---------------------------------------- | ------------------------------------------- |
+| `createChatCompletion(options)`          | Single chat completion request              |
 | `createStreamingChatCompletion(options)` | Streaming chat completion (async generator) |
-| `createEmbedding(options)` | **Throws error** -- not supported |
-| `listModels(settings)` | List available models from Groq |
-| `isAvailable(settings)` | Test API key and connection |
-| `getCapabilities()` | Return supported capabilities |
-| `healthCheck()` | Return plugin health status |
+| `createEmbedding(options)`               | **Throws error** -- not supported           |
+| `listModels(settings)`                   | List available models from Groq             |
+| `isAvailable(settings)`                  | Test API key and connection                 |
+| `getCapabilities()`                      | Return supported capabilities               |
+| `healthCheck()`                          | Return plugin health status                 |
 
 ## Comparison: Groq vs Ollama
 
-| Aspect | Groq | Ollama |
-|---|---|---|
-| Hosting | Cloud (Groq servers) | Self-hosted |
-| API key required | Yes | Usually not |
-| Speed | Very fast (custom LPU hardware) | Depends on local hardware |
-| Cost | Free tier + paid plans | Free (your own hardware) |
-| Embeddings | Not supported | Supported |
-| Data privacy | Data sent to Groq servers | Data stays local |
-| Model availability | Curated set of models | Any Ollama-compatible model |
+| Aspect             | Groq                            | Ollama                      |
+| ------------------ | ------------------------------- | --------------------------- |
+| Hosting            | Cloud (Groq servers)            | Self-hosted                 |
+| API key required   | Yes                             | Usually not                 |
+| Speed              | Very fast (custom LPU hardware) | Depends on local hardware   |
+| Cost               | Free tier + paid plans          | Free (your own hardware)    |
+| Embeddings         | Not supported                   | Supported                   |
+| Data privacy       | Data sent to Groq servers       | Data stays local            |
+| Model availability | Curated set of models           | Any Ollama-compatible model |
 
 ## Getting Started
 
@@ -187,10 +187,10 @@ The `apiKey` is intentionally empty at load time. It is merged from the user's s
 
 ## Troubleshooting
 
-| Issue | Cause | Solution |
-|---|---|---|
-| Authentication error | Invalid or missing API key | Verify your key at [console.groq.com](https://console.groq.com) |
-| Rate limit exceeded | Too many requests | Wait and retry, or upgrade your Groq plan |
-| Embedding request fails | Groq does not support embeddings | Use a different provider for embeddings |
-| Model not available | Model removed from Groq | Check Groq docs for current model list and update your selection |
-| Slow responses | Network latency to Groq servers | Check your connection; Groq inference itself is fast |
+| Issue                   | Cause                            | Solution                                                         |
+| ----------------------- | -------------------------------- | ---------------------------------------------------------------- |
+| Authentication error    | Invalid or missing API key       | Verify your key at [console.groq.com](https://console.groq.com)  |
+| Rate limit exceeded     | Too many requests                | Wait and retry, or upgrade your Groq plan                        |
+| Embedding request fails | Groq does not support embeddings | Use a different provider for embeddings                          |
+| Model not available     | Model removed from Groq          | Check Groq docs for current model list and update your selection |
+| Slow responses          | Network latency to Groq servers  | Check your connection; Groq inference itself is fast             |

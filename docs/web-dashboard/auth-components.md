@@ -45,10 +45,10 @@ Server actions handle all form submissions. OAuth flows redirect the browser to 
 
 This component takes no props. It renders two OAuth buttons in a two-column grid:
 
-| Button | Provider | Icon |
-|--------|----------|------|
+| Button | Provider               | Icon                      |
+| ------ | ---------------------- | ------------------------- |
 | Google | `OAuthProvider.GOOGLE` | Google "G" multicolor SVG |
-| GitHub | `OAuthProvider.GITHUB` | GitHub octocat SVG |
+| GitHub | `OAuthProvider.GITHUB` | GitHub octocat SVG        |
 
 Each button calls the `connectProvider` server action with the appropriate `OAuthProvider` enum value. The server action returns a `{ success, url }` response. If successful, the component redirects the browser to the OAuth authorization URL via `window.location.href`.
 
@@ -59,10 +59,10 @@ import { SocialLoginButtons } from '@/components/auth/social-login';
 
 // Used on both login and register pages
 <div>
-    <form>{/* email/password fields */}</form>
-    <div className="divider">or</div>
-    <SocialLoginButtons />
-</div>
+	<form>{/* email/password fields */}</form>
+	<div className="divider">or</div>
+	<SocialLoginButtons />
+</div>;
 ```
 
 ## Implementation Details
@@ -82,14 +82,14 @@ The complete OAuth flow works as follows:
 
 The auth server actions in `apps/web/src/app/actions/auth.ts` include:
 
-| Action | Purpose | Validation |
-|--------|---------|------------|
-| `login` | Email/password authentication | Zod schema (email, password) |
-| `register` | New user registration | Zod schema (username, email, password) |
-| `logout` | Clear session and redirect | None |
-| `connectProvider` | Initiate OAuth flow | Provider enum |
-| `forgotPassword` | Send password reset email | Zod schema (email) |
-| `resetPassword` | Set new password with token | Zod schema (token, password) |
+| Action            | Purpose                       | Validation                             |
+| ----------------- | ----------------------------- | -------------------------------------- |
+| `login`           | Email/password authentication | Zod schema (email, password)           |
+| `register`        | New user registration         | Zod schema (username, email, password) |
+| `logout`          | Clear session and redirect    | None                                   |
+| `connectProvider` | Initiate OAuth flow           | Provider enum                          |
+| `forgotPassword`  | Send password reset email     | Zod schema (email)                     |
+| `resetPassword`   | Set new password with token   | Zod schema (token, password)           |
 
 All form-based actions use Zod for input validation. On validation failure, they return structured error objects with field-level error messages. On success, `login` and `register` redirect to the dashboard.
 
@@ -139,40 +139,30 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 
 export function LoginPage() {
-    return (
-        <div className="max-w-md mx-auto space-y-6">
-            <h1>Sign In</h1>
+	return (
+		<div className="max-w-md mx-auto space-y-6">
+			<h1>Sign In</h1>
 
-            <form action={login}>
-                <Input
-                    variant="form"
-                    label="Email"
-                    name="email"
-                    type="email"
-                />
-                <Input
-                    variant="form"
-                    label="Password"
-                    name="password"
-                    type="password"
-                />
-                <Button type="submit" className="w-full">
-                    Sign In
-                </Button>
-            </form>
+			<form action={login}>
+				<Input variant="form" label="Email" name="email" type="email" />
+				<Input variant="form" label="Password" name="password" type="password" />
+				<Button type="submit" className="w-full">
+					Sign In
+				</Button>
+			</form>
 
-            <div className="relative">
-                <div className="absolute inset-0 flex items-center">
-                    <span className="w-full border-t" />
-                </div>
-                <div className="relative flex justify-center text-xs uppercase">
-                    <span className="bg-white px-2 text-text-muted">Or</span>
-                </div>
-            </div>
+			<div className="relative">
+				<div className="absolute inset-0 flex items-center">
+					<span className="w-full border-t" />
+				</div>
+				<div className="relative flex justify-center text-xs uppercase">
+					<span className="bg-white px-2 text-text-muted">Or</span>
+				</div>
+			</div>
 
-            <SocialLoginButtons />
-        </div>
-    );
+			<SocialLoginButtons />
+		</div>
+	);
 }
 ```
 

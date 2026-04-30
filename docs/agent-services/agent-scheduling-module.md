@@ -59,12 +59,12 @@ The core service (~571 lines) managing all scheduling operations:
 
 Four cadence levels are supported:
 
-| Cadence | Interval | Typical Use Case |
-|---|---|---|
-| `HOURLY` | Every 60 minutes | High-frequency monitoring directories |
-| `DAILY` | Every 24 hours | Standard content directories |
-| `WEEKLY` | Every 7 days | Slower-moving curated lists |
-| `MONTHLY` | Every 30 days | Archival or low-update directories |
+| Cadence   | Interval         | Typical Use Case                      |
+| --------- | ---------------- | ------------------------------------- |
+| `HOURLY`  | Every 60 minutes | High-frequency monitoring directories |
+| `DAILY`   | Every 24 hours   | Standard content directories          |
+| `WEEKLY`  | Every 7 days     | Slower-moving curated lists           |
+| `MONTHLY` | Every 30 days    | Archival or low-update directories    |
 
 ### Drift Correction
 
@@ -92,12 +92,13 @@ The service implements configurable failure limits:
 
 Two billing modes are supported:
 
-| Mode | Behavior |
-|---|---|
+| Mode           | Behavior                                                                                     |
+| -------------- | -------------------------------------------------------------------------------------------- |
 | `SUBSCRIPTION` | Schedule runs are included in the subscription plan. Cadence options are gated by plan tier. |
-| `USAGE` | Pay-per-use billing. Each run is metered and billed separately. |
+| `USAGE`        | Pay-per-use billing. Each run is metered and billed separately.                              |
 
 Plan enforcement validates:
+
 - Allowed cadence levels per subscription tier
 - Maximum number of directories with active schedules
 - Per-run entitlement check before dispatch
@@ -140,14 +141,14 @@ validateRunEntitlement(directory: Directory, user: User): Promise<{
 
 ```typescript
 interface ScheduleInfo {
-    enabled: boolean;
-    cadence: DirectoryScheduleCadence | null;
-    status: DirectoryScheduleStatus | null;
-    nextRunAt: Date | null;
-    lastRunAt?: Date;
-    lastError?: string;
-    failureCount: number;
-    maxFailureBeforePause: number;
+	enabled: boolean;
+	cadence: DirectoryScheduleCadence | null;
+	status: DirectoryScheduleStatus | null;
+	nextRunAt: Date | null;
+	lastRunAt?: Date;
+	lastError?: string;
+	failureCount: number;
+	maxFailureBeforePause: number;
 }
 ```
 
@@ -199,15 +200,15 @@ Scheduled runs are dispatched through the `DirectoryGenerationDispatcher` interf
 
 ```typescript
 interface DirectoryGenerationDispatcher {
-    dispatchDirectoryGeneration(payload: DirectoryGenerationPayload): Promise<string | null>;
+	dispatchDirectoryGeneration(payload: DirectoryGenerationPayload): Promise<string | null>;
 }
 
 interface DirectoryGenerationPayload {
-    directoryId: string;
-    userId: string;
-    options?: {
-        aiProviderOverride?: string;
-    };
+	directoryId: string;
+	userId: string;
+	options?: {
+		aiProviderOverride?: string;
+	};
 }
 ```
 
@@ -215,12 +216,12 @@ The dispatcher is injected via the `DIRECTORY_GENERATION_DISPATCHER` Symbol toke
 
 ## Dependencies
 
-| Dependency | Purpose |
-|---|---|
-| `@ever-works/agent/database` | `DirectoryRepository`, `DirectoryScheduleRepository` |
-| `@ever-works/agent/subscriptions` | Plan enforcement and billing mode resolution |
-| `@ever-works/agent/tasks` | `DIRECTORY_GENERATION_DISPATCHER` for background dispatch |
-| `TypeORM` | Entity persistence and queries |
+| Dependency                        | Purpose                                                   |
+| --------------------------------- | --------------------------------------------------------- |
+| `@ever-works/agent/database`      | `DirectoryRepository`, `DirectoryScheduleRepository`      |
+| `@ever-works/agent/subscriptions` | Plan enforcement and billing mode resolution              |
+| `@ever-works/agent/tasks`         | `DIRECTORY_GENERATION_DISPATCHER` for background dispatch |
+| `TypeORM`                         | Entity persistence and queries                            |
 
 ## Usage Examples
 
@@ -229,12 +230,7 @@ The dispatcher is injected via the `DIRECTORY_GENERATION_DISPATCHER` Symbol toke
 ```typescript
 import { DirectoryScheduleService } from '@ever-works/agent/services';
 
-const schedule = await scheduleService.updateSchedule(
-    directory,
-    user,
-    'DAILY',
-    { maxFailureBeforePause: 5 },
-);
+const schedule = await scheduleService.updateSchedule(directory, user, 'DAILY', { maxFailureBeforePause: 5 });
 
 console.log(`Next run at: ${schedule.nextRunAt}`);
 ```
@@ -264,7 +260,7 @@ console.log(`Recovered ${recovered} stuck schedules`);
 ```typescript
 const { allowed, reason } = await scheduleService.validateRunEntitlement(directory, user);
 if (!allowed) {
-    console.log(`Schedule blocked: ${reason}`);
-    // e.g., "Plan does not allow HOURLY cadence"
+	console.log(`Schedule blocked: ${reason}`);
+	// e.g., "Plan does not allow HOURLY cadence"
 }
 ```

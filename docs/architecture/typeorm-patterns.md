@@ -31,16 +31,16 @@ graph TD
 
 ## Source Files
 
-| File | Purpose |
-|------|---------|
-| `packages/agent/src/database/database.module.ts` | Module registering all entities and repositories |
-| `packages/agent/src/database/database.config.ts` | Multi-database configuration with environment-based selection |
+| File                                                     | Purpose                                                         |
+| -------------------------------------------------------- | --------------------------------------------------------------- |
+| `packages/agent/src/database/database.module.ts`         | Module registering all entities and repositories                |
+| `packages/agent/src/database/database.config.ts`         | Multi-database configuration with environment-based selection   |
 | `packages/agent/src/database/database-config.factory.ts` | Predefined configurations for CLI, API, test, PostgreSQL, MySQL |
-| `packages/agent/src/database/database-init.service.ts` | Module lifecycle hook for database initialization |
-| `packages/agent/src/database/repositories/*.ts` | All custom repository classes |
-| `packages/agent/src/database/utils/db.utils.ts` | TLS options helper, database URL parser |
-| `packages/agent/src/database/utils/helper.ts` | SQL LIKE pattern sanitization utilities |
-| `packages/agent/src/entities/*.ts` | All TypeORM entity definitions |
+| `packages/agent/src/database/database-init.service.ts`   | Module lifecycle hook for database initialization               |
+| `packages/agent/src/database/repositories/*.ts`          | All custom repository classes                                   |
+| `packages/agent/src/database/utils/db.utils.ts`          | TLS options helper, database URL parser                         |
+| `packages/agent/src/database/utils/helper.ts`            | SQL LIKE pattern sanitization utilities                         |
+| `packages/agent/src/entities/*.ts`                       | All TypeORM entity definitions                                  |
 
 ## Key Classes
 
@@ -50,30 +50,30 @@ The central module that registers all entities via `TypeOrmModule.forFeature(ENT
 
 ```typescript
 @Module({
-    imports: [
-        ConfigModule.forFeature(databaseConfig),
-        TypeOrmModule.forRootAsync({
-            imports: [ConfigModule],
-            useFactory: (configService: ConfigService) => {
-                const config = configService.get('database');
-                return config;
-            },
-            inject: [ConfigService],
-        }),
-        TypeOrmModule.forFeature(ENTITIES),
-    ],
-    providers: [
-        DirectoryRepository,
-        UserRepository,
-        ApiKeyRepository,
-        // ... all repositories
-    ],
-    exports: [
-        TypeOrmModule,
-        DirectoryRepository,
-        UserRepository,
-        // ... all repositories
-    ],
+	imports: [
+		ConfigModule.forFeature(databaseConfig),
+		TypeOrmModule.forRootAsync({
+			imports: [ConfigModule],
+			useFactory: (configService: ConfigService) => {
+				const config = configService.get('database');
+				return config;
+			},
+			inject: [ConfigService]
+		}),
+		TypeOrmModule.forFeature(ENTITIES)
+	],
+	providers: [
+		DirectoryRepository,
+		UserRepository,
+		ApiKeyRepository
+		// ... all repositories
+	],
+	exports: [
+		TypeOrmModule,
+		DirectoryRepository,
+		UserRepository
+		// ... all repositories
+	]
 })
 export class DatabaseModule {}
 ```
@@ -85,19 +85,19 @@ Every repository follows the same pattern -- an `@Injectable()` service wrapping
 ```typescript
 @Injectable()
 export class UserRepository {
-    constructor(
-        @InjectRepository(User)
-        private readonly repository: Repository<User>,
-    ) {}
+	constructor(
+		@InjectRepository(User)
+		private readonly repository: Repository<User>
+	) {}
 
-    async findByEmail(email: string): Promise<User | null> {
-        return this.repository.findOne({ where: { email } });
-    }
+	async findByEmail(email: string): Promise<User | null> {
+		return this.repository.findOne({ where: { email } });
+	}
 
-    async create(userData: Partial<User>): Promise<User> {
-        const user = this.repository.create(userData);
-        return this.repository.save(user);
-    }
+	async create(userData: Partial<User>): Promise<User> {
+		const user = this.repository.create(userData);
+		return this.repository.save(user);
+	}
 }
 ```
 
@@ -108,29 +108,29 @@ Entities use standard TypeORM decorators with UUID primary keys and relationship
 ```typescript
 @Entity({ name: 'directories' })
 export class Directory {
-    @PrimaryGeneratedColumn('uuid')
-    id: string;
+	@PrimaryGeneratedColumn('uuid')
+	id: string;
 
-    @Column()
-    name: string;
+	@Column()
+	name: string;
 
-    @ManyToOne(() => User, (user) => user.directories, {
-        onDelete: 'CASCADE',
-        eager: true,
-    })
-    user: User;
+	@ManyToOne(() => User, (user) => user.directories, {
+		onDelete: 'CASCADE',
+		eager: true
+	})
+	user: User;
 
-    @OneToMany(() => DirectoryMember, (member) => member.directory)
-    members?: DirectoryMember[];
+	@OneToMany(() => DirectoryMember, (member) => member.directory)
+	members?: DirectoryMember[];
 
-    @Column('simple-json', { nullable: true })
-    generateStatus?: GenerateStatus;
+	@Column('simple-json', { nullable: true })
+	generateStatus?: GenerateStatus;
 
-    @CreateDateColumn()
-    createdAt: Date;
+	@CreateDateColumn()
+	createdAt: Date;
 
-    @UpdateDateColumn()
-    updatedAt: Date;
+	@UpdateDateColumn()
+	updatedAt: Date;
 }
 ```
 
@@ -140,10 +140,7 @@ The `DirectoryRepository` implements a `caseInsensitiveLike` helper using `Raw()
 
 ```typescript
 function caseInsensitiveLike(search: string) {
-    return Raw(
-        (alias) => `LOWER(${alias}) LIKE LOWER(:search)`,
-        { search: `%${search}%` },
-    );
+	return Raw((alias) => `LOWER(${alias}) LIKE LOWER(:search)`, { search: `%${search}%` });
 }
 ```
 
@@ -193,20 +190,20 @@ async findAllAccessible(options?: {
 
 The `databaseConfig` function (registered via `@nestjs/config`) auto-detects the database type from environment variables:
 
-| Environment Variable | Purpose | Default |
-|---------------------|---------|---------|
-| `DATABASE_TYPE` | `sqlite`, `postgres`, `mysql`, `mariadb` | `better-sqlite3` |
-| `DATABASE_URL` | Full connection URL (PostgreSQL/MySQL) | -- |
-| `DATABASE_HOST` | Database host | `localhost` |
-| `DATABASE_PORT` | Database port | `5432` (PG) / `3306` (MySQL) |
-| `DATABASE_USERNAME` | Username | `postgres` / `root` |
-| `DATABASE_PASSWORD` | Password | -- |
-| `DATABASE_NAME` | Database name | `ever_works` |
-| `DATABASE_PATH` | SQLite file path | auto-detected |
-| `DATABASE_IN_MEMORY` | Use in-memory SQLite | `false` |
-| `DATABASE_LOGGING` | Enable SQL logging | `false` |
-| `DATABASE_SSL_MODE` | Enable SSL/TLS | `false` |
-| `DATABASE_AUTO_MIGRATE` | Auto-sync schema | `false` |
+| Environment Variable    | Purpose                                  | Default                      |
+| ----------------------- | ---------------------------------------- | ---------------------------- |
+| `DATABASE_TYPE`         | `sqlite`, `postgres`, `mysql`, `mariadb` | `better-sqlite3`             |
+| `DATABASE_URL`          | Full connection URL (PostgreSQL/MySQL)   | --                           |
+| `DATABASE_HOST`         | Database host                            | `localhost`                  |
+| `DATABASE_PORT`         | Database port                            | `5432` (PG) / `3306` (MySQL) |
+| `DATABASE_USERNAME`     | Username                                 | `postgres` / `root`          |
+| `DATABASE_PASSWORD`     | Password                                 | --                           |
+| `DATABASE_NAME`         | Database name                            | `ever_works`                 |
+| `DATABASE_PATH`         | SQLite file path                         | auto-detected                |
+| `DATABASE_IN_MEMORY`    | Use in-memory SQLite                     | `false`                      |
+| `DATABASE_LOGGING`      | Enable SQL logging                       | `false`                      |
+| `DATABASE_SSL_MODE`     | Enable SSL/TLS                           | `false`                      |
+| `DATABASE_AUTO_MIGRATE` | Auto-sync schema                         | `false`                      |
 
 ### Predefined Configurations
 
@@ -221,11 +218,11 @@ DatabaseConfigurations.apiDevelopment();
 
 // Production PostgreSQL
 DatabaseConfigurations.postgres({
-    host: 'db.example.com',
-    port: 5432,
-    username: 'app',
-    password: 'secret',
-    databaseName: 'ever_works',
+	host: 'db.example.com',
+	port: 5432,
+	username: 'app',
+	password: 'secret',
+	databaseName: 'ever_works'
 });
 
 // Test: always in-memory
@@ -290,14 +287,14 @@ async countByUserId(userId: string): Promise<number> {
 ```typescript
 // Escapes %, _, and \ to prevent SQL injection in LIKE queries
 export function sanitizeLikePattern(search: string): string {
-    return search.replace(/[%_\\]/g, '\\$&');
+	return search.replace(/[%_\\]/g, '\\$&');
 }
 
 export function prepareLikeSearchTerm(search?: string): string | undefined {
-    if (!search) return undefined;
-    const trimmed = search.trim();
-    if (!trimmed) return undefined;
-    return sanitizeLikePattern(trimmed);
+	if (!search) return undefined;
+	const trimmed = search.trim();
+	if (!trimmed) return undefined;
+	return sanitizeLikePattern(trimmed);
 }
 ```
 

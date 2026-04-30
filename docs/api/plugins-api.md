@@ -31,9 +31,9 @@ All endpoints require JWT authentication.
 
 List all available plugins with user-specific installation status.
 
-| Query Parameter | Type   | Description                     |
-|-----------------|--------|---------------------------------|
-| `category`      | string | Filter by plugin category       |
+| Query Parameter | Type   | Description               |
+| --------------- | ------ | ------------------------- |
+| `category`      | string | Filter by plugin category |
 
 Returns `PluginListResponseDto` containing `plugins` (array), `total` count, available `categories`, and `capabilities`.
 
@@ -107,25 +107,27 @@ Extends `UserPluginResponseDto` with: `directoryEnabled`, `activeCapability`, `d
 
 Plugin settings are defined via JSON Schema with custom extensions:
 
-| Extension    | Description                                    |
-|--------------|------------------------------------------------|
-| `secret`     | Field is never returned in API responses       |
-| `adminOnly`  | Restricted to admin users                      |
-| `envVar`     | Environment variable name for env-only fields  |
-| `scope`      | `global`, `user`, or `directory`               |
-| `widget`     | UI widget hint (e.g., `model-select`)          |
-| `hidden`     | Hide from settings UI                          |
+| Extension   | Description                                   |
+| ----------- | --------------------------------------------- |
+| `secret`    | Field is never returned in API responses      |
+| `adminOnly` | Restricted to admin users                     |
+| `envVar`    | Environment variable name for env-only fields |
+| `scope`     | `global`, `user`, or `directory`              |
+| `widget`    | UI widget hint (e.g., `model-select`)         |
+| `hidden`    | Hide from settings UI                         |
 
 ## Module Registration
 
 ```typescript
 @Module({
-  imports: [
-    TypeOrmModule.forFeature([PluginEntity, UserPluginEntity, DirectoryPluginEntity]),
-    FacadesModule, DirectoryModule, AuthModule,
-  ],
-  controllers: [PluginsController],
-  providers: [PluginOperationsService, SettingsSchemaValidatorService],
+	imports: [
+		TypeOrmModule.forFeature([PluginEntity, UserPluginEntity, DirectoryPluginEntity]),
+		FacadesModule,
+		DirectoryModule,
+		AuthModule
+	],
+	controllers: [PluginsController],
+	providers: [PluginOperationsService, SettingsSchemaValidatorService]
 })
 export class PluginsModule {}
 ```

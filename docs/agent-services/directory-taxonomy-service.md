@@ -1,7 +1,7 @@
 ---
 id: directory-taxonomy-service
-title: "DirectoryTaxonomyService Deep Dive"
-sidebar_label: "Directory Taxonomy"
+title: 'DirectoryTaxonomyService Deep Dive'
+sidebar_label: 'Directory Taxonomy'
 sidebar_position: 14
 ---
 
@@ -49,9 +49,9 @@ Returns all categories for a directory. Requires viewer access.
 
 Creates a new category. Requires editor access. Enforces unique names (case-insensitive).
 
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| `dto` | `CreateCategoryDto` | `{ name, description?, icon_url?, priority? }` |
+| Parameter | Type                | Description                                    |
+| --------- | ------------------- | ---------------------------------------------- |
+| `dto`     | `CreateCategoryDto` | `{ name, description?, icon_url?, priority? }` |
 
 **Returns:** `Promise<{ status: string; category: Category }>`
 
@@ -59,10 +59,10 @@ Creates a new category. Requires editor access. Enforces unique names (case-inse
 
 Updates an existing category by ID. Requires editor access.
 
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| `categoryId` | `string` | The slugified category ID |
-| `dto` | `UpdateCategoryDto` | Partial update fields |
+| Parameter    | Type                | Description               |
+| ------------ | ------------------- | ------------------------- |
+| `categoryId` | `string`            | The slugified category ID |
+| `dto`        | `UpdateCategoryDto` | Partial update fields     |
 
 **Returns:** `Promise<{ status: string; category: Category }>`
 
@@ -106,9 +106,9 @@ Update methods use conditional spreading to apply only provided fields:
 
 ```typescript
 const updatedCategory: Category = {
-    ...existingCategory,
-    ...(dto.name && { name: dto.name.trim() }),
-    ...(dto.description !== undefined && { description: dto.description?.trim() }),
+	...existingCategory,
+	...(dto.name && { name: dto.name.trim() }),
+	...(dto.description !== undefined && { description: dto.description?.trim() })
 };
 ```
 
@@ -120,12 +120,12 @@ All string inputs are trimmed. Names and descriptions pass through the `sanitize
 
 ## Database Interactions
 
-| Repository / Service | Method | Purpose |
-|---------------------|--------|---------|
-| `DirectoryOwnershipService` | `ensureAccess`, `ensureCanEdit` | Authorization checks |
-| `UserRepository` | `findById` | Load the User entity for git operations |
-| `DataGeneratorService` | `getCategoriesTags` | Read current taxonomy from git data repo |
-| `DataGeneratorService` | `saveCategories`, `saveTags`, `saveCollections` | Write updated taxonomy to git data repo |
+| Repository / Service        | Method                                          | Purpose                                  |
+| --------------------------- | ----------------------------------------------- | ---------------------------------------- |
+| `DirectoryOwnershipService` | `ensureAccess`, `ensureCanEdit`                 | Authorization checks                     |
+| `UserRepository`            | `findById`                                      | Load the User entity for git operations  |
+| `DataGeneratorService`      | `getCategoriesTags`                             | Read current taxonomy from git data repo |
+| `DataGeneratorService`      | `saveCategories`, `saveTags`, `saveCollections` | Write updated taxonomy to git data repo  |
 
 ## Event System
 
@@ -133,13 +133,13 @@ This service does not directly emit events. Changes to taxonomy are persisted th
 
 ## Error Handling
 
-| Scenario | Exception | HTTP Status |
-|----------|-----------|-------------|
-| User not found | `NotFoundException` | 404 |
-| Duplicate name on create | `BadRequestException` | 400 |
-| Duplicate name on update | `BadRequestException` | 400 |
-| Entity not found on update/delete | `NotFoundException` | 404 |
-| Insufficient permissions | `ForbiddenException` (via ownership service) | 403 |
+| Scenario                          | Exception                                    | HTTP Status |
+| --------------------------------- | -------------------------------------------- | ----------- |
+| User not found                    | `NotFoundException`                          | 404         |
+| Duplicate name on create          | `BadRequestException`                        | 400         |
+| Duplicate name on update          | `BadRequestException`                        | 400         |
+| Entity not found on update/delete | `NotFoundException`                          | 404         |
+| Insufficient permissions          | `ForbiddenException` (via ownership service) | 403         |
 
 ## Usage Examples
 
@@ -149,26 +149,22 @@ const categories = await taxonomyService.getCategories(directoryId, userId);
 
 // Create a new category
 const result = await taxonomyService.createCategory(
-    directoryId,
-    { name: 'Machine Learning', description: 'ML tools and frameworks', priority: 1 },
-    userId,
+	directoryId,
+	{ name: 'Machine Learning', description: 'ML tools and frameworks', priority: 1 },
+	userId
 );
 // result.category.id === 'machine-learning'
 
 // Create a tag
-const tagResult = await taxonomyService.createTag(
-    directoryId,
-    { name: 'Open Source' },
-    userId,
-);
+const tagResult = await taxonomyService.createTag(directoryId, { name: 'Open Source' }, userId);
 // tagResult.tag.id === 'open-source'
 
 // Update a category
 await taxonomyService.updateCategory(
-    directoryId,
-    'machine-learning',
-    { description: 'Updated description for ML tools' },
-    userId,
+	directoryId,
+	'machine-learning',
+	{ description: 'Updated description for ML tools' },
+	userId
 );
 
 // Delete a tag

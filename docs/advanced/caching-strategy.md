@@ -1,7 +1,7 @@
 ---
 id: caching-strategy
-title: "Caching Strategy"
-sidebar_label: "Caching"
+title: 'Caching Strategy'
+sidebar_label: 'Caching'
 sidebar_position: 6
 ---
 
@@ -10,6 +10,7 @@ sidebar_position: 6
 Ever Works uses a multi-layer caching approach built on NestJS `CacheModule` with `cache-manager`. Caching is used for pipeline checkpoints, plugin-scoped data, settings resolution, and remote cache proxying in distributed worker environments.
 
 **Key sources:**
+
 - `packages/agent/src/pipeline/step-pipeline-executor.service.ts` -- Pipeline checkpoint caching
 - `packages/agent/src/plugins/services/plugin-context-factory.service.ts` -- Plugin-scoped caching
 - `packages/plugin/src/contracts/plugin-context.interface.ts` -- PluginCache interface
@@ -51,11 +52,11 @@ Each plugin receives its own cache instance through `PluginContext`. The cache i
 
 ```typescript
 interface PluginCache {
-    get<T>(key: string): Promise<T | undefined>;
-    set<T>(key: string, value: T, ttl?: number): Promise<void>;
-    delete(key: string): Promise<boolean>;
-    has(key: string): Promise<boolean>;
-    clear(): Promise<void>;
+	get<T>(key: string): Promise<T | undefined>;
+	set<T>(key: string, value: T, ttl?: number): Promise<void>;
+	delete(key: string): Promise<boolean>;
+	has(key: string): Promise<boolean>;
+	clear(): Promise<void>;
 }
 ```
 
@@ -92,11 +93,11 @@ private createCache(pluginId: string): PluginCache {
 
 ### Cache Key Examples
 
-| Plugin | Key Set By Plugin | Actual Cache Key |
-|---|---|---|
-| `openrouter` | `models-list` | `plugin:openrouter:models-list` |
-| `scrapfly` | `screenshot:abc123` | `plugin:scrapfly:screenshot:abc123` |
-| `github` | `repo-info:owner/repo` | `plugin:github:repo-info:owner/repo` |
+| Plugin       | Key Set By Plugin      | Actual Cache Key                     |
+| ------------ | ---------------------- | ------------------------------------ |
+| `openrouter` | `models-list`          | `plugin:openrouter:models-list`      |
+| `scrapfly`   | `screenshot:abc123`    | `plugin:scrapfly:screenshot:abc123`  |
+| `github`     | `repo-info:owner/repo` | `plugin:github:repo-info:owner/repo` |
 
 ## Pipeline Checkpoint Cache
 
@@ -106,13 +107,13 @@ The `StepPipelineExecutorService` uses the cache for pipeline checkpoint persist
 
 ```typescript
 interface CheckpointData {
-    stepIndex: number;        // Index of the last completed step
-    stepName: string;         // Name of the last completed step
-    pipelineId: string;       // Pipeline plugin ID
-    timestamp: string;        // ISO timestamp
-    context: unknown;         // Serialized pipeline context (opaque)
-    completedSteps: string[]; // IDs of all completed steps
-    schemaVersion: number;    // Version for migration (currently 4)
+	stepIndex: number; // Index of the last completed step
+	stepName: string; // Name of the last completed step
+	pipelineId: string; // Pipeline plugin ID
+	timestamp: string; // ISO timestamp
+	context: unknown; // Serialized pipeline context (opaque)
+	completedSteps: string[]; // IDs of all completed steps
+	schemaVersion: number; // Version for migration (currently 4)
 }
 ```
 
@@ -161,11 +162,11 @@ pipeline-checkpoint-{directoryId}-{pipelineId}
 
 ### Checkpoint Configuration
 
-| Setting | Value | Description |
-|---|---|---|
-| TTL | 24 hours | Checkpoints expire after 24 hours |
-| Schema Version | 4 | Version for forward compatibility |
-| Serialization | superjson | Handles Date, Map, Set, BigInt |
+| Setting        | Value     | Description                       |
+| -------------- | --------- | --------------------------------- |
+| TTL            | 24 hours  | Checkpoints expire after 24 hours |
+| Schema Version | 4         | Version for forward compatibility |
+| Serialization  | superjson | Handles Date, Map, Set, BigInt    |
 
 ### Schema Version Migration
 
@@ -174,9 +175,9 @@ When a checkpoint is loaded, the schema version is validated:
 ```typescript
 const schemaVersion = data.schemaVersion ?? 0;
 if (schemaVersion !== CURRENT_CHECKPOINT_VERSION) {
-    // Incompatible checkpoint -- clear and restart
-    await this.cacheManager.del(checkpointKey);
-    return null;
+	// Incompatible checkpoint -- clear and restart
+	await this.cacheManager.del(checkpointKey);
+	return null;
 }
 ```
 
@@ -198,21 +199,20 @@ graph LR
 @Global()
 @Module({})
 export class TriggerRemoteCacheModule {
-    static forRoot(): DynamicModule {
-        return {
-            module: TriggerRemoteCacheModule,
-            global: true,
-            providers: [
-                {
-                    provide: CACHE_MANAGER,
-                    useFactory: (apiClient: TriggerInternalApiClient) =>
-                        createRemoteProxy(apiClient, 'CacheManager'),
-                    inject: [TriggerInternalApiClient],
-                },
-            ],
-            exports: [CACHE_MANAGER],
-        };
-    }
+	static forRoot(): DynamicModule {
+		return {
+			module: TriggerRemoteCacheModule,
+			global: true,
+			providers: [
+				{
+					provide: CACHE_MANAGER,
+					useFactory: (apiClient: TriggerInternalApiClient) => createRemoteProxy(apiClient, 'CacheManager'),
+					inject: [TriggerInternalApiClient]
+				}
+			],
+			exports: [CACHE_MANAGER]
+		};
+	}
 }
 ```
 
@@ -222,12 +222,12 @@ This allows pipeline plugins running in Trigger.dev workers to use the same `CAC
 
 ### Automatic Invalidation
 
-| Scenario | Invalidation |
-|---|---|
-| Pipeline completes | Checkpoint cleared via `clearCheckpoint()` |
-| Schema version mismatch | Checkpoint cleared on load |
-| Plugin unload | Plugin-scoped cache cleared |
-| TTL expiry | Automatic by cache-manager |
+| Scenario                | Invalidation                               |
+| ----------------------- | ------------------------------------------ |
+| Pipeline completes      | Checkpoint cleared via `clearCheckpoint()` |
+| Schema version mismatch | Checkpoint cleared on load                 |
+| Plugin unload           | Plugin-scoped cache cleared                |
+| TTL expiry              | Automatic by cache-manager                 |
 
 ### Manual Invalidation
 

@@ -10,6 +10,7 @@ sidebar_position: 3
 The scheduling system enables automated, recurring generation runs for directories. It consists of two services: `DirectoryScheduleService` (configuration and state management) and `DirectoryScheduleDispatcherService` (cron-like dispatch logic).
 
 **Sources:**
+
 - `packages/agent/src/services/directory-schedule.service.ts`
 - `packages/agent/src/services/directory-schedule-dispatcher.service.ts`
 
@@ -23,28 +24,28 @@ Scheduled updates allow directories to automatically refresh their content at co
 
 The system supports four cadence options, defined in `DirectoryScheduleCadence`:
 
-| Cadence | Interval | Typical Use Case |
-|---------|----------|-----------------|
-| `HOURLY` | Every hour | High-frequency monitoring directories |
-| `DAILY` | Every 24 hours | Standard content refresh |
-| `WEEKLY` | Every 7 days | Low-frequency curated lists |
-| `MONTHLY` | Every 30 days | Archival or slow-moving directories |
+| Cadence   | Interval       | Typical Use Case                      |
+| --------- | -------------- | ------------------------------------- |
+| `HOURLY`  | Every hour     | High-frequency monitoring directories |
+| `DAILY`   | Every 24 hours | Standard content refresh              |
+| `WEEKLY`  | Every 7 days   | Low-frequency curated lists           |
+| `MONTHLY` | Every 30 days  | Archival or slow-moving directories   |
 
 ### Schedule Statuses
 
-| Status | Description |
-|--------|-------------|
-| `ACTIVE` | Schedule is running; `nextRunAt` is set |
-| `PAUSED` | Temporarily stopped (manual or auto-pause after failures) |
-| `CANCELED` | Permanently stopped; configuration cleared |
-| `DISABLED` | Default state before any schedule is created |
+| Status     | Description                                               |
+| ---------- | --------------------------------------------------------- |
+| `ACTIVE`   | Schedule is running; `nextRunAt` is set                   |
+| `PAUSED`   | Temporarily stopped (manual or auto-pause after failures) |
+| `CANCELED` | Permanently stopped; configuration cleared                |
+| `DISABLED` | Default state before any schedule is created              |
 
 ### Billing Modes
 
-| Mode | Description |
-|------|-------------|
+| Mode           | Description                                            |
+| -------------- | ------------------------------------------------------ |
 | `SUBSCRIPTION` | Runs count against the user's subscription plan limits |
-| `USAGE` | Pay-per-use billing; no plan cadence restrictions |
+| `USAGE`        | Pay-per-use billing; no plan cadence restrictions      |
 
 ## DirectoryScheduleService API
 
@@ -59,14 +60,18 @@ Returns a `DirectoryScheduleDto` containing current state, allowed cadences, and
 ### Creating or Updating a Schedule
 
 ```typescript
-const schedule = await scheduleService.updateSchedule(directoryId, {
-    enable: true,
-    cadence: DirectoryScheduleCadence.DAILY,
-    billingMode: DirectoryScheduleBillingMode.SUBSCRIPTION,
-    maxFailureBeforePause: 3,
-    alwaysCreatePullRequest: false,
-    providerOverrides: { ai: 'anthropic' },
-}, user);
+const schedule = await scheduleService.updateSchedule(
+	directoryId,
+	{
+		enable: true,
+		cadence: DirectoryScheduleCadence.DAILY,
+		billingMode: DirectoryScheduleBillingMode.SUBSCRIPTION,
+		maxFailureBeforePause: 3,
+		alwaysCreatePullRequest: false,
+		providerOverrides: { ai: 'anthropic' }
+	},
+	user
+);
 ```
 
 The `updateSchedule` method performs extensive validation:
@@ -118,13 +123,14 @@ When a generation completes successfully:
 
 ```typescript
 await scheduleService.markRunCompleted({
-    scheduleId,
-    historyId,
-    status: GenerateStatusType.GENERATED,
+	scheduleId,
+	historyId,
+	status: GenerateStatusType.GENERATED
 });
 ```
 
 This method:
+
 - Calculates the next run time based on the **intended execution time** (not completion time) to prevent schedule drift.
 - Compensates for retry delays when recovering from previous failures.
 - Resets the failure counter to zero.
@@ -137,6 +143,7 @@ await scheduleService.markRunFailed(scheduleId, 'API rate limit exceeded');
 ```
 
 Failure handling:
+
 - Increments `failureCount`.
 - If `failureCount >= maxFailureBeforePause`, the schedule is paused and a notification is sent.
 - Otherwise, sets `nextRunAt` to `anchor + RETRY_DELAY_MINUTES` (default: 15 minutes).
@@ -169,10 +176,10 @@ Schedule state changes are synced back to the directory entity via `syncDirector
 
 ```typescript
 await directoryRepository.update(directoryId, {
-    scheduledUpdatesEnabled: true,
-    scheduledCadence: 'daily',
-    scheduledNextRunAt: nextRunDate,
-    scheduledStatus: 'active',
+	scheduledUpdatesEnabled: true,
+	scheduledCadence: 'daily',
+	scheduledNextRunAt: nextRunDate,
+	scheduledStatus: 'active'
 });
 ```
 
@@ -182,11 +189,11 @@ This denormalization allows the frontend to display schedule status without a se
 
 The scheduling system reads configuration from the agent config module:
 
-| Config Key | Environment Variable | Default | Description |
-|------------|---------------------|---------|-------------|
-| `scheduledUpdatesEnabled` | `SCHEDULED_UPDATES_ENABLED` | `true` | Master toggle for scheduling |
-| `dispatchIntervalMinutes` | `SCHEDULED_UPDATES_DISPATCH_INTERVAL_MINUTES` | `5` | Cron dispatch frequency |
-| `maxBatch` | `SCHEDULED_UPDATES_MAX_BATCH` | `25` | Max schedules processed per dispatch |
-| `maxFailureBeforePause` | `SCHEDULED_UPDATES_MAX_FAILURE_BEFORE_PAUSE` | `3` | Default failure threshold |
+| Config Key                | Environment Variable                          | Default | Description                          |
+| ------------------------- | --------------------------------------------- | ------- | ------------------------------------ |
+| `scheduledUpdatesEnabled` | `SCHEDULED_UPDATES_ENABLED`                   | `true`  | Master toggle for scheduling         |
+| `dispatchIntervalMinutes` | `SCHEDULED_UPDATES_DISPATCH_INTERVAL_MINUTES` | `5`     | Cron dispatch frequency              |
+| `maxBatch`                | `SCHEDULED_UPDATES_MAX_BATCH`                 | `25`    | Max schedules processed per dispatch |
+| `maxFailureBeforePause`   | `SCHEDULED_UPDATES_MAX_FAILURE_BEFORE_PAUSE`  | `3`     | Default failure threshold            |
 
 When `SCHEDULED_UPDATES_ENABLED` is `false`, all schedule operations throw a `BadRequestException`.

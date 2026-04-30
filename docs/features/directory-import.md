@@ -136,25 +136,25 @@ flowchart LR
 **How it works step by step:**
 
 1. **Analyze for linking.** Before anything is created, the platform runs an analysis to verify that the target repository can be linked. This checks:
-   - **Repository existence** — the repo must exist and be accessible via the git provider API.
-   - **Write access** — the user must have write permission to the repository. Read-only access is not enough, because the platform needs to commit updates when syncing. If the user lacks write access, the import fails with a clear error message.
-   - **Data repo structure** — the repository is temporarily cloned and inspected to count items, categories, and tags. This data is **not** copied — the clone is used only for validation and counting, then discarded.
+    - **Repository existence** — the repo must exist and be accessible via the git provider API.
+    - **Write access** — the user must have write permission to the repository. Read-only access is not enough, because the platform needs to commit updates when syncing. If the user lacks write access, the import fails with a clear error message.
+    - **Data repo structure** — the repository is temporarily cloned and inspected to count items, categories, and tags. This data is **not** copied — the clone is used only for validation and counting, then discarded.
 
 2. **Detect the repository ecosystem.** The analyzer looks for companion repositories that may already exist alongside the data repo:
-   - If the source repo is `my-dir-data`, it looks for `my-dir` (markdown repo) and `my-dir-website` (website repo).
-   - If the source repo is `my-dir` (no suffix), it looks for `my-dir-data` and `my-dir-website`.
-   - For each companion, it checks whether it exists and whether the user has write access.
-   - This ecosystem detection also works in reverse: if the user points at a markdown or website repo, the analyzer tries to find the associated data repo automatically.
+    - If the source repo is `my-dir-data`, it looks for `my-dir` (markdown repo) and `my-dir-website` (website repo).
+    - If the source repo is `my-dir` (no suffix), it looks for `my-dir-data` and `my-dir-website`.
+    - For each companion, it checks whether it exists and whether the user has write access.
+    - This ecosystem detection also works in reverse: if the user points at a markdown or website repo, the analyzer tries to find the associated data repo automatically.
 
 3. **Create the directory entry.** A new directory is created in the database. Unlike other import types, the directory's **owner is set to the source repository's owner**, not the user's default git account. For example, if linking to `acme-org/awesome-tools-data`, the directory owner becomes `acme-org`. This ensures that companion repos are created under the same owner/organization as the data repo.
 
 4. **Record source metadata.** The directory is immediately marked as `GENERATED` (not `GENERATING` — there's no background work to do). The source repository metadata is stored on the directory entity: the URL, owner, repo name, and import type (`link_existing`). A generation history entry is created with a duration of 0 seconds.
 
 5. **Create missing companion repos (optional).** If the `createMissingRepos` flag is set to `true`, the platform checks the ecosystem detection results:
-   - If the **markdown repository** doesn't exist, it creates a fresh one using the markdown generator. This repo will hold rendered markdown pages for each item.
-   - If the **website repository** doesn't exist, it creates a fresh one using the website generator. This repo will hold the deployable static site.
-   - The **data repository is never created** — it must already exist (that's the entire point of linking).
-   - These companion repos are brand-new repositories, not clones. They are initialized empty and will be populated when the platform processes the linked data.
+    - If the **markdown repository** doesn't exist, it creates a fresh one using the markdown generator. This repo will hold rendered markdown pages for each item.
+    - If the **website repository** doesn't exist, it creates a fresh one using the website generator. This repo will hold the deployable static site.
+    - The **data repository is never created** — it must already exist (that's the entire point of linking).
+    - These companion repos are brand-new repositories, not clones. They are initialized empty and will be populated when the platform processes the linked data.
 
 6. **Emit completion event.** A `DirectoryGenerationCompletedEvent` is emitted, triggering any downstream actions (notifications, etc.).
 
@@ -164,14 +164,14 @@ The entire link existing operation completes **synchronously**. The API returns 
 
 **Key differences from other import types:**
 
-| Aspect | Link Existing | Data Repo / Awesome README |
-|--------|--------------|---------------------------|
-| Data movement | None — references the existing repo | Clones or generates data into new repos |
-| Processing | Synchronous, instant | Asynchronous via Trigger.dev |
-| Directory owner | Source repo's owner | User's configured git account |
-| Sync support | No automatic sync schedule | Yes (weekly for Awesome README) |
-| Slug conflicts | Not resolved (no new data repo created) | Auto-resolved with numeric suffixes |
-| Generate status | Set to `GENERATED` immediately | Transitions through `GENERATING` → `GENERATED` |
+| Aspect          | Link Existing                           | Data Repo / Awesome README                     |
+| --------------- | --------------------------------------- | ---------------------------------------------- |
+| Data movement   | None — references the existing repo     | Clones or generates data into new repos        |
+| Processing      | Synchronous, instant                    | Asynchronous via Trigger.dev                   |
+| Directory owner | Source repo's owner                     | User's configured git account                  |
+| Sync support    | No automatic sync schedule              | Yes (weekly for Awesome README)                |
+| Slug conflicts  | Not resolved (no new data repo created) | Auto-resolved with numeric suffixes            |
+| Generate status | Set to `GENERATED` immediately          | Transitions through `GENERATING` → `GENERATED` |
 
 **When to use Link Existing:** This mode is ideal when you already have an Ever Works data repository (perhaps created manually or by another instance) and want to manage it through the platform's UI without duplicating data. It's also the right choice when you want to bring an existing directory ecosystem (data + markdown + website repos) under platform management.
 

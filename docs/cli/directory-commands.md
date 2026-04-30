@@ -49,9 +49,9 @@ Interactive directory creation. Walks through:
 
 List all directories the user has access to.
 
-| Option         | Default | Description            |
-|----------------|---------|------------------------|
-| `--limit <n>`  | --      | Maximum results        |
+| Option        | Default | Description     |
+| ------------- | ------- | --------------- |
+| `--limit <n>` | --      | Maximum results |
 
 Displays directories with their roles (owned vs. shared) and generation status.
 
@@ -60,6 +60,7 @@ Displays directories with their roles (owned vs. shared) and generation status.
 Full content generation flow with pipeline and provider selection.
 
 **Steps:**
+
 1. Select a directory (must have edit permission; generation must not already be in progress)
 2. Verify git provider connection
 3. Load generator configuration and form schema
@@ -82,14 +83,15 @@ Update an existing directory and its repository. Used for simple updates without
 
 Deploy the website for a directory. Implements a state machine with four states:
 
-| State | Condition                                  | Behavior                                          |
-|-------|--------------------------------------------|---------------------------------------------------|
-| **A** | No deploy provider set                     | Prompt to select provider, set it, then deploy     |
-| **B** | Has provider, cannot deploy, shared dir    | Show message that owner must configure token       |
-| **C** | Has provider, cannot deploy, owned dir     | Prompt to configure token or switch provider       |
-| **D** | Has provider, can deploy                   | Execute deployment                                 |
+| State | Condition                               | Behavior                                       |
+| ----- | --------------------------------------- | ---------------------------------------------- |
+| **A** | No deploy provider set                  | Prompt to select provider, set it, then deploy |
+| **B** | Has provider, cannot deploy, shared dir | Show message that owner must configure token   |
+| **C** | Has provider, cannot deploy, owned dir  | Prompt to configure token or switch provider   |
+| **D** | Has provider, can deploy                | Execute deployment                             |
 
 **Deployment execution (State D):**
+
 1. Look up existing deployment
 2. Fetch and select deployment team (if available)
 3. Show deployment summary and confirm

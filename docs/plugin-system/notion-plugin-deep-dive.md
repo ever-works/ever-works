@@ -1,7 +1,7 @@
 ---
 id: notion-plugin-deep-dive
-title: "Notion Extractor Plugin Deep Dive"
-sidebar_label: "Notion Extractor Deep Dive"
+title: 'Notion Extractor Plugin Deep Dive'
+sidebar_label: 'Notion Extractor Deep Dive'
 sidebar_position: 57
 ---
 
@@ -30,17 +30,17 @@ The plugin is **not** a system plugin and must be explicitly enabled by the user
 
 ### Environment Variables
 
-| Variable | Required | Description |
-|----------|----------|-------------|
-| N/A | -- | No environment-variable fallbacks |
+| Variable | Required | Description                       |
+| -------- | -------- | --------------------------------- |
+| N/A      | --       | No environment-variable fallbacks |
 
 ### Settings Schema
 
 ```typescript
 interface NotionExtractorSettings {
-  apiKey?: string;                    // Notion integration API key (optional, x-secret, user-scoped)
-  useSplitbeeForPublicPages: boolean; // Use Splitbee API for public pages (default: true)
-  timeout: number;                    // HTTP request timeout in ms (default: 30000, range: 5000-120000)
+	apiKey?: string; // Notion integration API key (optional, x-secret, user-scoped)
+	useSplitbeeForPublicPages: boolean; // Use Splitbee API for public pages (default: true)
+	timeout: number; // HTTP request timeout in ms (default: 30000, range: 5000-120000)
 }
 ```
 
@@ -50,8 +50,8 @@ interface NotionExtractorSettings {
 
 ## Capabilities
 
-| Capability | Description |
-|------------|-------------|
+| Capability          | Description                              |
+| ------------------- | ---------------------------------------- |
 | `content-extractor` | Extracts Notion page content as markdown |
 
 Supported output formats: `text` and `markdown`.
@@ -60,13 +60,13 @@ Supported output formats: `text` and `markdown`.
 
 ### Content Extraction
 
-| Method | Signature | Description |
-|--------|-----------|-------------|
-| `canExtract` | `(url: string) => Promise<boolean>` | Returns `true` for `notion.so` and `notion.site` URLs |
-| `extract` | `(options: ContentExtractionOptions) => Promise<ContentExtractionResult>` | Extracts a single Notion page |
-| `extractBatch` | `(urls: readonly string[], options?) => Promise<readonly ContentExtractionResult[]>` | Sequentially extracts multiple Notion pages |
-| `isAvailable` | `() => Promise<boolean>` | Always returns `true` |
-| `getSupportedFormats` | `() => readonly ('text' \| 'html' \| 'markdown')[]` | Returns `['text', 'markdown']` |
+| Method                | Signature                                                                            | Description                                           |
+| --------------------- | ------------------------------------------------------------------------------------ | ----------------------------------------------------- |
+| `canExtract`          | `(url: string) => Promise<boolean>`                                                  | Returns `true` for `notion.so` and `notion.site` URLs |
+| `extract`             | `(options: ContentExtractionOptions) => Promise<ContentExtractionResult>`            | Extracts a single Notion page                         |
+| `extractBatch`        | `(urls: readonly string[], options?) => Promise<readonly ContentExtractionResult[]>` | Sequentially extracts multiple Notion pages           |
+| `isAvailable`         | `() => Promise<boolean>`                                                             | Always returns `true`                                 |
+| `getSupportedFormats` | `() => readonly ('text' \| 'html' \| 'markdown')[]`                                  | Returns `['text', 'markdown']`                        |
 
 ## Implementation Details
 
@@ -75,7 +75,7 @@ Supported output formats: `text` and `markdown`.
 The `canExtract` method uses a regex to match Notion URLs:
 
 ```typescript
-/^([\w-]+\.)?notion\.(so|site)$/.test(parsed.hostname)
+/^([\w-]+\.)?notion\.(so|site)$/.test(parsed.hostname);
 ```
 
 This matches `notion.so`, `notion.site`, `www.notion.so`, and any subdomain like `myworkspace.notion.site`.
@@ -133,28 +133,27 @@ const isNotion = await notionPlugin.canExtract('https://notion.so/My-Page-abc123
 
 // Extract a public Notion page (no API key needed)
 const result = await notionPlugin.extract({
-  url: 'https://myworkspace.notion.site/My-Public-Page-abc123...',
-  settings: {}
+	url: 'https://myworkspace.notion.site/My-Public-Page-abc123...',
+	settings: {}
 });
 if (result.success) {
-  console.log(result.title);     // Extracted page title
-  console.log(result.markdown);  // Full page as markdown
+	console.log(result.title); // Extracted page title
+	console.log(result.markdown); // Full page as markdown
 }
 
 // Extract a private Notion page
 const privateResult = await notionPlugin.extract({
-  url: 'https://notion.so/Private-Page-abc123...',
-  settings: {
-    apiKey: 'ntn_...',
-    useSplitbeeForPublicPages: false
-  }
+	url: 'https://notion.so/Private-Page-abc123...',
+	settings: {
+		apiKey: 'ntn_...',
+		useSplitbeeForPublicPages: false
+	}
 });
 
 // Batch extract multiple Notion pages
-const results = await notionPlugin.extractBatch(
-  ['https://notion.so/Page-1-...', 'https://notion.so/Page-2-...'],
-  { settings: { apiKey: 'ntn_...' } }
-);
+const results = await notionPlugin.extractBatch(['https://notion.so/Page-1-...', 'https://notion.so/Page-2-...'], {
+	settings: { apiKey: 'ntn_...' }
+});
 ```
 
 ## Rate Limiting & Quotas
@@ -170,8 +169,8 @@ const results = await notionPlugin.extractBatch(
 - **Invalid page ID**: Returns `{ success: false, error: 'Could not extract Notion page ID from URL' }`.
 - **Service not initialized**: Returns `{ success: false }` if the plugin was not properly loaded.
 - **Official API failures**: Caught and logged; the plugin falls back to the Splitbee API for public pages. Specific error codes handled:
-  - `401`: Invalid API key or insufficient permissions
-  - `404`: Page not found or not shared with the integration
+    - `401`: Invalid API key or insufficient permissions
+    - `404`: Page not found or not shared with the integration
 - **Empty or private pages via Splitbee**: Throws a descriptive error when no data is returned.
 - All errors in `extract` are caught and returned as `{ success: false, error: message }` rather than thrown, ensuring the pipeline can continue with other sources.
 

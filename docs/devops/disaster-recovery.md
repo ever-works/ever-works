@@ -38,11 +38,11 @@ This document describes the backup strategies, restore procedures, failover mech
 
 ## Recovery Objectives
 
-| Metric | Target       | Notes                                                  |
-|--------|--------------|--------------------------------------------------------|
-| **RTO** (Recovery Time Objective) | 15 minutes | Time to restore service after outage detection |
-| **RPO** (Recovery Point Objective) | 1 hour | Maximum acceptable data loss window            |
-| **MTTR** (Mean Time To Recover) | 10 minutes | Average recovery time for pod-level failures   |
+| Metric                             | Target     | Notes                                          |
+| ---------------------------------- | ---------- | ---------------------------------------------- |
+| **RTO** (Recovery Time Objective)  | 15 minutes | Time to restore service after outage detection |
+| **RPO** (Recovery Point Objective) | 1 hour     | Maximum acceptable data loss window            |
+| **MTTR** (Mean Time To Recover)    | 10 minutes | Average recovery time for pod-level failures   |
 
 ## Backup Strategies
 
@@ -84,9 +84,9 @@ The API pods mount an `emptyDir` volume at `/tmp/ever-works-repos` with a 5Gi si
 
 ```yaml
 volumes:
-  - name: git-repos
-    emptyDir:
-      sizeLimit: 5Gi
+    - name: git-repos
+      emptyDir:
+          sizeLimit: 5Gi
 ```
 
 Git repositories are the source of truth; local clones are regenerated on demand. No backup is required for this volume.
@@ -112,20 +112,20 @@ Both the API and Web deployments run with 2 replicas and a rolling update strate
 
 ```yaml
 spec:
-  replicas: 2
-  strategy:
-    type: RollingUpdate
-    rollingUpdate:
-      maxSurge: 1
-      maxUnavailable: 0
+    replicas: 2
+    strategy:
+        type: RollingUpdate
+        rollingUpdate:
+            maxSurge: 1
+            maxUnavailable: 0
 ```
 
 Kubernetes health probes detect and replace unhealthy pods:
 
-| Probe        | Path          | Port | Initial Delay | Period | Failure Threshold |
-|-------------|---------------|------|---------------|--------|-------------------|
-| Liveness    | `/api/health` | 3100 (API) / 3000 (Web) | 30s | 10s | 3 |
-| Readiness   | `/api/health` | 3100 (API) / 3000 (Web) | 10s | 5s  | 3 |
+| Probe     | Path          | Port                    | Initial Delay | Period | Failure Threshold |
+| --------- | ------------- | ----------------------- | ------------- | ------ | ----------------- |
+| Liveness  | `/api/health` | 3100 (API) / 3000 (Web) | 30s           | 10s    | 3                 |
+| Readiness | `/api/health` | 3100 (API) / 3000 (Web) | 10s           | 5s     | 3                 |
 
 When a liveness probe fails 3 consecutive times, Kubernetes restarts the pod. Readiness failures remove the pod from the service load balancer without restarting it.
 
@@ -139,8 +139,8 @@ Ingress resources use NGINX ingress controller with forced SSL redirect:
 
 ```yaml
 annotations:
-  nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
-  nginx.ingress.kubernetes.io/proxy-body-size: "10m"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: 'true'
+    nginx.ingress.kubernetes.io/proxy-body-size: '10m'
 ```
 
 TLS certificates are pre-provisioned as Kubernetes secrets. If cert-manager is used, certificates auto-renew before expiry.
@@ -203,7 +203,7 @@ node -e "
 The k8s manifests define resource boundaries to prevent cascade failures:
 
 | Service | CPU Request | CPU Limit | Memory Request | Memory Limit |
-|---------|-------------|-----------|----------------|--------------|
+| ------- | ----------- | --------- | -------------- | ------------ |
 | API     | 500m        | 2 cores   | 512Mi          | 2Gi          |
 | Web     | 250m        | 500m      | 256Mi          | 512Mi        |
 

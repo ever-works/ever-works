@@ -11,12 +11,12 @@ The `@ever-works/contracts` package defines the shared TypeScript types, interfa
 
 ## Package Overview
 
-| Property | Value |
-|---|---|
-| **Package name** | `@ever-works/contracts` |
-| **Location** | `platform/packages/contracts/` |
-| **Format** | ESM (TypeScript declarations) |
-| **Dependents** | API, frontend, plugins, CLI, generation pipeline |
+| Property         | Value                                            |
+| ---------------- | ------------------------------------------------ |
+| **Package name** | `@ever-works/contracts`                          |
+| **Location**     | `platform/packages/contracts/`                   |
+| **Format**       | ESM (TypeScript declarations)                    |
+| **Dependents**   | API, frontend, plugins, CLI, generation pipeline |
 
 ## Module Exports
 
@@ -38,12 +38,12 @@ The `item/item.types.ts` module defines the core data structures for directory i
 
 ```typescript
 interface Category {
-    name: string;
-    slug: string;
-    description?: string;
-    icon?: string;
-    parentSlug?: string;
-    itemCount?: number;
+	name: string;
+	slug: string;
+	description?: string;
+	icon?: string;
+	parentSlug?: string;
+	itemCount?: number;
 }
 ```
 
@@ -51,10 +51,10 @@ interface Category {
 
 ```typescript
 interface Tag {
-    name: string;
-    slug: string;
-    description?: string;
-    itemCount?: number;
+	name: string;
+	slug: string;
+	description?: string;
+	itemCount?: number;
 }
 ```
 
@@ -62,10 +62,10 @@ interface Tag {
 
 ```typescript
 interface Collection {
-    name: string;
-    slug: string;
-    description?: string;
-    items?: string[];  // Item IDs
+	name: string;
+	slug: string;
+	description?: string;
+	items?: string[]; // Item IDs
 }
 ```
 
@@ -73,11 +73,11 @@ interface Collection {
 
 ```typescript
 interface Brand {
-    name: string;
-    slug: string;
-    description?: string;
-    logo?: string;
-    website?: string;
+	name: string;
+	slug: string;
+	description?: string;
+	logo?: string;
+	website?: string;
 }
 ```
 
@@ -87,15 +87,15 @@ Badges are visual indicators attached to items for quick recognition.
 
 ```typescript
 interface Badge {
-    label: string;
-    color?: string;
-    icon?: string;
-    tooltip?: string;
+	label: string;
+	color?: string;
+	icon?: string;
+	tooltip?: string;
 }
 
 interface ItemBadges {
-    primary?: Badge;
-    secondary?: Badge[];
+	primary?: Badge;
+	secondary?: Badge[];
 }
 ```
 
@@ -105,25 +105,25 @@ The central item type used across the platform. Contains all displayable and sea
 
 ```typescript
 interface ItemData {
-    name: string;
-    slug: string;
-    description: string;
-    url?: string;
-    imageUrl?: string;
-    categories: Category[];
-    tags: Tag[];
-    badges?: ItemBadges;
-    brand?: Brand;
-    metadata?: Record<string, unknown>;
-    features?: string[];
-    pros?: string[];
-    cons?: string[];
-    rating?: number;
-    reviewCount?: number;
-    pricing?: string;
-    lastUpdated?: string;
-    source?: string;
-    sourceUrl?: string;
+	name: string;
+	slug: string;
+	description: string;
+	url?: string;
+	imageUrl?: string;
+	categories: Category[];
+	tags: Tag[];
+	badges?: ItemBadges;
+	brand?: Brand;
+	metadata?: Record<string, unknown>;
+	features?: string[];
+	pros?: string[];
+	cons?: string[];
+	rating?: number;
+	reviewCount?: number;
+	pricing?: string;
+	lastUpdated?: string;
+	source?: string;
+	sourceUrl?: string;
 }
 ```
 
@@ -133,18 +133,18 @@ A subset of `ItemData` fields that can be modified after creation.
 
 ```typescript
 interface MutableItemData {
-    name?: string;
-    description?: string;
-    url?: string;
-    imageUrl?: string;
-    categories?: Category[];
-    tags?: Tag[];
-    badges?: ItemBadges;
-    metadata?: Record<string, unknown>;
-    features?: string[];
-    pros?: string[];
-    cons?: string[];
-    pricing?: string;
+	name?: string;
+	description?: string;
+	url?: string;
+	imageUrl?: string;
+	categories?: Category[];
+	tags?: Tag[];
+	badges?: ItemBadges;
+	metadata?: Record<string, unknown>;
+	features?: string[];
+	pros?: string[];
+	cons?: string[];
+	pricing?: string;
 }
 ```
 
@@ -154,15 +154,15 @@ Used for side-by-side item comparisons in the frontend.
 
 ```typescript
 interface ComparisonDimension {
-    name: string;
-    key: string;
-    type: 'text' | 'number' | 'boolean' | 'rating';
-    description?: string;
+	name: string;
+	key: string;
+	type: 'text' | 'number' | 'boolean' | 'rating';
+	description?: string;
 }
 
 interface ComparisonData {
-    dimensions: ComparisonDimension[];
-    items: Record<string, Record<string, unknown>>;
+	dimensions: ComparisonDimension[];
+	items: Record<string, Record<string, unknown>>;
 }
 ```
 
@@ -174,10 +174,10 @@ The `domain/domain.types.ts` module defines types related to domain detection an
 
 ```typescript
 enum DomainType {
-    SOFTWARE = 'software',
-    ECOMMERCE = 'ecommerce',
-    SERVICES = 'services',
-    GENERAL = 'general',
+	SOFTWARE = 'software',
+	ECOMMERCE = 'ecommerce',
+	SERVICES = 'services',
+	GENERAL = 'general'
 }
 ```
 
@@ -187,10 +187,10 @@ The domain type influences how items are structured, what fields are emphasized,
 
 ```typescript
 interface DomainAnalysis {
-    domain: DomainType;
-    confidence: number;       // 0-1 confidence score
-    reasoning: string;        // Why this domain was detected
-    suggestedFields?: string[];
+	domain: DomainType;
+	confidence: number; // 0-1 confidence score
+	reasoning: string; // Why this domain was detected
+	suggestedFields?: string[];
 }
 ```
 
@@ -200,12 +200,12 @@ Represents fetched web page content used during content extraction.
 
 ```typescript
 interface WebPageData {
-    url: string;
-    title?: string;
-    content: string;
-    description?: string;
-    statusCode?: number;
-    contentType?: string;
+	url: string;
+	title?: string;
+	content: string;
+	description?: string;
+	statusCode?: number;
+	contentType?: string;
 }
 ```
 
@@ -215,10 +215,10 @@ Scores how relevant a piece of web content is to the user's directory topic.
 
 ```typescript
 interface RelevanceAssessment {
-    relevant: boolean;
-    score: number;            // 0-1 relevance score
-    reasoning: string;
-    extractableItems?: number;
+	relevant: boolean;
+	score: number; // 0-1 relevance score
+	reasoning: string;
+	extractableItems?: number;
 }
 ```
 
@@ -232,32 +232,32 @@ An extensive enumeration of all supported form field types.
 
 ```typescript
 enum FormFieldType {
-    TEXT = 'text',
-    TEXTAREA = 'textarea',
-    NUMBER = 'number',
-    EMAIL = 'email',
-    URL = 'url',
-    TEL = 'tel',
-    PASSWORD = 'password',
-    SELECT = 'select',
-    MULTI_SELECT = 'multi-select',
-    CHECKBOX = 'checkbox',
-    RADIO = 'radio',
-    TOGGLE = 'toggle',
-    DATE = 'date',
-    DATETIME = 'datetime',
-    TIME = 'time',
-    COLOR = 'color',
-    FILE = 'file',
-    IMAGE = 'image',
-    RICH_TEXT = 'rich-text',
-    MARKDOWN = 'markdown',
-    CODE = 'code',
-    JSON = 'json',
-    SLIDER = 'slider',
-    RATING = 'rating',
-    TAGS = 'tags',
-    HIDDEN = 'hidden',
+	TEXT = 'text',
+	TEXTAREA = 'textarea',
+	NUMBER = 'number',
+	EMAIL = 'email',
+	URL = 'url',
+	TEL = 'tel',
+	PASSWORD = 'password',
+	SELECT = 'select',
+	MULTI_SELECT = 'multi-select',
+	CHECKBOX = 'checkbox',
+	RADIO = 'radio',
+	TOGGLE = 'toggle',
+	DATE = 'date',
+	DATETIME = 'datetime',
+	TIME = 'time',
+	COLOR = 'color',
+	FILE = 'file',
+	IMAGE = 'image',
+	RICH_TEXT = 'rich-text',
+	MARKDOWN = 'markdown',
+	CODE = 'code',
+	JSON = 'json',
+	SLIDER = 'slider',
+	RATING = 'rating',
+	TAGS = 'tags',
+	HIDDEN = 'hidden'
 }
 ```
 
@@ -267,11 +267,11 @@ Options for select, multi-select, radio, and checkbox group fields.
 
 ```typescript
 interface FormFieldOption {
-    label: string;
-    value: string | number | boolean;
-    description?: string;
-    disabled?: boolean;
-    icon?: string;
+	label: string;
+	value: string | number | boolean;
+	description?: string;
+	disabled?: boolean;
+	icon?: string;
 }
 ```
 
@@ -281,14 +281,14 @@ Validation rules applied to individual form fields.
 
 ```typescript
 interface FormFieldValidation {
-    required?: boolean;
-    minLength?: number;
-    maxLength?: number;
-    min?: number;
-    max?: number;
-    pattern?: string;
-    patternMessage?: string;
-    custom?: (value: unknown) => string | undefined;
+	required?: boolean;
+	minLength?: number;
+	maxLength?: number;
+	min?: number;
+	max?: number;
+	pattern?: string;
+	patternMessage?: string;
+	custom?: (value: unknown) => string | undefined;
 }
 ```
 
@@ -298,9 +298,9 @@ Conditional visibility logic for form fields.
 
 ```typescript
 interface FormFieldCondition {
-    field: string;           // Field key to watch
-    operator: 'eq' | 'neq' | 'gt' | 'lt' | 'gte' | 'lte' | 'in' | 'nin' | 'contains';
-    value: unknown;
+	field: string; // Field key to watch
+	operator: 'eq' | 'neq' | 'gt' | 'lt' | 'gte' | 'lte' | 'in' | 'nin' | 'contains';
+	value: unknown;
 }
 ```
 
@@ -310,20 +310,20 @@ The complete definition for a single form field.
 
 ```typescript
 interface FormFieldDefinition {
-    key: string;
-    type: FormFieldType;
-    label: string;
-    description?: string;
-    placeholder?: string;
-    defaultValue?: unknown;
-    validation?: FormFieldValidation;
-    options?: FormFieldOption[];
-    condition?: FormFieldCondition;
-    group?: string;
-    order?: number;
-    disabled?: boolean;
-    readOnly?: boolean;
-    metadata?: Record<string, unknown>;
+	key: string;
+	type: FormFieldType;
+	label: string;
+	description?: string;
+	placeholder?: string;
+	defaultValue?: unknown;
+	validation?: FormFieldValidation;
+	options?: FormFieldOption[];
+	condition?: FormFieldCondition;
+	group?: string;
+	order?: number;
+	disabled?: boolean;
+	readOnly?: boolean;
+	metadata?: Record<string, unknown>;
 }
 ```
 
@@ -333,18 +333,18 @@ Groups organize related fields visually, and the schema ties everything together
 
 ```typescript
 interface FormFieldGroup {
-    key: string;
-    label: string;
-    description?: string;
-    collapsible?: boolean;
-    defaultCollapsed?: boolean;
-    order?: number;
+	key: string;
+	label: string;
+	description?: string;
+	collapsible?: boolean;
+	defaultCollapsed?: boolean;
+	order?: number;
 }
 
 interface FormSchema {
-    fields: FormFieldDefinition[];
-    groups?: FormFieldGroup[];
-    metadata?: Record<string, unknown>;
+	fields: FormFieldDefinition[];
+	groups?: FormFieldGroup[];
+	metadata?: Record<string, unknown>;
 }
 ```
 
@@ -358,12 +358,12 @@ Tracks the state of a directory generation process.
 
 ```typescript
 enum GenerateStatusType {
-    IDLE = 'idle',
-    PENDING = 'pending',
-    RUNNING = 'running',
-    COMPLETED = 'completed',
-    FAILED = 'failed',
-    CANCELLED = 'cancelled',
+	IDLE = 'idle',
+	PENDING = 'pending',
+	RUNNING = 'running',
+	COMPLETED = 'completed',
+	FAILED = 'failed',
+	CANCELLED = 'cancelled'
 }
 ```
 
@@ -373,16 +373,16 @@ How items are generated for a directory.
 
 ```typescript
 enum GenerationMethod {
-    AI_GENERATED = 'ai-generated',
-    MANUAL = 'manual',
-    IMPORTED = 'imported',
-    HYBRID = 'hybrid',
+	AI_GENERATED = 'ai-generated',
+	MANUAL = 'manual',
+	IMPORTED = 'imported',
+	HYBRID = 'hybrid'
 }
 
 enum WebsiteRepositoryCreationMethod {
-    TEMPLATE = 'template',
-    EXISTING = 'existing',
-    BLANK = 'blank',
+	TEMPLATE = 'template',
+	EXISTING = 'existing',
+	BLANK = 'blank'
 }
 ```
 
@@ -392,15 +392,15 @@ Data transfer objects for the generation API.
 
 ```typescript
 interface CreateItemsGeneratorDto {
-    directoryId: string;
-    prompt: string;
-    method: GenerationMethod;
-    options?: Record<string, unknown>;
+	directoryId: string;
+	prompt: string;
+	method: GenerationMethod;
+	options?: Record<string, unknown>;
 }
 
 interface UpdateItemsGeneratorDto {
-    prompt?: string;
-    options?: Record<string, unknown>;
+	prompt?: string;
+	options?: Record<string, unknown>;
 }
 ```
 
@@ -410,15 +410,15 @@ Types for managing automated directory update schedules.
 
 ```typescript
 interface DirectoryScheduleDto {
-    cadence: DirectoryScheduleAllowedCadence;
-    enabled: boolean;
-    nextRunAt?: string;
-    lastRunAt?: string;
+	cadence: DirectoryScheduleAllowedCadence;
+	enabled: boolean;
+	nextRunAt?: string;
+	lastRunAt?: string;
 }
 
 interface UpdateDirectorySchedulePayload {
-    cadence?: DirectoryScheduleAllowedCadence;
-    enabled?: boolean;
+	cadence?: DirectoryScheduleAllowedCadence;
+	enabled?: boolean;
 }
 
 type DirectoryScheduleAllowedCadence = 'daily' | 'weekly' | 'biweekly' | 'monthly';
@@ -428,12 +428,12 @@ type DirectoryScheduleAllowedCadence = 'daily' | 'weekly' | 'biweekly' | 'monthl
 
 The contracts package is the foundation that enables type-safe communication across the platform:
 
-| Consumer | Types Used |
-|---|---|
-| **API** | All types for request/response validation |
-| **Frontend** | `ItemData`, `FormSchema`, `Category`, `Tag` for rendering |
-| **Plugins** | `DomainType`, `ItemData`, `WebPageData` for generation |
-| **CLI** | `GenerationMethod`, `DirectoryScheduleDto` for commands |
+| Consumer                | Types Used                                                |
+| ----------------------- | --------------------------------------------------------- |
+| **API**                 | All types for request/response validation                 |
+| **Frontend**            | `ItemData`, `FormSchema`, `Category`, `Tag` for rendering |
+| **Plugins**             | `DomainType`, `ItemData`, `WebPageData` for generation    |
+| **CLI**                 | `GenerationMethod`, `DirectoryScheduleDto` for commands   |
 | **Generation pipeline** | `DomainAnalysis`, `RelevanceAssessment`, `ComparisonData` |
 
 ## File Structure

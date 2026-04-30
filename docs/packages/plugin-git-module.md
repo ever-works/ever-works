@@ -11,12 +11,12 @@ The Plugin Git Module (`@ever-works/plugin/git`) provides a complete git operati
 
 ## Package Overview
 
-| Property | Value |
-|---|---|
-| **Import path** | `@ever-works/plugin/git` |
-| **Location** | `platform/packages/plugin/src/git/` |
-| **Dependencies** | `isomorphic-git`, `isomorphic-git/http/node` |
-| **Used by** | GitHub plugin, and any future git provider plugins |
+| Property         | Value                                              |
+| ---------------- | -------------------------------------------------- |
+| **Import path**  | `@ever-works/plugin/git`                           |
+| **Location**     | `platform/packages/plugin/src/git/`                |
+| **Dependencies** | `isomorphic-git`, `isomorphic-git/http/node`       |
+| **Used by**      | GitHub plugin, and any future git provider plugins |
 
 ## Module Exports
 
@@ -24,13 +24,30 @@ The Plugin Git Module (`@ever-works/plugin/git`) provides a complete git operati
 export { GitOperations, type GitOperationsConfig } from './git-operations.js';
 
 export type {
-    IGitOperations, IGitProviderPlugin,
-    GitAuth, GitCommitter, GitRepository, GitBranch, GitCommit,
-    GitFileStatus, GitFileChange, GitCloneOptions, GitPushOptions,
-    CreateRepoOptions, ForkRepositoryOptions, CreatePROptions,
-    MergeOptions, MergeResult, GitUser, GitOrganization,
-    GitPullRequest, GitRepositoryPermissions, GitRepositoryWithPermissions,
-    ListRepositoriesOptions, GitPullRequestFile, ListPullRequestsOptions,
+	IGitOperations,
+	IGitProviderPlugin,
+	GitAuth,
+	GitCommitter,
+	GitRepository,
+	GitBranch,
+	GitCommit,
+	GitFileStatus,
+	GitFileChange,
+	GitCloneOptions,
+	GitPushOptions,
+	CreateRepoOptions,
+	ForkRepositoryOptions,
+	CreatePROptions,
+	MergeOptions,
+	MergeResult,
+	GitUser,
+	GitOrganization,
+	GitPullRequest,
+	GitRepositoryPermissions,
+	GitRepositoryWithPermissions,
+	ListRepositoriesOptions,
+	GitPullRequestFile,
+	ListPullRequestsOptions
 } from '../contracts/capabilities/git-provider.interface.js';
 
 export { isGitProviderPlugin } from '../contracts/capabilities/git-provider.interface.js';
@@ -44,13 +61,13 @@ The core class implementing the `IGitOperations` interface. It is constructed wi
 
 ```typescript
 interface GitOperationsConfig {
-    readonly baseDir?: string;           // default: os.tmpdir()/ever-works-repos
-    readonly defaultCommitter?: GitCommitter;  // default: Ever Works Bot
+	readonly baseDir?: string; // default: os.tmpdir()/ever-works-repos
+	readonly defaultCommitter?: GitCommitter; // default: Ever Works Bot
 }
 
 interface GitCommitter {
-    name: string;
-    email: string;
+	name: string;
+	email: string;
 }
 ```
 
@@ -58,9 +75,9 @@ interface GitCommitter {
 
 ```typescript
 const gitOps = new GitOperations(
-    (token) => ({ username: 'x-access-token', password: token }),  // getAuth
-    (owner, repo) => `https://github.com/${owner}/${repo}.git`,    // getCloneUrl
-    { baseDir: '/tmp/repos' }                                      // optional config
+	(token) => ({ username: 'x-access-token', password: token }), // getAuth
+	(owner, repo) => `https://github.com/${owner}/${repo}.git`, // getCloneUrl
+	{ baseDir: '/tmp/repos' } // optional config
 );
 ```
 
@@ -68,43 +85,44 @@ const gitOps = new GitOperations(
 
 ### Clone and Pull
 
-| Method | Description |
-|---|---|
-| `cloneOrPull(options)` | Clones a repo or pulls if already cloned. Auto-switches to main branch. |
-| `pull(dir, token, committer?)` | Pulls latest changes from remote |
-| `cloneBranch(params)` | Clones a specific branch into a unique directory |
+| Method                         | Description                                                             |
+| ------------------------------ | ----------------------------------------------------------------------- |
+| `cloneOrPull(options)`         | Clones a repo or pulls if already cloned. Auto-switches to main branch. |
+| `pull(dir, token, committer?)` | Pulls latest changes from remote                                        |
+| `cloneBranch(params)`          | Clones a specific branch into a unique directory                        |
 
 The `cloneOrPull` method handles several edge cases:
+
 - If the directory exists, attempts a pull first; on failure, removes and re-clones
 - If the remote repository is empty or not found, initializes a new repo with `git init`
 - Automatically switches to the main branch before pulling
 
 ```typescript
 const dir = await gitOps.cloneOrPull({
-    owner: 'my-org',
-    repo: 'my-directory',
-    token: 'ghp_...',
-    branch: 'main',
-    autoSwitchToMainBranch: true,
+	owner: 'my-org',
+	repo: 'my-directory',
+	token: 'ghp_...',
+	branch: 'main',
+	autoSwitchToMainBranch: true
 });
 // => '/tmp/ever-works-repos/my-org-my-directory'
 ```
 
 ### Staging and Committing
 
-| Method | Description |
-|---|---|
-| `add(dir, paths)` | Stage specific file paths |
-| `addAll(dir)` | Stage all changed, new, and deleted files |
-| `commit(dir, message, committer?)` | Create a commit |
+| Method                             | Description                               |
+| ---------------------------------- | ----------------------------------------- |
+| `add(dir, paths)`                  | Stage specific file paths                 |
+| `addAll(dir)`                      | Stage all changed, new, and deleted files |
+| `commit(dir, message, committer?)` | Create a commit                           |
 
 The `addAll` method uses `git.statusMatrix` to correctly handle additions, modifications, and deletions:
 
 ```typescript
 await gitOps.addAll(dir);
 await gitOps.commit(dir, 'Update directory content', {
-    name: 'Ever Works Bot',
-    email: 'bot@ever.works',
+	name: 'Ever Works Bot',
+	email: 'bot@ever.works'
 });
 ```
 
@@ -114,10 +132,10 @@ The `push` method includes automatic retry with exponential backoff for transien
 
 ```typescript
 await gitOps.push({
-    dir,
-    token: 'ghp_...',
-    force: false,
-    maxRetries: 3,  // default
+	dir,
+	token: 'ghp_...',
+	force: false,
+	maxRetries: 3 // default
 });
 ```
 
@@ -125,12 +143,12 @@ await gitOps.push({
 
 ### Branch Management
 
-| Method | Description |
-|---|---|
-| `getCurrentBranch(dir)` | Get the current branch name |
-| `getMainBranch(dir)` | Find `main` or `master` branch |
-| `switchBranch(dir, branch, create?)` | Switch to or create a branch |
-| `renameBranch(dir, oldName, newName)` | Rename a branch |
+| Method                                        | Description                        |
+| --------------------------------------------- | ---------------------------------- |
+| `getCurrentBranch(dir)`                       | Get the current branch name        |
+| `getMainBranch(dir)`                          | Find `main` or `master` branch     |
+| `switchBranch(dir, branch, create?)`          | Switch to or create a branch       |
+| `renameBranch(dir, oldName, newName)`         | Rename a branch                    |
 | `createAndSwitchToRandomBranch(dir, prefix?)` | Create a unique timestamped branch |
 
 ```typescript
@@ -140,6 +158,7 @@ const branchName = await gitOps.createAndSwitchToRandomBranch(dir, 'feature');
 ```
 
 The `renameBranch` method handles edge cases:
+
 - If the new branch already exists, checks out to it and deletes the old one
 - Preserves commit history by resolving the commit SHA before renaming
 
@@ -158,20 +177,20 @@ const changes = await gitOps.getStatus(dir);
 
 ### Remote Management
 
-| Method | Description |
-|---|---|
-| `remoteAdd(dir, remote, url)` | Add a remote |
-| `remoteRemove(dir, remote)` | Remove a remote |
-| `replaceRemote(dir, remote, url)` | Replace a remote (remove + add) |
-| `fetch(dir, token, remote?)` | Fetch from remote |
-| `merge(dir, ours, theirs, committer?)` | Merge branches |
+| Method                                 | Description                     |
+| -------------------------------------- | ------------------------------- |
+| `remoteAdd(dir, remote, url)`          | Add a remote                    |
+| `remoteRemove(dir, remote)`            | Remove a remote                 |
+| `replaceRemote(dir, remote, url)`      | Replace a remote (remove + add) |
+| `fetch(dir, token, remote?)`           | Fetch from remote               |
+| `merge(dir, ours, theirs, committer?)` | Merge branches                  |
 
 ### Directory Management
 
-| Method | Description |
-|---|---|
-| `getLocalDir(owner, repo)` | Get the local directory path for a repo |
-| `removeLocalDir(owner, repo)` | Remove the local clone |
+| Method                        | Description                             |
+| ----------------------------- | --------------------------------------- |
+| `getLocalDir(owner, repo)`    | Get the local directory path for a repo |
+| `removeLocalDir(owner, repo)` | Remove the local clone                  |
 
 The local directory path is generated by slugifying `{owner}-{repo}` and placing it under the configured `baseDir`.
 
@@ -192,16 +211,16 @@ The module uses `['main', 'master']` as the ordered list of default branch names
 
 The module re-exports all git-related types from the contracts package for convenience:
 
-| Type | Description |
-|---|---|
-| `GitAuth` | Authentication credentials (username/password) |
-| `GitRepository` | Repository metadata |
-| `GitBranch` | Branch information |
-| `GitCommit` | Commit data |
-| `GitPullRequest` | Pull request details |
-| `CreateRepoOptions` | Options for creating repositories |
-| `CreatePROptions` | Options for creating pull requests |
-| `ListRepositoriesOptions` | Options for listing repositories |
+| Type                      | Description                                    |
+| ------------------------- | ---------------------------------------------- |
+| `GitAuth`                 | Authentication credentials (username/password) |
+| `GitRepository`           | Repository metadata                            |
+| `GitBranch`               | Branch information                             |
+| `GitCommit`               | Commit data                                    |
+| `GitPullRequest`          | Pull request details                           |
+| `CreateRepoOptions`       | Options for creating repositories              |
+| `CreatePROptions`         | Options for creating pull requests             |
+| `ListRepositoriesOptions` | Options for listing repositories               |
 
 ## File Structure
 

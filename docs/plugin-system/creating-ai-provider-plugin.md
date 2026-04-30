@@ -1,7 +1,7 @@
 ---
 id: creating-ai-provider-plugin
-title: "Creating an AI Provider Plugin"
-sidebar_label: "AI Provider Plugin"
+title: 'Creating an AI Provider Plugin'
+sidebar_label: 'AI Provider Plugin'
 sidebar_position: 5
 ---
 
@@ -45,12 +45,12 @@ flowchart LR
 
 **Key actors:**
 
-| Component | Location | Role |
-|---|---|---|
-| `AiFacadeService` | `packages/agent/src/facades/` | Selects the active AI provider and routes requests |
-| `BaseAiProvider` | `packages/plugin/src/abstract/base-ai-provider.ts` | Abstract class every AI provider extends |
-| `AiOperations` | `packages/plugin/src/ai/ai-operations.ts` | Shared wrapper around LangChain's `ChatOpenAI` |
-| `IAiProviderPlugin` | `packages/plugin/src/contracts/capabilities/ai-provider.interface.ts` | The TypeScript interface your plugin satisfies |
+| Component           | Location                                                              | Role                                               |
+| ------------------- | --------------------------------------------------------------------- | -------------------------------------------------- |
+| `AiFacadeService`   | `packages/agent/src/facades/`                                         | Selects the active AI provider and routes requests |
+| `BaseAiProvider`    | `packages/plugin/src/abstract/base-ai-provider.ts`                    | Abstract class every AI provider extends           |
+| `AiOperations`      | `packages/plugin/src/ai/ai-operations.ts`                             | Shared wrapper around LangChain's `ChatOpenAI`     |
+| `IAiProviderPlugin` | `packages/plugin/src/contracts/capabilities/ai-provider.interface.ts` | The TypeScript interface your plugin satisfies     |
 
 When the platform needs AI -- generating a directory listing, running the conversational assistant, extracting structured data -- it calls `AiFacadeService`, which finds the enabled AI provider plugin and invokes its methods. Your plugin receives the call, resolves user-provided settings (API key, model, temperature), and delegates to `AiOperations`, which handles the LangChain invocation, parameter retry logic, JSON repair, token tracking, and streaming.
 
@@ -84,57 +84,57 @@ packages/plugins/my-ai/
 
 ```json
 {
-  "name": "@ever-works/my-ai-plugin",
-  "version": "1.0.0",
-  "description": "My AI provider plugin for Ever Works platform",
-  "private": false,
-  "type": "module",
-  "license": "MIT",
-  "main": "./dist/index.cjs",
-  "module": "./dist/index.js",
-  "types": "./dist/index.d.ts",
-  "exports": {
-    ".": {
-      "types": "./dist/index.d.ts",
-      "import": "./dist/index.js",
-      "require": "./dist/index.cjs"
-    }
-  },
-  "files": ["dist"],
-  "scripts": {
-    "build": "tsup",
-    "dev": "tsup --watch",
-    "clean": "rm -rf dist",
-    "type-check": "tsc --noEmit",
-    "test": "vitest run",
-    "test:watch": "vitest"
-  },
-  "dependencies": {
-    "@ever-works/plugin": "workspace:*",
-    "@langchain/openai": "^0.6.17",
-    "@langchain/core": "^0.3.80"
-  },
-  "devDependencies": {
-    "tsup": "^8.0.0",
-    "typescript": "^5.9.3",
-    "vitest": "^3.2.1"
-  },
-  "everworks": {
-    "plugin": {
-      "id": "my-ai",
-      "name": "My AI Provider",
-      "version": "1.0.0",
-      "category": "ai-provider",
-      "capabilities": ["ai-provider"],
-      "description": "My AI provider plugin for Ever Works platform",
-      "author": {
-        "name": "Your Name"
-      },
-      "license": "MIT",
-      "builtIn": true,
-      "autoEnable": false
-    }
-  }
+	"name": "@ever-works/my-ai-plugin",
+	"version": "1.0.0",
+	"description": "My AI provider plugin for Ever Works platform",
+	"private": false,
+	"type": "module",
+	"license": "MIT",
+	"main": "./dist/index.cjs",
+	"module": "./dist/index.js",
+	"types": "./dist/index.d.ts",
+	"exports": {
+		".": {
+			"types": "./dist/index.d.ts",
+			"import": "./dist/index.js",
+			"require": "./dist/index.cjs"
+		}
+	},
+	"files": ["dist"],
+	"scripts": {
+		"build": "tsup",
+		"dev": "tsup --watch",
+		"clean": "rm -rf dist",
+		"type-check": "tsc --noEmit",
+		"test": "vitest run",
+		"test:watch": "vitest"
+	},
+	"dependencies": {
+		"@ever-works/plugin": "workspace:*",
+		"@langchain/openai": "^0.6.17",
+		"@langchain/core": "^0.3.80"
+	},
+	"devDependencies": {
+		"tsup": "^8.0.0",
+		"typescript": "^5.9.3",
+		"vitest": "^3.2.1"
+	},
+	"everworks": {
+		"plugin": {
+			"id": "my-ai",
+			"name": "My AI Provider",
+			"version": "1.0.0",
+			"category": "ai-provider",
+			"capabilities": ["ai-provider"],
+			"description": "My AI provider plugin for Ever Works platform",
+			"author": {
+				"name": "Your Name"
+			},
+			"license": "MIT",
+			"builtIn": true,
+			"autoEnable": false
+		}
+	}
 }
 ```
 
@@ -144,24 +144,24 @@ The `everworks.plugin` block is how the platform discovers your plugin at runtim
 
 ```json
 {
-  "compilerOptions": {
-    "target": "ES2021",
-    "module": "ESNext",
-    "moduleResolution": "bundler",
-    "declaration": true,
-    "declarationMap": true,
-    "sourceMap": true,
-    "outDir": "./dist",
-    "strict": true,
-    "esModuleInterop": true,
-    "skipLibCheck": true,
-    "forceConsistentCasingInFileNames": true,
-    "resolveJsonModule": true,
-    "isolatedModules": true,
-    "noEmit": true
-  },
-  "include": ["src"],
-  "exclude": ["node_modules", "dist"]
+	"compilerOptions": {
+		"target": "ES2021",
+		"module": "ESNext",
+		"moduleResolution": "bundler",
+		"declaration": true,
+		"declarationMap": true,
+		"sourceMap": true,
+		"outDir": "./dist",
+		"strict": true,
+		"esModuleInterop": true,
+		"skipLibCheck": true,
+		"forceConsistentCasingInFileNames": true,
+		"resolveJsonModule": true,
+		"isolatedModules": true,
+		"noEmit": true
+	},
+	"include": ["src"],
+	"exclude": ["node_modules", "dist"]
 }
 ```
 
@@ -171,16 +171,16 @@ The `everworks.plugin` block is how the platform discovers your plugin at runtim
 import { defineConfig } from 'tsup';
 
 export default defineConfig({
-  entry: ['src/index.ts'],
-  noExternal: ['@ever-works/plugin'],
-  format: ['esm', 'cjs'],
-  dts: true,
-  clean: true,
-  sourcemap: false,
-  splitting: false,
-  treeshake: true,
-  target: 'es2021',
-  outDir: 'dist'
+	entry: ['src/index.ts'],
+	noExternal: ['@ever-works/plugin'],
+	format: ['esm', 'cjs'],
+	dts: true,
+	clean: true,
+	sourcemap: false,
+	splitting: false,
+	treeshake: true,
+	target: 'es2021',
+	outDir: 'dist'
 });
 ```
 
@@ -194,15 +194,15 @@ The plugin package is bundled into the output so the built plugin is self-contai
 import { defineConfig } from 'vitest/config';
 
 export default defineConfig({
-  test: {
-    environment: 'node',
-    globals: true,
-    include: ['src/**/*.{test,spec}.ts'],
-    coverage: {
-      provider: 'v8',
-      reporter: ['text', 'json', 'html']
-    }
-  }
+	test: {
+		environment: 'node',
+		globals: true,
+		include: ['src/**/*.{test,spec}.ts'],
+		coverage: {
+			provider: 'v8',
+			reporter: ['text', 'json', 'html']
+		}
+	}
 });
 ```
 
@@ -224,18 +224,18 @@ Below is a complete, annotated implementation. Each section is explained in deta
 import { BaseAiProvider } from '@ever-works/plugin/abstract';
 import { AiOperations } from '@ever-works/plugin/ai';
 import type {
-  PluginContext,
-  PluginManifest,
-  PluginHealthCheck,
-  JsonSchema,
-  PluginSettings,
-  ChatCompletionOptions,
-  ChatCompletionResponse,
-  ChatCompletionChunk,
-  EmbeddingOptions,
-  EmbeddingResponse,
-  AiModel,
-  AiModelCapabilities
+	PluginContext,
+	PluginManifest,
+	PluginHealthCheck,
+	JsonSchema,
+	PluginSettings,
+	ChatCompletionOptions,
+	ChatCompletionResponse,
+	ChatCompletionChunk,
+	EmbeddingOptions,
+	EmbeddingResponse,
+	AiModel,
+	AiModelCapabilities
 } from '@ever-works/plugin';
 
 /**
@@ -245,224 +245,224 @@ import type {
  * Uses 'user-required' configuration mode - users MUST provide their own API key.
  */
 export class MyAiPlugin extends BaseAiProvider {
-  // ──────────────────────────────────────────────
-  // Identity & metadata
-  // ──────────────────────────────────────────────
+	// ──────────────────────────────────────────────
+	// Identity & metadata
+	// ──────────────────────────────────────────────
 
-  readonly id = 'my-ai';
-  readonly name = 'My AI Provider';
-  readonly version = '1.0.0';
+	readonly id = 'my-ai';
+	readonly name = 'My AI Provider';
+	readonly version = '1.0.0';
 
-  /** Must match a provider type known to AiOperations (or 'openai' if the
-   *  API is OpenAI-compatible). */
-  readonly providerType = 'my-ai';
-  readonly providerName = 'My AI';
+	/** Must match a provider type known to AiOperations (or 'openai' if the
+	 *  API is OpenAI-compatible). */
+	readonly providerType = 'my-ai';
+	readonly providerName = 'My AI';
 
-  /** 'user-required' means every user must supply their own API key.
-   *  Use 'hybrid' if the admin can also set a shared key via env var. */
-  readonly configurationMode: 'admin-only' | 'user-required' | 'hybrid' = 'user-required';
+	/** 'user-required' means every user must supply their own API key.
+	 *  Use 'hybrid' if the admin can also set a shared key via env var. */
+	readonly configurationMode: 'admin-only' | 'user-required' | 'hybrid' = 'user-required';
 
-  // ──────────────────────────────────────────────
-  // Settings schema (JSON Schema + x-* extensions)
-  // ──────────────────────────────────────────────
+	// ──────────────────────────────────────────────
+	// Settings schema (JSON Schema + x-* extensions)
+	// ──────────────────────────────────────────────
 
-  readonly settingsSchema: JsonSchema = {
-    type: 'object',
-    properties: {
-      apiKey: {
-        type: 'string',
-        title: 'My AI API Key',
-        description: 'Connects to My AI for content generation and chat',
-        'x-secret': true,
-        'x-scope': 'user'
-      },
-      defaultModel: {
-        type: 'string',
-        title: 'Default Model',
-        description: 'Used for all AI tasks unless a tier-specific model is set',
-        default: 'my-ai-standard',
-        'x-widget': 'model-select',
-        'x-scope': 'global'
-      },
-      simpleModel: {
-        type: 'string',
-        title: 'Simple Tasks Model',
-        description: 'Handles tags, short descriptions, and quick classifications',
-        default: 'my-ai-mini',
-        'x-widget': 'model-select',
-        'x-scope': 'global'
-      },
-      mediumModel: {
-        type: 'string',
-        title: 'Standard Tasks Model',
-        description: 'Handles listings, summaries, and content reformatting',
-        default: 'my-ai-standard',
-        'x-widget': 'model-select',
-        'x-scope': 'global'
-      },
-      complexModel: {
-        type: 'string',
-        title: 'Complex Tasks Model',
-        description: 'Handles full page generation and multi-step analysis',
-        default: 'my-ai-pro',
-        'x-widget': 'model-select',
-        'x-scope': 'global'
-      },
-      temperature: {
-        type: 'number',
-        title: 'Temperature',
-        description: 'Lower values give consistent output, higher values add variety',
-        default: 0.7,
-        minimum: 0,
-        maximum: 2,
-        'x-hidden': true
-      },
-      maxTokens: {
-        type: 'number',
-        title: 'Max Tokens',
-        description: 'Limits the length of each AI-generated response',
-        default: 4096,
-        'x-hidden': true
-      },
-      baseUrl: {
-        type: 'string',
-        title: 'Base URL',
-        description: 'My AI API endpoint',
-        default: 'https://api.my-ai.com/v1',
-        'x-hidden': true
-      }
-    },
-    required: ['apiKey', 'defaultModel']
-  };
+	readonly settingsSchema: JsonSchema = {
+		type: 'object',
+		properties: {
+			apiKey: {
+				type: 'string',
+				title: 'My AI API Key',
+				description: 'Connects to My AI for content generation and chat',
+				'x-secret': true,
+				'x-scope': 'user'
+			},
+			defaultModel: {
+				type: 'string',
+				title: 'Default Model',
+				description: 'Used for all AI tasks unless a tier-specific model is set',
+				default: 'my-ai-standard',
+				'x-widget': 'model-select',
+				'x-scope': 'global'
+			},
+			simpleModel: {
+				type: 'string',
+				title: 'Simple Tasks Model',
+				description: 'Handles tags, short descriptions, and quick classifications',
+				default: 'my-ai-mini',
+				'x-widget': 'model-select',
+				'x-scope': 'global'
+			},
+			mediumModel: {
+				type: 'string',
+				title: 'Standard Tasks Model',
+				description: 'Handles listings, summaries, and content reformatting',
+				default: 'my-ai-standard',
+				'x-widget': 'model-select',
+				'x-scope': 'global'
+			},
+			complexModel: {
+				type: 'string',
+				title: 'Complex Tasks Model',
+				description: 'Handles full page generation and multi-step analysis',
+				default: 'my-ai-pro',
+				'x-widget': 'model-select',
+				'x-scope': 'global'
+			},
+			temperature: {
+				type: 'number',
+				title: 'Temperature',
+				description: 'Lower values give consistent output, higher values add variety',
+				default: 0.7,
+				minimum: 0,
+				maximum: 2,
+				'x-hidden': true
+			},
+			maxTokens: {
+				type: 'number',
+				title: 'Max Tokens',
+				description: 'Limits the length of each AI-generated response',
+				default: 4096,
+				'x-hidden': true
+			},
+			baseUrl: {
+				type: 'string',
+				title: 'Base URL',
+				description: 'My AI API endpoint',
+				default: 'https://api.my-ai.com/v1',
+				'x-hidden': true
+			}
+		},
+		required: ['apiKey', 'defaultModel']
+	};
 
-  // ──────────────────────────────────────────────
-  // Lifecycle
-  // ──────────────────────────────────────────────
+	// ──────────────────────────────────────────────
+	// Lifecycle
+	// ──────────────────────────────────────────────
 
-  async onLoad(context: PluginContext): Promise<void> {
-    await super.onLoad(context);
+	async onLoad(context: PluginContext): Promise<void> {
+		await super.onLoad(context);
 
-    // Create AiOperations with default config.
-    // The apiKey is empty here -- it gets resolved at call time
-    // from user settings via resolveConfig().
-    this.aiOps = new AiOperations({
-      apiKey: '',
-      model: 'my-ai-mini',
-      temperature: 0.7,
-      baseURL: 'https://api.my-ai.com/v1',
-      maxTokens: 4096,
-      providerType: 'my-ai'
-    });
+		// Create AiOperations with default config.
+		// The apiKey is empty here -- it gets resolved at call time
+		// from user settings via resolveConfig().
+		this.aiOps = new AiOperations({
+			apiKey: '',
+			model: 'my-ai-mini',
+			temperature: 0.7,
+			baseURL: 'https://api.my-ai.com/v1',
+			maxTokens: 4096,
+			providerType: 'my-ai'
+		});
 
-    context.logger.log('My AI Plugin loaded');
-  }
+		context.logger.log('My AI Plugin loaded');
+	}
 
-  async onUnload(): Promise<void> {
-    this.aiOps = null;
-    await super.onUnload();
-  }
+	async onUnload(): Promise<void> {
+		this.aiOps = null;
+		await super.onUnload();
+	}
 
-  // ──────────────────────────────────────────────
-  // Abstract method implementations
-  // ──────────────────────────────────────────────
+	// ──────────────────────────────────────────────
+	// Abstract method implementations
+	// ──────────────────────────────────────────────
 
-  async createChatCompletion(options: ChatCompletionOptions): Promise<ChatCompletionResponse> {
-    if (!this.aiOps) {
-      throw new Error('My AI plugin not loaded');
-    }
-    const resolvedConfig = this.resolveConfig(options.settings);
-    return this.aiOps.createChatCompletion(options, resolvedConfig);
-  }
+	async createChatCompletion(options: ChatCompletionOptions): Promise<ChatCompletionResponse> {
+		if (!this.aiOps) {
+			throw new Error('My AI plugin not loaded');
+		}
+		const resolvedConfig = this.resolveConfig(options.settings);
+		return this.aiOps.createChatCompletion(options, resolvedConfig);
+	}
 
-  async *createStreamingChatCompletion(options: ChatCompletionOptions): AsyncIterable<ChatCompletionChunk> {
-    if (!this.aiOps) {
-      throw new Error('My AI plugin not loaded');
-    }
-    const resolvedConfig = this.resolveConfig(options.settings);
-    yield* this.aiOps.createStreamingChatCompletion(options, resolvedConfig);
-  }
+	async *createStreamingChatCompletion(options: ChatCompletionOptions): AsyncIterable<ChatCompletionChunk> {
+		if (!this.aiOps) {
+			throw new Error('My AI plugin not loaded');
+		}
+		const resolvedConfig = this.resolveConfig(options.settings);
+		yield* this.aiOps.createStreamingChatCompletion(options, resolvedConfig);
+	}
 
-  async createEmbedding(options: EmbeddingOptions): Promise<EmbeddingResponse> {
-    if (!this.aiOps) {
-      throw new Error('My AI plugin not loaded');
-    }
-    return this.aiOps.createEmbedding(options);
-  }
+	async createEmbedding(options: EmbeddingOptions): Promise<EmbeddingResponse> {
+		if (!this.aiOps) {
+			throw new Error('My AI plugin not loaded');
+		}
+		return this.aiOps.createEmbedding(options);
+	}
 
-  async listModels(settings?: PluginSettings): Promise<readonly AiModel[]> {
-    if (!this.aiOps) {
-      throw new Error('My AI plugin not loaded');
-    }
-    return this.aiOps.listModels(this.resolveConfig(settings));
-  }
+	async listModels(settings?: PluginSettings): Promise<readonly AiModel[]> {
+		if (!this.aiOps) {
+			throw new Error('My AI plugin not loaded');
+		}
+		return this.aiOps.listModels(this.resolveConfig(settings));
+	}
 
-  protected getDefaultModelId(): string {
-    return 'my-ai-mini';
-  }
+	protected getDefaultModelId(): string {
+		return 'my-ai-mini';
+	}
 
-  // ──────────────────────────────────────────────
-  // Capabilities
-  // ──────────────────────────────────────────────
+	// ──────────────────────────────────────────────
+	// Capabilities
+	// ──────────────────────────────────────────────
 
-  getCapabilities(): AiModelCapabilities {
-    return {
-      supportsStructuredOutput: true,
-      supportsStreaming: true,
-      supportsToolCalling: true,
-      supportsVision: false,
-      maxContextLength: 128000
-    };
-  }
+	getCapabilities(): AiModelCapabilities {
+		return {
+			supportsStructuredOutput: true,
+			supportsStreaming: true,
+			supportsToolCalling: true,
+			supportsVision: false,
+			maxContextLength: 128000
+		};
+	}
 
-  // ──────────────────────────────────────────────
-  // Health check
-  // ──────────────────────────────────────────────
+	// ──────────────────────────────────────────────
+	// Health check
+	// ──────────────────────────────────────────────
 
-  async healthCheck(): Promise<PluginHealthCheck> {
-    return {
-      status: 'healthy',
-      message: 'My AI plugin is ready',
-      checkedAt: Date.now()
-    };
-  }
+	async healthCheck(): Promise<PluginHealthCheck> {
+		return {
+			status: 'healthy',
+			message: 'My AI plugin is ready',
+			checkedAt: Date.now()
+		};
+	}
 
-  // ──────────────────────────────────────────────
-  // Manifest
-  // ──────────────────────────────────────────────
+	// ──────────────────────────────────────────────
+	// Manifest
+	// ──────────────────────────────────────────────
 
-  getManifest(): PluginManifest {
-    return {
-      id: this.id,
-      name: this.name,
-      version: this.version,
-      description: 'Use My AI models for content generation and AI features',
-      category: this.category,
-      capabilities: [...this.capabilities],
-      author: { name: 'Your Name' },
-      license: 'MIT',
-      builtIn: true,
-      autoEnable: false,
-      visibility: 'public',
-      readme: [
-        '## What is the My AI plugin?',
-        '',
-        'This plugin connects Ever Works to the My AI API.',
-        '',
-        '## Getting started',
-        '',
-        '1. Obtain an API key from the My AI dashboard',
-        '2. Enable the My AI plugin on this page',
-        '3. Enter your API key in the settings below',
-        '4. Select your preferred models for each task complexity level'
-      ].join('\n'),
-      homepage: 'https://my-ai.com',
-      icon: {
-        type: 'svg',
-        value: '<svg viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="10"/></svg>',
-        backgroundColor: '#000000'
-      }
-    };
-  }
+	getManifest(): PluginManifest {
+		return {
+			id: this.id,
+			name: this.name,
+			version: this.version,
+			description: 'Use My AI models for content generation and AI features',
+			category: this.category,
+			capabilities: [...this.capabilities],
+			author: { name: 'Your Name' },
+			license: 'MIT',
+			builtIn: true,
+			autoEnable: false,
+			visibility: 'public',
+			readme: [
+				'## What is the My AI plugin?',
+				'',
+				'This plugin connects Ever Works to the My AI API.',
+				'',
+				'## Getting started',
+				'',
+				'1. Obtain an API key from the My AI dashboard',
+				'2. Enable the My AI plugin on this page',
+				'3. Enter your API key in the settings below',
+				'4. Select your preferred models for each task complexity level'
+			].join('\n'),
+			homepage: 'https://my-ai.com',
+			icon: {
+				type: 'svg',
+				value: '<svg viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="10"/></svg>',
+				backgroundColor: '#000000'
+			}
+		};
+	}
 }
 
 export default MyAiPlugin;
@@ -544,28 +544,28 @@ classDiagram
 
 You do **not** need to implement these -- they come from the base class:
 
-| Method | Behavior |
-|---|---|
-| `askJson(prompt, options)` | Delegates to `AiOperations.askJson()` with Zod schema validation, JSON repair fallback, and resolved config |
-| `resolveConfig(settings)` | Maps user settings (`apiKey`, `defaultModel`, `baseUrl`, `temperature`, `maxTokens`) to `AiOperationsConfig` |
-| `isAvailable(settings)` | Calls `AiOperations.testConnection()` or falls back to `listModels()` |
-| `getModel(modelId, settings)` | Calls `listModels()` and finds the model by ID |
-| `validateConnection(settings)` | Wraps `isAvailable()` into a `ConnectionValidationResult` |
-| `createStreamingChatCompletion()` | Falls back to non-streaming if not overridden |
-| `createEmbedding()` | Throws "not supported" if not overridden |
+| Method                            | Behavior                                                                                                     |
+| --------------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| `askJson(prompt, options)`        | Delegates to `AiOperations.askJson()` with Zod schema validation, JSON repair fallback, and resolved config  |
+| `resolveConfig(settings)`         | Maps user settings (`apiKey`, `defaultModel`, `baseUrl`, `temperature`, `maxTokens`) to `AiOperationsConfig` |
+| `isAvailable(settings)`           | Calls `AiOperations.testConnection()` or falls back to `listModels()`                                        |
+| `getModel(modelId, settings)`     | Calls `listModels()` and finds the model by ID                                                               |
+| `validateConnection(settings)`    | Wraps `isAvailable()` into a `ConnectionValidationResult`                                                    |
+| `createStreamingChatCompletion()` | Falls back to non-streaming if not overridden                                                                |
+| `createEmbedding()`               | Throws "not supported" if not overridden                                                                     |
 
 ### What You Must Implement
 
-| Member | Type | Purpose |
-|---|---|---|
-| `id` | `string` | Unique plugin identifier (e.g., `'my-ai'`) |
-| `name` | `string` | Human-readable name (e.g., `'My AI Provider'`) |
-| `version` | `string` | Semver version string |
-| `providerType` | `string` | Provider type passed to `AiOperations` |
-| `providerName` | `string` | Display name for connection messages |
-| `createChatCompletion(options)` | method | Main text completion method |
-| `listModels(settings)` | method | Returns available models from the API |
-| `getDefaultModelId()` | method | Returns the fallback model ID |
+| Member                          | Type     | Purpose                                        |
+| ------------------------------- | -------- | ---------------------------------------------- |
+| `id`                            | `string` | Unique plugin identifier (e.g., `'my-ai'`)     |
+| `name`                          | `string` | Human-readable name (e.g., `'My AI Provider'`) |
+| `version`                       | `string` | Semver version string                          |
+| `providerType`                  | `string` | Provider type passed to `AiOperations`         |
+| `providerName`                  | `string` | Display name for connection messages           |
+| `createChatCompletion(options)` | method   | Main text completion method                    |
+| `listModels(settings)`          | method   | Returns available models from the API          |
+| `getDefaultModelId()`           | method   | Returns the fallback model ID                  |
 
 ## Settings Schema Deep-Dive
 
@@ -575,36 +575,36 @@ The settings schema is a JSON Schema object extended with Ever Works' custom `x-
 
 The platform uses a tiered model system to balance cost and quality. Each tier maps to a different complexity of AI task:
 
-| Setting | Purpose | Examples |
-|---|---|---|
-| `defaultModel` | Fallback for all tasks when no tier-specific model is set | `gpt-5.1`, `claude-sonnet-4.5` |
-| `simpleModel` | Tags, short descriptions, quick classifications | `gpt-5-nano`, `gpt-5-mini` |
-| `mediumModel` | Listings, summaries, content reformatting | `gpt-4o-mini`, `claude-sonnet-4.5` |
-| `complexModel` | Full page generation, multi-step analysis | `gpt-5.1`, `gpt-5` |
+| Setting        | Purpose                                                   | Examples                           |
+| -------------- | --------------------------------------------------------- | ---------------------------------- |
+| `defaultModel` | Fallback for all tasks when no tier-specific model is set | `gpt-5.1`, `claude-sonnet-4.5`     |
+| `simpleModel`  | Tags, short descriptions, quick classifications           | `gpt-5-nano`, `gpt-5-mini`         |
+| `mediumModel`  | Listings, summaries, content reformatting                 | `gpt-4o-mini`, `claude-sonnet-4.5` |
+| `complexModel` | Full page generation, multi-step analysis                 | `gpt-5.1`, `gpt-5`                 |
 
 The pipeline selects the appropriate model tier based on the step being executed. Users can override any tier in the plugin settings.
 
-### x-* Extension Reference
+### x-\* Extension Reference
 
-| Extension | Type | Description |
-|---|---|---|
-| `x-secret` | `boolean` | Value is encrypted at rest, never returned in API responses, rendered as a password input |
-| `x-scope` | `'global' \| 'user' \| 'directory'` | Where the setting is stored. `user` = per-user, `global` = shared across all users |
-| `x-envVar` | `string` | Environment variable to check as a fallback when no stored setting exists |
-| `x-widget` | `string` | UI widget hint. `'model-select'` renders a dropdown that calls `listModels()` |
-| `x-hidden` | `boolean` | Hides the field from the settings UI (advanced tuning) |
-| `x-adminOnly` | `boolean` | Only visible to admin users |
-| `x-showIf` | `{ field, value }` | Conditionally show based on another field's value |
+| Extension     | Type                                | Description                                                                               |
+| ------------- | ----------------------------------- | ----------------------------------------------------------------------------------------- |
+| `x-secret`    | `boolean`                           | Value is encrypted at rest, never returned in API responses, rendered as a password input |
+| `x-scope`     | `'global' \| 'user' \| 'directory'` | Where the setting is stored. `user` = per-user, `global` = shared across all users        |
+| `x-envVar`    | `string`                            | Environment variable to check as a fallback when no stored setting exists                 |
+| `x-widget`    | `string`                            | UI widget hint. `'model-select'` renders a dropdown that calls `listModels()`             |
+| `x-hidden`    | `boolean`                           | Hides the field from the settings UI (advanced tuning)                                    |
+| `x-adminOnly` | `boolean`                           | Only visible to admin users                                                               |
+| `x-showIf`    | `{ field, value }`                  | Conditionally show based on another field's value                                         |
 
 ### Configuration Modes
 
 The `configurationMode` property determines who provides the API key:
 
-| Mode | Behavior | Example |
-|---|---|---|
-| `user-required` | Every user must enter their own API key. No admin fallback. | OpenAI, Anthropic, Google, Groq |
-| `hybrid` | Admin can set a shared key via `x-envVar`; users can override with their own. | OpenRouter |
-| `admin-only` | Only the admin configures the key; users cannot override. | Internal deployments |
+| Mode            | Behavior                                                                      | Example                         |
+| --------------- | ----------------------------------------------------------------------------- | ------------------------------- |
+| `user-required` | Every user must enter their own API key. No admin fallback.                   | OpenAI, Anthropic, Google, Groq |
+| `hybrid`        | Admin can set a shared key via `x-envVar`; users can override with their own. | OpenRouter                      |
+| `admin-only`    | Only the admin configures the key; users cannot override.                     | Internal deployments            |
 
 For `hybrid` mode, add `x-envVar` to the `apiKey` field:
 
@@ -654,18 +654,18 @@ The manifest provides metadata displayed in the plugin marketplace and settings 
 
 Key fields:
 
-| Field | Required | Description |
-|---|---|---|
-| `id`, `name`, `version` | Yes | Must match plugin identity properties |
-| `description` | Yes | One-line description shown in plugin listings |
-| `category` | Yes | Use `this.category` (inherits `'ai-provider'`) |
-| `capabilities` | Yes | Use `[...this.capabilities]` |
-| `icon` | Recommended | SVG icon with `fill="currentColor"` for theme compatibility |
-| `readme` | Recommended | Markdown string shown on the plugin detail page |
-| `homepage` | Recommended | Link to the provider's website |
-| `builtIn` | Yes | `true` for platform-shipped plugins |
-| `autoEnable` | Yes | `false` for most providers; `true` only for the default provider |
-| `visibility` | No | `'public'` (default), `'hidden'`, or `'user-only'` |
+| Field                   | Required    | Description                                                      |
+| ----------------------- | ----------- | ---------------------------------------------------------------- |
+| `id`, `name`, `version` | Yes         | Must match plugin identity properties                            |
+| `description`           | Yes         | One-line description shown in plugin listings                    |
+| `category`              | Yes         | Use `this.category` (inherits `'ai-provider'`)                   |
+| `capabilities`          | Yes         | Use `[...this.capabilities]`                                     |
+| `icon`                  | Recommended | SVG icon with `fill="currentColor"` for theme compatibility      |
+| `readme`                | Recommended | Markdown string shown on the plugin detail page                  |
+| `homepage`              | Recommended | Link to the provider's website                                   |
+| `builtIn`               | Yes         | `true` for platform-shipped plugins                              |
+| `autoEnable`            | Yes         | `false` for most providers; `true` only for the default provider |
+| `visibility`            | No          | `'public'` (default), `'hidden'`, or `'user-only'`               |
 
 :::tip Icon Best Practices
 Use an inline SVG with `fill="currentColor"` so the icon adapts to light/dark themes. Set `backgroundColor` to the provider's brand color. Keep the SVG minimal -- under 2 KB.
@@ -752,231 +752,227 @@ import { AiOperations } from '@ever-works/plugin/ai';
 
 // Mock AiOperations so no real API calls are made
 vi.mock('@ever-works/plugin/ai', () => {
-  const MockAiOperations = vi.fn().mockImplementation(() => ({
-    createChatCompletion: vi.fn().mockResolvedValue({
-      id: 'test',
-      choices: [],
-      model: 'my-ai-standard',
-      created: 0
-    }),
-    createStreamingChatCompletion: vi.fn(),
-    createEmbedding: vi.fn(),
-    askJson: vi.fn().mockResolvedValue({ result: {}, model: 'my-ai-standard', usage: undefined }),
-    listModels: vi.fn().mockResolvedValue([]),
-    testConnection: vi.fn().mockResolvedValue({ success: true })
-  }));
-  return { AiOperations: MockAiOperations };
+	const MockAiOperations = vi.fn().mockImplementation(() => ({
+		createChatCompletion: vi.fn().mockResolvedValue({
+			id: 'test',
+			choices: [],
+			model: 'my-ai-standard',
+			created: 0
+		}),
+		createStreamingChatCompletion: vi.fn(),
+		createEmbedding: vi.fn(),
+		askJson: vi.fn().mockResolvedValue({ result: {}, model: 'my-ai-standard', usage: undefined }),
+		listModels: vi.fn().mockResolvedValue([]),
+		testConnection: vi.fn().mockResolvedValue({ success: true })
+	}));
+	return { AiOperations: MockAiOperations };
 });
 
 describe('MyAiPlugin', () => {
-  let plugin: MyAiPlugin;
+	let plugin: MyAiPlugin;
 
-  beforeEach(() => {
-    vi.clearAllMocks();
-    plugin = new MyAiPlugin();
-  });
+	beforeEach(() => {
+		vi.clearAllMocks();
+		plugin = new MyAiPlugin();
+	});
 
-  // ────────────────────────────────────────────
-  // Metadata
-  // ────────────────────────────────────────────
+	// ────────────────────────────────────────────
+	// Metadata
+	// ────────────────────────────────────────────
 
-  describe('metadata', () => {
-    it('should have correct plugin id and name', () => {
-      expect(plugin.id).toBe('my-ai');
-      expect(plugin.name).toBe('My AI Provider');
-      expect(plugin.version).toBe('1.0.0');
-    });
+	describe('metadata', () => {
+		it('should have correct plugin id and name', () => {
+			expect(plugin.id).toBe('my-ai');
+			expect(plugin.name).toBe('My AI Provider');
+			expect(plugin.version).toBe('1.0.0');
+		});
 
-    it('should have ai-provider category and capability', () => {
-      expect(plugin.category).toBe('ai-provider');
-      expect(plugin.capabilities).toContain('ai-provider');
-    });
+		it('should have ai-provider category and capability', () => {
+			expect(plugin.category).toBe('ai-provider');
+			expect(plugin.capabilities).toContain('ai-provider');
+		});
 
-    it('should have user-required configuration mode', () => {
-      expect(plugin.configurationMode).toBe('user-required');
-    });
-  });
+		it('should have user-required configuration mode', () => {
+			expect(plugin.configurationMode).toBe('user-required');
+		});
+	});
 
-  // ────────────────────────────────────────────
-  // Settings schema
-  // ────────────────────────────────────────────
+	// ────────────────────────────────────────────
+	// Settings schema
+	// ────────────────────────────────────────────
 
-  describe('settingsSchema', () => {
-    it('should have required apiKey and defaultModel fields', () => {
-      expect(plugin.settingsSchema).toBeDefined();
-      expect(plugin.settingsSchema.type).toBe('object');
-      expect(plugin.settingsSchema.properties).toHaveProperty('apiKey');
-      expect(plugin.settingsSchema.required).toContain('apiKey');
-      expect(plugin.settingsSchema.required).toContain('defaultModel');
-    });
+	describe('settingsSchema', () => {
+		it('should have required apiKey and defaultModel fields', () => {
+			expect(plugin.settingsSchema).toBeDefined();
+			expect(plugin.settingsSchema.type).toBe('object');
+			expect(plugin.settingsSchema.properties).toHaveProperty('apiKey');
+			expect(plugin.settingsSchema.required).toContain('apiKey');
+			expect(plugin.settingsSchema.required).toContain('defaultModel');
+		});
 
-    it('should have apiKey as secret and user-scoped', () => {
-      const apiKeySchema = plugin.settingsSchema.properties?.apiKey as any;
-      expect(apiKeySchema).toBeDefined();
-      expect(apiKeySchema.type).toBe('string');
-      expect(apiKeySchema['x-secret']).toBe(true);
-      expect(apiKeySchema['x-scope']).toBe('user');
-    });
+		it('should have apiKey as secret and user-scoped', () => {
+			const apiKeySchema = plugin.settingsSchema.properties?.apiKey as any;
+			expect(apiKeySchema).toBeDefined();
+			expect(apiKeySchema.type).toBe('string');
+			expect(apiKeySchema['x-secret']).toBe(true);
+			expect(apiKeySchema['x-scope']).toBe('user');
+		});
 
-    it('should have all model tier settings', () => {
-      const props = plugin.settingsSchema.properties!;
-      expect(props).toHaveProperty('defaultModel');
-      expect(props).toHaveProperty('simpleModel');
-      expect(props).toHaveProperty('mediumModel');
-      expect(props).toHaveProperty('complexModel');
-    });
+		it('should have all model tier settings', () => {
+			const props = plugin.settingsSchema.properties!;
+			expect(props).toHaveProperty('defaultModel');
+			expect(props).toHaveProperty('simpleModel');
+			expect(props).toHaveProperty('mediumModel');
+			expect(props).toHaveProperty('complexModel');
+		});
 
-    it('should have temperature and maxTokens settings', () => {
-      const props = plugin.settingsSchema.properties!;
-      expect(props).toHaveProperty('temperature');
-      expect(props).toHaveProperty('maxTokens');
-      expect((props.temperature as any).type).toBe('number');
-      expect((props.maxTokens as any).type).toBe('number');
-    });
+		it('should have temperature and maxTokens settings', () => {
+			const props = plugin.settingsSchema.properties!;
+			expect(props).toHaveProperty('temperature');
+			expect(props).toHaveProperty('maxTokens');
+			expect((props.temperature as any).type).toBe('number');
+			expect((props.maxTokens as any).type).toBe('number');
+		});
 
-    it('should have description on all settings fields', () => {
-      const props = plugin.settingsSchema.properties!;
-      for (const [key, prop] of Object.entries(props)) {
-        expect((prop as any).description, `${key} should have a description`).toBeDefined();
-        expect((prop as any).description, `${key} description should not be empty`).not.toBe('');
-      }
-    });
+		it('should have description on all settings fields', () => {
+			const props = plugin.settingsSchema.properties!;
+			for (const [key, prop] of Object.entries(props)) {
+				expect((prop as any).description, `${key} should have a description`).toBeDefined();
+				expect((prop as any).description, `${key} description should not be empty`).not.toBe('');
+			}
+		});
 
-    it('should have title on all settings fields', () => {
-      const props = plugin.settingsSchema.properties!;
-      for (const [key, prop] of Object.entries(props)) {
-        expect((prop as any).title, `${key} should have a title`).toBeDefined();
-      }
-    });
-  });
+		it('should have title on all settings fields', () => {
+			const props = plugin.settingsSchema.properties!;
+			for (const [key, prop] of Object.entries(props)) {
+				expect((prop as any).title, `${key} should have a title`).toBeDefined();
+			}
+		});
+	});
 
-  // ────────────────────────────────────────────
-  // Lifecycle hooks
-  // ────────────────────────────────────────────
+	// ────────────────────────────────────────────
+	// Lifecycle hooks
+	// ────────────────────────────────────────────
 
-  describe('lifecycle hooks', () => {
-    const createMockContext = (): PluginContext =>
-      ({
-        pluginId: 'my-ai',
-        logger: {
-          log: vi.fn(),
-          debug: vi.fn(),
-          warn: vi.fn(),
-          error: vi.fn()
-        },
-        getSettings: vi.fn().mockResolvedValue({})
-      }) as unknown as PluginContext;
+	describe('lifecycle hooks', () => {
+		const createMockContext = (): PluginContext =>
+			({
+				pluginId: 'my-ai',
+				logger: {
+					log: vi.fn(),
+					debug: vi.fn(),
+					warn: vi.fn(),
+					error: vi.fn()
+				},
+				getSettings: vi.fn().mockResolvedValue({})
+			}) as unknown as PluginContext;
 
-    it('should load successfully', async () => {
-      const mockContext = createMockContext();
-      await plugin.onLoad(mockContext);
-      expect(mockContext.logger.log).toHaveBeenCalledWith('My AI Plugin loaded');
-    });
+		it('should load successfully', async () => {
+			const mockContext = createMockContext();
+			await plugin.onLoad(mockContext);
+			expect(mockContext.logger.log).toHaveBeenCalledWith('My AI Plugin loaded');
+		});
 
-    it('should unload successfully', async () => {
-      const mockContext = createMockContext();
-      await plugin.onLoad(mockContext);
-      await plugin.onUnload();
-    });
-  });
+		it('should unload successfully', async () => {
+			const mockContext = createMockContext();
+			await plugin.onLoad(mockContext);
+			await plugin.onUnload();
+		});
+	});
 
-  // ────────────────────────────────────────────
-  // Manifest
-  // ────────────────────────────────────────────
+	// ────────────────────────────────────────────
+	// Manifest
+	// ────────────────────────────────────────────
 
-  describe('manifest', () => {
-    it('should return correct manifest', () => {
-      const manifest = plugin.getManifest();
-      expect(manifest.id).toBe('my-ai');
-      expect(manifest.name).toBe('My AI Provider');
-      expect(manifest.builtIn).toBe(true);
-      expect(manifest.autoEnable).toBe(false);
-      expect(manifest.visibility).toBe('public');
-      expect(manifest.icon).toBeDefined();
-      expect(manifest.icon?.type).toBe('svg');
-    });
-  });
+	describe('manifest', () => {
+		it('should return correct manifest', () => {
+			const manifest = plugin.getManifest();
+			expect(manifest.id).toBe('my-ai');
+			expect(manifest.name).toBe('My AI Provider');
+			expect(manifest.builtIn).toBe(true);
+			expect(manifest.autoEnable).toBe(false);
+			expect(manifest.visibility).toBe('public');
+			expect(manifest.icon).toBeDefined();
+			expect(manifest.icon?.type).toBe('svg');
+		});
+	});
 
-  // ────────────────────────────────────────────
-  // Health check
-  // ────────────────────────────────────────────
+	// ────────────────────────────────────────────
+	// Health check
+	// ────────────────────────────────────────────
 
-  describe('healthCheck', () => {
-    it('should return healthy status', async () => {
-      const health = await plugin.healthCheck();
-      expect(health.status).toBe('healthy');
-      expect(health.message).toBe('My AI plugin is ready');
-      expect(health.checkedAt).toBeDefined();
-    });
-  });
+	describe('healthCheck', () => {
+		it('should return healthy status', async () => {
+			const health = await plugin.healthCheck();
+			expect(health.status).toBe('healthy');
+			expect(health.message).toBe('My AI plugin is ready');
+			expect(health.checkedAt).toBeDefined();
+		});
+	});
 
-  // ────────────────────────────────────────────
-  // askJson delegation
-  // ────────────────────────────────────────────
+	// ────────────────────────────────────────────
+	// askJson delegation
+	// ────────────────────────────────────────────
 
-  describe('askJson', () => {
-    const createMockContext = (): PluginContext =>
-      ({
-        pluginId: 'my-ai',
-        logger: { log: vi.fn(), debug: vi.fn(), warn: vi.fn(), error: vi.fn() },
-        getSettings: vi.fn().mockResolvedValue({})
-      }) as unknown as PluginContext;
+	describe('askJson', () => {
+		const createMockContext = (): PluginContext =>
+			({
+				pluginId: 'my-ai',
+				logger: { log: vi.fn(), debug: vi.fn(), warn: vi.fn(), error: vi.fn() },
+				getSettings: vi.fn().mockResolvedValue({})
+			}) as unknown as PluginContext;
 
-    it('should delegate to aiOps.askJson with resolved config', async () => {
-      await plugin.onLoad(createMockContext());
-      const aiOpsInstance = (AiOperations as unknown as ReturnType<typeof vi.fn>).mock.results[0].value;
+		it('should delegate to aiOps.askJson with resolved config', async () => {
+			await plugin.onLoad(createMockContext());
+			const aiOpsInstance = (AiOperations as unknown as ReturnType<typeof vi.fn>).mock.results[0].value;
 
-      await plugin.askJson('Generate JSON', {
-        settings: { apiKey: 'sk-test' }
-      });
+			await plugin.askJson('Generate JSON', {
+				settings: { apiKey: 'sk-test' }
+			});
 
-      expect(aiOpsInstance.askJson).toHaveBeenCalledWith(
-        'Generate JSON',
-        expect.any(Object),
-        expect.objectContaining({ apiKey: 'sk-test' }),
-        expect.any(Object)
-      );
-    });
+			expect(aiOpsInstance.askJson).toHaveBeenCalledWith(
+				'Generate JSON',
+				expect.any(Object),
+				expect.objectContaining({ apiKey: 'sk-test' }),
+				expect.any(Object)
+			);
+		});
 
-    it('should throw when plugin not loaded', async () => {
-      await expect(plugin.askJson('test')).rejects.toThrow('Plugin not loaded');
-    });
-  });
+		it('should throw when plugin not loaded', async () => {
+			await expect(plugin.askJson('test')).rejects.toThrow('Plugin not loaded');
+		});
+	});
 
-  // ────────────────────────────────────────────
-  // Settings threading
-  // ────────────────────────────────────────────
+	// ────────────────────────────────────────────
+	// Settings threading
+	// ────────────────────────────────────────────
 
-  describe('settings threading', () => {
-    const createMockContext = (): PluginContext =>
-      ({
-        pluginId: 'my-ai',
-        logger: { log: vi.fn(), debug: vi.fn(), warn: vi.fn(), error: vi.fn() },
-        getSettings: vi.fn().mockResolvedValue({})
-      }) as unknown as PluginContext;
+	describe('settings threading', () => {
+		const createMockContext = (): PluginContext =>
+			({
+				pluginId: 'my-ai',
+				logger: { log: vi.fn(), debug: vi.fn(), warn: vi.fn(), error: vi.fn() },
+				getSettings: vi.fn().mockResolvedValue({})
+			}) as unknown as PluginContext;
 
-    it('should pass settings as configOverrides to AiOperations.listModels', async () => {
-      await plugin.onLoad(createMockContext());
-      const aiOpsInstance = (AiOperations as unknown as ReturnType<typeof vi.fn>).mock.results[0].value;
+		it('should pass settings as configOverrides to AiOperations.listModels', async () => {
+			await plugin.onLoad(createMockContext());
+			const aiOpsInstance = (AiOperations as unknown as ReturnType<typeof vi.fn>).mock.results[0].value;
 
-      await plugin.listModels({ apiKey: 'sk-test' });
+			await plugin.listModels({ apiKey: 'sk-test' });
 
-      expect(aiOpsInstance.listModels).toHaveBeenCalledWith(
-        expect.objectContaining({ apiKey: 'sk-test' })
-      );
-    });
+			expect(aiOpsInstance.listModels).toHaveBeenCalledWith(expect.objectContaining({ apiKey: 'sk-test' }));
+		});
 
-    it('should pass settings as configOverrides to AiOperations.testConnection', async () => {
-      await plugin.onLoad(createMockContext());
-      const aiOpsInstance = (AiOperations as unknown as ReturnType<typeof vi.fn>).mock.results[0].value;
+		it('should pass settings as configOverrides to AiOperations.testConnection', async () => {
+			await plugin.onLoad(createMockContext());
+			const aiOpsInstance = (AiOperations as unknown as ReturnType<typeof vi.fn>).mock.results[0].value;
 
-      await plugin.isAvailable({ apiKey: 'sk-test' });
+			await plugin.isAvailable({ apiKey: 'sk-test' });
 
-      expect(aiOpsInstance.testConnection).toHaveBeenCalledWith(
-        expect.objectContaining({ apiKey: 'sk-test' })
-      );
-    });
-  });
+			expect(aiOpsInstance.testConnection).toHaveBeenCalledWith(expect.objectContaining({ apiKey: 'sk-test' }));
+		});
+	});
 });
 ```
 
@@ -1068,6 +1064,7 @@ Key behaviors:
 Use this checklist to verify your plugin is production-ready before submitting a pull request.
 
 ### Package Setup
+
 - [ ] Directory created at `packages/plugins/<your-plugin>/`
 - [ ] `package.json` has `"type": "module"` and dual ESM/CJS exports
 - [ ] `package.json` has correct `everworks.plugin` metadata
@@ -1075,6 +1072,7 @@ Use this checklist to verify your plugin is production-ready before submitting a
 - [ ] `pnpm install` succeeds from the repo root
 
 ### Plugin Class
+
 - [ ] Extends `BaseAiProvider`
 - [ ] Sets `id`, `name`, `version`, `providerType`, `providerName`
 - [ ] Sets `configurationMode` to `'user-required'` or `'hybrid'`
@@ -1084,11 +1082,13 @@ Use this checklist to verify your plugin is production-ready before submitting a
 - [ ] `required` array includes `['apiKey', 'defaultModel']`
 
 ### Lifecycle
+
 - [ ] `onLoad()` calls `super.onLoad(context)` first
 - [ ] `onLoad()` creates `AiOperations` with empty `apiKey` and correct `providerType`
 - [ ] `onUnload()` sets `this.aiOps = null` and calls `super.onUnload()`
 
 ### Methods
+
 - [ ] `createChatCompletion()` checks `this.aiOps` and delegates with resolved config
 - [ ] `createStreamingChatCompletion()` overridden (or base class fallback is acceptable)
 - [ ] `listModels()` delegates to `this.aiOps.listModels()`
@@ -1098,9 +1098,11 @@ Use this checklist to verify your plugin is production-ready before submitting a
 - [ ] `healthCheck()` returns a health status
 
 ### Exports
+
 - [ ] `src/index.ts` exports plugin as both named and default export
 
 ### Tests
+
 - [ ] Mock `@ever-works/plugin/ai` module
 - [ ] Test metadata (id, name, version, category, configurationMode)
 - [ ] Test settings schema (required fields, types, x-secret, x-scope)
@@ -1112,6 +1114,7 @@ Use this checklist to verify your plugin is production-ready before submitting a
 - [ ] All tests pass: `pnpm test`
 
 ### Build & Quality
+
 - [ ] `pnpm build` succeeds
 - [ ] `pnpm type-check` passes
 - [ ] `pnpm lint` passes

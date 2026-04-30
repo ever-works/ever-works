@@ -22,10 +22,10 @@ Use data management to migrate between Ever Works instances, create backups of y
 
 The data management system has three parts:
 
-| Feature | Description |
-|---------|-------------|
-| **Export** | Download a JSON file containing your full account data |
-| **Import** | Upload a previously exported JSON file to restore or migrate data |
+| Feature         | Description                                                                  |
+| --------------- | ---------------------------------------------------------------------------- |
+| **Export**      | Download a JSON file containing your full account data                       |
+| **Import**      | Upload a previously exported JSON file to restore or migrate data            |
 | **GitHub Sync** | Push/pull configuration to a private GitHub repository for continuous backup |
 
 All three are accessible from **Settings > Data** in the web dashboard.
@@ -36,21 +36,21 @@ All three are accessible from **Settings > Data** in the web dashboard.
 
 The export produces a versioned JSON file (currently v1) containing:
 
-| Data | Details |
-|------|---------|
-| **Profile** | Username, email, avatar |
-| **Directories** | Name, slug, description, git/deploy provider, settings |
-| **Directory Items** | Full item data from the data repository (YAML), including markdown |
-| **Categories, Tags, Collections** | Taxonomy data from the data repository |
-| **Comparisons** | Comparison data with dimensions, scores, and markdown content |
-| **Site Config** | Per-directory website configuration |
-| **Markdown Templates** | Header and footer markdown templates |
-| **Schedules** | Update cadence, status, billing mode, failure thresholds |
-| **Advanced Prompts** | Custom AI prompt overrides for each pipeline step |
-| **Members** | Directory member user IDs and roles |
-| **Custom Domains** | Domain name, environment, verification status |
-| **User Plugins** | Plugin ID, enabled state, settings |
-| **Directory Plugins** | Per-directory plugin configuration, capability, priority |
+| Data                              | Details                                                            |
+| --------------------------------- | ------------------------------------------------------------------ |
+| **Profile**                       | Username, email, avatar                                            |
+| **Directories**                   | Name, slug, description, git/deploy provider, settings             |
+| **Directory Items**               | Full item data from the data repository (YAML), including markdown |
+| **Categories, Tags, Collections** | Taxonomy data from the data repository                             |
+| **Comparisons**                   | Comparison data with dimensions, scores, and markdown content      |
+| **Site Config**                   | Per-directory website configuration                                |
+| **Markdown Templates**            | Header and footer markdown templates                               |
+| **Schedules**                     | Update cadence, status, billing mode, failure thresholds           |
+| **Advanced Prompts**              | Custom AI prompt overrides for each pipeline step                  |
+| **Members**                       | Directory member user IDs and roles                                |
+| **Custom Domains**                | Domain name, environment, verification status                      |
+| **User Plugins**                  | Plugin ID, enabled state, settings                                 |
+| **Directory Plugins**             | Per-directory plugin configuration, capability, priority           |
 
 ### Secret Handling
 
@@ -65,45 +65,45 @@ The masked format shows the first 3 and last 4 characters of the original value 
 
 ```json
 {
-  "version": 1,
-  "exportedAt": "2026-03-10T18:00:00.000Z",
-  "includesSecrets": true,
-  "data": {
-    "profile": {
-      "username": "myuser",
-      "email": "user@example.com"
-    },
-    "directories": [
-      {
-        "name": "My Directory",
-        "slug": "my-directory",
-        "description": "...",
-        "gitProvider": "github",
-        "items": [],
-        "categories": [],
-        "tags": [],
-        "collections": [],
-        "comparisons": [],
-        "siteConfig": {},
-        "markdownTemplate": { "header": "...", "footer": "..." },
-        "schedule": { "cadence": "weekly", "status": "active" },
-        "advancedPrompts": { "itemGeneration": "..." },
-        "members": [],
-        "customDomains": [],
-        "directoryPlugins": [
-          {
-            "pluginId": "openai",
-            "enabled": true,
-            "settings": { "model": "gpt-4o" },
-            "secretSettings": {
-              "apiKey": "MASKED:sk-***abcd"
-            }
-          }
-        ]
-      }
-    ],
-    "userPlugins": []
-  }
+	"version": 1,
+	"exportedAt": "2026-03-10T18:00:00.000Z",
+	"includesSecrets": true,
+	"data": {
+		"profile": {
+			"username": "myuser",
+			"email": "user@example.com"
+		},
+		"directories": [
+			{
+				"name": "My Directory",
+				"slug": "my-directory",
+				"description": "...",
+				"gitProvider": "github",
+				"items": [],
+				"categories": [],
+				"tags": [],
+				"collections": [],
+				"comparisons": [],
+				"siteConfig": {},
+				"markdownTemplate": { "header": "...", "footer": "..." },
+				"schedule": { "cadence": "weekly", "status": "active" },
+				"advancedPrompts": { "itemGeneration": "..." },
+				"members": [],
+				"customDomains": [],
+				"directoryPlugins": [
+					{
+						"pluginId": "openai",
+						"enabled": true,
+						"settings": { "model": "gpt-4o" },
+						"secretSettings": {
+							"apiKey": "MASKED:sk-***abcd"
+						}
+					}
+				]
+			}
+		],
+		"userPlugins": []
+	}
 }
 ```
 
@@ -115,8 +115,8 @@ POST /api/account/export
 
 **Query parameters:**
 
-| Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
+| Parameter        | Type    | Default | Description                                  |
+| ---------------- | ------- | ------- | -------------------------------------------- |
 | `includeSecrets` | boolean | `false` | Include masked secret settings in the export |
 
 **Response**: JSON file download with `Content-Disposition: attachment`.
@@ -129,23 +129,23 @@ Import is a two-step process: **preview** then **apply**.
 
 Upload a JSON file to analyze its contents before making any changes. The preview returns:
 
-| Field | Description |
-|-------|-------------|
-| `valid` | Whether the file is a valid export |
-| `version` | Export format version |
-| `includesSecrets` | Whether the file contains secret settings |
+| Field              | Description                                                     |
+| ------------------ | --------------------------------------------------------------- |
+| `valid`            | Whether the file is a valid export                              |
+| `version`          | Export format version                                           |
+| `includesSecrets`  | Whether the file contains secret settings                       |
 | `hasMaskedSecrets` | Whether secret values are masked (need replacing before import) |
-| `directoryCount` | Number of directories in the file |
-| `totalItemCount` | Total items across all directories |
-| `userPluginCount` | Number of user plugins |
-| `conflicts` | Directories whose slugs match existing directories |
-| `missingPlugins` | Plugin IDs not installed on this instance |
+| `directoryCount`   | Number of directories in the file                               |
+| `totalItemCount`   | Total items across all directories                              |
+| `userPluginCount`  | Number of user plugins                                          |
+| `conflicts`        | Directories whose slugs match existing directories              |
+| `missingPlugins`   | Plugin IDs not installed on this instance                       |
 
 ### Masked Secrets Detection
 
 If the import file contains masked secret values (`MASKED:...`), the preview sets `hasMaskedSecrets: true` and the UI displays a warning:
 
-> This file contains masked secret values (MASKED:***). Please open the JSON file and replace all masked values with your real API keys and credentials before importing. Masked values will be skipped during import.
+> This file contains masked secret values (MASKED:\*\*\*). Please open the JSON file and replace all masked values with your real API keys and credentials before importing. Masked values will be skipped during import.
 
 During import, any secret settings that still contain masked values are **skipped** (not written to the database), and a per-plugin warning is added to the result.
 
@@ -153,11 +153,11 @@ During import, any secret settings that still contain masked values are **skippe
 
 When a directory slug in the import file matches an existing directory, you choose a resolution strategy:
 
-| Strategy | Behavior |
-|----------|----------|
-| **Skip** | Keep the existing directory, do not import the incoming one |
-| **Overwrite** | Update the existing directory with the imported data |
-| **Rename** | Import with a new slug (e.g., `my-dir-imported`) |
+| Strategy      | Behavior                                                    |
+| ------------- | ----------------------------------------------------------- |
+| **Skip**      | Keep the existing directory, do not import the incoming one |
+| **Overwrite** | Update the existing directory with the imported data        |
+| **Rename**    | Import with a new slug (e.g., `my-dir-imported`)            |
 
 ### Step 3: Apply
 
@@ -178,6 +178,7 @@ POST /api/account/import/apply
 **Preview body**: The full JSON export payload.
 
 **Apply body**:
+
 ```json
 {
   "payload": { ... },
@@ -254,13 +255,13 @@ DELETE /api/account/sync
 
 ## Security Considerations
 
-| Concern | Mitigation |
-|---------|------------|
-| Secret leakage via export | Secrets are always masked with `MASKED:` prefix; real values never leave the API |
-| Secret leakage via GitHub | Push always writes masked values; pull always ignores secret values |
-| Masked values imported as real | Import detects `MASKED:` prefix and skips those values with a warning |
-| Path traversal in sync | Directory slugs are validated with `path.basename()` on both write and read operations |
-| Repository tampering | Pull operations use the same preview/conflict flow as file import |
+| Concern                        | Mitigation                                                                             |
+| ------------------------------ | -------------------------------------------------------------------------------------- |
+| Secret leakage via export      | Secrets are always masked with `MASKED:` prefix; real values never leave the API       |
+| Secret leakage via GitHub      | Push always writes masked values; pull always ignores secret values                    |
+| Masked values imported as real | Import detects `MASKED:` prefix and skips those values with a warning                  |
+| Path traversal in sync         | Directory slugs are validated with `path.basename()` on both write and read operations |
+| Repository tampering           | Pull operations use the same preview/conflict flow as file import                      |
 
 ## Dashboard UI
 

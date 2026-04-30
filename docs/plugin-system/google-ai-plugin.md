@@ -1,7 +1,7 @@
 ---
 id: google-ai-plugin
-title: "Google AI (Gemini) Plugin"
-sidebar_label: "Google Gemini"
+title: 'Google AI (Gemini) Plugin'
+sidebar_label: 'Google Gemini'
 sidebar_position: 33
 ---
 
@@ -13,18 +13,18 @@ The Google Gemini plugin connects Ever Works to Google's Gemini models, offering
 
 ## Overview
 
-| Property | Value |
-|---|---|
-| Plugin ID | `google` |
-| Package | `@ever-works/google-plugin` |
-| Category | `ai-provider` |
-| Capabilities | `ai-provider` |
-| Version | `1.0.0` |
-| Configuration Mode | `user-required` |
-| Provider Type | `google` |
-| Auto-enable | No |
-| Built-in | Yes |
-| Visibility | `public` |
+| Property           | Value                       |
+| ------------------ | --------------------------- |
+| Plugin ID          | `google`                    |
+| Package            | `@ever-works/google-plugin` |
+| Category           | `ai-provider`               |
+| Capabilities       | `ai-provider`               |
+| Version            | `1.0.0`                     |
+| Configuration Mode | `user-required`             |
+| Provider Type      | `google`                    |
+| Auto-enable        | No                          |
+| Built-in           | Yes                         |
+| Visibility         | `public`                    |
 
 ## Architecture
 
@@ -46,16 +46,16 @@ Google provides an OpenAI-compatible API endpoint at `https://generativelanguage
 
 ### Settings Schema
 
-| Setting | Type | Required | Default | Scope | Widget | Description |
-|---|---|---|---|---|---|---|
-| `apiKey` | `string` | Yes | -- | `user` | -- | Google AI API key. Secret. |
-| `defaultModel` | `string` | Yes | `models/gemini-2.5-flash` | `global` | `model-select` | Default model for all AI tasks. |
-| `simpleModel` | `string` | No | `models/gemini-2.0-flash` | `global` | `model-select` | Model for tags, descriptions, classifications. |
-| `mediumModel` | `string` | No | `models/gemini-2.5-flash` | `global` | `model-select` | Model for listings, summaries, reformatting. |
-| `complexModel` | `string` | No | `models/gemini-2.5-pro` | `global` | `model-select` | Model for full page generation, multi-step analysis. |
-| `temperature` | `number` | No | `0.7` | -- | -- | Sampling temperature (0--2). Hidden. |
-| `maxTokens` | `number` | No | `4096` | -- | -- | Max tokens per response. Hidden. |
-| `baseUrl` | `string` | No | `https://generativelanguage.googleapis.com/v1beta/openai/` | -- | -- | API endpoint. Hidden. |
+| Setting        | Type     | Required | Default                                                    | Scope    | Widget         | Description                                          |
+| -------------- | -------- | -------- | ---------------------------------------------------------- | -------- | -------------- | ---------------------------------------------------- |
+| `apiKey`       | `string` | Yes      | --                                                         | `user`   | --             | Google AI API key. Secret.                           |
+| `defaultModel` | `string` | Yes      | `models/gemini-2.5-flash`                                  | `global` | `model-select` | Default model for all AI tasks.                      |
+| `simpleModel`  | `string` | No       | `models/gemini-2.0-flash`                                  | `global` | `model-select` | Model for tags, descriptions, classifications.       |
+| `mediumModel`  | `string` | No       | `models/gemini-2.5-flash`                                  | `global` | `model-select` | Model for listings, summaries, reformatting.         |
+| `complexModel` | `string` | No       | `models/gemini-2.5-pro`                                    | `global` | `model-select` | Model for full page generation, multi-step analysis. |
+| `temperature`  | `number` | No       | `0.7`                                                      | --       | --             | Sampling temperature (0--2). Hidden.                 |
+| `maxTokens`    | `number` | No       | `4096`                                                     | --       | --             | Max tokens per response. Hidden.                     |
+| `baseUrl`      | `string` | No       | `https://generativelanguage.googleapis.com/v1beta/openai/` | --       | --             | API endpoint. Hidden.                                |
 
 ### Model Tiers
 
@@ -68,11 +68,11 @@ graph LR
     end
 ```
 
-| Tier | Default Model | Strengths |
-|---|---|---|
-| Simple | `models/gemini-2.0-flash` | Fast inference, low cost, good for structured extraction |
-| Standard | `models/gemini-2.5-flash` | Strong reasoning with thinking, balanced performance |
-| Complex | `models/gemini-2.5-pro` | Advanced reasoning, best quality output |
+| Tier     | Default Model             | Strengths                                                |
+| -------- | ------------------------- | -------------------------------------------------------- |
+| Simple   | `models/gemini-2.0-flash` | Fast inference, low cost, good for structured extraction |
+| Standard | `models/gemini-2.5-flash` | Strong reasoning with thinking, balanced performance     |
+| Complex  | `models/gemini-2.5-pro`   | Advanced reasoning, best quality output                  |
 
 ### Model Naming Convention
 
@@ -86,50 +86,50 @@ models/gemini-2.5-pro
 
 ## Capabilities
 
-| Capability | Supported | Details |
-|---|---|---|
-| Structured Output | Yes | JSON mode and schema-constrained generation |
-| Streaming | Yes | Server-sent events for incremental responses |
-| Tool Calling | Yes | Function calling for structured tasks |
-| Vision | Yes | Image analysis and understanding |
-| Max Context Length | **1,048,576 tokens** | 1M token context window |
+| Capability         | Supported            | Details                                      |
+| ------------------ | -------------------- | -------------------------------------------- |
+| Structured Output  | Yes                  | JSON mode and schema-constrained generation  |
+| Streaming          | Yes                  | Server-sent events for incremental responses |
+| Tool Calling       | Yes                  | Function calling for structured tasks        |
+| Vision             | Yes                  | Image analysis and understanding             |
+| Max Context Length | **1,048,576 tokens** | 1M token context window                      |
 
 The 1 million token context window is the largest among all AI provider plugins, making Gemini ideal for processing large volumes of source material during directory generation.
 
 ### Context Window Comparison
 
-| Provider | Max Context |
-|---|---|
-| **Google Gemini** | **1,048,576 tokens** |
-| Mistral | 128,000 tokens |
-| OpenAI (via OpenRouter) | 128,000 tokens |
-| Anthropic (via OpenRouter) | 200,000 tokens |
+| Provider                   | Max Context          |
+| -------------------------- | -------------------- |
+| **Google Gemini**          | **1,048,576 tokens** |
+| Mistral                    | 128,000 tokens       |
+| OpenAI (via OpenRouter)    | 128,000 tokens       |
+| Anthropic (via OpenRouter) | 200,000 tokens       |
 
 ## Usage Examples
 
 ```typescript
 // Chat completion
 const response = await googlePlugin.createChatCompletion({
-    messages: [{ role: 'user', content: 'Describe this business' }],
-    settings: { apiKey: 'AIza...' }
+	messages: [{ role: 'user', content: 'Describe this business' }],
+	settings: { apiKey: 'AIza...' }
 });
 
 // Streaming
 for await (const chunk of googlePlugin.createStreamingChatCompletion({
-    messages: [{ role: 'user', content: 'Write a detailed description' }],
-    settings: { apiKey: 'AIza...' }
+	messages: [{ role: 'user', content: 'Write a detailed description' }],
+	settings: { apiKey: 'AIza...' }
 })) {
-    process.stdout.write(chunk.content ?? '');
+	process.stdout.write(chunk.content ?? '');
 }
 
 // Embeddings
 const embedding = await googlePlugin.createEmbedding({
-    input: 'text for semantic search'
+	input: 'text for semantic search'
 });
 
 // Structured JSON output
 const result = await googlePlugin.askJson('Generate category taxonomy', {
-    settings: { apiKey: 'AIza...' }
+	settings: { apiKey: 'AIza...' }
 });
 
 // List available models
@@ -154,13 +154,13 @@ graph TD
 
 ## Why Use Gemini?
 
-| Advantage | Description |
-|---|---|
-| Extended context | Process up to 1M tokens -- ideal for large source documents |
-| Embedding support | Built-in text-embedding models for semantic search |
-| Cost-efficient | Gemini Flash models deliver strong results at low per-token cost |
-| Vision | Analyze images and screenshots during content generation |
-| Thinking models | Gemini 2.5 models use extended thinking for better reasoning |
+| Advantage         | Description                                                      |
+| ----------------- | ---------------------------------------------------------------- |
+| Extended context  | Process up to 1M tokens -- ideal for large source documents      |
+| Embedding support | Built-in text-embedding models for semantic search               |
+| Cost-efficient    | Gemini Flash models deliver strong results at low per-token cost |
+| Vision            | Analyze images and screenshots during content generation         |
+| Thinking models   | Gemini 2.5 models use extended thinking for better reasoning     |
 
 ## Lifecycle
 
@@ -199,11 +199,11 @@ To verify API connectivity, call `isAvailable()` with a valid API key. This invo
 
 ## Dependencies
 
-| Package | Version | Purpose |
-|---|---|---|
-| `@ever-works/plugin` | workspace | Plugin contracts and base classes |
-| `@langchain/openai` | ^0.6.17 | LangChain OpenAI-compatible provider |
-| `@langchain/core` | ^0.3.80 | LangChain core abstractions |
+| Package              | Version   | Purpose                              |
+| -------------------- | --------- | ------------------------------------ |
+| `@ever-works/plugin` | workspace | Plugin contracts and base classes    |
+| `@langchain/openai`  | ^0.6.17   | LangChain OpenAI-compatible provider |
+| `@langchain/core`    | ^0.3.80   | LangChain core abstractions          |
 
 ## Getting Started
 

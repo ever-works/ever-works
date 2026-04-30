@@ -1,7 +1,7 @@
 ---
 id: brave-search-plugin
-title: "Brave Search Plugin"
-sidebar_label: "Brave Search"
+title: 'Brave Search Plugin'
+sidebar_label: 'Brave Search'
 sidebar_position: 15
 ---
 
@@ -13,15 +13,15 @@ The Brave Search plugin provides privacy-focused web search using the [Brave Sea
 
 ## Overview
 
-| Property | Value |
-|---|---|
-| Plugin ID | `brave` |
-| Category | `search` |
-| Capabilities | `search` |
-| Version | `1.0.0` |
-| Configuration Mode | `hybrid` |
-| Auto-enable | No |
-| SDK | None (plain `fetch()`) |
+| Property           | Value                  |
+| ------------------ | ---------------------- |
+| Plugin ID          | `brave`                |
+| Category           | `search`               |
+| Capabilities       | `search`               |
+| Version            | `1.0.0`                |
+| Configuration Mode | `hybrid`               |
+| Auto-enable        | No                     |
+| SDK                | None (plain `fetch()`) |
 
 The plugin implements `IPlugin` and `ISearchPlugin` from `@ever-works/plugin`. It uses raw HTTP requests against the Brave Search REST API rather than an SDK, keeping dependencies minimal.
 
@@ -46,10 +46,10 @@ sequenceDiagram
 
 ### Settings Schema
 
-| Setting | Type | Required | Default | Env Variable | Description |
-|---|---|---|---|---|---|
-| `apiKey` | `string` | Yes | -- | `PLUGIN_BRAVE_API_KEY` | Your Brave Search API key. Marked as secret (`x-secret`). |
-| `maxResults` | `number` | No | `10` | -- | Default maximum results per search. Range: 1--20. |
+| Setting      | Type     | Required | Default | Env Variable           | Description                                               |
+| ------------ | -------- | -------- | ------- | ---------------------- | --------------------------------------------------------- |
+| `apiKey`     | `string` | Yes      | --      | `PLUGIN_BRAVE_API_KEY` | Your Brave Search API key. Marked as secret (`x-secret`). |
+| `maxResults` | `number` | No       | `10`    | --                     | Default maximum results per search. Range: 1--20.         |
 
 ### Obtaining an API Key
 
@@ -62,15 +62,15 @@ sequenceDiagram
 
 The `search()` method accepts a `SearchOptions` object and maps its fields to Brave API query parameters:
 
-| SearchOptions Field | Brave API Parameter | Notes |
-|---|---|---|
-| `query` | `q` | Required search query string. |
-| `limit` | `count` | Capped at `MAX_RESULTS_LIMIT` (20). |
-| `page` | `offset` | Converted to 0-based offset. Max offset: page 9. |
-| `region` | `country` | Two-letter country code (e.g., `us`, `gb`). |
-| `language` | `search_lang` | Language code (e.g., `en`, `fr`). |
-| `safeSearch` | `safesearch` | `off`, `moderate`, or `strict`. |
-| `timeRange` | `freshness` | Mapped through `FRESHNESS_MAP` (see below). |
+| SearchOptions Field | Brave API Parameter | Notes                                            |
+| ------------------- | ------------------- | ------------------------------------------------ |
+| `query`             | `q`                 | Required search query string.                    |
+| `limit`             | `count`             | Capped at `MAX_RESULTS_LIMIT` (20).              |
+| `page`              | `offset`            | Converted to 0-based offset. Max offset: page 9. |
+| `region`            | `country`           | Two-letter country code (e.g., `us`, `gb`).      |
+| `language`          | `search_lang`       | Language code (e.g., `en`, `fr`).                |
+| `safeSearch`        | `safesearch`        | `off`, `moderate`, or `strict`.                  |
+| `timeRange`         | `freshness`         | Mapped through `FRESHNESS_MAP` (see below).      |
 
 ### Time Range Mapping
 
@@ -78,10 +78,10 @@ The plugin translates standard time range values to Brave's freshness codes:
 
 ```typescript
 const FRESHNESS_MAP: Record<string, string> = {
-  day: 'pd',    // past day
-  week: 'pw',   // past week
-  month: 'pm',  // past month
-  year: 'py'    // past year
+	day: 'pd', // past day
+	week: 'pw', // past week
+	month: 'pm', // past month
+	year: 'py' // past year
 };
 ```
 
@@ -93,27 +93,27 @@ The plugin returns a `SearchResponse` with these fields:
 
 ```typescript
 interface SearchResponse {
-  results: SearchResult[];    // Mapped result objects
-  query: string;              // Original query
-  totalResults: number;       // Number of results returned
-  hasMore: boolean;           // Whether additional pages exist
-  nextPage?: number;          // Next page number if hasMore is true
-  duration: number;           // Request duration in milliseconds
+	results: SearchResult[]; // Mapped result objects
+	query: string; // Original query
+	totalResults: number; // Number of results returned
+	hasMore: boolean; // Whether additional pages exist
+	nextPage?: number; // Next page number if hasMore is true
+	duration: number; // Request duration in milliseconds
 }
 ```
 
 Each `SearchResult` contains:
 
-| Field | Source |
-|---|---|
-| `title` | `web.results[].title` |
-| `url` | `web.results[].url` |
-| `snippet` | `web.results[].description` |
-| `faviconUrl` | `web.results[].favicon` |
-| `position` | 1-based index |
-| `publishedDate` | `web.results[].age` |
-| `metadata.language` | Language of the result |
-| `metadata.familyFriendly` | Family-friendly flag |
+| Field                     | Source                      |
+| ------------------------- | --------------------------- |
+| `title`                   | `web.results[].title`       |
+| `url`                     | `web.results[].url`         |
+| `snippet`                 | `web.results[].description` |
+| `faviconUrl`              | `web.results[].favicon`     |
+| `position`                | 1-based index               |
+| `publishedDate`           | `web.results[].age`         |
+| `metadata.language`       | Language of the result      |
+| `metadata.familyFriendly` | Family-friendly flag        |
 
 ## Pagination
 
@@ -131,10 +131,10 @@ The `hasMore` flag is derived from `query.more_results_available` in the API res
 The `getRateLimitInfo()` method returns `-1` for both `remaining` and `limit`, indicating that rate limit tracking is not performed client-side. Brave enforces rate limits at the API level based on your subscription plan:
 
 | Plan | Requests/Month |
-|---|---|
-| Free | 2,000 |
-| Base | 5,000 |
-| Pro | 20,000+ |
+| ---- | -------------- |
+| Free | 2,000          |
+| Base | 5,000          |
+| Pro  | 20,000+        |
 
 ## Error Handling
 
@@ -144,12 +144,12 @@ The `getRateLimitInfo()` method returns `-1` for both `remaining` and `limit`, i
 
 ## Lifecycle
 
-| Method | Behavior |
-|---|---|
-| `onLoad(context)` | Stores the plugin context for logging. |
-| `onUnload()` | Clears the stored context. |
-| `healthCheck()` | Always returns `healthy` -- actual connectivity depends on a valid API key at call time. |
-| `isAvailable()` | Always returns `true`. |
+| Method            | Behavior                                                                                 |
+| ----------------- | ---------------------------------------------------------------------------------------- |
+| `onLoad(context)` | Stores the plugin context for logging.                                                   |
+| `onUnload()`      | Clears the stored context.                                                               |
+| `healthCheck()`   | Always returns `healthy` -- actual connectivity depends on a valid API key at call time. |
+| `isAvailable()`   | Always returns `true`.                                                                   |
 
 ## Usage in the Platform
 
@@ -159,10 +159,10 @@ When Brave Search is enabled and selected as the active search provider for a di
 // Conceptual usage inside the generation pipeline
 const bravePlugin = pluginManager.getPlugin<ISearchPlugin>('brave');
 const results = await bravePlugin.search({
-  query: 'best project management tools 2025',
-  limit: 10,
-  timeRange: 'month',
-  settings: { apiKey: 'sk-...' }
+	query: 'best project management tools 2025',
+	limit: 10,
+	timeRange: 'month',
+	settings: { apiKey: 'sk-...' }
 });
 ```
 

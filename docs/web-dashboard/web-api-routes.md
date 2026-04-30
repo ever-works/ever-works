@@ -74,15 +74,15 @@ This avoids buffering the entire response, enabling real-time token-by-token del
 ```typescript
 // Simplified implementation
 export async function POST(request: Request) {
-    const session = await getSession();
-    if (!session) {
-        return Response.json({ error: 'Unauthorized' }, { status: 401 });
-    }
+	const session = await getSession();
+	if (!session) {
+		return Response.json({ error: 'Unauthorized' }, { status: 401 });
+	}
 
-    const body = await request.json();
-    const stream = await aiConversationAPI.streamChat(body, session.token);
+	const body = await request.json();
+	const stream = await aiConversationAPI.streamChat(body, session.token);
 
-    return nextApiResponseStreaming(stream);
+	return nextApiResponseStreaming(stream);
 }
 ```
 
@@ -91,8 +91,8 @@ export async function POST(request: Request) {
 ```tsx
 const { streamMessage } = useAIStream({ onComplete: handleComplete });
 await streamMessage('/api/ai-conversations/chat/stream', {
-    messages: conversationMessages,
-    providerId: 'openai',
+	messages: conversationMessages,
+	providerId: 'openai'
 });
 ```
 
@@ -108,8 +108,8 @@ A minimal health check endpoint that returns a static JSON response. Used by mon
 
 ```json
 {
-    "status": "OK",
-    "message": "Application is healthy"
+	"status": "OK",
+	"message": "Application is healthy"
 }
 ```
 
@@ -117,10 +117,10 @@ No authentication required. Returns HTTP 200 unconditionally.
 
 ```typescript
 export async function GET() {
-    return Response.json({
-        status: 'OK',
-        message: 'Application is healthy',
-    });
+	return Response.json({
+		status: 'OK',
+		message: 'Application is healthy'
+	});
 }
 ```
 
@@ -132,10 +132,10 @@ export async function GET() {
 
 **Query parameters:**
 
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| `redirect_uri` | `string` | Where to redirect after authorization |
-| `state` | `string` (optional) | State parameter to pass through |
+| Parameter      | Type                | Description                           |
+| -------------- | ------------------- | ------------------------------------- |
+| `redirect_uri` | `string`            | Where to redirect after authorization |
+| `state`        | `string` (optional) | State parameter to pass through       |
 
 This endpoint handles authorization flows where an external service needs to verify the user's identity. It:
 
@@ -156,10 +156,10 @@ If the user is not authenticated, they are redirected to the login page with the
 
 **Query parameters (from OAuth provider):**
 
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| `code` | `string` | Authorization code from the provider |
-| `state` | `string` | CSRF state parameter |
+| Parameter | Type     | Description                          |
+| --------- | -------- | ------------------------------------ |
+| `code`    | `string` | Authorization code from the provider |
+| `state`   | `string` | CSRF state parameter                 |
 
 This is the return URL for OAuth login flows (Google, GitHub). When a user completes authorization with the provider, they are redirected here. The route handler:
 
@@ -175,44 +175,41 @@ This is the return URL for OAuth login flows (Google, GitHub). When a user compl
 
 ```typescript
 // Simplified implementation
-export async function GET(
-    request: Request,
-    { params }: { params: { providerId: string } }
-) {
-    const { providerId } = params;
-    const { searchParams } = new URL(request.url);
-    const code = searchParams.get('code');
-    const state = searchParams.get('state');
+export async function GET(request: Request, { params }: { params: { providerId: string } }) {
+	const { providerId } = params;
+	const { searchParams } = new URL(request.url);
+	const code = searchParams.get('code');
+	const state = searchParams.get('state');
 
-    // Validate CSRF state
-    const storedState = cookies().get('oauth_state')?.value;
-    if (state !== storedState) {
-        return redirect('/login?error=invalid_state');
-    }
+	// Validate CSRF state
+	const storedState = cookies().get('oauth_state')?.value;
+	if (state !== storedState) {
+		return redirect('/login?error=invalid_state');
+	}
 
-    // Exchange code for tokens
-    const result = await authAPI.oauthCallback(providerId, code);
+	// Exchange code for tokens
+	const result = await authAPI.oauthCallback(providerId, code);
 
-    if (!result.success) {
-        return redirect('/login?error=auth_failed');
-    }
+	if (!result.success) {
+		return redirect('/login?error=auth_failed');
+	}
 
-    // Set auth cookies
-    cookies().set('access_token', result.accessToken, {
-        httpOnly: true,
-        secure: true,
-        sameSite: 'lax',
-    });
-    cookies().set('refresh_token', result.refreshToken, {
-        httpOnly: true,
-        secure: true,
-        sameSite: 'lax',
-    });
+	// Set auth cookies
+	cookies().set('access_token', result.accessToken, {
+		httpOnly: true,
+		secure: true,
+		sameSite: 'lax'
+	});
+	cookies().set('refresh_token', result.refreshToken, {
+		httpOnly: true,
+		secure: true,
+		sameSite: 'lax'
+	});
 
-    // Cleanup
-    cookies().delete('oauth_state');
+	// Cleanup
+	cookies().delete('oauth_state');
 
-    return redirect('/dashboard');
+	return redirect('/dashboard');
 }
 ```
 
@@ -239,14 +236,14 @@ The `nextApiResponseStreaming` utility converts a backend readable stream into a
 
 ```typescript
 function nextApiResponseStreaming(backendStream: ReadableStream): Response {
-    return new Response(backendStream, {
-        headers: {
-            'Content-Type': 'application/x-ndjson',
-            'Transfer-Encoding': 'chunked',
-            'Cache-Control': 'no-cache',
-            'Connection': 'keep-alive',
-        },
-    });
+	return new Response(backendStream, {
+		headers: {
+			'Content-Type': 'application/x-ndjson',
+			'Transfer-Encoding': 'chunked',
+			'Cache-Control': 'no-cache',
+			Connection: 'keep-alive'
+		}
+	});
 }
 ```
 
@@ -257,11 +254,8 @@ This ensures the stream is not buffered by Next.js and is delivered to the clien
 The OAuth callback uses Next.js dynamic segments (`[providerId]`) to handle multiple providers with a single route file. The provider ID is extracted from the `params` object:
 
 ```typescript
-export async function GET(
-    request: Request,
-    { params }: { params: { providerId: string } }
-) {
-    // params.providerId is 'google', 'github', etc.
+export async function GET(request: Request, { params }: { params: { providerId: string } }) {
+	// params.providerId is 'google', 'github', etc.
 }
 ```
 
@@ -269,24 +263,24 @@ export async function GET(
 
 All authentication cookies are set with security flags:
 
-| Flag | Value | Purpose |
-|------|-------|---------|
-| `httpOnly` | `true` | Prevents JavaScript access (XSS protection) |
-| `secure` | `true` (production) | Only sent over HTTPS |
-| `sameSite` | `'lax'` | CSRF protection while allowing OAuth redirects |
-| `path` | `'/'` | Available to all routes |
-| `maxAge` | Varies | Token-specific lifetime |
+| Flag       | Value               | Purpose                                        |
+| ---------- | ------------------- | ---------------------------------------------- |
+| `httpOnly` | `true`              | Prevents JavaScript access (XSS protection)    |
+| `secure`   | `true` (production) | Only sent over HTTPS                           |
+| `sameSite` | `'lax'`             | CSRF protection while allowing OAuth redirects |
+| `path`     | `'/'`               | Available to all routes                        |
+| `maxAge`   | Varies              | Token-specific lifetime                        |
 
 ### API Route vs Server Action
 
 The decision of when to use an API route vs a server action:
 
-| Use API Route When | Use Server Action When |
-|-------------------|----------------------|
-| Streaming responses needed | Simple request/response |
-| External OAuth callbacks | Form submissions |
-| Health/status checks | Data mutations |
-| Third-party webhooks | Client-initiated operations |
+| Use API Route When         | Use Server Action When             |
+| -------------------------- | ---------------------------------- |
+| Streaming responses needed | Simple request/response            |
+| External OAuth callbacks   | Form submissions                   |
+| Health/status checks       | Data mutations                     |
+| Third-party webhooks       | Client-initiated operations        |
 | Custom HTTP headers needed | Standard JSON responses sufficient |
 
 ## Styling & Theming
@@ -295,8 +289,8 @@ API routes have no visual component. They return JSON or streaming data. Error r
 
 ```json
 {
-    "error": "Error message",
-    "status": 401
+	"error": "Error message",
+	"status": 401
 }
 ```
 
@@ -310,26 +304,26 @@ API routes have no visual component. They return JSON or streaming data. Error r
 import { useAIStream } from '@/lib/hooks/use-ai-stream';
 
 export function ChatPanel() {
-    const { streamMessage, isStreaming, content } = useAIStream({
-        onComplete: (fullContent) => {
-            // Save the completed message
-            saveAssistantMessage(fullContent);
-        },
-    });
+	const { streamMessage, isStreaming, content } = useAIStream({
+		onComplete: (fullContent) => {
+			// Save the completed message
+			saveAssistantMessage(fullContent);
+		}
+	});
 
-    const sendMessage = async (text: string) => {
-        await streamMessage('/api/ai-conversations/chat/stream', {
-            messages: [{ role: 'user', content: text }],
-            providerId: 'openai',
-        });
-    };
+	const sendMessage = async (text: string) => {
+		await streamMessage('/api/ai-conversations/chat/stream', {
+			messages: [{ role: 'user', content: text }],
+			providerId: 'openai'
+		});
+	};
 
-    return (
-        <div>
-            {isStreaming && <p>{content}</p>}
-            <textarea onKeyDown={handleEnterKey} />
-        </div>
-    );
+	return (
+		<div>
+			{isStreaming && <p>{content}</p>}
+			<textarea onKeyDown={handleEnterKey} />
+		</div>
+	);
 }
 ```
 

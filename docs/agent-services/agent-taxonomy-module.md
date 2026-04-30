@@ -118,11 +118,11 @@ deleteCollection(directory: Directory, user: User, collectionId: string): Promis
 
 ```typescript
 interface Category {
-    id: string;           // Auto-generated slug from name
-    name: string;         // Display name
-    description?: string; // Optional description
-    icon?: string;        // Optional icon identifier
-    order?: number;       // Sort order
+	id: string; // Auto-generated slug from name
+	name: string; // Display name
+	description?: string; // Optional description
+	icon?: string; // Optional icon identifier
+	order?: number; // Sort order
 }
 ```
 
@@ -130,9 +130,9 @@ interface Category {
 
 ```typescript
 interface Tag {
-    id: string;           // Auto-generated slug from name
-    name: string;         // Display name
-    description?: string;
+	id: string; // Auto-generated slug from name
+	name: string; // Display name
+	description?: string;
 }
 ```
 
@@ -140,10 +140,10 @@ interface Tag {
 
 ```typescript
 interface Collection {
-    id: string;
-    name: string;
-    description?: string;
-    items: string[];      // Array of item slugs
+	id: string;
+	name: string;
+	description?: string;
+	items: string[]; // Array of item slugs
 }
 ```
 
@@ -175,12 +175,12 @@ Taxonomy data is stored as YAML files in the data repository root:
 
 ## Dependencies
 
-| Dependency | Purpose |
-|---|---|
-| `@ever-works/contracts` | `Category`, `Tag`, `Collection` type definitions |
-| `@ever-works/agent/generators` | `DataGeneratorService` for Git-backed persistence |
-| `@ever-works/agent/utils` | `slugifyText` for ID generation |
-| `@ever-works/agent/facades` | `GitFacadeService` (via DataGeneratorService) for repository operations |
+| Dependency                     | Purpose                                                                 |
+| ------------------------------ | ----------------------------------------------------------------------- |
+| `@ever-works/contracts`        | `Category`, `Tag`, `Collection` type definitions                        |
+| `@ever-works/agent/generators` | `DataGeneratorService` for Git-backed persistence                       |
+| `@ever-works/agent/utils`      | `slugifyText` for ID generation                                         |
+| `@ever-works/agent/facades`    | `GitFacadeService` (via DataGeneratorService) for repository operations |
 
 ## Usage Examples
 
@@ -191,8 +191,8 @@ import { DirectoryTaxonomyService } from '@ever-works/agent/services';
 
 // Create a category
 const category = await taxonomyService.createCategory(directory, user, {
-    name: 'Developer Tools',
-    description: 'Tools for software developers',
+	name: 'Developer Tools',
+	description: 'Tools for software developers'
 });
 // category.id === 'developer-tools' (auto-generated slug)
 
@@ -201,8 +201,8 @@ const categories = await taxonomyService.getCategories(directory, user);
 
 // Update a category
 await taxonomyService.updateCategory(directory, user, 'developer-tools', {
-    name: 'Dev Tools',
-    description: 'Updated description',
+	name: 'Dev Tools',
+	description: 'Updated description'
 });
 
 // Delete a category
@@ -213,7 +213,7 @@ await taxonomyService.deleteCategory(directory, user, 'developer-tools');
 
 ```typescript
 const tag = await taxonomyService.createTag(directory, user, {
-    name: 'Open Source',
+	name: 'Open Source'
 });
 // tag.id === 'open-source'
 
@@ -224,8 +224,8 @@ const tags = await taxonomyService.getTags(directory, user);
 
 ```typescript
 const collection = await taxonomyService.createCollection(directory, user, {
-    name: 'Top Picks',
-    description: 'Our recommended tools',
-    items: ['vscode', 'github-copilot', 'cursor'],
+	name: 'Top Picks',
+	description: 'Our recommended tools',
+	items: ['vscode', 'github-copilot', 'cursor']
 });
 ```

@@ -45,24 +45,24 @@ packages/agent/src/
 
 The core TypeORM entity mapped to the `directories` table. Key fields include:
 
-| Field | Type | Purpose |
-|---|---|---|
-| `id` | UUID | Primary key |
-| `name` / `slug` | string | Display name and URL-safe identifier |
-| `userId` | string | Creator reference (FK to `users`) |
-| `owner` | string | Git repository owner (user or org) |
-| `gitProvider` | string | Git provider identifier (`github`, `gitlab`) |
-| `deployProvider` | string | Deployment provider (`vercel`, `netlify`) |
-| `generateStatus` | JSON | Current generation state per phase |
-| `generationStartedAt` / `generationFinishedAt` | Date | Generation timing |
-| `domainType` | string | Content domain classification (`software`, `ecommerce`, `services`, `general`) |
-| `scheduledUpdatesEnabled` | boolean | Whether automated updates are active |
-| `scheduledCadence` | string | Update frequency (`hourly`, `daily`, `weekly`, `monthly`) |
-| `communityPrEnabled` | boolean | Whether community PR processing is active |
-| `comparisonsEnabled` | boolean | Whether comparison generation is active |
-| `websiteTemplateAutoUpdate` | boolean | Auto-update the website template |
-| `repoVisibility` | JSON | Privacy settings per repo (data, website, directory) |
-| `sourceRepository` | JSON | Import source metadata |
+| Field                                          | Type    | Purpose                                                                        |
+| ---------------------------------------------- | ------- | ------------------------------------------------------------------------------ |
+| `id`                                           | UUID    | Primary key                                                                    |
+| `name` / `slug`                                | string  | Display name and URL-safe identifier                                           |
+| `userId`                                       | string  | Creator reference (FK to `users`)                                              |
+| `owner`                                        | string  | Git repository owner (user or org)                                             |
+| `gitProvider`                                  | string  | Git provider identifier (`github`, `gitlab`)                                   |
+| `deployProvider`                               | string  | Deployment provider (`vercel`, `netlify`)                                      |
+| `generateStatus`                               | JSON    | Current generation state per phase                                             |
+| `generationStartedAt` / `generationFinishedAt` | Date    | Generation timing                                                              |
+| `domainType`                                   | string  | Content domain classification (`software`, `ecommerce`, `services`, `general`) |
+| `scheduledUpdatesEnabled`                      | boolean | Whether automated updates are active                                           |
+| `scheduledCadence`                             | string  | Update frequency (`hourly`, `daily`, `weekly`, `monthly`)                      |
+| `communityPrEnabled`                           | boolean | Whether community PR processing is active                                      |
+| `comparisonsEnabled`                           | boolean | Whether comparison generation is active                                        |
+| `websiteTemplateAutoUpdate`                    | boolean | Auto-update the website template                                               |
+| `repoVisibility`                               | JSON    | Privacy settings per repo (data, website, directory)                           |
+| `sourceRepository`                             | JSON    | Import source metadata                                                         |
 
 Helper methods on the entity:
 
@@ -150,16 +150,16 @@ directoryGenerationHistory(directoryId: string): Promise<DirectoryGenerationHist
 
 Validated with `class-validator` decorators:
 
-| Field | Validation | Required |
-|---|---|---|
-| `slug` | Regex `^[a-z0-9]+(?:-[a-z0-9]+)*$`, max 100 chars | Yes |
-| `name` | Max 100 characters, sanitized | Yes |
-| `description` | Max 500 characters, sanitized | Yes |
-| `owner` | Optional string | No |
-| `organization` | Boolean | No |
-| `gitProvider` | Default `github` | No |
-| `deployProvider` | Default `vercel` | No |
-| `readmeConfig` | `MarkdownReadmeConfigDto` (header/footer) | No |
+| Field            | Validation                                        | Required |
+| ---------------- | ------------------------------------------------- | -------- |
+| `slug`           | Regex `^[a-z0-9]+(?:-[a-z0-9]+)*$`, max 100 chars | Yes      |
+| `name`           | Max 100 characters, sanitized                     | Yes      |
+| `description`    | Max 500 characters, sanitized                     | Yes      |
+| `owner`          | Optional string                                   | No       |
+| `organization`   | Boolean                                           | No       |
+| `gitProvider`    | Default `github`                                  | No       |
+| `deployProvider` | Default `vercel`                                  | No       |
+| `readmeConfig`   | `MarkdownReadmeConfigDto` (header/footer)         | No       |
 
 Input sanitization is applied via `sanitizeName`, `sanitizeDescription`, and `sanitizeText` transforms that strip HTML tags, trim whitespace, and normalize unicode.
 
@@ -169,15 +169,15 @@ Optional fields: `name`, `description`, `owner`, `organization`, `deployProvider
 
 ## Dependencies
 
-| Dependency | Purpose |
-|---|---|
-| `TypeORM` | Entity mapping, repository queries |
-| `class-validator` / `class-transformer` | DTO validation and sanitization |
-| `@ever-works/agent/database` | `DirectoryRepository` and related repositories |
-| `@ever-works/agent/generators` | Data, Markdown, and Website generator services |
-| `@ever-works/agent/facades` | `DeployFacadeService`, `GitFacadeService` |
-| `@ever-works/agent/subscriptions` | Subscription plan enforcement |
-| `@ever-works/agent/notifications` | Email/push notification dispatch |
+| Dependency                              | Purpose                                        |
+| --------------------------------------- | ---------------------------------------------- |
+| `TypeORM`                               | Entity mapping, repository queries             |
+| `class-validator` / `class-transformer` | DTO validation and sanitization                |
+| `@ever-works/agent/database`            | `DirectoryRepository` and related repositories |
+| `@ever-works/agent/generators`          | Data, Markdown, and Website generator services |
+| `@ever-works/agent/facades`             | `DeployFacadeService`, `GitFacadeService`      |
+| `@ever-works/agent/subscriptions`       | Subscription plan enforcement                  |
+| `@ever-works/agent/notifications`       | Email/push notification dispatch               |
 
 ## Usage Examples
 
@@ -187,14 +187,14 @@ Optional fields: `name`, `description`, `owner`, `organization`, `deployProvider
 import { DirectoryLifecycleService } from '@ever-works/agent/services';
 
 const directory = await lifecycleService.createDirectory(
-    {
-        slug: 'ai-tools',
-        name: 'AI Tools Directory',
-        description: 'A curated list of AI-powered developer tools',
-        gitProvider: 'github',
-        deployProvider: 'vercel',
-    },
-    currentUser,
+	{
+		slug: 'ai-tools',
+		name: 'AI Tools Directory',
+		description: 'A curated list of AI-powered developer tools',
+		gitProvider: 'github',
+		deployProvider: 'vercel'
+	},
+	currentUser
 );
 ```
 
@@ -204,14 +204,14 @@ const directory = await lifecycleService.createDirectory(
 import { DirectoryQueryService } from '@ever-works/agent/services';
 
 const { directories, total } = await queryService.getDirectories(userId, {
-    page: 1,
-    limit: 20,
-    search: 'tools',
+	page: 1,
+	limit: 20,
+	search: 'tools'
 });
 
 // Each directory includes userRole: 'owner' | 'editor' | 'viewer'
 directories.forEach((dir) => {
-    console.log(`${dir.name} - Role: ${dir.userRole}`);
+	console.log(`${dir.name} - Role: ${dir.userRole}`);
 });
 ```
 
@@ -221,7 +221,7 @@ directories.forEach((dir) => {
 const directory = await queryService.getDirectory(directoryId, userId);
 
 if (directory.hasAccess(userId)) {
-    const role = directory.getUserRole(userId);
-    // 'owner' can delete, 'editor' can modify, 'viewer' can read
+	const role = directory.getUserRole(userId);
+	// 'owner' can delete, 'editor' can modify, 'viewer' can read
 }
 ```

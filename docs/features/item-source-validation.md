@@ -22,57 +22,57 @@ For an item like GitHub Copilot, `https://github.com/` may be reachable, but it 
 
 ### Reachability Status
 
-| Status | Meaning |
-|---|---|
-| `reachable` | The system could verify or infer that the URL is reachable |
-| `broken` | The URL returned a high-confidence dead-link signal such as `404` or `410` |
-| `unknown` | The automated check could not confirm reachability |
+| Status      | Meaning                                                                    |
+| ----------- | -------------------------------------------------------------------------- |
+| `reachable` | The system could verify or infer that the URL is reachable                 |
+| `broken`    | The URL returned a high-confidence dead-link signal such as `404` or `410` |
+| `unknown`   | The automated check could not confirm reachability                         |
 
 ### Accuracy Status
 
-| Status | Meaning |
-|---|---|
-| `accurate` | The source is relevant and specific to the item |
-| `generic` | The source is relevant, but too broad or generic |
-| `weak` | The source is not a strong supporting page for the item |
-| `unknown` | Accuracy could not be determined confidently |
+| Status     | Meaning                                                 |
+| ---------- | ------------------------------------------------------- |
+| `accurate` | The source is relevant and specific to the item         |
+| `generic`  | The source is relevant, but too broad or generic        |
+| `weak`     | The source is not a strong supporting page for the item |
+| `unknown`  | Accuracy could not be determined confidently            |
 
 ### Stored Metadata
 
 ```typescript
 interface ItemSourceValidation {
-  reachability_status: 'reachable' | 'broken' | 'unknown';
-  accuracy_status: 'accurate' | 'generic' | 'weak' | 'unknown';
-  checked_at?: string;
-  confidence_score?: number | null;
-  is_relevant?: boolean;
-  is_specific?: boolean;
-  is_official?: boolean;
-  reason?: string | null;
-  suggested_source_url?: string | null;
+	reachability_status: 'reachable' | 'broken' | 'unknown';
+	accuracy_status: 'accurate' | 'generic' | 'weak' | 'unknown';
+	checked_at?: string;
+	confidence_score?: number | null;
+	is_relevant?: boolean;
+	is_specific?: boolean;
+	is_official?: boolean;
+	reason?: string | null;
+	suggested_source_url?: string | null;
 }
 ```
 
 ## How It Works
 
 1. **Deterministic reachability check**
-   - The system runs an HTTP-based check on the source URL.
-   - Clear dead-link signals such as `404` and `410` are treated as broken.
-   - Ambiguous automated failures remain `unknown` rather than being shown as false errors.
+    - The system runs an HTTP-based check on the source URL.
+    - Clear dead-link signals such as `404` and `410` are treated as broken.
+    - Ambiguous automated failures remain `unknown` rather than being shown as false errors.
 2. **Content extraction**
-   - If the URL is not clearly broken, content extraction is attempted.
-   - Successful extraction is also treated as evidence that the source is usable enough to inspect.
+    - If the URL is not clearly broken, content extraction is attempted.
+    - Successful extraction is also treated as evidence that the source is usable enough to inspect.
 3. **AI source validation**
-   - AI evaluates whether the page is relevant, specific, and likely the right source for the item.
-   - The result is stored separately from reachability.
+    - AI evaluates whether the page is relevant, specific, and likely the right source for the item.
+    - The result is stored separately from reachability.
 
 ## Manual Checks
 
 Users can manually trigger validation from the item actions menu.
 
-| Action | Behavior |
-|--------|----------|
-| `Re-check source` | Re-runs source validation for a single item |
+| Action             | Behavior                                                                          |
+| ------------------ | --------------------------------------------------------------------------------- |
+| `Re-check source`  | Re-runs source validation for a single item                                       |
 | `Apply suggestion` | Replaces the current `source_url` with an AI-suggested alternative when available |
 
 Repeated manual checks are cached for a short window so the same item does not rerun the full git + extraction + AI flow on every click.
@@ -100,8 +100,8 @@ The Items UI shows compact validation status without turning every ambiguous cas
 
 ### Check a Single Item Source
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
+| Method | Endpoint                                 | Description                                               |
+| ------ | ---------------------------------------- | --------------------------------------------------------- |
 | `POST` | `/api/directories/:id/check-item-health` | Run source validation for one item and persist the result |
 
 **Example:**

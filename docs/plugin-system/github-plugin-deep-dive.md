@@ -1,7 +1,7 @@
 ---
 id: github-plugin-deep-dive
-title: "GitHub Plugin Deep Dive"
-sidebar_label: "GitHub Deep Dive"
+title: 'GitHub Plugin Deep Dive'
+sidebar_label: 'GitHub Deep Dive'
 sidebar_position: 51
 ---
 
@@ -32,18 +32,18 @@ The plugin is loaded during platform startup. On `onLoad`, it initialises `GitOp
 
 ### Environment Variables
 
-| Variable | Required | Description |
-|----------|----------|-------------|
-| `PLUGIN_GITHUB_CLIENT_ID` | Yes (admin) | GitHub OAuth App Client ID |
+| Variable                      | Required    | Description                    |
+| ----------------------------- | ----------- | ------------------------------ |
+| `PLUGIN_GITHUB_CLIENT_ID`     | Yes (admin) | GitHub OAuth App Client ID     |
 | `PLUGIN_GITHUB_CLIENT_SECRET` | Yes (admin) | GitHub OAuth App Client Secret |
 
 ### Settings Schema
 
 ```typescript
 interface GitHubSettings {
-  readonly clientId?: string;      // OAuth App Client ID
-  readonly clientSecret?: string;  // OAuth App Client Secret (x-secret)
-  readonly apiBaseUrl?: string;    // Default: 'https://api.github.com'
+	readonly clientId?: string; // OAuth App Client ID
+	readonly clientSecret?: string; // OAuth App Client Secret (x-secret)
+	readonly apiBaseUrl?: string; // Default: 'https://api.github.com'
 }
 ```
 
@@ -52,10 +52,10 @@ interface GitHubSettings {
 
 ## Capabilities
 
-| Capability | Description |
-|------------|-------------|
+| Capability     | Description                                                             |
+| -------------- | ----------------------------------------------------------------------- |
 | `git-provider` | Full repository lifecycle: create, read, update, delete, fork, template |
-| `oauth` | GitHub OAuth 2.0 authorization code flow |
+| `oauth`        | GitHub OAuth 2.0 authorization code flow                                |
 
 Default OAuth scopes requested: `user:email`, `read:user`, `repo`, `delete_repo`, `workflow`, `write:repo_hook`, `read:org`, `project`.
 
@@ -63,63 +63,63 @@ Default OAuth scopes requested: `user:email`, `read:user`, `repo`, `delete_repo`
 
 ### Authentication
 
-| Method | Signature | Description |
-|--------|-----------|-------------|
-| `getAuth` | `(token: string) => GitAuth` | Returns `{ username: 'x-access-token', password: token }` |
-| `getAuthorizationUrl` | `(state: string, config?: Partial<OAuthConfig>) => string` | Builds GitHub OAuth authorize URL |
-| `exchangeCodeForToken` | `(code: string, config?: Partial<OAuthConfig>) => Promise<OAuthToken>` | Exchanges authorization code for access token |
-| `getAuthenticatedUser` | `(token: string) => Promise<OAuthUser>` | Returns authenticated user info |
+| Method                 | Signature                                                              | Description                                               |
+| ---------------------- | ---------------------------------------------------------------------- | --------------------------------------------------------- |
+| `getAuth`              | `(token: string) => GitAuth`                                           | Returns `{ username: 'x-access-token', password: token }` |
+| `getAuthorizationUrl`  | `(state: string, config?: Partial<OAuthConfig>) => string`             | Builds GitHub OAuth authorize URL                         |
+| `exchangeCodeForToken` | `(code: string, config?: Partial<OAuthConfig>) => Promise<OAuthToken>` | Exchanges authorization code for access token             |
+| `getAuthenticatedUser` | `(token: string) => Promise<OAuthUser>`                                | Returns authenticated user info                           |
 
 ### Repository Operations
 
-| Method | Signature |
-|--------|-----------|
-| `getRepository` | `(owner, repo, token) => Promise<GitRepository \| null>` |
-| `listRepositories` | `(token, page?, perPage?, options?) => Promise<GitRepositoryWithPermissions[]>` |
-| `createRepository` | `(options: CreateRepoOptions, token) => Promise<GitRepository>` |
-| `deleteRepository` | `(owner, repo, token) => Promise<void>` |
-| `updateRepository` | `(owner, repo, data, token) => Promise<GitRepository>` |
-| `forkRepository` | `(owner, repo, options, token) => Promise<GitRepository \| null>` |
+| Method                         | Signature                                                                         |
+| ------------------------------ | --------------------------------------------------------------------------------- |
+| `getRepository`                | `(owner, repo, token) => Promise<GitRepository \| null>`                          |
+| `listRepositories`             | `(token, page?, perPage?, options?) => Promise<GitRepositoryWithPermissions[]>`   |
+| `createRepository`             | `(options: CreateRepoOptions, token) => Promise<GitRepository>`                   |
+| `deleteRepository`             | `(owner, repo, token) => Promise<void>`                                           |
+| `updateRepository`             | `(owner, repo, data, token) => Promise<GitRepository>`                            |
+| `forkRepository`               | `(owner, repo, options, token) => Promise<GitRepository \| null>`                 |
 | `createRepositoryFromTemplate` | `(templateOwner, templateRepo, options, token) => Promise<GitRepository \| null>` |
 
 ### Branch & Commit Operations
 
-| Method | Signature |
-|--------|-----------|
-| `listBranches` | `(owner, repo, token) => Promise<GitBranch[]>` |
-| `createBranch` | `(owner, repo, name, fromRef, token) => Promise<GitBranch>` |
-| `deleteBranch` | `(owner, repo, name, token) => Promise<void>` |
+| Method            | Signature                                                    |
+| ----------------- | ------------------------------------------------------------ |
+| `listBranches`    | `(owner, repo, token) => Promise<GitBranch[]>`               |
+| `createBranch`    | `(owner, repo, name, fromRef, token) => Promise<GitBranch>`  |
+| `deleteBranch`    | `(owner, repo, name, token) => Promise<void>`                |
 | `getLatestCommit` | `(owner, repo, branch, token) => Promise<GitCommit \| null>` |
 
 ### Pull Request Operations
 
-| Method | Signature |
-|--------|-----------|
-| `createPullRequest` | `(options: CreatePROptions, token) => Promise<GitPullRequest>` |
-| `getPullRequest` | `(owner, repo, prNumber, token) => Promise<GitPullRequest \| null>` |
-| `mergePullRequest` | `(owner, repo, prNumber, options, token) => Promise<MergeResult>` |
-| `listPullRequests` | `(owner, repo, options, token) => Promise<GitPullRequest[]>` |
-| `closePullRequest` | `(owner, repo, prNumber, token) => Promise<GitPullRequest>` |
+| Method              | Signature                                                           |
+| ------------------- | ------------------------------------------------------------------- |
+| `createPullRequest` | `(options: CreatePROptions, token) => Promise<GitPullRequest>`      |
+| `getPullRequest`    | `(owner, repo, prNumber, token) => Promise<GitPullRequest \| null>` |
+| `mergePullRequest`  | `(owner, repo, prNumber, options, token) => Promise<MergeResult>`   |
+| `listPullRequests`  | `(owner, repo, options, token) => Promise<GitPullRequest[]>`        |
+| `closePullRequest`  | `(owner, repo, prNumber, token) => Promise<GitPullRequest>`         |
 
 ### GitHub Actions
 
-| Method | Signature |
-|--------|-----------|
-| `getRepositoryPublicKey` | `(owner, repo, token) => Promise<GitHubPublicKey>` |
-| `setActionSecret` | `(data, publicKey, token) => Promise<void>` |
-| `setActionVariable` | `(data, token) => Promise<void>` |
+| Method                      | Signature                                           |
+| --------------------------- | --------------------------------------------------- |
+| `getRepositoryPublicKey`    | `(owner, repo, token) => Promise<GitHubPublicKey>`  |
+| `setActionSecret`           | `(data, publicKey, token) => Promise<void>`         |
+| `setActionVariable`         | `(data, token) => Promise<void>`                    |
 | `enableDeploymentWorkflows` | `(owner, repo, token, withDelay?) => Promise<void>` |
-| `dispatchWorkflow` | `(data, token) => Promise<void>` |
+| `dispatchWorkflow`          | `(data, token) => Promise<void>`                    |
 
 ### Local Git Operations
 
-| Method | Signature |
-|--------|-----------|
-| `cloneOrPull` | `(options: GitCloneOptions) => Promise<string>` |
-| `commit` | `(dir, message, committer?) => Promise<string>` |
-| `push` | `(options: GitPushOptions) => Promise<void>` |
-| `switchBranch` | `(dir, branch, create?) => Promise<string>` |
-| `getStatus` | `(dir) => Promise<GitFileChange[]>` |
+| Method         | Signature                                       |
+| -------------- | ----------------------------------------------- |
+| `cloneOrPull`  | `(options: GitCloneOptions) => Promise<string>` |
+| `commit`       | `(dir, message, committer?) => Promise<string>` |
+| `push`         | `(options: GitPushOptions) => Promise<void>`    |
+| `switchBranch` | `(dir, branch, create?) => Promise<string>`     |
+| `getStatus`    | `(dir) => Promise<GitFileChange[]>`             |
 
 ## Implementation Details
 
@@ -151,13 +151,16 @@ const user = await githubPlugin.getUser(token);
 
 // Create a repository
 const repo = await githubPlugin.createRepository(
-  { name: 'my-directory', isPrivate: true, organization: 'my-org' },
-  token
+	{ name: 'my-directory', isPrivate: true, organization: 'my-org' },
+	token
 );
 
 // Create a branch and push changes
 await githubPlugin.cloneOrPull({
-  owner: 'my-org', repo: 'my-directory', token, branch: 'main'
+	owner: 'my-org',
+	repo: 'my-directory',
+	token,
+	branch: 'main'
 });
 await githubPlugin.switchBranch(localDir, 'feature-update', true);
 await githubPlugin.addAll(localDir);
@@ -166,8 +169,8 @@ await githubPlugin.push({ dir: localDir, token, remote: 'origin', branch: 'featu
 
 // Dispatch a deployment workflow
 await githubPlugin.dispatchWorkflow(
-  { workflow: 'deploy_vercel.yaml', branch: 'main', owner: 'my-org', repo: 'my-directory' },
-  token
+	{ workflow: 'deploy_vercel.yaml', branch: 'main', owner: 'my-org', repo: 'my-directory' },
+	token
 );
 ```
 

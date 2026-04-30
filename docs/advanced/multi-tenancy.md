@@ -1,7 +1,7 @@
 ---
 id: multi-tenancy
-title: "Multi-Tenancy & Isolation"
-sidebar_label: "Multi-Tenancy"
+title: 'Multi-Tenancy & Isolation'
+sidebar_label: 'Multi-Tenancy'
 sidebar_position: 8
 ---
 
@@ -10,6 +10,7 @@ sidebar_position: 8
 Ever Works isolates data and configuration at the directory level. Each directory acts as an independent workspace with its own plugin settings, capability routing, member permissions, and generated content. This page documents the isolation boundaries, role-based access control, and settings scoping that make multi-tenancy work.
 
 **Key sources:**
+
 - `packages/agent/src/services/directory-ownership.service.ts` -- Role-based access control
 - `packages/agent/src/plugins/entities/directory-plugin.entity.ts` -- Per-directory plugin configuration
 - `packages/agent/src/plugins/services/plugin-settings.service.ts` -- Multi-level settings resolution
@@ -65,14 +66,14 @@ The directory is the primary isolation boundary in Ever Works. Each directory:
 - Has its own member list with role-based permissions
 - Maintains separate pipeline checkpoints
 
-| Aspect | Isolation Level | Mechanism |
-|---|---|---|
-| Content (items, categories) | Full | Foreign key to `directoryId` |
-| Plugin settings | Layered | `DirectoryPluginEntity` overrides |
-| Capability routing | Independent | `activeCapability` per directory-plugin |
-| Access control | Per-directory | `DirectoryOwnershipService` + roles |
-| Cache / checkpoints | Scoped | Cache key includes `directoryId` |
-| Generation history | Per-directory | Scoped to directory |
+| Aspect                      | Isolation Level | Mechanism                               |
+| --------------------------- | --------------- | --------------------------------------- |
+| Content (items, categories) | Full            | Foreign key to `directoryId`            |
+| Plugin settings             | Layered         | `DirectoryPluginEntity` overrides       |
+| Capability routing          | Independent     | `activeCapability` per directory-plugin |
+| Access control              | Per-directory   | `DirectoryOwnershipService` + roles     |
+| Cache / checkpoints         | Scoped          | Cache key includes `directoryId`        |
+| Generation history          | Per-directory   | Scoped to directory                     |
 
 ## Role-Based Access Control
 
@@ -87,21 +88,21 @@ graph BT
     M --> O["OWNER (4)<br/>Full control"]
 ```
 
-| Role | Level | Permissions |
-|---|---|---|
-| `VIEWER` | 1 | View directory content |
-| `EDITOR` | 2 | View + edit content, trigger generation |
-| `MANAGER` | 3 | View + edit + manage members |
-| `OWNER` | 4 | Full control including deletion and transfer |
+| Role      | Level | Permissions                                  |
+| --------- | ----- | -------------------------------------------- |
+| `VIEWER`  | 1     | View directory content                       |
+| `EDITOR`  | 2     | View + edit content, trigger generation      |
+| `MANAGER` | 3     | View + edit + manage members                 |
+| `OWNER`   | 4     | Full control including deletion and transfer |
 
 ### Access Check Methods
 
 ```typescript
 // Check minimum role requirement
-await ownershipService.ensureCanView(directoryId, userId);    // VIEWER+
-await ownershipService.ensureCanEdit(directoryId, userId);    // EDITOR+
+await ownershipService.ensureCanView(directoryId, userId); // VIEWER+
+await ownershipService.ensureCanEdit(directoryId, userId); // EDITOR+
 await ownershipService.ensureCanManageMembers(directoryId, userId); // MANAGER+
-await ownershipService.ensureIsOwner(directoryId, userId);    // OWNER only
+await ownershipService.ensureIsOwner(directoryId, userId); // OWNER only
 
 // Non-throwing check
 const hasAccess = await ownershipService.hasAccess(directoryId, userId);
@@ -118,12 +119,12 @@ The directory creator always has `OWNER` access, even without an explicit member
 const isCreator = directory.userId === userId;
 
 if (isCreator) {
-    return {
-        directory,
-        member: null,
-        role: DirectoryMemberRole.OWNER,
-        isCreator: true,
-    };
+	return {
+		directory,
+		member: null,
+		role: DirectoryMemberRole.OWNER,
+		isCreator: true
+	};
 }
 ```
 
@@ -133,10 +134,10 @@ Every access check returns a `DirectoryAccessResult` with full context:
 
 ```typescript
 interface DirectoryAccessResult {
-    directory: Directory;      // The directory entity
-    member: DirectoryMember | null;  // Membership record (null for creator)
-    role: DirectoryMemberRole; // Effective role
-    isCreator: boolean;        // Whether user is the original creator
+	directory: Directory; // The directory entity
+	member: DirectoryMember | null; // Membership record (null for creator)
+	role: DirectoryMemberRole; // Effective role
+	isCreator: boolean; // Whether user is the original creator
 }
 ```
 
@@ -161,13 +162,13 @@ graph TD
     style E fill:#f3e5f5
 ```
 
-| Priority | Source | Storage | Scope |
-|---|---|---|---|
-| 1 (highest) | Directory | `directory_plugins.settings` | Per directory |
-| 2 | User | `user_plugins.settings` | Per user |
-| 3 | Admin | `plugins.settings` | Global |
-| 4 | Environment | `process.env[x-envVar]` | Server-wide |
-| 5 (lowest) | Default | JSON Schema `default` | Built-in |
+| Priority    | Source      | Storage                      | Scope         |
+| ----------- | ----------- | ---------------------------- | ------------- |
+| 1 (highest) | Directory   | `directory_plugins.settings` | Per directory |
+| 2           | User        | `user_plugins.settings`      | Per user      |
+| 3           | Admin       | `plugins.settings`           | Global        |
+| 4           | Environment | `process.env[x-envVar]`      | Server-wide   |
+| 5 (lowest)  | Default     | JSON Schema `default`        | Built-in      |
 
 ### How Resolution Works
 
@@ -203,10 +204,10 @@ Each resolved setting includes its source and whether it is a fallback:
 
 ```typescript
 interface ResolvedSetting {
-    key: string;
-    value: unknown;
-    source: 'directory' | 'user' | 'admin' | 'env' | 'default';
-    isFallback: boolean;  // true when source doesn't match setting's intended scope
+	key: string;
+	value: unknown;
+	source: 'directory' | 'user' | 'admin' | 'env' | 'default';
+	isFallback: boolean; // true when source doesn't match setting's intended scope
 }
 ```
 
@@ -214,19 +215,17 @@ interface ResolvedSetting {
 
 Plugins declare how their settings can be managed:
 
-| Mode | Directory Settings | User Settings | Admin Settings | Use Case |
-|---|---|---|---|---|
-| `hybrid` | Yes | Yes | Yes | Most plugins (OpenRouter, Scrapfly) |
-| `user-required` | Yes | Yes (required) | No | Per-user API keys (Mistral, Google) |
-| `admin-only` | No | No | Yes | System-level config |
+| Mode            | Directory Settings | User Settings  | Admin Settings | Use Case                            |
+| --------------- | ------------------ | -------------- | -------------- | ----------------------------------- |
+| `hybrid`        | Yes                | Yes            | Yes            | Most plugins (OpenRouter, Scrapfly) |
+| `user-required` | Yes                | Yes (required) | No             | Per-user API keys (Mistral, Google) |
+| `admin-only`    | No                 | No             | Yes            | System-level config                 |
 
 When a plugin is `admin-only`, the settings service rejects user and directory level updates:
 
 ```typescript
 if (configMode === 'admin-only') {
-    throw new Error(
-        `Plugin "${pluginId}" is admin-only and cannot be configured by users`
-    );
+	throw new Error(`Plugin "${pluginId}" is admin-only and cannot be configured by users`);
 }
 ```
 
@@ -237,12 +236,12 @@ Settings declare their intended scope via the `x-scope` schema extension. The se
 ```typescript
 // directory-scoped settings can only be set at directory level
 if (settingScope === 'directory' && updateScope !== 'directory') {
-    violations.push(`Setting "${key}" cannot be updated at "${updateScope}" level`);
+	violations.push(`Setting "${key}" cannot be updated at "${updateScope}" level`);
 }
 
 // user-scoped settings cannot be set at global level
 if (settingScope === 'user' && updateScope === 'global') {
-    violations.push(`Setting "${key}" cannot be updated at "global" level`);
+	violations.push(`Setting "${key}" cannot be updated at "global" level`);
 }
 ```
 
@@ -254,14 +253,14 @@ The `DirectoryPluginEntity` stores directory-specific plugin overrides:
 @Entity({ name: 'directory_plugins' })
 @Unique(['directoryId', 'pluginId'])
 class DirectoryPluginEntity {
-    directoryId: string;           // Which directory
-    pluginId: string;              // Which plugin
-    enabled: boolean;              // Plugin enabled for this directory
-    activeCapability: string;      // Active capability routing
-    settings: Record<string, unknown>;       // Directory-level settings
-    secretSettings: Record<string, unknown>; // Directory-level secrets
-    metadata: Record<string, unknown>;       // Integration state
-    priority: number;              // Plugin priority in this directory
+	directoryId: string; // Which directory
+	pluginId: string; // Which plugin
+	enabled: boolean; // Plugin enabled for this directory
+	activeCapability: string; // Active capability routing
+	settings: Record<string, unknown>; // Directory-level settings
+	secretSettings: Record<string, unknown>; // Directory-level secrets
+	metadata: Record<string, unknown>; // Integration state
+	priority: number; // Plugin priority in this directory
 }
 ```
 
@@ -296,16 +295,16 @@ The `activeCapability` field on `DirectoryPluginEntity` determines which plugin 
 
 Secrets (API keys, tokens) are stored separately from regular settings and are never included in API responses unless explicitly requested:
 
-| Column | Content | API Response |
-|---|---|---|
-| `settings` | Non-sensitive configuration | Included |
+| Column           | Content                       | API Response         |
+| ---------------- | ----------------------------- | -------------------- |
+| `settings`       | Non-sensitive configuration   | Included             |
 | `secretSettings` | API keys, tokens, credentials | Masked as `********` |
 
 The settings service strips masked placeholders on write to prevent overwriting real secrets with mask values:
 
 ```typescript
 if (propSchema?.['x-secret'] && value === MASKED_SECRET_PLACEHOLDER) {
-    continue; // Don't save the placeholder
+	continue; // Don't save the placeholder
 }
 ```
 
@@ -328,9 +327,9 @@ The context factory injects the `userId` and `directoryId` into the settings res
 
 ```typescript
 const settings = await this.settingsService.getSettings(pluginId, {
-    directoryId: context.directoryId,
-    userId: context.userId,
-    includeSecrets: true,
+	directoryId: context.directoryId,
+	userId: context.userId,
+	includeSecrets: true
 });
 ```
 
@@ -338,10 +337,10 @@ const settings = await this.settingsService.getSettings(pluginId, {
 
 All cache keys include the directory ID to prevent cross-directory data leakage:
 
-| Cache Type | Key Format | Example |
-|---|---|---|
+| Cache Type          | Key Format                                       | Example                                        |
+| ------------------- | ------------------------------------------------ | ---------------------------------------------- |
 | Pipeline checkpoint | `pipeline-checkpoint-{directoryId}-{pipelineId}` | `pipeline-checkpoint-dir123-standard-pipeline` |
-| Plugin cache | `plugin:{pluginId}:{key}` | `plugin:openrouter:models-list` |
+| Plugin cache        | `plugin:{pluginId}:{key}`                        | `plugin:openrouter:models-list`                |
 
 Pipeline checkpoints are fully scoped to the directory, so resuming a failed generation in one directory never affects another.
 
@@ -373,12 +372,12 @@ graph LR
     end
 ```
 
-| Boundary | What Is Isolated | How |
-|---|---|---|
-| Platform | Plugin code, registry | Shared singleton services |
-| User | API keys, user settings | `UserPluginEntity`, user-scoped resolution |
+| Boundary  | What Is Isolated           | How                                         |
+| --------- | -------------------------- | ------------------------------------------- |
+| Platform  | Plugin code, registry      | Shared singleton services                   |
+| User      | API keys, user settings    | `UserPluginEntity`, user-scoped resolution  |
 | Directory | Content, settings, members | `DirectoryPluginEntity`, foreign keys, RBAC |
-| Plugin | Cache, logger, events | Namespace-prefixed keys, scoped context |
+| Plugin    | Cache, logger, events      | Namespace-prefixed keys, scoped context     |
 
 ## Best Practices
 

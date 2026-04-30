@@ -41,12 +41,12 @@ flowchart TD
 
 ## Source Files
 
-| File | Purpose |
-|------|---------|
-| `packages/agent/src/facades/ai.facade.ts` | Main AI facade with routing, escalation, cost calculation |
-| `packages/agent/src/facades/base.facade.ts` | Abstract base with provider resolution and settings hierarchy |
-| `packages/agent/src/facades/openrouter-model-lookup.ts` | OpenRouter API model list fetching and fuzzy matching |
-| `packages/agent/src/facades/facades.module.ts` | Module registering all facades |
+| File                                                    | Purpose                                                       |
+| ------------------------------------------------------- | ------------------------------------------------------------- |
+| `packages/agent/src/facades/ai.facade.ts`               | Main AI facade with routing, escalation, cost calculation     |
+| `packages/agent/src/facades/base.facade.ts`             | Abstract base with provider resolution and settings hierarchy |
+| `packages/agent/src/facades/openrouter-model-lookup.ts` | OpenRouter API model list fetching and fuzzy matching         |
+| `packages/agent/src/facades/facades.module.ts`          | Module registering all facades                                |
 
 ## Key Classes
 
@@ -57,41 +57,41 @@ The primary interface for all AI operations. Extends `BaseFacadeService` to inhe
 ```typescript
 @Injectable()
 export class AiFacadeService extends BaseFacadeService implements IAiFacade {
-    protected readonly CAPABILITY = PLUGIN_CAPABILITIES.AI_PROVIDER;
+	protected readonly CAPABILITY = PLUGIN_CAPABILITIES.AI_PROVIDER;
 
-    async askJson<T>(
-        promptTemplate: string,
-        schema: z.ZodSchema<T>,
-        options: AskJsonOptions | undefined,
-        facadeOptions: FacadeOptions,
-    ): Promise<AskJsonResponse<T>> {
-        // 1. Resolve plugin
-        const plugin = await this.resolvePlugin<IAiProviderPlugin>(
-            options?.routing?.providerOverride ?? facadeOptions.providerOverride,
-            facadeOptions.userId,
-            facadeOptions.directoryId,
-        );
+	async askJson<T>(
+		promptTemplate: string,
+		schema: z.ZodSchema<T>,
+		options: AskJsonOptions | undefined,
+		facadeOptions: FacadeOptions
+	): Promise<AskJsonResponse<T>> {
+		// 1. Resolve plugin
+		const plugin = await this.resolvePlugin<IAiProviderPlugin>(
+			options?.routing?.providerOverride ?? facadeOptions.providerOverride,
+			facadeOptions.userId,
+			facadeOptions.directoryId
+		);
 
-        // 2. Resolve settings (4-level hierarchy)
-        const settings = await this.getResolvedSettings(plugin.id, {
-            userId: facadeOptions.userId,
-            directoryId: facadeOptions.directoryId,
-        });
+		// 2. Resolve settings (4-level hierarchy)
+		const settings = await this.getResolvedSettings(plugin.id, {
+			userId: facadeOptions.userId,
+			directoryId: facadeOptions.directoryId
+		});
 
-        // 3. Resolve model
-        const model = this.resolveModel(plugin, settings, options?.routing);
+		// 3. Resolve model
+		const model = this.resolveModel(plugin, settings, options?.routing);
 
-        // 4. Execute with escalation
-        const response = await this.withEscalation(call, settings, model, options?.routing);
+		// 4. Execute with escalation
+		const response = await this.withEscalation(call, settings, model, options?.routing);
 
-        // 5. Validate with Zod schema
-        const validated = schema.safeParse(response.result);
+		// 5. Validate with Zod schema
+		const validated = schema.safeParse(response.result);
 
-        // 6. Calculate cost
-        const cost = await this.calculateCost(plugin, response.model, response.usage, settings);
+		// 6. Calculate cost
+		const cost = await this.calculateCost(plugin, response.model, response.usage, settings);
 
-        return { result: validated.data, usage, cost, provider: plugin.id, model: response.model };
-    }
+		return { result: validated.data, usage, cost, provider: plugin.id, model: response.model };
+	}
 }
 ```
 
@@ -194,23 +194,23 @@ The system fetches model metadata from OpenRouter for context length resolution:
 
 ```typescript
 export async function fetchOpenRouterModels(): Promise<OpenRouterModelEntry[] | null> {
-    const response = await fetch('https://openrouter.ai/api/v1/models', {
-        signal: AbortSignal.timeout(10_000),
-        headers: { Accept: 'application/json' },
-    });
-    if (!response.ok) return null;
-    const body = await response.json();
-    return body.data;
+	const response = await fetch('https://openrouter.ai/api/v1/models', {
+		signal: AbortSignal.timeout(10_000),
+		headers: { Accept: 'application/json' }
+	});
+	if (!response.ok) return null;
+	const body = await response.json();
+	return body.data;
 }
 
 // Fuzzy matching: exact ID first, then base-name match
 export function fuzzyMatchModel(
-    modelId: string,
-    candidates: readonly OpenRouterModelEntry[],
+	modelId: string,
+	candidates: readonly OpenRouterModelEntry[]
 ): OpenRouterModelEntry | null {
-    // Priority 1: exact match (case-insensitive)
-    // Priority 2: base-name match (after last /)
-    // Also tries -instruct and -thinking variants
+	// Priority 1: exact match (case-insensitive)
+	// Priority 2: base-name match (after last /)
+	// Also tries -instruct and -thinking variants
 }
 ```
 
@@ -238,12 +238,12 @@ private async calculateCost(
 
 Settings are resolved by `PluginSettingsService` with this precedence:
 
-| Level | Source | Scope |
-|-------|--------|-------|
-| 1 | Directory plugin settings | Per-directory overrides |
-| 2 | User plugin settings | Per-user defaults |
-| 3 | Admin settings | Server-wide defaults |
-| 4 | Plugin manifest defaults | Built into the plugin |
+| Level | Source                    | Scope                   |
+| ----- | ------------------------- | ----------------------- |
+| 1     | Directory plugin settings | Per-directory overrides |
+| 2     | User plugin settings      | Per-user defaults       |
+| 3     | Admin settings            | Server-wide defaults    |
+| 4     | Plugin manifest defaults  | Built into the plugin   |
 
 ### Routing Options
 
@@ -251,10 +251,10 @@ The `AiRoutingOptions` interface controls how requests are routed:
 
 ```typescript
 interface AiRoutingOptions {
-    providerOverride?: string;  // Force specific plugin
-    modelOverride?: string;     // Force specific model
-    complexity?: TaskComplexity; // 'simple' | 'medium' | 'complex'
-    autoEscalate?: boolean;     // Retry with higher model on failure
+	providerOverride?: string; // Force specific plugin
+	modelOverride?: string; // Force specific model
+	complexity?: TaskComplexity; // 'simple' | 'medium' | 'complex'
+	autoEscalate?: boolean; // Retry with higher model on failure
 }
 ```
 
@@ -264,18 +264,18 @@ interface AiRoutingOptions {
 
 ```typescript
 const result = await this.aiFacade.askJson(
-    'Analyze this item: {itemName}',
-    z.object({
-        category: z.string(),
-        tags: z.array(z.string()),
-        score: z.number().min(0).max(100),
-    }),
-    {
-        variables: { itemName: 'React' },
-        routing: { complexity: 'simple' },
-        temperature: 0.3,
-    },
-    { userId: user.id, directoryId: directory.id },
+	'Analyze this item: {itemName}',
+	z.object({
+		category: z.string(),
+		tags: z.array(z.string()),
+		score: z.number().min(0).max(100)
+	}),
+	{
+		variables: { itemName: 'React' },
+		routing: { complexity: 'simple' },
+		temperature: 0.3
+	},
+	{ userId: user.id, directoryId: directory.id }
 );
 ```
 
@@ -283,25 +283,22 @@ const result = await this.aiFacade.askJson(
 
 ```typescript
 const stream = this.aiFacade.createStreamingChatCompletion(
-    {
-        messages: [{ role: 'user', content: 'Hello' }],
-        model: 'gpt-4o',
-    },
-    { userId: user.id },
+	{
+		messages: [{ role: 'user', content: 'Hello' }],
+		model: 'gpt-4o'
+	},
+	{ userId: user.id }
 );
 
 for await (const chunk of stream) {
-    process.stdout.write(chunk.choices[0]?.delta?.content || '');
+	process.stdout.write(chunk.choices[0]?.delta?.content || '');
 }
 ```
 
 ### Context Length Resolution
 
 ```typescript
-const contextLength = await this.aiFacade.resolveModelContextLength(
-    'gpt-4o',
-    { userId: user.id },
-);
+const contextLength = await this.aiFacade.resolveModelContextLength('gpt-4o', { userId: user.id });
 // Returns 128000 (from OpenRouter metadata, cached for 1 hour)
 ```
 

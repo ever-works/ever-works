@@ -30,44 +30,44 @@ BaseAiProvider (from @ever-works/plugin/abstract)
 
 ### Provider Configuration
 
-| Property | Value |
-|----------|-------|
-| Base URL | `https://generativelanguage.googleapis.com/v1beta/openai/` |
-| Default Model | `models/gemini-2.5-flash` |
-| Simple Tier | `models/gemini-2.0-flash` |
-| Medium Tier | *(uses default)* |
-| Complex Tier | `models/gemini-2.5-pro` |
-| Max Context Tokens | `1048576` (1,048,576 = 1M tokens) |
-| Supports Embeddings | `true` |
-| Supports Vision | `true` (inherited default) |
+| Property            | Value                                                      |
+| ------------------- | ---------------------------------------------------------- |
+| Base URL            | `https://generativelanguage.googleapis.com/v1beta/openai/` |
+| Default Model       | `models/gemini-2.5-flash`                                  |
+| Simple Tier         | `models/gemini-2.0-flash`                                  |
+| Medium Tier         | _(uses default)_                                           |
+| Complex Tier        | `models/gemini-2.5-pro`                                    |
+| Max Context Tokens  | `1048576` (1,048,576 = 1M tokens)                          |
+| Supports Embeddings | `true`                                                     |
+| Supports Vision     | `true` (inherited default)                                 |
 
 ### Model Tiers
 
 The plugin configures three distinct model tiers for task-based routing:
 
-| Tier | Model | Use Case |
-|------|-------|----------|
-| **Simple** | `models/gemini-2.0-flash` | Fast, lightweight tasks (prompt processing, domain detection) |
-| **Medium/Default** | `models/gemini-2.5-flash` | Balanced tasks (item extraction, search queries) |
-| **Complex** | `models/gemini-2.5-pro` | Complex reasoning tasks (data aggregation, AI item generation) |
+| Tier               | Model                     | Use Case                                                       |
+| ------------------ | ------------------------- | -------------------------------------------------------------- |
+| **Simple**         | `models/gemini-2.0-flash` | Fast, lightweight tasks (prompt processing, domain detection)  |
+| **Medium/Default** | `models/gemini-2.5-flash` | Balanced tasks (item extraction, search queries)               |
+| **Complex**        | `models/gemini-2.5-pro`   | Complex reasoning tasks (data aggregation, AI item generation) |
 
 ## Configuration
 
 ### Settings Schema
 
-| Field | Type | Required | Description |
-|-------|------|----------|-------------|
-| `apiKey` | `string` | Yes | Google AI API key (`x-secret`, `x-envVar: PLUGIN_GOOGLE_API_KEY`, `x-scope: user`) |
-| `model` | `string` | No | Override default model (`default: models/gemini-2.5-flash`) |
-| `simpleModel` | `string` | No | Model for simple tasks (`default: models/gemini-2.0-flash`) |
-| `mediumModel` | `string` | No | Model for medium complexity tasks |
-| `complexModel` | `string` | No | Model for complex tasks (`default: models/gemini-2.5-pro`) |
-| `maxContextTokens` | `number` | No | Override max context window (`default: 1048576`) |
+| Field              | Type     | Required | Description                                                                        |
+| ------------------ | -------- | -------- | ---------------------------------------------------------------------------------- |
+| `apiKey`           | `string` | Yes      | Google AI API key (`x-secret`, `x-envVar: PLUGIN_GOOGLE_API_KEY`, `x-scope: user`) |
+| `model`            | `string` | No       | Override default model (`default: models/gemini-2.5-flash`)                        |
+| `simpleModel`      | `string` | No       | Model for simple tasks (`default: models/gemini-2.0-flash`)                        |
+| `mediumModel`      | `string` | No       | Model for medium complexity tasks                                                  |
+| `complexModel`     | `string` | No       | Model for complex tasks (`default: models/gemini-2.5-pro`)                         |
+| `maxContextTokens` | `number` | No       | Override max context window (`default: 1048576`)                                   |
 
 ### Environment Variables
 
-| Variable | Maps To |
-|----------|---------|
+| Variable                | Maps To  |
+| ----------------------- | -------- |
 | `PLUGIN_GOOGLE_API_KEY` | `apiKey` |
 
 ## Capabilities
@@ -94,16 +94,16 @@ Through `BaseAiProvider` and `AiOperations`:
 
 ```typescript
 class GooglePlugin extends BaseAiProvider {
-    readonly id = 'google';
-    readonly name = 'Google AI';
-    readonly version = '1.0.0';
-    readonly providerName = 'Google';
+	readonly id = 'google';
+	readonly name = 'Google AI';
+	readonly version = '1.0.0';
+	readonly providerName = 'Google';
 
-    // Inherited from BaseAiProvider:
-    async askText(prompt: string, options?: AiRequestOptions): Promise<AiTextResult>;
-    async askJson<T>(prompt: string, schema: ZodSchema<T>, options?: AiRequestOptions): Promise<AiJsonResult<T>>;
-    async getEmbeddings(text: string): Promise<number[]>;
-    resolveConfig(settings: PluginSettings): ProviderConfig;
+	// Inherited from BaseAiProvider:
+	async askText(prompt: string, options?: AiRequestOptions): Promise<AiTextResult>;
+	async askJson<T>(prompt: string, schema: ZodSchema<T>, options?: AiRequestOptions): Promise<AiJsonResult<T>>;
+	async getEmbeddings(text: string): Promise<number[]>;
+	resolveConfig(settings: PluginSettings): ProviderConfig;
 }
 ```
 
@@ -128,6 +128,7 @@ resolveConfig(settings: PluginSettings): ProviderConfig {
 ### OpenAI-Compatible Endpoint
 
 Google provides an OpenAI-compatible API endpoint at:
+
 ```
 https://generativelanguage.googleapis.com/v1beta/openai/
 ```
@@ -137,6 +138,7 @@ This allows the plugin to use the same LangChain `ChatOpenAI` integration as oth
 ### Model Naming
 
 Google models use a `models/` prefix in their identifiers:
+
 - `models/gemini-2.5-flash`
 - `models/gemini-2.0-flash`
 - `models/gemini-2.5-pro`
@@ -146,12 +148,14 @@ This prefix is included in the default model names and must be included when ove
 ### Context Window
 
 At 1,048,576 tokens (1M), Google's context window is significantly larger than other providers:
+
 - OpenAI GPT-4o: 128K tokens
 - Anthropic Claude: 200K tokens
 - Groq: 128K tokens
 - **Google Gemini: 1M tokens**
 
 This large context window is particularly beneficial for:
+
 - Processing very long web pages without chunking
 - Maintaining longer conversation histories in the Agent Pipeline
 - Reducing the need for context compaction
@@ -163,11 +167,11 @@ This large context window is particularly beneficial for:
 ```typescript
 // Plugin settings
 const settings = {
-    apiKey: 'AIza...',  // Google AI API key
-    // Model tiers (using defaults):
-    // simple: models/gemini-2.0-flash
-    // default: models/gemini-2.5-flash
-    // complex: models/gemini-2.5-pro
+	apiKey: 'AIza...' // Google AI API key
+	// Model tiers (using defaults):
+	// simple: models/gemini-2.0-flash
+	// default: models/gemini-2.5-flash
+	// complex: models/gemini-2.5-pro
 };
 ```
 
@@ -176,27 +180,37 @@ const settings = {
 ```typescript
 // AiFacade routes to Google if configured as the active provider
 // Simple task - uses gemini-2.0-flash
-await aiFacade.askJson(prompt, schema, {
-    routing: { complexity: 'simple', taskId: 'prompt-processing' }
-}, facadeOptions);
+await aiFacade.askJson(
+	prompt,
+	schema,
+	{
+		routing: { complexity: 'simple', taskId: 'prompt-processing' }
+	},
+	facadeOptions
+);
 
 // Complex task - uses gemini-2.5-pro
-await aiFacade.askJson(prompt, schema, {
-    routing: { complexity: 'complex', taskId: 'data-aggregation' }
-}, facadeOptions);
+await aiFacade.askJson(
+	prompt,
+	schema,
+	{
+		routing: { complexity: 'complex', taskId: 'data-aggregation' }
+	},
+	facadeOptions
+);
 ```
 
 ## Error Handling
 
 ### Common Errors
 
-| Error | Cause | Resolution |
-|-------|-------|------------|
-| `401 Unauthorized` | Invalid API key | Verify key at [aistudio.google.com](https://aistudio.google.com) |
-| `429 Rate Limited` | Quota exceeded | Check usage quotas, wait and retry |
-| `400 Bad Request` | Invalid model name or parameters | Verify model name includes `models/` prefix |
-| `Context length exceeded` | Input too large (unlikely at 1M) | Reduce input size |
-| `Embedding model not found` | Wrong model for embeddings | Ensure embedding-capable model is used |
+| Error                       | Cause                            | Resolution                                                       |
+| --------------------------- | -------------------------------- | ---------------------------------------------------------------- |
+| `401 Unauthorized`          | Invalid API key                  | Verify key at [aistudio.google.com](https://aistudio.google.com) |
+| `429 Rate Limited`          | Quota exceeded                   | Check usage quotas, wait and retry                               |
+| `400 Bad Request`           | Invalid model name or parameters | Verify model name includes `models/` prefix                      |
+| `Context length exceeded`   | Input too large (unlikely at 1M) | Reduce input size                                                |
+| `Embedding model not found` | Wrong model for embeddings       | Ensure embedding-capable model is used                           |
 
 ### Health Check
 

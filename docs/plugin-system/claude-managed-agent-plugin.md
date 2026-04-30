@@ -7,14 +7,14 @@ sidebar_position: 65
 
 # Claude Managed Agent Plugin
 
-| Field              | Value                                              |
-| ------------------ | -------------------------------------------------- |
-| Plugin ID          | `claude-managed-agent`                             |
-| Package            | `@ever-works/claude-managed-agent-plugin`          |
-| Category           | `pipeline`                                         |
-| Capabilities       | `pipeline`, `form-schema-provider`                 |
-| Configuration Mode | `user-required`                                    |
-| Auto Enable        | No                                                 |
+| Field              | Value                                     |
+| ------------------ | ----------------------------------------- |
+| Plugin ID          | `claude-managed-agent`                    |
+| Package            | `@ever-works/claude-managed-agent-plugin` |
+| Category           | `pipeline`                                |
+| Capabilities       | `pipeline`, `form-schema-provider`        |
+| Configuration Mode | `user-required`                           |
+| Auto Enable        | No                                        |
 
 ## Overview
 

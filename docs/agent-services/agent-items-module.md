@@ -66,10 +66,10 @@ Updates item metadata without changing content:
 
 **Workflow modes:**
 
-| Mode | Behavior |
-|---|---|
-| Direct commit | Changes pushed to main branch immediately. Used when the user is the directory owner/editor. |
-| PR-based | Changes submitted as a pull request. Used for community contributions or when approval is required. |
+| Mode          | Behavior                                                                                            |
+| ------------- | --------------------------------------------------------------------------------------------------- |
+| Direct commit | Changes pushed to main branch immediately. Used when the user is the directory owner/editor.        |
+| PR-based      | Changes submitted as a pull request. Used for community contributions or when approval is required. |
 
 The mode is determined by the `autoapproval` option and the user's role in the directory.
 
@@ -89,28 +89,31 @@ Low-level file operations for item data:
 Each item is stored in `data/<item-slug>/` with two files:
 
 **`data.json`:**
+
 ```json
 {
-    "name": "Example Tool",
-    "slug": "example-tool",
-    "description": "A brief description of the tool",
-    "source_url": "https://example.com",
-    "category": "developer-tools",
-    "tags": ["open-source", "freemium"],
-    "images": ["screenshot.png"],
-    "featured": false,
-    "order": 0,
-    "metadata": {}
+	"name": "Example Tool",
+	"slug": "example-tool",
+	"description": "A brief description of the tool",
+	"source_url": "https://example.com",
+	"category": "developer-tools",
+	"tags": ["open-source", "freemium"],
+	"images": ["screenshot.png"],
+	"featured": false,
+	"order": 0,
+	"metadata": {}
 }
 ```
 
 **`content.md`:**
+
 ```markdown
 # Example Tool
 
 A detailed description of the tool with markdown formatting.
 
 ## Features
+
 - Feature 1
 - Feature 2
 ```
@@ -181,6 +184,7 @@ This behavior is automatic and requires no configuration beyond having a screens
 ### PR-Based Workflow Settings
 
 PR-based submission is controlled by:
+
 - The `autoapproval` option on the submission call
 - The user's role in the directory (owners/editors default to direct commit)
 - The directory's `communityPrEnabled` setting (enables external PR processing)
@@ -191,12 +195,12 @@ If no `slug` is provided, it is auto-generated from the item name using `slugify
 
 ## Dependencies
 
-| Dependency | Purpose |
-|---|---|
-| `@ever-works/agent/facades` | `GitFacadeService` for repository operations, `ScreenshotFacadeService` for auto-capture |
-| `@ever-works/agent/generators` | `DataRepository` for item file I/O |
-| `@ever-works/agent/utils` | `slugifyText` for slug generation |
-| `isomorphic-git` | Local git clone, commit, push operations |
+| Dependency                     | Purpose                                                                                  |
+| ------------------------------ | ---------------------------------------------------------------------------------------- |
+| `@ever-works/agent/facades`    | `GitFacadeService` for repository operations, `ScreenshotFacadeService` for auto-capture |
+| `@ever-works/agent/generators` | `DataRepository` for item file I/O                                                       |
+| `@ever-works/agent/utils`      | `slugifyText` for slug generation                                                        |
+| `isomorphic-git`               | Local git clone, commit, push operations                                                 |
 
 ## Usage Examples
 
@@ -206,16 +210,16 @@ If no `slug` is provided, it is auto-generated from the item name using `slugify
 import { ItemSubmissionService } from '@ever-works/agent/items-generator';
 
 const result = await submissionService.submitItem(
-    directory,
-    user,
-    {
-        name: 'VS Code',
-        description: 'A powerful code editor by Microsoft',
-        source_url: 'https://code.visualstudio.com',
-        category: 'developer-tools',
-        tags: ['editor', 'open-source', 'microsoft'],
-    },
-    { autoapproval: true },
+	directory,
+	user,
+	{
+		name: 'VS Code',
+		description: 'A powerful code editor by Microsoft',
+		source_url: 'https://code.visualstudio.com',
+		category: 'developer-tools',
+		tags: ['editor', 'open-source', 'microsoft']
+	},
+	{ autoapproval: true }
 );
 
 console.log(`Item created: ${result.slug}`); // 'vs-code'
@@ -225,7 +229,7 @@ console.log(`Item created: ${result.slug}`); // 'vs-code'
 
 ```typescript
 await submissionService.removeItem(directory, user, 'vs-code', {
-    autoapproval: true,
+	autoapproval: true
 });
 ```
 
@@ -233,18 +237,18 @@ await submissionService.removeItem(directory, user, 'vs-code', {
 
 ```typescript
 const result = await submissionService.submitItem(
-    directory,
-    user,
-    {
-        name: 'New Tool',
-        description: 'A new tool to add',
-        source_url: 'https://newtool.dev',
-    },
-    {
-        autoapproval: false,
-        prTitle: 'Add New Tool to directory',
-        prBody: 'This tool provides...',
-    },
+	directory,
+	user,
+	{
+		name: 'New Tool',
+		description: 'A new tool to add',
+		source_url: 'https://newtool.dev'
+	},
+	{
+		autoapproval: false,
+		prTitle: 'Add New Tool to directory',
+		prBody: 'This tool provides...'
+	}
 );
 
 console.log(`PR created: ${result.prUrl}`);
@@ -254,7 +258,7 @@ console.log(`PR created: ${result.prUrl}`);
 
 ```typescript
 await submissionService.updateItem(directory, user, 'vs-code', {
-    featured: true,
-    order: 1,
+	featured: true,
+	order: 1
 });
 ```

@@ -5,16 +5,16 @@ This is the [Docusaurus 3](https://docusaurus.io/) documentation site for the Ev
 ## Layout
 
 - **App (this folder)** — `platform/apps/docs/`
-  - `docusaurus.config.ts` — site config (Algolia, Sentry, Mermaid, etc.)
-  - `sidebarsPlatform.ts` — sidebar configuration
-  - `src/` — custom React pages, components, theme, CSS
-  - `static/` — static assets (images, CNAME)
-  - `i18n/` — translations (13 locales)
-  - `blog/` — blog content
+    - `docusaurus.config.ts` — site config (Algolia, Sentry, Mermaid, etc.)
+    - `sidebarsPlatform.ts` — sidebar configuration
+    - `src/` — custom React pages, components, theme, CSS
+    - `static/` — static assets (images, CNAME)
+    - `i18n/` — translations (13 locales)
+    - `blog/` — blog content
 - **Docs content** — `platform/docs/`
-  - All markdown files served by this site live here, NOT inside the app folder.
-  - The Docusaurus `docs.path` is set to `../../docs/`.
-  - Internal `specs/` folder is also rendered (not part of the sidebar).
+    - All markdown files served by this site live here, NOT inside the app folder.
+    - The Docusaurus `docs.path` is set to `../../docs/`.
+    - Internal `specs/` folder is also rendered (not part of the sidebar).
 
 ## Local Development
 
@@ -52,13 +52,13 @@ To add or edit a documentation page:
 
 ## Environment Variables
 
-| Variable                              | Required | Description                       |
-| ------------------------------------- | -------- | --------------------------------- |
-| `ALGOLIA_APP_ID`                      | No       | Algolia search app ID             |
-| `ALGOLIA_API_KEY`                     | No       | Algolia search API key            |
-| `ALGOLIA_INDEX_NAME`                  | No       | Algolia index name                |
-| `NEXT_PUBLIC_SENTRY_DNS`              | No       | Sentry DSN for error tracking     |
-| `EVER_WORKS_WEBSITE_TEMPLATE_API_URL` | No       | API URL custom field              |
+| Variable                              | Required | Description                   |
+| ------------------------------------- | -------- | ----------------------------- |
+| `ALGOLIA_APP_ID`                      | No       | Algolia search app ID         |
+| `ALGOLIA_API_KEY`                     | No       | Algolia search API key        |
+| `ALGOLIA_INDEX_NAME`                  | No       | Algolia index name            |
+| `NEXT_PUBLIC_SENTRY_DNS`              | No       | Sentry DSN for error tracking |
+| `EVER_WORKS_WEBSITE_TEMPLATE_API_URL` | No       | API URL custom field          |
 
 When Algolia env vars are unset, search falls back to `@easyops-cn/docusaurus-search-local`.
 

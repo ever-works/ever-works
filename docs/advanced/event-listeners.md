@@ -55,17 +55,17 @@ flowchart TD
 
 ## Source Files
 
-| File | Purpose |
-|------|---------|
-| `packages/agent/src/events/base.ts` | Abstract `BaseEvent` class with static `EVENT_NAME` |
-| `packages/agent/src/events/directory-created.event.ts` | `DirectoryCreatedEvent` domain event |
-| `packages/agent/src/events/directory-generation-completed.event.ts` | `DirectoryGenerationCompletedEvent` domain event |
-| `apps/api/src/events/index.ts` | API-layer user lifecycle events (created, forgot password, etc.) |
-| `packages/plugin/src/events/event-types.ts` | Typed event names and payload interfaces for the plugin system |
-| `packages/agent/src/pipeline/step-pipeline-executor.service.ts` | Pipeline runtime event emission |
-| `packages/agent/src/pipeline/executable-pipeline.class.ts` | Pipeline runner state change events |
-| `apps/api/src/mail/mail.service.ts` | Event listener: sends emails on user events |
-| `apps/api/src/directories/tasks/directory-cleanup.service.ts` | Event listener: clears cache on generation completion |
+| File                                                                | Purpose                                                          |
+| ------------------------------------------------------------------- | ---------------------------------------------------------------- |
+| `packages/agent/src/events/base.ts`                                 | Abstract `BaseEvent` class with static `EVENT_NAME`              |
+| `packages/agent/src/events/directory-created.event.ts`              | `DirectoryCreatedEvent` domain event                             |
+| `packages/agent/src/events/directory-generation-completed.event.ts` | `DirectoryGenerationCompletedEvent` domain event                 |
+| `apps/api/src/events/index.ts`                                      | API-layer user lifecycle events (created, forgot password, etc.) |
+| `packages/plugin/src/events/event-types.ts`                         | Typed event names and payload interfaces for the plugin system   |
+| `packages/agent/src/pipeline/step-pipeline-executor.service.ts`     | Pipeline runtime event emission                                  |
+| `packages/agent/src/pipeline/executable-pipeline.class.ts`          | Pipeline runner state change events                              |
+| `apps/api/src/mail/mail.service.ts`                                 | Event listener: sends emails on user events                      |
+| `apps/api/src/directories/tasks/directory-cleanup.service.ts`       | Event listener: clears cache on generation completion            |
 
 ## Key Classes
 
@@ -75,7 +75,7 @@ The abstract base for all agent-level domain events:
 
 ```typescript
 export abstract class BaseEvent {
-    static EVENT_NAME: string;
+	static EVENT_NAME: string;
 }
 ```
 
@@ -85,19 +85,19 @@ Each event extends `BaseEvent` and carries a typed payload:
 
 ```typescript
 export class DirectoryCreatedEvent extends BaseEvent {
-    static EVENT_NAME = 'directory.created';
+	static EVENT_NAME = 'directory.created';
 
-    constructor(public readonly directory: Directory) {
-        super();
-    }
+	constructor(public readonly directory: Directory) {
+		super();
+	}
 }
 
 export class DirectoryGenerationCompletedEvent extends BaseEvent {
-    static EVENT_NAME = 'directory.generation.completed';
+	static EVENT_NAME = 'directory.generation.completed';
 
-    constructor(public readonly directory: Directory) {
-        super();
-    }
+	constructor(public readonly directory: Directory) {
+		super();
+	}
 }
 ```
 
@@ -107,45 +107,45 @@ The API application defines its own event hierarchy for user lifecycle operation
 
 ```typescript
 export abstract class BaseUserEvent {
-    public abstract user: User;
+	public abstract user: User;
 }
 
 export class UserCreatedEvent extends BaseUserEvent {
-    static EVENT_NAME = 'user.created';
+	static EVENT_NAME = 'user.created';
 
-    constructor(
-        public user: User,
-        public confirmationToken: string,
-        public confirmationUrl: string,
-    ) {
-        super();
-    }
+	constructor(
+		public user: User,
+		public confirmationToken: string,
+		public confirmationUrl: string
+	) {
+		super();
+	}
 }
 
 export class MemberInvitedEvent {
-    static EVENT_NAME = 'directory.member_invited';
+	static EVENT_NAME = 'directory.member_invited';
 
-    constructor(
-        public invitee: User,
-        public inviter: User,
-        public directory: Directory,
-        public role: string,
-        public directoryUrl: string,
-    ) {}
+	constructor(
+		public invitee: User,
+		public inviter: User,
+		public directory: Directory,
+		public role: string,
+		public directoryUrl: string
+	) {}
 }
 ```
 
 Full list of API user events:
 
-| Event Class | EVENT_NAME | Payload |
-|------------|------------|---------|
-| `UserCreatedEvent` | `user.created` | user, confirmationToken, confirmationUrl |
-| `UserForgotPasswordEvent` | `user.forgot_password` | user, resetToken, resetUrl, expiresIn |
-| `UserPasswordChangedEvent` | `user.password_changed` | user, changedAt, ipAddress, location, device |
-| `UserConfirmedEvent` | `user.confirmed` | user, dashboardUrl |
-| `UserNewDeviceLoginEvent` | `user.new_device_login` | user, loginTime, device, browser, location, ipAddress |
-| `UserAccountDeletionEvent` | `user.delete_account` | user, deleteToken, deleteUrl, expiresIn |
-| `MemberInvitedEvent` | `directory.member_invited` | invitee, inviter, directory, role, directoryUrl |
+| Event Class                | EVENT_NAME                 | Payload                                               |
+| -------------------------- | -------------------------- | ----------------------------------------------------- |
+| `UserCreatedEvent`         | `user.created`             | user, confirmationToken, confirmationUrl              |
+| `UserForgotPasswordEvent`  | `user.forgot_password`     | user, resetToken, resetUrl, expiresIn                 |
+| `UserPasswordChangedEvent` | `user.password_changed`    | user, changedAt, ipAddress, location, device          |
+| `UserConfirmedEvent`       | `user.confirmed`           | user, dashboardUrl                                    |
+| `UserNewDeviceLoginEvent`  | `user.new_device_login`    | user, loginTime, device, browser, location, ipAddress |
+| `UserAccountDeletionEvent` | `user.delete_account`      | user, deleteToken, deleteUrl, expiresIn               |
+| `MemberInvitedEvent`       | `directory.member_invited` | invitee, inviter, directory, role, directoryUrl       |
 
 ### Plugin Event Type System
 
@@ -154,22 +154,32 @@ The `@ever-works/plugin` package defines a comprehensive typed event system for 
 ```typescript
 // Event name union types
 type PluginLifecycleEvent =
-    | 'plugin:loaded' | 'plugin:enabled' | 'plugin:disabled'
-    | 'plugin:unloaded' | 'plugin:error' | 'plugin:settings-changed';
+	| 'plugin:loaded'
+	| 'plugin:enabled'
+	| 'plugin:disabled'
+	| 'plugin:unloaded'
+	| 'plugin:error'
+	| 'plugin:settings-changed';
 
 type DirectoryEvent =
-    | 'directory:created' | 'directory:updated' | 'directory:deleted'
-    | 'directory:deployed' | 'directory:generation-started'
-    | 'directory:generation-completed' | 'directory:generation-failed';
+	| 'directory:created'
+	| 'directory:updated'
+	| 'directory:deleted'
+	| 'directory:deployed'
+	| 'directory:generation-started'
+	| 'directory:generation-completed'
+	| 'directory:generation-failed';
 
-type ItemEvent =
-    | 'item:created' | 'item:updated' | 'item:deleted'
-    | 'item:extracted' | 'item:validated';
+type ItemEvent = 'item:created' | 'item:updated' | 'item:deleted' | 'item:extracted' | 'item:validated';
 
 type PipelineEvent =
-    | 'pipeline:started' | 'pipeline:step-started' | 'pipeline:step-completed'
-    | 'pipeline:step-failed' | 'pipeline:completed' | 'pipeline:failed'
-    | 'pipeline:cancelled';
+	| 'pipeline:started'
+	| 'pipeline:step-started'
+	| 'pipeline:step-completed'
+	| 'pipeline:step-failed'
+	| 'pipeline:completed'
+	| 'pipeline:failed'
+	| 'pipeline:cancelled';
 
 type SystemEvent = 'system:startup' | 'system:shutdown' | 'system:health-check';
 ```
@@ -178,13 +188,13 @@ Each event name maps to a typed payload interface via `PluginEventPayloads`:
 
 ```typescript
 interface PluginEventPayloads {
-    'plugin:loaded': PluginLoadedPayload;
-    'plugin:error': PluginErrorPayload;
-    'plugin:settings-changed': PluginSettingsChangedPayload;
-    'directory:generation-completed': DirectoryGenerationCompletedPayload;
-    'pipeline:step-completed': PipelineStepCompletedPayload;
-    'pipeline:failed': PipelineFailedPayload;
-    // ... all events mapped to payloads
+	'plugin:loaded': PluginLoadedPayload;
+	'plugin:error': PluginErrorPayload;
+	'plugin:settings-changed': PluginSettingsChangedPayload;
+	'directory:generation-completed': DirectoryGenerationCompletedPayload;
+	'pipeline:step-completed': PipelineStepCompletedPayload;
+	'pipeline:failed': PipelineFailedPayload;
+	// ... all events mapped to payloads
 }
 ```
 
@@ -194,14 +204,14 @@ The pipeline executor emits events during step execution:
 
 ```typescript
 export const PipelineEvents = {
-    STARTED: 'pipeline:started',
-    STEP_STARTED: 'pipeline:step-started',
-    STEP_COMPLETED: 'pipeline:step-completed',
-    STEP_FAILED: 'pipeline:step-failed',
-    STEP_SKIPPED: 'pipeline:step-skipped',
-    COMPLETED: 'pipeline:completed',
-    FAILED: 'pipeline:failed',
-    CANCELLED: 'pipeline:cancelled',
+	STARTED: 'pipeline:started',
+	STEP_STARTED: 'pipeline:step-started',
+	STEP_COMPLETED: 'pipeline:step-completed',
+	STEP_FAILED: 'pipeline:step-failed',
+	STEP_SKIPPED: 'pipeline:step-skipped',
+	COMPLETED: 'pipeline:completed',
+	FAILED: 'pipeline:failed',
+	CANCELLED: 'pipeline:cancelled'
 } as const;
 ```
 
@@ -209,15 +219,15 @@ The `ExecutablePipelineRunner` also emits lower-level state change events:
 
 ```typescript
 export const PipelineRuntimeEvents = {
-    STATE_CHANGED: 'pipeline:state-changed',
-    STEP_STATUS_CHANGED: 'pipeline:step-status-changed',
+	STATE_CHANGED: 'pipeline:state-changed',
+	STEP_STATUS_CHANGED: 'pipeline:step-status-changed'
 } as const;
 
 export interface StateChangePayload {
-    stepId: string;
-    previousStatus: StepStatus;
-    newStatus: StepStatus;
-    timestamp: number;
+	stepId: string;
+	previousStatus: StepStatus;
+	newStatus: StepStatus;
+	timestamp: number;
 }
 ```
 
@@ -230,17 +240,17 @@ The `EventEmitterModule` is registered at the root of both the API application a
 ```typescript
 // apps/api/src/api.module.ts
 @Module({
-    imports: [
-        EventEmitterModule.forRoot(),
-        // ... other modules
-    ],
+	imports: [
+		EventEmitterModule.forRoot()
+		// ... other modules
+	]
 })
 export class ApiModule {}
 
 // packages/agent/src/pipeline/pipeline.module.ts
 @Module({
-    imports: [FacadesModule, EventEmitterModule.forRoot()],
-    // ...
+	imports: [FacadesModule, EventEmitterModule.forRoot()]
+	// ...
 })
 export class PipelineModule {}
 ```
@@ -254,10 +264,12 @@ import { OnEvent } from '@nestjs/event-emitter';
 
 @Injectable()
 export class MailService {
-    @OnEvent(UserCreatedEvent.EVENT_NAME)
-    async sendSignupConfirmation(data: UserCreatedEvent): Promise<void> {
-        await this.mailerService.sendMail({ /* ... */ });
-    }
+	@OnEvent(UserCreatedEvent.EVENT_NAME)
+	async sendSignupConfirmation(data: UserCreatedEvent): Promise<void> {
+		await this.mailerService.sendMail({
+			/* ... */
+		});
+	}
 }
 ```
 
@@ -271,19 +283,16 @@ import { DirectoryCreatedEvent } from '@ever-works/agent/events';
 
 @Injectable()
 export class DirectoryLifecycleService {
-    constructor(private readonly eventEmitter: EventEmitter2) {}
+	constructor(private readonly eventEmitter: EventEmitter2) {}
 
-    async createDirectory(dto: CreateDirectoryDto, userId: string): Promise<Directory> {
-        const directory = await this.repository.save(/* ... */);
+	async createDirectory(dto: CreateDirectoryDto, userId: string): Promise<Directory> {
+		const directory = await this.repository.save(/* ... */);
 
-        // Emit the event -- all @OnEvent('directory.created') listeners fire
-        this.eventEmitter.emit(
-            DirectoryCreatedEvent.EVENT_NAME,
-            new DirectoryCreatedEvent(directory),
-        );
+		// Emit the event -- all @OnEvent('directory.created') listeners fire
+		this.eventEmitter.emit(DirectoryCreatedEvent.EVENT_NAME, new DirectoryCreatedEvent(directory));
 
-        return directory;
-    }
+		return directory;
+	}
 }
 ```
 
@@ -295,17 +304,17 @@ import { DirectoryGenerationCompletedEvent } from '@ever-works/agent/events';
 
 @Injectable()
 export class DirectoryCleanupService {
-    @OnEvent(DirectoryGenerationCompletedEvent.EVENT_NAME)
-    clearDirectoryCache(data: DirectoryGenerationCompletedEvent) {
-        this.cacheRepository.typeormAdapter
-            .deleteUnscopedEntriesLike(data.directory.id)
-            .then(() => {
-                this.logger.log(`Cache cleared for directory ${data.directory.id}`);
-            })
-            .catch((err) => {
-                this.logger.error('Failed to clear cache:', err);
-            });
-    }
+	@OnEvent(DirectoryGenerationCompletedEvent.EVENT_NAME)
+	clearDirectoryCache(data: DirectoryGenerationCompletedEvent) {
+		this.cacheRepository.typeormAdapter
+			.deleteUnscopedEntriesLike(data.directory.id)
+			.then(() => {
+				this.logger.log(`Cache cleared for directory ${data.directory.id}`);
+			})
+			.catch((err) => {
+				this.logger.error('Failed to clear cache:', err);
+			});
+	}
 }
 ```
 
@@ -317,21 +326,19 @@ import type { PipelineStepCompletedPayload, PipelineFailedPayload } from '@ever-
 
 @Injectable()
 export class PipelineMonitoringService {
-    @OnEvent('pipeline:step-completed')
-    onStepCompleted(payload: PipelineStepCompletedPayload) {
-        this.logger.log(
-            `Step "${payload.stepName}" completed in ${payload.duration}ms ` +
-            `(${payload.stepIndex + 1}/${payload.totalSteps})`,
-        );
-    }
+	@OnEvent('pipeline:step-completed')
+	onStepCompleted(payload: PipelineStepCompletedPayload) {
+		this.logger.log(
+			`Step "${payload.stepName}" completed in ${payload.duration}ms ` +
+				`(${payload.stepIndex + 1}/${payload.totalSteps})`
+		);
+	}
 
-    @OnEvent('pipeline:failed')
-    onPipelineFailed(payload: PipelineFailedPayload) {
-        this.logger.error(
-            `Pipeline failed at step "${payload.failedStep}": ${payload.error}`,
-        );
-        // Send notification, update status, etc.
-    }
+	@OnEvent('pipeline:failed')
+	onPipelineFailed(payload: PipelineFailedPayload) {
+		this.logger.error(`Pipeline failed at step "${payload.failedStep}": ${payload.error}`);
+		// Send notification, update status, etc.
+	}
 }
 ```
 
@@ -376,15 +383,15 @@ import type { EventHandler, PluginEventName } from '@ever-works/plugin';
 
 // Type-safe event handler
 const handler: EventHandler<'pipeline:step-completed'> = (payload) => {
-    // payload is PipelineStepCompletedPayload
-    console.log(payload.stepName, payload.duration);
+	// payload is PipelineStepCompletedPayload
+	console.log(payload.stepName, payload.duration);
 };
 
 // Plugin event emitter interface
 interface PluginEventEmitter {
-    on<T extends PluginEventName>(event: T, handler: EventHandler<T>): EventSubscription;
-    once<T extends PluginEventName>(event: T, handler: EventHandler<T>): EventSubscription;
-    emit<T extends PluginEventName>(event: T, payload: PluginEventPayloads[T]): void;
+	on<T extends PluginEventName>(event: T, handler: EventHandler<T>): EventSubscription;
+	once<T extends PluginEventName>(event: T, handler: EventHandler<T>): EventSubscription;
+	emit<T extends PluginEventName>(event: T, payload: PluginEventPayloads[T]): void;
 }
 ```
 

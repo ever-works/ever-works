@@ -44,13 +44,11 @@ src/lib/api/
 The foundation for all API calls. Handles authentication, error parsing, and response processing.
 
 ```typescript
-async function serverFetch<T>(
-    endpoint: string,
-    options?: ServerFetchOptions
-): Promise<T>
+async function serverFetch<T>(endpoint: string, options?: ServerFetchOptions): Promise<T>;
 ```
 
 **Request Pipeline**:
+
 1. Reads the auth access token from cookies via `getAuthAccessCookie()`
 2. Determines the frontend URL from request headers (`x-forwarded-host`, `host`) for the `X-Frontend-URL` header
 3. Constructs headers: `Content-Type: application/json`, `Authorization: Bearer {token}`, `X-Frontend-URL`
@@ -60,13 +58,14 @@ async function serverFetch<T>(
 
 **Error Handling**:
 
-| Status | Behavior |
-|--------|----------|
-| 401 | Throws with `t('unauthorizedLogin')` or API error message |
-| 403 | Throws with `t('forbidden')` or API error message |
+| Status        | Behavior                                                                        |
+| ------------- | ------------------------------------------------------------------------------- |
+| 401           | Throws with `t('unauthorizedLogin')` or API error message                       |
+| 403           | Throws with `t('forbidden')` or API error message                               |
 | Other 4xx/5xx | Parses error from `message`, `error.message`, or `error` field in response body |
 
 Error messages are extracted from multiple response formats to handle different API error shapes:
+
 ```typescript
 // Format 1: { message: "..." } or { message: ["err1", "err2"] }
 // Format 2: { error: { message: "..." } }
@@ -95,7 +94,7 @@ When `wrapInData` is true, the data is wrapped as `{ data: ... }` in the request
 A utility for re-throwing errors with translated messages:
 
 ```typescript
-async function handleServerError(error: unknown): Promise<never>
+async function handleServerError(error: unknown): Promise<never>;
 ```
 
 ## Items Generator API
@@ -104,30 +103,39 @@ async function handleServerError(error: unknown): Promise<never>
 
 Provides the client for all generation-related endpoints.
 
-| Method | Endpoint | HTTP | Description |
-|--------|----------|------|-------------|
-| `generate` | `/directories/{id}/generate` | POST | Starts item generation |
-| `update` | `/directories/{id}/update` | POST | Starts item update generation |
-| `submitItem` | `/directories/{id}/submit-item` | POST | Submits a new item |
-| `removeItem` | `/directories/{id}/remove-item` | POST | Removes an item |
-| `updateItem` | `/directories/{id}/update-item` | POST | Updates item metadata |
-| `extractItemDetails` | `/extract-item-details` | POST | AI-extracts details from URL |
-| `regenerateMarkdown` | `/directories/{id}/regenerate-markdown` | POST | Regenerates all markdown |
-| `getFormSchema` | `/directories/{id}/generator-form` | GET | Gets directory form schema |
-| `getFormSchemaGlobal` | `/generator-form` | GET | Gets global form schema |
+| Method                | Endpoint                                | HTTP | Description                   |
+| --------------------- | --------------------------------------- | ---- | ----------------------------- |
+| `generate`            | `/directories/{id}/generate`            | POST | Starts item generation        |
+| `update`              | `/directories/{id}/update`              | POST | Starts item update generation |
+| `submitItem`          | `/directories/{id}/submit-item`         | POST | Submits a new item            |
+| `removeItem`          | `/directories/{id}/remove-item`         | POST | Removes an item               |
+| `updateItem`          | `/directories/{id}/update-item`         | POST | Updates item metadata         |
+| `extractItemDetails`  | `/extract-item-details`                 | POST | AI-extracts details from URL  |
+| `regenerateMarkdown`  | `/directories/{id}/regenerate-markdown` | POST | Regenerates all markdown      |
+| `getFormSchema`       | `/directories/{id}/generator-form`      | GET  | Gets directory form schema    |
+| `getFormSchemaGlobal` | `/generator-form`                       | GET  | Gets global form schema       |
 
 **Type Re-exports**: The file re-exports key types from `@ever-works/plugin` and `@ever-works/contracts/api`:
 
 ```typescript
 export type {
-    PluginIcon, ProviderOption, GeneratorFormSchema,
-    FormSchemaProvidersType, ProviderSelectionState,
-    SelectableProviderCategory, ProviderCategoryKey,
+	PluginIcon,
+	ProviderOption,
+	GeneratorFormSchema,
+	FormSchemaProvidersType,
+	ProviderSelectionState,
+	SelectableProviderCategory,
+	ProviderCategoryKey
 } from '@ever-works/plugin';
 
 export type {
-    ProvidersDto, CreateItemsGeneratorDto, UpdateItemsGeneratorDto,
-    SubmitItemDto, RemoveItemDto, UpdateItemDto, ExtractItemDetailsDto,
+	ProvidersDto,
+	CreateItemsGeneratorDto,
+	UpdateItemsGeneratorDto,
+	SubmitItemDto,
+	RemoveItemDto,
+	UpdateItemDto,
+	ExtractItemDetailsDto
 } from '@ever-works/contracts/api';
 ```
 
@@ -135,22 +143,22 @@ export type {
 
 ```typescript
 interface ItemsGeneratorResponse {
-    id: string;
-    slug: string;
-    status: string;
-    message?: string;
+	id: string;
+	slug: string;
+	status: string;
+	message?: string;
 }
 
 interface ItemResponse {
-    status: 'success' | 'error' | 'pending';
-    slug: string;
-    item_name: string;
-    item_slug?: string;
-    message: string;
-    pr_number?: number;
-    pr_url?: string;
-    auto_merged?: boolean;
-    item?: ItemData;
+	status: 'success' | 'error' | 'pending';
+	slug: string;
+	item_name: string;
+	item_slug?: string;
+	message: string;
+	pr_number?: number;
+	pr_url?: string;
+	auto_merged?: boolean;
+	item?: ItemData;
 }
 ```
 
@@ -163,26 +171,30 @@ Centralizes enum definitions, re-exporting from `@ever-works/contracts/api` and 
 ```typescript
 // From @ever-works/contracts/api
 export { GenerationMethod, WebsiteRepositoryCreationMethod } from '@ever-works/contracts/api';
-export { GenerateStatusType, DirectoryScheduleCadence,
-         DirectoryScheduleStatus, DirectoryScheduleBillingMode } from '@ever-works/contracts/api';
+export {
+	GenerateStatusType,
+	DirectoryScheduleCadence,
+	DirectoryScheduleStatus,
+	DirectoryScheduleBillingMode
+} from '@ever-works/contracts/api';
 
 // Web-specific
 export enum OAuthProvider {
-    GITHUB = 'github',
-    GOOGLE = 'google',
+	GITHUB = 'github',
+	GOOGLE = 'google'
 }
 
 export enum DirectoryMemberRole {
-    OWNER = 'owner',      // Reserved for creator, not assignable
-    MANAGER = 'manager',  // Can edit directory and manage members
-    EDITOR = 'editor',    // Can edit content, cannot manage members
-    VIEWER = 'viewer',    // Read-only access
+	OWNER = 'owner', // Reserved for creator, not assignable
+	MANAGER = 'manager', // Can edit directory and manage members
+	EDITOR = 'editor', // Can edit content, cannot manage members
+	VIEWER = 'viewer' // Read-only access
 }
 
 export const ASSIGNABLE_MEMBER_ROLES = [
-    DirectoryMemberRole.MANAGER,
-    DirectoryMemberRole.EDITOR,
-    DirectoryMemberRole.VIEWER,
+	DirectoryMemberRole.MANAGER,
+	DirectoryMemberRole.EDITOR,
+	DirectoryMemberRole.VIEWER
 ] as const;
 ```
 
@@ -192,33 +204,33 @@ The `plugins-capabilities/` directory contains API clients for plugin-specific f
 
 ### Screenshot API (`screenshot.ts`)
 
-| Method | Description |
-|--------|-------------|
-| `checkAvailability()` | Checks if any screenshot plugin is configured |
+| Method                      | Description                                   |
+| --------------------------- | --------------------------------------------- |
+| `checkAvailability()`       | Checks if any screenshot plugin is configured |
 | `getScreenshotUrl(options)` | Gets a screenshot URL for a given website URL |
 
 ### Deploy API (`deploy.ts`)
 
-| Method | Description |
-|--------|-------------|
-| `deploy(directoryId, options)` | Triggers a deployment |
-| `getDeploymentTeams()` | Lists deployment provider teams |
-| `getTeamsForDirectory(directoryId)` | Lists teams using directory's plugin token |
-| `lookupExistingDeployment(directoryId)` | Checks for existing deployments |
+| Method                                  | Description                                |
+| --------------------------------------- | ------------------------------------------ |
+| `deploy(directoryId, options)`          | Triggers a deployment                      |
+| `getDeploymentTeams()`                  | Lists deployment provider teams            |
+| `getTeamsForDirectory(directoryId)`     | Lists teams using directory's plugin token |
+| `lookupExistingDeployment(directoryId)` | Checks for existing deployments            |
 
 ### Git Providers API (`git-providers.ts`)
 
-| Method | Description |
-|--------|-------------|
-| `checkConnection(providerId)` | Checks if a git provider is connected |
+| Method                         | Description                                |
+| ------------------------------ | ------------------------------------------ |
+| `checkConnection(providerId)`  | Checks if a git provider is connected      |
 | `getOrganizations(providerId)` | Lists user's organizations on the provider |
 
 ### OAuth API (`oauth.ts`)
 
-| Method | Description |
-|--------|-------------|
-| `getConnectUrl(providerId, callbackUrl, state, forceConsent?)` | Gets OAuth authorization URL |
-| `disconnect(providerId)` | Disconnects an OAuth provider |
+| Method                                                         | Description                   |
+| -------------------------------------------------------------- | ----------------------------- |
+| `getConnectUrl(providerId, callbackUrl, state, forceConsent?)` | Gets OAuth authorization URL  |
+| `disconnect(providerId)`                                       | Disconnects an OAuth provider |
 
 ## Request/Response Patterns
 
@@ -228,9 +240,9 @@ Most API responses follow this structure:
 
 ```typescript
 interface APIResponse<T = unknown> {
-    status: 'success' | 'error';
-    message?: string;
-    data?: T;
+	status: 'success' | 'error';
+	message?: string;
+	data?: T;
 }
 ```
 

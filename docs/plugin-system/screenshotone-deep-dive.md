@@ -30,6 +30,7 @@ IPlugin (lifecycle, manifest)
 ```
 
 The `IScreenshotPlugin` interface requires:
+
 - `capture(options)` - Capture a screenshot and return image data
 - `getScreenshotUrl(options)` - Generate a screenshot URL without capturing
 - `isAvailable()` - Check if the plugin is ready
@@ -40,6 +41,7 @@ The `IScreenshotPlugin` interface requires:
 ### SDK Integration
 
 The plugin uses the official `screenshotone-api-sdk` which provides:
+
 - `Client` class for API communication
 - `TakeOptions` builder for screenshot parameters
 - Signed URL generation for secure, time-limited access
@@ -48,22 +50,22 @@ The plugin uses the official `screenshotone-api-sdk` which provides:
 
 ### Settings Schema
 
-| Field | Type | Default | Description |
-|-------|------|---------|-------------|
-| `accessKey` | `string` | - | ScreenshotOne access key (`x-secret`, `x-envVar: PLUGIN_SCREENSHOTONE_ACCESS_KEY`, `x-scope: user`) |
-| `secretKey` | `string` | - | ScreenshotOne secret key for signed URLs (`x-secret`, `x-envVar: PLUGIN_SCREENSHOTONE_SECRET_KEY`, `x-scope: user`) |
-| `viewportWidth` | `number` | `1280` | Default viewport width (320-3840 px) |
-| `viewportHeight` | `number` | `800` | Default viewport height (200-2160 px) |
-| `format` | `string` | `'png'` | Image format (png, jpg, jpeg, webp) |
-| `fullPage` | `boolean` | `false` | Capture full page scroll height |
-| `deviceScaleFactor` | `number` | `1` | Device pixel ratio (1-3) |
-| `blockAds` | `boolean` | `true` | Block advertisements |
-| `blockTrackers` | `boolean` | `true` | Block tracking scripts |
+| Field               | Type      | Default | Description                                                                                                         |
+| ------------------- | --------- | ------- | ------------------------------------------------------------------------------------------------------------------- |
+| `accessKey`         | `string`  | -       | ScreenshotOne access key (`x-secret`, `x-envVar: PLUGIN_SCREENSHOTONE_ACCESS_KEY`, `x-scope: user`)                 |
+| `secretKey`         | `string`  | -       | ScreenshotOne secret key for signed URLs (`x-secret`, `x-envVar: PLUGIN_SCREENSHOTONE_SECRET_KEY`, `x-scope: user`) |
+| `viewportWidth`     | `number`  | `1280`  | Default viewport width (320-3840 px)                                                                                |
+| `viewportHeight`    | `number`  | `800`   | Default viewport height (200-2160 px)                                                                               |
+| `format`            | `string`  | `'png'` | Image format (png, jpg, jpeg, webp)                                                                                 |
+| `fullPage`          | `boolean` | `false` | Capture full page scroll height                                                                                     |
+| `deviceScaleFactor` | `number`  | `1`     | Device pixel ratio (1-3)                                                                                            |
+| `blockAds`          | `boolean` | `true`  | Block advertisements                                                                                                |
+| `blockTrackers`     | `boolean` | `true`  | Block tracking scripts                                                                                              |
 
 ### Environment Variables
 
-| Variable | Maps To |
-|----------|---------|
+| Variable                          | Maps To     |
+| --------------------------------- | ----------- |
 | `PLUGIN_SCREENSHOTONE_ACCESS_KEY` | `accessKey` |
 | `PLUGIN_SCREENSHOTONE_SECRET_KEY` | `secretKey` |
 
@@ -82,11 +84,11 @@ The plugin uses the official `screenshotone-api-sdk` which provides:
 ### Supported Formats
 
 | Format | Extension |
-|--------|-----------|
-| PNG | `.png` |
-| JPG | `.jpg` |
-| JPEG | `.jpeg` |
-| WebP | `.webp` |
+| ------ | --------- |
+| PNG    | `.png`    |
+| JPG    | `.jpg`    |
+| JPEG   | `.jpeg`   |
+| WebP   | `.webp`   |
 
 ### Maximum Dimensions
 
@@ -99,24 +101,24 @@ The plugin uses the official `screenshotone-api-sdk` which provides:
 
 ```typescript
 class ScreenshotOnePlugin implements IPlugin, IScreenshotPlugin {
-    readonly id = 'screenshotone';
-    readonly name = 'ScreenshotOne';
-    readonly version = '1.0.0';
-    readonly category: PluginCategory = 'screenshot';
-    readonly capabilities = ['screenshot'];
-    readonly providerName = 'ScreenshotOne';
+	readonly id = 'screenshotone';
+	readonly name = 'ScreenshotOne';
+	readonly version = '1.0.0';
+	readonly category: PluginCategory = 'screenshot';
+	readonly capabilities = ['screenshot'];
+	readonly providerName = 'ScreenshotOne';
 
-    async capture(options: ScreenshotOptions): Promise<ScreenshotResult>;
-    async getScreenshotUrl(options: ScreenshotOptions): Promise<string | null>;
-    async isAvailable(): Promise<boolean>;
-    async validateCredentials(): Promise<ScreenshotValidationResult>;
-    getSupportedFormats(): readonly ScreenshotFormat[];
-    getMaxDimensions(): { width: number; height: number };
+	async capture(options: ScreenshotOptions): Promise<ScreenshotResult>;
+	async getScreenshotUrl(options: ScreenshotOptions): Promise<string | null>;
+	async isAvailable(): Promise<boolean>;
+	async validateCredentials(): Promise<ScreenshotValidationResult>;
+	getSupportedFormats(): readonly ScreenshotFormat[];
+	getMaxDimensions(): { width: number; height: number };
 
-    async onLoad(context: PluginContext): Promise<void>;
-    async onUnload(): Promise<void>;
-    async healthCheck(): Promise<PluginHealthCheck>;
-    getManifest(): PluginManifest;
+	async onLoad(context: PluginContext): Promise<void>;
+	async onUnload(): Promise<void>;
+	async healthCheck(): Promise<PluginHealthCheck>;
+	getManifest(): PluginManifest;
 }
 ```
 
@@ -124,17 +126,17 @@ class ScreenshotOnePlugin implements IPlugin, IScreenshotPlugin {
 
 ```typescript
 interface ScreenshotOptions {
-    url: string;
-    viewportWidth?: number;
-    viewportHeight?: number;
-    format?: ScreenshotFormat;
-    fullPage?: boolean;
-    delay?: number;
-    waitForSelector?: string;
-    userAgent?: string;
-    blockAds?: boolean;
-    blockCookieBanners?: boolean;
-    settings?: PluginSettings;
+	url: string;
+	viewportWidth?: number;
+	viewportHeight?: number;
+	format?: ScreenshotFormat;
+	fullPage?: boolean;
+	delay?: number;
+	waitForSelector?: string;
+	userAgent?: string;
+	blockAds?: boolean;
+	blockCookieBanners?: boolean;
+	settings?: PluginSettings;
 }
 ```
 
@@ -143,19 +145,19 @@ interface ScreenshotOptions {
 ```typescript
 // Success
 interface ScreenshotResult {
-    success: true;
-    imageBuffer: Buffer;
-    imageBase64: string;
-    imageUrl: string;
-    width: number;
-    height: number;
-    fileSize: number;
+	success: true;
+	imageBuffer: Buffer;
+	imageBase64: string;
+	imageUrl: string;
+	width: number;
+	height: number;
+	fileSize: number;
 }
 
 // Failure
 interface ScreenshotResult {
-    success: false;
-    error: string;
+	success: false;
+	error: string;
 }
 ```
 
@@ -213,6 +215,7 @@ private buildOptions(options: ScreenshotOptions, settings: ScreenshotOneSettings
 ### Credential Validation
 
 The `validateCredentials()` method:
+
 1. Retrieves settings from the plugin context
 2. Checks that `accessKey` is configured
 3. Creates a client and generates a test URL for `https://example.com`
@@ -258,17 +261,17 @@ const plugin = new ScreenshotOnePlugin();
 await plugin.onLoad(context);
 
 const result = await plugin.capture({
-    url: 'https://example.com',
-    viewportWidth: 1440,
-    viewportHeight: 900,
-    format: 'webp',
-    blockAds: true,
-    settings: { accessKey: 'key', secretKey: 'secret' }
+	url: 'https://example.com',
+	viewportWidth: 1440,
+	viewportHeight: 900,
+	format: 'webp',
+	blockAds: true,
+	settings: { accessKey: 'key', secretKey: 'secret' }
 });
 
 if (result.success) {
-    console.log(`Image size: ${result.fileSize} bytes`);
-    console.log(`Dimensions: ${result.width}x${result.height}`);
+	console.log(`Image size: ${result.fileSize} bytes`);
+	console.log(`Dimensions: ${result.width}x${result.height}`);
 }
 ```
 
@@ -276,9 +279,9 @@ if (result.success) {
 
 ```typescript
 const url = await plugin.getScreenshotUrl({
-    url: 'https://example.com',
-    format: 'png',
-    settings: { accessKey: 'key', secretKey: 'secret' }
+	url: 'https://example.com',
+	format: 'png',
+	settings: { accessKey: 'key', secretKey: 'secret' }
 });
 // Returns signed URL like: https://api.screenshotone.com/take?...&signature=...
 ```
@@ -287,12 +290,12 @@ const url = await plugin.getScreenshotUrl({
 
 ### Capture Errors
 
-| Error | Cause | Handling |
-|-------|-------|---------|
-| `Access key not configured` | Missing `accessKey` | Returns `{ success: false, error: '...' }` |
-| `Render failed with status X` | API returned error | Logs error, returns failure result |
-| `Network error` | API unreachable | Caught, logged, returns failure result |
-| `Invalid URL` | Malformed target URL | API returns error status |
+| Error                         | Cause                | Handling                                   |
+| ----------------------------- | -------------------- | ------------------------------------------ |
+| `Access key not configured`   | Missing `accessKey`  | Returns `{ success: false, error: '...' }` |
+| `Render failed with status X` | API returned error   | Logs error, returns failure result         |
+| `Network error`               | API unreachable      | Caught, logged, returns failure result     |
+| `Invalid URL`                 | Malformed target URL | API returns error status                   |
 
 ### Graceful Failure
 

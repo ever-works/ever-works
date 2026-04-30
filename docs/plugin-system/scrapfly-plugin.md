@@ -1,7 +1,7 @@
 ---
 id: scrapfly-plugin
-title: "Scrapfly Plugin"
-sidebar_label: "Scrapfly"
+title: 'Scrapfly Plugin'
+sidebar_label: 'Scrapfly'
 sidebar_position: 31
 ---
 
@@ -13,17 +13,17 @@ The Scrapfly plugin provides both screenshot capture and content extraction capa
 
 ## Overview
 
-| Property | Value |
-|---|---|
-| Plugin ID | `scrapfly` |
-| Package | `@ever-works/scrapfly-plugin` |
-| Category | `content-extractor` |
-| Capabilities | `screenshot`, `content-extractor` |
-| Version | `1.0.0` |
-| Configuration Mode | `hybrid` |
-| Auto-enable | No |
-| Built-in | Yes |
-| System Plugin | No |
+| Property           | Value                             |
+| ------------------ | --------------------------------- |
+| Plugin ID          | `scrapfly`                        |
+| Package            | `@ever-works/scrapfly-plugin`     |
+| Category           | `content-extractor`               |
+| Capabilities       | `screenshot`, `content-extractor` |
+| Version            | `1.0.0`                           |
+| Configuration Mode | `hybrid`                          |
+| Auto-enable        | No                                |
+| Built-in           | Yes                               |
+| System Plugin      | No                                |
 
 The plugin implements three interfaces: `IPlugin`, `IScreenshotPlugin`, and `IContentExtractorPlugin`. This dual-capability design means a single plugin and API key can serve both screenshot and content extraction needs.
 
@@ -48,14 +48,14 @@ graph TD
 
 ### Settings Schema
 
-| Setting | Type | Required | Scope | Description |
-|---|---|---|---|---|
-| `apiKey` | `string` | Yes | `user` | Scrapfly API key. Secret. Env: `PLUGIN_SCRAPFLY_API_KEY` |
+| Setting  | Type     | Required | Scope  | Description                                              |
+| -------- | -------- | -------- | ------ | -------------------------------------------------------- |
+| `apiKey` | `string` | Yes      | `user` | Scrapfly API key. Secret. Env: `PLUGIN_SCRAPFLY_API_KEY` |
 
 ### Environment Variables
 
-| Variable | Description |
-|---|---|
+| Variable                  | Description                                                       |
+| ------------------------- | ----------------------------------------------------------------- |
 | `PLUGIN_SCRAPFLY_API_KEY` | Scrapfly API key (optional -- can be set via admin/user settings) |
 
 ## Screenshot Capability
@@ -66,19 +66,19 @@ The `capture()` method takes a URL and returns a full-page screenshot:
 
 ```typescript
 const result = await scrapflyPlugin.capture({
-    url: 'https://example.com',
-    viewportWidth: 1280,
-    viewportHeight: 800,
-    delay: 2000,                    // Wait 2s before capture
-    waitForSelector: '.content',    // Wait for element
-    settings: { apiKey: 'your-key' }
+	url: 'https://example.com',
+	viewportWidth: 1280,
+	viewportHeight: 800,
+	delay: 2000, // Wait 2s before capture
+	waitForSelector: '.content', // Wait for element
+	settings: { apiKey: 'your-key' }
 });
 
 if (result.success) {
-    console.log(result.imageUrl);   // Screenshot URL
-    console.log(result.width);      // Viewport width
-    console.log(result.height);     // Viewport height
-    console.log(result.fileSize);   // File size in bytes
+	console.log(result.imageUrl); // Screenshot URL
+	console.log(result.width); // Viewport width
+	console.log(result.height); // Viewport height
+	console.log(result.fileSize); // File size in bytes
 }
 ```
 
@@ -86,13 +86,13 @@ if (result.success) {
 
 The plugin configures Scrapfly's `ScrapeConfig` with these settings:
 
-| Parameter | Value | Description |
-|---|---|---|
-| `render_js` | `true` | JavaScript rendering enabled |
-| `rendering_wait` | From `options.delay` | Wait time before screenshot |
-| `wait_for_selector` | From `options.waitForSelector` | CSS selector to wait for |
-| `screenshots` | `{ main: 'fullpage' }` | Full-page screenshot |
-| `country` | `'us'` | Request from US proxies |
+| Parameter           | Value                          | Description                  |
+| ------------------- | ------------------------------ | ---------------------------- |
+| `render_js`         | `true`                         | JavaScript rendering enabled |
+| `rendering_wait`    | From `options.delay`           | Wait time before screenshot  |
+| `wait_for_selector` | From `options.waitForSelector` | CSS selector to wait for     |
+| `screenshots`       | `{ main: 'fullpage' }`         | Full-page screenshot         |
+| `country`           | `'us'`                         | Request from US proxies      |
 
 ### Maximum Dimensions
 
@@ -110,28 +110,28 @@ The `extract()` method scrapes a URL and returns markdown content:
 
 ```typescript
 const result = await scrapflyPlugin.extract({
-    url: 'https://example.com/article',
-    waitForJs: true,     // Enable JS rendering (default: true)
-    settings: { apiKey: 'your-key' }
+	url: 'https://example.com/article',
+	waitForJs: true, // Enable JS rendering (default: true)
+	settings: { apiKey: 'your-key' }
 });
 
 if (result.success) {
-    console.log(result.content);      // Raw content
-    console.log(result.markdown);     // Markdown formatted
-    console.log(result.wordCount);    // Word count
-    console.log(result.readingTime);  // Estimated reading time (minutes)
-    console.log(result.duration);     // Extraction time (ms)
+	console.log(result.content); // Raw content
+	console.log(result.markdown); // Markdown formatted
+	console.log(result.wordCount); // Word count
+	console.log(result.readingTime); // Estimated reading time (minutes)
+	console.log(result.duration); // Extraction time (ms)
 }
 ```
 
 ### Extraction Configuration
 
-| Parameter | Value | Description |
-|---|---|---|
+| Parameter   | Value                    | Description                          |
+| ----------- | ------------------------ | ------------------------------------ |
 | `render_js` | From `options.waitForJs` | JavaScript rendering (default: true) |
-| `asp` | `true` | Anti-Scraping Protection bypass |
-| `format` | `'markdown'` | Output as markdown |
-| `country` | `'us'` | Request from US proxies |
+| `asp`       | `true`                   | Anti-Scraping Protection bypass      |
+| `format`    | `'markdown'`             | Output as markdown                   |
+| `country`   | `'us'`                   | Request from US proxies              |
 
 ### Batch Extraction
 
@@ -139,8 +139,8 @@ The plugin supports batch extraction with concurrency control:
 
 ```typescript
 const results = await scrapflyPlugin.extractBatch(
-    ['https://example.com/page1', 'https://example.com/page2', 'https://example.com/page3'],
-    { settings: { apiKey: 'your-key' } }
+	['https://example.com/page1', 'https://example.com/page2', 'https://example.com/page3'],
+	{ settings: { apiKey: 'your-key' } }
 );
 ```
 
@@ -178,14 +178,14 @@ Only HTTP and HTTPS URLs are supported.
 
 ## Key Features
 
-| Feature | Description |
-|---|---|
-| Anti-Bot Bypass | Handles CAPTCHAs, JavaScript challenges, and bot detection |
-| JavaScript Rendering | Full browser rendering for SPAs and dynamic content |
-| Full-Page Screenshots | Captures entire page, not just viewport |
-| Markdown Output | Content extracted directly as markdown |
-| Global Proxy Network | Access region-locked content from any country |
-| Concurrent Batching | Process multiple URLs in parallel batches |
+| Feature               | Description                                                |
+| --------------------- | ---------------------------------------------------------- |
+| Anti-Bot Bypass       | Handles CAPTCHAs, JavaScript challenges, and bot detection |
+| JavaScript Rendering  | Full browser rendering for SPAs and dynamic content        |
+| Full-Page Screenshots | Captures entire page, not just viewport                    |
+| Markdown Output       | Content extracted directly as markdown                     |
+| Global Proxy Network  | Access region-locked content from any country              |
+| Concurrent Batching   | Process multiple URLs in parallel batches                  |
 
 ## Lifecycle
 
@@ -217,9 +217,9 @@ Note that a new `ScrapflyClient` is created for each operation, using the API ke
 
 ## Dependencies
 
-| Package | Version | Purpose |
-|---|---|---|
-| `scrapfly-sdk` | ^0.7.3 | Official Scrapfly SDK |
+| Package              | Version   | Purpose                            |
+| -------------------- | --------- | ---------------------------------- |
+| `scrapfly-sdk`       | ^0.7.3    | Official Scrapfly SDK              |
 | `@ever-works/plugin` | workspace | Plugin contracts (peer dependency) |
 
 ## How It Works in Ever Works

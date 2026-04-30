@@ -102,30 +102,30 @@ flowchart TD
 
 The `getResolvedSettings()` method merges settings from multiple scopes:
 
-| Priority | Source | Description |
-|----------|--------|-------------|
-| 1 (highest) | Directory settings | Per-directory plugin configuration |
-| 2 | User settings | Per-user plugin configuration |
-| 3 | Admin settings | Global admin configuration |
-| 4 | Environment variables | `x-envVar` annotated schema fields |
-| 5 (lowest) | Plugin defaults | `default` values from settings schema |
+| Priority    | Source                | Description                           |
+| ----------- | --------------------- | ------------------------------------- |
+| 1 (highest) | Directory settings    | Per-directory plugin configuration    |
+| 2           | User settings         | Per-user plugin configuration         |
+| 3           | Admin settings        | Global admin configuration            |
+| 4           | Environment variables | `x-envVar` annotated schema fields    |
+| 5 (lowest)  | Plugin defaults       | `default` values from settings schema |
 
 ### Helper Methods
 
-| Method | Description |
-|--------|-------------|
-| `getSettingTyped<T>(settings, key)` | Type-safe setting retrieval |
-| `getSettingRequired(settings, key)` | Throws if setting is missing |
-| `getSettingWithDefault(settings, key, defaultValue)` | Returns default if missing |
-| `isConfigured()` | Returns `true` if at least one loaded plugin has the capability |
+| Method                                               | Description                                                     |
+| ---------------------------------------------------- | --------------------------------------------------------------- |
+| `getSettingTyped<T>(settings, key)`                  | Type-safe setting retrieval                                     |
+| `getSettingRequired(settings, key)`                  | Throws if setting is missing                                    |
+| `getSettingWithDefault(settings, key, defaultValue)` | Returns default if missing                                      |
+| `isConfigured()`                                     | Returns `true` if at least one loaded plugin has the capability |
 
 ### Error Classes
 
-| Class | Description |
-|-------|-------------|
-| `FacadeError` | Base error with `operation` and `provider` context |
-| `NoProviderError` | No plugin found for the required capability |
-| `ProviderNotFoundError` | A specific plugin ID was requested but not found |
+| Class                   | Description                                        |
+| ----------------------- | -------------------------------------------------- |
+| `FacadeError`           | Base error with `operation` and `provider` context |
+| `NoProviderError`       | No plugin found for the required capability        |
+| `ProviderNotFoundError` | A specific plugin ID was requested but not found   |
 
 ## Facade Services
 
@@ -135,19 +135,19 @@ The primary interface for all AI operations. Implements `IAiFacade`.
 
 **Key methods**:
 
-| Method | Description |
-|--------|-------------|
-| `askJson(prompt, schema, options, facadeOptions)` | Sends a prompt and validates the response against a Zod schema. Supports retry with auto-escalation to more capable models. |
-| `createChatCompletion(messages, options, facadeOptions)` | Standard chat completion with configurable model, temperature, and max tokens. |
-| `streamChatCompletion(messages, options, facadeOptions)` | Returns an async iterable of streaming chunks. |
+| Method                                                   | Description                                                                                                                 |
+| -------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| `askJson(prompt, schema, options, facadeOptions)`        | Sends a prompt and validates the response against a Zod schema. Supports retry with auto-escalation to more capable models. |
+| `createChatCompletion(messages, options, facadeOptions)` | Standard chat completion with configurable model, temperature, and max tokens.                                              |
+| `streamChatCompletion(messages, options, facadeOptions)` | Returns an async iterable of streaming chunks.                                                                              |
 
 **Model routing**: The facade supports complexity-based model selection:
 
-| Complexity | Typical Models | Use Case |
-|------------|---------------|----------|
-| `simple` | GPT-4o-mini, Claude Haiku | Fast, cheap tasks (classification, extraction) |
-| `medium` | GPT-4o, Claude Sonnet | Standard generation tasks |
-| `complex` | GPT-4o (latest), Claude Opus | Complex reasoning, long context |
+| Complexity | Typical Models               | Use Case                                       |
+| ---------- | ---------------------------- | ---------------------------------------------- |
+| `simple`   | GPT-4o-mini, Claude Haiku    | Fast, cheap tasks (classification, extraction) |
+| `medium`   | GPT-4o, Claude Sonnet        | Standard generation tasks                      |
+| `complex`  | GPT-4o (latest), Claude Opus | Complex reasoning, long context                |
 
 **Auto-escalation**: If `askJson` fails validation with the initial model, it automatically retries with the next complexity tier. This handles cases where simpler models produce malformed JSON.
 
@@ -164,16 +164,16 @@ Wraps all git operations with dual authentication support.
 
 **Key methods**:
 
-| Method | Description |
-|--------|-------------|
-| `clone(options, facadeOptions)` | Clones a repository with authentication |
-| `push(options, facadeOptions)` | Pushes commits with auth headers |
-| `createBranch(repo, branch, facadeOptions)` | Creates a new branch |
-| `createPullRequest(options, facadeOptions)` | Opens a PR via the git provider API |
-| `getDefaultBranch(owner, repo, facadeOptions)` | Fetches the default branch name |
-| `createRepository(options, facadeOptions)` | Creates a new repository |
-| `deleteRepository(owner, repo, facadeOptions)` | Deletes a repository |
-| `getFileContent(owner, repo, path, facadeOptions)` | Reads a single file from the repo |
+| Method                                             | Description                             |
+| -------------------------------------------------- | --------------------------------------- |
+| `clone(options, facadeOptions)`                    | Clones a repository with authentication |
+| `push(options, facadeOptions)`                     | Pushes commits with auth headers        |
+| `createBranch(repo, branch, facadeOptions)`        | Creates a new branch                    |
+| `createPullRequest(options, facadeOptions)`        | Opens a PR via the git provider API     |
+| `getDefaultBranch(owner, repo, facadeOptions)`     | Fetches the default branch name         |
+| `createRepository(options, facadeOptions)`         | Creates a new repository                |
+| `deleteRepository(owner, repo, facadeOptions)`     | Deletes a repository                    |
+| `getFileContent(owner, repo, path, facadeOptions)` | Reads a single file from the repo       |
 
 ### DeployFacadeService
 
@@ -181,14 +181,14 @@ Manages deployment operations and custom domain lifecycle.
 
 **Key methods**:
 
-| Method | Description |
-|--------|-------------|
-| `createProject(options, facadeOptions)` | Creates a new deployment project |
-| `deploy(options, facadeOptions)` | Triggers a deployment |
-| `getDeploymentStatus(projectId, facadeOptions)` | Polls deployment state |
-| `addDomain(options, facadeOptions)` | Adds a custom domain (syncs DB + provider) |
-| `removeDomain(options, facadeOptions)` | Removes a custom domain |
-| `verifyDomain(options, facadeOptions)` | Verifies domain DNS configuration |
+| Method                                          | Description                                |
+| ----------------------------------------------- | ------------------------------------------ |
+| `createProject(options, facadeOptions)`         | Creates a new deployment project           |
+| `deploy(options, facadeOptions)`                | Triggers a deployment                      |
+| `getDeploymentStatus(projectId, facadeOptions)` | Polls deployment state                     |
+| `addDomain(options, facadeOptions)`             | Adds a custom domain (syncs DB + provider) |
+| `removeDomain(options, facadeOptions)`          | Removes a custom domain                    |
+| `verifyDomain(options, facadeOptions)`          | Verifies domain DNS configuration          |
 
 **Domain management**: The facade uses the database `DirectoryCustomDomain` entity as the source of truth for domain state. When adding/removing domains, it synchronizes both the database record and the deployment provider (e.g., Vercel).
 
@@ -198,9 +198,9 @@ Web search abstraction over search plugins (Exa, Tavily, SerpAPI, Brave).
 
 ```typescript
 const results = await searchFacade.search(
-    'best React component libraries 2025',
-    { maxResults: 10, includeDomains: ['github.com'] },
-    { userId, directoryId },
+	'best React component libraries 2025',
+	{ maxResults: 10, includeDomains: ['github.com'] },
+	{ userId, directoryId }
 );
 // Returns: SearchFacadeResult[] with title, url, score, publishedDate
 ```
@@ -211,12 +211,12 @@ Captures webpage screenshots via screenshot plugins (ScreenshotOne, Urlbox).
 
 **Key methods**:
 
-| Method | Description |
-|--------|-------------|
-| `capture(options, facadeOptions)` | Full screenshot capture with viewport, format, and blocking options |
-| `getSmartImage(options, facadeOptions)` | Simplified screenshot for directory item images (1280x800, PNG, ad-blocked) |
-| `getScreenshotUrl(options, facadeOptions)` | Returns a URL to the screenshot without downloading |
-| `isAvailable()` | Checks if any screenshot plugin is configured |
+| Method                                     | Description                                                                 |
+| ------------------------------------------ | --------------------------------------------------------------------------- |
+| `capture(options, facadeOptions)`          | Full screenshot capture with viewport, format, and blocking options         |
+| `getSmartImage(options, facadeOptions)`    | Simplified screenshot for directory item images (1280x800, PNG, ad-blocked) |
+| `getScreenshotUrl(options, facadeOptions)` | Returns a URL to the screenshot without downloading                         |
+| `isAvailable()`                            | Checks if any screenshot plugin is configured                               |
 
 ### ContentExtractorFacadeService
 
@@ -247,12 +247,12 @@ The `queryAll()` method queries all enabled data source plugins and merges their
 
 Manages OAuth authentication flows with external providers.
 
-| Method | Description |
-|--------|-------------|
-| `getAuthorizationUrl(provider, options)` | Generates the OAuth authorization URL |
-| `exchangeCode(provider, code, options)` | Exchanges authorization code for tokens |
-| `validateCredentials(provider, facadeOptions)` | Tests if stored credentials are valid |
-| `revokeToken(provider, facadeOptions)` | Revokes stored OAuth tokens |
+| Method                                         | Description                             |
+| ---------------------------------------------- | --------------------------------------- |
+| `getAuthorizationUrl(provider, options)`       | Generates the OAuth authorization URL   |
+| `exchangeCode(provider, code, options)`        | Exchanges authorization code for tokens |
+| `validateCredentials(provider, facadeOptions)` | Tests if stored credentials are valid   |
+| `revokeToken(provider, facadeOptions)`         | Revokes stored OAuth tokens             |
 
 ## FacadesModule
 
@@ -260,18 +260,20 @@ The NestJS module that registers all facade services:
 
 ```typescript
 @Module({
-    imports: [PluginsModule, DatabaseModule],
-    providers: [
-        AiFacadeService,
-        GitFacadeService,
-        DeployFacadeService,
-        SearchFacadeService,
-        ScreenshotFacadeService,
-        ContentExtractorFacadeService,
-        DataSourceFacadeService,
-        OAuthFacadeService,
-    ],
-    exports: [/* all facade services */],
+	imports: [PluginsModule, DatabaseModule],
+	providers: [
+		AiFacadeService,
+		GitFacadeService,
+		DeployFacadeService,
+		SearchFacadeService,
+		ScreenshotFacadeService,
+		ContentExtractorFacadeService,
+		DataSourceFacadeService,
+		OAuthFacadeService
+	],
+	exports: [
+		/* all facade services */
+	]
 })
 export class FacadesModule {}
 ```
@@ -285,17 +287,17 @@ import { AiFacadeService } from '@ever-works/agent/facades';
 
 @Injectable()
 export class ItemGeneratorService {
-    constructor(private readonly aiFacade: AiFacadeService) {}
+	constructor(private readonly aiFacade: AiFacadeService) {}
 
-    async generateDescription(item: Item, userId: string, directoryId: string) {
-        const result = await this.aiFacade.askJson(
-            `Generate a description for: ${item.name}`,
-            descriptionSchema,  // Zod schema
-            { complexity: 'simple' },
-            { userId, directoryId },
-        );
-        return result;
-    }
+	async generateDescription(item: Item, userId: string, directoryId: string) {
+		const result = await this.aiFacade.askJson(
+			`Generate a description for: ${item.name}`,
+			descriptionSchema, // Zod schema
+			{ complexity: 'simple' },
+			{ userId, directoryId }
+		);
+		return result;
+	}
 }
 ```
 
@@ -305,9 +307,9 @@ Every facade method accepts a `FacadeOptions` object as its last parameter:
 
 ```typescript
 interface FacadeOptions {
-    userId?: string;        // For user-level settings resolution
-    directoryId?: string;   // For directory-level settings resolution
-    providerOverride?: string; // Force a specific plugin by ID
+	userId?: string; // For user-level settings resolution
+	directoryId?: string; // For directory-level settings resolution
+	providerOverride?: string; // Force a specific plugin by ID
 }
 ```
 

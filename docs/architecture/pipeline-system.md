@@ -48,10 +48,10 @@ The main entry point for all pipeline execution. It resolves the correct pipelin
 
 **Execution mode routing:**
 
-| Mode | Condition | Executor |
-|------|-----------|----------|
+| Mode   | Condition                                        | Executor                      |
+| ------ | ------------------------------------------------ | ----------------------------- |
 | `step` | Plugin implements `isStepOrchestratablePipeline` | `StepPipelineExecutorService` |
-| `full` | Plugin is self-managed (e.g., Claude Code) | `FullPipelineExecutorService` |
+| `full` | Plugin is self-managed (e.g., Claude Code)       | `FullPipelineExecutorService` |
 
 **Plugin resolution priority:**
 
@@ -87,14 +87,14 @@ Compiles an `ExecutablePipeline` from a pipeline plugin's step definitions and m
 
 **Step position types supported by modifier plugins:**
 
-| Position Type | Behavior |
-|---------------|----------|
-| `replace` | Replace an existing step entirely |
-| `before` | Inject a new step before a target step |
-| `after` | Inject a new step after a target step |
-| `disable` | Remove a step from the pipeline |
-| `first` | Prepend a step to the beginning |
-| `last` | Append a step to the end |
+| Position Type | Behavior                               |
+| ------------- | -------------------------------------- |
+| `replace`     | Replace an existing step entirely      |
+| `before`      | Inject a new step before a target step |
+| `after`       | Inject a new step after a target step  |
+| `disable`     | Remove a step from the pipeline        |
+| `first`       | Prepend a step to the beginning        |
+| `last`        | Append a step to the end               |
 
 **Error classes:**
 
@@ -158,6 +158,7 @@ createStepExecutionContext(
 ```
 
 The returned `StepExecutionContext` includes:
+
 - `aiFacade` -- Bound AI facade (askJson, chat completion, streaming)
 - `searchFacade` -- Bound web search facade
 - `screenshotFacade` -- Bound screenshot capture facade
@@ -175,13 +176,13 @@ The `StepPipelineExecutorService` persists checkpoint data after each successful
 
 ```typescript
 interface CheckpointData {
-    stepIndex: number;        // Index of last completed step
-    stepName: string;         // Name of last completed step
-    pipelineId: string;       // Pipeline plugin ID
-    timestamp: string;        // ISO timestamp
-    context: unknown;         // Serialized pipeline context (via plugin.contextToSnapshot)
-    completedSteps: string[]; // IDs of all completed steps
-    schemaVersion: number;    // Currently version 4
+	stepIndex: number; // Index of last completed step
+	stepName: string; // Name of last completed step
+	pipelineId: string; // Pipeline plugin ID
+	timestamp: string; // ISO timestamp
+	context: unknown; // Serialized pipeline context (via plugin.contextToSnapshot)
+	completedSteps: string[]; // IDs of all completed steps
+	schemaVersion: number; // Currently version 4
 }
 ```
 
@@ -195,36 +196,36 @@ interface CheckpointData {
 
 The `validatePipelineResult()` function validates that plugin-returned results conform to the `PipelineResult` interface:
 
-| Field | Type | Required |
-|-------|------|----------|
-| `success` | `boolean` | Yes |
-| `outputs.items` | `array` | Yes |
-| `outputs.categories` | `array` | Yes |
-| `outputs.tags` | `array` | Yes |
-| `outputs.collections` | `array` | Yes |
-| `outputs.brands` | `array` | Yes |
-| `stepsCompleted` | `number` | Yes |
-| `totalSteps` | `number` | Yes |
-| `duration` | `number` | Yes |
-| `state.isRunning` | `boolean` | Yes (if state present) |
-| `state.isCancelled` | `boolean` | Yes (if state present) |
-| `state.completedSteps` | `array` | Yes (if state present) |
-| `state.failedSteps` | `array` | Yes (if state present) |
+| Field                  | Type      | Required               |
+| ---------------------- | --------- | ---------------------- |
+| `success`              | `boolean` | Yes                    |
+| `outputs.items`        | `array`   | Yes                    |
+| `outputs.categories`   | `array`   | Yes                    |
+| `outputs.tags`         | `array`   | Yes                    |
+| `outputs.collections`  | `array`   | Yes                    |
+| `outputs.brands`       | `array`   | Yes                    |
+| `stepsCompleted`       | `number`  | Yes                    |
+| `totalSteps`           | `number`  | Yes                    |
+| `duration`             | `number`  | Yes                    |
+| `state.isRunning`      | `boolean` | Yes (if state present) |
+| `state.isCancelled`    | `boolean` | Yes (if state present) |
+| `state.completedSteps` | `array`   | Yes (if state present) |
+| `state.failedSteps`    | `array`   | Yes (if state present) |
 
 ## Pipeline Events
 
 The pipeline system emits events at each stage of execution:
 
-| Event | Payload | Emitted When |
-|-------|---------|-------------|
-| `pipeline:started` | `PipelineEventPayload` | Pipeline execution begins |
-| `pipeline:step-started` | `PipelineStepEventPayload` | A step begins executing |
-| `pipeline:step-completed` | `PipelineStepCompletedPayload` | A step completes successfully |
-| `pipeline:step-failed` | `PipelineStepFailedPayload` | A step fails (includes recoverability) |
-| `pipeline:step-skipped` | `PipelineStepEventPayload` | A step is skipped |
-| `pipeline:completed` | `PipelineCompletedPayload` | Pipeline finishes successfully |
-| `pipeline:failed` | `PipelineFailedPayload` | Pipeline fails |
-| `pipeline:cancelled` | `PipelineEventPayload` | Pipeline is cancelled via AbortSignal |
+| Event                     | Payload                        | Emitted When                           |
+| ------------------------- | ------------------------------ | -------------------------------------- |
+| `pipeline:started`        | `PipelineEventPayload`         | Pipeline execution begins              |
+| `pipeline:step-started`   | `PipelineStepEventPayload`     | A step begins executing                |
+| `pipeline:step-completed` | `PipelineStepCompletedPayload` | A step completes successfully          |
+| `pipeline:step-failed`    | `PipelineStepFailedPayload`    | A step fails (includes recoverability) |
+| `pipeline:step-skipped`   | `PipelineStepEventPayload`     | A step is skipped                      |
+| `pipeline:completed`      | `PipelineCompletedPayload`     | Pipeline finishes successfully         |
+| `pipeline:failed`         | `PipelineFailedPayload`        | Pipeline fails                         |
+| `pipeline:cancelled`      | `PipelineEventPayload`         | Pipeline is cancelled via AbortSignal  |
 
 ## NestJS Module
 
@@ -232,15 +233,17 @@ The `PipelineModule` registers all pipeline services and imports:
 
 ```typescript
 @Module({
-    imports: [FacadesModule, EventEmitterModule.forRoot()],
-    providers: [
-        PipelineBuilderService,
-        StepPipelineExecutorService,
-        FullPipelineExecutorService,
-        PipelineOrchestratorService,
-        PipelineFacadeService,
-    ],
-    exports: [/* all providers */],
+	imports: [FacadesModule, EventEmitterModule.forRoot()],
+	providers: [
+		PipelineBuilderService,
+		StepPipelineExecutorService,
+		FullPipelineExecutorService,
+		PipelineOrchestratorService,
+		PipelineFacadeService
+	],
+	exports: [
+		/* all providers */
+	]
 })
 export class PipelineModule {}
 ```

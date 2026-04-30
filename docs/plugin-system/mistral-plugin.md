@@ -1,7 +1,7 @@
 ---
 id: mistral-plugin
-title: "Mistral Plugin"
-sidebar_label: "Mistral"
+title: 'Mistral Plugin'
+sidebar_label: 'Mistral'
 sidebar_position: 28
 ---
 
@@ -13,18 +13,18 @@ The Mistral plugin connects Ever Works to Mistral AI's API, providing access to 
 
 ## Overview
 
-| Property | Value |
-|---|---|
-| Plugin ID | `mistral` |
-| Package | `@ever-works/mistral-plugin` |
-| Category | `ai-provider` |
-| Capabilities | `ai-provider` |
-| Version | `1.0.0` |
-| Configuration Mode | `user-required` |
-| Provider Type | `mistral` |
-| Auto-enable | No |
-| Built-in | Yes |
-| Visibility | `public` |
+| Property           | Value                        |
+| ------------------ | ---------------------------- |
+| Plugin ID          | `mistral`                    |
+| Package            | `@ever-works/mistral-plugin` |
+| Category           | `ai-provider`                |
+| Capabilities       | `ai-provider`                |
+| Version            | `1.0.0`                      |
+| Configuration Mode | `user-required`              |
+| Provider Type      | `mistral`                    |
+| Auto-enable        | No                           |
+| Built-in           | Yes                          |
+| Visibility         | `public`                     |
 
 The plugin extends `BaseAiProvider` from `@ever-works/plugin/abstract` and creates an `AiOperations` instance configured with `providerType: 'mistral'` to handle all AI operations through the unified LangChain-based abstraction.
 
@@ -45,16 +45,16 @@ Mistral's API is OpenAI-compatible, so the plugin uses the same LangChain OpenAI
 
 ### Settings Schema
 
-| Setting | Type | Required | Default | Scope | Widget | Description |
-|---|---|---|---|---|---|---|
-| `apiKey` | `string` | Yes | -- | `user` | -- | Mistral API key. Secret. Env: `PLUGIN_MISTRAL_API_KEY` |
-| `defaultModel` | `string` | Yes | `mistral-small-latest` | `global` | `model-select` | Default model for all AI tasks. Env: `PLUGIN_MISTRAL_DEFAULT_MODEL` |
-| `simpleModel` | `string` | No | `mistral-small-latest` | `global` | `model-select` | Model for tags, descriptions, classifications. |
-| `mediumModel` | `string` | No | `mistral-medium-latest` | `global` | `model-select` | Model for listings, summaries, reformatting. |
-| `complexModel` | `string` | No | `mistral-large-latest` | `global` | `model-select` | Model for full page generation, multi-step analysis. |
-| `temperature` | `number` | No | `0.7` | -- | -- | Sampling temperature (0--2). Hidden. |
-| `maxTokens` | `number` | No | `4096` | -- | -- | Max tokens per response. Hidden. |
-| `baseUrl` | `string` | No | `https://api.mistral.ai/v1` | -- | -- | API endpoint. Hidden. Env: `PLUGIN_MISTRAL_BASE_URL` |
+| Setting        | Type     | Required | Default                     | Scope    | Widget         | Description                                                         |
+| -------------- | -------- | -------- | --------------------------- | -------- | -------------- | ------------------------------------------------------------------- |
+| `apiKey`       | `string` | Yes      | --                          | `user`   | --             | Mistral API key. Secret. Env: `PLUGIN_MISTRAL_API_KEY`              |
+| `defaultModel` | `string` | Yes      | `mistral-small-latest`      | `global` | `model-select` | Default model for all AI tasks. Env: `PLUGIN_MISTRAL_DEFAULT_MODEL` |
+| `simpleModel`  | `string` | No       | `mistral-small-latest`      | `global` | `model-select` | Model for tags, descriptions, classifications.                      |
+| `mediumModel`  | `string` | No       | `mistral-medium-latest`     | `global` | `model-select` | Model for listings, summaries, reformatting.                        |
+| `complexModel` | `string` | No       | `mistral-large-latest`      | `global` | `model-select` | Model for full page generation, multi-step analysis.                |
+| `temperature`  | `number` | No       | `0.7`                       | --       | --             | Sampling temperature (0--2). Hidden.                                |
+| `maxTokens`    | `number` | No       | `4096`                      | --       | --             | Max tokens per response. Hidden.                                    |
+| `baseUrl`      | `string` | No       | `https://api.mistral.ai/v1` | --       | --             | API endpoint. Hidden. Env: `PLUGIN_MISTRAL_BASE_URL`                |
 
 ### Model Tiers
 
@@ -69,33 +69,33 @@ graph LR
     end
 ```
 
-| Tier | Default Model | Use Cases |
-|---|---|---|
-| Simple | `mistral-small-latest` | Tags, short descriptions, quick classifications |
-| Standard | `mistral-medium-latest` | Listings, summaries, content reformatting |
-| Complex | `mistral-large-latest` | Full page generation, multi-step analysis |
+| Tier     | Default Model           | Use Cases                                       |
+| -------- | ----------------------- | ----------------------------------------------- |
+| Simple   | `mistral-small-latest`  | Tags, short descriptions, quick classifications |
+| Standard | `mistral-medium-latest` | Listings, summaries, content reformatting       |
+| Complex  | `mistral-large-latest`  | Full page generation, multi-step analysis       |
 
 ### Environment Variables
 
-| Variable | Description |
-|---|---|
-| `PLUGIN_MISTRAL_API_KEY` | Mistral API key (overrides UI setting) |
-| `PLUGIN_MISTRAL_DEFAULT_MODEL` | Default model ID |
-| `PLUGIN_MISTRAL_SIMPLE_MODEL` | Simple tier model ID |
-| `PLUGIN_MISTRAL_MEDIUM_MODEL` | Medium tier model ID |
-| `PLUGIN_MISTRAL_COMPLEX_MODEL` | Complex tier model ID |
-| `PLUGIN_MISTRAL_BASE_URL` | Custom API endpoint |
+| Variable                       | Description                            |
+| ------------------------------ | -------------------------------------- |
+| `PLUGIN_MISTRAL_API_KEY`       | Mistral API key (overrides UI setting) |
+| `PLUGIN_MISTRAL_DEFAULT_MODEL` | Default model ID                       |
+| `PLUGIN_MISTRAL_SIMPLE_MODEL`  | Simple tier model ID                   |
+| `PLUGIN_MISTRAL_MEDIUM_MODEL`  | Medium tier model ID                   |
+| `PLUGIN_MISTRAL_COMPLEX_MODEL` | Complex tier model ID                  |
+| `PLUGIN_MISTRAL_BASE_URL`      | Custom API endpoint                    |
 
 ## Capabilities
 
 The `getCapabilities()` method reports the following:
 
-| Capability | Supported |
-|---|---|
-| Structured Output | Yes |
-| Streaming | Yes |
-| Tool Calling | Yes |
-| Vision | Yes |
+| Capability         | Supported      |
+| ------------------ | -------------- |
+| Structured Output  | Yes            |
+| Streaming          | Yes            |
+| Tool Calling       | Yes            |
+| Vision             | Yes            |
 | Max Context Length | 128,000 tokens |
 
 ### Supported Operations
@@ -103,31 +103,31 @@ The `getCapabilities()` method reports the following:
 ```typescript
 // Chat completion
 const response = await mistralPlugin.createChatCompletion({
-  messages: [{ role: 'user', content: 'Describe this restaurant' }],
-  settings: { apiKey: 'your-key' }
+	messages: [{ role: 'user', content: 'Describe this restaurant' }],
+	settings: { apiKey: 'your-key' }
 });
 
 // Streaming chat completion
 for await (const chunk of mistralPlugin.createStreamingChatCompletion({
-  messages: [{ role: 'user', content: 'Write a description' }],
-  settings: { apiKey: 'your-key' }
+	messages: [{ role: 'user', content: 'Write a description' }],
+	settings: { apiKey: 'your-key' }
 })) {
-  process.stdout.write(chunk.content ?? '');
+	process.stdout.write(chunk.content ?? '');
 }
 
 // Embeddings
 const embedding = await mistralPlugin.createEmbedding({
-  input: 'semantic search text'
+	input: 'semantic search text'
 });
 
 // Structured JSON output
 const result = await mistralPlugin.askJson('Generate categories', {
-  settings: { apiKey: 'your-key' }
+	settings: { apiKey: 'your-key' }
 });
 
 // List available models
 const models = await mistralPlugin.listModels({
-  apiKey: 'your-key'
+	apiKey: 'your-key'
 });
 ```
 
@@ -212,11 +212,11 @@ To verify actual API connectivity, use `isAvailable()` with a valid API key, whi
 
 ## Dependencies
 
-| Package | Version | Purpose |
-|---|---|---|
-| `@ever-works/plugin` | workspace | Plugin contracts and base classes |
-| `@langchain/openai` | ^0.6.17 | LangChain OpenAI-compatible provider |
-| `@langchain/core` | ^0.3.80 | LangChain core abstractions |
+| Package              | Version   | Purpose                              |
+| -------------------- | --------- | ------------------------------------ |
+| `@ever-works/plugin` | workspace | Plugin contracts and base classes    |
+| `@langchain/openai`  | ^0.6.17   | LangChain OpenAI-compatible provider |
+| `@langchain/core`    | ^0.3.80   | LangChain core abstractions          |
 
 ## Getting Started
 

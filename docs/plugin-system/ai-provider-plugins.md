@@ -23,33 +23,33 @@ import { BaseAiProvider } from '@ever-works/plugin/abstract';
 import { AiOperations } from '@ever-works/plugin/ai';
 
 export class MyProviderPlugin extends BaseAiProvider {
-  readonly id = 'my-provider';
-  readonly name = 'My Provider';
-  readonly version = '1.0.0';
-  readonly providerType = 'my-provider';
-  readonly providerName = 'My Provider';
+	readonly id = 'my-provider';
+	readonly name = 'My Provider';
+	readonly version = '1.0.0';
+	readonly providerType = 'my-provider';
+	readonly providerName = 'My Provider';
 
-  async onLoad(context: PluginContext): Promise<void> {
-    await super.onLoad(context);
-    this.aiOps = new AiOperations({
-      apiKey: '',
-      model: 'default-model',
-      temperature: 0.7,
-      providerType: 'my-provider'
-    });
-  }
+	async onLoad(context: PluginContext): Promise<void> {
+		await super.onLoad(context);
+		this.aiOps = new AiOperations({
+			apiKey: '',
+			model: 'default-model',
+			temperature: 0.7,
+			providerType: 'my-provider'
+		});
+	}
 
-  async createChatCompletion(options: ChatCompletionOptions) {
-    return this.aiOps!.createChatCompletion(options, this.resolveConfig(options.settings));
-  }
+	async createChatCompletion(options: ChatCompletionOptions) {
+		return this.aiOps!.createChatCompletion(options, this.resolveConfig(options.settings));
+	}
 
-  async listModels(settings?: PluginSettings) {
-    return this.aiOps!.listModels(this.resolveConfig(settings));
-  }
+	async listModels(settings?: PluginSettings) {
+		return this.aiOps!.listModels(this.resolveConfig(settings));
+	}
 
-  protected getDefaultModelId(): string {
-    return 'default-model';
-  }
+	protected getDefaultModelId(): string {
+		return 'default-model';
+	}
 }
 ```
 
@@ -86,140 +86,140 @@ protected resolveConfig(settings?: PluginSettings): Partial<AiOperationsConfig> 
 
 ### OpenAI
 
-| Property | Value |
-|---|---|
-| Package | `@ever-works/openai-plugin` |
-| Provider Type | `openai` |
-| Configuration Mode | `user-required` |
-| Default Model | `gpt-5.1` |
-| Structured Output | Yes |
-| Streaming | Yes |
-| Tool Calling | Yes |
-| Vision | Yes |
-| Embeddings | Yes |
-| Max Context | 128,000 tokens |
+| Property           | Value                       |
+| ------------------ | --------------------------- |
+| Package            | `@ever-works/openai-plugin` |
+| Provider Type      | `openai`                    |
+| Configuration Mode | `user-required`             |
+| Default Model      | `gpt-5.1`                   |
+| Structured Output  | Yes                         |
+| Streaming          | Yes                         |
+| Tool Calling       | Yes                         |
+| Vision             | Yes                         |
+| Embeddings         | Yes                         |
+| Max Context        | 128,000 tokens              |
 
 Supports tiered model selection: `simpleModel` (gpt-5-nano), `mediumModel` (gpt-4o-mini), `complexModel` (gpt-5.1). Each tier is used for different task complexity levels during generation.
 
 ### Anthropic
 
-| Property | Value |
-|---|---|
-| Package | `@ever-works/anthropic-plugin` |
-| Provider Type | `anthropic` |
-| Configuration Mode | `user-required` |
-| Default Model | Claude series |
-| Structured Output | Yes |
-| Streaming | Yes |
-| Tool Calling | Yes |
-| Vision | Yes |
-| Embeddings | No |
+| Property           | Value                          |
+| ------------------ | ------------------------------ |
+| Package            | `@ever-works/anthropic-plugin` |
+| Provider Type      | `anthropic`                    |
+| Configuration Mode | `user-required`                |
+| Default Model      | Claude series                  |
+| Structured Output  | Yes                            |
+| Streaming          | Yes                            |
+| Tool Calling       | Yes                            |
+| Vision             | Yes                            |
+| Embeddings         | No                             |
 
 ### Google (Gemini)
 
-| Property | Value |
-|---|---|
-| Package | `@ever-works/google-plugin` |
-| Provider Type | `google` |
-| Configuration Mode | `user-required` |
-| Default Model | Gemini series |
-| Structured Output | Yes |
-| Streaming | Yes |
-| Tool Calling | Yes |
-| Vision | Yes |
-| Embeddings | Yes |
+| Property           | Value                       |
+| ------------------ | --------------------------- |
+| Package            | `@ever-works/google-plugin` |
+| Provider Type      | `google`                    |
+| Configuration Mode | `user-required`             |
+| Default Model      | Gemini series               |
+| Structured Output  | Yes                         |
+| Streaming          | Yes                         |
+| Tool Calling       | Yes                         |
+| Vision             | Yes                         |
+| Embeddings         | Yes                         |
 
 ### Groq
 
-| Property | Value |
-|---|---|
-| Package | `@ever-works/groq-plugin` |
-| Provider Type | `groq` |
-| Configuration Mode | `user-required` |
-| Default Model | Groq-hosted models |
-| Structured Output | Yes |
-| Streaming | Yes |
-| Tool Calling | Yes |
-| Vision | Depends on model |
-| Embeddings | No |
+| Property           | Value                     |
+| ------------------ | ------------------------- |
+| Package            | `@ever-works/groq-plugin` |
+| Provider Type      | `groq`                    |
+| Configuration Mode | `user-required`           |
+| Default Model      | Groq-hosted models        |
+| Structured Output  | Yes                       |
+| Streaming          | Yes                       |
+| Tool Calling       | Yes                       |
+| Vision             | Depends on model          |
+| Embeddings         | No                        |
 
 Groq provides extremely fast inference through custom LPU hardware. Ideal for latency-sensitive tasks.
 
 ### Ollama
 
-| Property | Value |
-|---|---|
-| Package | `@ever-works/ollama-plugin` |
-| Provider Type | `ollama` |
-| Configuration Mode | `user-required` |
-| Default Model | User's local models |
-| Structured Output | Model dependent |
-| Streaming | Yes |
-| Tool Calling | Model dependent |
-| Vision | Model dependent |
-| Embeddings | Model dependent |
+| Property           | Value                       |
+| ------------------ | --------------------------- |
+| Package            | `@ever-works/ollama-plugin` |
+| Provider Type      | `ollama`                    |
+| Configuration Mode | `user-required`             |
+| Default Model      | User's local models         |
+| Structured Output  | Model dependent             |
+| Streaming          | Yes                         |
+| Tool Calling       | Model dependent             |
+| Vision             | Model dependent             |
+| Embeddings         | Model dependent             |
 
 Ollama runs models locally. Users must have Ollama installed and running. The `baseUrl` setting (default: `http://localhost:11434`) points to the local Ollama instance.
 
 ### Mistral
 
-| Property | Value |
-|---|---|
-| Package | `@ever-works/mistral-plugin` |
-| Provider Type | `mistral` |
-| Configuration Mode | `user-required` |
-| Default Model | Mistral series |
-| Structured Output | Yes |
-| Streaming | Yes |
-| Tool Calling | Yes |
-| Vision | Model dependent |
-| Embeddings | Yes |
+| Property           | Value                        |
+| ------------------ | ---------------------------- |
+| Package            | `@ever-works/mistral-plugin` |
+| Provider Type      | `mistral`                    |
+| Configuration Mode | `user-required`              |
+| Default Model      | Mistral series               |
+| Structured Output  | Yes                          |
+| Streaming          | Yes                          |
+| Tool Calling       | Yes                          |
+| Vision             | Model dependent              |
+| Embeddings         | Yes                          |
 
 ### Perplexity
 
-| Property | Value |
-|---|---|
-| Package | `@ever-works/perplexity-plugin` |
-| Provider Type | `perplexity` |
-| Configuration Mode | `hybrid` |
-| Default Model | Perplexity online models |
-| Structured Output | Limited |
-| Streaming | Yes |
-| Tool Calling | No |
-| Vision | No |
-| Embeddings | No |
+| Property           | Value                           |
+| ------------------ | ------------------------------- |
+| Package            | `@ever-works/perplexity-plugin` |
+| Provider Type      | `perplexity`                    |
+| Configuration Mode | `hybrid`                        |
+| Default Model      | Perplexity online models        |
+| Structured Output  | Limited                         |
+| Streaming          | Yes                             |
+| Tool Calling       | No                              |
+| Vision             | No                              |
+| Embeddings         | No                              |
 
 Perplexity specializes in search-augmented AI responses with built-in web citations.
 
 ### OpenRouter
 
-| Property | Value |
-|---|---|
-| Package | `@ever-works/openrouter-plugin` |
-| Provider Type | `openrouter` |
-| Configuration Mode | `user-required` |
-| Default Model | Varies (multi-provider access) |
-| Structured Output | Model dependent |
-| Streaming | Yes |
-| Tool Calling | Model dependent |
-| Vision | Model dependent |
-| Embeddings | No |
+| Property           | Value                           |
+| ------------------ | ------------------------------- |
+| Package            | `@ever-works/openrouter-plugin` |
+| Provider Type      | `openrouter`                    |
+| Configuration Mode | `user-required`                 |
+| Default Model      | Varies (multi-provider access)  |
+| Structured Output  | Model dependent                 |
+| Streaming          | Yes                             |
+| Tool Calling       | Model dependent                 |
+| Vision             | Model dependent                 |
+| Embeddings         | No                              |
 
 OpenRouter aggregates multiple AI providers behind a single API. It overrides `resolveConfig()` to handle provider-specific model mapping.
 
 ### Vercel AI Gateway
 
-| Property | Value |
-|---|---|
-| Package | `@ever-works/vercel-ai-gateway-plugin` |
-| Provider Type | `vercel-ai-gateway` |
-| Configuration Mode | `user-required` |
-| Default Model | Routed through Vercel |
-| Structured Output | Model dependent |
-| Streaming | Yes |
-| Tool Calling | Model dependent |
-| Vision | Model dependent |
-| Embeddings | No |
+| Property           | Value                                  |
+| ------------------ | -------------------------------------- |
+| Package            | `@ever-works/vercel-ai-gateway-plugin` |
+| Provider Type      | `vercel-ai-gateway`                    |
+| Configuration Mode | `user-required`                        |
+| Default Model      | Routed through Vercel                  |
+| Structured Output  | Model dependent                        |
+| Streaming          | Yes                                    |
+| Tool Calling       | Model dependent                        |
+| Vision             | Model dependent                        |
+| Embeddings         | No                                     |
 
 Routes requests through the Vercel AI Gateway for caching, rate limiting, and observability.
 
@@ -229,14 +229,14 @@ All AI provider plugins share a common settings pattern:
 
 ```json
 {
-  "apiKey":       { "type": "string", "x-secret": true, "x-scope": "user" },
-  "defaultModel": { "type": "string", "x-widget": "model-select", "x-scope": "global" },
-  "simpleModel":  { "type": "string", "x-widget": "model-select", "x-scope": "global" },
-  "mediumModel":  { "type": "string", "x-widget": "model-select", "x-scope": "global" },
-  "complexModel": { "type": "string", "x-widget": "model-select", "x-scope": "global" },
-  "temperature":  { "type": "number", "default": 0.7, "minimum": 0, "maximum": 2 },
-  "maxTokens":    { "type": "number", "default": 4096 },
-  "baseUrl":      { "type": "string", "x-hidden": true }
+	"apiKey": { "type": "string", "x-secret": true, "x-scope": "user" },
+	"defaultModel": { "type": "string", "x-widget": "model-select", "x-scope": "global" },
+	"simpleModel": { "type": "string", "x-widget": "model-select", "x-scope": "global" },
+	"mediumModel": { "type": "string", "x-widget": "model-select", "x-scope": "global" },
+	"complexModel": { "type": "string", "x-widget": "model-select", "x-scope": "global" },
+	"temperature": { "type": "number", "default": 0.7, "minimum": 0, "maximum": 2 },
+	"maxTokens": { "type": "number", "default": 4096 },
+	"baseUrl": { "type": "string", "x-hidden": true }
 }
 ```
 
@@ -248,12 +248,12 @@ Each model reports its capabilities through the `AiModelCapabilities` interface:
 
 ```typescript
 interface AiModelCapabilities {
-  supportsStructuredOutput: boolean;
-  supportsStreaming: boolean;
-  supportsToolCalling: boolean;
-  supportsVision: boolean;
-  maxContextLength: number;
-  maxOutputTokens?: number;
+	supportsStructuredOutput: boolean;
+	supportsStreaming: boolean;
+	supportsToolCalling: boolean;
+	supportsVision: boolean;
+	maxContextLength: number;
+	maxOutputTokens?: number;
 }
 ```
 

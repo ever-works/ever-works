@@ -33,13 +33,14 @@ The provider wraps the chat history hook and adds AI provider management via Rea
 
 ```typescript
 interface ChatContextValue extends UseChatHistoryValue {
-    providers: ProviderOption[];
-    selectedProvider: string | null;
-    setSelectedProvider: (id: string | null) => void;
+	providers: ProviderOption[];
+	selectedProvider: string | null;
+	setSelectedProvider: (id: string | null) => void;
 }
 ```
 
 **Initialization Flow**:
+
 1. Creates a `useChatHistory` instance for message state
 2. On mount, calls `getGlobalFormSchema()` server action to fetch available AI providers
 3. Extracts the `providers.ai` array from the form schema response
@@ -47,25 +48,28 @@ interface ChatContextValue extends UseChatHistoryValue {
 5. Stores providers and selected provider in local state
 
 **Provider Option Shape**:
+
 ```typescript
 interface ProviderOption {
-    id: string;
-    name: string;
-    icon?: PluginIcon;
-    configured: boolean;
-    isDefault?: boolean;
+	id: string;
+	name: string;
+	icon?: PluginIcon;
+	configured: boolean;
+	isDefault?: boolean;
 }
 ```
 
 **Usage**:
+
 ```tsx
 // In a layout or page component
 <ChatProvider>
-    <ChatInterface />
+	<ChatInterface />
 </ChatProvider>
 ```
 
 **Context Hook**:
+
 ```typescript
 // Throws if used outside ChatProvider
 const context = useChatContext();
@@ -91,19 +95,18 @@ The interface is divided into four vertical sections:
 When multiple AI providers are available, the header renders a horizontal scrollable row of provider buttons:
 
 ```tsx
-{providers.length > 1 && (
-    <div className="flex gap-1.5 overflow-x-auto">
-        {providers.map((provider) => (
-            <button
-                onClick={() => setSelectedProvider(provider.id)}
-                disabled={!provider.configured || isStreaming}
-            >
-                <PluginIcon icon={provider.icon} name={provider.name} size={16} />
-                <span>{provider.name}</span>
-            </button>
-        ))}
-    </div>
-)}
+{
+	providers.length > 1 && (
+		<div className="flex gap-1.5 overflow-x-auto">
+			{providers.map((provider) => (
+				<button onClick={() => setSelectedProvider(provider.id)} disabled={!provider.configured || isStreaming}>
+					<PluginIcon icon={provider.icon} name={provider.name} size={16} />
+					<span>{provider.name}</span>
+				</button>
+			))}
+		</div>
+	);
+}
 ```
 
 Unconfigured providers are shown with reduced opacity and wrapped in a `Tooltip` explaining the issue. The active provider shows a checkmark icon.
@@ -112,10 +115,10 @@ Unconfigured providers are shown with reduced opacity and wrapped in a `Tooltip`
 
 Messages use the `ChatMessage` type from `useChatHistory`:
 
-| Role | Visual Style | Description |
-|------|-------------|-------------|
-| `user` | Purple background, right-aligned | User input messages |
-| `assistant` | Light gray background, left-aligned | AI responses |
+| Role        | Visual Style                        | Description         |
+| ----------- | ----------------------------------- | ------------------- |
+| `user`      | Purple background, right-aligned    | User input messages |
+| `assistant` | Light gray background, left-aligned | AI responses        |
 
 **Streaming Indicator**: When `isStreaming` is true and content is empty, three animated bouncing dots are shown. As content arrives, it renders incrementally as a pre-wrapped paragraph.
 
@@ -129,26 +132,26 @@ The submit handler orchestrates the full message lifecycle:
 
 ```typescript
 async function handleSubmit(event: FormEvent) {
-    // 1. Create user message and empty assistant placeholder
-    const userMessage = { id: generateMessageId(), role: 'user', content: input };
-    const assistantMessage = { id: generateMessageId(), role: 'assistant', content: '', isStreaming: true };
+	// 1. Create user message and empty assistant placeholder
+	const userMessage = { id: generateMessageId(), role: 'user', content: input };
+	const assistantMessage = { id: generateMessageId(), role: 'assistant', content: '', isStreaming: true };
 
-    // 2. Track the assistant message ID for updates
-    pendingMessageRef.current = assistantMessage.id;
+	// 2. Track the assistant message ID for updates
+	pendingMessageRef.current = assistantMessage.id;
 
-    // 3. Add both messages to the history
-    setMessages([...messages, userMessage, assistantMessage]);
+	// 3. Add both messages to the history
+	setMessages([...messages, userMessage, assistantMessage]);
 
-    // 4. Build chat history (excluding empty placeholder)
-    const chatHistory = updatedMessages
-        .filter(m => m.content.trim().length > 0)
-        .map(m => ({ role: m.role, content: m.content }));
+	// 4. Build chat history (excluding empty placeholder)
+	const chatHistory = updatedMessages
+		.filter((m) => m.content.trim().length > 0)
+		.map((m) => ({ role: m.role, content: m.content }));
 
-    // 5. Stream response from API
-    await streamMessage('/api/ai/conversations/chat/stream', {
-        messages: chatHistory,
-        providerOverride: selectedProvider ?? undefined,
-    });
+	// 5. Stream response from API
+	await streamMessage('/api/ai/conversations/chat/stream', {
+		messages: chatHistory,
+		providerOverride: selectedProvider ?? undefined
+	});
 }
 ```
 
@@ -166,10 +169,10 @@ The textarea auto-resizes up to 160px max height:
 
 ```typescript
 const autoResize = () => {
-    const el = textareaRef.current;
-    if (!el) return;
-    el.style.height = 'auto';
-    el.style.height = `${Math.min(el.scrollHeight, 160)}px`;
+	const el = textareaRef.current;
+	if (!el) return;
+	el.style.height = 'auto';
+	el.style.height = `${Math.min(el.scrollHeight, 160)}px`;
 };
 ```
 
@@ -183,11 +186,11 @@ The "New Chat" button calls `handleResetConversation`:
 
 ```typescript
 const handleResetConversation = () => {
-    if (isStreaming) return;
-    reset();           // useAIStream: clear content/error/streaming
-    resetHistory();    // useChatHistory: reset to initial greeting
-    setErrorMessage(null);
-    clearPending();    // Clear pendingMessageRef
+	if (isStreaming) return;
+	reset(); // useAIStream: clear content/error/streaming
+	resetHistory(); // useChatHistory: reset to initial greeting
+	setErrorMessage(null);
+	clearPending(); // Clear pendingMessageRef
 };
 ```
 
@@ -197,9 +200,9 @@ Messages auto-scroll to the bottom when the message list changes:
 
 ```typescript
 useEffect(() => {
-    if (messages.length) {
-        scrollToBottom('auto');
-    }
+	if (messages.length) {
+		scrollToBottom('auto');
+	}
 }, [messages, scrollToBottom]);
 ```
 

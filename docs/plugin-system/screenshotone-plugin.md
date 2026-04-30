@@ -1,7 +1,7 @@
 ---
 id: screenshotone-plugin
-title: "ScreenshotOne Plugin"
-sidebar_label: "ScreenshotOne"
+title: 'ScreenshotOne Plugin'
+sidebar_label: 'ScreenshotOne'
 sidebar_position: 41
 ---
 
@@ -13,17 +13,17 @@ The ScreenshotOne plugin captures website screenshots using the [ScreenshotOne A
 
 ## Overview
 
-| Property | Value |
-|---|---|
-| Plugin ID | `screenshotone` |
-| Category | `screenshot` |
-| Capabilities | `screenshot` |
-| Version | `1.0.0` |
-| Configuration Mode | `hybrid` |
-| Auto-enable | No |
-| Built-in | No |
-| System Plugin | No |
-| Dependencies | `screenshotone-api-sdk` |
+| Property           | Value                   |
+| ------------------ | ----------------------- |
+| Plugin ID          | `screenshotone`         |
+| Category           | `screenshot`            |
+| Capabilities       | `screenshot`            |
+| Version            | `1.0.0`                 |
+| Configuration Mode | `hybrid`                |
+| Auto-enable        | No                      |
+| Built-in           | No                      |
+| System Plugin      | No                      |
+| Dependencies       | `screenshotone-api-sdk` |
 
 The plugin implements `IPlugin` and `IScreenshotPlugin`. It uses the official `screenshotone-api-sdk` package to build capture requests and download the resulting images.
 
@@ -51,27 +51,27 @@ When both an access key and a secret key are configured, the plugin generates **
 
 ### Settings Schema
 
-| Setting | Type | Required | Default | Scope | Description |
-|---|---|---|---|---|---|
-| `accessKey` | `string` | Yes | -- | `user` | ScreenshotOne access key (secret) |
-| `secretKey` | `string` | No | -- | `user` | Secret key for signed URLs (secret) |
-| `viewportWidth` | `number` | No | `1280` | -- | Viewport width in pixels (320--3840) |
-| `viewportHeight` | `number` | No | `800` | -- | Viewport height in pixels (200--2160) |
-| `format` | `string` | No | `"png"` | -- | Image format: `png`, `jpg`, `jpeg`, or `webp` |
-| `fullPage` | `boolean` | No | `false` | -- | Capture the full scrollable page |
-| `deviceScaleFactor` | `number` | No | `1` | -- | Device scale factor (0.5--3, 2 = retina) |
-| `blockAds` | `boolean` | No | `true` | -- | Block ads during capture |
-| `blockTrackers` | `boolean` | No | `true` | -- | Block trackers during capture |
+| Setting             | Type      | Required | Default | Scope  | Description                                   |
+| ------------------- | --------- | -------- | ------- | ------ | --------------------------------------------- |
+| `accessKey`         | `string`  | Yes      | --      | `user` | ScreenshotOne access key (secret)             |
+| `secretKey`         | `string`  | No       | --      | `user` | Secret key for signed URLs (secret)           |
+| `viewportWidth`     | `number`  | No       | `1280`  | --     | Viewport width in pixels (320--3840)          |
+| `viewportHeight`    | `number`  | No       | `800`   | --     | Viewport height in pixels (200--2160)         |
+| `format`            | `string`  | No       | `"png"` | --     | Image format: `png`, `jpg`, `jpeg`, or `webp` |
+| `fullPage`          | `boolean` | No       | `false` | --     | Capture the full scrollable page              |
+| `deviceScaleFactor` | `number`  | No       | `1`     | --     | Device scale factor (0.5--3, 2 = retina)      |
+| `blockAds`          | `boolean` | No       | `true`  | --     | Block ads during capture                      |
+| `blockTrackers`     | `boolean` | No       | `true`  | --     | Block trackers during capture                 |
 
 ### Environment Variables
 
-| Variable | Description |
-|---|---|
-| `PLUGIN_SCREENSHOTONE_ACCESS_KEY` | Access key fallback |
-| `PLUGIN_SCREENSHOTONE_SECRET_KEY` | Secret key fallback |
-| `PLUGIN_SCREENSHOTONE_VIEWPORT_WIDTH` | Viewport width fallback |
+| Variable                               | Description              |
+| -------------------------------------- | ------------------------ |
+| `PLUGIN_SCREENSHOTONE_ACCESS_KEY`      | Access key fallback      |
+| `PLUGIN_SCREENSHOTONE_SECRET_KEY`      | Secret key fallback      |
+| `PLUGIN_SCREENSHOTONE_VIEWPORT_WIDTH`  | Viewport width fallback  |
 | `PLUGIN_SCREENSHOTONE_VIEWPORT_HEIGHT` | Viewport height fallback |
-| `PLUGIN_SCREENSHOTONE_FORMAT` | Image format fallback |
+| `PLUGIN_SCREENSHOTONE_FORMAT`          | Image format fallback    |
 
 ### Settings Resolution
 
@@ -144,19 +144,19 @@ During directory generation, the screenshot facade delegates capture requests to
 
 ## Comparison with Urlbox
 
-| Feature | ScreenshotOne | Urlbox |
-|---|---|---|
-| SDK | `screenshotone-api-sdk` | `urlbox` |
-| Signed URLs | Yes (with secret key) | Yes (with API secret) |
-| Default viewport | 1280 x 800 | 1280 x 1024 |
-| Device scale factor | 0.5--3 (configurable) | Boolean retina (2x) |
-| Image quality control | No (format-dependent) | Yes (1--100 slider) |
-| Ad blocking | Yes | Yes |
-| Tracker blocking | Yes | No |
-| Cookie banner blocking | Per-request | Default enabled |
-| Server-side caching | Yes (with TTL) | No |
-| Supported formats | PNG, JPG, JPEG, WebP | PNG, JPG, JPEG, WebP |
-| Max dimensions | 3840 x 2160 | 3840 x 2160 |
+| Feature                | ScreenshotOne           | Urlbox                |
+| ---------------------- | ----------------------- | --------------------- |
+| SDK                    | `screenshotone-api-sdk` | `urlbox`              |
+| Signed URLs            | Yes (with secret key)   | Yes (with API secret) |
+| Default viewport       | 1280 x 800              | 1280 x 1024           |
+| Device scale factor    | 0.5--3 (configurable)   | Boolean retina (2x)   |
+| Image quality control  | No (format-dependent)   | Yes (1--100 slider)   |
+| Ad blocking            | Yes                     | Yes                   |
+| Tracker blocking       | Yes                     | No                    |
+| Cookie banner blocking | Per-request             | Default enabled       |
+| Server-side caching    | Yes (with TTL)          | No                    |
+| Supported formats      | PNG, JPG, JPEG, WebP    | PNG, JPG, JPEG, WebP  |
+| Max dimensions         | 3840 x 2160             | 3840 x 2160           |
 
 ScreenshotOne offers granular device scale factor control (0.5--3), tracker blocking, and built-in caching. Urlbox provides a quality slider for lossy formats and cookie banner blocking enabled by default.
 
@@ -166,29 +166,29 @@ ScreenshotOne offers granular device scale factor control (0.5--3), tracker bloc
 
 ```typescript
 class ScreenshotOnePlugin implements IPlugin, IScreenshotPlugin {
-  readonly id: 'screenshotone';
-  readonly category: 'screenshot';
+	readonly id: 'screenshotone';
+	readonly category: 'screenshot';
 
-  capture(options: ScreenshotOptions): Promise<ScreenshotResult>;
-  getScreenshotUrl(options: ScreenshotOptions): Promise<string | null>;
-  validateCredentials(): Promise<ScreenshotValidationResult>;
-  getSupportedFormats(): readonly ScreenshotFormat[];
-  getMaxDimensions(): { width: number; height: number };
+	capture(options: ScreenshotOptions): Promise<ScreenshotResult>;
+	getScreenshotUrl(options: ScreenshotOptions): Promise<string | null>;
+	validateCredentials(): Promise<ScreenshotValidationResult>;
+	getSupportedFormats(): readonly ScreenshotFormat[];
+	getMaxDimensions(): { width: number; height: number };
 }
 ```
 
 ### ScreenshotResult Fields
 
-| Field | Description |
-|---|---|
-| `success` | Whether capture succeeded |
-| `imageBuffer` | Raw image data as a Buffer |
-| `imageBase64` | Base64-encoded image string |
-| `imageUrl` | Reference URL for the screenshot |
-| `width` | Viewport width used |
-| `height` | Viewport height used |
-| `fileSize` | Image file size in bytes |
-| `error` | Error message (on failure) |
+| Field         | Description                      |
+| ------------- | -------------------------------- |
+| `success`     | Whether capture succeeded        |
+| `imageBuffer` | Raw image data as a Buffer       |
+| `imageBase64` | Base64-encoded image string      |
+| `imageUrl`    | Reference URL for the screenshot |
+| `width`       | Viewport width used              |
+| `height`      | Viewport height used             |
+| `fileSize`    | Image file size in bytes         |
+| `error`       | Error message (on failure)       |
 
 ## Getting Started
 
@@ -200,10 +200,10 @@ class ScreenshotOnePlugin implements IPlugin, IScreenshotPlugin {
 
 ## Troubleshooting
 
-| Issue | Cause | Solution |
-|---|---|---|
-| "Access key not configured" | Missing API credentials | Set the access key in plugin settings or via environment variable |
-| Blank screenshots | Page loads dynamic content | Use the `delay` option or `waitForSelector` |
-| Low-resolution images | Default scale factor is 1 | Increase `deviceScaleFactor` to 2 for retina output |
-| Ads appearing in screenshots | `blockAds` disabled | Ensure `blockAds` is set to `true` |
-| Invalid credentials | Wrong access key or secret key | Verify credentials at screenshotone.com dashboard |
+| Issue                        | Cause                          | Solution                                                          |
+| ---------------------------- | ------------------------------ | ----------------------------------------------------------------- |
+| "Access key not configured"  | Missing API credentials        | Set the access key in plugin settings or via environment variable |
+| Blank screenshots            | Page loads dynamic content     | Use the `delay` option or `waitForSelector`                       |
+| Low-resolution images        | Default scale factor is 1      | Increase `deviceScaleFactor` to 2 for retina output               |
+| Ads appearing in screenshots | `blockAds` disabled            | Ensure `blockAds` is set to `true`                                |
+| Invalid credentials          | Wrong access key or secret key | Verify credentials at screenshotone.com dashboard                 |

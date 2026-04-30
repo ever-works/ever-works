@@ -15,11 +15,11 @@ The `RepositoryManagementService` provides a unified interface for inspecting an
 
 Each directory in Ever Works is backed by up to three Git repositories:
 
-| Repository Type | Naming Convention | Contents |
-|----------------|-------------------|----------|
-| `data` | `{slug}-data` | Item JSON files, config, categories, tags |
-| `directory` | `{slug}` | Markdown README and documentation |
-| `website` | `{slug}-website` | Generated website (Astro/Next.js) source code |
+| Repository Type | Naming Convention | Contents                                      |
+| --------------- | ----------------- | --------------------------------------------- |
+| `data`          | `{slug}-data`     | Item JSON files, config, categories, tags     |
+| `directory`     | `{slug}`          | Markdown README and documentation             |
+| `website`       | `{slug}-website`  | Generated website (Astro/Next.js) source code |
 
 The `RepositoryManagementService` allows users to check the status of these repositories and toggle their visibility (public/private).
 
@@ -47,11 +47,11 @@ type RepositoryType = 'data' | 'directory' | 'website';
 
 ```typescript
 interface RepositoryStatus {
-    type: RepositoryType;
-    name: string;
-    url: string;
-    isPrivate: boolean;
-    exists: boolean;
+	type: RepositoryType;
+	name: string;
+	url: string;
+	isPrivate: boolean;
+	exists: boolean;
 }
 ```
 
@@ -67,9 +67,9 @@ const statuses = await repoService.getRepositoriesStatus(directory, user);
 
 1. Determines the repository owner from `directory.getRepoOwner()`.
 2. Builds a list of all three repositories with their names from the directory entity methods:
-   - `directory.getDataRepo()` for the data repository
-   - `directory.getMainRepo()` for the markdown/directory repository
-   - `directory.getWebsiteRepo()` for the website repository
+    - `directory.getDataRepo()` for the data repository
+    - `directory.getMainRepo()` for the markdown/directory repository
+    - `directory.getWebsiteRepo()` for the website repository
 3. Queries each repository via `gitFacade.getRepository()` in parallel using `Promise.all()`.
 4. For repositories that exist, returns the actual URL and privacy status.
 5. For repositories that do not exist (404), returns `exists: false` with `isPrivate: true` as a safe default.
@@ -80,9 +80,9 @@ After querying, the service compares the fetched visibility against the cached `
 
 ```typescript
 interface RepoVisibility {
-    data: boolean;      // true = private
-    directory: boolean;
-    website: boolean;
+	data: boolean; // true = private
+	directory: boolean;
+	website: boolean;
 }
 ```
 
@@ -92,28 +92,28 @@ This cache prevents unnecessary API calls when the frontend needs to display rep
 
 ```typescript
 [
-    {
-        type: 'data',
-        name: 'my-tools-data',
-        url: 'https://github.com/user/my-tools-data',
-        isPrivate: true,
-        exists: true,
-    },
-    {
-        type: 'directory',
-        name: 'my-tools',
-        url: 'https://github.com/user/my-tools',
-        isPrivate: false,
-        exists: true,
-    },
-    {
-        type: 'website',
-        name: 'my-tools-website',
-        url: '',
-        isPrivate: true,
-        exists: false,
-    },
-]
+	{
+		type: 'data',
+		name: 'my-tools-data',
+		url: 'https://github.com/user/my-tools-data',
+		isPrivate: true,
+		exists: true
+	},
+	{
+		type: 'directory',
+		name: 'my-tools',
+		url: 'https://github.com/user/my-tools',
+		isPrivate: false,
+		exists: true
+	},
+	{
+		type: 'website',
+		name: 'my-tools-website',
+		url: '',
+		isPrivate: true,
+		exists: false
+	}
+];
 ```
 
 ## Updating Repository Visibility
@@ -122,19 +122,19 @@ The `updateRepositoryVisibility` method toggles a repository between public and 
 
 ```typescript
 const result = await repoService.updateRepositoryVisibility(
-    directory,
-    user,
-    'directory',  // repoType
-    false,        // isPrivate = false means public
+	directory,
+	user,
+	'directory', // repoType
+	false // isPrivate = false means public
 );
 ```
 
 ### How It Works
 
 1. Resolves the repository name based on the `repoType` parameter:
-   - `'data'` maps to `directory.getDataRepo()`
-   - `'directory'` maps to `directory.getMainRepo()`
-   - `'website'` maps to `directory.getWebsiteRepo()`
+    - `'data'` maps to `directory.getDataRepo()`
+    - `'directory'` maps to `directory.getMainRepo()`
+    - `'website'` maps to `directory.getWebsiteRepo()`
 2. Calls `gitFacade.updateRepository()` with the `{ isPrivate }` payload.
 3. Updates the visibility cache on the directory entity.
 4. Returns the updated `RepositoryStatus`.

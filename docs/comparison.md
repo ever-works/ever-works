@@ -19,7 +19,7 @@ The **Ever Works Platform** is the backend infrastructure for building and manag
 - Includes a **Next.js Web Dashboard** for administrators to manage directories, configure pipelines, and monitor AI agents
 - Ships with **CLI tools** (public CLI and internal CLI) for development, deployment, and automation tasks
 - Runs **AI agents** powered by LangChain with support for 7 LLM providers (OpenAI, Anthropic, Google, Groq, OpenRouter, Ollama, and custom endpoints)
-- Features a **plugin system** with 21 plugins across categories: AI providers, search engines, content extraction, screenshot services, Git integrations, and infrastructure
+- Features a **plugin system** with 39 plugins across categories: AI providers, AI gateways, search engines, content extraction, screenshot services, Git integrations, deployment, pipeline generators (Standard, Agent, Claude Code, Claude Managed Agent, Codex, Gemini, OpenCode, Make.com, SIM AI, Zapier), and prompt management (Langfuse)
 - Manages **background jobs** via Trigger.dev and BullMQ for scheduled updates, pipeline execution, and async processing
 - Includes **monitoring** via Sentry (error tracking) and PostHog (product analytics)
 

@@ -19,13 +19,13 @@ Each changelog entry is stored alongside directory history and includes an `acti
 
 ### Activity Types
 
-| Activity Type | Examples |
-|---|---|
-| `generation` | AI generation run added, updated, or removed items |
-| `item_added` / `item_updated` / `item_removed` | Direct item management changes |
-| `comparison_added` / `comparison_removed` | Comparison pages created or deleted |
-| `category_change` / `tag_change` / `collection_change` | Taxonomy updates |
-| `community_pr_merged` | Items imported from processed community PRs |
+| Activity Type                                          | Examples                                           |
+| ------------------------------------------------------ | -------------------------------------------------- |
+| `generation`                                           | AI generation run added, updated, or removed items |
+| `item_added` / `item_updated` / `item_removed`         | Direct item management changes                     |
+| `comparison_added` / `comparison_removed`              | Comparison pages created or deleted                |
+| `category_change` / `tag_change` / `collection_change` | Taxonomy updates                                   |
+| `community_pr_merged`                                  | Items imported from processed community PRs        |
 
 ### Changelog Payload
 
@@ -33,17 +33,17 @@ Each history row can carry a structured changelog payload:
 
 ```typescript
 interface DirectoryChangelog {
-  summary?: string | null;
-  addedCount: number;
-  updatedCount: number;
-  removedCount: number;
-  entries: {
-    entityType: 'item' | 'comparison' | 'category' | 'tag' | 'collection';
-    action: 'added' | 'updated' | 'removed';
-    name: string;
-    slug?: string;
-    fieldsChanged?: string[];
-  }[];
+	summary?: string | null;
+	addedCount: number;
+	updatedCount: number;
+	removedCount: number;
+	entries: {
+		entityType: 'item' | 'comparison' | 'category' | 'tag' | 'collection';
+		action: 'added' | 'updated' | 'removed';
+		name: string;
+		slug?: string;
+		fieldsChanged?: string[];
+	}[];
 }
 ```
 
@@ -72,16 +72,16 @@ This turns the History page into a practical review tool instead of a metrics-on
 
 ### Get Directory History
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| `GET` | `/api/directories/:id/history` | Get paginated directory history with changelog data |
+| Method | Endpoint                       | Description                                         |
+| ------ | ------------------------------ | --------------------------------------------------- |
+| `GET`  | `/api/directories/:id/history` | Get paginated directory history with changelog data |
 
 **Query parameters:**
 
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| `limit` | number | Page size |
-| `offset` | number | Pagination offset |
+| Parameter      | Type   | Description                                                                              |
+| -------------- | ------ | ---------------------------------------------------------------------------------------- |
+| `limit`        | number | Page size                                                                                |
+| `offset`       | number | Pagination offset                                                                        |
 | `activityType` | string | Optional filter group (`generation`, `items`, `comparisons`, `taxonomy`, `community_pr`) |
 
 **Example:**

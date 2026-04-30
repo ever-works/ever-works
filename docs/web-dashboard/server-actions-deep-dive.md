@@ -47,14 +47,14 @@ All actions follow a consistent pattern: validate input, call the backend API, h
 
 **File:** `apps/web/src/app/actions/auth.ts`
 
-| Action | Parameters | Returns | Description |
-|--------|-----------|---------|-------------|
-| `login` | `FormData \| { email, password }` | Redirect or `{ error }` | Email/password login with Zod validation |
-| `register` | `FormData \| { username, email, password }` | Redirect or `{ error }` | New user registration |
-| `logout` | None | Redirect | Clears cookies and redirects to home |
-| `connectProvider` | `provider: OAuthProvider` | `{ success, url?, error? }` | Initiates OAuth flow, returns authorization URL |
-| `forgotPassword` | `{ email }` | `{ success, error? }` | Sends password reset email |
-| `resetPassword` | `{ token, password }` | `{ success, error? }` | Sets new password using reset token |
+| Action            | Parameters                                  | Returns                     | Description                                     |
+| ----------------- | ------------------------------------------- | --------------------------- | ----------------------------------------------- |
+| `login`           | `FormData \| { email, password }`           | Redirect or `{ error }`     | Email/password login with Zod validation        |
+| `register`        | `FormData \| { username, email, password }` | Redirect or `{ error }`     | New user registration                           |
+| `logout`          | None                                        | Redirect                    | Clears cookies and redirects to home            |
+| `connectProvider` | `provider: OAuthProvider`                   | `{ success, url?, error? }` | Initiates OAuth flow, returns authorization URL |
+| `forgotPassword`  | `{ email }`                                 | `{ success, error? }`       | Sends password reset email                      |
+| `resetPassword`   | `{ token, password }`                       | `{ success, error? }`       | Sets new password using reset token             |
 
 **Login flow:**
 
@@ -82,15 +82,15 @@ All actions follow a consistent pattern: validate input, call the backend API, h
 import { login } from '@/app/actions/auth';
 
 function LoginForm() {
-    const [error, setError] = useState(null);
+	const [error, setError] = useState(null);
 
-    async function handleSubmit(formData: FormData) {
-        const result = await login(formData);
-        if (result?.error) setError(result.error);
-        // On success, login redirects automatically
-    }
+	async function handleSubmit(formData: FormData) {
+		const result = await login(formData);
+		if (result?.error) setError(result.error);
+		// On success, login redirects automatically
+	}
 
-    return <form action={handleSubmit}>{/* fields */}</form>;
+	return <form action={handleSubmit}>{/* fields */}</form>;
 }
 ```
 
@@ -100,27 +100,27 @@ function LoginForm() {
 
 This is the largest action file, covering all directory operations:
 
-| Action | Description |
-|--------|-------------|
-| `createDirectory` | Create a new directory with name, type, and optional repository config |
-| `createDirectoryWithAI` | Create a directory with AI-assisted content generation |
-| `updateDirectory` | Update directory metadata (name, description, etc.) |
-| `deleteDirectory` | Delete a directory and its associated repositories |
-| `getDirectories` | Fetch all directories for the current user |
-| `syncDirectoryData` | Trigger a sync with the source repository |
-| `analyzeRepository` | Analyze a URL to detect format and content structure |
-| `analyzeForLinking` | Check if a repository has existing Ever Works structure |
-| `importDirectory` | Import a directory from an external source |
-| `getUserRepositories` | List repositories from the user's git provider |
-| `updateDirectorySchedule` | Configure automated generation schedule |
-| `getRepositoryVisibility` | Check if a repository is public or private |
-| `toggleRepositoryVisibility` | Toggle repository public/private state |
-| `getAdvancedPrompts` | Fetch custom AI prompts for a directory |
-| `updateAdvancedPrompts` | Update custom AI prompts |
-| `getWebsiteSettings` | Fetch website deployment configuration |
-| `updateWebsiteSettings` | Update website deployment configuration |
-| `updateCommunityPrSettings` | Update community PR settings for a directory |
-| `fetchDirectoryGenerationHistory` | Get the generation history log |
+| Action                            | Description                                                            |
+| --------------------------------- | ---------------------------------------------------------------------- |
+| `createDirectory`                 | Create a new directory with name, type, and optional repository config |
+| `createDirectoryWithAI`           | Create a directory with AI-assisted content generation                 |
+| `updateDirectory`                 | Update directory metadata (name, description, etc.)                    |
+| `deleteDirectory`                 | Delete a directory and its associated repositories                     |
+| `getDirectories`                  | Fetch all directories for the current user                             |
+| `syncDirectoryData`               | Trigger a sync with the source repository                              |
+| `analyzeRepository`               | Analyze a URL to detect format and content structure                   |
+| `analyzeForLinking`               | Check if a repository has existing Ever Works structure                |
+| `importDirectory`                 | Import a directory from an external source                             |
+| `getUserRepositories`             | List repositories from the user's git provider                         |
+| `updateDirectorySchedule`         | Configure automated generation schedule                                |
+| `getRepositoryVisibility`         | Check if a repository is public or private                             |
+| `toggleRepositoryVisibility`      | Toggle repository public/private state                                 |
+| `getAdvancedPrompts`              | Fetch custom AI prompts for a directory                                |
+| `updateAdvancedPrompts`           | Update custom AI prompts                                               |
+| `getWebsiteSettings`              | Fetch website deployment configuration                                 |
+| `updateWebsiteSettings`           | Update website deployment configuration                                |
+| `updateCommunityPrSettings`       | Update community PR settings for a directory                           |
+| `fetchDirectoryGenerationHistory` | Get the generation history log                                         |
 
 **Example: createDirectoryWithAI**
 
@@ -128,22 +128,22 @@ This is the largest action file, covering all directory operations:
 'use server';
 
 export async function createDirectoryWithAI(params: {
-    name: string;
-    description: string;
-    aiProvider: string;
-    aiModel: string;
+	name: string;
+	description: string;
+	aiProvider: string;
+	aiModel: string;
 }) {
-    const session = await getSession();
-    if (!session) return { success: false, error: 'Unauthorized' };
+	const session = await getSession();
+	if (!session) return { success: false, error: 'Unauthorized' };
 
-    const result = await directoryAPI.createWithAI(params, session.token);
+	const result = await directoryAPI.createWithAI(params, session.token);
 
-    if (!result.success) {
-        return { success: false, error: result.error };
-    }
+	if (!result.success) {
+		return { success: false, error: result.error };
+	}
 
-    revalidatePath('/dashboard');
-    return { success: true, data: result.data };
+	revalidatePath('/dashboard');
+	return { success: true, data: result.data };
 }
 ```
 
@@ -151,28 +151,28 @@ export async function createDirectoryWithAI(params: {
 
 **File:** `apps/web/src/app/actions/dashboard/generator.ts`
 
-| Action | Description |
-|--------|-------------|
-| `generateItems` | Start AI generation for a directory with sanitized plugin config |
-| `updateItems` | Batch update generated items |
-| `regenerateMarkdown` | Regenerate markdown output from existing items |
+| Action               | Description                                                      |
+| -------------------- | ---------------------------------------------------------------- |
+| `generateItems`      | Start AI generation for a directory with sanitized plugin config |
+| `updateItems`        | Batch update generated items                                     |
+| `regenerateMarkdown` | Regenerate markdown output from existing items                   |
 
 **generateItems** is notable for its `sanitizePluginConfig` step, which strips sensitive data (like API keys marked with `x-secret`) from the plugin configuration before logging or transmitting it over non-secure channels. The actual secret values are resolved server-side from the stored plugin settings.
 
 ```tsx
 // Client component usage
 startTransition(async () => {
-    const result = await generateItems({
-        directoryId: directory.id,
-        providers: selectedProviders,
-        options: generatorOptions,
-    });
+	const result = await generateItems({
+		directoryId: directory.id,
+		providers: selectedProviders,
+		options: generatorOptions
+	});
 
-    if (result.success) {
-        toast.success('Generation started');
-    } else {
-        toast.error(result.error);
-    }
+	if (result.success) {
+		toast.success('Generation started');
+	} else {
+		toast.error(result.error);
+	}
 });
 ```
 
@@ -180,13 +180,13 @@ startTransition(async () => {
 
 **File:** `apps/web/src/app/actions/notifications.ts`
 
-| Action | Description |
-|--------|-------------|
-| `getNotifications` | Fetch paginated notifications |
+| Action                       | Description                            |
+| ---------------------------- | -------------------------------------- |
+| `getNotifications`           | Fetch paginated notifications          |
 | `getUnreadNotificationCount` | Get the number of unread notifications |
-| `markNotificationAsRead` | Mark a single notification as read |
-| `markAllNotificationsAsRead` | Mark all notifications as read |
-| `dismissNotification` | Remove a notification |
+| `markNotificationAsRead`     | Mark a single notification as read     |
+| `markAllNotificationsAsRead` | Mark all notifications as read         |
+| `dismissNotification`        | Remove a notification                  |
 
 These actions are consumed by `NotificationDropdown` in the dashboard header.
 
@@ -194,21 +194,21 @@ These actions are consumed by `NotificationDropdown` in the dashboard header.
 
 **File:** `apps/web/src/app/actions/plugins.ts`
 
-| Action | Description |
-|--------|-------------|
+| Action                 | Description                        |
+| ---------------------- | ---------------------------------- |
 | `updatePluginSettings` | Save plugin configuration settings |
-| `getPluginSettings` | Fetch current plugin settings |
-| `enablePlugin` | Enable a plugin |
-| `disablePlugin` | Disable a plugin |
+| `getPluginSettings`    | Fetch current plugin settings      |
+| `enablePlugin`         | Enable a plugin                    |
+| `disablePlugin`        | Disable a plugin                   |
 
 ### OAuth Actions
 
 **File:** `apps/web/src/app/actions/dashboard/oauth.ts`
 
-| Action | Description |
-|--------|-------------|
-| `connectOAuthProvider` | Initiate OAuth connection for a git provider or plugin |
-| `disconnectOAuthProvider` | Remove an OAuth connection |
+| Action                    | Description                                            |
+| ------------------------- | ------------------------------------------------------ |
+| `connectOAuthProvider`    | Initiate OAuth connection for a git provider or plugin |
+| `disconnectOAuthProvider` | Remove an OAuth connection                             |
 
 Used by both `GitProviderConnections` and `PluginOAuthConnection` settings components.
 
@@ -216,20 +216,20 @@ Used by both `GitProviderConnections` and `PluginOAuthConnection` settings compo
 
 **File:** `apps/web/src/app/actions/settings.ts`
 
-| Action | Description |
-|--------|-------------|
-| `updateProfile` | Update username |
-| `updatePassword` | Change password |
-| `deleteAccount` | Delete the user's account |
+| Action           | Description               |
+| ---------------- | ------------------------- |
+| `updateProfile`  | Update username           |
+| `updatePassword` | Change password           |
+| `deleteAccount`  | Delete the user's account |
 
 ### API Key Actions
 
 **File:** `apps/web/src/app/actions/api-keys.ts`
 
-| Action | Description |
-|--------|-------------|
+| Action         | Description                                            |
+| -------------- | ------------------------------------------------------ |
 | `createApiKey` | Create a new API key with name and optional expiration |
-| `revokeApiKey` | Revoke an existing API key |
+| `revokeApiKey` | Revoke an existing API key                             |
 
 ## Implementation Details
 
@@ -244,29 +244,29 @@ import { getSession } from '@/lib/auth/session';
 import { revalidatePath } from 'next/cache';
 
 export async function someAction(params: SomeInput) {
-    // 1. Authenticate
-    const session = await getSession();
-    if (!session) {
-        return { success: false, error: 'Unauthorized' };
-    }
+	// 1. Authenticate
+	const session = await getSession();
+	if (!session) {
+		return { success: false, error: 'Unauthorized' };
+	}
 
-    // 2. Validate (optional, for form inputs)
-    const parsed = SomeSchema.safeParse(params);
-    if (!parsed.success) {
-        return { success: false, errors: parsed.error.flatten().fieldErrors };
-    }
+	// 2. Validate (optional, for form inputs)
+	const parsed = SomeSchema.safeParse(params);
+	if (!parsed.success) {
+		return { success: false, errors: parsed.error.flatten().fieldErrors };
+	}
 
-    // 3. Call backend API
-    try {
-        const result = await backendAPI.someMethod(parsed.data, session.token);
+	// 3. Call backend API
+	try {
+		const result = await backendAPI.someMethod(parsed.data, session.token);
 
-        // 4. Revalidate cached data
-        revalidatePath('/dashboard');
+		// 4. Revalidate cached data
+		revalidatePath('/dashboard');
 
-        return { success: true, data: result };
-    } catch (error) {
-        return { success: false, error: 'Operation failed' };
-    }
+		return { success: true, data: result };
+	} catch (error) {
+		return { success: false, error: 'Operation failed' };
+	}
 }
 ```
 
@@ -280,14 +280,14 @@ Form-based actions use Zod schemas for validation:
 
 ```typescript
 const LoginSchema = z.object({
-    email: z.string().email('Invalid email'),
-    password: z.string().min(1, 'Password required'),
+	email: z.string().email('Invalid email'),
+	password: z.string().min(1, 'Password required')
 });
 
 const RegisterSchema = z.object({
-    username: z.string().min(3).max(50),
-    email: z.string().email(),
-    password: z.string().min(8, 'Minimum 8 characters'),
+	username: z.string().min(3).max(50),
+	email: z.string().email(),
+	password: z.string().min(8, 'Minimum 8 characters')
 });
 ```
 
@@ -332,33 +332,19 @@ import { useActionState } from 'react';
 import { register } from '@/app/actions/auth';
 
 export function RegisterForm() {
-    const [state, formAction, isPending] = useActionState(register, null);
+	const [state, formAction, isPending] = useActionState(register, null);
 
-    return (
-        <form action={formAction}>
-            <Input
-                name="username"
-                label="Username"
-                error={state?.errors?.username?.[0]}
-            />
-            <Input
-                name="email"
-                type="email"
-                label="Email"
-                error={state?.errors?.email?.[0]}
-            />
-            <Input
-                name="password"
-                type="password"
-                label="Password"
-                error={state?.errors?.password?.[0]}
-            />
-            {state?.error && <p className="text-danger">{state.error}</p>}
-            <Button type="submit" loading={isPending}>
-                Register
-            </Button>
-        </form>
-    );
+	return (
+		<form action={formAction}>
+			<Input name="username" label="Username" error={state?.errors?.username?.[0]} />
+			<Input name="email" type="email" label="Email" error={state?.errors?.email?.[0]} />
+			<Input name="password" type="password" label="Password" error={state?.errors?.password?.[0]} />
+			{state?.error && <p className="text-danger">{state.error}</p>}
+			<Button type="submit" loading={isPending}>
+				Register
+			</Button>
+		</form>
+	);
 }
 ```
 
@@ -372,24 +358,24 @@ import { deleteDirectory } from '@/app/actions/dashboard/directories';
 import { toast } from 'sonner';
 
 export function DeleteDirectoryButton({ directoryId }) {
-    const [isPending, startTransition] = useTransition();
+	const [isPending, startTransition] = useTransition();
 
-    const handleDelete = () => {
-        startTransition(async () => {
-            const result = await deleteDirectory(directoryId);
-            if (result.success) {
-                toast.success('Directory deleted');
-            } else {
-                toast.error(result.error || 'Failed to delete');
-            }
-        });
-    };
+	const handleDelete = () => {
+		startTransition(async () => {
+			const result = await deleteDirectory(directoryId);
+			if (result.success) {
+				toast.success('Directory deleted');
+			} else {
+				toast.error(result.error || 'Failed to delete');
+			}
+		});
+	};
 
-    return (
-        <Button variant="danger" onClick={handleDelete} loading={isPending}>
-            Delete Directory
-        </Button>
-    );
+	return (
+		<Button variant="danger" onClick={handleDelete} loading={isPending}>
+			Delete Directory
+		</Button>
+	);
 }
 ```
 

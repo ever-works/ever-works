@@ -32,6 +32,7 @@ ever-works --help
 ```
 
 Output:
+
 ```text
 Usage: ever-works [options] [command]
 

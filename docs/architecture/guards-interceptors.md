@@ -45,16 +45,16 @@ sequenceDiagram
 
 ## Source Files
 
-| File | Purpose |
-|------|---------|
-| `apps/api/src/auth/guards/jwt-auth.guard.ts` | Main authentication guard with dual JWT + API key support |
-| `apps/api/src/auth/guards/local-auth.guard.ts` | Username/password authentication guard for login |
-| `apps/api/src/auth/strategies/jwt.strategy.ts` | Passport JWT strategy for token validation |
-| `apps/api/src/auth/strategies/local.strategy.ts` | Passport local strategy for login |
-| `apps/api/src/auth/strategies/github.strategy.ts` | OAuth GitHub strategy |
-| `apps/api/src/auth/strategies/google.strategy.ts` | OAuth Google strategy |
-| `apps/api/src/auth/decorators/public.decorator.ts` | `@Public()` decorator to skip auth |
-| `apps/api/src/auth/decorators/user.decorator.ts` | `@CurrentUser()` parameter decorator |
+| File                                               | Purpose                                                   |
+| -------------------------------------------------- | --------------------------------------------------------- |
+| `apps/api/src/auth/guards/jwt-auth.guard.ts`       | Main authentication guard with dual JWT + API key support |
+| `apps/api/src/auth/guards/local-auth.guard.ts`     | Username/password authentication guard for login          |
+| `apps/api/src/auth/strategies/jwt.strategy.ts`     | Passport JWT strategy for token validation                |
+| `apps/api/src/auth/strategies/local.strategy.ts`   | Passport local strategy for login                         |
+| `apps/api/src/auth/strategies/github.strategy.ts`  | OAuth GitHub strategy                                     |
+| `apps/api/src/auth/strategies/google.strategy.ts`  | OAuth Google strategy                                     |
+| `apps/api/src/auth/decorators/public.decorator.ts` | `@Public()` decorator to skip auth                        |
+| `apps/api/src/auth/decorators/user.decorator.ts`   | `@CurrentUser()` parameter decorator                      |
 
 ## Key Classes
 
@@ -69,37 +69,37 @@ The primary guard applied globally. It checks three things in order:
 ```typescript
 @Injectable()
 export class JwtAuthGuard extends AuthGuard('jwt') {
-    constructor(
-        private reflector: Reflector,
-        private moduleRef: ModuleRef,
-    ) {
-        super();
-    }
+	constructor(
+		private reflector: Reflector,
+		private moduleRef: ModuleRef
+	) {
+		super();
+	}
 
-    async canActivate(context: ExecutionContext): Promise<boolean> {
-        // 1. Check @Public() metadata
-        const isPublic = this.reflector.getAllAndOverride<boolean>(
-            IS_PUBLIC_KEY,
-            [context.getHandler(), context.getClass()],
-        );
-        if (isPublic) return true;
+	async canActivate(context: ExecutionContext): Promise<boolean> {
+		// 1. Check @Public() metadata
+		const isPublic = this.reflector.getAllAndOverride<boolean>(IS_PUBLIC_KEY, [
+			context.getHandler(),
+			context.getClass()
+		]);
+		if (isPublic) return true;
 
-        // 2. Try API key authentication
-        const request = context.switchToHttp().getRequest();
-        const apiKey = this.extractApiKey(request);
-        if (apiKey) {
-            const keyRecord = await this.apiKeyService.validateKey(apiKey);
-            if (!keyRecord) {
-                throw new UnauthorizedException('Invalid or expired API key');
-            }
-            // Build user object and attach to request
-            request.user = authenticatedUser;
-            return true;
-        }
+		// 2. Try API key authentication
+		const request = context.switchToHttp().getRequest();
+		const apiKey = this.extractApiKey(request);
+		if (apiKey) {
+			const keyRecord = await this.apiKeyService.validateKey(apiKey);
+			if (!keyRecord) {
+				throw new UnauthorizedException('Invalid or expired API key');
+			}
+			// Build user object and attach to request
+			request.user = authenticatedUser;
+			return true;
+		}
 
-        // 3. Fall through to Passport JWT
-        return super.canActivate(context) as Promise<boolean>;
-    }
+		// 3. Fall through to Passport JWT
+		return super.canActivate(context) as Promise<boolean>;
+	}
 }
 ```
 
@@ -138,12 +138,10 @@ export const Public = () => SetMetadata(IS_PUBLIC_KEY, true);
 A parameter decorator that extracts the authenticated user from the request:
 
 ```typescript
-export const CurrentUser = createParamDecorator(
-    (data: unknown, ctx: ExecutionContext) => {
-        const request = ctx.switchToHttp().getRequest();
-        return request.user;
-    },
-);
+export const CurrentUser = createParamDecorator((data: unknown, ctx: ExecutionContext) => {
+	const request = ctx.switchToHttp().getRequest();
+	return request.user;
+});
 ```
 
 ### JWT Strategy
@@ -153,25 +151,25 @@ Configures Passport to validate JWT tokens from the `Authorization: Bearer <toke
 ```typescript
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy) {
-    constructor() {
-        super({
-            jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
-            ignoreExpiration: jwtConstants.isTokenExpirationDisabled(),
-            secretOrKey: jwtConstants.secret(),
-        });
-    }
+	constructor() {
+		super({
+			jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
+			ignoreExpiration: jwtConstants.isTokenExpirationDisabled(),
+			secretOrKey: jwtConstants.secret()
+		});
+	}
 
-    async validate(payload: JwtPayload): Promise<AuthenticatedUser> {
-        return {
-            userId: payload.sub,
-            email: payload.email,
-            username: payload.username,
-            provider: payload.provider,
-            emailVerified: payload.emailVerified,
-            isActive: payload.isActive,
-            avatar: payload.avatar,
-        };
-    }
+	async validate(payload: JwtPayload): Promise<AuthenticatedUser> {
+		return {
+			userId: payload.sub,
+			email: payload.email,
+			username: payload.username,
+			provider: payload.provider,
+			emailVerified: payload.emailVerified,
+			isActive: payload.isActive,
+			avatar: payload.avatar
+		};
+	}
 }
 ```
 
@@ -183,22 +181,22 @@ The `JwtAuthGuard` is registered globally in the API module so all routes requir
 
 ```typescript
 @Module({
-    providers: [
-        {
-            provide: APP_GUARD,
-            useClass: JwtAuthGuard,
-        },
-    ],
+	providers: [
+		{
+			provide: APP_GUARD,
+			useClass: JwtAuthGuard
+		}
+	]
 })
 export class AuthModule {}
 ```
 
 ### JWT Configuration
 
-| Environment Variable | Purpose |
-|---------------------|---------|
-| `JWT_SECRET` | Secret key for signing JWT tokens |
-| `JWT_EXPIRATION` | Token expiration time (e.g., `7d`) |
+| Environment Variable     | Purpose                                     |
+| ------------------------ | ------------------------------------------- |
+| `JWT_SECRET`             | Secret key for signing JWT tokens           |
+| `JWT_EXPIRATION`         | Token expiration time (e.g., `7d`)          |
 | `JWT_DISABLE_EXPIRATION` | Disable token expiration (development only) |
 
 ## Code Examples

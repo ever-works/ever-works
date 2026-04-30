@@ -27,10 +27,10 @@ Use API keys whenever you need programmatic access to the API without user inter
 
 ## Key Format
 
-| Part | Example | Description |
-|------|---------|-------------|
-| Prefix | `ew_live_` | Fixed prefix identifying Ever Works API keys |
-| Secret | `a1b2c3d4...` | 64 random hex characters (256 bits) |
+| Part     | Example                   | Description                                  |
+| -------- | ------------------------- | -------------------------------------------- |
+| Prefix   | `ew_live_`                | Fixed prefix identifying Ever Works API keys |
+| Secret   | `a1b2c3d4...`             | 64 random hex characters (256 bits)          |
 | Full key | `ew_live_a1b2c3d4e5f6...` | 76 characters total — shown only at creation |
 
 After creation, only the first 12 characters (the display prefix) are stored in plain text. The full key is hashed and cannot be recovered.
@@ -63,8 +63,8 @@ All endpoints require JWT authentication (API keys cannot be used to manage othe
 
 ### Create API Key
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
+| Method | Endpoint             | Description            |
+| ------ | -------------------- | ---------------------- |
 | `POST` | `/api/auth/api-keys` | Generate a new API key |
 
 ```bash
@@ -79,21 +79,21 @@ curl -X POST http://localhost:3100/api/auth/api-keys \
 
 **Request body:**
 
-| Field | Type | Required | Description |
-|-------|------|----------|-------------|
-| `name` | string | Yes | Descriptive label (max 100 characters) |
-| `expiresAt` | string | No | ISO 8601 expiration date (must be in the future) |
+| Field       | Type   | Required | Description                                      |
+| ----------- | ------ | -------- | ------------------------------------------------ |
+| `name`      | string | Yes      | Descriptive label (max 100 characters)           |
+| `expiresAt` | string | No       | ISO 8601 expiration date (must be in the future) |
 
 **Response:**
 
 ```json
 {
-  "id": "550e8400-e29b-41d4-a716-446655440000",
-  "name": "CI Pipeline",
-  "key": "ew_live_a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2",
-  "prefix": "ew_live_a1b2",
-  "expiresAt": "2027-01-01T00:00:00.000Z",
-  "createdAt": "2026-03-06T12:00:00.000Z"
+	"id": "550e8400-e29b-41d4-a716-446655440000",
+	"name": "CI Pipeline",
+	"key": "ew_live_a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2",
+	"prefix": "ew_live_a1b2",
+	"expiresAt": "2027-01-01T00:00:00.000Z",
+	"createdAt": "2026-03-06T12:00:00.000Z"
 }
 ```
 
@@ -103,9 +103,9 @@ The `key` field is only returned in this response. Copy it immediately and store
 
 ### List API Keys
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| `GET` | `/api/auth/api-keys` | List all API keys for the current user |
+| Method | Endpoint             | Description                            |
+| ------ | -------------------- | -------------------------------------- |
+| `GET`  | `/api/auth/api-keys` | List all API keys for the current user |
 
 ```bash
 curl http://localhost:3100/api/auth/api-keys \
@@ -116,14 +116,14 @@ curl http://localhost:3100/api/auth/api-keys \
 
 ```json
 [
-  {
-    "id": "550e8400-e29b-41d4-a716-446655440000",
-    "name": "CI Pipeline",
-    "prefix": "ew_live_a1b2",
-    "expiresAt": "2027-01-01T00:00:00.000Z",
-    "lastUsedAt": "2026-03-06T14:30:00.000Z",
-    "createdAt": "2026-03-06T12:00:00.000Z"
-  }
+	{
+		"id": "550e8400-e29b-41d4-a716-446655440000",
+		"name": "CI Pipeline",
+		"prefix": "ew_live_a1b2",
+		"expiresAt": "2027-01-01T00:00:00.000Z",
+		"lastUsedAt": "2026-03-06T14:30:00.000Z",
+		"createdAt": "2026-03-06T12:00:00.000Z"
+	}
 ]
 ```
 
@@ -131,8 +131,8 @@ The full key is never returned in list responses — only the display prefix.
 
 ### Revoke API Key
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
+| Method   | Endpoint                 | Description                              |
+| -------- | ------------------------ | ---------------------------------------- |
 | `DELETE` | `/api/auth/api-keys/:id` | Revoke and permanently delete an API key |
 
 ```bash

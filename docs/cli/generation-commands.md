@@ -1,7 +1,7 @@
 ---
 id: generation-commands
-title: "CLI Generation Commands"
-sidebar_label: "Generation Commands"
+title: 'CLI Generation Commands'
+sidebar_label: 'Generation Commands'
 sidebar_position: 7
 ---
 
@@ -13,12 +13,12 @@ The CLI provides four commands that cover the full content lifecycle: generating
 
 ## Command Overview
 
-| Command | Description | Source File |
-|---|---|---|
-| `directory generate` | Generate items and create/update the data repository | `generate.ts` |
-| `directory regenerate-markdown` | Regenerate the README.md from existing data | `regenerate-markdown.ts` |
-| `directory update-website` | Sync data repository content to the website repository | `update-website.ts` |
-| `directory deploy` | Deploy the website to the configured provider | `deploy.ts` |
+| Command                         | Description                                            | Source File              |
+| ------------------------------- | ------------------------------------------------------ | ------------------------ |
+| `directory generate`            | Generate items and create/update the data repository   | `generate.ts`            |
+| `directory regenerate-markdown` | Regenerate the README.md from existing data            | `regenerate-markdown.ts` |
+| `directory update-website`      | Sync data repository content to the website repository | `update-website.ts`      |
+| `directory deploy`              | Deploy the website to the configured provider          | `deploy.ts`              |
 
 ```mermaid
 graph LR
@@ -74,7 +74,7 @@ Prompts the user to select from their directories. Checks that generation is not
 
 ```typescript
 if (directory.generateStatus?.status === GenerateStatusType.GENERATING) {
-  // Already in progress — show current step and exit
+	// Already in progress — show current step and exit
 }
 ```
 
@@ -93,10 +93,7 @@ When a pipeline is selected, the schema is re-fetched with the pipeline ID to ge
 For each provider category in the schema (e.g. `ai-provider`, `search`, `screenshot`), the user selects which plugin to use:
 
 ```typescript
-const individualProviders = await generatePrompt.promptIndividualProviders(
-  schema,
-  lastRequestData?.providers
-);
+const individualProviders = await generatePrompt.promptIndividualProviders(schema, lastRequestData?.providers);
 ```
 
 Previous selections from the last generation run are used as defaults.
@@ -105,9 +102,9 @@ Previous selections from the last generation run are used as defaults.
 
 Two fields are always collected:
 
-| Field | Description |
-|---|---|
-| `name` | The directory name (read-only, pre-filled) |
+| Field    | Description                                                          |
+| -------- | -------------------------------------------------------------------- |
+| `name`   | The directory name (read-only, pre-filled)                           |
 | `prompt` | The generation prompt (pre-filled from last generation if available) |
 
 ### Step 6: Dynamic Plugin Fields
@@ -123,8 +120,8 @@ Before proceeding, the CLI validates that all selected providers are properly co
 ```typescript
 const unconfigured = findUnconfiguredProviders(providerSelections, schema);
 if (unconfigured.length > 0) {
-  console.log(`Unconfigured providers: ${unconfigured.join(', ')}`);
-  // Exit — user must configure in Settings > Plugins
+	console.log(`Unconfigured providers: ${unconfigured.join(', ')}`);
+	// Exit — user must configure in Settings > Plugins
 }
 ```
 
@@ -132,11 +129,11 @@ if (unconfigured.length > 0) {
 
 For previously generated directories, the user chooses:
 
-| Option | Values | Description |
-|---|---|---|
-| `generation_method` | `CREATE_UPDATE`, `RECREATE` | Whether to update existing items or start from scratch |
-| `update_with_pull_request` | `true`, `false` | Whether updates go through a PR workflow |
-| `website_repository_creation_method` | `CREATE_USING_TEMPLATE`, etc. | How the website repository is created |
+| Option                               | Values                        | Description                                            |
+| ------------------------------------ | ----------------------------- | ------------------------------------------------------ |
+| `generation_method`                  | `CREATE_UPDATE`, `RECREATE`   | Whether to update existing items or start from scratch |
+| `update_with_pull_request`           | `true`, `false`               | Whether updates go through a PR workflow               |
+| `website_repository_creation_method` | `CREATE_USING_TEMPLATE`, etc. | How the website repository is created                  |
 
 Selecting `RECREATE` triggers an extra confirmation since it deletes existing items.
 
@@ -256,12 +253,12 @@ stateDiagram-v2
     StateD --> ExecuteDeploy
 ```
 
-| State | Condition | Behavior |
-|---|---|---|
-| A | No `deployProvider` set | Prompt user to select a provider. If valid, proceed to deploy. |
-| B | Has provider, `canDeploy=false`, shared directory | Tell user the owner must configure their token. |
-| C | Has provider, `canDeploy=false`, owned directory | Tell user to configure their token. Offer to switch providers. |
-| D | Has provider, `canDeploy=true` | Execute the deployment. |
+| State | Condition                                         | Behavior                                                       |
+| ----- | ------------------------------------------------- | -------------------------------------------------------------- |
+| A     | No `deployProvider` set                           | Prompt user to select a provider. If valid, proceed to deploy. |
+| B     | Has provider, `canDeploy=false`, shared directory | Tell user the owner must configure their token.                |
+| C     | Has provider, `canDeploy=false`, owned directory  | Tell user to configure their token. Offer to switch providers. |
+| D     | Has provider, `canDeploy=true`                    | Execute the deployment.                                        |
 
 ### Deployment Execution
 
@@ -279,15 +276,15 @@ The `executeDeploy()` function handles the full deployment lifecycle:
 const STOP_STATES = ['READY', 'ERROR', 'CANCELED', 'TIMEOUT'];
 
 while (true) {
-  const { directory } = await apiService.getDirectory(directoryId);
+	const { directory } = await apiService.getDirectory(directoryId);
 
-  if (STOP_STATES.includes(directory.deploymentState)) {
-    // Show final status and website URL
-    break;
-  }
+	if (STOP_STATES.includes(directory.deploymentState)) {
+		// Show final status and website URL
+		break;
+	}
 
-  // Update spinner text with current state
-  await new Promise(resolve => setTimeout(resolve, 5000));
+	// Update spinner text with current state
+	await new Promise((resolve) => setTimeout(resolve, 5000));
 }
 ```
 
@@ -295,22 +292,22 @@ The `isDeploying()` helper prevents false positives by checking that the deploym
 
 ```typescript
 function isDeploying(directory: Directory) {
-  const hasDeploymentState = ['INITIALIZING', 'QUEUED', 'BUILDING']
-    .includes(directory.deploymentState);
-  const hasStartedAt = directory.deploymentStartedAt &&
-    new Date(directory.deploymentStartedAt) > new Date(Date.now() - 10 * 60 * 1000);
-  return Boolean(hasDeploymentState && hasStartedAt);
+	const hasDeploymentState = ['INITIALIZING', 'QUEUED', 'BUILDING'].includes(directory.deploymentState);
+	const hasStartedAt =
+		directory.deploymentStartedAt &&
+		new Date(directory.deploymentStartedAt) > new Date(Date.now() - 10 * 60 * 1000);
+	return Boolean(hasDeploymentState && hasStartedAt);
 }
 ```
 
 ### Terminal States
 
-| State | Spinner | Output |
-|---|---|---|
-| `READY` | Success | Website URL |
-| `ERROR` | Fail | Error message if available |
-| `CANCELED` | Warning | -- |
-| `TIMEOUT` | Fail | -- |
+| State      | Spinner | Output                     |
+| ---------- | ------- | -------------------------- |
+| `READY`    | Success | Website URL                |
+| `ERROR`    | Fail    | Error message if available |
+| `CANCELED` | Warning | --                         |
+| `TIMEOUT`  | Fail    | --                         |
 
 ## Common Patterns
 
@@ -337,8 +334,8 @@ Interactive directory picker with role and sharing information.
 
 ```typescript
 if (!canEdit(role)) {
-  // Show error — requires editor or higher
-  return;
+	// Show error — requires editor or higher
+	return;
 }
 ```
 

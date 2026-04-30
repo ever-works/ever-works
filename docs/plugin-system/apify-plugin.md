@@ -1,7 +1,7 @@
 ---
 id: apify-plugin
-title: "Apify Plugin"
-sidebar_label: "Apify"
+title: 'Apify Plugin'
+sidebar_label: 'Apify'
 sidebar_position: 26
 ---
 
@@ -13,15 +13,15 @@ The Apify plugin imports items from [Apify](https://apify.com) datasets and acto
 
 ## Overview
 
-| Property | Value |
-|---|---|
-| Plugin ID | `apify` |
-| Category | `data-source` |
-| Capabilities | `data-source`, `form-schema-provider` |
-| Version | `1.0.0` |
-| Built-in | No |
-| System plugin | No |
-| Auto-enable | No |
+| Property      | Value                                 |
+| ------------- | ------------------------------------- |
+| Plugin ID     | `apify`                               |
+| Category      | `data-source`                         |
+| Capabilities  | `data-source`, `form-schema-provider` |
+| Version       | `1.0.0`                               |
+| Built-in      | No                                    |
+| System plugin | No                                    |
+| Auto-enable   | No                                    |
 
 Unlike system plugins, the Apify plugin must be explicitly installed and enabled by users. It implements two interfaces: `IDataSourcePlugin` for querying items and `IFormSchemaProvider` for injecting fields into the directory generation form.
 
@@ -46,43 +46,43 @@ graph TD
 
 The plugin uses a three-level configuration approach:
 
-| Level | Where | What |
-|---|---|---|
-| Level 1 | Settings > Plugins | API token (admin or user scope) |
-| Level 2 | Directory plugin settings | Enable/disable per directory |
-| Level 3 | Generation form | Dataset ID, actor run ID, max items, relevance filter |
+| Level   | Where                     | What                                                  |
+| ------- | ------------------------- | ----------------------------------------------------- |
+| Level 1 | Settings > Plugins        | API token (admin or user scope)                       |
+| Level 2 | Directory plugin settings | Enable/disable per directory                          |
+| Level 3 | Generation form           | Dataset ID, actor run ID, max items, relevance filter |
 
 ## Configuration
 
 ### Settings Schema (Level 1)
 
-| Setting | Type | Required | Scope | Description |
-|---|---|---|---|---|
-| `apiToken` | `string` | Yes | `user` | Apify API token (marked as secret) |
-| `defaultFieldMapping` | `object` | No | -- | Default mapping from Apify fields to item fields |
+| Setting               | Type     | Required | Scope  | Description                                      |
+| --------------------- | -------- | -------- | ------ | ------------------------------------------------ |
+| `apiToken`            | `string` | Yes      | `user` | Apify API token (marked as secret)               |
+| `defaultFieldMapping` | `object` | No       | --     | Default mapping from Apify fields to item fields |
 
 ### Default Field Mapping
 
 The field mapping controls how Apify dataset fields are transformed into Ever Works `ItemData` properties:
 
-| ItemData Field | Default Apify Field | Description |
-|---|---|---|
-| `name` | `title` | Item display name |
-| `description` | `description` | Item description text |
-| `source_url` | `url` | Original source URL |
-| `category` | `category` | Category classification |
-| `image_url` | `image` | Image URL (mapped to `images[]` array) |
+| ItemData Field | Default Apify Field | Description                            |
+| -------------- | ------------------- | -------------------------------------- |
+| `name`         | `title`             | Item display name                      |
+| `description`  | `description`       | Item description text                  |
+| `source_url`   | `url`               | Original source URL                    |
+| `category`     | `category`          | Category classification                |
+| `image_url`    | `image`             | Image URL (mapped to `images[]` array) |
 
 ### Generation Form Fields (Level 3)
 
 The plugin injects these fields into the generation form via `IFormSchemaProvider`:
 
-| Field Name | Type | Default | Description |
-|---|---|---|---|
-| `apify_datasetId` | `text` | (empty) | Apify dataset ID to import from |
-| `apify_actorRunId` | `text` | (empty) | Import from a specific actor run instead |
-| `apify_maxItems` | `number` | `100` | Maximum items to import (0 = no limit) |
-| `apify_filterByRelevance` | `boolean` | `true` | Only import items relevant to the directory prompt |
+| Field Name                | Type      | Default | Description                                        |
+| ------------------------- | --------- | ------- | -------------------------------------------------- |
+| `apify_datasetId`         | `text`    | (empty) | Apify dataset ID to import from                    |
+| `apify_actorRunId`        | `text`    | (empty) | Import from a specific actor run instead           |
+| `apify_maxItems`          | `number`  | `100`   | Maximum items to import (0 = no limit)             |
+| `apify_filterByRelevance` | `boolean` | `true`  | Only import items relevant to the directory prompt |
 
 These fields are grouped under a collapsible "Apify" section:
 
@@ -125,9 +125,9 @@ sequenceDiagram
 
 The plugin constructs different API URLs depending on whether a dataset ID or actor run ID is provided:
 
-| Source | API Endpoint |
-|---|---|
-| Dataset | `https://api.apify.com/v2/datasets/{datasetId}/items` |
+| Source    | API Endpoint                                                     |
+| --------- | ---------------------------------------------------------------- |
+| Dataset   | `https://api.apify.com/v2/datasets/{datasetId}/items`            |
 | Actor run | `https://api.apify.com/v2/actor-runs/{actorRunId}/dataset/items` |
 
 The API token and item limit are passed as query parameters.
@@ -219,10 +219,10 @@ transformFormValues(values) {
 
 ## Troubleshooting
 
-| Issue | Cause | Solution |
-|---|---|---|
-| Empty import results | Invalid dataset ID or empty dataset | Verify the dataset ID in the Apify console |
-| "Apify API token not configured" | No API token set | Enter your token in plugin settings |
-| "Apify API error: 401" | Invalid API token | Regenerate the token in Apify Settings > Integrations |
-| Irrelevant items imported | Relevance filter disabled or keywords too broad | Enable filtering and refine the directory prompt |
-| Missing fields in imported items | Field mapping does not match dataset structure | Update the default field mapping in plugin settings |
+| Issue                            | Cause                                           | Solution                                              |
+| -------------------------------- | ----------------------------------------------- | ----------------------------------------------------- |
+| Empty import results             | Invalid dataset ID or empty dataset             | Verify the dataset ID in the Apify console            |
+| "Apify API token not configured" | No API token set                                | Enter your token in plugin settings                   |
+| "Apify API error: 401"           | Invalid API token                               | Regenerate the token in Apify Settings > Integrations |
+| Irrelevant items imported        | Relevance filter disabled or keywords too broad | Enable filtering and refine the directory prompt      |
+| Missing fields in imported items | Field mapping does not match dataset structure  | Update the default field mapping in plugin settings   |

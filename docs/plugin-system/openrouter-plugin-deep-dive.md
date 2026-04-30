@@ -33,24 +33,24 @@ BaseAiProvider (from @ever-works/plugin/abstract)
 
 ### Provider Configuration
 
-| Property | Value |
-|----------|-------|
-| Base URL | `https://openrouter.ai/api/v1` |
-| Default Model | `openai/gpt-5.1` |
-| Simple Tier | `openai/gpt-5-nano` |
-| Medium Tier | `openai/gpt-4o` |
-| Complex Tier | *(uses default: openai/gpt-5.1)* |
-| Max Context Tokens | `128000` |
-| Supports Embeddings | `true` (inherited default) |
-| Supports Vision | `false` |
+| Property            | Value                            |
+| ------------------- | -------------------------------- |
+| Base URL            | `https://openrouter.ai/api/v1`   |
+| Default Model       | `openai/gpt-5.1`                 |
+| Simple Tier         | `openai/gpt-5-nano`              |
+| Medium Tier         | `openai/gpt-4o`                  |
+| Complex Tier        | _(uses default: openai/gpt-5.1)_ |
+| Max Context Tokens  | `128000`                         |
+| Supports Embeddings | `true` (inherited default)       |
+| Supports Vision     | `false`                          |
 
 ### Model Tiers
 
-| Tier | Model | Use Case |
-|------|-------|----------|
-| **Simple** | `openai/gpt-5-nano` | Lightweight tasks (prompt processing, domain detection) |
-| **Medium** | `openai/gpt-4o` | Balanced tasks (content extraction, search queries) |
-| **Complex/Default** | `openai/gpt-5.1` | Complex reasoning (AI generation, data aggregation) |
+| Tier                | Model               | Use Case                                                |
+| ------------------- | ------------------- | ------------------------------------------------------- |
+| **Simple**          | `openai/gpt-5-nano` | Lightweight tasks (prompt processing, domain detection) |
+| **Medium**          | `openai/gpt-4o`     | Balanced tasks (content extraction, search queries)     |
+| **Complex/Default** | `openai/gpt-5.1`    | Complex reasoning (AI generation, data aggregation)     |
 
 ### System Plugin Role
 
@@ -68,24 +68,25 @@ This ensures that the platform always has an AI provider available, even before 
 
 ### Settings Schema
 
-| Field | Type | Required | Description |
-|-------|------|----------|-------------|
-| `apiKey` | `string` | Yes | OpenRouter API key (`x-secret`, `x-envVar: PLUGIN_OPENROUTER_API_KEY`, `x-scope: user`) |
-| `model` | `string` | No | Override default model (`default: openai/gpt-5.1`) |
-| `simpleModel` | `string` | No | Model for simple tasks (`default: openai/gpt-5-nano`) |
-| `mediumModel` | `string` | No | Model for medium tasks (`default: openai/gpt-4o`) |
-| `complexModel` | `string` | No | Model for complex tasks |
-| `maxContextTokens` | `number` | No | Override max context window (`default: 128000`) |
+| Field              | Type     | Required | Description                                                                             |
+| ------------------ | -------- | -------- | --------------------------------------------------------------------------------------- |
+| `apiKey`           | `string` | Yes      | OpenRouter API key (`x-secret`, `x-envVar: PLUGIN_OPENROUTER_API_KEY`, `x-scope: user`) |
+| `model`            | `string` | No       | Override default model (`default: openai/gpt-5.1`)                                      |
+| `simpleModel`      | `string` | No       | Model for simple tasks (`default: openai/gpt-5-nano`)                                   |
+| `mediumModel`      | `string` | No       | Model for medium tasks (`default: openai/gpt-4o`)                                       |
+| `complexModel`     | `string` | No       | Model for complex tasks                                                                 |
+| `maxContextTokens` | `number` | No       | Override max context window (`default: 128000`)                                         |
 
 ### Environment Variables
 
-| Variable | Maps To |
-|----------|---------|
+| Variable                    | Maps To  |
+| --------------------------- | -------- |
 | `PLUGIN_OPENROUTER_API_KEY` | `apiKey` |
 
 ### Configuration Mode: `hybrid`
 
 Unlike other AI providers that use `user-required`, OpenRouter uses `hybrid` mode. This means:
+
 - Admin can set a global API key for all users (admin-level configuration)
 - Individual users can override with their own API key (user-level configuration)
 - This supports the platform's default provider role -- admin can configure one key for everyone
@@ -119,16 +120,16 @@ Through `BaseAiProvider` and `AiOperations`:
 
 ```typescript
 class OpenRouterPlugin extends BaseAiProvider {
-    readonly id = 'openrouter';
-    readonly name = 'OpenRouter';
-    readonly version = '1.0.0';
-    readonly providerName = 'OpenRouter';
+	readonly id = 'openrouter';
+	readonly name = 'OpenRouter';
+	readonly version = '1.0.0';
+	readonly providerName = 'OpenRouter';
 
-    // Inherited from BaseAiProvider:
-    async askText(prompt: string, options?: AiRequestOptions): Promise<AiTextResult>;
-    async askJson<T>(prompt: string, schema: ZodSchema<T>, options?: AiRequestOptions): Promise<AiJsonResult<T>>;
-    async getEmbeddings(text: string): Promise<number[]>;
-    resolveConfig(settings: PluginSettings): ProviderConfig;
+	// Inherited from BaseAiProvider:
+	async askText(prompt: string, options?: AiRequestOptions): Promise<AiTextResult>;
+	async askJson<T>(prompt: string, schema: ZodSchema<T>, options?: AiRequestOptions): Promise<AiJsonResult<T>>;
+	async getEmbeddings(text: string): Promise<number[]>;
+	resolveConfig(settings: PluginSettings): ProviderConfig;
 }
 ```
 
@@ -169,6 +170,7 @@ getManifest(): PluginManifest {
 ### OpenRouter Model IDs
 
 OpenRouter uses a `provider/model` naming convention:
+
 - `openai/gpt-5.1` - OpenAI's GPT-5.1 via OpenRouter
 - `openai/gpt-5-nano` - OpenAI's GPT-5 Nano via OpenRouter
 - `openai/gpt-4o` - OpenAI's GPT-4o via OpenRouter
@@ -180,6 +182,7 @@ Users can override the default models with any valid OpenRouter model ID.
 ### OpenAI Compatibility
 
 OpenRouter's API at `https://openrouter.ai/api/v1` is fully OpenAI-compatible:
+
 - Chat completions (`/chat/completions`)
 - Embeddings (`/embeddings`)
 - Function/tool calling
@@ -203,11 +206,11 @@ This ensures the platform is functional out of the box with just an admin-level 
 ```typescript
 // Admin sets a global API key for all users
 const adminSettings = {
-    apiKey: 'sk-or-v1-...',  // OpenRouter API key
-    // Default tiers apply:
-    // simple: openai/gpt-5-nano
-    // medium: openai/gpt-4o
-    // complex: openai/gpt-5.1
+	apiKey: 'sk-or-v1-...' // OpenRouter API key
+	// Default tiers apply:
+	// simple: openai/gpt-5-nano
+	// medium: openai/gpt-4o
+	// complex: openai/gpt-5.1
 };
 ```
 
@@ -216,10 +219,10 @@ const adminSettings = {
 ```typescript
 // User overrides with their own key and preferred models
 const userSettings = {
-    apiKey: 'sk-or-v1-user-key',
-    model: 'anthropic/claude-sonnet-4-20250514',
-    simpleModel: 'google/gemini-2.0-flash',
-    complexModel: 'anthropic/claude-opus-4-20250514'
+	apiKey: 'sk-or-v1-user-key',
+	model: 'anthropic/claude-sonnet-4-20250514',
+	simpleModel: 'google/gemini-2.0-flash',
+	complexModel: 'anthropic/claude-opus-4-20250514'
 };
 ```
 
@@ -228,10 +231,10 @@ const userSettings = {
 ```typescript
 // Users can specify any model available on OpenRouter
 const settings = {
-    apiKey: 'sk-or-v1-...',
-    model: 'meta-llama/llama-4-maverick',
-    simpleModel: 'meta-llama/llama-4-scout',
-    complexModel: 'deepseek/deepseek-r1'
+	apiKey: 'sk-or-v1-...',
+	model: 'meta-llama/llama-4-maverick',
+	simpleModel: 'meta-llama/llama-4-scout',
+	complexModel: 'deepseek/deepseek-r1'
 };
 ```
 
@@ -239,13 +242,13 @@ const settings = {
 
 ### Common Errors
 
-| Error | Cause | Resolution |
-|-------|-------|------------|
-| `401 Unauthorized` | Invalid API key | Verify key at [openrouter.ai/keys](https://openrouter.ai/keys) |
-| `402 Payment Required` | Insufficient credits | Add credits to OpenRouter account |
-| `429 Rate Limited` | Too many requests | Check rate limits, implement backoff |
-| `Model not found` | Invalid model ID | Verify model exists on OpenRouter |
-| `Upstream provider error` | Model provider issue | Try different model or wait |
+| Error                     | Cause                | Resolution                                                     |
+| ------------------------- | -------------------- | -------------------------------------------------------------- |
+| `401 Unauthorized`        | Invalid API key      | Verify key at [openrouter.ai/keys](https://openrouter.ai/keys) |
+| `402 Payment Required`    | Insufficient credits | Add credits to OpenRouter account                              |
+| `429 Rate Limited`        | Too many requests    | Check rate limits, implement backoff                           |
+| `Model not found`         | Invalid model ID     | Verify model exists on OpenRouter                              |
+| `Upstream provider error` | Model provider issue | Try different model or wait                                    |
 
 ### Health Check
 

@@ -1,7 +1,7 @@
 ---
 id: tavily-plugin
-title: "Tavily Plugin"
-sidebar_label: "Tavily"
+title: 'Tavily Plugin'
+sidebar_label: 'Tavily'
 sidebar_position: 25
 ---
 
@@ -13,17 +13,17 @@ The Tavily plugin provides AI-optimized web search and content extraction throug
 
 ## Overview
 
-| Property | Value |
-|---|---|
-| Plugin ID | `tavily` |
-| Category | `search` |
-| Capabilities | `search`, `content-extractor` |
-| Version | `1.0.0` |
-| Configuration Mode | `hybrid` |
-| Auto-enable | Yes |
-| System plugin | Yes |
-| Default for | `search` capability |
-| SDK | `@tavily/core` |
+| Property           | Value                         |
+| ------------------ | ----------------------------- |
+| Plugin ID          | `tavily`                      |
+| Category           | `search`                      |
+| Capabilities       | `search`, `content-extractor` |
+| Version            | `1.0.0`                       |
+| Configuration Mode | `hybrid`                      |
+| Auto-enable        | Yes                           |
+| System plugin      | Yes                           |
+| Default for        | `search` capability           |
+| SDK                | `@tavily/core`                |
 
 The plugin implements three interfaces: `IPlugin`, `ISearchPlugin`, and `IContentExtractorPlugin`. It is a system plugin that is auto-enabled and serves as the default search provider.
 
@@ -44,9 +44,9 @@ graph TD
 
 Unlike single-purpose plugins, Tavily handles both search and content extraction:
 
-| Capability | Method | Description |
-|---|---|---|
-| `search` | `search(options)` | Find web pages relevant to a query |
+| Capability          | Method             | Description                        |
+| ------------------- | ------------------ | ---------------------------------- |
+| `search`            | `search(options)`  | Find web pages relevant to a query |
 | `content-extractor` | `extract(options)` | Pull clean text content from a URL |
 
 During directory generation, the pipeline uses the search capability to discover sources and the content extraction capability to pull full text from those sources.
@@ -55,22 +55,22 @@ During directory generation, the pipeline uses the search capability to discover
 
 ### Settings Schema
 
-| Setting | Type | Required | Scope | Description |
-|---|---|---|---|---|
-| `apiKey` | `string` | Yes | `user` | Tavily API key (marked as secret) |
+| Setting  | Type     | Required | Scope  | Description                       |
+| -------- | -------- | -------- | ------ | --------------------------------- |
+| `apiKey` | `string` | Yes      | `user` | Tavily API key (marked as secret) |
 
 The API key is mapped to the environment variable `PLUGIN_TAVILY_API_KEY` via the `x-envVar` schema extension:
 
 ```json
 {
-    "apiKey": {
-        "type": "string",
-        "title": "API Key",
-        "description": "Your Tavily API key. Get one at https://tavily.com",
-        "x-secret": true,
-        "x-envVar": "PLUGIN_TAVILY_API_KEY",
-        "x-scope": "user"
-    }
+	"apiKey": {
+		"type": "string",
+		"title": "API Key",
+		"description": "Your Tavily API key. Get one at https://tavily.com",
+		"x-secret": true,
+		"x-envVar": "PLUGIN_TAVILY_API_KEY",
+		"x-scope": "user"
+	}
 }
 ```
 
@@ -104,13 +104,13 @@ async search(options: SearchOptions): Promise<SearchResponse>
 
 ### Search Options
 
-| Option | Type | Default | Description |
-|---|---|---|---|
-| `query` | `string` | (required) | The search query |
-| `limit` | `number` | `20` | Maximum number of results to return |
-| `includeDomains` | `string[]` | (empty) | Only include results from these domains |
-| `excludeDomains` | `string[]` | (empty) | Exclude results from these domains |
-| `settings` | `PluginSettings` | (resolved) | Plugin settings including the API key |
+| Option           | Type             | Default    | Description                             |
+| ---------------- | ---------------- | ---------- | --------------------------------------- |
+| `query`          | `string`         | (required) | The search query                        |
+| `limit`          | `number`         | `20`       | Maximum number of results to return     |
+| `includeDomains` | `string[]`       | (empty)    | Only include results from these domains |
+| `excludeDomains` | `string[]`       | (empty)    | Exclude results from these domains      |
+| `settings`       | `PluginSettings` | (resolved) | Plugin settings including the API key   |
 
 ### Search Behavior
 
@@ -118,10 +118,10 @@ The plugin uses `searchDepth: 'advanced'` for all queries, which performs a more
 
 ```typescript
 const response = await client.search(options.query, {
-    searchDepth: 'advanced',
-    maxResults,
-    includeDomains: options.includeDomains,
-    excludeDomains: options.excludeDomains
+	searchDepth: 'advanced',
+	maxResults,
+	includeDomains: options.includeDomains,
+	excludeDomains: options.excludeDomains
 });
 ```
 
@@ -129,15 +129,15 @@ const response = await client.search(options.query, {
 
 Each result in the `SearchResponse` contains:
 
-| Field | Source | Description |
-|---|---|---|
-| `title` | Tavily `title` | Page title |
-| `url` | Tavily `url` | Page URL |
-| `snippet` | Tavily `content` | Extracted text snippet |
-| `position` | Index + 1 | Result ranking position |
-| `publishedDate` | Tavily `publishedDate` | Publication date if available |
-| `metadata.score` | Tavily `score` | Relevance score |
-| `metadata.rawContent` | Tavily `rawContent` | Full extracted content |
+| Field                 | Source                 | Description                   |
+| --------------------- | ---------------------- | ----------------------------- |
+| `title`               | Tavily `title`         | Page title                    |
+| `url`                 | Tavily `url`           | Page URL                      |
+| `snippet`             | Tavily `content`       | Extracted text snippet        |
+| `position`            | Index + 1              | Result ranking position       |
+| `publishedDate`       | Tavily `publishedDate` | Publication date if available |
+| `metadata.score`      | Tavily `score`         | Relevance score               |
+| `metadata.rawContent` | Tavily `rawContent`    | Full extracted content        |
 
 ## Content Extraction
 
@@ -155,15 +155,15 @@ const response = await client.extract([options.url]);
 
 The result includes:
 
-| Field | Description |
-|---|---|
-| `success` | Whether extraction succeeded |
-| `url` | The requested URL |
-| `finalUrl` | The resolved URL if it differs from the request |
-| `content` | Extracted text content |
-| `markdown` | Content in markdown format |
-| `wordCount` | Number of words extracted |
-| `duration` | Time taken in milliseconds |
+| Field       | Description                                     |
+| ----------- | ----------------------------------------------- |
+| `success`   | Whether extraction succeeded                    |
+| `url`       | The requested URL                               |
+| `finalUrl`  | The resolved URL if it differs from the request |
+| `content`   | Extracted text content                          |
+| `markdown`  | Content in markdown format                      |
+| `wordCount` | Number of words extracted                       |
+| `duration`  | Time taken in milliseconds                      |
 
 ### Batch Extraction
 
@@ -245,9 +245,9 @@ sequenceDiagram
 
 ## Troubleshooting
 
-| Issue | Cause | Solution |
-|---|---|---|
-| "Tavily API key not configured" | No API key at any settings level | Set the key in plugin settings or `.env` |
-| Search returns empty results | Query too specific or domain filters too strict | Broaden the query or remove domain filters |
-| Extraction returns no content | Page blocks automated access | Try a different content extractor plugin |
-| Rate limit errors | Too many API calls | Check your Tavily plan limits and reduce batch sizes |
+| Issue                           | Cause                                           | Solution                                             |
+| ------------------------------- | ----------------------------------------------- | ---------------------------------------------------- |
+| "Tavily API key not configured" | No API key at any settings level                | Set the key in plugin settings or `.env`             |
+| Search returns empty results    | Query too specific or domain filters too strict | Broaden the query or remove domain filters           |
+| Extraction returns no content   | Page blocks automated access                    | Try a different content extractor plugin             |
+| Rate limit errors               | Too many API calls                              | Check your Tavily plan limits and reduce batch sizes |

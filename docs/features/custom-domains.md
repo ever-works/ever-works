@@ -31,10 +31,10 @@ Use custom domains when you want a branded URL for your directory — for exampl
 
 After adding a domain, configure your DNS based on the domain type:
 
-| Domain Type | DNS Record | Example |
-|-------------|-----------|---------|
-| Subdomain (e.g., `blog.example.com`) | `CNAME` pointing to provider | `CNAME blog cname.vercel-dns.com` |
-| Apex domain (e.g., `example.com`) | `A` record pointing to provider IP | `A @ 76.76.21.21` |
+| Domain Type                          | DNS Record                         | Example                           |
+| ------------------------------------ | ---------------------------------- | --------------------------------- |
+| Subdomain (e.g., `blog.example.com`) | `CNAME` pointing to provider       | `CNAME blog cname.vercel-dns.com` |
+| Apex domain (e.g., `example.com`)    | `A` record pointing to provider IP | `A @ 76.76.21.21`                 |
 
 The exact values depend on your deployment provider. Check the verification response for provider-specific DNS instructions.
 
@@ -48,9 +48,9 @@ All endpoints require JWT or API key authentication and directory edit permissio
 
 ### List Domains
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| `GET` | `/api/deploy/directories/:id/domains` | List all custom domains for a directory |
+| Method | Endpoint                              | Description                             |
+| ------ | ------------------------------------- | --------------------------------------- |
+| `GET`  | `/api/deploy/directories/:id/domains` | List all custom domains for a directory |
 
 ```bash
 curl http://localhost:3100/api/deploy/directories/<directory-id>/domains \
@@ -61,21 +61,21 @@ curl http://localhost:3100/api/deploy/directories/<directory-id>/domains \
 
 ```json
 {
-  "domains": [
-    {
-      "domain": "tools.example.com",
-      "verified": true,
-      "environment": "production",
-      "provider": "vercel"
-    }
-  ]
+	"domains": [
+		{
+			"domain": "tools.example.com",
+			"verified": true,
+			"environment": "production",
+			"provider": "vercel"
+		}
+	]
 }
 ```
 
 ### Add Domain
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
+| Method | Endpoint                              | Description         |
+| ------ | ------------------------------------- | ------------------- |
 | `POST` | `/api/deploy/directories/:id/domains` | Add a custom domain |
 
 ```bash
@@ -87,16 +87,16 @@ curl -X POST http://localhost:3100/api/deploy/directories/<directory-id>/domains
 
 **Request body:**
 
-| Field | Type | Required | Description |
-|-------|------|----------|-------------|
-| `domain` | string | Yes | Domain name (e.g., `tools.example.com`) |
+| Field    | Type   | Required | Description                             |
+| -------- | ------ | -------- | --------------------------------------- |
+| `domain` | string | Yes      | Domain name (e.g., `tools.example.com`) |
 
 **Response** includes provider verification details (DNS records to configure).
 
 ### Remove Domain
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
+| Method   | Endpoint                                      | Description            |
+| -------- | --------------------------------------------- | ---------------------- |
 | `DELETE` | `/api/deploy/directories/:id/domains/:domain` | Remove a custom domain |
 
 ```bash
@@ -108,8 +108,8 @@ Removes the domain from both the database and the deployment provider.
 
 ### Verify Domain
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
+| Method | Endpoint                                             | Description              |
+| ------ | ---------------------------------------------------- | ------------------------ |
 | `POST` | `/api/deploy/directories/:id/domains/:domain/verify` | Trigger DNS verification |
 
 ```bash
@@ -121,8 +121,8 @@ curl -X POST http://localhost:3100/api/deploy/directories/<directory-id>/domains
 
 ```json
 {
-  "verified": true,
-  "domain": "tools.example.com"
+	"verified": true,
+	"domain": "tools.example.com"
 }
 ```
 
@@ -130,12 +130,12 @@ If DNS is not yet configured, `verified` will be `false`. Re-run verification af
 
 ## Domain Record Fields
 
-| Field | Type | Description |
-|-------|------|-------------|
-| `domain` | string | The domain name |
-| `verified` | boolean | Whether DNS verification has passed |
-| `environment` | string | Deployment environment (default: `production`) |
-| `provider` | string | Which deployment provider manages this domain |
+| Field         | Type    | Description                                    |
+| ------------- | ------- | ---------------------------------------------- |
+| `domain`      | string  | The domain name                                |
+| `verified`    | boolean | Whether DNS verification has passed            |
+| `environment` | string  | Deployment environment (default: `production`) |
+| `provider`    | string  | Which deployment provider manages this domain  |
 
 ## Related
 

@@ -1,7 +1,7 @@
 ---
 id: anthropic-plugin-deep-dive
-title: "Anthropic Plugin Deep Dive"
-sidebar_label: "Anthropic Deep Dive"
+title: 'Anthropic Plugin Deep Dive'
+sidebar_label: 'Anthropic Deep Dive'
 sidebar_position: 54
 ---
 
@@ -28,22 +28,22 @@ On `onLoad`, the plugin creates an `AiOperations` instance configured with `prov
 
 ### Environment Variables
 
-| Variable | Required | Description |
-|----------|----------|-------------|
-| N/A | -- | No environment-variable fallbacks; users provide their own API key |
+| Variable | Required | Description                                                        |
+| -------- | -------- | ------------------------------------------------------------------ |
+| N/A      | --       | No environment-variable fallbacks; users provide their own API key |
 
 ### Settings Schema
 
 ```typescript
 interface AnthropicSettings {
-  apiKey: string;           // Anthropic API key (x-secret, user-scoped, required)
-  defaultModel: string;     // Default model (default: 'claude-sonnet-4-5-20250514')
-  simpleModel: string;      // Simple tasks model (default: 'claude-haiku-4-5-20251001')
-  mediumModel: string;      // Standard tasks model (default: 'claude-sonnet-4-5-20250929')
-  complexModel: string;     // Complex tasks model (default: 'claude-sonnet-4-5-20250514')
-  baseUrl: string;          // Custom API endpoint (default: 'https://api.anthropic.com/v1/', hidden)
-  temperature: number;      // Response randomness, 0-2 (default: 0.7, hidden)
-  maxTokens: number;        // Max response length (default: 4096, hidden)
+	apiKey: string; // Anthropic API key (x-secret, user-scoped, required)
+	defaultModel: string; // Default model (default: 'claude-sonnet-4-5-20250514')
+	simpleModel: string; // Simple tasks model (default: 'claude-haiku-4-5-20251001')
+	mediumModel: string; // Standard tasks model (default: 'claude-sonnet-4-5-20250929')
+	complexModel: string; // Complex tasks model (default: 'claude-sonnet-4-5-20250514')
+	baseUrl: string; // Custom API endpoint (default: 'https://api.anthropic.com/v1/', hidden)
+	temperature: number; // Response randomness, 0-2 (default: 0.7, hidden)
+	maxTokens: number; // Max response length (default: 4096, hidden)
 }
 ```
 
@@ -53,14 +53,14 @@ interface AnthropicSettings {
 
 ## Capabilities
 
-| Capability | Supported | Details |
-|------------|-----------|---------|
-| Structured output | Yes | JSON mode and tool use |
-| Streaming | Yes | Server-sent events via async iterables |
-| Tool calling | Yes | Tool use for structured data extraction |
-| Vision | Yes | Image analysis with Claude models |
-| Embeddings | No | Throws `Error('Embeddings not supported by Anthropic')` |
-| Max context | 200,000 tokens | Claude's extended context window |
+| Capability        | Supported      | Details                                                 |
+| ----------------- | -------------- | ------------------------------------------------------- |
+| Structured output | Yes            | JSON mode and tool use                                  |
+| Streaming         | Yes            | Server-sent events via async iterables                  |
+| Tool calling      | Yes            | Tool use for structured data extraction                 |
+| Vision            | Yes            | Image analysis with Claude models                       |
+| Embeddings        | No             | Throws `Error('Embeddings not supported by Anthropic')` |
+| Max context       | 200,000 tokens | Claude's extended context window                        |
 
 **Important**: Anthropic does not offer an embeddings API. The `createEmbedding` method throws an explicit error. If you need embeddings alongside Anthropic for chat, use a secondary provider (e.g., OpenAI) for embedding generation.
 
@@ -68,24 +68,24 @@ interface AnthropicSettings {
 
 ### Chat Completion
 
-| Method | Signature | Description |
-|--------|-----------|-------------|
-| `createChatCompletion` | `(options: ChatCompletionOptions) => Promise<ChatCompletionResponse>` | Single-shot completion |
+| Method                          | Signature                                                                | Description                              |
+| ------------------------------- | ------------------------------------------------------------------------ | ---------------------------------------- |
+| `createChatCompletion`          | `(options: ChatCompletionOptions) => Promise<ChatCompletionResponse>`    | Single-shot completion                   |
 | `createStreamingChatCompletion` | `(options: ChatCompletionOptions) => AsyncIterable<ChatCompletionChunk>` | Streaming completion via async generator |
 
 ### Embeddings
 
-| Method | Signature | Description |
-|--------|-----------|-------------|
+| Method            | Signature                                                   | Description                        |
+| ----------------- | ----------------------------------------------------------- | ---------------------------------- |
 | `createEmbedding` | `(options: EmbeddingOptions) => Promise<EmbeddingResponse>` | **Not supported** -- always throws |
 
 ### Model Management
 
-| Method | Signature | Description |
-|--------|-----------|-------------|
-| `listModels` | `(settings?) => Promise<readonly AiModel[]>` | Lists available Claude models |
-| `isAvailable` | `(settings?) => Promise<boolean>` | Tests connection to Anthropic API |
-| `getCapabilities` | `() => AiModelCapabilities` | Returns static capability flags |
+| Method            | Signature                                    | Description                       |
+| ----------------- | -------------------------------------------- | --------------------------------- |
+| `listModels`      | `(settings?) => Promise<readonly AiModel[]>` | Lists available Claude models     |
+| `isAvailable`     | `(settings?) => Promise<boolean>`            | Tests connection to Anthropic API |
+| `getCapabilities` | `() => AiModelCapabilities`                  | Returns static capability flags   |
 
 ## Implementation Details
 
@@ -119,19 +119,19 @@ Claude models support up to 200,000 tokens of context, which is reported via `ge
 ```typescript
 // Non-streaming chat completion with Claude
 const response = await anthropicPlugin.createChatCompletion({
-  messages: [
-    { role: 'system', content: 'You are a directory content writer.' },
-    { role: 'user', content: 'Write a detailed description for Acme Corp.' }
-  ],
-  settings: { apiKey: userApiKey, defaultModel: 'claude-sonnet-4-5-20250514' }
+	messages: [
+		{ role: 'system', content: 'You are a directory content writer.' },
+		{ role: 'user', content: 'Write a detailed description for Acme Corp.' }
+	],
+	settings: { apiKey: userApiKey, defaultModel: 'claude-sonnet-4-5-20250514' }
 });
 
 // Streaming chat completion
 for await (const chunk of anthropicPlugin.createStreamingChatCompletion({
-  messages: [{ role: 'user', content: 'Summarize this company...' }],
-  settings: { apiKey: userApiKey }
+	messages: [{ role: 'user', content: 'Summarize this company...' }],
+	settings: { apiKey: userApiKey }
 })) {
-  process.stdout.write(chunk.content || '');
+	process.stdout.write(chunk.content || '');
 }
 
 // List available models

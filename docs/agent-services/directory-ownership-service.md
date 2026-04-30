@@ -1,7 +1,7 @@
 ---
 id: directory-ownership-service
-title: "DirectoryOwnershipService Deep Dive"
-sidebar_label: "Directory Ownership"
+title: 'DirectoryOwnershipService Deep Dive'
+sidebar_label: 'Directory Ownership'
 sidebar_position: 13
 ---
 
@@ -39,12 +39,12 @@ DirectoryAccessResult { directory, member, role, isCreator }
 
 The service enforces a four-level role hierarchy:
 
-| Role | Level | Capabilities |
-|------|-------|-------------|
-| `OWNER` | 4 | Full control, can delete directory |
-| `MANAGER` | 3 | Can manage members and settings |
-| `EDITOR` | 2 | Can modify directory content |
-| `VIEWER` | 1 | Read-only access |
+| Role      | Level | Capabilities                       |
+| --------- | ----- | ---------------------------------- |
+| `OWNER`   | 4     | Full control, can delete directory |
+| `MANAGER` | 3     | Can manage members and settings    |
+| `EDITOR`  | 2     | Can modify directory content       |
+| `VIEWER`  | 1     | Read-only access                   |
 
 ## API Reference
 
@@ -54,24 +54,25 @@ The service enforces a four-level role hierarchy:
 
 The core authorization method. Verifies a user has at least the specified minimum role.
 
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| `directoryId` | `string` | The directory to check |
-| `userId` | `string` | The user requesting access |
+| Parameter     | Type                             | Description                 |
+| ------------- | -------------------------------- | --------------------------- |
+| `directoryId` | `string`                         | The directory to check      |
+| `userId`      | `string`                         | The user requesting access  |
 | `minimumRole` | `DirectoryMemberRole` (optional) | Minimum required role level |
 
 **Returns:** `Promise<DirectoryAccessResult>`
 
 **Throws:**
+
 - `NotFoundException` if the directory does not exist
 - `ForbiddenException` if the user lacks access or the required role level
 
 ```typescript
 interface DirectoryAccessResult {
-    directory: Directory;
-    member: DirectoryMember | null;  // null for creators
-    role: DirectoryMemberRole;
-    isCreator: boolean;
+	directory: Directory;
+	member: DirectoryMember | null; // null for creators
+	role: DirectoryMemberRole;
+	isCreator: boolean;
 }
 ```
 
@@ -95,10 +96,10 @@ Shorthand for `ensureAccess(directoryId, userId, DirectoryMemberRole.OWNER)`.
 
 Non-throwing access check. Returns `true` if the user has any level of access, `false` otherwise.
 
-| Parameter | Type | Description |
-|-----------|------|-------------|
+| Parameter     | Type     | Description            |
+| ------------- | -------- | ---------------------- |
 | `directoryId` | `string` | The directory to check |
-| `userId` | `string` | The user to check |
+| `userId`      | `string` | The user to check      |
 
 **Returns:** `Promise<boolean>`
 
@@ -106,10 +107,10 @@ Non-throwing access check. Returns `true` if the user has any level of access, `
 
 Returns the user's role in a directory without throwing exceptions.
 
-| Parameter | Type | Description |
-|-----------|------|-------------|
+| Parameter     | Type     | Description            |
+| ------------- | -------- | ---------------------- |
 | `directoryId` | `string` | The directory to check |
-| `userId` | `string` | The user to check |
+| `userId`      | `string` | The user to check      |
 
 **Returns:** `Promise<DirectoryMemberRole | null>` -- `null` if no access.
 
@@ -125,10 +126,10 @@ The `roleIsAtLeast()` helper uses a numeric hierarchy map to compare roles:
 
 ```typescript
 const roleHierarchy: Record<DirectoryMemberRole, number> = {
-    OWNER: 4,
-    MANAGER: 3,
-    EDITOR: 2,
-    VIEWER: 1,
+	OWNER: 4,
+	MANAGER: 3,
+	EDITOR: 2,
+	VIEWER: 1
 };
 ```
 
@@ -140,10 +141,10 @@ The `hasAccess()` method wraps `ensureAccess()` in a try-catch, returning a bool
 
 ## Database Interactions
 
-| Repository | Method | Purpose |
-|------------|--------|---------|
-| `DirectoryRepository` | `findById(directoryId)` | Load the directory entity to check creator status |
-| `DirectoryMemberRepository` | `findMember(directoryId, userId)` | Look up membership record for non-creator users |
+| Repository                  | Method                            | Purpose                                           |
+| --------------------------- | --------------------------------- | ------------------------------------------------- |
+| `DirectoryRepository`       | `findById(directoryId)`           | Load the directory entity to check creator status |
+| `DirectoryMemberRepository` | `findMember(directoryId, userId)` | Look up membership record for non-creator users   |
 
 ## Event System
 
@@ -151,11 +152,11 @@ This service does not emit or consume any events. It is a pure authorization ser
 
 ## Error Handling
 
-| Scenario | Exception | HTTP Status |
-|----------|-----------|-------------|
-| Directory not found | `NotFoundException` | 404 |
-| User not creator and not a member | `ForbiddenException` | 403 |
-| User role below minimum requirement | `ForbiddenException` | 403 |
+| Scenario                            | Exception            | HTTP Status |
+| ----------------------------------- | -------------------- | ----------- |
+| Directory not found                 | `NotFoundException`  | 404         |
+| User not creator and not a member   | `ForbiddenException` | 403         |
+| User role below minimum requirement | `ForbiddenException` | 403         |
 
 All exceptions include structured error bodies with `status: 'error'` and a descriptive `message`.
 
@@ -168,19 +169,19 @@ const { directory } = await this.ownershipService.ensureCanEdit(directoryId, use
 // Non-throwing check for conditional logic
 const canAccess = await this.ownershipService.hasAccess(directoryId, userId);
 if (canAccess) {
-    // show directory in list
+	// show directory in list
 }
 
 // Get role for UI rendering
 const role = await this.ownershipService.getUserRole(directoryId, userId);
 if (role === DirectoryMemberRole.OWNER) {
-    // show delete button
+	// show delete button
 }
 
 // Full access result with member info
 const result = await this.ownershipService.ensureAccess(directoryId, userId);
-console.log(result.isCreator);  // true if they created it
-console.log(result.role);       // 'owner', 'manager', 'editor', or 'viewer'
+console.log(result.isCreator); // true if they created it
+console.log(result.role); // 'owner', 'manager', 'editor', or 'viewer'
 ```
 
 ## Configuration

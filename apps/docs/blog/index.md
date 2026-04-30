@@ -1,7 +1,7 @@
 ---
 slug: /
 title: Ever Works Blog
-description: "Blog for the Ever Works documentation site"
+description: 'Blog for the Ever Works documentation site'
 ---
 
 # Ever Works Blog

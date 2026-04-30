@@ -13,15 +13,15 @@ This guide walks through creating a new plugin from scratch. We'll build a searc
 
 For detailed, category-specific instructions, see these dedicated guides:
 
-| Category | Guide | What It Covers |
-|----------|-------|----------------|
-| AI Provider | [Creating an AI Provider Plugin](./creating-ai-provider-plugin) | `BaseAiProvider`, `AiOperations`, model tiers, embeddings |
-| Search | [Creating a Search Plugin](./creating-search-plugin) | `ISearchPlugin`, filtering, pagination, dual-capability |
-| Screenshot | [Creating a Screenshot Plugin](./creating-screenshot-plugin) | `IScreenshotPlugin`, capture, signed URLs, viewport config |
-| Content Extractor | [Creating a Content Extractor Plugin](./creating-content-extractor-plugin) | `IContentExtractorPlugin`, general vs additive, batch extraction |
-| Pipeline | [Creating a Pipeline Plugin](./creating-pipeline-plugin) | `IPipelinePlugin`, self-managed vs engine-orchestratable, modifiers |
-| Deployment & Git | [Creating a Deployment Plugin](./creating-deployment-plugin) | `BaseGitProvider`, `IDeploymentPlugin`, OAuth |
-| Data Source | [Creating a Data Source Plugin](./creating-data-source-plugin) | `IDataSourcePlugin`, field mapping, form schema |
+| Category          | Guide                                                                      | What It Covers                                                      |
+| ----------------- | -------------------------------------------------------------------------- | ------------------------------------------------------------------- |
+| AI Provider       | [Creating an AI Provider Plugin](./creating-ai-provider-plugin)            | `BaseAiProvider`, `AiOperations`, model tiers, embeddings           |
+| Search            | [Creating a Search Plugin](./creating-search-plugin)                       | `ISearchPlugin`, filtering, pagination, dual-capability             |
+| Screenshot        | [Creating a Screenshot Plugin](./creating-screenshot-plugin)               | `IScreenshotPlugin`, capture, signed URLs, viewport config          |
+| Content Extractor | [Creating a Content Extractor Plugin](./creating-content-extractor-plugin) | `IContentExtractorPlugin`, general vs additive, batch extraction    |
+| Pipeline          | [Creating a Pipeline Plugin](./creating-pipeline-plugin)                   | `IPipelinePlugin`, self-managed vs engine-orchestratable, modifiers |
+| Deployment & Git  | [Creating a Deployment Plugin](./creating-deployment-plugin)               | `BaseGitProvider`, `IDeploymentPlugin`, OAuth                       |
+| Data Source       | [Creating a Data Source Plugin](./creating-data-source-plugin)             | `IDataSourcePlugin`, field mapping, form schema                     |
 
 The rest of this page covers the **common patterns** shared by all plugin categories.
 
@@ -45,75 +45,75 @@ The `everworks.plugin` field is how the platform discovers your plugin at startu
 
 ```json
 {
-    "name": "@ever-works/my-search-plugin",
-    "version": "1.0.0",
-    "description": "My custom search plugin",
-    "private": true,
-    "type": "module",
-    "main": "./dist/index.cjs",
-    "module": "./dist/index.js",
-    "types": "./dist/index.d.ts",
-    "exports": {
-        ".": {
-            "types": "./dist/index.d.ts",
-            "import": "./dist/index.js",
-            "require": "./dist/index.cjs"
-        }
-    },
-    "scripts": {
-        "build": "tsup",
-        "dev": "tsup --watch",
-        "type-check": "tsc --noEmit",
-        "clean": "rm -rf dist",
-        "test": "vitest run --passWithNoTests",
-        "test:watch": "vitest"
-    },
-    "peerDependencies": {
-        "@ever-works/plugin": "workspace:*"
-    },
-    "devDependencies": {
-        "@ever-works/plugin": "workspace:*",
-        "tsup": "^8.4.0",
-        "typescript": "^5.7.3",
-        "vitest": "^3.0.0"
-    },
-    "everworks": {
-        "plugin": {
-            "id": "my-search",
-            "name": "My Search",
-            "version": "1.0.0",
-            "category": "search",
-            "capabilities": ["search"],
-            "description": "Custom web search provider.",
-            "author": {
-                "name": "Your Name"
-            },
-            "license": "MIT",
-            "builtIn": true,
-            "autoEnable": false,
-            "envVars": [
-                {
-                    "name": "PLUGIN_MY_SEARCH_API_KEY",
-                    "required": false,
-                    "secret": true,
-                    "description": "API key for My Search"
-                }
-            ]
-        }
-    }
+	"name": "@ever-works/my-search-plugin",
+	"version": "1.0.0",
+	"description": "My custom search plugin",
+	"private": true,
+	"type": "module",
+	"main": "./dist/index.cjs",
+	"module": "./dist/index.js",
+	"types": "./dist/index.d.ts",
+	"exports": {
+		".": {
+			"types": "./dist/index.d.ts",
+			"import": "./dist/index.js",
+			"require": "./dist/index.cjs"
+		}
+	},
+	"scripts": {
+		"build": "tsup",
+		"dev": "tsup --watch",
+		"type-check": "tsc --noEmit",
+		"clean": "rm -rf dist",
+		"test": "vitest run --passWithNoTests",
+		"test:watch": "vitest"
+	},
+	"peerDependencies": {
+		"@ever-works/plugin": "workspace:*"
+	},
+	"devDependencies": {
+		"@ever-works/plugin": "workspace:*",
+		"tsup": "^8.4.0",
+		"typescript": "^5.7.3",
+		"vitest": "^3.0.0"
+	},
+	"everworks": {
+		"plugin": {
+			"id": "my-search",
+			"name": "My Search",
+			"version": "1.0.0",
+			"category": "search",
+			"capabilities": ["search"],
+			"description": "Custom web search provider.",
+			"author": {
+				"name": "Your Name"
+			},
+			"license": "MIT",
+			"builtIn": true,
+			"autoEnable": false,
+			"envVars": [
+				{
+					"name": "PLUGIN_MY_SEARCH_API_KEY",
+					"required": false,
+					"secret": true,
+					"description": "API key for My Search"
+				}
+			]
+		}
+	}
 }
 ```
 
 Key fields in `everworks.plugin`:
 
-| Field | Description |
-|-------|-------------|
-| `id` | Unique plugin identifier. Must match the `id` in your plugin class. |
-| `category` | Primary category (see [Architecture](./architecture#plugin-categories)) |
-| `capabilities` | Array of capabilities this plugin provides |
-| `builtIn` | Set to `true` for plugins shipped with the platform |
-| `autoEnable` | If `true`, the plugin is enabled by default for new users |
-| `envVars` | Environment variables the plugin uses (for documentation and `.env.example`) |
+| Field          | Description                                                                  |
+| -------------- | ---------------------------------------------------------------------------- |
+| `id`           | Unique plugin identifier. Must match the `id` in your plugin class.          |
+| `category`     | Primary category (see [Architecture](./architecture#plugin-categories))      |
+| `capabilities` | Array of capabilities this plugin provides                                   |
+| `builtIn`      | Set to `true` for plugins shipped with the platform                          |
+| `autoEnable`   | If `true`, the plugin is enabled by default for new users                    |
+| `envVars`      | Environment variables the plugin uses (for documentation and `.env.example`) |
 
 ## 2. tsup.config.ts
 
@@ -123,14 +123,14 @@ Build configuration for dual CJS/ESM output:
 import { defineConfig } from 'tsup';
 
 export default defineConfig({
-    entry: ['src/index.ts'],
-    noExternal: ['@ever-works/plugin'],
-    format: ['cjs', 'esm'],
-    dts: true,
-    clean: true,
-    sourcemap: true,
-    splitting: false,
-    treeshake: true,
+	entry: ['src/index.ts'],
+	noExternal: ['@ever-works/plugin'],
+	format: ['cjs', 'esm'],
+	dts: true,
+	clean: true,
+	sourcemap: true,
+	splitting: false,
+	treeshake: true
 });
 ```
 
@@ -138,23 +138,23 @@ export default defineConfig({
 
 ```json
 {
-    "compilerOptions": {
-        "target": "ES2022",
-        "module": "NodeNext",
-        "moduleResolution": "NodeNext",
-        "declaration": true,
-        "declarationMap": true,
-        "sourceMap": true,
-        "outDir": "./dist",
-        "rootDir": "./src",
-        "strict": true,
-        "esModuleInterop": true,
-        "skipLibCheck": true,
-        "forceConsistentCasingInFileNames": true,
-        "resolveJsonModule": true,
-        "isolatedModules": true,
-        "noEmit": true
-    }
+	"compilerOptions": {
+		"target": "ES2022",
+		"module": "NodeNext",
+		"moduleResolution": "NodeNext",
+		"declaration": true,
+		"declarationMap": true,
+		"sourceMap": true,
+		"outDir": "./dist",
+		"rootDir": "./src",
+		"strict": true,
+		"esModuleInterop": true,
+		"skipLibCheck": true,
+		"forceConsistentCasingInFileNames": true,
+		"resolveJsonModule": true,
+		"isolatedModules": true,
+		"noEmit": true
+	}
 }
 ```
 
@@ -177,166 +177,159 @@ Here's a complete search plugin implementation:
 
 ```typescript
 import type {
-    IPlugin,
-    ISearchPlugin,
-    PluginContext,
-    PluginCategory,
-    PluginManifest,
-    PluginHealthCheck,
-    JsonSchema,
-    ValidationResult,
-    PluginSettings,
-    SearchOptions,
-    SearchResponse,
-    SearchResult,
-    RateLimitInfo,
+	IPlugin,
+	ISearchPlugin,
+	PluginContext,
+	PluginCategory,
+	PluginManifest,
+	PluginHealthCheck,
+	JsonSchema,
+	ValidationResult,
+	PluginSettings,
+	SearchOptions,
+	SearchResponse,
+	SearchResult,
+	RateLimitInfo
 } from '@ever-works/plugin';
 
 export class MySearchPlugin implements IPlugin, ISearchPlugin {
-    // ── IPlugin Properties ──────────────────────────────────
+	// ── IPlugin Properties ──────────────────────────────────
 
-    readonly id = 'my-search';
-    readonly name = 'My Search';
-    readonly version = '1.0.0';
-    readonly category: PluginCategory = 'search';
-    readonly capabilities: readonly string[] = ['search'];
-    readonly providerName = 'My Search';
-    readonly configurationMode: 'admin-only' | 'user-required' | 'hybrid' = 'hybrid';
+	readonly id = 'my-search';
+	readonly name = 'My Search';
+	readonly version = '1.0.0';
+	readonly category: PluginCategory = 'search';
+	readonly capabilities: readonly string[] = ['search'];
+	readonly providerName = 'My Search';
+	readonly configurationMode: 'admin-only' | 'user-required' | 'hybrid' = 'hybrid';
 
-    readonly settingsSchema: JsonSchema = {
-        type: 'object',
-        properties: {
-            apiKey: {
-                type: 'string',
-                title: 'API Key',
-                description: 'Your API key',
-                'x-secret': true,
-                'x-envVar': 'PLUGIN_MY_SEARCH_API_KEY',
-                'x-scope': 'user',
-            },
-            maxResults: {
-                type: 'number',
-                title: 'Max Results',
-                description: 'Maximum results per search',
-                default: 10,
-                minimum: 1,
-                maximum: 50,
-            },
-        },
-        required: ['apiKey'],
-    };
+	readonly settingsSchema: JsonSchema = {
+		type: 'object',
+		properties: {
+			apiKey: {
+				type: 'string',
+				title: 'API Key',
+				description: 'Your API key',
+				'x-secret': true,
+				'x-envVar': 'PLUGIN_MY_SEARCH_API_KEY',
+				'x-scope': 'user'
+			},
+			maxResults: {
+				type: 'number',
+				title: 'Max Results',
+				description: 'Maximum results per search',
+				default: 10,
+				minimum: 1,
+				maximum: 50
+			}
+		},
+		required: ['apiKey']
+	};
 
-    private context?: PluginContext;
+	private context?: PluginContext;
 
-    // ── Lifecycle ───────────────────────────────────────────
+	// ── Lifecycle ───────────────────────────────────────────
 
-    async onLoad(context: PluginContext): Promise<void> {
-        this.context = context;
-        context.logger.log('My Search plugin loaded');
-    }
+	async onLoad(context: PluginContext): Promise<void> {
+		this.context = context;
+		context.logger.log('My Search plugin loaded');
+	}
 
-    async onUnload(): Promise<void> {
-        this.context = undefined;
-    }
+	async onUnload(): Promise<void> {
+		this.context = undefined;
+	}
 
-    async validateSettings(settings: PluginSettings): Promise<ValidationResult> {
-        const errors: Array<{ path: string; message: string }> = [];
+	async validateSettings(settings: PluginSettings): Promise<ValidationResult> {
+		const errors: Array<{ path: string; message: string }> = [];
 
-        if (!settings.apiKey) {
-            errors.push({ path: 'apiKey', message: 'API key is required' });
-        }
+		if (!settings.apiKey) {
+			errors.push({ path: 'apiKey', message: 'API key is required' });
+		}
 
-        return {
-            valid: errors.length === 0,
-            errors: errors.length > 0 ? errors : undefined,
-        };
-    }
+		return {
+			valid: errors.length === 0,
+			errors: errors.length > 0 ? errors : undefined
+		};
+	}
 
-    async healthCheck(): Promise<PluginHealthCheck> {
-        return {
-            status: 'healthy',
-            message: 'My Search plugin is ready',
-            checkedAt: Date.now(),
-        };
-    }
+	async healthCheck(): Promise<PluginHealthCheck> {
+		return {
+			status: 'healthy',
+			message: 'My Search plugin is ready',
+			checkedAt: Date.now()
+		};
+	}
 
-    getManifest(): PluginManifest {
-        return {
-            id: this.id,
-            name: this.name,
-            version: this.version,
-            description: 'Custom web search provider',
-            category: this.category,
-            capabilities: [...this.capabilities],
-            author: { name: 'Your Name' },
-            license: 'MIT',
-            builtIn: true,
-            autoEnable: false,
-            icon: {
-                type: 'svg',
-                value: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>',
-            },
-        };
-    }
+	getManifest(): PluginManifest {
+		return {
+			id: this.id,
+			name: this.name,
+			version: this.version,
+			description: 'Custom web search provider',
+			category: this.category,
+			capabilities: [...this.capabilities],
+			author: { name: 'Your Name' },
+			license: 'MIT',
+			builtIn: true,
+			autoEnable: false,
+			icon: {
+				type: 'svg',
+				value: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>'
+			}
+		};
+	}
 
-    // ── ISearchPlugin Interface ─────────────────────────────
+	// ── ISearchPlugin Interface ─────────────────────────────
 
-    async search(options: SearchOptions): Promise<SearchResponse> {
-        const apiKey = options.settings?.apiKey as string;
-        if (!apiKey) {
-            throw new Error(
-                'API key not configured. '
-                + 'Set it in plugin settings or via PLUGIN_MY_SEARCH_API_KEY.',
-            );
-        }
+	async search(options: SearchOptions): Promise<SearchResponse> {
+		const apiKey = options.settings?.apiKey as string;
+		if (!apiKey) {
+			throw new Error('API key not configured. ' + 'Set it in plugin settings or via PLUGIN_MY_SEARCH_API_KEY.');
+		}
 
-        const startTime = Date.now();
-        const maxResults = options.limit
-            || (options.settings?.maxResults as number)
-            || 10;
+		const startTime = Date.now();
+		const maxResults = options.limit || (options.settings?.maxResults as number) || 10;
 
-        // Use the context HTTP client for API calls
-        const response = await this.context!.http.get<MyApiResponse>(
-            `https://api.example.com/search?q=${encodeURIComponent(options.query)}&limit=${maxResults}`,
-            {
-                headers: { Authorization: `Bearer ${apiKey}` },
-            },
-        );
+		// Use the context HTTP client for API calls
+		const response = await this.context!.http.get<MyApiResponse>(
+			`https://api.example.com/search?q=${encodeURIComponent(options.query)}&limit=${maxResults}`,
+			{
+				headers: { Authorization: `Bearer ${apiKey}` }
+			}
+		);
 
-        const results: SearchResult[] = (response.data?.results || []).map(
-            (r, index) => ({
-                title: r.title,
-                url: r.url,
-                snippet: r.description,
-                position: index + 1,
-            }),
-        );
+		const results: SearchResult[] = (response.data?.results || []).map((r, index) => ({
+			title: r.title,
+			url: r.url,
+			snippet: r.description,
+			position: index + 1
+		}));
 
-        return {
-            results,
-            query: options.query,
-            totalResults: results.length,
-            hasMore: results.length >= maxResults,
-            duration: Date.now() - startTime,
-        };
-    }
+		return {
+			results,
+			query: options.query,
+			totalResults: results.length,
+			hasMore: results.length >= maxResults,
+			duration: Date.now() - startTime
+		};
+	}
 
-    async isAvailable(): Promise<boolean> {
-        return true;
-    }
+	async isAvailable(): Promise<boolean> {
+		return true;
+	}
 
-    async getRateLimitInfo(): Promise<RateLimitInfo> {
-        return { remaining: -1, limit: -1, period: 'month' };
-    }
+	async getRateLimitInfo(): Promise<RateLimitInfo> {
+		return { remaining: -1, limit: -1, period: 'month' };
+	}
 }
 
 // Private types for the external API response
 interface MyApiResponse {
-    results: Array<{
-        title: string;
-        url: string;
-        description: string;
-    }>;
+	results: Array<{
+		title: string;
+		url: string;
+		description: string;
+	}>;
 }
 
 export default MySearchPlugin;
@@ -362,7 +355,7 @@ Use `this.context!.http` instead of `fetch` or axios. The context HTTP client is
 
 ```typescript
 const response = await this.context!.http.get<MyResponse>(url, {
-    headers: { Authorization: `Bearer ${apiKey}` },
+	headers: { Authorization: `Bearer ${apiKey}` }
 });
 ```
 
@@ -395,75 +388,75 @@ AI provider plugins extend `BaseAiProvider` instead of implementing interfaces d
 import { BaseAiProvider } from '@ever-works/plugin/abstract';
 import { AiOperations } from '@ever-works/plugin/ai';
 import type {
-    PluginContext,
-    ChatCompletionOptions,
-    ChatCompletionResponse,
-    AiModel,
-    AiModelCapabilities,
-    PluginSettings,
+	PluginContext,
+	ChatCompletionOptions,
+	ChatCompletionResponse,
+	AiModel,
+	AiModelCapabilities,
+	PluginSettings
 } from '@ever-works/plugin';
 
 export class MyAiPlugin extends BaseAiProvider {
-    readonly id = 'my-ai';
-    readonly name = 'My AI Provider';
-    readonly version = '1.0.0';
-    readonly providerType = 'my-ai';
-    readonly providerName = 'My AI';
-    readonly configurationMode = 'user-required' as const;
+	readonly id = 'my-ai';
+	readonly name = 'My AI Provider';
+	readonly version = '1.0.0';
+	readonly providerType = 'my-ai';
+	readonly providerName = 'My AI';
+	readonly configurationMode = 'user-required' as const;
 
-    readonly settingsSchema = {
-        type: 'object' as const,
-        properties: {
-            apiKey: {
-                type: 'string' as const,
-                title: 'API Key',
-                'x-secret': true,
-                'x-scope': 'user' as const,
-            },
-            defaultModel: {
-                type: 'string' as const,
-                title: 'Default Model',
-                default: 'my-model-v1',
-                'x-widget': 'model-select',
-            },
-        },
-        required: ['apiKey'] as const,
-    };
+	readonly settingsSchema = {
+		type: 'object' as const,
+		properties: {
+			apiKey: {
+				type: 'string' as const,
+				title: 'API Key',
+				'x-secret': true,
+				'x-scope': 'user' as const
+			},
+			defaultModel: {
+				type: 'string' as const,
+				title: 'Default Model',
+				default: 'my-model-v1',
+				'x-widget': 'model-select'
+			}
+		},
+		required: ['apiKey'] as const
+	};
 
-    async onLoad(context: PluginContext): Promise<void> {
-        await super.onLoad(context);
-        this.aiOps = new AiOperations({
-            apiKey: '',
-            model: 'my-model-v1',
-            providerType: 'custom',
-            baseURL: 'https://api.example.com/v1',
-        });
-    }
+	async onLoad(context: PluginContext): Promise<void> {
+		await super.onLoad(context);
+		this.aiOps = new AiOperations({
+			apiKey: '',
+			model: 'my-model-v1',
+			providerType: 'custom',
+			baseURL: 'https://api.example.com/v1'
+		});
+	}
 
-    async createChatCompletion(options: ChatCompletionOptions): Promise<ChatCompletionResponse> {
-        if (!this.aiOps) throw new Error('Plugin not loaded');
-        const config = this.resolveConfig(options.settings);
-        return this.aiOps.createChatCompletion(options, config);
-    }
+	async createChatCompletion(options: ChatCompletionOptions): Promise<ChatCompletionResponse> {
+		if (!this.aiOps) throw new Error('Plugin not loaded');
+		const config = this.resolveConfig(options.settings);
+		return this.aiOps.createChatCompletion(options, config);
+	}
 
-    async listModels(settings?: PluginSettings): Promise<readonly AiModel[]> {
-        if (!this.aiOps) throw new Error('Plugin not loaded');
-        return this.aiOps.listModels(this.resolveConfig(settings));
-    }
+	async listModels(settings?: PluginSettings): Promise<readonly AiModel[]> {
+		if (!this.aiOps) throw new Error('Plugin not loaded');
+		return this.aiOps.listModels(this.resolveConfig(settings));
+	}
 
-    getCapabilities(): AiModelCapabilities {
-        return {
-            supportsStructuredOutput: true,
-            supportsStreaming: true,
-            supportsToolCalling: false,
-            supportsVision: false,
-            maxContextLength: 32000,
-        };
-    }
+	getCapabilities(): AiModelCapabilities {
+		return {
+			supportsStructuredOutput: true,
+			supportsStreaming: true,
+			supportsToolCalling: false,
+			supportsVision: false,
+			maxContextLength: 32000
+		};
+	}
 
-    protected getDefaultModelId(): string {
-        return 'my-model-v1';
-    }
+	protected getDefaultModelId(): string {
+		return 'my-model-v1';
+	}
 }
 ```
 
@@ -478,48 +471,49 @@ import { BasePipelineStep } from '@ever-works/plugin/abstract';
 import type { MutableGenerationContext, StepExecutionOptions, StepProgressCallback } from '@ever-works/plugin';
 
 export class MyPipelineStep extends BasePipelineStep {
-    readonly id = 'my-step';
-    readonly name = 'My Pipeline Step';
-    readonly version = '1.0.0';
+	readonly id = 'my-step';
+	readonly name = 'My Pipeline Step';
+	readonly version = '1.0.0';
 
-    readonly stepId = 'my-custom-step';
-    readonly stepName = 'Custom Processing';
-    readonly stepDescription = 'Applies custom processing to generated items';
-    readonly stepPosition = BasePipelineStep.after('format');
+	readonly stepId = 'my-custom-step';
+	readonly stepName = 'Custom Processing';
+	readonly stepDescription = 'Applies custom processing to generated items';
+	readonly stepPosition = BasePipelineStep.after('format');
 
-    readonly provides = ['customData'];
-    readonly requires = ['items'];
+	readonly provides = ['customData'];
+	readonly requires = ['items'];
 
-    async execute(
-        context: MutableGenerationContext,
-        options?: StepExecutionOptions,
-        onProgress?: StepProgressCallback,
-    ): Promise<MutableGenerationContext> {
-        this.reportProgress(onProgress, this.createProgress('running', 0, 'Starting...'));
+	async execute(
+		context: MutableGenerationContext,
+		options?: StepExecutionOptions,
+		onProgress?: StepProgressCallback
+	): Promise<MutableGenerationContext> {
+		this.reportProgress(onProgress, this.createProgress('running', 0, 'Starting...'));
 
-        // Process items
-        for (let i = 0; i < context.items.length; i++) {
-            context.items[i].customData = await this.process(context.items[i]);
-            this.reportProgress(onProgress, this.createProgress(
-                'running', (i + 1) / context.items.length * 100, `Processed ${i + 1} items`,
-            ));
-        }
+		// Process items
+		for (let i = 0; i < context.items.length; i++) {
+			context.items[i].customData = await this.process(context.items[i]);
+			this.reportProgress(
+				onProgress,
+				this.createProgress('running', ((i + 1) / context.items.length) * 100, `Processed ${i + 1} items`)
+			);
+		}
 
-        this.reportProgress(onProgress, this.createProgress('completed', 100, 'Done'));
-        return context;
-    }
+		this.reportProgress(onProgress, this.createProgress('completed', 100, 'Done'));
+		return context;
+	}
 }
 ```
 
 Step positioning options:
 
-| Method | Effect |
-|--------|--------|
-| `BasePipelineStep.after('stepId')` | Run after the specified step |
-| `BasePipelineStep.before('stepId')` | Run before the specified step |
-| `BasePipelineStep.replace('stepId')` | Replace the specified step |
-| `BasePipelineStep.first()` | Run as the first step |
-| `BasePipelineStep.last()` | Run as the last step |
+| Method                               | Effect                        |
+| ------------------------------------ | ----------------------------- |
+| `BasePipelineStep.after('stepId')`   | Run after the specified step  |
+| `BasePipelineStep.before('stepId')`  | Run before the specified step |
+| `BasePipelineStep.replace('stepId')` | Replace the specified step    |
+| `BasePipelineStep.first()`           | Run as the first step         |
+| `BasePipelineStep.last()`            | Run as the last step          |
 
 ## Build and Test
 
@@ -548,13 +542,17 @@ A single plugin can provide multiple capabilities. For example, Tavily provides 
 
 ```typescript
 export class TavilyPlugin implements IPlugin, ISearchPlugin, IContentExtractorPlugin {
-    readonly capabilities: readonly string[] = ['search', 'content-extractor'];
+	readonly capabilities: readonly string[] = ['search', 'content-extractor'];
 
-    // ISearchPlugin methods
-    async search(options: SearchOptions): Promise<SearchResponse> { /* ... */ }
+	// ISearchPlugin methods
+	async search(options: SearchOptions): Promise<SearchResponse> {
+		/* ... */
+	}
 
-    // IContentExtractorPlugin methods
-    async extract(options: ContentExtractionOptions): Promise<ContentExtractionResult> { /* ... */ }
+	// IContentExtractorPlugin methods
+	async extract(options: ContentExtractionOptions): Promise<ContentExtractionResult> {
+		/* ... */
+	}
 }
 ```
 

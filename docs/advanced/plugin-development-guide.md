@@ -37,22 +37,22 @@ flowchart TD
 
 ## Source Files
 
-| File | Purpose |
-|------|---------|
-| `packages/agent/src/plugins/plugins.module.ts` | Global plugin module with `forRoot()` / `forRootAsync()` |
-| `packages/agent/src/plugins/services/plugin-bootstrap.service.ts` | Entry point: discover, load, call `onLoad` |
-| `packages/agent/src/plugins/services/plugin-loader.service.ts` | File system scanning, manifest extraction, module loading |
-| `packages/agent/src/plugins/services/plugin-registry.service.ts` | In-memory registry with category/capability indexes |
-| `packages/agent/src/plugins/services/plugin-manifest-validator.service.ts` | Validates `everworks.plugin` manifest in `package.json` |
-| `packages/agent/src/plugins/services/plugin-class-validator.service.ts` | Validates plugin class implements required interface |
-| `packages/agent/src/plugins/services/plugin-version-checker.service.ts` | Checks version compatibility with platform |
-| `packages/agent/src/plugins/services/plugin-lifecycle-manager.service.ts` | Calls `onLoad`, `onUnload` lifecycle hooks |
-| `packages/agent/src/plugins/services/plugin-settings.service.ts` | 4-level settings resolution |
-| `packages/agent/src/plugins/services/plugin-context-factory.service.ts` | Creates execution context for plugins |
-| `packages/agent/src/plugins/entities/plugin.entity.ts` | Database entity for installed plugins |
-| `packages/agent/src/plugins/entities/user-plugin.entity.ts` | Per-user plugin settings entity |
-| `packages/agent/src/plugins/entities/directory-plugin.entity.ts` | Per-directory plugin settings entity |
-| `packages/plugins/*/` | 21 built-in plugin implementations |
+| File                                                                       | Purpose                                                   |
+| -------------------------------------------------------------------------- | --------------------------------------------------------- |
+| `packages/agent/src/plugins/plugins.module.ts`                             | Global plugin module with `forRoot()` / `forRootAsync()`  |
+| `packages/agent/src/plugins/services/plugin-bootstrap.service.ts`          | Entry point: discover, load, call `onLoad`                |
+| `packages/agent/src/plugins/services/plugin-loader.service.ts`             | File system scanning, manifest extraction, module loading |
+| `packages/agent/src/plugins/services/plugin-registry.service.ts`           | In-memory registry with category/capability indexes       |
+| `packages/agent/src/plugins/services/plugin-manifest-validator.service.ts` | Validates `everworks.plugin` manifest in `package.json`   |
+| `packages/agent/src/plugins/services/plugin-class-validator.service.ts`    | Validates plugin class implements required interface      |
+| `packages/agent/src/plugins/services/plugin-version-checker.service.ts`    | Checks version compatibility with platform                |
+| `packages/agent/src/plugins/services/plugin-lifecycle-manager.service.ts`  | Calls `onLoad`, `onUnload` lifecycle hooks                |
+| `packages/agent/src/plugins/services/plugin-settings.service.ts`           | 4-level settings resolution                               |
+| `packages/agent/src/plugins/services/plugin-context-factory.service.ts`    | Creates execution context for plugins                     |
+| `packages/agent/src/plugins/entities/plugin.entity.ts`                     | Database entity for installed plugins                     |
+| `packages/agent/src/plugins/entities/user-plugin.entity.ts`                | Per-user plugin settings entity                           |
+| `packages/agent/src/plugins/entities/directory-plugin.entity.ts`           | Per-directory plugin settings entity                      |
+| `packages/plugins/*/`                                                      | 21 built-in plugin implementations                        |
 
 ## Step-by-Step: Creating a New AI Provider Plugin
 
@@ -77,60 +77,60 @@ The `everworks.plugin` key in `package.json` is the plugin manifest. The `Plugin
 
 ```json
 {
-    "name": "@ever-works/plugin-my-provider",
-    "version": "1.0.0",
-    "type": "module",
-    "main": "dist/index.js",
-    "types": "dist/index.d.ts",
-    "everworks": {
-        "plugin": {
-            "id": "my-provider",
-            "name": "My AI Provider",
-            "version": "1.0.0",
-            "description": "Custom AI provider integration",
-            "category": "ai-provider",
-            "capabilities": ["ai-provider"],
-            "builtIn": true,
-            "autoEnable": false,
-            "settingsSchema": {
-                "type": "object",
-                "properties": {
-                    "apiKey": {
-                        "type": "string",
-                        "title": "API Key",
-                        "x-secret": true,
-                        "x-envVar": "MY_PROVIDER_API_KEY",
-                        "x-widget": "password"
-                    },
-                    "defaultModel": {
-                        "type": "string",
-                        "title": "Default Model",
-                        "default": "my-model-v1"
-                    },
-                    "simpleModel": {
-                        "type": "string",
-                        "title": "Simple Task Model"
-                    },
-                    "mediumModel": {
-                        "type": "string",
-                        "title": "Medium Task Model"
-                    },
-                    "complexModel": {
-                        "type": "string",
-                        "title": "Complex Task Model"
-                    }
-                },
-                "required": ["apiKey"]
-            }
-        }
-    },
-    "dependencies": {
-        "@ever-works/plugin": "workspace:*"
-    },
-    "devDependencies": {
-        "tsup": "^8.0.0",
-        "vitest": "^2.0.0"
-    }
+	"name": "@ever-works/plugin-my-provider",
+	"version": "1.0.0",
+	"type": "module",
+	"main": "dist/index.js",
+	"types": "dist/index.d.ts",
+	"everworks": {
+		"plugin": {
+			"id": "my-provider",
+			"name": "My AI Provider",
+			"version": "1.0.0",
+			"description": "Custom AI provider integration",
+			"category": "ai-provider",
+			"capabilities": ["ai-provider"],
+			"builtIn": true,
+			"autoEnable": false,
+			"settingsSchema": {
+				"type": "object",
+				"properties": {
+					"apiKey": {
+						"type": "string",
+						"title": "API Key",
+						"x-secret": true,
+						"x-envVar": "MY_PROVIDER_API_KEY",
+						"x-widget": "password"
+					},
+					"defaultModel": {
+						"type": "string",
+						"title": "Default Model",
+						"default": "my-model-v1"
+					},
+					"simpleModel": {
+						"type": "string",
+						"title": "Simple Task Model"
+					},
+					"mediumModel": {
+						"type": "string",
+						"title": "Medium Task Model"
+					},
+					"complexModel": {
+						"type": "string",
+						"title": "Complex Task Model"
+					}
+				},
+				"required": ["apiKey"]
+			}
+		}
+	},
+	"dependencies": {
+		"@ever-works/plugin": "workspace:*"
+	},
+	"devDependencies": {
+		"tsup": "^8.0.0",
+		"vitest": "^2.0.0"
+	}
 }
 ```
 
@@ -142,66 +142,60 @@ Extend `BaseAiProvider` from `@ever-works/plugin/abstract`:
 import { BaseAiProvider } from '@ever-works/plugin/abstract';
 import { AiOperations } from '@ever-works/plugin/ai';
 import type {
-    ChatCompletionOptions,
-    ChatCompletionResponse,
-    ChatCompletionChunk,
-    AiModel,
-    AskJsonCompletionResponse,
-    PluginManifest,
+	ChatCompletionOptions,
+	ChatCompletionResponse,
+	ChatCompletionChunk,
+	AiModel,
+	AskJsonCompletionResponse,
+	PluginManifest
 } from '@ever-works/plugin';
 
 export default class MyProviderPlugin extends BaseAiProvider {
-    id = 'my-provider';
-    name = 'My AI Provider';
-    version = '1.0.0';
-    category = 'ai-provider' as const;
-    capabilities = ['ai-provider'];
-    providerName = 'MyProvider';
+	id = 'my-provider';
+	name = 'My AI Provider';
+	version = '1.0.0';
+	category = 'ai-provider' as const;
+	capabilities = ['ai-provider'];
+	providerName = 'MyProvider';
 
-    async isAvailable(settings?: Record<string, unknown>): Promise<boolean> {
-        const apiKey = settings?.apiKey as string;
-        return !!apiKey;
-    }
+	async isAvailable(settings?: Record<string, unknown>): Promise<boolean> {
+		const apiKey = settings?.apiKey as string;
+		return !!apiKey;
+	}
 
-    async createChatCompletion(
-        options: ChatCompletionOptions,
-    ): Promise<ChatCompletionResponse> {
-        const ops = new AiOperations({
-            provider: 'openai-compatible',
-            apiKey: options.settings?.apiKey as string,
-            baseUrl: 'https://api.myprovider.com/v1',
-            model: options.model || 'my-model-v1',
-        });
+	async createChatCompletion(options: ChatCompletionOptions): Promise<ChatCompletionResponse> {
+		const ops = new AiOperations({
+			provider: 'openai-compatible',
+			apiKey: options.settings?.apiKey as string,
+			baseUrl: 'https://api.myprovider.com/v1',
+			model: options.model || 'my-model-v1'
+		});
 
-        return ops.chatCompletion(options);
-    }
+		return ops.chatCompletion(options);
+	}
 
-    async *createStreamingChatCompletion(
-        options: ChatCompletionOptions,
-    ): AsyncGenerator<ChatCompletionChunk> {
-        const ops = new AiOperations({
-            provider: 'openai-compatible',
-            apiKey: options.settings?.apiKey as string,
-            baseUrl: 'https://api.myprovider.com/v1',
-            model: options.model || 'my-model-v1',
-        });
+	async *createStreamingChatCompletion(options: ChatCompletionOptions): AsyncGenerator<ChatCompletionChunk> {
+		const ops = new AiOperations({
+			provider: 'openai-compatible',
+			apiKey: options.settings?.apiKey as string,
+			baseUrl: 'https://api.myprovider.com/v1',
+			model: options.model || 'my-model-v1'
+		});
 
-        yield* ops.streamingChatCompletion(options);
-    }
+		yield* ops.streamingChatCompletion(options);
+	}
 
-    async listModels(
-        settings?: Record<string, unknown>,
-    ): Promise<readonly AiModel[]> {
-        return [
-            {
-                id: 'my-model-v1',
-                name: 'My Model V1',
-                contextLength: 128000,
-                inputCostPer1k: 0.001,
-                outputCostPer1k: 0.002,
-            },
-        ];
-    }
+	async listModels(settings?: Record<string, unknown>): Promise<readonly AiModel[]> {
+		return [
+			{
+				id: 'my-model-v1',
+				name: 'My Model V1',
+				contextLength: 128000,
+				inputCostPer1k: 0.001,
+				outputCostPer1k: 0.002
+			}
+		];
+	}
 }
 ```
 
@@ -213,10 +207,10 @@ export default class MyProviderPlugin extends BaseAiProvider {
 import { defineConfig } from 'tsup';
 
 export default defineConfig({
-    entry: ['src/my-provider.ts'],
-    format: ['esm'],
-    dts: true,
-    clean: true,
+	entry: ['src/my-provider.ts'],
+	format: ['esm'],
+	dts: true,
+	clean: true
 });
 ```
 
@@ -227,32 +221,32 @@ import { describe, it, expect } from 'vitest';
 import MyProviderPlugin from './my-provider';
 
 describe('MyProviderPlugin', () => {
-    const plugin = new MyProviderPlugin();
+	const plugin = new MyProviderPlugin();
 
-    it('should have correct metadata', () => {
-        expect(plugin.id).toBe('my-provider');
-        expect(plugin.capabilities).toContain('ai-provider');
-    });
+	it('should have correct metadata', () => {
+		expect(plugin.id).toBe('my-provider');
+		expect(plugin.capabilities).toContain('ai-provider');
+	});
 
-    it('should check availability', async () => {
-        expect(await plugin.isAvailable({})).toBe(false);
-        expect(await plugin.isAvailable({ apiKey: 'test' })).toBe(true);
-    });
+	it('should check availability', async () => {
+		expect(await plugin.isAvailable({})).toBe(false);
+		expect(await plugin.isAvailable({ apiKey: 'test' })).toBe(true);
+	});
 });
 ```
 
 ## Plugin Categories
 
-| Category | Capability | Base Class | Examples |
-|----------|-----------|------------|----------|
-| `ai-provider` | `ai-provider` | `BaseAiProvider` | openai, anthropic, google, groq, ollama |
-| `search` | `search` | -- | exa, tavily, serpapi, brave |
-| `content-extraction` | `content-extraction` | -- | local-content-extractor, notion-extractor |
-| `screenshot` | `screenshot` | -- | screenshotone, urlbox |
-| `git` | `git` | -- | github |
-| `infrastructure` | `deploy` | -- | vercel, apify |
-| `pipeline` | `pipeline` | -- | standard-pipeline, agent-pipeline |
-| `ai-tools` | varies | -- | claude-code, vercel-ai-gateway |
+| Category             | Capability           | Base Class       | Examples                                  |
+| -------------------- | -------------------- | ---------------- | ----------------------------------------- |
+| `ai-provider`        | `ai-provider`        | `BaseAiProvider` | openai, anthropic, google, groq, ollama   |
+| `search`             | `search`             | --               | exa, tavily, serpapi, brave               |
+| `content-extraction` | `content-extraction` | --               | local-content-extractor, notion-extractor |
+| `screenshot`         | `screenshot`         | --               | screenshotone, urlbox                     |
+| `git`                | `git`                | --               | github                                    |
+| `infrastructure`     | `deploy`             | --               | vercel, apify                             |
+| `pipeline`           | `pipeline`           | --               | standard-pipeline, agent-pipeline         |
+| `ai-tools`           | varies               | --               | claude-code, vercel-ai-gateway            |
 
 ## Plugin Enable/Disable Resolution
 
@@ -269,11 +263,11 @@ The `resolvePluginEnabled()` function determines whether a plugin is active for 
 
 ## Settings JSON Schema Extensions
 
-| Extension | Purpose | Example |
-|-----------|---------|---------|
-| `x-secret` | Marks field as sensitive (encrypted at rest) | `"x-secret": true` |
-| `x-envVar` | Environment variable fallback | `"x-envVar": "OPENAI_API_KEY"` |
-| `x-widget` | UI widget hint | `"x-widget": "password"` |
+| Extension  | Purpose                                      | Example                        |
+| ---------- | -------------------------------------------- | ------------------------------ |
+| `x-secret` | Marks field as sensitive (encrypted at rest) | `"x-secret": true`             |
+| `x-envVar` | Environment variable fallback                | `"x-envVar": "OPENAI_API_KEY"` |
+| `x-widget` | UI widget hint                               | `"x-widget": "password"`       |
 
 ## Best Practices
 

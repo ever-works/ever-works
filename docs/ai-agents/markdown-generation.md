@@ -13,12 +13,12 @@ The Markdown Generation system transforms structured directory data into human-r
 
 Located in `packages/agent/src/generators/markdown-generator/`, the system comprises:
 
-| Component | File | Purpose |
-|---|---|---|
+| Component                  | File                            | Purpose                                       |
+| -------------------------- | ------------------------------- | --------------------------------------------- |
 | `MarkdownGeneratorService` | `markdown-generator.service.ts` | Orchestrates the markdown generation workflow |
-| `MarkdownRepository` | `markdown-repository.ts` | File I/O for the markdown repository |
-| `ReadmeBuilder` | `readme-builder.ts` | Programmatic README.md construction |
-| `MarkdownGeneratorModule` | `markdown-generator.module.ts` | NestJS module definition |
+| `MarkdownRepository`       | `markdown-repository.ts`        | File I/O for the markdown repository          |
+| `ReadmeBuilder`            | `readme-builder.ts`             | Programmatic README.md construction           |
+| `MarkdownGeneratorModule`  | `markdown-generator.module.ts`  | NestJS module definition                      |
 
 ## Markdown Repository Structure
 
@@ -48,20 +48,20 @@ The `MarkdownGeneratorService.initialize()` method runs the full pipeline:
 
 The service supports three branching strategies based on the `GenerationMethod`:
 
-| Method | Behavior |
-|---|---|
-| `RECREATE` | Switches to main branch, deletes all existing item files, regenerates everything |
-| `APPEND` / `UPDATE` | Creates or switches to a PR branch, preserving existing content |
+| Method              | Behavior                                                                         |
+| ------------------- | -------------------------------------------------------------------------------- |
+| `RECREATE`          | Switches to main branch, deletes all existing item files, regenerates everything |
+| `APPEND` / `UPDATE` | Creates or switches to a PR branch, preserving existing content                  |
 
 ```typescript
 if (generation_method === GenerationMethod.RECREATE) {
-    await this.gitFacade.switchBranch(provider, markdownRepo.dir, defaultBranch);
-    await markdownRepo.resetFiles();
+	await this.gitFacade.switchBranch(provider, markdownRepo.dir, defaultBranch);
+	await markdownRepo.resetFiles();
 } else if (canCreatePR) {
-    await Promise.all([
-        this.gitFacade.switchBranch(provider, markdownRepo.dir, pr_update.branch, true),
-        this.gitFacade.switchBranch(provider, dataRepo.dir, pr_update.branch, true),
-    ]);
+	await Promise.all([
+		this.gitFacade.switchBranch(provider, markdownRepo.dir, pr_update.branch, true),
+		this.gitFacade.switchBranch(provider, dataRepo.dir, pr_update.branch, true)
+	]);
 }
 ```
 
@@ -81,13 +81,13 @@ The `ReadmeBuilder` constructs the README programmatically:
 ```typescript
 const builder = new ReadmeBuilder(header, footer);
 if (config.content_table) {
-    builder.enableToC();
+	builder.enableToC();
 }
 for (const categoryId of sortedCategoryIds) {
-    builder.addSubHeader(categoryDetails.name, items.length);
-    for (const item of items) {
-        builder.addItem(item, { hasDetails: markdowns.has(item.slug) });
-    }
+	builder.addSubHeader(categoryDetails.name, items.length);
+	for (const item of items) {
+		builder.addItem(item, { hasDetails: markdowns.has(item.slug) });
+	}
 }
 return builder.build();
 ```
@@ -107,13 +107,13 @@ After generating the README and detail files:
 
 The `ReadmeBuilder` class provides a fluent interface for constructing README files:
 
-| Method | Description |
-|---|---|
-| `addHeader(text)` | Adds a top-level `# Header` |
-| `addSubHeader(text, count)` | Adds a `## Section` with optional item count |
-| `addItem(item, options)` | Renders an item as a list entry with link, description, tags |
-| `enableToC()` | Enables table of contents generation |
-| `build()` | Assembles the final markdown string |
+| Method                      | Description                                                  |
+| --------------------------- | ------------------------------------------------------------ |
+| `addHeader(text)`           | Adds a top-level `# Header`                                  |
+| `addSubHeader(text, count)` | Adds a `## Section` with optional item count                 |
+| `addItem(item, options)`    | Renders an item as a list entry with link, description, tags |
+| `enableToC()`               | Enables table of contents generation                         |
+| `build()`                   | Assembles the final markdown string                          |
 
 ### Item Rendering Format
 
@@ -146,6 +146,7 @@ Categories are sorted using a multi-level priority system:
 4. **Alphabetical** -- Final tiebreaker is alphabetical by category name.
 
 Within each category, items are sorted by:
+
 1. Featured status (featured items first)
 2. Explicit `order` field (ascending)
 3. Alphabetical by name
@@ -156,12 +157,12 @@ When using `APPEND` or `UPDATE` modes with a PR configuration:
 
 ```typescript
 const pr = await this.gitFacade.createPullRequest({
-    owner: directory.getRepoOwner(),
-    repo: directory.slug,
-    base: defaultBranch,
-    head: pr_update.branch,
-    title: pr_update.title,
-    body: pr_update.body,
+	owner: directory.getRepoOwner(),
+	repo: directory.slug,
+	base: defaultBranch,
+	head: pr_update.branch,
+	title: pr_update.title,
+	body: pr_update.body
 });
 ```
 

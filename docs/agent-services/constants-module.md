@@ -55,21 +55,17 @@ Used when a git operation fails because no authentication token could be resolve
 ## Usage
 
 ```typescript
-import {
-    GENERATION_CANCELLED,
-    IMPORT_CANCELLED,
-    GIT_TOKEN_NOT_AVAILABLE,
-} from '@ever-works/agent/constants';
+import { GENERATION_CANCELLED, IMPORT_CANCELLED, GIT_TOKEN_NOT_AVAILABLE } from '@ever-works/agent/constants';
 
 // Example: checking if generation was user-cancelled
 if (directory.generateStatus?.error === GENERATION_CANCELLED) {
-    // Handle user cancellation differently from errors
+	// Handle user cancellation differently from errors
 }
 
 // Example: setting cancellation status
 directory.generateStatus = {
-    status: GenerateStatusType.CANCELLED,
-    error: GENERATION_CANCELLED,
+	status: GenerateStatusType.CANCELLED,
+	error: GENERATION_CANCELLED
 };
 ```
 

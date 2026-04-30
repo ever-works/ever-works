@@ -76,11 +76,11 @@ Links a directory to an existing data repository without copying:
 
 Dispatcher method that routes to the appropriate import method based on `sourceType`:
 
-| Source Type | Method | Description |
-|---|---|---|
-| `data_repo` | `importFromDataRepo` | Clone and copy from another data repo |
-| `awesome_readme` | `importFromAwesomeReadme` | Parse an awesome-list README with AI |
-| `link_existing` | `linkExistingDataRepo` | Link to an existing data repo in-place |
+| Source Type      | Method                    | Description                            |
+| ---------------- | ------------------------- | -------------------------------------- |
+| `data_repo`      | `importFromDataRepo`      | Clone and copy from another data repo  |
+| `awesome_readme` | `importFromAwesomeReadme` | Parse an awesome-list README with AI   |
+| `link_existing`  | `linkExistingDataRepo`    | Link to an existing data repo in-place |
 
 #### `SourceRepoAnalyzerService`
 
@@ -95,6 +95,7 @@ Analyzes external repositories to determine their type and structure:
 **Repository type detection:**
 
 The analyzer classifies repositories by examining their contents:
+
 - `data_repo` -- has `config.yml` (or `.yaml`) AND a `data/` directory
 - `awesome_readme` -- has a README with section headers and 5+ list-formatted links
 - `null` -- structure not recognized
@@ -156,13 +157,15 @@ Processes a single PR:
 
 ```typescript
 const extractedItemSchema = z.object({
-    items: z.array(z.object({
-        name: z.string(),
-        description: z.string(),
-        source_url: z.string(),
-        category: z.string(),
-        tags: z.array(z.string()),
-    })),
+	items: z.array(
+		z.object({
+			name: z.string(),
+			description: z.string(),
+			source_url: z.string(),
+			category: z.string(),
+			tags: z.array(z.string())
+		})
+	)
 });
 ```
 
@@ -190,6 +193,7 @@ Implements `IOAuthFacade` and provides OAuth authentication flows through plugin
 OAuth tokens are stored in the `OAuthToken` entity via `OAuthTokenRepository`. The facade handles token lifecycle including expiration checking and remote revocation (if supported by the provider).
 
 **Custom errors:**
+
 - `NoOAuthProviderError` -- no OAuth provider configured
 - `OAuthProviderNotFoundError` -- specified provider not found
 - `OAuthNotSupportedError` -- plugin does not implement the OAuth interface
@@ -209,14 +213,14 @@ linkExistingDataRepo(options: LinkExistingDataRepoOptions): Promise<DirectoryImp
 
 ```typescript
 interface DirectoryImportResult {
-    success: boolean;
-    directoryId: string;
-    itemsImported?: number;
-    categoriesImported?: number;
-    tagsImported?: number;
-    error?: string;
-    errorCode?: DirectoryImportErrorCode;
-    metrics?: ImportMetrics;
+	success: boolean;
+	directoryId: string;
+	itemsImported?: number;
+	categoriesImported?: number;
+	tagsImported?: number;
+	error?: string;
+	errorCode?: DirectoryImportErrorCode;
+	metrics?: ImportMetrics;
 }
 ```
 
@@ -258,7 +262,7 @@ Imports can be dispatched to background workers via the `DIRECTORY_IMPORT_DISPAT
 
 ```typescript
 interface DirectoryImportDispatcher {
-    dispatchDirectoryImport(payload: DirectoryImportPayload): Promise<string | null>;
+	dispatchDirectoryImport(payload: DirectoryImportPayload): Promise<string | null>;
 }
 ```
 
@@ -268,10 +272,10 @@ The `communityPrState` JSON field on the Directory entity tracks processing prog
 
 ```typescript
 interface CommunityPrState {
-    processedPrNumbers: number[];  // Capped at 500
-    totalItemsAdded: number;
-    lastProcessedAt?: string;      // ISO timestamp
-    lastError?: string;
+	processedPrNumbers: number[]; // Capped at 500
+	totalItemsAdded: number;
+	lastProcessedAt?: string; // ISO timestamp
+	lastError?: string;
 }
 ```
 
@@ -279,11 +283,11 @@ interface CommunityPrState {
 
 ```typescript
 enum DirectoryImportErrorCode {
-    CLONE_FAILED = 'CLONE_FAILED',
-    PARSE_FAILED = 'PARSE_FAILED',
-    CREATE_REPO_FAILED = 'CREATE_REPO_FAILED',
-    REPO_ACCESS_DENIED = 'REPO_ACCESS_DENIED',
-    AI_EXTRACTION_FAILED = 'AI_EXTRACTION_FAILED',
+	CLONE_FAILED = 'CLONE_FAILED',
+	PARSE_FAILED = 'PARSE_FAILED',
+	CREATE_REPO_FAILED = 'CREATE_REPO_FAILED',
+	REPO_ACCESS_DENIED = 'REPO_ACCESS_DENIED',
+	AI_EXTRACTION_FAILED = 'AI_EXTRACTION_FAILED'
 }
 ```
 
@@ -291,24 +295,24 @@ enum DirectoryImportErrorCode {
 
 The `SourceRepoAnalyzerService` supports these URL patterns:
 
-| Provider | Pattern |
-|---|---|
-| GitHub | `https://github.com/{owner}/{repo}` |
-| GitLab | `https://gitlab.com/{owner}/{repo}` |
+| Provider  | Pattern                                |
+| --------- | -------------------------------------- |
+| GitHub    | `https://github.com/{owner}/{repo}`    |
+| GitLab    | `https://gitlab.com/{owner}/{repo}`    |
 | Bitbucket | `https://bitbucket.org/{owner}/{repo}` |
 
 URLs with `.git` suffix or trailing slashes are automatically cleaned.
 
 ## Dependencies
 
-| Dependency | Purpose |
-|---|---|
-| `@ever-works/agent/facades` | `GitFacadeService`, `AiFacadeService`, `OAuthFacadeService` |
+| Dependency                     | Purpose                                                                       |
+| ------------------------------ | ----------------------------------------------------------------------------- |
+| `@ever-works/agent/facades`    | `GitFacadeService`, `AiFacadeService`, `OAuthFacadeService`                   |
 | `@ever-works/agent/generators` | `DataGeneratorService`, `MarkdownGeneratorService`, `WebsiteGeneratorService` |
-| `@ever-works/agent/database` | `DirectoryRepository`, `OAuthTokenRepository` |
-| `@ever-works/plugin` | `IOAuthPlugin`, `PLUGIN_CAPABILITIES`, plugin interfaces |
-| `@ever-works/contracts` | `Category`, `Tag` type definitions |
-| `zod` | Schema validation for AI extraction output |
+| `@ever-works/agent/database`   | `DirectoryRepository`, `OAuthTokenRepository`                                 |
+| `@ever-works/plugin`           | `IOAuthPlugin`, `PLUGIN_CAPABILITIES`, plugin interfaces                      |
+| `@ever-works/contracts`        | `Category`, `Tag` type definitions                                            |
+| `zod`                          | Schema validation for AI extraction output                                    |
 
 ## Usage Examples
 
@@ -318,14 +322,14 @@ URLs with `.git` suffix or trailing slashes are automatically cleaned.
 import { ImportExecutorService } from '@ever-works/agent/import';
 
 const result = await importExecutor.importFromDataRepo({
-    directory,
-    user,
-    source: { owner: 'example-org', repo: 'tools-data' },
-    token: gitAccessToken,
+	directory,
+	user,
+	source: { owner: 'example-org', repo: 'tools-data' },
+	token: gitAccessToken
 });
 
 if (result.success) {
-    console.log(`Imported ${result.itemsImported} items, ${result.categoriesImported} categories`);
+	console.log(`Imported ${result.itemsImported} items, ${result.categoriesImported} categories`);
 }
 ```
 
@@ -333,11 +337,11 @@ if (result.success) {
 
 ```typescript
 const result = await importExecutor.importFromAwesomeReadme({
-    directory,
-    user,
-    sourceUrl: 'https://github.com/sindresorhus/awesome-nodejs',
-    token: gitAccessToken,
-    aiProviderOverride: 'openai',
+	directory,
+	user,
+	sourceUrl: 'https://github.com/sindresorhus/awesome-nodejs',
+	token: gitAccessToken,
+	aiProviderOverride: 'openai'
 });
 ```
 
@@ -346,12 +350,9 @@ const result = await importExecutor.importFromAwesomeReadme({
 ```typescript
 import { SourceRepoAnalyzerService } from '@ever-works/agent/import';
 
-const analysis = await analyzer.analyzeRepository(
-    'https://github.com/example/cool-tools',
-    token,
-);
+const analysis = await analyzer.analyzeRepository('https://github.com/example/cool-tools', token);
 
-console.log(`Type: ${analysis.detectedType}`);       // 'data_repo' | 'awesome_readme' | null
+console.log(`Type: ${analysis.detectedType}`); // 'data_repo' | 'awesome_readme' | null
 console.log(`Items: ${analysis.structure.itemCount}`);
 console.log(`Public: ${analysis.isPublic}`);
 ```
@@ -365,7 +366,7 @@ import { CommunityPrProcessorService } from '@ever-works/agent/community-pr';
 const result = await processor.processAllDirectories();
 console.log(`Processed ${result.processed} items from community PRs`);
 result.errors.forEach((e) => {
-    console.error(`Directory ${e.directoryId}: ${e.error}`);
+	console.error(`Directory ${e.directoryId}: ${e.error}`);
 });
 ```
 

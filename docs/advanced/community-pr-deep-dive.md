@@ -83,13 +83,15 @@ The AI returns a structured response validated against a Zod schema:
 
 ```typescript
 const extractedItemSchema = z.object({
-    items: z.array(z.object({
-        name: z.string(),
-        description: z.string(),
-        source_url: z.string(),
-        category: z.string(),
-        tags: z.array(z.string()),
-    })),
+	items: z.array(
+		z.object({
+			name: z.string(),
+			description: z.string(),
+			source_url: z.string(),
+			category: z.string(),
+			tags: z.array(z.string())
+		})
+	)
 });
 ```
 
@@ -107,10 +109,7 @@ For each extracted item:
 
 ```typescript
 await this.gitFacade.add(directory.gitProvider, dest, '.');
-await this.gitFacade.commit(
-    directory.gitProvider, dest,
-    `Add ${items.length} item(s) from community PR #${pr.number}`,
-);
+await this.gitFacade.commit(directory.gitProvider, dest, `Add ${items.length} item(s) from community PR #${pr.number}`);
 await this.gitFacade.push({ dir: dest }, gitOptions);
 ```
 
@@ -133,10 +132,10 @@ Each directory maintains a `CommunityPrState` object:
 
 ```typescript
 interface CommunityPrState {
-    processedPrNumbers: number[];   // PR numbers already processed
-    totalItemsAdded: number;        // Cumulative items added
-    lastProcessedAt?: string;       // ISO timestamp of last processing
-    lastError?: string;             // Most recent error message
+	processedPrNumbers: number[]; // PR numbers already processed
+	totalItemsAdded: number; // Cumulative items added
+	lastProcessedAt?: string; // ISO timestamp of last processing
+	lastError?: string; // Most recent error message
 }
 ```
 
@@ -146,7 +145,7 @@ The `processedPrNumbers` array is capped at 500 entries to prevent unbounded gro
 
 ```typescript
 if (state.processedPrNumbers.length > MAX_PROCESSED_PR_NUMBERS) {
-    state.processedPrNumbers = state.processedPrNumbers.slice(-MAX_PROCESSED_PR_NUMBERS);
+	state.processedPrNumbers = state.processedPrNumbers.slice(-MAX_PROCESSED_PR_NUMBERS);
 }
 ```
 
@@ -177,16 +176,16 @@ Errors are handled at two levels:
 
 Community PR processing is controlled by two directory settings:
 
-| Setting | Type | Description |
-|---|---|---|
-| `communityPrEnabled` | boolean | Enable/disable community PR processing |
+| Setting                | Type    | Description                              |
+| ---------------------- | ------- | ---------------------------------------- |
+| `communityPrEnabled`   | boolean | Enable/disable community PR processing   |
 | `communityPrAutoClose` | boolean | Automatically close PRs after processing |
 
 ## Limits and Constants
 
-| Constant | Value | Purpose |
-|---|---|---|
-| `MAX_PROCESSED_PR_NUMBERS` | 500 | Cap on tracked processed PR numbers |
+| Constant                    | Value  | Purpose                                  |
+| --------------------------- | ------ | ---------------------------------------- |
+| `MAX_PROCESSED_PR_NUMBERS`  | 500    | Cap on tracked processed PR numbers      |
 | `MAX_CHANGE_CONTEXT_LENGTH` | 50,000 | Maximum characters of PR diff sent to AI |
 
 ## Batch Processing Results
@@ -195,7 +194,7 @@ The `processAllDirectories()` method returns an aggregate result:
 
 ```typescript
 interface CommunityPrProcessingResult {
-    processed: number;                          // Total items added across all directories
-    errors: Array<{ directoryId: string; error: string }>;  // Failed directories
+	processed: number; // Total items added across all directories
+	errors: Array<{ directoryId: string; error: string }>; // Failed directories
 }
 ```
