@@ -98,7 +98,7 @@ export class ActivepiecesPlugin implements IPlugin, IPipelinePlugin, IFormSchema
 				'x-scope': 'user'
 			}
 		},
-		required: ['apiKey', 'defaultFlowId']
+		required: ['apiKey']
 	};
 
 	private context: PluginContext | null = null;
@@ -317,6 +317,14 @@ export class ActivepiecesPlugin implements IPlugin, IPipelinePlugin, IFormSchema
 					`${payload.existingSummary?.totalItems ?? 0} existing items, ` +
 					`dataSource=${payload.dataSource?.type ?? 'none'}`
 			);
+			if (payload.dataSource?.accessToken) {
+				logger.warn(
+					'Activepieces payload contains a repository access token. ' +
+						'This token will be visible in the Activepieces flow run logs and dashboard, ' +
+						'and to every downstream step of your flow. ' +
+						'Use a fine-grained, short-lived, read-only token scoped to this repository only.'
+				);
+			}
 			setState('prepare-payload', 'completed');
 
 			if (signal.aborted) return handleCancel();

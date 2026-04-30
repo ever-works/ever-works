@@ -339,6 +339,45 @@ describe('ActivepiecesPlugin', () => {
 			expect(state).toBeDefined();
 			expect(state!.completedSteps.length).toBeGreaterThan(0);
 		});
+
+		it('should emit a security warning when payload contains a repo access token', async () => {
+			const ctx = createMockContext();
+			await plugin.onLoad(ctx);
+
+			await plugin.execute(
+				createDirectory(),
+				createRequest({
+					config: {
+						flow_id: 'flow-test-123',
+						target_items: 5,
+						webhook_mode: 'sync',
+						pass_repo_access: true,
+						repo_url: 'https://github.com/org/repo',
+						repo_access_token: 'ghp_secret_token'
+					}
+				}),
+				createExisting()
+			);
+
+			const warnCalls = (ctx.logger.warn as ReturnType<typeof vi.fn>).mock.calls;
+			const matched = warnCalls.find(
+				(args) => typeof args[0] === 'string' && args[0].includes('repository access token')
+			);
+			expect(matched).toBeDefined();
+		});
+
+		it('should not emit a security warning when no repo token is present', async () => {
+			const ctx = createMockContext();
+			await plugin.onLoad(ctx);
+
+			await plugin.execute(createDirectory(), createRequest(), createExisting());
+
+			const warnCalls = (ctx.logger.warn as ReturnType<typeof vi.fn>).mock.calls;
+			const matched = warnCalls.find(
+				(args) => typeof args[0] === 'string' && args[0].includes('repository access token')
+			);
+			expect(matched).toBeUndefined();
+		});
 	});
 
 	describe('validateConnection', () => {

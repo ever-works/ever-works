@@ -348,8 +348,14 @@ async function buildHttpError(response: Response, url: string): Promise<Error> {
 
 	const baseMessage = `Activepieces request failed (${response.status} ${response.statusText}) for ${url}`;
 
-	if (response.status === 401 || response.status === 403) {
+	if (response.status === 401) {
 		return new Error('Invalid Activepieces API key. Please update your API key in plugin settings.');
+	}
+	if (response.status === 403) {
+		return new Error(
+			'Activepieces API key does not have permission to access this resource. ' +
+				'Check that the key belongs to the correct project.'
+		);
 	}
 	if (response.status === 404) {
 		return new Error(

@@ -56,7 +56,10 @@ export function getFormFields(): FormFieldDefinition[] {
 			name: 'pass_repo_access',
 			type: 'boolean',
 			label: 'Pass Data Repository Access',
-			description: 'Grant the Activepieces flow read access to the directory data repository',
+			description:
+				'Grant the Activepieces flow read access to the directory data repository. ' +
+				'⚠ The repository URL and access token are sent in the webhook payload and become ' +
+				'visible to every step of your flow and to the Activepieces run logs.',
 			defaultValue: false,
 			group: 'data'
 		},
@@ -74,8 +77,12 @@ export function getFormFields(): FormFieldDefinition[] {
 			name: 'repo_access_token',
 			type: 'password',
 			label: 'Repository Access Token',
-			description: 'Read-only access token for the data repository (short-lived recommended)',
-			placeholder: 'ghp_...',
+			description:
+				'Read-only token for the data repository. ⚠ This token is forwarded to Activepieces ' +
+				'in the webhook body and persists in the flow run logs and dashboard. ' +
+				'Use a fine-grained, short-lived, read-only token scoped to this repository only — ' +
+				'never a classic PAT with broad scopes.',
+			placeholder: 'ghp_... (fine-grained, read-only)',
 			group: 'data',
 			showIf: REPO_ACCESS_CONDITION,
 			requiredIf: REPO_ACCESS_CONDITION
