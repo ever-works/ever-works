@@ -219,7 +219,9 @@ export function GitHubAppSettings({ installations: initialInstallations }: GitHu
                                                         type="button"
                                                         variant="secondary"
                                                         size="sm"
-                                                        loading={pendingRepositoryId === repository.id}
+                                                        loading={
+                                                            pendingRepositoryId === repository.id
+                                                        }
                                                         onClick={() =>
                                                             handleOnboard(
                                                                 installation.installationId,

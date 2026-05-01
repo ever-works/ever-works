@@ -85,9 +85,10 @@ export class GitHubAppOnboardingService {
         const installationDetails = await this.gitHubAppService.getInstallation(
             state.installationId,
         );
-        const existingInstallation = await this.gitHubAppInstallationRepository.findByInstallationId(
-            String(installationDetails.id),
-        );
+        const existingInstallation =
+            await this.gitHubAppInstallationRepository.findByInstallationId(
+                String(installationDetails.id),
+            );
         const installation = await this.gitHubAppInstallationRepository.upsertFromGithub({
             installationId: String(installationDetails.id),
             appSlug: installationDetails.app_slug || config.githubApp.slug(),
