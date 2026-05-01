@@ -1820,8 +1820,7 @@
                         "model": "โมเดล",
                         "schedule": "กำหนดการ",
                         "providers": "ผู้ให้บริการ",
-                        "websiteRepo": "คลังเว็บไซต์",
-                        "additionalAgents": "ตัวแทนเพิ่มเติม"
+                        "websiteRepo": "คลังเว็บไซต์"
                     },
                     "sourceTypes": {
                         "dataRepo": "คลังข้อมูล",
@@ -2496,6 +2495,7 @@
                     "nameRequired": "ชื่อไดเรกทอรีจำเป็นต้องมี",
                     "noAnalysis": "กรุณาวิเคราะห์ repository ก่อน",
                     "githubRequired": "กรุณาเชื่อมต่อบัญชี GitHub ของคุณก่อน",
+                    "providerRequired": "กรุณาเลือกผู้ให้บริการ Git ก่อน",
                     "importFailed": "ไม่สามารถนำเข้าไดเรกทอรีได้",
                     "linkFailed": "ไม่สามารถลิงก์ไดเรกทอรีได้",
                     "providerNotConfigured": "{provider} ยังไม่ได้ตั้งค่า ไปที่ Settings → Plugins เพื่อตั้งค่าก่อนนำเข้า"

@@ -11,11 +11,6 @@ const withNextIntl = createNextIntlPlugin();
 
 const nextConfig: NextConfig = {
     output: BUILD_OUTPUT as NextConfig['output'],
-    experimental: {
-        // Webpack mode is used for production builds because Turbopack is
-        // currently unstable for this app in CI/local sandboxed environments.
-        webpackBuildWorker: false,
-    },
     images: {
         remotePatterns: [
             {

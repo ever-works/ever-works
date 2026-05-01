@@ -3,4 +3,7 @@ export * from './services/works-config-restore.service';
 export * from './services/works-config-import-planner.service';
 export * from './services/works-config-import-applier.service';
 export * from './services/works-config-writer.service';
+export * from './services/works-config-projection.service';
+export * from './services/works-config-repository-sync.service';
+export * from './services/works-config-sync.listener';
 export * from './works-config-data';

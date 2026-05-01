@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useTransition } from 'react';
+import { useState } from 'react';
 import { Directory } from '@/lib/api/types-only';
 import { cn } from '@/lib/utils/cn';
 import { getGenerationStatusConfig } from '@/lib/utils/generation-status';
@@ -13,8 +13,7 @@ import { getStepProgress, getStepText, getItemsProcessedText } from '@/lib/utils
 import { Terminal } from 'lucide-react';
 import { TerminalLogViewer } from './shared/TerminalLogViewer';
 import { ShinyText } from '@/components/ui/ShinyText';
-import { cancelGeneration } from '@/app/actions/dashboard/generator';
-import { toast } from 'sonner';
+import { CancelGenerationButton } from './generator/CancelGenerationButton';
 
 interface DirectoryStatusCardProps {
     directory: Directory;
@@ -25,7 +24,6 @@ export function DirectoryStatusCard({ directory }: DirectoryStatusCardProps) {
     const t = useTranslations('dashboard.directoryDetail.statusCard');
     const tProgress = useTranslations('dashboard.directoryDetail.progress');
     const [showLogs, setShowLogs] = useState(false);
-    const [isCancelling, startCancelling] = useTransition();
 
     const generateStatus = directory.generateStatus;
     const hasWarnings = !!generateStatus?.warnings?.length;
@@ -122,34 +120,17 @@ export function DirectoryStatusCard({ directory }: DirectoryStatusCardProps) {
                             </div>
                         </div>
                         <div className="flex items-center gap-2">
-                            <Button
-                                variant="danger"
-                                size="sm"
-                                loading={isCancelling}
-                                onClick={() => {
-                                    startCancelling(async () => {
-                                        const result = await cancelGeneration(directory.id);
-
-                                        if (!result.success) {
-                                            if (result.error?.includes('is not generating')) {
-                                                toast.error(result.error);
-                                                router.refresh();
-                                                return;
-                                            }
-
-                                            toast.error(result.error || t('generating.stopFailed'));
-                                            return;
-                                        }
-
-                                        toast.success(
-                                            result.message || t('generating.stopRequested'),
-                                        );
-                                        router.refresh();
-                                    });
+                            <CancelGenerationButton
+                                directoryId={directory.id}
+                                labels={{
+                                    stop: t('generating.stop'),
+                                    stopping: t('generating.stopping'),
+                                    stopRequested: t('generating.stopRequested'),
+                                    stopFailed: t('generating.stopFailed'),
                                 }}
-                            >
-                                {isCancelling ? t('generating.stopping') : t('generating.stop')}
-                            </Button>
+                                onCancelled={() => router.refresh()}
+                                onAlreadyFinished={() => router.refresh()}
+                            />
                         </div>
                         {logsSection}
                     </div>

@@ -31,7 +31,7 @@ import type {
 } from '@ever-works/plugin';
 import type { DirectoryHistoryChangeEntry } from '@ever-works/contracts/api';
 import type { GenerationLogCollector } from './generation-log-collector';
-import { GENERATION_CANCELLED } from '@src/constants/messages';
+import { throwIfGenerationCancelled } from '@src/utils';
 import { WorksConfigWriterService } from '@src/works-config/services/works-config-writer.service';
 import type { ResolvedWorksConfig } from '@src/works-config/services/works-config.service';
 
@@ -112,18 +112,7 @@ export class DataGeneratorService {
             `Initializing data repository for directory: ${JSON.stringify(createItemsGeneratorDto)}`,
         );
 
-        const throwIfCancelled = () => {
-            if (options?.signal?.aborted) {
-                const reason = options.signal.reason;
-                if (reason instanceof Error) {
-                    throw reason;
-                }
-
-                const error = new Error(GENERATION_CANCELLED);
-                error.name = 'AbortError';
-                throw error;
-            }
-        };
+        const throwIfCancelled = () => throwIfGenerationCancelled(options?.signal);
 
         let existingData = {
             existingItems: [],
@@ -1573,25 +1562,12 @@ export class DataGeneratorService {
                 };
             });
 
-            // Calculate stats
+            // Calculate candidate stats. The final no-op decision is based on git status after
+            // writing, because existing imported items may serialize to identical files.
             const newItemsCount = itemsWithSlugs.filter(
                 (item) => !existingSlugSet.has(item.slug),
             ).length;
             const updatedItemsCount = itemsWithSlugs.length - newItemsCount;
-
-            if (newItemsCount === 0 && updatedItemsCount === 0) {
-                this.logger.log('No new or updated items found during sync.');
-                return {
-                    success: true,
-                    prUpdate: null,
-                    hasExistingItems: existingItems.length > 0,
-                    stats: {
-                        newItemsCount: 0,
-                        updatedItemsCount: 0,
-                        totalItemsCount: existingItems.length,
-                    },
-                };
-            }
 
             // Write items
             await pMap(itemsWithSlugs, (item) => this.writeItemToDisk(data, item), {
@@ -1604,6 +1580,22 @@ export class DataGeneratorService {
                 importedWorksConfig: importedData.worksConfig,
                 initialPrompt: importedData.config?.metadata?.initial_prompt,
             });
+
+            const changes = await this.gitFacade.getStatus(provider, data.dir);
+
+            if (changes.length === 0) {
+                this.logger.log('No repository changes found during source sync.');
+                return {
+                    success: true,
+                    prUpdate: null,
+                    hasExistingItems: existingItems.length > 0,
+                    stats: {
+                        newItemsCount: 0,
+                        updatedItemsCount: 0,
+                        totalItemsCount: existingItems.length,
+                    },
+                };
+            }
 
             // Commit
             await this.gitFacade.addAll(provider, data.dir);
@@ -1621,13 +1613,13 @@ export class DataGeneratorService {
 
             // Update DB stats
             await this.directoryOperations.updateDirectory(directory.id, {
-                itemsCount: itemsWithSlugs.length, // Approximation, assuming we keep all existing + new
+                itemsCount: existingItems.length + newItemsCount,
             });
 
             const stats: GenerationStats = {
                 newItemsCount,
                 updatedItemsCount,
-                totalItemsCount: itemsWithSlugs.length, // Note: this might be inaccurate if we didn't fetch ALL existing items to merge, but usually import fetches full state
+                totalItemsCount: existingItems.length + newItemsCount,
             };
 
             let prUpdate: PRUpdate | null = null;

@@ -194,6 +194,10 @@ export function DirectoryImportForm({ gitProvider, deployProvider }: DirectoryIm
 
     const handleLinkConfirm = async (createMissingRepos: boolean) => {
         if (!analysisResult) return;
+        if (!gitProvider) {
+            toast.error(t('errors.providerRequired'));
+            return;
+        }
 
         setShowLinkConfirm(false);
 
@@ -237,6 +241,10 @@ export function DirectoryImportForm({ gitProvider, deployProvider }: DirectoryIm
         const sourceType = analysisResult?.detectedType || manualSourceType;
         if (!analysisResult || !sourceType) {
             toast.error(t('errors.noAnalysis'));
+            return;
+        }
+        if (!gitProvider) {
+            toast.error(t('errors.providerRequired'));
             return;
         }
 

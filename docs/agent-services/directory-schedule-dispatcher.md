@@ -9,117 +9,235 @@ sidebar_position: 15
 
 ## Overview
 
-The `DirectoryScheduleDispatcherService` is the cron-triggered entry point that finds due directory schedules and dispatches their scheduled updates. It handles zombie schedule recovery, atomic reservation of schedules to prevent duplicate processing, and delegates the actual generation work to `DirectoryGenerationService`.
+`DirectoryScheduleDispatcherService` is the cron-triggered entry point that finds due directory schedules and dispatches their scheduled updates. It runs on a configurable cron interval (every N minutes), recovers zombie schedules left behind by crashed workers, claims each due schedule **atomically via a single SQL `UPDATE ... WHERE`** (no Redis or external lock service needed), and delegates the actual generation work to `DirectoryGenerationService`.
+
+This doc covers what the service does, the race-condition-safe claim pattern it uses, and the data it returns.
+
+## Where It Runs
+
+The dispatcher does not start itself — it's wrapped by a **Trigger.dev scheduled task** that fires it on a cron schedule:
+
+```ts
+// packages/tasks/src/tasks/trigger/directory-schedule-dispatcher.task.ts
+const interval = Math.max(1, config.subscriptions.getDispatchIntervalMinutes());
+const cronExpression = `*/${interval} * * * *`;
+
+export const directoryScheduleDispatcherTask = schedules.task({
+	id: 'directory-schedule-dispatcher',
+	cron: cronExpression,
+	run: async () => {
+		const appContext = await NestFactory.createApplicationContext(TriggerInternalModule);
+		try {
+			const dispatcher = appContext.get(DirectoryScheduleDispatcherService);
+			return { intervalMinutes: interval, ...(await dispatcher.dispatchDue()) };
+		} finally {
+			await appContext.close();
+		}
+	}
+});
+```
+
+The Trigger.dev runtime guarantees one execution per cron tick across the whole worker pool — so the cron itself is single-fired. What the service guards against is the case where _two cron ticks overlap_ (a slow tick still running when the next one fires) and try to grab the same due schedules.
 
 ## Architecture
 
-This service runs at the outermost layer of the scheduling system, typically invoked by a cron job or background task runner. It coordinates between the schedule repository (to find due schedules), the schedule service (for state management), and the generation service (for executing updates).
-
 ```
-Cron Job / Trigger.dev Task
+Trigger.dev cron (*/N * * * *)
         |
         v
 DirectoryScheduleDispatcherService.dispatchDue(limit?)
         |
-        +-- Step 0: recoverStuckSchedules()           <-- cleanup zombies
+        +-- Step 0: feature flag check (subscriptions.scheduledUpdatesEnabled)
         |
-        +-- Step 1: scheduleRepository.findDue(limit)  <-- find ready schedules
+        +-- Step 1: recoverStuckSchedules()                    <- cleanup zombies
         |
-        +-- Step 2: For each schedule:
+        +-- Step 2: scheduleRepository.findDue(limit)          <- WHERE nextRunAt <= now()
+        |
+        +-- Step 3: For each due schedule:
         |       |
-        |       +-- markRunDispatched(schedule.id)     <-- atomic reservation
+        |       +-- markRunDispatched(scheduleId)              <- atomic CAS claim
+        |       |     |
+        |       |     +-- null   -> already claimed elsewhere; record `skipped`
+        |       |     +-- entity -> we own the run; continue
         |       |
         |       +-- directoryGenerationService.runScheduledUpdate(schedule)
         |       |
-        |       +-- On error: markRunFailed(schedule.id, errorMessage)
+        |       +-- error -> record `failed`; finalization happens inside the
+        |                   inner methods (finalizeGeneration, handleSyncFailure,
+        |                   etc.) so we don't double-count failures here.
         |
         v
-Returns: number of dispatched schedules
+Returns: DirectoryScheduleDispatchSummary
 ```
 
 ## API Reference
 
-### Methods
-
-#### `dispatchDue(limit?)`
-
-Finds and dispatches all due scheduled directory updates.
+### `dispatchDue(limit?): Promise<DirectoryScheduleDispatchSummary>`
 
 | Parameter | Type     | Default                              | Description                                          |
 | --------- | -------- | ------------------------------------ | ---------------------------------------------------- |
 | `limit`   | `number` | `config.subscriptions.getMaxBatch()` | Maximum number of schedules to process in this batch |
 
-**Returns:** `Promise<number>` -- the count of successfully dispatched schedules.
+Returns:
 
-## Implementation Details
+```ts
+interface DirectoryScheduleDispatchSummary {
+	limit: number;
+	dueCount: number;
+	dispatched: number;
+	skipped: number;
+	failed: number;
+	entries: DirectoryScheduleDispatchEntry[];
+}
 
-### Feature Gate
-
-The method first checks `config.subscriptions.scheduledUpdatesEnabled()`. If scheduled updates are disabled globally, it logs a warning and returns `0` immediately. This allows operators to pause all scheduled processing without code changes.
-
-### Zombie Recovery
-
-Before finding due schedules, the service calls `recoverStuckSchedules()` on the `DirectoryScheduleService`. This handles schedules that were marked as "dispatched" but never completed (e.g., due to a worker crash), resetting them to a retriable state.
-
-### Atomic Reservation
-
-The `markRunDispatched()` call acts as a pessimistic lock. If another dispatcher instance already reserved the schedule (race condition in a multi-instance deployment), the method returns `null` and the schedule is skipped with a warning log. This prevents duplicate generation runs.
-
-### Sequential Processing
-
-Schedules are processed sequentially in a `for` loop rather than in parallel. This is intentional to:
-
-1. Prevent resource exhaustion from concurrent generation jobs
-2. Allow the configurable `limit` to act as a true batch ceiling
-3. Ensure individual failures do not cascade to other schedules
-
-### Error Isolation
-
-Each schedule is processed inside its own try-catch block. A failure in one schedule's generation does not prevent subsequent schedules from being dispatched. Failed schedules are marked via `markRunFailed()` with the error message.
-
-## Database Interactions
-
-| Repository / Service          | Method                         | Purpose                                            |
-| ----------------------------- | ------------------------------ | -------------------------------------------------- |
-| `DirectoryScheduleRepository` | `findDue(limit)`               | Query for schedules whose next run time has passed |
-| `DirectoryScheduleService`    | `recoverStuckSchedules()`      | Reset zombie schedules                             |
-| `DirectoryScheduleService`    | `markRunDispatched(id)`        | Atomically reserve a schedule for processing       |
-| `DirectoryScheduleService`    | `markRunFailed(id, message)`   | Record schedule failure                            |
-| `DirectoryGenerationService`  | `runScheduledUpdate(schedule)` | Execute the actual directory generation            |
-
-## Event System
-
-This service does not emit events directly. Events are emitted by the downstream `DirectoryGenerationService` upon completion.
-
-## Error Handling
-
-| Scenario                   | Behavior                                            |
-| -------------------------- | --------------------------------------------------- |
-| Scheduled updates disabled | Returns `0`, logs warning                           |
-| Schedule already reserved  | Logs warning, skips to next                         |
-| Generation failure         | Calls `markRunFailed()`, continues to next schedule |
-| Repository query failure   | Propagates the exception (no schedules processed)   |
-
-## Usage Examples
-
-```typescript
-// Typically called from a cron task
-const dispatched = await schedulerDispatcher.dispatchDue();
-console.log(`Dispatched ${dispatched} scheduled updates`);
-
-// With a custom batch limit
-const dispatched = await schedulerDispatcher.dispatchDue(5);
+interface DirectoryScheduleDispatchEntry {
+	scheduleId: string;
+	directoryId: string;
+	directoryName: string;
+	directorySlug: string;
+	directoryOwner: string;
+	scheduledFor: string | null;
+	outcome: 'dispatched' | 'skipped' | 'failed';
+	message?: string;
+	historyId?: string;
+}
 ```
+
+The Trigger.dev wrapper merges `intervalMinutes` into this summary and returns it as the run output, so you can see in the Trigger.dev dashboard exactly which schedules ran in each tick.
+
+## How Claiming Works (The Race-Free Part)
+
+The most important detail in this service is `markRunDispatched`, which delegates to the repository's **`tryMarkDispatched(scheduleId)`**. The repository performs the claim with a single conditional `UPDATE`:
+
+```ts
+// packages/agent/src/database/repositories/directory-schedule.repository.ts
+async tryMarkDispatched(scheduleId: string): Promise<Date | null> {
+    const schedule = await this.repository.findOne({
+        where: { id: scheduleId },
+        select: ['id', 'nextRunAt'],
+    });
+    if (!schedule?.nextRunAt) return null;
+
+    const originalNextRunAt = schedule.nextRunAt;
+    const dispatchedAt = new Date();
+
+    const result = await this.repository
+        .createQueryBuilder()
+        .update(DirectorySchedule)
+        .set({
+            lastRunStatus: GenerateStatusType.GENERATING,
+            scheduledFor: originalNextRunAt,   // preserved as drift anchor
+            nextRunAt: null,                   // claim marker
+            lastRunAt: dispatchedAt,
+            updatedAt: dispatchedAt,
+        })
+        .where('id = :id', { id: scheduleId })
+        .andWhere('status = :status', { status: DirectoryScheduleStatus.ACTIVE })
+        .andWhere('nextRunAt IS NOT NULL')   // <-- the CAS predicate
+        .execute();
+
+    return (result.affected ?? 0) > 0 ? originalNextRunAt : null;
+}
+```
+
+The `WHERE nextRunAt IS NOT NULL` clause is the lock. The first dispatcher to UPDATE flips `nextRunAt` to `null`; any second dispatcher's UPDATE matches zero rows and returns `null`. This holds because:
+
+- **Updates against a single row are serializable** in every supported RDBMS (PostgreSQL, SQLite, etc.) without an explicit transaction.
+- The dispatcher reads `nextRunAt` _before_ the UPDATE only to preserve it into `scheduledFor` for drift correction (see below). The actual claim guarantee comes from the WHERE clause, not the read.
+- A `status = ACTIVE` check prevents racing with manual pause/cancel operations.
+
+**No Redis, no advisory locks, no distributed lock service required** — the schedule row itself is the lock. This is why the dispatcher can run on multiple workers concurrently without coordination.
+
+> The repository code includes a comment about a theoretical TOCTOU window between the read of `nextRunAt` and the UPDATE. In practice this window is microseconds and the only way `scheduledFor` could go stale is if a full generation cycle completed between the two queries — which can't happen.
+
+## `scheduledFor` — The Drift Anchor
+
+Standard "calculate the next run from now" cron logic causes drift: a 1-hour schedule that fires 90 seconds late and re-schedules from `now()` will be 90 seconds late forever. The dispatcher avoids this by:
+
+1. At claim time, copying `nextRunAt` (the time the run _was supposed_ to fire) into `scheduledFor` and clearing `nextRunAt`.
+2. At completion time, calculating the next `nextRunAt` from the `scheduledFor` anchor — not from "right now".
+
+```ts
+private resolveAnchorDate(schedule: DirectorySchedule): Date {
+    const oneDayAgo = Date.now() - 24 * 60 * 60 * 1000;
+    if (schedule.scheduledFor && schedule.scheduledFor.getTime() > oneDayAgo) {
+        return schedule.scheduledFor;
+    }
+    if (schedule.nextRunAt && schedule.nextRunAt.getTime() > oneDayAgo) {
+        return schedule.nextRunAt;
+    }
+    return new Date();
+}
+```
+
+If the anchor is older than 24 hours (e.g. a schedule that was paused for a week and just resumed) the dispatcher gives up on drift correction and resets to "now" — otherwise the next `nextRunAt` could fire dozens of times in immediate succession.
+
+A side benefit: a manual "Run Now" request that fires _before_ the scheduled slot doesn't reset the upcoming run. `isManualRunAheadOfSchedule` detects this case and preserves the existing `nextRunAt`.
+
+## Zombie Recovery
+
+Before claiming any new work, the dispatcher calls `directoryScheduleService.recoverStuckSchedules()`. A schedule is "stuck" if:
+
+- Its `lastRunStatus` is `GENERATING`, **and**
+- Its `lastRunAt` is older than `config.subscriptions.getScheduleStuckTimeoutMinutes()` (default 60).
+
+Stuck schedules are flipped to `ERROR` via `markRunFailed`, which increments their failure counter (and may auto-pause them after exceeding `maxFailureBeforePause`). On the next dispatch cycle they become eligible for claiming again — assuming the schedule wasn't paused.
+
+Stuck schedules are caused by hard worker crashes (process killed, container restarted mid-generation) where the run never gets a chance to call its own finalization handlers.
+
+## Sequential Processing & Limits
+
+Schedules are processed sequentially in a `for` loop, not in parallel. This is intentional:
+
+| Reason                | Why it matters                                                                                              |
+| --------------------- | ----------------------------------------------------------------------------------------------------------- |
+| Resource exhaustion   | A single generation can use 1+ CPU core and several GB of RAM; concurrent ones would saturate the worker.   |
+| Predictable batch cap | `limit` (default `subscriptions.getMaxBatch()`) is a true batch ceiling, not a "max concurrent" suggestion. |
+| Failure isolation     | One schedule's exception doesn't take down sibling runs.                                                    |
+
+The trade-off is that a single batch's wall-clock time grows linearly with `limit`. Tune `getDispatchIntervalMinutes()` and `getMaxBatch()` together to make sure one tick finishes before the next fires.
+
+## Outcome Recording
+
+Every schedule processed in a batch produces exactly one entry in `summary.entries`, even if it errors. Outcomes:
+
+| Outcome      | When it happens                                                                                                                                                                                                                      |
+| ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `dispatched` | Generation kicked off successfully.                                                                                                                                                                                                  |
+| `skipped`    | Either another worker already claimed the schedule (`markRunDispatched` returned `null`), or `DirectoryGenerationService.runScheduledUpdate` returned `status: skipped` (e.g. the directory was deleted between queue and dispatch). |
+| `failed`     | The dispatch threw. The actual finalization (`markRunFailed`) is handled by the inner methods so the dispatcher only logs and counts here.                                                                                           |
 
 ## Configuration
 
-| Setting                   | Source                 | Description                                   |
-| ------------------------- | ---------------------- | --------------------------------------------- |
-| `scheduledUpdatesEnabled` | `config.subscriptions` | Global feature flag for scheduled updates     |
-| `getMaxBatch`             | `config.subscriptions` | Default maximum batch size per dispatch cycle |
+| Setting                            | Source                 | Description                                                      |
+| ---------------------------------- | ---------------------- | ---------------------------------------------------------------- |
+| `scheduledUpdatesEnabled`          | `config.subscriptions` | Global feature flag — `false` returns an empty summary.          |
+| `getDispatchIntervalMinutes()`     | `config.subscriptions` | Cron tick interval (drives `*/N * * * *`).                       |
+| `getMaxBatch()`                    | `config.subscriptions` | Default `limit` for `dispatchDue()`.                             |
+| `getScheduleStuckTimeoutMinutes()` | `config.subscriptions` | Threshold above which an in-progress run is treated as a zombie. |
+| `getMaxFailureBeforePause()`       | `config.subscriptions` | Default failure ceiling before auto-pausing a schedule.          |
 
-## Related Services
+## Database Interactions
 
-- [Directory Scheduling](/agent-services/directory-scheduling) -- manages schedule CRUD and state transitions
-- [Directory Generation](/agent-services/directory-generation) -- executes the actual generation work
-- [Directory Import Service](/agent-services/directory-import-service) -- creates sync schedules for imported directories
+| Repository / Service          | Method                             | Purpose                                                     |
+| ----------------------------- | ---------------------------------- | ----------------------------------------------------------- |
+| `DirectoryScheduleService`    | `recoverStuckSchedules()`          | Reset zombie schedules                                      |
+| `DirectoryScheduleRepository` | `findDue(limit)`                   | `WHERE nextRunAt <= NOW() AND status = ACTIVE`              |
+| `DirectoryScheduleService`    | `markRunDispatched(id)`            | Wraps the CAS claim and triggers the directory sync         |
+| `DirectoryScheduleRepository` | `tryMarkDispatched(id)`            | The actual atomic UPDATE (returns the original `nextRunAt`) |
+| `DirectoryGenerationService`  | `runScheduledUpdate(schedule)`     | Execute the actual generation                               |
+| `DirectoryScheduleService`    | `finalizeScheduleRun(id, outcome)` | Idempotent finalize (called from inner methods, not here)   |
+
+## Why This Doesn't Use `DistributedTaskLockService`
+
+`DistributedTaskLockService` (see [Distributed Task Lock](./distributed-task-lock)) is a generic cache-row-backed lock used by background workers that **don't have a single row to UPDATE** — for example, "run an analytics aggregation" doesn't have a per-target row.
+
+The schedule dispatcher does have such a row (the `DirectorySchedule` itself), so the conditional UPDATE is both simpler and stronger: it claims the work and updates state in one atomic step, no separate lock acquire/release lifecycle.
+
+## Related
+
+- [Directory Scheduling](./directory-scheduling) — schedule CRUD and state transitions
+- [Directory Generation](./directory-generation) — the generation work the dispatcher kicks off
+- [Distributed Task Lock](./distributed-task-lock) — the alternative locking mechanism for non-schedule background jobs
+- [Scheduled Updates](/features/scheduled-updates) — the user-facing feature this powers
+- [Directory Import Service](./directory-import-service) — creates schedules during import

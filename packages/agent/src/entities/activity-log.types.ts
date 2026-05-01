@@ -40,6 +40,7 @@ export enum ActivityActionType {
     SETTINGS_UPDATED = 'settings_updated',
     WEBSITE_SETTINGS_UPDATED = 'website_settings_updated',
     PROMPTS_UPDATED = 'prompts_updated',
+    WORKS_CONFIG_SYNC = 'works_config_sync',
 
     // Auth / Account
     USER_LOGIN = 'user_login',
@@ -59,6 +60,7 @@ export enum ActivityStatus {
     IN_PROGRESS = 'in_progress',
     COMPLETED = 'completed',
     FAILED = 'failed',
+    CANCELLED = 'cancelled',
 }
 
 export interface CreateActivityLogDto {

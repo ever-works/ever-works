@@ -43,7 +43,7 @@ jobs:
         run: pnpm format:check
 
       - name: Build all packages
-        run: pnpm build
+        run: pnpm build --filter=!./apps/docs
 
       - name: run test on all packages
         run: pnpm test

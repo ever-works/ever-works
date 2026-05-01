@@ -5,6 +5,7 @@ import {
     NotFoundException,
     Optional,
 } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { DirectorySchedule } from '@src/entities/directory-schedule.entity';
 import { DirectoryScheduleRepository } from '@src/database/repositories/directory-schedule.repository';
 import { DirectoryRepository } from '@src/database/repositories/directory.repository';
@@ -32,6 +33,11 @@ import { PluginRegistryService } from '@src/plugins/services/plugin-registry.ser
 import { Directory } from '@src/entities/directory.entity';
 import { NotificationService } from '@src/notifications/notification.service';
 import type { ScheduleRunOutcome } from './types/trigger-context.types';
+import { WorksConfigSyncRequestedEvent, type WorksConfigSyncReason } from '@src/events';
+import {
+    LINKED_DIRECTORY_SYNC_UNSUPPORTED_MESSAGE,
+    supportsDirectorySourceSync,
+} from '@src/import/source-sync-support';
 
 type DirectoryScheduleReadiness = {
     featureEnabled: boolean;
@@ -39,6 +45,7 @@ type DirectoryScheduleReadiness = {
     blockingCode?:
         | 'SCHEDULED_UPDATES_DISABLED'
         | 'INITIAL_DIRECTORY_SETUP_REQUIRED'
+        | 'SOURCE_SYNC_UNSUPPORTED'
         | 'CONFIG_UNAVAILABLE';
     blockingReason?: string;
 };
@@ -59,6 +66,8 @@ export class DirectoryScheduleService {
         private readonly pluginRegistry: PluginRegistryService,
         @Optional()
         private readonly notificationService?: NotificationService,
+        @Optional()
+        private readonly eventEmitter?: EventEmitter2,
     ) {}
 
     async getSchedule(
@@ -104,12 +113,7 @@ export class DirectoryScheduleService {
         const plan = await this.subscriptionService.resolvePlanForUser(user);
         const allowances = await this.subscriptionService.getCadenceAllowances(user);
 
-        const enable =
-            dto.enable !== undefined
-                ? dto.enable
-                : existing
-                  ? existing.status === DirectoryScheduleStatus.ACTIVE
-                  : true;
+        const enable = this.resolveRequestedEnabledState(dto, existing);
 
         const cadence =
             dto.cadence || existing?.cadence || this.subscriptionService.getDefaultCadence(plan);
@@ -142,9 +146,7 @@ export class DirectoryScheduleService {
             dto.alwaysCreatePullRequest ?? existing?.alwaysCreatePullRequest ?? false;
 
         const importedProviderOverrides =
-            directory.sourceRepository?.type === 'works_config'
-                ? (directory.sourceRepository.worksConfig?.providers ?? null)
-                : null;
+            directory.sourceRepository?.worksConfig?.providers ?? null;
 
         const providerOverrides =
             dto.providerOverrides !== undefined
@@ -181,12 +183,12 @@ export class DirectoryScheduleService {
                 existing.status !== DirectoryScheduleStatus.ACTIVE ||
                 existing.cadence !== cadence);
 
-        const nextRunAt =
-            status === DirectoryScheduleStatus.ACTIVE
-                ? shouldRecalculateNextRun
-                    ? this.calculateNextRun(cadence)
-                    : (existing?.nextRunAt ?? null)
-                : (existing?.nextRunAt ?? null);
+        const nextRunAt = this.resolveNextRunAfterScheduleUpdate({
+            status,
+            cadence,
+            existing,
+            shouldRecalculateNextRun,
+        });
 
         const schedule = await this.scheduleRepository.upsert(directory.id, {
             userId: user.id,
@@ -200,6 +202,7 @@ export class DirectoryScheduleService {
         });
 
         await this.syncDirectory(directory.id, schedule);
+        this.requestWorksConfigSync(directory.id, user.id, 'schedule_updated');
 
         const readiness = await this.getScheduleReadiness(directory, user);
         return this.toDto(schedule, allowances, plan.code, subscriptionsEnabled, readiness);
@@ -226,6 +229,7 @@ export class DirectoryScheduleService {
         });
 
         await this.syncDirectory(directory.id, updated);
+        this.requestWorksConfigSync(directory.id, user.id, 'schedule_cancelled');
 
         const [allowances, plan] = await Promise.all([
             this.subscriptionService.getCadenceAllowances(user),
@@ -312,11 +316,11 @@ export class DirectoryScheduleService {
         const anchorDate = this.resolveAnchorDate(schedule);
 
         const preserveExistingNextRun = this.isManualRunAheadOfSchedule(schedule);
-        const nextRunAt = preserveExistingNextRun
-            ? (schedule.nextRunAt ?? null)
-            : schedule.status === DirectoryScheduleStatus.ACTIVE && schedule.cadence
-              ? this.calculateNextRun(schedule.cadence, 0, anchorDate)
-              : null;
+        const nextRunAt = this.resolveNextRunAfterCompletedRun(
+            schedule,
+            anchorDate,
+            preserveExistingNextRun,
+        );
 
         await this.scheduleRepository.updateById(schedule.id, {
             lastRunStatus: options.status,
@@ -363,13 +367,12 @@ export class DirectoryScheduleService {
         const reachedLimit = !preserveExistingNextRun && failureCount >= maxFailures;
 
         const anchorDate = this.resolveAnchorDate(schedule);
-        const nextRunAt = preserveExistingNextRun
-            ? (schedule.nextRunAt ?? null)
-            : reachedLimit
-              ? null
-              : schedule.cadence
-                ? new Date(anchorDate.getTime() + this.RETRY_DELAY_MINUTES * 60 * 1000)
-                : null;
+        const nextRunAt = this.resolveNextRunAfterFailedRun({
+            schedule,
+            anchorDate,
+            preserveExistingNextRun,
+            reachedLimit,
+        });
         const lastRunStatus = preserveExistingNextRun ? null : GenerateStatusType.ERROR;
 
         await this.scheduleRepository.updateById(schedule.id, {
@@ -423,11 +426,11 @@ export class DirectoryScheduleService {
         const preserveExistingNextRun = this.isManualRunAheadOfSchedule(schedule);
         const anchorDate = this.resolveAnchorDate(schedule);
         const baseDate = anchorDate.getTime() > Date.now() ? anchorDate : new Date();
-        const nextRunAt = preserveExistingNextRun
-            ? (schedule.nextRunAt ?? null)
-            : schedule.status === DirectoryScheduleStatus.ACTIVE && schedule.cadence
-              ? new Date(baseDate.getTime() + this.RETRY_DELAY_MINUTES * 60 * 1000)
-              : null;
+        const nextRunAt = this.resolveNextRunAfterSkippedRun(
+            schedule,
+            baseDate,
+            preserveExistingNextRun,
+        );
 
         await this.scheduleRepository.updateById(schedule.id, {
             lastRunStatus: null,
@@ -482,6 +485,87 @@ export class DirectoryScheduleService {
         }
 
         return new Date();
+    }
+
+    private resolveRequestedEnabledState(
+        dto: UpdateDirectoryScheduleDto,
+        existing: DirectorySchedule | null,
+    ): boolean {
+        if (dto.enable !== undefined) {
+            return dto.enable;
+        }
+
+        if (!existing) {
+            return true;
+        }
+
+        return existing.status === DirectoryScheduleStatus.ACTIVE;
+    }
+
+    private resolveNextRunAfterScheduleUpdate(options: {
+        status: DirectoryScheduleStatus;
+        cadence: DirectoryScheduleCadence;
+        existing: DirectorySchedule | null;
+        shouldRecalculateNextRun: boolean;
+    }): Date | null {
+        if (options.status !== DirectoryScheduleStatus.ACTIVE) {
+            return options.existing?.nextRunAt ?? null;
+        }
+
+        if (options.shouldRecalculateNextRun) {
+            return this.calculateNextRun(options.cadence);
+        }
+
+        return options.existing?.nextRunAt ?? null;
+    }
+
+    private resolveNextRunAfterCompletedRun(
+        schedule: DirectorySchedule,
+        anchorDate: Date,
+        preserveExistingNextRun: boolean,
+    ): Date | null {
+        if (preserveExistingNextRun) {
+            return schedule.nextRunAt ?? null;
+        }
+
+        if (schedule.status !== DirectoryScheduleStatus.ACTIVE || !schedule.cadence) {
+            return null;
+        }
+
+        return this.calculateNextRun(schedule.cadence, 0, anchorDate);
+    }
+
+    private resolveNextRunAfterFailedRun(options: {
+        schedule: DirectorySchedule;
+        anchorDate: Date;
+        preserveExistingNextRun: boolean;
+        reachedLimit: boolean;
+    }): Date | null {
+        if (options.preserveExistingNextRun) {
+            return options.schedule.nextRunAt ?? null;
+        }
+
+        if (options.reachedLimit || !options.schedule.cadence) {
+            return null;
+        }
+
+        return new Date(options.anchorDate.getTime() + this.RETRY_DELAY_MINUTES * 60 * 1000);
+    }
+
+    private resolveNextRunAfterSkippedRun(
+        schedule: DirectorySchedule,
+        baseDate: Date,
+        preserveExistingNextRun: boolean,
+    ): Date | null {
+        if (preserveExistingNextRun) {
+            return schedule.nextRunAt ?? null;
+        }
+
+        if (schedule.status !== DirectoryScheduleStatus.ACTIVE || !schedule.cadence) {
+            return null;
+        }
+
+        return new Date(baseDate.getTime() + this.RETRY_DELAY_MINUTES * 60 * 1000);
     }
 
     /**
@@ -660,6 +744,17 @@ export class DirectoryScheduleService {
         });
     }
 
+    private requestWorksConfigSync(
+        directoryId: string,
+        userId: string,
+        reason: WorksConfigSyncReason,
+    ): void {
+        this.eventEmitter?.emit(
+            WorksConfigSyncRequestedEvent.EVENT_NAME,
+            new WorksConfigSyncRequestedEvent(directoryId, userId, reason),
+        );
+    }
+
     private async getScheduleReadiness(
         directory: Directory,
         user: User,
@@ -673,8 +768,17 @@ export class DirectoryScheduleService {
             };
         }
 
-        // Sync directories do not rely on saved generation request data.
         if (directory.sourceRepository) {
+            if (!supportsDirectorySourceSync(directory.sourceRepository.type)) {
+                return {
+                    featureEnabled: true,
+                    canEnable: false,
+                    blockingCode: 'SOURCE_SYNC_UNSUPPORTED',
+                    blockingReason: LINKED_DIRECTORY_SYNC_UNSUPPORTED_MESSAGE,
+                };
+            }
+
+            // Import-backed sync directories do not rely on saved generation request data.
             return {
                 featureEnabled: true,
                 canEnable: true,

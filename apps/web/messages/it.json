@@ -1820,8 +1820,7 @@
                         "model": "Modello",
                         "schedule": "Pianificazione",
                         "providers": "Fornitori",
-                        "websiteRepo": "Repo sito web",
-                        "additionalAgents": "Agenti aggiuntivi"
+                        "websiteRepo": "Repo sito web"
                     },
                     "sourceTypes": {
                         "dataRepo": "Repository dati",
@@ -2496,6 +2495,7 @@
                     "nameRequired": "Il nome della directory è obbligatorio",
                     "noAnalysis": "Analizza prima un repository",
                     "githubRequired": "Collega prima il tuo account GitHub",
+                    "providerRequired": "Seleziona prima un provider git",
                     "importFailed": "Impossibile importare la directory",
                     "linkFailed": "Impossibile collegare la directory",
                     "providerNotConfigured": "{provider} non è configurato. Vai su Impostazioni → Plugin per configurarlo prima di importare."
