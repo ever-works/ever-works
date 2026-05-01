@@ -553,7 +553,8 @@
                     "pending": "In Attesa",
                     "inProgress": "In Corso",
                     "completed": "Completato",
-                    "failed": "Fallito"
+                    "failed": "Fallito",
+                    "cancelled": "Annullato"
                 }
             },
             "actions": {
@@ -1799,7 +1800,11 @@
                 "closeNote": "Potrebbe richiedere alcuni minuti. Puoi chiudere questa pagina e tornare dopo.",
                 "showLogs": "Mostra log passi",
                 "hideLogs": "Nascondi log passi",
-                "waitingForLogs": "In attesa di log live..."
+                "waitingForLogs": "In attesa di log live...",
+                "stop": "Arresta la generazione",
+                "stopping": "Interruzione in corso...",
+                "stopRequested": "Richiesta di annullamento della generazione",
+                "stopFailed": "Impossibile annullare la generazione"
             },
             "settings": {
                 "sourceSettings": "Repository di origine",

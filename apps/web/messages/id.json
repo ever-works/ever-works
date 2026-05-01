@@ -553,7 +553,8 @@
                     "pending": "Menunggu",
                     "inProgress": "Sedang Berlangsung",
                     "completed": "Selesai",
-                    "failed": "Gagal"
+                    "failed": "Gagal",
+                    "cancelled": "Dibatalkan"
                 }
             },
             "actions": {
@@ -1799,7 +1800,11 @@
                 "closeNote": "Ini mungkin memakan waktu beberapa menit. Anda dapat menutup halaman ini dan kembali nanti.",
                 "showLogs": "Tampilkan log langkah",
                 "hideLogs": "Sembunyikan log langkah",
-                "waitingForLogs": "Menunggu log langsung tiba..."
+                "waitingForLogs": "Menunggu log langsung tiba...",
+                "stop": "Berhenti menghasilkan",
+                "stopping": "Menghentikan...",
+                "stopRequested": "Pembatalan pembuatan diminta",
+                "stopFailed": "Gagal membatalkan pembuatan"
             },
             "settings": {
                 "sourceSettings": "Repositori Sumber",

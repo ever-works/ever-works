@@ -1800,7 +1800,11 @@
                 "closeNote": "This may take a few minutes. You can close this page and come back later.",
                 "showLogs": "Show step logs",
                 "hideLogs": "Hide step logs",
-                "waitingForLogs": "Waiting for live logs to arrive..."
+                "waitingForLogs": "Waiting for live logs to arrive...",
+                "stop": "Stop generation",
+                "stopping": "Stopping...",
+                "stopRequested": "Generation cancellation requested",
+                "stopFailed": "Failed to cancel generation"
             },
             "settings": {
                 "sourceSettings": "Source Repository",

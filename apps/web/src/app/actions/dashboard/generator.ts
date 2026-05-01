@@ -4,6 +4,7 @@ import {
     itemsGeneratorAPI,
     CreateItemsGeneratorDto,
     UpdateItemsGeneratorDto,
+    CancelGenerationResponse,
     directoryAPI,
     gitProvidersAPI,
 } from '@/lib/api';
@@ -41,6 +42,17 @@ function sanitizePluginConfig(config: Record<string, unknown>): Record<string, u
 
     return sanitized;
 }
+
+type CancelGenerationActionResult =
+    | {
+          success: true;
+          data: CancelGenerationResponse;
+          message: string;
+      }
+    | {
+          success: false;
+          error: string;
+      };
 
 export async function generateItems(directoryId: string, data: CreateItemsGeneratorDto) {
     const t = await getTranslations('actions.generator');
@@ -139,7 +151,7 @@ export async function updateItems(directoryId: string, data: UpdateItemsGenerato
     }
 }
 
-export async function cancelGeneration(directoryId: string) {
+export async function cancelGeneration(directoryId: string): Promise<CancelGenerationActionResult> {
     const t = await getTranslations('actions.generator');
 
     try {
@@ -152,6 +164,7 @@ export async function cancelGeneration(directoryId: string) {
         };
     } catch (error) {
         console.error('Failed to cancel generation:', error);
+
         return {
             success: false,
             error: error instanceof Error ? error.message : t('failedToCancelGeneration'),

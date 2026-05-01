@@ -553,7 +553,8 @@
                     "pending": "In afwachting",
                     "inProgress": "Uitvoeren",
                     "completed": "Voltooid",
-                    "failed": "Mislukt"
+                    "failed": "Mislukt",
+                    "cancelled": "Geannuleerd"
                 }
             },
             "actions": {
@@ -1799,7 +1800,11 @@
                 "closeNote": "Dit kan enkele minuten duren. Je kunt deze pagina sluiten en later terugkomen.",
                 "showLogs": "Staplogs tonen",
                 "hideLogs": "Staplogs verbergen",
-                "waitingForLogs": "Wachten op live logs..."
+                "waitingForLogs": "Wachten op live logs...",
+                "stop": "Generatie stoppen",
+                "stopping": "Stopt...",
+                "stopRequested": "Annulering van generatie aangevraagd",
+                "stopFailed": "Annulering van generatie mislukt"
             },
             "settings": {
                 "sourceSettings": "Bronrepository",
