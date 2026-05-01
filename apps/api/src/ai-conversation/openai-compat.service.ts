@@ -67,35 +67,27 @@ export class OpenAiCompatService {
         } catch (error) {
             this.logger.error('Streaming completion error', error);
 
-            const errorChunk: OpenAiChatCompletionChunkResponse = {
-                id: `chatcmpl-err-${Date.now()}`,
-                object: 'chat.completion.chunk',
-                created: Math.floor(Date.now() / 1000),
-                model: dto.model ?? 'auto',
-                choices: [
-                    {
-                        index: 0,
-                        delta: {
-                            role: 'assistant',
-                            content: `\n\n**Error:** ${this.sanitizeErrorMessage(error)}`,
+            const message = this.sanitizeErrorMessage(error);
+            if (!res.headersSent) {
+                res.status(502);
+                res.setHeader('Content-Type', 'application/json');
+                res.end(
+                    JSON.stringify({
+                        error: {
+                            message,
+                            type: 'provider_error',
+                            code: 'ai_provider_error',
                         },
-                        finish_reason: null,
-                    },
-                ],
-            };
-            res.write(`data: ${JSON.stringify(errorChunk)}\n\n`);
+                    }),
+                );
+                return;
+            }
 
-            const doneChunk: OpenAiChatCompletionChunkResponse = {
-                id: `chatcmpl-err-${Date.now()}`,
-                object: 'chat.completion.chunk',
-                created: Math.floor(Date.now() / 1000),
-                model: dto.model ?? 'auto',
-                choices: [{ index: 0, delta: {}, finish_reason: 'stop' }],
-            };
-            res.write(`data: ${JSON.stringify(doneChunk)}\n\n`);
-            res.write(`data: [DONE]\n\n`);
+            res.destroy(error instanceof Error ? error : new Error(message));
         } finally {
-            res.end();
+            if (!res.destroyed && !res.writableEnded) {
+                res.end();
+            }
         }
     }
 
