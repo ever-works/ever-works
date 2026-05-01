@@ -28,7 +28,9 @@ export async function saveConversationMessages({
     usage,
 }: SaveMessagesOptions): Promise<void> {
     const existingIds = new Set(originalMessages.map((m) => m.id));
-    const newMessages = allMessages.filter((m) => !existingIds.has(m.id));
+    const newMessages = allMessages.filter(
+        (m) => !existingIds.has(m.id) && !isProviderErrorMessage(m),
+    );
 
     if (newMessages.length === 0) return;
 
@@ -53,4 +55,11 @@ function extractTextContent(msg: UIMessage): string {
         .filter((p): p is { type: 'text'; text: string } => p.type === 'text')
         .map((p) => p.text)
         .join('');
+}
+
+function isProviderErrorMessage(msg: UIMessage): boolean {
+    if (msg.role !== 'assistant') return false;
+
+    const text = extractTextContent(msg).trim();
+    return text.startsWith('**Error:**') || text.startsWith('Error:');
 }

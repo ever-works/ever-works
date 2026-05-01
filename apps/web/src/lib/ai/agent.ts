@@ -93,9 +93,23 @@ export async function runAgent({
     return streamText({
         model,
         system: SYSTEM_PROMPT.replace('{context}', context),
-        messages: await convertToModelMessages(messages),
+        messages: await convertToModelMessages(
+            messages.filter((message) => !isProviderErrorMessage(message)),
+        ),
         tools,
         stopWhen: stepCountIs(MAX_TOOL_STEPS),
         onFinish,
     });
+}
+
+function isProviderErrorMessage(message: UIMessage): boolean {
+    if (message.role !== 'assistant') return false;
+
+    const text = message.parts
+        .filter((part): part is { type: 'text'; text: string } => part.type === 'text')
+        .map((part) => part.text)
+        .join('')
+        .trim();
+
+    return text.startsWith('**Error:**') || text.startsWith('Error:');
 }
