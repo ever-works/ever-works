@@ -22,23 +22,74 @@ docs/specs/
 │   └── 001-pipeline-checkpointing.md
 ├── architecture/                   # Cross-feature architecture docs
 │   ├── pipeline-overview.md
-│   └── trigger-integration.md
+│   ├── trigger-integration.md
+│   ├── plugin-sdk.md               # @ever-works/plugin SDK deep-dive
+│   ├── settings-system.md          # 3-tier resolution + secret hygiene
+│   └── ai-facade.md                # AiFacadeService routing & model catalog
 ├── ai/                             # Cross-cutting AI / generation specs
 │   ├── implementation-plan.md
 │   └── tasks-checklist.md
 └── features/                       # Spec Kit feature directories
-    ├── advanced-prompts/           # spec.md + acceptance.md
-    ├── data-generator/             # spec.md + acceptance.md
-    ├── markdown-generator/         # spec.md + acceptance.md
-    ├── website-generator/          # spec.md + acceptance.md
-    ├── works-config/               # spec.md + plan.md + tasks.md (retrospective)
-    ├── scheduled-updates/          # …                            (retrospective)
-    ├── comparisons/                # …                            (retrospective)
-    ├── generation-cancellation/    # …                            (retrospective)
-    ├── community-pr-processing/    # …                            (retrospective)
-    ├── directory-import/           # …                            (retrospective)
-    └── plugin-system/              # …                            (retrospective)
+    │
+    │   # Pre-Spec-Kit internal specs (kept as-is; spec.md + acceptance.md):
+    ├── advanced-prompts/
+    ├── data-generator/
+    ├── markdown-generator/
+    ├── website-generator/
+    │
+    │   # Retrospective Spec Kit specs (spec.md + plan.md + tasks.md):
+    ├── api-keys/
+    ├── collections/
+    ├── community-pr-processing/
+    ├── comparisons/
+    ├── creating-a-directory/
+    ├── custom-domains/
+    ├── data-management/
+    ├── directory-changelog/
+    ├── directory-import/
+    ├── directory-members/
+    ├── generation-cancellation/
+    ├── git-operations/
+    ├── item-source-validation/
+    ├── mcp-server/
+    ├── plugin-system/
+    ├── scheduled-updates/
+    ├── taxonomy-system/
+    └── works-config/
 ```
+
+## Feature Spec Index
+
+Every user-facing feature on `develop` has a Spec Kit retrospective set
+(`spec.md` + `plan.md` + `tasks.md`). The four pre-Spec-Kit internal
+specs (`advanced-prompts`, `data-generator`, `markdown-generator`,
+`website-generator`) are deeper architectural specs from before Spec Kit
+adoption and are kept in their original `spec.md + acceptance.md` form.
+
+| Feature                                                            | Status        | Description                                                    |
+| ------------------------------------------------------------------ | ------------- | -------------------------------------------------------------- |
+| [`advanced-prompts`](features/advanced-prompts/spec)               | Pre-Spec-Kit  | Per-directory prompt overrides per pipeline step               |
+| [`api-keys`](features/api-keys/spec)                               | Retrospective | Long-lived auth tokens for CI / CLI / MCP                      |
+| [`collections`](features/collections/spec)                         | Retrospective | Editorial groupings cutting across categories                  |
+| [`community-pr-processing`](features/community-pr-processing/spec) | Retrospective | AI-driven processing of community-contributed PRs              |
+| [`comparisons`](features/comparisons/spec)                         | Retrospective | A vs B comparison page generator                               |
+| [`creating-a-directory`](features/creating-a-directory/spec)       | Retrospective | Three creation methods: AI / Manual / Import                   |
+| [`custom-domains`](features/custom-domains/spec)                   | Retrospective | Branded domain assignment with provider sync                   |
+| [`data-generator`](features/data-generator/spec)                   | Pre-Spec-Kit  | Data repository management and item persistence                |
+| [`data-management`](features/data-management/spec)                 | Retrospective | Export / Import / GitHub Sync with secret hygiene              |
+| [`directory-changelog`](features/directory-changelog/spec)         | Retrospective | Audit trail of all directory mutations                         |
+| [`directory-import`](features/directory-import/spec)               | Retrospective | Bootstrap from existing repo or Awesome List                   |
+| [`directory-members`](features/directory-members/spec)             | Retrospective | Role-based collaboration (Owner / Manager / Editor / Viewer)   |
+| [`generation-cancellation`](features/generation-cancellation/spec) | Retrospective | Mid-flight generation cancel with four mode paths              |
+| [`git-operations`](features/git-operations/spec)                   | Retrospective | `GitFacadeService` and provider plugin contract                |
+| [`item-source-validation`](features/item-source-validation/spec)   | Retrospective | Reachability + AI accuracy checks per item                     |
+| [`markdown-generator`](features/markdown-generator/spec)           | Pre-Spec-Kit  | Markdown rendering pipeline                                    |
+| [`mcp-server`](features/mcp-server/spec)                           | Retrospective | OpenAPI-derived MCP tool surface                               |
+| [`plugin-system`](features/plugin-system/spec)                     | Retrospective | Capability-driven plugin architecture (39 first-party plugins) |
+| [`scheduled-updates`](features/scheduled-updates/spec)             | Retrospective | Cron-driven generation with CAS claim and drift correction     |
+| [`taxonomy-system`](features/taxonomy-system/spec)                 | Retrospective | Categories, tags, and collections in the data repo             |
+| [`website-generator`](features/website-generator/spec)             | Pre-Spec-Kit  | Static site generation pipeline                                |
+| [`works-config`](features/works-config/spec)                       | Retrospective | `works.yml` source-controlled directory configuration          |
 
 ## Reading order for new contributors
 
@@ -100,9 +151,10 @@ A feature is retrospectively spec'd when:
    branch (no speculation).
 3. Constitution gates have been audited.
 
-Features that are still partly in flight (e.g. GitHub App onboarding, the
-hermes-agent / activepieces plugins) will get specs once their behaviour
-stabilises on `develop`.
+Coverage today: every user-facing feature on `develop` has a
+retrospective spec set. Features still in feature branches (GitHub App
+onboarding, the `hermes-agent` and `activepieces` plugins) will get
+specs once they merge to `develop` and stabilise.
 
 ## Spec Format
 
