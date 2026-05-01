@@ -4,7 +4,7 @@ import { BranchSyncService } from './branch-sync.service';
 import { WebsiteRepositoryCreationMethod } from '../../items-generator/dto/create-items-generator.dto';
 import { Directory } from '../../entities/directory.entity';
 import { User } from '../../entities/user.entity';
-import { WEBSITE_TEMPLATE_CONFIG } from './config/website-template.config';
+import { getWebsiteTemplateConfig } from './config/website-template.config';
 import { getDirectoryOwner } from '../../utils/directory.utils';
 import * as fs from 'node:fs/promises';
 import { cloneFreshRepository } from '../../utils/fresh-repository-clone.utils';
@@ -53,7 +53,8 @@ export class WebsiteGeneratorService {
     }
 
     private async ensureTemplateDefaultBranch(directory: Directory, userId: string): Promise<void> {
-        const targetBranch = WEBSITE_TEMPLATE_CONFIG.branch;
+        const template = getWebsiteTemplateConfig(directory.websiteTemplateId);
+        const targetBranch = template.branch;
         const websiteOwner = directory.getRepoOwner('website');
         const websiteRepo = directory.getWebsiteRepo();
 
@@ -92,6 +93,7 @@ export class WebsiteGeneratorService {
 
         const directoryOwner = getDirectoryOwner(directory);
         const committer = directory.resolveCommitter(user);
+        const template = getWebsiteTemplateConfig(directory.websiteTemplateId);
 
         await this.cleanup(directory);
         throwIfGenerationCancelled(options.signal);
@@ -99,9 +101,9 @@ export class WebsiteGeneratorService {
         // Clone template repo
         const templateDir = await this.gitFacade.cloneOrPull(
             {
-                owner: WEBSITE_TEMPLATE_CONFIG.owner,
-                repo: WEBSITE_TEMPLATE_CONFIG.repo,
-                branch: WEBSITE_TEMPLATE_CONFIG.branch,
+                owner: template.owner,
+                repo: template.repo,
+                branch: template.branch,
                 committer,
             },
             { userId: directoryOwner.id, providerId: directory.gitProvider },
@@ -172,10 +174,11 @@ export class WebsiteGeneratorService {
         const directoryOwner = getDirectoryOwner(directory);
         const websiteOwner = directory.getRepoOwner('website');
         const websiteRepo = directory.getWebsiteRepo();
+        const template = getWebsiteTemplateConfig(directory.websiteTemplateId);
 
         const createdWebsiteRepository = await this.gitFacade.createRepositoryFromTemplate(
-            WEBSITE_TEMPLATE_CONFIG.owner,
-            WEBSITE_TEMPLATE_CONFIG.repo,
+            template.owner,
+            template.repo,
             {
                 name: websiteRepo,
                 organization: directory.organization ? websiteOwner : undefined,

@@ -168,6 +168,9 @@ export class Directory {
     @Column({ type: 'boolean', default: false })
     comparisonsEnabled: boolean;
 
+    @Column({ type: 'varchar', default: 'classic' })
+    websiteTemplateId: string;
+
     // Website Template Auto-Update FIELDS
     @Column({ type: 'boolean', default: false })
     websiteTemplateAutoUpdate: boolean;

@@ -17,6 +17,7 @@ import { DirectoryOwnershipService } from './directory-ownership.service';
 import { rethrowAsNormalized } from './utils/error.utils';
 import { GenerateStatusType } from '@src/entities/types';
 import { DeployFacadeService } from '@src/facades/deploy.facade';
+import { getDefaultWebsiteTemplateId } from '@src/generators/website-generator';
 
 @Injectable()
 export class DirectoryLifecycleService {
@@ -41,6 +42,7 @@ export class DirectoryLifecycleService {
             organization,
             gitProvider,
             deployProvider,
+            websiteTemplateId,
         } = createDirectoryDto;
 
         const directoryData: Partial<CreateDirectoryDto & { userId: string }> = {
@@ -51,6 +53,7 @@ export class DirectoryLifecycleService {
             owner,
             gitProvider,
             deployProvider,
+            websiteTemplateId: websiteTemplateId || getDefaultWebsiteTemplateId(),
             readmeConfig,
             organization,
         };
@@ -120,6 +123,11 @@ export class DirectoryLifecycleService {
                 if (updateDto.websiteTemplateUseBeta !== directory.websiteTemplateUseBeta) {
                     updateData.websiteTemplateLastCommit = null;
                 }
+            }
+
+            if (updateDto.websiteTemplateId !== undefined) {
+                updateData.websiteTemplateId =
+                    updateDto.websiteTemplateId || getDefaultWebsiteTemplateId();
             }
 
             // Handle community PR processing settings

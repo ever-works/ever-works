@@ -58,6 +58,7 @@ const getCreateDirectorySchema = async () => {
         organization: z.boolean(),
         gitProvider: z.string().optional(),
         deployProvider: z.string().optional(),
+        websiteTemplateId: z.string().optional(),
         readmeConfig: readmeConfigSchema.optional(),
     });
 
@@ -169,6 +170,7 @@ interface AIDirectoryOptions {
     owner?: string;
     gitProvider?: string;
     deployProvider?: string;
+    websiteTemplateId?: string;
     providers?: {
         search?: string;
         screenshot?: string;
@@ -266,6 +268,7 @@ export async function createDirectoryWithAI(request: AIDirectoryOptions) {
             owner,
             gitProvider: providerId,
             deployProvider: request.deployProvider || undefined,
+            websiteTemplateId: request.websiteTemplateId || undefined,
         };
 
         // Validate the generated directory data
@@ -347,6 +350,7 @@ export async function updateDirectory(directoryId: string, data: UpdateDirectory
             .optional()
             .transform((val) => val?.trim()),
         organization: z.boolean().optional(),
+        websiteTemplateId: z.string().optional(),
         readmeConfig: readmeConfigSchema.optional(),
     });
 

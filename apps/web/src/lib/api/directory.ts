@@ -69,6 +69,7 @@ export interface CreateDirectoryDto {
     organization: boolean;
     gitProvider?: string;
     deployProvider?: string;
+    websiteTemplateId?: string;
     readmeConfig?: MarkdownReadmeConfig;
 }
 
@@ -78,6 +79,7 @@ export interface UpdateDirectoryDto {
     owner?: string;
     organization?: boolean;
     deployProvider?: string;
+    websiteTemplateId?: string;
     readmeConfig?: MarkdownReadmeConfig;
     websiteTemplateAutoUpdate?: boolean;
     websiteTemplateUseBeta?: boolean;
@@ -157,6 +159,7 @@ export interface Directory {
     // This is computed based on user's access - creator is always 'owner'
     userRole?: DirectoryMemberRole;
     // Website template auto-update settings
+    websiteTemplateId?: string;
     websiteTemplateAutoUpdate?: boolean;
     websiteTemplateUseBeta?: boolean;
     websiteTemplateLastCommit?: string | null;

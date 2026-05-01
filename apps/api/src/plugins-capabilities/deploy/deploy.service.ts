@@ -4,7 +4,11 @@ import { DeployFacadeService, GitFacadeService } from '@ever-works/agent/facades
 import { DirectoryRepository } from '@ever-works/agent/database';
 import { PluginRegistryService } from '@ever-works/agent/plugins';
 import { Directory, User } from '@ever-works/agent/entities';
-import { WebsiteUpdateService, WEBSITE_TEMPLATE_CONFIG } from '@ever-works/agent/generators';
+import {
+    WebsiteUpdateService,
+    getWebsiteTemplateBranch,
+    getWebsiteTemplateConfig,
+} from '@ever-works/agent/generators';
 import type { BatchDeployItemDto, BatchDeployItemResultDto } from './dto/batch-deploy.dto';
 
 interface RepoContext {
@@ -248,6 +252,7 @@ export class DeployService {
         const workflowFilesToTry = ['deploy_vercel.yaml', 'deploy_prod.yaml'];
         const owner = directory.getRepoOwner('website');
         const repo = directory.getWebsiteRepo();
+        const template = getWebsiteTemplateConfig(directory.websiteTemplateId);
 
         const tryDispatch = async (): Promise<boolean> => {
             for (const workflowFile of workflowFilesToTry) {
@@ -260,7 +265,7 @@ export class DeployService {
                         {
                             workflow: workflowFile,
                             inputs: { environment: 'production' },
-                            branch: WEBSITE_TEMPLATE_CONFIG.branch,
+                            branch: template.branch,
                             owner,
                             repo,
                         },
@@ -316,13 +321,14 @@ export class DeployService {
         const directoryOwner = directory.user as User;
         const websiteOwner = directory.getRepoOwner('website');
         const websiteRepo = directory.getWebsiteRepo();
+        const template = getWebsiteTemplateConfig(directory.websiteTemplateId);
 
         try {
             const repoDir = await this.gitFacade.cloneOrPull(
                 {
                     owner: websiteOwner,
                     repo: websiteRepo,
-                    branch: WEBSITE_TEMPLATE_CONFIG.branch,
+                    branch: getWebsiteTemplateBranch(template, directory.websiteTemplateUseBeta),
                     committer: directory.resolveCommitter(user),
                 },
                 { userId: directoryOwner.id, providerId: directory.gitProvider },
