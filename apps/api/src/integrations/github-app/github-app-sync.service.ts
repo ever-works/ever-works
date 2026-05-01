@@ -178,16 +178,19 @@ export class GitHubAppSyncService {
                 accountLogin: installationPayload.account?.login || '',
                 accountType: installationPayload.account?.type || 'User',
                 targetType: installationPayload.target_type || 'User',
-                createdByGithubUserId: installationPayloadWrapper.sender?.id
-                    ? String(installationPayloadWrapper.sender.id)
-                    : null,
+                createdByGithubUserId:
+                    action === 'created' && installationPayloadWrapper.sender?.id
+                        ? String(installationPayloadWrapper.sender.id)
+                        : undefined,
                 deletedAt: null,
                 suspendedAt:
                     action === 'suspend'
                         ? new Date()
-                        : installationPayload.suspended_at
-                          ? new Date(installationPayload.suspended_at)
-                          : null,
+                        : action === 'unsuspend'
+                          ? null
+                          : installationPayload.suspended_at
+                            ? new Date(installationPayload.suspended_at)
+                            : undefined,
                 rawPayload: installationPayload,
             });
 
