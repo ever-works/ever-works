@@ -85,25 +85,28 @@ export class GitHubAppOnboardingService {
         const installationDetails = await this.gitHubAppService.getInstallation(
             state.installationId,
         );
-        const existingInstallation =
-            await this.gitHubAppInstallationRepository.findByInstallationId(
-                String(installationDetails.id),
-            );
-        const installation = await this.gitHubAppInstallationRepository.upsertFromGithub({
+        await this.gitHubAppInstallationRepository.upsertFromGithub({
             installationId: String(installationDetails.id),
             appSlug: installationDetails.app_slug || config.githubApp.slug(),
             accountLogin: installationDetails.account?.login || '',
             accountType: installationDetails.account?.type || 'User',
             targetType: installationDetails.target_type || 'User',
-            createdByUserId: existingInstallation?.createdByUserId ?? user.id,
-            createdByGithubUserId:
-                existingInstallation?.createdByGithubUserId ?? githubUser.githubUserId,
             deletedAt: null,
             suspendedAt: installationDetails.suspended_at
                 ? new Date(installationDetails.suspended_at)
                 : null,
             rawPayload: installationDetails as unknown as Record<string, unknown>,
         });
+        const installation =
+            await this.gitHubAppInstallationRepository.claimOwnershipIfUnassigned(
+                String(installationDetails.id),
+                user.id,
+                githubUser.githubUserId,
+            );
+
+        if (!installation) {
+            throw new BadRequestException('GitHub App installation could not be persisted');
+        }
 
         return {
             user,

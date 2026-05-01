@@ -6,9 +6,9 @@ describe('GitHubAppInstallationRepository', () => {
         findOneOrFail: jest.Mock;
         find: jest.Mock;
         update: jest.Mock;
-        upsert: jest.Mock;
         create: jest.Mock;
         save: jest.Mock;
+        createQueryBuilder: jest.Mock;
     };
     let installationRepository: GitHubAppInstallationRepository;
 
@@ -18,9 +18,9 @@ describe('GitHubAppInstallationRepository', () => {
             findOneOrFail: jest.fn(),
             find: jest.fn(),
             update: jest.fn(),
-            upsert: jest.fn(),
             create: jest.fn((value) => value),
             save: jest.fn(),
+            createQueryBuilder: jest.fn(),
         };
 
         installationRepository = new GitHubAppInstallationRepository(repository as any);
@@ -104,6 +104,51 @@ describe('GitHubAppInstallationRepository', () => {
             id: 'installation-row-1',
             installationId: '12345',
             accountLogin: 'acme',
+        });
+    });
+
+    it('claims installation ownership atomically when it is still unassigned', async () => {
+        const execute = jest.fn().mockResolvedValue(undefined);
+        const where = jest.fn().mockReturnValue({ execute });
+        const set = jest.fn().mockReturnValue({ where });
+        const updateBuilder = jest.fn().mockReturnValue({ set });
+
+        repository.findOne
+            .mockResolvedValueOnce({
+                id: 'installation-row-1',
+                installationId: '12345',
+                createdByUserId: null,
+            })
+            .mockResolvedValueOnce({
+                id: 'installation-row-1',
+                installationId: '12345',
+                createdByUserId: 'user-123',
+                createdByGithubUserId: 'gh-user-123',
+            });
+        repository.createQueryBuilder.mockReturnValue({
+            update: updateBuilder,
+        });
+
+        const result = await installationRepository.claimOwnershipIfUnassigned(
+            '12345',
+            'user-123',
+            'gh-user-123',
+        );
+
+        expect(updateBuilder).toHaveBeenCalled();
+        expect(set).toHaveBeenCalledWith({
+            createdByUserId: 'user-123',
+            createdByGithubUserId: 'gh-user-123',
+        });
+        expect(where).toHaveBeenCalledWith('id = :id AND "createdByUserId" IS NULL', {
+            id: 'installation-row-1',
+        });
+        expect(execute).toHaveBeenCalled();
+        expect(result).toEqual({
+            id: 'installation-row-1',
+            installationId: '12345',
+            createdByUserId: 'user-123',
+            createdByGithubUserId: 'gh-user-123',
         });
     });
 });

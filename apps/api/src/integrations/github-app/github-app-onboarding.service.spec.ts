@@ -18,6 +18,7 @@ describe('GitHubAppOnboardingService', () => {
         };
         const installationRepository = {
             findByInstallationId: jest.fn(),
+            claimOwnershipIfUnassigned: jest.fn(),
             upsertFromGithub: jest.fn(),
         };
         const userLinkRepository = {
@@ -158,8 +159,8 @@ describe('GitHubAppOnboardingService', () => {
             authAccountRepository.findProviderAccountByAccountId.mockResolvedValue(null);
             userRepository.findByEmail.mockResolvedValue(existingUser);
             userRepository.update.mockResolvedValue(updatedUser);
-            installationRepository.findByInstallationId.mockResolvedValue(null);
             installationRepository.upsertFromGithub.mockResolvedValue(installation);
+            installationRepository.claimOwnershipIfUnassigned.mockResolvedValue(installation);
 
             const result = await service.completeUserAuth({
                 code: 'code',
@@ -181,6 +182,11 @@ describe('GitHubAppOnboardingService', () => {
                     userId: existingUser.id,
                     githubUserId: 'gh-user-1',
                 }),
+            );
+            expect(installationRepository.claimOwnershipIfUnassigned).toHaveBeenCalledWith(
+                '12345',
+                existingUser.id,
+                'gh-user-1',
             );
         });
 
@@ -232,15 +238,15 @@ describe('GitHubAppOnboardingService', () => {
             userRepository.findByEmail.mockResolvedValue(null);
             userRepository.findByUsername.mockResolvedValue(null);
             userRepository.create.mockResolvedValue(user);
-            installationRepository.findByInstallationId.mockResolvedValue({
+            installationRepository.upsertFromGithub.mockResolvedValue({
+                id: 'installation-row-1',
+                installationId: '12345',
+            });
+            installationRepository.claimOwnershipIfUnassigned.mockResolvedValue({
                 id: 'installation-row-1',
                 installationId: '12345',
                 createdByUserId: 'user-1',
                 createdByGithubUserId: 'gh-user-1',
-            });
-            installationRepository.upsertFromGithub.mockResolvedValue({
-                id: 'installation-row-1',
-                installationId: '12345',
             });
 
             await service.completeUserAuth({
@@ -248,11 +254,10 @@ describe('GitHubAppOnboardingService', () => {
                 state,
             });
 
-            expect(installationRepository.upsertFromGithub).toHaveBeenCalledWith(
-                expect.objectContaining({
-                    createdByUserId: 'user-1',
-                    createdByGithubUserId: 'gh-user-1',
-                }),
+            expect(installationRepository.claimOwnershipIfUnassigned).toHaveBeenCalledWith(
+                '12345',
+                'user-2',
+                'gh-user-2',
             );
         });
     });

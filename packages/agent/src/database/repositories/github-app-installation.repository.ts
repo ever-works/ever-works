@@ -71,6 +71,33 @@ export class GitHubAppInstallationRepository {
         }
     }
 
+    async claimOwnershipIfUnassigned(
+        installationId: string,
+        createdByUserId: string,
+        createdByGithubUserId: string,
+    ): Promise<GitHubAppInstallation | null> {
+        const existing = await this.findByInstallationId(installationId);
+        if (!existing) {
+            return null;
+        }
+
+        if (existing.createdByUserId) {
+            return existing;
+        }
+
+        await this.repository
+            .createQueryBuilder()
+            .update(GitHubAppInstallation)
+            .set({
+                createdByUserId,
+                createdByGithubUserId,
+            })
+            .where('id = :id AND "createdByUserId" IS NULL', { id: existing.id })
+            .execute();
+
+        return this.findByInstallationId(installationId);
+    }
+
     async markSuspended(
         installationId: string,
         suspendedAt: Date | null,
