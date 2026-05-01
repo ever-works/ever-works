@@ -22,6 +22,7 @@ describe('DirectoryLifecycleService', () => {
     let websiteGenerator: any;
     let ownershipService: any;
     let deployFacade: any;
+    let gitFacade: any;
     let service: DirectoryLifecycleService;
 
     beforeEach(() => {
@@ -47,6 +48,10 @@ describe('DirectoryLifecycleService', () => {
         deployFacade = {
             getAvailableProviders: jest.fn().mockReturnValue([]),
         };
+        gitFacade = {
+            hasValidCredentials: jest.fn().mockResolvedValue(false),
+            repositoryExists: jest.fn(),
+        };
 
         service = new DirectoryLifecycleService(
             directoryRepository,
@@ -55,6 +60,7 @@ describe('DirectoryLifecycleService', () => {
             websiteGenerator,
             ownershipService,
             deployFacade,
+            gitFacade,
         );
     });
 
@@ -89,6 +95,31 @@ describe('DirectoryLifecycleService', () => {
             expect.objectContaining({
                 generateStatus: null,
             }),
+        );
+    });
+
+    it('rejects website template changes after website repository initialization', async () => {
+        const directory = {
+            id: 'dir-1',
+            name: 'Test Directory',
+            description: 'Test description',
+            owner: 'ever-works',
+            organization: false,
+            readmeConfig: {},
+            gitProvider: 'github',
+            userId: user.id,
+            website: 'https://example.com',
+            websiteTemplateId: 'classic',
+            getRepoOwner: jest.fn().mockReturnValue('ever-works'),
+            getWebsiteRepo: jest.fn().mockReturnValue('test-directory-website'),
+        } as any;
+
+        ownershipService.ensureCanEdit.mockResolvedValue({ directory });
+
+        await expect(
+            service.updateDirectory(directory.id, { websiteTemplateId: 'minimal' } as any, user),
+        ).rejects.toThrow(
+            'Website template cannot be changed after the website repository has been initialized.',
         );
     });
 });

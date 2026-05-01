@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState, useTransition } from 'react';
-import type { Directory } from '@/lib/api';
+import type { Directory, WebsiteTemplateOption } from '@/lib/api';
 import { cn } from '@/lib/utils/cn';
 import { toast } from 'sonner';
 import { useTranslations } from 'next-intl';
@@ -27,9 +27,15 @@ interface DeployFormProps {
     directory: Directory;
     isDeploying?: boolean;
     providerName?: string;
+    websiteTemplates?: WebsiteTemplateOption[];
 }
 
-export function DeployForm({ directory, isDeploying, providerName }: DeployFormProps) {
+export function DeployForm({
+    directory,
+    isDeploying,
+    providerName,
+    websiteTemplates = [],
+}: DeployFormProps) {
     const t = useTranslations('dashboard.directoryDetail.deploy');
     const [isPending, startTransition] = useTransition();
     const router = useRouter();
@@ -237,7 +243,7 @@ export function DeployForm({ directory, isDeploying, providerName }: DeployFormP
             <UpdateWebsiteRepository directory={directory} />
 
             {/* Website Template Settings Section */}
-            <WebsiteTemplateSettings directory={directory} />
+            <WebsiteTemplateSettings directory={directory} websiteTemplates={websiteTemplates} />
 
             {/* Info Section */}
             <div className="p-6 rounded-lg bg-info/5 dark:bg-info-dark/5 border border-info/20 dark:border-info-dark/20 hidden">
@@ -319,7 +325,10 @@ function UpdateWebsiteRepository({ directory }: DeployFormProps) {
     );
 }
 
-function WebsiteTemplateSettings({ directory }: DeployFormProps) {
+function WebsiteTemplateSettings({
+    directory,
+    websiteTemplates = [],
+}: Pick<DeployFormProps, 'directory' | 'websiteTemplates'>) {
     const t = useTranslations('dashboard.directoryDetail.deploy');
     const [isPending, startTransition] = useTransition();
     const router = useRouter();
@@ -387,6 +396,9 @@ function WebsiteTemplateSettings({ directory }: DeployFormProps) {
     const lastUpdated = formatDate(directory.websiteTemplateLastUpdatedAt);
     const lastChecked = formatDate(directory.websiteTemplateLastCheckedAt);
     const hasError = Boolean(directory.websiteTemplateLastError);
+    const selectedTemplate =
+        websiteTemplates.find((template) => template.id === directory.websiteTemplateId) ||
+        websiteTemplates.find((template) => template.isDefault);
 
     return (
         <div className="rounded-lg bg-surface dark:bg-surface-dark border border-border dark:border-border-dark p-6">
@@ -408,6 +420,23 @@ function WebsiteTemplateSettings({ directory }: DeployFormProps) {
                     </p>
 
                     <div className="space-y-4">
+                        {selectedTemplate && (
+                            <div className="rounded-lg border border-border dark:border-border-dark p-4 bg-card dark:bg-card-primary-dark/20">
+                                <p className="text-sm font-medium text-text dark:text-text-dark">
+                                    Selected template
+                                </p>
+                                <p className="mt-1 text-sm text-text dark:text-text-dark">
+                                    {selectedTemplate.name}
+                                </p>
+                                <p className="mt-1 text-sm text-text-secondary dark:text-text-secondary-dark">
+                                    {selectedTemplate.description}
+                                </p>
+                                <p className="mt-2 text-xs text-text-muted dark:text-text-muted-dark">
+                                    Template switching is locked after the first website generation.
+                                </p>
+                            </div>
+                        )}
+
                         <Switch
                             checked={autoUpdate}
                             onChange={handleAutoUpdateChange}

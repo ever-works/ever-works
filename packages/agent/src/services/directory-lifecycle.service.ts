@@ -12,12 +12,14 @@ import { WebsiteGeneratorService } from '@src/generators/website-generator/websi
 import { CreateDirectoryDto } from '@src/dto/create-directory.dto';
 import { UpdateDirectoryDto } from '@src/dto';
 import { DeleteDirectoryDto, DeleteDirectoryResponseDto } from '@src/items-generator/dto';
+import { Directory } from '@src/entities/directory.entity';
 import { User } from '@src/entities/user.entity';
 import { DirectoryOwnershipService } from './directory-ownership.service';
 import { rethrowAsNormalized } from './utils/error.utils';
 import { GenerateStatusType } from '@src/entities/types';
 import { DeployFacadeService } from '@src/facades/deploy.facade';
 import { getDefaultWebsiteTemplateId } from '@src/generators/website-generator';
+import { GitFacadeService } from '@src/facades/git.facade';
 
 @Injectable()
 export class DirectoryLifecycleService {
@@ -30,7 +32,58 @@ export class DirectoryLifecycleService {
         private readonly websiteGenerator: WebsiteGeneratorService,
         private readonly ownershipService: DirectoryOwnershipService,
         private readonly deployFacade: DeployFacadeService,
+        private readonly gitFacade: GitFacadeService,
     ) {}
+
+    private async hasInitializedWebsiteRepository(
+        directory: Directory,
+        user: User,
+    ): Promise<boolean> {
+        if (
+            directory.website ||
+            directory.deployProjectId ||
+            directory.websiteTemplateLastCommit ||
+            directory.websiteTemplateLastUpdatedAt ||
+            directory.websiteTemplateLastCheckedAt
+        ) {
+            return true;
+        }
+
+        const userIds = [...new Set([user.id, directory.userId].filter(Boolean))];
+
+        for (const userId of userIds) {
+            const authOptions = {
+                userId,
+                providerId: directory.gitProvider,
+                directoryId: directory.id,
+            };
+
+            const hasCredentials = await this.gitFacade.hasValidCredentials(authOptions);
+            if (!hasCredentials) {
+                continue;
+            }
+
+            try {
+                const exists = await this.gitFacade.repositoryExists(
+                    directory.getRepoOwner('website'),
+                    directory.getWebsiteRepo(),
+                    authOptions,
+                );
+
+                if (exists) {
+                    return true;
+                }
+            } catch (error) {
+                this.logger.warn(
+                    `Failed to verify website repository initialization for directory ${directory.id}: ${
+                        error instanceof Error ? error.message : String(error)
+                    }`,
+                );
+            }
+        }
+
+        return false;
+    }
 
     async createDirectory(createDirectoryDto: CreateDirectoryDto, user: User) {
         const {
@@ -126,8 +179,24 @@ export class DirectoryLifecycleService {
             }
 
             if (updateDto.websiteTemplateId !== undefined) {
-                updateData.websiteTemplateId =
-                    updateDto.websiteTemplateId || getDefaultWebsiteTemplateId();
+                const nextTemplateId = updateDto.websiteTemplateId || getDefaultWebsiteTemplateId();
+
+                if (nextTemplateId !== directory.websiteTemplateId) {
+                    const websiteRepoInitialized = await this.hasInitializedWebsiteRepository(
+                        directory,
+                        user,
+                    );
+
+                    if (websiteRepoInitialized) {
+                        throw new BadRequestException({
+                            status: 'error',
+                            message:
+                                'Website template cannot be changed after the website repository has been initialized.',
+                        });
+                    }
+                }
+
+                updateData.websiteTemplateId = nextTemplateId;
             }
 
             // Handle community PR processing settings
