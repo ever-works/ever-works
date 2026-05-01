@@ -61,5 +61,5 @@ function isProviderErrorMessage(msg: UIMessage): boolean {
     if (msg.role !== 'assistant') return false;
 
     const text = extractTextContent(msg).trim();
-    return text.startsWith('**Error:**') || text.startsWith('Error:');
+    return text.startsWith('**Error:**');
 }

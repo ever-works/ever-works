@@ -111,5 +111,5 @@ function isProviderErrorMessage(message: UIMessage): boolean {
         .join('')
         .trim();
 
-    return text.startsWith('**Error:**') || text.startsWith('Error:');
+    return text.startsWith('**Error:**');
 }
