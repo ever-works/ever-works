@@ -17,7 +17,15 @@ import type {
     GenerateStatus,
     DirectoryMemberRole,
 } from './types';
-import type { ProvidersDto } from '@ever-works/contracts/api';
+import type {
+    ImportSourceType,
+    RelatedRepositories,
+    RepoVisibility,
+    RepositoryRole,
+    RepositoryTarget,
+    SourceRepository as ContractSourceRepository,
+    WorksConfigSnapshot,
+} from '@ever-works/contracts/api';
 import type { PRUpdate } from '@src/generators/data-generator';
 import { DirectoryGenerationHistory } from './directory-generation-history.entity';
 import { TimestampColumn } from './_types';
@@ -295,42 +303,13 @@ export interface MarkdownReadmeConfig {
     overwriteDefaultFooter?: boolean;
 }
 
-export type ImportSourceType = 'data_repo' | 'awesome_readme' | 'link_existing' | 'works_config';
-export type RepositoryRole = 'data' | 'directory' | 'website';
-
-export type RepositoryTarget = {
-    owner?: string;
-    repo: string;
+export type {
+    ImportSourceType,
+    RelatedRepositories,
+    RepoVisibility,
+    RepositoryRole,
+    RepositoryTarget,
+    WorksConfigSnapshot,
 };
 
-export type RelatedRepositories = {
-    data?: RepositoryTarget;
-    directory?: RepositoryTarget;
-    website?: RepositoryTarget;
-};
-
-export type WorksConfigSnapshot = {
-    name?: string;
-    initialPrompt?: string;
-    model?: string;
-    websiteRepo?: string;
-    scheduleCadence?: DirectoryScheduleCadence | null;
-    providers?: ProvidersDto;
-    additionalAgentsCount?: number;
-};
-
-export interface SourceRepository {
-    url: string;
-    owner: string;
-    repo: string;
-    type: ImportSourceType;
-    importedAt: Date;
-    relatedRepositories?: RelatedRepositories;
-    worksConfig?: WorksConfigSnapshot;
-}
-
-export interface RepoVisibility {
-    data: boolean; // true = private, false = public
-    website: boolean;
-    directory: boolean;
-}
+export type SourceRepository = ContractSourceRepository<Date>;

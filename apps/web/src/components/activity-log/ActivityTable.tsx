@@ -13,10 +13,8 @@ import { Link } from '@/i18n/navigation';
 import { ROUTES } from '@/lib/constants';
 import { TerminalLogViewer } from '@/components/directories/detail/shared/TerminalLogViewer';
 import type { GenerationStepLog } from '@/lib/api/types-only';
-import { Button } from '@/components/ui/button';
-import { cancelGeneration } from '@/app/actions/dashboard/generator';
-import { toast } from 'sonner';
 import { useMounted } from '@/lib/hooks/use-mounted';
+import { CancelGenerationButton } from '@/components/directories/detail/generator/CancelGenerationButton';
 
 interface ActivityTableProps {
     activities: ActivityLogEntry[];
@@ -180,7 +178,6 @@ export function ActivityTable({ activities, loading, onStopRequested }: Activity
     const [hydratedActivities, setHydratedActivities] = useState<Record<string, ActivityLogEntry>>(
         {},
     );
-    const [stoppingDirectoryIds, setStoppingDirectoryIds] = useState<string[]>([]);
 
     const toggleExpanded = (id: string) => {
         setExpandedIds((current) =>
@@ -243,32 +240,6 @@ export function ActivityTable({ activities, loading, onStopRequested }: Activity
         if (e.key === 'Enter' || e.key === ' ') {
             e.preventDefault();
             toggleExpanded(id);
-        }
-    };
-
-    const stopGeneration = async (directoryId: string) => {
-        setStoppingDirectoryIds((current) =>
-            current.includes(directoryId) ? current : [...current, directoryId],
-        );
-
-        try {
-            const result = await cancelGeneration(directoryId);
-
-            if (!result.success) {
-                if (result.error?.includes('is not generating')) {
-                    toast.error(result.error);
-                    onStopRequested?.();
-                    return;
-                }
-
-                toast.error(result.error || t('actions.stopFailed'));
-                return;
-            }
-
-            toast.success(result.message || t('actions.stopRequested'));
-            onStopRequested?.();
-        } finally {
-            setStoppingDirectoryIds((current) => current.filter((id) => id !== directoryId));
         }
     };
 
@@ -350,10 +321,6 @@ export function ActivityTable({ activities, loading, onStopRequested }: Activity
                             const hasDetails = hasStructuredData(detailsWithoutLiveLogs);
                             const hasMetadata = hasStructuredData(hydratedActivity.metadata);
                             const hasStructuredContent = hasDetails || hasMetadata;
-                            const isStopping = activity.directoryId
-                                ? stoppingDirectoryIds.includes(activity.directoryId)
-                                : false;
-
                             return (
                                 <Fragment key={activity.id}>
                                     <tr
@@ -423,19 +390,20 @@ export function ActivityTable({ activities, loading, onStopRequested }: Activity
                                                 {activity.actionType === 'generation' &&
                                                 activity.status === 'in_progress' &&
                                                 activity.directoryId ? (
-                                                    <Button
-                                                        variant="danger"
-                                                        size="sm"
-                                                        loading={isStopping}
-                                                        onClick={(e) => {
-                                                            e.stopPropagation();
-                                                            stopGeneration(activity.directoryId!);
-                                                        }}
-                                                    >
-                                                        {isStopping
-                                                            ? t('actions.stopping')
-                                                            : t('actions.stop')}
-                                                    </Button>
+                                                    <div onClick={(e) => e.stopPropagation()}>
+                                                        <CancelGenerationButton
+                                                            directoryId={activity.directoryId}
+                                                            labels={{
+                                                                stop: t('actions.stop'),
+                                                                stopping: t('actions.stopping'),
+                                                                stopRequested:
+                                                                    t('actions.stopRequested'),
+                                                                stopFailed: t('actions.stopFailed'),
+                                                            }}
+                                                            onCancelled={onStopRequested}
+                                                            onAlreadyFinished={onStopRequested}
+                                                        />
+                                                    </div>
                                                 ) : null}
                                             </div>
                                         </td>

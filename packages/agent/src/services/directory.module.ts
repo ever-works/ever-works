@@ -20,11 +20,14 @@ import { DirectoryImportService } from './directory-import.service';
 import { DirectoryAdvancedPromptsService } from './directory-advanced-prompts.service';
 import { DirectoryTaxonomyService } from './directory-taxonomy.service';
 import { GeneratorFormSchemaService } from './generator-form-schema.service';
-import {
-    WorksConfigImportApplierService,
-    WorksConfigImportPlannerService,
-    WorksConfigRestoreService,
-} from '@src/works-config';
+import { WorksConfigImportApplierService } from '@src/works-config/services/works-config-import-applier.service';
+import { WorksConfigImportPlannerService } from '@src/works-config/services/works-config-import-planner.service';
+import { WorksConfigProjectionService } from '@src/works-config/services/works-config-projection.service';
+import { WorksConfigRepositorySyncService } from '@src/works-config/services/works-config-repository-sync.service';
+import { WorksConfigRestoreService } from '@src/works-config/services/works-config-restore.service';
+import { WorksConfigService } from '@src/works-config/services/works-config.service';
+import { WorksConfigSyncListener } from '@src/works-config/services/works-config-sync.listener';
+import { WorksConfigWriterService } from '@src/works-config/services/works-config-writer.service';
 import { ItemHealthService } from './item-health.service';
 import { ItemSourceValidationSchedulerService } from './item-source-validation-scheduler.service';
 import { PluginOperationsService } from '../plugins/services/plugin-operations.service';
@@ -72,6 +75,11 @@ import { NotificationsModule } from '@src/notifications';
         WorksConfigImportPlannerService,
         WorksConfigImportApplierService,
         WorksConfigRestoreService,
+        WorksConfigService,
+        WorksConfigWriterService,
+        WorksConfigProjectionService,
+        WorksConfigRepositorySyncService,
+        WorksConfigSyncListener,
         PluginOperationsService,
         SettingsSchemaValidatorService,
     ],
@@ -94,6 +102,10 @@ import { NotificationsModule } from '@src/notifications';
         WorksConfigImportPlannerService,
         WorksConfigImportApplierService,
         WorksConfigRestoreService,
+        WorksConfigService,
+        WorksConfigWriterService,
+        WorksConfigProjectionService,
+        WorksConfigRepositorySyncService,
         CommunityPrModule,
         ComparisonGeneratorModule,
     ],

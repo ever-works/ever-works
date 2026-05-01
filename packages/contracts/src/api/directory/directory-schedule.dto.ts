@@ -27,7 +27,11 @@ export interface DirectoryScheduleDto {
 	/** Whether this directory is currently eligible to enable scheduled updates */
 	canEnable: boolean;
 	/** Machine-readable reason the schedule cannot currently be enabled */
-	blockingCode?: 'SCHEDULED_UPDATES_DISABLED' | 'INITIAL_DIRECTORY_SETUP_REQUIRED' | 'CONFIG_UNAVAILABLE';
+	blockingCode?:
+		| 'SCHEDULED_UPDATES_DISABLED'
+		| 'INITIAL_DIRECTORY_SETUP_REQUIRED'
+		| 'SOURCE_SYNC_UNSUPPORTED'
+		| 'CONFIG_UNAVAILABLE';
 	/** Human-readable reason the schedule cannot currently be enabled */
 	blockingReason?: string;
 	/** Selected cadence (null if disabled) */

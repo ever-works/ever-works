@@ -1820,8 +1820,7 @@
                         "model": "模型",
                         "schedule": "调度",
                         "providers": "提供商",
-                        "websiteRepo": "网站仓库",
-                        "additionalAgents": "额外代理"
+                        "websiteRepo": "网站仓库"
                     },
                     "sourceTypes": {
                         "dataRepo": "数据仓库",
@@ -2496,6 +2495,7 @@
                     "nameRequired": "目录名称是必填的",
                     "noAnalysis": "请先分析仓库",
                     "githubRequired": "请先连接您的 GitHub 账户",
+                    "providerRequired": "请先选择一个 git 提供商",
                     "importFailed": "导入目录失败",
                     "linkFailed": "链接目录失败",
                     "providerNotConfigured": "{provider} 未配置。请访问设置 → 插件在导入前进行设置。"

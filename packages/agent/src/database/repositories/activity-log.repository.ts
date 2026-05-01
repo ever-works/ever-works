@@ -159,6 +159,7 @@ export class ActivityLogRepository {
             in_progress: 0,
             completed: 0,
             failed: 0,
+            cancelled: 0,
         } as Record<ActivityStatus, number>;
 
         for (const row of rows) {
