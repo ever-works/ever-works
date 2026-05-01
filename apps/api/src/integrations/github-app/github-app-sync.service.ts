@@ -67,6 +67,10 @@ export class GitHubAppSyncService {
             return null;
         }
 
+        if (installation.suspendedAt) {
+            return null;
+        }
+
         if (userId && installation.createdByUserId !== userId) {
             return null;
         }
@@ -105,6 +109,10 @@ export class GitHubAppSyncService {
         }
 
         if (installation.deletedAt) {
+            return null;
+        }
+
+        if (installation.suspendedAt) {
             return null;
         }
 

@@ -120,4 +120,34 @@ describe('GitHubAppSyncService', () => {
 
         expect(result).toBeNull();
     });
+
+    it('does not sync suspended installations', async () => {
+        const { service, gitHubAppInstallationRepository } = createService();
+        gitHubAppInstallationRepository.findByInstallationId.mockResolvedValue({
+            id: 'installation-row-1',
+            installationId: '12345',
+            createdByUserId: 'user-1',
+            suspendedAt: new Date('2026-05-01T00:00:00.000Z'),
+        });
+
+        const result = await service.syncInstallation('12345', 'user-1');
+
+        expect(result).toBeNull();
+    });
+
+    it('does not onboard repositories for suspended installations', async () => {
+        const { service, gitHubAppInstallationRepository } = createService();
+        gitHubAppInstallationRepository.findByInstallationId.mockResolvedValue({
+            id: 'installation-row-1',
+            installationId: '12345',
+            createdByUserId: 'user-1',
+            suspendedAt: new Date('2026-05-01T00:00:00.000Z'),
+        });
+
+        const result = await service.onboardInstallationRepository('12345', 'repo-1', {
+            id: 'user-1',
+        } as any);
+
+        expect(result).toBeNull();
+    });
 });
