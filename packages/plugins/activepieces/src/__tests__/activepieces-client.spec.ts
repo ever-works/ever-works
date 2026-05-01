@@ -313,9 +313,9 @@ describe('ActivepiecesClient', () => {
 			}
 		});
 
-		it('should reject when projectId is missing in async mode', async () => {
-			queueFetch([{ urlContains: '/webhooks/flow-1', response: mockJsonResponse({}) }]);
-
+		it('should reject when projectId is missing BEFORE firing the webhook', async () => {
+			// No queued response — if the webhook fires, queueFetch's stub would not be set,
+			// but more importantly we assert below that fetch was never called.
 			await expect(
 				createClient().executeFlow(
 					'flow-1',
@@ -323,6 +323,10 @@ describe('ActivepiecesClient', () => {
 					createSettings({ webhookMode: 'async', projectId: undefined })
 				)
 			).rejects.toThrow(/project id/i);
+
+			// Critical: the Activepieces flow must NOT have been triggered, otherwise
+			// it consumes quota and runs to completion with no caller to retrieve the result.
+			expect(fetchSpy).not.toHaveBeenCalled();
 		});
 	});
 

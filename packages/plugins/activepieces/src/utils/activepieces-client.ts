@@ -139,6 +139,14 @@ export class ActivepiecesClient {
 	): Promise<ActivepiecesExecutionResult> {
 		if (signal?.aborted) throw new Error('Pipeline execution was cancelled');
 
+		// Validate prerequisites BEFORE firing the webhook — otherwise the Activepieces
+		// flow starts executing (and consumes quota) before we can refuse the request.
+		if (settings.webhookMode === 'async' && !settings.projectId) {
+			throw new Error(
+				'Async mode requires a Default Project ID in plugin settings so the latest flow run can be polled.'
+			);
+		}
+
 		const startTime = Date.now();
 		const path = webhookPath(flowId, settings.webhookMode);
 		this.logger.log(`Triggering Activepieces webhook ${path} (mode=${settings.webhookMode})`);
@@ -159,15 +167,10 @@ export class ActivepiecesClient {
 
 		// Async mode: webhook body has no flow output — poll the run instead.
 		if (settings.webhookMode === 'async') {
-			if (!settings.projectId) {
-				throw new Error(
-					'Async mode requires a Default Project ID in plugin settings so the latest flow run can be polled.'
-				);
-			}
-
+			// projectId presence already validated above (pre-trigger).
 			const run = await this.pollUntilTerminal(
 				flowId,
-				settings.projectId,
+				settings.projectId!,
 				triggerStartedAt,
 				settings.timeoutMs,
 				onProgress,
