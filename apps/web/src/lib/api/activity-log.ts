@@ -31,7 +31,7 @@ export interface RunningCountResponse {
 }
 
 export interface ActivitySummaryResponse {
-    counts: Record<'pending' | 'in_progress' | 'completed' | 'failed', number>;
+    counts: Record<'pending' | 'in_progress' | 'completed' | 'failed' | 'cancelled', number>;
 }
 
 export interface GetActivityLogParams {

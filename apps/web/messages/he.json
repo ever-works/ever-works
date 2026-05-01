@@ -1820,8 +1820,7 @@
                         "model": "מודל",
                         "schedule": "תזמון",
                         "providers": "ספקים",
-                        "websiteRepo": "מאגר אתר",
-                        "additionalAgents": "סוכנים נוספים"
+                        "websiteRepo": "מאגר אתר"
                     },
                     "sourceTypes": {
                         "dataRepo": "מאגר נתונים",
@@ -2496,6 +2495,7 @@
                     "nameRequired": "שם ספרייה נדרש",
                     "noAnalysis": "נא נתח מאגר תחילה",
                     "githubRequired": "נא לחבר את חשבון GitHub שלך תחילה",
+                    "providerRequired": "אנא בחר ספק Git קודם",
                     "importFailed": "נכשל בייבוא ספרייה",
                     "linkFailed": "נכשל בקישור ספרייה",
                     "providerNotConfigured": "{provider} לא מוגדר. בקר בהגדרות → תוספים כדי להגדיר לפני ייבוא."

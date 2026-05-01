@@ -18,7 +18,6 @@ export interface WorksConfigSummary {
     websiteRepo?: string;
     scheduleCadence?: DirectoryScheduleCadence | null;
     providers?: ProvidersDto;
-    additionalAgentsCount?: number;
 }
 
 export interface ParsedWorksConfig extends WorksConfigSummary {
@@ -98,7 +97,6 @@ export class WorksConfigService {
                 'websiteRepository',
             ]),
             scheduleCadence: this.readScheduleCadence(raw),
-            additionalAgentsCount: Array.isArray(raw.agents) ? raw.agents.length : 0,
             providers: this.readProviders(raw),
             websiteRepositoryTarget: this.parseRepositoryReference(
                 this.readString(raw, [

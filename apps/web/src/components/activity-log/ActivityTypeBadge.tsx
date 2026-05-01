@@ -19,6 +19,7 @@ const TYPE_COLORS: Record<string, string> = {
     schedule_created: 'bg-teal-50 text-teal-700 dark:bg-teal-900/20 dark:text-teal-300',
     schedule_executed: 'bg-teal-50 text-teal-700 dark:bg-teal-900/20 dark:text-teal-300',
     import: 'bg-amber-50 text-amber-700 dark:bg-amber-900/20 dark:text-amber-300',
+    works_config_sync: 'bg-amber-50 text-amber-700 dark:bg-amber-900/20 dark:text-amber-300',
     user_signup: 'bg-emerald-50 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-300',
     user_login: 'bg-emerald-50 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-300',
     password_changed: 'bg-rose-50 text-rose-700 dark:bg-rose-900/20 dark:text-rose-300',

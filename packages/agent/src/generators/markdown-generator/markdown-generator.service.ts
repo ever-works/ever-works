@@ -12,11 +12,13 @@ import { DirectoryOperationsService } from '@src/directory-operations';
 import { getDirectoryOwner } from '../../utils/directory.utils';
 import { cloneFreshRepository } from '../../utils/fresh-repository-clone.utils';
 import { assertCreatedRepositoryTarget } from '../../utils/git-repository.utils';
+import { throwIfGenerationCancelled } from '../../utils/generation-cancellation.utils';
 
 type InitializeOptions = {
     generation_method?: GenerationMethod;
     pr_update?: PRUpdate;
     remove_details?: string[];
+    signal?: AbortSignal;
 };
 
 @Injectable()
@@ -29,6 +31,8 @@ export class MarkdownGeneratorService {
     ) {}
 
     async initialize(directory: Directory, user: User, options: InitializeOptions = {}) {
+        throwIfGenerationCancelled(options.signal);
+
         const directoryOwner = getDirectoryOwner(directory);
         const committer = directory.resolveCommitter(user);
         const description = directory.description;
@@ -54,6 +58,7 @@ export class MarkdownGeneratorService {
             mainRepo,
             'Markdown repository',
         );
+        throwIfGenerationCancelled(options.signal);
 
         // Clone markdown repo
         const markdownPath = await cloneFreshRepository(
@@ -68,6 +73,7 @@ export class MarkdownGeneratorService {
             },
             this.logger,
         );
+        throwIfGenerationCancelled(options.signal);
 
         // Clone data repo
         const dataPath = await this.gitFacade.cloneOrPull(
@@ -82,6 +88,7 @@ export class MarkdownGeneratorService {
                 directoryId: directory.id,
             },
         );
+        throwIfGenerationCancelled(options.signal);
 
         const markdownRepo = new MarkdownRepository(markdownPath);
         const dataRepo = await DataRepository.create(dataPath);
@@ -135,6 +142,8 @@ export class MarkdownGeneratorService {
 
             const groups = {}; // we want to group items by category, like: { 'open-source': [items], 'commercial': [items] }
             for (const slug of slugs) {
+                throwIfGenerationCancelled(options.signal);
+
                 try {
                     const markdown = await dataRepo.getMarkdown(slug);
                     if (markdown) {
@@ -193,16 +202,19 @@ export class MarkdownGeneratorService {
             // Remove detail files
             if (options?.remove_details && options.remove_details.length > 0) {
                 for (const slug of options.remove_details) {
+                    throwIfGenerationCancelled(options.signal);
                     await markdownRepo.removeDetails(slug);
                     markdowns.delete(slug);
                 }
             }
 
+            throwIfGenerationCancelled(options.signal);
             const license = await dataRepo.getLicense();
             if (license) {
                 await markdownRepo.writeLicense(license);
             }
 
+            throwIfGenerationCancelled(options.signal);
             const readme: string = await this.generateReadme(
                 dataRepo,
                 markdowns,
@@ -211,6 +223,7 @@ export class MarkdownGeneratorService {
             );
             await markdownRepo.writeReadme(readme);
 
+            throwIfGenerationCancelled(options.signal);
             await this.gitFacade.addAll(provider, markdownPath);
             await this.gitFacade.commit(
                 provider,
@@ -218,6 +231,7 @@ export class MarkdownGeneratorService {
                 'sync README.md',
                 directory.resolveCommitter(user),
             );
+            throwIfGenerationCancelled(options.signal);
             await this.gitFacade.push(
                 { dir: markdownPath },
                 {
@@ -227,6 +241,7 @@ export class MarkdownGeneratorService {
                 },
             );
 
+            throwIfGenerationCancelled(options.signal);
             if (canCreatePR && defaultBranch) {
                 this.logger.log(
                     `Creating PR from ${pr_update.branch} to ${defaultBranch} for ${directory.slug}`,

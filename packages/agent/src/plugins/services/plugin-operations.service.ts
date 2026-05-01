@@ -4,7 +4,9 @@ import {
     BadRequestException,
     ForbiddenException,
     Logger,
+    Optional,
 } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import pickBy from 'lodash/pickBy';
@@ -45,6 +47,7 @@ import {
 } from './settings-schema-validator.service';
 import { PluginSettingsService } from './plugin-settings.service';
 import { AiFacadeService } from '../../facades';
+import { WorksConfigSyncRequestedEvent, type WorksConfigSyncReason } from '@src/events';
 
 @Injectable()
 export class PluginOperationsService {
@@ -61,6 +64,8 @@ export class PluginOperationsService {
         private readonly settingsValidator: SettingsSchemaValidatorService,
         private readonly settingsService: PluginSettingsService,
         private readonly aiFacade: AiFacadeService,
+        @Optional()
+        private readonly eventEmitter?: EventEmitter2,
     ) {}
 
     // ============================================
@@ -773,6 +778,10 @@ export class PluginOperationsService {
         await this.directoryPluginRepository.save(directoryPlugin);
         this.logger.log(`Plugin "${pluginId}" enabled for directory "${directoryId}"`);
 
+        if (directoryPlugin.activeCapability) {
+            this.requestWorksConfigSync(directoryId, userId, 'provider_changed');
+        }
+
         return this.toDirectoryPluginResponse(registered, userPlugin, directoryPlugin);
     }
 
@@ -836,6 +845,10 @@ export class PluginOperationsService {
         }
 
         this.logger.log(`Plugin "${pluginId}" disabled for directory "${directoryId}"`);
+
+        if (directoryPlugin?.activeCapability) {
+            this.requestWorksConfigSync(directoryId, userId, 'provider_changed');
+        }
 
         return this.toDirectoryPluginResponse(registered, userPlugin, directoryPlugin);
     }
@@ -938,6 +951,10 @@ export class PluginOperationsService {
         await this.directoryPluginRepository.save(directoryPlugin);
         this.logger.log(`Plugin "${pluginId}" settings updated for directory "${directoryId}"`);
 
+        if (directoryPlugin.activeCapability === 'pipeline' && settings?.model !== undefined) {
+            this.requestWorksConfigSync(directoryId, userId, 'pipeline_settings_changed');
+        }
+
         return this.toDirectoryPluginResponse(registered, userPlugin, directoryPlugin);
     }
 
@@ -1000,7 +1017,20 @@ export class PluginOperationsService {
             `Capability "${capability}" set to plugin "${pluginId}" for directory "${directoryId}"`,
         );
 
+        this.requestWorksConfigSync(directoryId, userId, 'provider_changed');
+
         return this.toDirectoryPluginResponse(registered, userPlugin, directoryPlugin);
+    }
+
+    private requestWorksConfigSync(
+        directoryId: string,
+        userId: string,
+        reason: WorksConfigSyncReason,
+    ): void {
+        this.eventEmitter?.emit(
+            WorksConfigSyncRequestedEvent.EVENT_NAME,
+            new WorksConfigSyncRequestedEvent(directoryId, userId, reason),
+        );
     }
 
     // ============================================

@@ -1820,8 +1820,7 @@
                         "model": "モデル",
                         "schedule": "スケジュール",
                         "providers": "プロバイダー",
-                        "websiteRepo": "ウェブサイトリポジトリ",
-                        "additionalAgents": "追加エージェント"
+                        "websiteRepo": "ウェブサイトリポジトリ"
                     },
                     "sourceTypes": {
                         "dataRepo": "データリポジトリ",
@@ -2496,6 +2495,7 @@
                     "nameRequired": "ディレクトリ名が必要です",
                     "noAnalysis": "まずリポジトリを解析してください",
                     "githubRequired": "まず GitHub アカウントを接続してください",
+                    "providerRequired": "まず Git プロバイダーを選択してください",
                     "importFailed": "ディレクトリインポートに失敗しました",
                     "linkFailed": "ディレクトリリンクに失敗しました",
                     "providerNotConfigured": "{provider} が未設定です。インポート前に設定 → プラグインを訪れて設定してください。"
