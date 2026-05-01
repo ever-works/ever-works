@@ -80,6 +80,7 @@ import {
     GetUserRepositoriesResponseDto,
 } from '@ever-works/agent/dto';
 import { UpdateWebsiteRepositoryResponseDto } from '@ever-works/agent/generators';
+import { getDefaultWebsiteTemplateId, listWebsiteTemplates } from '@ever-works/agent/generators';
 import { CommunityPrProcessorService } from '@ever-works/agent/community-pr';
 import { DirectoryRepository } from '@ever-works/agent/database';
 import { AuthService, CurrentUser, AuthSessionGuard } from '../auth';
@@ -175,6 +176,27 @@ export class DirectoriesController {
     async getDirectoryStats(@CurrentUser() auth: AuthenticatedUser) {
         const user = await this.authService.getUser(auth.userId);
         return this.directoryQueryService.getStats(user);
+    }
+
+    @Get('directories/website-templates')
+    @HttpCode(HttpStatus.OK)
+    @ApiOperation({
+        summary: 'List website templates',
+        description: 'Get the available website templates for directory website generation',
+    })
+    @ApiResponse({ status: 200, description: 'Available website templates' })
+    async getWebsiteTemplates() {
+        const defaultTemplateId = getDefaultWebsiteTemplateId();
+
+        return {
+            status: 'success',
+            templates: listWebsiteTemplates().map((template) => ({
+                id: template.id,
+                name: template.name,
+                description: template.description,
+                isDefault: template.id === defaultTemplateId,
+            })),
+        };
     }
 
     @Post('directories')

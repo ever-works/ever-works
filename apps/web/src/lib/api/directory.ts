@@ -61,6 +61,13 @@ export interface MarkdownReadmeConfig {
     overwriteDefaultFooter?: boolean;
 }
 
+export interface WebsiteTemplateOption {
+    id: string;
+    name: string;
+    description: string;
+    isDefault: boolean;
+}
+
 export interface CreateDirectoryDto {
     slug: string;
     name: string;
@@ -492,6 +499,12 @@ export const directoryAPI = {
     // Get a directory by ID
     get: async (id: string) => {
         return serverFetch<APIResponse<{ directory: Directory }>>(`/directories/${id}`);
+    },
+
+    getWebsiteTemplates: async () => {
+        return serverFetch<APIResponse<{ templates: WebsiteTemplateOption[] }>>(
+            `/directories/website-templates`,
+        );
     },
 
     // Create a new directory

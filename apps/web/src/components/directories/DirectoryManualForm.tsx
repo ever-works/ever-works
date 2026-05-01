@@ -13,13 +13,16 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { RepositoryOwnerCard } from './RepositoryOwnerCard';
+import { WebsiteTemplateSelector } from './shared/WebsiteTemplateSelector';
 import { Plus } from 'lucide-react';
+import type { WebsiteTemplateOption } from '@/lib/api/directory';
 
 interface DirectoryManualFormProps {
     user: AuthUser;
     gitProvider?: string;
     gitConnected?: boolean;
     deployProvider?: string;
+    websiteTemplates: WebsiteTemplateOption[];
 }
 
 export function DirectoryManualForm({
@@ -27,6 +30,7 @@ export function DirectoryManualForm({
     gitProvider,
     gitConnected,
     deployProvider,
+    websiteTemplates,
 }: DirectoryManualFormProps) {
     const [isPending, startTransition] = useTransition();
     const router = useRouter();
@@ -39,6 +43,8 @@ export function DirectoryManualForm({
         description: '',
         organization: false,
         owner: '',
+        websiteTemplateId:
+            websiteTemplates.find((template) => template.isDefault)?.id || websiteTemplates[0]?.id,
     });
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -151,6 +157,15 @@ export function DirectoryManualForm({
                             rows={3}
                             variant="form"
                             required
+                        />
+
+                        <WebsiteTemplateSelector
+                            templates={websiteTemplates}
+                            value={formData.websiteTemplateId || websiteTemplates[0]?.id || ''}
+                            onChange={(websiteTemplateId) =>
+                                setFormData({ ...formData, websiteTemplateId })
+                            }
+                            helperText="Choose the website template that will be used when the website repository is first created."
                         />
                     </div>
                 </div>

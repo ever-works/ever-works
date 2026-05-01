@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import { getTranslations } from 'next-intl/server';
-import { directoryAPI } from '@/lib/api';
+import { directoryAPI, type WebsiteTemplateOption } from '@/lib/api';
 import { GeneratorForm } from '@/components/directories/detail/generator/GeneratorForm';
 import { GenerationProgress } from '@/components/directories/detail/generator/GenerationProgress';
 import { GenerateStatusType } from '@/lib/api/enums';
@@ -37,6 +37,7 @@ export default async function DirectoryGeneratorPage({ params }: Params) {
     }
 
     let config;
+    let websiteTemplates: WebsiteTemplateOption[] = [];
 
     try {
         const configRes = await directoryAPI.getConfig(id).catch(() => ({ config: undefined }));
@@ -45,5 +46,19 @@ export default async function DirectoryGeneratorPage({ params }: Params) {
         config = undefined;
     }
 
-    return <GeneratorForm directoryId={id} directory={directory} config={config} />;
+    try {
+        const websiteTemplatesRes = await directoryAPI.getWebsiteTemplates();
+        websiteTemplates = websiteTemplatesRes.templates;
+    } catch {
+        websiteTemplates = [];
+    }
+
+    return (
+        <GeneratorForm
+            directoryId={id}
+            directory={directory}
+            config={config}
+            websiteTemplates={websiteTemplates}
+        />
+    );
 }

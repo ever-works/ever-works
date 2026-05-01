@@ -1,7 +1,14 @@
 import type { Metadata } from 'next';
 import { getTranslations } from 'next-intl/server';
 import { getAuthFromCookie } from '@/lib/auth';
-import { gitProvidersAPI, deployAPI, GitProviderConnectionInfo, GitProviderInfo } from '@/lib/api';
+import {
+    gitProvidersAPI,
+    deployAPI,
+    directoryAPI,
+    GitProviderConnectionInfo,
+    GitProviderInfo,
+    type WebsiteTemplateOption,
+} from '@/lib/api';
 import NewDirectoryClient from './new-directory-client';
 import type { DeployProvider } from './deploy-provider-selector';
 
@@ -25,6 +32,7 @@ export default async function NewDirectoryPage() {
     // Get all available deploy providers
     let deployProviders: DeployProvider[] = [];
     let defaultDeployProviderId: string | null = null;
+    let websiteTemplates: WebsiteTemplateOption[] = [];
 
     try {
         const providersResult = await gitProvidersAPI.list();
@@ -59,6 +67,14 @@ export default async function NewDirectoryPage() {
         deployProviders = [];
     }
 
+    try {
+        const websiteTemplatesResult = await directoryAPI.getWebsiteTemplates();
+        websiteTemplates = websiteTemplatesResult.templates;
+    } catch (error) {
+        console.error('Failed to fetch website templates:', error);
+        websiteTemplates = [];
+    }
+
     return (
         <NewDirectoryClient
             user={user!}
@@ -66,6 +82,7 @@ export default async function NewDirectoryPage() {
             defaultProviderId={defaultProviderId}
             deployProviders={deployProviders}
             defaultDeployProviderId={defaultDeployProviderId}
+            websiteTemplates={websiteTemplates}
         />
     );
 }

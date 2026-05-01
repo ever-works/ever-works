@@ -396,6 +396,43 @@ export async function updateDirectory(directoryId: string, data: UpdateDirectory
     }
 }
 
+export async function updateDirectoryTemplate(directoryId: string, websiteTemplateId: string) {
+    const t = await getTranslations('actions.directories');
+
+    const schema = z.object({
+        directoryId: z.string().uuid(t('invalidId')),
+        websiteTemplateId: z.string().min(1),
+    });
+
+    try {
+        const validation = schema.safeParse({ directoryId, websiteTemplateId });
+        if (!validation.success) {
+            return {
+                success: false,
+                error: validation.error.errors[0].message,
+            };
+        }
+
+        await directoryAPI.update(validation.data.directoryId, {
+            websiteTemplateId: validation.data.websiteTemplateId,
+        });
+
+        revalidatePath(ROUTES.DASHBOARD_DIRECTORY_GENERATOR(validation.data.directoryId));
+        revalidatePath(ROUTES.DASHBOARD_DIRECTORY_SETTINGS(validation.data.directoryId));
+
+        return {
+            success: true,
+            message: t('updateSuccess'),
+        };
+    } catch (error) {
+        console.error('Failed to update directory template:', error);
+        return {
+            success: false,
+            error: error instanceof Error ? error.message : t('updateFailed'),
+        };
+    }
+}
+
 export async function deleteDirectory(directoryId: string, options?: DeleteDirectoryDto) {
     const t = await getTranslations('actions.directories');
 
