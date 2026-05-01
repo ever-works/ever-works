@@ -1,5 +1,5 @@
 import { HttpService } from '@nestjs/axios';
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable, UnauthorizedException } from '@nestjs/common';
 import {
     createGitHubAppJwt,
     createGitHubAppHeaders,
@@ -43,6 +43,8 @@ type GitHubAccessTokenResponse = {
     refresh_token_expires_in?: number;
     scope?: string;
     token_type?: string;
+    error?: string;
+    error_description?: string;
 };
 
 type GitHubUserResponse = {
@@ -98,6 +100,18 @@ export class GitHubAppService {
                 },
             ),
         );
+
+        if (data.error) {
+            throw new UnauthorizedException(
+                data.error_description || `GitHub App authorization failed: ${data.error}`,
+            );
+        }
+
+        if (!data.access_token) {
+            throw new BadRequestException(
+                'GitHub App authorization did not return an access token',
+            );
+        }
 
         return data;
     }

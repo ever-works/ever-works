@@ -182,7 +182,7 @@ export class GitHubAppSyncService {
                     action === 'created' && installationPayloadWrapper.sender?.id
                         ? String(installationPayloadWrapper.sender.id)
                         : undefined,
-                deletedAt: null,
+                deletedAt: undefined,
                 suspendedAt:
                     action === 'suspend'
                         ? new Date()

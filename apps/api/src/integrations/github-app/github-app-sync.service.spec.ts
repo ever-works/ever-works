@@ -99,6 +99,7 @@ describe('GitHubAppSyncService', () => {
         expect(gitHubAppInstallationRepository.upsertFromGithub).toHaveBeenCalledWith(
             expect.objectContaining({
                 installationId: '12345',
+                deletedAt: undefined,
                 suspendedAt: null,
             }),
         );

@@ -1,5 +1,6 @@
 import { of } from 'rxjs';
 import { GitHubAppService } from './github-app.service';
+import { BadRequestException, UnauthorizedException } from '@nestjs/common';
 
 describe('GitHubAppService', () => {
     const createService = () => {
@@ -15,6 +16,39 @@ describe('GitHubAppService', () => {
             httpService,
         };
     };
+
+    describe('exchangeUserCode', () => {
+        it('throws when GitHub returns an OAuth error payload', async () => {
+            const { service, httpService } = createService();
+            httpService.post.mockReturnValue(
+                of({
+                    data: {
+                        error: 'bad_verification_code',
+                        error_description: 'The code passed is incorrect or expired.',
+                    },
+                }),
+            );
+
+            await expect(service.exchangeUserCode('bad-code')).rejects.toBeInstanceOf(
+                UnauthorizedException,
+            );
+        });
+
+        it('throws when GitHub does not return an access token', async () => {
+            const { service, httpService } = createService();
+            httpService.post.mockReturnValue(
+                of({
+                    data: {
+                        token_type: 'bearer',
+                    },
+                }),
+            );
+
+            await expect(service.exchangeUserCode('bad-code')).rejects.toBeInstanceOf(
+                BadRequestException,
+            );
+        });
+    });
 
     describe('listInstallationRepositories', () => {
         it('fetches all installation repositories across paginated responses', async () => {
