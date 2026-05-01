@@ -1,11 +1,10 @@
-import { Injectable, Logger, BadRequestException } from '@nestjs/common';
+import { Injectable, Logger, BadRequestException, Optional } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import type {
     PluginSettings,
     ResolvedSettings,
     ResolvedSetting,
     SettingScope,
-    SettingSource,
     SettingDefinition,
     JsonSchema,
 } from '@ever-works/plugin';
@@ -14,7 +13,11 @@ import { PluginRepository } from '../repositories/plugin.repository';
 import { UserPluginRepository } from '../repositories/user-plugin.repository';
 import { DirectoryPluginRepository } from '../repositories/directory-plugin.repository';
 import { PluginRegistryService } from './plugin-registry.service';
-import { PluginEvents, SETTING_SOURCE_PRIORITY } from '../plugins.constants';
+import { PluginEvents } from '../plugins.constants';
+import {
+    SettingsSchemaValidatorService,
+    type SettingsScope as ValidatorSettingsScope,
+} from './settings-schema-validator.service';
 
 /** Placeholder for masked secrets in API responses */
 const MASKED_SECRET_PLACEHOLDER = '********';
@@ -58,6 +61,8 @@ export class PluginSettingsService {
         private readonly userPluginRepository: UserPluginRepository,
         private readonly directoryPluginRepository: DirectoryPluginRepository,
         private readonly eventEmitter: EventEmitter2,
+        @Optional()
+        private readonly settingsValidator?: SettingsSchemaValidatorService,
     ) {}
 
     /**
@@ -186,10 +191,21 @@ export class PluginSettingsService {
         settings: Record<string, unknown>,
         options?: { secretKeys?: string[] },
     ): Promise<void> {
-        const { regularSettings, secretSettings, filteredSettings } =
-            await this.validateAndSeparateSettings(pluginId, settings, 'global', options);
-
         const entity = await this.pluginRepository.findByPluginId(pluginId);
+        const validationSettings = {
+            ...(entity?.settings || {}),
+            ...(entity?.secretSettings || {}),
+            ...settings,
+        };
+        const { regularSettings, secretSettings, filteredSettings } =
+            await this.validateAndSeparateSettings(
+                pluginId,
+                settings,
+                'global',
+                options,
+                validationSettings,
+            );
+
         if (entity) {
             await this.pluginRepository.updateSettings(
                 pluginId,
@@ -217,15 +233,26 @@ export class PluginSettingsService {
         settings: Record<string, unknown>,
         options?: { secretKeys?: string[] },
     ): Promise<void> {
+        const existing = await this.userPluginRepository.findByUserAndPlugin(userId, pluginId);
+        const validationSettings = {
+            ...(existing?.settings || {}),
+            ...(existing?.secretSettings || {}),
+            ...settings,
+        };
         const { regularSettings, secretSettings, filteredSettings } =
-            await this.validateAndSeparateSettings(pluginId, settings, 'user', options);
+            await this.validateAndSeparateSettings(
+                pluginId,
+                settings,
+                'user',
+                options,
+                validationSettings,
+            );
 
         const pluginEntity = await this.pluginRepository.findByPluginId(pluginId);
         if (!pluginEntity) {
             throw new Error(`Plugin entity not found for ${pluginId}`);
         }
 
-        const existing = await this.userPluginRepository.findByUserAndPlugin(userId, pluginId);
         if (existing) {
             await this.userPluginRepository.updateSettings(
                 userId,
@@ -263,18 +290,29 @@ export class PluginSettingsService {
         settings: Record<string, unknown>,
         options?: { secretKeys?: string[] },
     ): Promise<void> {
+        const existing = await this.directoryPluginRepository.findByDirectoryAndPlugin(
+            directoryId,
+            pluginId,
+        );
+        const validationSettings = {
+            ...(existing?.settings || {}),
+            ...(existing?.secretSettings || {}),
+            ...settings,
+        };
         const { regularSettings, secretSettings, filteredSettings } =
-            await this.validateAndSeparateSettings(pluginId, settings, 'directory', options);
+            await this.validateAndSeparateSettings(
+                pluginId,
+                settings,
+                'directory',
+                options,
+                validationSettings,
+            );
 
         const pluginEntity = await this.pluginRepository.findByPluginId(pluginId);
         if (!pluginEntity) {
             throw new Error(`Plugin entity not found for ${pluginId}`);
         }
 
-        const existing = await this.directoryPluginRepository.findByDirectoryAndPlugin(
-            directoryId,
-            pluginId,
-        );
         if (existing) {
             await this.directoryPluginRepository.updateSettings(
                 directoryId,
@@ -315,6 +353,7 @@ export class PluginSettingsService {
         settings: Record<string, unknown>,
         scope: SettingScope,
         options?: { secretKeys?: string[] },
+        settingsForValidation: Record<string, unknown> = settings,
     ): Promise<{
         regularSettings: Record<string, unknown>;
         secretSettings: Record<string, unknown>;
@@ -340,6 +379,11 @@ export class PluginSettingsService {
 
         let filteredSettings = this.filterEnvVarFields(settings, schema);
         filteredSettings = this.stripMaskedPlaceholders(filteredSettings, schema);
+        let filteredValidationSettings = this.filterEnvVarFields(settingsForValidation, schema);
+        filteredValidationSettings = this.stripMaskedPlaceholders(
+            filteredValidationSettings,
+            schema,
+        );
 
         const scopeValidation = this.validateSettingsScope(
             definitions,
@@ -348,6 +392,31 @@ export class PluginSettingsService {
         );
         if (!scopeValidation.valid) {
             throw new Error(`Scope violation: ${scopeValidation.violations.join(', ')}`);
+        }
+
+        if (this.settingsValidator) {
+            const schemaValidation = this.settingsValidator.validate(
+                filteredValidationSettings,
+                schema,
+                scope as ValidatorSettingsScope,
+            );
+            if (!schemaValidation.valid) {
+                throw new Error(`Invalid settings: ${schemaValidation.errors.join(', ')}`);
+            }
+        }
+
+        if (registered.plugin.validateSettings) {
+            const pluginValidation = await registered.plugin.validateSettings(
+                filteredValidationSettings,
+            );
+            if (!pluginValidation.valid) {
+                throw new Error(
+                    `Invalid settings: ${
+                        pluginValidation.errors?.map((error) => error.message).join(', ') ??
+                        'Custom validation failed'
+                    }`,
+                );
+            }
         }
 
         const regularSettings: Record<string, unknown> = {};

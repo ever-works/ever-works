@@ -48,6 +48,12 @@ import {
 import { PluginSettingsService } from './plugin-settings.service';
 import { AiFacadeService } from '../../facades';
 import { WorksConfigSyncRequestedEvent, type WorksConfigSyncReason } from '@src/events';
+import {
+    addActiveCapability,
+    getActiveCapabilities,
+    hasActiveCapability,
+    removeActiveCapability,
+} from '../utils/active-capabilities.util';
 
 @Injectable()
 export class PluginOperationsService {
@@ -190,10 +196,10 @@ export class PluginOperationsService {
             const category = registered.manifest.category;
             const userPlugin = userPluginMap.get(registered.plugin.id);
 
-            // Check if plugin has required settings that are not configured
-            const hasRequiredSettings = this.checkHasUnconfiguredRequiredSettings(
+            const hasRequiredSettings = await this.hasUnconfiguredRequiredSettings(
+                registered.plugin.id,
                 registered.plugin.settingsSchema,
-                userPlugin?.settings || {},
+                userId,
             );
 
             const pluginItem: SettingsMenuPlugin = {
@@ -203,7 +209,7 @@ export class PluginOperationsService {
                 enabled: resolvePluginEnabled({
                     systemPlugin: registered.manifest?.systemPlugin,
                     autoEnable: registered.manifest?.autoEnable,
-                    userPlugin: userPluginMap.get(registered.plugin.id) ?? null,
+                    userPlugin: userPlugin ?? null,
                     directoryPlugin: null,
                     hasDirectoryContext: false,
                 }),
@@ -242,13 +248,20 @@ export class PluginOperationsService {
     /**
      * Check if plugin has required settings that are not configured
      */
-    private checkHasUnconfiguredRequiredSettings(
+    private async hasUnconfiguredRequiredSettings(
+        pluginId: string,
         schema: JsonSchema | undefined,
-        settings: Record<string, unknown>,
-    ): boolean {
-        if (!schema?.required || !schema.properties) return false;
+        userId: string,
+    ): Promise<boolean> {
+        if (!schema?.properties) return false;
+        if (!schema.required?.length && !schema['x-requiredGroups']?.length) return false;
 
-        for (const field of schema.required) {
+        const resolved = await this.settingsService.getResolvedSettings(pluginId, {
+            userId,
+            includeSecrets: true,
+        });
+
+        for (const field of schema.required ?? []) {
             const propSchema = schema.properties[field];
             if (!propSchema) continue;
 
@@ -259,10 +272,28 @@ export class PluginOperationsService {
             const scope = propSchema['x-scope'] || 'global';
             if (scope !== 'global' && scope !== 'user') continue;
 
-            const value = settings[field];
+            const value = resolved[field]?.value;
             if (value === undefined || value === null || value === '') {
                 return true;
             }
+        }
+
+        for (const group of schema['x-requiredGroups'] ?? []) {
+            const visibleFields = group.fields.filter((field) => {
+                const propSchema = schema.properties?.[field];
+                if (!propSchema) return false;
+                if (propSchema['x-envVar']) return false;
+                if (propSchema['x-adminOnly']) return false;
+                const scope = propSchema['x-scope'] || 'global';
+                return scope === 'global' || scope === 'user';
+            });
+            if (visibleFields.length === 0) continue;
+
+            const hasAny = visibleFields.some((field) => {
+                const value = resolved[field]?.value;
+                return value !== undefined && value !== null && value !== '';
+            });
+            if (!hasAny) return true;
         }
 
         return false;
@@ -667,9 +698,21 @@ export class PluginOperationsService {
         // Build capability providers mapping (exclude supplementary plugins)
         const capabilityProviders: Record<string, string> = {};
         for (const dp of directoryPlugins) {
-            if (!dp.enabled || !dp.activeCapability) continue;
-            if (registryMap.get(dp.pluginId)?.manifest.supplementary) continue;
-            capabilityProviders[dp.activeCapability] = dp.pluginId;
+            if (!dp.enabled) continue;
+            const registered = registryMap.get(dp.pluginId);
+            if (!registered || registered.manifest.supplementary) continue;
+            const userPlugin = userPluginMap.get(dp.pluginId) ?? null;
+            const isEnabled = resolvePluginEnabled({
+                systemPlugin: registered.manifest?.systemPlugin,
+                autoEnable: registered.manifest?.autoEnable,
+                userPlugin,
+                directoryPlugin: dp,
+                hasDirectoryContext: true,
+            });
+            if (!isEnabled) continue;
+            for (const capability of getActiveCapabilities(dp)) {
+                capabilityProviders[capability] = dp.pluginId;
+            }
         }
 
         // Map to response
@@ -755,7 +798,10 @@ export class PluginOperationsService {
                 directoryPlugin.settings = { ...directoryPlugin.settings, ...options.settings };
             }
             if (options?.activeCapability) {
-                directoryPlugin.activeCapability = options.activeCapability;
+                directoryPlugin.activeCapabilities = addActiveCapability(
+                    directoryPlugin,
+                    options.activeCapability,
+                );
             }
             if (options?.priority !== undefined) {
                 directoryPlugin.priority = options.priority;
@@ -770,7 +816,7 @@ export class PluginOperationsService {
                 settings: options?.settings || {},
                 secretSettings: {},
                 metadata: {},
-                activeCapability: options?.activeCapability,
+                activeCapabilities: options?.activeCapability ? [options.activeCapability] : [],
                 priority: options?.priority || 0,
             });
         }
@@ -778,7 +824,7 @@ export class PluginOperationsService {
         await this.directoryPluginRepository.save(directoryPlugin);
         this.logger.log(`Plugin "${pluginId}" enabled for directory "${directoryId}"`);
 
-        if (directoryPlugin.activeCapability) {
+        if (getActiveCapabilities(directoryPlugin).length > 0) {
             this.requestWorksConfigSync(directoryId, userId, 'provider_changed');
         }
 
@@ -846,7 +892,7 @@ export class PluginOperationsService {
 
         this.logger.log(`Plugin "${pluginId}" disabled for directory "${directoryId}"`);
 
-        if (directoryPlugin?.activeCapability) {
+        if (getActiveCapabilities(directoryPlugin).length > 0) {
             this.requestWorksConfigSync(directoryId, userId, 'provider_changed');
         }
 
@@ -951,7 +997,7 @@ export class PluginOperationsService {
         await this.directoryPluginRepository.save(directoryPlugin);
         this.logger.log(`Plugin "${pluginId}" settings updated for directory "${directoryId}"`);
 
-        if (directoryPlugin.activeCapability === 'pipeline' && settings?.model !== undefined) {
+        if (hasActiveCapability(directoryPlugin, 'pipeline') && settings?.model !== undefined) {
             this.requestWorksConfigSync(directoryId, userId, 'pipeline_settings_changed');
         }
 
@@ -997,20 +1043,21 @@ export class PluginOperationsService {
         );
 
         // Clear this capability from other plugins in this directory.
-        // Must use () => 'NULL' — passing undefined is silently swallowed by TypeORM
-        // (UpdateDateColumn fills the SET clause) so activeCapability is never cleared,
-        // leaving stale rows that corrupt the capabilityProviders map on the next read.
-        await this.directoryPluginRepository
-            .createQueryBuilder()
-            .update()
-            .set({ activeCapability: () => 'NULL' })
-            .where('directoryId = :directoryId', { directoryId })
-            .andWhere('activeCapability = :capability', { capability })
-            .andWhere('pluginId != :pluginId', { pluginId })
-            .execute();
+        // Each capability has one provider; each plugin can provide many capabilities.
+        const directoryPlugins = await this.directoryPluginRepository.find({
+            where: { directoryId },
+        });
+        for (const otherPlugin of directoryPlugins) {
+            if (otherPlugin.pluginId === pluginId) continue;
+            if (!hasActiveCapability(otherPlugin, capability)) continue;
+
+            otherPlugin.activeCapabilities = removeActiveCapability(otherPlugin, capability);
+            await this.directoryPluginRepository.save(otherPlugin);
+        }
 
         // Set this capability as active for this plugin
-        directoryPlugin.activeCapability = capability;
+        directoryPlugin.enabled = true;
+        directoryPlugin.activeCapabilities = addActiveCapability(directoryPlugin, capability);
         await this.directoryPluginRepository.save(directoryPlugin);
 
         this.logger.log(
@@ -1380,7 +1427,7 @@ export class PluginOperationsService {
                 directoryPlugin: directoryPlugin ?? null,
                 hasDirectoryContext: true,
             }),
-            activeCapability: directoryPlugin?.activeCapability,
+            activeCapabilities: getActiveCapabilities(directoryPlugin),
             directorySettings: this.maskSecretSettings(
                 directoryPlugin
                     ? { ...directoryPlugin.settings, ...directoryPlugin.secretSettings }
@@ -1561,6 +1608,7 @@ export class PluginOperationsService {
             settings: {},
             secretSettings: {},
             metadata: {},
+            activeCapabilities: [],
             priority: 0,
         });
     }

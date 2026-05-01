@@ -234,8 +234,8 @@ export interface UserPluginResponse extends PluginResponse {
 export interface DirectoryPluginResponse extends UserPluginResponse {
 	/** Whether plugin is enabled for this directory */
 	directoryEnabled: boolean;
-	/** Active capability for this directory */
-	activeCapability?: string;
+	/** Active capabilities for this directory */
+	activeCapabilities?: string[];
 	/** Directory-specific settings (masked) */
 	directorySettings?: Record<string, unknown>;
 	/** Directory plugin entity ID */

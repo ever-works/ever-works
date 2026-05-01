@@ -229,7 +229,14 @@ export class PipelineOrchestratorService {
         if (typeof pipelineId === 'string') {
             const registered = this.registry.get(pipelineId);
             if (registered?.state === 'loaded' && isPipelinePlugin(registered.plugin)) {
-                return registered.plugin;
+                const isEnabled = await this.registry.isPluginEnabledForScope(
+                    registered.plugin.id,
+                    directoryId,
+                    userId,
+                );
+                if (isEnabled) {
+                    return registered.plugin;
+                }
             }
             this.logger.warn(
                 `Pipeline plugin "${pipelineId}" not available, falling back to auto-detect`,

@@ -109,7 +109,7 @@ export class ContentExtractorFacadeService
      *   0. Supplementary (pdf-extractor, notion-extractor) — intercept by URL pattern first,
      *      regardless of any explicit override. Only active when enabled for the scope.
      *   1. Explicit providerOverride (user's selected provider)
-     *   2. Directory's configured default (activeCapability)
+     *   2. Directory's configured default provider
      *   3. General non-system extractors (Jina, Firecrawl, Tavily, …)
      *   4. System/default extractor (local-content-extractor)
      *   5. Last resort: any enabled extractor that accepts the URL

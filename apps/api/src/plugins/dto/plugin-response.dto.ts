@@ -234,8 +234,11 @@ export class DirectoryPluginResponseDto
     @ApiProperty({ description: 'Whether plugin is enabled for this directory' })
     directoryEnabled: boolean;
 
-    @ApiPropertyOptional({ description: 'Active capability for this directory' })
-    activeCapability?: string;
+    @ApiPropertyOptional({
+        description: 'Active capabilities for this directory',
+        type: [String],
+    })
+    activeCapabilities?: string[];
 
     @ApiPropertyOptional({ description: 'Directory-specific settings (masked)' })
     directorySettings?: Record<string, unknown>;

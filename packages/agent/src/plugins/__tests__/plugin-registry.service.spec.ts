@@ -406,7 +406,7 @@ describe('PluginRegistryService', () => {
                 directoryId: 'dir-1',
                 pluginId: 'search-plugin',
                 enabled: true,
-                activeCapability: 'search',
+                activeCapabilities: ['search'],
             } as any);
 
             const result = await service.getDefaultForCapabilityScoped('search', 'dir-1');
