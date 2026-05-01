@@ -10,6 +10,7 @@ import { updateDirectorySchedule } from '@/app/actions/dashboard/directories';
 import { useRouter } from '@/i18n/navigation';
 import { toast } from 'sonner';
 import { formatWorksConfigProviders } from '../../shared/works-config';
+import type { RepositoryTarget } from '@/lib/api/types-only';
 
 export function SourceSettings() {
     const t = useTranslations('dashboard.directoryDetail.settings');
@@ -24,24 +25,29 @@ export function SourceSettings() {
 
     const sourceRepository = directory.sourceRepository;
     const worksConfig = sourceRepository.worksConfig;
+    const relatedWebsiteRepository = sourceRepository.relatedRepositories?.website;
+
     const sourceTypeLabel = getSourceTypeLabel(sourceRepository.type, t);
+    const supportsSourceSync = sourceRepository.type !== 'link_existing';
     const fallbackOwner = directory.owner || sourceRepository.owner;
-    const websiteTarget =
-        sourceRepository.relatedRepositories?.website?.owner &&
-        sourceRepository.relatedRepositories?.website?.repo
-            ? `${sourceRepository.relatedRepositories.website.owner}/${sourceRepository.relatedRepositories.website.repo}`
-            : worksConfig?.websiteRepo || null;
-    const appliedWebsiteRepo = sourceRepository.relatedRepositories?.website
-        ? `${sourceRepository.relatedRepositories.website.owner || fallbackOwner}/${sourceRepository.relatedRepositories.website.repo}`
-        : `${fallbackOwner}/${directory.slug}-website`;
+
+    const websiteTarget = getConfiguredWebsiteTarget(
+        relatedWebsiteRepository,
+        worksConfig?.websiteRepo,
+    );
+    const appliedWebsiteRepo = getAppliedWebsiteTarget({
+        relatedWebsiteRepository,
+        fallbackOwner,
+        directorySlug: directory.slug,
+    });
+
     const appliedSchedule = directory.scheduledUpdatesEnabled
         ? directory.scheduledCadence || t('worksConfig.enabled')
         : t('worksConfig.disabled');
+
     const importedProviders = formatWorksConfigProviders(worksConfig?.providers);
     const appliedProviderOverrides =
-        directory.scheduledUpdatesEnabled && sourceRepository.type === 'works_config'
-            ? importedProviders
-            : null;
+        directory.scheduledUpdatesEnabled && worksConfig?.providers ? importedProviders : null;
 
     const metadataRows = [
         { label: t('worksConfig.fields.sourceType'), value: sourceTypeLabel },
@@ -84,12 +90,6 @@ export function SourceSettings() {
                   label: t('worksConfig.fields.websiteRepo'),
                   value: websiteTarget,
                   hint: t('worksConfig.applied', { value: appliedWebsiteRepo }),
-              }
-            : null,
-        typeof worksConfig?.additionalAgentsCount === 'number'
-            ? {
-                  label: t('worksConfig.fields.additionalAgents'),
-                  value: String(worksConfig.additionalAgentsCount),
               }
             : null,
     ].filter(Boolean) as Array<{
@@ -175,24 +175,28 @@ export function SourceSettings() {
                     </div>
                 )}
 
-                <div className="flex items-center justify-between pt-2">
-                    <div>
-                        <h4 className="text-xs font-medium text-text dark:text-text-dark">
-                            {t('syncEnabled')}
-                        </h4>
-                        <p className="text-xs text-text-muted dark:text-text-muted-dark">
-                            {t('syncDescription')}
-                        </p>
+                {supportsSourceSync && (
+                    <div className="flex items-center justify-between pt-2">
+                        <div>
+                            <h4 className="text-xs font-medium text-text dark:text-text-dark">
+                                {t('syncEnabled')}
+                            </h4>
+                            <p className="text-xs text-text-muted dark:text-text-muted-dark">
+                                {t('syncDescription')}
+                            </p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            {isSyncing && (
+                                <Loader2 className="h-4 w-4 animate-spin text-text-muted" />
+                            )}
+                            <Switch
+                                checked={directory.scheduledUpdatesEnabled}
+                                onChange={handleSyncToggle}
+                                disabled={isSyncing}
+                            />
+                        </div>
                     </div>
-                    <div className="flex items-center gap-2">
-                        {isSyncing && <Loader2 className="h-4 w-4 animate-spin text-text-muted" />}
-                        <Switch
-                            checked={directory.scheduledUpdatesEnabled}
-                            onChange={handleSyncToggle}
-                            disabled={isSyncing}
-                        />
-                    </div>
-                </div>
+                )}
             </div>
         </div>
     );
@@ -211,4 +215,31 @@ function getSourceTypeLabel(sourceType: string, t: ReturnType<typeof useTranslat
         default:
             return sourceType.replace(/_/g, ' ');
     }
+}
+
+function getConfiguredWebsiteTarget(
+    relatedWebsiteRepository: RepositoryTarget | undefined,
+    websiteRepo: string | undefined,
+): string | null {
+    if (relatedWebsiteRepository?.owner && relatedWebsiteRepository.repo) {
+        return `${relatedWebsiteRepository.owner}/${relatedWebsiteRepository.repo}`;
+    }
+
+    return websiteRepo || null;
+}
+
+function getAppliedWebsiteTarget({
+    relatedWebsiteRepository,
+    fallbackOwner,
+    directorySlug,
+}: {
+    relatedWebsiteRepository?: RepositoryTarget;
+    fallbackOwner: string;
+    directorySlug: string;
+}): string {
+    if (relatedWebsiteRepository?.repo) {
+        return `${relatedWebsiteRepository.owner || fallbackOwner}/${relatedWebsiteRepository.repo}`;
+    }
+
+    return `${fallbackOwner}/${directorySlug}-website`;
 }

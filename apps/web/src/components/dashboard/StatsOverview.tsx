@@ -2,6 +2,7 @@
 
 import { cn } from '@/lib/utils/cn';
 import { useTranslations } from 'next-intl';
+import { FolderClosed, ListTodo, Globe } from 'lucide-react';
 
 interface StatsOverviewProps {
     totalDirectories?: number;
@@ -19,32 +20,36 @@ export function StatsOverview({
     const statCards: Array<{
         title: string;
         value: string | number;
-        icon: React.ComponentType<{ className?: string }>;
+        icon: React.ComponentType<{ className?: string; strokeWidth?: number }>;
         change: string;
         changeType: 'positive' | 'negative' | 'neutral';
         iconColor?: string;
+        dotColor?: string;
     }> = [
         {
             title: t('totalDirectories'),
             value: totalDirectories,
-            icon: FolderIcon,
+            icon: FolderClosed,
             iconColor: 'text-blue-500',
+            dotColor: 'bg-blue-500',
             change: '+12%',
             changeType: 'positive',
         },
         {
             title: t('totalItems'),
             value: totalItems,
-            icon: ItemsIcon,
+            icon: ListTodo,
             iconColor: 'text-violet-500',
+            dotColor: 'bg-violet-500',
             change: '+23%',
             changeType: 'positive',
         },
         {
             title: t('activeWebsites'),
             value: activeWebsites,
-            icon: WebsiteIcon,
+            icon: Globe,
             iconColor: 'text-emerald-500',
+            dotColor: 'bg-emerald-500',
             change: '0%',
             changeType: 'neutral',
         },
@@ -56,9 +61,8 @@ export function StatsOverview({
                 <div
                     key={stat.title}
                     className={cn(
-                        'p-1 rounded-lg space-y-6',
-                        'bg-card/10 dark:bg-card-primary-dark/30',
-                        'border border-card-border dark:border-border-secondary-dark',
+                        'group relative rounded-md p-1 transition-shadow duration-200 overflow-hidden',
+                        'border border-card-border dark:border-border-dark',
                     )}
                 >
                     <div
@@ -69,32 +73,31 @@ export function StatsOverview({
                         )}
                     >
                         {/* Decorative short top border accent with fading edges */}
-                        <div className="card-top-accent pointer-events-none absolute left-1/2 -translate-x-1/2 top-0 w-1/2 h-px z-20 opacity-50 rounded-full" />
+                        <div className="card-top-accent pointer-events-none absolute left-1/2 -translate-x-1/2 top-0 w-1/2 h-px z-20 opacity-40 rounded-full" />
 
-                        <div>
-                            <div>
-                                <p className="text-sm text-text-muted dark:text-text-muted-dark">
-                                    {stat.title}
-                                </p>
-                                <p className="text-2xl font-bold text-text dark:text-text-dark mt-2">
-                                    {stat.value}
-                                </p>
-                            </div>
-                        </div>
-
-                        <div className="absolute top-3 right-3">
+                        <div className="flex items-end space-x-2">
                             <div
                                 className={cn(
-                                    'p-3 rounded-lg',
-                                    'bg-surface dark:bg-surface-dark/50',
+                                    'rounded-md w-8 h-8 flex items-center justify-center',
+                                    'bg-surface dark:bg-white/6',
                                 )}
                             >
                                 <stat.icon
-                                    className={cn('w-6 h-6', stat.iconColor ?? 'text-primary')}
+                                    className={cn('w-4.5 h-4.5', stat.iconColor)}
+                                    strokeWidth={1.3}
                                 />
                             </div>
+                            <p className="text-3xl text-text dark:text-text-dark truncate">
+                                {stat.value}
+                            </p>
                         </div>
-                        <div className="mt-4  items-center hidden">
+                        <div className="mt-1 flex items-center space-x-2">
+                            <div className={cn('w-1 h-1 rounded-full mt-0.5', stat.dotColor)} />
+                            <p className="text-xs text-gray-500 dark:text-text-muted-dark">
+                                {stat.title}
+                            </p>
+                        </div>
+                        <div className="mt-4 items-center hidden">
                             <span
                                 className={cn(
                                     'text-sm font-medium',
@@ -114,44 +117,5 @@ export function StatsOverview({
                 </div>
             ))}
         </div>
-    );
-}
-
-function FolderIcon({ className }: { className?: string }) {
-    return (
-        <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"
-            />
-        </svg>
-    );
-}
-
-function ItemsIcon({ className }: { className?: string }) {
-    return (
-        <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"
-            />
-        </svg>
-    );
-}
-
-function WebsiteIcon({ className }: { className?: string }) {
-    return (
-        <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9"
-            />
-        </svg>
     );
 }

@@ -22,18 +22,14 @@ export class DirectoryScheduleRepository {
         directoryId: string,
         data: Partial<DirectorySchedule>,
     ): Promise<DirectorySchedule> {
-        let schedule = await this.repository.findOne({ where: { directoryId } });
+        await this.repository.upsert(
+            {
+                directoryId,
+                ...data,
+            },
+            ['directoryId'],
+        );
 
-        if (schedule) {
-            await this.repository.update(schedule.id, data);
-            return this.repository.findOne({
-                where: { id: schedule.id },
-                relations: ['directory', 'user'],
-            });
-        }
-
-        schedule = this.repository.create({ directoryId, ...data });
-        await this.repository.save(schedule);
         return this.findByDirectoryId(directoryId);
     }
 
@@ -101,10 +97,9 @@ export class DirectoryScheduleRepository {
      * Atomically claim a schedule for dispatch.
      * Returns the original nextRunAt value if successful, or null if already claimed.
      *
-     * Note: there is a theoretical TOCTOU gap between reading nextRunAt and the
-     * atomic UPDATE. In practice the window is microseconds, and the only way
-     * scheduledFor could be stale is if a full generation cycle completes between
-     * the two queries — which is effectively impossible.
+     * The UPDATE verifies nextRunAt still matches the value read before claiming.
+     * That avoids clearing a newer rescheduled value if another request updates
+     * the schedule between the read and write.
      */
     async tryMarkDispatched(scheduleId: string): Promise<Date | null> {
         // Read the nextRunAt before clearing it so we can preserve it as scheduledFor
@@ -117,6 +112,7 @@ export class DirectoryScheduleRepository {
         }
 
         const originalNextRunAt = schedule.nextRunAt;
+        const originalNextRunAtMs = originalNextRunAt.getTime();
         const dispatchedAt = new Date();
 
         const result = await this.repository
@@ -131,7 +127,7 @@ export class DirectoryScheduleRepository {
             })
             .where('id = :id', { id: scheduleId })
             .andWhere('status = :status', { status: DirectoryScheduleStatus.ACTIVE })
-            .andWhere('nextRunAt IS NOT NULL')
+            .andWhere('nextRunAt = :nextRunAt', { nextRunAt: originalNextRunAtMs })
             .execute();
 
         return (result.affected ?? 0) > 0 ? originalNextRunAt : null;

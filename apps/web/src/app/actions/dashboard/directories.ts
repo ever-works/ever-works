@@ -9,7 +9,7 @@ import {
     DeleteDirectoryDto,
     SyncDirectoryResponse,
     AnalyzeRepositoryResponseDto,
-    ImportSourceType,
+    ImportDirectoryDto,
     GetUserRepositoriesResponseDto,
     UpdateDirectorySchedulePayload,
     UpdateDirectoryAdvancedPromptsDto,
@@ -548,24 +548,7 @@ export async function analyzeRepository(sourceUrl: string, providerId?: string) 
     }
 }
 
-interface ImportEnrichmentConfig {
-    expansionFactor?: number;
-}
-
-interface ImportDirectoryRequest {
-    sourceUrl: string;
-    sourceType: ImportSourceType;
-    name: string;
-    organization?: boolean;
-    owner?: string;
-    createMissingRepos?: boolean;
-    sync?: boolean;
-    restoreWorksConfig?: boolean;
-    gitProvider?: string;
-    deployProvider?: string;
-    providers?: Record<string, string>;
-    enrichmentConfig?: ImportEnrichmentConfig;
-}
+type ImportDirectoryRequest = ImportDirectoryDto;
 
 interface ImportDirectoryProviderErrors {
     ai?: string;

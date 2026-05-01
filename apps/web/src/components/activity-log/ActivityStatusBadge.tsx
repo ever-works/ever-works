@@ -1,6 +1,6 @@
 'use client';
 
-import { Loader2, CheckCircle2, XCircle, Clock } from 'lucide-react';
+import { Loader2, CheckCircle2, XCircle, Clock, OctagonMinus } from 'lucide-react';
 import { ShinyText } from '@/components/ui/ShinyText';
 
 const STATUS_CONFIG: Record<string, { icon: typeof Clock; color: string; bg: string }> = {
@@ -23,6 +23,11 @@ const STATUS_CONFIG: Record<string, { icon: typeof Clock; color: string; bg: str
         icon: XCircle,
         color: 'text-red-600 dark:text-red-400',
         bg: 'bg-red-50 dark:bg-red-900/20',
+    },
+    cancelled: {
+        icon: OctagonMinus,
+        color: 'text-amber-700 dark:text-amber-300',
+        bg: 'bg-amber-50 dark:bg-amber-900/20',
     },
 };
 

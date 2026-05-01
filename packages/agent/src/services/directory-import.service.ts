@@ -17,6 +17,10 @@ import { GitFacadeService } from '@src/facades/git.facade';
 import { SourceRepoAnalyzerService } from '@src/import/source-repo-analyzer.service';
 import { ImportExecutorService } from '@src/import/import-executor.service';
 import {
+    LINKED_DIRECTORY_SYNC_UNSUPPORTED_MESSAGE,
+    supportsDirectorySourceSync,
+} from '@src/import/source-sync-support';
+import {
     WorksConfigService,
     type ParsedWorksConfig,
     type ResolvedWorksConfig,
@@ -647,12 +651,19 @@ export class DirectoryImportService {
                     owner: sourceRepo.owner,
                     repo: sourceRepo.repo,
                 });
-            } else {
-                // For LINK_EXISTING or others, we assume it's up to date via direct git operations
+            } else if (!supportsDirectorySourceSync(sourceRepo.type)) {
                 return {
-                    success: true,
+                    success: false,
                     directoryId: directory.id,
-                    itemsImported: 0,
+                    error: LINKED_DIRECTORY_SYNC_UNSUPPORTED_MESSAGE,
+                    errorCode: DirectoryImportErrorCode.UNSUPPORTED_FORMAT,
+                };
+            } else {
+                return {
+                    success: false,
+                    directoryId: directory.id,
+                    error: `Unsupported source repository type: ${sourceRepo.type}`,
+                    errorCode: DirectoryImportErrorCode.UNSUPPORTED_FORMAT,
                 };
             }
 
