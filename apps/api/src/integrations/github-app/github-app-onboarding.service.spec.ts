@@ -17,6 +17,7 @@ describe('GitHubAppOnboardingService', () => {
             getAuthenticatedGithubUser: jest.fn(),
         };
         const installationRepository = {
+            findByInstallationId: jest.fn(),
             upsertFromGithub: jest.fn(),
         };
         const userLinkRepository = {
@@ -157,6 +158,7 @@ describe('GitHubAppOnboardingService', () => {
             authAccountRepository.findProviderAccountByAccountId.mockResolvedValue(null);
             userRepository.findByEmail.mockResolvedValue(existingUser);
             userRepository.update.mockResolvedValue(updatedUser);
+            installationRepository.findByInstallationId.mockResolvedValue(null);
             installationRepository.upsertFromGithub.mockResolvedValue(installation);
 
             const result = await service.completeUserAuth({
@@ -178,6 +180,78 @@ describe('GitHubAppOnboardingService', () => {
                 expect.objectContaining({
                     userId: existingUser.id,
                     githubUserId: 'gh-user-1',
+                }),
+            );
+        });
+
+        it('preserves an existing installation owner during callback completion', async () => {
+            const {
+                service,
+                gitHubAppService,
+                installationRepository,
+                userLinkRepository,
+                authAccountRepository,
+                userRepository,
+            } = createService();
+            const state = (service as any).signState({
+                installationId: '12345',
+                issuedAt: Date.now(),
+            });
+            const user = {
+                id: 'user-2',
+                username: 'new-user',
+                email: 'new@example.com',
+                emailVerified: true,
+                registrationProvider: 'github',
+                avatar: null,
+            };
+
+            gitHubAppService.exchangeUserCode.mockResolvedValue({
+                access_token: 'token',
+                scope: 'read:user',
+            });
+            gitHubAppService.getAuthenticatedGithubUser.mockResolvedValue({
+                githubUserId: 'gh-user-2',
+                login: 'octocat-2',
+                email: 'new@example.com',
+                emailVerified: true,
+                avatarUrl: null,
+                nodeId: 'NODE_2',
+            });
+            gitHubAppService.getInstallation.mockResolvedValue({
+                id: 12345,
+                app_slug: 'ever-works',
+                account: {
+                    login: 'acme',
+                    type: 'Organization',
+                },
+                target_type: 'Organization',
+            });
+            userLinkRepository.findByGithubUserId.mockResolvedValue(null);
+            authAccountRepository.findProviderAccountByAccountId.mockResolvedValue(null);
+            userRepository.findByEmail.mockResolvedValue(null);
+            userRepository.findByUsername.mockResolvedValue(null);
+            userRepository.create.mockResolvedValue(user);
+            installationRepository.findByInstallationId.mockResolvedValue({
+                id: 'installation-row-1',
+                installationId: '12345',
+                createdByUserId: 'user-1',
+                createdByGithubUserId: 'gh-user-1',
+            });
+            installationRepository.upsertFromGithub.mockResolvedValue({
+                id: 'installation-row-1',
+                installationId: '12345',
+            });
+
+            await service.completeUserAuth({
+                code: 'code',
+                state,
+            });
+
+            expect(installationRepository.upsertFromGithub).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    createdByUserId: 'user-1',
+                    createdByGithubUserId: 'gh-user-1',
                 }),
             );
         });

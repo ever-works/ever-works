@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useTransition } from 'react';
+import { useState } from 'react';
 import { useRouter } from '@/i18n/navigation';
 import { useTranslations } from 'next-intl';
 import { toast } from 'sonner';
@@ -21,63 +21,52 @@ export function GitHubAppSettings({ installations: initialInstallations }: GitHu
     const [installations, setInstallations] = useState(initialInstallations);
     const [pendingInstallationId, setPendingInstallationId] = useState<string | null>(null);
     const [pendingRepositoryId, setPendingRepositoryId] = useState<string | null>(null);
-    const [isPending, startTransition] = useTransition();
 
-    const handleSync = (installationId: string) => {
+    const handleSync = async (installationId: string) => {
         setPendingInstallationId(installationId);
 
-        startTransition(() => {
-            void (async () => {
-                try {
-                    const result = await syncGitHubAppInstallation(installationId);
+        try {
+            const result = await syncGitHubAppInstallation(installationId);
 
-                    if (!result.success || !result.data) {
-                        toast.error(result.error || t('syncError'));
-                        return;
-                    }
+            if (!result.success || !result.data) {
+                toast.error(result.error || t('syncError'));
+                return;
+            }
 
-                    setInstallations((current) =>
-                        current.map((installation) =>
-                            installation.installationId === installationId
-                                ? result.data
-                                : installation,
-                        ),
-                    );
-                    toast.success(t('syncSuccess'));
-                } catch {
-                    toast.error(t('syncError'));
-                } finally {
-                    setPendingInstallationId(null);
-                }
-            })();
-        });
+            setInstallations((current) =>
+                current.map((installation) =>
+                    installation.installationId === installationId ? result.data : installation,
+                ),
+            );
+            toast.success(t('syncSuccess'));
+        } catch {
+            toast.error(t('syncError'));
+        } finally {
+            setPendingInstallationId(null);
+        }
     };
 
-    const handleOnboard = (installationId: string, repositoryId: string) => {
+    const handleOnboard = async (installationId: string, repositoryId: string) => {
         setPendingRepositoryId(repositoryId);
 
-        startTransition(() => {
-            void (async () => {
-                try {
-                    const result = await onboardGitHubAppRepository(installationId, repositoryId);
+        try {
+            const result = await onboardGitHubAppRepository(installationId, repositoryId);
 
-                    if (!result.success || !result.data) {
-                        toast.error(result.error || t('onboardError'));
-                        return;
-                    }
+            if (!result.success || !result.data) {
+                toast.error(result.error || t('onboardError'));
+                return;
+            }
 
-                    toast.success(result.data.message || t('onboardSuccess'));
+            toast.success(result.data.message || t('onboardSuccess'));
 
-                    if (result.data.directoryId) {
-                        router.push(ROUTES.DASHBOARD_DIRECTORY(result.data.directoryId));
-                    }
-                } catch {
-                    toast.error(t('onboardError'));
-                } finally {
-                    setPendingRepositoryId(null);
-                }
-            })();
-        });
+            if (result.data.directoryId) {
+                router.push(ROUTES.DASHBOARD_DIRECTORY(result.data.directoryId));
+            }
+        } catch {
+            toast.error(t('onboardError'));
+        } finally {
+            setPendingRepositoryId(null);
+        }
     };
 
     if (installations.length === 0) {
@@ -108,8 +97,7 @@ export function GitHubAppSettings({ installations: initialInstallations }: GitHu
             </div>
 
             {installations.map((installation) => {
-                const isSyncing =
-                    isPending && pendingInstallationId === installation.installationId;
+                const isSyncing = pendingInstallationId === installation.installationId;
                 const repositoryCount = installation.repositories.length;
 
                 return (
@@ -231,10 +219,7 @@ export function GitHubAppSettings({ installations: initialInstallations }: GitHu
                                                         type="button"
                                                         variant="secondary"
                                                         size="sm"
-                                                        loading={
-                                                            isPending &&
-                                                            pendingRepositoryId === repository.id
-                                                        }
+                                                        loading={pendingRepositoryId === repository.id}
                                                         onClick={() =>
                                                             handleOnboard(
                                                                 installation.installationId,

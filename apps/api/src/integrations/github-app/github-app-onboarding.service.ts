@@ -85,14 +85,18 @@ export class GitHubAppOnboardingService {
         const installationDetails = await this.gitHubAppService.getInstallation(
             state.installationId,
         );
+        const existingInstallation = await this.gitHubAppInstallationRepository.findByInstallationId(
+            String(installationDetails.id),
+        );
         const installation = await this.gitHubAppInstallationRepository.upsertFromGithub({
             installationId: String(installationDetails.id),
             appSlug: installationDetails.app_slug || config.githubApp.slug(),
             accountLogin: installationDetails.account?.login || '',
             accountType: installationDetails.account?.type || 'User',
             targetType: installationDetails.target_type || 'User',
-            createdByUserId: user.id,
-            createdByGithubUserId: githubUser.githubUserId,
+            createdByUserId: existingInstallation?.createdByUserId ?? user.id,
+            createdByGithubUserId:
+                existingInstallation?.createdByGithubUserId ?? githubUser.githubUserId,
             deletedAt: null,
             suspendedAt: installationDetails.suspended_at
                 ? new Date(installationDetails.suspended_at)
