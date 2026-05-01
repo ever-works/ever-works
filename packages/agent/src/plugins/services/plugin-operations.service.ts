@@ -1047,15 +1047,18 @@ export class PluginOperationsService {
         const directoryPlugins = await this.directoryPluginRepository.find({
             where: { directoryId },
         });
-        for (const otherPlugin of directoryPlugins) {
-            if (otherPlugin.pluginId === pluginId) continue;
-            if (!hasActiveCapability(otherPlugin, capability)) continue;
+        const pluginsToUpdate = directoryPlugins.filter(
+            (otherPlugin) =>
+                otherPlugin.pluginId !== pluginId && hasActiveCapability(otherPlugin, capability),
+        );
+        await Promise.all(
+            pluginsToUpdate.map((otherPlugin) => {
+                otherPlugin.activeCapabilities = removeActiveCapability(otherPlugin, capability);
+                return this.directoryPluginRepository.save(otherPlugin);
+            }),
+        );
 
-            otherPlugin.activeCapabilities = removeActiveCapability(otherPlugin, capability);
-            await this.directoryPluginRepository.save(otherPlugin);
-        }
-
-        // Set this capability as active for this plugin
+        // Selecting a provider is an explicit opt-in to use that plugin for this directory.
         directoryPlugin.enabled = true;
         directoryPlugin.activeCapabilities = addActiveCapability(directoryPlugin, capability);
         await this.directoryPluginRepository.save(directoryPlugin);

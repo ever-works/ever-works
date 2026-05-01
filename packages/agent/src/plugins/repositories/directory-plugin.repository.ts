@@ -179,19 +179,21 @@ export class DirectoryPluginRepository {
             where: { directoryId },
         });
 
-        let affected = 0;
-        for (const directoryPlugin of directoryPlugins) {
-            if (!hasActiveCapability(directoryPlugin, capability)) continue;
+        const affectedPlugins = directoryPlugins.filter((directoryPlugin) =>
+            hasActiveCapability(directoryPlugin, capability),
+        );
 
-            directoryPlugin.activeCapabilities = removeActiveCapability(
-                directoryPlugin,
-                capability,
-            );
-            await this.repository.save(directoryPlugin);
-            affected += 1;
-        }
+        await Promise.all(
+            affectedPlugins.map((directoryPlugin) => {
+                directoryPlugin.activeCapabilities = removeActiveCapability(
+                    directoryPlugin,
+                    capability,
+                );
+                return this.repository.save(directoryPlugin);
+            }),
+        );
 
-        return affected;
+        return affectedPlugins.length;
     }
 
     /**

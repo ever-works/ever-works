@@ -505,7 +505,8 @@ export class AccountImportService {
                     pluginId: dp.pluginId,
                     pluginEntityId: pluginEntity.id,
                     enabled: dp.enabled,
-                    activeCapabilities: dp.activeCapabilities ?? [],
+                    activeCapabilities:
+                        dp.activeCapabilities ?? (dp.activeCapability ? [dp.activeCapability] : []),
                     settings: dp.settings || {},
                     secretSettings,
                     priority: dp.priority,

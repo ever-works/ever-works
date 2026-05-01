@@ -1832,6 +1832,42 @@ describe('PluginOperationsService', () => {
             expect(directoryPluginRepository.save).toHaveBeenCalled();
         });
 
+        it('should enable an existing directory plugin when selected as capability provider', async () => {
+            const registered = createRegisteredPlugin();
+            jest.spyOn(pluginRegistryService, 'get').mockReturnValue(registered);
+            jest.spyOn(userPluginRepository, 'findOne').mockResolvedValue({
+                id: '1',
+                userId: 'user-1',
+                pluginId: 'test-plugin',
+                enabled: true,
+                settings: {},
+                secretSettings: {},
+                metadata: {},
+            } as any);
+
+            const directoryPlugin = {
+                id: '1',
+                directoryId: 'dir-1',
+                pluginId: 'test-plugin',
+                enabled: false,
+                activeCapabilities: [],
+                settings: {},
+                secretSettings: {},
+                metadata: {},
+            } as any;
+            jest.spyOn(directoryPluginRepository, 'findOne').mockResolvedValue(directoryPlugin);
+            jest.spyOn(directoryPluginRepository, 'find').mockResolvedValue([directoryPlugin]);
+
+            await service.setActiveCapability('dir-1', 'test-plugin', 'user-1', 'test');
+
+            expect(directoryPluginRepository.save).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    enabled: true,
+                    activeCapabilities: ['test'],
+                }),
+            );
+        });
+
         it('should keep one plugin active for multiple capabilities independently', async () => {
             const tavilyPlugin = {
                 ...createMockPlugin(),
