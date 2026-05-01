@@ -1820,8 +1820,7 @@
                         "model": "Modelo",
                         "schedule": "Programación",
                         "providers": "Proveedores",
-                        "websiteRepo": "Repositorio del sitio web",
-                        "additionalAgents": "Agentes adicionales"
+                        "websiteRepo": "Repositorio del sitio web"
                     },
                     "sourceTypes": {
                         "dataRepo": "Repositorio de datos",
@@ -2496,6 +2495,7 @@
                     "nameRequired": "El nombre del directorio es requerido",
                     "noAnalysis": "Por favor, analiza un repositorio primero",
                     "githubRequired": "Por favor, conecta tu cuenta de GitHub primero",
+                    "providerRequired": "Por favor, selecciona un proveedor de Git primero",
                     "importFailed": "Error al importar directorio",
                     "linkFailed": "Error al vincular directorio",
                     "providerNotConfigured": "{provider} no está configurado. Visita Configuración → Plugins para configurarlo antes de importar."

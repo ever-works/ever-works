@@ -10,6 +10,7 @@ import {
     type ActivityLogQueryOptions,
 } from '../entities/activity-log.types';
 import type { ActivityLog } from '../entities/activity-log.entity';
+import type { Directory } from '../entities/directory.entity';
 import { GenerateStatusType } from '@src/entities/types';
 import {
     ACTIVITY_LOG_ANALYTICS_DISPATCHER,
@@ -41,6 +42,45 @@ export class ActivityLogService {
         activity: Pick<ActivityLog, 'actionType' | 'status' | 'summary' | 'details'>,
     ): string {
         return formatStoredActivitySummary(activity);
+    }
+
+    resolveGenerationActivityStatus(
+        directory?: Pick<Directory, 'generateStatus'> | null,
+    ): ActivityStatus {
+        if (!directory) {
+            return ActivityStatus.FAILED;
+        }
+
+        switch (directory.generateStatus?.status) {
+            case GenerateStatusType.CANCELLED:
+                return ActivityStatus.CANCELLED;
+            case GenerateStatusType.ERROR:
+                return ActivityStatus.FAILED;
+            default:
+                return ActivityStatus.COMPLETED;
+        }
+    }
+
+    formatGenerationCompletionSummary(
+        directory: Pick<Directory, 'name' | 'generateStatus'> | null | undefined,
+        counts?: {
+            newItemsCount?: number | null;
+            updatedItemsCount?: number | null;
+            totalItemsCount?: number | null;
+        },
+    ): string {
+        if (!directory) {
+            return 'Generation state is no longer available for this directory';
+        }
+
+        switch (directory.generateStatus?.status) {
+            case GenerateStatusType.CANCELLED:
+                return `Generation cancelled for ${directory.name}`;
+            case GenerateStatusType.ERROR:
+                return `Generation failed for ${directory.name}`;
+            default:
+                return this.formatGenerationSummary(counts);
+        }
     }
 
     private dispatchAnalytics(activity: ActivityLog) {
@@ -122,19 +162,11 @@ export class ActivityLogService {
                               activity.directoryId,
                           )
                         : null;
-                    const resolvedStatus =
-                        !directory ||
-                        directory.generateStatus?.status === GenerateStatusType.ERROR ||
-                        directory.generateStatus?.status === GenerateStatusType.CANCELLED
-                            ? ActivityStatus.FAILED
-                            : ActivityStatus.COMPLETED;
-                    const summary = !directory
-                        ? 'Generation state is no longer available for this directory'
-                        : directory.generateStatus?.status === GenerateStatusType.CANCELLED
-                          ? `Generation cancelled for ${directory.name}`
-                          : directory.generateStatus?.status === GenerateStatusType.ERROR
-                            ? `Generation failed for ${directory.name}`
-                            : this.formatGenerationSummary(latestHistory);
+                    const resolvedStatus = this.resolveGenerationActivityStatus(directory);
+                    const summary = this.formatGenerationCompletionSummary(
+                        directory,
+                        latestHistory,
+                    );
                     const existingDetails =
                         activity.details &&
                         typeof activity.details === 'object' &&

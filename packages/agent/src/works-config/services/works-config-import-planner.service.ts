@@ -106,7 +106,6 @@ export class WorksConfigImportPlannerService {
                 worksConfig.providers && Object.keys(worksConfig.providers).length > 0
                     ? worksConfig.providers
                     : undefined,
-            additionalAgentsCount: worksConfig.additionalAgentsCount,
         };
     }
 

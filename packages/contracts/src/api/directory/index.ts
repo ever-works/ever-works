@@ -22,3 +22,16 @@ export type {
 } from './generation-metrics.js';
 export { DirectoryHistoryActivityType } from './generation-metrics.js';
 export type { UpdateSourceValidationPayload, SourceValidationSettingsDto } from './source-validation.dto.js';
+export { IMPORT_SOURCE_TYPES } from './import-source.dto.js';
+export type {
+	ImportSourceType,
+	RepositoryRole,
+	RepositoryTarget,
+	RelatedRepositories,
+	WorksConfigSnapshot,
+	SourceRepository,
+	RepoVisibility,
+	ImportEnrichmentConfig,
+	AnalyzeRepositoryResponseDto,
+	ImportDirectoryDto
+} from './import-source.dto.js';

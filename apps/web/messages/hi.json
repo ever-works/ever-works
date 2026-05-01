@@ -1820,8 +1820,7 @@
                         "model": "मॉडल",
                         "schedule": "अनुसूची",
                         "providers": "प्रदाता",
-                        "websiteRepo": "वेबसाइट रिपॉजिटरी",
-                        "additionalAgents": "अतिरिक्त एजेंट"
+                        "websiteRepo": "वेबसाइट रिपॉजिटरी"
                     },
                     "sourceTypes": {
                         "dataRepo": "डेटा रिपॉजिटरी",
@@ -2496,6 +2495,7 @@
                     "nameRequired": "निर्देशिका का नाम आवश्यक है",
                     "noAnalysis": "कृपया पहले एक रिपॉजिटरी विश्लेषण करें",
                     "githubRequired": "कृपया पहले अपना GitHub खाता जोड़ें",
+                    "providerRequired": "कृपया पहले एक git प्रदाता चुनें",
                     "importFailed": "निर्देशिका आयात करने में विफल",
                     "linkFailed": "निर्देशिका लिंक करने में विफल",
                     "providerNotConfigured": "{provider} कॉन्फ़िगर नहीं किया गया। आयात करने से पहले सेटिंग्स → प्लगइन्स पर जाएँ।"

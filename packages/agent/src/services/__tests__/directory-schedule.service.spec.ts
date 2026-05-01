@@ -3,6 +3,7 @@ jest.mock('@src/generators/data-generator/data-generator.service', () => ({
 }));
 
 import { DirectoryScheduleService } from '../directory-schedule.service';
+import { ImportSourceTypeEnum } from '@src/dto/import-directory.dto';
 import {
     DirectoryScheduleBillingMode,
     DirectoryScheduleCadence,
@@ -98,6 +99,10 @@ describe('DirectoryScheduleService', () => {
         );
     });
 
+    afterEach(() => {
+        jest.useRealTimers();
+    });
+
     afterAll(() => {
         restoreScheduledUpdatesEnabled();
     });
@@ -137,6 +142,58 @@ describe('DirectoryScheduleService', () => {
                 blockingReason: 'Scheduled updates are currently disabled.',
             }),
         );
+    });
+
+    it('does not allow scheduled source sync for linked existing directories', async () => {
+        const linkedDirectory = {
+            ...directory,
+            sourceRepository: {
+                type: ImportSourceTypeEnum.LINK_EXISTING,
+            },
+        };
+
+        ownershipService.ensureCanView.mockResolvedValue({ directory: linkedDirectory });
+        scheduleRepository.findByDirectoryId.mockResolvedValue(null);
+
+        const result = await service.getSchedule(directory.id, user);
+
+        expect(result.schedule).toEqual(
+            expect.objectContaining({
+                status: DirectoryScheduleStatus.DISABLED,
+                featureEnabled: true,
+                canEnable: false,
+                blockingCode: 'SOURCE_SYNC_UNSUPPORTED',
+                blockingReason:
+                    'Linked directories use existing repositories directly and cannot be synced from an import source.',
+            }),
+        );
+    });
+
+    it('rejects enabling scheduled source sync for linked existing directories', async () => {
+        const linkedDirectory = {
+            ...directory,
+            sourceRepository: {
+                type: ImportSourceTypeEnum.LINK_EXISTING,
+            },
+        };
+
+        ownershipService.ensureCanEdit.mockResolvedValue({ directory: linkedDirectory });
+        scheduleRepository.findByDirectoryId.mockResolvedValue(null);
+
+        await expect(
+            service.updateSchedule(
+                directory.id,
+                {
+                    enable: true,
+                    cadence: DirectoryScheduleCadence.DAILY,
+                },
+                user,
+            ),
+        ).rejects.toMatchObject({
+            response: expect.objectContaining({
+                code: 'SOURCE_SYNC_UNSUPPORTED',
+            }),
+        });
     });
 
     it('returns config-unavailable metadata when readiness inspection fails', async () => {
@@ -195,6 +252,59 @@ describe('DirectoryScheduleService', () => {
         );
     });
 
+    it('restores provider overrides from imported works config for any source type', async () => {
+        const directoryWithWorksConfig = {
+            ...directory,
+            sourceRepository: {
+                type: 'data_repo',
+                worksConfig: {
+                    providers: {
+                        ai: 'openrouter',
+                        pipeline: 'agent-pipeline',
+                    },
+                },
+            },
+        };
+        ownershipService.ensureCanEdit.mockResolvedValue({ directory: directoryWithWorksConfig });
+        scheduleRepository.findByDirectoryId.mockResolvedValue(null);
+        scheduleRepository.upsert.mockResolvedValue({
+            id: 'schedule-1',
+            directoryId: directory.id,
+            userId: user.id,
+            cadence: DirectoryScheduleCadence.DAILY,
+            billingMode: DirectoryScheduleBillingMode.SUBSCRIPTION,
+            status: DirectoryScheduleStatus.ACTIVE,
+            nextRunAt: new Date('2026-04-08T12:47:00.000Z'),
+            maxFailureBeforePause: 3,
+            alwaysCreatePullRequest: false,
+            providerOverrides: {
+                ai: 'openrouter',
+                pipeline: 'agent-pipeline',
+            },
+        });
+
+        await service.updateSchedule(
+            directory.id,
+            {
+                enable: true,
+                cadence: DirectoryScheduleCadence.DAILY,
+                billingMode: DirectoryScheduleBillingMode.SUBSCRIPTION,
+                maxFailureBeforePause: 3,
+            },
+            user,
+        );
+
+        expect(scheduleRepository.upsert).toHaveBeenCalledWith(
+            directory.id,
+            expect.objectContaining({
+                providerOverrides: {
+                    ai: 'openrouter',
+                    pipeline: 'agent-pipeline',
+                },
+            }),
+        );
+    });
+
     it('recalculates nextRunAt when the cadence changes on an active schedule', async () => {
         const nextRunAt = new Date('2026-04-08T12:47:00.000Z');
         const existing = {
@@ -237,6 +347,117 @@ describe('DirectoryScheduleService', () => {
                 cadence: DirectoryScheduleCadence.WEEKLY,
             }),
         );
+    });
+
+    it('reschedules completed scheduled runs from scheduledFor to avoid drift', async () => {
+        const scheduledFor = new Date(Date.now() - 60 * 1000);
+        const expectedNextRunAt = new Date(scheduledFor);
+        expectedNextRunAt.setDate(expectedNextRunAt.getDate() + 1);
+        const schedule = {
+            id: 'schedule-1',
+            directoryId: directory.id,
+            userId: user.id,
+            cadence: DirectoryScheduleCadence.DAILY,
+            billingMode: DirectoryScheduleBillingMode.SUBSCRIPTION,
+            status: DirectoryScheduleStatus.ACTIVE,
+            nextRunAt: null,
+            scheduledFor,
+            failureCount: 2,
+        };
+
+        scheduleRepository.findById.mockResolvedValue(schedule);
+
+        await service.markRunCompleted({
+            scheduleId: schedule.id,
+            historyId: 'history-1',
+            status: GenerateStatusType.GENERATED,
+        });
+
+        expect(scheduleRepository.updateById).toHaveBeenCalledWith(
+            schedule.id,
+            expect.objectContaining({
+                lastRunStatus: GenerateStatusType.GENERATED,
+                nextRunAt: expectedNextRunAt,
+                failureCount: 0,
+                scheduledFor: null,
+            }),
+        );
+        expect(directoryRepository.update).toHaveBeenCalledWith(
+            directory.id,
+            expect.objectContaining({
+                scheduledUpdatesEnabled: true,
+                scheduledNextRunAt: expectedNextRunAt,
+                scheduledStatus: DirectoryScheduleStatus.ACTIVE,
+            }),
+        );
+    });
+
+    it('schedules failed scheduled runs for retry from scheduledFor', async () => {
+        const scheduledFor = new Date(Date.now() - 60 * 1000);
+        const expectedRetryAt = new Date(scheduledFor.getTime() + 15 * 60 * 1000);
+        const schedule = {
+            id: 'schedule-1',
+            directoryId: directory.id,
+            userId: user.id,
+            cadence: DirectoryScheduleCadence.DAILY,
+            billingMode: DirectoryScheduleBillingMode.SUBSCRIPTION,
+            status: DirectoryScheduleStatus.ACTIVE,
+            nextRunAt: null,
+            scheduledFor,
+            failureCount: 1,
+            maxFailureBeforePause: 3,
+        };
+
+        scheduleRepository.findById.mockResolvedValue(schedule);
+
+        await service.markRunFailed(schedule.id, 'scheduled run failed');
+
+        expect(scheduleRepository.updateById).toHaveBeenCalledWith(
+            schedule.id,
+            expect.objectContaining({
+                failureCount: 2,
+                lastRunStatus: GenerateStatusType.ERROR,
+                status: DirectoryScheduleStatus.ACTIVE,
+                scheduledFor: null,
+                nextRunAt: expectedRetryAt,
+            }),
+        );
+        expect(notificationService.notifySchedulePaused).not.toHaveBeenCalled();
+    });
+
+    it('keeps skipped scheduled runs active and retries without incrementing failures', async () => {
+        const now = new Date('2026-04-11T15:55:12.034Z');
+        const scheduledFor = new Date('2026-04-11T15:54:12.034Z');
+        const expectedRetryAt = new Date(now.getTime() + 15 * 60 * 1000);
+        const schedule = {
+            id: 'schedule-1',
+            directoryId: directory.id,
+            userId: user.id,
+            cadence: DirectoryScheduleCadence.DAILY,
+            billingMode: DirectoryScheduleBillingMode.SUBSCRIPTION,
+            status: DirectoryScheduleStatus.ACTIVE,
+            nextRunAt: null,
+            scheduledFor,
+            failureCount: 2,
+        };
+
+        jest.useFakeTimers().setSystemTime(now);
+        scheduleRepository.findById.mockResolvedValue(schedule);
+
+        await service.finalizeScheduleRun(schedule.id, {
+            status: 'skipped',
+            reason: 'directory already generating',
+        });
+
+        expect(scheduleRepository.updateById).toHaveBeenCalledWith(
+            schedule.id,
+            expect.objectContaining({
+                lastRunStatus: null,
+                nextRunAt: expectedRetryAt,
+                scheduledFor: null,
+            }),
+        );
+        expect(scheduleRepository.updateById.mock.calls[0][1]).not.toHaveProperty('failureCount');
     });
 
     it('defaults provider overrides from imported works.yml config when enabling schedule', async () => {

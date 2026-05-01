@@ -21,6 +21,7 @@ import { CommunityPrSchedulerService } from './tasks/community-pr-scheduler.serv
 import { ComparisonSchedulerService } from './tasks/comparison-scheduler.service';
 import { ItemSourceValidationCronService } from './tasks/item-source-validation-scheduler.service';
 import { DirectoryCacheWarmupService } from './tasks/directory-cache-warmup.service';
+import { DirectoryScheduleDispatcherCronService } from './tasks/directory-schedule-dispatcher-cron.service';
 
 @Module({
     imports: [
@@ -41,6 +42,7 @@ import { DirectoryCacheWarmupService } from './tasks/directory-cache-warmup.serv
         ComparisonSchedulerService,
         ItemSourceValidationCronService,
         DirectoryCacheWarmupService,
+        DirectoryScheduleDispatcherCronService,
         DistributedTaskLockService,
     ],
     controllers: [DirectoriesController, MembersController],

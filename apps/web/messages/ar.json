@@ -1820,8 +1820,7 @@
                         "model": "النموذج",
                         "schedule": "الجدولة",
                         "providers": "المزودون",
-                        "websiteRepo": "مستودع الموقع",
-                        "additionalAgents": "وكلاء إضافيون"
+                        "websiteRepo": "مستودع الموقع"
                     },
                     "sourceTypes": {
                         "dataRepo": "مستودع البيانات",
@@ -2496,6 +2495,7 @@
                     "nameRequired": "اسم الدليل مطلوب",
                     "noAnalysis": "يرجى تحليل مستودع أولاً",
                     "githubRequired": "يرجى ربط حساب GitHub الخاص بك أولاً",
+                    "providerRequired": "يرجى اختيار مزود Git أولاً",
                     "importFailed": "فشل في استيراد الدليل",
                     "linkFailed": "فشل في ربط الدليل",
                     "providerNotConfigured": "{provider} غير مُهيأ. قم بزيارة الإعدادات → الإضافات للتهيئة قبل الاستيراد."

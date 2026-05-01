@@ -482,6 +482,57 @@ describe('DirectoryImportService.initiateImport', () => {
 });
 
 describe('DirectoryImportService.syncDirectory', () => {
+    it('does not treat linked existing directories as source-syncable imports', async () => {
+        const importExecutor = {
+            importFromDataRepo: jest.fn(),
+            importFromAwesomeReadme: jest.fn(),
+            importFromWorksConfig: jest.fn(),
+        };
+
+        const service = new DirectoryImportService(
+            {} as any,
+            {} as any,
+            {} as any,
+            {} as any,
+            {} as any,
+            {} as any,
+            {} as any,
+            importExecutor as any,
+            {} as any,
+            createWorksConfigRestoreServiceMock() as any,
+            {} as any,
+            {} as any,
+            {
+                emit: jest.fn(),
+            } as any,
+        );
+
+        const directory = {
+            id: 'dir-1',
+            sourceRepository: {
+                url: 'https://github.com/Ntermast/Compare-Cloud-Pricing',
+                owner: 'Ntermast',
+                repo: 'Compare-Cloud-Pricing',
+                type: ImportSourceTypeEnum.LINK_EXISTING,
+                importedAt: new Date('2026-04-24T00:00:00.000Z'),
+            },
+        } as any;
+
+        const result = await service.syncDirectory(directory, {
+            id: 'user-1',
+            username: 'Ntermast',
+        } as any);
+
+        expect(result).toMatchObject({
+            success: false,
+            directoryId: 'dir-1',
+            error: 'Linked directories use existing repositories directly and cannot be synced from an import source.',
+        });
+        expect(importExecutor.importFromDataRepo).not.toHaveBeenCalled();
+        expect(importExecutor.importFromAwesomeReadme).not.toHaveBeenCalled();
+        expect(importExecutor.importFromWorksConfig).not.toHaveBeenCalled();
+    });
+
     it('updates the in-memory directory source repository before works config sync import runs', async () => {
         const importExecutor = {
             importFromWorksConfig: jest.fn().mockResolvedValue({
