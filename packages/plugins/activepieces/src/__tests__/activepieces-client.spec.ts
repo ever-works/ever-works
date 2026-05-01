@@ -165,6 +165,27 @@ describe('ActivepiecesClient', () => {
 			expect(result.flowDuration).toBeDefined();
 		});
 
+		it('should NOT mistake a user-defined `id` field for a flow run id', async () => {
+			// Flow returns its own item id — must not be interpreted as a runId
+			queueFetch([
+				{
+					urlContains: '/webhooks/flow-1/sync',
+					response: mockJsonResponse({ id: 'item-123', items: [{ name: 'A', id: 'item-123' }] })
+				}
+			]);
+
+			const result = await createClient().executeFlow(
+				'flow-1',
+				{ metadata: { directoryId: 'd', directoryName: 'D', directorySlug: 'd', targetItems: 1 } },
+				createSettings()
+			);
+
+			expect(result.flowRunId).toBeUndefined();
+			expect(result.run).toBeUndefined();
+			// Only one fetch call — no spurious /flow-runs/{id} lookup
+			expect(fetchSpy).toHaveBeenCalledTimes(1);
+		});
+
 		it('should enrich result with run record when runId is in response', async () => {
 			queueFetch([
 				{

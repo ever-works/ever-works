@@ -327,10 +327,21 @@ function webhookPath(flowId: string, mode: WebhookMode): string {
 	return mode === 'sync' ? `/webhooks/${encoded}/sync` : `/webhooks/${encoded}`;
 }
 
+/**
+ * Extracts the Activepieces flow-run id from a sync webhook response body.
+ *
+ * Only matches unambiguous keys (`runId`, `flowRunId`). A bare `id` is *not*
+ * accepted — flows commonly emit user-defined `id` fields (e.g. tool ids, item
+ * ids) in their Return Response payload, and matching those would cause us to
+ * call `getFlowRun(<wrong-id>)` and either 404 or audit the wrong run.
+ *
+ * If neither key is present we simply skip the run-record enrichment; the
+ * sync HTTP 200 is already proof the flow's Return Response fired.
+ */
 function extractFlowRunId(response: unknown): string | undefined {
 	if (!response || typeof response !== 'object') return undefined;
 	const obj = response as Record<string, unknown>;
-	for (const key of ['runId', 'flowRunId', 'id']) {
+	for (const key of ['runId', 'flowRunId']) {
 		const value = obj[key];
 		if (typeof value === 'string' && value.length > 0) return value;
 	}

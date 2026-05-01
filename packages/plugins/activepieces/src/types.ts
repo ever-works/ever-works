@@ -112,6 +112,10 @@ export interface ActivepiecesFlow {
 /**
  * Terminal flow-run statuses returned by Activepieces.
  * Reference: https://www.activepieces.com/docs/endpoints/flow-runs/schema
+ *
+ * `PAUSED` is intentionally excluded — it's a resumable waiting state used by
+ * `Delay` and `Wait for Approval` steps. The flow resumes automatically when
+ * the delay expires or approval arrives, so polling must keep waiting.
  */
 export const TERMINAL_FLOW_RUN_STATUSES: readonly string[] = [
 	'SUCCEEDED',
@@ -120,7 +124,6 @@ export const TERMINAL_FLOW_RUN_STATUSES: readonly string[] = [
 	'INTERNAL_ERROR',
 	'QUOTA_EXCEEDED',
 	'STOPPED',
-	'PAUSED',
 	'MEMORY_LIMIT_EXCEEDED'
 ] as const;
 
