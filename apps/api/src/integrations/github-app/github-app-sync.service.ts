@@ -104,6 +104,10 @@ export class GitHubAppSyncService {
             return null;
         }
 
+        if (installation.deletedAt) {
+            return null;
+        }
+
         const repository = await this.gitHubAppInstallationRepoRepository.findById(repositoryId);
         if (!repository || repository.installationEntityId !== installation.id) {
             return null;

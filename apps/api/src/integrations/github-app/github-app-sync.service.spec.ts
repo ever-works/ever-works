@@ -104,4 +104,20 @@ describe('GitHubAppSyncService', () => {
             }),
         );
     });
+
+    it('does not onboard repositories for deleted installations', async () => {
+        const { service, gitHubAppInstallationRepository } = createService();
+        gitHubAppInstallationRepository.findByInstallationId.mockResolvedValue({
+            id: 'installation-row-1',
+            installationId: '12345',
+            createdByUserId: 'user-1',
+            deletedAt: new Date('2026-05-01T00:00:00.000Z'),
+        });
+
+        const result = await service.onboardInstallationRepository('12345', 'repo-1', {
+            id: 'user-1',
+        } as any);
+
+        expect(result).toBeNull();
+    });
 });
