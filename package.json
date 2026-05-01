@@ -23,7 +23,7 @@
 		"dev:docs": "turbo dev --filter=ever-works-docs",
 		"dev:trigger": "turbo dev:trigger --filter=@ever-works/trigger-tasks",
 		"deploy:trigger": "turbo deploy:trigger --filter=@ever-works/trigger-tasks",
-		"build": "turbo build",
+		"build": "turbo build --filter=!./apps/docs",
 		"build:apps": "turbo build --filter=./apps/* --filter=!./apps/docs",
 		"build:packages": "turbo build --filter=./packages/*",
 		"build:plugins": "turbo build --filter=./packages/plugin --filter=./packages/plugins/*",
