@@ -7,7 +7,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 **Ever Works** is an open-source directory builder platform with AI-powered content generation.
 
 - **Repository**: https://github.com/ever-works/ever-works
-- **Docs**: https://github.com/ever-works/ever-works-docs/tree/develop/website/docs
+- **Docs site**: https://docs.ever.works (built from `apps/docs/`, content in `docs/`)
+- **Specs**: `docs/specs/` (internal architecture specs + GitHub Spec Kit format under `docs/specs/features/`)
 
 ## Commands
 
@@ -69,6 +70,14 @@ apps/
   web/              # Next.js 16 App Router (React 19, Tailwind CSS 4, next-intl)
   cli/              # Public CLI (esbuild, commander)
   internal-cli/     # Internal NestJS CLI (nest-commander)
+  admin/            # Admin interface
+  mcp/              # MCP (Model Context Protocol) server
+  docs/             # Docusaurus 3 documentation site (renders ../../docs/)
+
+docs/               # Markdown docs content rendered by apps/docs
+  specs/            # Internal architecture specs + Spec Kit feature specs
+
+.specify/           # GitHub Spec Kit infrastructure (constitution, templates, scripts)
 
 packages/
   plugin/           # Plugin system contracts & utilities (ESM, tsup, MIT)
@@ -77,7 +86,7 @@ packages/
   tasks/            # Trigger.dev background jobs
   monitoring/       # Sentry + PostHog integration
   cli-shared/       # Shared CLI utilities
-  plugins/          # 21 plugin implementations (each ESM, tsup, Vitest)
+  plugins/          # 39 plugin implementations (each ESM, tsup, Vitest)
 ```
 
 ### Plugin System
@@ -90,13 +99,25 @@ Plugins are standalone ESM packages in `packages/plugins/`. Each plugin:
 - Defines settings via JSON Schema with custom extensions (`x-widget`, `x-secret`, `x-envVar`)
 - Builds with tsup, tests with Vitest
 
-**Plugin categories**: ai-provider (openai, anthropic, google, groq, ollama, openrouter), search (exa, tavily, serpapi, brave), content-extraction (local-content-extractor, notion-extractor), screenshot (screenshotone, urlbox), git (github), infrastructure (vercel, apify), pipeline (agent-pipeline, standard-pipeline), ai-tools (claude-code, vercel-ai-gateway)
+**Plugin categories** (39 plugins on `develop`):
+
+- **ai-provider**: openai, anthropic, google, groq, ollama, mistral
+- **ai-gateway**: openrouter (default), vercel-ai-gateway
+- **search**: tavily (default), brave, exa, serpapi, perplexity, brightdata, firecrawl, jina, valyu, linkup
+- **content-extractor**: local-content-extractor (default), notion-extractor, pdf-extractor, scrapfly
+- **screenshot**: screenshotone, urlbox, scrapfly
+- **git-provider**: github (default + OAuth)
+- **deployment**: vercel (default)
+- **data-source**: apify
+- **pipeline**: standard-pipeline (default 15-step), agent-pipeline (Vercel AI SDK), claude-code, claude-managed-agent, codex, gemini (CLI — distinct from `google` AI provider), opencode, make, sim-ai, zapier
+- **prompt-provider**: langfuse
+- **utility**: comparison-generator
 
 The `AiFacadeService` in `packages/agent/src/facades/` consumes AI provider plugins.
 
 ### Agent Package
 
-`@ever-works/agent` is the core logic package with 18 sub-module exports (generators, database, dto, entities, git, facades, plugins, pipeline, etc.). It uses:
+`@ever-works/agent` is the core logic package with 21 sub-module exports (generators, items-generator, pipeline, database, entities, dto, git, directory-operations, import, subscriptions, notifications, events, tasks, cache, config, services, plugins, community-pr, comparison-generator, facades, utils, works-config). It uses:
 
 - NestJS + SWC for build, plus `tsc -p tsconfig.types.json` for declaration files
 - BullMQ for job queues
@@ -106,7 +127,7 @@ The `AiFacadeService` in `packages/agent/src/facades/` consumes AI provider plug
 
 ### API Structure
 
-`apps/api/src/` modules: auth (JWT + OAuth), directories (core domain), ai-conversation, mail, integrations, plugins, subscriptions, notifications, trigger, events, config. Uses `@Public()` decorator to skip auth, `@CurrentUser()` for user context.
+`apps/api/src/` modules: account, activity-log, ai-conversation, auth (JWT + OAuth GitHub/Google), config, directories (core domain — CRUD, generation, items, categories, tags, collections, import, scheduled updates, community PR, cancellation), events, integrations, mail, notifications, plugins, plugins-capabilities (AI/Search/Deploy/Screenshot/Content-Extractor facades), subscriptions, templates, trigger. Uses `@Public()` decorator to skip auth, `@CurrentUser()` for user context.
 
 ### Web Structure
 
