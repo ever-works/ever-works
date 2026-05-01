@@ -34,12 +34,18 @@ export function CancelGenerationButton({
             const result = await cancelGeneration(directoryId);
 
             if (!result.success) {
-                toast.error(result.error || labels.stopFailed);
-
-                if (result.error?.includes('is not generating')) {
+                if (result.mode === 'already_finished') {
                     onAlreadyFinished?.();
+                    return;
                 }
 
+                toast.error(result.error || labels.stopFailed);
+
+                return;
+            }
+
+            if (result.data.mode === 'already_finished') {
+                onAlreadyFinished?.();
                 return;
             }
 

@@ -152,9 +152,19 @@ export async function cancelGeneration(directoryId: string) {
         };
     } catch (error) {
         console.error('Failed to cancel generation:', error);
+
+        const apiErrorMode =
+            typeof error === 'object' &&
+            error !== null &&
+            'details' in error &&
+            typeof (error as { details?: Record<string, unknown> }).details?.mode === 'string'
+                ? ((error as { details?: Record<string, unknown> }).details?.mode as string)
+                : undefined;
+
         return {
             success: false,
             error: error instanceof Error ? error.message : t('failedToCancelGeneration'),
+            mode: apiErrorMode,
         };
     }
 }
