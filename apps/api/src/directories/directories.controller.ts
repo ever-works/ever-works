@@ -41,6 +41,7 @@ import {
     ExtractItemDetailsDto,
     ExtractItemDetailsResponseDto,
     ItemsGeneratorResponseDto,
+    CancelGenerationResponseDto,
     RemoveItemDto,
     RemoveItemResponseDto,
     SubmitItemDto,
@@ -524,7 +525,7 @@ export class DirectoriesController {
     async cancelGeneration(
         @CurrentUser() auth: AuthenticatedUser,
         @Param('id') id: string,
-    ): Promise<{ status: 'success'; message: string; mode: string }> {
+    ): Promise<CancelGenerationResponseDto> {
         const user = await this.authService.getUser(auth.userId);
         return this.directoryGenerationService.cancelGeneration(id, user);
     }

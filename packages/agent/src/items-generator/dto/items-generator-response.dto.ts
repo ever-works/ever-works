@@ -20,3 +20,11 @@ export interface ItemsGeneratorResponseDto {
     parameters?: CreateItemsGeneratorDto;
     historyId?: string;
 }
+
+export type CancelGenerationMode = 'trigger' | 'in_process' | 'stale' | 'already_finished';
+
+export interface CancelGenerationResponseDto {
+    status: 'success';
+    message: string;
+    mode: CancelGenerationMode;
+}
