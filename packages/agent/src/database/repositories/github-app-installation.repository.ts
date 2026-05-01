@@ -49,10 +49,26 @@ export class GitHubAppInstallationRepository {
     }
 
     async upsertFromGithub(data: UpsertGitHubAppInstallationData): Promise<GitHubAppInstallation> {
-        await this.repository.upsert(this.repository.create(data), ['installationId']);
-        return this.repository.findOneOrFail({
-            where: { installationId: data.installationId },
-        });
+        const existing = await this.findByInstallationId(data.installationId);
+        const definedData = this.removeUndefinedValues(data);
+
+        if (existing) {
+            await this.repository.update(existing.id, definedData);
+            return this.repository.findOneOrFail({ where: { id: existing.id } });
+        }
+
+        try {
+            return await this.repository.save(this.repository.create(definedData));
+        } catch (error) {
+            if (!this.isUniqueConstraintError(error)) {
+                throw error;
+            }
+
+            await this.repository.update({ installationId: data.installationId }, definedData);
+            return this.repository.findOneOrFail({
+                where: { installationId: data.installationId },
+            });
+        }
     }
 
     async markSuspended(
@@ -82,5 +98,20 @@ export class GitHubAppInstallationRepository {
             suspendedAt: null,
         });
         return this.repository.findOne({ where: { id: existing.id } });
+    }
+
+    private removeUndefinedValues<T extends object>(data: T): Partial<T> {
+        return Object.fromEntries(
+            Object.entries(data).filter(([, value]) => value !== undefined),
+        ) as Partial<T>;
+    }
+
+    private isUniqueConstraintError(error: unknown): boolean {
+        if (error && typeof error === 'object' && 'code' in error) {
+            const code = (error as { code: string }).code;
+            return code === '23505' || code === 'ER_DUP_ENTRY' || code === 'SQLITE_CONSTRAINT';
+        }
+
+        return false;
     }
 }

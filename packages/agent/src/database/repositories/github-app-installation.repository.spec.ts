@@ -8,6 +8,7 @@ describe('GitHubAppInstallationRepository', () => {
         update: jest.Mock;
         upsert: jest.Mock;
         create: jest.Mock;
+        save: jest.Mock;
     };
     let installationRepository: GitHubAppInstallationRepository;
 
@@ -19,12 +20,18 @@ describe('GitHubAppInstallationRepository', () => {
             update: jest.fn(),
             upsert: jest.fn(),
             create: jest.fn((value) => value),
+            save: jest.fn(),
         };
 
         installationRepository = new GitHubAppInstallationRepository(repository as any);
     });
 
-    it('upserts by installationId and reloads the persisted installation', async () => {
+    it('updates an existing installation without overwriting omitted ownership fields', async () => {
+        repository.findOne.mockResolvedValue({
+            id: 'installation-row-1',
+            installationId: '12345',
+            createdByUserId: 'user-123',
+        });
         repository.findOneOrFail.mockResolvedValue({
             id: 'installation-row-1',
             installationId: '12345',
@@ -38,12 +45,57 @@ describe('GitHubAppInstallationRepository', () => {
             targetType: 'Organization',
         });
 
-        expect(repository.upsert).toHaveBeenCalledWith(
+        expect(repository.update).toHaveBeenCalledWith(
+            'installation-row-1',
             expect.objectContaining({
                 installationId: '12345',
                 accountLogin: 'acme',
             }),
-            ['installationId'],
+        );
+        expect(repository.update).not.toHaveBeenCalledWith(
+            'installation-row-1',
+            expect.objectContaining({
+                createdByUserId: undefined,
+            }),
+        );
+        expect(repository.findOneOrFail).toHaveBeenCalledWith({
+            where: { id: 'installation-row-1' },
+        });
+        expect(result).toEqual({
+            id: 'installation-row-1',
+            installationId: '12345',
+            accountLogin: 'acme',
+        });
+    });
+
+    it('recovers from a concurrent insert race by updating the existing installation', async () => {
+        repository.findOne.mockResolvedValueOnce(null);
+        repository.save.mockRejectedValue({ code: '23505' });
+        repository.findOneOrFail.mockResolvedValue({
+            id: 'installation-row-1',
+            installationId: '12345',
+            accountLogin: 'acme',
+        });
+
+        const result = await installationRepository.upsertFromGithub({
+            installationId: '12345',
+            accountLogin: 'acme',
+            accountType: 'Organization',
+            targetType: 'Organization',
+        });
+
+        expect(repository.save).toHaveBeenCalledWith(
+            expect.objectContaining({
+                installationId: '12345',
+                accountLogin: 'acme',
+            }),
+        );
+        expect(repository.update).toHaveBeenCalledWith(
+            { installationId: '12345' },
+            expect.objectContaining({
+                installationId: '12345',
+                accountLogin: 'acme',
+            }),
         );
         expect(repository.findOneOrFail).toHaveBeenCalledWith({
             where: { installationId: '12345' },
