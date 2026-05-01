@@ -97,12 +97,11 @@ export class GitHubAppOnboardingService {
                 : null,
             rawPayload: installationDetails as unknown as Record<string, unknown>,
         });
-        const installation =
-            await this.gitHubAppInstallationRepository.claimOwnershipIfUnassigned(
-                String(installationDetails.id),
-                user.id,
-                githubUser.githubUserId,
-            );
+        const installation = await this.gitHubAppInstallationRepository.claimOwnershipIfUnassigned(
+            String(installationDetails.id),
+            user.id,
+            githubUser.githubUserId,
+        );
 
         if (!installation) {
             throw new BadRequestException('GitHub App installation could not be persisted');
