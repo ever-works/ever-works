@@ -49,14 +49,10 @@ export class GitHubAppInstallationRepository {
     }
 
     async upsertFromGithub(data: UpsertGitHubAppInstallationData): Promise<GitHubAppInstallation> {
-        const existing = await this.findByInstallationId(data.installationId);
-
-        if (existing) {
-            await this.repository.update(existing.id, data);
-            return this.repository.findOneOrFail({ where: { id: existing.id } });
-        }
-
-        return this.repository.save(this.repository.create(data));
+        await this.repository.upsert(this.repository.create(data), ['installationId']);
+        return this.repository.findOneOrFail({
+            where: { installationId: data.installationId },
+        });
     }
 
     async markSuspended(
