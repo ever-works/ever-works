@@ -30,6 +30,7 @@ import {
     buildPluginProviderId,
 } from '../database/repositories/auth-account.repository';
 import { DirectoryRepository } from '../database/repositories/directory.repository';
+import { GitHubAppInstallationRepository } from '../database/repositories/github-app-installation.repository';
 import type { AuthAccount } from '../entities';
 import { FacadeError } from './base.facade';
 import { config } from '@src/config';
@@ -122,6 +123,7 @@ export class GitFacadeService implements IGitFacade {
         private readonly authAccountRepository: AuthAccountRepository,
         private readonly settingsService: PluginSettingsService,
         private readonly directoryRepository: DirectoryRepository,
+        private readonly gitHubAppInstallationRepository: GitHubAppInstallationRepository,
     ) {}
 
     private getRequiredOAuthScopes(providerId: string): readonly string[] {
@@ -919,6 +921,15 @@ export class GitFacadeService implements IGitFacade {
         const auth = directory?.sourceRepository?.auth;
 
         if (!auth || auth.mode !== 'github_app_installation' || !auth.installationId) {
+            return null;
+        }
+
+        const installation = await this.gitHubAppInstallationRepository.findByInstallationId(
+            auth.installationId,
+        );
+        if (!installation || installation.deletedAt || installation.suspendedAt) {
+            this.installationTokenCache.delete(auth.installationId);
+            this.installationTokenRequests.delete(auth.installationId);
             return null;
         }
 
