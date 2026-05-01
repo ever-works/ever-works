@@ -553,7 +553,8 @@
                     "pending": "Ausstehend",
                     "inProgress": "In Bearbeitung",
                     "completed": "Abgeschlossen",
-                    "failed": "Fehlgeschlagen"
+                    "failed": "Fehlgeschlagen",
+                    "cancelled": "Storniert"
                 }
             },
             "actions": {
@@ -1799,7 +1800,11 @@
                 "closeNote": "Dies kann einige Minuten dauern. Sie können diese Seite schließen und später zurückkommen.",
                 "showLogs": "Schritt-Logs anzeigen",
                 "hideLogs": "Schritt-Logs ausblenden",
-                "waitingForLogs": "Warte auf Live-Logs…"
+                "waitingForLogs": "Warte auf Live-Logs…",
+                "stop": "Generierung stoppen",
+                "stopping": "Wird gestoppt...",
+                "stopRequested": "Stornierung der Generierung angefordert",
+                "stopFailed": "Stornierung der Generierung fehlgeschlagen"
             },
             "settings": {
                 "sourceSettings": "Quell-Repository",

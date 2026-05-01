@@ -553,7 +553,8 @@
                     "pending": "ממתין",
                     "inProgress": "בתהליך",
                     "completed": "הושלם",
-                    "failed": "נכשל"
+                    "failed": "נכשל",
+                    "cancelled": "מבוטל"
                 }
             },
             "actions": {
@@ -1799,7 +1800,11 @@
                 "closeNote": "זה עשוי לקחת מספר דקות. ניתן לסגור את הדף ולחזור מאוחר יותר.",
                 "showLogs": "הצג יומני שלבים",
                 "hideLogs": "הסתר יומני שלבים",
-                "waitingForLogs": "מחכה ליומנים חיים להגיע..."
+                "waitingForLogs": "מחכה ליומנים חיים להגיע...",
+                "stop": "עצור יצירה",
+                "stopping": "עצירה...",
+                "stopRequested": "נדרש ביטול יצירה",
+                "stopFailed": "נכשל בביטול יצירה"
             },
             "settings": {
                 "sourceSettings": "מאגר מקור",

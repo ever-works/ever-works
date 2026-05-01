@@ -553,7 +553,8 @@
                     "pending": "Đang chờ",
                     "inProgress": "Đang tiến hành",
                     "completed": "Hoàn thành",
-                    "failed": "Thất bại"
+                    "failed": "Thất bại",
+                    "cancelled": "Đã hủy"
                 }
             },
             "actions": {
@@ -1799,7 +1800,11 @@
                 "closeNote": "Có thể mất vài phút. Bạn có thể đóng trang này và quay lại sau.",
                 "showLogs": "Hiển thị nhật ký bước",
                 "hideLogs": "Ẩn nhật ký bước",
-                "waitingForLogs": "Đang chờ nhật ký trực tiếp..."
+                "waitingForLogs": "Đang chờ nhật ký trực tiếp...",
+                "stop": "Dừng việc tạo",
+                "stopping": "Đang dừng...",
+                "stopRequested": "Đã yêu cầu hủy việc tạo",
+                "stopFailed": "Không thể hủy việc tạo"
             },
             "settings": {
                 "sourceSettings": "Kho lưu trữ nguồn",
