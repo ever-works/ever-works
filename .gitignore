@@ -60,3 +60,4 @@ packages/**/.cache
 
 packages/tasks/.trigger
 packages/tasks/plugins
+.vercel

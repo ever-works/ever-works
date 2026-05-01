@@ -1,0 +1,51 @@
+name: Deploy Docs to Vercel Prod
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'apps/docs/**'
+      - 'docs/**'
+      - 'packages/**'
+      - 'pnpm-lock.yaml'
+      - 'pnpm-workspace.yaml'
+      - 'turbo.json'
+      - 'package.json'
+      - 'vercel.json'
+      - '.github/workflows/deploy-vercel-docs-prod.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-vercel-docs-prod
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    environment:
+      name: vercel-docs-prod
+      url: https://docs.ever.works
+
+    env:
+      VERCEL_ORG_ID: team_FMuCKr7b9pko0XcCm0BqmPT4
+      VERCEL_PROJECT_ID: prj_VWUVn7oqhR2CStIMfGzEut9XLX4N
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20.x
+
+      - name: Install Vercel CLI
+        run: npm install -g vercel@latest
+
+      - name: Pull Vercel project settings
+        run: vercel pull --yes --environment=production --token=$VERCEL_TOKEN
+
+      - name: Deploy to Vercel Production
+        run: vercel deploy --prod --token=$VERCEL_TOKEN
