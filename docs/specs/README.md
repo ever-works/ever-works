@@ -21,11 +21,14 @@ docs/specs/
 ├── decisions/                      # Architecture Decision Records (ADRs)
 │   └── 001-pipeline-checkpointing.md
 ├── architecture/                   # Cross-feature architecture docs
-│   ├── pipeline-overview.md
-│   ├── trigger-integration.md
+│   ├── pipeline-overview.md        # High-level generation flow
+│   ├── pipeline-executor.md        # Executor / step / modifier substrate
+│   ├── trigger-integration.md      # Trigger.dev wiring
 │   ├── plugin-sdk.md               # @ever-works/plugin SDK deep-dive
 │   ├── settings-system.md          # 3-tier resolution + secret hygiene
-│   └── ai-facade.md                # AiFacadeService routing & model catalog
+│   ├── ai-facade.md                # AiFacadeService routing & model catalog
+│   ├── auth.md                     # JWT + OAuth + API keys + device flow
+│   └── activity-log.md             # Audit + changelog infrastructure
 ├── ai/                             # Cross-cutting AI / generation specs
 │   ├── implementation-plan.md
 │   └── tasks-checklist.md
