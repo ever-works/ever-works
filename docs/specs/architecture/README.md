@@ -1,10 +1,10 @@
 # Architecture Specs
 
 This directory holds **cross-feature architecture specs** — deep
-descriptions of the substrates that user-facing features in
-[`../features/`](../features/) build on top of. Each spec targets AI
-agents and engineers reading the codebase and reasoning about
-changes, not end users.
+descriptions of the substrates that user-facing features under
+`docs/specs/features/` build on top of. Each spec targets AI agents
+and engineers reading the codebase and reasoning about changes,
+not end users.
 
 If you're new to the platform, **read in this order**:
 
@@ -119,25 +119,32 @@ Every architecture spec in this directory follows the same shape:
 Specs ground every claim in **a real file path or class name** from
 the current `develop` branch — no speculation, no aspirations. When
 the code changes, the spec changes; when the spec is wrong, file an
-ADR in [`../decisions/`](../decisions/) explaining why.
+ADR under `docs/specs/decisions/` explaining why.
 
 ## When a spec needs to change
 
 1. The code changed → update the spec in the same PR.
-2. The architecture _should_ change → write an ADR in `../decisions/`,
-   land it, then update the spec to match the new reality.
+2. The architecture _should_ change → write an ADR under
+   `docs/specs/decisions/`, land it, then update the spec to match
+   the new reality.
 3. You found the spec wrong on `develop` → fix it directly; no ADR
    needed for documentation drift.
 
 ## Related
 
-- **Feature specs**: [`../features/`](../features/) — the user-facing
-  features built on top of these substrates
-- **ADRs**: [`../decisions/`](../decisions/) — historical decisions
-  that constrain current designs
-- **AI / generation cross-cutting**: [`../ai/`](../ai/) — plans and
-  task lists that touch multiple architecture substrates
-- **User-facing docs**: [`../../features/`](../../features/),
-  [`../../api/`](../../api/), [`../../plugin-system/`](../../plugin-system/)
+- **Feature specs** under `docs/specs/features/` — the user-facing
+  features built on top of these substrates. Start with
+  [`features/data-generator/spec`](../features/data-generator/spec.md),
+  [`features/markdown-generator/spec`](../features/markdown-generator/spec.md),
+  and [`features/website-generator/spec`](../features/website-generator/spec.md).
+- **ADRs** under `docs/specs/decisions/` — historical decisions that
+  constrain current designs. See
+  [`001-pipeline-checkpointing`](../decisions/001-pipeline-checkpointing.md),
+  [`002-trigger-worker-callback-channel`](../decisions/002-trigger-worker-callback-channel.md),
+  [`003-pnpm-overrides-strategy`](../decisions/003-pnpm-overrides-strategy.md).
+- **AI / generation cross-cutting** under `docs/specs/ai/` — plans and
+  task lists that touch multiple architecture substrates.
+- **Spec index**: [`../README.md`](../README.md) — the top-level
+  contents page across all spec types.
 - **Constitution**: [`.specify/memory/constitution.md`](https://github.com/ever-works/ever-works/blob/develop/.specify/memory/constitution.md)
-  at the monorepo root
+  at the monorepo root.
