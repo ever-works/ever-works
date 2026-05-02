@@ -3,6 +3,7 @@
 import { cn } from '@/lib/utils/cn';
 import { useTranslations } from 'next-intl';
 import { FolderClosed, ListTodo, Globe } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 
 interface StatsOverviewProps {
     totalDirectories?: number;
@@ -20,7 +21,7 @@ export function StatsOverview({
     const statCards: Array<{
         title: string;
         value: string | number;
-        icon: React.ComponentType<{ className?: string; strokeWidth?: number }>;
+        icon: LucideIcon;
         change: string;
         changeType: 'positive' | 'negative' | 'neutral';
         iconColor?: string;

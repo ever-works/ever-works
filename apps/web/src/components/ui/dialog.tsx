@@ -52,6 +52,8 @@ interface DialogContentProps {
 }
 
 export function DialogContent({ children, className }: DialogContentProps) {
+    const panelChildren = children as React.ComponentProps<typeof DialogPanel>['children'];
+
     return (
         <TransitionChild
             enter="ease-out duration-300"
@@ -70,7 +72,7 @@ export function DialogContent({ children, className }: DialogContentProps) {
                     className,
                 )}
             >
-                {children}
+                {panelChildren}
             </DialogPanel>
         </TransitionChild>
     );
@@ -98,6 +100,8 @@ interface DialogDescriptionProps {
 }
 
 export function DialogDescription({ children, className }: DialogDescriptionProps) {
+    const descriptionChildren = children as React.ComponentProps<typeof Description>['children'];
+
     return (
         <Description
             className={cn(
@@ -105,7 +109,7 @@ export function DialogDescription({ children, className }: DialogDescriptionProp
                 className,
             )}
         >
-            {children}
+            {descriptionChildren}
         </Description>
     );
 }

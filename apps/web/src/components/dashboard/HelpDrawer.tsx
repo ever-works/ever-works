@@ -43,11 +43,10 @@ export function HelpDrawer({ open, onClose, onboarding }: HelpDrawerProps) {
     ];
 
     return (
-        <Transition show={open} as={Fragment}>
+        <Transition show={open}>
             <Dialog onClose={onClose} className="relative z-50">
                 {/* Backdrop */}
                 <TransitionChild
-                    as={Fragment}
                     enter="ease-out duration-300"
                     enterFrom="opacity-0"
                     enterTo="opacity-100"
@@ -63,7 +62,6 @@ export function HelpDrawer({ open, onClose, onboarding }: HelpDrawerProps) {
                     <div className="absolute inset-0 overflow-hidden">
                         <div className="pointer-events-none fixed inset-y-0 right-0 flex max-w-full pl-10">
                             <TransitionChild
-                                as={Fragment}
                                 enter="transform transition ease-in-out duration-300"
                                 enterFrom="translate-x-full"
                                 enterTo="translate-x-0"

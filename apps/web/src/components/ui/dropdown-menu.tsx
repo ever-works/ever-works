@@ -4,14 +4,20 @@ import * as React from 'react';
 import { Menu, MenuButton, MenuItems, MenuItem } from '@headlessui/react';
 import { cn } from '@/lib/utils/cn';
 
+function PassThrough({ children }: { children?: React.ReactNode }) {
+    return <>{children}</>;
+}
+
 interface DropdownMenuProps {
     children: React.ReactNode;
 }
 
 export function DropdownMenu({ children }: DropdownMenuProps) {
+    const menuChildren = children as React.ComponentProps<typeof Menu>['children'];
+
     return (
         <Menu as="div" className="relative inline-block text-left w-full">
-            {children}
+            {menuChildren}
         </Menu>
     );
 }
@@ -23,13 +29,15 @@ interface DropdownMenuTriggerProps {
 }
 
 export function DropdownMenuTrigger({ children, asChild, className }: DropdownMenuTriggerProps) {
+    const triggerChildren = children as React.ComponentProps<typeof MenuButton>['children'];
+
     if (asChild && React.isValidElement(children)) {
-        return <MenuButton as={React.Fragment}>{children}</MenuButton>;
+        return <MenuButton as={PassThrough}>{triggerChildren}</MenuButton>;
     }
 
     return (
         <MenuButton className={cn('inline-flex items-center justify-center', className)}>
-            {children}
+            {triggerChildren}
         </MenuButton>
     );
 }
@@ -50,6 +58,7 @@ export function DropdownMenuContent({
     const anchorSide = side === 'bottom' ? 'bottom' : 'top';
     const anchorAlign = align === 'center' ? '' : align === 'start' ? ' start' : ' end';
     const anchorTo = `${anchorSide}${anchorAlign}` as const;
+    const menuItemsChildren = children as React.ReactNode;
 
     return (
         <MenuItems
@@ -69,7 +78,7 @@ export function DropdownMenuContent({
                 className,
             )}
         >
-            <div className="p-1">{children}</div>
+            <div className="p-1">{menuItemsChildren}</div>
         </MenuItems>
     );
 }

@@ -350,14 +350,6 @@ function WebsiteTemplateSettings({
     );
     const [confirmSwitchOpen, setConfirmSwitchOpen] = useState(false);
 
-    useEffect(() => {
-        setSelectedTemplateId(
-            directory.websiteTemplateId ||
-                websiteTemplates.find((template) => template.isDefault)?.id ||
-                '',
-        );
-    }, [directory.websiteTemplateId, websiteTemplates]);
-
     const handleAutoUpdateChange = (checked: boolean) => {
         setAutoUpdate(checked);
         startTransition(async () => {
