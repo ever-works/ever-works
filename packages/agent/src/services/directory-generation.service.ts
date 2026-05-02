@@ -352,10 +352,17 @@ export class DirectoryGenerationService {
 
         if (history?.triggerRunId) {
             if (!this.generationDispatcher) {
-                throw new BadRequestException({
-                    status: 'error',
-                    message: 'Generation cancellation is not available in this environment.',
-                });
+                await this.finalizeCancelledGeneration(
+                    directory.id,
+                    history,
+                    history.scheduleId ?? null,
+                );
+
+                return {
+                    status: 'success',
+                    message: 'Generation was marked as cancelled.',
+                    mode: 'stale',
+                };
             }
 
             const cancelled = await this.generationDispatcher.cancelDirectoryGeneration(
@@ -363,9 +370,15 @@ export class DirectoryGenerationService {
             );
 
             if (cancelled) {
+                await this.finalizeCancelledGeneration(
+                    directory.id,
+                    history,
+                    history.scheduleId ?? null,
+                );
+
                 return {
                     status: 'success',
-                    message: 'Cancellation requested. The generation will stop shortly.',
+                    message: 'Cancellation requested. The generation was marked as cancelled.',
                     mode: 'trigger',
                 };
             }
@@ -383,10 +396,18 @@ export class DirectoryGenerationService {
                 };
             }
 
-            throw new BadRequestException({
-                status: 'error',
-                message: 'Failed to cancel the active generation run. Please try again.',
-            });
+            await this.finalizeCancelledGeneration(
+                directory.id,
+                history,
+                history.scheduleId ?? null,
+            );
+
+            return {
+                status: 'success',
+                message:
+                    'Generation was marked as cancelled. The remote cancellation request could not be confirmed.',
+                mode: 'stale',
+            };
         }
 
         const controller = this.generationAbortControllers.get(directoryId);
