@@ -26,6 +26,7 @@ export interface DirectoryGenerationHistoryDto {
     activityType: DirectoryHistoryActivityType;
     changelog?: DirectoryChangelog | null;
     logs?: GenerationStepLog[] | null;
+    warnings?: string[] | null;
     triggeredBy?: 'user' | 'schedule' | 'api' | null;
 }
 

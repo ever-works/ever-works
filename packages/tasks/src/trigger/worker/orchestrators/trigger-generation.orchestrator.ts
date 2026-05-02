@@ -150,6 +150,7 @@ export class TriggerGenerationOrchestrator extends BaseOrchestrator {
                     status: GenerateStatusType.GENERATED,
                     finishedAt: endTime,
                     durationInSeconds: calculateDurationSeconds(startTime, endTime),
+                    warnings: generationWarnings ?? null,
                     ...buildStatsUpdate(generationStats),
                 }),
             ]);
@@ -174,6 +175,7 @@ export class TriggerGenerationOrchestrator extends BaseOrchestrator {
                     finishedAt: endTime,
                     durationInSeconds: calculateDurationSeconds(startTime, endTime),
                     errorMessage: failure.errorMessage,
+                    warnings: generationWarnings ?? null,
                     ...buildStatsUpdate(generationStats),
                 }),
             ]);

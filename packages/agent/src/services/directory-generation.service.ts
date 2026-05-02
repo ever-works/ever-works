@@ -1547,6 +1547,7 @@ Only include image URLs that are absolute URLs (starting with http).`;
                 finishedAt: endTime,
                 durationInSeconds,
                 ...(errorMessage ? { errorMessage } : {}),
+                warnings: warnings ?? null,
                 ...buildStatsUpdate(stats),
             });
         }
