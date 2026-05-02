@@ -317,6 +317,7 @@ export class ComparisonGenerationService {
         return {
             userId: directory.userId,
             providerId: directory.gitProvider,
+            directoryId: directory.id,
         };
     }
 

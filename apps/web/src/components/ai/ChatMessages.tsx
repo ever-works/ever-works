@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { cn } from '@/lib/utils/cn';
 import { useStickToBottom } from 'use-stick-to-bottom';
 import { useTranslations } from 'next-intl';
@@ -17,6 +17,18 @@ export function ChatMessages({ messages, isStreaming }: ChatMessagesProps) {
     const t = useTranslations('dashboard.aiChat');
     const { scrollRef, contentRef, isAtBottom, scrollToBottom } = useStickToBottom();
     const [isAtTop, setIsAtTop] = useState(true);
+    const setScrollRef = useCallback(
+        (node: HTMLDivElement | null) => {
+            scrollRef(node);
+        },
+        [scrollRef],
+    );
+    const setContentRef = useCallback(
+        (node: HTMLDivElement | null) => {
+            contentRef(node);
+        },
+        [contentRef],
+    );
 
     const lastMessage = messages[messages.length - 1];
     const isWaitingForResponse = isStreaming && lastMessage?.role === 'user';
@@ -64,8 +76,8 @@ export function ChatMessages({ messages, isStreaming }: ChatMessagesProps) {
                 )}
             />
 
-            <div ref={scrollRef} className="h-full overflow-y-auto">
-                <div ref={contentRef} className="px-4 py-3 space-y-3">
+            <div ref={setScrollRef} className="h-full overflow-y-auto">
+                <div ref={setContentRef} className="px-4 py-3 space-y-3">
                     {messages.map((message, index) => {
                         const duplicateCount = messages
                             .slice(0, index)

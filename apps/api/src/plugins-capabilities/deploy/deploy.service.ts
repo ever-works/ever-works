@@ -52,6 +52,7 @@ export class DeployService {
         const gitToken = await this.gitFacade.getAccessToken({
             userId: user.id,
             providerId: directory.gitProvider,
+            directoryId: directory.id,
         });
 
         if (!gitToken) {
@@ -325,7 +326,11 @@ export class DeployService {
                     branch: WEBSITE_TEMPLATE_CONFIG.branch,
                     committer: directory.resolveCommitter(user),
                 },
-                { userId: directoryOwner.id, providerId: directory.gitProvider },
+                {
+                    userId: directoryOwner.id,
+                    providerId: directory.gitProvider,
+                    directoryId: directory.id,
+                },
             );
 
             const triggerFile = `${repoDir}/.deployment-trigger`;
@@ -344,7 +349,11 @@ export class DeployService {
             );
             await this.gitFacade.push(
                 { dir: repoDir },
-                { userId: directoryOwner.id, providerId: directory.gitProvider },
+                {
+                    userId: directoryOwner.id,
+                    providerId: directory.gitProvider,
+                    directoryId: directory.id,
+                },
             );
 
             this.logger.log(`Created trigger commit for ${websiteOwner}/${websiteRepo}`);

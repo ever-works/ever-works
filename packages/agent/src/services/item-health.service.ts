@@ -172,7 +172,11 @@ export class ItemHealthService {
                 repo,
                 committer,
             },
-            { userId: directoryOwner.id, providerId: directory.gitProvider },
+            {
+                userId: directoryOwner.id,
+                providerId: directory.gitProvider,
+                directoryId: directory.id,
+            },
         );
 
         const data = await DataRepository.create(dest);
@@ -271,7 +275,11 @@ export class ItemHealthService {
             );
             await this.gitFacade.push(
                 { dir: dest },
-                { userId: directoryOwner.id, providerId: directory.gitProvider },
+                {
+                    userId: directoryOwner.id,
+                    providerId: directory.gitProvider,
+                    directoryId: directory.id,
+                },
             );
         }
 

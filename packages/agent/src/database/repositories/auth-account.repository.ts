@@ -153,6 +153,18 @@ export class AuthAccountRepository {
         });
     }
 
+    async findProviderAccountByAccountId(
+        providerId: string,
+        accountId: string,
+    ): Promise<AuthAccount | null> {
+        return this.authAccountRepository.findOne({
+            where: {
+                providerId,
+                accountId,
+            },
+        });
+    }
+
     async findConnectedProviderAccount(
         userId: string,
         providerId: string,

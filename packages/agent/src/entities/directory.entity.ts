@@ -24,7 +24,7 @@ import type {
     RepositoryRole,
     RepositoryTarget,
     SourceRepository as ContractSourceRepository,
-    WorksConfigSnapshot,
+    WorksConfigSnapshot as ContractWorksConfigSnapshot,
 } from '@ever-works/contracts/api';
 import type { PRUpdate } from '@src/generators/data-generator';
 import { DirectoryGenerationHistory } from './directory-generation-history.entity';
@@ -309,7 +309,25 @@ export type {
     RepoVisibility,
     RepositoryRole,
     RepositoryTarget,
-    WorksConfigSnapshot,
 };
 
-export type SourceRepository = ContractSourceRepository<Date>;
+export type WorksConfigSnapshot = ContractWorksConfigSnapshot & {
+    additionalAgentsCount?: number;
+};
+
+export type SourceRepositoryAuth =
+    | {
+          mode: 'github_app_installation';
+          providerId: 'github';
+          installationId: string;
+          installationRepositoryId?: string;
+          repoFullName?: string;
+      }
+    | {
+          mode: 'none';
+      };
+
+export type SourceRepository = ContractSourceRepository<Date> & {
+    worksConfig?: WorksConfigSnapshot;
+    auth?: SourceRepositoryAuth;
+};
