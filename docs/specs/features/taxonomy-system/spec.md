@@ -10,7 +10,7 @@
 
 ## 1. Overview
 
-Every directory has a three-dimensional taxonomy:
+Every work has a three-dimensional taxonomy:
 
 - **Categories** — primary classification, exactly **one per item**
 - **Tags** — descriptive labels, **0 or more per item**
@@ -18,7 +18,7 @@ Every directory has a three-dimensional taxonomy:
 
 Taxonomy is stored in the data repository as YAML files
 (`categories.yml`, `tags.yml`, `collections.yml`) and managed through
-`DirectoryTaxonomyService`. CRUD operations enforce role-based access
+`WorkTaxonomyService`. CRUD operations enforce role-based access
 control, auto-generate URL-friendly slug ids from names, validate name
 uniqueness case-insensitively, and persist by reading-modifying-writing
 the relevant YAML file with a single git commit.
@@ -27,8 +27,8 @@ the relevant YAML file with a single git commit.
 
 ### 2.1 Primary scenarios
 
-- **Given** I'm an editor on a directory, **when** I `POST` to
-  `/api/directories/:id/categories` with `{name: "Frontend Frameworks"}`,
+- **Given** I'm an editor on a work, **when** I `POST` to
+  `/api/works/:id/categories` with `{name: "Frontend Frameworks"}`,
   **then** the platform creates a category with id
   `frontend-frameworks` (auto-slugified) and commits the updated
   `categories.yml` to the data repo.
@@ -73,7 +73,7 @@ the relevant YAML file with a single git commit.
 - **FR-5** Slug ids MUST be immutable on update; renaming the entity
   keeps the existing id.
 - **FR-6** Name uniqueness MUST be enforced case-insensitively per
-  entity type within a directory.
+  entity type within a work.
 - **FR-7** Categories MUST support: `id`, `name`, optional
   `description`, optional `icon_url`, optional `priority`.
 - **FR-8** Tags MUST support: `id`, `name` (no description / icon /
@@ -84,7 +84,7 @@ the relevant YAML file with a single git commit.
   `categories.yml`, `tags.yml`, `collections.yml`.
 - **FR-11** Items MUST reference taxonomy entities by slug id.
 - **FR-12** Read operations MUST require viewer role; mutations MUST
-  require editor role (enforced by `DirectoryOwnershipService`).
+  require editor role (enforced by `WorkOwnershipService`).
 - **FR-13** Deletion MUST NOT auto-reassign referencing items —
   they're left dangling until the user re-categorises.
 - **FR-14** AI-generated taxonomy entries MUST flow through the same
@@ -98,7 +98,7 @@ the relevant YAML file with a single git commit.
   unchanged.
 - **Security & privacy**: role-checked on every operation.
 - **Observability**: taxonomy mutations emit `category_change`,
-  `tag_change`, `collection_change` entries in the directory
+  `tag_change`, `collection_change` entries in the work
   changelog.
 - **Compatibility**: YAML schema is backwards-compatible — older
   items missing optional fields still validate.
@@ -119,7 +119,7 @@ the relevant YAML file with a single git commit.
 - Hierarchical / nested categories.
 - Tags with metadata (description, icon, priority).
 - Multiple collections per item.
-- Cross-directory shared taxonomy.
+- Cross-work shared taxonomy.
 - Auto-reassignment on delete (deliberate choice; user owns cleanup).
 
 ## 7. Acceptance Criteria
@@ -146,7 +146,7 @@ _None on develop._
       background work.
 - [x] **V**: no DB schema (storage is in the repo).
 - [x] **VI**: covered in
-      `packages/agent/src/services/__tests__/directory-taxonomy.service.spec.ts`.
+      `packages/agent/src/services/__tests__/work-taxonomy.service.spec.ts`.
 - [x] **VII**: no secrets involved.
 - [x] **VIII**: N/A.
 - [x] **IX**: behaviour-first.
@@ -157,6 +157,6 @@ _None on develop._
 - User-facing doc: [`../../../features/taxonomy-system.md`](../../../features/taxonomy-system.md)
 - Related: [`collections/spec.md`](../collections/spec.md)
 - Implementation:
-    - `packages/agent/src/services/directory-taxonomy.service.ts`
-    - `packages/agent/src/services/directory-ownership.service.ts`
+    - `packages/agent/src/services/work-taxonomy.service.ts`
+    - `packages/agent/src/services/work-ownership.service.ts`
 - Pipeline: `packages/plugins/standard-pipeline/src/steps/categories-tags-processing.step.ts`

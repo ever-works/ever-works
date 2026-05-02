@@ -60,9 +60,9 @@ Domain code emits notifications via a **single entry point**:
 await notificationService.notify({
 	userId,
 	kind: NotificationKind.SCHEDULE_PAUSED,
-	directoryId,
+	workId,
 	payload: {
-		directoryName: directory.name,
+		workName: work.name,
 		failureCount,
 		reason
 	},
@@ -84,13 +84,13 @@ The service:
 
 | Kind                     | Description                                          |
 | ------------------------ | ---------------------------------------------------- |
-| `MEMBER_INVITED`         | You were invited to a directory                      |
+| `MEMBER_INVITED`         | You were invited to a work                      |
 | `SCHEDULE_PAUSED`        | Schedule auto-paused after consecutive failures      |
 | `GENERATION_COMPLETED`   | Generation finished (opt-in)                         |
 | `GENERATION_FAILED`      | Generation failed                                    |
 | `OAUTH_REAUTH_REQUIRED`  | Provider token revoked; reconnect to keep generating |
 | `PAYMENT_FAILED`         | Stripe payment failed; plan downgrade pending        |
-| `COMMUNITY_PR_PROCESSED` | Community PR was merged into your directory          |
+| `COMMUNITY_PR_PROCESSED` | Community PR was merged into your work          |
 | `CUSTOM_DOMAIN_VERIFIED` | Domain DNS verified; site available                  |
 
 Adding a new kind is one enum value + one template + one renderer
@@ -106,7 +106,7 @@ In-app notifications are rows in the `notifications` table:
 export class Notification {
 	@PrimaryGeneratedColumn('uuid') id: string;
 	@Column() userId: string;
-	@Column({ nullable: true }) directoryId: string | null;
+	@Column({ nullable: true }) workId: string | null;
 	@Column({ type: 'varchar' }) kind: NotificationKind;
 	@Column() title: string;
 	@Column() body: string;
@@ -220,7 +220,7 @@ schedule retrying, a webhook redelivering). The notification service
 guards against duplicate user-visible messages via:
 
 1. **Per-kind idempotency window** — within a configurable window
-   (default 5 minutes per kind), a duplicate `(userId, kind, directoryId,
+   (default 5 minutes per kind), a duplicate `(userId, kind, workId,
 payloadHash)` triple is suppressed silently.
 2. **Cache-backed lookup** — the idempotency key is stored in
    [`cache_entries`](./cache.md) under namespace `notification-idem`
@@ -246,9 +246,9 @@ The mail layer is best-effort:
   email is dropped and an activity-log entry records the
   permanent failure.
 - **No transactional dependency** — emails are _not_ part of the
-  underlying mutation's transaction. A directory invitation
+  underlying mutation's transaction. A work invitation
   succeeds even if the email fails (the user is still a member;
-  they'll see the directory in their dashboard regardless).
+  they'll see the work in their dashboard regardless).
 
 In-app notifications are stronger: they're persisted as part of the
 notification service's call, which runs in the **same transaction** as
@@ -332,7 +332,7 @@ out those toggles.
     - `packages/agent/src/notifications/`
 - Related specs:
     - [`activity-log`](./activity-log.md)
-    - [`features/directory-members/spec`](../features/directory-members/spec.md)
+    - [`features/work-members/spec`](../features/work-members/spec.md)
     - [`features/scheduled-updates/spec`](../features/scheduled-updates/spec.md)
     - [`subscriptions`](./subscriptions.md)
     - [`cache`](./cache.md) (notification idempotency keys)

@@ -10,7 +10,7 @@
 
 ## 1. Overview
 
-For any directory with at least N items per category, the platform can
+For any work with at least N items per category, the platform can
 auto-generate SEO-optimised "A vs B" comparison pages between pairs of items
 in the same category. Comparisons are produced by a dedicated plugin
 (`comparison-generator`), follow a configurable cadence, and ship with the
@@ -20,13 +20,13 @@ website on the next deploy.
 
 ### 2.1 Primary scenarios
 
-- **Given** my directory has at least 3 items in a category, **when** I
+- **Given** my work has at least 3 items in a category, **when** I
   enable comparisons, **then** the platform schedules generation of pair
   comparisons across that category and ships them to my website on the
   next deploy.
 - **Given** I want comparisons regenerated weekly, **when** I set
   `cadence_override: weekly`, **then** the comparison generator runs on a
-  weekly cadence independent of the directory's main schedule.
+  weekly cadence independent of the work's main schedule.
 - **Given** I want extended analyses, **when** I enable
   `extended_analysis: true`, **then** each comparison includes seven
   deep-dive sections (use cases, pricing, integrations, etc.) instead of
@@ -49,7 +49,7 @@ website on the next deploy.
 
 - **FR-1** The platform MUST ship a `comparison-generator` plugin with
   capability `form-schema-provider` and id `comparison-generator`.
-- **FR-2** The plugin MUST be configurable per directory with the settings
+- **FR-2** The plugin MUST be configurable per work with the settings
   `cadence_override`, `max_comparisons_mode`, `max_comparisons`,
   `min_items_for_comparison`, `ai_provider`, `ai_model`, `custom_prompt`,
   `extended_analysis`.
@@ -60,10 +60,10 @@ website on the next deploy.
 - **FR-5** When `max_comparisons_mode = unlimited`, the system MUST generate
   every possible pair within the configured `min_items_for_comparison`
   threshold.
-- **FR-6** The cadence override MUST accept `use_directory`, `daily`,
-  `weekly`, `monthly`. `use_directory` inherits from the directory's main
+- **FR-6** The cadence override MUST accept `use_work`, `daily`,
+  `weekly`, `monthly`. `use_work` inherits from the work's main
   schedule.
-- **FR-7** Generated comparisons MUST be persisted to the directory's data
+- **FR-7** Generated comparisons MUST be persisted to the work's data
   repository (so they ship with the website like any other content).
 - **FR-8** Each generated comparison MUST be reproducible: the same input
   items + settings must produce a deterministic output structure (model
@@ -71,7 +71,7 @@ website on the next deploy.
 - **FR-9** When `extended_analysis = true`, the comparison output MUST
   include the seven deep-dive sections.
 - **FR-10** When `ai_provider` is set, the comparison generator MUST
-  request that specific provider rather than the directory's default AI
+  request that specific provider rather than the work's default AI
   provider.
 
 ## 4. Non-Functional Requirements
@@ -79,7 +79,7 @@ website on the next deploy.
 - **Performance**: comparison generation runs as background work — no API
   request blocks on it.
 - **Reliability**: failure of one comparison must not abort the batch.
-- **Security**: comparison generation reuses the directory's plugin
+- **Security**: comparison generation reuses the work's plugin
   credentials; no separate auth.
 - **Observability**: each batch produces an activity-log entry with
   counts of generated / skipped / failed comparisons.
@@ -91,25 +91,25 @@ website on the next deploy.
 | Entity / concept     | Description                                                  |
 | -------------------- | ------------------------------------------------------------ |
 | Comparison page      | An A vs B page between two items in the same category        |
-| `cadence_override`   | Per-comparison schedule, independent from directory schedule |
+| `cadence_override`   | Per-comparison schedule, independent from work schedule |
 | Pair selection score | Heuristic to rank pairs when `max_comparisons_mode = custom` |
 | Extended analysis    | 7-section deep-dive variant of the standard comparison       |
 
 ## 6. Out of Scope
 
-- Cross-directory comparisons (only within a single directory's category).
+- Cross-work comparisons (only within a single work's category).
 - Three-way comparisons (only A vs B; multi-way is future work).
 - User-authored comparisons (the feature is fully AI-generated).
 
 ## 7. Acceptance Criteria
 
-- [x] Default cadence is `use_directory` and inherits the directory schedule.
+- [x] Default cadence is `use_work` and inherits the work schedule.
 - [x] Categories below `min_items_for_comparison` are skipped with logging.
 - [x] `max_comparisons_mode = custom` caps total output at `max_comparisons`.
 - [x] `max_comparisons_mode = unlimited` ignores the cap.
 - [x] `extended_analysis: true` produces the 7-section variant.
 - [x] `ai_provider`/`ai_model` overrides flow into comparison generation
-      only — the directory's regular generation still uses its own settings.
+      only — the work's regular generation still uses its own settings.
 - [x] Tests cover threshold check, cap enforcement, override routing.
 
 ## 8. Open Questions

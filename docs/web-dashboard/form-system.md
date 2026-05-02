@@ -29,12 +29,12 @@ graph TD
 
 | Form System            | Source Component               | Schema Source                                      | Used By                                               |
 | ---------------------- | ------------------------------ | -------------------------------------------------- | ----------------------------------------------------- |
-| Dynamic Plugin Fields  | `DynamicPluginFields.tsx`      | `FormFieldDefinition[]` from `IFormSchemaProvider` | Generator form (per-directory pipeline config)        |
-| Plugin Settings Fields | `PluginSettingsFormFields.tsx` | `JsonSchema` from plugin `settingsSchema`          | Plugin settings page, directory plugin settings modal |
+| Dynamic Plugin Fields  | `DynamicPluginFields.tsx`      | `FormFieldDefinition[]` from `IFormSchemaProvider` | Generator form (per-work pipeline config)        |
+| Plugin Settings Fields | `PluginSettingsFormFields.tsx` | `JsonSchema` from plugin `settingsSchema`          | Plugin settings page, work plugin settings modal |
 
 ## DynamicPluginFields
 
-**Source:** `apps/web/src/components/directories/detail/generator/DynamicPluginFields.tsx`
+**Source:** `apps/web/src/components/works/detail/generator/DynamicPluginFields.tsx`
 
 This component renders form fields defined by pipeline plugins that implement `IFormSchemaProvider` (such as the Apify plugin). Plugins declare their fields using `FormFieldDefinition` objects, and this component turns them into interactive form controls.
 
@@ -135,7 +135,7 @@ Fields are deduplicated by name (first occurrence wins) using a `useMemo` filter
 
 **Source:** `apps/web/src/components/plugins/PluginSettingsFormFields.tsx`
 
-This component renders plugin configuration forms from the plugin's `settingsSchema` (JSON Schema). It is used by both the user-level plugin settings page and the directory-level plugin settings modal.
+This component renders plugin configuration forms from the plugin's `settingsSchema` (JSON Schema). It is used by both the user-level plugin settings page and the work-level plugin settings modal.
 
 ### Props
 
@@ -250,7 +250,7 @@ getFormFields(): FormFieldDefinition[] {
             name: 'apify_filterByRelevance',
             type: 'boolean',
             label: 'Filter by Relevance',
-            description: 'Only import items relevant to the directory prompt',
+            description: 'Only import items relevant to the work prompt',
             defaultValue: true,
             group: 'apify'
         }

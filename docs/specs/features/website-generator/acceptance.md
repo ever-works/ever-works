@@ -27,7 +27,7 @@
 
 ### AC-4: Naming
 
-- [ ] Uses `{directory-slug}-web` pattern
+- [ ] Uses `{work-slug}-web` pattern
 - [ ] Handles slug length limits
 - [ ] URL-safe characters only
 

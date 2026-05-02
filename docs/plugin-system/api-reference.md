@@ -160,7 +160,7 @@ Enable a plugin for the current user. Optionally provide initial settings.
 	"secretSettings": {
 		"apiKey": "sk-..."
 	},
-	"autoEnableForDirectories": true
+	"autoEnableForWorks": true
 }
 ```
 
@@ -168,11 +168,11 @@ Enable a plugin for the current user. Optionally provide initial settings.
 | -------------------------- | ------- | ------------------------------------------- |
 | `settings`                 | object  | Non-secret settings to apply                |
 | `secretSettings`           | object  | Secret settings (API keys, tokens)          |
-| `autoEnableForDirectories` | boolean | Auto-enable this plugin for all directories |
+| `autoEnableForWorks` | boolean | Auto-enable this plugin for all works |
 
 ### Disable Plugin
 
-Disable a plugin for the current user. This cascades — the plugin will be disabled for all the user's directories.
+Disable a plugin for the current user. This cascades — the plugin will be disabled for all the user's works.
 
 **Endpoint:** `POST /api/plugins/:pluginId/disable`
 
@@ -212,15 +212,15 @@ Update user-specific settings for an enabled plugin.
 | 400    | Plugin not enabled for this user |
 | 404    | Plugin not found                 |
 
-## Directory Plugin Management
+## Work Plugin Management
 
-Directory endpoints manage plugin configuration at the directory level. All directory endpoints require the user to have edit permissions on the directory.
+Work endpoints manage plugin configuration at the work level. All work endpoints require the user to have edit permissions on the work.
 
-### List Directory Plugins
+### List Work Plugins
 
-Get all plugins with their directory-specific configuration.
+Get all plugins with their work-specific configuration.
 
-**Endpoint:** `GET /api/directories/:directoryId/plugins`
+**Endpoint:** `GET /api/works/:workId/plugins`
 
 **Response:**
 
@@ -242,11 +242,11 @@ Get all plugins with their directory-specific configuration.
 }
 ```
 
-### Enable Plugin for Directory
+### Enable Plugin for Work
 
-Enable a plugin for a specific directory. The plugin must already be enabled at the user level.
+Enable a plugin for a specific work. The plugin must already be enabled at the user level.
 
-**Endpoint:** `POST /api/directories/:directoryId/plugins/:pluginId/enable`
+**Endpoint:** `POST /api/works/:workId/plugins/:pluginId/enable`
 
 **Body:**
 
@@ -262,7 +262,7 @@ Enable a plugin for a specific directory. The plugin must already be enabled at 
 
 | Field              | Type   | Description                                                |
 | ------------------ | ------ | ---------------------------------------------------------- |
-| `settings`         | object | Directory-specific settings overrides                      |
+| `settings`         | object | Work-specific settings overrides                      |
 | `activeCapability` | string | Set this plugin as the active provider for this capability |
 | `priority`         | number | Priority when multiple plugins provide the same capability |
 
@@ -271,19 +271,19 @@ Enable a plugin for a specific directory. The plugin must already be enabled at 
 | Status | Description                      |
 | ------ | -------------------------------- |
 | 400    | Plugin not enabled at user level |
-| 404    | Plugin or directory not found    |
+| 404    | Plugin or work not found    |
 
-### Disable Plugin for Directory
+### Disable Plugin for Work
 
-Disable a plugin for a specific directory. The user-level setting is not affected.
+Disable a plugin for a specific work. The user-level setting is not affected.
 
-**Endpoint:** `POST /api/directories/:directoryId/plugins/:pluginId/disable`
+**Endpoint:** `POST /api/works/:workId/plugins/:pluginId/disable`
 
-### Update Directory Plugin Settings
+### Update Work Plugin Settings
 
-Update directory-specific settings for a plugin. These settings take highest priority in the [settings hierarchy](/plugin-system/settings#resolution-hierarchy).
+Update work-specific settings for a plugin. These settings take highest priority in the [settings hierarchy](/plugin-system/settings#resolution-hierarchy).
 
-**Endpoint:** `PATCH /api/directories/:directoryId/plugins/:pluginId/settings`
+**Endpoint:** `PATCH /api/works/:workId/plugins/:pluginId/settings`
 
 **Body:**
 
@@ -294,7 +294,7 @@ Update directory-specific settings for a plugin. These settings take highest pri
 		"temperature": 0.5
 	},
 	"secretSettings": {
-		"apiKey": "directory-specific-key"
+		"apiKey": "work-specific-key"
 	}
 }
 ```
@@ -303,13 +303,13 @@ Update directory-specific settings for a plugin. These settings take highest pri
 
 | Status | Description                           |
 | ------ | ------------------------------------- |
-| 400    | Plugin not enabled for this directory |
+| 400    | Plugin not enabled for this work |
 
 ### Set Active Capability
 
-Designate a plugin as the active provider for a specific capability in this directory. For example, set OpenAI as the active `ai-provider` for this directory.
+Designate a plugin as the active provider for a specific capability in this work. For example, set OpenAI as the active `ai-provider` for this work.
 
-**Endpoint:** `POST /api/directories/:directoryId/plugins/:pluginId/capability`
+**Endpoint:** `POST /api/works/:workId/plugins/:pluginId/capability`
 
 **Body:**
 
@@ -319,7 +319,7 @@ Designate a plugin as the active provider for a specific capability in this dire
 }
 ```
 
-Only one plugin can be active per capability per directory. Setting a new active plugin for a capability automatically deactivates the previous one.
+Only one plugin can be active per capability per work. Setting a new active plugin for a capability automatically deactivates the previous one.
 
 **Errors:**
 
@@ -338,8 +338,8 @@ Only one plugin can be active per capability per directory. Setting a new active
 | `POST`  | `/api/plugins/:pluginId/enable`                              | Enable for user                 |
 | `POST`  | `/api/plugins/:pluginId/disable`                             | Disable for user                |
 | `PATCH` | `/api/plugins/:pluginId/settings`                            | Update user settings            |
-| `GET`   | `/api/directories/:directoryId/plugins`                      | Directory plugins               |
-| `POST`  | `/api/directories/:directoryId/plugins/:pluginId/enable`     | Enable for directory            |
-| `POST`  | `/api/directories/:directoryId/plugins/:pluginId/disable`    | Disable for directory           |
-| `PATCH` | `/api/directories/:directoryId/plugins/:pluginId/settings`   | Update directory settings       |
-| `POST`  | `/api/directories/:directoryId/plugins/:pluginId/capability` | Set active capability           |
+| `GET`   | `/api/works/:workId/plugins`                      | Work plugins               |
+| `POST`  | `/api/works/:workId/plugins/:pluginId/enable`     | Enable for work            |
+| `POST`  | `/api/works/:workId/plugins/:pluginId/disable`    | Disable for work           |
+| `PATCH` | `/api/works/:workId/plugins/:pluginId/settings`   | Update work settings       |
+| `POST`  | `/api/works/:workId/plugins/:pluginId/capability` | Set active capability           |

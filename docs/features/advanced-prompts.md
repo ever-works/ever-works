@@ -7,13 +7,13 @@ sidebar_position: 8
 
 # Advanced Prompts
 
-Advanced prompts let you customize the AI's behavior for specific pipeline steps on a per-directory basis. Each prompt is appended to the system's default prompt for that step, giving you additional control without replacing the base behavior.
+Advanced prompts let you customize the AI's behavior for specific pipeline steps on a per-work basis. Each prompt is appended to the system's default prompt for that step, giving you additional control without replacing the base behavior.
 
 ## Available Prompt Fields
 
 | Field                 | Pipeline Step      | Description                                                                |
 | --------------------- | ------------------ | -------------------------------------------------------------------------- |
-| `relevanceAssessment` | Relevance check    | Custom criteria for deciding if a discovered item belongs in the directory |
+| `relevanceAssessment` | Relevance check    | Custom criteria for deciding if a discovered item belongs in the work |
 | `itemGeneration`      | Content generation | Additional instructions for generating item descriptions and content       |
 | `itemExtraction`      | Content extraction | Guidelines for extracting structured data from web pages                   |
 | `searchQuery`         | Search queries     | Custom instructions for how search queries are constructed                 |
@@ -33,10 +33,10 @@ All endpoints require JWT authentication.
 
 | Method | Endpoint                                | Description                  |
 | ------ | --------------------------------------- | ---------------------------- |
-| `GET`  | `/api/directories/:id/advanced-prompts` | Get current prompt overrides |
+| `GET`  | `/api/works/:id/advanced-prompts` | Get current prompt overrides |
 
 ```bash
-curl http://localhost:3100/api/directories/:id/advanced-prompts \
+curl http://localhost:3100/api/works/:id/advanced-prompts \
   -H "Authorization: Bearer <token>"
 ```
 
@@ -44,7 +44,7 @@ Response:
 
 ```json
 {
-	"directoryId": "uuid",
+	"workId": "uuid",
 	"relevanceAssessment": "Only include tools that are actively maintained and have >100 GitHub stars",
 	"itemGeneration": null,
 	"itemExtraction": null,
@@ -60,10 +60,10 @@ Response:
 
 | Method | Endpoint                                | Description          |
 | ------ | --------------------------------------- | -------------------- |
-| `PUT`  | `/api/directories/:id/advanced-prompts` | Set prompt overrides |
+| `PUT`  | `/api/works/:id/advanced-prompts` | Set prompt overrides |
 
 ```bash
-curl -X PUT http://localhost:3100/api/directories/:id/advanced-prompts \
+curl -X PUT http://localhost:3100/api/works/:id/advanced-prompts \
   -H "Authorization: Bearer <token>" \
   -H "Content-Type: application/json" \
   -d '{
@@ -77,7 +77,7 @@ Fields not included in the request body are not modified. Set a field to `null` 
 ## Tips
 
 - Keep prompts concise and directive — the AI performs best with clear, specific instructions.
-- Focus on what makes your directory unique (e.g., inclusion criteria, preferred sources, categorization rules).
+- Focus on what makes your work unique (e.g., inclusion criteria, preferred sources, categorization rules).
 - Test with a small generation run before enabling [Scheduled Updates](./scheduled-updates).
 - For comparison-specific prompt customization, use the `custom_prompt` setting in the [Comparison Generator](/plugin-system/built-in-plugins#comparison-generator) plugin settings instead.
 
@@ -89,11 +89,11 @@ Fields not included in the request body are not modified. Set a field to `null` 
 
 # Advanced Prompts System
 
-The advanced prompts system allows directory owners to customize the AI behavior for their specific directory by providing additional instructions that are appended to the platform's standard prompts during generation.
+The advanced prompts system allows work owners to customize the AI behavior for their specific work by providing additional instructions that are appended to the platform's standard prompts during generation.
 
 ## Overview
 
-Every AI operation in the generation pipeline uses a hardcoded base prompt optimized for the general case. The advanced prompts system lets users add supplementary instructions per directory without modifying the core prompts. These custom instructions are appended as "Additional User Instructions" to the base prompt.
+Every AI operation in the generation pipeline uses a hardcoded base prompt optimized for the general case. The advanced prompts system lets users add supplementary instructions per work without modifying the core prompts. These custom instructions are appended as "Additional User Instructions" to the base prompt.
 
 ## Architecture
 
@@ -101,10 +101,10 @@ The system is implemented across several layers:
 
 | File                                                             | Purpose                                                   |
 | ---------------------------------------------------------------- | --------------------------------------------------------- |
-| `entities/directory-advanced-prompts.entity.ts`                  | TypeORM entity with nullable text columns per prompt type |
-| `database/repositories/directory-advanced-prompts.repository.ts` | CRUD operations for the entity                            |
-| `services/directory-advanced-prompts.service.ts`                 | Business logic with access control                        |
-| `dto/directory-advanced-prompts.dto.ts`                          | Request/response DTOs                                     |
+| `entities/work-advanced-prompts.entity.ts`                  | TypeORM entity with nullable text columns per prompt type |
+| `database/repositories/work-advanced-prompts.repository.ts` | CRUD operations for the entity                            |
+| `services/work-advanced-prompts.service.ts`                 | Business logic with access control                        |
+| `dto/work-advanced-prompts.dto.ts`                          | Request/response DTOs                                     |
 | `utils/prompt.util.ts`                                           | Utility for appending custom prompts to base prompts      |
 
 ## Prompt Types
@@ -117,7 +117,7 @@ The system supports seven customizable prompt areas, each corresponding to a spe
 Column: relevanceAssessment
 ```
 
-Controls which web pages the AI considers relevant to the directory topic. Useful for narrowing or broadening the scope of discovered sources.
+Controls which web pages the AI considers relevant to the work topic. Useful for narrowing or broadening the scope of discovered sources.
 
 **Example**: "Focus only on open-source tools. Ignore paid SaaS products unless they have a free tier."
 
@@ -127,7 +127,7 @@ Controls which web pages the AI considers relevant to the directory topic. Usefu
 Column: itemGeneration
 ```
 
-Affects AI-generated items during initial directory creation or expansion. Controls what kinds of items the AI proposes.
+Affects AI-generated items during initial work creation or expansion. Controls what kinds of items the AI proposes.
 
 **Example**: "Each item should be a specific library or framework, not a general concept or methodology."
 
@@ -147,7 +147,7 @@ Controls how items are identified and what metadata is extracted from web pages 
 Column: searchQuery
 ```
 
-Affects what search queries the AI generates when looking for sources to populate the directory.
+Affects what search queries the AI generates when looking for sources to populate the work.
 
 **Example**: "Include queries for GitHub repositories and NPM packages, not just blog posts."
 
@@ -177,26 +177,26 @@ Affects how duplicate items are identified and merged. Useful when the default s
 Column: sourceValidation
 ```
 
-Controls which URLs are accepted as official sources for items. Useful for directories with strict sourcing requirements.
+Controls which URLs are accepted as official sources for items. Useful for works with strict sourcing requirements.
 
 **Example**: "Only accept GitHub repository URLs or official documentation sites. Reject blog posts and tutorials as source URLs."
 
 ## Entity Structure
 
-The `DirectoryAdvancedPrompts` entity uses a one-to-one relationship with the `Directory` entity:
+The `WorkAdvancedPrompts` entity uses a one-to-one relationship with the `Work` entity:
 
 ```typescript
-@Entity({ name: 'directory_advanced_prompts' })
-export class DirectoryAdvancedPrompts {
+@Entity({ name: 'work_advanced_prompts' })
+export class WorkAdvancedPrompts {
 	@PrimaryGeneratedColumn('uuid')
 	id: string;
 
 	@Column({ unique: true })
-	directoryId: string;
+	workId: string;
 
-	@OneToOne(() => Directory, { onDelete: 'CASCADE' })
-	@JoinColumn({ name: 'directoryId' })
-	directory: Directory;
+	@OneToOne(() => Work, { onDelete: 'CASCADE' })
+	@JoinColumn({ name: 'workId' })
+	work: Work;
 
 	@Column({ type: 'text', nullable: true })
 	relevanceAssessment?: string | null;
@@ -221,27 +221,27 @@ All prompt columns are nullable. A `null` value means the standard prompt is use
 ### Get Prompts
 
 ```typescript
-async getAdvancedPrompts(directoryId: string, userId: string): Promise<DirectoryAdvancedPromptsResponseDto>
+async getAdvancedPrompts(workId: string, userId: string): Promise<WorkAdvancedPromptsResponseDto>
 ```
 
-Returns the current prompts for a directory. Requires at least viewer access.
+Returns the current prompts for a work. Requires at least viewer access.
 
 ### Update Prompts
 
 ```typescript
 async updateAdvancedPrompts(
-    directoryId: string,
-    dto: UpdateDirectoryAdvancedPromptsDto,
+    workId: string,
+    dto: UpdateWorkAdvancedPromptsDto,
     userId: string
-): Promise<DirectoryAdvancedPromptsResponseDto>
+): Promise<WorkAdvancedPromptsResponseDto>
 ```
 
-Creates or updates prompts for a directory. Requires editor role. Uses `createOrUpdate` to upsert -- creating a new record if none exists, or updating the existing one.
+Creates or updates prompts for a work. Requires editor role. Uses `createOrUpdate` to upsert -- creating a new record if none exists, or updating the existing one.
 
 ### Get Prompts for Generation (Internal)
 
 ```typescript
-async getPromptsForGeneration(directoryId: string): Promise<DirectoryAdvancedPrompts | null>
+async getPromptsForGeneration(workId: string): Promise<WorkAdvancedPrompts | null>
 ```
 
 Internal method used by the `ItemsGeneratorService` during generation. No access control -- called within the trusted generation pipeline context.
@@ -249,26 +249,26 @@ Internal method used by the `ItemsGeneratorService` during generation. No access
 ### Delete Prompts
 
 ```typescript
-async deleteAdvancedPrompts(directoryId: string, userId: string): Promise<boolean>
+async deleteAdvancedPrompts(workId: string, userId: string): Promise<boolean>
 ```
 
-Removes all custom prompts for a directory, reverting to standard behavior. Requires editor role.
+Removes all custom prompts for a work, reverting to standard behavior. Requires editor role.
 
 ## Access Control
 
-The service uses `DirectoryOwnershipService` for access checks:
+The service uses `WorkOwnershipService` for access checks:
 
-- **`ensureAccess(directoryId, userId)`** -- minimum viewer role to read prompts.
-- **`ensureCanEdit(directoryId, userId)`** -- editor role required to modify prompts.
+- **`ensureAccess(workId, userId)`** -- minimum viewer role to read prompts.
+- **`ensureCanEdit(workId, userId)`** -- editor role required to modify prompts.
 
-This integrates with the directory membership system, so team members with appropriate roles can customize prompts.
+This integrates with the work membership system, so team members with appropriate roles can customize prompts.
 
 ## Integration with Generation Pipeline
 
 During generation, the `ItemsGeneratorService` loads custom prompts and appends them to each base prompt. The pattern uses the `prompt.util.ts` utility:
 
 ```typescript
-const customPrompts = await advancedPromptsService.getPromptsForGeneration(directoryId);
+const customPrompts = await advancedPromptsService.getPromptsForGeneration(workId);
 
 const effectivePrompt = appendCustomPrompt(BASE_RELEVANCE_PROMPT, customPrompts?.relevanceAssessment);
 ```
@@ -291,8 +291,8 @@ Additional User Instructions:
 The response DTO returns all prompt values along with metadata:
 
 ```typescript
-interface DirectoryAdvancedPromptsResponseDto {
-	directoryId: string;
+interface WorkAdvancedPromptsResponseDto {
+	workId: string;
 	relevanceAssessment: string | null;
 	itemGeneration: string | null;
 	itemExtraction: string | null;

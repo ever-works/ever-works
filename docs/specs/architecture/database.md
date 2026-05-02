@@ -37,12 +37,12 @@ packages/agent/src/database/
 │   ├── api-key.repository.ts
 │   ├── auth-account.repository.ts
 │   ├── conversation.repository.ts
-│   ├── directory-advanced-prompts.repository.ts
-│   ├── directory-custom-domain.repository.ts
-│   ├── directory-generation-history.repository.ts
-│   ├── directory-member.repository.ts
-│   ├── directory-schedule.repository.ts
-│   ├── directory.repository.ts
+│   ├── work-advanced-prompts.repository.ts
+│   ├── work-custom-domain.repository.ts
+│   ├── work-generation-history.repository.ts
+│   ├── work-member.repository.ts
+│   ├── work-schedule.repository.ts
+│   ├── work.repository.ts
 │   ├── notification.repository.ts
 │   ├── refresh-token.repository.ts
 │   ├── subscription-plan.repository.ts
@@ -89,12 +89,12 @@ every TypeORM entity:
 
 ```ts
 export const ENTITIES = [
-	Directory,
-	DirectoryMember,
-	DirectorySchedule,
-	DirectoryAdvancedPrompts,
-	DirectoryCustomDomain,
-	DirectoryGenerationHistory,
+	Work,
+	WorkMember,
+	WorkSchedule,
+	WorkAdvancedPrompts,
+	WorkCustomDomain,
+	WorkGenerationHistory,
 	User,
 	AuthAccount,
 	RefreshToken,
@@ -109,7 +109,7 @@ export const ENTITIES = [
 	OAuthToken,
 	PluginSettings,
 	UserPlugin,
-	DirectoryPlugin
+	WorkPlugin
 	// ...
 ];
 ```
@@ -131,7 +131,7 @@ Every entity has a dedicated repository class that:
 - Encapsulates **all** queries against that entity — services don't
   write SQL or query-builder calls.
 - Provides typed methods named after the domain operation
-  (`findLatestInProgressByDirectory`, `tryMarkDispatched`,
+  (`findLatestInProgressByWork`, `tryMarkDispatched`,
   `countActiveByUser`).
 - Hides driver differences (PostgreSQL upserts, SQLite shims).
 
@@ -139,25 +139,25 @@ Example shape:
 
 ```ts
 @Injectable()
-export class DirectoryScheduleRepository {
+export class WorkScheduleRepository {
 	constructor(
-		@InjectRepository(DirectorySchedule)
-		private readonly repository: Repository<DirectorySchedule>
+		@InjectRepository(WorkSchedule)
+		private readonly repository: Repository<WorkSchedule>
 	) {}
 
-	async findDue(limit: number): Promise<DirectorySchedule[]> {
+	async findDue(limit: number): Promise<WorkSchedule[]> {
 		return this.repository.find({
 			where: {
-				status: DirectoryScheduleStatus.ACTIVE,
+				status: WorkScheduleStatus.ACTIVE,
 				nextRunAt: LessThanOrEqual(new Date())
 			},
 			order: { nextRunAt: 'ASC' },
 			take: limit,
-			relations: ['directory']
+			relations: ['work']
 		});
 	}
 
-	// The CAS claim — see directory-schedule-dispatcher spec
+	// The CAS claim — see work-schedule-dispatcher spec
 	async tryMarkDispatched(scheduleId: string): Promise<Date | null> {
 		// ...
 	}
@@ -260,17 +260,17 @@ Multi-step operations use the
 `Repository.manager.transaction(...)` pattern:
 
 ```ts
-return this.directoryRepository.manager.transaction(async (entityManager) => {
-	const directory = await entityManager.save(Directory, dto);
-	await entityManager.save(DirectoryMember, { ...owner, directoryId: directory.id });
-	await entityManager.save(ActivityLog, { ...event, directoryId: directory.id });
-	return directory;
+return this.workRepository.manager.transaction(async (entityManager) => {
+	const work = await entityManager.save(Work, dto);
+	await entityManager.save(WorkMember, { ...owner, workId: work.id });
+	await entityManager.save(ActivityLog, { ...event, workId: work.id });
+	return work;
 });
 ```
 
 Critical paths that must be atomic:
 
-- **Directory creation** — DB row + initial member + activity-log entry
+- **Work creation** — DB row + initial member + activity-log entry
   in one transaction.
 - **Membership change** — membership row + activity-log entry.
 - **Schedule finalize** — generation-history update + activity-log
@@ -278,7 +278,7 @@ Critical paths that must be atomic:
 - **Plugin settings update** — settings + activity-log entry.
 
 The CAS-claim pattern in
-[`directory-schedule-dispatcher`](../../agent-services/directory-schedule-dispatcher.md)
+[`work-schedule-dispatcher`](../../agent-services/work-schedule-dispatcher.md)
 deliberately **doesn't** use a transaction — the single conditional
 UPDATE is its own atomic unit and a transaction would just add
 overhead.
@@ -291,7 +291,7 @@ TypeORM's default `timestamptz`:
 | Column                               | Why bigint                                                    |
 | ------------------------------------ | ------------------------------------------------------------- |
 | `cache_entries.expiresAt`            | Comparison hot path; integer compare faster than `now()` cast |
-| `directory_schedules.nextRunAt` (ms) | Race-free CAS comparison without `Date` conversion edge cases |
+| `work_schedules.nextRunAt` (ms) | Race-free CAS comparison without `Date` conversion edge cases |
 
 The pattern surfaced as a recurring source of bugs: comparing
 `Date` objects via `<` / `>` worked locally but failed under
@@ -311,7 +311,7 @@ Entities that need soft-delete (preserve audit trail, allow restore):
 | ----------------- | ----------------------------------------------------------- |
 | `Notification`    | `deletedAt` column; `where: { deletedAt: IsNull() }` filter |
 | `ActivityLog`     | Hard delete only via cleanup task (90/180-day window)       |
-| `DirectoryMember` | Hard delete (membership change is the audit trail)          |
+| `WorkMember` | Hard delete (membership change is the audit trail)          |
 
 Most entities **don't** soft-delete. Notifications + a couple of
 others do because users explicitly recover them from a "Trash"
@@ -324,10 +324,10 @@ on entities):
 
 | Entity                         | Indexes                                                            |
 | ------------------------------ | ------------------------------------------------------------------ |
-| `directories`                  | `(userId, slug)` unique, `(userId, status)`                        |
-| `directory_schedules`          | `(nextRunAt) WHERE nextRunAt IS NOT NULL` partial, `(directoryId)` |
-| `directory_generation_history` | `(directoryId, createdAt DESC)` for History tab pagination         |
-| `activity_log`                 | `(userId, createdAt DESC)`, `(directoryId, createdAt DESC)`        |
+| `works`                  | `(userId, slug)` unique, `(userId, status)`                        |
+| `work_schedules`          | `(nextRunAt) WHERE nextRunAt IS NOT NULL` partial, `(workId)` |
+| `work_generation_history` | `(workId, createdAt DESC)` for History tab pagination         |
+| `activity_log`                 | `(userId, createdAt DESC)`, `(workId, createdAt DESC)`        |
 | `cache_entries`                | `(expiresAt)` for sweep                                            |
 | `api_keys`                     | `(hash)` unique                                                    |
 | `notifications`                | `(userId, read, createdAt DESC)` covering for unread query         |
@@ -347,7 +347,7 @@ work in `synchronize` mode but are discovered late in production.
 | V — Forward-only migrations | `synchronize: false` in production; two-phase column drops; CI runs migrations.      |
 | VI — Tests                  | Each repository class has a `*.spec.ts` covering query semantics.                    |
 | VII — Secret hygiene        | Encrypted columns (OAuth tokens, plugin secrets) decrypt only at read time.          |
-| VIII — Plugin counts        | Counts are queries against `plugin_settings` / `user_plugins` / `directory_plugins`. |
+| VIII — Plugin counts        | Counts are queries against `plugin_settings` / `user_plugins` / `work_plugins`. |
 | IX — Behaviour-first        | This spec describes observable DB behaviour.                                         |
 | X — Backwards-compat        | Forward-only migrations + driver-agnostic queries keep schema stable.                |
 

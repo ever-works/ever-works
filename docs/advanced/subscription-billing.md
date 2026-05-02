@@ -21,7 +21,7 @@ The subscription system manages plan tiers, cadence allowances, and usage-based 
 
 Three plans are seeded on application startup via `OnModuleInit`:
 
-| Plan     | Code       | Max Directories | Allowed Cadences               | Monthly Price |
+| Plan     | Code       | Max Works | Allowed Cadences               | Monthly Price |
 | -------- | ---------- | --------------- | ------------------------------ | ------------- |
 | Free     | `free`     | 1               | All (currently)                | $0            |
 | Standard | `standard` | 5               | Monthly, Weekly, Daily         | $29           |
@@ -29,7 +29,7 @@ Three plans are seeded on application startup via `OnModuleInit`:
 
 Each plan defines:
 
-- **`maxDirectories`** -- maximum number of directories a user can create.
+- **`maxWorks`** -- maximum number of works a user can create.
 - **`allowedCadences`** -- which schedule cadences are included in the plan.
 - **`monthlyPrice`** -- base monthly subscription cost.
 - **`overagePricePerRun`** -- cost per generation run when using a cadence not included in the plan.
@@ -65,8 +65,8 @@ If subscriptions are disabled globally (`config.subscriptions.isEnabled()` retur
 The `getCadenceAllowances(user)` method returns a list of all cadences with their availability:
 
 ```typescript
-interface DirectoryScheduleAllowedCadence {
-	cadence: DirectoryScheduleCadence;
+interface WorkScheduleAllowedCadence {
+	cadence: WorkScheduleCadence;
 	allowed: boolean;
 	payPerUse: boolean;
 	reason?: string;
@@ -99,7 +99,7 @@ Each ledger entry captures:
 | Field                 | Description                                   |
 | --------------------- | --------------------------------------------- |
 | `userId`              | User who triggered the run                    |
-| `directoryId`         | Directory being generated                     |
+| `workId`         | Work being generated                     |
 | `scheduleId`          | Associated schedule (if applicable)           |
 | `triggerType`         | How the run was triggered (manual, scheduled) |
 | `billingMode`         | `USAGE` for pay-per-use runs                  |

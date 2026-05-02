@@ -15,8 +15,8 @@ The Events Module (`@ever-works/agent/events`) defines the domain event classes 
 packages/agent/src/events/
 ├── index.ts                                  # Barrel exports
 ├── base.ts                                   # BaseEvent abstract class
-├── directory-created.event.ts                # DirectoryCreatedEvent
-└── directory-generation-completed.event.ts   # DirectoryGenerationCompletedEvent
+├── work-created.event.ts                # WorkCreatedEvent
+└── work-generation-completed.event.ts   # WorkGenerationCompletedEvent
 ```
 
 ## Architecture
@@ -48,16 +48,16 @@ export abstract class BaseEvent {
 
 Every concrete event class must define a static `EVENT_NAME` string that identifies the event type. This string is used with `EventEmitter2.emit()` and the `@OnEvent()` decorator.
 
-### DirectoryCreatedEvent
+### WorkCreatedEvent
 
-Emitted when a new directory is created.
+Emitted when a new work is created.
 
 ```typescript
-export class DirectoryCreatedEvent extends BaseEvent {
-	static EVENT_NAME = 'directory.created';
+export class WorkCreatedEvent extends BaseEvent {
+	static EVENT_NAME = 'work.created';
 
 	constructor(
-		public readonly directoryId: string,
+		public readonly workId: string,
 		public readonly userId: string,
 		public readonly slug: string
 	) {
@@ -68,22 +68,22 @@ export class DirectoryCreatedEvent extends BaseEvent {
 
 | Property      | Type     | Description                         |
 | ------------- | -------- | ----------------------------------- |
-| `directoryId` | `string` | UUID of the newly created directory |
+| `workId` | `string` | UUID of the newly created work |
 | `userId`      | `string` | UUID of the user who created it     |
-| `slug`        | `string` | URL slug of the directory           |
+| `slug`        | `string` | URL slug of the work           |
 
 **Typical subscribers**: Notification services, analytics, default setup workflows.
 
-### DirectoryGenerationCompletedEvent
+### WorkGenerationCompletedEvent
 
-Emitted when a directory generation run finishes (successfully or with an error).
+Emitted when a work generation run finishes (successfully or with an error).
 
 ```typescript
-export class DirectoryGenerationCompletedEvent extends BaseEvent {
-	static EVENT_NAME = 'directory.generation.completed';
+export class WorkGenerationCompletedEvent extends BaseEvent {
+	static EVENT_NAME = 'work.generation.completed';
 
 	constructor(
-		public readonly directoryId: string,
+		public readonly workId: string,
 		public readonly userId: string,
 		public readonly success: boolean,
 		public readonly error?: string
@@ -95,7 +95,7 @@ export class DirectoryGenerationCompletedEvent extends BaseEvent {
 
 | Property      | Type                | Description                                 |
 | ------------- | ------------------- | ------------------------------------------- |
-| `directoryId` | `string`            | UUID of the directory                       |
+| `workId` | `string`            | UUID of the work                       |
 | `userId`      | `string`            | UUID of the user who triggered generation   |
 | `success`     | `boolean`           | Whether generation completed without errors |
 | `error`       | `string` (optional) | Error message if `success` is `false`       |
@@ -108,21 +108,21 @@ export class DirectoryGenerationCompletedEvent extends BaseEvent {
 
 ```typescript
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import { DirectoryCreatedEvent } from '@ever-works/agent/events';
+import { WorkCreatedEvent } from '@ever-works/agent/events';
 
 @Injectable()
-export class DirectoryService {
+export class WorkService {
 	constructor(private readonly eventEmitter: EventEmitter2) {}
 
-	async createDirectory(dto: CreateDirectoryDto, userId: string) {
-		const directory = await this.save(dto);
+	async createWork(dto: CreateWorkDto, userId: string) {
+		const work = await this.save(dto);
 
 		this.eventEmitter.emit(
-			DirectoryCreatedEvent.EVENT_NAME,
-			new DirectoryCreatedEvent(directory.id, userId, directory.slug)
+			WorkCreatedEvent.EVENT_NAME,
+			new WorkCreatedEvent(work.id, userId, work.slug)
 		);
 
-		return directory;
+		return work;
 	}
 }
 ```
@@ -131,12 +131,12 @@ export class DirectoryService {
 
 ```typescript
 import { OnEvent } from '@nestjs/event-emitter';
-import { DirectoryGenerationCompletedEvent } from '@ever-works/agent/events';
+import { WorkGenerationCompletedEvent } from '@ever-works/agent/events';
 
 @Injectable()
 export class NotificationHandler {
-	@OnEvent(DirectoryGenerationCompletedEvent.EVENT_NAME)
-	async handleGenerationCompleted(event: DirectoryGenerationCompletedEvent) {
+	@OnEvent(WorkGenerationCompletedEvent.EVENT_NAME)
+	async handleGenerationCompleted(event: WorkGenerationCompletedEvent) {
 		if (!event.success) {
 			await this.notifyUser(event.userId, `Generation failed: ${event.error}`);
 		}
@@ -146,7 +146,7 @@ export class NotificationHandler {
 
 ## Design Conventions
 
-1. **Static EVENT_NAME**: Each event class has a static string property following the pattern `domain.action` (e.g., `directory.created`). This enables type-safe event registration.
+1. **Static EVENT_NAME**: Each event class has a static string property following the pattern `domain.action` (e.g., `work.created`). This enables type-safe event registration.
 
 2. **Immutable payloads**: All event properties are `readonly` to prevent handlers from mutating shared state.
 

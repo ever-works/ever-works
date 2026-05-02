@@ -18,12 +18,12 @@ packages/agent/src/entities/
 ├── types.ts                              # Shared enums, types, and re-exports
 ├── notification.types.ts                 # Notification-specific enums and DTOs
 ├── user.entity.ts                        # User entity
-├── directory.entity.ts                   # Directory entity (core domain)
-├── directory-member.entity.ts            # Directory member with role-based access
-├── directory-advanced-prompts.entity.ts  # Custom AI prompt overrides
-├── directory-custom-domain.entity.ts     # Custom domain mapping
-├── directory-generation-history.entity.ts # Generation run tracking
-├── directory-schedule.entity.ts          # Scheduled update configuration
+├── work.entity.ts                   # Work entity (core domain)
+├── work-member.entity.ts            # Work member with role-based access
+├── work-advanced-prompts.entity.ts  # Custom AI prompt overrides
+├── work-custom-domain.entity.ts     # Custom domain mapping
+├── work-generation-history.entity.ts # Generation run tracking
+├── work-schedule.entity.ts          # Scheduled update configuration
 ├── api-key.entity.ts                     # API key management
 ├── refresh-token.entity.ts              # JWT refresh token rotation
 ├── oauth-token.entity.ts                # OAuth provider tokens
@@ -38,23 +38,23 @@ packages/agent/src/entities/
 
 ```mermaid
 erDiagram
-    User ||--o{ Directory : creates
-    User ||--o{ DirectoryMember : "is member of"
+    User ||--o{ Work : creates
+    User ||--o{ WorkMember : "is member of"
     User ||--o{ UserSubscription : subscribes
     User ||--o{ ApiKey : owns
     User ||--o{ RefreshToken : authenticates
     User ||--o{ OAuthToken : "connects providers"
     User ||--o{ Notification : receives
 
-    Directory ||--o{ DirectoryMember : "has members"
-    Directory ||--o| DirectorySchedule : "has schedule"
-    Directory ||--o{ DirectoryGenerationHistory : "tracks generations"
-    Directory ||--o{ DirectoryCustomDomain : "has domains"
-    Directory ||--o| DirectoryAdvancedPrompts : "custom prompts"
+    Work ||--o{ WorkMember : "has members"
+    Work ||--o| WorkSchedule : "has schedule"
+    Work ||--o{ WorkGenerationHistory : "tracks generations"
+    Work ||--o{ WorkCustomDomain : "has domains"
+    Work ||--o| WorkAdvancedPrompts : "custom prompts"
 
     SubscriptionPlan ||--o{ UserSubscription : "defines plans"
     UserSubscription ||--o{ UsageLedgerEntry : "tracks usage"
-    DirectorySchedule ||--o{ UsageLedgerEntry : "triggers usage"
+    WorkSchedule ||--o{ UsageLedgerEntry : "triggers usage"
 ```
 
 ## Core Entities
@@ -78,13 +78,13 @@ The `User` entity (`users` table) represents an authenticated platform user.
 | `createdAt`              | `timestamp`            | Account creation date                       |
 | `updatedAt`              | `timestamp`            | Last update date                            |
 
-**Relations**: `directories` (OneToMany), `generationHistory` (OneToMany), `subscriptions` (OneToMany), `schedules` (OneToMany), `memberships` (OneToMany).
+**Relations**: `works` (OneToMany), `generationHistory` (OneToMany), `subscriptions` (OneToMany), `schedules` (OneToMany), `memberships` (OneToMany).
 
 **Helper method**: `asCommitter()` returns a `{ name, email }` object for git commit authoring.
 
-### Directory
+### Work
 
-The `Directory` entity (`directories` table) is the central domain object representing a generated directory/listing site.
+The `Work` entity (`works` table) is the central domain object representing a generated work/listing site.
 
 **Core fields**:
 
@@ -95,7 +95,7 @@ The `Directory` entity (`directories` table) is the central domain object repres
 | `slug`           | `varchar`            | URL-safe identifier, used for repo names |
 | `userId`         | `uuid` (FK)          | Creator's user ID                        |
 | `owner`          | `varchar` (nullable) | GitHub org/user override for repos       |
-| `description`    | `varchar`            | Directory description                    |
+| `description`    | `varchar`            | Work description                    |
 | `gitProvider`    | `varchar`            | Git provider (`github`)                  |
 | `deployProvider` | `varchar` (nullable) | Deploy provider (`vercel`)               |
 | `website`        | `varchar` (nullable) | Published website URL                    |
@@ -122,19 +122,19 @@ The `Directory` entity (`directories` table) is the central domain object repres
 | `getWebsiteRepo()`    | `string`                       | Returns `{slug}-website`                |
 | `getMainRepo()`       | `string`                       | Returns `slug`                          |
 | `getRepoOwner()`      | `string`                       | Returns `owner` or `user.username`      |
-| `isCreator(userId)`   | `boolean`                      | Checks if user is the directory creator |
-| `getMember(userId)`   | `DirectoryMember \| undefined` | Finds member entry                      |
+| `isCreator(userId)`   | `boolean`                      | Checks if user is the work creator |
+| `getMember(userId)`   | `WorkMember \| undefined` | Finds member entry                      |
 | `hasAccess(userId)`   | `boolean`                      | Creator or member check                 |
-| `getUserRole(userId)` | `DirectoryMemberRole \| null`  | Returns role (owner for creator)        |
+| `getUserRole(userId)` | `WorkMemberRole \| null`  | Returns role (owner for creator)        |
 
-### DirectoryMember
+### WorkMember
 
-Represents a user's membership in a directory with role-based access control.
+Represents a user's membership in a work with role-based access control.
 
 | Column            | Type              | Description                      |
 | ----------------- | ----------------- | -------------------------------- |
 | `id`              | `uuid` (PK)       | Auto-generated UUID              |
-| `directoryId`     | `uuid` (FK)       | Directory reference              |
+| `workId`     | `uuid` (FK)       | Work reference              |
 | `userId`          | `uuid` (FK)       | User reference                   |
 | `role`            | `enum`            | `manager`, `editor`, or `viewer` |
 | `invitedByUserId` | `uuid` (nullable) | Who sent the invite              |
@@ -148,13 +148,13 @@ Represents a user's membership in a directory with role-based access control.
 - `canManageMembers()` -- Returns `true` for manager and above
 - `canEdit()` -- Returns `true` for editor and above
 
-### DirectorySchedule
+### WorkSchedule
 
-Configures recurring directory updates with scheduling, billing, and failure tracking.
+Configures recurring work updates with scheduling, billing, and failure tracking.
 
 | Column                | Type                   | Description                              |
 | --------------------- | ---------------------- | ---------------------------------------- |
-| `directoryId`         | `uuid` (PK, FK)        | One-to-one with Directory                |
+| `workId`         | `uuid` (PK, FK)        | One-to-one with Work                |
 | `cadence`             | `enum`                 | `daily`, `weekly`, `biweekly`, `monthly` |
 | `billingMode`         | `enum`                 | `included` or `usage`                    |
 | `status`              | `enum`                 | `active`, `paused`, `failed`             |
@@ -164,14 +164,14 @@ Configures recurring directory updates with scheduling, billing, and failure tra
 | `lastFailureReason`   | `varchar` (nullable)   | Last error description                   |
 | `providerOverrides`   | `json` (nullable)      | Per-schedule plugin provider overrides   |
 
-### DirectoryGenerationHistory
+### WorkGenerationHistory
 
 Tracks each generation run with metrics and status.
 
 | Column         | Type                   | Description                                         |
 | -------------- | ---------------------- | --------------------------------------------------- |
 | `id`           | `uuid` (PK)            | Auto-generated UUID                                 |
-| `directoryId`  | `uuid` (FK)            | Directory reference                                 |
+| `workId`  | `uuid` (FK)            | Work reference                                 |
 | `userId`       | `uuid` (FK)            | User who triggered it                               |
 | `method`       | `varchar`              | Generation method used                              |
 | `status`       | `varchar`              | `completed`, `failed`, `cancelled`                  |
@@ -202,11 +202,11 @@ interface GenerationMetrics {
 | Export                         | Kind             | Values / Description                                                |
 | ------------------------------ | ---------------- | ------------------------------------------------------------------- |
 | `GenerateStatusType`           | enum (re-export) | From `@ever-works/contracts/api`                                    |
-| `DirectoryScheduleCadence`     | enum (re-export) | `daily`, `weekly`, `biweekly`, `monthly`                            |
-| `DirectoryScheduleStatus`      | enum (re-export) | `active`, `paused`, `failed`                                        |
-| `DirectoryScheduleBillingMode` | enum (re-export) | `included`, `usage`                                                 |
+| `WorkScheduleCadence`     | enum (re-export) | `daily`, `weekly`, `biweekly`, `monthly`                            |
+| `WorkScheduleStatus`      | enum (re-export) | `active`, `paused`, `failed`                                        |
+| `WorkScheduleBillingMode` | enum (re-export) | `included`, `usage`                                                 |
 | `SubscriptionPlanCode`         | enum             | `free`, `standard`, `premium`                                       |
-| `DirectoryMemberRole`          | enum             | `owner`, `manager`, `editor`, `viewer`                              |
+| `WorkMemberRole`          | enum             | `owner`, `manager`, `editor`, `viewer`                              |
 | `DomainEnvironment`            | enum             | `production`, `staging`, `development`                              |
 | `GenerateStatus`               | type             | Status object with step, progress, errors, warnings                 |
 | `CommunityPrState`             | interface        | PR processing state (`processedPrNumbers`, `lastProcessedAt`, etc.) |

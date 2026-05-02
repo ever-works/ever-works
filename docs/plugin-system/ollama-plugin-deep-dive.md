@@ -123,7 +123,7 @@ The `healthCheck` method always returns `{ status: 'healthy' }` as a simple read
 // Non-streaming chat completion with Ollama
 const response = await ollamaPlugin.createChatCompletion({
 	messages: [
-		{ role: 'system', content: 'You are a directory content writer.' },
+		{ role: 'system', content: 'You are a work content writer.' },
 		{ role: 'user', content: 'Write a description for Acme Corp.' }
 	],
 	settings: {
@@ -142,7 +142,7 @@ for await (const chunk of ollamaPlugin.createStreamingChatCompletion({
 
 // Generate embeddings
 const embedding = await ollamaPlugin.createEmbedding({
-	input: 'AI-powered directory builder',
+	input: 'AI-powered work builder',
 	settings: {
 		baseUrl: 'http://localhost:11434/v1',
 		defaultModel: 'nomic-embed-text'

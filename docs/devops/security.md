@@ -193,32 +193,32 @@ In production, only the web application and API domains are allowed. Development
 
 ## Role-Based Access Control
 
-### Directory Roles
+### Work Roles
 
-The `DirectoryMemberRole` enum defines four access levels:
+The `WorkMemberRole` enum defines four access levels:
 
 | Role        | Level | Capabilities                                 |
 | ----------- | ----- | -------------------------------------------- |
-| **OWNER**   | 4     | Full access (implicit for directory creator) |
+| **OWNER**   | 4     | Full access (implicit for work creator) |
 | **MANAGER** | 3     | Edit content, manage members                 |
 | **EDITOR**  | 2     | Edit content                                 |
 | **VIEWER**  | 1     | Read-only                                    |
 
-The OWNER role is never directly assigned to a member. It is inferred from `directory.userId`. Only MANAGER, EDITOR, and VIEWER can be assigned to members.
+The OWNER role is never directly assigned to a member. It is inferred from `work.userId`. Only MANAGER, EDITOR, and VIEWER can be assigned to members.
 
 ### Access Checks
 
-The `Directory` entity provides access control methods:
+The `Work` entity provides access control methods:
 
 ```typescript
 // Check if user has any access
-directory.hasAccess(userId): boolean
+work.hasAccess(userId): boolean
 
 // Get user's role
-directory.getUserRole(userId): DirectoryMemberRole | null
+work.getUserRole(userId): WorkMemberRole | null
 
 // Check specific member capabilities
-member.hasRoleOrHigher(DirectoryMemberRole.EDITOR): boolean
+member.hasRoleOrHigher(WorkMemberRole.EDITOR): boolean
 member.canManageMembers(): boolean
 member.canEdit(): boolean
 ```

@@ -16,7 +16,7 @@
 - [x] **T2**. `readConfig` / `writeConfig` for `config.yml` —
       preserve unknown fields on write (forward-compat).
 - [x] **T3**. `readItems` / `writeItem` / `removeItem` for the
-      `items/` directory (one JSON file per slug).
+      `items/` work (one JSON file per slug).
 - [x] **T4**. `readCategories` / `writeCategories` /
       `readTags` / `writeTags` / `readBrands` / `writeBrands` for
       the corresponding YAML files.
@@ -29,7 +29,7 @@
       update, no-op cases.
 - [x] **T7**. CREATE_UPDATE mode: merge new items with existing,
       keep items not in this batch.
-- [x] **T8**. RECREATE mode: clear `items/` directory before
+- [x] **T8**. RECREATE mode: clear `items/` work before
       writing new items; reset `categories.yml` / `tags.yml` /
       `brands.yml` to the pipeline output.
 - [x] **T9**. Both modes increment `config.yml.version` and update
@@ -42,7 +42,7 @@
       with the public method:
 
             ```ts
-            initialize(directory, user, dto, opts: { logCollector, signal }): Promise<DataGeneratorResult>
+            initialize(work, user, dto, opts: { logCollector, signal }): Promise<DataGeneratorResult>
             ```
 
 - [x] **T11**. `initialize` flow:
@@ -52,7 +52,7 @@
     4. Call `ItemsGeneratorService.generateItems()` with full context.
     5. Apply mode-specific merge.
     6. Write all files back to working tree.
-    7. Commit + push (or commit + PR per directory setting).
+    7. Commit + push (or commit + PR per work setting).
     8. Build `DataGeneratorResult` with stats + optional PR info.
 - [x] **T12**. `signal` (AbortSignal) propagated into the items pipeline
       and into git operations so cancellation aborts in-flight work.
@@ -63,9 +63,9 @@
 ## Phase 4 — PR mode
 
 - [x] **T14**. Branch creation: `ever-update-<unix-timestamp>` from
-      the directory's default branch.
+      the work's default branch.
 - [x] **T15**. Commit changes on the new branch with a clear
-      "Ever Works: Update directory items" message.
+      "Ever Works: Update work items" message.
 - [x] **T16**. Open PR via `GitFacadeService.createPullRequest` with
       a body summarising new/updated counts.
 - [x] **T17**. Capture PR `{ branch, title, body, number, url }`
@@ -80,7 +80,7 @@
 - [x] **T20**. PR creation falls back to direct commit if the user's
       git provider rejects PR creation.
 - [x] **T21**. `normalizeGeneratorError` translates raw exceptions
-      into `DirectoryGenerationError` codes for consistent UI display.
+      into `WorkGenerationError` codes for consistent UI display.
 
 ## Phase 6 — Pipeline integration
 
@@ -120,7 +120,7 @@
 ## Definition of Done
 
 - [x] Both generation modes produce identical outputs for a fixed input set
-- [x] PR mode + direct mode both shipped, configurable per directory
+- [x] PR mode + direct mode both shipped, configurable per work
 - [x] User-edited fields (`featured`, `order`) preserved in CREATE_UPDATE
 - [x] Cancellation propagates into clone, pipeline, and push without leaving the repo dirty
 - [x] Constitution gates in `spec.md` §9 confirmed satisfied

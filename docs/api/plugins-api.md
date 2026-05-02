@@ -7,7 +7,7 @@ sidebar_position: 10
 
 # Plugins API Endpoints
 
-The plugins API exposes REST endpoints for managing plugins at two levels: **user-level** (global installation and settings) and **directory-level** (per-directory enablement and capability assignment). The controller is at `apps/api/src/plugins/plugins.controller.ts`, backed by `PluginOperationsService` from the agent package.
+The plugins API exposes REST endpoints for managing plugins at two levels: **user-level** (global installation and settings) and **work-level** (per-work enablement and capability assignment). The controller is at `apps/api/src/plugins/plugins.controller.ts`, backed by `PluginOperationsService` from the agent package.
 
 ## Architecture
 
@@ -16,7 +16,7 @@ apps/api/src/plugins/
   plugins.controller.ts           # REST endpoints for plugin management
   plugins.module.ts               # NestJS module (TypeORM entities, services)
   dto/
-    plugin-response.dto.ts        # Response DTOs (Plugin, UserPlugin, DirectoryPlugin)
+    plugin-response.dto.ts        # Response DTOs (Plugin, UserPlugin, WorkPlugin)
     settings-menu.dto.ts          # Settings menu grouping DTOs
     update-plugin-settings.dto.ts # Request DTOs for enable/disable/settings
     validators/
@@ -53,7 +53,7 @@ List available models for an AI provider plugin. Requires the plugin to be enabl
 
 ### POST `/api/plugins/:pluginId/enable`
 
-Enable a plugin for the current user. Accepts optional `settings`, `secretSettings`, and `autoEnableForDirectories` flag in the request body.
+Enable a plugin for the current user. Accepts optional `settings`, `secretSettings`, and `autoEnableForWorks` flag in the request body.
 
 ### POST `/api/plugins/:pluginId/disable`
 
@@ -63,31 +63,31 @@ Disable a plugin for the current user.
 
 Update user-specific settings for a plugin. Accepts `settings`, `secretSettings`, and `metadata` in the request body. Returns `400` if the plugin is not installed.
 
-## Directory Plugin Management
+## Work Plugin Management
 
-Directory-level endpoints manage how plugins are configured per directory. Ownership checks enforce view or edit permissions through `DirectoryOwnershipService`.
+Work-level endpoints manage how plugins are configured per work. Ownership checks enforce view or edit permissions through `WorkOwnershipService`.
 
-### GET `/api/directories/:directoryId/plugins`
+### GET `/api/works/:workId/plugins`
 
-List all plugins with directory-specific configuration. Requires view permission.
+List all plugins with work-specific configuration. Requires view permission.
 
-Returns `DirectoryPluginListResponseDto` with `plugins`, `total`, and a `capabilityProviders` mapping that shows which plugin is the active provider for each capability.
+Returns `WorkPluginListResponseDto` with `plugins`, `total`, and a `capabilityProviders` mapping that shows which plugin is the active provider for each capability.
 
-### POST `/api/directories/:directoryId/plugins/:pluginId/enable`
+### POST `/api/works/:workId/plugins/:pluginId/enable`
 
-Enable a plugin for a specific directory. Requires edit permission. The plugin must already be installed at the user level. Accepts optional `settings`, `activeCapability`, and `priority`.
+Enable a plugin for a specific work. Requires edit permission. The plugin must already be installed at the user level. Accepts optional `settings`, `activeCapability`, and `priority`.
 
-### POST `/api/directories/:directoryId/plugins/:pluginId/disable`
+### POST `/api/works/:workId/plugins/:pluginId/disable`
 
-Disable a plugin for a specific directory. Requires edit permission.
+Disable a plugin for a specific work. Requires edit permission.
 
-### PATCH `/api/directories/:directoryId/plugins/:pluginId/settings`
+### PATCH `/api/works/:workId/plugins/:pluginId/settings`
 
-Update directory-specific settings for a plugin. Accepts `settings`, `secretSettings`, and `metadata`. Requires edit permission.
+Update work-specific settings for a plugin. Accepts `settings`, `secretSettings`, and `metadata`. Requires edit permission.
 
-### POST `/api/directories/:directoryId/plugins/:pluginId/capability`
+### POST `/api/works/:workId/plugins/:pluginId/capability`
 
-Set this plugin as the active provider for a given capability in the directory. The request body contains a `capability` string validated against `ALL_PLUGIN_CAPABILITIES`. Returns `400` if the plugin does not support the requested capability.
+Set this plugin as the active provider for a given capability in the work. The request body contains a `capability` string validated against `ALL_PLUGIN_CAPABILITIES`. Returns `400` if the plugin does not support the requested capability.
 
 ## Response DTOs
 
@@ -99,9 +99,9 @@ Base plugin information: `id`, `pluginId`, `name`, `version`, `description`, `ca
 
 Extends `PluginResponseDto` with: `installed`, `enabled`, `settings` (masked), `userPluginId`.
 
-### DirectoryPluginResponseDto
+### WorkPluginResponseDto
 
-Extends `UserPluginResponseDto` with: `directoryEnabled`, `activeCapability`, `directorySettings` (masked), `directoryPluginId`, `priority`, `metadata`.
+Extends `UserPluginResponseDto` with: `workEnabled`, `activeCapability`, `workSettings` (masked), `workPluginId`, `priority`, `metadata`.
 
 ## Settings Schema
 
@@ -112,7 +112,7 @@ Plugin settings are defined via JSON Schema with custom extensions:
 | `secret`    | Field is never returned in API responses      |
 | `adminOnly` | Restricted to admin users                     |
 | `envVar`    | Environment variable name for env-only fields |
-| `scope`     | `global`, `user`, or `directory`              |
+| `scope`     | `global`, `user`, or `work`              |
 | `widget`    | UI widget hint (e.g., `model-select`)         |
 | `hidden`    | Hide from settings UI                         |
 
@@ -121,9 +121,9 @@ Plugin settings are defined via JSON Schema with custom extensions:
 ```typescript
 @Module({
 	imports: [
-		TypeOrmModule.forFeature([PluginEntity, UserPluginEntity, DirectoryPluginEntity]),
+		TypeOrmModule.forFeature([PluginEntity, UserPluginEntity, WorkPluginEntity]),
 		FacadesModule,
-		DirectoryModule,
+		WorkModule,
 		AuthModule
 	],
 	controllers: [PluginsController],

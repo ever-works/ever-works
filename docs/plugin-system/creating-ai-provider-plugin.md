@@ -52,7 +52,7 @@ flowchart LR
 | `AiOperations`      | `packages/plugin/src/ai/ai-operations.ts`                             | Shared wrapper around LangChain's `ChatOpenAI`     |
 | `IAiProviderPlugin` | `packages/plugin/src/contracts/capabilities/ai-provider.interface.ts` | The TypeScript interface your plugin satisfies     |
 
-When the platform needs AI -- generating a directory listing, running the conversational assistant, extracting structured data -- it calls `AiFacadeService`, which finds the enabled AI provider plugin and invokes its methods. Your plugin receives the call, resolves user-provided settings (API key, model, temperature), and delegates to `AiOperations`, which handles the LangChain invocation, parameter retry logic, JSON repair, token tracking, and streaming.
+When the platform needs AI -- generating a work listing, running the conversational assistant, extracting structured data -- it calls `AiFacadeService`, which finds the enabled AI provider plugin and invokes its methods. Your plugin receives the call, resolves user-provided settings (API key, model, temperature), and delegates to `AiOperations`, which handles the LangChain invocation, parameter retry logic, JSON repair, token tracking, and streaming.
 
 ## Prerequisites
 
@@ -63,9 +63,9 @@ When the platform needs AI -- generating a directory listing, running the conver
 
 ## Project Scaffolding
 
-Every AI provider plugin lives in its own directory under `packages/plugins/`. The structure is identical across all providers.
+Every AI provider plugin lives in its own work under `packages/plugins/`. The structure is identical across all providers.
 
-### Directory Layout
+### Work Layout
 
 ```
 packages/plugins/my-ai/
@@ -589,7 +589,7 @@ The pipeline selects the appropriate model tier based on the step being executed
 | Extension     | Type                                | Description                                                                               |
 | ------------- | ----------------------------------- | ----------------------------------------------------------------------------------------- |
 | `x-secret`    | `boolean`                           | Value is encrypted at rest, never returned in API responses, rendered as a password input |
-| `x-scope`     | `'global' \| 'user' \| 'directory'` | Where the setting is stored. `user` = per-user, `global` = shared across all users        |
+| `x-scope`     | `'global' \| 'user' \| 'work'` | Where the setting is stored. `user` = per-user, `global` = shared across all users        |
 | `x-envVar`    | `string`                            | Environment variable to check as a fallback when no stored setting exists                 |
 | `x-widget`    | `string`                            | UI widget hint. `'model-select'` renders a dropdown that calls `listModels()`             |
 | `x-hidden`    | `boolean`                           | Hides the field from the settings UI (advanced tuning)                                    |
@@ -979,7 +979,7 @@ describe('MyAiPlugin', () => {
 ### Running Tests
 
 ```bash
-# From your plugin directory
+# From your plugin work
 cd packages/plugins/my-ai
 
 # Run all tests
@@ -1009,7 +1009,7 @@ pnpm build
 
 ### Registering the Plugin
 
-1. **Add to pnpm workspace.** The `pnpm-workspace.yaml` at the repo root already includes `packages/plugins/*`, so your new directory is automatically discovered.
+1. **Add to pnpm workspace.** The `pnpm-workspace.yaml` at the repo root already includes `packages/plugins/*`, so your new work is automatically discovered.
 
 2. **Install dependencies.** Run `pnpm install` from the repo root to link your new package.
 
@@ -1065,7 +1065,7 @@ Use this checklist to verify your plugin is production-ready before submitting a
 
 ### Package Setup
 
-- [ ] Directory created at `packages/plugins/<your-plugin>/`
+- [ ] Work created at `packages/plugins/<your-plugin>/`
 - [ ] `package.json` has `"type": "module"` and dual ESM/CJS exports
 - [ ] `package.json` has correct `everworks.plugin` metadata
 - [ ] `tsconfig.json`, `tsup.config.ts`, and `vitest.config.ts` are present

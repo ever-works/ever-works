@@ -176,21 +176,21 @@ Used when `MAILER_PROVIDER=resend`:
 
 ---
 
-## Directory Generation
+## Work Generation
 
 | Variable                        | Description                                     | Type     | Default | Required |
 | ------------------------------- | ----------------------------------------------- | -------- | ------- | -------- |
 | `DIRECTORY_STALE_TIMEOUT_HOURS` | Timeout before a stale generation is cleaned up | `number` | `2`     | No       |
 
-## Scheduled Directory Updates
+## Scheduled Work Updates
 
 | Variable                                      | Description                                     | Type      | Default | Required |
 | --------------------------------------------- | ----------------------------------------------- | --------- | ------- | -------- |
-| `SCHEDULED_UPDATES_ENABLED`                   | Enable automatic directory updates              | `boolean` | `true`  | No       |
+| `SCHEDULED_UPDATES_ENABLED`                   | Enable automatic work updates              | `boolean` | `true`  | No       |
 | `SCHEDULED_UPDATES_DISPATCH_INTERVAL_MINUTES` | Interval between update dispatch cycles         | `number`  | `5`     | No       |
-| `SCHEDULED_UPDATES_MAX_BATCH`                 | Maximum directories per update batch            | `number`  | `25`    | No       |
-| `SCHEDULED_UPDATES_MAX_FAILURE_BEFORE_PAUSE`  | Failures before pausing updates for a directory | `number`  | `3`     | No       |
-| `PAY_PER_USE_PRICE_USD`                       | Price per on-demand directory update            | `number`  | `5`     | No       |
+| `SCHEDULED_UPDATES_MAX_BATCH`                 | Maximum works per update batch            | `number`  | `25`    | No       |
+| `SCHEDULED_UPDATES_MAX_FAILURE_BEFORE_PAUSE`  | Failures before pausing updates for a work | `number`  | `3`     | No       |
+| `PAY_PER_USE_PRICE_USD`                       | Price per on-demand work update            | `number`  | `5`     | No       |
 
 ## Website Template
 
@@ -233,7 +233,7 @@ Used when `MAILER_PROVIDER=resend`:
 
 ### GitHub Plugin
 
-Separate from the GitHub OAuth configuration above -- used for directory Git operations:
+Separate from the GitHub OAuth configuration above -- used for work Git operations:
 
 | Variable                      | Description                                   | Type     | Default | Required |
 | ----------------------------- | --------------------------------------------- | -------- | ------- | -------- |
@@ -275,8 +275,8 @@ These variables control branding and metadata for the web dashboard. All are opt
 | ------------------------------ | ------------------------------- | -------- | ------------------------------- |
 | `NEXT_PUBLIC_SITE_NAME`        | Site display name               | `string` | Uses `APP_NAME`                 |
 | `NEXT_PUBLIC_SITE_TITLE`       | HTML title / SEO title          | `string` | Uses `APP_NAME`                 |
-| `NEXT_PUBLIC_SITE_DESCRIPTION` | Meta description                | `string` | `Build Directories with AI`     |
-| `NEXT_PUBLIC_SITE_KEYWORDS`    | Meta keywords (comma-separated) | `string` | `Ever Works,Directories,AI,...` |
+| `NEXT_PUBLIC_SITE_DESCRIPTION` | Meta description                | `string` | `Build Works with AI`     |
+| `NEXT_PUBLIC_SITE_KEYWORDS`    | Meta keywords (comma-separated) | `string` | `Ever Works,Works,AI,...` |
 | `NEXT_PUBLIC_SITE_AUTHOR`      | Site author metadata            | `string` | Uses `APP_NAME`                 |
 | `NEXT_PUBLIC_SITE_IMAGE`       | Default Open Graph image path   | `string` | `/logo-light.png`               |
 
@@ -308,7 +308,7 @@ These variables control branding and metadata for the web dashboard. All are opt
 
 | Variable                           | Description                       | Type                     | Default                       |
 | ---------------------------------- | --------------------------------- | ------------------------ | ----------------------------- |
-| `NEXT_PUBLIC_DIRECTORY_LIST_LIMIT` | Directories per page (pagination) | `number`                 | `6`                           |
+| `NEXT_PUBLIC_DIRECTORY_LIST_LIMIT` | Works per page (pagination) | `number`                 | `6`                           |
 | `NEXT_BUILD_OUTPUT`                | Next.js build output mode         | `standalone` \| `export` | -- (default Next.js behavior) |
 
 ---

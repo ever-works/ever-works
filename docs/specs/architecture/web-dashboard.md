@@ -11,7 +11,7 @@ pages, server actions, plugin UIs, or i18n.
 
 The Ever Works dashboard is a Next.js 16 App Router application backed
 by React 19, Tailwind CSS 4, and `next-intl`. It is the platform's
-primary UI surface — every directory CRUD, plugin configuration,
+primary UI surface — every work CRUD, plugin configuration,
 generation kick-off, and member invitation flows through it. This spec
 covers the **route structure**, **server-component vs client-component
 strategy**, **server actions**, **API integration**, **i18n
@@ -40,7 +40,7 @@ apps/web/src/
 │   │   │   ├── layout-client.tsx     # Client wrapper for the dashboard chrome
 │   │   │   ├── (home)/
 │   │   │   ├── activity/
-│   │   │   ├── directories/
+│   │   │   ├── works/
 │   │   │   ├── plugins/
 │   │   │   ├── settings/
 │   │   │   ├── error.tsx
@@ -103,7 +103,7 @@ only when it needs:
 
 Mixed pages are common: a server component for the data fetch + form
 shell, with one or two client islands for the interactive bits.
-Reference: every directory detail page composes this way.
+Reference: every work detail page composes this way.
 
 ## 5. Server Actions
 
@@ -179,7 +179,7 @@ plugin's JSON Schema (see [Plugin SDK §8](./plugin-sdk.md) and
    schema); the API runs a second validation pass.
 
 The renderer lives in `components/plugin-settings/`. It's the same
-component for admin / user / directory plugin pages — the differences
+component for admin / user / work plugin pages — the differences
 are in which scope endpoint the form posts to.
 
 ## 8. Auth Integration
@@ -228,8 +228,8 @@ Most forms follow the **server-action submit + revalidate** pattern:
 
 ```tsx
 'use client';
-function CreateDirectoryForm() {
-	const [state, formAction] = useActionState(createDirectoryAction, null);
+function CreateWorkForm() {
+	const [state, formAction] = useActionState(createWorkAction, null);
 	return (
 		<form action={formAction}>
 			<input name="name" />
@@ -242,7 +242,7 @@ function CreateDirectoryForm() {
 
 The `useActionState` hook gives forms inline error/success state
 without managing it manually. After success, the action calls
-`revalidatePath('/directories')` and `redirect('/directories/<slug>')`.
+`revalidatePath('/works')` and `redirect('/works/<slug>')`.
 
 Complex client-side state (multi-step wizards, drag-drop) uses
 **Zustand** stores scoped to the page; we deliberately avoid Redux.
@@ -276,7 +276,7 @@ tests catch real bugs faster than React-Testing-Library mocks would.
 The Playwright suite covers:
 
 - Login / register / forgot-password flows (with mocked OAuth providers).
-- Directory creation in all three methods (AI / Manual / Import).
+- Work creation in all three methods (AI / Manual / Import).
 - Plugin settings save + read-back across all three configuration modes.
 - Member invite + role-update + leave flows.
 - Generation cancellation.

@@ -66,7 +66,7 @@ private readonly PLAN_SEED_DATA: Array<{
     description: string;
     monthlyPriceCents: number;
     yearlyPriceCents: number;
-    allowedCadences: DirectoryScheduleCadence[];
+    allowedCadences: WorkScheduleCadence[];
 }>;
 ```
 
@@ -104,10 +104,10 @@ Records usage-based billing events when subscriptions are configured for pay-per
 ```typescript
 type RecordUsageOptions = {
 	userId: string;
-	directoryId: string;
-	schedule?: DirectorySchedule | null;
+	workId: string;
+	schedule?: WorkSchedule | null;
 	triggerType: UsageLedgerTriggerType;
-	billingMode: DirectoryScheduleBillingMode;
+	billingMode: WorkScheduleBillingMode;
 	generationHistoryId?: string;
 };
 ```
@@ -121,10 +121,10 @@ type RecordUsageOptions = {
 ```typescript
 const entry = await usageLedger.recordUsage({
 	userId,
-	directoryId,
+	workId,
 	schedule,
 	triggerType: UsageLedgerTriggerType.SCHEDULED,
-	billingMode: DirectoryScheduleBillingMode.USAGE,
+	billingMode: WorkScheduleBillingMode.USAGE,
 	generationHistoryId: history.id
 });
 ```
@@ -191,7 +191,7 @@ The `BillingProvider` token is bound to `ManualBillingProvider` by default. Over
 | `description`       | `varchar`          | Plan description                                    |
 | `monthlyPriceCents` | `int`              | Monthly price in cents                              |
 | `yearlyPriceCents`  | `int`              | Yearly price in cents                               |
-| `allowedCadences`   | `json`             | Array of allowed `DirectoryScheduleCadence` values  |
+| `allowedCadences`   | `json`             | Array of allowed `WorkScheduleCadence` values  |
 | `isActive`          | `boolean`          | Whether the plan is available for new subscriptions |
 
 ### UserSubscription Entity
@@ -213,7 +213,7 @@ The `BillingProvider` token is bound to `ManualBillingProvider` by default. Over
 | --------------------- | -------------------- | ------------------------------------------ |
 | `id`                  | `uuid` (PK)          | Auto-generated                             |
 | `userId`              | `varchar`            | User reference                             |
-| `directoryId`         | `varchar`            | Directory reference                        |
+| `workId`         | `varchar`            | Work reference                        |
 | `scheduleId`          | `varchar` (nullable) | Schedule reference                         |
 | `triggerType`         | `enum`               | `manual`, `scheduled`, `api`               |
 | `billingMode`         | `enum`               | `included`, `usage`                        |
@@ -235,7 +235,7 @@ import { SubscriptionService } from '@ever-works/agent/subscriptions';
 export class ScheduleService {
 	constructor(private readonly subscriptions: SubscriptionService) {}
 
-	async canUseCadence(userId: string, cadence: DirectoryScheduleCadence) {
+	async canUseCadence(userId: string, cadence: WorkScheduleCadence) {
 		const allowances = await this.subscriptions.getCadenceAllowances(userId);
 		return allowances[cadence] === true;
 	}
@@ -253,13 +253,13 @@ export class GenerationService {
 
 	async afterGeneration(options: {
 		userId: string;
-		directoryId: string;
-		schedule: DirectorySchedule;
+		workId: string;
+		schedule: WorkSchedule;
 		historyId: string;
 	}) {
 		await this.usageLedger.recordUsage({
 			userId: options.userId,
-			directoryId: options.directoryId,
+			workId: options.workId,
 			schedule: options.schedule,
 			triggerType: UsageLedgerTriggerType.SCHEDULED,
 			billingMode: options.schedule.billingMode,
@@ -289,7 +289,7 @@ export class StripeBillingProvider extends BillingProvider {
             customer: entry.userId, // Resolve to Stripe customer ID
             amount: entry.amountCents,
             currency: entry.currency,
-            description: `Directory update: ${entry.directoryId}`,
+            description: `Work update: ${entry.workId}`,
         });
     }
 }

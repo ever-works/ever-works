@@ -151,25 +151,25 @@ const user = await githubPlugin.getUser(token);
 
 // Create a repository
 const repo = await githubPlugin.createRepository(
-	{ name: 'my-directory', isPrivate: true, organization: 'my-org' },
+	{ name: 'my-work', isPrivate: true, organization: 'my-org' },
 	token
 );
 
 // Create a branch and push changes
 await githubPlugin.cloneOrPull({
 	owner: 'my-org',
-	repo: 'my-directory',
+	repo: 'my-work',
 	token,
 	branch: 'main'
 });
 await githubPlugin.switchBranch(localDir, 'feature-update', true);
 await githubPlugin.addAll(localDir);
-await githubPlugin.commit(localDir, 'Update directory content');
+await githubPlugin.commit(localDir, 'Update work content');
 await githubPlugin.push({ dir: localDir, token, remote: 'origin', branch: 'feature-update' });
 
 // Dispatch a deployment workflow
 await githubPlugin.dispatchWorkflow(
-	{ workflow: 'deploy_vercel.yaml', branch: 'main', owner: 'my-org', repo: 'my-directory' },
+	{ workflow: 'deploy_vercel.yaml', branch: 'main', owner: 'my-org', repo: 'my-work' },
 	token
 );
 ```

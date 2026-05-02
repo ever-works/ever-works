@@ -33,7 +33,7 @@ flowchart TD
     subgraph "API Route Groups"
         O["/ - Health"]
         P["api/auth/* - Authentication"]
-        Q["api/directories/* - Directories"]
+        Q["api/works/* - Works"]
         R["api/ai-conversations/* - AI Chat"]
         S["api/deploy/* - Deployment"]
         T["api/plugins/* - Plugin Management"]
@@ -55,7 +55,7 @@ flowchart TD
 | `apps/api/src/api.controller.ts`                       | Health check endpoints (`/`, `/api/health`)                          |
 | `apps/api/src/config/throttler.config.ts`              | Tiered rate limiting configuration                                   |
 | `apps/api/src/logging.interceptor.ts`                  | Debug-mode HTTP request/response logging                             |
-| `apps/api/src/directories/directories.controller.ts`   | Primary domain controller (directories, items, taxonomy)             |
+| `apps/api/src/works/works.controller.ts`   | Primary domain controller (works, items, taxonomy)             |
 | `apps/api/src/auth/controllers/auth.controller.ts`     | Authentication (login, register, password reset)                     |
 | `apps/api/src/auth/controllers/api-keys.controller.ts` | API key management                                                   |
 | `apps/api/src/plugins/plugins.controller.ts`           | Plugin enable/disable and settings management                        |
@@ -109,7 +109,7 @@ async function bootstrap() {
 		.addBearerAuth(/* JWT config */)
 		.addTag('Health')
 		.addTag('Auth')
-		.addTag('Directories') /* ... */
+		.addTag('Works') /* ... */
 		.build();
 
 	const document = SwaggerModule.createDocument(app, config);
@@ -152,8 +152,8 @@ Controllers use a flat `api/` prefix pattern with domain-specific sub-paths:
 | `APIController`             | `/`, `/api/health`                     | Health           | Public   |
 | `AuthController`            | `api/auth`                             | Auth             | Mixed    |
 | `ApiKeysController`         | `api/auth/api-keys`                    | API Keys         | JWT      |
-| `DirectoriesController`     | `api`                                  | Directories      | JWT      |
-| `MembersController`         | `api/directories/:directoryId/members` | Members          | JWT      |
+| `WorksController`     | `api`                                  | Works      | JWT      |
+| `MembersController`         | `api/works/:workId/members` | Members          | JWT      |
 | `AiConversationController`  | `api/ai-conversations`                 | AI Conversations | JWT      |
 | `PluginsController`         | `api`                                  | Plugins          | JWT      |
 | `DeployController`          | `api/deploy`                           | Deploy           | JWT      |
@@ -231,31 +231,31 @@ export class LoggingInterceptor implements NestInterceptor {
 ### Typical Controller Pattern
 
 ```typescript
-@ApiTags('Directories')
+@ApiTags('Works')
 @ApiBearerAuth('JWT-auth')
 @Controller('api')
 @UseGuards(JwtAuthGuard)
-export class DirectoriesController {
-	@Get('directories')
-	@ApiOperation({ summary: 'List directories' })
-	@ApiResponse({ status: 200, description: 'List of directories' })
-	async listDirectories(@CurrentUser() user: AuthenticatedUser) {
+export class WorksController {
+	@Get('works')
+	@ApiOperation({ summary: 'List works' })
+	@ApiResponse({ status: 200, description: 'List of works' })
+	async listWorks(@CurrentUser() user: AuthenticatedUser) {
 		return this.queryService.findByUser(user.userId);
 	}
 
-	@Post('directories')
-	@ApiOperation({ summary: 'Create directory' })
+	@Post('works')
+	@ApiOperation({ summary: 'Create work' })
 	@HttpCode(HttpStatus.CREATED)
-	async createDirectory(@Body() dto: CreateDirectoryDto, @CurrentUser() user: AuthenticatedUser) {
+	async createWork(@Body() dto: CreateWorkDto, @CurrentUser() user: AuthenticatedUser) {
 		return this.lifecycleService.create(dto, user.userId);
 	}
 
-	@Put('directories/:slug')
-	@ApiOperation({ summary: 'Update directory' })
-	@ApiParam({ name: 'slug', description: 'Directory URL slug' })
-	async updateDirectory(
+	@Put('works/:slug')
+	@ApiOperation({ summary: 'Update work' })
+	@ApiParam({ name: 'slug', description: 'Work URL slug' })
+	async updateWork(
 		@Param('slug') slug: string,
-		@Body() dto: UpdateDirectoryDto,
+		@Body() dto: UpdateWorkDto,
 		@CurrentUser() user: AuthenticatedUser
 	) {
 		return this.lifecycleService.update(slug, dto, user.userId);
@@ -292,10 +292,10 @@ All `api/*` routes automatically support both authentication methods via the `Jw
 
 ```bash
 # JWT authentication
-curl -H "Authorization: Bearer eyJhbGciOi..." https://api.example.com/api/directories
+curl -H "Authorization: Bearer eyJhbGciOi..." https://api.example.com/api/works
 
 # API key authentication
-curl -H "x-api-key: ew_live_abc123..." https://api.example.com/api/directories
+curl -H "x-api-key: ew_live_abc123..." https://api.example.com/api/works
 ```
 
 ## Best Practices

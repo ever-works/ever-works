@@ -33,7 +33,7 @@
 
 ## Phase 5 — CLI
 
-- [x] T12. `ever-works directory domain` commands.
+- [x] T12. `ever-works work domain` commands.
 
 ## Phase 6 — Docs
 

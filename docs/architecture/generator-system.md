@@ -7,7 +7,7 @@ sidebar_position: 4
 
 # Generator System
 
-The Ever Works generator system is a three-stage content pipeline that transforms AI-generated data into Git-backed directory websites. Each stage handles a specific concern: data generation, markdown rendering, and website repository management.
+The Ever Works generator system is a three-stage content pipeline that transforms AI-generated data into Git-backed work websites. Each stage handles a specific concern: data generation, markdown rendering, and website repository management.
 
 ## Three-Stage Architecture
 
@@ -46,7 +46,7 @@ graph LR
 
 **Source:** `packages/agent/src/generators/data-generator/`
 
-The `DataGeneratorService` is the primary entry point for directory content generation. It orchestrates the full lifecycle from initial repository setup through AI-powered item generation to Git persistence.
+The `DataGeneratorService` is the primary entry point for work content generation. It orchestrates the full lifecycle from initial repository setup through AI-powered item generation to Git persistence.
 
 ### Responsibilities
 
@@ -61,7 +61,7 @@ The `DataGeneratorService` is the primary entry point for directory content gene
 
 | Method               | Purpose                                                               |
 | -------------------- | --------------------------------------------------------------------- |
-| `initialize()`       | Full directory generation: clone repo, run pipeline, write data, push |
+| `initialize()`       | Full work generation: clone repo, run pipeline, write data, push |
 | `addItems()`         | Add or update individual items                                        |
 | `removeItem()`       | Remove an item from the data repository                               |
 | `removeRepository()` | Delete the data Git repository                                        |
@@ -73,11 +73,11 @@ The `DataGeneratorService` is the primary entry point for directory content gene
 3. **Data writing** -- Write items (as individual JSON files), categories, tags, collections, and config to the `DataRepository`
 4. **Markdown integration** -- Generate default markdown for items when not provided by the pipeline
 5. **Git operations** -- Stage, commit, and push changes; optionally create pull requests for updates
-6. **Status tracking** -- Update directory generation status and metrics
+6. **Status tracking** -- Update work generation status and metrics
 
 ### DataRepository
 
-The `DataRepository` class manages the file-system structure of a directory's data:
+The `DataRepository` class manages the file-system structure of a work's data:
 
 ```
 data-repo/
@@ -89,18 +89,18 @@ data-repo/
 ├── categories.json           # Category definitions
 ├── tags.json                 # Tag definitions
 ├── collections.json          # Collection definitions
-├── config.json               # Directory configuration
+├── config.json               # Work configuration
 ├── template.md               # Markdown template (header/footer)
 └── LICENSE                   # License file
 ```
 
 ### Pipeline Integration
 
-The `DataGeneratorService` creates a `DirectoryReference` and `GenerationRequest` from the directory entity, then passes them to the `PipelineOrchestratorService`:
+The `DataGeneratorService` creates a `WorkReference` and `GenerationRequest` from the work entity, then passes them to the `PipelineOrchestratorService`:
 
 ```typescript
 const pipelineResult = await this.pipelineOrchestrator.execute(
-	directoryRef,
+	workRef,
 	generationRequest,
 	existingItems,
 	{ signal },
@@ -162,7 +162,7 @@ The `ReadmeBuilder` generates a README with:
 
 **Source:** `packages/agent/src/generators/website-generator/`
 
-The `WebsiteGeneratorService` manages the website repository that renders the directory as a deployable website.
+The `WebsiteGeneratorService` manages the website repository that renders the work as a deployable website.
 
 ### Responsibilities
 
@@ -200,7 +200,7 @@ The `BranchSyncService` keeps website repositories synchronized with the templat
 
 ### WebsiteUpdateService
 
-The `WebsiteUpdateService` (in `website-update.service.ts`) handles configuration updates to the website repository, such as updating directory metadata, theme settings, or deployment configuration.
+The `WebsiteUpdateService` (in `website-update.service.ts`) handles configuration updates to the website repository, such as updating work metadata, theme settings, or deployment configuration.
 
 ## Module Structure
 
@@ -229,34 +229,34 @@ Each generator stage has its own NestJS module:
 })
 ```
 
-All three modules are imported by the `DirectoryModule`, which provides the `DirectoryGenerationService` that coordinates the full three-stage generation flow.
+All three modules are imported by the `WorkModule`, which provides the `WorkGenerationService` that coordinates the full three-stage generation flow.
 
 ## End-to-End Generation Flow
 
 ```mermaid
 sequenceDiagram
     participant API as API Controller
-    participant DGS as DirectoryGenerationService
+    participant DGS as WorkGenerationService
     participant DGen as DataGeneratorService
     participant Pipeline as PipelineOrchestrator
     participant MGen as MarkdownGeneratorService
     participant WGen as WebsiteGeneratorService
     participant Git as GitFacadeService
 
-    API->>DGS: generate(directory, user, options)
-    DGS->>DGen: initialize(directory, user)
+    API->>DGS: generate(work, user, options)
+    DGS->>DGen: initialize(work, user)
     DGen->>Git: createRepository(data-repo)
-    DGen->>Pipeline: execute(directoryRef, request)
+    DGen->>Pipeline: execute(workRef, request)
     Pipeline-->>DGen: PipelineResult (items, categories, tags)
     DGen->>Git: commit & push data
     DGen-->>DGS: generation stats
 
-    DGS->>MGen: initialize(directory, user)
+    DGS->>MGen: initialize(work, user)
     MGen->>Git: clone data repo & markdown repo
     MGen->>MGen: build README, write detail pages
     MGen->>Git: commit & push markdown
 
-    DGS->>WGen: initialize(directory, user)
+    DGS->>WGen: initialize(work, user)
     WGen->>Git: clone template, create website repo
     WGen->>Git: push template to website repo
     WGen-->>DGS: complete
@@ -274,4 +274,4 @@ The data generator defines structured error types for initialization failures:
 | `GENERATION_FAILED`  | Pipeline execution failed         |
 | `PUSH_FAILED`        | Git push operation failed         |
 
-Each generator stage catches errors independently and provides detailed logging. The `DirectoryGenerationService` tracks the overall generation status on the directory entity.
+Each generator stage catches errors independently and provides detailed logging. The `WorkGenerationService` tracks the overall generation status on the work entity.

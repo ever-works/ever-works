@@ -18,13 +18,13 @@ sidebar_position: 67
 
 ## Overview
 
-The Gemini plugin is a **full pipeline plugin** that delegates the entire directory generation flow to the [Gemini CLI](https://github.com/google/generative-ai-cli). It runs the Gemini agent autonomously and consumes the resulting items.
+The Gemini plugin is a **full pipeline plugin** that delegates the entire work generation flow to the [Gemini CLI](https://github.com/google/generative-ai-cli). It runs the Gemini agent autonomously and consumes the resulting items.
 
 > Note: This is **distinct** from the [`google` AI provider plugin](./google-ai-plugin.md). The `google` plugin exposes Gemini models for use as a regular AI provider inside the Standard or Agent pipelines. This `gemini` plugin replaces the entire pipeline with a CLI-driven Gemini agent.
 
 ## Selecting It
 
-In the directory edit screen, set **Generation Pipeline** to `Gemini Generator`. The plugin appears once configured with a Google AI API key.
+In the work edit screen, set **Generation Pipeline** to `Gemini Generator`. The plugin appears once configured with a Google AI API key.
 
 ## Configuration
 

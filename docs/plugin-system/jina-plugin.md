@@ -217,9 +217,9 @@ The `getRateLimitInfo()` method reports the rate limit period as `minute` (disti
 
 ## Usage in the Platform
 
-During directory generation, Jina can serve as:
+During work generation, Jina can serve as:
 
-1. **Search provider** -- Finds relevant web pages about directory items with LLM-optimized result snippets.
+1. **Search provider** -- Finds relevant web pages about work items with LLM-optimized result snippets.
 2. **Content extractor** -- Converts discovered pages into clean markdown for enriching item descriptions, stripping ads, navigation, and other noise.
 
 ```mermaid

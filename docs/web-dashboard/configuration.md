@@ -30,8 +30,8 @@ These variables support multi-tenant deployments where each instance can have it
 | ------------------------------ | ---------------------------- | ---------------------------- |
 | `NEXT_PUBLIC_SITE_NAME`        | Uses `APP_NAME`              | Site name                    |
 | `NEXT_PUBLIC_SITE_TITLE`       | Uses `APP_NAME`              | SEO title                    |
-| `NEXT_PUBLIC_SITE_DESCRIPTION` | `Build Directories with AI`  | Meta description             |
-| `NEXT_PUBLIC_SITE_KEYWORDS`    | `Ever Works,Directories,...` | Comma-separated SEO keywords |
+| `NEXT_PUBLIC_SITE_DESCRIPTION` | `Build Works with AI`  | Meta description             |
+| `NEXT_PUBLIC_SITE_KEYWORDS`    | `Ever Works,Works,...` | Comma-separated SEO keywords |
 | `NEXT_PUBLIC_SITE_AUTHOR`      | Uses `APP_NAME`              | Author meta tag              |
 | `NEXT_PUBLIC_SITE_IMAGE`       | `/logo-light.png`            | Open Graph image path        |
 
@@ -65,7 +65,7 @@ The dashboard has built-in support for 21 locales: en, ar, bg, de, es, fr, he, h
 
 | Variable                           | Default               | Description                              |
 | ---------------------------------- | --------------------- | ---------------------------------------- |
-| `NEXT_PUBLIC_DIRECTORY_LIST_LIMIT` | `6`                   | Directories per page (pagination)        |
+| `NEXT_PUBLIC_DIRECTORY_LIST_LIMIT` | `6`                   | Works per page (pagination)        |
 | `REDIRECT_SEARCH_PARAM`            | `redirect_uri`        | URL param for post-login redirect        |
 | `ALLOWED_REDIRECT_URLS`            | `localhost,127.0.0.1` | Allowed redirect hosts (comma-separated) |
 
@@ -112,20 +112,20 @@ The following external image domains are whitelisted:
 
 ### Build Output
 
-The `output` property is dynamically set from `NEXT_BUILD_OUTPUT`. When set to `standalone`, Next.js produces a self-contained deployment directory suitable for Docker containers.
+The `output` property is dynamically set from `NEXT_BUILD_OUTPUT`. When set to `standalone`, Next.js produces a self-contained deployment work suitable for Docker containers.
 
 ## Site Configuration Object
 
-The `getSiteConfig()` function in `lib/constants.ts` merges environment variables with optional directory-level `config.yml` overrides. This supports multi-tenant scenarios where a deployed directory site can override the base branding:
+The `getSiteConfig()` function in `lib/constants.ts` merges environment variables with optional work-level `config.yml` overrides. This supports multi-tenant scenarios where a deployed work site can override the base branding:
 
 ```typescript
-const config = getSiteConfig(directoryConfig);
+const config = getSiteConfig(workConfig);
 // config.name, config.logo, config.favicon, config.title, etc.
 ```
 
 The precedence order is:
 
-1. Directory `config.yml` values (if present)
+1. Work `config.yml` values (if present)
 2. `NEXT_PUBLIC_*` environment variables
 3. Hardcoded defaults
 
@@ -136,8 +136,8 @@ All dashboard routes are defined as constants in `lib/constants.ts`:
 ```typescript
 export const ROUTES = {
 	DASHBOARD: '/',
-	DASHBOARD_DIRECTORIES: '/directories',
-	DASHBOARD_DIRECTORY: (id: string) => `/directories/${id}`
+	DASHBOARD_DIRECTORIES: '/works',
+	DASHBOARD_DIRECTORY: (id: string) => `/works/${id}`
 	// ... all other routes
 };
 ```

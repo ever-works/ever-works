@@ -31,11 +31,11 @@ flowchart TD
 | Mutual exclusion  | `DistributedTaskLockService`          | Principle IV; no owning DB row       |
 | GitHub access     | `GitFacadeService`                    | Principle II                         |
 | AI extraction     | `AiFacadeService` with structured out | Principle II                         |
-| State persistence | jsonb column on `directories`         | Simple, atomic per-directory updates |
+| State persistence | jsonb column on `works`         | Simple, atomic per-work updates |
 
 ## 3. Data Model
 
-- New nullable jsonb column `communityPrState` on `directories`:
+- New nullable jsonb column `communityPrState` on `works`:
   `{processedPrNumbers, processedPrs, totalItemsAdded, …}`.
 - Migration: additive, default `null`.
 
@@ -43,23 +43,23 @@ flowchart TD
 
 | Method | Endpoint                                    | Description                     |
 | ------ | ------------------------------------------- | ------------------------------- |
-| `POST` | `/api/directories/:id/community-pr/process` | Trigger processing now (manual) |
+| `POST` | `/api/works/:id/community-pr/process` | Trigger processing now (manual) |
 
 ## 5. Plugin / Web / CLI
 
 - Plugin: uses existing AI + git provider plugins; no new plugins.
-- Web: a "Process community PRs" button on the directory detail page.
+- Web: a "Process community PRs" button on the work detail page.
 - CLI: command wrapping the API endpoint.
 
 ## 6. Background Jobs
 
-A Trigger.dev cron task fans out per-directory processing to per-directory
+A Trigger.dev cron task fans out per-work processing to per-work
 runs (each acquiring its own lock).
 
 ## 7. Security & Permissions
 
-- Manual trigger requires directory edit rights.
-- Cron runs server-side with elevated DB access; uses the directory
+- Manual trigger requires work edit rights.
+- Cron runs server-side with elevated DB access; uses the work
   owner's GitHub token from the plugin-settings store.
 
 ## 8. Observability
@@ -71,7 +71,7 @@ runs (each acquiring its own lock).
 
 | Risk                          | Mitigation                                           |
 | ----------------------------- | ---------------------------------------------------- |
-| Duplicate processing          | Per-directory lock                                   |
+| Duplicate processing          | Per-work lock                                   |
 | State loss on mid-batch crash | Persist `communityPrState` per processed PR          |
 | Bad AI extraction merges junk | Schema validation + comment-on-failure path          |
 | GitHub rate limit             | Catch + retry on next cycle; state already persisted |

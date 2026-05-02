@@ -7,11 +7,11 @@ sidebar_position: 7
 
 # Creating a Screenshot Plugin
 
-Screenshot plugins capture website preview images for directory items. When a directory item has a source URL, the screenshot plugin generates a thumbnail that appears on the item card. This guide walks through creating a screenshot plugin from scratch, following the same patterns used by the built-in [ScreenshotOne](./screenshotone-plugin) and [Urlbox](./urlbox-plugin) plugins.
+Screenshot plugins capture website preview images for work items. When a work item has a source URL, the screenshot plugin generates a thumbnail that appears on the item card. This guide walks through creating a screenshot plugin from scratch, following the same patterns used by the built-in [ScreenshotOne](./screenshotone-plugin) and [Urlbox](./urlbox-plugin) plugins.
 
 ## How Screenshot Plugins Fit into the Platform
 
-During directory generation, the pipeline reaches the **image-capture** step. The `IScreenshotFacade` resolves which screenshot plugin to use, passes the item's URL along with the user's resolved settings, and receives back an image buffer or URL. That image becomes the item's preview thumbnail.
+During work generation, the pipeline reaches the **image-capture** step. The `IScreenshotFacade` resolves which screenshot plugin to use, passes the item's URL along with the user's resolved settings, and receives back an image buffer or URL. That image becomes the item's preview thumbnail.
 
 ```mermaid
 sequenceDiagram
@@ -25,7 +25,7 @@ sequenceDiagram
     Plugin->>API: HTTP request with API key
     API-->>Plugin: Image response
     Plugin-->>Facade: ScreenshotResult (buffer, base64, url)
-    Facade-->>Pipeline: Image for directory item
+    Facade-->>Pipeline: Image for work item
 ```
 
 ## Prerequisites
@@ -37,7 +37,7 @@ sequenceDiagram
 
 ## 1. Project Scaffolding
 
-Create a new directory under `packages/plugins/`:
+Create a new work under `packages/plugins/`:
 
 ```
 packages/plugins/my-screenshot/
@@ -273,7 +273,7 @@ interface ScreenshotOptions {
 ```
 
 :::info Settings are resolved at call time
-The `settings` field on `ScreenshotOptions` is populated by the facade with the fully resolved settings for the current user and directory. Your plugin should always read configuration from `options.settings`, never from a cached instance property.
+The `settings` field on `ScreenshotOptions` is populated by the facade with the fully resolved settings for the current user and work. Your plugin should always read configuration from `options.settings`, never from a cached instance property.
 :::
 
 ### ScreenshotResult
@@ -337,12 +337,12 @@ interface MyScreenshotSettings {
  *
  * Settings Resolution:
  * API keys are resolved through the 4-level hierarchy:
- * 1. Directory settings (highest priority)
+ * 1. Work settings (highest priority)
  * 2. User settings
  * 3. Admin settings
  * 4. Environment variables: PLUGIN_MY_SCREENSHOT_API_KEY
  *
- * Configuration mode: hybrid - admin-level defaults with user/directory overrides.
+ * Configuration mode: hybrid - admin-level defaults with user/work overrides.
  */
 export class MyScreenshotPlugin implements IPlugin, IScreenshotPlugin {
 	// ════════════════════════════════════════════════════════════
@@ -442,7 +442,7 @@ export class MyScreenshotPlugin implements IPlugin, IScreenshotPlugin {
 		required: ['apiKey']
 	};
 
-	/** hybrid: admin sets defaults, users and directories can override */
+	/** hybrid: admin sets defaults, users and works can override */
 	readonly configurationMode: 'admin-only' | 'user-required' | 'hybrid' = 'hybrid';
 
 	private context?: PluginContext;
@@ -624,7 +624,7 @@ export class MyScreenshotPlugin implements IPlugin, IScreenshotPlugin {
 			id: this.id,
 			name: this.name,
 			version: this.version,
-			description: 'Capture website screenshots for directory items',
+			description: 'Capture website screenshots for work items',
 			category: this.category,
 			capabilities: [...this.capabilities],
 			author: { name: 'Your Name' },
@@ -634,7 +634,7 @@ export class MyScreenshotPlugin implements IPlugin, IScreenshotPlugin {
 			readme: [
 				'## What does My Screenshot do?',
 				'',
-				'Automatically captures website screenshots for directory items.',
+				'Automatically captures website screenshots for work items.',
 				'',
 				'## Getting started',
 				'',
@@ -1257,7 +1257,7 @@ pnpm type-check --filter=@ever-works/my-screenshot-plugin
 
 Plugins in `packages/plugins/` are automatically discovered when the API starts. The platform reads the `everworks.plugin` field from each plugin's `package.json` to find screenshot-category plugins.
 
-No manual registration is needed. Simply place your plugin directory under `packages/plugins/` and restart the API:
+No manual registration is needed. Simply place your plugin work under `packages/plugins/` and restart the API:
 
 ```bash
 pnpm dev:api
@@ -1272,9 +1272,9 @@ The `IScreenshotFacade` picks the active screenshot plugin at runtime:
 1. The admin or user enables one screenshot plugin in the dashboard
 2. When the pipeline reaches the image-capture step, the facade loads the enabled plugin
 3. The facade calls `isAvailable()` to confirm the plugin is ready
-4. The facade passes `capture()` with fully resolved settings (directory > user > admin > env vars)
+4. The facade passes `capture()` with fully resolved settings (work > user > admin > env vars)
 
-Only one screenshot plugin is active at a time per directory.
+Only one screenshot plugin is active at a time per work.
 
 ## 9. Comparison: ScreenshotOne vs. Urlbox
 

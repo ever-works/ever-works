@@ -28,7 +28,7 @@ The OpenRouter plugin is the **default AI provider** for Ever Works. It connects
 | Default For        | `ai-provider`                   |
 | Visibility         | `public`                        |
 
-OpenRouter is unique among AI provider plugins because it is a **system plugin** with `autoEnable: true` and `defaultForCapabilities: ['ai-provider']`. This means it is automatically enabled and selected as the default AI provider for new directories.
+OpenRouter is unique among AI provider plugins because it is a **system plugin** with `autoEnable: true` and `defaultForCapabilities: ['ai-provider']`. This means it is automatically enabled and selected as the default AI provider for new works.
 
 ## Architecture
 
@@ -146,7 +146,7 @@ graph TD
     B -->|Yes| C[Auto-enable]
     B -->|No| D[Error: System plugin missing]
     C --> E[Register as default ai-provider]
-    E --> F[Available for all directories]
+    E --> F[Available for all works]
 ```
 
 ## Cost Optimization Strategy

@@ -7,14 +7,14 @@ sidebar_position: 18
 
 # Generation History
 
-The History UI displays a chronological record of all AI-powered directory generation runs, including status, duration, item counts, token usage, and links to Trigger.dev run logs. It supports paginated loading for directories with extensive generation histories.
+The History UI displays a chronological record of all AI-powered work generation runs, including status, duration, item counts, token usage, and links to Trigger.dev run logs. It supports paginated loading for works with extensive generation histories.
 
 ## Component Hierarchy
 
 ```
-DirectoryHistoryPage (server component)
+WorkHistoryPage (server component)
   |
-  +-- DirectoryHistoryPageClient
+  +-- WorkHistoryPageClient
         |
         +-- Page header (title + subtitle)
         |
@@ -35,20 +35,20 @@ DirectoryHistoryPage (server component)
 
 ## Key Components
 
-### DirectoryHistoryPageClient
+### WorkHistoryPageClient
 
-**File**: `apps/web/src/components/directories/detail/history/DirectoryHistoryPageClient.tsx`
+**File**: `apps/web/src/components/works/detail/history/WorkHistoryPageClient.tsx`
 
 The client-side container that manages paginated history loading.
 
 ```typescript
-interface DirectoryHistoryPageClientProps {
-	directoryId: string;
-	initialHistory: DirectoryGenerationHistoryResponse | null;
+interface WorkHistoryPageClientProps {
+	workId: string;
+	initialHistory: WorkGenerationHistoryResponse | null;
 }
 
-interface DirectoryGenerationHistoryResponse {
-	history: DirectoryGenerationHistoryEntry[];
+interface WorkGenerationHistoryResponse {
+	history: WorkGenerationHistoryEntry[];
 	total: number;
 	limit: number;
 	offset: number;
@@ -59,7 +59,7 @@ interface DirectoryGenerationHistoryResponse {
 
 | State       | Type                                | Purpose                           |
 | ----------- | ----------------------------------- | --------------------------------- |
-| `entries`   | `DirectoryGenerationHistoryEntry[]` | Accumulated history entries       |
+| `entries`   | `WorkGenerationHistoryEntry[]` | Accumulated history entries       |
 | `total`     | `number`                            | Total count from server           |
 | `limit`     | `number`                            | Page size (default: 20)           |
 | `offset`    | `number`                            | Current cursor position           |
@@ -69,19 +69,19 @@ interface DirectoryGenerationHistoryResponse {
 
 1. Initial data is provided by the server component via `initialHistory` prop
 2. `hasMore` is computed as `entries.length < total`
-3. Clicking "Load More" calls `fetchDirectoryGenerationHistory(directoryId, { limit, offset })`
+3. Clicking "Load More" calls `fetchWorkGenerationHistory(workId, { limit, offset })`
 4. New entries are appended to the existing list
 5. Offset is advanced by the number of returned entries
 
 ### HistoryTable
 
-**File**: `apps/web/src/components/directories/detail/history/HistoryTable.tsx`
+**File**: `apps/web/src/components/works/detail/history/HistoryTable.tsx`
 
 A data table displaying generation run details with formatted metrics.
 
 ```typescript
 interface HistoryTableProps {
-	entries: DirectoryGenerationHistoryEntry[];
+	entries: WorkGenerationHistoryEntry[];
 	locale: string;
 }
 ```
@@ -127,16 +127,16 @@ formatCost(0.0234); // "$0.0234"
 
 ### HistoryEmptyState
 
-**File**: `apps/web/src/components/directories/detail/history/HistoryEmptyState.tsx`
+**File**: `apps/web/src/components/works/detail/history/HistoryEmptyState.tsx`
 
-A centered empty state with a dashed border, title, and description text. Shown when no generation history exists for the directory.
+A centered empty state with a dashed border, title, and description text. Shown when no generation history exists for the work.
 
-### DirectoryGenerationHistoryEntry
+### WorkGenerationHistoryEntry
 
 The data model for each history row:
 
 ```typescript
-interface DirectoryGenerationHistoryEntry {
+interface WorkGenerationHistoryEntry {
 	id: string;
 	status: 'generating' | 'generated' | 'error' | 'cancelled';
 	startedAt?: string; // ISO datetime
@@ -173,8 +173,8 @@ This provides deep observability into the generation pipeline:
 ```
 Server Component (fetches initial history)
   |
-  +-- DirectoryHistoryPageClient
-        |-- entries: DirectoryGenerationHistoryEntry[]  (append-only growth)
+  +-- WorkHistoryPageClient
+        |-- entries: WorkGenerationHistoryEntry[]  (append-only growth)
         |-- total: number                                (from server response)
         |-- offset: number                               (tracks pagination cursor)
         |-- isPending: boolean                           (useTransition loading)
@@ -189,11 +189,11 @@ The component uses an append-only pattern for pagination: new entries are concat
 
 | Action                    | Server Action Function                                            | HTTP Method |
 | ------------------------- | ----------------------------------------------------------------- | ----------- |
-| Fetch history (paginated) | `fetchDirectoryGenerationHistory(directoryId, { limit, offset })` | GET         |
+| Fetch history (paginated) | `fetchWorkGenerationHistory(workId, { limit, offset })` | GET         |
 
 ## Internationalization
 
-All strings use `next-intl` with the namespace `dashboard.directoryDetail.history`:
+All strings use `next-intl` with the namespace `dashboard.workDetail.history`:
 
 - `title`, `subtitle` -- page header
 - `table.run`, `table.startedAt`, `table.duration`, `table.newItems`, `table.updatedItems`, `table.totalItems`, `table.tokens` -- column headers

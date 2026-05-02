@@ -9,7 +9,7 @@ sidebar_position: 19
 
 ## Overview
 
-The `ComparisonGenerationService` generates AI-powered comparison pages between pairs of directory items. It supports both automatic pair selection (picking the next best un-compared pair) and manual pair specification. The pipeline researches items via web search, generates structured comparison data with dimension-by-dimension scoring, and produces a full markdown article -- all committed to the directory's data repository.
+The `ComparisonGenerationService` generates AI-powered comparison pages between pairs of work items. It supports both automatic pair selection (picking the next best un-compared pair) and manual pair specification. The pipeline researches items via web search, generates structured comparison data with dimension-by-dimension scoring, and produces a full markdown article -- all committed to the work's data repository.
 
 ## Architecture
 
@@ -44,13 +44,13 @@ ComparisonGenerationService (NestJS service)
 
 ### Methods
 
-#### `generateNextComparison(directoryId, userId)`
+#### `generateNextComparison(workId, userId)`
 
 Automatically selects and generates the next comparison pair.
 
 | Parameter     | Type     | Description              |
 | ------------- | -------- | ------------------------ |
-| `directoryId` | `string` | The directory ID         |
+| `workId` | `string` | The work ID         |
 | `userId`      | `string` | The requesting user's ID |
 
 **Returns:** `Promise<ComparisonResult>`
@@ -63,31 +63,31 @@ interface ComparisonResult {
 }
 ```
 
-#### `generateManualComparison(directoryId, userId, itemASlug, itemBSlug)`
+#### `generateManualComparison(workId, userId, itemASlug, itemBSlug)`
 
 Generates a comparison for two specifically chosen items.
 
 **Returns:** `Promise<ComparisonResult>`
 
-#### `getRemainingCount(directoryId, userId)`
+#### `getRemainingCount(workId, userId)`
 
 Counts how many un-generated comparison pairs remain.
 
 **Returns:** `Promise<number>`
 
-#### `listComparisons(directoryId, userId)`
+#### `listComparisons(workId, userId)`
 
-Lists all existing comparisons for a directory.
+Lists all existing comparisons for a work.
 
 **Returns:** `Promise<ComparisonData[]>`
 
-#### `getComparison(directoryId, userId, slug)`
+#### `getComparison(workId, userId, slug)`
 
 Retrieves a single comparison by slug, including markdown content and optional extended analysis.
 
 **Returns:** `Promise<{ comparison: ComparisonData | null; markdown?: string; extendedAnalysisMarkdown?: string }>`
 
-#### `deleteComparison(directoryId, userId, slug)`
+#### `deleteComparison(workId, userId, slug)`
 
 Deletes a comparison by slug, updates the comparison state, and pushes the changes.
 
@@ -141,7 +141,7 @@ The overall verdict also designates a winner.
 
 ### Plugin Settings
 
-Comparison behavior is configurable per-directory via the `comparison-generator` plugin:
+Comparison behavior is configurable per-work via the `comparison-generator` plugin:
 
 | Setting                    | Default   | Description                                       |
 | -------------------------- | --------- | ------------------------------------------------- |
@@ -157,8 +157,8 @@ Comparison behavior is configurable per-directory via the `comparison-generator`
 
 | Repository                  | Method                                                                                                                     | Purpose                         |
 | --------------------------- | -------------------------------------------------------------------------------------------------------------------------- | ------------------------------- |
-| `DirectoryRepository`       | `findById`                                                                                                                 | Load directory entity           |
-| `DirectoryPluginRepository` | `findByDirectoryAndPlugin`                                                                                                 | Load comparison plugin settings |
+| `WorkRepository`       | `findById`                                                                                                                 | Load work entity           |
+| `WorkPluginRepository` | `findByWorkAndPlugin`                                                                                                 | Load comparison plugin settings |
 | `DataRepository`            | `getItems`, `getConfig`, `getComparisons`, `writeComparison`, `writeComparisonMarkdown`, `removeComparison`, `mergeConfig` | Git-backed data operations      |
 
 ## Event System
@@ -169,7 +169,7 @@ This service does not emit domain events. Comparison state is tracked in the dat
 
 | Scenario                       | Result                                                      |
 | ------------------------------ | ----------------------------------------------------------- |
-| Directory not found            | `NotFoundException`                                         |
+| Work not found            | `NotFoundException`                                         |
 | No pairs available             | `{ status: 'skipped', message: 'No more pairs available' }` |
 | Item slugs not found           | `{ status: 'error', message: 'Could not find items...' }`   |
 | Comparison already exists      | `{ status: 'skipped' }` with existing slug                  |
@@ -181,37 +181,37 @@ This service does not emit domain events. Comparison state is tracked in the dat
 
 ```typescript
 // Generate the next automatic comparison
-const result = await comparisonService.generateNextComparison(directoryId, userId);
+const result = await comparisonService.generateNextComparison(workId, userId);
 // { status: 'success', slug: 'netlify--vercel', message: 'Generated comparison: ...' }
 
 // Generate a specific comparison
-const result = await comparisonService.generateManualComparison(directoryId, userId, 'react', 'vue');
+const result = await comparisonService.generateManualComparison(workId, userId, 'react', 'vue');
 
 // Check remaining pairs
-const remaining = await comparisonService.getRemainingCount(directoryId, userId);
+const remaining = await comparisonService.getRemainingCount(workId, userId);
 // 45
 
 // List all comparisons
-const comparisons = await comparisonService.listComparisons(directoryId, userId);
+const comparisons = await comparisonService.listComparisons(workId, userId);
 
 // Get a comparison with markdown
-const detail = await comparisonService.getComparison(directoryId, userId, 'netlify--vercel');
+const detail = await comparisonService.getComparison(workId, userId, 'netlify--vercel');
 
 // Delete a comparison
-await comparisonService.deleteComparison(directoryId, userId, 'netlify--vercel');
+await comparisonService.deleteComparison(workId, userId, 'netlify--vercel');
 ```
 
 ## Configuration
 
 | Setting           | Source                            | Description                             |
 | ----------------- | --------------------------------- | --------------------------------------- |
-| Plugin settings   | `DirectoryPluginRepository`       | Per-directory comparison configuration  |
+| Plugin settings   | `WorkPluginRepository`       | Per-work comparison configuration  |
 | AI provider/model | Plugin settings or system default | Controls which AI generates comparisons |
 | Search facade     | System configuration              | Web search provider for research        |
 | Content extractor | System configuration              | Web content extraction provider         |
 
 ## Related Services
 
-- [Directory Generation](/agent-services/directory-generation) -- may trigger comparison generation as part of scheduled updates
-- [Directory Taxonomy](/agent-services/directory-taxonomy-service) -- categories used for pair grouping
-- [Advanced Prompts](/agent-services/directory-advanced-prompts) -- custom prompts can be layered via plugin settings
+- [Work Generation](/agent-services/work-generation) -- may trigger comparison generation as part of scheduled updates
+- [Work Taxonomy](/agent-services/work-taxonomy-service) -- categories used for pair grouping
+- [Advanced Prompts](/agent-services/work-advanced-prompts) -- custom prompts can be layered via plugin settings

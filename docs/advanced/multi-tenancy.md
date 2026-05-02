@@ -7,12 +7,12 @@ sidebar_position: 8
 
 # Multi-Tenancy & Isolation
 
-Ever Works isolates data and configuration at the directory level. Each directory acts as an independent workspace with its own plugin settings, capability routing, member permissions, and generated content. This page documents the isolation boundaries, role-based access control, and settings scoping that make multi-tenancy work.
+Ever Works isolates data and configuration at the work level. Each work acts as an independent workspace with its own plugin settings, capability routing, member permissions, and generated content. This page documents the isolation boundaries, role-based access control, and settings scoping that make multi-tenancy work.
 
 **Key sources:**
 
-- `packages/agent/src/services/directory-ownership.service.ts` -- Role-based access control
-- `packages/agent/src/plugins/entities/directory-plugin.entity.ts` -- Per-directory plugin configuration
+- `packages/agent/src/services/work-ownership.service.ts` -- Role-based access control
+- `packages/agent/src/plugins/entities/work-plugin.entity.ts` -- Per-work plugin configuration
 - `packages/agent/src/plugins/services/plugin-settings.service.ts` -- Multi-level settings resolution
 - `packages/agent/src/plugins/services/plugin-context-factory.service.ts` -- Scoped plugin contexts
 
@@ -20,9 +20,9 @@ Ever Works isolates data and configuration at the directory level. Each director
 
 ```mermaid
 graph TD
-    subgraph "Tenant Boundary: Directory"
-        A["Directory A"]
-        B["Directory B"]
+    subgraph "Tenant Boundary: Work"
+        A["Work A"]
+        B["Work B"]
     end
 
     subgraph "Shared Platform"
@@ -31,8 +31,8 @@ graph TD
         E[User Accounts]
     end
 
-    subgraph "Per-Directory Isolation"
-        F["Plugin Settings<br/>(DirectoryPluginEntity)"]
+    subgraph "Per-Work Isolation"
+        F["Plugin Settings<br/>(WorkPluginEntity)"]
         G["Capability Routing<br/>(which plugin per capability)"]
         H["Member Roles<br/>(RBAC)"]
         I["Generated Content<br/>(items, categories, tags)"]
@@ -56,30 +56,30 @@ graph TD
     E --> H
 ```
 
-## Directory as Tenant
+## Work as Tenant
 
-The directory is the primary isolation boundary in Ever Works. Each directory:
+The work is the primary isolation boundary in Ever Works. Each work:
 
 - Has its own set of items, categories, and tags
-- Can override plugin settings at the directory level
-- Routes capabilities independently (e.g., Directory A uses GitHub, Directory B uses GitLab)
+- Can override plugin settings at the work level
+- Routes capabilities independently (e.g., Work A uses GitHub, Work B uses GitLab)
 - Has its own member list with role-based permissions
 - Maintains separate pipeline checkpoints
 
 | Aspect                      | Isolation Level | Mechanism                               |
 | --------------------------- | --------------- | --------------------------------------- |
-| Content (items, categories) | Full            | Foreign key to `directoryId`            |
-| Plugin settings             | Layered         | `DirectoryPluginEntity` overrides       |
-| Capability routing          | Independent     | `activeCapability` per directory-plugin |
-| Access control              | Per-directory   | `DirectoryOwnershipService` + roles     |
-| Cache / checkpoints         | Scoped          | Cache key includes `directoryId`        |
-| Generation history          | Per-directory   | Scoped to directory                     |
+| Content (items, categories) | Full            | Foreign key to `workId`            |
+| Plugin settings             | Layered         | `WorkPluginEntity` overrides       |
+| Capability routing          | Independent     | `activeCapability` per work-plugin |
+| Access control              | Per-work   | `WorkOwnershipService` + roles     |
+| Cache / checkpoints         | Scoped          | Cache key includes `workId`        |
+| Generation history          | Per-work   | Scoped to work                     |
 
 ## Role-Based Access Control
 
 ### Role Hierarchy
 
-The `DirectoryOwnershipService` enforces a four-level role hierarchy:
+The `WorkOwnershipService` enforces a four-level role hierarchy:
 
 ```mermaid
 graph BT
@@ -90,7 +90,7 @@ graph BT
 
 | Role      | Level | Permissions                                  |
 | --------- | ----- | -------------------------------------------- |
-| `VIEWER`  | 1     | View directory content                       |
+| `VIEWER`  | 1     | View work content                       |
 | `EDITOR`  | 2     | View + edit content, trigger generation      |
 | `MANAGER` | 3     | View + edit + manage members                 |
 | `OWNER`   | 4     | Full control including deletion and transfer |
@@ -99,30 +99,30 @@ graph BT
 
 ```typescript
 // Check minimum role requirement
-await ownershipService.ensureCanView(directoryId, userId); // VIEWER+
-await ownershipService.ensureCanEdit(directoryId, userId); // EDITOR+
-await ownershipService.ensureCanManageMembers(directoryId, userId); // MANAGER+
-await ownershipService.ensureIsOwner(directoryId, userId); // OWNER only
+await ownershipService.ensureCanView(workId, userId); // VIEWER+
+await ownershipService.ensureCanEdit(workId, userId); // EDITOR+
+await ownershipService.ensureCanManageMembers(workId, userId); // MANAGER+
+await ownershipService.ensureIsOwner(workId, userId); // OWNER only
 
 // Non-throwing check
-const hasAccess = await ownershipService.hasAccess(directoryId, userId);
+const hasAccess = await ownershipService.hasAccess(workId, userId);
 
 // Get role without enforcing
-const role = await ownershipService.getUserRole(directoryId, userId);
+const role = await ownershipService.getUserRole(workId, userId);
 ```
 
 ### Creator Privilege
 
-The directory creator always has `OWNER` access, even without an explicit membership record:
+The work creator always has `OWNER` access, even without an explicit membership record:
 
 ```typescript
-const isCreator = directory.userId === userId;
+const isCreator = work.userId === userId;
 
 if (isCreator) {
 	return {
-		directory,
+		work,
 		member: null,
-		role: DirectoryMemberRole.OWNER,
+		role: WorkMemberRole.OWNER,
 		isCreator: true
 	};
 }
@@ -130,13 +130,13 @@ if (isCreator) {
 
 ### Access Result
 
-Every access check returns a `DirectoryAccessResult` with full context:
+Every access check returns a `WorkAccessResult` with full context:
 
 ```typescript
-interface DirectoryAccessResult {
-	directory: Directory; // The directory entity
-	member: DirectoryMember | null; // Membership record (null for creator)
-	role: DirectoryMemberRole; // Effective role
+interface WorkAccessResult {
+	work: Work; // The work entity
+	member: WorkMember | null; // Membership record (null for creator)
+	role: WorkMemberRole; // Effective role
 	isCreator: boolean; // Whether user is the original creator
 }
 ```
@@ -149,7 +149,7 @@ Plugin settings resolve through five levels, with higher-priority levels overrid
 
 ```mermaid
 graph TD
-    A["1. Directory Settings<br/>(DirectoryPluginEntity)"] --> F[Resolved Value]
+    A["1. Work Settings<br/>(WorkPluginEntity)"] --> F[Resolved Value]
     B["2. User Settings<br/>(UserPluginEntity)"] --> F
     C["3. Admin Settings<br/>(PluginEntity)"] --> F
     D["4. Environment Variables<br/>(process.env)"] --> F
@@ -164,7 +164,7 @@ graph TD
 
 | Priority    | Source      | Storage                      | Scope         |
 | ----------- | ----------- | ---------------------------- | ------------- |
-| 1 (highest) | Directory   | `directory_plugins.settings` | Per directory |
+| 1 (highest) | Work   | `work_plugins.settings` | Per work |
 | 2           | User        | `user_plugins.settings`      | Per user      |
 | 3           | Admin       | `plugins.settings`           | Global        |
 | 4           | Environment | `process.env[x-envVar]`      | Server-wide   |
@@ -173,11 +173,11 @@ graph TD
 ### How Resolution Works
 
 ```typescript
-// Resolution order: directory > user > admin > env > default
+// Resolution order: work > user > admin > env > default
 async getResolvedSettings(pluginId: string, options?: SettingsResolutionOptions) {
-    // 1. Check directory settings (if directoryId provided)
-    if (options?.directoryId && sources.directory[key] !== undefined) {
-        return { value, source: 'directory' };
+    // 1. Check work settings (if workId provided)
+    if (options?.workId && sources.work[key] !== undefined) {
+        return { value, source: 'work' };
     }
 
     // 2. Check user settings (if userId provided)
@@ -206,7 +206,7 @@ Each resolved setting includes its source and whether it is a fallback:
 interface ResolvedSetting {
 	key: string;
 	value: unknown;
-	source: 'directory' | 'user' | 'admin' | 'env' | 'default';
+	source: 'work' | 'user' | 'admin' | 'env' | 'default';
 	isFallback: boolean; // true when source doesn't match setting's intended scope
 }
 ```
@@ -215,13 +215,13 @@ interface ResolvedSetting {
 
 Plugins declare how their settings can be managed:
 
-| Mode            | Directory Settings | User Settings  | Admin Settings | Use Case                            |
+| Mode            | Work Settings | User Settings  | Admin Settings | Use Case                            |
 | --------------- | ------------------ | -------------- | -------------- | ----------------------------------- |
 | `hybrid`        | Yes                | Yes            | Yes            | Most plugins (OpenRouter, Scrapfly) |
 | `user-required` | Yes                | Yes (required) | No             | Per-user API keys (Mistral, Google) |
 | `admin-only`    | No                 | No             | Yes            | System-level config                 |
 
-When a plugin is `admin-only`, the settings service rejects user and directory level updates:
+When a plugin is `admin-only`, the settings service rejects user and work level updates:
 
 ```typescript
 if (configMode === 'admin-only') {
@@ -234,8 +234,8 @@ if (configMode === 'admin-only') {
 Settings declare their intended scope via the `x-scope` schema extension. The service validates that updates happen at the correct level:
 
 ```typescript
-// directory-scoped settings can only be set at directory level
-if (settingScope === 'directory' && updateScope !== 'directory') {
+// work-scoped settings can only be set at work level
+if (settingScope === 'work' && updateScope !== 'work') {
 	violations.push(`Setting "${key}" cannot be updated at "${updateScope}" level`);
 }
 
@@ -245,51 +245,51 @@ if (settingScope === 'user' && updateScope === 'global') {
 }
 ```
 
-## Per-Directory Plugin Configuration
+## Per-Work Plugin Configuration
 
-The `DirectoryPluginEntity` stores directory-specific plugin overrides:
+The `WorkPluginEntity` stores work-specific plugin overrides:
 
 ```typescript
-@Entity({ name: 'directory_plugins' })
-@Unique(['directoryId', 'pluginId'])
-class DirectoryPluginEntity {
-	directoryId: string; // Which directory
+@Entity({ name: 'work_plugins' })
+@Unique(['workId', 'pluginId'])
+class WorkPluginEntity {
+	workId: string; // Which work
 	pluginId: string; // Which plugin
-	enabled: boolean; // Plugin enabled for this directory
+	enabled: boolean; // Plugin enabled for this work
 	activeCapability: string; // Active capability routing
-	settings: Record<string, unknown>; // Directory-level settings
-	secretSettings: Record<string, unknown>; // Directory-level secrets
+	settings: Record<string, unknown>; // Work-level settings
+	secretSettings: Record<string, unknown>; // Work-level secrets
 	metadata: Record<string, unknown>; // Integration state
-	priority: number; // Plugin priority in this directory
+	priority: number; // Plugin priority in this work
 }
 ```
 
 ### Capability Routing
 
-Each directory can independently choose which plugin serves each capability:
+Each work can independently choose which plugin serves each capability:
 
 ```mermaid
 graph TD
-    subgraph "Directory A"
+    subgraph "Work A"
         A1["ai-provider: OpenAI"]
         A2["search: Exa"]
         A3["git: GitHub"]
     end
 
-    subgraph "Directory B"
+    subgraph "Work B"
         B1["ai-provider: Google Gemini"]
         B2["search: Bright Data"]
         B3["git: GitHub"]
     end
 
-    subgraph "Directory C"
+    subgraph "Work C"
         C1["ai-provider: OpenRouter"]
         C2["search: Tavily"]
         C3["git: (none)"]
     end
 ```
 
-The `activeCapability` field on `DirectoryPluginEntity` determines which plugin is active for a given capability within a directory. Only one plugin can be active per capability per directory.
+The `activeCapability` field on `WorkPluginEntity` determines which plugin is active for a given capability within a work. Only one plugin can be active per capability per work.
 
 ### Secret Isolation
 
@@ -310,7 +310,7 @@ if (propSchema?.['x-secret'] && value === MASKED_SECRET_PLACEHOLDER) {
 
 ## Scoped Plugin Contexts
 
-When a plugin executes, it receives a `PluginContext` scoped to the current directory and user:
+When a plugin executes, it receives a `PluginContext` scoped to the current work and user:
 
 ```mermaid
 graph TD
@@ -318,16 +318,16 @@ graph TD
     B --> C["PluginContext"]
     C --> D["Scoped Logger<br/>(Plugin:pluginId)"]
     C --> E["Scoped Cache<br/>(plugin:pluginId: prefix)"]
-    C --> F["Scoped Settings<br/>(directory > user > admin)"]
+    C --> F["Scoped Settings<br/>(work > user > admin)"]
     C --> G["Scoped Events<br/>(correlationId enrichment)"]
     C --> H["HTTP Client"]
 ```
 
-The context factory injects the `userId` and `directoryId` into the settings resolution, ensuring each plugin operation uses the correct settings for the current scope:
+The context factory injects the `userId` and `workId` into the settings resolution, ensuring each plugin operation uses the correct settings for the current scope:
 
 ```typescript
 const settings = await this.settingsService.getSettings(pluginId, {
-	directoryId: context.directoryId,
+	workId: context.workId,
 	userId: context.userId,
 	includeSecrets: true
 });
@@ -335,14 +335,14 @@ const settings = await this.settingsService.getSettings(pluginId, {
 
 ## Cache Key Scoping
 
-All cache keys include the directory ID to prevent cross-directory data leakage:
+All cache keys include the work ID to prevent cross-work data leakage:
 
 | Cache Type          | Key Format                                       | Example                                        |
 | ------------------- | ------------------------------------------------ | ---------------------------------------------- |
-| Pipeline checkpoint | `pipeline-checkpoint-{directoryId}-{pipelineId}` | `pipeline-checkpoint-dir123-standard-pipeline` |
+| Pipeline checkpoint | `pipeline-checkpoint-{workId}-{pipelineId}` | `pipeline-checkpoint-dir123-standard-pipeline` |
 | Plugin cache        | `plugin:{pluginId}:{key}`                        | `plugin:openrouter:models-list`                |
 
-Pipeline checkpoints are fully scoped to the directory, so resuming a failed generation in one directory never affects another.
+Pipeline checkpoints are fully scoped to the work, so resuming a failed generation in one work never affects another.
 
 ## Data Isolation Summary
 
@@ -361,9 +361,9 @@ graph LR
         G[Notification Preferences]
     end
 
-    subgraph "Per-Directory"
-        H[Directory Plugin Settings]
-        I[Directory Secrets]
+    subgraph "Per-Work"
+        H[Work Plugin Settings]
+        I[Work Secrets]
         J[Items / Categories / Tags]
         K[Member Roles]
         L[Generation History]
@@ -376,13 +376,13 @@ graph LR
 | --------- | -------------------------- | ------------------------------------------- |
 | Platform  | Plugin code, registry      | Shared singleton services                   |
 | User      | API keys, user settings    | `UserPluginEntity`, user-scoped resolution  |
-| Directory | Content, settings, members | `DirectoryPluginEntity`, foreign keys, RBAC |
+| Work | Content, settings, members | `WorkPluginEntity`, foreign keys, RBAC |
 | Plugin    | Cache, logger, events      | Namespace-prefixed keys, scoped context     |
 
 ## Best Practices
 
-1. **Always pass `directoryId` and `userId` to settings resolution**: Omitting these causes the service to skip higher-priority settings levels
+1. **Always pass `workId` and `userId` to settings resolution**: Omitting these causes the service to skip higher-priority settings levels
 2. **Use `ensureCanEdit` before mutations**: All content-changing operations should verify at least `EDITOR` role
 3. **Never store secrets in `settings`**: Use `secretSettings` for API keys and tokens so they are masked in API responses
-4. **Scope cache keys to directory**: When writing custom plugins that cache data, include the directory ID in cache keys to prevent cross-directory leakage
-5. **Respect `configurationMode`**: Plugins that declare `admin-only` should not accept user-level or directory-level settings overrides
+4. **Scope cache keys to work**: When writing custom plugins that cache data, include the work ID in cache keys to prevent cross-work leakage
+5. **Respect `configurationMode`**: Plugins that declare `admin-only` should not accept user-level or work-level settings overrides

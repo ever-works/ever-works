@@ -9,7 +9,7 @@ sidebar_position: 8
 
 The Ever Works Platform is organized as a Turborepo monorepo with pnpm workspaces.
 
-## Directory Structure
+## Work Structure
 
 ```
 ever-works/
@@ -44,7 +44,7 @@ The NestJS API (`apps/api/`) is composed of the following modules, registered in
 | Module                    | Description                                                                                                             |
 | ------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
 | **AuthModule**            | JWT authentication, OAuth (GitHub, Google), registration, email verification                                            |
-| **DirectoriesModule**     | Directory CRUD, AI generation, items, categories, tags, collections, import, scheduled updates, community PR processing |
+| **WorksModule**     | Work CRUD, AI generation, items, categories, tags, collections, import, scheduled updates, community PR processing |
 | **AiConversationModule**  | Stateless streaming AI chat (NDJSON)                                                                                    |
 | **ScreenshotModule**      | Provider-agnostic screenshot capture                                                                                    |
 | **MailModule**            | Email sending (SMTP, with provider abstraction)                                                                         |
@@ -74,8 +74,8 @@ The `@packages/agent` package is the core shared library. It exports 21 subpacka
 | `@packages/agent/entities`             | All TypeORM entity definitions                                              |
 | `@packages/agent/dto`                  | Shared DTOs and validation                                                  |
 | `@packages/agent/git`                  | Git operations (isomorphic-git, Octokit)                                    |
-| `@packages/agent/directory-operations` | Directory business logic                                                    |
-| `@packages/agent/import`               | Directory import from existing repos                                        |
+| `@packages/agent/work-operations` | Work business logic                                                    |
+| `@packages/agent/import`               | Work import from existing repos                                        |
 | `@packages/agent/subscriptions`        | Subscription and billing logic                                              |
 | `@packages/agent/notifications`        | Notification creation                                                       |
 | `@packages/agent/events`               | Event definitions and emitters                                              |
@@ -93,7 +93,7 @@ The `@packages/agent` package is the core shared library. It exports 21 subpacka
 
 ```mermaid
 flowchart TD
-    A["User creates directory<br/>(Web Dashboard / API)"] --> B["API validates request,<br/>creates Directory entity in DB"]
+    A["User creates work<br/>(Web Dashboard / API)"] --> B["API validates request,<br/>creates Work entity in DB"]
     B --> C["GitHub repositories created<br/>(main, data, website)"]
     C --> D["Generation Pipeline<br/>(Standard, Agent, or Claude Code)"]
     D --> D1["Prompt Processing &<br/>Domain Detection"]
@@ -105,7 +105,7 @@ flowchart TD
     D6 --> D7["Markdown Generation"]
     D7 --> E["Generated items committed<br/>to data repository"]
     E --> F["Website repository updated<br/>with latest data"]
-    F --> G["Deployed to Vercel →<br/>Live directory website"]
+    F --> G["Deployed to Vercel →<br/>Live work website"]
 ```
 
 ## Security

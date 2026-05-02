@@ -23,7 +23,7 @@
 ## Phase 3 — Settings store + cascade
 
 - [x] T9. `plugin_settings` table + encryption.
-- [x] T10. Three-tier resolver: directory → user → admin.
+- [x] T10. Three-tier resolver: work → user → admin.
 - [x] T11. Secret redaction helpers + tests.
 
 ## Phase 4 — Facades

@@ -195,7 +195,7 @@ Position classes:
 ```tsx
 import { Tooltip } from '@/components/ui/tooltip';
 
-<Tooltip content="Create new directory" position="bottom">
+<Tooltip content="Create new work" position="bottom">
 	<Button variant="icon">
 		<Plus className="w-4 h-4" />
 	</Button>

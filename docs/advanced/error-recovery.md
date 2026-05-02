@@ -7,7 +7,7 @@ sidebar_position: 7
 
 # Error Recovery & Resilience
 
-Ever Works implements multiple layers of error recovery to handle failures gracefully during pipeline execution, AI tool calling, and directory generation. The platform distinguishes between recoverable and non-recoverable errors, uses checkpoint-based resumption, and provides targeted user notifications based on error classification.
+Ever Works implements multiple layers of error recovery to handle failures gracefully during pipeline execution, AI tool calling, and work generation. The platform distinguishes between recoverable and non-recoverable errors, uses checkpoint-based resumption, and provides targeted user notifications based on error classification.
 
 **Key sources:**
 
@@ -157,7 +157,7 @@ this.logger.warn(`Step "${step.id}" failed but continuing: ${err.message}`);
 The `continueOnError` execution option forces the pipeline to continue past any step failure, regardless of whether the step is marked optional:
 
 ```typescript
-const result = await orchestrator.execute(directory, request, existing, {
+const result = await orchestrator.execute(work, request, existing, {
 	continueOnError: true
 });
 ```
@@ -210,7 +210,7 @@ After each successful step, a checkpoint is saved to the cache:
 
 ```typescript
 await this.cacheManager.set(
-	`pipeline-checkpoint-${directoryId}-${pipelineId}`,
+	`pipeline-checkpoint-${workId}-${pipelineId}`,
 	superjson.stringify(checkpointData),
 	CHECKPOINT_TTL_MS // 24 hours
 );
@@ -225,8 +225,8 @@ sequenceDiagram
     participant Cache
     participant Plugin as PipelinePlugin
 
-    Orchestrator->>Executor: resumeFromCheckpoint(directoryId, pipelineId)
-    Executor->>Cache: loadCheckpoint(directoryId, pipelineId)
+    Orchestrator->>Executor: resumeFromCheckpoint(workId, pipelineId)
+    Executor->>Cache: loadCheckpoint(workId, pipelineId)
 
     alt No checkpoint found
         Cache-->>Executor: null
@@ -251,15 +251,15 @@ sequenceDiagram
 The `resumeOrExecute()` method on the orchestrator combines both flows:
 
 ```typescript
-async resumeOrExecute(directory, request, existing, options): Promise<PipelineResult> {
+async resumeOrExecute(work, request, existing, options): Promise<PipelineResult> {
     // Try checkpoint resume first
     const resumed = await this.stepExecutor.resumeFromCheckpoint(
-        plugin, directory.id, plugin.id, options
+        plugin, work.id, plugin.id, options
     );
     if (resumed) return resumed;
 
     // No checkpoint: fresh execution
-    return this.execute(directory, request, existing, options);
+    return this.execute(work, request, existing, options);
 }
 ```
 
@@ -322,7 +322,7 @@ switch (classification.type) {
 		await notificationService.notifyGitAuthExpired(userId, provider);
 		break;
 	case 'account_level':
-		await notificationService.notifyGenerationAccountError(userId, directoryId, directoryName, message);
+		await notificationService.notifyGenerationAccountError(userId, workId, workName, message);
 		break;
 	// 'unknown': no notification sent
 }

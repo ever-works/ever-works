@@ -2,7 +2,7 @@
 
 ## Overview
 
-The Data Generator manages the **data repository** for each directory - a GitHub repository containing YAML configuration and JSON item data. It orchestrates the items generation pipeline and persists results to GitHub.
+The Data Generator manages the **data repository** for each work - a GitHub repository containing YAML configuration and JSON item data. It orchestrates the items generation pipeline and persists results to GitHub.
 
 ## Architecture
 
@@ -27,8 +27,8 @@ The Data Generator manages the **data repository** for each directory - a GitHub
 ┌─────────────────────────────────────────────────────────────────┐
 │                    GitHub Data Repository                        │
 │                                                                  │
-│  {owner}/{directory-slug}-data/                                 │
-│  ├── config.yml           # Directory configuration             │
+│  {owner}/{work-slug}-data/                                 │
+│  ├── config.yml           # Work configuration             │
 │  ├── items/               # Item JSON files                     │
 │  │   ├── item-slug-1.json                                       │
 │  │   ├── item-slug-2.json                                       │
@@ -81,8 +81,8 @@ The `DataRepository` class handles all file operations for the data repository.
 ```typescript
 class DataRepository {
 	// Configuration
-	readConfig(): Promise<DirectoryConfig>;
-	writeConfig(config: DirectoryConfig): Promise<void>;
+	readConfig(): Promise<WorkConfig>;
+	writeConfig(config: WorkConfig): Promise<void>;
 
 	// Items
 	readItems(): Promise<ItemData[]>;
@@ -116,9 +116,9 @@ class DataRepository {
 ### config.yml
 
 ```yaml
-name: "My Directory"
+name: "My Work"
 description: "A curated list of tools..."
-slug: "my-directory"
+slug: "my-work"
 version: 3                          # Auto-incremented on each update
 metadata:
   initial_prompt: "Find the best..."
@@ -199,7 +199,7 @@ metadata:
 
 ```typescript
 interface DataGeneratorPayload {
-	directoryId: string;
+	workId: string;
 	userId: string;
 	mode: 'create' | 'update';
 	dto: CreateItemsGeneratorDto;
@@ -229,10 +229,10 @@ interface DataGeneratorResult {
 }
 ```
 
-### DirectoryConfig
+### WorkConfig
 
 ```typescript
-interface DirectoryConfig {
+interface WorkConfig {
 	name: string;
 	description: string;
 	slug: string;
@@ -275,7 +275,7 @@ When `update_with_pull_request: true`:
 // PR creation
 const prUpdate = {
 	branch: 'ever-update-1705330800',
-	title: 'Ever Works: Update directory items',
+	title: 'Ever Works: Update work items',
 	body: `## Changes\n\n- Added ${newCount} new items\n- Updated ${updatedCount} items`,
 	number: 42,
 	url: 'https://github.com/user/repo/pull/42'
@@ -288,7 +288,7 @@ The `version` field in config.yml auto-increments on each update:
 
 ```typescript
 // In DataGeneratorService
-async updateConfig(config: DirectoryConfig) {
+async updateConfig(config: WorkConfig) {
     config.version = (config.version || 0) + 1;
     config.metadata.updated_at = new Date().toISOString();
     await this.dataRepository.writeConfig(config);

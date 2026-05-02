@@ -45,7 +45,7 @@ graph TD
 
 Unlike most plugins that serve a single role, the Valyu plugin registers for two capabilities:
 
-- **Search** -- discovers relevant URLs and content for directory items
+- **Search** -- discovers relevant URLs and content for work items
 - **Content extraction** -- pulls full text and markdown from web pages
 
 Both capabilities share the same API client and credentials.
@@ -151,13 +151,13 @@ The `canExtract()` method accepts any HTTP or HTTPS URL, making Valyu a general-
 
 ## Usage in Pipelines
 
-During directory generation, the search facade uses Valyu to:
+During work generation, the search facade uses Valyu to:
 
 1. **Find information** about each item via search queries
 2. **Discover source URLs** for items that need them
 3. **Extract content** from web pages for enrichment
 
-Valyu is particularly useful when your directory covers academic or specialized topics, since it can pull from proprietary data sources like arXiv and PubMed.
+Valyu is particularly useful when your work covers academic or specialized topics, since it can pull from proprietary data sources like arXiv and PubMed.
 
 ## Comparison with Other Search Plugins
 
@@ -203,7 +203,7 @@ class ValyuSearchPlugin implements IPlugin, ISearchPlugin, IContentExtractorPlug
 2. Copy your API key from the Valyu dashboard
 3. Enable the Valyu plugin on the Plugins page
 4. Enter the API key in the plugin settings
-5. Select Valyu as the search provider and/or content extractor for your directory
+5. Select Valyu as the search provider and/or content extractor for your work
 
 ## Troubleshooting
 

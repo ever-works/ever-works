@@ -23,7 +23,7 @@ The `@ever-works/cli-shared` package provides shared utilities for both the publ
 ```typescript
 // Prompt services
 export * from './prompts/base-prompt.service';
-export * from './prompts/directory-prompt.service';
+export * from './prompts/work-prompt.service';
 
 // Utilities
 export * from './utils/config-check';
@@ -76,14 +76,14 @@ An abstract class providing reusable interactive prompt methods with chalk-style
 | `validateMaxTokens(tokens)`                    | Integer range 1-200,000                     |
 | `validateGitName(name)`                        | 2-100 chars, letters + spaces + punctuation |
 
-## DirectoryPromptService
+## WorkPromptService
 
-Extends `BasePromptService` with directory-specific interactive prompts for creating, selecting, and configuring directories.
+Extends `BasePromptService` with work-specific interactive prompts for creating, selecting, and configuring works.
 
 ### Key Interfaces
 
 ```typescript
-interface DirectoryInputData {
+interface WorkInputData {
 	slug: string;
 	name: string;
 	description: string;
@@ -95,7 +95,7 @@ interface SlugConflictResolution {
 	finalSlug?: string;
 }
 
-enum DirectoryMemberRole {
+enum WorkMemberRole {
 	OWNER = 'owner',
 	MANAGER = 'manager',
 	EDITOR = 'editor',
@@ -107,15 +107,15 @@ enum DirectoryMemberRole {
 
 | Method                                              | Description                                                     |
 | --------------------------------------------------- | --------------------------------------------------------------- |
-| `promptDirectoryCreation(ownerDefault?, orgs?)`     | Full directory creation wizard (name, slug, description, owner) |
+| `promptWorkCreation(ownerDefault?, orgs?)`     | Full work creation wizard (name, slug, description, owner) |
 | `promptSlugConflictResolution(original, suggested)` | Handles slug conflicts with 3 options                           |
-| `promptDirectorySelection(directories?)`            | Interactive directory picker with role labels                   |
+| `promptWorkSelection(works?)`            | Interactive work picker with role labels                   |
 | `promptGitProviderSelection(providers)`             | Git provider selection with connection status                   |
 | `promptDeployProviderSelection(providers)`          | Deploy provider selection with "None" option                    |
 
-### Directory Creation Flow
+### Work Creation Flow
 
-The `promptDirectoryCreation` method guides users through a multi-step wizard:
+The `promptWorkCreation` method guides users through a multi-step wizard:
 
 1. Prompts for a display name (2-100 characters)
 2. Auto-generates a slug from the name via `slugifyName()`
@@ -129,7 +129,7 @@ Functions in `utils/slug-utils.ts` for URL-friendly slug operations:
 
 ```typescript
 // Generate a slug from text
-slugify('My Cool Directory'); // => 'my-cool-directory'
+slugify('My Cool Work'); // => 'my-cool-work'
 
 // Validate slug format
 validateSlug('my-dir'); // => true
@@ -237,7 +237,7 @@ cli-shared/src/
   index.ts                           # Public exports
   prompts/
     base-prompt.service.ts           # Abstract base with common prompts
-    directory-prompt.service.ts      # Directory-specific prompts
+    work-prompt.service.ts      # Work-specific prompts
   utils/
     config-check.ts                  # Configuration validation helpers
     slug-utils.ts                    # Slug generation and validation

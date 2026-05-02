@@ -7,7 +7,7 @@ sidebar_position: 1
 
 # Tasks Package
 
-The `@ever-works/trigger-tasks` package provides background task execution for the Ever Works platform using [Trigger.dev](https://trigger.dev). It handles long-running directory generation and import operations outside the main API process, enabling reliable multi-hour workflows with automatic failure recovery, cancellation handling, and schedule-based dispatching.
+The `@ever-works/trigger-tasks` package provides background task execution for the Ever Works platform using [Trigger.dev](https://trigger.dev). It handles long-running work generation and import operations outside the main API process, enabling reliable multi-hour workflows with automatic failure recovery, cancellation handling, and schedule-based dispatching.
 
 ## Package Overview
 
@@ -30,8 +30,8 @@ The tasks package operates in two distinct contexts:
 ```
 API Process                          Trigger.dev Worker
 -----------                          ------------------
-TriggerService                       directoryGenerationTask
-  .dispatchDirectoryGeneration() --> withWorkerContext()
+TriggerService                       workGenerationTask
+  .dispatchWorkGeneration() --> withWorkerContext()
                                        createTaskContext()
                                        TriggerGenerationOrchestrator.run()
 ```
@@ -40,14 +40,14 @@ TriggerService                       directoryGenerationTask
 
 Tasks are defined in `src/tasks/trigger/` using the Trigger.dev SDK.
 
-### Directory Generation Task
+### Work Generation Task
 
-The primary task that orchestrates AI-powered directory content generation.
+The primary task that orchestrates AI-powered work content generation.
 
 ```typescript
-// src/tasks/trigger/directory-generation.task.ts
-export const directoryGenerationTask = task({
-	id: 'directory-generation',
+// src/tasks/trigger/work-generation.task.ts
+export const workGenerationTask = task({
+	id: 'work-generation',
 	maxDuration: 3600 * 5, // 5 hours
 	onFailure: async ({ payload, error }) => {
 		/* ... */
@@ -55,43 +55,43 @@ export const directoryGenerationTask = task({
 	onCancel: async ({ payload }) => {
 		/* ... */
 	},
-	run: async (payload: DirectoryGenerationPayload) => {
-		return withWorkerContext('DirectoryGeneration', async (appContext) => {
-			const { orchestrator, directory, user } = await createTaskContext(
+	run: async (payload: WorkGenerationPayload) => {
+		return withWorkerContext('WorkGeneration', async (appContext) => {
+			const { orchestrator, work, user } = await createTaskContext(
 				appContext,
 				payload,
 				TriggerGenerationOrchestrator
 			);
 			await orchestrator.run({
-				directory,
+				work,
 				user,
 				dto: payload.dto,
 				historyId: payload.historyId,
 				historyStartedAt: payload.historyStartedAt
 			});
-			return { status: 'completed', directoryId: payload.directoryId };
+			return { status: 'completed', workId: payload.workId };
 		});
 	}
 });
 ```
 
-### Directory Import Task
+### Work Import Task
 
-Handles importing directory content from external sources such as GitHub repositories.
+Handles importing work content from external sources such as GitHub repositories.
 
 ```typescript
-export const directoryImportTask = task({
-	id: 'directory-import',
+export const workImportTask = task({
+	id: 'work-import',
 	maxDuration: 3600 * 2, // 2 hours
-	run: async (payload: DirectoryImportPayload) => {
-		return withWorkerContext('DirectoryImport', async (appContext) => {
-			const { orchestrator, directory, user, gitToken } = await createTaskContext(
+	run: async (payload: WorkImportPayload) => {
+		return withWorkerContext('WorkImport', async (appContext) => {
+			const { orchestrator, work, user, gitToken } = await createTaskContext(
 				appContext,
 				payload,
 				TriggerImportOrchestrator
 			);
-			await orchestrator.run({ directory, user, payload, gitToken });
-			return { status: 'completed', directoryId: payload.directoryId };
+			await orchestrator.run({ work, user, payload, gitToken });
+			return { status: 'completed', workId: payload.workId };
 		});
 	}
 });
@@ -99,15 +99,15 @@ export const directoryImportTask = task({
 
 ### Schedule Dispatcher Task
 
-A cron-based task that polls for due scheduled directory generations and dispatches them.
+A cron-based task that polls for due scheduled work generations and dispatches them.
 
 ```typescript
-export const directoryScheduleDispatcherTask = schedules.task({
-	id: 'directory-schedule-dispatcher',
+export const workScheduleDispatcherTask = schedules.task({
+	id: 'work-schedule-dispatcher',
 	cron: `*/${interval} * * * *`, // configurable interval
 	run: async () => {
 		const appContext = await NestFactory.createApplicationContext(TriggerInternalModule);
-		const dispatcher = appContext.get(DirectoryScheduleDispatcherService);
+		const dispatcher = appContext.get(WorkScheduleDispatcherService);
 		const dispatched = await dispatcher.dispatchDue();
 		return { dispatched, intervalMinutes: interval };
 	}
@@ -116,12 +116,12 @@ export const directoryScheduleDispatcherTask = schedules.task({
 
 ## TriggerService (API-Side Dispatcher)
 
-The `TriggerService` runs in the NestJS API and implements both `DirectoryGenerationDispatcher` and `DirectoryImportDispatcher` interfaces. It lazily configures the Trigger.dev SDK on first use.
+The `TriggerService` runs in the NestJS API and implements both `WorkGenerationDispatcher` and `WorkImportDispatcher` interfaces. It lazily configures the Trigger.dev SDK on first use.
 
 | Method                                 | Description                                       |
 | -------------------------------------- | ------------------------------------------------- |
-| `dispatchDirectoryGeneration(payload)` | Triggers a generation task with tags for tracking |
-| `dispatchDirectoryImport(payload)`     | Triggers an import task with source-type tags     |
+| `dispatchWorkGeneration(payload)` | Triggers a generation task with tags for tracking |
+| `dispatchWorkImport(payload)`     | Triggers an import task with source-type tags     |
 
 The service supports configurable machine sizes: `micro`, `small-1x`, `small-2x`, `medium-1x`, `medium-2x`, `large-1x`, `large-2x`.
 
@@ -141,14 +141,14 @@ async function withWorkerContext<T>(
 
 ### `createTaskContext`
 
-Shared bootstrap logic that hydrates plugins, fetches directory context from the API, and resolves the orchestrator instance.
+Shared bootstrap logic that hydrates plugins, fetches work context from the API, and resolves the orchestrator instance.
 
 ```typescript
 async function createTaskContext<T>(
 	appContext: INestApplicationContext,
-	payload: { directoryId: string; userId: string },
+	payload: { workId: string; userId: string },
 	orchestratorClass: Type<T>
-): Promise<{ user: User; directory: Directory; orchestrator: T; gitToken?: string }>;
+): Promise<{ user: User; work: Work; orchestrator: T; gitToken?: string }>;
 ```
 
 ## Orchestrators
@@ -163,7 +163,7 @@ Abstract base class providing common functionality:
 | ------------------------------------------------- | ------------------------------------------------------ |
 | `handleFailure(options)`                          | Records error state, updates history, emits completion |
 | `handleCancellation(options)`                     | Records cancelled state with duration calculation      |
-| `handleErrorNotification(error, user, directory)` | Classifies errors and sends notifications              |
+| `handleErrorNotification(error, user, work)` | Classifies errors and sends notifications              |
 
 ### TriggerGenerationOrchestrator
 
@@ -178,11 +178,11 @@ Coordinates the full generation pipeline:
 
 ### TriggerImportOrchestrator
 
-Coordinates directory imports from external sources:
+Coordinates work imports from external sources:
 
 1. Records import start and status
 2. Delegates to `ImportExecutorService` based on source type
-3. Updates directory item count on success
+3. Updates work item count on success
 4. Records import statistics in generation history
 
 ## Worker Services
@@ -193,7 +193,7 @@ HTTP client for communication between the Trigger.dev worker and the main API. U
 
 | Method                                       | Description                                        |
 | -------------------------------------------- | -------------------------------------------------- |
-| `fetchDirectoryContext(directoryId, userId)` | Fetches directory and user data from the API       |
+| `fetchWorkContext(workId, userId)` | Fetches work and user data from the API       |
 | `callRemote(name, method, args)`             | Forwards method calls to API-side services via RPC |
 
 Features automatic retry with exponential backoff (3 attempts, 500ms base delay) for 5xx errors and network failures.

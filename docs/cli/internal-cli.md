@@ -27,18 +27,18 @@ apps/internal-cli/
         set.subcommand.ts             # Set a config value
         unset.subcommand.ts           # Remove a config value
         switch-ai.subcommand.ts       # Switch AI provider
-      directory/
-        directory.command.ts          # Directory command group
-        create.subcommand.ts          # Create directory
-        list.subcommand.ts            # List directories
+      work/
+        work.command.ts          # Work command group
+        create.subcommand.ts          # Create work
+        list.subcommand.ts            # List works
         generate.subcommand.ts        # Generate content
-        update.subcommand.ts          # Update directory
+        update.subcommand.ts          # Update work
         submit-item.subcommand.ts     # Submit item
         remove-item.subcommand.ts     # Remove item
         regenerate-markdown.subcommand.ts
         update-website.subcommand.ts
         deploy.subcommand.ts          # Deploy website
-        delete.subcommand.ts          # Delete directory
+        delete.subcommand.ts          # Delete work
       serve/
         serve.command.ts              # Development server
 ```
@@ -61,7 +61,7 @@ The `CLIModule` imports the full agent stack for direct database and service acc
 		MarkdownGeneratorModule,
 		WebsiteGeneratorModule,
 		FacadesModule,
-		DirectoryModule
+		WorkModule
 	]
 })
 export class CLIModule implements OnApplicationBootstrap {
@@ -88,22 +88,22 @@ Configuration management for the internal CLI environment.
 | `unset`     | Remove a configuration value                |
 | `switch-ai` | Switch between configured AI providers      |
 
-### `directory`
+### `work`
 
-Directory management commands that operate directly against the database.
+Work management commands that operate directly against the database.
 
 | Subcommand            | Description                                |
 | --------------------- | ------------------------------------------ |
-| `create`              | Create a new directory                     |
-| `list`                | List all directories                       |
+| `create`              | Create a new work                     |
+| `list`                | List all works                       |
 | `generate`            | Generate data and create a repository      |
-| `update`              | Update a directory and its repository      |
-| `submit-item`         | Submit an item to a directory              |
-| `remove-item`         | Remove an item from a directory            |
-| `regenerate-markdown` | Regenerate readme markdown for a directory |
+| `update`              | Update a work and its repository      |
+| `submit-item`         | Submit an item to a work              |
+| `remove-item`         | Remove an item from a work            |
+| `regenerate-markdown` | Regenerate readme markdown for a work |
 | `update-website`      | Update the website repository              |
-| `deploy`              | Deploy the website for a directory         |
-| `delete`              | Delete a directory and its repositories    |
+| `deploy`              | Deploy the website for a work         |
+| `delete`              | Delete a work and its repositories    |
 
 ### `serve`
 
@@ -128,8 +128,8 @@ cd apps/internal-cli
 
 # Run a command
 npx nest-commander config show
-npx nest-commander directory list
-npx nest-commander directory generate
+npx nest-commander work list
+npx nest-commander work generate
 ```
 
 The CLI uses `DatabaseConfigurations.cli()` which configures the database connection for CLI-mode operation (typically SQLite for local development).

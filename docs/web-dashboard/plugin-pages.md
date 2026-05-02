@@ -141,7 +141,7 @@ The main detail page component, divided into four sections.
 The component uses two hooks to manage its interactive state:
 
 - `usePluginSettings` -- Manages the settings form with scopes `['global', 'user']`, validation, secret splitting, and the save lifecycle. The `onSave` callback calls `updatePluginSettings` server action.
-- `usePluginToggle` -- Manages enable/disable with optimistic UI, confirmation dialogs, and auto-enable-for-directories option.
+- `usePluginToggle` -- Manages enable/disable with optimistic UI, confirmation dialogs, and auto-enable-for-works option.
 
 **Enable/Disable Toggle**: System plugins cannot be toggled (the button is hidden). Non-system plugins show either a "Disable" button (danger-styled) or an "Enable" button (primary-styled).
 
@@ -151,7 +151,7 @@ The component uses two hooks to manage its interactive state:
 
 **File**: `src/components/plugins/PluginEnablePanel.tsx`
 
-A dialog shown when enabling a plugin that supports directory scope.
+A dialog shown when enabling a plugin that supports work scope.
 
 **Props**:
 
@@ -164,13 +164,13 @@ A dialog shown when enabling a plugin that supports directory scope.
 | `onConfirm`          | `() => void`                 | Confirm handler                |
 | `isPending`          | `boolean`                    | Loading state                  |
 
-The panel includes a checkbox that lets users automatically enable the plugin for all their existing directories.
+The panel includes a checkbox that lets users automatically enable the plugin for all their existing works.
 
 ## PluginDisableWarning
 
 **File**: `src/components/plugins/PluginDisableWarning.tsx`
 
-A confirmation dialog shown before disabling a plugin. Displays a warning message about the cascade effect (disabling at user level also disables for all directories). Uses `AlertTriangle` icon and danger-styled confirmation button.
+A confirmation dialog shown before disabling a plugin. Displays a warning message about the cascade effect (disabling at user level also disables for all works). Uses `AlertTriangle` icon and danger-styled confirmation button.
 
 ## Server Actions Used
 
@@ -179,8 +179,8 @@ A confirmation dialog shown before disabling a plugin. Displays a warning messag
 | `enablePlugin`           | `src/app/actions/plugins.ts` | Enables a plugin for the user                       |
 | `disablePlugin`          | `src/app/actions/plugins.ts` | Disables a plugin for the user                      |
 | `updatePluginSettings`   | `src/app/actions/plugins.ts` | Updates plugin settings (regular + secret)          |
-| `enableDirectoryPlugin`  | `src/app/actions/plugins.ts` | Enables a plugin for a specific directory           |
-| `disableDirectoryPlugin` | `src/app/actions/plugins.ts` | Disables a plugin for a specific directory          |
+| `enableWorkPlugin`  | `src/app/actions/plugins.ts` | Enables a plugin for a specific work           |
+| `disableWorkPlugin` | `src/app/actions/plugins.ts` | Disables a plugin for a specific work          |
 | `fetchModels`            | `src/app/actions/plugins.ts` | Fetches AI models for a plugin                      |
 | `setActiveCapability`    | `src/app/actions/plugins.ts` | Sets active capability for multi-capability plugins |
 

@@ -7,7 +7,7 @@ sidebar_position: 20
 
 # Vercel Deployment Plugin
 
-The Vercel plugin enables one-click publishing of directories as live websites on [Vercel](https://vercel.com). It integrates with the Vercel API to manage projects, track deployments, and look up existing sites.
+The Vercel plugin enables one-click publishing of works as live websites on [Vercel](https://vercel.com). It integrates with the Vercel API to manage projects, track deployments, and look up existing sites.
 
 **Source:** `packages/plugins/vercel/src/`
 
@@ -69,7 +69,7 @@ sequenceDiagram
     participant GH as GitHub Plugin
     participant Vercel as Vercel (via GitHub Actions)
 
-    User->>API: Deploy directory
+    User->>API: Deploy work
     API->>GH: Push site to GitHub repo
     API->>GH: dispatchWorkflow('deploy_vercel.yaml')
     GH->>Vercel: GitHub Actions triggers Vercel build
@@ -190,7 +190,7 @@ Searches the personal account and all teams the user belongs to, returning the f
 | `getTeams(token)`                                   | Lists user's Vercel teams.                                                    |
 | `listProjects(token)`                               | Lists projects under the default team scope.                                  |
 | `getProject(projectId, token)`                      | Gets a specific project by ID.                                                |
-| `lookupExistingDeployment(name, token, teamScope?)` | Finds existing deployment for a directory.                                    |
+| `lookupExistingDeployment(name, token, teamScope?)` | Finds existing deployment for a work.                                    |
 | `getAuthenticatedUser(token)`                       | Returns username and email for the token.                                     |
 
 ### Direct API Access
@@ -233,7 +233,7 @@ The `link` field connects a Vercel project to its source GitHub repository, incl
 
 ## Usage in the Platform
 
-When a user deploys a directory:
+When a user deploys a work:
 
 1. The platform checks `validateToken()` to confirm the user's Vercel token is valid.
 2. `lookupExistingDeployment()` checks if a Vercel project already exists.

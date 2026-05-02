@@ -9,7 +9,7 @@ sidebar_position: 54
 
 ## Overview
 
-The Anthropic plugin connects Ever Works to Anthropic's Claude API for AI-powered content generation and conversational AI. It extends the `BaseAiProvider` abstract class and uses the shared `AiOperations` utility (wrapping LangChain) to provide chat completions and streaming responses. Claude models are recognized for their large context windows and strong instruction-following capabilities, making them well-suited for directory content generation.
+The Anthropic plugin connects Ever Works to Anthropic's Claude API for AI-powered content generation and conversational AI. It extends the `BaseAiProvider` abstract class and uses the shared `AiOperations` utility (wrapping LangChain) to provide chat completions and streaming responses. Claude models are recognized for their large context windows and strong instruction-following capabilities, making them well-suited for work content generation.
 
 ## Architecture
 
@@ -108,11 +108,11 @@ async createEmbedding(_options: EmbeddingOptions): Promise<EmbeddingResponse> {
 }
 ```
 
-Directories that require semantic search should pair Anthropic (for generation) with a separate embedding provider.
+Works that require semantic search should pair Anthropic (for generation) with a separate embedding provider.
 
 ### 200K Context Window
 
-Claude models support up to 200,000 tokens of context, which is reported via `getCapabilities()`. This allows processing large source documents or entire website contents in a single request during directory generation.
+Claude models support up to 200,000 tokens of context, which is reported via `getCapabilities()`. This allows processing large source documents or entire website contents in a single request during work generation.
 
 ## Usage Examples
 
@@ -120,7 +120,7 @@ Claude models support up to 200,000 tokens of context, which is reported via `ge
 // Non-streaming chat completion with Claude
 const response = await anthropicPlugin.createChatCompletion({
 	messages: [
-		{ role: 'system', content: 'You are a directory content writer.' },
+		{ role: 'system', content: 'You are a work content writer.' },
 		{ role: 'user', content: 'Write a detailed description for Acme Corp.' }
 	],
 	settings: { apiKey: userApiKey, defaultModel: 'claude-sonnet-4-5-20250514' }

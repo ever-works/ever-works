@@ -10,21 +10,21 @@
 
 ## 1. Overview
 
-When community members open Pull Requests against a directory's main repo
+When community members open Pull Requests against a work's main repo
 (typically adding a new item to an Awesome-List-style README), the platform
 discovers the open PRs, extracts each item via AI, validates it against the
-directory's data schema, merges or comments on the PR, and (optionally)
-auto-closes processed PRs. Each directory gets a per-directory mutex so two
+work's data schema, merges or comments on the PR, and (optionally)
+auto-closes processed PRs. Each work gets a per-work mutex so two
 processing runs don't fight over the same PRs.
 
 ## 2. User Scenarios
 
 ### 2.1 Primary scenarios
 
-- **Given** my directory has community PRs open with new items, **when**
+- **Given** my work has community PRs open with new items, **when**
   the periodic processor runs, **then** each PR is read, parsed, validated,
   and merged (or commented if invalid).
-- **Given** a PR adds an item that already exists in the directory,
+- **Given** a PR adds an item that already exists in the work,
   **when** processing runs, **then** the PR is closed with a "duplicate"
   comment instead of merging.
 - **Given** a PR has been processed before (its number is in
@@ -33,7 +33,7 @@ processing runs don't fight over the same PRs.
 
 ### 2.2 Edge cases & failures
 
-- **Given** another worker is already processing the same directory's PRs,
+- **Given** another worker is already processing the same work's PRs,
   **when** my worker tries, **then** my run is a no-op (`acquired: false`)
   and exits cleanly.
 - **Given** the AI extraction returns malformed YAML/JSON, **when**
@@ -45,16 +45,16 @@ processing runs don't fight over the same PRs.
 
 ## 3. Functional Requirements
 
-- **FR-1** The processor MUST list open PRs in the directory's main repo,
+- **FR-1** The processor MUST list open PRs in the work's main repo,
   paginated up to 100 at a time.
-- **FR-2** Per-directory exclusivity MUST be enforced via
-  `DistributedTaskLockService.runExclusive` keyed by `community-pr:<directoryId>`.
+- **FR-2** Per-work exclusivity MUST be enforced via
+  `DistributedTaskLockService.runExclusive` keyed by `community-pr:<workId>`.
 - **FR-3** The processor MUST track processed PRs in
-  `directory.communityPrState.processedPrNumbers` and skip any PR already
+  `work.communityPrState.processedPrNumbers` and skip any PR already
   listed there.
 - **FR-4** For each unprocessed open PR, the processor MUST extract the
-  proposed item(s) using the directory's configured AI provider plugin.
-- **FR-5** Extracted items MUST be validated against the directory's data
+  proposed item(s) using the work's configured AI provider plugin.
+- **FR-5** Extracted items MUST be validated against the work's data
   schema (categories, tags, required fields).
 - **FR-6** Valid items MUST be merged (PR auto-merged or branch
   fast-forwarded as configured); the PR MUST then be marked processed.
@@ -63,17 +63,17 @@ processing runs don't fight over the same PRs.
 - **FR-8** Duplicate items MUST result in PR closure with a duplicate
   comment, not merging.
 - **FR-9** If `autoClose` is true, processed PRs MUST be closed after merge.
-- **FR-10** The processor MUST persist `directory.communityPrState`
+- **FR-10** The processor MUST persist `work.communityPrState`
   (totalItemsAdded, processedPrNumbers) on each successful PR processing
   so progress survives crashes.
 
 ## 4. Non-Functional Requirements
 
-- **Performance**: a processing run handles up to 100 PRs per directory per
+- **Performance**: a processing run handles up to 100 PRs per work per
   invocation; longer queues drain over multiple runs.
-- **Reliability**: per-directory mutex prevents duplicate processing; state
+- **Reliability**: per-work mutex prevents duplicate processing; state
   persistence enables resume.
-- **Security**: PR processing uses the directory owner's GitHub token via
+- **Security**: PR processing uses the work owner's GitHub token via
   the configured git provider plugin.
 - **Observability**: each run emits an activity-log entry with counts
   (processed / skipped / failed); per-PR outcomes go to logs.
@@ -84,22 +84,22 @@ processing runs don't fight over the same PRs.
 
 | Entity / concept              | Description                                                       |
 | ----------------------------- | ----------------------------------------------------------------- |
-| `CommunityPrState`            | Directory-level progress: `processedPrNumbers`, `totalItemsAdded` |
+| `CommunityPrState`            | Work-level progress: `processedPrNumbers`, `totalItemsAdded` |
 | `CommunityPrProcessorService` | Service that drives processing; uses the lock service             |
 | `CommunityPrTriggerSource`    | Where the run was triggered from (`api` / `cron` / `webhook`)     |
-| Per-directory lock key        | `community-pr:<directoryId>` (Principle IV)                       |
+| Per-work lock key        | `community-pr:<workId>` (Principle IV)                       |
 
 ## 6. Out of Scope
 
-- Generating new items from external sources (that's the directory's main
+- Generating new items from external sources (that's the work's main
   generation pipeline).
 - Reviewing PRs that don't follow the data-add convention (only structured
   "add an item" PRs are processed).
-- Multi-repo processing (one main repo per directory).
+- Multi-repo processing (one main repo per work).
 
 ## 7. Acceptance Criteria
 
-- [x] Two concurrent runs against the same directory produce one effective
+- [x] Two concurrent runs against the same work produce one effective
       execution; the loser exits cleanly with `acquired: false`.
 - [x] Already-processed PR numbers are skipped on re-runs.
 - [x] Invalid PRs receive a comment, not a merge.
@@ -118,7 +118,7 @@ _None on develop._
 - [x] **III**: items are merged into the user's repo, not the database.
 - [x] **IV**: long-running batches run as Trigger.dev tasks; in-process
       coordination via `DistributedTaskLockService`.
-- [x] **V**: `directory.communityPrState` jsonb column added via additive
+- [x] **V**: `work.communityPrState` jsonb column added via additive
       migration.
 - [x] **VI**: covered in
       `packages/agent/src/community-pr/__tests__/`.
@@ -126,7 +126,7 @@ _None on develop._
       store; never logged.
 - [x] **VIII**: N/A.
 - [x] **IX**: this spec describes user-observable behaviour.
-- [x] **X**: state schema is additive; old directories without the column
+- [x] **X**: state schema is additive; old works without the column
       default to empty state.
 
 ## 10. References

@@ -9,7 +9,7 @@ sidebar_position: 16
 
 ## Overview
 
-Ever Works uses the `@nestjs/event-emitter` package (built on `eventemitter2`) for in-process event-driven communication. The system defines two layers of events: domain events (directory creation, user lifecycle, generation completion) handled by NestJS services via the `@OnEvent()` decorator, and pipeline runtime events emitted during step execution. Events decouple producers from consumers, allowing services like mail, cleanup, and analytics to react to domain changes without tight coupling.
+Ever Works uses the `@nestjs/event-emitter` package (built on `eventemitter2`) for in-process event-driven communication. The system defines two layers of events: domain events (work creation, user lifecycle, generation completion) handled by NestJS services via the `@OnEvent()` decorator, and pipeline runtime events emitted during step execution. Events decouple producers from consumers, allowing services like mail, cleanup, and analytics to react to domain changes without tight coupling.
 
 ## Architecture
 
@@ -18,19 +18,19 @@ flowchart TD
     A[Event Producer] -->|"eventEmitter.emit()"| B[EventEmitter2]
     B --> C{Event Routing}
 
-    C --> D["@OnEvent('directory.created')"]
+    C --> D["@OnEvent('work.created')"]
     C --> E["@OnEvent('user.created')"]
-    C --> F["@OnEvent('directory.generation.completed')"]
+    C --> F["@OnEvent('work.generation.completed')"]
     C --> G["@OnEvent('pipeline:step-completed')"]
 
-    D --> H[DirectorySetupService]
+    D --> H[WorkSetupService]
     E --> I[MailService]
-    F --> J[DirectoryCleanupService]
+    F --> J[WorkCleanupService]
     G --> K[Progress Tracking]
 
     subgraph "Agent Package Events"
-        L[DirectoryCreatedEvent]
-        M[DirectoryGenerationCompletedEvent]
+        L[WorkCreatedEvent]
+        M[WorkGenerationCompletedEvent]
         N[BaseEvent]
     end
 
@@ -46,7 +46,7 @@ flowchart TD
 
     subgraph "Plugin Event Types"
         V[PluginLifecycleEvent]
-        W[DirectoryEvent]
+        W[WorkEvent]
         X[ItemEvent]
         Y[PipelineEvent]
         Z[SystemEvent]
@@ -58,14 +58,14 @@ flowchart TD
 | File                                                                | Purpose                                                          |
 | ------------------------------------------------------------------- | ---------------------------------------------------------------- |
 | `packages/agent/src/events/base.ts`                                 | Abstract `BaseEvent` class with static `EVENT_NAME`              |
-| `packages/agent/src/events/directory-created.event.ts`              | `DirectoryCreatedEvent` domain event                             |
-| `packages/agent/src/events/directory-generation-completed.event.ts` | `DirectoryGenerationCompletedEvent` domain event                 |
+| `packages/agent/src/events/work-created.event.ts`              | `WorkCreatedEvent` domain event                             |
+| `packages/agent/src/events/work-generation-completed.event.ts` | `WorkGenerationCompletedEvent` domain event                 |
 | `apps/api/src/events/index.ts`                                      | API-layer user lifecycle events (created, forgot password, etc.) |
 | `packages/plugin/src/events/event-types.ts`                         | Typed event names and payload interfaces for the plugin system   |
 | `packages/agent/src/pipeline/step-pipeline-executor.service.ts`     | Pipeline runtime event emission                                  |
 | `packages/agent/src/pipeline/executable-pipeline.class.ts`          | Pipeline runner state change events                              |
 | `apps/api/src/mail/mail.service.ts`                                 | Event listener: sends emails on user events                      |
-| `apps/api/src/directories/tasks/directory-cleanup.service.ts`       | Event listener: clears cache on generation completion            |
+| `apps/api/src/works/tasks/work-cleanup.service.ts`       | Event listener: clears cache on generation completion            |
 
 ## Key Classes
 
@@ -84,18 +84,18 @@ export abstract class BaseEvent {
 Each event extends `BaseEvent` and carries a typed payload:
 
 ```typescript
-export class DirectoryCreatedEvent extends BaseEvent {
-	static EVENT_NAME = 'directory.created';
+export class WorkCreatedEvent extends BaseEvent {
+	static EVENT_NAME = 'work.created';
 
-	constructor(public readonly directory: Directory) {
+	constructor(public readonly work: Work) {
 		super();
 	}
 }
 
-export class DirectoryGenerationCompletedEvent extends BaseEvent {
-	static EVENT_NAME = 'directory.generation.completed';
+export class WorkGenerationCompletedEvent extends BaseEvent {
+	static EVENT_NAME = 'work.generation.completed';
 
-	constructor(public readonly directory: Directory) {
+	constructor(public readonly work: Work) {
 		super();
 	}
 }
@@ -123,14 +123,14 @@ export class UserCreatedEvent extends BaseUserEvent {
 }
 
 export class MemberInvitedEvent {
-	static EVENT_NAME = 'directory.member_invited';
+	static EVENT_NAME = 'work.member_invited';
 
 	constructor(
 		public invitee: User,
 		public inviter: User,
-		public directory: Directory,
+		public work: Work,
 		public role: string,
-		public directoryUrl: string
+		public workUrl: string
 	) {}
 }
 ```
@@ -145,7 +145,7 @@ Full list of API user events:
 | `UserConfirmedEvent`       | `user.confirmed`           | user, dashboardUrl                                    |
 | `UserNewDeviceLoginEvent`  | `user.new_device_login`    | user, loginTime, device, browser, location, ipAddress |
 | `UserAccountDeletionEvent` | `user.delete_account`      | user, deleteToken, deleteUrl, expiresIn               |
-| `MemberInvitedEvent`       | `directory.member_invited` | invitee, inviter, directory, role, directoryUrl       |
+| `MemberInvitedEvent`       | `work.member_invited` | invitee, inviter, work, role, workUrl       |
 
 ### Plugin Event Type System
 
@@ -161,14 +161,14 @@ type PluginLifecycleEvent =
 	| 'plugin:error'
 	| 'plugin:settings-changed';
 
-type DirectoryEvent =
-	| 'directory:created'
-	| 'directory:updated'
-	| 'directory:deleted'
-	| 'directory:deployed'
-	| 'directory:generation-started'
-	| 'directory:generation-completed'
-	| 'directory:generation-failed';
+type WorkEvent =
+	| 'work:created'
+	| 'work:updated'
+	| 'work:deleted'
+	| 'work:deployed'
+	| 'work:generation-started'
+	| 'work:generation-completed'
+	| 'work:generation-failed';
 
 type ItemEvent = 'item:created' | 'item:updated' | 'item:deleted' | 'item:extracted' | 'item:validated';
 
@@ -191,7 +191,7 @@ interface PluginEventPayloads {
 	'plugin:loaded': PluginLoadedPayload;
 	'plugin:error': PluginErrorPayload;
 	'plugin:settings-changed': PluginSettingsChangedPayload;
-	'directory:generation-completed': DirectoryGenerationCompletedPayload;
+	'work:generation-completed': WorkGenerationCompletedPayload;
 	'pipeline:step-completed': PipelineStepCompletedPayload;
 	'pipeline:failed': PipelineFailedPayload;
 	// ... all events mapped to payloads
@@ -279,19 +279,19 @@ export class MailService {
 
 ```typescript
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import { DirectoryCreatedEvent } from '@ever-works/agent/events';
+import { WorkCreatedEvent } from '@ever-works/agent/events';
 
 @Injectable()
-export class DirectoryLifecycleService {
+export class WorkLifecycleService {
 	constructor(private readonly eventEmitter: EventEmitter2) {}
 
-	async createDirectory(dto: CreateDirectoryDto, userId: string): Promise<Directory> {
-		const directory = await this.repository.save(/* ... */);
+	async createWork(dto: CreateWorkDto, userId: string): Promise<Work> {
+		const work = await this.repository.save(/* ... */);
 
-		// Emit the event -- all @OnEvent('directory.created') listeners fire
-		this.eventEmitter.emit(DirectoryCreatedEvent.EVENT_NAME, new DirectoryCreatedEvent(directory));
+		// Emit the event -- all @OnEvent('work.created') listeners fire
+		this.eventEmitter.emit(WorkCreatedEvent.EVENT_NAME, new WorkCreatedEvent(work));
 
-		return directory;
+		return work;
 	}
 }
 ```
@@ -300,16 +300,16 @@ export class DirectoryLifecycleService {
 
 ```typescript
 import { OnEvent } from '@nestjs/event-emitter';
-import { DirectoryGenerationCompletedEvent } from '@ever-works/agent/events';
+import { WorkGenerationCompletedEvent } from '@ever-works/agent/events';
 
 @Injectable()
-export class DirectoryCleanupService {
-	@OnEvent(DirectoryGenerationCompletedEvent.EVENT_NAME)
-	clearDirectoryCache(data: DirectoryGenerationCompletedEvent) {
+export class WorkCleanupService {
+	@OnEvent(WorkGenerationCompletedEvent.EVENT_NAME)
+	clearWorkCache(data: WorkGenerationCompletedEvent) {
 		this.cacheRepository.typeormAdapter
-			.deleteUnscopedEntriesLike(data.directory.id)
+			.deleteUnscopedEntriesLike(data.work.id)
 			.then(() => {
-				this.logger.log(`Cache cleared for directory ${data.directory.id}`);
+				this.logger.log(`Cache cleared for work ${data.work.id}`);
 			})
 			.catch((err) => {
 				this.logger.error('Failed to clear cache:', err);
@@ -346,13 +346,13 @@ export class PipelineMonitoringService {
 
 ```typescript
 import { BaseEvent } from '@ever-works/agent/events';
-import { Directory } from '@ever-works/agent/entities';
+import { Work } from '@ever-works/agent/entities';
 
-export class DirectoryDeployedEvent extends BaseEvent {
-    static EVENT_NAME = 'directory.deployed';
+export class WorkDeployedEvent extends BaseEvent {
+    static EVENT_NAME = 'work.deployed';
 
     constructor(
-        public readonly directory: Directory,
+        public readonly work: Work,
         public readonly deployUrl: string,
         public readonly provider: string,
     ) {
@@ -362,16 +362,16 @@ export class DirectoryDeployedEvent extends BaseEvent {
 
 // Emit it:
 this.eventEmitter.emit(
-    DirectoryDeployedEvent.EVENT_NAME,
-    new DirectoryDeployedEvent(directory, url, 'vercel'),
+    WorkDeployedEvent.EVENT_NAME,
+    new WorkDeployedEvent(work, url, 'vercel'),
 );
 
 // Listen for it:
-@OnEvent(DirectoryDeployedEvent.EVENT_NAME)
-async onDirectoryDeployed(event: DirectoryDeployedEvent) {
+@OnEvent(WorkDeployedEvent.EVENT_NAME)
+async onWorkDeployed(event: WorkDeployedEvent) {
     await this.notificationService.notify(
-        event.directory.creator.id,
-        `Directory deployed to ${event.deployUrl}`,
+        event.work.creator.id,
+        `Work deployed to ${event.deployUrl}`,
     );
 }
 ```

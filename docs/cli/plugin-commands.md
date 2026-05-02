@@ -7,9 +7,9 @@ sidebar_position: 6
 
 # CLI Plugin Commands
 
-The CLI provides two levels of plugin management: global user-level plugin configuration (`plugins`) and directory-scoped plugin overrides (`directory plugins`). Both commands present interactive, searchable interfaces for browsing, enabling, and configuring plugins.
+The CLI provides two levels of plugin management: global user-level plugin configuration (`plugins`) and work-scoped plugin overrides (`work plugins`). Both commands present interactive, searchable interfaces for browsing, enabling, and configuring plugins.
 
-**Source:** `apps/cli/src/commands/plugins/` and `apps/cli/src/commands/directory/plugins.ts`
+**Source:** `apps/cli/src/commands/plugins/` and `apps/cli/src/commands/work/plugins.ts`
 
 ## Global Plugin Management
 
@@ -35,7 +35,7 @@ graph TD
     F -->|Enable| G[Prompt required settings]
     F -->|Disable| H[Confirm disable]
     F -->|Configure| I[Prompt all settings]
-    G --> J[Auto-enable for directories?]
+    G --> J[Auto-enable for works?]
     J --> K[Save and refresh]
     H --> K
     I --> K
@@ -63,7 +63,7 @@ Enabling a plugin follows this sequence:
 
 1. **Check required settings** -- Uses `getRequiredFields()` and `validateRequiredSettings()` from `@ever-works/plugin/api` to determine if mandatory fields are missing.
 2. **Prompt missing settings** -- If required fields are missing, `PluginSettingsPromptService` collects them before enabling.
-3. **Auto-enable for directories** -- Optionally enables the plugin for all existing directories.
+3. **Auto-enable for works** -- Optionally enables the plugin for all existing works.
 4. **API call** -- Sends settings and secret settings to `apiService.enablePlugin()`.
 
 ```typescript
@@ -71,7 +71,7 @@ Enabling a plugin follows this sequence:
 {
   settings?: Record<string, unknown>;
   secretSettings?: Record<string, unknown>;
-  autoEnableForDirectories?: boolean;
+  autoEnableForWorks?: boolean;
 }
 ```
 
@@ -158,28 +158,28 @@ After collecting all fields, two validations run:
 
 Settings are sanitized with `sanitizeSettingsForSave()` before returning.
 
-## Directory Plugin Management
+## Work Plugin Management
 
 ```bash
-ever-works directory plugins
+ever-works work plugins
 ```
 
-This command manages plugins at the directory level. Directory-scoped settings override user-level settings, and plugins can be individually enabled or disabled per directory.
+This command manages plugins at the work level. Work-scoped settings override user-level settings, and plugins can be individually enabled or disabled per work.
 
 ### Interactive Flow
 
 ```mermaid
 graph TD
-    A[ever-works directory plugins] --> B[Select directory]
+    A[ever-works work plugins] --> B[Select work]
     B --> C[Check edit permissions]
-    C --> D[Load directory plugins]
+    C --> D[Load work plugins]
     D --> E[Show active capability providers]
     E --> F[Select plugin]
     F --> G{Choose action}
     G -->|Enable| H[Select capability if multi-cap]
     G -->|Disable| I[Confirm disable]
     G -->|Set capability| J[Choose active capability]
-    G -->|Configure| K[Prompt directory settings]
+    G -->|Configure| K[Prompt work settings]
     H --> L[Save and refresh]
     I --> L
     J --> L
@@ -198,18 +198,18 @@ Before the plugin list, the command shows the current active provider for each c
   deployment → vercel
 ```
 
-### Directory Plugin Actions
+### Work Plugin Actions
 
 | Action                       | Description                                                                                                         |
 | ---------------------------- | ------------------------------------------------------------------------------------------------------------------- |
-| Enable for directory         | Enables the plugin at directory scope. If the plugin has multiple capabilities, prompts for which one to activate.  |
-| Disable for directory        | Disables the plugin at directory scope with confirmation.                                                           |
+| Enable for work         | Enables the plugin at work scope. If the plugin has multiple capabilities, prompts for which one to activate.  |
+| Disable for work        | Disables the plugin at work scope with confirmation.                                                           |
 | Set active capability        | Shown when a plugin provides more than one capability. Switches which capability is active.                         |
-| Configure directory settings | Prompts for directory-scoped settings. Uses user-level settings as fallback defaults (shown as `Inherited: value`). |
+| Configure work settings | Prompts for work-scoped settings. Uses user-level settings as fallback defaults (shown as `Inherited: value`). |
 
 ### Settings Inheritance
 
-Directory settings inherit from user-level settings. The prompt shows inherited values and allows overriding:
+Work settings inherit from user-level settings. The prompt shows inherited values and allows overriding:
 
 ```typescript
 const promptService = new PluginSettingsPromptService();
@@ -218,13 +218,13 @@ const result = await promptService.promptSettings({
 	schema: plugin.settingsSchema,
 	currentSettings: regular,
 	currentSecretSettings: secret,
-	scope: 'directory',
-	scopes: ['global', 'directory'],
+	scope: 'work',
+	scopes: ['global', 'work'],
 	fallbackSettings: userPlugin.settings // inherited defaults
 });
 ```
 
-When `scope` is `'directory'` and an inherited value exists, the prompt displays:
+When `scope` is `'work'` and an inherited value exists, the prompt displays:
 
 ```
   Inherited: gpt-5.1
@@ -254,11 +254,11 @@ if (!canEdit(role)) {
 | `disablePlugin(pluginId)`                              | `plugins`           | Disable a plugin                                  |
 | `updatePluginSettings(pluginId, data)`                 | `plugins`           | Save plugin settings                              |
 | `listPluginModels(pluginId)`                           | `plugins`           | Fetch available AI models for a plugin            |
-| `getDirectoryPlugins(directoryId)`                     | `directory plugins` | List plugins for a specific directory             |
-| `enableDirectoryPlugin(dirId, pluginId, data)`         | `directory plugins` | Enable a plugin at directory scope                |
-| `disableDirectoryPlugin(dirId, pluginId)`              | `directory plugins` | Disable a plugin at directory scope               |
-| `setDirectoryPluginCapability(dirId, pluginId, cap)`   | `directory plugins` | Set the active capability for a plugin            |
-| `updateDirectoryPluginSettings(dirId, pluginId, data)` | `directory plugins` | Save directory-level plugin settings              |
+| `getWorkPlugins(workId)`                     | `work plugins` | List plugins for a specific work             |
+| `enableWorkPlugin(dirId, pluginId, data)`         | `work plugins` | Enable a plugin at work scope                |
+| `disableWorkPlugin(dirId, pluginId)`              | `work plugins` | Disable a plugin at work scope               |
+| `setWorkPluginCapability(dirId, pluginId, cap)`   | `work plugins` | Set the active capability for a plugin            |
+| `updateWorkPluginSettings(dirId, pluginId, data)` | `work plugins` | Save work-level plugin settings              |
 
 ## Utility Functions
 

@@ -25,7 +25,7 @@ OpenAPI spec — there are no manual tool definitions to maintain.
 
 - **Given** I have an Ever Works API key, **when** I configure Claude
   Desktop with the MCP server in stdio mode, **then** Claude can list
-  my directories, generate items, deploy websites, etc. through
+  my works, generate items, deploy websites, etc. through
   natural-language conversation.
 - **Given** I want to use the MCP server from a remote client,
   **when** I run it in HTTP mode and supply an `Authorization`
@@ -78,7 +78,7 @@ Bearer`).
   AI client (response sanitisation).
 - **FR-9** API calls MUST time out after 2 minutes.
 - **FR-10** The server MUST publish 36 tools across these categories:
-  Directories (12), Generation (4), Items (4), Deployment (4),
+  Works (12), Generation (4), Items (4), Deployment (4),
   Plugins (5), Scheduling (4), Comparisons (5).
 - **FR-11** Configuration MUST be entirely via environment variables
   (no config file).

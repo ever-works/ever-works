@@ -7,37 +7,37 @@ sidebar_position: 3
 
 # Community PR Processing Deep Dive
 
-The community PR system enables directories to accept contributions from external users via GitHub pull requests. When community members submit PRs to a directory's main repository, the system automatically extracts new items, adds them to the data repository, and provides feedback on the PR.
+The community PR system enables works to accept contributions from external users via GitHub pull requests. When community members submit PRs to a work's main repository, the system automatically extracts new items, adds them to the data repository, and provides feedback on the PR.
 
 ## Architecture
 
 The system is implemented in `packages/agent/src/community-pr/` with a single service:
 
-- **`CommunityPrProcessorService`** -- processes open PRs across all community-enabled directories.
+- **`CommunityPrProcessorService`** -- processes open PRs across all community-enabled works.
 
 Dependencies:
 
 - **GitFacadeService** -- lists PRs, reads file changes, creates comments, closes PRs
 - **AiFacadeService** -- extracts structured item data from PR diffs
-- **DirectoryRepository** -- queries directories with community PR enabled, persists state
+- **WorkRepository** -- queries works with community PR enabled, persists state
 
 ## Processing Flow
 
-### 1. Directory Discovery
+### 1. Work Discovery
 
 ```
-processAllDirectories()
+processAllWorks()
   -> findWithCommunityPrEnabled()
-  -> for each directory: processDirectory()
+  -> for each work: processWork()
 ```
 
-The scheduler (via Trigger.dev or BullMQ) periodically calls `processAllDirectories()`, which loads all directories with community PR processing enabled.
+The scheduler (via Trigger.dev or BullMQ) periodically calls `processAllWorks()`, which loads all works with community PR processing enabled.
 
 ### 2. PR Enumeration
 
-For each directory, the service:
+For each work, the service:
 
-1. Resolves the directory owner and main repository name.
+1. Resolves the work owner and main repository name.
 2. Lists open PRs via `gitFacade.listPullRequests()` (up to 100 per batch).
 3. Filters out already-processed PRs using `state.processedPrNumbers` (a Set for O(1) lookups).
 
@@ -70,8 +70,8 @@ The data repository is cloned/pulled to get the current state, including existin
 The change context is sent to the AI with a structured extraction prompt:
 
 ```
-You are analyzing a community pull request submitted to the "{directoryName}" directory.
-Directory description: {description}
+You are analyzing a community pull request submitted to the "{workName}" work.
+Work description: {description}
 Existing categories: {categoryNames}
 PR Title: {prTitle}
 PR Changes: {changeContext}
@@ -101,15 +101,15 @@ If zero items are extracted, the system posts a comment and skips.
 
 For each extracted item:
 
-1. Create the item directory in the data repo.
+1. Create the item work in the data repo.
 2. Write the `item.yml` metadata file.
 3. Write a markdown description file.
 
 #### Step 5: Commit and Push
 
 ```typescript
-await this.gitFacade.add(directory.gitProvider, dest, '.');
-await this.gitFacade.commit(directory.gitProvider, dest, `Add ${items.length} item(s) from community PR #${pr.number}`);
+await this.gitFacade.add(work.gitProvider, dest, '.');
+await this.gitFacade.commit(work.gitProvider, dest, `Add ${items.length} item(s) from community PR #${pr.number}`);
 await this.gitFacade.push({ dir: dest }, gitOptions);
 ```
 
@@ -124,11 +124,11 @@ Thank you for your contribution! The following items have been added:
 The data repository has been updated automatically.
 ```
 
-If `autoClose` is enabled on the directory, the PR is closed after processing.
+If `autoClose` is enabled on the work, the PR is closed after processing.
 
 ## State Management
 
-Each directory maintains a `CommunityPrState` object:
+Each work maintains a `CommunityPrState` object:
 
 ```typescript
 interface CommunityPrState {
@@ -153,28 +153,28 @@ Old PR numbers are trimmed from the start since they are unlikely to reappear as
 
 ### State Persistence
 
-After processing all unprocessed PRs for a directory, the updated state is saved:
+After processing all unprocessed PRs for a work, the updated state is saved:
 
 ```typescript
-await this.directoryRepository.update(directory.id, { communityPrState: state });
+await this.workRepository.update(work.id, { communityPrState: state });
 ```
 
 Item counts are atomically incremented:
 
 ```typescript
-await this.directoryRepository.increment(directory.id, 'itemsCount', totalItemsAdded);
+await this.workRepository.increment(work.id, 'itemsCount', totalItemsAdded);
 ```
 
 ## Error Handling
 
 Errors are handled at two levels:
 
-1. **Per-directory**: If processing a directory fails entirely, the error is logged and added to the result's `errors` array. Other directories continue processing.
+1. **Per-work**: If processing a work fails entirely, the error is logged and added to the result's `errors` array. Other works continue processing.
 2. **Per-PR**: If a single PR fails, the error is logged and stored in `state.lastError`. The PR number is still added to `processedPrNumbers` to avoid reprocessing a broken PR.
 
 ## Configuration
 
-Community PR processing is controlled by two directory settings:
+Community PR processing is controlled by two work settings:
 
 | Setting                | Type    | Description                              |
 | ---------------------- | ------- | ---------------------------------------- |
@@ -190,11 +190,11 @@ Community PR processing is controlled by two directory settings:
 
 ## Batch Processing Results
 
-The `processAllDirectories()` method returns an aggregate result:
+The `processAllWorks()` method returns an aggregate result:
 
 ```typescript
 interface CommunityPrProcessingResult {
-	processed: number; // Total items added across all directories
-	errors: Array<{ directoryId: string; error: string }>; // Failed directories
+	processed: number; // Total items added across all works
+	errors: Array<{ workId: string; error: string }>; // Failed works
 }
 ```

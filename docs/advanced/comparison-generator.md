@@ -7,7 +7,7 @@ sidebar_position: 2
 
 # Comparison Generator
 
-The comparison generator creates structured "X vs Y" comparison pages for items within a directory. It combines web research, AI analysis, and scored dimensions to produce detailed comparison content.
+The comparison generator creates structured "X vs Y" comparison pages for items within a work. It combines web research, AI analysis, and scored dimensions to produce detailed comparison content.
 
 ## Architecture
 
@@ -29,7 +29,7 @@ The comparison system spans two packages:
 
 ### Supporting Modules
 
-The `comparison/` subdirectory contains pure functions and focused modules:
+The `comparison/` subwork contains pure functions and focused modules:
 
 | Module                     | Purpose                                            |
 | -------------------------- | -------------------------------------------------- |
@@ -115,11 +115,11 @@ The service exposes five operations:
 
 | Method                                                        | Purpose                                      |
 | ------------------------------------------------------------- | -------------------------------------------- |
-| `generateNextComparison(directoryId, userId)`                 | Auto-select and generate the next comparison |
-| `generateManualComparison(directoryId, userId, itemA, itemB)` | Generate comparison for two specific items   |
-| `listComparisons(directoryId, userId)`                        | List all comparisons for a directory         |
-| `getComparison(directoryId, userId, slug)`                    | Get a single comparison with markdown        |
-| `deleteComparison(directoryId, userId, slug)`                 | Delete a comparison and update state         |
+| `generateNextComparison(workId, userId)`                 | Auto-select and generate the next comparison |
+| `generateManualComparison(workId, userId, itemA, itemB)` | Generate comparison for two specific items   |
+| `listComparisons(workId, userId)`                        | List all comparisons for a work         |
+| `getComparison(workId, userId, slug)`                    | Get a single comparison with markdown        |
+| `deleteComparison(workId, userId, slug)`                 | Delete a comparison and update state         |
 
 ## Manual vs Automatic Comparisons
 

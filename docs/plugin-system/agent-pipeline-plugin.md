@@ -7,7 +7,7 @@ sidebar_position: 46
 
 # Agent Pipeline Plugin
 
-The Agent Pipeline plugin is an autonomous, tool-based generation pipeline that uses an AI agent to research and generate directory items. Unlike the Standard Pipeline's fixed 15-step sequence, the Agent Pipeline gives the AI model a set of tools and lets it decide how to research, extract, and create items.
+The Agent Pipeline plugin is an autonomous, tool-based generation pipeline that uses an AI agent to research and generate work items. Unlike the Standard Pipeline's fixed 15-step sequence, the Agent Pipeline gives the AI model a set of tools and lets it decide how to research, extract, and create items.
 
 **Source:** `packages/plugins/agent-pipeline/src/agent-pipeline.plugin.ts`
 
@@ -71,7 +71,7 @@ The Agent Pipeline runs 5 sequential steps:
 | 2    | `generate-items`      | Run the AI agent with tool calling to research and create items                         | ~120s    |
 | 3    | `collect-results`     | Read generated JSON files from the workspace, merge with data source items, deduplicate | ~2s      |
 | 4    | `capture-screenshots` | Capture screenshots for items with source URLs (optional)                               | ~30s     |
-| 5    | `cleanup`             | Remove the temporary workspace directory                                                | ~1s      |
+| 5    | `cleanup`             | Remove the temporary workspace work                                                | ~1s      |
 
 ## Agent Tools
 
@@ -153,7 +153,7 @@ Before the agent runs, the pipeline queries configured data sources (via `dataSo
 1. Enable the Agent Pipeline plugin on the Plugins page
 2. Configure an AI provider with a model that supports tool calling
 3. Optionally configure search, screenshot, and content extractor providers
-4. Select "Agent Pipeline" as the pipeline provider when generating a directory
+4. Select "Agent Pipeline" as the pipeline provider when generating a work
 
 ## API Reference
 
@@ -164,7 +164,7 @@ class AgentPipelinePlugin implements IPlugin, IPipelinePlugin<AgentPipelineStepI
 	readonly id: 'agent-pipeline';
 	readonly category: 'pipeline';
 
-	execute(directory, request, existing, options?, onProgress?): Promise<PipelineResult>;
+	execute(work, request, existing, options?, onProgress?): Promise<PipelineResult>;
 	cancel(): Promise<void>;
 	getState(): PipelineState<AgentPipelineStepId> | null;
 	getStepDefinitions(): readonly PipelineStepDefinition<AgentPipelineStepId>[];

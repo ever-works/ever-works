@@ -16,12 +16,12 @@ src/lib/api/
   index.ts                  # Re-exports all API modules
   server-api.ts             # Core fetch utilities (serverFetch, serverMutation)
   auth.ts                   # Authentication endpoints
-  directory.ts              # Directory CRUD, import, schedule, settings
+  work.ts              # Work CRUD, import, schedule, settings
   items-generator.ts        # Item generation, submission, extraction
   ai-conversation.ts        # AI chat streaming endpoint
   website.ts                # Website repository management
   health.ts                 # Health check endpoint
-  members.ts                # Directory member management
+  members.ts                # Work member management
   notifications.ts          # Notification endpoints
   plugins.ts                # Plugin management and settings
   settings.ts               # User settings endpoints
@@ -105,14 +105,14 @@ Provides the client for all generation-related endpoints.
 
 | Method                | Endpoint                                | HTTP | Description                   |
 | --------------------- | --------------------------------------- | ---- | ----------------------------- |
-| `generate`            | `/directories/{id}/generate`            | POST | Starts item generation        |
-| `update`              | `/directories/{id}/update`              | POST | Starts item update generation |
-| `submitItem`          | `/directories/{id}/submit-item`         | POST | Submits a new item            |
-| `removeItem`          | `/directories/{id}/remove-item`         | POST | Removes an item               |
-| `updateItem`          | `/directories/{id}/update-item`         | POST | Updates item metadata         |
+| `generate`            | `/works/{id}/generate`            | POST | Starts item generation        |
+| `update`              | `/works/{id}/update`              | POST | Starts item update generation |
+| `submitItem`          | `/works/{id}/submit-item`         | POST | Submits a new item            |
+| `removeItem`          | `/works/{id}/remove-item`         | POST | Removes an item               |
+| `updateItem`          | `/works/{id}/update-item`         | POST | Updates item metadata         |
 | `extractItemDetails`  | `/extract-item-details`                 | POST | AI-extracts details from URL  |
-| `regenerateMarkdown`  | `/directories/{id}/regenerate-markdown` | POST | Regenerates all markdown      |
-| `getFormSchema`       | `/directories/{id}/generator-form`      | GET  | Gets directory form schema    |
+| `regenerateMarkdown`  | `/works/{id}/regenerate-markdown` | POST | Regenerates all markdown      |
+| `getFormSchema`       | `/works/{id}/generator-form`      | GET  | Gets work form schema    |
 | `getFormSchemaGlobal` | `/generator-form`                       | GET  | Gets global form schema       |
 
 **Type Re-exports**: The file re-exports key types from `@ever-works/plugin` and `@ever-works/contracts/api`:
@@ -173,9 +173,9 @@ Centralizes enum definitions, re-exporting from `@ever-works/contracts/api` and 
 export { GenerationMethod, WebsiteRepositoryCreationMethod } from '@ever-works/contracts/api';
 export {
 	GenerateStatusType,
-	DirectoryScheduleCadence,
-	DirectoryScheduleStatus,
-	DirectoryScheduleBillingMode
+	WorkScheduleCadence,
+	WorkScheduleStatus,
+	WorkScheduleBillingMode
 } from '@ever-works/contracts/api';
 
 // Web-specific
@@ -184,23 +184,23 @@ export enum OAuthProvider {
 	GOOGLE = 'google'
 }
 
-export enum DirectoryMemberRole {
+export enum WorkMemberRole {
 	OWNER = 'owner', // Reserved for creator, not assignable
-	MANAGER = 'manager', // Can edit directory and manage members
+	MANAGER = 'manager', // Can edit work and manage members
 	EDITOR = 'editor', // Can edit content, cannot manage members
 	VIEWER = 'viewer' // Read-only access
 }
 
 export const ASSIGNABLE_MEMBER_ROLES = [
-	DirectoryMemberRole.MANAGER,
-	DirectoryMemberRole.EDITOR,
-	DirectoryMemberRole.VIEWER
+	WorkMemberRole.MANAGER,
+	WorkMemberRole.EDITOR,
+	WorkMemberRole.VIEWER
 ] as const;
 ```
 
 ## Plugin Capabilities APIs
 
-The `plugins-capabilities/` directory contains API clients for plugin-specific features:
+The `plugins-capabilities/` work contains API clients for plugin-specific features:
 
 ### Screenshot API (`screenshot.ts`)
 
@@ -213,10 +213,10 @@ The `plugins-capabilities/` directory contains API clients for plugin-specific f
 
 | Method                                  | Description                                |
 | --------------------------------------- | ------------------------------------------ |
-| `deploy(directoryId, options)`          | Triggers a deployment                      |
+| `deploy(workId, options)`          | Triggers a deployment                      |
 | `getDeploymentTeams()`                  | Lists deployment provider teams            |
-| `getTeamsForDirectory(directoryId)`     | Lists teams using directory's plugin token |
-| `lookupExistingDeployment(directoryId)` | Checks for existing deployments            |
+| `getTeamsForWork(workId)`     | Lists teams using work's plugin token |
+| `lookupExistingDeployment(workId)` | Checks for existing deployments            |
 
 ### Git Providers API (`git-providers.ts`)
 
@@ -281,7 +281,7 @@ The index file provides a single import point for all API modules:
 
 ```typescript
 export * from './auth';
-export * from './directory';
+export * from './work';
 export * from './items-generator';
 export * from './website';
 export * from './server-api';
@@ -297,4 +297,4 @@ export * from './plugins-capabilities/oauth';
 export * from './types';
 ```
 
-Server actions import from this index: `import { directoryAPI, itemsGeneratorAPI } from '@/lib/api'`.
+Server actions import from this index: `import { workAPI, itemsGeneratorAPI } from '@/lib/api'`.

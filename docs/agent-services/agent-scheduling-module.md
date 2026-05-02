@@ -9,51 +9,51 @@ sidebar_position: 29
 
 ## Overview
 
-The Scheduling module in `@ever-works/agent` manages automated, recurring updates for directories. It provides cadence-based scheduling (hourly, daily, weekly, monthly), integrates with the subscription/billing system for plan enforcement, handles failure recovery with configurable retry limits, and implements drift-correction to maintain consistent execution timing.
+The Scheduling module in `@ever-works/agent` manages automated, recurring updates for works. It provides cadence-based scheduling (hourly, daily, weekly, monthly), integrates with the subscription/billing system for plan enforcement, handles failure recovery with configurable retry limits, and implements drift-correction to maintain consistent execution timing.
 
-The scheduler is designed to work with the Trigger.dev background job system -- it manages schedule state and entitlements while the actual execution dispatch happens through the `DirectoryGenerationDispatcher` interface.
+The scheduler is designed to work with the Trigger.dev background job system -- it manages schedule state and entitlements while the actual execution dispatch happens through the `WorkGenerationDispatcher` interface.
 
 ## Module Structure
 
 ```
 packages/agent/src/
   services/
-    directory-schedule.service.ts    # Core scheduling service (~571 lines)
-    directory.module.ts              # Registered as part of DirectoryModule
+    work-schedule.service.ts    # Core scheduling service (~571 lines)
+    work.module.ts              # Registered as part of WorkModule
   entities/
-    directory.entity.ts              # Schedule fields on Directory entity
-    directory-schedule.entity.ts     # DirectorySchedule entity (1:1 with Directory)
-    types.ts                         # DirectoryScheduleCadence, DirectoryScheduleStatus
+    work.entity.ts              # Schedule fields on Work entity
+    work-schedule.entity.ts     # WorkSchedule entity (1:1 with Work)
+    types.ts                         # WorkScheduleCadence, WorkScheduleStatus
   subscriptions/
     subscription.service.ts          # Plan enforcement for scheduling
   tasks/
-    directory-generation-dispatcher.ts   # Dispatcher interface
-    directory-generation.types.ts        # Dispatch payload types
+    work-generation-dispatcher.ts   # Dispatcher interface
+    work-generation.types.ts        # Dispatch payload types
 ```
 
 ## Key Classes and Services
 
-### `DirectoryScheduleService`
+### `WorkScheduleService`
 
 The core service (~571 lines) managing all scheduling operations:
 
 **Schedule management:**
 
-- **`getSchedule(directoryId)`** -- retrieve the current schedule configuration and status
-- **`updateSchedule(directory, user, cadence, options)`** -- enable or update the schedule. Validates entitlements, calculates next run time, and persists the schedule.
-- **`cancelSchedule(directory, user)`** -- disable scheduling entirely. Clears the cadence, next run time, and resets status.
-- **`pauseSchedule(directory, user, reason?)`** -- temporarily pause without losing configuration. The cadence is preserved but no runs will be dispatched.
+- **`getSchedule(workId)`** -- retrieve the current schedule configuration and status
+- **`updateSchedule(work, user, cadence, options)`** -- enable or update the schedule. Validates entitlements, calculates next run time, and persists the schedule.
+- **`cancelSchedule(work, user)`** -- disable scheduling entirely. Clears the cadence, next run time, and resets status.
+- **`pauseSchedule(work, user, reason?)`** -- temporarily pause without losing configuration. The cadence is preserved but no runs will be dispatched.
 
 **Run lifecycle:**
 
-- **`markRunDispatched(directoryId)`** -- mark that a scheduled run has been sent to the background worker
-- **`markRunCompleted(directoryId)`** -- mark successful completion. Calculates the next run time using drift correction.
-- **`markRunFailed(directoryId, error)`** -- record a failure. Increments the failure counter and potentially auto-pauses the schedule.
+- **`markRunDispatched(workId)`** -- mark that a scheduled run has been sent to the background worker
+- **`markRunCompleted(workId)`** -- mark successful completion. Calculates the next run time using drift correction.
+- **`markRunFailed(workId, error)`** -- record a failure. Increments the failure counter and potentially auto-pauses the schedule.
 
 **Recovery:**
 
 - **`recoverStuckSchedules()`** -- find schedules that have been in "dispatched" status for too long and reset them for retry. This handles cases where the background worker crashed or timed out.
-- **`validateRunEntitlement(directory, user)`** -- check that the user's subscription plan allows the scheduled run to proceed.
+- **`validateRunEntitlement(work, user)`** -- check that the user's subscription plan allows the scheduled run to proceed.
 
 ### Cadence System
 
@@ -61,10 +61,10 @@ Four cadence levels are supported:
 
 | Cadence   | Interval         | Typical Use Case                      |
 | --------- | ---------------- | ------------------------------------- |
-| `HOURLY`  | Every 60 minutes | High-frequency monitoring directories |
-| `DAILY`   | Every 24 hours   | Standard content directories          |
+| `HOURLY`  | Every 60 minutes | High-frequency monitoring works |
+| `DAILY`   | Every 24 hours   | Standard content works          |
 | `WEEKLY`  | Every 7 days     | Slower-moving curated lists           |
-| `MONTHLY` | Every 30 days    | Archival or low-update directories    |
+| `MONTHLY` | Every 30 days    | Archival or low-update works    |
 
 ### Drift Correction
 
@@ -100,38 +100,38 @@ Two billing modes are supported:
 Plan enforcement validates:
 
 - Allowed cadence levels per subscription tier
-- Maximum number of directories with active schedules
+- Maximum number of works with active schedules
 - Per-run entitlement check before dispatch
 
 ## API Reference
 
-### DirectoryScheduleService
+### WorkScheduleService
 
 ```typescript
 // Schedule management
-getSchedule(directoryId: string): Promise<ScheduleInfo>
+getSchedule(workId: string): Promise<ScheduleInfo>
 
 updateSchedule(
-    directory: Directory,
+    work: Work,
     user: User,
-    cadence: DirectoryScheduleCadence,
+    cadence: WorkScheduleCadence,
     options?: {
         maxFailureBeforePause?: number;  // 1-10, default: 3
         startAt?: Date;                  // When to begin (default: now + interval)
     }
 ): Promise<ScheduleInfo>
 
-cancelSchedule(directory: Directory, user: User): Promise<void>
-pauseSchedule(directory: Directory, user: User, reason?: string): Promise<void>
+cancelSchedule(work: Work, user: User): Promise<void>
+pauseSchedule(work: Work, user: User, reason?: string): Promise<void>
 
 // Run lifecycle
-markRunDispatched(directoryId: string): Promise<void>
-markRunCompleted(directoryId: string): Promise<void>
-markRunFailed(directoryId: string, error: string): Promise<void>
+markRunDispatched(workId: string): Promise<void>
+markRunCompleted(workId: string): Promise<void>
+markRunFailed(workId: string, error: string): Promise<void>
 
 // Recovery and validation
 recoverStuckSchedules(): Promise<number>  // Returns count of recovered schedules
-validateRunEntitlement(directory: Directory, user: User): Promise<{
+validateRunEntitlement(work: Work, user: User): Promise<{
     allowed: boolean;
     reason?: string;
 }>
@@ -142,8 +142,8 @@ validateRunEntitlement(directory: Directory, user: User): Promise<{
 ```typescript
 interface ScheduleInfo {
 	enabled: boolean;
-	cadence: DirectoryScheduleCadence | null;
-	status: DirectoryScheduleStatus | null;
+	cadence: WorkScheduleCadence | null;
+	status: WorkScheduleStatus | null;
 	nextRunAt: Date | null;
 	lastRunAt?: Date;
 	lastError?: string;
@@ -152,41 +152,41 @@ interface ScheduleInfo {
 }
 ```
 
-### DirectoryScheduleCadence
+### WorkScheduleCadence
 
 ```typescript
-type DirectoryScheduleCadence = 'HOURLY' | 'DAILY' | 'WEEKLY' | 'MONTHLY';
+type WorkScheduleCadence = 'HOURLY' | 'DAILY' | 'WEEKLY' | 'MONTHLY';
 ```
 
-### DirectoryScheduleStatus
+### WorkScheduleStatus
 
 ```typescript
-type DirectoryScheduleStatus = 'active' | 'paused' | 'dispatched' | 'running' | 'error';
+type WorkScheduleStatus = 'active' | 'paused' | 'dispatched' | 'running' | 'error';
 ```
 
 ## Configuration
 
-### Directory Entity Schedule Fields
+### Work Entity Schedule Fields
 
-The `Directory` entity carries inline schedule fields for quick-access:
+The `Work` entity carries inline schedule fields for quick-access:
 
 ```typescript
 @Column({ type: 'boolean', default: false })
 scheduledUpdatesEnabled: boolean;
 
 @Column({ type: 'varchar', nullable: true })
-scheduledCadence?: DirectoryScheduleCadence | null;
+scheduledCadence?: WorkScheduleCadence | null;
 
 @TimestampColumn({ nullable: true })
 scheduledNextRunAt?: Date | null;
 
 @Column({ type: 'varchar', nullable: true })
-scheduledStatus?: DirectoryScheduleStatus | null;
+scheduledStatus?: WorkScheduleStatus | null;
 ```
 
-### DirectorySchedule Entity
+### WorkSchedule Entity
 
-The `DirectorySchedule` entity (one-to-one with Directory) stores extended scheduling metadata:
+The `WorkSchedule` entity (one-to-one with Work) stores extended scheduling metadata:
 
 - `failureCount` -- current consecutive failure count
 - `maxFailureBeforePause` -- threshold for auto-pause
@@ -196,15 +196,15 @@ The `DirectorySchedule` entity (one-to-one with Directory) stores extended sched
 
 ### Dispatch Integration
 
-Scheduled runs are dispatched through the `DirectoryGenerationDispatcher` interface:
+Scheduled runs are dispatched through the `WorkGenerationDispatcher` interface:
 
 ```typescript
-interface DirectoryGenerationDispatcher {
-	dispatchDirectoryGeneration(payload: DirectoryGenerationPayload): Promise<string | null>;
+interface WorkGenerationDispatcher {
+	dispatchWorkGeneration(payload: WorkGenerationPayload): Promise<string | null>;
 }
 
-interface DirectoryGenerationPayload {
-	directoryId: string;
+interface WorkGenerationPayload {
+	workId: string;
 	userId: string;
 	options?: {
 		aiProviderOverride?: string;
@@ -218,7 +218,7 @@ The dispatcher is injected via the `DIRECTORY_GENERATION_DISPATCHER` Symbol toke
 
 | Dependency                        | Purpose                                                   |
 | --------------------------------- | --------------------------------------------------------- |
-| `@ever-works/agent/database`      | `DirectoryRepository`, `DirectoryScheduleRepository`      |
+| `@ever-works/agent/database`      | `WorkRepository`, `WorkScheduleRepository`      |
 | `@ever-works/agent/subscriptions` | Plan enforcement and billing mode resolution              |
 | `@ever-works/agent/tasks`         | `DIRECTORY_GENERATION_DISPATCHER` for background dispatch |
 | `TypeORM`                         | Entity persistence and queries                            |
@@ -228,9 +228,9 @@ The dispatcher is injected via the `DIRECTORY_GENERATION_DISPATCHER` Symbol toke
 ### Enabling a Daily Schedule
 
 ```typescript
-import { DirectoryScheduleService } from '@ever-works/agent/services';
+import { WorkScheduleService } from '@ever-works/agent/services';
 
-const schedule = await scheduleService.updateSchedule(directory, user, 'DAILY', { maxFailureBeforePause: 5 });
+const schedule = await scheduleService.updateSchedule(work, user, 'DAILY', { maxFailureBeforePause: 5 });
 
 console.log(`Next run at: ${schedule.nextRunAt}`);
 ```
@@ -239,11 +239,11 @@ console.log(`Next run at: ${schedule.nextRunAt}`);
 
 ```typescript
 // Called by the background worker after successful generation
-await scheduleService.markRunCompleted(directoryId);
+await scheduleService.markRunCompleted(workId);
 // Next run time is calculated with drift correction
 
 // On failure
-await scheduleService.markRunFailed(directoryId, 'AI provider rate limit exceeded');
+await scheduleService.markRunFailed(workId, 'AI provider rate limit exceeded');
 // Auto-pauses after maxFailureBeforePause consecutive failures
 ```
 
@@ -258,7 +258,7 @@ console.log(`Recovered ${recovered} stuck schedules`);
 ### Checking Entitlements
 
 ```typescript
-const { allowed, reason } = await scheduleService.validateRunEntitlement(directory, user);
+const { allowed, reason } = await scheduleService.validateRunEntitlement(work, user);
 if (!allowed) {
 	console.log(`Schedule blocked: ${reason}`);
 	// e.g., "Plan does not allow HOURLY cadence"

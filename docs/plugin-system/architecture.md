@@ -242,7 +242,7 @@ interface PluginContext {
 	readonly logger: PluginLogger; // Scoped logging
 	readonly cache: PluginCache; // Plugin-scoped key-value cache with TTL
 	readonly http: PluginHttpClient; // HTTP client (get, post, put, patch, delete)
-	readonly env: PluginEnvironment; // Platform info, flags, directories
+	readonly env: PluginEnvironment; // Platform info, flags, works
 	readonly envVars: EnvironmentVariables; // Environment variable access
 	readonly services: PluginServices; // Limited platform service interfaces
 
@@ -343,7 +343,7 @@ On application startup, the API calls `PluginBootstrapService.bootstrap()`:
 
 ### Discovery Paths
 
-The loader scans these directories for plugin packages:
+The loader scans these works for plugin packages:
 
 ```
 ./plugins
@@ -353,7 +353,7 @@ The loader scans these directories for plugin packages:
 ../../packages/plugins
 ```
 
-Each subdirectory is checked for a `package.json` with an `everworks.plugin` manifest.
+Each subwork is checked for a `package.json` with an `everworks.plugin` manifest.
 
 ### Dependency Resolution
 
@@ -388,7 +388,7 @@ Each capability has a **facade service** that abstracts plugin selection from th
 When a facade receives a request, it resolves which plugin to use:
 
 1. **Explicit override** — If the caller specifies a provider, use that
-2. **Directory active plugin** — Check if the directory has an active plugin for this capability
+2. **Work active plugin** — Check if the work has an active plugin for this capability
 3. **Default for capability** — Use the plugin marked as `defaultForCapabilities` in its manifest
 4. **First enabled** — Fall back to any enabled plugin for the capability
 
@@ -401,8 +401,8 @@ The plugin system uses three database tables:
 | Entity                  | Scope         | Key Fields                                                                       |
 | ----------------------- | ------------- | -------------------------------------------------------------------------------- |
 | `PluginEntity`          | System/admin  | `pluginId`, `state`, `manifest`, `settings`, `secretSettings`                    |
-| `UserPluginEntity`      | Per user      | `userId`, `pluginId`, `enabled`, `autoEnableForDirectories`, `settings`          |
-| `DirectoryPluginEntity` | Per directory | `directoryId`, `pluginId`, `enabled`, `activeCapability`, `priority`, `settings` |
+| `UserPluginEntity`      | Per user      | `userId`, `pluginId`, `enabled`, `autoEnableForWorks`, `settings`          |
+| `WorkPluginEntity` | Per work | `workId`, `pluginId`, `enabled`, `activeCapability`, `priority`, `settings` |
 
 These tables store plugin state, per-scope settings, and enable/disable preferences. The in-memory registry is the source of truth for loaded plugins; the database persists configuration across restarts.
 
@@ -413,8 +413,8 @@ When determining if a plugin is enabled for a given context:
 ```
 System plugin? → always enabled
 User disabled? → disabled everywhere
-Directory context + directory record? → use directory enabled value
-Directory context + user autoEnableForDirectories? → enabled
+Work context + work record? → use work enabled value
+Work context + user autoEnableForWorks? → enabled
 User record exists? → use user enabled value
 Fallback → manifest autoEnable default (typically false)
 ```

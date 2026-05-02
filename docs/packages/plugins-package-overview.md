@@ -7,7 +7,7 @@ sidebar_position: 12
 
 # Plugins Package Overview
 
-The `packages/plugins/` directory contains all first-party plugin implementations for the Ever Works platform. Each plugin is a standalone ESM package that extends the platform with capabilities such as AI content generation, web search, content extraction, screenshot capture, git integration, deployment, and pipeline orchestration.
+The `packages/plugins/` work contains all first-party plugin implementations for the Ever Works platform. Each plugin is a standalone ESM package that extends the platform with capabilities such as AI content generation, web search, content extraction, screenshot capture, git integration, deployment, and pipeline orchestration.
 
 ## Overview
 
@@ -23,7 +23,7 @@ The `packages/plugins/` directory contains all first-party plugin implementation
 
 ## Module Structure
 
-Each plugin follows a consistent directory layout:
+Each plugin follows a consistent work layout:
 
 ```
 packages/plugins/<plugin-name>/
@@ -84,7 +84,7 @@ Extract and process content from web pages, documents, and external services.
 
 ### Screenshot Providers
 
-Capture website screenshots for directory item thumbnails and previews.
+Capture website screenshots for work item thumbnails and previews.
 
 | Plugin        | Package                            | Description                       |
 | ------------- | ---------------------------------- | --------------------------------- |
@@ -93,7 +93,7 @@ Capture website screenshots for directory item thumbnails and previews.
 
 ### Git Providers
 
-Manage repository operations for directory data storage and website deployment.
+Manage repository operations for work data storage and website deployment.
 
 | Plugin | Package                     | Description                                               |
 | ------ | --------------------------- | --------------------------------------------------------- |
@@ -211,7 +211,7 @@ Plugins define their configurable settings using JSON Schema with custom extensi
 | Extension  | Purpose                                         |
 | ---------- | ----------------------------------------------- |
 | `x-secret` | Marks a field as sensitive (encrypted at rest)  |
-| `x-scope`  | Setting scope: `user`, `global`, or `directory` |
+| `x-scope`  | Setting scope: `user`, `global`, or `work` |
 | `x-widget` | UI widget hint (e.g., `model-select`)           |
 | `x-hidden` | Hides field from the default settings UI        |
 | `x-envVar` | Maps field to an environment variable           |
@@ -273,7 +273,7 @@ cd packages/plugins/openai && pnpm test:watch
 
 ### Registering Plugins with the Platform
 
-Plugins are discovered and loaded by the `PluginsModule` in the agent package. Built-in plugins are loaded from the `packages/plugins/` directory at startup:
+Plugins are discovered and loaded by the `PluginsModule` in the agent package. Built-in plugins are loaded from the `packages/plugins/` work at startup:
 
 ```typescript
 import { PluginsModule } from '@ever-works/agent/plugins';
@@ -303,7 +303,7 @@ export class ApiModule implements OnApplicationBootstrap {
 
 To add a new plugin to the platform:
 
-1. Create a new directory under `packages/plugins/<plugin-name>/`
+1. Create a new work under `packages/plugins/<plugin-name>/`
 2. Add a `package.json` with the `everworks.plugin` manifest
 3. Implement the plugin class extending the appropriate base class
 4. Export the plugin from `src/index.ts`
@@ -387,10 +387,10 @@ Plugin settings are resolved through a multi-layer priority system. Higher-prior
 
 | Priority    | Source      | Description                            |
 | ----------- | ----------- | -------------------------------------- |
-| 1 (highest) | `directory` | Per-directory overrides                |
+| 1 (highest) | `work` | Per-work overrides                |
 | 2           | `user`      | User-level preferences                 |
 | 3           | `admin`     | Platform admin defaults                |
 | 4           | `env`       | Environment variables (via `x-envVar`) |
 | 5 (lowest)  | `default`   | Schema-defined defaults                |
 
-This allows flexible configuration where, for example, an admin can set a default AI model but individual users can override it with their own preference, and specific directories can further customize the setting.
+This allows flexible configuration where, for example, an admin can set a default AI model but individual users can override it with their own preference, and specific works can further customize the setting.

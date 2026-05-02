@@ -10,10 +10,10 @@
 
 ## Context
 
-The platform splits long-running directory generation into two
+The platform splits long-running work generation into two
 processes: the NestJS API and the Trigger.dev worker. The worker
 runs the pipeline, the data generator, and the markdown / website
-generators — every one of which needs database access (read directory
+generators — every one of which needs database access (read work
 config, write generation history, append logs, update plugin
 settings, persist the items metrics).
 
@@ -38,7 +38,7 @@ endpoint on the API.
 Concretely:
 
 1. The API exposes two endpoints under `/internal/trigger/`:
-    - `GET /directories/:id/context` — fetches a directory plus its
+    - `GET /works/:id/context` — fetches a work plus its
       user plus a fresh git access token.
     - `POST /remote/call` — generic RPC: takes `{ name, method, args }`
       where `name` is one of an allow-listed set of provider names
@@ -107,7 +107,7 @@ safety on every call. We chose the runtime Proxy because:
   bump.
 - TypeScript's structural typing already gives compile-time safety on
   the worker side because the binding declares the proxy as
-  `DirectoryOperationsService`, etc.
+  `WorkOperationsService`, etc.
 
 The trade-off: typos in method names fail at runtime, not compile
 time. We accept this because the worker code goes through the same
@@ -215,7 +215,7 @@ cost. Worth revisiting if we ever ship a third callback consumer
 ### 3. Message queue (NATS, BullMQ, AMQP)
 
 **Rejected** — most worker → API calls are synchronous reads
-(fetch directory context, get plugin settings). A queue-based RPC
+(fetch work context, get plugin settings). A queue-based RPC
 adds a hop and a correlation-id machinery without solving any
 problem we have. We already use BullMQ + Trigger.dev for the
 async-job parts.

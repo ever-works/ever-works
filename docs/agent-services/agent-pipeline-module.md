@@ -9,7 +9,7 @@ sidebar_position: 23
 
 ## Overview
 
-The Pipeline Execution module implements a plugin-driven, step-based execution engine within `@ever-works/agent`. It is responsible for building, ordering, and running multi-step generation pipelines that transform directory configurations into enriched content. The pipeline system supports topological dependency sorting, parallel execution groups, modifier-based step injection, and two distinct execution modes (step-based and self-managed).
+The Pipeline Execution module implements a plugin-driven, step-based execution engine within `@ever-works/agent`. It is responsible for building, ordering, and running multi-step generation pipelines that transform work configurations into enriched content. The pipeline system supports topological dependency sorting, parallel execution groups, modifier-based step injection, and two distinct execution modes (step-based and self-managed).
 
 Pipelines are constructed from plugin-contributed steps, allowing the generation process to be customized through the plugin system without modifying core code.
 
@@ -71,13 +71,13 @@ The main entry point for pipeline execution. Routes execution to the appropriate
 
 **Key methods:**
 
-- `execute(directory, user, options)` -- run a pipeline with automatic mode detection
-- `executeWithMode(directory, user, mode, options)` -- run with explicit mode
-- `getRecommendedMode(directoryId)` -- determine the best execution mode
+- `execute(work, user, options)` -- run a pipeline with automatic mode detection
+- `executeWithMode(work, user, mode, options)` -- run with explicit mode
+- `getRecommendedMode(workId)` -- determine the best execution mode
 - `hasFullPipelinePlugin()` -- check if a self-managed pipeline plugin is available
-- `resumeFromCheckpoint(directory, user)` -- resume a previously interrupted pipeline
-- `clearCheckpoint(directoryId)` -- discard saved checkpoint state
-- `resumeOrExecute(directory, user, options)` -- resume if checkpoint exists, otherwise start fresh
+- `resumeFromCheckpoint(work, user)` -- resume a previously interrupted pipeline
+- `clearCheckpoint(workId)` -- discard saved checkpoint state
+- `resumeOrExecute(work, user, options)` -- resume if checkpoint exists, otherwise start fresh
 
 ### `ExecutablePipelineRunner`
 
@@ -110,7 +110,7 @@ Methods: `startExecution()`, `completeExecution()`, `cancelExecution()`, `startS
 
 ### `PipelineFacadeService`
 
-Creates bound facade instances for pipeline step execution. Each step receives a `StepExecutionContext` with pre-configured facades scoped to the current directory and user:
+Creates bound facade instances for pipeline step execution. Each step receives a `StepExecutionContext` with pre-configured facades scoped to the current work and user:
 
 ```typescript
 interface StepExecutionContext {
@@ -120,13 +120,13 @@ interface StepExecutionContext {
 	contentExtractor: IContentExtractorFacade;
 	dataSource: IDataSourceFacade;
 	logger: Logger;
-	directory: Directory;
+	work: Work;
 	user: User;
 	signal?: AbortSignal; // Cancellation support
 }
 ```
 
-The `FacadeBindingContext` binds `directoryId`, `userId`, and `providerOverrides` so that each facade call automatically uses the correct scope and credentials.
+The `FacadeBindingContext` binds `workId`, `userId`, and `providerOverrides` so that each facade call automatically uses the correct scope and credentials.
 
 ## API Reference
 
@@ -134,7 +134,7 @@ The `FacadeBindingContext` binds `directoryId`, `userId`, and `providerOverrides
 
 ```typescript
 execute(
-    directory: Directory,
+    work: Work,
     user: User,
     options?: {
         pipelineId?: string;
@@ -144,17 +144,17 @@ execute(
 ): Promise<PipelineResult>
 
 executeWithMode(
-    directory: Directory,
+    work: Work,
     user: User,
     mode: 'step' | 'full',
     options?: PipelineOptions
 ): Promise<PipelineResult>
 
-getRecommendedMode(directoryId: string): Promise<'step' | 'full'>
+getRecommendedMode(workId: string): Promise<'step' | 'full'>
 hasFullPipelinePlugin(): boolean
-resumeFromCheckpoint(directory: Directory, user: User): Promise<PipelineResult>
-clearCheckpoint(directoryId: string): Promise<void>
-resumeOrExecute(directory: Directory, user: User, options?: PipelineOptions): Promise<PipelineResult>
+resumeFromCheckpoint(work: Work, user: User): Promise<PipelineResult>
+clearCheckpoint(workId: string): Promise<void>
+resumeOrExecute(work: Work, user: User, options?: PipelineOptions): Promise<PipelineResult>
 ```
 
 ### PipelineBuilderService
@@ -171,7 +171,7 @@ build(
 
 ```typescript
 createStepExecutionContext(
-    directory: Directory,
+    work: Work,
     user: User,
     options?: { providerOverrides?: Record<string, string>; signal?: AbortSignal }
 ): StepExecutionContext
@@ -222,7 +222,7 @@ interface PipelineModification {
 | `@ever-works/plugin`         | `IPipelinePlugin`, `IPipelineModifier` interfaces      |
 | `@ever-works/agent/plugins`  | `PluginRegistryService` for pipeline plugin resolution |
 | `@ever-works/agent/facades`  | All facade services for step execution context         |
-| `@ever-works/agent/database` | Directory repository for checkpoint persistence        |
+| `@ever-works/agent/database` | Work repository for checkpoint persistence        |
 | `EventEmitter2`              | Pipeline runtime event emission                        |
 
 ## Usage Examples
@@ -233,12 +233,12 @@ interface PipelineModification {
 import { PipelineOrchestratorService } from '@ever-works/agent/pipeline';
 
 // Auto-detect execution mode
-const result = await orchestrator.execute(directory, user, {
+const result = await orchestrator.execute(work, user, {
 	aiProviderOverride: 'anthropic'
 });
 
 // Explicit step-based mode
-const result = await orchestrator.executeWithMode(directory, user, 'step', {
+const result = await orchestrator.executeWithMode(work, user, 'step', {
 	signal: abortController.signal
 });
 ```
@@ -247,7 +247,7 @@ const result = await orchestrator.executeWithMode(directory, user, 'step', {
 
 ```typescript
 // If a previous run was interrupted, resume from where it left off
-const result = await orchestrator.resumeOrExecute(directory, user, {
+const result = await orchestrator.resumeOrExecute(work, user, {
 	pipelineId: 'agent-pipeline'
 });
 ```
@@ -258,7 +258,7 @@ const result = await orchestrator.resumeOrExecute(directory, user, {
 import { PipelineBuilderService } from '@ever-works/agent/pipeline';
 
 const pipeline = builder.build(pipelinePlugin, modifierPlugins, {
-	directory,
+	work,
 	user,
 	options: { aiProviderOverride: 'openai' }
 });

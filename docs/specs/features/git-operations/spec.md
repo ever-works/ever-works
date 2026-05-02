@@ -10,7 +10,7 @@
 
 ## 1. Overview
 
-The platform's primary storage is Git. Every directory has three repos —
+The platform's primary storage is Git. Every work has three repos —
 data, markdown, website — under user ownership. All read/write access
 goes through `GitFacadeService`, which resolves the user's configured
 git provider plugin (today: GitHub) and routes operations through a
@@ -21,7 +21,7 @@ provider REST APIs for remote operations.
 
 ### 2.1 Primary scenarios
 
-- **Given** I have a directory whose data lives in `me/cool-tools-data`,
+- **Given** I have a work whose data lives in `me/cool-tools-data`,
   **when** any pipeline step calls `gitFacade.cloneOrPull(...)`, **then**
   the repo is cloned the first time and pulled on subsequent calls,
   cached locally per user/repo.
@@ -60,7 +60,7 @@ provider REST APIs for remote operations.
   hardcoded.
 - **FR-3** The facade MUST expose: repository management
   (`getRepository`, `createRepository`, `repositoryExists`,
-  `hasRepositoryAccess`, `getDirectoryContents`, `getFileContent`,
+  `hasRepositoryAccess`, `getWorkContents`, `getFileContent`,
   `getReadme`); local git (`cloneOrPull`, `add`, `commit`, `push`);
   PR operations (`listPullRequests`, `getPullRequestFiles`,
   `createPullRequestComment`, `closePullRequest`); branch and history
@@ -75,7 +75,7 @@ provider REST APIs for remote operations.
 - **FR-6** `cloneOrPull` MUST cache repos locally per user/repo and
   upgrade subsequent calls to `pull`.
 - **FR-7** `push` MUST support `maxRetries` for transient failures.
-- **FR-8** Each directory MUST operate on three repos using the
+- **FR-8** Each work MUST operate on three repos using the
   naming convention `<slug>-data`, `<slug>`, `<slug>-website`.
 - **FR-9** Provider plugins (today GitHub) MUST implement the full
   `IGitProviderPlugin` interface; new providers (GitLab / Bitbucket)
@@ -101,9 +101,9 @@ provider REST APIs for remote operations.
 | -------------------- | ------------------------------------------------------------------------- |
 | `GitFacadeService`   | Capability-agnostic entry point for all git operations                    |
 | `IGitProviderPlugin` | Contract every git provider plugin must implement                         |
-| `GitFacadeOptions`   | `{userId, providerId, directoryId?, token?}` per-call context             |
-| Repository ecosystem | Per-directory triple: `<slug>-data`, `<slug>`, `<slug>-website`           |
-| Local cache          | Per-user, per-repo working directory reused across calls                  |
+| `GitFacadeOptions`   | `{userId, providerId, workId?, token?}` per-call context             |
+| Repository ecosystem | Per-work triple: `<slug>-data`, `<slug>`, `<slug>-website`           |
+| Local cache          | Per-user, per-repo working work reused across calls                  |
 | Error hierarchy      | `NoGitProviderError`, `GitProviderNotFoundError`, `NoGitCredentialsError` |
 
 ## 6. Out of Scope

@@ -7,7 +7,7 @@ sidebar_position: 5
 
 # Trigger.dev Integration
 
-Ever Works uses [Trigger.dev](https://trigger.dev/) for background job processing. Long-running directory generation and import tasks are offloaded to Trigger.dev workers, keeping the API responsive while heavy AI pipeline work runs asynchronously.
+Ever Works uses [Trigger.dev](https://trigger.dev/) for background job processing. Long-running work generation and import tasks are offloaded to Trigger.dev workers, keeping the API responsive while heavy AI pipeline work runs asynchronously.
 
 ## Architecture
 
@@ -25,7 +25,7 @@ The `TriggerService` is the main NestJS service that dispatches background jobs.
 
 ```typescript
 @Injectable()
-export class TriggerService implements DirectoryGenerationDispatcher, DirectoryImportDispatcher {
+export class TriggerService implements WorkGenerationDispatcher, WorkImportDispatcher {
 	// ...
 }
 ```
@@ -67,76 +67,76 @@ The machine size is set via the `TRIGGER_MACHINE` environment variable. If the c
 
 ### Dispatch Methods
 
-#### Directory Generation
+#### Work Generation
 
 ```typescript
-async dispatchDirectoryGeneration(
-    payload: DirectoryGenerationPayload
+async dispatchWorkGeneration(
+    payload: WorkGenerationPayload
 ): Promise<string | null>
 ```
 
-Dispatches a directory generation task with tags for filtering:
+Dispatches a work generation task with tags for filtering:
 
-- `directory-generation` (task type)
+- `work-generation` (task type)
 - Generation mode (e.g., `recreate`, `append`)
-- Directory ID
+- Work ID
 
 Returns the Trigger.dev run ID on success, or `null` if dispatch fails.
 
-#### Directory Import
+#### Work Import
 
 ```typescript
-async dispatchDirectoryImport(
-    payload: DirectoryImportPayload
+async dispatchWorkImport(
+    payload: WorkImportPayload
 ): Promise<string | null>
 ```
 
-Dispatches a directory import task with tags:
+Dispatches a work import task with tags:
 
-- `directory-import` (task type)
+- `work-import` (task type)
 - Source type (e.g., `data_repo`, `awesome_readme`)
-- Directory ID
+- Work ID
 
 ## Task Definitions
 
-### Directory Generation Task
+### Work Generation Task
 
-**File**: `tasks/trigger/directory-generation.task.ts`
-**Task ID**: `directory-generation`
+**File**: `tasks/trigger/work-generation.task.ts`
+**Task ID**: `work-generation`
 **Max Duration**: 5 hours (`3600 * 5` seconds)
 
-This is the primary background task for AI-powered directory content generation.
+This is the primary background task for AI-powered work content generation.
 
 #### Lifecycle Handlers
 
 | Handler     | Purpose                                                                     |
 | ----------- | --------------------------------------------------------------------------- |
 | `run`       | Main execution: bootstraps NestJS context, runs the generation orchestrator |
-| `onFailure` | Captures error, updates directory state, marks scheduled run as failed      |
-| `onCancel`  | Updates directory state to cancelled, marks scheduled run as failed         |
+| `onFailure` | Captures error, updates work state, marks scheduled run as failed      |
+| `onCancel`  | Updates work state to cancelled, marks scheduled run as failed         |
 
 #### Run Handler
 
 The `run` handler:
 
 1. Bootstraps a standalone NestJS application context using `withWorkerContext()`.
-2. Creates a task context with the orchestrator, directory, and user references.
+2. Creates a task context with the orchestrator, work, and user references.
 3. Executes the generation pipeline via `TriggerGenerationOrchestrator`.
 4. If triggered by a schedule, marks the schedule run as completed.
 
 ```typescript
-run: async (payload: DirectoryGenerationPayload) => {
-    return withWorkerContext('DirectoryGeneration', async (appContext) => {
-        const { orchestrator, directory, user } = await createTaskContext(
+run: async (payload: WorkGenerationPayload) => {
+    return withWorkerContext('WorkGeneration', async (appContext) => {
+        const { orchestrator, work, user } = await createTaskContext(
             appContext, payload, TriggerGenerationOrchestrator,
         );
         await orchestrator.run({
-            directory, user,
+            work, user,
             dto: payload.dto,
             historyId: payload.historyId,
             historyStartedAt: payload.historyStartedAt,
         });
-        return { status: 'completed', directoryId: payload.directoryId };
+        return { status: 'completed', workId: payload.workId };
     });
 },
 ```
@@ -152,9 +152,9 @@ On failure, the handler:
 
 The failure handler uses `try/catch` around the entire body -- if context bootstrapping fails, it silently exits since there is nothing more it can do.
 
-### Directory Schedule Dispatcher Task
+### Work Schedule Dispatcher Task
 
-**File**: `tasks/trigger/directory-schedule-dispatcher.task.ts`
+**File**: `tasks/trigger/work-schedule-dispatcher.task.ts`
 
 A cron-triggered task that checks for schedules that need to run and dispatches generation tasks for each.
 
@@ -172,14 +172,14 @@ This creates a full NestJS module tree with database access, facades, and servic
 
 ### createTaskContext
 
-The `createTaskContext()` utility resolves the directory, user, and orchestrator from the task payload:
+The `createTaskContext()` utility resolves the work, user, and orchestrator from the task payload:
 
 ```typescript
 async function createTaskContext<T>(
 	appContext: INestApplicationContext,
-	payload: DirectoryGenerationPayload,
+	payload: WorkGenerationPayload,
 	OrchestratorClass: Type<T>
-): Promise<{ orchestrator: T; directory: Directory; user: User }>;
+): Promise<{ orchestrator: T; work: Work; user: User }>;
 ```
 
 ## Environment Variables

@@ -13,7 +13,7 @@ The platform ships **two distinct CLI applications** with different
 audiences, runtimes, and architectures:
 
 - **`apps/cli`** (`ever-works`) — the **public** CLI, distributed via
-  npm, used by end users to manage their directories from a terminal.
+  npm, used by end users to manage their works from a terminal.
   Built with Commander.js + esbuild into a single bundled binary.
 - **`apps/internal-cli`** (`ever-works-admin`) — the **internal** CLI,
   used by platform operators and maintenance scripts. Built with
@@ -37,7 +37,7 @@ The split is deliberate and not redundant:
 | Bundling     | esbuild → single self-contained `index.js`           | nest-commander, runtime-loaded modules   |
 | Bundle size  | ~5 MB                                                | Doesn't matter (run in repo)             |
 | Startup time | ~200 ms (cold)                                       | ~3–5 s (NestJS bootstrap)                |
-| Permissions  | Bound to the user's plan + per-directory roles       | Full DB access; superuser-equivalent     |
+| Permissions  | Bound to the user's plan + per-work roles       | Full DB access; superuser-equivalent     |
 | Dependencies | Pinned + audited                                     | Anything in the workspace                |
 
 The public CLI is **customer-facing** software — it has to be small,
@@ -68,10 +68,10 @@ Top-level commands roughly mirror the API's resource taxonomy:
 | Command group        | Examples                                                  |
 | -------------------- | --------------------------------------------------------- |
 | `auth`               | `login`, `logout`, `whoami`                               |
-| `directory`          | `create`, `list`, `get`, `delete`, `regenerate`, `cancel` |
-| `directory item`     | `add`, `update`, `remove`, `list`                         |
-| `directory schedule` | `set`, `pause`, `cancel`, `run`                           |
-| `directory domain`   | `add`, `verify`, `rm`                                     |
+| `work`          | `create`, `list`, `get`, `delete`, `regenerate`, `cancel` |
+| `work item`     | `add`, `update`, `remove`, `list`                         |
+| `work schedule` | `set`, `pause`, `cancel`, `run`                           |
+| `work domain`   | `add`, `verify`, `rm`                                     |
 | `plugin`             | `list`, `enable`, `disable`, `set` (settings update)      |
 | `comparison`         | `list`, `generate`, `delete`                              |
 
@@ -129,8 +129,8 @@ output that `jq` can pipe; designed for scripts.
 
 | Command output   | Default                                  | `--json`                  |
 | ---------------- | ---------------------------------------- | ------------------------- |
-| `directory list` | Table of slug + name + status + last-run | Array of full objects     |
-| `directory get`  | Key-value pairs grouped by section       | Single full object        |
+| `work list` | Table of slug + name + status + last-run | Array of full objects     |
+| `work get`  | Key-value pairs grouped by section       | Single full object        |
 | `error`          | Coloured red message + exit 1            | `{error: "..."}` + exit 1 |
 
 ## 4. Internal CLI (`apps/internal-cli`)
@@ -148,14 +148,14 @@ apps/internal-cli/
     ├── local-event-emitter.module.ts  # In-process events instead of network
     ├── config/                   # Config commands (AI providers, plans, etc.)
     ├── commands/                 # Top-level commands
-    └── directories/              # Directory-management commands
+    └── works/              # Work-management commands
 ```
 
 ### 4.2 What it does that the public CLI can't
 
 | Operation                                        | Why it's internal-only                                          |
 | ------------------------------------------------ | --------------------------------------------------------------- |
-| Backfilling stale data                           | Bypasses per-user permissions; touches every user's directories |
+| Backfilling stale data                           | Bypasses per-user permissions; touches every user's works |
 | Re-running failed Trigger.dev tasks              | Needs DB access to find them                                    |
 | Bulk plan migrations                             | Modifies subscriptions across all users                         |
 | AI provider config (model lists, pricing tweaks) | Touches global config, not per-user settings                    |
@@ -169,7 +169,7 @@ Internal CLI commands extend `nest-commander`'s `CommandRunner`:
 ```ts
 @Command({ name: 'reschedule-stuck' })
 export class RescheduleStuckCommand extends CommandRunner {
-	constructor(private readonly scheduleService: DirectoryScheduleService) {
+	constructor(private readonly scheduleService: WorkScheduleService) {
 		super();
 	}
 
@@ -201,12 +201,12 @@ Both CLIs depend on `@ever-works/cli-shared`:
 packages/cli-shared/src/
 ├── index.ts
 ├── prompts/                  # Inquirer-style prompts (consistent UX)
-│   ├── directory-prompt.service.ts
+│   ├── work-prompt.service.ts
 │   └── ...
 └── utils/                    # Slug validation, output formatters, env helpers
 ```
 
-The notable shared piece is `directory-prompt.service.ts` which holds
+The notable shared piece is `work-prompt.service.ts` which holds
 the `GenerateStatusType` enum used across the platform — the public
 CLI mirrors the API's status names so users see the same vocabulary.
 
@@ -241,7 +241,7 @@ user to run `ever-works auth login` again.
 | Network error          | Retries 2× with 250 ms backoff, then "API unreachable, try later"      | Throws — operator should see the stack |
 | 401 Unauthorized       | Refreshes JWT once, retries; if still 401, prompts to log in again     | N/A                                    |
 | 403 Forbidden          | "You don't have permission for that operation"                         | N/A                                    |
-| 404 Not Found          | "Directory '<slug>' not found. Did you mean '...'?" (Levenshtein hint) | "Not found" + stack                    |
+| 404 Not Found          | "Work '<slug>' not found. Did you mean '...'?" (Levenshtein hint) | "Not found" + stack                    |
 | Validation error (400) | Pretty-prints the first 3 field errors                                 | Dumps the full error object            |
 | Unknown 5xx            | "Server error. Please try again. If it persists, contact support."     | Stack trace + Sentry breadcrumb        |
 

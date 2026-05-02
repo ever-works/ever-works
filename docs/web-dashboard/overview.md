@@ -7,7 +7,7 @@ sidebar_position: 1
 
 # Web Dashboard Overview
 
-The Ever Works web dashboard is a Next.js 16 application that serves as the primary user interface for managing directories, plugins, and account settings. It uses the App Router with React 19, Tailwind CSS 4, and `next-intl` for internationalization.
+The Ever Works web dashboard is a Next.js 16 application that serves as the primary user interface for managing works, plugins, and account settings. It uses the App Router with React 19, Tailwind CSS 4, and `next-intl` for internationalization.
 
 ## Application Structure
 
@@ -42,18 +42,18 @@ Pages are located under `app/[locale]/` and are organized into two route groups:
 | Route                           | Purpose                               |
 | ------------------------------- | ------------------------------------- |
 | `/`                             | Home dashboard with stats overview    |
-| `/directories`                  | List of user directories              |
-| `/directories/new`              | Create a new directory (manual or AI) |
-| `/directories/[id]`             | Directory overview                    |
-| `/directories/[id]/items`       | Browse and manage items               |
-| `/directories/[id]/generator`   | Run AI generation                     |
-| `/directories/[id]/schedule`    | Configure automated schedules         |
-| `/directories/[id]/deploy`      | Deploy the directory website          |
-| `/directories/[id]/members`     | Manage team members                   |
-| `/directories/[id]/settings`    | Directory settings                    |
-| `/directories/[id]/plugins`     | Per-directory plugin configuration    |
-| `/directories/[id]/comparisons` | Item comparison pages                 |
-| `/directories/[id]/history`     | Generation run history                |
+| `/works`                  | List of user works              |
+| `/works/new`              | Create a new work (manual or AI) |
+| `/works/[id]`             | Work overview                    |
+| `/works/[id]/items`       | Browse and manage items               |
+| `/works/[id]/generator`   | Run AI generation                     |
+| `/works/[id]/schedule`    | Configure automated schedules         |
+| `/works/[id]/deploy`      | Deploy the work website          |
+| `/works/[id]/members`     | Manage team members                   |
+| `/works/[id]/settings`    | Work settings                    |
+| `/works/[id]/plugins`     | Per-work plugin configuration    |
+| `/works/[id]/comparisons` | Item comparison pages                 |
+| `/works/[id]/history`     | Generation run history                |
 | `/plugins`                      | Global plugin marketplace             |
 | `/plugins/[pluginId]`           | Plugin detail and configuration       |
 | `/settings`                     | Profile settings                      |
@@ -85,7 +85,7 @@ API client utilities live in `lib/api/` and use cookies-based authentication. Th
 
 The dashboard supports 21 locales out of the box: English, Arabic, Bulgarian, German, Spanish, French, Hebrew, Hindi, Indonesian, Italian, Japanese, Korean, Dutch, Polish, Portuguese, Russian, Thai, Turkish, Ukrainian, Vietnamese, and Chinese.
 
-Locale routing is configured in `i18n/routing.ts` using `next-intl`'s `defineRouting` helper. The default locale is controlled by `NEXT_PUBLIC_DEFAULT_LOCALE` (defaults to `en`). Translation files are stored in the `messages/` directory.
+Locale routing is configured in `i18n/routing.ts` using `next-intl`'s `defineRouting` helper. The default locale is controlled by `NEXT_PUBLIC_DEFAULT_LOCALE` (defaults to `en`). Translation files are stored in the `messages/` work.
 
 ## Key Technologies
 

@@ -79,7 +79,7 @@ Fireworks AI is known for fast inference times. This benefits Ever Works in seve
 
 | Benefit                         | Description                                                |
 | ------------------------------- | ---------------------------------------------------------- |
-| **Faster directory generation** | Items are processed more quickly during pipeline execution |
+| **Faster work generation** | Items are processed more quickly during pipeline execution |
 | **Lower latency AI chat**       | Conversational responses arrive faster                     |
 | **Better throughput**           | More items can be processed in parallel                    |
 

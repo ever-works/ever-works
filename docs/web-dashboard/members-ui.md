@@ -7,7 +7,7 @@ sidebar_position: 17
 
 # Team Members Interface
 
-The Members UI provides directory-level team management, allowing directory owners and managers to invite collaborators, assign roles, update permissions, and remove members. Access control is enforced through a role-based permission system.
+The Members UI provides work-level team management, allowing work owners and managers to invite collaborators, assign roles, update permissions, and remove members. Access control is enforced through a role-based permission system.
 
 ## Component Hierarchy
 
@@ -38,15 +38,15 @@ MembersPage
 
 ### MembersPage
 
-**File**: `apps/web/src/components/directories/detail/members/MembersPage.tsx`
+**File**: `apps/web/src/components/works/detail/members/MembersPage.tsx`
 
 The top-level container that manages the members list state and coordinates the invite dialog.
 
 ```typescript
 interface MembersPageProps {
-	directory: Directory;
-	members: DirectoryMember[];
-	owner: DirectoryOwner;
+	work: Work;
+	members: WorkMember[];
+	owner: WorkOwner;
 }
 ```
 
@@ -54,7 +54,7 @@ interface MembersPageProps {
 
 - `members` state is initialized from `initialMembers` prop and updated locally on add/remove/update
 - `inviteDialogOpen` controls the invite modal visibility
-- `canInvite` is derived from `canManageMembers(directory.userRole)`
+- `canInvite` is derived from `canManageMembers(work.userRole)`
 
 **Callback Handlers**:
 
@@ -64,17 +64,17 @@ interface MembersPageProps {
 
 ### MembersList
 
-**File**: `apps/web/src/components/directories/detail/members/MembersList.tsx`
+**File**: `apps/web/src/components/works/detail/members/MembersList.tsx`
 
 Renders the owner row followed by all member rows in a bordered card with dividers.
 
 ```typescript
 interface MembersListProps {
-	directory: Directory;
-	members: DirectoryMember[];
-	owner: DirectoryOwner;
+	work: Work;
+	members: WorkMember[];
+	owner: WorkOwner;
 	onMemberRemoved: (memberId: string) => void;
-	onMemberUpdated: (member: DirectoryMember) => void;
+	onMemberUpdated: (member: WorkMember) => void;
 }
 ```
 
@@ -82,24 +82,24 @@ The owner is always displayed at the top with a highlighted background and a "Cr
 
 ### MemberRow
 
-**File**: `apps/web/src/components/directories/detail/members/MemberRow.tsx`
+**File**: `apps/web/src/components/works/detail/members/MemberRow.tsx`
 
 Renders a single member with inline role management and removal capabilities.
 
 ```typescript
 interface MemberRowProps {
-	directoryId: string;
-	member: DirectoryMember;
+	workId: string;
+	member: WorkMember;
 	canManage: boolean;
 	onRemoved: () => void;
-	onUpdated: (member: DirectoryMember) => void;
+	onUpdated: (member: WorkMember) => void;
 }
 ```
 
 **Role Change Flow**:
 
 1. Manager selects a new role from the inline `Select` dropdown
-2. `updateMemberRole(directoryId, memberId, newRole)` server action is called
+2. `updateMemberRole(workId, memberId, newRole)` server action is called
 3. On success, `onUpdated` callback propagates the change to `MembersPage`
 4. Toast notification confirms the update
 
@@ -107,22 +107,22 @@ interface MemberRowProps {
 
 1. Manager clicks the trash icon button
 2. A confirmation `Dialog` opens with the member's username
-3. On confirm, `removeMember(directoryId, memberId)` server action is called
+3. On confirm, `removeMember(workId, memberId)` server action is called
 4. On success, `onRemoved` callback removes the member from the list
 5. Toast notification confirms removal
 
 ### InviteMemberDialog
 
-**File**: `apps/web/src/components/directories/detail/members/InviteMemberDialog.tsx`
+**File**: `apps/web/src/components/works/detail/members/InviteMemberDialog.tsx`
 
 A modal form for inviting new members by email with a role assignment.
 
 ```typescript
 interface InviteMemberDialogProps {
-	directoryId: string;
+	workId: string;
 	open: boolean;
 	onOpenChange: (open: boolean) => void;
-	onMemberAdded: (member: DirectoryMember) => void;
+	onMemberAdded: (member: WorkMember) => void;
 }
 ```
 
@@ -137,9 +137,9 @@ interface InviteMemberDialogProps {
 
 | Role      | Label   | Description                                              |
 | --------- | ------- | -------------------------------------------------------- |
-| `VIEWER`  | Viewer  | Can view directory content and settings (read-only)      |
+| `VIEWER`  | Viewer  | Can view work content and settings (read-only)      |
 | `EDITOR`  | Editor  | Can edit items, categories, and content                  |
-| `MANAGER` | Manager | Can manage members, settings, and all directory features |
+| `MANAGER` | Manager | Can manage members, settings, and all work features |
 
 The dialog displays a contextual description panel below the role selector that updates dynamically based on the selected role.
 
@@ -147,7 +147,7 @@ The dialog displays a contextual description panel below the role selector that 
 
 1. User enters email and selects role
 2. Form validation checks for non-empty email
-3. `inviteMember(directoryId, email, role)` server action is called
+3. `inviteMember(workId, email, role)` server action is called
 4. On success: toast notification, form reset, dialog closes, `onMemberAdded` callback fires
 5. On failure: inline error message displayed below the email field
 
@@ -169,7 +169,7 @@ When `canManage` is `false`, the role is displayed as a static badge rather than
 ```
 MembersPage (state owner)
   |
-  |-- members: DirectoryMember[]        // local state, initialized from server
+  |-- members: WorkMember[]        // local state, initialized from server
   |-- inviteDialogOpen: boolean          // dialog visibility
   |
   +-- MembersList (stateless display)
@@ -185,13 +185,13 @@ All server mutations go through Next.js server actions. Optimistic updates are a
 
 | Action        | Server Action Function                          | HTTP Method |
 | ------------- | ----------------------------------------------- | ----------- |
-| Invite member | `inviteMember(directoryId, email, role)`        | POST        |
-| Update role   | `updateMemberRole(directoryId, memberId, role)` | PATCH       |
-| Remove member | `removeMember(directoryId, memberId)`           | DELETE      |
+| Invite member | `inviteMember(workId, email, role)`        | POST        |
+| Update role   | `updateMemberRole(workId, memberId, role)` | PATCH       |
+| Remove member | `removeMember(workId, memberId)`           | DELETE      |
 
 ## Internationalization
 
-All strings use `next-intl` with the namespace `dashboard.directoryDetail.members`:
+All strings use `next-intl` with the namespace `dashboard.workDetail.members`:
 
 - `title`, `subtitle` -- page header
 - `inviteMember` -- invite button label
@@ -204,5 +204,5 @@ All strings use `next-intl` with the namespace `dashboard.directoryDetail.member
 ## Cross-References
 
 - [Deployment UI](./deployment-ui.md) -- members need appropriate roles to trigger deployments
-- [Items Management UI](./items-ui.md) -- editors and above can manage directory items
+- [Items Management UI](./items-ui.md) -- editors and above can manage work items
 - [Schedule UI](./schedule-ui.md) -- schedule management permissions

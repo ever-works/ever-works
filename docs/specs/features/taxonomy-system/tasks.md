@@ -8,7 +8,7 @@
 
 ## Phase 1 — Service
 
-- [x] T1. `DirectoryTaxonomyService` with categories CRUD.
+- [x] T1. `WorkTaxonomyService` with categories CRUD.
 - [x] T2. Tags CRUD on the same service.
 - [x] T3. Collections CRUD on the same service.
 - [x] T4. `slugifyText()` shared util used everywhere.
@@ -23,7 +23,7 @@
 
 ## Phase 3 — Access control
 
-- [x] T9. Wire `DirectoryOwnershipService.ensureAccess` into reads.
+- [x] T9. Wire `WorkOwnershipService.ensureAccess` into reads.
 - [x] T10. Wire `ensureCanEdit` into writes.
 
 ## Phase 4 — API
@@ -47,12 +47,12 @@
 ## Phase 7 — Observability
 
 - [x] T18. `category_change`, `tag_change`, `collection_change` emit
-      Directory Changelog entries.
+      Work Changelog entries.
 
 ## Phase 8 — Docs
 
 - [x] T19. User-facing doc `docs/features/taxonomy-system.md`.
-- [x] T20. Cross-link from `collections.md` and `directory-changelog.md`.
+- [x] T20. Cross-link from `collections.md` and `work-changelog.md`.
 - [x] T21. Retrospective spec/plan/tasks.
 
 ## Definition of Done

@@ -7,10 +7,10 @@ sidebar_position: 13
 
 # MCP Server
 
-The Ever Works MCP (Model Context Protocol) server exposes the Ever Works API as tools that AI assistants like Claude can call directly. This enables natural-language management of directories — creating directories, generating items, deploying websites, and more — all through conversation.
+The Ever Works MCP (Model Context Protocol) server exposes the Ever Works API as tools that AI assistants like Claude can call directly. This enables natural-language management of works — creating works, generating items, deploying websites, and more — all through conversation.
 
 :::tip When to use this
-Connect the MCP server to Claude Desktop, Claude Code, or any MCP-compatible client to manage your Ever Works directories through AI-powered conversation instead of manual API calls.
+Connect the MCP server to Claude Desktop, Claude Code, or any MCP-compatible client to manage your Ever Works works through AI-powered conversation instead of manual API calls.
 :::
 
 ## Prerequisites
@@ -109,19 +109,19 @@ Add the MCP server to your project's `.mcp.json`:
 
 The MCP server exposes 36 tools organized by domain. Each tool's parameters and descriptions are auto-generated from the API's OpenAPI specification.
 
-### Directories (12 tools)
+### Works (12 tools)
 
 | Tool                    | Description                                 |
 | ----------------------- | ------------------------------------------- |
-| `list_directories`      | List all directories accessible to the user |
-| `create_directory`      | Create a new directory                      |
-| `get_directory`         | Get a specific directory by ID              |
-| `update_directory`      | Update directory settings and configuration |
-| `delete_directory`      | Delete a directory and its repositories     |
-| `get_directory_config`  | Get directory configuration and metadata    |
-| `get_directory_items`   | Get all items in a directory                |
-| `get_categories_tags`   | Get categories and tags for a directory     |
-| `get_directory_history` | Get generation history                      |
+| `list_works`      | List all works accessible to the user |
+| `create_work`      | Create a new work                      |
+| `get_work`         | Get a specific work by ID              |
+| `update_work`      | Update work settings and configuration |
+| `delete_work`      | Delete a work and its repositories     |
+| `get_work_config`  | Get work configuration and metadata    |
+| `get_work_items`   | Get all items in a work                |
+| `get_categories_tags`   | Get categories and tags for a work     |
+| `get_work_history` | Get generation history                      |
 | `regenerate_markdown`   | Regenerate markdown files for all items     |
 | `update_website`        | Trigger a website rebuild                   |
 | `process_community_prs` | Process community pull requests             |
@@ -132,15 +132,15 @@ The MCP server exposes 36 tools organized by domain. Each tool's parameters and 
 | ---------------------------- | ------------------------------------------- |
 | `generate_items`             | Start AI-powered item generation            |
 | `update_items`               | Update existing items using AI              |
-| `generate_directory_details` | AI-generate directory details from a prompt |
+| `generate_work_details` | AI-generate work details from a prompt |
 | `get_generator_form`         | Get the dynamic generator form schema       |
 
 ### Items (4 tools)
 
 | Tool                   | Description                              |
 | ---------------------- | ---------------------------------------- |
-| `submit_item`          | Add a single item to a directory         |
-| `remove_item`          | Remove an item from a directory          |
+| `submit_item`          | Add a single item to a work         |
+| `remove_item`          | Remove an item from a work          |
 | `update_item`          | Update item metadata (featured, order)   |
 | `extract_item_details` | Extract item details from a URL using AI |
 
@@ -148,8 +148,8 @@ The MCP server exposes 36 tools organized by domain. Each tool's parameters and 
 
 | Tool                      | Description                              |
 | ------------------------- | ---------------------------------------- |
-| `deploy_directory`        | Deploy a directory to a hosting provider |
-| `list_domains`            | List custom domains for a directory      |
+| `deploy_work`        | Deploy a work to a hosting provider |
+| `list_domains`            | List custom domains for a work      |
 | `list_deploy_providers`   | List available deployment providers      |
 | `check_deploy_capability` | Check if deployment is available         |
 
@@ -176,7 +176,7 @@ The MCP server exposes 36 tools organized by domain. Each tool's parameters and 
 
 | Tool                         | Description                                |
 | ---------------------------- | ------------------------------------------ |
-| `list_comparisons`           | List all comparisons for a directory       |
+| `list_comparisons`           | List all comparisons for a work       |
 | `get_comparison`             | Get a comparison with markdown content     |
 | `generate_comparison`        | Auto-generate the next comparison          |
 | `generate_manual_comparison` | Generate comparison for two specific items |

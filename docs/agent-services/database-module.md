@@ -24,12 +24,12 @@ packages/agent/src/database/
 │   └── helper.ts                 # TLS and URL parsing utilities
 └── repositories/                 # 14 TypeORM repository wrappers
     ├── api-key.repository.ts
-    ├── directory.repository.ts
-    ├── directory-advanced-prompts.repository.ts
-    ├── directory-custom-domain.repository.ts
-    ├── directory-generation-history.repository.ts
-    ├── directory-member.repository.ts
-    ├── directory-schedule.repository.ts
+    ├── work.repository.ts
+    ├── work-advanced-prompts.repository.ts
+    ├── work-custom-domain.repository.ts
+    ├── work-generation-history.repository.ts
+    ├── work-member.repository.ts
+    ├── work-schedule.repository.ts
     ├── notification.repository.ts
     ├── oauth-token.repository.ts
     ├── refresh-token.repository.ts
@@ -83,12 +83,12 @@ export interface DatabaseConfig {
 | Entity                       | Table                          |
 | ---------------------------- | ------------------------------ |
 | `User`                       | `users`                        |
-| `Directory`                  | `directories`                  |
-| `DirectoryAdvancedPrompts`   | `directory_advanced_prompts`   |
-| `DirectoryCustomDomain`      | `directory_custom_domains`     |
-| `DirectoryMember`            | `directory_members`            |
-| `DirectoryGenerationHistory` | `directory_generation_history` |
-| `DirectorySchedule`          | `directory_schedules`          |
+| `Work`                  | `works`                  |
+| `WorkAdvancedPrompts`   | `work_advanced_prompts`   |
+| `WorkCustomDomain`      | `work_custom_domains`     |
+| `WorkMember`            | `work_members`            |
+| `WorkGenerationHistory` | `work_generation_history` |
+| `WorkSchedule`          | `work_schedules`          |
 | `ApiKey`                     | `api_keys`                     |
 | `RefreshToken`               | `refresh_tokens`               |
 | `OAuthToken`                 | `oauth_tokens`                 |
@@ -99,7 +99,7 @@ export interface DatabaseConfig {
 | `CacheEntry`                 | `cache_entries`                |
 | `PluginEntity`               | `plugins`                      |
 | `UserPluginEntity`           | `user_plugins`                 |
-| `DirectoryPluginEntity`      | `directory_plugins`            |
+| `WorkPluginEntity`      | `work_plugins`            |
 
 The factory reads environment variables to determine the database type:
 
@@ -127,7 +127,7 @@ The NestJS module that wires TypeORM and all repositories:
 	],
 	providers: [
 		// 14 repository services
-		DirectoryRepository,
+		WorkRepository,
 		UserRepository,
 		ApiKeyRepository
 		// ... etc.
@@ -201,20 +201,20 @@ Typical repository pattern:
 
 ```typescript
 @Injectable()
-export class DirectoryRepository {
+export class WorkRepository {
 	constructor(
-		@InjectRepository(Directory)
-		private readonly repo: Repository<Directory>
+		@InjectRepository(Work)
+		private readonly repo: Repository<Work>
 	) {}
 
-	async findBySlug(slug: string): Promise<Directory | null> {
+	async findBySlug(slug: string): Promise<Work | null> {
 		return this.repo.findOne({
 			where: { slug },
 			relations: ['user', 'members']
 		});
 	}
 
-	async findByUserId(userId: string): Promise<Directory[]> {
+	async findByUserId(userId: string): Promise<Work[]> {
 		return this.repo.find({
 			where: { userId },
 			order: { createdAt: 'DESC' }
@@ -239,14 +239,14 @@ export class AppModule {}
 ### Injecting Repositories
 
 ```typescript
-import { DirectoryRepository } from '@ever-works/agent/database';
+import { WorkRepository } from '@ever-works/agent/database';
 
 @Injectable()
 export class MyService {
-	constructor(private readonly directoryRepo: DirectoryRepository) {}
+	constructor(private readonly workRepo: WorkRepository) {}
 
-	async getDirectory(slug: string) {
-		return this.directoryRepo.findBySlug(slug);
+	async getWork(slug: string) {
+		return this.workRepo.findBySlug(slug);
 	}
 }
 ```

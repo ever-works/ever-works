@@ -37,7 +37,7 @@ flowchart LR
 @Entity('custom_domains')
 export class CustomDomain {
 	@PrimaryGeneratedColumn('uuid') id: string;
-	@Column() directoryId: string;
+	@Column() workId: string;
 	@Column() domain: string;
 	@Column({ default: false }) verified: boolean;
 	@Column({ default: 'production' }) environment: string;
@@ -47,16 +47,16 @@ export class CustomDomain {
 }
 ```
 
-Migration: additive, with composite index `(directoryId, domain)`.
+Migration: additive, with composite index `(workId, domain)`.
 
 ## 4. API Surface
 
 | Method   | Endpoint                                             | Description          |
 | -------- | ---------------------------------------------------- | -------------------- |
-| `GET`    | `/api/deploy/directories/:id/domains`                | List domains         |
-| `POST`   | `/api/deploy/directories/:id/domains`                | Add domain           |
-| `DELETE` | `/api/deploy/directories/:id/domains/:domain`        | Remove domain        |
-| `POST`   | `/api/deploy/directories/:id/domains/:domain/verify` | Trigger verification |
+| `GET`    | `/api/deploy/works/:id/domains`                | List domains         |
+| `POST`   | `/api/deploy/works/:id/domains`                | Add domain           |
+| `DELETE` | `/api/deploy/works/:id/domains/:domain`        | Remove domain        |
+| `POST`   | `/api/deploy/works/:id/domains/:domain/verify` | Trigger verification |
 
 ## 5. Plugin Surface
 
@@ -64,17 +64,17 @@ Deploy provider plugins implement:
 
 ```ts
 interface IDeployCapability {
-	addDomain(directoryId, domain, settings): Promise<DnsRecords>;
-	removeDomain(directoryId, domain, settings): Promise<void>;
-	verifyDomain(directoryId, domain, settings): Promise<{ verified: boolean; details? }>;
+	addDomain(workId, domain, settings): Promise<DnsRecords>;
+	removeDomain(workId, domain, settings): Promise<void>;
+	verifyDomain(workId, domain, settings): Promise<{ verified: boolean; details? }>;
 }
 ```
 
 ## 6. Web / CLI
 
-- Web: directory **Settings → Domains** with add / verify / remove
+- Web: work **Settings → Domains** with add / verify / remove
   controls and per-row DNS instructions.
-- CLI: `ever-works directory domain add/verify/rm` commands.
+- CLI: `ever-works work domain add/verify/rm` commands.
 
 ## 7. Background Jobs
 

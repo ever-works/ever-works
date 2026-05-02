@@ -7,7 +7,7 @@ sidebar_position: 5
 
 # Website Generation
 
-The Website Generation system creates and maintains static websites for each directory by cloning a template repository and syncing branches. It manages the full lifecycle of website repositories, including creation, updates, and template synchronization.
+The Website Generation system creates and maintains static websites for each work by cloning a template repository and syncing branches. It manages the full lifecycle of website repositories, including creation, updates, and template synchronization.
 
 ## Architecture Overview
 
@@ -37,13 +37,13 @@ This means every generated website is based on the `ever-works-website-template`
 
 ## Repository Naming Convention
 
-For a directory with slug `my-directory`:
+For a work with slug `my-work`:
 
 | Repository             | Purpose                                          |
 | ---------------------- | ------------------------------------------------ |
-| `my-directory-data`    | YAML data repository (items, categories, config) |
-| `my-directory`         | Markdown README repository                       |
-| `my-directory-website` | Static website repository                        |
+| `my-work-data`    | YAML data repository (items, categories, config) |
+| `my-work`         | Markdown README repository                       |
+| `my-work-website` | Static website repository                        |
 
 ## Creation Methods
 
@@ -54,7 +54,7 @@ The `duplicate` method performs a full copy of the template:
 ```
 1. Cleanup any existing local files
 2. Clone the template repository (ever-works-website-template)
-3. Create a new repository for the directory's website
+3. Create a new repository for the work's website
 4. Replace the Git remote origin with the new repository URL
 5. Force push the template content to the new repository
 6. Sync all branches from template
@@ -69,11 +69,11 @@ await this.gitFacade.createRepositoryFromTemplate(
 	WEBSITE_TEMPLATE_CONFIG.owner,
 	WEBSITE_TEMPLATE_CONFIG.repo,
 	{
-		name: directory.getWebsiteRepo(),
-		organization: directory.organization ? directory.getRepoOwner() : undefined,
+		name: work.getWebsiteRepo(),
+		organization: work.organization ? work.getRepoOwner() : undefined,
 		isPrivate: true
 	},
-	{ userId: directoryOwner.id, providerId: directory.gitProvider }
+	{ userId: workOwner.id, providerId: work.gitProvider }
 );
 ```
 
@@ -85,7 +85,7 @@ The `BranchSyncService` keeps website repositories up to date with the template 
 
 ### Sync Strategy
 
-Branch syncing runs sequentially (concurrency = 1) because `cloneOrPull` uses a deterministic directory based on `owner+repo`, meaning parallel syncs would corrupt each other.
+Branch syncing runs sequentially (concurrency = 1) because `cloneOrPull` uses a deterministic work based on `owner+repo`, meaning parallel syncs would corrupt each other.
 
 ```typescript
 private readonly MAX_CONCURRENT_SYNCS = 1;
@@ -105,10 +105,10 @@ For each branch in `WEBSITE_TEMPLATE_CONFIG.syncBranches`:
 
 ### Branch Mapping (Beta Support)
 
-Directories that opt into beta templates use branch mapping:
+Works that opt into beta templates use branch mapping:
 
 ```typescript
-const branchMapping = directory.websiteTemplateUseBeta
+const branchMapping = work.websiteTemplateUseBeta
 	? { [config.websiteTemplate.getBetaBranch()]: 'main' }
 	: undefined;
 ```
@@ -165,7 +165,7 @@ The `WebsiteUpdateService` handles updating existing websites when the template 
 The service can check if an update is available without applying it:
 
 ```typescript
-async checkForUpdate(directory: Directory): Promise<{
+async checkForUpdate(work: Work): Promise<{
     updateAvailable: boolean;
     latestCommit?: string;
     currentCommit?: string;
@@ -174,7 +174,7 @@ async checkForUpdate(directory: Directory): Promise<{
 }>
 ```
 
-This compares the template's latest commit SHA against the directory's `websiteTemplateLastCommit` field.
+This compares the template's latest commit SHA against the work's `websiteTemplateLastCommit` field.
 
 ## Update Response DTO
 
@@ -191,7 +191,7 @@ interface UpdateWebsiteRepositoryResponseDto {
 
 ## Auto-Update Support
 
-Directories can enable automatic template updates via the `websiteTemplateAutoUpdate` flag on the directory entity. When enabled, a scheduled task checks for template changes and applies updates automatically. Relevant entity fields:
+Works can enable automatic template updates via the `websiteTemplateAutoUpdate` flag on the work entity. When enabled, a scheduled task checks for template changes and applies updates automatically. Relevant entity fields:
 
 | Field                          | Type      | Purpose                             |
 | ------------------------------ | --------- | ----------------------------------- |

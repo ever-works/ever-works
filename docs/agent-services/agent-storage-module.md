@@ -98,13 +98,13 @@ Implements `IDataSourceFacade`. Aggregates items from external data source plugi
 **Core operations:**
 
 - **`queryAll(options)`** -- query all enabled data source plugins and aggregate results. Returns a unified `DataSourceFacadeResult` with items, categories, tags, brands, source mapping, and any errors from individual sources.
-- **`getEnabledSources(directoryId, userId)`** -- list data sources enabled for a specific directory
+- **`getEnabledSources(workId, userId)`** -- list data sources enabled for a specific work
 - **`isConfigured()`** -- check if any data source plugin is available
 - **`getAvailableProviders()`** -- list all registered data source providers
 
 **Per-plugin enablement:**
 
-Data source plugins can be enabled at the directory level. The facade checks both:
+Data source plugins can be enabled at the work level. The facade checks both:
 
 1. Request-level plugin config overrides (`pluginConfig[pluginId].enabled === true`)
 2. Registry scope resolution (`isPluginEnabledForScope`)
@@ -124,9 +124,9 @@ interface DataSourceFacadeResult {
 
 All content facades inherit from `BaseFacadeService` which provides:
 
-- **Provider resolution:** `resolvePlugin(providerOverride?, userId?, directoryId?)` -- resolves the appropriate plugin via: explicit override > directory active plugin > `defaultForCapabilities` > first enabled plugin
-- **Settings resolution:** `getResolvedSettings(pluginId, options)` -- merges from Directory > User > Admin > Plugin defaults
-- **Enable checking:** `isPluginEnabled(pluginId, directoryId, userId)` -- scope-aware enablement
+- **Provider resolution:** `resolvePlugin(providerOverride?, userId?, workId?)` -- resolves the appropriate plugin via: explicit override > work active plugin > `defaultForCapabilities` > first enabled plugin
+- **Settings resolution:** `getResolvedSettings(pluginId, options)` -- merges from Work > User > Admin > Plugin defaults
+- **Enable checking:** `isPluginEnabled(pluginId, workId, userId)` -- scope-aware enablement
 - **Typed settings helpers:** `getSettingTyped()`, `getSettingRequired()`, `getSettingWithDefault()`
 
 ## API Reference
@@ -183,10 +183,10 @@ getAvailableProviders(): Array<{ id: string; name: string; enabled: boolean }>
 
 ```typescript
 queryAll(options: DataSourceFacadeOptions): Promise<DataSourceFacadeResult>
-getEnabledSources(directoryId: string, userId: string): Promise<EnabledDataSource[]>
+getEnabledSources(workId: string, userId: string): Promise<EnabledDataSource[]>
 isConfigured(): boolean
 getAvailableProviders(): Array<{ id: string; name: string; sourceName: string; enabled: boolean }>
-getDefaultProvider(capability: string, directoryId?: string, userId?: string): Promise<{ id: string; name: string } | null>
+getDefaultProvider(capability: string, workId?: string, userId?: string): Promise<{ id: string; name: string } | null>
 ```
 
 ## Configuration
@@ -237,8 +237,8 @@ All content provider plugins define their settings via JSON Schema with custom e
 | Dependency                   | Purpose                                                                       |
 | ---------------------------- | ----------------------------------------------------------------------------- |
 | `@ever-works/plugin`         | Facade interfaces, capability constants, plugin types                         |
-| `@ever-works/agent/plugins`  | `PluginRegistryService`, `PluginSettingsService`, `DirectoryPluginRepository` |
-| `@ever-works/agent/database` | `DirectoryPluginRepository` for directory-level plugin config                 |
+| `@ever-works/agent/plugins`  | `PluginRegistryService`, `PluginSettingsService`, `WorkPluginRepository` |
+| `@ever-works/agent/database` | `WorkPluginRepository` for work-level plugin config                 |
 
 ## Usage Examples
 
@@ -250,7 +250,7 @@ import { SearchFacadeService } from '@ever-works/agent/facades';
 const results = await searchFacade.search(
 	'best open source code editors 2025',
 	{ maxResults: 10, includeContent: true },
-	{ userId: user.id, directoryId: directory.id }
+	{ userId: user.id, workId: work.id }
 );
 
 results.forEach((r) => {
@@ -287,7 +287,7 @@ console.log(content.mainText);
 import { DataSourceFacadeService } from '@ever-works/agent/facades';
 
 const result = await dataSourceFacade.queryAll({
-	directoryId: directory.id,
+	workId: work.id,
 	userId: user.id,
 	limit: 100,
 	pluginConfig: {

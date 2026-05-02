@@ -2,7 +2,7 @@
 
 ## Overview
 
-The plugin system supports a 4-level settings hierarchy (`directory > user > admin > env > default`) and scope-aware plugin resolution (`directory > user > autoEnable`). The pipeline system correctly handles this via "bound facades" in `step-pipeline-executor.service.ts`, but **direct service callers outside the pipeline** were bypassing scoping by not passing `userId`/`directoryId`.
+The plugin system supports a 4-level settings hierarchy (`work > user > admin > env > default`) and scope-aware plugin resolution (`work > user > autoEnable`). The pipeline system correctly handles this via "bound facades" in `step-pipeline-executor.service.ts`, but **direct service callers outside the pipeline** were bypassing scoping by not passing `userId`/`workId`.
 
 This document describes the issues found and the fixes applied.
 
@@ -19,23 +19,23 @@ This document describes the issues found and the fixes applied.
 
 ### Issue 1 (CRITICAL): AwesomeReadmeParserService — scope not threaded
 
-**Problem:** The `parseReadme()` method's `facadeOptions` parameter was threaded through correctly, but the `syncFromAwesomeReadme()` caller in `DirectoryImportService` was not passing scope.
+**Problem:** The `parseReadme()` method's `facadeOptions` parameter was threaded through correctly, but the `syncFromAwesomeReadme()` caller in `WorkImportService` was not passing scope.
 
-**Fix:** `directory-import.service.ts` — Pass `{ userId: user.id, directoryId: directory.id }` to `parseReadme()` in the sync flow.
+**Fix:** `work-import.service.ts` — Pass `{ userId: user.id, workId: work.id }` to `parseReadme()` in the sync flow.
 
 **Files modified:**
 
-- `packages/agent/src/services/directory-import.service.ts`
+- `packages/agent/src/services/work-import.service.ts`
 
-### Issue 2 (CRITICAL): DirectoryDetailService — askJson missing userId
+### Issue 2 (CRITICAL): WorkDetailService — askJson missing userId
 
-**Problem:** When generating directory details via AI, the user's AI provider preference and API key were ignored because `userId` was not passed to `askJson()`.
+**Problem:** When generating work details via AI, the user's AI provider preference and API key were ignored because `userId` was not passed to `askJson()`.
 
-**Fix:** Added `{ userId: user.id }` as the 4th argument to `askJson()`. No `directoryId` is available at this point (directory not yet created), which is correct.
+**Fix:** Added `{ userId: user.id }` as the 4th argument to `askJson()`. No `workId` is available at this point (work not yet created), which is correct.
 
 **File modified:**
 
-- `packages/agent/src/services/directory-detail.service.ts`
+- `packages/agent/src/services/work-detail.service.ts`
 
 ### Issue 3 (MEDIUM): listPluginModels ignores user credentials
 
@@ -48,15 +48,15 @@ This document describes the issues found and the fixes applied.
 - `apps/api/src/plugins/plugins.service.ts` — Inject `AiFacadeService`, delegate to facade
 - `apps/api/src/plugins/plugins.module.ts` — Import `FacadesModule`
 
-### Issue 4 (MEDIUM): Directory plugin endpoints lack ownership checks
+### Issue 4 (MEDIUM): Work plugin endpoints lack ownership checks
 
-**Problem:** Any authenticated user who knew a `directoryId` could enable/disable plugins and change settings for any directory — a security vulnerability.
+**Problem:** Any authenticated user who knew a `workId` could enable/disable plugins and change settings for any work — a security vulnerability.
 
-**Fix:** Added `DirectoryOwnershipService` injection to `PluginsController` and added ownership checks to all directory-scoped endpoints:
+**Fix:** Added `WorkOwnershipService` injection to `PluginsController` and added ownership checks to all work-scoped endpoints:
 
 | Route                                       | Guard           |
 | ------------------------------------------- | --------------- |
-| `GET /api/directories/:directoryId/plugins` | `ensureCanView` |
+| `GET /api/works/:workId/plugins` | `ensureCanView` |
 | `POST .../plugins/:pluginId/enable`         | `ensureCanEdit` |
 | `POST .../plugins/:pluginId/disable`        | `ensureCanEdit` |
 | `PATCH .../plugins/:pluginId/settings`      | `ensureCanEdit` |
@@ -65,7 +65,7 @@ This document describes the issues found and the fixes applied.
 **Files modified:**
 
 - `apps/api/src/plugins/plugins.controller.ts` — Inject service, add checks
-- `apps/api/src/plugins/plugins.module.ts` — Import `DirectoryModule`
+- `apps/api/src/plugins/plugins.module.ts` — Import `WorkModule`
 
 ### Issue 5 (MEDIUM): configurationMode not enforced in API layer
 
@@ -75,8 +75,8 @@ This document describes the issues found and the fixes applied.
 
 - `enablePluginForUser()` — when settings are provided
 - `updateUserPluginSettings()` — when settings are provided
-- `enablePluginForDirectory()` — when settings are provided
-- `updateDirectoryPluginSettings()` — when settings are provided
+- `enablePluginForWork()` — when settings are provided
+- `updateWorkPluginSettings()` — when settings are provided
 
 **File modified:**
 
@@ -84,7 +84,7 @@ This document describes the issues found and the fixes applied.
 
 ### Issue 6 (LOW): ContentExtractorFacade type-safety gap
 
-**Problem:** `extractContent(url, options?)` accepted `FacadeExtractionOptions` which doesn't include `userId`/`directoryId`. The compiler wouldn't flag missing scope for future direct callers.
+**Problem:** `extractContent(url, options?)` accepted `FacadeExtractionOptions` which doesn't include `userId`/`workId`. The compiler wouldn't flag missing scope for future direct callers.
 
 **Fix:** Added explicit `facadeOptions: BaseFacadeOptions` as required 3rd parameter. Updated pipeline binding to use new parameter. Removed legacy `ExtendedFacadeExtractionOptions` type and casting. Removed `implements IContentExtractorFacade` since the concrete service now has a richer signature.
 
@@ -104,11 +104,11 @@ This document describes the issues found and the fixes applied.
 - `packages/agent/src/facades/search.facade.ts`
 - `packages/agent/src/pipeline/step-pipeline-executor.service.ts`
 
-### Issue 8 (LOW): getDefaultProvider directory check ignores user scope
+### Issue 8 (LOW): getDefaultProvider work check ignores user scope
 
-**Problem:** `getDefaultProvider(directoryId?, userId?)` found active plugins by directory capability but only checked global `registered.state === 'enabled'` without verifying user-scoped enable/disable state.
+**Problem:** `getDefaultProvider(workId?, userId?)` found active plugins by work capability but only checked global `registered.state === 'enabled'` without verifying user-scoped enable/disable state.
 
-**Fix:** Added `isPluginEnabled(pluginId, directoryId, userId)` check after finding active directory plugin.
+**Fix:** Added `isPluginEnabled(pluginId, workId, userId)` check after finding active work plugin.
 
 **File modified:**
 
@@ -120,5 +120,5 @@ This document describes the issues found and the fixes applied.
 2. `pnpm test` in `packages/agent` — 26 suites, 722 tests passing
 3. Plugin tests — all passing (openai: 16, openrouter: 29, screenshotone: 35, vercel: 33, default-pipeline: 277)
 4. Manual: Import an awesome readme with user-specific AI key — verify user's key is used
-5. Manual: Attempt directory plugin endpoint as non-owner — should get 403
+5. Manual: Attempt work plugin endpoint as non-owner — should get 403
 6. Manual: Configure user-specific API key — list models — should use user key

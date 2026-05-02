@@ -40,7 +40,7 @@ interface IAiFacade {
 ```
 
 Every method accepts a `FacadeOptions` block carrying `userId`,
-`directoryId?`, optional explicit `providerId`, and `routing` overrides.
+`workId?`, optional explicit `providerId`, and `routing` overrides.
 Without these the facade falls back to the cascade (§3).
 
 ## 3. Provider Resolution Cascade
@@ -49,7 +49,7 @@ The facade resolves a request to a plugin in this order:
 
 1. **Explicit `providerId`** in the options (admin tool calls, "test
    this provider" button).
-2. **Per-directory binding** — `directory_plugins.aiProvider` row.
+2. **Per-work binding** — `work_plugins.aiProvider` row.
 3. **Per-user binding** — `user_plugins.aiProvider` row.
 4. **`defaultFor: 'ai-provider'` plugin** — today: `openrouter`.
 5. **Throw `AiFacadeError("no provider")`** — caller handles.
@@ -123,7 +123,7 @@ const { result, model, usage } = await aiFacade.askJson(
 		prompt: 'Extract metadata from: ' + html,
 		complexity: 'medium'
 	},
-	{ userId, directoryId }
+	{ userId, workId }
 );
 ```
 
@@ -182,8 +182,8 @@ entry — the facade and plugins both consult it.
 
 `AiFacadeService.CACHE_TTL = 3_600_000` (1 hour). The facade caches:
 
-- The resolved provider plugin per `(userId, directoryId)` tuple.
-- The resolved provider config per `(userId, directoryId, providerId)`.
+- The resolved provider plugin per `(userId, workId)` tuple.
+- The resolved provider config per `(userId, workId, providerId)`.
 - The model catalog (process-wide, 1 h).
 
 The cache invalidates automatically on `onSettingsUpdated` events that

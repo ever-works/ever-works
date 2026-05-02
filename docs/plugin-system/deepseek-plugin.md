@@ -7,7 +7,7 @@ sidebar_position: 34
 
 # DeepSeek Models via OpenRouter
 
-Ever Works does not ship a standalone DeepSeek plugin. DeepSeek models are accessed through the **OpenRouter** plugin, which is the platform's default AI provider. This page explains how to configure OpenRouter to use DeepSeek models for directory generation and AI conversations.
+Ever Works does not ship a standalone DeepSeek plugin. DeepSeek models are accessed through the **OpenRouter** plugin, which is the platform's default AI provider. This page explains how to configure OpenRouter to use DeepSeek models for work generation and AI conversations.
 
 **Related source files:**
 
@@ -29,7 +29,7 @@ OpenRouter lists DeepSeek models with the `deepseek/` prefix:
 | ------------------------- | --------------------------- | ------------------------------------------- |
 | `deepseek/deepseek-r1`    | DeepSeek R1 reasoning model | Complex analysis, multi-step reasoning      |
 | `deepseek/deepseek-chat`  | DeepSeek Chat               | General-purpose content generation          |
-| `deepseek/deepseek-coder` | DeepSeek Coder              | Technical content, code-related directories |
+| `deepseek/deepseek-coder` | DeepSeek Coder              | Technical content, code-related works |
 
 ### Via Ollama (Local)
 

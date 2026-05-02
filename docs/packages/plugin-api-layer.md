@@ -55,8 +55,8 @@ The API provides increasingly detailed plugin responses based on context:
 | Type                      | Extends              | Additional Fields                                                                            |
 | ------------------------- | -------------------- | -------------------------------------------------------------------------------------------- |
 | `PluginResponse`          | --                   | Base plugin data                                                                             |
-| `UserPluginResponse`      | `PluginResponse`     | `installed`, `enabled`, `settings`, `userPluginId`, `autoEnableForDirectories`               |
-| `DirectoryPluginResponse` | `UserPluginResponse` | `directoryEnabled`, `activeCapability`, `directorySettings`, `directoryPluginId`, `priority` |
+| `UserPluginResponse`      | `PluginResponse`     | `installed`, `enabled`, `settings`, `userPluginId`, `autoEnableForWorks`               |
+| `WorkPluginResponse` | `UserPluginResponse` | `workEnabled`, `activeCapability`, `workSettings`, `workPluginId`, `priority` |
 
 ### List Response Types
 
@@ -68,8 +68,8 @@ interface PluginListResponse {
 	capabilities?: string[];
 }
 
-interface DirectoryPluginListResponse {
-	plugins: DirectoryPluginResponse[];
+interface WorkPluginListResponse {
+	plugins: WorkPluginResponse[];
 	total: number;
 	capabilityProviders?: Record<string, string>;
 }
@@ -110,7 +110,7 @@ The `PluginSettingsSchema` and `PluginSettingsSchemaProperty` types are flattene
 | `x-secret`            | `secret`         | Password-masked field                        |
 | `x-adminOnly`         | `adminOnly`      | Admin-only field                             |
 | `x-envVar`            | `envVar`         | Environment variable name                    |
-| `x-scope`             | `scope`          | Setting scope: `global`, `user`, `directory` |
+| `x-scope`             | `scope`          | Setting scope: `global`, `user`, `work` |
 | `x-widget`            | `widget`         | UI widget hint (e.g., `model-select`)        |
 | `x-hidden`            | `hidden`         | Hidden from settings UI                      |
 | `x-showIf`            | `showIf`         | Conditional visibility                       |
@@ -157,15 +157,15 @@ const required = getRequiredFields(schema, ['global', 'user']);
 
 ### validateRequiredSettings
 
-Validates that required fields are filled, supporting directory-level inheritance from user-level fallback settings. Also validates `requiredGroups`.
+Validates that required fields are filled, supporting work-level inheritance from user-level fallback settings. Also validates `requiredGroups`.
 
 ```typescript
 const errors = validateRequiredSettings(
 	settings,
 	secretSettings,
 	schema,
-	['global', 'user', 'directory'],
-	'directory',
+	['global', 'user', 'work'],
+	'work',
 	userFallbackSettings
 );
 // ['API Key', 'At least one of: API Key, Base URL']
@@ -173,10 +173,10 @@ const errors = validateRequiredSettings(
 
 ### sanitizeSettingsForSave
 
-Normalizes settings values for storage: converts `undefined` to `null`, and at directory scope also converts empty strings to `null`.
+Normalizes settings values for storage: converts `undefined` to `null`, and at work scope also converts empty strings to `null`.
 
 ```typescript
-const sanitized = sanitizeSettingsForSave(settings, 'directory');
+const sanitized = sanitizeSettingsForSave(settings, 'work');
 ```
 
 ## Constraint Validation

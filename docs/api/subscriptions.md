@@ -29,7 +29,7 @@ packages/agent/src/subscriptions/
 
 Plans are seeded automatically on module initialization via `SubscriptionService.onModuleInit()`. Three tiers are defined:
 
-| Plan         | Code       | Max Directories | Allowed Cadences                  | Monthly Price | Overage/Run |
+| Plan         | Code       | Max Works | Allowed Cadences                  | Monthly Price | Overage/Run |
 | ------------ | ---------- | --------------- | --------------------------------- | ------------- | ----------- |
 | **Free**     | `free`     | 1               | Monthly, Weekly, Daily, Hourly \* | $0            | $10         |
 | **Standard** | `standard` | 5               | Monthly, Weekly, Daily            | $29           | $8          |
@@ -37,7 +37,7 @@ Plans are seeded automatically on module initialization via `SubscriptionService
 
 > \* Currently all cadences are enabled for the Free plan during the early-access period.
 
-Each plan is stored as a `SubscriptionPlan` entity with fields: `code`, `displayName`, `maxDirectories`, `allowedCadences`, `monthlyPrice`, `overagePricePerRun`, `currency`, and `active`.
+Each plan is stored as a `SubscriptionPlan` entity with fields: `code`, `displayName`, `maxWorks`, `allowedCadences`, `monthlyPrice`, `overagePricePerRun`, `currency`, and `active`.
 
 ## REST Endpoints
 
@@ -130,15 +130,15 @@ The core service in `packages/agent/src/subscriptions/subscription.service.ts` p
 
 ## Usage Ledger Service
 
-`UsageLedgerService` records pay-per-use charges when a directory generation runs on a cadence not included in the user's plan.
+`UsageLedgerService` records pay-per-use charges when a work generation runs on a cadence not included in the user's plan.
 
 ```typescript
 await usageLedgerService.recordUsage({
 	userId: 'user-123',
-	directoryId: 'dir-456',
-	schedule: directorySchedule,
+	workId: 'dir-456',
+	schedule: workSchedule,
 	triggerType: UsageLedgerTriggerType.SCHEDULED,
-	billingMode: DirectoryScheduleBillingMode.USAGE,
+	billingMode: WorkScheduleBillingMode.USAGE,
 	generationHistoryId: 'gen-789'
 });
 ```

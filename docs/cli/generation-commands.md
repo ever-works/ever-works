@@ -7,18 +7,18 @@ sidebar_position: 7
 
 # CLI Generation Commands
 
-The CLI provides four commands that cover the full content lifecycle: generating directory content, regenerating markdown, syncing the website repository, and deploying to production. Each command is a subcommand of `directory`.
+The CLI provides four commands that cover the full content lifecycle: generating work content, regenerating markdown, syncing the website repository, and deploying to production. Each command is a subcommand of `work`.
 
-**Source:** `apps/cli/src/commands/directory/`
+**Source:** `apps/cli/src/commands/work/`
 
 ## Command Overview
 
 | Command                         | Description                                            | Source File              |
 | ------------------------------- | ------------------------------------------------------ | ------------------------ |
-| `directory generate`            | Generate items and create/update the data repository   | `generate.ts`            |
-| `directory regenerate-markdown` | Regenerate the README.md from existing data            | `regenerate-markdown.ts` |
-| `directory update-website`      | Sync data repository content to the website repository | `update-website.ts`      |
-| `directory deploy`              | Deploy the website to the configured provider          | `deploy.ts`              |
+| `work generate`            | Generate items and create/update the data repository   | `generate.ts`            |
+| `work regenerate-markdown` | Regenerate the README.md from existing data            | `regenerate-markdown.ts` |
+| `work update-website`      | Sync data repository content to the website repository | `update-website.ts`      |
+| `work deploy`              | Deploy the website to the configured provider          | `deploy.ts`              |
 
 ```mermaid
 graph LR
@@ -31,7 +31,7 @@ graph LR
 ## Generate Content
 
 ```bash
-ever-works directory generate
+ever-works work generate
 ```
 
 The most complex CLI command. It guides the user through a multi-step configuration wizard, validates provider setup, and starts the generation pipeline.
@@ -39,7 +39,7 @@ The most complex CLI command. It guides the user through a multi-step configurat
 ### Prerequisites
 
 - User must be authenticated.
-- User must have `editor` role or higher on the selected directory.
+- User must have `editor` role or higher on the selected work.
 - A git provider (GitHub) must be connected.
 - No generation may already be in progress.
 
@@ -51,11 +51,11 @@ sequenceDiagram
     participant CLI
     participant API
 
-    User->>CLI: ever-works directory generate
+    User->>CLI: ever-works work generate
     CLI->>API: requireAuth()
-    CLI->>User: Select directory
+    CLI->>User: Select work
     CLI->>API: checkGitProviderConnection()
-    CLI->>API: getDirectoryConfig() + getGeneratorFormSchema()
+    CLI->>API: getWorkConfig() + getGeneratorFormSchema()
     CLI->>User: Select pipeline
     CLI->>API: getGeneratorFormSchema(pipelineId)
     CLI->>User: Select individual providers
@@ -63,17 +63,17 @@ sequenceDiagram
     CLI->>User: Configure plugin fields
     CLI->>User: Choose generation options
     CLI->>User: Review summary + confirm
-    CLI->>API: generateContent(directoryId, dto)
+    CLI->>API: generateContent(workId, dto)
     API-->>CLI: Generation started
-    CLI->>User: Use "directory status" to track
+    CLI->>User: Use "work status" to track
 ```
 
-### Step 1: Directory Selection
+### Step 1: Work Selection
 
-Prompts the user to select from their directories. Checks that generation is not already running:
+Prompts the user to select from their works. Checks that generation is not already running:
 
 ```typescript
-if (directory.generateStatus?.status === GenerateStatusType.GENERATING) {
+if (work.generateStatus?.status === GenerateStatusType.GENERATING) {
 	// Already in progress — show current step and exit
 }
 ```
@@ -104,7 +104,7 @@ Two fields are always collected:
 
 | Field    | Description                                                          |
 | -------- | -------------------------------------------------------------------- |
-| `name`   | The directory name (read-only, pre-filled)                           |
+| `name`   | The work name (read-only, pre-filled)                           |
 | `prompt` | The generation prompt (pre-filled from last generation if available) |
 
 ### Step 6: Dynamic Plugin Fields
@@ -127,7 +127,7 @@ if (unconfigured.length > 0) {
 
 ### Step 8: Generation Options
 
-For previously generated directories, the user chooses:
+For previously generated works, the user chooses:
 
 | Option                               | Values                        | Description                                            |
 | ------------------------------------ | ----------------------------- | ------------------------------------------------------ |
@@ -137,11 +137,11 @@ For previously generated directories, the user chooses:
 
 Selecting `RECREATE` triggers an extra confirmation since it deletes existing items.
 
-New directories always use `CREATE_UPDATE` without prompting.
+New works always use `CREATE_UPDATE` without prompting.
 
 ### Step 9: Confirm and Start
 
-The CLI displays a summary of all selections and asks for final confirmation. On confirmation, it calls `apiService.generateContent()` and directs the user to check progress with `directory status`.
+The CLI displays a summary of all selections and asks for final confirmation. On confirmation, it calls `apiService.generateContent()` and directs the user to check progress with `work status`.
 
 ### Plugin Config Sanitization
 
@@ -154,22 +154,22 @@ Before sending to the API, plugin config values are sanitized:
 ## Regenerate Markdown
 
 ```bash
-ever-works directory regenerate-markdown
+ever-works work regenerate-markdown
 ```
 
 Regenerates the README.md file in the data repository without re-running the full generation pipeline. Useful for updating presentation while preserving existing data.
 
 ### Flow
 
-1. Authenticate and select directory.
+1. Authenticate and select work.
 2. Check edit permissions.
 3. Confirm the operation.
-4. Call `apiService.regenerateMarkdown(directoryId)`.
+4. Call `apiService.regenerateMarkdown(workId)`.
 5. Show status and next steps.
 
 ### What It Does
 
-- Regenerates the `README.md` file for the directory's data repository.
+- Regenerates the `README.md` file for the work's data repository.
 - Preserves all existing item data.
 - Updates only the presentation layer (markdown formatting).
 
@@ -180,24 +180,24 @@ The CLI suggests:
 ```
   - Check your data repository for the updated README.md
   - Review the changes and commit if satisfied
-  - Use "directory update-website" to update the website
+  - Use "work update-website" to update the website
 ```
 
 ## Update Website
 
 ```bash
-ever-works directory update-website
+ever-works work update-website
 ```
 
 Syncs content from the data repository to the website repository. This prepares the website for deployment without triggering a deploy.
 
 ### Flow
 
-1. Authenticate and select directory.
+1. Authenticate and select work.
 2. Check edit permissions.
 3. Display the target repository (`{owner}/{slug}-website`).
 4. Confirm the operation.
-5. Call `apiService.updateWebsite(directoryId)`.
+5. Call `apiService.updateWebsite(workId)`.
 6. Show status, repository URL, and next steps.
 
 ### What It Does
@@ -210,21 +210,21 @@ Syncs content from the data repository to the website repository. This prepares 
 
 ```
   - Check the website repository for updates
-  - Use "directory deploy" to deploy the website
+  - Use "work deploy" to deploy the website
   - Review the changes before deployment
 ```
 
 ## Deploy Website
 
 ```bash
-ever-works directory deploy
+ever-works work deploy
 ```
 
 Deploys the website to the configured deployment provider (e.g. Vercel). Handles provider selection, team scoping, and deployment status polling.
 
 ### Prerequisites
 
-- Directory content must be generated (`generateStatus === GENERATED`).
+- Work content must be generated (`generateStatus === GENERATED`).
 - A deployment provider must be configured or selected during the command.
 - The deployment provider's API token must be configured.
 
@@ -256,19 +256,19 @@ stateDiagram-v2
 | State | Condition                                         | Behavior                                                       |
 | ----- | ------------------------------------------------- | -------------------------------------------------------------- |
 | A     | No `deployProvider` set                           | Prompt user to select a provider. If valid, proceed to deploy. |
-| B     | Has provider, `canDeploy=false`, shared directory | Tell user the owner must configure their token.                |
-| C     | Has provider, `canDeploy=false`, owned directory  | Tell user to configure their token. Offer to switch providers. |
+| B     | Has provider, `canDeploy=false`, shared work | Tell user the owner must configure their token.                |
+| C     | Has provider, `canDeploy=false`, owned work  | Tell user to configure their token. Offer to switch providers. |
 | D     | Has provider, `canDeploy=true`                    | Execute the deployment.                                        |
 
 ### Deployment Execution
 
 The `executeDeploy()` function handles the full deployment lifecycle:
 
-1. **Lookup existing deployment** -- Checks if the directory already has a live deployment and shows its URL.
+1. **Lookup existing deployment** -- Checks if the work already has a live deployment and shows its URL.
 2. **Team selection** -- If the user's deployment account has teams, prompts for which team to deploy under.
 3. **Confirmation** -- Shows the source repository and what will happen.
-4. **Deploy** -- Calls `apiService.deployWebsite(directoryId, { teamScope })`.
-5. **Poll for status** -- Polls the directory's `deploymentState` every 5 seconds.
+4. **Deploy** -- Calls `apiService.deployWebsite(workId, { teamScope })`.
+5. **Poll for status** -- Polls the work's `deploymentState` every 5 seconds.
 
 ### Deployment Status Polling
 
@@ -276,9 +276,9 @@ The `executeDeploy()` function handles the full deployment lifecycle:
 const STOP_STATES = ['READY', 'ERROR', 'CANCELED', 'TIMEOUT'];
 
 while (true) {
-	const { directory } = await apiService.getDirectory(directoryId);
+	const { work } = await apiService.getWork(workId);
 
-	if (STOP_STATES.includes(directory.deploymentState)) {
+	if (STOP_STATES.includes(work.deploymentState)) {
 		// Show final status and website URL
 		break;
 	}
@@ -291,11 +291,11 @@ while (true) {
 The `isDeploying()` helper prevents false positives by checking that the deployment was started within the last 10 minutes:
 
 ```typescript
-function isDeploying(directory: Directory) {
-	const hasDeploymentState = ['INITIALIZING', 'QUEUED', 'BUILDING'].includes(directory.deploymentState);
+function isDeploying(work: Work) {
+	const hasDeploymentState = ['INITIALIZING', 'QUEUED', 'BUILDING'].includes(work.deploymentState);
 	const hasStartedAt =
-		directory.deploymentStartedAt &&
-		new Date(directory.deploymentStartedAt) > new Date(Date.now() - 10 * 60 * 1000);
+		work.deploymentStartedAt &&
+		new Date(work.deploymentStartedAt) > new Date(Date.now() - 10 * 60 * 1000);
 	return Boolean(hasDeploymentState && hasStartedAt);
 }
 ```
@@ -321,14 +321,14 @@ await requireAuth();
 
 Every command requires an active session.
 
-### Directory Selection
+### Work Selection
 
 ```typescript
-const selection = await directoryPrompt.promptDirectorySelection();
-if (selection.cancelled || !selection.directory) return;
+const selection = await workPrompt.promptWorkSelection();
+if (selection.cancelled || !selection.work) return;
 ```
 
-Interactive directory picker with role and sharing information.
+Interactive work picker with role and sharing information.
 
 ### Permission Check
 
@@ -348,18 +348,18 @@ All commands wrap their logic in try/catch and use `handleCliError()` for consis
 A typical workflow using all four commands:
 
 ```bash
-# 1. Generate directory content
-ever-works directory generate
-# Select directory, configure providers, set prompt, confirm
+# 1. Generate work content
+ever-works work generate
+# Select work, configure providers, set prompt, confirm
 
 # 2. (Optional) Regenerate markdown if data format changes
-ever-works directory regenerate-markdown
+ever-works work regenerate-markdown
 
 # 3. Sync to website repository
-ever-works directory update-website
+ever-works work update-website
 
 # 4. Deploy to production
-ever-works directory deploy
+ever-works work deploy
 # Select team (if applicable), confirm, wait for READY
 ```
 
@@ -370,12 +370,12 @@ sequenceDiagram
     participant WebRepo as Website Repository
     participant Vercel as Deployment Provider
 
-    User->>DataRepo: directory generate
+    User->>DataRepo: work generate
     Note over DataRepo: AI generates items + README
-    User->>DataRepo: directory regenerate-markdown
+    User->>DataRepo: work regenerate-markdown
     Note over DataRepo: README updated
-    User->>WebRepo: directory update-website
+    User->>WebRepo: work update-website
     Note over WebRepo: Content synced from data repo
-    User->>Vercel: directory deploy
+    User->>Vercel: work deploy
     Note over Vercel: Website live
 ```

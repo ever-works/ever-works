@@ -41,14 +41,14 @@ The dashboard follows the React Server Components (RSC) model:
 
 ```typescript
 // Server component (default) -- page.tsx
-export default async function DirectoriesPage() {
-    const directories = await fetchDirectories(); // Server-side data fetch
-    return <DirectoryList directories={directories} />;
+export default async function WorksPage() {
+    const works = await fetchWorks(); // Server-side data fetch
+    return <WorkList works={works} />;
 }
 
-// Client component -- DirectoryCard.tsx
+// Client component -- WorkCard.tsx
 'use client';
-export function DirectoryCard({ directory }) {
+export function WorkCard({ work }) {
     const [expanded, setExpanded] = useState(false);
     // Interactive UI with event handlers
 }
@@ -71,27 +71,27 @@ export const routing = defineRouting({
 
 ### Route Groups
 
-Next.js route groups (parenthesized directories) organize pages without affecting URL structure:
+Next.js route groups (parenthesized works) organize pages without affecting URL structure:
 
 - **`(auth)/`** -- login, register, forgot-password, reset-password
-- **`(dashboard)/`** -- home, directories, plugins, settings
+- **`(dashboard)/`** -- home, works, plugins, settings
 
 Each group has its own `layout.tsx` that provides the appropriate UI shell (auth layout vs. dashboard sidebar layout).
 
 ### Dynamic Routes
 
-Directory detail pages use the `[id]` dynamic segment:
+Work detail pages use the `[id]` dynamic segment:
 
 ```
-app/[locale]/(dashboard)/directories/[id]/
-  layout.tsx          # Directory detail layout with tabs
+app/[locale]/(dashboard)/works/[id]/
+  layout.tsx          # Work detail layout with tabs
   page.tsx            # Overview tab
   items/page.tsx      # Items tab
   generator/page.tsx  # Generator tab
   ...
 ```
 
-The directory layout loads the directory entity and provides it to all child pages via `DirectoryDetailContext`.
+The work layout loads the work entity and provides it to all child pages via `WorkDetailContext`.
 
 ## Middleware
 
@@ -123,13 +123,13 @@ Authentication tokens are extracted from the encrypted cookie and passed as Bear
 
 ### Server Actions
 
-The `app/actions/` directory contains Next.js Server Actions for form submissions and mutations that need to run on the server.
+The `app/actions/` work contains Next.js Server Actions for form submissions and mutations that need to run on the server.
 
 ## Internationalization with next-intl
 
 ### Translation Files
 
-Translations are stored as JSON in the `messages/` directory:
+Translations are stored as JSON in the `messages/` work:
 
 ```
 messages/
@@ -178,7 +178,7 @@ The `NEXT_BUILD_OUTPUT` environment variable controls the build output:
 
 The `lib/permissions.ts` module defines client-side permission checks for UI visibility:
 
-- Whether a user can edit a directory
+- Whether a user can edit a work
 - Whether a user can manage members
 - Whether settings should be shown
 

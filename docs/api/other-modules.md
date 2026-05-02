@@ -7,7 +7,7 @@ sidebar_position: 6
 
 # Other API Modules
 
-In addition to the core directory and authentication APIs, the Ever Works Platform provides specialized modules for screenshots, deployment providers, subscriptions, and notifications.
+In addition to the core work and authentication APIs, the Ever Works Platform provides specialized modules for screenshots, deployment providers, subscriptions, and notifications.
 
 ## Screenshot API
 
@@ -95,7 +95,7 @@ Dynamic form schema endpoints return the configuration form for the active pipel
 | Method | Endpoint                              | Description                              |
 | ------ | ------------------------------------- | ---------------------------------------- |
 | `GET`  | `/api/generator-form`                 | Get global generator form schema         |
-| `GET`  | `/api/directories/:id/generator-form` | Get form schema for a specific directory |
+| `GET`  | `/api/works/:id/generator-form` | Get form schema for a specific work |
 
 Both endpoints accept an optional `?pipelineId=` query parameter to get the form for a specific pipeline plugin.
 
@@ -148,6 +148,6 @@ You can filter notifications by adding query parameters:
 
 - `ai_credits`: AI usage alerts
 - `subscription`: Billing and plan updates
-- `generation`: Directory generation status
+- `generation`: Work generation status
 - `system`: System-wide announcements
 - `security`: Security alerts (logins, password changes)

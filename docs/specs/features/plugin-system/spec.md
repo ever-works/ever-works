@@ -17,7 +17,7 @@ managers — without touching core code. Each plugin is a standalone
 `packages/plugins/<id>/` workspace that declares its metadata and
 capabilities. The platform discovers plugins at startup, loads their
 settings schemas, and routes capability requests to active plugins through
-**facades** that respect a three-tier settings cascade (directory → user → admin).
+**facades** that respect a three-tier settings cascade (work → user → admin).
 
 ## 2. User Scenarios
 
@@ -26,12 +26,12 @@ settings schemas, and routes capability requests to active plugins through
 - **Given** I install the platform fresh, **when** the API boots, **then**
   all 39 packaged plugins are discovered, loaded, and visible in the
   plugin registry.
-- **Given** I configure OpenAI as my AI provider for directory A and
-  Anthropic for directory B, **when** each directory generates content,
+- **Given** I configure OpenAI as my AI provider for work A and
+  Anthropic for work B, **when** each work generates content,
   **then** the corresponding provider is used — they never cross over.
 - **Given** I configure an AI provider at the user level and override it
-  at directory level, **when** that directory runs, **then** the
-  directory-level setting wins.
+  at work level, **when** that work runs, **then** the
+  work-level setting wins.
 - **Given** a plugin author wants to add a new AI provider, **when** they
   scaffold a new package under `packages/plugins/<their-id>/`, declare
   `everworks.plugin` metadata, and implement the AI capability interface,
@@ -43,10 +43,10 @@ settings schemas, and routes capability requests to active plugins through
   platform loads it, **then** the plugin is marked as failed-to-load and
   excluded from capability resolution; the API logs the error with the
   plugin id.
-- **Given** a plugin's API key is missing for a directory that selects it,
+- **Given** a plugin's API key is missing for a work that selects it,
   **when** generation runs, **then** the run fails with a clear
   "missing credentials" error referencing the plugin's settings UI.
-- **Given** I disable a plugin globally, **when** any directory tries to
+- **Given** I disable a plugin globally, **when** any work tries to
   use it, **then** the resolver falls back to the configured default
   (or fails with "no default available") rather than silently using the
   disabled plugin.
@@ -66,7 +66,7 @@ settings schemas, and routes capability requests to active plugins through
   `prompt-provider`, plus internal helpers.
 - **FR-4** The platform MUST resolve capability requests via facades
   (`AiFacadeService`, `GitFacadeService`, etc.) that consult the
-  three-tier settings cascade: directory → user → admin.
+  three-tier settings cascade: work → user → admin.
 - **FR-5** Plugin settings MUST be defined as JSON Schema with custom
   extensions: `x-secret`, `x-widget`, `x-envVar`.
 - **FR-6** Settings flagged `x-secret: true` MUST be encrypted at rest and
@@ -109,7 +109,7 @@ settings schemas, and routes capability requests to active plugins through
 | Plugin metadata block       | The `everworks.plugin` section of `package.json`                        |
 | Settings schema             | JSON Schema with `x-secret`, `x-widget`, `x-envVar` extensions          |
 | Plugin context              | Logger, cache, HTTP client, events, settings access — passed at runtime |
-| Three-tier settings cascade | directory → user → admin                                                |
+| Three-tier settings cascade | work → user → admin                                                |
 | Facade                      | Capability-aware resolver/router (e.g. `AiFacadeService`)               |
 | Default plugin              | Per-capability fallback when no scope override is set                   |
 

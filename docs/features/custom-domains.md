@@ -7,15 +7,15 @@ sidebar_position: 12
 
 # Custom Domains
 
-Custom Domains let you assign your own domain name to a directory's deployed website. Instead of accessing your directory at a provider-assigned URL (e.g., `my-directory.vercel.app`), visitors can reach it at `directory.yourdomain.com`.
+Custom Domains let you assign your own domain name to a work's deployed website. Instead of accessing your work at a provider-assigned URL (e.g., `my-work.vercel.app`), visitors can reach it at `work.yourdomain.com`.
 
 :::tip When to use this
-Use custom domains when you want a branded URL for your directory — for example, `tools.mycompany.com` instead of a `.vercel.app` subdomain.
+Use custom domains when you want a branded URL for your work — for example, `tools.mycompany.com` instead of a `.vercel.app` subdomain.
 :::
 
 ## Prerequisites
 
-- Directory must be deployed to a provider that supports custom domains (e.g., Vercel)
+- Work must be deployed to a provider that supports custom domains (e.g., Vercel)
 - You must own or control the domain's DNS settings
 - A deployment provider plugin must be enabled and configured
 
@@ -25,7 +25,7 @@ Use custom domains when you want a branded URL for your directory — for exampl
 2. **Sync to provider** — the platform pushes the domain to your deployment provider (e.g., Vercel).
 3. **Configure DNS** — point your domain to the provider using the DNS records returned by the verification step.
 4. **Verify** — trigger DNS verification to confirm your domain is correctly configured.
-5. **Auto-promote** — once verified, if the directory's current URL is a provider-assigned subdomain (e.g., `.vercel.app`), it is automatically updated to the custom domain.
+5. **Auto-promote** — once verified, if the work's current URL is a provider-assigned subdomain (e.g., `.vercel.app`), it is automatically updated to the custom domain.
 
 ### DNS Configuration
 
@@ -44,16 +44,16 @@ Domain records are stored in the Ever Works database as the primary source of tr
 
 ## API
 
-All endpoints require JWT or API key authentication and directory edit permission.
+All endpoints require JWT or API key authentication and work edit permission.
 
 ### List Domains
 
 | Method | Endpoint                              | Description                             |
 | ------ | ------------------------------------- | --------------------------------------- |
-| `GET`  | `/api/deploy/directories/:id/domains` | List all custom domains for a directory |
+| `GET`  | `/api/deploy/works/:id/domains` | List all custom domains for a work |
 
 ```bash
-curl http://localhost:3100/api/deploy/directories/<directory-id>/domains \
+curl http://localhost:3100/api/deploy/works/<work-id>/domains \
   -H "Authorization: Bearer <token>"
 ```
 
@@ -76,10 +76,10 @@ curl http://localhost:3100/api/deploy/directories/<directory-id>/domains \
 
 | Method | Endpoint                              | Description         |
 | ------ | ------------------------------------- | ------------------- |
-| `POST` | `/api/deploy/directories/:id/domains` | Add a custom domain |
+| `POST` | `/api/deploy/works/:id/domains` | Add a custom domain |
 
 ```bash
-curl -X POST http://localhost:3100/api/deploy/directories/<directory-id>/domains \
+curl -X POST http://localhost:3100/api/deploy/works/<work-id>/domains \
   -H "Authorization: Bearer <token>" \
   -H "Content-Type: application/json" \
   -d '{"domain": "tools.example.com"}'
@@ -97,10 +97,10 @@ curl -X POST http://localhost:3100/api/deploy/directories/<directory-id>/domains
 
 | Method   | Endpoint                                      | Description            |
 | -------- | --------------------------------------------- | ---------------------- |
-| `DELETE` | `/api/deploy/directories/:id/domains/:domain` | Remove a custom domain |
+| `DELETE` | `/api/deploy/works/:id/domains/:domain` | Remove a custom domain |
 
 ```bash
-curl -X DELETE http://localhost:3100/api/deploy/directories/<directory-id>/domains/tools.example.com \
+curl -X DELETE http://localhost:3100/api/deploy/works/<work-id>/domains/tools.example.com \
   -H "Authorization: Bearer <token>"
 ```
 
@@ -110,10 +110,10 @@ Removes the domain from both the database and the deployment provider.
 
 | Method | Endpoint                                             | Description              |
 | ------ | ---------------------------------------------------- | ------------------------ |
-| `POST` | `/api/deploy/directories/:id/domains/:domain/verify` | Trigger DNS verification |
+| `POST` | `/api/deploy/works/:id/domains/:domain/verify` | Trigger DNS verification |
 
 ```bash
-curl -X POST http://localhost:3100/api/deploy/directories/<directory-id>/domains/tools.example.com/verify \
+curl -X POST http://localhost:3100/api/deploy/works/<work-id>/domains/tools.example.com/verify \
   -H "Authorization: Bearer <token>"
 ```
 
@@ -139,6 +139,6 @@ If DNS is not yet configured, `verified` will be `false`. Re-run verification af
 
 ## Related
 
-- [Deployment](/api/deployment) — Directory deployment and provider configuration
+- [Deployment](/api/deployment) — Work deployment and provider configuration
 - [API Keys](./api-keys) — Programmatic authentication for domain management
 - [Plugin System](/plugin-system/) — Deploy provider plugins (Vercel, etc.)

@@ -7,7 +7,7 @@ sidebar_position: 1
 
 # AI & Generation
 
-The Ever Works Platform uses AI services to power directory content generation, enrichment, and conversational features. AI providers are implemented as [plugins](/plugin-system) and routed through the `AiFacadeService`.
+The Ever Works Platform uses AI services to power work content generation, enrichment, and conversational features. AI providers are implemented as [plugins](/plugin-system) and routed through the `AiFacadeService`.
 
 ## Providers
 
@@ -40,7 +40,7 @@ All providers support chat completions and structured output. Additional capabil
 
 ### Configuration
 
-Providers are configured through the plugin settings UI or environment variables. Each directory can use a different AI provider.
+Providers are configured through the plugin settings UI or environment variables. Each work can use a different AI provider.
 
 See [Built-in Plugins — AI Providers](/plugin-system/built-in-plugins#ai-providers) for complete configuration details for each provider.
 
@@ -50,7 +50,7 @@ The AI service supports structured output via Zod schemas through LangChain's `w
 
 ## Generation Pipelines
 
-The platform supports three generation pipelines, each implemented as a plugin. Directories can select which pipeline to use.
+The platform supports three generation pipelines, each implemented as a plugin. Works can select which pipeline to use.
 
 | Pipeline              | Plugin ID           | Approach                                              | Best For                                                        |
 | --------------------- | ------------------- | ----------------------------------------------------- | --------------------------------------------------------------- |
@@ -79,7 +79,7 @@ The pipeline uses plugins for each external operation — the active search plug
 
 ### Agent Pipeline
 
-The Agent Pipeline uses the Vercel AI SDK's `generateText` with tool calling to autonomously research and generate directory items. It has a parent/worker model architecture:
+The Agent Pipeline uses the Vercel AI SDK's `generateText` with tool calling to autonomously research and generate work items. It has a parent/worker model architecture:
 
 - **Parent model** (complex model) — orchestrates the research, decides which tools to call
 - **Worker model** (default model) — handles content extraction from URLs
@@ -90,7 +90,7 @@ The agent has access to tools for web search, URL processing, item management, a
 
 ### Claude Code Pipeline
 
-The Claude Code Pipeline downloads the Claude Code CLI binary, creates a temporary workspace seeded with existing directory data, then runs Claude Code as a subprocess to research and generate items. It requires either an OAuth token or Anthropic API key.
+The Claude Code Pipeline downloads the Claude Code CLI binary, creates a temporary workspace seeded with existing work data, then runs Claude Code as a subprocess to research and generate items. It requires either an OAuth token or Anthropic API key.
 
 **6 steps:** Setup Claude Code, Prepare Context, Generate Items, Collect Results, Capture Screenshots, Cleanup.
 

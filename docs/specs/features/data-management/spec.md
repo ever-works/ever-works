@@ -24,22 +24,22 @@ the API surface, and sync repos never store usable secrets.
 
 - **Export**: **Given** I want to migrate my account, **when** I click
   "Export" with `includeSecrets: true`, **then** I download a JSON file
-  containing all my directories, items, plugins, etc. — with secret
+  containing all my works, items, plugins, etc. — with secret
   values **masked** (`MASKED:sk-***1234`) so they're identifiable but
   unusable.
 - **Import preview**: **Given** I have an export JSON, **when** I upload
   it to the preview endpoint, **then** I get a summary including
-  directory count, total items, missing-plugin warnings, masked-secret
+  work count, total items, missing-plugin warnings, masked-secret
   detection, and slug conflicts before any data changes.
 - **Import apply**: **Given** I confirmed the preview and resolved
   conflicts, **when** I apply the import, **then** the platform
-  creates/updates directories and their relations, clones each data
+  creates/updates works and their relations, clones each data
   repo, writes items + categories + tags + collections + comparisons +
   site config + markdown templates, commits, and pushes — all atomic
-  per directory.
+  per work.
 - **GitHub Sync push**: **Given** I configured a private
   `ever-works-config` repo, **when** I push, **then** the platform
-  writes a structured manifest + per-directory folders (with masked
+  writes a structured manifest + per-work folders (with masked
   secrets) and commits.
 - **GitHub Sync pull**: **Given** my config exists in the repo, **when**
   I pull, **then** the platform reads the structured files,
@@ -54,11 +54,11 @@ the API surface, and sync repos never store usable secrets.
 - **Given** my import file references a plugin that's not installed,
   **when** the preview runs, **then** the missing plugin id appears in
   `missingPlugins` and (on apply) those settings are skipped.
-- **Given** an imported directory's slug collides with an existing one,
+- **Given** an imported work's slug collides with an existing one,
   **when** I see the conflict, **then** I choose one of: `skip` (keep
   existing), `overwrite` (update existing), or `rename` (use a fresh
   slug).
-- **Given** a malicious file tries to write to `directories/../etc/passwd`,
+- **Given** a malicious file tries to write to `works/../etc/passwd`,
   **when** GitHub Sync writes it, **then** `path.basename()` strips
   any traversal and only the safe slug component is used as a filename.
 - **Given** my GitHub repo contains masked values from a previous push,
@@ -70,28 +70,28 @@ the API surface, and sync repos never store usable secrets.
 
 - **FR-1** Export MUST produce a versioned JSON file with `version`,
   `exportedAt`, `includesSecrets`, and `data` fields.
-- **FR-2** Export MUST include: profile, directories (with items,
+- **FR-2** Export MUST include: profile, works (with items,
   categories, tags, collections, comparisons, site config, markdown
   templates, schedules, advanced prompts, members, custom domains,
-  directory plugins), and user plugins.
+  work plugins), and user plugins.
 - **FR-3** When `includeSecrets` is `true`, secret values MUST be
   **masked** as `MASKED:<first-3>***<last-4>` (or `MASKED:********`
   for values ≤ 8 chars). Real values MUST NEVER be exported.
 - **FR-4** When `includeSecrets` is `false`, secret keys MUST be omitted
   entirely.
 - **FR-5** Import preview MUST return: `valid`, `version`,
-  `includesSecrets`, `hasMaskedSecrets`, `directoryCount`,
+  `includesSecrets`, `hasMaskedSecrets`, `workCount`,
   `totalItemCount`, `userPluginCount`, `conflicts`, `missingPlugins`.
 - **FR-6** Import apply MUST accept a `resolutions[]` array per
   conflicting slug, each with strategy `skip` / `overwrite` / `rename`.
 - **FR-7** Import apply MUST detect any value still containing
   `MASKED:...` and SKIP it, recording a per-plugin warning.
-- **FR-8** Import apply MUST persist directories and their relations
+- **FR-8** Import apply MUST persist works and their relations
   (members, domains, plugins, advanced prompts, schedules) atomically
-  per-directory; partial failures must not corrupt state.
+  per-work; partial failures must not corrupt state.
 - **FR-9** GitHub Sync MUST support a private repo (default name
   `ever-works-config`) and produce a structured layout with
-  `manifest.json`, `profile.json`, per-directory folders.
+  `manifest.json`, `profile.json`, per-work folders.
 - **FR-10** GitHub Sync push MUST follow the same secret hygiene as
   export — masked or omitted, never real values.
 - **FR-11** GitHub Sync pull MUST always ignore secret values
@@ -104,9 +104,9 @@ the API surface, and sync repos never store usable secrets.
 
 - **Performance**: export of a typical account (10 dirs, 1000 items
   each) completes in ≤ 30 s. Import is bounded by git push time per
-  directory.
-- **Reliability**: per-directory atomicity means a single failed
-  directory doesn't break the rest of the import.
+  work.
+- **Reliability**: per-work atomicity means a single failed
+  work doesn't break the rest of the import.
 - **Security & privacy**: this feature exists almost entirely to make
   Constitution Principle VII durable across export/import/sync
   boundaries.
@@ -127,7 +127,7 @@ the API surface, and sync repos never store usable secrets.
 
 ## 6. Out of Scope
 
-- Selective per-directory export (today export is all-or-nothing per user).
+- Selective per-work export (today export is all-or-nothing per user).
 - Cross-user import (each user imports into their own account).
 - Two-way live sync (push and pull are user-initiated, no continuous
   sync daemon).

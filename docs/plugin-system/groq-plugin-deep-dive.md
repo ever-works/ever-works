@@ -188,7 +188,7 @@ const result = await aiFacade.askJson(
 	systemPrompt,
 	outputSchema,
 	{ temperature: 0, routing: { complexity: 'simple' } },
-	{ userId: user.id, directoryId: directory.id }
+	{ userId: user.id, workId: work.id }
 );
 ```
 

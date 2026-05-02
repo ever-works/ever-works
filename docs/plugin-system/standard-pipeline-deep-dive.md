@@ -9,7 +9,7 @@ sidebar_position: 61
 
 ## Overview
 
-The Standard Pipeline plugin (`@ever-works/plugins/standard-pipeline`) is the default directory generation engine in Ever Works. It implements a 15-step, engine-orchestrated pipeline that transforms a user prompt into a fully structured directory with items, categories, tags, badges, images, and markdown descriptions.
+The Standard Pipeline plugin (`@ever-works/plugins/standard-pipeline`) is the default work generation engine in Ever Works. It implements a 15-step, engine-orchestrated pipeline that transforms a user prompt into a fully structured work with items, categories, tags, badges, images, and markdown descriptions.
 
 Unlike the Agent Pipeline (which uses autonomous tool calling), the Standard Pipeline follows a deterministic execution order where each step runs in sequence with explicit data dependencies. The pipeline engine controls step execution, checkpoint/resume, and context management.
 
@@ -133,7 +133,7 @@ The Standard Pipeline provides a comprehensive form schema through the `IFormSch
 
 | Field       | Type     | Default | Description                      |
 | ----------- | -------- | ------- | -------------------------------- |
-| `max_items` | `number` | `50`    | Target number of directory items |
+| `max_items` | `number` | `50`    | Target number of work items |
 
 #### Feature Toggles
 
@@ -176,7 +176,7 @@ getFormSchema(): PluginFormSchema {
 
 ### Core Capabilities
 
-- **`pipeline`** - Full directory generation from prompt to structured output
+- **`pipeline`** - Full work generation from prompt to structured output
 - **`form-schema`** - Dynamic form field definitions for the generation UI
 
 ### What the Pipeline Produces
@@ -290,7 +290,7 @@ interface StandardPipelineMetrics extends PipelineMetrics {
 
 ### Step 1: Prompt Comparison (`prompt-comparison`)
 
-Compares a new prompt with the existing directory's previous prompt (for `CREATE_UPDATE` mode). Uses AI with a zod schema to determine if prompts are related:
+Compares a new prompt with the existing work's previous prompt (for `CREATE_UPDATE` mode). Uses AI with a zod schema to determine if prompts are related:
 
 ```typescript
 const schema = z.object({
@@ -317,7 +317,7 @@ Uses AI with structured output (zod schema). Falls back to regex URL extraction 
 
 ### Step 3: Domain Detection (`domain-detection`)
 
-Classifies the directory's domain to optimize downstream extraction:
+Classifies the work's domain to optimize downstream extraction:
 
 ```typescript
 interface DomainAnalysis {
@@ -363,7 +363,7 @@ Retrieves full content from discovered URLs and filters out irrelevant or low-qu
 
 ### Step 9: Items Extraction (`items-extraction`)
 
-Extracts directory items from web page content:
+Extracts work items from web page content:
 
 - Uses `RecursiveCharacterTextSplitter` with `MAX_CHUNK_SIZE = 6000` and `CHUNK_OVERLAP = 200`
 - Processes chunks in batches of 10
@@ -414,14 +414,14 @@ Generates markdown descriptions for each item using the content cache populated 
 
 ## Usage Examples
 
-### Basic Directory Generation
+### Basic Work Generation
 
 ```typescript
 // The pipeline is invoked by the engine, not directly
 // Configuration is passed through the generation request:
 
 const request = {
-	prompt: 'Create a directory of the best React component libraries',
+	prompt: 'Create a work of the best React component libraries',
 	config: {
 		max_items: 30,
 		max_search_queries: 8,
@@ -433,7 +433,7 @@ const request = {
 };
 ```
 
-### Update Existing Directory
+### Update Existing Work
 
 ```typescript
 const request = {
@@ -450,7 +450,7 @@ const request = {
 
 ```typescript
 const request = {
-	prompt: 'Create a directory of DevOps tools. Categories: CI/CD, Monitoring, Infrastructure. Start with CI/CD.',
+	prompt: 'Create a work of DevOps tools. Categories: CI/CD, Monitoring, Infrastructure. Start with CI/CD.',
 	config: {
 		initial_categories: ['CI/CD', 'Monitoring', 'Infrastructure'],
 		priority_categories: ['CI/CD']

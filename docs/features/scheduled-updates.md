@@ -7,22 +7,22 @@ sidebar_position: 4
 
 # Scheduled Updates
 
-Scheduled Updates let you keep a directory's content fresh by re-running the AI generation pipeline on a recurring basis. You can choose from seven cadences ranging from hourly to monthly, and the platform handles retries, failure tracking, and billing automatically.
+Scheduled Updates let you keep a work's content fresh by re-running the AI generation pipeline on a recurring basis. You can choose from seven cadences ranging from hourly to monthly, and the platform handles retries, failure tracking, and billing automatically.
 
 :::tip When to use this
-Enable scheduled updates on directories where the underlying data changes frequently — for example, a directory of trending open-source projects that should reflect new entries every week.
+Enable scheduled updates on works where the underlying data changes frequently — for example, a work of trending open-source projects that should reflect new entries every week.
 :::
 
 ## Prerequisites
 
-- The directory must have completed at least one generation (initial setup must be done first).
+- The work must have completed at least one generation (initial setup must be done first).
 - At least one AI provider plugin must be active.
 - Scheduled updates must be enabled globally (`SCHEDULED_UPDATES_ENABLED` environment variable, defaults to `true`).
 
 ## How It Works
 
 1. **Schedule creation** — You set a cadence (hourly, daily, weekly, monthly) via the API or the Web Dashboard. The platform calculates the next run time.
-2. **Automatic execution** — When `nextRunAt` arrives, the platform triggers a generation run using the directory's existing config.
+2. **Automatic execution** — When `nextRunAt` arrives, the platform triggers a generation run using the work's existing config.
 3. **Success** — On completion, `nextRunAt` advances to the next cadence interval and the failure counter resets.
 4. **Failure handling** — On error, the run is retried after 15 minutes. If failures exceed the `maxFailureBeforePause` threshold (default 3), the schedule is automatically paused and you receive a notification.
 5. **Stuck run recovery** — Runs stuck in a "generating" state for over 1 hour are automatically marked as failed.
@@ -47,7 +47,7 @@ Available cadences may depend on your subscription plan. Cadences not included i
 
 | Mode           | Description                                               |
 | -------------- | --------------------------------------------------------- |
-| `subscription` | Counts against your plan's included scheduled directories |
+| `subscription` | Counts against your plan's included scheduled works |
 | `usage`        | Pay-per-use — bypasses plan limits, any cadence available |
 
 ### Settings
@@ -62,7 +62,7 @@ Available cadences may depend on your subscription plan. Cadences not included i
 
 ### Provider Overrides
 
-You can override which plugins the scheduled run uses, independent of the directory's default settings:
+You can override which plugins the scheduled run uses, independent of the work's default settings:
 
 | Field              | Description                   |
 | ------------------ | ----------------------------- |
@@ -82,10 +82,10 @@ All endpoints require JWT authentication.
 
 | Method | Endpoint                        | Description                         |
 | ------ | ------------------------------- | ----------------------------------- |
-| `GET`  | `/api/directories/:id/schedule` | Get the current schedule and status |
+| `GET`  | `/api/works/:id/schedule` | Get the current schedule and status |
 
 ```bash
-curl http://localhost:3100/api/directories/<directory-id>/schedule \
+curl http://localhost:3100/api/works/<work-id>/schedule \
   -H "Authorization: Bearer <token>"
 ```
 
@@ -94,7 +94,7 @@ curl http://localhost:3100/api/directories/<directory-id>/schedule \
 ```json
 {
 	"status": "success",
-	"directoryId": "<uuid>",
+	"workId": "<uuid>",
 	"schedule": {
 		"status": "active",
 		"cadence": "weekly",
@@ -120,10 +120,10 @@ curl http://localhost:3100/api/directories/<directory-id>/schedule \
 
 | Method | Endpoint                        | Description                 |
 | ------ | ------------------------------- | --------------------------- |
-| `PUT`  | `/api/directories/:id/schedule` | Create or update a schedule |
+| `PUT`  | `/api/works/:id/schedule` | Create or update a schedule |
 
 ```bash
-curl -X PUT http://localhost:3100/api/directories/<directory-id>/schedule \
+curl -X PUT http://localhost:3100/api/works/<work-id>/schedule \
   -H "Authorization: Bearer <token>" \
   -H "Content-Type: application/json" \
   -d '{
@@ -153,17 +153,17 @@ curl -X PUT http://localhost:3100/api/directories/<directory-id>/schedule \
 | `400`  | Cadence not available on plan and billing mode is `subscription` |
 | `400`  | `maxFailureBeforePause` outside 1–10                             |
 | `400`  | Provider override references an uninstalled or disabled plugin   |
-| `400`  | Activating would exceed plan's directory limit                   |
-| `400`  | Directory has not completed initial generation                   |
+| `400`  | Activating would exceed plan's work limit                   |
+| `400`  | Work has not completed initial generation                   |
 
 ### Cancel Schedule
 
 | Method   | Endpoint                        | Description         |
 | -------- | ------------------------------- | ------------------- |
-| `DELETE` | `/api/directories/:id/schedule` | Cancel the schedule |
+| `DELETE` | `/api/works/:id/schedule` | Cancel the schedule |
 
 ```bash
-curl -X DELETE http://localhost:3100/api/directories/<directory-id>/schedule \
+curl -X DELETE http://localhost:3100/api/works/<work-id>/schedule \
   -H "Authorization: Bearer <token>"
 ```
 
@@ -173,10 +173,10 @@ Canceling resets the schedule to its default state (cadence cleared, billing mod
 
 | Method | Endpoint                            | Description                 |
 | ------ | ----------------------------------- | --------------------------- |
-| `POST` | `/api/directories/:id/schedule/run` | Trigger a scheduled run now |
+| `POST` | `/api/works/:id/schedule/run` | Trigger a scheduled run now |
 
 ```bash
-curl -X POST http://localhost:3100/api/directories/<directory-id>/schedule/run \
+curl -X POST http://localhost:3100/api/works/<work-id>/schedule/run \
   -H "Authorization: Bearer <token>"
 ```
 
@@ -193,6 +193,6 @@ Returns `202 Accepted`. The schedule must be in `active` status — returns `400
 
 ## Related
 
-- [Directories API](/api/directories) — Full endpoint reference including schedule endpoints
+- [Works API](/api/works) — Full endpoint reference including schedule endpoints
 - [AI & Generation](/ai-agents) — The generation pipeline that runs on each scheduled update
 - [Collections](./collections) — Items generated by scheduled updates can be assigned to collections

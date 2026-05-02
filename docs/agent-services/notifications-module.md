@@ -103,8 +103,8 @@ Pre-configured notification creators for common platform events:
 | ---------------------------------------------------------- | ------------ | --------- | --------------------------------- |
 | `notifyAiCreditsDepleted(userId)`                          | `ai_credits` | `warning` | `ai-credits-depleted`             |
 | `notifyAiProviderError(userId, provider, error)`           | `ai_credits` | `error`   | `ai-provider-error-{provider}`    |
-| `notifyGenerationAccountError(userId, directoryId, error)` | `generation` | `error`   | `gen-account-error-{directoryId}` |
-| `notifySchedulePaused(userId, directoryId, reason)`        | `generation` | `warning` | `schedule-paused-{directoryId}`   |
+| `notifyGenerationAccountError(userId, workId, error)` | `generation` | `error`   | `gen-account-error-{workId}` |
+| `notifySchedulePaused(userId, workId, reason)`        | `generation` | `warning` | `schedule-paused-{workId}`   |
 | `notifyGitAuthExpired(userId)`                             | `security`   | `warning` | `git-auth-expired`                |
 
 All convenience methods use deduplication to prevent notification flooding. For example, if a user's AI credits are depleted and generation runs multiple times, only one `ai-credits-depleted` notification will be active at a time.
@@ -146,9 +146,9 @@ import { NotificationType, NotificationCategory } from '@ever-works/agent/entiti
 export class MyService {
 	constructor(private readonly notifications: NotificationService) {}
 
-	async onScheduleFailed(userId: string, directoryId: string) {
+	async onScheduleFailed(userId: string, workId: string) {
 		// Uses convenience method with built-in deduplication
-		await this.notifications.notifySchedulePaused(userId, directoryId, 'Too many consecutive failures');
+		await this.notifications.notifySchedulePaused(userId, workId, 'Too many consecutive failures');
 	}
 
 	async sendCustomNotification(userId: string) {
@@ -156,10 +156,10 @@ export class MyService {
 		await this.notifications.create({
 			userId,
 			title: 'Import Complete',
-			message: 'Your directory has been imported from the awesome list.',
+			message: 'Your work has been imported from the awesome list.',
 			type: NotificationType.SUCCESS,
 			category: NotificationCategory.GENERATION,
-			actionUrl: '/dashboard/my-directory',
+			actionUrl: '/dashboard/my-work',
 			metadata: { itemCount: 42 }
 		});
 	}

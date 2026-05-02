@@ -45,23 +45,23 @@ The `comparison-generator` plugin under `packages/plugins/comparison-generator/`
 
 ## 6. Web / CLI
 
-- Web: comparison configuration form on directory settings (rendered from
+- Web: comparison configuration form on work settings (rendered from
   the plugin's JSON Schema with `form-schema-provider` extensions).
 - CLI: not exposed.
 
 ## 7. Background Jobs
 
 When `cadence_override` is set, comparison generation runs as a Trigger.dev
-fan-out task; otherwise it piggybacks on the directory's main generation.
+fan-out task; otherwise it piggybacks on the work's main generation.
 
 ## 8. Security & Permissions
 
-Comparison settings are scoped per directory; only directory editors can
+Comparison settings are scoped per work; only work editors can
 modify them. AI calls use the resolved AI provider's credentials.
 
 ## 9. Observability
 
-Activity-log action `directory_comparisons_generated` with counts.
+Activity-log action `work_comparisons_generated` with counts.
 
 ## 10. Risks & Mitigations
 

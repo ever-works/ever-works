@@ -10,7 +10,7 @@ work into existing pipelines.
 
 ## 1. Purpose
 
-Every directory generation that runs through the **Standard Pipeline**
+Every work generation that runs through the **Standard Pipeline**
 flows through a single executor — `ExecutablePipelineRunner`. The
 executor is provided by `@ever-works/plugin/pipeline` (so step plugins
 can construct pipelines outside NestJS), wrapped on the platform side
@@ -32,9 +32,9 @@ pipeline-as-a-feature description in [`pipeline-overview`](./pipeline-overview.m
 ## 2. Layered Surface
 
 ```
-                       ┌─ Trigger.dev directory-generation task
+                       ┌─ Trigger.dev work-generation task
                        │
-            DirectoryGenerationService.runScheduledUpdate()
+            WorkGenerationService.runScheduledUpdate()
                        │
        ┌───────────────┼─────────────────────────────────────────┐
        │               │                                          │
@@ -224,7 +224,7 @@ AI facade both do this automatically.
 For long-running generations a step can opt in to **checkpointing** by
 declaring `checkpoint: true`. Before the step runs, the executor:
 
-1. Computes a **checkpoint key** from the directory id, run id, and
+1. Computes a **checkpoint key** from the work id, run id, and
    step name.
 2. Looks up the cache (TypeORM-backed `cache_entries` table) for a
    cached result.
@@ -247,7 +247,7 @@ When a step throws, the executor:
 3. Resolves the runner with `{outcome: 'failed', failedStep, reason}`.
 4. The orchestrator wraps that into a platform-side
    `ScheduleRunOutcome` and calls `finalizeScheduleRun(...)` (see
-   [Schedule Dispatcher](../../agent-services/directory-schedule-dispatcher.md)
+   [Schedule Dispatcher](../../agent-services/work-schedule-dispatcher.md)
    for the dispatcher's mirror).
 
 Step errors are **not retried** by the executor itself. Scheduled
@@ -259,7 +259,7 @@ updates retry the whole run after 15 minutes (see
 - **Within a run**, steps execute sequentially. The executor never runs
   two steps concurrently.
 - **Across runs**, the dispatcher sequences runs per-worker (see
-  [Schedule Dispatcher §6](../../agent-services/directory-schedule-dispatcher.md#sequential-processing--limits)).
+  [Schedule Dispatcher §6](../../agent-services/work-schedule-dispatcher.md#sequential-processing--limits)).
 - AI calls inside a step can fan out. The executor doesn't enforce a
   concurrency cap — that's the step's responsibility (the
   `Promise.allSettled` pattern).
@@ -271,7 +271,7 @@ Every step receives a `StepContext` that carries:
 | Field                    | Purpose                                                        |
 | ------------------------ | -------------------------------------------------------------- |
 | `signal`                 | `AbortSignal` for cancellation                                 |
-| `directory`              | The current directory entity                                   |
+| `work`              | The current work entity                                   |
 | `user`                   | The triggering user                                            |
 | `pluginContext`          | The plugin's own `PluginContext` (logger, cache, http, events) |
 | `aiFacade`               | Resolved `IAiFacade`                                           |
@@ -292,12 +292,12 @@ step's `input` — no global state.
 
 `PipelineBuilderService` (in `packages/agent/src/pipeline/`) constructs
 a runtime executor from a pipeline plugin's step registry, resolved
-modifiers, and the directory's settings:
+modifiers, and the work's settings:
 
 ```ts
 const runner = await pipelineBuilder.build({
 	pipelinePluginId: 'standard-pipeline',
-	directory,
+	work,
 	user,
 	overrides: schedule.providerOverrides,
 	cancellationSignal
@@ -326,7 +326,7 @@ runner with stubbed steps — see `__tests__/mock-pipeline-plugin.ts`.
 | II — Capability-driven      | Steps consume facades by capability; never plugin id.                           |
 | III — Source-of-truth repos | Steps that write data go through `GitFacadeService`.                            |
 | IV — Trigger.dev            | Production runs are wrapped by Trigger.dev tasks.                               |
-| V — Forward-only migrations | Step state is jsonb on `directory_generation_history` — additive.               |
+| V — Forward-only migrations | Step state is jsonb on `work_generation_history` — additive.               |
 | VI — Tests                  | Executor + builder + every shipped step has a Jest suite.                       |
 | VII — Secret hygiene        | StepContext exposes facades; secret values never appear in `state`.             |
 | VIII — Plugin counts        | N/A.                                                                            |

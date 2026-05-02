@@ -20,13 +20,13 @@ The generator form is not static -- it changes based on which pipeline plugin is
 ```typescript
 constructor(
     private readonly pluginRegistry: PluginRegistryService,
-    @Optional() private readonly directoryPluginRepository?: DirectoryPluginRepository,
+    @Optional() private readonly workPluginRepository?: WorkPluginRepository,
     @Optional() private readonly pluginSettingsService?: PluginSettingsService,
 )
 ```
 
 - **PluginRegistryService** -- Central registry of all installed plugins and their capabilities.
-- **DirectoryPluginRepository** -- Tracks which plugins are enabled/active per directory.
+- **WorkPluginRepository** -- Tracks which plugins are enabled/active per work.
 - **PluginSettingsService** -- Resolves plugin settings and checks required configuration.
 
 ## Core Concepts
@@ -68,7 +68,7 @@ The primary method `getFormSchema()` orchestrates the full schema resolution:
 ```typescript
 const schema = await formSchemaService.getFormSchema(
 	'agent-pipeline', // pipelineId (optional)
-	{ directoryId, userId } // scope options
+	{ workId, userId } // scope options
 );
 ```
 
@@ -88,7 +88,7 @@ The service resolves the pipeline plugin through a priority chain:
 | Priority | Source                                             | Description             |
 | -------- | -------------------------------------------------- | ----------------------- |
 | 1        | Explicit `pipelineId` parameter                    | User-selected pipeline  |
-| 2        | Directory's `activeCapability` for `'pipeline'`    | Directory-level default |
+| 2        | Work's `activeCapability` for `'pipeline'`    | Work-level default |
 | 3        | Plugin with `defaultForCapabilities: ['pipeline']` | System-level default    |
 | 4        | First loaded pipeline plugin                       | Fallback                |
 
@@ -96,7 +96,7 @@ The service resolves the pipeline plugin through a priority chain:
 
 Providers are filtered based on scope:
 
-- **Enable status** -- Checked via `pluginRegistry.isPluginEnabledForScope()` which considers Directory > User > autoEnable hierarchy.
+- **Enable status** -- Checked via `pluginRegistry.isPluginEnabledForScope()` which considers Work > User > autoEnable hierarchy.
 - **Supplementary flag** -- Plugins marked as `supplementary` (e.g., notion-extractor) are excluded from selectable lists; they activate via URL matching.
 - **Plugin state** -- Only `loaded` plugins are included.
 
@@ -104,14 +104,14 @@ Providers are filtered based on scope:
 
 A provider is marked as `isDefault` when:
 
-1. It matches the directory's `activeCapability` entry for that category, **OR**
+1. It matches the work's `activeCapability` entry for that category, **OR**
 2. Its manifest includes the capability in `defaultForCapabilities`, **OR**
 3. It is a `systemPlugin` (fallback).
 
 ## Validating Form Values
 
 ```typescript
-const result = await formSchemaService.validateFormValues(pipelineId, formValues, { directoryId, userId });
+const result = await formSchemaService.validateFormValues(pipelineId, formValues, { workId, userId });
 // result: { valid: true } or { valid: false, errors: [...] }
 ```
 
@@ -126,7 +126,7 @@ The `processFormConfig()` method transforms raw form values into structured conf
 
 ```typescript
 const { config, pluginConfig } = await formSchemaService.processFormConfig(pipelineId, rawFormValues, {
-	directoryId,
+	workId,
 	userId
 });
 ```
@@ -159,7 +159,7 @@ const { config, pluginConfig } = await formSchemaService.processFormConfig(pipel
 The `validateFormSchemaPlugins()` method ensures all enabled form-schema-provider plugins are properly configured:
 
 ```typescript
-await formSchemaService.validateFormSchemaPlugins({ directoryId, userId });
+await formSchemaService.validateFormSchemaPlugins({ workId, userId });
 ```
 
 For each enabled plugin:
@@ -174,7 +174,7 @@ Throws `BadRequestException` with a list of errors if any plugins are misconfigu
 ## Validating Selected Providers
 
 ```typescript
-await formSchemaService.validateSelectedProviders({ ai: 'openai', search: 'exa' }, { directoryId, userId });
+await formSchemaService.validateSelectedProviders({ ai: 'openai', search: 'exa' }, { workId, userId });
 ```
 
 Validates each provider through the chain: **exists** -> **loaded** -> **enabled** -> **configured**. If a provider field is empty, validates the default provider for that category instead.

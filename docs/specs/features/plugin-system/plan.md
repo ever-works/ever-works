@@ -16,7 +16,7 @@ flowchart LR
     Load --> Schema[Read settings JSON Schema]
     Schema --> Reg[Plugin Registry]
     Caller[Service] --> Facade[AiFacadeService etc.]
-    Facade --> Resolve[Resolve scope: directory then user then admin]
+    Facade --> Resolve[Resolve scope: work then user then admin]
     Resolve --> Reg
     Reg --> Plugin[Capability impl]
     Plugin --> Result[Return]
@@ -36,7 +36,7 @@ flowchart LR
 
 - `plugin_settings` table: `(scope, scopeId, pluginId, settings_json, createdAt, updatedAt)`.
 - Three scopes: `admin` (scopeId = null), `user` (scopeId = userId),
-  `directory` (scopeId = directoryId).
+  `work` (scopeId = workId).
 - Encrypted columns for `x-secret` fields (envelope encryption with the
   platform's master key).
 

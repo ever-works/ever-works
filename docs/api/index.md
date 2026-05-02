@@ -7,7 +7,7 @@ sidebar_position: 1
 
 # API Reference
 
-The Ever Works Platform API is a REST API built with NestJS. It provides endpoints for authentication, directory management, AI-powered content generation, deployment, and more.
+The Ever Works Platform API is a REST API built with NestJS. It provides endpoints for authentication, work management, AI-powered content generation, deployment, and more.
 
 ## Base URL
 
@@ -54,7 +54,7 @@ All tiers apply simultaneously. If any tier's limit is exceeded, the API returns
 | **Health**          | `/api`                             | Health check                                          | `GET /api` returns API status                                                           |
 | **Auth**            | `/api/auth`                        | Registration, login, email verification               | [Authentication](/api/authentication)                                                   |
 | **OAuth**           | `/api/oauth`                       | OAuth flows (GitHub, Google), plugin connections      | [Authentication](/api/authentication), [Other Modules](/api/other-modules#plugin-oauth) |
-| **Directories**     | `/api/directories`                 | Directory CRUD, items, categories, generation, import | [Directories](/api/directories)                                                         |
+| **Works**     | `/api/works`                 | Work CRUD, items, categories, generation, import | [Works](/api/works)                                                         |
 | **Deploy**          | `/api/deploy`                      | Provider-agnostic deployment                          | [Deployment](/api/deployment)                                                           |
 | **AI Conversation** | `/api/ai-conversations`            | Streaming AI chat                                     | [AI Conversation](/api/ai-conversation)                                                 |
 | **Git Providers**   | `/api/git-providers`               | Git provider connections, repos, orgs                 | [Other Modules](/api/other-modules#git-provider-api)                                    |
@@ -62,8 +62,8 @@ All tiers apply simultaneously. If any tier's limit is exceeded, the API returns
 | **Screenshot**      | `/api/screenshot`                  | Screenshot capture                                    | [Other Modules](/api/other-modules#screenshot-api)                                      |
 | **Subscriptions**   | `/api/subscriptions`               | Plans, billing, usage tracking                        | [Other Modules](/api/other-modules#subscriptions-api)                                   |
 | **Notifications**   | `/api/notifications`               | User notifications                                    | [Other Modules](/api/other-modules#notifications-api)                                   |
-| **Members**         | `/api/directories/:id/members`     | Directory member management                           | [Directories](/api/directories)                                                         |
-| **Comparisons**     | `/api/directories/:id/comparisons` | A vs B comparison page generation and management      | [Directories](/api/directories)                                                         |
+| **Members**         | `/api/works/:id/members`     | Work member management                           | [Works](/api/works)                                                         |
+| **Comparisons**     | `/api/works/:id/comparisons` | A vs B comparison page generation and management      | [Works](/api/works)                                                         |
 
 ## Request Format
 

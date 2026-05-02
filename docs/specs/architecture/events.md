@@ -11,7 +11,7 @@ notification surface.
 ## 1. Purpose
 
 The platform uses **`@nestjs/event-emitter`** to decouple modules
-that don't need synchronous coupling. A directory creation, a
+that don't need synchronous coupling. A work creation, a
 generation completion, or a `works.yml` sync request fires a typed
 event; downstream consumers subscribe to it independently. The event
 emitter is **in-process only** — there's no message broker, no Redis
@@ -37,12 +37,12 @@ That's the entire base. Concrete events extend it with:
 
 ```ts
 import { BaseEvent } from './base';
-import type { Directory } from '@src/entities';
+import type { Work } from '@src/entities';
 
-export class DirectoryCreatedEvent extends BaseEvent {
-	static EVENT_NAME = 'directory.created';
+export class WorkCreatedEvent extends BaseEvent {
+	static EVENT_NAME = 'work.created';
 
-	constructor(public readonly directory: Directory) {
+	constructor(public readonly work: Work) {
 		super();
 	}
 }
@@ -51,7 +51,7 @@ export class DirectoryCreatedEvent extends BaseEvent {
 Two conventions:
 
 1. **Event names are dot-namespaced** — `<domain>.<action>` so
-   wildcard subscribers can listen to `directory.*`.
+   wildcard subscribers can listen to `work.*`.
 2. **The static `EVENT_NAME`** is the routing key; emitter calls and
    `@OnEvent` decorators all reference it via `MyEvent.EVENT_NAME`.
 
@@ -66,9 +66,9 @@ The events shipped today (in
 
 | Event                               | `EVENT_NAME`                     | When                                                     |
 | ----------------------------------- | -------------------------------- | -------------------------------------------------------- |
-| `DirectoryCreatedEvent`             | `directory.created`              | A new directory has been persisted (any creation method) |
-| `DirectoryGenerationCompletedEvent` | `directory.generation.completed` | A pipeline run finished successfully                     |
-| `WorksConfigSyncRequestedEvent`     | `works-config.sync.requested`    | A directory mutation needs `works.yml` updated           |
+| `WorkCreatedEvent`             | `work.created`              | A new work has been persisted (any creation method) |
+| `WorkGenerationCompletedEvent` | `work.generation.completed` | A pipeline run finished successfully                     |
+| `WorksConfigSyncRequestedEvent`     | `works-config.sync.requested`    | A work mutation needs `works.yml` updated           |
 | `WorksConfigSyncFailedEvent`        | `works-config.sync.failed`       | A `works.yml` sync write failed                          |
 
 Future events follow the same shape — a class extending `BaseEvent`,
@@ -81,13 +81,13 @@ Producers inject NestJS's `EventEmitter2` and emit:
 
 ```ts
 @Injectable()
-export class DirectoryCreationService {
+export class WorkCreationService {
 	constructor(private readonly events: EventEmitter2) {}
 
-	async create(dto: CreateDirectoryDto): Promise<Directory> {
-		const directory = await this.repository.save(dto);
-		this.events.emit(DirectoryCreatedEvent.EVENT_NAME, new DirectoryCreatedEvent(directory));
-		return directory;
+	async create(dto: CreateWorkDto): Promise<Work> {
+		const work = await this.repository.save(dto);
+		this.events.emit(WorkCreatedEvent.EVENT_NAME, new WorkCreatedEvent(work));
+		return work;
 	}
 }
 ```
@@ -117,17 +117,17 @@ Consumers register with NestJS's `@OnEvent` decorator:
 export class WorksConfigSyncSubscriber {
 	constructor(private readonly worksConfigWriter: WorksConfigWriterService) {}
 
-	@OnEvent(DirectoryGenerationCompletedEvent.EVENT_NAME)
-	async onGenerationCompleted(event: DirectoryGenerationCompletedEvent): Promise<void> {
+	@OnEvent(WorkGenerationCompletedEvent.EVENT_NAME)
+	async onGenerationCompleted(event: WorkGenerationCompletedEvent): Promise<void> {
 		try {
 			await this.worksConfigWriter.writeToDataRepository({
-				directory: event.directory,
+				work: event.work,
 				dataRepository: event.dataRepository
 			});
 		} catch (error) {
 			this.events.emit(
 				WorksConfigSyncFailedEvent.EVENT_NAME,
-				new WorksConfigSyncFailedEvent(event.directory, error)
+				new WorksConfigSyncFailedEvent(event.work, error)
 			);
 		}
 	}
@@ -145,7 +145,7 @@ root with these flags:
 
 | Option              | Value  | Effect                                                  |
 | ------------------- | ------ | ------------------------------------------------------- |
-| `wildcard`          | `true` | Allows `directory.*` style listeners                    |
+| `wildcard`          | `true` | Allows `work.*` style listeners                    |
 | `delimiter`         | `.`    | Dot-separated event names                               |
 | `maxListeners`      | 20     | Per-event soft cap; a warning logs at 80% capacity      |
 | `verboseMemoryLeak` | `true` | Logs the event name when the listener cap is approached |
@@ -162,9 +162,9 @@ The `wildcard: true` config means consumers can subscribe to a class
 of events:
 
 ```ts
-@OnEvent('directory.*')
-async onAnyDirectoryEvent(event: BaseEvent): Promise<void> {
-    // Activity log captures every directory.* event for audit
+@OnEvent('work.*')
+async onAnyWorkEvent(event: BaseEvent): Promise<void> {
+    // Activity log captures every work.* event for audit
 }
 ```
 
@@ -208,9 +208,9 @@ Some platform features are implemented as event-sourced read models:
 
 | Read model           | Source events                                               |
 | -------------------- | ----------------------------------------------------------- |
-| Activity log         | All `directory.*` events + auth + plan events               |
+| Activity log         | All `work.*` events + auth + plan events               |
 | Notifications drawer | Subset of activity-log events that match `NotificationKind` |
-| `works.yml` sync     | `directory.generation.completed` → write back               |
+| `works.yml` sync     | `work.generation.completed` → write back               |
 | Cost reporting       | `pipeline:step-status-changed` with `aiUsage` accumulators  |
 
 Each read model is a thin subscriber + writer. None of them update
@@ -261,7 +261,7 @@ is rarely an issue.
 | ------------------------- | --------------------------------------------------------------------- |
 | Subscriber unit test      | Construct subscriber + mock dependencies; invoke its handler directly |
 | Producer + subscriber e2e | Boot the test module; emit; assert side effect                        |
-| Wildcard listener test    | Subscribe to `directory.*` and assert the right events fire           |
+| Wildcard listener test    | Subscribe to `work.*` and assert the right events fire           |
 
 `@nestjs/event-emitter` exposes a real emitter in the test module —
 no mocking is required for the emitter itself.
@@ -285,7 +285,7 @@ no mocking is required for the emitter itself.
 
 - Source:
     - `packages/agent/src/events/`
-    - `packages/agent/src/directory-operations/directory-operations.service.ts` (canonical emitter)
+    - `packages/agent/src/work-operations/work-operations.service.ts` (canonical emitter)
     - `packages/agent/src/pipeline/executable-pipeline.class.ts` (runtime events)
 - Related specs:
     - [`pipeline-executor`](./pipeline-executor.md)

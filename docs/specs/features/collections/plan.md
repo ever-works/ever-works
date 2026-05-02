@@ -13,12 +13,12 @@
 flowchart LR
     UI[Web Dashboard] --> API[POST/PUT/DELETE collections]
     AI[Standard Pipeline AI step] --> Service
-    API --> Service[DirectoryTaxonomyService]
+    API --> Service[WorkTaxonomyService]
     Service --> Validate[validate name + slugify]
     Validate --> DataGen[DataGeneratorService]
     DataGen --> Repo[Commit collections.yml]
     Repo --> Push[GitFacadeService.push]
-    Service --> Changelog[Directory changelog: collection_change]
+    Service --> Changelog[Work changelog: collection_change]
 ```
 
 ## 2. Tech Choices
@@ -55,10 +55,10 @@ collection: editors-picks
 
 | Method   | Endpoint                                         | Description            |
 | -------- | ------------------------------------------------ | ---------------------- |
-| `GET`    | `/api/directories/:id/categories-tags`           | List taxonomy (3 dims) |
-| `POST`   | `/api/directories/:id/collections`               | Create                 |
-| `PUT`    | `/api/directories/:id/collections/:collectionId` | Update                 |
-| `DELETE` | `/api/directories/:id/collections/:collectionId` | Delete + cleanup       |
+| `GET`    | `/api/works/:id/categories-tags`           | List taxonomy (3 dims) |
+| `POST`   | `/api/works/:id/collections`               | Create                 |
+| `PUT`    | `/api/works/:id/collections/:collectionId` | Update                 |
+| `DELETE` | `/api/works/:id/collections/:collectionId` | Delete + cleanup       |
 
 ## 5. Plugin Surface
 
@@ -71,7 +71,7 @@ collection: editors-picks
 - Web: **Items → Collections** tab with create/edit/delete UI.
 - Website-side rendering controlled by `collections_enabled` in website
   settings.
-- CLI: not directly exposed; piggybacks on directory commands.
+- CLI: not directly exposed; piggybacks on work commands.
 
 ## 7. Background Jobs
 
@@ -81,13 +81,13 @@ None — collection mutations are inline.
 
 - Read: viewer role.
 - Write: editor role.
-- Both checked via `DirectoryOwnershipService`.
+- Both checked via `WorkOwnershipService`.
 
 ## 9. Observability
 
 - Activity log: `collection_change` entries with action (`added` /
   `updated` / `removed`) and collection name.
-- Surfaces in the [Directory Changelog](../directory-changelog/spec.md).
+- Surfaces in the [Work Changelog](../work-changelog/spec.md).
 
 ## 10. Risks & Mitigations
 
@@ -105,5 +105,5 @@ See `spec.md` §9.
 
 - Spec: `./spec.md`
 - Implementation:
-    - `packages/agent/src/services/directory-taxonomy.service.ts`
+    - `packages/agent/src/services/work-taxonomy.service.ts`
     - `packages/plugins/standard-pipeline/src/steps/categories-tags-processing.step.ts`

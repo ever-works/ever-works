@@ -7,7 +7,7 @@ sidebar_position: 49
 
 # Claude Code Generator Plugin
 
-The Claude Code Generator plugin is a full pipeline plugin that delegates the entire directory generation process to [Claude Code](https://github.com/anthropics/claude-code). It runs a single Claude Code CLI session that autonomously handles web search, content creation, and file generation within a sandboxed workspace.
+The Claude Code Generator plugin is a full pipeline plugin that delegates the entire work generation process to [Claude Code](https://github.com/anthropics/claude-code). It runs a single Claude Code CLI session that autonomously handles web search, content creation, and file generation within a sandboxed workspace.
 
 **Source:** `packages/plugins/claude-code/src/claude-code.plugin.ts`
 
@@ -60,11 +60,11 @@ The plugin runs 6 sequential steps:
 | Step | ID                    | Description                                                                   | Duration |
 | ---- | --------------------- | ----------------------------------------------------------------------------- | -------- |
 | 1    | `setup-claude-code`   | Downloads and caches the Claude Code CLI binary for the configured version    | ~5s      |
-| 2    | `prepare-context`     | Creates a temp workspace, seeds it with existing items and directory metadata | ~2s      |
+| 2    | `prepare-context`     | Creates a temp workspace, seeds it with existing items and work metadata | ~2s      |
 | 3    | `generate-items`      | Runs the Claude Code CLI to research and generate items as JSON files         | ~60-180s |
-| 4    | `collect-results`     | Reads generated JSON files from the workspace directory                       | ~2s      |
+| 4    | `collect-results`     | Reads generated JSON files from the workspace work                       | ~2s      |
 | 5    | `capture-screenshots` | Takes screenshots for items that need images (optional)                       | ~30s     |
-| 6    | `cleanup`             | Removes the temporary workspace directory                                     | ~1s      |
+| 6    | `cleanup`             | Removes the temporary workspace work                                     | ~1s      |
 
 ## Configuration
 
@@ -109,8 +109,8 @@ The `ensureBinary()` utility in `utils/binary-manager.ts` handles downloading an
 
 Each generation runs in an isolated temporary workspace:
 
-1. **Creation** -- a unique directory is created under a base temp directory
-2. **Seeding** -- existing items are written as reference files, and metadata (directory name, description, categories, tags, brands) is written as context files
+1. **Creation** -- a unique work is created under a base temp work
+2. **Seeding** -- existing items are written as reference files, and metadata (work name, description, categories, tags, brands) is written as context files
 3. **Onboarding config** -- ensures the Claude Code CLI has necessary configuration
 4. **Cleanup** -- the workspace is removed after generation, even if an error occurs
 
@@ -123,7 +123,7 @@ The `startTaxonomyWatcher()` utility monitors the workspace for new item files d
 The `executeClaudeCode()` function spawns the CLI as a child process with:
 
 - A system prompt providing generation instructions
-- A user prompt with the specific directory request
+- A user prompt with the specific work request
 - Environment variables for authentication
 - Configurable max turns and budget limits
 - Abort signal support for cancellation
@@ -148,7 +148,7 @@ The Claude Code Generator only allows selecting a `screenshot` provider. All oth
 1. Enable the Claude Code Generator plugin on the Plugins page
 2. Configure authentication with either an OAuth token or API key
 3. Optionally set a model and budget limit
-4. Select "Claude Code Generator" as the pipeline provider when generating a directory
+4. Select "Claude Code Generator" as the pipeline provider when generating a work
 5. Generation will run autonomously -- Claude Code handles research and item creation
 
 ## API Reference
@@ -160,7 +160,7 @@ class ClaudeCodePlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvider 
 	readonly id: 'claude-code';
 	readonly category: 'pipeline';
 
-	execute(directory, request, existing, options?, onProgress?): Promise<PipelineResult>;
+	execute(work, request, existing, options?, onProgress?): Promise<PipelineResult>;
 	cancel(): Promise<void>;
 	getState(): PipelineState<ClaudeCodeStepId> | null;
 	getStepDefinitions(): readonly PipelineStepDefinition[];

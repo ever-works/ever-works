@@ -152,16 +152,16 @@ High-level service wrapping `TwentyCrmService` for typed entity operations:
 Manages tenant context resolution for multi-tenant CRM operations:
 
 ```typescript
-// Resolve tenant from directory or global context
+// Resolve tenant from work or global context
 const context = crmTenantService.resolveTenantContext(
-	directoryId, // Optional: creates "directory_{id}" tenant
+	workId, // Optional: creates "work_{id}" tenant
 	userId, // Optional: for audit context
 	globalTenantId // Optional: fallback to "global_everworks"
 );
 
 // Get tenant-specific API prefix
 const prefix = crmTenantService.getTenantEndpointPrefix(context);
-// Returns: "/tenants/directory_abc123"
+// Returns: "/tenants/work_abc123"
 ```
 
 ## Controllers

@@ -7,7 +7,7 @@ sidebar_position: 38
 
 # Pipeline Module
 
-The Pipeline Module (`@ever-works/agent/pipeline`) orchestrates multi-step directory generation workflows. It compiles pipeline definitions from plugins, resolves step dependencies using topological sorting, supports parallel execution groups, checkpointing for resume, and two execution modes (step-based and self-managed).
+The Pipeline Module (`@ever-works/agent/pipeline`) orchestrates multi-step work generation workflows. It compiles pipeline definitions from plugins, resolves step dependencies using topological sorting, supports parallel execution groups, checkpointing for resume, and two execution modes (step-based and self-managed).
 
 ## Module Structure
 
@@ -81,7 +81,7 @@ The entry point that routes pipeline execution to the appropriate executor.
 
 ```typescript
 interface PipelineExecutionOptions {
-	directoryId: string;
+	workId: string;
 	userId: string;
 	pipelinePluginId?: string; // Explicit plugin override
 	skipSteps?: string[]; // Steps to skip
@@ -147,9 +147,9 @@ stateDiagram-v2
 
 | Event                 | Payload                         | When              |
 | --------------------- | ------------------------------- | ----------------- |
-| `execution:started`   | `{ directoryId, totalSteps }`   | Pipeline begins   |
-| `execution:completed` | `{ directoryId, result }`       | Pipeline finishes |
-| `execution:cancelled` | `{ directoryId, reason }`       | User cancels      |
+| `execution:started`   | `{ workId, totalSteps }`   | Pipeline begins   |
+| `execution:completed` | `{ workId, result }`       | Pipeline finishes |
+| `execution:cancelled` | `{ workId, reason }`       | User cancels      |
 | `step:started`        | `{ stepId, stepIndex }`         | Step begins       |
 | `step:completed`      | `{ stepId, stepIndex, result }` | Step finishes     |
 | `step:failed`         | `{ stepId, stepIndex, error }`  | Step errors       |
@@ -164,7 +164,7 @@ Executes pipeline steps one by one (or in parallel groups) with checkpointing.
 
 ```typescript
 interface CheckpointData {
-	directoryId: string;
+	workId: string;
 	pipelinePluginId: string;
 	completedStepIds: string[];
 	stepResults: Record<string, unknown>;
@@ -189,11 +189,11 @@ Checkpoints are serialized with `superjson` (supporting Maps, Sets, Dates, etc.)
 
 ### PipelineFacadeService
 
-Creates pre-bound facade instances for use within pipeline steps. Each facade is automatically configured with the current directory and user context.
+Creates pre-bound facade instances for use within pipeline steps. Each facade is automatically configured with the current work and user context.
 
 ```typescript
 interface FacadeBindingContext {
-	directoryId: string;
+	workId: string;
 	userId: string;
 	providerOverrides?: Record<string, string>;
 }
@@ -209,7 +209,7 @@ interface FacadeBindingContext {
 | Content Extractor Facade | Extract content from URLs                   |
 | Data Source Facade       | Query external data sources                 |
 
-Pipeline steps receive these bound facades so they never need to manually pass `userId` and `directoryId` on every call.
+Pipeline steps receive these bound facades so they never need to manually pass `userId` and `workId` on every call.
 
 ### FullPipelineExecutorService
 
@@ -218,7 +218,7 @@ Handles self-managed pipeline execution by delegating to the plugin's `execute()
 ```typescript
 // The plugin receives full control
 await pipelinePlugin.execute({
-	directory,
+	work,
 	facades: boundFacades,
 	abortSignal,
 	onProgress: (progress) => {
@@ -257,26 +257,26 @@ import { PipelineOrchestratorService } from '@ever-works/agent/pipeline';
 export class GenerationService {
 	constructor(private readonly orchestrator: PipelineOrchestratorService) {}
 
-	async generateDirectory(directoryId: string, userId: string) {
+	async generateWork(workId: string, userId: string) {
 		const result = await this.orchestrator.execute({
-			directoryId,
+			workId,
 			userId
 		});
 		return result;
 	}
 
-	async resumeGeneration(directoryId: string, userId: string) {
+	async resumeGeneration(workId: string, userId: string) {
 		const result = await this.orchestrator.execute({
-			directoryId,
+			workId,
 			userId,
 			resumeFromCheckpoint: true
 		});
 		return result;
 	}
 
-	async runSpecificSteps(directoryId: string, userId: string) {
+	async runSpecificSteps(workId: string, userId: string) {
 		const result = await this.orchestrator.execute({
-			directoryId,
+			workId,
 			userId,
 			onlySteps: ['search', 'extract', 'generate-items']
 		});

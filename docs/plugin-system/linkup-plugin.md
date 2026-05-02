@@ -24,7 +24,7 @@ Because the plugin advertises both `search` and `content-extractor` capabilities
 
 ## Configuration
 
-The settings schema is defined in `packages/plugins/linkup/src/` — see that source for current fields and defaults. At a minimum you will need a Linkup API key (set via the directory settings UI or the `PLUGIN_LINKUP_API_KEY` environment variable, depending on the resolved configuration mode).
+The settings schema is defined in `packages/plugins/linkup/src/` — see that source for current fields and defaults. At a minimum you will need a Linkup API key (set via the work settings UI or the `PLUGIN_LINKUP_API_KEY` environment variable, depending on the resolved configuration mode).
 
 ## When to Use
 

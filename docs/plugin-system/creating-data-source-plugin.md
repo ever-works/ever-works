@@ -7,18 +7,18 @@ sidebar_position: 11
 
 # Creating a Data Source Plugin
 
-Data source plugins import items from external services into Ever Works directories. They transform external data -- from web scraping platforms, APIs, databases, or files -- into the `ItemData` format that the generation pipeline consumes.
+Data source plugins import items from external services into Ever Works works. They transform external data -- from web scraping platforms, APIs, databases, or files -- into the `ItemData` format that the generation pipeline consumes.
 
 ## What Data Source Plugins Do
 
-During directory generation, the platform's `DataSourceFacade` calls `query()` on each enabled data source plugin. The returned items are merged into the generation pipeline alongside items discovered by search and AI. This allows users to seed directories with pre-existing data rather than relying entirely on AI-generated content.
+During work generation, the platform's `DataSourceFacade` calls `query()` on each enabled data source plugin. The returned items are merged into the generation pipeline alongside items discovered by search and AI. This allows users to seed works with pre-existing data rather than relying entirely on AI-generated content.
 
 A data source plugin:
 
 1. Connects to an external service using configured credentials.
 2. Fetches raw data (items, records, rows).
 3. Maps the external data schema to the Ever Works `ItemData` format.
-4. Optionally filters items by relevance to the directory's topic.
+4. Optionally filters items by relevance to the work's topic.
 5. Returns structured results that the pipeline can process.
 
 ## The IDataSourcePlugin Interface
@@ -68,7 +68,7 @@ interface DataSourceQueryOptions {
 	/** Resolved plugin settings (API keys, field mappings, etc.) */
 	readonly settings?: PluginSettings;
 
-	/** Context for filtering items by relevance to the directory topic */
+	/** Context for filtering items by relevance to the work topic */
 	readonly filterContext?: DataSourceFilterContext;
 }
 ```
@@ -92,12 +92,12 @@ interface DataSourceQueryResult {
 
 ### Filter Context
 
-When relevance filtering is enabled, the facade passes a `DataSourceFilterContext` so the plugin can narrow results to items relevant to the directory:
+When relevance filtering is enabled, the facade passes a `DataSourceFilterContext` so the plugin can narrow results to items relevant to the work:
 
 ```typescript
 interface DataSourceFilterContext {
-	readonly prompt?: string; // Directory description/prompt
-	readonly subject?: string; // Directory subject/topic
+	readonly prompt?: string; // Work description/prompt
+	readonly subject?: string; // Work subject/topic
 	readonly keywords?: readonly string[]; // Pre-extracted keywords
 }
 ```
@@ -162,7 +162,7 @@ Your `package.json` must include the `everworks.plugin` metadata:
 			"version": "1.0.0",
 			"category": "data-source",
 			"capabilities": ["data-source", "form-schema-provider"],
-			"description": "Import items from Your Source into directories",
+			"description": "Import items from Your Source into works",
 			"author": { "name": "Your Name" },
 			"license": "MIT",
 			"systemPlugin": false,
@@ -281,7 +281,7 @@ export class YourSourcePlugin implements IPlugin, IDataSourcePlugin, IFormSchema
 				name: 'yoursource_filterByRelevance',
 				type: 'boolean',
 				label: 'Filter by Relevance',
-				description: 'Only import items relevant to the directory prompt',
+				description: 'Only import items relevant to the work prompt',
 				defaultValue: true,
 				group: 'your-source'
 			}
@@ -530,7 +530,7 @@ export class YourSourcePlugin implements IPlugin, IDataSourcePlugin, IFormSchema
 			id: this.id,
 			name: this.name,
 			version: this.version,
-			description: 'Import items from Your Source into directories',
+			description: 'Import items from Your Source into works',
 			category: this.category,
 			capabilities: [...this.capabilities],
 			author: { name: 'Your Name' },
@@ -555,7 +555,7 @@ The `IFormSchemaProvider` interface is what makes your data source configurable 
 | Level       | Where              | What                         | Interface                           |
 | ----------- | ------------------ | ---------------------------- | ----------------------------------- |
 | **Level 1** | Settings > Plugins | API tokens, default mappings | `settingsSchema` on `IPlugin`       |
-| **Level 2** | Directory > Apps   | Enable/disable per directory | `DirectoryPlugin` entity (platform) |
+| **Level 2** | Work > Apps   | Enable/disable per work | `WorkPlugin` entity (platform) |
 | **Level 3** | Generator Form     | Per-generation options       | `IFormSchemaProvider`               |
 
 Your `getFormFields()` method returns Level 3 fields only. Enable/disable is handled at Level 2 by the platform.
@@ -727,7 +727,7 @@ readonly settingsSchema: JsonSchema = {
     defaultFieldMapping: {
       type: 'object',
       title: 'Default Field Mapping',
-      description: 'Map your data fields to directory item fields',
+      description: 'Map your data fields to work item fields',
       properties: {
         name:        { type: 'string', default: 'title' },
         description: { type: 'string', default: 'description' },
@@ -754,7 +754,7 @@ const fieldMapping = (settings?.defaultFieldMapping as FieldMapping) ?? {
 
 ### Relevance Filtering
 
-Use `extractKeywords` from `@ever-works/plugin/keywords` to build a keyword set from the directory prompt, then filter items that match at least one keyword:
+Use `extractKeywords` from `@ever-works/plugin/keywords` to build a keyword set from the work prompt, then filter items that match at least one keyword:
 
 ```typescript
 import { extractKeywords } from '@ever-works/plugin/keywords';
@@ -1071,5 +1071,5 @@ Use this checklist before submitting your data source plugin:
 
 - [ ] `pnpm install` run after adding the package
 - [ ] `pnpm build:plugins` passes
-- [ ] `vitest run` passes in the plugin directory
+- [ ] `vitest run` passes in the plugin work
 - [ ] `pnpm type-check` passes

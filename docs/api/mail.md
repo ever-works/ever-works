@@ -27,7 +27,7 @@ apps/api/src/templates/
   welcome.hbs                       # Post-confirmation welcome email
   new-device-login.hbs              # New device login alert
   account-deletion.hbs              # Account deletion confirmation
-  member-invitation.hbs             # Directory collaboration invitation
+  member-invitation.hbs             # Work collaboration invitation
 ```
 
 ## Mail Providers
@@ -83,7 +83,7 @@ Templates use Handlebars (`.hbs`) with inline CSS enabled. All templates receive
 | `welcome`             | `UserConfirmedEvent`       | `firstName`, `dashboardUrl`                                                                                            |
 | `new-device-login`    | `UserNewDeviceLoginEvent`  | `firstName`, `loginTime`, `device`, `browser`, `location`, `ipAddress`, `verifyUrl`, `verifyToken`, `secureAccountUrl` |
 | `account-deletion`    | `UserAccountDeletionEvent` | `firstName`, `deleteUrl`, `deleteToken`, `keepAccountUrl`, `expiresIn`                                                 |
-| `member-invitation`   | `MemberInvitedEvent`       | `inviteeName`, `inviterName`, `directoryName`, `roleName`, `directoryUrl`                                              |
+| `member-invitation`   | `MemberInvitedEvent`       | `inviteeName`, `inviterName`, `workName`, `roleName`, `workUrl`                                              |
 
 ## Event-Driven Delivery
 

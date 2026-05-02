@@ -9,7 +9,7 @@ sidebar_position: 52
 
 ## Overview
 
-The Vercel plugin provides deployment capabilities for Ever Works directories, publishing generated sites as live websites on Vercel's global CDN. It manages projects, deployments, domains, and team scopes through the official Vercel SDK. Deployments are orchestrated indirectly via GitHub Actions workflow dispatch rather than direct Vercel API uploads.
+The Vercel plugin provides deployment capabilities for Ever Works works, publishing generated sites as live websites on Vercel's global CDN. It manages projects, deployments, domains, and team scopes through the official Vercel SDK. Deployments are orchestrated indirectly via GitHub Actions workflow dispatch rather than direct Vercel API uploads.
 
 ## Architecture
 
@@ -51,7 +51,7 @@ interface VercelSettings {
 
 | Capability   | Description                                   |
 | ------------ | --------------------------------------------- |
-| `deployment` | Deploy directories as live websites on Vercel |
+| `deployment` | Deploy works as live websites on Vercel |
 
 This plugin is the default for the `deployment` capability (`defaultForCapabilities: ['deployment']`).
 
@@ -135,19 +135,19 @@ The Vercel SDK sometimes throws errors that contain valid data in `error.rawValu
 const isValid = await vercelPlugin.validateToken(userToken);
 
 // Look up an existing deployment
-const result = await vercelPlugin.lookupExistingDeployment('my-directory-site', userToken, 'my-team-slug');
+const result = await vercelPlugin.lookupExistingDeployment('my-work-site', userToken, 'my-team-slug');
 if (result.found) {
 	console.log(`Live at: ${result.website}`);
 }
 
 // Add a custom domain
-const domainResult = await vercelPlugin.addDomain(projectId, 'directory.example.com', userToken, teamScope);
+const domainResult = await vercelPlugin.addDomain(projectId, 'work.example.com', userToken, teamScope);
 if (!domainResult.verified) {
 	console.log('DNS verification required:', domainResult.domain.verification);
 }
 
 // Verify domain DNS
-const verified = await vercelPlugin.verifyDomain(projectId, 'directory.example.com', userToken, teamScope);
+const verified = await vercelPlugin.verifyDomain(projectId, 'work.example.com', userToken, teamScope);
 ```
 
 ## Rate Limiting & Quotas

@@ -7,7 +7,7 @@ sidebar_position: 2
 
 # Dashboard Components
 
-The web dashboard organizes React components by feature area under `apps/web/src/components/`. Each subdirectory groups components that serve a specific part of the application.
+The web dashboard organizes React components by feature area under `apps/web/src/components/`. Each subwork groups components that serve a specific part of the application.
 
 ## Component Areas
 
@@ -41,48 +41,48 @@ Top-level dashboard layout and home page components:
 | `HelpDrawer.tsx`           | Slide-out help panel                                  |
 | `NotificationDropdown.tsx` | Notification bell and dropdown list                   |
 | `RecentActivity.tsx`       | Activity feed on the home page                        |
-| `StatsOverview.tsx`        | Dashboard statistics cards (directories, items, runs) |
+| `StatsOverview.tsx`        | Dashboard statistics cards (works, items, runs) |
 
-### Directory Components (`components/directories/`)
+### Work Components (`components/works/`)
 
-Components for listing, creating, and managing directories:
+Components for listing, creating, and managing works:
 
 | Component                  | Purpose                                           |
 | -------------------------- | ------------------------------------------------- |
-| `DirectoryList.tsx`        | Paginated directory grid/list view                |
-| `DirectoryCard.tsx`        | Individual directory card with status and actions |
-| `DirectoryAICreator.tsx`   | AI-powered directory creation wizard              |
-| `DirectoryManualForm.tsx`  | Manual directory creation form                    |
-| `DirectoryImportForm.tsx`  | Import directory from external source             |
+| `WorkList.tsx`        | Paginated work grid/list view                |
+| `WorkCard.tsx`        | Individual work card with status and actions |
+| `WorkAICreator.tsx`   | AI-powered work creation wizard              |
+| `WorkManualForm.tsx`  | Manual work creation form                    |
+| `WorkImportForm.tsx`  | Import work from external source             |
 | `OrganizationSelector.tsx` | GitHub organization picker                        |
 | `RepositorySelector.tsx`   | Repository picker for imports                     |
 | `RepositoryOwnerCard.tsx`  | Display card for repo owner info                  |
 
-#### Detail Subdirectories
+#### Detail Subworks
 
-The `directories/detail/` subdirectory contains components for the directory detail view, organized by tab:
+The `works/detail/` subwork contains components for the work detail view, organized by tab:
 
-| Subdirectory          | Purpose                            |
+| Subwork          | Purpose                            |
 | --------------------- | ---------------------------------- |
-| `detail/overview/`    | Directory overview tab             |
+| `detail/overview/`    | Work overview tab             |
 | `detail/items/`       | Items browser and editor           |
 | `detail/generator/`   | AI generation controls             |
 | `detail/schedule/`    | Schedule configuration             |
 | `detail/deploy/`      | Deployment settings                |
 | `detail/members/`     | Team member management             |
-| `detail/settings/`    | Directory settings form            |
-| `detail/plugins/`     | Per-directory plugin toggles       |
+| `detail/settings/`    | Work settings form            |
+| `detail/plugins/`     | Per-work plugin toggles       |
 | `detail/comparisons/` | Comparison page list               |
 | `detail/history/`     | Generation run history             |
 | `detail/shared/`      | Shared components used across tabs |
 
 Key context and layout components:
 
-- **`DirectoryDetailContext.tsx`** -- React context providing the current directory entity and user permissions to all child tabs.
-- **`DirectoryLayoutClient.tsx`** -- Client-side layout wrapper for the directory detail view.
-- **`DirectoryHeader.tsx`** -- Header with directory name, status badge, and action buttons.
-- **`DirectoryTabs.tsx`** -- Tab navigation for switching between detail views.
-- **`DirectoryStatusCard.tsx`** -- Status indicator card showing generation state.
+- **`WorkDetailContext.tsx`** -- React context providing the current work entity and user permissions to all child tabs.
+- **`WorkLayoutClient.tsx`** -- Client-side layout wrapper for the work detail view.
+- **`WorkHeader.tsx`** -- Header with work name, status badge, and action buttons.
+- **`WorkTabs.tsx`** -- Tab navigation for switching between detail views.
+- **`WorkStatusCard.tsx`** -- Status indicator card showing generation state.
 - **`PrUpdateInfo.tsx`** -- Banner showing pending community PR information.
 
 ### Plugin Components (`components/plugins/`)
@@ -140,7 +140,7 @@ Shared primitive components based on shadcn/ui:
 
 ### Other Components
 
-| Directory          | Purpose                                      |
+| Work          | Purpose                                      |
 | ------------------ | -------------------------------------------- |
 | `common/`          | Shared layout helpers and utility components |
 | `footer/`          | Page footer                                  |

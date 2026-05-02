@@ -7,7 +7,7 @@ sidebar_position: 35
 
 # xAI Grok Models via OpenRouter
 
-Ever Works does not include a standalone xAI plugin. Grok models from xAI are accessed through the **OpenRouter** plugin, which aggregates hundreds of AI models behind a single API key. This page describes how to use Grok models for directory generation and AI conversations.
+Ever Works does not include a standalone xAI plugin. Grok models from xAI are accessed through the **OpenRouter** plugin, which aggregates hundreds of AI models behind a single API key. This page describes how to use Grok models for work generation and AI conversations.
 
 **Related source files:**
 

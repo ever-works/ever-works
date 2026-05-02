@@ -9,14 +9,14 @@ sidebar_position: 18
 
 ## Overview
 
-The Import System is a module comprising three services that handle the low-level mechanics of importing directories from external sources. `SourceRepoAnalyzerService` detects repository types and structures, `AwesomeReadmeParserService` uses AI to extract structured data from Awesome List READMEs, and `ImportExecutorService` orchestrates the end-to-end import execution for each source type.
+The Import System is a module comprising three services that handle the low-level mechanics of importing works from external sources. `SourceRepoAnalyzerService` detects repository types and structures, `AwesomeReadmeParserService` uses AI to extract structured data from Awesome List READMEs, and `ImportExecutorService` orchestrates the end-to-end import execution for each source type.
 
 ## Architecture
 
 The module is composed of three distinct services with clear responsibilities:
 
 ```
-DirectoryImportService (orchestrator layer)
+WorkImportService (orchestrator layer)
         |
         v
 ImportModule
@@ -65,14 +65,14 @@ The `analyzeRepository()` method inspects repository contents to determine the s
 
 | Detection          | Criteria                                                     | Result Type      |
 | ------------------ | ------------------------------------------------------------ | ---------------- |
-| Data Repository    | Has `config.yml`/`config.yaml` AND `data/` directory         | `data_repo`      |
+| Data Repository    | Has `config.yml`/`config.yaml` AND `data/` work         | `data_repo`      |
 | Awesome List       | Has `README.md` with section headers + list links (5+ items) | `awesome_readme` |
-| Multi-file Awesome | Has `README.md` with 3+ internal directory links             | `awesome_readme` |
+| Multi-file Awesome | Has `README.md` with 3+ internal work links             | `awesome_readme` |
 | Unrecognized       | None of the above                                            | `null`           |
 
 ### Ecosystem Detection
 
-For non-data repos, the service detects the "directory ecosystem" by looking for companion `-data` repos. For example, analyzing `my-directory-website` will detect `my-directory-data` as the data repo and return `baseSlug: 'my-directory'`.
+For non-data repos, the service detects the "work ecosystem" by looking for companion `-data` repos. For example, analyzing `my-work-website` will detect `my-work-data` as the data repo and return `baseSlug: 'my-work'`.
 
 ### Slug Conflict Checking
 
@@ -141,14 +141,14 @@ The `executeBySourceType()` method routes to the appropriate import strategy bas
 
 1. Clone the source data repository via `GitFacadeService`
 2. Read items, categories, tags, and config from the `DataRepository`
-3. Initialize the new directory's data repo with imported data
+3. Initialize the new work's data repo with imported data
 4. Generate markdown and website repos
 
 ### Awesome README Import Flow
 
 1. Fetch README content via `SourceRepoAnalyzerService`
 2. Parse with `AwesomeReadmeParserService` (AI extraction)
-3. Initialize the new directory's data repo with parsed data
+3. Initialize the new work's data repo with parsed data
 4. Generate markdown and website repos
 
 ### Link Existing Flow
@@ -159,7 +159,7 @@ The `executeBySourceType()` method routes to the appropriate import strategy bas
 
 ### Error Codes
 
-All import strategies return `DirectoryImportResult` with typed error codes:
+All import strategies return `WorkImportResult` with typed error codes:
 
 | Error Code             | Meaning                                   |
 | ---------------------- | ----------------------------------------- |
@@ -172,17 +172,17 @@ All import strategies return `DirectoryImportResult` with typed error codes:
 
 ## Database Interactions
 
-The Import System services primarily interact with git repositories through `GitFacadeService` and `DataRepository` rather than the database directly. The orchestrating `DirectoryImportService` handles database persistence.
+The Import System services primarily interact with git repositories through `GitFacadeService` and `DataRepository` rather than the database directly. The orchestrating `WorkImportService` handles database persistence.
 
 ## Event System
 
-The Import System does not emit events directly. Events are emitted by the orchestrating `DirectoryImportService`.
+The Import System does not emit events directly. Events are emitted by the orchestrating `WorkImportService`.
 
 ## Error Handling
 
 - **SourceRepoAnalyzerService:** Returns structured error responses in the DTO rather than throwing exceptions. All git provider errors are caught and translated to user-friendly messages.
 - **AwesomeReadmeParserService:** Uses per-chunk error handling -- individual chunk failures are logged and skipped, with parsing continuing on remaining chunks. Parse errors are collected and returned in `metadata.parseErrors`.
-- **ImportExecutorService:** Catches all errors per strategy and returns structured `DirectoryImportResult` with typed error codes.
+- **ImportExecutorService:** Catches all errors per strategy and returns structured `WorkImportResult` with typed error codes.
 
 ## Usage Examples
 
@@ -193,14 +193,14 @@ const analysis = await sourceRepoAnalyzer.analyzeRepository('https://github.com/
 // analysis.structure.itemCount === 150
 
 // Parse an awesome readme
-const parsed = await awesomeReadmeParser.parseReadme(readmeContent, { userId: user.id, directoryId: directory.id });
+const parsed = await awesomeReadmeParser.parseReadme(readmeContent, { userId: user.id, workId: work.id });
 // parsed.items.length === 150
 // parsed.categories.length === 20
 // parsed.metrics.total_tokens_used === 45000
 
 // Execute a full import
 const result = await importExecutor.executeBySourceType({
-	directory,
+	work,
 	user,
 	sourceType: 'awesome_readme',
 	sourceOwner: 'sindresorhus',
@@ -223,6 +223,6 @@ const result = await importExecutor.executeBySourceType({
 
 ## Related Services
 
-- [Directory Import Service](/agent-services/directory-import-service) -- orchestrates import operations using this module
+- [Work Import Service](/agent-services/work-import-service) -- orchestrates import operations using this module
 - [Community PR Service](/agent-services/community-pr-service) -- similar AI extraction pattern for PR diffs
-- [Directory Detail Service](/agent-services/directory-detail-service) -- complementary metadata extraction
+- [Work Detail Service](/agent-services/work-detail-service) -- complementary metadata extraction

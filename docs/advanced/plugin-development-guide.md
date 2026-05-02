@@ -29,7 +29,7 @@ flowchart TD
 
     I -->|lookup by capability| J[FacadeService]
     J -->|resolve settings| K[PluginSettingsService]
-    K -->|4-level hierarchy| L[Directory > User > Admin > Defaults]
+    K -->|4-level hierarchy| L[Work > User > Admin > Defaults]
 
     M[PluginBootstrapService] -->|bootstrap| E
     M -->|lifecycle hooks| N[PluginLifecycleManagerService]
@@ -51,14 +51,14 @@ flowchart TD
 | `packages/agent/src/plugins/services/plugin-context-factory.service.ts`    | Creates execution context for plugins                     |
 | `packages/agent/src/plugins/entities/plugin.entity.ts`                     | Database entity for installed plugins                     |
 | `packages/agent/src/plugins/entities/user-plugin.entity.ts`                | Per-user plugin settings entity                           |
-| `packages/agent/src/plugins/entities/directory-plugin.entity.ts`           | Per-directory plugin settings entity                      |
+| `packages/agent/src/plugins/entities/work-plugin.entity.ts`           | Per-work plugin settings entity                      |
 | `packages/plugins/*/`                                                      | 21 built-in plugin implementations                        |
 
 ## Step-by-Step: Creating a New AI Provider Plugin
 
 ### Step 1: Scaffold the Package
 
-Create a new directory in `packages/plugins/`:
+Create a new work in `packages/plugins/`:
 
 ```
 packages/plugins/my-provider/
@@ -255,9 +255,9 @@ The `resolvePluginEnabled()` function determines whether a plugin is active for 
 ```
 1. System plugins -> always enabled
 2. User-level DISABLE -> cascades globally (plugin off everywhere)
-3. Directory explicit record -> use its enabled value
-4. User autoEnableForDirectories -> true (in directory context)
-5. User record exists -> enabled outside directory
+3. Work explicit record -> use its enabled value
+4. User autoEnableForWorks -> true (in work context)
+5. User record exists -> enabled outside work
 6. Fallback to manifest autoEnable (default false)
 ```
 

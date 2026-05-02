@@ -50,10 +50,10 @@ Every domain event declares a static `EVENT_NAME` string that serves as the even
 
 | Event Class                         | Event Name                       | Payload                    | Emitted When                  |
 | ----------------------------------- | -------------------------------- | -------------------------- | ----------------------------- |
-| `DirectoryCreatedEvent`             | `directory.created`              | `{ directory: Directory }` | A new directory is created    |
-| `DirectoryGenerationCompletedEvent` | `directory.generation.completed` | `{ directory: Directory }` | Directory generation finishes |
+| `WorkCreatedEvent`             | `work.created`              | `{ work: Work }` | A new work is created    |
+| `WorkGenerationCompletedEvent` | `work.generation.completed` | `{ work: Work }` | Work generation finishes |
 
-These events carry full TypeORM entity instances, allowing listeners to access all directory properties including relations.
+These events carry full TypeORM entity instances, allowing listeners to access all work properties including relations.
 
 ### Emitting Domain Events
 
@@ -61,16 +61,16 @@ Services emit events using NestJS `EventEmitter2`:
 
 ```typescript
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import { DirectoryCreatedEvent } from '../events';
+import { WorkCreatedEvent } from '../events';
 
 @Injectable()
-export class DirectoryLifecycleService {
+export class WorkLifecycleService {
 	constructor(private readonly eventEmitter: EventEmitter2) {}
 
-	async createDirectory(/* ... */): Promise<Directory> {
-		const directory = await this.save(/* ... */);
-		this.eventEmitter.emit(DirectoryCreatedEvent.EVENT_NAME, new DirectoryCreatedEvent(directory));
-		return directory;
+	async createWork(/* ... */): Promise<Work> {
+		const work = await this.save(/* ... */);
+		this.eventEmitter.emit(WorkCreatedEvent.EVENT_NAME, new WorkCreatedEvent(work));
+		return work;
 	}
 }
 ```
@@ -81,12 +81,12 @@ Listeners use the `@OnEvent` decorator from `@nestjs/event-emitter`:
 
 ```typescript
 import { OnEvent } from '@nestjs/event-emitter';
-import { DirectoryCreatedEvent } from '@ever-works/agent/events';
+import { WorkCreatedEvent } from '@ever-works/agent/events';
 
 @Injectable()
-export class DirectoryEventListener {
-	@OnEvent(DirectoryCreatedEvent.EVENT_NAME)
-	handleDirectoryCreated(event: DirectoryCreatedEvent) {
+export class WorkEventListener {
+	@OnEvent(WorkCreatedEvent.EVENT_NAME)
+	handleWorkCreated(event: WorkCreatedEvent) {
 		// Handle the event
 	}
 }
@@ -111,17 +111,17 @@ Events are organized into five categories:
 | `plugin:error`            | `PluginErrorPayload`           | Plugin encountered an error |
 | `plugin:settings-changed` | `PluginSettingsChangedPayload` | Plugin settings updated     |
 
-#### Directory Events
+#### Work Events
 
 | Event Name                       | Payload                               | Description          |
 | -------------------------------- | ------------------------------------- | -------------------- |
-| `directory:created`              | `DirectoryEventPayload`               | Directory created    |
-| `directory:updated`              | `DirectoryEventPayload`               | Directory updated    |
-| `directory:deleted`              | `DirectoryEventPayload`               | Directory deleted    |
-| `directory:deployed`             | `DirectoryEventPayload`               | Directory deployed   |
-| `directory:generation-started`   | `DirectoryGenerationStartedPayload`   | Generation started   |
-| `directory:generation-completed` | `DirectoryGenerationCompletedPayload` | Generation completed |
-| `directory:generation-failed`    | `DirectoryGenerationFailedPayload`    | Generation failed    |
+| `work:created`              | `WorkEventPayload`               | Work created    |
+| `work:updated`              | `WorkEventPayload`               | Work updated    |
+| `work:deleted`              | `WorkEventPayload`               | Work deleted    |
+| `work:deployed`             | `WorkEventPayload`               | Work deployed   |
+| `work:generation-started`   | `WorkGenerationStartedPayload`   | Generation started   |
+| `work:generation-completed` | `WorkGenerationCompletedPayload` | Generation completed |
+| `work:generation-failed`    | `WorkGenerationFailedPayload`    | Generation failed    |
 
 #### Item Events
 
@@ -180,7 +180,7 @@ interface PipelineStepEventPayload extends PipelineEventPayload {
 }
 
 interface PipelineEventPayload extends BaseEventPayload {
-	readonly directoryId: string;
+	readonly workId: string;
 	readonly pipelineId?: string;
 }
 ```
@@ -234,15 +234,15 @@ The `PipelineEvents` constant maps to the same event names defined in the plugin
 ```mermaid
 sequenceDiagram
     participant User as API Request
-    participant Svc as DirectoryService
+    participant Svc as WorkService
     participant EE as EventEmitter2
     participant PL as Pipeline Listener
     participant NL as Notification Listener
 
-    User->>Svc: createDirectory()
-    Svc->>EE: emit("directory.created", event)
-    EE->>PL: @OnEvent("directory.created")
-    EE->>NL: @OnEvent("directory.created")
+    User->>Svc: createWork()
+    Svc->>EE: emit("work.created", event)
+    EE->>PL: @OnEvent("work.created")
+    EE->>NL: @OnEvent("work.created")
 
     Note over PL: Pipeline may auto-start
     Note over NL: Send notification
