@@ -298,8 +298,12 @@ export class DirectoryLifecycleService {
                 slug: directory.slug,
                 owner: websiteOwner,
                 repository: `${websiteOwner}/${websiteRepo}`,
+                previousWebsiteTemplateId: directory.websiteTemplateId,
                 websiteTemplateId: directory.websiteTemplateId,
                 repositoryRecreated: false,
+                switchMode: websiteRepoInitialized
+                    ? 'repository_reset'
+                    : 'saved_for_initialization',
                 message: websiteRepoInitialized
                     ? 'Website template is already selected for this directory.'
                     : 'Website template saved. It will be used when the website repository is first created.',
@@ -327,6 +331,8 @@ export class DirectoryLifecycleService {
         directory.websiteTemplateLastCheckedAt = null;
 
         if (websiteRepoInitialized) {
+            let repositoryRecreated = false;
+
             try {
                 await this.websiteUpdateService.updateRepository(directory, user);
             } catch (error) {
@@ -349,6 +355,7 @@ export class DirectoryLifecycleService {
                         user,
                         WebsiteRepositoryCreationMethod.CREATE_USING_TEMPLATE,
                     );
+                    repositoryRecreated = true;
                 } catch (initializeError) {
                     directory.websiteTemplateId = previousTemplateId;
                     directory.websiteTemplateLastCommit = previousTemplateLastCommit;
@@ -366,10 +373,13 @@ export class DirectoryLifecycleService {
                 slug: directory.slug,
                 owner: websiteOwner,
                 repository: `${websiteOwner}/${websiteRepo}`,
+                previousWebsiteTemplateId: previousTemplateId,
                 websiteTemplateId: nextTemplateId,
-                repositoryRecreated: true,
-                message:
-                    'Website template switched successfully. The website repository was reset from the selected template.',
+                repositoryRecreated,
+                switchMode: repositoryRecreated ? 'repository_recreated' : 'repository_reset',
+                message: repositoryRecreated
+                    ? 'Website template switched successfully. The website repository was recreated from the selected template.'
+                    : 'Website template switched successfully. The existing website repository was reset from the selected template.',
             };
         }
 
@@ -380,8 +390,10 @@ export class DirectoryLifecycleService {
             slug: directory.slug,
             owner: websiteOwner,
             repository: `${websiteOwner}/${websiteRepo}`,
+            previousWebsiteTemplateId: previousTemplateId,
             websiteTemplateId: nextTemplateId,
             repositoryRecreated: false,
+            switchMode: 'saved_for_initialization',
             message:
                 'Website template updated successfully. It will be used when the website repository is first created.',
         };

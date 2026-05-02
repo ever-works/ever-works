@@ -15,8 +15,10 @@ export type SwitchWebsiteTemplateResponse = APIResponse<{
     slug: string;
     owner: string;
     repository: string;
+    previousWebsiteTemplateId: string;
     websiteTemplateId: string;
     repositoryRecreated: boolean;
+    switchMode: 'saved_for_initialization' | 'repository_reset' | 'repository_recreated';
     message: string;
 }>;
 

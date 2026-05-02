@@ -186,7 +186,9 @@ describe('DirectoryLifecycleService', () => {
         expect(websiteUpdateService.updateRepository).toHaveBeenCalledWith(directory, user);
         expect(websiteGenerator.removeRepository).not.toHaveBeenCalled();
         expect(websiteGenerator.initialize).not.toHaveBeenCalled();
-        expect(result.repositoryRecreated).toBe(true);
+        expect(result.repositoryRecreated).toBe(false);
+        expect(result.previousWebsiteTemplateId).toBe('classic');
+        expect(result.switchMode).toBe('repository_reset');
         expect(result.websiteTemplateId).toBe('minimal');
     });
 
@@ -227,6 +229,8 @@ describe('DirectoryLifecycleService', () => {
             'create-using-template',
         );
         expect(result.repositoryRecreated).toBe(true);
+        expect(result.previousWebsiteTemplateId).toBe('classic');
+        expect(result.switchMode).toBe('repository_recreated');
     });
 
     it('does not persist the template switch when updating the existing website repo fails', async () => {

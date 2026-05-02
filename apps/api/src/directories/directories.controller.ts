@@ -1005,7 +1005,7 @@ export class DirectoriesController {
     @ApiOperation({
         summary: 'Switch website template',
         description:
-            'Update the selected website template and recreate the website repository when it already exists',
+            'Update the selected website template and apply it to the existing website repository when it already exists',
     })
     @ApiParam({ name: 'id', description: 'Directory ID' })
     @ApiResponse({ status: 200, description: 'Website template switched' })
@@ -1022,6 +1022,12 @@ export class DirectoriesController {
             user,
         );
 
+        const summaryByMode = {
+            saved_for_initialization: `Saved website template change from ${result.previousWebsiteTemplateId} to ${result.websiteTemplateId} for first website creation`,
+            repository_reset: `Switched website template from ${result.previousWebsiteTemplateId} to ${result.websiteTemplateId} and reset the existing website repository`,
+            repository_recreated: `Switched website template from ${result.previousWebsiteTemplateId} to ${result.websiteTemplateId} and recreated the website repository`,
+        } as const;
+
         this.activityLogService
             .log({
                 userId: auth.userId,
@@ -1029,7 +1035,14 @@ export class DirectoriesController {
                 actionType: ActivityActionType.WEBSITE_SETTINGS_UPDATED,
                 action: 'directory.website_template_switched',
                 status: ActivityStatus.COMPLETED,
-                summary: `Switched website template to ${body.websiteTemplateId}`,
+                summary: summaryByMode[result.switchMode],
+                details: {
+                    previousWebsiteTemplateId: result.previousWebsiteTemplateId,
+                    websiteTemplateId: result.websiteTemplateId,
+                    switchMode: result.switchMode,
+                    repositoryRecreated: result.repositoryRecreated,
+                    repository: result.repository,
+                },
             })
             .catch(() => {});
 
