@@ -2,16 +2,16 @@ import { Injectable, Logger } from '@nestjs/common';
 import { configure, runs } from '@trigger.dev/sdk';
 import { config } from '@ever-works/agent/config';
 import {
-    DirectoryGenerationPayload,
-    DirectoryGenerationDispatcher,
-    DirectoryImportPayload,
-    DirectoryImportDispatcher,
+    WorkGenerationPayload,
+    WorkGenerationDispatcher,
+    WorkImportPayload,
+    WorkImportDispatcher,
 } from '@ever-works/agent/tasks';
-import { directoryGenerationTask } from '../tasks/trigger/directory-generation.task';
-import { directoryImportTask } from '../tasks/trigger/directory-import.task';
+import { workGenerationTask } from '../tasks/trigger/work-generation.task';
+import { workImportTask } from '../tasks/trigger/work-import.task';
 
 @Injectable()
-export class TriggerService implements DirectoryGenerationDispatcher, DirectoryImportDispatcher {
+export class TriggerService implements WorkGenerationDispatcher, WorkImportDispatcher {
     private readonly logger = new Logger(TriggerService.name);
     private configured = false;
 
@@ -55,25 +55,25 @@ export class TriggerService implements DirectoryGenerationDispatcher, DirectoryI
         return undefined;
     }
 
-    async dispatchDirectoryGeneration(payload: DirectoryGenerationPayload): Promise<string | null> {
+    async dispatchWorkGeneration(payload: WorkGenerationPayload): Promise<string | null> {
         if (!this.ensureConfigured()) {
             return null;
         }
 
         try {
-            const handle = await directoryGenerationTask.trigger(payload, {
-                tags: ['directory-generation', payload.mode, payload.directoryId],
+            const handle = await workGenerationTask.trigger(payload, {
+                tags: ['work-generation', payload.mode, payload.workId],
                 machine: this.machine() as any,
             });
 
             return handle.id;
         } catch (error) {
-            this.logger.error('Failed to dispatch directory-generation task', error as Error);
+            this.logger.error('Failed to dispatch work-generation task', error as Error);
             return null;
         }
     }
 
-    async cancelDirectoryGeneration(runId: string): Promise<boolean> {
+    async cancelWorkGeneration(runId: string): Promise<boolean> {
         if (!this.ensureConfigured()) {
             return false;
         }
@@ -83,27 +83,27 @@ export class TriggerService implements DirectoryGenerationDispatcher, DirectoryI
             return true;
         } catch (error) {
             this.logger.error(
-                `Failed to cancel directory-generation task ${runId}`,
+                `Failed to cancel work-generation task ${runId}`,
                 error as Error,
             );
             return false;
         }
     }
 
-    async dispatchDirectoryImport(payload: DirectoryImportPayload): Promise<string | null> {
+    async dispatchWorkImport(payload: WorkImportPayload): Promise<string | null> {
         if (!this.ensureConfigured()) {
             return null;
         }
 
         try {
-            const handle = await directoryImportTask.trigger(payload, {
-                tags: ['directory-import', payload.sourceType, payload.directoryId],
+            const handle = await workImportTask.trigger(payload, {
+                tags: ['work-import', payload.sourceType, payload.workId],
                 machine: this.machine() as any,
             });
 
             return handle.id;
         } catch (error) {
-            this.logger.error('Failed to dispatch directory-import task', error as Error);
+            this.logger.error('Failed to dispatch work-import task', error as Error);
             return null;
         }
     }

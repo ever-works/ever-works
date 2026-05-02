@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import type { ParsedWorksConfig, ResolvedWorksConfig } from './works-config.service';
-import { Directory, type RepositoryTarget } from '@src/entities/directory.entity';
+import { Work, type RepositoryTarget } from '@src/entities/work.entity';
 import { User } from '@src/entities/user.entity';
 import {
     WorksConfigImportPlannerService,
@@ -67,26 +67,26 @@ export class WorksConfigRestoreService {
     }
 
     async applyPipelineSettings(
-        directoryId: string,
+        workId: string,
         userId: string,
         worksConfig?: ParsedWorksConfig | ResolvedWorksConfig | null,
     ): Promise<void> {
-        await this.applier.applyPipelineSettings(directoryId, userId, worksConfig);
+        await this.applier.applyPipelineSettings(workId, userId, worksConfig);
     }
 
     async applyInitialSchedule(
-        directoryId: string,
+        workId: string,
         user: User,
         worksConfig?: ParsedWorksConfig | ResolvedWorksConfig | null,
     ): Promise<void> {
-        await this.applier.applyInitialSchedule(directoryId, user, worksConfig);
+        await this.applier.applyInitialSchedule(workId, user, worksConfig);
     }
 
     async applyScheduleOverrides(
-        directory: Directory,
+        work: Work,
         user: User,
         worksConfig?: ParsedWorksConfig | ResolvedWorksConfig | null,
     ): Promise<void> {
-        await this.applier.applyScheduleOverrides(directory, user, worksConfig);
+        await this.applier.applyScheduleOverrides(work, user, worksConfig);
     }
 }

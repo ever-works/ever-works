@@ -5,12 +5,12 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 // Entities
 import { PluginEntity } from './entities/plugin.entity';
 import { UserPluginEntity } from './entities/user-plugin.entity';
-import { DirectoryPluginEntity } from './entities/directory-plugin.entity';
+import { WorkPluginEntity } from './entities/work-plugin.entity';
 
 // Repositories
 import { PluginRepository } from './repositories/plugin.repository';
 import { UserPluginRepository } from './repositories/user-plugin.repository';
-import { DirectoryPluginRepository } from './repositories/directory-plugin.repository';
+import { WorkPluginRepository } from './repositories/work-plugin.repository';
 
 // Services
 import { PluginRegistryService } from './services/plugin-registry.service';
@@ -36,7 +36,7 @@ import type {
 /**
  * Plugin entities for TypeORM registration
  */
-export const PLUGIN_ENTITIES = [PluginEntity, UserPluginEntity, DirectoryPluginEntity];
+export const PLUGIN_ENTITIES = [PluginEntity, UserPluginEntity, WorkPluginEntity];
 
 /**
  * All plugin-related providers
@@ -49,7 +49,7 @@ const PROVIDERS = [
     // Repositories
     PluginRepository,
     UserPluginRepository,
-    DirectoryPluginRepository,
+    WorkPluginRepository,
     // Validation services
     PluginManifestValidatorService,
     PluginVersionCheckerService,
@@ -75,7 +75,7 @@ const EXPORTS = [
     // Repositories
     PluginRepository,
     UserPluginRepository,
-    DirectoryPluginRepository,
+    WorkPluginRepository,
     // Core services
     PluginRegistryService,
     PluginLoaderService,

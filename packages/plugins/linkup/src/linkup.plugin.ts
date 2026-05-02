@@ -322,14 +322,14 @@ export class LinkupSearchPlugin implements IPlugin, ISearchPlugin, IContentExtra
 				'',
 				'## How it works in Ever Works',
 				'',
-				'During directory generation, the search facade uses Linkup to find information about each item, discover relevant source URLs, and extract content from web pages. This powers automatic descriptions, source URL resolution, and content enrichment across the generation pipeline.',
+				'During work generation, the search facade uses Linkup to find information about each item, discover relevant source URLs, and extract content from web pages. This powers automatic descriptions, source URL resolution, and content enrichment across the generation pipeline.',
 				'',
 				'## Getting started',
 				'',
 				'1. Create an account at [linkup.so](https://linkup.so)',
 				'2. Copy your API key from the Linkup dashboard',
 				'3. Enter the key in the **API Key** field below',
-				'4. Linkup will be available for use during directory generation'
+				'4. Linkup will be available for use during work generation'
 			].join('\n')
 		};
 	}

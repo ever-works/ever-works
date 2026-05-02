@@ -1,18 +1,18 @@
-import { User, Directory } from '@ever-works/agent/entities';
+import { User, Work } from '@ever-works/agent/entities';
 
 export abstract class BaseUserEvent {
     public abstract user: User;
 }
 
 export class MemberInvitedEvent {
-    static EVENT_NAME = 'directory.member_invited';
+    static EVENT_NAME = 'work.member_invited';
 
     constructor(
         public invitee: User,
         public inviter: User,
-        public directory: Directory,
+        public work: Work,
         public role: string,
-        public directoryUrl: string,
+        public workUrl: string,
     ) {}
 }
 

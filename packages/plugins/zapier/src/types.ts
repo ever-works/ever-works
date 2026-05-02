@@ -55,9 +55,9 @@ export interface ZapierActionRef {
 /**
  * How the plugin should interpret the action's `data` payload.
  *  - `structured`: the Zap returns `{ items: [...] }` — cleanest for custom Zaps.
- *  - `native`: raw records projected onto directory items via a field mapping.
+ *  - `native`: raw records projected onto work items via a field mapping.
  *  - `side-effect`: the action is fire-and-forget (e.g. send email, post message)
- *    and produces no directory items. The plugin completes successfully with 0 items.
+ *    and produces no work items. The plugin completes successfully with 0 items.
  */
 export type ZapierResultShape = 'structured' | 'native' | 'side-effect';
 
@@ -79,10 +79,10 @@ export type DataSourceType = 'inline' | 'github-repo';
 /** Input payload sent as `inputs` to the Zapier action. */
 export interface ZapierWorkflowInput {
 	metadata: {
-		directoryId: string;
-		directoryName: string;
-		directorySlug: string;
-		directoryDescription?: string;
+		workId: string;
+		workName: string;
+		workSlug: string;
+		workDescription?: string;
 		prompt?: string;
 		generationMethod?: string;
 		targetItems: number;
@@ -103,7 +103,7 @@ export interface ZapierWorkflowInput {
 	actionParams?: Record<string, unknown>;
 }
 
-/** Structured directory payload returned by a custom Zap (mirrors sim-ai). */
+/** Structured work payload returned by a custom Zap (mirrors sim-ai). */
 export interface ZapierWorkflowOutput {
 	items: ZapierOutputItem[];
 	categories?: Array<{ name: string; description?: string }>;

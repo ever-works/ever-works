@@ -29,7 +29,7 @@ interface DashboardLayoutClientProps {
     initialChatOpen?: boolean;
     initialSidebarCollapsed?: boolean;
     hasGithubConnected?: boolean;
-    onboardingTotalDirectories: number;
+    onboardingTotalWorks: number;
     onboardingPlugins: UserPlugin[];
     initialOnboardingConnections: Record<
         string,
@@ -46,7 +46,7 @@ export function DashboardLayoutClient({
     initialChatOpen = false,
     initialSidebarCollapsed = false,
     hasGithubConnected = false,
-    onboardingTotalDirectories,
+    onboardingTotalWorks,
     onboardingPlugins,
     initialOnboardingConnections,
     initialOnboardingDeviceAuthStatuses,
@@ -77,10 +77,10 @@ export function DashboardLayoutClient({
     const onboardingTotalSteps = onboardingPlugins.length + 2;
     const onboardingCurrentStep = Math.min(onboardingState.step, onboardingTotalSteps - 1) + 1;
     const shouldAutoOpenOnboarding =
-        onboardingTotalDirectories === 0 && !onboardingState.modalDismissed;
+        onboardingTotalWorks === 0 && !onboardingState.modalDismissed;
     const isOnboardingOpen = onboardingOpen || shouldAutoOpenOnboarding;
     const showOnboardingBadge =
-        onboardingTotalDirectories === 0 &&
+        onboardingTotalWorks === 0 &&
         onboardingState.modalDismissed &&
         !onboardingState.headerDismissed;
 

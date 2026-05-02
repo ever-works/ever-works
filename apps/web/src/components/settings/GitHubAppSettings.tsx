@@ -59,8 +59,8 @@ export function GitHubAppSettings({ installations: initialInstallations }: GitHu
 
             toast.success(result.data.message || t('onboardSuccess'));
 
-            if (result.data.directoryId) {
-                router.push(ROUTES.DASHBOARD_DIRECTORY(result.data.directoryId));
+            if (result.data.workId) {
+                router.push(ROUTES.DASHBOARD_WORK(result.data.workId));
             }
         } catch {
             toast.error(t('onboardError'));

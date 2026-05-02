@@ -34,7 +34,7 @@ import {
     DropdownMenuLabel,
 } from '@/components/ui/dropdown-menu';
 import { LogoEverWork, FaviconEverWork } from '../logos';
-import { useDirectoryDetail } from '../directories/detail/DirectoryDetailContext';
+import { useWorkDetail } from '../works/detail/WorkDetailContext';
 import { ChatPanelExpandButton } from '@/components/ai/ChatPanel';
 import { SidebarActivityIndicator } from './SidebarActivityIndicator';
 import { useMounted } from '@/lib/hooks/use-mounted';
@@ -85,7 +85,7 @@ export function DashboardSidebar({
     const [avatarError, setAvatarError] = useState(false);
     const mounted = useMounted();
     const t = useTranslations('dashboard.sidebar');
-    const { config } = useDirectoryDetail();
+    const { config } = useWorkDetail();
 
     const handleCollapsedChange = (v: boolean) => {
         onCollapsedChange?.(v);
@@ -199,7 +199,7 @@ export function DashboardSidebar({
                     </div>
                 </div>
 
-                {/* New Directory */}
+                {/* New Work */}
                 <div
                     className={cn(isCollapsed ? 'px-2 py-3 flex justify-center' : 'px-4 pt-5 pb-6')}
                 >

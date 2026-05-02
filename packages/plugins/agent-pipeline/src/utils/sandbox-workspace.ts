@@ -2,7 +2,7 @@ import { mkdir, writeFile, readdir, readFile, rm } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { createHash, randomUUID } from 'node:crypto';
-import type { ItemData, DirectoryReference, GenerationRequest, ExistingItems } from '@ever-works/plugin';
+import type { ItemData, WorkReference, GenerationRequest, ExistingItems } from '@ever-works/plugin';
 import { slugify, validateRequiredItemFields, normalizeItemTags, jsonrepair } from '@ever-works/plugin';
 
 interface Logger {
@@ -43,8 +43,8 @@ async function parallelBatch<T>(tasks: (() => Promise<T>)[], concurrency: number
 	return results;
 }
 
-export function getWorkspacePath(userId: string, directoryId: string, runId: string): string {
-	return join(BASE_DIR, userId, `${directoryId}-${runId}`);
+export function getWorkspacePath(userId: string, workId: string, runId: string): string {
+	return join(BASE_DIR, userId, `${workId}-${runId}`);
 }
 
 /**
@@ -52,12 +52,12 @@ export function getWorkspacePath(userId: string, directoryId: string, runId: str
  */
 export async function createWorkspace(
 	userId: string,
-	directoryId: string,
+	workId: string,
 	existing: ExistingItems,
-	directory: DirectoryReference,
+	work: WorkReference,
 	request: GenerationRequest
 ): Promise<string> {
-	const workspacePath = getWorkspacePath(userId, directoryId, randomUUID());
+	const workspacePath = getWorkspacePath(userId, workId, randomUUID());
 	const metaDir = join(workspacePath, '_meta');
 
 	await mkdir(metaDir, { recursive: true });
@@ -88,8 +88,8 @@ export async function createWorkspace(
 
 	metaWrites.push(
 		writeFile(
-			join(metaDir, 'directory.json'),
-			JSON.stringify({ name: directory.name, description: directory.description }, null, 2),
+			join(metaDir, 'work.json'),
+			JSON.stringify({ name: work.name, description: work.description }, null, 2),
 			'utf-8'
 		)
 	);
@@ -135,7 +135,7 @@ export async function collectItemsFromWorkspace(workspacePath: string, logger?: 
 	try {
 		entries = await readdir(workspacePath);
 	} catch {
-		logger?.warn('Could not read workspace directory');
+		logger?.warn('Could not read workspace work');
 		return [];
 	}
 
@@ -197,7 +197,7 @@ export async function collectItemsFromWorkspace(workspacePath: string, logger?: 
 export async function cleanupWorkspace(workspacePath: string): Promise<void> {
 	await rm(workspacePath, { recursive: true, force: true });
 
-	// Remove parent user directory if now empty
+	// Remove parent user work if now empty
 	const userDir = dirname(workspacePath);
 	try {
 		const remaining = await readdir(userDir);

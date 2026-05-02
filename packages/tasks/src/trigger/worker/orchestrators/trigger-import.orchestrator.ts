@@ -1,26 +1,26 @@
 import { Injectable, Logger, Optional } from '@nestjs/common';
-import { Directory, User, GenerateStatusType } from '@ever-works/agent/entities';
+import { Work, User, GenerateStatusType } from '@ever-works/agent/entities';
 import {
-    DirectoryOperationsService,
+    WorkOperationsService,
     buildImportStatsUpdate,
-} from '@ever-works/agent/directory-operations';
+} from '@ever-works/agent/work-operations';
 import { NotificationService } from '@ever-works/agent/notifications';
-import { DirectoryImportPayload, DirectoryImportResult } from '@ever-works/agent/tasks';
+import { WorkImportPayload, WorkImportResult } from '@ever-works/agent/tasks';
 import { normalizeGeneratorError } from '@ever-works/agent/services';
-import { DirectoryScheduleService } from '@ever-works/agent/services';
+import { WorkScheduleService } from '@ever-works/agent/services';
 import { ImportExecutorService } from '@ever-works/agent/import';
 import { calculateDurationSeconds } from '@ever-works/agent/utils';
 import { BaseOrchestrator } from './base-orchestrator';
 
 export type TriggerImportOptions = {
-    directory: Directory;
+    work: Work;
     user: User;
-    payload: DirectoryImportPayload;
+    payload: WorkImportPayload;
     gitToken?: string;
 };
 
 export type TriggerImportCancellationOptions = {
-    directory: Directory;
+    work: Work;
     historyId: string;
     historyStartedAt?: string;
 };
@@ -32,34 +32,34 @@ export class TriggerImportOrchestrator extends BaseOrchestrator {
 
     constructor(
         private readonly importExecutor: ImportExecutorService,
-        private readonly directoryScheduleService: DirectoryScheduleService,
-        directoryOperations: DirectoryOperationsService,
+        private readonly workScheduleService: WorkScheduleService,
+        workOperations: WorkOperationsService,
         @Optional()
         notificationService?: NotificationService,
     ) {
-        super(directoryOperations, notificationService);
+        super(workOperations, notificationService);
     }
 
-    async run({ directory, user, payload, gitToken }: TriggerImportOptions): Promise<void> {
+    async run({ work, user, payload, gitToken }: TriggerImportOptions): Promise<void> {
         const startTime = this.resolveStartTime(payload.historyStartedAt);
 
         await Promise.all([
-            this.directoryOperations.recordGenerationStartTime(directory.id, startTime),
-            this.directoryOperations.updateGenerateStatus(directory.id, {
+            this.workOperations.recordGenerationStartTime(work.id, startTime),
+            this.workOperations.updateGenerateStatus(work.id, {
                 status: GenerateStatusType.GENERATING,
                 step: 'import_started',
             }),
-            this.directoryOperations.updateGenerationHistory(directory.id, payload.historyId, {
+            this.workOperations.updateGenerationHistory(work.id, payload.historyId, {
                 status: GenerateStatusType.GENERATING,
                 startedAt: startTime,
             }),
         ]);
 
-        let result: DirectoryImportResult | null = null;
+        let result: WorkImportResult | null = null;
 
         try {
             result = await this.importExecutor.executeBySourceType({
-                directory,
+                work,
                 user,
                 sourceType: payload.sourceType,
                 sourceOwner: payload.sourceOwner,
@@ -80,8 +80,8 @@ export class TriggerImportOrchestrator extends BaseOrchestrator {
 
             if (payload.worksConfig?.scheduleCadence) {
                 try {
-                    await this.directoryScheduleService.updateSchedule(
-                        directory.id,
+                    await this.workScheduleService.updateSchedule(
+                        work.id,
                         {
                             enable: true,
                             cadence: payload.worksConfig.scheduleCadence,
@@ -96,7 +96,7 @@ export class TriggerImportOrchestrator extends BaseOrchestrator {
                     );
                 } catch (error) {
                     this.logger.warn(
-                        `Failed to restore schedule from works.yml for directory ${directory.id}: ${
+                        `Failed to restore schedule from works.yml for work ${work.id}: ${
                             error instanceof Error ? error.message : String(error)
                         }`,
                     );
@@ -104,18 +104,18 @@ export class TriggerImportOrchestrator extends BaseOrchestrator {
             }
 
             await Promise.all([
-                this.directoryOperations.recordGenerationFinishTime(directory.id, endTime),
-                this.directoryOperations.updateGenerateStatus(directory.id, {
+                this.workOperations.recordGenerationFinishTime(work.id, endTime),
+                this.workOperations.updateGenerateStatus(work.id, {
                     status: GenerateStatusType.GENERATED,
                     step: null,
                 }),
-                this.directoryOperations.updateGenerationHistory(directory.id, payload.historyId, {
+                this.workOperations.updateGenerationHistory(work.id, payload.historyId, {
                     status: GenerateStatusType.GENERATED,
                     finishedAt: endTime,
                     durationInSeconds: calculateDurationSeconds(startTime, endTime),
                     ...buildImportStatsUpdate(result),
                 }),
-                this.directoryOperations.updateDirectory(directory.id, {
+                this.workOperations.updateWork(work.id, {
                     itemsCount: result?.itemsImported ?? 0,
                 }),
             ]);
@@ -123,15 +123,15 @@ export class TriggerImportOrchestrator extends BaseOrchestrator {
             const endTime = new Date();
 
             await Promise.all([
-                this.directoryOperations.recordGenerationFinishTime(directory.id, endTime),
-                this.directoryOperations.updateGenerateStatus(directory.id, {
+                this.workOperations.recordGenerationFinishTime(work.id, endTime),
+                this.workOperations.updateGenerateStatus(work.id, {
                     status: GenerateStatusType.ERROR,
                     error: normalizeGeneratorError(error),
                 }),
             ]);
 
-            await this.directoryOperations.updateGenerationHistory(
-                directory.id,
+            await this.workOperations.updateGenerationHistory(
+                work.id,
                 payload.historyId,
                 {
                     status: GenerateStatusType.ERROR,
@@ -144,11 +144,11 @@ export class TriggerImportOrchestrator extends BaseOrchestrator {
 
             this.logger.error('Import failed', error as Error);
 
-            await this.handleErrorNotification(error, user, directory);
+            await this.handleErrorNotification(error, user, work);
 
             throw error;
         } finally {
-            await this.directoryOperations.emitGenerationCompleted(directory.id);
+            await this.workOperations.emitGenerationCompleted(work.id);
         }
     }
 }

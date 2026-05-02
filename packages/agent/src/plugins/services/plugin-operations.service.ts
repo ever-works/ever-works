@@ -23,9 +23,9 @@ import type {
     PluginResponse,
     PluginConnectionStatus,
     UserPluginResponse,
-    DirectoryPluginResponse,
+    WorkPluginResponse,
     PluginListResponse,
-    DirectoryPluginListResponse,
+    WorkPluginListResponse,
     PluginIcon,
     PluginSettingsSchema,
     PluginSettingsSchemaProperty,
@@ -35,7 +35,7 @@ import type {
 } from '@ever-works/plugin/api';
 import { PluginEntity } from '../entities/plugin.entity';
 import { UserPluginEntity } from '../entities/user-plugin.entity';
-import { DirectoryPluginEntity } from '../entities/directory-plugin.entity';
+import { WorkPluginEntity } from '../entities/work-plugin.entity';
 import {
     PluginRegistryService,
     type RegisteredPlugin,
@@ -65,8 +65,8 @@ export class PluginOperationsService {
         private readonly pluginRepository: Repository<PluginEntity>,
         @InjectRepository(UserPluginEntity)
         private readonly userPluginRepository: Repository<UserPluginEntity>,
-        @InjectRepository(DirectoryPluginEntity)
-        private readonly directoryPluginRepository: Repository<DirectoryPluginEntity>,
+        @InjectRepository(WorkPluginEntity)
+        private readonly workPluginRepository: Repository<WorkPluginEntity>,
         private readonly pluginRegistryService: PluginRegistryService,
         private readonly settingsValidator: SettingsSchemaValidatorService,
         private readonly settingsService: PluginSettingsService,
@@ -108,8 +108,8 @@ export class PluginOperationsService {
                     systemPlugin: registered.manifest?.systemPlugin,
                     autoEnable: registered.manifest?.autoEnable,
                     userPlugin,
-                    directoryPlugin: null,
-                    hasDirectoryContext: false,
+                    workPlugin: null,
+                    hasWorkContext: false,
                 });
             });
         }
@@ -170,8 +170,8 @@ export class PluginOperationsService {
                 systemPlugin: registered.manifest?.systemPlugin,
                 autoEnable: registered.manifest?.autoEnable,
                 userPlugin,
-                directoryPlugin: null,
-                hasDirectoryContext: false,
+                workPlugin: null,
+                hasWorkContext: false,
             });
             if (!isEnabled) return false;
 
@@ -211,8 +211,8 @@ export class PluginOperationsService {
                     systemPlugin: registered.manifest?.systemPlugin,
                     autoEnable: registered.manifest?.autoEnable,
                     userPlugin: userPlugin ?? null,
-                    directoryPlugin: null,
-                    hasDirectoryContext: false,
+                    workPlugin: null,
+                    hasWorkContext: false,
                 }),
                 hasRequiredSettings,
             };
@@ -378,7 +378,7 @@ export class PluginOperationsService {
         userId: string,
         settings?: Record<string, unknown>,
         secretSettings?: Record<string, unknown>,
-        autoEnableForDirectories?: boolean,
+        autoEnableForWorks?: boolean,
     ): Promise<UserPluginResponse> {
         const registered = this.pluginRegistryService.get(pluginId);
         if (!registered) {
@@ -417,8 +417,8 @@ export class PluginOperationsService {
         if (userPlugin) {
             // Update existing record
             userPlugin.enabled = true;
-            if (autoEnableForDirectories !== undefined) {
-                userPlugin.autoEnableForDirectories = autoEnableForDirectories;
+            if (autoEnableForWorks !== undefined) {
+                userPlugin.autoEnableForWorks = autoEnableForWorks;
             }
             if (settings) {
                 userPlugin.settings = { ...userPlugin.settings, ...settings };
@@ -436,7 +436,7 @@ export class PluginOperationsService {
                 pluginId,
                 pluginEntityId: pluginEntity.id,
                 enabled: true,
-                autoEnableForDirectories: autoEnableForDirectories ?? false,
+                autoEnableForWorks: autoEnableForWorks ?? false,
                 settings: settings || {},
                 secretSettings: secretSettings || {},
                 metadata: {},
@@ -477,8 +477,8 @@ export class PluginOperationsService {
                 systemPlugin: registered.manifest?.systemPlugin,
                 autoEnable: registered.manifest?.autoEnable,
                 userPlugin: null,
-                directoryPlugin: null,
-                hasDirectoryContext: false,
+                workPlugin: null,
+                hasWorkContext: false,
             });
             if (wouldBeEnabled) {
                 const pluginEntity = await this.pluginRepository.findOne({
@@ -490,7 +490,7 @@ export class PluginOperationsService {
                         pluginId,
                         pluginEntityId: pluginEntity.id,
                         enabled: false,
-                        autoEnableForDirectories: false,
+                        autoEnableForWorks: false,
                         settings: {},
                         secretSettings: {},
                         metadata: {},
@@ -663,20 +663,20 @@ export class PluginOperationsService {
     }
 
     // ============================================
-    // Directory Plugin Operations
+    // Work Plugin Operations
     // ============================================
 
     /**
-     * List plugins for a directory with directory-specific status
+     * List plugins for a work with work-specific status
      */
-    async listDirectoryPlugins(
-        directoryId: string,
+    async listWorkPlugins(
+        workId: string,
         userId: string,
-    ): Promise<DirectoryPluginListResponse> {
+    ): Promise<WorkPluginListResponse> {
         const allPlugins = this.pluginRegistryService.getAll();
 
-        // Filter: visible + applicable to directory scope
-        // 'hidden' and 'user-only' plugins are not shown in directory plugins list
+        // Filter: visible + applicable to work scope
+        // 'hidden' and 'user-only' plugins are not shown in work plugins list
         const visiblePlugins = allPlugins.filter((p) => {
             const visibility = p.manifest?.visibility ?? 'public';
             return visibility !== 'hidden' && visibility !== 'user-only';
@@ -687,18 +687,18 @@ export class PluginOperationsService {
         });
         const userPluginMap = new Map(userPlugins.map((up) => [up.pluginId, up]));
 
-        // Get directory plugin configurations
-        const directoryPlugins = await this.directoryPluginRepository.find({
-            where: { directoryId },
+        // Get work plugin configurations
+        const workPlugins = await this.workPluginRepository.find({
+            where: { workId },
         });
-        const directoryPluginMap = new Map(directoryPlugins.map((dp) => [dp.pluginId, dp]));
+        const workPluginMap = new Map(workPlugins.map((dp) => [dp.pluginId, dp]));
 
         // Build registry map for quick supplementary lookups
         const registryMap = new Map(allPlugins.map((p) => [p.plugin.id, p]));
 
         // Build capability providers mapping (exclude supplementary plugins)
         const capabilityProviders: Record<string, string> = {};
-        for (const dp of directoryPlugins) {
+        for (const dp of workPlugins) {
             if (!dp.enabled) continue;
             const registered = registryMap.get(dp.pluginId);
             if (!registered || registered.manifest.supplementary) continue;
@@ -707,8 +707,8 @@ export class PluginOperationsService {
                 systemPlugin: registered.manifest?.systemPlugin,
                 autoEnable: registered.manifest?.autoEnable,
                 userPlugin,
-                directoryPlugin: dp,
-                hasDirectoryContext: true,
+                workPlugin: dp,
+                hasWorkContext: true,
             });
             if (!isEnabled) continue;
             for (const capability of getActiveCapabilities(dp)) {
@@ -717,13 +717,13 @@ export class PluginOperationsService {
         }
 
         // Map to response
-        const plugins: DirectoryPluginResponse[] = await Promise.all(
+        const plugins: WorkPluginResponse[] = await Promise.all(
             visiblePlugins.map((registered) => {
                 const userPlugin = userPluginMap.get(registered.plugin.id);
-                const directoryPlugin = directoryPluginMap.get(registered.plugin.id);
-                return this.toDirectoryPluginResponse(registered, userPlugin, directoryPlugin, {
+                const workPlugin = workPluginMap.get(registered.plugin.id);
+                return this.toWorkPluginResponse(registered, userPlugin, workPlugin, {
                     userId,
-                    directoryId,
+                    workId,
                 });
             }),
         );
@@ -736,10 +736,10 @@ export class PluginOperationsService {
     }
 
     /**
-     * Enable a plugin for a directory
+     * Enable a plugin for a work
      */
-    async enablePluginForDirectory(
-        directoryId: string,
+    async enablePluginForWork(
+        workId: string,
         pluginId: string,
         userId: string,
         options?: {
@@ -747,15 +747,15 @@ export class PluginOperationsService {
             activeCapability?: string;
             priority?: number;
         },
-    ): Promise<DirectoryPluginResponse> {
+    ): Promise<WorkPluginResponse> {
         const registered = this.pluginRegistryService.get(pluginId);
         if (!registered) {
             throw new NotFoundException(`Plugin "${pluginId}" not found`);
         }
 
-        // Enforce configurationMode — admin-only plugins cannot have directory settings
+        // Enforce configurationMode — admin-only plugins cannot have work settings
         if (options?.settings) {
-            this.enforceConfigurationMode(registered, 'directory');
+            this.enforceConfigurationMode(registered, 'work');
         }
 
         const schema = registered.plugin.settingsSchema;
@@ -781,7 +781,7 @@ export class PluginOperationsService {
                 ...(userPlugin?.secretSettings || {}),
                 ...options.settings,
             };
-            await this.validateSettingsOrThrow(allSettings, schema, 'directory', registered.plugin);
+            await this.validateSettingsOrThrow(allSettings, schema, 'work', registered.plugin);
         }
 
         // Get the plugin entity
@@ -792,30 +792,30 @@ export class PluginOperationsService {
             throw new NotFoundException(`Plugin entity "${pluginId}" not found`);
         }
 
-        // Check if directory already has this plugin configured
-        let directoryPlugin = await this.directoryPluginRepository.findOne({
-            where: { directoryId, pluginId },
+        // Check if work already has this plugin configured
+        let workPlugin = await this.workPluginRepository.findOne({
+            where: { workId, pluginId },
         });
 
-        if (directoryPlugin) {
+        if (workPlugin) {
             // Update existing record
-            directoryPlugin.enabled = true;
+            workPlugin.enabled = true;
             if (options?.settings) {
-                directoryPlugin.settings = { ...directoryPlugin.settings, ...options.settings };
+                workPlugin.settings = { ...workPlugin.settings, ...options.settings };
             }
             if (options?.activeCapability) {
-                directoryPlugin.activeCapabilities = addActiveCapability(
-                    directoryPlugin,
+                workPlugin.activeCapabilities = addActiveCapability(
+                    workPlugin,
                     options.activeCapability,
                 );
             }
             if (options?.priority !== undefined) {
-                directoryPlugin.priority = options.priority;
+                workPlugin.priority = options.priority;
             }
         } else {
-            // Create new directory plugin record
-            directoryPlugin = this.directoryPluginRepository.create({
-                directoryId,
+            // Create new work plugin record
+            workPlugin = this.workPluginRepository.create({
+                workId,
                 pluginId,
                 pluginEntityId: pluginEntity.id,
                 enabled: true,
@@ -827,27 +827,27 @@ export class PluginOperationsService {
             });
         }
 
-        await this.directoryPluginRepository.save(directoryPlugin);
-        this.logger.log(`Plugin "${pluginId}" enabled for directory "${directoryId}"`);
+        await this.workPluginRepository.save(workPlugin);
+        this.logger.log(`Plugin "${pluginId}" enabled for work "${workId}"`);
 
-        if (getActiveCapabilities(directoryPlugin).length > 0) {
-            this.requestWorksConfigSync(directoryId, userId, 'provider_changed');
+        if (getActiveCapabilities(workPlugin).length > 0) {
+            this.requestWorksConfigSync(workId, userId, 'provider_changed');
         }
 
-        return this.toDirectoryPluginResponse(registered, userPlugin, directoryPlugin, {
+        return this.toWorkPluginResponse(registered, userPlugin, workPlugin, {
             userId,
-            directoryId,
+            workId,
         });
     }
 
     /**
-     * Disable a plugin for a directory
+     * Disable a plugin for a work
      */
-    async disablePluginForDirectory(
-        directoryId: string,
+    async disablePluginForWork(
+        workId: string,
         pluginId: string,
         userId: string,
-    ): Promise<DirectoryPluginResponse> {
+    ): Promise<WorkPluginResponse> {
         const registered = this.pluginRegistryService.get(pluginId);
         if (!registered) {
             throw new NotFoundException(`Plugin "${pluginId}" not found`);
@@ -863,29 +863,29 @@ export class PluginOperationsService {
             where: { userId, pluginId },
         });
 
-        let directoryPlugin = await this.directoryPluginRepository.findOne({
-            where: { directoryId, pluginId },
+        let workPlugin = await this.workPluginRepository.findOne({
+            where: { workId, pluginId },
         });
 
-        if (directoryPlugin) {
-            directoryPlugin.enabled = false;
-            await this.directoryPluginRepository.save(directoryPlugin);
+        if (workPlugin) {
+            workPlugin.enabled = false;
+            await this.workPluginRepository.save(workPlugin);
         } else {
-            // For plugins that would be enabled in this directory, create a record with enabled=false to opt out
+            // For plugins that would be enabled in this work, create a record with enabled=false to opt out
             const wouldBeEnabled = resolvePluginEnabled({
                 systemPlugin: registered.manifest?.systemPlugin,
                 autoEnable: registered.manifest?.autoEnable,
                 userPlugin: userPlugin ?? null,
-                directoryPlugin: null,
-                hasDirectoryContext: true,
+                workPlugin: null,
+                hasWorkContext: true,
             });
             if (wouldBeEnabled) {
                 const pluginEntity = await this.pluginRepository.findOne({
                     where: { pluginId },
                 });
                 if (pluginEntity) {
-                    directoryPlugin = this.directoryPluginRepository.create({
-                        directoryId,
+                    workPlugin = this.workPluginRepository.create({
+                        workId,
                         pluginId,
                         pluginEntityId: pluginEntity.id,
                         enabled: false,
@@ -894,50 +894,50 @@ export class PluginOperationsService {
                         metadata: {},
                         priority: 0,
                     });
-                    await this.directoryPluginRepository.save(directoryPlugin);
+                    await this.workPluginRepository.save(workPlugin);
                 }
             }
         }
 
-        this.logger.log(`Plugin "${pluginId}" disabled for directory "${directoryId}"`);
+        this.logger.log(`Plugin "${pluginId}" disabled for work "${workId}"`);
 
-        if (getActiveCapabilities(directoryPlugin).length > 0) {
-            this.requestWorksConfigSync(directoryId, userId, 'provider_changed');
+        if (getActiveCapabilities(workPlugin).length > 0) {
+            this.requestWorksConfigSync(workId, userId, 'provider_changed');
         }
 
-        return this.toDirectoryPluginResponse(registered, userPlugin, directoryPlugin, {
+        return this.toWorkPluginResponse(registered, userPlugin, workPlugin, {
             userId,
-            directoryId,
+            workId,
         });
     }
 
     /**
-     * Update directory plugin settings
+     * Update work plugin settings
      */
-    async updateDirectoryPluginSettings(
-        directoryId: string,
+    async updateWorkPluginSettings(
+        workId: string,
         pluginId: string,
         userId: string,
         settings?: Record<string, unknown>,
         secretSettings?: Record<string, unknown>,
         metadata?: Record<string, unknown>,
-    ): Promise<DirectoryPluginResponse> {
+    ): Promise<WorkPluginResponse> {
         const registered = this.pluginRegistryService.get(pluginId);
         if (!registered) {
             throw new NotFoundException(`Plugin "${pluginId}" not found`);
         }
 
-        // Enforce configurationMode — admin-only plugins cannot have directory settings
+        // Enforce configurationMode — admin-only plugins cannot have work settings
         if (settings || secretSettings) {
-            this.enforceConfigurationMode(registered, 'directory');
+            this.enforceConfigurationMode(registered, 'work');
         }
 
         const userPlugin = await this.userPluginRepository.findOne({
             where: { userId, pluginId },
         });
 
-        const directoryPlugin = await this.ensureDirectoryPlugin(
-            directoryId,
+        const workPlugin = await this.ensureWorkPlugin(
+            workId,
             pluginId,
             userPlugin,
             registered.manifest,
@@ -950,13 +950,13 @@ export class PluginOperationsService {
         // Validate combined settings against schema.
         // User settings serve as inherited base (mirrors resolved cascade).
         if (settings || secretSettings) {
-            // Apply nulls to directory settings first, then strip them
+            // Apply nulls to work settings first, then strip them
             const dirSettingsAfterUpdate = this.stripNullValues({
-                ...directoryPlugin.settings,
+                ...workPlugin.settings,
                 ...(settings || {}),
             });
             const dirSecretsAfterUpdate = this.stripNullValues({
-                ...directoryPlugin.secretSettings,
+                ...workPlugin.secretSettings,
                 ...(secretSettings || {}),
             });
 
@@ -971,7 +971,7 @@ export class PluginOperationsService {
             await this.validateSettingsOrThrow(
                 allSettingsForValidation,
                 schema,
-                'directory',
+                'work',
                 registered.plugin,
             );
         }
@@ -979,8 +979,8 @@ export class PluginOperationsService {
         // Strip masked placeholders then merge settings, clearing null keys
         if (settings) {
             const clean = this.stripMaskedValues(settings);
-            directoryPlugin.settings = this.stripNullValues({
-                ...directoryPlugin.settings,
+            workPlugin.settings = this.stripNullValues({
+                ...workPlugin.settings,
                 ...clean,
             });
         }
@@ -988,46 +988,46 @@ export class PluginOperationsService {
         if (secretSettings) {
             const clean = this.stripMaskedValues(secretSettings);
             // Update secretSettings
-            directoryPlugin.secretSettings = this.stripNullValues({
-                ...directoryPlugin.secretSettings,
+            workPlugin.secretSettings = this.stripNullValues({
+                ...workPlugin.secretSettings,
                 ...clean,
             });
 
             // Cleanup: also remove secret fields from settings if they exist there
             // (handles migration case where secret fields were stored in wrong field)
-            const cleanedSettings = { ...directoryPlugin.settings };
+            const cleanedSettings = { ...workPlugin.settings };
             for (const key of Object.keys(clean)) {
                 delete cleanedSettings[key];
             }
-            directoryPlugin.settings = cleanedSettings;
+            workPlugin.settings = cleanedSettings;
         }
 
         if (metadata) {
-            directoryPlugin.metadata = { ...directoryPlugin.metadata, ...metadata };
+            workPlugin.metadata = { ...workPlugin.metadata, ...metadata };
         }
 
-        await this.directoryPluginRepository.save(directoryPlugin);
-        this.logger.log(`Plugin "${pluginId}" settings updated for directory "${directoryId}"`);
+        await this.workPluginRepository.save(workPlugin);
+        this.logger.log(`Plugin "${pluginId}" settings updated for work "${workId}"`);
 
-        if (hasActiveCapability(directoryPlugin, 'pipeline') && settings?.model !== undefined) {
-            this.requestWorksConfigSync(directoryId, userId, 'pipeline_settings_changed');
+        if (hasActiveCapability(workPlugin, 'pipeline') && settings?.model !== undefined) {
+            this.requestWorksConfigSync(workId, userId, 'pipeline_settings_changed');
         }
 
-        return this.toDirectoryPluginResponse(registered, userPlugin, directoryPlugin, {
+        return this.toWorkPluginResponse(registered, userPlugin, workPlugin, {
             userId,
-            directoryId,
+            workId,
         });
     }
 
     /**
-     * Set active capability for a directory plugin
+     * Set active capability for a work plugin
      */
     async setActiveCapability(
-        directoryId: string,
+        workId: string,
         pluginId: string,
         userId: string,
         capability: string,
-    ): Promise<DirectoryPluginResponse> {
+    ): Promise<WorkPluginResponse> {
         const registered = this.pluginRegistryService.get(pluginId);
         if (!registered) {
             throw new NotFoundException(`Plugin "${pluginId}" not found`);
@@ -1050,54 +1050,54 @@ export class PluginOperationsService {
             where: { userId, pluginId },
         });
 
-        const directoryPlugin = await this.ensureDirectoryPlugin(
-            directoryId,
+        const workPlugin = await this.ensureWorkPlugin(
+            workId,
             pluginId,
             userPlugin,
             registered.manifest,
         );
 
-        // Clear this capability from other plugins in this directory.
+        // Clear this capability from other plugins in this work.
         // Each capability has one provider; each plugin can provide many capabilities.
-        const directoryPlugins = await this.directoryPluginRepository.find({
-            where: { directoryId },
+        const workPlugins = await this.workPluginRepository.find({
+            where: { workId },
         });
-        const pluginsToUpdate = directoryPlugins.filter(
+        const pluginsToUpdate = workPlugins.filter(
             (otherPlugin) =>
                 otherPlugin.pluginId !== pluginId && hasActiveCapability(otherPlugin, capability),
         );
         await Promise.all(
             pluginsToUpdate.map((otherPlugin) => {
                 otherPlugin.activeCapabilities = removeActiveCapability(otherPlugin, capability);
-                return this.directoryPluginRepository.save(otherPlugin);
+                return this.workPluginRepository.save(otherPlugin);
             }),
         );
 
-        // Selecting a provider is an explicit opt-in to use that plugin for this directory.
-        directoryPlugin.enabled = true;
-        directoryPlugin.activeCapabilities = addActiveCapability(directoryPlugin, capability);
-        await this.directoryPluginRepository.save(directoryPlugin);
+        // Selecting a provider is an explicit opt-in to use that plugin for this work.
+        workPlugin.enabled = true;
+        workPlugin.activeCapabilities = addActiveCapability(workPlugin, capability);
+        await this.workPluginRepository.save(workPlugin);
 
         this.logger.log(
-            `Capability "${capability}" set to plugin "${pluginId}" for directory "${directoryId}"`,
+            `Capability "${capability}" set to plugin "${pluginId}" for work "${workId}"`,
         );
 
-        this.requestWorksConfigSync(directoryId, userId, 'provider_changed');
+        this.requestWorksConfigSync(workId, userId, 'provider_changed');
 
-        return this.toDirectoryPluginResponse(registered, userPlugin, directoryPlugin, {
+        return this.toWorkPluginResponse(registered, userPlugin, workPlugin, {
             userId,
-            directoryId,
+            workId,
         });
     }
 
     private requestWorksConfigSync(
-        directoryId: string,
+        workId: string,
         userId: string,
         reason: WorksConfigSyncReason,
     ): void {
         this.eventEmitter?.emit(
             WorksConfigSyncRequestedEvent.EVENT_NAME,
-            new WorksConfigSyncRequestedEvent(directoryId, userId, reason),
+            new WorksConfigSyncRequestedEvent(workId, userId, reason),
         );
     }
 
@@ -1149,13 +1149,13 @@ export class PluginOperationsService {
 
     /**
      * Validate that user-level required settings are configured before
-     * allowing directory overrides.
+     * allowing work overrides.
      *
      * Individual `required` fields: always enforced at user scope.
      *
      * `x-requiredGroups`: only enforced when every field in the group is
-     * user-scoped (directory can't satisfy any of them). If any field is
-     * global or directory-scoped, the group is skipped — directory may
+     * user-scoped (work can't satisfy any of them). If any field is
+     * global or work-scoped, the group is skipped — work may
      * fill it during its own validation.
      */
     private validateUserLevelRequiredFields(
@@ -1200,7 +1200,7 @@ export class PluginOperationsService {
 
     /**
      * Returns only groups where every field is user-scoped,
-     * meaning directory level cannot satisfy them.
+     * meaning work level cannot satisfy them.
      */
     private filterUserOnlyGroups(schema: JsonSchema): { fields: string[]; message?: string }[] {
         const groups = schema['x-requiredGroups'];
@@ -1253,8 +1253,8 @@ export class PluginOperationsService {
             systemPlugin: registered.manifest?.systemPlugin,
             autoEnable: registered.manifest?.autoEnable,
             userPlugin: userPlugin ?? null,
-            directoryPlugin: null,
-            hasDirectoryContext: false,
+            workPlugin: null,
+            hasWorkContext: false,
         });
 
         const mergedSettings = userPlugin
@@ -1268,7 +1268,7 @@ export class PluginOperationsService {
             settings: this.maskSecretSettings(mergedSettings, registered.plugin.settingsSchema),
             metadata: userPlugin?.metadata ?? {},
             userPluginId: userPlugin?.id,
-            autoEnableForDirectories: userPlugin?.autoEnableForDirectories ?? false,
+            autoEnableForWorks: userPlugin?.autoEnableForWorks ?? false,
         };
     }
 
@@ -1429,69 +1429,69 @@ export class PluginOperationsService {
     }
 
     /**
-     * Convert to directory plugin response
+     * Convert to work plugin response
      *
-     * For plugins with autoEnable=true, directoryEnabled defaults to true
-     * even without a DirectoryPluginEntity record (unless explicitly disabled).
+     * For plugins with autoEnable=true, workEnabled defaults to true
+     * even without a WorkPluginEntity record (unless explicitly disabled).
      */
-    private async toDirectoryPluginResponse(
+    private async toWorkPluginResponse(
         registered: RegisteredPlugin,
         userPlugin?: UserPluginEntity | null,
-        directoryPlugin?: DirectoryPluginEntity | null,
-        options?: { userId: string; directoryId: string },
-    ): Promise<DirectoryPluginResponse> {
+        workPlugin?: WorkPluginEntity | null,
+        options?: { userId: string; workId: string },
+    ): Promise<WorkPluginResponse> {
         const userResponse = this.toUserPluginResponse(registered, userPlugin);
-        const rawDirectorySettings = this.maskSecretSettings(
-            directoryPlugin
-                ? { ...directoryPlugin.settings, ...directoryPlugin.secretSettings }
+        const rawWorkSettings = this.maskSecretSettings(
+            workPlugin
+                ? { ...workPlugin.settings, ...workPlugin.secretSettings }
                 : undefined,
             registered.plugin.settingsSchema,
         );
-        const [resolvedSettings, models, directorySettings] = options
+        const [resolvedSettings, models, workSettings] = options
             ? await Promise.all([
                   this.getResolvedDisplaySettings(registered, options.userId),
                   this.getProviderModelSummaries(registered, options),
-                  this.getDirectoryOverrideDisplaySettings(registered, options),
+                  this.getWorkOverrideDisplaySettings(registered, options),
               ])
-            : [undefined, undefined, rawDirectorySettings];
+            : [undefined, undefined, rawWorkSettings];
 
         return {
             ...userResponse,
             resolvedSettings,
-            directoryEnabled: resolvePluginEnabled({
+            workEnabled: resolvePluginEnabled({
                 systemPlugin: registered.manifest?.systemPlugin,
                 autoEnable: registered.manifest?.autoEnable,
                 userPlugin: userPlugin ?? null,
-                directoryPlugin: directoryPlugin ?? null,
-                hasDirectoryContext: true,
+                workPlugin: workPlugin ?? null,
+                hasWorkContext: true,
             }),
-            activeCapabilities: getActiveCapabilities(directoryPlugin),
-            directorySettings,
-            directoryPluginId: directoryPlugin?.id,
-            priority: directoryPlugin?.priority,
+            activeCapabilities: getActiveCapabilities(workPlugin),
+            workSettings,
+            workPluginId: workPlugin?.id,
+            priority: workPlugin?.priority,
             models,
         };
     }
 
     private async getProviderModelSummaries(
         registered: RegisteredPlugin,
-        options: { userId: string; directoryId?: string },
-    ): Promise<DirectoryPluginResponse['models']> {
+        options: { userId: string; workId?: string },
+    ): Promise<WorkPluginResponse['models']> {
         if (!registered.plugin.capabilities.includes(PLUGIN_CAPABILITIES.AI_PROVIDER)) {
             return undefined;
         }
 
         const resolved = await this.settingsService.getResolvedSettings(registered.plugin.id, {
             userId: options.userId,
-            directoryId: options.directoryId,
+            workId: options.workId,
         });
 
         return buildProviderModelSummaries(registered.plugin.settingsSchema, resolved);
     }
 
-    private async getDirectoryOverrideDisplaySettings(
+    private async getWorkOverrideDisplaySettings(
         registered: RegisteredPlugin,
-        options: { userId: string; directoryId: string },
+        options: { userId: string; workId: string },
     ): Promise<Record<string, unknown> | undefined> {
         const schema = registered.plugin.settingsSchema;
         if (!schema?.properties) {
@@ -1500,22 +1500,22 @@ export class PluginOperationsService {
 
         const resolved = await this.settingsService.getResolvedSettings(registered.plugin.id, {
             userId: options.userId,
-            directoryId: options.directoryId,
+            workId: options.workId,
             includeSecrets: true,
         });
 
-        const directorySettings: Record<string, unknown> = {};
+        const workSettings: Record<string, unknown> = {};
 
         for (const key of Object.keys(schema.properties)) {
             const setting = resolved[key];
-            if (setting?.source !== 'directory') continue;
+            if (setting?.source !== 'work') continue;
             if (setting.value === undefined || setting.value === null) continue;
 
-            directorySettings[key] = setting.value;
+            workSettings[key] = setting.value;
         }
 
         return this.maskSecretSettings(
-            Object.keys(directorySettings).length > 0 ? directorySettings : undefined,
+            Object.keys(workSettings).length > 0 ? workSettings : undefined,
             schema,
         );
     }
@@ -1644,18 +1644,18 @@ export class PluginOperationsService {
     }
 
     /**
-     * Find an existing DirectoryPluginEntity or auto-create one if the plugin
-     * is considered enabled for this directory (via manifest.autoEnable or
-     * user autoEnableForDirectories). Throws if the plugin is not enabled.
+     * Find an existing WorkPluginEntity or auto-create one if the plugin
+     * is considered enabled for this work (via manifest.autoEnable or
+     * user autoEnableForWorks). Throws if the plugin is not enabled.
      */
-    private async ensureDirectoryPlugin(
-        directoryId: string,
+    private async ensureWorkPlugin(
+        workId: string,
         pluginId: string,
         userPlugin: UserPluginEntity | null,
         manifest: PluginManifest,
-    ): Promise<DirectoryPluginEntity> {
-        const existing = await this.directoryPluginRepository.findOne({
-            where: { directoryId, pluginId },
+    ): Promise<WorkPluginEntity> {
+        const existing = await this.workPluginRepository.findOne({
+            where: { workId, pluginId },
         });
         if (existing) {
             return existing;
@@ -1665,12 +1665,12 @@ export class PluginOperationsService {
             systemPlugin: manifest?.systemPlugin,
             autoEnable: manifest?.autoEnable,
             userPlugin,
-            directoryPlugin: null,
-            hasDirectoryContext: true,
+            workPlugin: null,
+            hasWorkContext: true,
         });
         if (!wouldBeEnabled) {
             throw new BadRequestException(
-                `Plugin "${pluginId}" is not enabled for this directory. Enable it first.`,
+                `Plugin "${pluginId}" is not enabled for this work. Enable it first.`,
             );
         }
 
@@ -1681,8 +1681,8 @@ export class PluginOperationsService {
             throw new NotFoundException(`Plugin entity "${pluginId}" not found in database`);
         }
 
-        return this.directoryPluginRepository.create({
-            directoryId,
+        return this.workPluginRepository.create({
+            workId,
             pluginId,
             pluginEntityId: pluginEntity.id,
             enabled: true,
@@ -1697,11 +1697,11 @@ export class PluginOperationsService {
     /**
      * Enforce configurationMode restrictions.
      * Throws ForbiddenException if the plugin is admin-only and the caller is trying
-     * to modify settings at user or directory scope.
+     * to modify settings at user or work scope.
      */
     private enforceConfigurationMode(
         registered: RegisteredPlugin,
-        scope: 'user' | 'directory',
+        scope: 'user' | 'work',
     ): void {
         const configMode = registered.plugin.configurationMode || 'hybrid';
         if (configMode === 'admin-only') {

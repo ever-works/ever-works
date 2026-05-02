@@ -288,7 +288,7 @@ export class DataRepository {
         try {
             const dirpath = path.join(dir, type);
             const stat = await fs.stat(dirpath);
-            return stat.isDirectory();
+            return stat.isWork();
         } catch (err) {
             if ((err as NodeJS.ErrnoException | undefined)?.code === 'ENOENT') {
                 return false;
@@ -319,7 +319,7 @@ export class DataRepository {
 
     /**
      * Remove all files except allowlisted ones
-     * and ensure all needed directories exist
+     * and ensure all needed works exist
      */
     async resetFiles() {
         const files = await fs.readdir(this.dir);
@@ -333,10 +333,10 @@ export class DataRepository {
             await fs.rm(path.join(this.dir, file), { recursive: true, force: true });
         }
 
-        await this.ensureDirectoriesExist();
+        await this.ensureWorksExist();
     }
 
-    async ensureDirectoriesExist() {
+    async ensureWorksExist() {
         await Promise.all([
             fs.mkdir(this.markdownTemplatePath, { recursive: true }),
             fs.mkdir(this.dataDir, { recursive: true }),
@@ -409,7 +409,7 @@ export class DataRepository {
     async getItems() {
         const items = await fs.readdir(this.dataDir, { withFileTypes: true });
         const promises = items
-            .filter((item) => item.isDirectory())
+            .filter((item) => item.isWork())
             .map(async (item) => {
                 const slug = item.name;
 
@@ -425,7 +425,7 @@ export class DataRepository {
     }
 
     async countItems(): Promise<number> {
-        return this.countNonEmptyDirectories(this.dataDir);
+        return this.countNonEmptyWorks(this.dataDir);
     }
 
     async getItem(slug: string): Promise<ItemData | null> {
@@ -614,7 +614,7 @@ export class DataRepository {
         try {
             const entries = await fs.readdir(this.comparisonsDir, { withFileTypes: true });
             const promises = entries
-                .filter((entry) => entry.isDirectory())
+                .filter((entry) => entry.isWork())
                 .map((entry) => this.getComparison(entry.name));
             const results = await Promise.all(promises);
             const comparisons = results.filter(Boolean) as ComparisonData[];
@@ -631,7 +631,7 @@ export class DataRepository {
     }
 
     async countComparisons(): Promise<number> {
-        return this.countNonEmptyDirectories(this.comparisonsDir);
+        return this.countNonEmptyWorks(this.comparisonsDir);
     }
 
     async getComparison(slug: string): Promise<ComparisonData | null> {
@@ -786,12 +786,12 @@ export class DataRepository {
         return error instanceof Error && error.message.includes('Map keys must be unique');
     }
 
-    private async countNonEmptyDirectories(dir: string): Promise<number> {
+    private async countNonEmptyWorks(dir: string): Promise<number> {
         try {
             const entries = await fs.readdir(dir, { withFileTypes: true });
             const counts = await Promise.all(
                 entries
-                    .filter((entry) => entry.isDirectory())
+                    .filter((entry) => entry.isWork())
                     .map(async (entry) => {
                         const childEntries = await fs.readdir(path.join(dir, entry.name));
                         return childEntries.length > 0 ? 1 : 0;
@@ -850,10 +850,10 @@ export class DataRepository {
         const itemPath = this.getItemPath(slug);
 
         try {
-            // Check if item directory exists
+            // Check if item work exists
             await fs.access(itemPath);
 
-            // Remove the entire item directory
+            // Remove the entire item work
             await fs.rm(itemPath, { recursive: true, force: true });
 
             return true;

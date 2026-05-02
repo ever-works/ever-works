@@ -267,7 +267,7 @@ export class PdfExtractorPlugin implements IPlugin, IContentExtractorPlugin {
 			id: this.id,
 			name: this.name,
 			version: this.version,
-			description: 'Extract text content from PDF files to use as source material for your directory',
+			description: 'Extract text content from PDF files to use as source material for your work',
 			category: this.category,
 			capabilities: [...this.capabilities],
 			author: { name: 'Ever Works Team' },
@@ -282,7 +282,7 @@ export class PdfExtractorPlugin implements IPlugin, IContentExtractorPlugin {
 			readme: [
 				'## What does the PDF Extractor do?',
 				'',
-				'This plugin extracts text content from PDF files and converts it to clean markdown for use as source material during directory generation. It uses a hybrid approach: fast text-layer extraction for text-based PDFs, with optional OCR fallback via Mistral AI for scanned or image-based documents.',
+				'This plugin extracts text content from PDF files and converts it to clean markdown for use as source material during work generation. It uses a hybrid approach: fast text-layer extraction for text-based PDFs, with optional OCR fallback via Mistral AI for scanned or image-based documents.',
 				'',
 				'## Why use it?',
 				'',
@@ -300,7 +300,7 @@ export class PdfExtractorPlugin implements IPlugin, IContentExtractorPlugin {
 				'1. Enable the PDF Content Extractor plugin on this page',
 				'2. For text-based PDFs, no additional configuration is required',
 				'3. For scanned/image-based PDFs, get a Mistral AI API key from [console.mistral.ai](https://console.mistral.ai) and enter it in the settings below',
-				'4. Add PDF URLs as source material when generating your directory'
+				'4. Add PDF URLs as source material when generating your work'
 			].join('\n')
 		};
 	}

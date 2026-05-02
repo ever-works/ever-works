@@ -5,13 +5,13 @@ import { useTranslations } from 'next-intl';
 import { FolderClosed, ListTodo, Globe, type LucideIcon } from 'lucide-react';
 
 interface StatsOverviewProps {
-    totalDirectories?: number;
+    totalWorks?: number;
     totalItems?: number;
     activeWebsites?: number;
 }
 
 export function StatsOverview({
-    totalDirectories = 0,
+    totalWorks = 0,
     totalItems = 0,
     activeWebsites = 0,
 }: StatsOverviewProps) {
@@ -28,7 +28,7 @@ export function StatsOverview({
     }> = [
         {
             title: t('totalWorks'),
-            value: totalDirectories,
+            value: totalWorks,
             icon: FolderClosed,
             iconColor: 'text-blue-500',
             dotColor: 'bg-blue-500',

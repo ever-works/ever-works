@@ -5,14 +5,14 @@ import { useTranslations } from 'next-intl';
 import { useBackgroundActivity } from '@/lib/hooks/use-background-activity';
 
 /**
- * Subtle pulsing dot shown next to the Directories nav item
- * when a directory is generating and the user hasn't visited /directories yet.
+ * Subtle pulsing dot shown next to the Works nav item
+ * when a work is generating and the user hasn't visited /works yet.
  */
 export function SidebarActivityIndicator({ className }: { className?: string }) {
     const t = useTranslations('dashboard.sidebar');
-    const { showDirectoryIndicator } = useBackgroundActivity();
+    const { showWorkIndicator } = useBackgroundActivity();
 
-    if (!showDirectoryIndicator) return null;
+    if (!showWorkIndicator) return null;
 
     return (
         <span

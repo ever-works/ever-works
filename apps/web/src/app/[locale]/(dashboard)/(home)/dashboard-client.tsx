@@ -1,32 +1,32 @@
 'use client';
 
 import { AuthUser } from '@/lib/auth';
-import { DirectoryList } from '@/components/directories/DirectoryList';
+import { WorkList } from '@/components/works/WorkList';
 import { StatsOverview } from '@/components/dashboard/StatsOverview';
 import { EmptyState } from '@/components/common/EmptyState';
-import { GET_DIRECTORY_LIST_LIMIT, ROUTES } from '@/lib/constants';
+import { GET_WORK_LIST_LIMIT, ROUTES } from '@/lib/constants';
 import { Link, useRouter } from '@/i18n/navigation';
 import { useTranslations } from 'next-intl';
-import type { Directory } from '@/lib/api';
+import type { Work } from '@/lib/api';
 
 interface DashboardClientProps {
     user: AuthUser;
-    initialDirectories: Directory[];
-    totalDirectories: number;
+    initialWorks: Work[];
+    totalWorks: number;
     totalItems: number;
     activeWebsites: number;
 }
 
 export default function DashboardClient({
     user,
-    initialDirectories,
-    totalDirectories,
+    initialWorks,
+    totalWorks,
     totalItems,
     activeWebsites,
 }: DashboardClientProps) {
     const router = useRouter();
     const t = useTranslations('dashboard');
-    const hasDirectories = initialDirectories.length > 0;
+    const hasWorks = initialWorks.length > 0;
 
     return (
         <div className="w-full">
@@ -40,31 +40,31 @@ export default function DashboardClient({
             </div>
 
             <StatsOverview
-                totalDirectories={totalDirectories}
+                totalWorks={totalWorks}
                 totalItems={totalItems}
                 activeWebsites={activeWebsites}
             />
 
             <div className="grid grid-cols-1 @3xl/main:grid-cols-3 gap-8 mt-8">
                 <div className="@3xl/main:col-span-3">
-                    {hasDirectories ? (
+                    {hasWorks ? (
                         <>
                             <div className="flex justify-between items-center mb-4">
                                 <h2 className="text-xl font-semibold text-text dark:text-text-dark">
                                     {t('works.recent')}
                                 </h2>
-                                {totalDirectories > 5 && (
+                                {totalWorks > 5 && (
                                     <Link
                                         href={ROUTES.DASHBOARD_DIRECTORIES}
                                         className="text-sm text-primary hover:text-primary-hover transition-colors"
                                     >
-                                        {t('works.viewAll', { count: totalDirectories })}
+                                        {t('works.viewAll', { count: totalWorks })}
                                     </Link>
                                 )}
                             </div>
-                            <DirectoryList
-                                initialDirectories={initialDirectories}
-                                showLimit={GET_DIRECTORY_LIST_LIMIT}
+                            <WorkList
+                                initialWorks={initialWorks}
+                                showLimit={GET_WORK_LIST_LIMIT}
                             />
                         </>
                     ) : (

@@ -1,7 +1,7 @@
 /**
  * Claude Managed Agent plugin.
  *
- * Self-managed pipeline plugin that delegates directory generation to
+ * Self-managed pipeline plugin that delegates work generation to
  * Anthropic Claude Managed Agents and converts the final structured
  * response into Ever Works pipeline outputs.
  *

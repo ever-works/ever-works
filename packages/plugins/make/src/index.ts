@@ -1,7 +1,7 @@
 /**
  * Make.com Workflows Plugin
  *
- * Full pipeline plugin that delegates directory generation to Make.com
+ * Full pipeline plugin that delegates work generation to Make.com
  * scenarios or webhooks. Instead of running local AI agents, this plugin
  * triggers a Make.com automation and collects the structured item results.
  *

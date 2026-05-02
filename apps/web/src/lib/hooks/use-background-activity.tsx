@@ -6,7 +6,7 @@ import { ROUTES } from '@/lib/constants';
 
 interface BackgroundActivityState {
     /** Show the sidebar indicator? */
-    showDirectoryIndicator: boolean;
+    showWorkIndicator: boolean;
     /** Call when a generation starts (or is detected) */
     markGenerating: () => void;
     /** Call when generation finishes */
@@ -17,28 +17,28 @@ const BackgroundActivityContext = createContext<BackgroundActivityState | null>(
 
 export function BackgroundActivityProvider({ children }: { children: React.ReactNode }) {
     const pathname = usePathname();
-    const [isGeneratingDirectory, setIsGeneratingDirectory] = useState(false);
-    const isOnDirectoriesPage =
+    const [isGeneratingWork, setIsGeneratingWork] = useState(false);
+    const isOnWorksPage =
         pathname === ROUTES.DASHBOARD_DIRECTORIES ||
         pathname?.startsWith(ROUTES.DASHBOARD_DIRECTORIES + '/');
 
     const markGenerating = useCallback(() => {
-        setIsGeneratingDirectory(true);
+        setIsGeneratingWork(true);
     }, []);
 
     const clearGenerating = useCallback(() => {
-        setIsGeneratingDirectory(false);
+        setIsGeneratingWork(false);
     }, []);
 
-    const showDirectoryIndicator = isGeneratingDirectory && !isOnDirectoriesPage;
+    const showWorkIndicator = isGeneratingWork && !isOnWorksPage;
 
     const value = useMemo(
         () => ({
-            showDirectoryIndicator,
+            showWorkIndicator,
             markGenerating,
             clearGenerating,
         }),
-        [showDirectoryIndicator, markGenerating, clearGenerating],
+        [showWorkIndicator, markGenerating, clearGenerating],
     );
 
     return (

@@ -60,15 +60,15 @@ export class SourceValidationStep extends BasePipelineStep {
 		context: MutableGenerationContext,
 		execContext: StepExecutionContext
 	): Promise<MutableGenerationContext> {
-		const { directory, finalItems, metrics, subject, advancedPrompts } = context;
+		const { work, finalItems, metrics, subject, advancedPrompts } = context;
 		const { logger, aiFacade, searchFacade, contentExtractorFacade, promptFacade } = execContext;
 
 		const facadeOptions: FacadeOptions = {
 			userId: execContext.user!.id,
-			directoryId: execContext.directory.id
+			workId: execContext.work.id
 		};
 
-		logger.log(`[${directory.slug}] Validating source URLs for ${finalItems.length} items`);
+		logger.log(`[${work.slug}] Validating source URLs for ${finalItems.length} items`);
 
 		const validatedItems = await this.filterAndValidateSourceItems(
 			finalItems,

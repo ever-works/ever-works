@@ -21,9 +21,9 @@ export function handleCliError(error: any) {
         console.log(chalk.yellow('\n⚠ Authentication failed. Please login again.'));
         console.log(chalk.gray('Run: ever-works auth login'));
     } else if (status === 404) {
-        if (message?.toLowerCase().includes('directory')) {
+        if (message?.toLowerCase().includes('work')) {
             console.log(
-                chalk.yellow('\n⚠ Directory not found. Please check your input and try again.'),
+                chalk.yellow('\n⚠ Work not found. Please check your input and try again.'),
             );
         } else {
             console.log(

@@ -9,7 +9,7 @@ import {
     SourceRepository,
     type RepositoryTarget,
     type WorksConfigSnapshot,
-} from '@src/entities/directory.entity';
+} from '@src/entities/work.entity';
 import { GeneratorFormSchemaService } from '@src/services/generator-form-schema.service';
 
 type ConflictResult = {
@@ -18,7 +18,7 @@ type ConflictResult = {
     suggestedSlug: string;
 };
 
-export type WorksConfigSourceRole = 'data' | 'directory';
+export type WorksConfigSourceRole = 'data' | 'work';
 
 export type WorksConfigSourceRepositoryOptions = {
     sourceUrl: string;
@@ -124,7 +124,7 @@ export class WorksConfigImportPlannerService {
             sourceTarget,
             options.worksConfig?.websiteRepositoryTarget,
         );
-        const sourceRole = options.sourceRole === undefined ? 'directory' : options.sourceRole;
+        const sourceRole = options.sourceRole === undefined ? 'work' : options.sourceRole;
 
         return {
             ...(options.previous || {
@@ -222,7 +222,7 @@ export class WorksConfigImportPlannerService {
 
         if (sameOwner && sameRepo) {
             throw new BadRequestException(
-                'works.yml website_repo must not point to the source directory repository',
+                'works.yml website_repo must not point to the source work repository',
             );
         }
     }

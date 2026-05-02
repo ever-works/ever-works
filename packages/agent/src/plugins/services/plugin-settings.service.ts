@@ -12,8 +12,8 @@ import isEqual from 'lodash/isEqual';
 import pickBy from 'lodash/pickBy';
 import { PluginRepository } from '../repositories/plugin.repository';
 import { UserPluginRepository } from '../repositories/user-plugin.repository';
-import { DirectoryPluginRepository } from '../repositories/directory-plugin.repository';
-import { DirectoryPluginEntity } from '../entities/directory-plugin.entity';
+import { WorkPluginRepository } from '../repositories/work-plugin.repository';
+import { WorkPluginEntity } from '../entities/work-plugin.entity';
 import { PluginRegistryService } from './plugin-registry.service';
 import { PluginEvents } from '../plugins.constants';
 import {
@@ -23,7 +23,7 @@ import {
 
 /** Placeholder for masked secrets in API responses */
 const MASKED_SECRET_PLACEHOLDER = '********';
-const DIRECTORY_DEFAULT_SHADOWS_NORMALIZED_AT = 'settingsDefaultShadowsNormalizedAt';
+const WORK_DEFAULT_SHADOWS_NORMALIZED_AT = 'settingsDefaultShadowsNormalizedAt';
 
 /**
  * Options for resolving settings
@@ -35,9 +35,9 @@ export interface SettingsResolutionOptions {
     scope?: SettingScope;
 
     /**
-     * Directory ID for directory-scoped settings
+     * Work ID for work-scoped settings
      */
-    directoryId?: string;
+    workId?: string;
 
     /**
      * User ID for user-scoped settings
@@ -62,7 +62,7 @@ export class PluginSettingsService {
         private readonly registry: PluginRegistryService,
         private readonly pluginRepository: PluginRepository,
         private readonly userPluginRepository: UserPluginRepository,
-        private readonly directoryPluginRepository: DirectoryPluginRepository,
+        private readonly workPluginRepository: WorkPluginRepository,
         private readonly eventEmitter: EventEmitter2,
         @Optional()
         private readonly settingsValidator?: SettingsSchemaValidatorService,
@@ -71,7 +71,7 @@ export class PluginSettingsService {
     /**
      * Get resolved settings for a plugin
      * Resolution priority (highest to lowest):
-     * 1. Directory settings
+     * 1. Work settings
      * 2. User settings
      * 3. Admin settings
      * 4. Environment variables
@@ -90,7 +90,7 @@ export class PluginSettingsService {
         const settingsSchema = plugin.settingsSchema;
         const configMode = this.getConfigurationMode(plugin);
 
-        // Enforce configurationMode: admin-only plugins ignore user/directory settings
+        // Enforce configurationMode: admin-only plugins ignore user/work settings
         const effectiveOptions = this.applyConfigurationMode(options, configMode);
 
         // Get settings from each level
@@ -111,17 +111,17 @@ export class PluginSettingsService {
             userSecrets = effectiveOptions?.includeSecrets ? userEntity?.secretSettings || {} : {};
         }
 
-        let directorySettings: Record<string, unknown> = {};
-        let directorySecrets: Record<string, unknown> = {};
-        let dirEntity: DirectoryPluginEntity | null = null;
+        let workSettings: Record<string, unknown> = {};
+        let workSecrets: Record<string, unknown> = {};
+        let dirEntity: WorkPluginEntity | null = null;
 
-        if (effectiveOptions?.directoryId && configMode !== 'admin-only') {
-            dirEntity = await this.directoryPluginRepository.findByDirectoryAndPlugin(
-                effectiveOptions.directoryId,
+        if (effectiveOptions?.workId && configMode !== 'admin-only') {
+            dirEntity = await this.workPluginRepository.findByWorkAndPlugin(
+                effectiveOptions.workId,
                 pluginId,
             );
-            directorySettings = dirEntity?.settings || {};
-            directorySecrets = effectiveOptions?.includeSecrets
+            workSettings = dirEntity?.settings || {};
+            workSecrets = effectiveOptions?.includeSecrets
                 ? dirEntity?.secretSettings || {}
                 : {};
         }
@@ -130,7 +130,7 @@ export class PluginSettingsService {
         const resolved: ResolvedSettings = {};
         const definitions = this.extractSettingDefinitions(settingsSchema);
         if (dirEntity) {
-            const normalized = await this.normalizeDirectoryDefaultShadows(
+            const normalized = await this.normalizeWorkDefaultShadows(
                 pluginId,
                 dirEntity,
                 definitions,
@@ -140,15 +140,15 @@ export class PluginSettingsService {
                 },
                 effectiveOptions,
             );
-            directorySettings = normalized.settings;
-            directorySecrets = effectiveOptions?.includeSecrets ? normalized.secretSettings : {};
+            workSettings = normalized.settings;
+            workSecrets = effectiveOptions?.includeSecrets ? normalized.secretSettings : {};
         }
 
         for (const def of definitions) {
             resolved[def.key] = this.resolveSetting(
                 def,
                 {
-                    directory: { ...directorySettings, ...directorySecrets },
+                    work: { ...workSettings, ...workSecrets },
                     user: { ...userSettings, ...userSecrets },
                     admin: { ...adminSettings, ...adminSecrets },
                 },
@@ -174,11 +174,11 @@ export class PluginSettingsService {
         configMode: string,
     ): SettingsResolutionOptions | undefined {
         if (configMode === 'admin-only') {
-            // Admin-only: ignore user/directory settings
+            // Admin-only: ignore user/work settings
             return {
                 ...options,
                 userId: undefined,
-                directoryId: undefined,
+                workId: undefined,
                 includeSecrets: false, // Never include secrets for non-admin reads
             };
         }
@@ -301,16 +301,16 @@ export class PluginSettingsService {
     }
 
     /**
-     * Update directory-level settings
+     * Update work-level settings
      */
-    async updateDirectorySettings(
+    async updateWorkSettings(
         pluginId: string,
-        directoryId: string,
+        workId: string,
         settings: Record<string, unknown>,
         options?: { secretKeys?: string[] },
     ): Promise<void> {
-        const existing = await this.directoryPluginRepository.findByDirectoryAndPlugin(
-            directoryId,
+        const existing = await this.workPluginRepository.findByWorkAndPlugin(
+            workId,
             pluginId,
         );
         const validationSettings = {
@@ -322,7 +322,7 @@ export class PluginSettingsService {
             await this.validateAndSeparateSettings(
                 pluginId,
                 settings,
-                'directory',
+                'work',
                 options,
                 validationSettings,
             );
@@ -333,15 +333,15 @@ export class PluginSettingsService {
         }
 
         if (existing) {
-            await this.directoryPluginRepository.updateSettings(
-                directoryId,
+            await this.workPluginRepository.updateSettings(
+                workId,
                 pluginId,
                 { ...existing.settings, ...regularSettings },
                 { ...existing.secretSettings, ...secretSettings },
             );
         } else {
-            await this.directoryPluginRepository.create({
-                directoryId,
+            await this.workPluginRepository.create({
+                workId,
                 pluginId,
                 pluginEntityId: pluginEntity.id,
                 settings: regularSettings,
@@ -352,13 +352,13 @@ export class PluginSettingsService {
         this.eventEmitter.emit(PluginEvents.SETTINGS_CHANGED, {
             pluginId,
             changedKeys: Object.keys(filteredSettings),
-            scope: 'directory',
-            directoryId,
+            scope: 'work',
+            workId,
             timestamp: Date.now(),
         });
 
         this.logger.debug(
-            `Updated directory settings for plugin ${pluginId}, directory ${directoryId}`,
+            `Updated work settings for plugin ${pluginId}, work ${workId}`,
         );
     }
 
@@ -386,7 +386,7 @@ export class PluginSettingsService {
         if (scope !== 'global') {
             const configMode = this.getConfigurationMode(registered.plugin);
             if (configMode === 'admin-only') {
-                const scopeLabel = scope === 'user' ? 'by users' : 'at directory level';
+                const scopeLabel = scope === 'user' ? 'by users' : 'at work level';
                 throw new Error(
                     `Plugin "${pluginId}" is admin-only and cannot be configured ${scopeLabel}`,
                 );
@@ -467,10 +467,10 @@ export class PluginSettingsService {
     }
 
     /**
-     * Delete directory settings for a plugin
+     * Delete work settings for a plugin
      */
-    async deleteDirectorySettings(pluginId: string, directoryId: string): Promise<boolean> {
-        return this.directoryPluginRepository.deleteByDirectoryAndPlugin(directoryId, pluginId);
+    async deleteWorkSettings(pluginId: string, workId: string): Promise<boolean> {
+        return this.workPluginRepository.deleteByWorkAndPlugin(workId, pluginId);
     }
 
     /**
@@ -522,7 +522,7 @@ export class PluginSettingsService {
     private resolveSetting(
         definition: SettingDefinition,
         sources: {
-            directory: Record<string, unknown>;
+            work: Record<string, unknown>;
             user: Record<string, unknown>;
             admin: Record<string, unknown>;
         },
@@ -530,17 +530,17 @@ export class PluginSettingsService {
     ): ResolvedSetting {
         const { key, envVar, defaultValue, scope: settingScope } = definition;
 
-        // Resolution order based on priority (directory > user > admin > env > default)
+        // Resolution order based on priority (work > user > admin > env > default)
         // isFallback indicates when a value comes from a scope that doesn't match the setting's intended scope
 
-        // 1. Directory settings (if directoryId provided)
-        if (options?.directoryId && sources.directory[key] !== undefined) {
+        // 1. Work settings (if workId provided)
+        if (options?.workId && sources.work[key] !== undefined) {
             return {
                 key,
-                value: sources.directory[key],
-                source: 'directory',
-                // Only non-fallback if setting is actually directory-scoped
-                isFallback: settingScope !== 'directory',
+                value: sources.work[key],
+                source: 'work',
+                // Only non-fallback if setting is actually work-scoped
+                isFallback: settingScope !== 'work',
             };
         }
 
@@ -563,7 +563,7 @@ export class PluginSettingsService {
                 key,
                 value: sources.user[key],
                 source: 'user',
-                // Only non-fallback if setting is user-scoped (directory-scoped should use directory)
+                // Only non-fallback if setting is user-scoped (work-scoped should use work)
                 isFallback: settingScope !== 'user',
             };
         }
@@ -598,9 +598,9 @@ export class PluginSettingsService {
         };
     }
 
-    private async normalizeDirectoryDefaultShadows(
+    private async normalizeWorkDefaultShadows(
         pluginId: string,
-        directoryPlugin: DirectoryPluginEntity,
+        workPlugin: WorkPluginEntity,
         definitions: SettingDefinition[],
         inheritedSources: {
             user: Record<string, unknown>;
@@ -608,11 +608,11 @@ export class PluginSettingsService {
         },
         options?: SettingsResolutionOptions,
     ): Promise<{ settings: Record<string, unknown>; secretSettings: Record<string, unknown> }> {
-        const settings = { ...(directoryPlugin.settings || {}) };
-        const secretSettings = { ...(directoryPlugin.secretSettings || {}) };
-        const metadata = directoryPlugin.metadata || {};
+        const settings = { ...(workPlugin.settings || {}) };
+        const secretSettings = { ...(workPlugin.secretSettings || {}) };
+        const metadata = workPlugin.metadata || {};
 
-        if (metadata[DIRECTORY_DEFAULT_SHADOWS_NORMALIZED_AT]) {
+        if (metadata[WORK_DEFAULT_SHADOWS_NORMALIZED_AT]) {
             return { settings, secretSettings };
         }
 
@@ -621,10 +621,10 @@ export class PluginSettingsService {
             const key = definition.key;
             const hasSetting = settings[key] !== undefined;
             const hasSecret = secretSettings[key] !== undefined;
-            const directoryValue = hasSecret ? secretSettings[key] : settings[key];
+            const workValue = hasSecret ? secretSettings[key] : settings[key];
             if (!hasSetting && !hasSecret) continue;
             if (definition.defaultValue === undefined) continue;
-            if (!isEqual(directoryValue, definition.defaultValue)) continue;
+            if (!isEqual(workValue, definition.defaultValue)) continue;
 
             const inheritedSetting = this.resolveInheritedSetting(
                 definition,
@@ -632,7 +632,7 @@ export class PluginSettingsService {
                 options,
             );
             if (inheritedSetting.source === 'default') continue;
-            if (isEqual(inheritedSetting.value, directoryValue)) continue;
+            if (isEqual(inheritedSetting.value, workValue)) continue;
 
             delete settings[key];
             delete secretSettings[key];
@@ -641,11 +641,11 @@ export class PluginSettingsService {
 
         const normalizedMetadata = {
             ...metadata,
-            [DIRECTORY_DEFAULT_SHADOWS_NORMALIZED_AT]: new Date().toISOString(),
+            [WORK_DEFAULT_SHADOWS_NORMALIZED_AT]: new Date().toISOString(),
         };
 
-        await this.directoryPluginRepository.updateByDirectoryAndPlugin(
-            directoryPlugin.directoryId,
+        await this.workPluginRepository.updateByWorkAndPlugin(
+            workPlugin.workId,
             pluginId,
             changed
                 ? { settings, secretSettings, metadata: normalizedMetadata }
@@ -660,13 +660,13 @@ export class PluginSettingsService {
      * Throws BadRequestException if scope requires an ID that is missing.
      *
      * @param scope - The scope being requested
-     * @param directoryId - Directory ID (required when scope='directory')
+     * @param workId - Work ID (required when scope='work')
      * @param userId - User ID (required when scope='user')
      * @throws BadRequestException if scope/ID mismatch
      */
-    validateScopeRequirements(scope: SettingScope, directoryId?: string, userId?: string): void {
-        if (scope === 'directory' && !directoryId) {
-            throw new BadRequestException('directoryId required for directory scope');
+    validateScopeRequirements(scope: SettingScope, workId?: string, userId?: string): void {
+        if (scope === 'work' && !workId) {
+            throw new BadRequestException('workId required for work scope');
         }
         if (scope === 'user' && !userId) {
             throw new BadRequestException('userId required for user scope');
@@ -735,7 +735,7 @@ export class PluginSettingsService {
     /**
      * Validate that settings can be updated at the given scope.
      * Settings with a specific x-scope can only be updated at that scope or higher.
-     * Hierarchy: global < user < directory
+     * Hierarchy: global < user < work
      *
      * @param definitions - Setting definitions from the schema
      * @param settingsKeys - Keys of settings being updated
@@ -758,11 +758,11 @@ export class PluginSettingsService {
 
             // Check if the update scope matches or is more specific than the setting scope
             // global settings can be set at any level
-            // user settings can be set at user or directory level
-            // directory settings can only be set at directory level
-            if (settingScope === 'directory' && updateScope !== 'directory') {
+            // user settings can be set at user or work level
+            // work settings can only be set at work level
+            if (settingScope === 'work' && updateScope !== 'work') {
                 violations.push(
-                    `Setting "${key}" has scope "directory" and cannot be updated at "${updateScope}" level`,
+                    `Setting "${key}" has scope "work" and cannot be updated at "${updateScope}" level`,
                 );
             } else if (settingScope === 'user' && updateScope === 'global') {
                 violations.push(
@@ -783,21 +783,21 @@ export class PluginSettingsService {
      * This method filters the plugin's settings schema to only include
      * properties that are appropriate for the given context:
      * - 'user' context: shows global + user scoped settings
-     * - 'directory' context: shows global + directory scoped settings
+     * - 'work' context: shows global + work scoped settings
      *
      * @param pluginId - Plugin ID
-     * @param context - 'user' shows global+user, 'directory' shows global+directory
+     * @param context - 'user' shows global+user, 'work' shows global+work
      * @returns Filtered schema or undefined if plugin not found
      */
     getSettingsSchemaForContext(
         pluginId: string,
-        context: 'user' | 'directory',
+        context: 'user' | 'work',
     ): JsonSchema | undefined {
         const schema = this.getSettingsSchema(pluginId);
         if (!schema?.properties) return schema;
 
         const allowedScopes: SettingScope[] =
-            context === 'user' ? ['global', 'user'] : ['global', 'directory'];
+            context === 'user' ? ['global', 'user'] : ['global', 'work'];
 
         const filteredProperties = pickBy(schema.properties, (prop) => {
             const propScope =

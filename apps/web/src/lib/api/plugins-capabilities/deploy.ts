@@ -110,10 +110,10 @@ export const deployAPI = {
         );
     },
 
-    // Deploy directory to its configured provider
-    deploy: async (directoryId: string, data: DeployWebsiteDto) => {
+    // Deploy work to its configured provider
+    deploy: async (workId: string, data: DeployWebsiteDto) => {
         return serverMutation<DeployWebsiteResponseDto>({
-            endpoint: `/deploy/directories/${directoryId}`,
+            endpoint: `/deploy/works/${workId}`,
             data: { teamScope: data.teamScope },
             method: 'POST',
             wrapInData: false,
@@ -130,7 +130,7 @@ export const deployAPI = {
         });
     },
 
-    // Get deployment teams (requires directory context for token)
+    // Get deployment teams (requires work context for token)
     getDeploymentTeams() {
         return serverMutation<DeploymentTeamResponse>({
             endpoint: '/deploy/teams',
@@ -140,19 +140,19 @@ export const deployAPI = {
         });
     },
 
-    // Get teams for a specific directory
-    getTeamsForDirectory(directoryId: string) {
+    // Get teams for a specific work
+    getTeamsForWork(workId: string) {
         return serverMutation<DeploymentTeamResponse>({
-            endpoint: `/deploy/directories/${directoryId}/teams`,
+            endpoint: `/deploy/works/${workId}/teams`,
             data: {},
             method: 'POST',
             wrapInData: false,
         });
     },
 
-    lookupExistingDeployment(directoryId: string, data?: DeployWebsiteDto) {
+    lookupExistingDeployment(workId: string, data?: DeployWebsiteDto) {
         return serverMutation<LookupDeploymentResponseDto>({
-            endpoint: `/deploy/directories/${directoryId}/lookup`,
+            endpoint: `/deploy/works/${workId}/lookup`,
             data: data ? { teamScope: data.teamScope } : {},
             method: 'POST',
             wrapInData: false,
@@ -160,11 +160,11 @@ export const deployAPI = {
     },
 
     /**
-     * Check if deployment is possible for a directory.
+     * Check if deployment is possible for a work.
      */
-    checkDeploymentCapability(directoryId: string) {
+    checkDeploymentCapability(workId: string) {
         return serverMutation<DeploymentCapabilityResponseDto>({
-            endpoint: `/deploy/directories/${directoryId}/check`,
+            endpoint: `/deploy/works/${workId}/check`,
             data: {},
             method: 'POST',
             wrapInData: false,
@@ -172,18 +172,18 @@ export const deployAPI = {
     },
 
     /**
-     * Get domains for a deployed directory
+     * Get domains for a deployed work
      */
-    getDomains(directoryId: string) {
-        return serverFetch<DomainsResponseDto>(`/deploy/directories/${directoryId}/domains`);
+    getDomains(workId: string) {
+        return serverFetch<DomainsResponseDto>(`/deploy/works/${workId}/domains`);
     },
 
     /**
-     * Add a domain to a deployed directory
+     * Add a domain to a deployed work
      */
-    addDomain(directoryId: string, domain: string) {
+    addDomain(workId: string, domain: string) {
         return serverMutation<AddDomainResponseDto>({
-            endpoint: `/deploy/directories/${directoryId}/domains`,
+            endpoint: `/deploy/works/${workId}/domains`,
             data: { domain },
             method: 'POST',
             wrapInData: false,
@@ -191,11 +191,11 @@ export const deployAPI = {
     },
 
     /**
-     * Remove a domain from a deployed directory
+     * Remove a domain from a deployed work
      */
-    removeDomain(directoryId: string, domain: string) {
+    removeDomain(workId: string, domain: string) {
         return serverMutation<RemoveDomainResponseDto>({
-            endpoint: `/deploy/directories/${encodeURIComponent(directoryId)}/domains/${encodeURIComponent(domain)}`,
+            endpoint: `/deploy/works/${encodeURIComponent(workId)}/domains/${encodeURIComponent(domain)}`,
             data: {},
             method: 'DELETE',
             wrapInData: false,
@@ -203,11 +203,11 @@ export const deployAPI = {
     },
 
     /**
-     * Verify a domain on a deployed directory
+     * Verify a domain on a deployed work
      */
-    verifyDomain(directoryId: string, domain: string) {
+    verifyDomain(workId: string, domain: string) {
         return serverMutation<VerifyDomainResponseDto>({
-            endpoint: `/deploy/directories/${directoryId}/domains/${encodeURIComponent(domain)}/verify`,
+            endpoint: `/deploy/works/${workId}/domains/${encodeURIComponent(domain)}/verify`,
             data: {},
             method: 'POST',
             wrapInData: false,

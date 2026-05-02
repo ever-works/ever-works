@@ -131,7 +131,7 @@ export async function processModification(
  * Default template for the modification worker system prompt.
  * Variables: {date}, {itemSchemaText}
  */
-export const DEFAULT_MODIFICATION_SYSTEM_PROMPT = `You are a directory item modifier. Today is {date}.
+export const DEFAULT_MODIFICATION_SYSTEM_PROMPT = `You are a work item modifier. Today is {date}.
 
 ## Tools
 - \`bash\` — Run targeted search commands to find items. NEVER \`ls *.json\` — workspaces can have thousands of files.

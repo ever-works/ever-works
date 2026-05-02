@@ -5,7 +5,7 @@ import { AuthUser } from '@/lib/auth';
 import { cn } from '@/lib/utils/cn';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { NotificationDropdown } from './NotificationDropdown';
-import { DirectorySwitcher } from './DirectorySwitcher';
+import { WorkSwitcher } from './WorkSwitcher';
 import { Tooltip } from '@/components/ui/tooltip';
 import { Menu, HelpCircle, Sparkles, X } from 'lucide-react';
 
@@ -60,7 +60,7 @@ export function DashboardHeader({
                             </Tooltip>
                         )}
 
-                        <DirectorySwitcher />
+                        <WorkSwitcher />
 
                         {onboardingBadge && (
                             <div className="flex max-w-[170px] items-center overflow-hidden rounded-full border border-border bg-surface-secondary/70 text-xs text-text-secondary shadow-sm dark:border-border-dark dark:bg-surface-secondary-dark/60 dark:text-text-secondary-dark sm:max-w-none">

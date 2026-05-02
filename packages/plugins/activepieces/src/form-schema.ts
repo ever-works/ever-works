@@ -48,7 +48,7 @@ export function getFormFields(): FormFieldDefinition[] {
 			name: 'pass_existing_items',
 			type: 'boolean',
 			label: 'Pass Existing Items Summary',
-			description: 'Include a summary of existing directory items in flow input for deduplication',
+			description: 'Include a summary of existing work items in flow input for deduplication',
 			defaultValue: true,
 			group: 'data'
 		},
@@ -57,7 +57,7 @@ export function getFormFields(): FormFieldDefinition[] {
 			type: 'boolean',
 			label: 'Pass Data Repository Access',
 			description:
-				'Grant the Activepieces flow read access to the directory data repository. ' +
+				'Grant the Activepieces flow read access to the work data repository. ' +
 				'⚠ The repository URL and access token are sent in the webhook payload and become ' +
 				'visible to every step of your flow and to the Activepieces run logs.',
 			defaultValue: false,
@@ -67,7 +67,7 @@ export function getFormFields(): FormFieldDefinition[] {
 			name: 'repo_url',
 			type: 'text',
 			label: 'Data Repository URL',
-			description: 'GitHub repository URL containing directory data',
+			description: 'GitHub repository URL containing work data',
 			placeholder: 'e.g., https://github.com/org/repo',
 			group: 'data',
 			showIf: REPO_ACCESS_CONDITION,

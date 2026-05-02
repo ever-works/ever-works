@@ -11,11 +11,11 @@ export async function POST(request: Request) {
         return new Response('Unauthorized', { status: 401 });
     }
 
-    const { messages, providerOverride, directoryId, conversationId, currentPageUrl } =
+    const { messages, providerOverride, workId, conversationId, currentPageUrl } =
         (await request.json()) as {
             messages: UIMessage[];
             providerOverride: string;
-            directoryId?: string;
+            workId?: string;
             conversationId?: string;
             currentPageUrl?: string;
         };
@@ -32,7 +32,7 @@ export async function POST(request: Request) {
         messages,
         authToken: token,
         providerOverride,
-        directoryId,
+        workId,
         conversationId,
         currentPageUrl,
         onFinish: ({ usage, response }) => {

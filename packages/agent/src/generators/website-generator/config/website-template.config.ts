@@ -16,9 +16,9 @@ export interface WebsiteTemplateConfig {
 const CLASSIC_WEBSITE_TEMPLATE: WebsiteTemplateConfig = {
     id: 'classic',
     name: 'Classic',
-    description: 'The original Ever Works directory website template.',
+    description: 'The original Ever Works work website template.',
     owner: 'ever-works',
-    repo: 'directory-web-template',
+    repo: 'work-web-template',
     branch: 'main',
     syncBranches: ['main', 'stage', 'develop'],
     betaBranch: config.websiteTemplate.getBetaBranch(),
@@ -33,7 +33,7 @@ const createMinimalWebsiteTemplate = (): WebsiteTemplateConfig | null => {
     return {
         id: 'minimal',
         name: 'Minimal',
-        description: 'A more minimalistic Ever Works directory website template.',
+        description: 'A more minimalistic Ever Works work website template.',
         owner: config.websiteTemplate.getMinimalOwner(),
         repo,
         branch: config.websiteTemplate.getMinimalBranch(),

@@ -6,7 +6,7 @@ describe('activity log summary', () => {
             formatStoredActivitySummary({
                 actionType: 'generation',
                 status: 'completed',
-                summary: 'Generated 0 items for Example Directory',
+                summary: 'Generated 0 items for Example Work',
                 details: {
                     newItemsCount: 13,
                     updatedItemsCount: 55,
@@ -34,14 +34,14 @@ describe('activity log summary', () => {
             formatStoredActivitySummary({
                 actionType: 'generation',
                 status: 'failed',
-                summary: 'Generation failed for Example Directory',
+                summary: 'Generation failed for Example Work',
                 details: {
                     newItemsCount: 13,
                     updatedItemsCount: 55,
                     totalItemsCount: 4412,
                 },
             }),
-        ).toBe('Generation failed for Example Directory');
+        ).toBe('Generation failed for Example Work');
     });
 
     it('formats generation counts directly', () => {

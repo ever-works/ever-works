@@ -12,7 +12,7 @@ import type {
 	PipelineExecutionOptions,
 	PipelineProgressCallback,
 	PipelineResult,
-	DirectoryReference,
+	WorkReference,
 	GenerationRequest,
 	ExistingItems,
 	PluginManifest,
@@ -52,7 +52,7 @@ import { README } from './readme.js';
 /**
  * Activepieces Automation Plugin
  *
- * Pipeline plugin that delegates directory generation to Activepieces flows.
+ * Pipeline plugin that delegates work generation to Activepieces flows.
  * Activepieces is the AI-first, open-source automation platform — this plugin
  * triggers a flow webhook at the execute stage and collects structured items
  * from its Return Response action.
@@ -176,7 +176,7 @@ export class ActivepiecesPlugin implements IPlugin, IPipelinePlugin, IFormSchema
 			id: this.id,
 			name: this.name,
 			version: this.version,
-			description: 'Pipeline plugin that delegates directory generation steps to Activepieces flows',
+			description: 'Pipeline plugin that delegates work generation steps to Activepieces flows',
 			category: this.category,
 			capabilities: [...this.capabilities],
 			author: { name: 'Ever Works Team' },
@@ -190,7 +190,7 @@ export class ActivepiecesPlugin implements IPlugin, IPipelinePlugin, IFormSchema
 				onboardingPriority: 3,
 				completionFields: ['apiKey', 'defaultFlowId'],
 				onboardingDescription:
-					'Connect Activepieces to delegate directory generation steps to AI-first automation flows.'
+					'Connect Activepieces to delegate work generation steps to AI-first automation flows.'
 			},
 			readme: README,
 			homepage: 'https://www.activepieces.com/docs/endpoints/overview',
@@ -229,7 +229,7 @@ export class ActivepiecesPlugin implements IPlugin, IPipelinePlugin, IFormSchema
 	private _lastAbortController: AbortController | null = null;
 
 	async execute(
-		directory: DirectoryReference,
+		work: WorkReference,
 		request: GenerationRequest,
 		existing: ExistingItems,
 		options?: PipelineExecutionOptions,
@@ -270,14 +270,14 @@ export class ActivepiecesPlugin implements IPlugin, IPipelinePlugin, IFormSchema
 		};
 
 		const logger = this.context?.logger ?? console;
-		const userId = directory.user?.id;
+		const userId = work.user?.id;
 
 		if (!userId) {
 			return handleError(new Error('User ID is required'));
 		}
 
 		try {
-			const pluginSettings = await resolveSettings(this.context, userId, directory.id);
+			const pluginSettings = await resolveSettings(this.context, userId, work.id);
 			const config = (request.config || {}) as Record<string, unknown>;
 
 			const apSettings = this.resolveApSettings(pluginSettings, config);
@@ -310,7 +310,7 @@ export class ActivepiecesPlugin implements IPlugin, IPipelinePlugin, IFormSchema
 			setState('prepare-payload', 'running');
 			reportProgress(onProgress, 1, 10, 'Prepare Flow Payload');
 
-			const payload = buildFlowPayload({ directory, request, existing, config });
+			const payload = buildFlowPayload({ work, request, existing, config });
 
 			logger.log(
 				`Payload prepared: ${payload.metadata.targetItems} target items, ` +
@@ -404,7 +404,7 @@ export class ActivepiecesPlugin implements IPlugin, IPipelinePlugin, IFormSchema
 				request,
 				options?.execContext,
 				items,
-				{ userId, directoryId: directory.id },
+				{ userId, workId: work.id },
 				signal,
 				onProgress,
 				logger

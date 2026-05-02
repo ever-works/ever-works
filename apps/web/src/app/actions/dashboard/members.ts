@@ -1,24 +1,24 @@
 'use server';
 
-import { membersAPI, DirectoryMember, AssignableMemberRole } from '@/lib/api';
+import { membersAPI, WorkMember, AssignableMemberRole } from '@/lib/api';
 import { revalidatePath } from 'next/cache';
 
 interface ActionResult {
     status: 'success' | 'error';
     message?: string;
-    member?: DirectoryMember;
+    member?: WorkMember;
 }
 
 export async function inviteMember(
-    directoryId: string,
+    workId: string,
     email: string,
     role: AssignableMemberRole,
 ): Promise<ActionResult> {
     try {
-        const result = await membersAPI.invite(directoryId, { email, role });
+        const result = await membersAPI.invite(workId, { email, role });
 
         if (result.status === 'success') {
-            revalidatePath(`/directories/${directoryId}/members`);
+            revalidatePath(`/works/${workId}/members`);
             return { status: 'success', member: result.member };
         }
 
@@ -32,15 +32,15 @@ export async function inviteMember(
 }
 
 export async function updateMemberRole(
-    directoryId: string,
+    workId: string,
     memberId: string,
     role: AssignableMemberRole,
 ): Promise<ActionResult> {
     try {
-        const result = await membersAPI.updateRole(directoryId, memberId, { role });
+        const result = await membersAPI.updateRole(workId, memberId, { role });
 
         if (result.status === 'success') {
-            revalidatePath(`/directories/${directoryId}/members`);
+            revalidatePath(`/works/${workId}/members`);
             return { status: 'success', member: result.member };
         }
 
@@ -53,12 +53,12 @@ export async function updateMemberRole(
     }
 }
 
-export async function removeMember(directoryId: string, memberId: string): Promise<ActionResult> {
+export async function removeMember(workId: string, memberId: string): Promise<ActionResult> {
     try {
-        const result = await membersAPI.remove(directoryId, memberId);
+        const result = await membersAPI.remove(workId, memberId);
 
         if (result.status === 'success') {
-            revalidatePath(`/directories/${directoryId}/members`);
+            revalidatePath(`/works/${workId}/members`);
             return { status: 'success' };
         }
 
@@ -71,20 +71,20 @@ export async function removeMember(directoryId: string, memberId: string): Promi
     }
 }
 
-export async function leaveDirectory(directoryId: string): Promise<ActionResult> {
+export async function leaveWork(workId: string): Promise<ActionResult> {
     try {
-        const result = await membersAPI.leave(directoryId);
+        const result = await membersAPI.leave(workId);
 
         if (result.status === 'success') {
-            revalidatePath('/directories');
+            revalidatePath('/works');
             return { status: 'success' };
         }
 
-        return { status: 'error', message: 'Failed to leave directory' };
+        return { status: 'error', message: 'Failed to leave work' };
     } catch (error: any) {
         return {
             status: 'error',
-            message: error?.message || 'Failed to leave directory',
+            message: error?.message || 'Failed to leave work',
         };
     }
 }

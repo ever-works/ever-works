@@ -25,8 +25,8 @@ describe('db.utils', () => {
 
     describe('buildCaseInsensitiveLikeClause', () => {
         it('includes an explicit ESCAPE clause for portable LIKE behavior', () => {
-            expect(buildCaseInsensitiveLikeClause('directory.name')).toBe(
-                "LOWER(directory.name) LIKE :search ESCAPE '\\'",
+            expect(buildCaseInsensitiveLikeClause('work.name')).toBe(
+                "LOWER(work.name) LIKE :search ESCAPE '\\'",
             );
         });
     });

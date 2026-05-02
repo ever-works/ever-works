@@ -28,8 +28,8 @@ interface UsePluginSettingsOptions {
      *  These are NOT saved — only used by getFieldValue for display purposes. */
     fallbackSettings?: Record<string, unknown>;
     /** Identifies validation context: 'user' scope requires all required fields,
-     *  'directory' scope allows inheritance from fallbackSettings */
-    scope: 'user' | 'directory';
+     *  'work' scope allows inheritance from fallbackSettings */
+    scope: 'user' | 'work';
 }
 
 /** Stable empty object to avoid re-renders when initialSettings is undefined */

@@ -40,7 +40,7 @@ export class JitsuService implements ActivityLogAnalyticsDispatcher {
             ...metadata,
             activityId: activity.id,
             userId: activity.userId,
-            directoryId: activity.directoryId ?? undefined,
+            workId: activity.workId ?? undefined,
             actionType: activity.actionType,
             action: activity.action,
             status: activity.status,

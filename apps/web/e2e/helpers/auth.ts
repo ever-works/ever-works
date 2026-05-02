@@ -18,7 +18,7 @@ export async function registerViaUI(
     await page.locator('button[type="submit"]').click();
 
     // Wait for redirect to dashboard
-    await page.waitForURL(/\/(en\/)?(directories|$)/, { timeout: 15_000 });
+    await page.waitForURL(/\/(en\/)?(works|$)/, { timeout: 15_000 });
 }
 
 /**
@@ -33,7 +33,7 @@ export async function loginViaUI(page: Page, credentials: { email: string; passw
     await page.locator('button[type="submit"]').click();
 
     // Wait for redirect to dashboard
-    await page.waitForURL(/\/(en\/)?(directories|$)/, { timeout: 15_000 });
+    await page.waitForURL(/\/(en\/)?(works|$)/, { timeout: 15_000 });
 }
 
 /**

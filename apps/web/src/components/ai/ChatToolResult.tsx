@@ -33,19 +33,19 @@ interface NavigateOutput {
     navigated?: boolean;
 }
 
-interface DirectoryListOutput {
-    directories?: Array<{ id: string; name: string; itemsCount: number; url: string }>;
+interface WorkListOutput {
+    works?: Array<{ id: string; name: string; itemsCount: number; url: string }>;
     total?: number;
 }
 
-interface DirectoryDetailOutput {
+interface WorkDetailOutput {
     name?: string;
     description?: string;
     url?: string;
 }
 
 interface StatsOutput {
-    totalDirectories?: number;
+    totalWorks?: number;
     totalItems?: number;
     activeWebsites?: number;
 }
@@ -88,31 +88,31 @@ interface GenericToolOutput {
 const executedToolActions = new Set<string>();
 
 const LABELS: Record<string, string> = {
-    listDirectories: 'Fetching works',
-    getDirectoryDetails: 'Loading work',
+    listWorks: 'Fetching works',
+    getWorkDetails: 'Loading work',
     getStats: 'Loading stats',
-    getDirectoryItemsSummary: 'Loading items summary',
-    getDirectoryConfig: 'Loading config',
+    getWorkItemsSummary: 'Loading items summary',
+    getWorkConfig: 'Loading config',
     getGenerationHistory: 'Loading history',
     getScheduleStatus: 'Checking schedule',
-    syncDirectory: 'Syncing work',
+    syncWork: 'Syncing work',
     checkGitConnection: 'Checking git',
     checkDeployConnection: 'Checking deploy',
     listGitProviders: 'Checking providers',
     listAvailablePipelines: 'Loading pipelines',
-    createDirectoryManual: 'Creating work',
-    createDirectoryWithAI: 'Creating work with AI',
-    importDirectory: 'Importing work',
+    createWorkManual: 'Creating work',
+    createWorkWithAI: 'Creating work with AI',
+    importWork: 'Importing work',
     analyzeImportSource: 'Analyzing repository',
-    updateDirectory: 'Updating work',
-    deleteDirectory: 'Deleting work',
+    updateWork: 'Updating work',
+    deleteWork: 'Deleting work',
     addItem: 'Adding item',
     removeItem: 'Removing item',
     updateItem: 'Updating item',
     generateItems: 'Starting generation',
     checkItemHealth: 'Checking item health',
     regenerateMarkdown: 'Regenerating markdown',
-    deployDirectory: 'Deploying',
+    deployWork: 'Deploying',
     checkDeploymentStatus: 'Checking deployment',
     listDomains: 'Loading domains',
     setSchedule: 'Updating schedule',
@@ -120,7 +120,7 @@ const LABELS: Record<string, string> = {
     cancelSchedule: 'Cancelling schedule',
     webSearch: 'Searching the web',
     getUserInfo: 'Loading user profile',
-    suggestDirectories: 'Researching ideas for new works',
+    suggestWorks: 'Researching ideas for new works',
     navigate: 'Navigating',
     reloadPage: 'Refreshing',
 };
@@ -211,11 +211,11 @@ export function ChatToolResult({
     }
 
     switch (toolName) {
-        case 'listDirectories':
-            return <DirectoryList output={output} />;
-        case 'getDirectoryDetails':
-            return <DirectoryDetail output={output} />;
-        case 'getDirectoryStats':
+        case 'listWorks':
+            return <WorkList output={output} />;
+        case 'getWorkDetails':
+            return <WorkDetail output={output} />;
+        case 'getWorkStats':
             return <Stats output={output} />;
         case 'checkGitConnection':
             return <GitConnection output={output} />;
@@ -252,13 +252,13 @@ export function ChatToolResult({
 // Result renderers
 // ────────────────────────────────────────────────────────────────
 
-function DirectoryList({ output }: { output: unknown }) {
-    const data = output as DirectoryListOutput;
-    if (!data?.directories?.length) return null;
+function WorkList({ output }: { output: unknown }) {
+    const data = output as WorkListOutput;
+    if (!data?.works?.length) return null;
 
     return (
         <div className="mt-1 space-y-0.5">
-            {data.directories.map((dir) => (
+            {data.works.map((dir) => (
                 <Link
                     key={dir.id}
                     href={dir.url}
@@ -280,8 +280,8 @@ function DirectoryList({ output }: { output: unknown }) {
     );
 }
 
-function DirectoryDetail({ output }: { output: unknown }) {
-    const data = output as DirectoryDetailOutput;
+function WorkDetail({ output }: { output: unknown }) {
+    const data = output as WorkDetailOutput;
     if (!data?.name || !data.url) return null;
 
     return (
@@ -307,7 +307,7 @@ function Stats({ output }: { output: unknown }) {
     return (
         <div className="flex gap-2 mt-1">
             {[
-                { label: 'Directories', value: data.totalDirectories ?? 0 },
+                { label: 'Works', value: data.totalWorks ?? 0 },
                 { label: 'Items', value: data.totalItems ?? 0 },
                 { label: 'Websites', value: data.activeWebsites ?? 0 },
             ].map((s) => (

@@ -307,7 +307,7 @@ export class BrightDataPlugin implements IPlugin, ISearchPlugin, IContentExtract
 				'',
 				'## How it works in Ever Works',
 				'',
-				'Bright Data serves dual purposes: the SERP API finds relevant information about directory items, while the Web Scraper extracts content from web pages. Its bot-detection bypass makes it effective for sites that block standard requests.',
+				'Bright Data serves dual purposes: the SERP API finds relevant information about work items, while the Web Scraper extracts content from web pages. Its bot-detection bypass makes it effective for sites that block standard requests.',
 				'',
 				'## Getting started',
 				'',

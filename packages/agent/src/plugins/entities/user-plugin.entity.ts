@@ -53,10 +53,10 @@ export class UserPluginEntity {
 
     /**
      * When true, this plugin is automatically considered enabled for all
-     * directories owned by this user, unless explicitly disabled per directory.
+     * works owned by this user, unless explicitly disabled per work.
      */
     @Column({ default: false })
-    autoEnableForDirectories: boolean;
+    autoEnableForWorks: boolean;
 
     /**
      * User-specific settings that override admin defaults

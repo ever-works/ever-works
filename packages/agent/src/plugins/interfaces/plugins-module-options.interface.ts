@@ -58,12 +58,12 @@ export interface PluginsModuleOptions {
     environment?: 'development' | 'production' | 'test';
 
     /**
-     * Temporary directory for plugin operations
+     * Temporary work for plugin operations
      */
     tempDir?: string;
 
     /**
-     * Data directory for plugin storage
+     * Data work for plugin storage
      */
     dataDir?: string;
 

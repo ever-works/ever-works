@@ -1,6 +1,6 @@
 import { IsBoolean, IsEnum, IsOptional } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { DirectoryScheduleCadence } from '@src/entities/types';
+import { WorkScheduleCadence } from '@src/entities/types';
 import type { UpdateSourceValidationPayload } from '@ever-works/contracts/api';
 
 export class UpdateSourceValidationDto implements UpdateSourceValidationPayload {
@@ -10,9 +10,9 @@ export class UpdateSourceValidationDto implements UpdateSourceValidationPayload 
 
     @ApiPropertyOptional({
         description: 'How often to run source validation',
-        enum: DirectoryScheduleCadence,
+        enum: WorkScheduleCadence,
     })
     @IsOptional()
-    @IsEnum(DirectoryScheduleCadence)
-    cadence?: DirectoryScheduleCadence;
+    @IsEnum(WorkScheduleCadence)
+    cadence?: WorkScheduleCadence;
 }

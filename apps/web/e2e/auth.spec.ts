@@ -35,7 +35,7 @@ test.describe('Registration', () => {
         await page.locator('button[type="submit"]').click();
 
         // Should redirect to dashboard
-        await page.waitForURL(/\/(en\/)?(directories|$)/, { timeout: 15_000 });
+        await page.waitForURL(/\/(en\/)?(works|$)/, { timeout: 15_000 });
         await expect(page).not.toHaveURL(/\/register/);
     });
 

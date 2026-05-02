@@ -1,6 +1,6 @@
 'use server';
 
-import { directoryAPI, websiteAPI, deployAPI } from '@/lib/api';
+import { workAPI, websiteAPI, deployAPI } from '@/lib/api';
 import { getAuthFromCookie } from '@/lib/auth';
 import { redirect } from 'next/navigation';
 import { ROUTES } from '@/lib/constants';
@@ -8,33 +8,33 @@ import { getTranslations } from 'next-intl/server';
 import { checkGitProviderConnection } from './oauth';
 import { revalidatePath } from 'next/cache';
 
-export async function deploy(directoryId: string, teamScope?: string) {
+export async function deploy(workId: string, teamScope?: string) {
     const user = await getAuthFromCookie();
     if (!user) {
         redirect(ROUTES.AUTH_LOGIN);
     }
 
     const t = await getTranslations('actions.deploy');
-    const tDirectories = await getTranslations('actions.works');
+    const tWorks = await getTranslations('actions.works');
 
     try {
-        const { directory } = await directoryAPI.get(directoryId);
+        const { work } = await workAPI.get(workId);
 
         // Check git provider connection
-        const connectionCheck = await checkGitProviderConnection(directory.gitProvider);
+        const connectionCheck = await checkGitProviderConnection(work.gitProvider);
         if (!connectionCheck.connected) {
             return {
                 success: false,
-                error: tDirectories('oauthRequired', { provider: directory.gitProvider }),
+                error: tWorks('oauthRequired', { provider: work.gitProvider }),
                 requiresGitProvider: true,
             };
         }
 
-        const response = await deployAPI.deploy(directoryId, {
+        const response = await deployAPI.deploy(workId, {
             teamScope,
         });
 
-        revalidatePath(ROUTES.DASHBOARD_DIRECTORY_DEPLOY(directoryId));
+        revalidatePath(ROUTES.DASHBOARD_WORK_DEPLOY(workId));
 
         return {
             success: response.status === 'success' || response.status === 'pending',
@@ -51,7 +51,7 @@ export async function deploy(directoryId: string, teamScope?: string) {
     }
 }
 
-export async function updateWebsiteRepository(directoryId: string) {
+export async function updateWebsiteRepository(workId: string) {
     const user = await getAuthFromCookie();
     if (!user) {
         redirect(ROUTES.AUTH_LOGIN);
@@ -60,7 +60,7 @@ export async function updateWebsiteRepository(directoryId: string) {
     const t = await getTranslations('actions.deploy');
 
     try {
-        const response = await websiteAPI.updateRepository(directoryId);
+        const response = await websiteAPI.updateRepository(workId);
         return {
             success: response.status === 'success',
             data: response,
@@ -76,7 +76,7 @@ export async function updateWebsiteRepository(directoryId: string) {
     }
 }
 
-export async function switchWebsiteTemplate(directoryId: string, websiteTemplateId: string) {
+export async function switchWebsiteTemplate(workId: string, websiteTemplateId: string) {
     const user = await getAuthFromCookie();
     if (!user) {
         redirect(ROUTES.AUTH_LOGIN);
@@ -85,8 +85,8 @@ export async function switchWebsiteTemplate(directoryId: string, websiteTemplate
     const t = await getTranslations('actions.deploy');
 
     try {
-        const response = await websiteAPI.switchTemplate(directoryId, websiteTemplateId);
-        revalidatePath(ROUTES.DASHBOARD_DIRECTORY_DEPLOY(directoryId));
+        const response = await websiteAPI.switchTemplate(workId, websiteTemplateId);
+        revalidatePath(ROUTES.DASHBOARD_WORK_DEPLOY(workId));
 
         return {
             success: response.status === 'success',
@@ -103,17 +103,17 @@ export async function switchWebsiteTemplate(directoryId: string, websiteTemplate
     }
 }
 
-export async function getDeploymentTeams(directoryId?: string) {
+export async function getDeploymentTeams(workId?: string) {
     const user = await getAuthFromCookie();
     if (!user) {
         redirect(ROUTES.AUTH_LOGIN);
     }
 
     try {
-        // If directoryId is provided, use the directory-specific endpoint
+        // If workId is provided, use the work-specific endpoint
         // which retrieves the token from plugin settings
-        const response = directoryId
-            ? await deployAPI.getTeamsForDirectory(directoryId)
+        const response = workId
+            ? await deployAPI.getTeamsForWork(workId)
             : await deployAPI.getDeploymentTeams();
         return {
             success: response.status === 'success',
@@ -129,18 +129,18 @@ export async function getDeploymentTeams(directoryId?: string) {
     }
 }
 
-export async function lookupExistingDeployment(directoryId: string) {
+export async function lookupExistingDeployment(workId: string) {
     const user = await getAuthFromCookie();
     if (!user) {
         redirect(ROUTES.AUTH_LOGIN);
     }
 
     try {
-        const response = await deployAPI.lookupExistingDeployment(directoryId);
+        const response = await deployAPI.lookupExistingDeployment(workId);
 
         // Ensure the page revalidates when we discover a deployment
         if (response.status === 'success' && response.website) {
-            revalidatePath(ROUTES.DASHBOARD_DIRECTORY_DEPLOY(directoryId));
+            revalidatePath(ROUTES.DASHBOARD_WORK_DEPLOY(workId));
         }
 
         return {
@@ -162,14 +162,14 @@ export async function lookupExistingDeployment(directoryId: string) {
     }
 }
 
-export async function getDomains(directoryId: string) {
+export async function getDomains(workId: string) {
     const user = await getAuthFromCookie();
     if (!user) {
         redirect(ROUTES.AUTH_LOGIN);
     }
 
     try {
-        const response = await deployAPI.getDomains(directoryId);
+        const response = await deployAPI.getDomains(workId);
         return {
             success: response.status === 'success',
             domains: response.domains ?? [],
@@ -184,15 +184,15 @@ export async function getDomains(directoryId: string) {
     }
 }
 
-export async function addDomain(directoryId: string, domain: string) {
+export async function addDomain(workId: string, domain: string) {
     const user = await getAuthFromCookie();
     if (!user) {
         redirect(ROUTES.AUTH_LOGIN);
     }
 
     try {
-        const response = await deployAPI.addDomain(directoryId, domain);
-        revalidatePath(ROUTES.DASHBOARD_DIRECTORY_DEPLOY(directoryId));
+        const response = await deployAPI.addDomain(workId, domain);
+        revalidatePath(ROUTES.DASHBOARD_WORK_DEPLOY(workId));
         return {
             success: response.status === 'success',
             domain: response.domain,
@@ -209,15 +209,15 @@ export async function addDomain(directoryId: string, domain: string) {
     }
 }
 
-export async function removeDomain(directoryId: string, domain: string) {
+export async function removeDomain(workId: string, domain: string) {
     const user = await getAuthFromCookie();
     if (!user) {
         redirect(ROUTES.AUTH_LOGIN);
     }
 
     try {
-        const response = await deployAPI.removeDomain(directoryId, domain);
-        revalidatePath(ROUTES.DASHBOARD_DIRECTORY_DEPLOY(directoryId));
+        const response = await deployAPI.removeDomain(workId, domain);
+        revalidatePath(ROUTES.DASHBOARD_WORK_DEPLOY(workId));
         return {
             success: response.status === 'success',
         };
@@ -230,15 +230,15 @@ export async function removeDomain(directoryId: string, domain: string) {
     }
 }
 
-export async function verifyDomain(directoryId: string, domain: string) {
+export async function verifyDomain(workId: string, domain: string) {
     const user = await getAuthFromCookie();
     if (!user) {
         redirect(ROUTES.AUTH_LOGIN);
     }
 
     try {
-        const response = await deployAPI.verifyDomain(directoryId, domain);
-        revalidatePath(ROUTES.DASHBOARD_DIRECTORY_DEPLOY(directoryId));
+        const response = await deployAPI.verifyDomain(workId, domain);
+        revalidatePath(ROUTES.DASHBOARD_WORK_DEPLOY(workId));
         return {
             success: response.status === 'success',
             domain: response.domain,
@@ -254,7 +254,7 @@ export async function verifyDomain(directoryId: string, domain: string) {
 }
 
 export async function updateWebsiteTemplateSettings(
-    directoryId: string,
+    workId: string,
     settings: {
         websiteTemplateAutoUpdate?: boolean;
         websiteTemplateUseBeta?: boolean;
@@ -266,30 +266,30 @@ export async function updateWebsiteTemplateSettings(
     }
 
     const t = await getTranslations('actions.deploy');
-    const tDirectories = await getTranslations('actions.works');
+    const tWorks = await getTranslations('actions.works');
 
     try {
-        const { directory } = await directoryAPI.get(directoryId);
+        const { work } = await workAPI.get(workId);
 
         // When enabling auto-update, verify git provider connection exists
         if (settings.websiteTemplateAutoUpdate === true) {
-            const connectionCheck = await checkGitProviderConnection(directory.gitProvider);
+            const connectionCheck = await checkGitProviderConnection(work.gitProvider);
             if (!connectionCheck.connected) {
                 return {
                     success: false,
-                    error: tDirectories('oauthRequired', { provider: directory.gitProvider }),
+                    error: tWorks('oauthRequired', { provider: work.gitProvider }),
                     requiresGitProvider: true,
                 };
             }
         }
 
-        const response = await directoryAPI.update(directoryId, settings);
+        const response = await workAPI.update(workId, settings);
 
-        revalidatePath(ROUTES.DASHBOARD_DIRECTORY_DEPLOY(directoryId));
+        revalidatePath(ROUTES.DASHBOARD_WORK_DEPLOY(workId));
 
         return {
             success: response.status === 'success',
-            data: response.directory,
+            data: response.work,
             error: response.status === 'error' ? t('updateSettingsFailed') : null,
         };
     } catch (error) {

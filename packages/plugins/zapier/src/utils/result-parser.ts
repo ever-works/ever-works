@@ -13,7 +13,7 @@ export interface ParsedResults {
  *
  * Supports two shapes:
  *  - 'structured': the Zap returns `{ items: [...], categories?, tags?, brands? }`
- *    (same contract as sim-ai — cleanest path for directory generation)
+ *    (same contract as sim-ai — cleanest path for work generation)
  *  - 'native': the Zap returns raw records produced by the underlying Zapier app,
  *    e.g. a `search` action returning an array of domain objects. The caller
  *    provides a field mapping to project each record onto ItemData.
@@ -29,7 +29,7 @@ export function parseZapierOutput(raw: unknown, shape: ZapierResultShape, mappin
 
 		if (items.length === 0) {
 			throw new Error(
-				'Zapier action returned records but none could be mapped to directory items. ' +
+				'Zapier action returned records but none could be mapped to work items. ' +
 					'Double-check the field mapping — at minimum the name field must point to a non-empty string.'
 			);
 		}

@@ -5,7 +5,7 @@ import { PluginSettingsService } from '../services/plugin-settings.service';
 import { PluginRegistryService, RegisteredPlugin } from '../services/plugin-registry.service';
 import { PluginRepository } from '../repositories/plugin.repository';
 import { UserPluginRepository } from '../repositories/user-plugin.repository';
-import { DirectoryPluginRepository } from '../repositories/directory-plugin.repository';
+import { WorkPluginRepository } from '../repositories/work-plugin.repository';
 import { PluginEvents } from '../plugins.constants';
 import type { IPlugin, PluginManifest, JsonSchema } from '@ever-works/plugin';
 
@@ -20,7 +20,7 @@ describe('PluginSettingsService', () => {
     let registry: PluginRegistryService;
     let pluginRepository: PluginRepository;
     let userPluginRepository: UserPluginRepository;
-    let directoryPluginRepository: DirectoryPluginRepository;
+    let workPluginRepository: WorkPluginRepository;
     let eventEmitter: EventEmitter2;
 
     const createSettingsSchema = (): JsonSchema =>
@@ -44,7 +44,7 @@ describe('PluginSettingsService', () => {
                 maxItems: {
                     type: 'number',
                     default: 10,
-                    'x-scope': 'directory',
+                    'x-scope': 'work',
                 },
                 theme: {
                     type: 'string',
@@ -110,13 +110,13 @@ describe('PluginSettingsService', () => {
                     },
                 },
                 {
-                    provide: DirectoryPluginRepository,
+                    provide: WorkPluginRepository,
                     useValue: {
-                        findByDirectoryAndPlugin: jest.fn().mockResolvedValue(null),
-                        updateByDirectoryAndPlugin: jest.fn().mockResolvedValue({}),
+                        findByWorkAndPlugin: jest.fn().mockResolvedValue(null),
+                        updateByWorkAndPlugin: jest.fn().mockResolvedValue({}),
                         updateSettings: jest.fn().mockResolvedValue({}),
                         create: jest.fn().mockResolvedValue({}),
-                        deleteByDirectoryAndPlugin: jest.fn().mockResolvedValue(true),
+                        deleteByWorkAndPlugin: jest.fn().mockResolvedValue(true),
                     },
                 },
                 {
@@ -132,8 +132,8 @@ describe('PluginSettingsService', () => {
         registry = module.get<PluginRegistryService>(PluginRegistryService);
         pluginRepository = module.get<PluginRepository>(PluginRepository);
         userPluginRepository = module.get<UserPluginRepository>(UserPluginRepository);
-        directoryPluginRepository =
-            module.get<DirectoryPluginRepository>(DirectoryPluginRepository);
+        workPluginRepository =
+            module.get<WorkPluginRepository>(WorkPluginRepository);
         eventEmitter = module.get<EventEmitter2>(EventEmitter2);
     });
 
@@ -207,7 +207,7 @@ describe('PluginSettingsService', () => {
             });
         });
 
-        it('should resolve directory settings over user settings', async () => {
+        it('should resolve work settings over user settings', async () => {
             jest.spyOn(pluginRepository, 'findByPluginId').mockResolvedValue({
                 id: '1',
                 pluginId: 'test-plugin',
@@ -223,9 +223,9 @@ describe('PluginSettingsService', () => {
                 secretSettings: {},
             } as any);
 
-            jest.spyOn(directoryPluginRepository, 'findByDirectoryAndPlugin').mockResolvedValue({
+            jest.spyOn(workPluginRepository, 'findByWorkAndPlugin').mockResolvedValue({
                 id: '1',
-                directoryId: 'dir-1',
+                workId: 'dir-1',
                 pluginId: 'test-plugin',
                 settings: { maxItems: 50 },
                 secretSettings: {},
@@ -233,18 +233,18 @@ describe('PluginSettingsService', () => {
 
             const result = await service.getResolvedSettings('test-plugin', {
                 userId: 'user-1',
-                directoryId: 'dir-1',
+                workId: 'dir-1',
             });
 
             expect(result.maxItems).toEqual({
                 key: 'maxItems',
                 value: 50,
-                source: 'directory',
+                source: 'work',
                 isFallback: false,
             });
         });
 
-        it('should inherit lower-scope values when directory settings only shadow schema defaults', async () => {
+        it('should inherit lower-scope values when work settings only shadow schema defaults', async () => {
             const schema: JsonSchema = {
                 type: 'object',
                 properties: {
@@ -287,9 +287,9 @@ describe('PluginSettingsService', () => {
                 secretSettings: {},
             } as any);
 
-            jest.spyOn(directoryPluginRepository, 'findByDirectoryAndPlugin').mockResolvedValue({
+            jest.spyOn(workPluginRepository, 'findByWorkAndPlugin').mockResolvedValue({
                 id: '1',
-                directoryId: 'dir-1',
+                workId: 'dir-1',
                 pluginId: 'test-plugin',
                 settings: {
                     defaultModel: 'minimax/minimax-m2.5:free',
@@ -304,13 +304,13 @@ describe('PluginSettingsService', () => {
 
             const result = await service.getResolvedSettings('test-plugin', {
                 userId: 'user-1',
-                directoryId: 'dir-1',
+                workId: 'dir-1',
             });
 
             expect(result.defaultModel).toEqual({
                 key: 'defaultModel',
                 value: 'minimax/minimax-m2.5:free',
-                source: 'directory',
+                source: 'work',
                 isFallback: true,
             });
             expect(result.simpleModel).toMatchObject({
@@ -329,7 +329,7 @@ describe('PluginSettingsService', () => {
                 value: 'casual',
                 source: 'user',
             });
-            expect(directoryPluginRepository.updateByDirectoryAndPlugin).toHaveBeenCalledWith(
+            expect(workPluginRepository.updateByWorkAndPlugin).toHaveBeenCalledWith(
                 'dir-1',
                 'test-plugin',
                 expect.objectContaining({
@@ -342,7 +342,7 @@ describe('PluginSettingsService', () => {
             );
         });
 
-        it('should respect schema default directory values after directory settings are normalized', async () => {
+        it('should respect schema default work values after work settings are normalized', async () => {
             const schema: JsonSchema = {
                 type: 'object',
                 properties: {
@@ -365,9 +365,9 @@ describe('PluginSettingsService', () => {
                 secretSettings: {},
             } as any);
 
-            jest.spyOn(directoryPluginRepository, 'findByDirectoryAndPlugin').mockResolvedValue({
+            jest.spyOn(workPluginRepository, 'findByWorkAndPlugin').mockResolvedValue({
                 id: '1',
-                directoryId: 'dir-1',
+                workId: 'dir-1',
                 pluginId: 'test-plugin',
                 settings: {
                     simpleModel: 'openai/gpt-5-mini',
@@ -380,14 +380,14 @@ describe('PluginSettingsService', () => {
 
             const result = await service.getResolvedSettings('test-plugin', {
                 userId: 'user-1',
-                directoryId: 'dir-1',
+                workId: 'dir-1',
             });
 
             expect(result.simpleModel).toMatchObject({
                 value: 'openai/gpt-5-mini',
-                source: 'directory',
+                source: 'work',
             });
-            expect(directoryPluginRepository.updateByDirectoryAndPlugin).not.toHaveBeenCalled();
+            expect(workPluginRepository.updateByWorkAndPlugin).not.toHaveBeenCalled();
         });
 
         it('should resolve from environment variable', async () => {
@@ -636,30 +636,30 @@ describe('PluginSettingsService', () => {
         });
     });
 
-    describe('updateDirectorySettings', () => {
+    describe('updateWorkSettings', () => {
         it('should throw error for non-existent plugin', async () => {
             jest.spyOn(registry, 'get').mockReturnValue(undefined);
 
             await expect(
-                service.updateDirectorySettings('non-existent', 'dir-1', {}),
+                service.updateWorkSettings('non-existent', 'dir-1', {}),
             ).rejects.toThrow('Plugin "non-existent" not found');
         });
 
-        it('should create directory settings if not exists', async () => {
+        it('should create work settings if not exists', async () => {
             jest.spyOn(pluginRepository, 'findByPluginId').mockResolvedValue({
                 id: '1',
                 pluginId: 'test-plugin',
                 settings: {},
                 secretSettings: {},
             } as any);
-            jest.spyOn(directoryPluginRepository, 'findByDirectoryAndPlugin').mockResolvedValue(
+            jest.spyOn(workPluginRepository, 'findByWorkAndPlugin').mockResolvedValue(
                 null,
             );
 
-            await service.updateDirectorySettings('test-plugin', 'dir-1', { maxItems: 25 });
+            await service.updateWorkSettings('test-plugin', 'dir-1', { maxItems: 25 });
 
-            expect(directoryPluginRepository.create).toHaveBeenCalledWith({
-                directoryId: 'dir-1',
+            expect(workPluginRepository.create).toHaveBeenCalledWith({
+                workId: 'dir-1',
                 pluginId: 'test-plugin',
                 pluginEntityId: '1',
                 settings: { maxItems: 25 },
@@ -667,24 +667,24 @@ describe('PluginSettingsService', () => {
             });
         });
 
-        it('should update existing directory settings', async () => {
+        it('should update existing work settings', async () => {
             jest.spyOn(pluginRepository, 'findByPluginId').mockResolvedValue({
                 id: '1',
                 pluginId: 'test-plugin',
                 settings: {},
                 secretSettings: {},
             } as any);
-            jest.spyOn(directoryPluginRepository, 'findByDirectoryAndPlugin').mockResolvedValue({
+            jest.spyOn(workPluginRepository, 'findByWorkAndPlugin').mockResolvedValue({
                 id: '1',
-                directoryId: 'dir-1',
+                workId: 'dir-1',
                 pluginId: 'test-plugin',
                 settings: { maxItems: 10 },
                 secretSettings: {},
             } as any);
 
-            await service.updateDirectorySettings('test-plugin', 'dir-1', { maxItems: 25 });
+            await service.updateWorkSettings('test-plugin', 'dir-1', { maxItems: 25 });
 
-            expect(directoryPluginRepository.updateSettings).toHaveBeenCalledWith(
+            expect(workPluginRepository.updateSettings).toHaveBeenCalledWith(
                 'dir-1',
                 'test-plugin',
                 { maxItems: 25 },
@@ -699,18 +699,18 @@ describe('PluginSettingsService', () => {
                 settings: {},
                 secretSettings: {},
             } as any);
-            jest.spyOn(directoryPluginRepository, 'findByDirectoryAndPlugin').mockResolvedValue(
+            jest.spyOn(workPluginRepository, 'findByWorkAndPlugin').mockResolvedValue(
                 null,
             );
 
-            await service.updateDirectorySettings('test-plugin', 'dir-1', { maxItems: 25 });
+            await service.updateWorkSettings('test-plugin', 'dir-1', { maxItems: 25 });
 
             expect(eventEmitter.emit).toHaveBeenCalledWith(
                 PluginEvents.SETTINGS_CHANGED,
                 expect.objectContaining({
                     pluginId: 'test-plugin',
-                    scope: 'directory',
-                    directoryId: 'dir-1',
+                    scope: 'work',
+                    workId: 'dir-1',
                 }),
             );
         });
@@ -728,12 +728,12 @@ describe('PluginSettingsService', () => {
         });
     });
 
-    describe('deleteDirectorySettings', () => {
-        it('should delete directory settings', async () => {
-            const result = await service.deleteDirectorySettings('test-plugin', 'dir-1');
+    describe('deleteWorkSettings', () => {
+        it('should delete work settings', async () => {
+            const result = await service.deleteWorkSettings('test-plugin', 'dir-1');
 
             expect(result).toBe(true);
-            expect(directoryPluginRepository.deleteByDirectoryAndPlugin).toHaveBeenCalledWith(
+            expect(workPluginRepository.deleteByWorkAndPlugin).toHaveBeenCalledWith(
                 'dir-1',
                 'test-plugin',
             );
@@ -982,7 +982,7 @@ describe('PluginSettingsService', () => {
     });
 
     describe('scope validation', () => {
-        it('should reject directory-scoped settings at global level', async () => {
+        it('should reject work-scoped settings at global level', async () => {
             jest.spyOn(pluginRepository, 'findByPluginId').mockResolvedValue({
                 id: '1',
                 pluginId: 'test-plugin',
@@ -990,13 +990,13 @@ describe('PluginSettingsService', () => {
                 secretSettings: {},
             } as any);
 
-            // maxItems has 'x-scope': 'directory'
+            // maxItems has 'x-scope': 'work'
             await expect(
                 service.updateAdminSettings('test-plugin', { maxItems: 50 }),
             ).rejects.toThrow('Scope violation');
         });
 
-        it('should reject directory-scoped settings at user level', async () => {
+        it('should reject work-scoped settings at user level', async () => {
             jest.spyOn(pluginRepository, 'findByPluginId').mockResolvedValue({
                 id: '1',
                 pluginId: 'test-plugin',
@@ -1005,7 +1005,7 @@ describe('PluginSettingsService', () => {
             } as any);
             jest.spyOn(userPluginRepository, 'findByUserAndPlugin').mockResolvedValue(null);
 
-            // maxItems has 'x-scope': 'directory'
+            // maxItems has 'x-scope': 'work'
             await expect(
                 service.updateUserSettings('test-plugin', 'user-1', { maxItems: 50 }),
             ).rejects.toThrow('Scope violation');
@@ -1018,13 +1018,13 @@ describe('PluginSettingsService', () => {
                 settings: {},
                 secretSettings: {},
             } as any);
-            jest.spyOn(directoryPluginRepository, 'findByDirectoryAndPlugin').mockResolvedValue(
+            jest.spyOn(workPluginRepository, 'findByWorkAndPlugin').mockResolvedValue(
                 null,
             );
 
             // enabled has no x-scope (defaults to 'global')
             await expect(
-                service.updateDirectorySettings('test-plugin', 'dir-1', { enabled: false }),
+                service.updateWorkSettings('test-plugin', 'dir-1', { enabled: false }),
             ).resolves.not.toThrow();
         });
 
@@ -1057,27 +1057,27 @@ describe('PluginSettingsService', () => {
             ).rejects.toThrow('Scope violation');
         });
 
-        it('should allow directory-scoped settings at directory level', async () => {
+        it('should allow work-scoped settings at work level', async () => {
             jest.spyOn(pluginRepository, 'findByPluginId').mockResolvedValue({
                 id: '1',
                 pluginId: 'test-plugin',
                 settings: {},
                 secretSettings: {},
             } as any);
-            jest.spyOn(directoryPluginRepository, 'findByDirectoryAndPlugin').mockResolvedValue(
+            jest.spyOn(workPluginRepository, 'findByWorkAndPlugin').mockResolvedValue(
                 null,
             );
 
-            // maxItems has 'x-scope': 'directory'
+            // maxItems has 'x-scope': 'work'
             await expect(
-                service.updateDirectorySettings('test-plugin', 'dir-1', { maxItems: 50 }),
+                service.updateWorkSettings('test-plugin', 'dir-1', { maxItems: 50 }),
             ).resolves.not.toThrow();
         });
     });
 
     describe('getSettingsSchemaForContext', () => {
         it('should filter properties for user context', () => {
-            // Default schema has: apiKey (global), enabled (global), maxItems (directory), theme (user)
+            // Default schema has: apiKey (global), enabled (global), maxItems (work), theme (user)
             const result = service.getSettingsSchemaForContext('test-plugin', 'user');
 
             expect(result).toBeDefined();
@@ -1085,17 +1085,17 @@ describe('PluginSettingsService', () => {
             expect('apiKey' in result!.properties!).toBe(true); // global
             expect('enabled' in result!.properties!).toBe(true); // global
             expect('theme' in result!.properties!).toBe(true); // user
-            expect('maxItems' in result!.properties!).toBe(false); // directory - should be filtered out
+            expect('maxItems' in result!.properties!).toBe(false); // work - should be filtered out
         });
 
-        it('should filter properties for directory context', () => {
-            const result = service.getSettingsSchemaForContext('test-plugin', 'directory');
+        it('should filter properties for work context', () => {
+            const result = service.getSettingsSchemaForContext('test-plugin', 'work');
 
             expect(result).toBeDefined();
             expect(result?.properties).toBeDefined();
             expect('apiKey' in result!.properties!).toBe(true); // global
             expect('enabled' in result!.properties!).toBe(true); // global
-            expect('maxItems' in result!.properties!).toBe(true); // directory
+            expect('maxItems' in result!.properties!).toBe(true); // work
             expect('theme' in result!.properties!).toBe(false); // user - should be filtered out
         });
 
@@ -1114,12 +1114,12 @@ describe('PluginSettingsService', () => {
                     globalSetting: {
                         type: 'string',
                     },
-                    directorySetting: {
+                    workSetting: {
                         type: 'string',
-                        'x-scope': 'directory',
+                        'x-scope': 'work',
                     },
                 },
-                required: ['globalSetting', 'directorySetting'],
+                required: ['globalSetting', 'workSetting'],
             } as unknown as JsonSchema;
 
             const plugin = createMockPlugin(schema);
@@ -1128,7 +1128,7 @@ describe('PluginSettingsService', () => {
             const result = service.getSettingsSchemaForContext('test-plugin', 'user');
 
             expect(result?.required).toEqual(['globalSetting']);
-            expect(result?.required).not.toContain('directorySetting');
+            expect(result?.required).not.toContain('workSetting');
         });
 
         it('should return schema unchanged if no properties', () => {
@@ -1146,13 +1146,13 @@ describe('PluginSettingsService', () => {
     });
 
     describe('validateScopeRequirements', () => {
-        it('should throw BadRequestException for directory scope without directoryId', () => {
+        it('should throw BadRequestException for work scope without workId', () => {
             expect(() => {
-                service.validateScopeRequirements('directory', undefined, 'user-1');
+                service.validateScopeRequirements('work', undefined, 'user-1');
             }).toThrow(BadRequestException);
             expect(() => {
-                service.validateScopeRequirements('directory', undefined, 'user-1');
-            }).toThrow('directoryId required for directory scope');
+                service.validateScopeRequirements('work', undefined, 'user-1');
+            }).toThrow('workId required for work scope');
         });
 
         it('should throw BadRequestException for user scope without userId', () => {
@@ -1164,9 +1164,9 @@ describe('PluginSettingsService', () => {
             }).toThrow('userId required for user scope');
         });
 
-        it('should not throw for directory scope with directoryId', () => {
+        it('should not throw for work scope with workId', () => {
             expect(() => {
-                service.validateScopeRequirements('directory', 'dir-1', undefined);
+                service.validateScopeRequirements('work', 'dir-1', undefined);
             }).not.toThrow();
         });
 
@@ -1187,13 +1187,13 @@ describe('PluginSettingsService', () => {
         it('should validate scope when scope option is provided', async () => {
             const result = await service.validateSettings(
                 'test-plugin',
-                { maxItems: 50 }, // directory-scoped setting
+                { maxItems: 50 }, // work-scoped setting
                 { scope: 'global' }, // trying to set at global scope
             );
 
             expect(result.valid).toBe(false);
             expect(result.errors).toContain(
-                'Setting "maxItems" has scope "directory" and cannot be updated at "global" level',
+                'Setting "maxItems" has scope "work" and cannot be updated at "global" level',
             );
         });
 
@@ -1201,7 +1201,7 @@ describe('PluginSettingsService', () => {
             const result = await service.validateSettings(
                 'test-plugin',
                 { maxItems: 50 },
-                { scope: 'directory' },
+                { scope: 'work' },
             );
 
             expect(result.valid).toBe(true);
@@ -1311,7 +1311,7 @@ describe('PluginSettingsService', () => {
             );
         });
 
-        it('should strip masked placeholder on updateDirectorySettings', async () => {
+        it('should strip masked placeholder on updateWorkSettings', async () => {
             const schema = createSchemaWithSecretFields();
             const plugin = createMockPlugin(schema);
             jest.spyOn(registry, 'get').mockReturnValue(createRegisteredPlugin(plugin));
@@ -1321,20 +1321,20 @@ describe('PluginSettingsService', () => {
                 settings: {},
                 secretSettings: {},
             } as any);
-            jest.spyOn(directoryPluginRepository, 'findByDirectoryAndPlugin').mockResolvedValue({
+            jest.spyOn(workPluginRepository, 'findByWorkAndPlugin').mockResolvedValue({
                 id: '1',
-                directoryId: 'dir-1',
+                workId: 'dir-1',
                 pluginId: 'test-plugin',
                 settings: {},
                 secretSettings: { accessToken: 'dir-token' },
             } as any);
 
-            await service.updateDirectorySettings('test-plugin', 'dir-1', {
+            await service.updateWorkSettings('test-plugin', 'dir-1', {
                 accessToken: '********',
                 normalSetting: 'updated',
             });
 
-            expect(directoryPluginRepository.updateSettings).toHaveBeenCalledWith(
+            expect(workPluginRepository.updateSettings).toHaveBeenCalledWith(
                 'dir-1',
                 'test-plugin',
                 { normalSetting: 'updated' },
@@ -1544,8 +1544,8 @@ describe('PluginSettingsService', () => {
             });
         });
 
-        describe('updateDirectorySettings', () => {
-            it('should filter out x-envVar fields when updating directory settings', async () => {
+        describe('updateWorkSettings', () => {
+            it('should filter out x-envVar fields when updating work settings', async () => {
                 const schema = createSchemaWithEnvVars();
                 const plugin = createMockPlugin(schema);
                 jest.spyOn(registry, 'get').mockReturnValue(createRegisteredPlugin(plugin));
@@ -1555,17 +1555,17 @@ describe('PluginSettingsService', () => {
                     settings: {},
                     secretSettings: {},
                 } as any);
-                jest.spyOn(directoryPluginRepository, 'findByDirectoryAndPlugin').mockResolvedValue(
+                jest.spyOn(workPluginRepository, 'findByWorkAndPlugin').mockResolvedValue(
                     null,
                 );
 
-                await service.updateDirectorySettings('test-plugin', 'dir-1', {
+                await service.updateWorkSettings('test-plugin', 'dir-1', {
                     clientId: 'should-be-filtered',
                     normalSetting: 'should-be-saved',
                 });
 
-                expect(directoryPluginRepository.create).toHaveBeenCalledWith({
-                    directoryId: 'dir-1',
+                expect(workPluginRepository.create).toHaveBeenCalledWith({
+                    workId: 'dir-1',
                     pluginId: 'test-plugin',
                     pluginEntityId: '1',
                     settings: { normalSetting: 'should-be-saved' },
@@ -1573,7 +1573,7 @@ describe('PluginSettingsService', () => {
                 });
             });
 
-            it('should filter x-envVar fields when updating existing directory settings', async () => {
+            it('should filter x-envVar fields when updating existing work settings', async () => {
                 const schema = createSchemaWithEnvVars();
                 const plugin = createMockPlugin(schema);
                 jest.spyOn(registry, 'get').mockReturnValue(createRegisteredPlugin(plugin));
@@ -1583,22 +1583,22 @@ describe('PluginSettingsService', () => {
                     settings: {},
                     secretSettings: {},
                 } as any);
-                jest.spyOn(directoryPluginRepository, 'findByDirectoryAndPlugin').mockResolvedValue(
+                jest.spyOn(workPluginRepository, 'findByWorkAndPlugin').mockResolvedValue(
                     {
                         id: '1',
-                        directoryId: 'dir-1',
+                        workId: 'dir-1',
                         pluginId: 'test-plugin',
                         settings: { normalSetting: 'old-value' },
                         secretSettings: {},
                     } as any,
                 );
 
-                await service.updateDirectorySettings('test-plugin', 'dir-1', {
+                await service.updateWorkSettings('test-plugin', 'dir-1', {
                     clientSecret: 'should-be-filtered',
                     normalSetting: 'new-value',
                 });
 
-                expect(directoryPluginRepository.updateSettings).toHaveBeenCalledWith(
+                expect(workPluginRepository.updateSettings).toHaveBeenCalledWith(
                     'dir-1',
                     'test-plugin',
                     { normalSetting: 'new-value' },
@@ -1645,17 +1645,17 @@ describe('PluginSettingsService', () => {
             ).rejects.toThrow('admin-only and cannot be configured by users');
         });
 
-        it('should reject directory settings for admin-only plugins', async () => {
+        it('should reject work settings for admin-only plugins', async () => {
             const adminOnlyPlugin = createMockPlugin();
             (adminOnlyPlugin as any).configurationMode = 'admin-only';
             jest.spyOn(registry, 'get').mockReturnValue(createRegisteredPlugin(adminOnlyPlugin));
 
             await expect(
-                service.updateDirectorySettings('test-plugin', 'dir-1', { maxItems: 25 }),
-            ).rejects.toThrow('admin-only and cannot be configured at directory level');
+                service.updateWorkSettings('test-plugin', 'dir-1', { maxItems: 25 }),
+            ).rejects.toThrow('admin-only and cannot be configured at work level');
         });
 
-        it('should ignore user/directory settings when resolving admin-only plugin settings', async () => {
+        it('should ignore user/work settings when resolving admin-only plugin settings', async () => {
             const adminOnlyPlugin = createMockPlugin();
             (adminOnlyPlugin as any).configurationMode = 'admin-only';
             jest.spyOn(registry, 'get').mockReturnValue(createRegisteredPlugin(adminOnlyPlugin));
@@ -1675,7 +1675,7 @@ describe('PluginSettingsService', () => {
 
             const result = await service.getResolvedSettings('test-plugin', {
                 userId: 'user-1',
-                directoryId: 'dir-1',
+                workId: 'dir-1',
             });
 
             // Should use admin settings, not user settings

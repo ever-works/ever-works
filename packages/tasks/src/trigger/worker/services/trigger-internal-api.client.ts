@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import superjson from 'superjson';
 import { config } from '@ever-works/agent/config';
-import { DirectoryContextResponse } from '@ever-works/agent/tasks';
+import { WorkContextResponse } from '@ever-works/agent/tasks';
 
 @Injectable()
 export class TriggerInternalApiClient {
@@ -21,15 +21,15 @@ export class TriggerInternalApiClient {
         }
     }
 
-    async fetchDirectoryContext(
-        directoryId: string,
+    async fetchWorkContext(
+        workId: string,
         userId: string,
-    ): Promise<DirectoryContextResponse> {
+    ): Promise<WorkContextResponse> {
         const searchParams = new URLSearchParams({ userId });
 
-        return this.request<DirectoryContextResponse>({
+        return this.request<WorkContextResponse>({
             method: 'GET',
-            path: `/directories/${directoryId}/context?${searchParams.toString()}`,
+            path: `/works/${workId}/context?${searchParams.toString()}`,
         });
     }
 

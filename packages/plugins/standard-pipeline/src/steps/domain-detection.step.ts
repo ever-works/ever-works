@@ -7,7 +7,7 @@ import { PROMPT_KEYS } from '../prompt-keys.js';
 /**
  * Domain detection prompt template
  */
-const DOMAIN_DETECTION_PROMPT = `You are classifying the domain of a directory topic.
+const DOMAIN_DETECTION_PROMPT = `You are classifying the domain of a work topic.
 
 Topic name: "{name}"
 Topic description: "{description}"
@@ -41,16 +41,16 @@ export class DomainDetectionStep extends BasePipelineStep {
 		context: MutableGenerationContext,
 		execContext: StepExecutionContext
 	): Promise<MutableGenerationContext> {
-		const { request, directory, metrics } = context;
+		const { request, work, metrics } = context;
 		const { logger, aiFacade, promptFacade } = execContext;
 		const { name, prompt } = request;
 
 		const facadeOptions: FacadeOptions = {
 			userId: execContext.user!.id,
-			directoryId: execContext.directory.id
+			workId: execContext.work.id
 		};
 
-		logger.log(`[${directory.slug}] Domain Detection - Starting`);
+		logger.log(`[${work.slug}] Domain Detection - Starting`);
 
 		try {
 			const resolvedPrompt = (
@@ -88,11 +88,11 @@ export class DomainDetectionStep extends BasePipelineStep {
 			}
 
 			logger.log(
-				`[${directory.slug}] Domain Detection Complete: ${result.domain_type} (conf=${result.confidence})`
+				`[${work.slug}] Domain Detection Complete: ${result.domain_type} (conf=${result.confidence})`
 			);
 		} catch (error) {
 			logger.error(
-				`[${directory.slug}] Domain detection failed, defaulting to software. ${this.formatError(error)}`
+				`[${work.slug}] Domain detection failed, defaulting to software. ${this.formatError(error)}`
 			);
 			context.domainAnalysis = {
 				domain_type: 'software' as DomainType,

@@ -1,12 +1,12 @@
-import type { DirectoryReference, ExistingItems, GenerationRequest } from '@ever-works/plugin';
+import type { WorkReference, ExistingItems, GenerationRequest } from '@ever-works/plugin';
 import { RESULT_FILE_NAME, RESULT_SCHEMA_FILE_NAME } from '../types.js';
 
 export const DEFAULT_SYSTEM_PROMPT = [
 	'You are Hermes Agent running inside an Ever Works generation workspace.',
-	'Your job is to research the directory topic and produce structured item data for Ever Works.',
+	'Your job is to research the work topic and produce structured item data for Ever Works.',
 	'',
 	'Workspace contract:',
-	'- Read context from the `_meta` directory before you start.',
+	'- Read context from the `_meta` work before you start.',
 	'- Do not modify existing seeded item files unless explicitly required for your own scratch work.',
 	`- You MUST write the final result file to \`_meta/${RESULT_FILE_NAME}\`.`,
 	`- You MUST read and follow the JSON schema in \`_meta/${RESULT_SCHEMA_FILE_NAME}\`.`,
@@ -25,10 +25,10 @@ export const DEFAULT_SYSTEM_PROMPT = [
 ].join('\n');
 
 export const DEFAULT_USER_PROMPT = [
-	'Generate a directory dataset for Ever Works.',
+	'Generate a work dataset for Ever Works.',
 	'',
-	'Directory name: {{directoryName}}',
-	'Directory description: {{directoryDescription}}',
+	'Work name: {{workName}}',
+	'Work description: {{workDescription}}',
 	'Generation name: {{generationName}}',
 	'Prompt: {{generationPrompt}}',
 	'Target items: {{targetItems}}',
@@ -39,7 +39,7 @@ export const DEFAULT_USER_PROMPT = [
 ].join('\n');
 
 interface PromptVariablesInput {
-	directory: DirectoryReference;
+	work: WorkReference;
 	request: GenerationRequest;
 	existing: ExistingItems;
 }
@@ -52,8 +52,8 @@ export function buildUserPromptVariables(input: PromptVariablesInput): Record<st
 	const config = input.request.config ?? {};
 
 	return {
-		directoryName: input.directory.name,
-		directoryDescription: input.directory.description ?? 'N/A',
+		workName: input.work.name,
+		workDescription: input.work.description ?? 'N/A',
 		generationName: input.request.name ?? 'N/A',
 		generationPrompt: input.request.prompt ?? 'N/A',
 		targetItems: String((config.target_items as number | undefined) ?? 50),

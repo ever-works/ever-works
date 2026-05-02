@@ -11,7 +11,7 @@ describe('mergeWorksConfigIntoDataConfig', () => {
             'Cloud Pricing',
             {
                 name: 'Cloud Pricing',
-                initialPrompt: 'Build cloud pricing directory',
+                initialPrompt: 'Build cloud pricing work',
                 model: 'gpt-5.2',
                 providers: {
                     ai: 'openai',
@@ -24,7 +24,7 @@ describe('mergeWorksConfigIntoDataConfig', () => {
             initial_prompt: 'Existing prompt',
             last_request_data: {
                 name: 'Cloud Pricing',
-                prompt: 'Build cloud pricing directory',
+                prompt: 'Build cloud pricing work',
                 model: 'gpt-5.2',
                 providers: {
                     ai: 'openai',
@@ -38,6 +38,6 @@ describe('mergeWorksConfigIntoDataConfig', () => {
     it('returns the original config when works config is not available', () => {
         const config = { metadata: { imported_from: 'source/repo' } };
 
-        expect(mergeWorksConfigIntoDataConfig(config, 'Directory', null)).toBe(config);
+        expect(mergeWorksConfigIntoDataConfig(config, 'Work', null)).toBe(config);
     });
 });

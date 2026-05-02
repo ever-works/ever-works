@@ -12,7 +12,7 @@ import type {
 	PipelineExecutionOptions,
 	PipelineProgressCallback,
 	PipelineResult,
-	DirectoryReference,
+	WorkReference,
 	GenerationRequest,
 	ExistingItems,
 	PluginManifest,
@@ -52,7 +52,7 @@ import { README } from './readme.js';
 /**
  * SIM AI Workflows Plugin
  *
- * Full pipeline plugin that delegates directory generation to SIM AI workflows.
+ * Full pipeline plugin that delegates work generation to SIM AI workflows.
  * SIM AI is an open-source AI agent workflow builder — this plugin triggers
  * deployed SIM workflows and collects structured item results.
  */
@@ -162,7 +162,7 @@ export class SimAiPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvide
 			id: this.id,
 			name: this.name,
 			version: this.version,
-			description: 'Pipeline plugin that delegates directory generation to SIM AI workflows',
+			description: 'Pipeline plugin that delegates work generation to SIM AI workflows',
 			category: this.category,
 			capabilities: [...this.capabilities],
 			author: { name: 'Ever Works Team' },
@@ -175,7 +175,7 @@ export class SimAiPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvide
 				includeInOnboarding: true,
 				onboardingPriority: 2,
 				completionFields: ['apiKey', 'defaultWorkflowId'],
-				onboardingDescription: 'Connect SIM AI to delegate directory generation to visual AI agent workflows.'
+				onboardingDescription: 'Connect SIM AI to delegate work generation to visual AI agent workflows.'
 			},
 			readme: README,
 			homepage: 'https://docs.sim.ai',
@@ -214,7 +214,7 @@ export class SimAiPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvide
 	private _lastAbortController: AbortController | null = null;
 
 	async execute(
-		directory: DirectoryReference,
+		work: WorkReference,
 		request: GenerationRequest,
 		existing: ExistingItems,
 		options?: PipelineExecutionOptions,
@@ -255,14 +255,14 @@ export class SimAiPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvide
 		};
 
 		const logger = this.context?.logger ?? console;
-		const userId = directory.user?.id;
+		const userId = work.user?.id;
 
 		if (!userId) {
 			return handleError(new Error('User ID is required'));
 		}
 
 		try {
-			const pluginSettings = await resolveSettings(this.context, userId, directory.id);
+			const pluginSettings = await resolveSettings(this.context, userId, work.id);
 			const config = (request.config || {}) as Record<string, unknown>;
 
 			const simSettings = this.resolveSimSettings(pluginSettings, config);
@@ -295,7 +295,7 @@ export class SimAiPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvide
 			setState('prepare-payload', 'running');
 			reportProgress(onProgress, 1, 10, 'Prepare Workflow Payload');
 
-			const payload = buildWorkflowPayload({ directory, request, existing, config });
+			const payload = buildWorkflowPayload({ work, request, existing, config });
 
 			logger.log(
 				`Payload prepared: ${payload.metadata.targetItems} target items, ` +
@@ -361,7 +361,7 @@ export class SimAiPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvide
 				request,
 				options?.execContext,
 				items,
-				{ userId, directoryId: directory.id },
+				{ userId, workId: work.id },
 				signal,
 				onProgress,
 				logger

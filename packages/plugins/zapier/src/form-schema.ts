@@ -65,7 +65,7 @@ export function getFormFields(): FormFieldDefinition[] {
 			type: 'select',
 			label: 'Result Shape',
 			description:
-				'How the plugin should interpret the action response. "Structured" expects { items: [...] }. "Native" maps raw Zapier records via the field mapping below. "Side-effect" runs the action for its effect only (e.g. send email, post message) and produces no directory items.',
+				'How the plugin should interpret the action response. "Structured" expects { items: [...] }. "Native" maps raw Zapier records via the field mapping below. "Side-effect" runs the action for its effect only (e.g. send email, post message) and produces no work items.',
 			options: [
 				{ value: 'structured', label: 'Structured ({ items: [...] })' },
 				{ value: 'native', label: 'Native records (with field mapping)' },
@@ -149,7 +149,7 @@ export function getFormFields(): FormFieldDefinition[] {
 			name: 'pass_existing_items',
 			type: 'boolean',
 			label: 'Pass Existing Items Summary',
-			description: 'Include a summary of existing directory items in the action input for deduplication',
+			description: 'Include a summary of existing work items in the action input for deduplication',
 			defaultValue: true,
 			group: 'data'
 		},
@@ -157,7 +157,7 @@ export function getFormFields(): FormFieldDefinition[] {
 			name: 'pass_repo_access',
 			type: 'boolean',
 			label: 'Pass Data Repository Access',
-			description: 'Grant the Zapier action read access to the directory data repository',
+			description: 'Grant the Zapier action read access to the work data repository',
 			defaultValue: false,
 			group: 'data'
 		},
@@ -165,7 +165,7 @@ export function getFormFields(): FormFieldDefinition[] {
 			name: 'repo_url',
 			type: 'text',
 			label: 'Data Repository URL',
-			description: 'GitHub repository URL containing directory data',
+			description: 'GitHub repository URL containing work data',
 			placeholder: 'e.g., https://github.com/org/repo',
 			group: 'data',
 			showIf: REPO_ACCESS_CONDITION,
@@ -224,7 +224,7 @@ export function getFormGroups(): FormFieldGroup[] {
 		{
 			name: 'mapping',
 			title: 'Result Mapping',
-			description: 'Control how the action response becomes directory items',
+			description: 'Control how the action response becomes work items',
 			order: 1,
 			collapsible: true,
 			collapsed: false

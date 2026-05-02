@@ -1,66 +1,66 @@
 'use server';
 
-import { directoryAPI, pluginsAPI } from '@/lib/api';
+import { workAPI, pluginsAPI } from '@/lib/api';
 import { getAuthFromCookie } from '@/lib/auth';
 import { redirect } from 'next/navigation';
 import { ROUTES } from '@/lib/constants';
 import { revalidatePath } from 'next/cache';
 import { getFormSchema } from './generator-form';
 
-export async function listComparisons(directoryId: string) {
+export async function listComparisons(workId: string) {
     const user = await getAuthFromCookie();
     if (!user) {
         redirect(ROUTES.AUTH_LOGIN);
     }
 
     try {
-        return await directoryAPI.getComparisons(directoryId);
+        return await workAPI.getComparisons(workId);
     } catch (error) {
         console.error('List comparisons error:', error);
         return [];
     }
 }
 
-export async function getRemainingComparisonCount(directoryId: string) {
+export async function getRemainingComparisonCount(workId: string) {
     const user = await getAuthFromCookie();
     if (!user) {
         redirect(ROUTES.AUTH_LOGIN);
     }
 
     try {
-        return await directoryAPI.getRemainingComparisonCount(directoryId);
+        return await workAPI.getRemainingComparisonCount(workId);
     } catch (error) {
         console.error('Get remaining comparison count error:', error);
         return { count: 0 };
     }
 }
 
-export async function getComparisonGenerationStatus(directoryId: string) {
+export async function getComparisonGenerationStatus(workId: string) {
     const user = await getAuthFromCookie();
     if (!user) {
         redirect(ROUTES.AUTH_LOGIN);
     }
 
     try {
-        return await directoryAPI.getComparisonGenerationStatus(directoryId);
+        return await workAPI.getComparisonGenerationStatus(workId);
     } catch (error) {
         console.error('Get comparison generation status error:', error);
         return { generating: false };
     }
 }
 
-export async function generateNextComparison(directoryId: string) {
+export async function generateNextComparison(workId: string) {
     const user = await getAuthFromCookie();
     if (!user) {
         redirect(ROUTES.AUTH_LOGIN);
     }
 
     try {
-        const result = await directoryAPI.generateNextComparison(directoryId);
+        const result = await workAPI.generateNextComparison(workId);
 
         if (result.status === 'success') {
-            revalidatePath(`/directories/${directoryId}/comparisons`);
-            revalidatePath(`/directories/${directoryId}`);
+            revalidatePath(`/works/${workId}/comparisons`);
+            revalidatePath(`/works/${workId}`);
         }
 
         return result;
@@ -74,7 +74,7 @@ export async function generateNextComparison(directoryId: string) {
 }
 
 export async function generateManualComparison(
-    directoryId: string,
+    workId: string,
     itemASlug: string,
     itemBSlug: string,
 ) {
@@ -84,15 +84,15 @@ export async function generateManualComparison(
     }
 
     try {
-        const result = await directoryAPI.generateManualComparison(
-            directoryId,
+        const result = await workAPI.generateManualComparison(
+            workId,
             itemASlug,
             itemBSlug,
         );
 
         if (result.status === 'success') {
-            revalidatePath(`/directories/${directoryId}/comparisons`);
-            revalidatePath(`/directories/${directoryId}`);
+            revalidatePath(`/works/${workId}/comparisons`);
+            revalidatePath(`/works/${workId}`);
         }
 
         return result;
@@ -105,18 +105,18 @@ export async function generateManualComparison(
     }
 }
 
-export async function deleteComparison(directoryId: string, slug: string) {
+export async function deleteComparison(workId: string, slug: string) {
     const user = await getAuthFromCookie();
     if (!user) {
         redirect(ROUTES.AUTH_LOGIN);
     }
 
     try {
-        const result = await directoryAPI.deleteComparison(directoryId, slug);
+        const result = await workAPI.deleteComparison(workId, slug);
 
         if (result.status === 'success') {
-            revalidatePath(`/directories/${directoryId}/comparisons`);
-            revalidatePath(`/directories/${directoryId}`);
+            revalidatePath(`/works/${workId}/comparisons`);
+            revalidatePath(`/works/${workId}`);
         }
 
         return result;
@@ -129,7 +129,7 @@ export async function deleteComparison(directoryId: string, slug: string) {
     }
 }
 
-export async function getComparisonAiConfig(directoryId: string) {
+export async function getComparisonAiConfig(workId: string) {
     const user = await getAuthFromCookie();
     if (!user) {
         redirect(ROUTES.AUTH_LOGIN);
@@ -137,12 +137,12 @@ export async function getComparisonAiConfig(directoryId: string) {
 
     try {
         const [dirPlugins, schemaResult] = await Promise.all([
-            pluginsAPI.listForDirectory(directoryId),
-            getFormSchema(directoryId),
+            pluginsAPI.listForWork(workId),
+            getFormSchema(workId),
         ]);
 
         const compPlugin = dirPlugins.plugins.find((p) => p.id === 'comparison-generator');
-        const settings = compPlugin?.directorySettings ?? {};
+        const settings = compPlugin?.workSettings ?? {};
 
         const availableProviders =
             schemaResult.success && schemaResult.data?.providers?.ai
@@ -173,7 +173,7 @@ export async function getComparisonAiConfig(directoryId: string) {
 }
 
 export async function saveComparisonAiConfig(
-    directoryId: string,
+    workId: string,
     config: { provider: string | null; model: string | null; extendedAnalysis?: boolean },
 ) {
     const user = await getAuthFromCookie();
@@ -183,11 +183,11 @@ export async function saveComparisonAiConfig(
 
     try {
         // Read existing settings to preserve custom_prompt
-        const dirPlugins = await pluginsAPI.listForDirectory(directoryId);
+        const dirPlugins = await pluginsAPI.listForWork(workId);
         const compPlugin = dirPlugins.plugins.find((p) => p.id === 'comparison-generator');
-        const existing = compPlugin?.directorySettings ?? {};
+        const existing = compPlugin?.workSettings ?? {};
 
-        await pluginsAPI.updateDirectorySettings(directoryId, 'comparison-generator', {
+        await pluginsAPI.updateWorkSettings(workId, 'comparison-generator', {
             settings: {
                 ...existing,
                 ai_provider: config.provider || null,
@@ -196,20 +196,20 @@ export async function saveComparisonAiConfig(
             },
         });
 
-        revalidatePath(`/directories/${directoryId}/comparisons`);
+        revalidatePath(`/works/${workId}/comparisons`);
         return { success: true };
     } catch (error: any) {
-        // If plugin not enabled for directory, enable it first then retry
+        // If plugin not enabled for work, enable it first then retry
         if (error?.status === 404 || error?.statusCode === 404) {
             try {
-                await pluginsAPI.enableForDirectory(directoryId, 'comparison-generator', {
+                await pluginsAPI.enableForWork(workId, 'comparison-generator', {
                     settings: {
                         ai_provider: config.provider || null,
                         ai_model: config.model || null,
                         extended_analysis: config.extendedAnalysis ?? false,
                     },
                 });
-                revalidatePath(`/directories/${directoryId}/comparisons`);
+                revalidatePath(`/works/${workId}/comparisons`);
                 return { success: true };
             } catch (retryError) {
                 console.error('Enable + save comparison AI config error:', retryError);
@@ -231,7 +231,7 @@ export async function saveComparisonAiConfig(
     }
 }
 
-export async function saveComparisonCustomPrompt(directoryId: string, customPrompt: string | null) {
+export async function saveComparisonCustomPrompt(workId: string, customPrompt: string | null) {
     const user = await getAuthFromCookie();
     if (!user) {
         redirect(ROUTES.AUTH_LOGIN);
@@ -239,28 +239,28 @@ export async function saveComparisonCustomPrompt(directoryId: string, customProm
 
     try {
         // Read existing settings to preserve ai_provider/ai_model
-        const dirPlugins = await pluginsAPI.listForDirectory(directoryId);
+        const dirPlugins = await pluginsAPI.listForWork(workId);
         const compPlugin = dirPlugins.plugins.find((p) => p.id === 'comparison-generator');
-        const existing = compPlugin?.directorySettings ?? {};
+        const existing = compPlugin?.workSettings ?? {};
 
-        await pluginsAPI.updateDirectorySettings(directoryId, 'comparison-generator', {
+        await pluginsAPI.updateWorkSettings(workId, 'comparison-generator', {
             settings: {
                 ...existing,
                 custom_prompt: customPrompt || null,
             },
         });
 
-        revalidatePath(`/directories/${directoryId}/settings`);
+        revalidatePath(`/works/${workId}/settings`);
         return { success: true };
     } catch (error: any) {
         if (error?.status === 404 || error?.statusCode === 404) {
             try {
-                await pluginsAPI.enableForDirectory(directoryId, 'comparison-generator', {
+                await pluginsAPI.enableForWork(workId, 'comparison-generator', {
                     settings: {
                         custom_prompt: customPrompt || null,
                     },
                 });
-                revalidatePath(`/directories/${directoryId}/settings`);
+                revalidatePath(`/works/${workId}/settings`);
                 return { success: true };
             } catch (retryError) {
                 console.error('Enable + save comparison custom prompt error:', retryError);

@@ -41,13 +41,13 @@ export class OpenAiCompatController {
     async chatCompletions(
         @CurrentUser() auth: AuthenticatedUser,
         @Headers('x-provider-override') providerOverride: string | undefined,
-        @Headers('x-directory-id') directoryId: string | undefined,
+        @Headers('x-work-id') workId: string | undefined,
         @Body() body: OpenAiChatCompletionRequestDto,
         @Res() res: OpenAiHttpResponse,
     ): Promise<void> {
         const facadeOptions = {
             userId: auth.userId,
-            directoryId,
+            workId,
             providerOverride,
         };
 

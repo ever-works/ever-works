@@ -1,9 +1,9 @@
 /**
  * Activepieces Automation Plugin
  *
- * Pipeline plugin that delegates directory generation steps to Activepieces flows.
+ * Pipeline plugin that delegates work generation steps to Activepieces flows.
  * Talks to the Activepieces REST API directly (no SDK) and triggers flow webhooks
- * synchronously to collect structured directory items.
+ * synchronously to collect structured work items.
  *
  * @packageDocumentation
  */

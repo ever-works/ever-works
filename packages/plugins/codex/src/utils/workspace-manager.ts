@@ -124,12 +124,12 @@ async function parallelBatch<T>(tasks: (() => Promise<T>)[], concurrency: number
 	return results;
 }
 
-export function getWorkspacePath(userId: string, directoryId: string, runId: string): string {
-	return path.join(BASE_TEMP_DIR, userId, `${directoryId}-${runId}`);
+export function getWorkspacePath(userId: string, workId: string, runId: string): string {
+	return path.join(BASE_TEMP_DIR, userId, `${workId}-${runId}`);
 }
 
-export async function createWorkspace(userId: string, directoryId: string): Promise<string> {
-	const workspacePath = getWorkspacePath(userId, directoryId, randomUUID());
+export async function createWorkspace(userId: string, workId: string): Promise<string> {
+	const workspacePath = getWorkspacePath(userId, workId, randomUUID());
 	await fs.mkdir(path.join(workspacePath, '_meta'), { recursive: true });
 	return workspacePath;
 }
@@ -167,7 +167,7 @@ export async function seedExistingItems(workspacePath: string, items: readonly I
 export async function seedMetadata(
 	workspacePath: string,
 	metadata: {
-		directory?: { name: string; description?: string };
+		work?: { name: string; description?: string };
 		request?: { prompt?: string; name?: string };
 		categories?: readonly Category[];
 		tags?: readonly Tag[];
@@ -176,8 +176,8 @@ export async function seedMetadata(
 ): Promise<void> {
 	const metaDir = path.join(workspacePath, '_meta');
 
-	if (metadata.directory) {
-		await fs.writeFile(path.join(metaDir, 'directory.json'), JSON.stringify(metadata.directory, null, 2), 'utf-8');
+	if (metadata.work) {
+		await fs.writeFile(path.join(metaDir, 'work.json'), JSON.stringify(metadata.work, null, 2), 'utf-8');
 	}
 	if (metadata.request) {
 		await fs.writeFile(path.join(metaDir, 'request.json'), JSON.stringify(metadata.request, null, 2), 'utf-8');
@@ -202,10 +202,10 @@ export async function readGeneratedItems(workspacePath: string, logger?: Logger)
 	try {
 		const dirEntries = await fs.readdir(workspacePath, { withFileTypes: true });
 		entries = dirEntries
-			.filter((entry) => !entry.isDirectory() && entry.name.endsWith('.json'))
+			.filter((entry) => !entry.isWork() && entry.name.endsWith('.json'))
 			.map((entry) => entry.name);
 	} catch {
-		logger?.warn('Could not read Codex workspace directory');
+		logger?.warn('Could not read Codex workspace work');
 		return [];
 	}
 
@@ -258,7 +258,7 @@ export async function describeWorkspaceOutputs(workspacePath: string): Promise<s
 		const dirEntries = await fs.readdir(workspacePath, { withFileTypes: true });
 		return dirEntries
 			.filter((entry) => !entry.name.startsWith('.'))
-			.map((entry) => (entry.isDirectory() ? `${entry.name}/` : entry.name))
+			.map((entry) => (entry.isWork() ? `${entry.name}/` : entry.name))
 			.sort();
 	} catch {
 		return [];
@@ -273,7 +273,7 @@ export async function writeGeneratedItems(workspacePath: string, items: readonly
 	const existingEntries = await fs.readdir(workspacePath, { withFileTypes: true }).catch(() => []);
 	const usedSlugs = new Set(
 		existingEntries
-			.filter((entry) => !entry.isDirectory() && entry.name.endsWith('.json'))
+			.filter((entry) => !entry.isWork() && entry.name.endsWith('.json'))
 			.map((entry) => entry.name.replace(/\.json$/u, ''))
 	);
 

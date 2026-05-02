@@ -29,7 +29,7 @@ import {
     AuthAccountRepository,
     buildPluginProviderId,
 } from '../database/repositories/auth-account.repository';
-import { DirectoryRepository } from '../database/repositories/directory.repository';
+import { WorkRepository } from '../database/repositories/work.repository';
 import { GitHubAppInstallationRepository } from '../database/repositories/github-app-installation.repository';
 import type { AuthAccount } from '../entities';
 import { FacadeError } from './base.facade';
@@ -86,7 +86,7 @@ export class NoGitCredentialsError extends GitFacadeError {
 /** Base options shared by all Git facade calls */
 interface GitFacadeBaseOptions {
     readonly providerId: string;
-    readonly directoryId?: string;
+    readonly workId?: string;
 }
 
 /** Token-based auth — used when caller already has a token (e.g., public repo analysis) */
@@ -122,7 +122,7 @@ export class GitFacadeService implements IGitFacade {
         private readonly registry: PluginRegistryService,
         private readonly authAccountRepository: AuthAccountRepository,
         private readonly settingsService: PluginSettingsService,
-        private readonly directoryRepository: DirectoryRepository,
+        private readonly workRepository: WorkRepository,
         private readonly gitHubAppInstallationRepository: GitHubAppInstallationRepository,
     ) {}
 
@@ -184,7 +184,7 @@ export class GitFacadeService implements IGitFacade {
         if (!options.userId || !options.providerId) return false;
 
         try {
-            const linkedToken = await this.getInstallationTokenForDirectory(options);
+            const linkedToken = await this.getInstallationTokenForWork(options);
             if (linkedToken) {
                 return true;
             }
@@ -192,7 +192,7 @@ export class GitFacadeService implements IGitFacade {
             const plugin = await this.resolvePlugin(
                 options.providerId,
                 options.userId,
-                options.directoryId,
+                options.workId,
             );
 
             // Check connected provider account first
@@ -205,7 +205,7 @@ export class GitFacadeService implements IGitFacade {
             const patToken = await this.getPatFromSettings(
                 plugin.id,
                 options.userId,
-                options.directoryId,
+                options.workId,
             );
             return !!patToken;
         } catch {
@@ -218,7 +218,7 @@ export class GitFacadeService implements IGitFacade {
         if (!options.userId || !options.providerId) return null;
 
         try {
-            const linkedToken = await this.getInstallationTokenForDirectory(options);
+            const linkedToken = await this.getInstallationTokenForWork(options);
             if (linkedToken) {
                 return linkedToken;
             }
@@ -226,7 +226,7 @@ export class GitFacadeService implements IGitFacade {
             const plugin = await this.resolvePlugin(
                 options.providerId,
                 options.userId,
-                options.directoryId,
+                options.workId,
             );
 
             // Try connected provider account first
@@ -236,7 +236,7 @@ export class GitFacadeService implements IGitFacade {
             }
 
             // Try plugin settings for PAT
-            return this.getPatFromSettings(plugin.id, options.userId, options.directoryId);
+            return this.getPatFromSettings(plugin.id, options.userId, options.workId);
         } catch {
             return null;
         }
@@ -249,7 +249,7 @@ export class GitFacadeService implements IGitFacade {
             const plugin = await this.resolvePlugin(
                 options.providerId,
                 options.userId,
-                options.directoryId,
+                options.workId,
             );
 
             // Try to get committer info from the connected provider account first
@@ -270,7 +270,7 @@ export class GitFacadeService implements IGitFacade {
             // For PAT-based auth, try to get committer info from plugin settings
             const settings = await this.settingsService.getResolvedSettings(plugin.id, {
                 userId: options.userId,
-                directoryId: options.directoryId,
+                workId: options.workId,
                 includeSecrets: false, // We don't need secrets, just user info
             });
 
@@ -285,7 +285,7 @@ export class GitFacadeService implements IGitFacade {
             const patToken = await this.getPatFromSettings(
                 plugin.id,
                 options.userId,
-                options.directoryId,
+                options.workId,
             );
             if (patToken) {
                 try {
@@ -547,7 +547,7 @@ export class GitFacadeService implements IGitFacade {
         );
     }
 
-    async getDirectoryContents(
+    async getWorkContents(
         owner: string,
         repo: string,
         path: string,
@@ -558,8 +558,8 @@ export class GitFacadeService implements IGitFacade {
         path: string;
     }> | null> {
         const { plugin, token } = await this.resolvePluginAndToken(options);
-        if (plugin.getDirectoryContents) {
-            return plugin.getDirectoryContents(owner, repo, path, token);
+        if (plugin.getWorkContents) {
+            return plugin.getWorkContents(owner, repo, path, token);
         }
         return null;
     }
@@ -787,7 +787,7 @@ export class GitFacadeService implements IGitFacade {
         const plugin = await this.resolvePlugin(
             options.providerId,
             options.userId,
-            options.directoryId,
+            options.workId,
         );
 
         // If token provided directly, use it
@@ -803,7 +803,7 @@ export class GitFacadeService implements IGitFacade {
             );
         }
 
-        const linkedToken = await this.getInstallationTokenForDirectory(options);
+        const linkedToken = await this.getInstallationTokenForWork(options);
         if (linkedToken) {
             return { plugin, token: linkedToken };
         }
@@ -818,7 +818,7 @@ export class GitFacadeService implements IGitFacade {
         const patToken = await this.getPatFromSettings(
             plugin.id,
             options.userId,
-            options.directoryId,
+            options.workId,
         );
         if (patToken) {
             return { plugin, token: patToken };
@@ -833,12 +833,12 @@ export class GitFacadeService implements IGitFacade {
     private async getPatFromSettings(
         pluginId: string,
         userId: string,
-        directoryId?: string,
+        workId?: string,
     ): Promise<string | null> {
         try {
             const settings = await this.settingsService.getResolvedSettings(pluginId, {
                 userId,
-                directoryId,
+                workId,
                 includeSecrets: true,
             });
             return (settings.accessToken?.value as string) || null;
@@ -850,7 +850,7 @@ export class GitFacadeService implements IGitFacade {
     private async resolvePlugin(
         providerId: string,
         userId?: string,
-        directoryId?: string,
+        workId?: string,
     ): Promise<IGitProviderPlugin> {
         if (!providerId) {
             throw new GitFacadeError('providerId is required', 'resolvePlugin');
@@ -864,7 +864,7 @@ export class GitFacadeService implements IGitFacade {
         ) {
             const isEnabled = await this.registry.isPluginEnabledForScope(
                 providerId,
-                directoryId,
+                workId,
                 userId,
             );
             if (isEnabled) {
@@ -874,15 +874,15 @@ export class GitFacadeService implements IGitFacade {
         throw new GitProviderNotFoundError(providerId);
     }
 
-    private async getInstallationTokenForDirectory(
+    private async getInstallationTokenForWork(
         options: GitFacadeOptions,
     ): Promise<string | null> {
-        if (!options.directoryId || options.providerId !== 'github') {
+        if (!options.workId || options.providerId !== 'github') {
             return null;
         }
 
-        const directory = await this.directoryRepository.findById(options.directoryId);
-        const auth = directory?.sourceRepository?.auth;
+        const work = await this.workRepository.findById(options.workId);
+        const auth = work?.sourceRepository?.auth;
 
         if (!auth || auth.mode !== 'github_app_installation' || !auth.installationId) {
             return null;

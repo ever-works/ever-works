@@ -4,7 +4,7 @@ import {
 } from '@ever-works/agent/database';
 import { User } from '@ever-works/agent/entities';
 import { SourceRepoAnalyzerService } from '@ever-works/agent/import';
-import { DirectoryImportService } from '@ever-works/agent/services';
+import { WorkImportService } from '@ever-works/agent/services';
 import { Injectable } from '@nestjs/common';
 import { config } from '@src/config/constants';
 import { GitHubAppService } from './github-app.service';
@@ -39,7 +39,7 @@ export class GitHubAppSyncService {
         private readonly gitHubAppInstallationRepository: GitHubAppInstallationRepository,
         private readonly gitHubAppInstallationRepoRepository: GitHubAppInstallationRepoRepository,
         private readonly sourceRepoAnalyzerService: SourceRepoAnalyzerService,
-        private readonly directoryImportService: DirectoryImportService,
+        private readonly workImportService: WorkImportService,
     ) {}
 
     async listInstallationsForUser(userId: string) {
@@ -144,7 +144,7 @@ export class GitHubAppSyncService {
             };
         }
 
-        return this.directoryImportService.onboardLinkedRepository(
+        return this.workImportService.onboardLinkedRepository(
             {
                 sourceUrl,
                 sourceOwner: repository.owner,

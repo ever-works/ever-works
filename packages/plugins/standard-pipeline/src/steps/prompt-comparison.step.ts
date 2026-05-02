@@ -48,7 +48,7 @@ export type PromptComparisonResult = z.infer<typeof promptComparisonOutputSchema
  * Prompt Comparison Step
  *
  * Compares new prompts with existing prompts to ensure consistency
- * when updating existing directories. Prevents data inconsistency
+ * when updating existing works. Prevents data inconsistency
  * by rejecting unrelated prompts in CREATE_UPDATE mode.
  */
 export class PromptComparisonStep extends BasePipelineStep {
@@ -59,12 +59,12 @@ export class PromptComparisonStep extends BasePipelineStep {
 		context: MutableGenerationContext,
 		execContext: StepExecutionContext
 	): Promise<MutableGenerationContext> {
-		const { request, existing, directory } = context;
+		const { request, existing, work } = context;
 		const { logger, aiFacade, promptFacade } = execContext;
 
 		const facadeOptions: FacadeOptions = {
 			userId: execContext.user!.id,
-			directoryId: execContext.directory.id
+			workId: execContext.work.id
 		};
 
 		const config = request.config || {};
@@ -78,7 +78,7 @@ export class PromptComparisonStep extends BasePipelineStep {
 			existing.items &&
 			existing.items.length > 0
 		) {
-			logger.log(`[${directory.slug}] Prompt Comparison - Starting`);
+			logger.log(`[${work.slug}] Prompt Comparison - Starting`);
 
 			const comparisonResult = await this.comparePrompts(
 				$configMetadata.initial_prompt as string,
@@ -96,7 +96,7 @@ export class PromptComparisonStep extends BasePipelineStep {
 			const areRelated = comparisonResult.areRelated && comparisonResult.confidence > confidenceThreshold;
 
 			logger.log(
-				`[${directory.slug}] Prompt comparison: ${comparisonResult.areRelated ? 'RELATED' : 'UNRELATED'} ` +
+				`[${work.slug}] Prompt comparison: ${comparisonResult.areRelated ? 'RELATED' : 'UNRELATED'} ` +
 					`(confidence: ${confidence.toFixed(2)})`
 			);
 
@@ -107,7 +107,7 @@ export class PromptComparisonStep extends BasePipelineStep {
 				);
 			}
 		} else {
-			logger.debug(`[${directory.slug}] Prompt Comparison - Skipped`);
+			logger.debug(`[${work.slug}] Prompt Comparison - Skipped`);
 		}
 
 		return context;

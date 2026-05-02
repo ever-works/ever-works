@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { ZapierPlugin } from '../zapier.plugin.js';
-import type { DirectoryReference, GenerationRequest, ExistingItems, PluginContext } from '@ever-works/plugin';
+import type { WorkReference, GenerationRequest, ExistingItems, PluginContext } from '@ever-works/plugin';
 
 const { mockGetAction, mockRunAction } = vi.hoisted(() => ({
 	mockGetAction: vi.fn(),
@@ -96,12 +96,12 @@ function createMockContext(settingsOverride?: Record<string, unknown>): PluginCo
 	} as unknown as PluginContext;
 }
 
-function createDirectory(overrides?: Partial<DirectoryReference>): DirectoryReference {
+function createWork(overrides?: Partial<WorkReference>): WorkReference {
 	return {
 		id: 'dir-123',
-		name: 'Test Directory',
-		slug: 'test-directory',
-		description: 'A test directory',
+		name: 'Test Work',
+		slug: 'test-work',
+		description: 'A test work',
 		user: { id: 'user-456' },
 		...overrides
 	};
@@ -344,7 +344,7 @@ describe('ZapierPlugin', () => {
 
 		it('should fail without a user ID', async () => {
 			const result = await plugin.execute(
-				createDirectory({ user: undefined }),
+				createWork({ user: undefined }),
 				createRequest(),
 				createExisting()
 			);
@@ -353,7 +353,7 @@ describe('ZapierPlugin', () => {
 
 		it('should fail when action_key is missing', async () => {
 			const result = await plugin.execute(
-				createDirectory(),
+				createWork(),
 				createRequest({ config: { app_key: 'slack', action_type: 'write', authentication_id: 1 } }),
 				createExisting()
 			);
@@ -363,7 +363,7 @@ describe('ZapierPlugin', () => {
 
 		it('should fail when authentication_id is missing — never auto-resolves', async () => {
 			const result = await plugin.execute(
-				createDirectory(),
+				createWork(),
 				createRequest({ config: { app_key: 'slack', action_type: 'write', action_key: 'custom' } }),
 				createExisting()
 			);
@@ -372,7 +372,7 @@ describe('ZapierPlugin', () => {
 		});
 
 		it('should execute a structured-shape action and return items', async () => {
-			const result = await plugin.execute(createDirectory(), createRequest(), createExisting());
+			const result = await plugin.execute(createWork(), createRequest(), createExisting());
 
 			expect(result.success).toBe(true);
 			expect(result.outputs.items.length).toBeGreaterThan(0);
@@ -380,7 +380,7 @@ describe('ZapierPlugin', () => {
 		});
 
 		it('should call runAction with the resolved action triple', async () => {
-			await plugin.execute(createDirectory(), createRequest(), createExisting());
+			await plugin.execute(createWork(), createRequest(), createExisting());
 
 			expect(mockRunAction).toHaveBeenCalledWith(
 				expect.objectContaining({
@@ -398,7 +398,7 @@ describe('ZapierPlugin', () => {
 				items: [{ name: 'Test Item 1', description: 'Existing' } as never]
 			});
 
-			const result = await plugin.execute(createDirectory(), createRequest(), existing);
+			const result = await plugin.execute(createWork(), createRequest(), existing);
 
 			expect(result.success).toBe(true);
 			const names = result.outputs.items.map((i) => i.name);
@@ -409,7 +409,7 @@ describe('ZapierPlugin', () => {
 			const controller = new AbortController();
 			controller.abort();
 
-			const result = await plugin.execute(createDirectory(), createRequest(), createExisting(), {
+			const result = await plugin.execute(createWork(), createRequest(), createExisting(), {
 				signal: controller.signal
 			});
 
@@ -428,7 +428,7 @@ describe('ZapierPlugin', () => {
 				);
 
 				const result = plugin.execute(
-					createDirectory(),
+					createWork(),
 					createRequest({
 						config: {
 							app_key: 'slack',
@@ -452,7 +452,7 @@ describe('ZapierPlugin', () => {
 		});
 
 		it('should expose state after execution', async () => {
-			await plugin.execute(createDirectory(), createRequest(), createExisting());
+			await plugin.execute(createWork(), createRequest(), createExisting());
 			const state = plugin.getState();
 			expect(state).toBeDefined();
 			expect(state!.completedSteps.length).toBeGreaterThan(0);
@@ -468,7 +468,7 @@ describe('ZapierPlugin', () => {
 			});
 
 			const result = await plugin.execute(
-				createDirectory(),
+				createWork(),
 				createRequest({
 					config: {
 						app_key: 'airtable',
@@ -497,7 +497,7 @@ describe('ZapierPlugin', () => {
 			mockGetAction.mockResolvedValue({ data: { key: 'custom' } });
 			mockRunAction.mockRejectedValue(new ZapierActionError('Invalid channel'));
 
-			const result = await plugin.execute(createDirectory(), createRequest(), createExisting());
+			const result = await plugin.execute(createWork(), createRequest(), createExisting());
 			expect(result.success).toBe(false);
 			expect(errorMessage(result.error)).toContain('Invalid channel');
 		});

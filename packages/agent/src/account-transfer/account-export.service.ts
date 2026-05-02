@@ -1,25 +1,25 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { DirectoryRepository } from '../database/repositories/directory.repository';
-import { DirectoryMemberRepository } from '../database/repositories/directory-member.repository';
-import { DirectoryCustomDomainRepository } from '../database/repositories/directory-custom-domain.repository';
+import { WorkRepository } from '../database/repositories/work.repository';
+import { WorkMemberRepository } from '../database/repositories/work-member.repository';
+import { WorkCustomDomainRepository } from '../database/repositories/work-custom-domain.repository';
 import { UserPluginRepository } from '../plugins/repositories/user-plugin.repository';
-import { DirectoryPluginRepository } from '../plugins/repositories/directory-plugin.repository';
+import { WorkPluginRepository } from '../plugins/repositories/work-plugin.repository';
 import { UserRepository } from '../database/repositories/user.repository';
-import { DirectoryAdvancedPromptsRepository } from '../database/repositories/directory-advanced-prompts.repository';
-import { DirectoryScheduleRepository } from '../database/repositories/directory-schedule.repository';
+import { WorkAdvancedPromptsRepository } from '../database/repositories/work-advanced-prompts.repository';
+import { WorkScheduleRepository } from '../database/repositories/work-schedule.repository';
 import { GitFacadeService } from '../facades/git.facade';
 import { DataRepository } from '../generators/data-generator/data-repository';
 import type {
     AccountExportPayload,
-    ExportedDirectory,
+    ExportedWork,
     ExportedAdvancedPrompts,
     ExportedSchedule,
     ExportedComparison,
     ExportedMarkdownTemplate,
-    ExportedDirectoryItem,
-    ExportedDirectoryCategory,
-    ExportedDirectoryTag,
-    ExportedDirectoryCollection,
+    ExportedWorkItem,
+    ExportedWorkCategory,
+    ExportedWorkTag,
+    ExportedWorkCollection,
     ExportedUserPlugin,
     ExportOptions,
 } from './types';
@@ -31,14 +31,14 @@ export class AccountExportService {
     private readonly logger = new Logger(AccountExportService.name);
 
     constructor(
-        private readonly directoryRepository: DirectoryRepository,
-        private readonly directoryMemberRepository: DirectoryMemberRepository,
-        private readonly directoryCustomDomainRepository: DirectoryCustomDomainRepository,
+        private readonly workRepository: WorkRepository,
+        private readonly workMemberRepository: WorkMemberRepository,
+        private readonly workCustomDomainRepository: WorkCustomDomainRepository,
         private readonly userPluginRepository: UserPluginRepository,
-        private readonly directoryPluginRepository: DirectoryPluginRepository,
+        private readonly workPluginRepository: WorkPluginRepository,
         private readonly userRepository: UserRepository,
-        private readonly advancedPromptsRepository: DirectoryAdvancedPromptsRepository,
-        private readonly scheduleRepository: DirectoryScheduleRepository,
+        private readonly advancedPromptsRepository: WorkAdvancedPromptsRepository,
+        private readonly scheduleRepository: WorkScheduleRepository,
         private readonly gitFacade: GitFacadeService,
     ) {}
 
@@ -53,10 +53,10 @@ export class AccountExportService {
             throw new Error('User not found');
         }
 
-        const directories = await this.directoryRepository.findByUser(userId);
+        const works = await this.workRepository.findByUser(userId);
 
-        const exportedDirectories: ExportedDirectory[] = await Promise.all(
-            directories.map((dir) => this.exportDirectory(dir.id, dir, includeSecrets)),
+        const exportedWorks: ExportedWork[] = await Promise.all(
+            works.map((dir) => this.exportWork(dir.id, dir, includeSecrets)),
         );
 
         const userPlugins = await this.userPluginRepository.findByUser(userId);
@@ -64,7 +64,7 @@ export class AccountExportService {
             const exported: ExportedUserPlugin = {
                 pluginId: up.pluginId,
                 enabled: up.enabled,
-                autoEnableForDirectories: up.autoEnableForDirectories,
+                autoEnableForWorks: up.autoEnableForWorks,
                 settings: up.settings || {},
             };
             if (includeSecrets && up.secretSettings) {
@@ -84,28 +84,28 @@ export class AccountExportService {
                     email: user.email,
                     avatar: user.avatar || undefined,
                 },
-                directories: exportedDirectories,
+                works: exportedWorks,
                 userPlugins: exportedUserPlugins,
             },
         };
     }
 
-    private async exportDirectory(
-        directoryId: string,
+    private async exportWork(
+        workId: string,
         dir: any,
         includeSecrets: boolean,
-    ): Promise<ExportedDirectory> {
-        const [members, customDomains, directoryPlugins, prompts, scheduleEntity] =
+    ): Promise<ExportedWork> {
+        const [members, customDomains, workPlugins, prompts, scheduleEntity] =
             await Promise.all([
-                this.directoryMemberRepository.findByDirectory(directoryId),
-                this.directoryCustomDomainRepository.findByDirectory(directoryId),
-                this.directoryPluginRepository.findByDirectory(directoryId),
-                this.advancedPromptsRepository.findByDirectoryId(directoryId),
-                this.scheduleRepository.findByDirectoryId(directoryId),
+                this.workMemberRepository.findByWork(workId),
+                this.workCustomDomainRepository.findByWork(workId),
+                this.workPluginRepository.findByWork(workId),
+                this.advancedPromptsRepository.findByWorkId(workId),
+                this.scheduleRepository.findByWorkId(workId),
             ]);
 
         // Fetch items, config, comparisons, and markdown template from the data repo
-        const repoData = await this.fetchDirectoryRepoData(dir);
+        const repoData = await this.fetchWorkRepoData(dir);
 
         // Build schedule if configured
         let schedule: ExportedSchedule | undefined;
@@ -159,7 +159,7 @@ export class AccountExportService {
                 verified: cd.verified,
                 provider: cd.provider || undefined,
             })),
-            directoryPlugins: directoryPlugins.map((dp) => {
+            workPlugins: workPlugins.map((dp) => {
                 const exported: any = {
                     pluginId: dp.pluginId,
                     enabled: dp.enabled,
@@ -185,11 +185,11 @@ export class AccountExportService {
         };
     }
 
-    private async fetchDirectoryRepoData(dir: any): Promise<{
-        items: ExportedDirectoryItem[];
-        categories: ExportedDirectoryCategory[];
-        tags: ExportedDirectoryTag[];
-        collections: ExportedDirectoryCollection[];
+    private async fetchWorkRepoData(dir: any): Promise<{
+        items: ExportedWorkItem[];
+        categories: ExportedWorkCategory[];
+        tags: ExportedWorkTag[];
+        collections: ExportedWorkCollection[];
         siteConfig?: Record<string, any>;
         comparisons: ExportedComparison[];
         markdownTemplate?: ExportedMarkdownTemplate;
@@ -235,10 +235,10 @@ export class AccountExportService {
             }
 
             return {
-                items: items as ExportedDirectoryItem[],
-                categories: categories as ExportedDirectoryCategory[],
-                tags: tags as ExportedDirectoryTag[],
-                collections: collections as ExportedDirectoryCollection[],
+                items: items as ExportedWorkItem[],
+                categories: categories as ExportedWorkCategory[],
+                tags: tags as ExportedWorkTag[],
+                collections: collections as ExportedWorkCollection[],
                 siteConfig: siteConfig || undefined,
                 comparisons: exportedComparisons,
                 markdownTemplate:
@@ -246,7 +246,7 @@ export class AccountExportService {
             };
         } catch (error) {
             this.logger.warn(
-                `Failed to fetch repo data for directory "${dir.slug}": ${error instanceof Error ? error.message : String(error)}`,
+                `Failed to fetch repo data for work "${dir.slug}": ${error instanceof Error ? error.message : String(error)}`,
             );
             return empty;
         }

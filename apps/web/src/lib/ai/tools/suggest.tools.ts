@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { tool, generateText, type LanguageModel } from 'ai';
-import { directoryAPI } from '@/lib/api/directory';
+import { workAPI } from '@/lib/api/work';
 import { webSearch } from './search.tools';
 import { getUserInfo } from './user.tools';
 
@@ -28,11 +28,11 @@ For each suggestion include:
 - Keep your final response concise and actionable.`;
 
 /**
- * Creates the suggestDirectories tool with a bound model.
+ * Creates the suggestWorks tool with a bound model.
  * This tool runs a subagent that autonomously researches the user
  * via webSearch + getUserInfo and returns personalized Work ideas.
  */
-export function createSuggestDirectoriesTool(model: LanguageModel) {
+export function createSuggestWorksTool(model: LanguageModel) {
     return tool({
         description: [
             'Research the current user and suggest personalized Work ideas.',
@@ -49,10 +49,10 @@ export function createSuggestDirectoriesTool(model: LanguageModel) {
         execute: async ({ additionalContext }, { abortSignal }) => {
             try {
                 // Fetch existing Works so the subagent avoids duplicates
-                let existingDirectories: string[] = [];
+                let existingWorks: string[] = [];
                 try {
-                    const dirs = await directoryAPI.getAll({ limit: 10 });
-                    existingDirectories = dirs.directories.map((d: { name: string }) => d.name);
+                    const dirs = await workAPI.getAll({ limit: 10 });
+                    existingWorks = dirs.works.map((d: { name: string }) => d.name);
                 } catch {
                     // Not critical
                 }
@@ -61,9 +61,9 @@ export function createSuggestDirectoriesTool(model: LanguageModel) {
                 if (additionalContext) {
                     parts.push(`Additional context from user: "${additionalContext}"`);
                 }
-                if (existingDirectories.length) {
+                if (existingWorks.length) {
                     parts.push(
-                        `They already have these Works: ${existingDirectories.join(', ')}. Don't suggest duplicates.`,
+                        `They already have these Works: ${existingWorks.join(', ')}. Don't suggest duplicates.`,
                     );
                 }
 

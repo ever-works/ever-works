@@ -8,11 +8,11 @@ import {
     UpdateDateColumn,
     Index,
 } from 'typeorm';
-import { DirectoryScheduleBillingMode, type ClassToObject } from './types';
+import { WorkScheduleBillingMode, type ClassToObject } from './types';
 import { User } from './user.entity';
-import { Directory } from './directory.entity';
-import { DirectorySchedule } from './directory-schedule.entity';
-import { DirectoryGenerationHistory } from './directory-generation-history.entity';
+import { Work } from './work.entity';
+import { WorkSchedule } from './work-schedule.entity';
+import { WorkGenerationHistory } from './work-generation-history.entity';
 
 export enum UsageLedgerTriggerType {
     MANUAL = 'manual',
@@ -27,7 +27,7 @@ export enum UsageLedgerStatus {
 }
 
 @Index(['userId', 'status'])
-@Index(['directoryId'])
+@Index(['workId'])
 @Index(['createdAt'])
 @Index(['scheduleId'])
 @Entity({ name: 'usage_ledger_entries' })
@@ -42,28 +42,28 @@ export class UsageLedgerEntry {
     @JoinColumn({ name: 'userId' })
     user: ClassToObject<User>;
 
-    @Column()
-    directoryId: string;
+    @Column({ name: 'directoryId' })
+    workId: string;
 
-    @ManyToOne(() => Directory, { onDelete: 'CASCADE' })
+    @ManyToOne(() => Work, { onDelete: 'CASCADE' })
     @JoinColumn({ name: 'directoryId' })
-    directory: ClassToObject<Directory>;
+    work: ClassToObject<Work>;
 
     @Column({ nullable: true })
     scheduleId?: string | null;
 
-    @ManyToOne(() => DirectorySchedule, (schedule) => schedule.ledgerEntries, {
+    @ManyToOne(() => WorkSchedule, (schedule) => schedule.ledgerEntries, {
         nullable: true,
         onDelete: 'SET NULL',
     })
     @JoinColumn({ name: 'scheduleId' })
-    schedule?: ClassToObject<DirectorySchedule> | null;
+    schedule?: ClassToObject<WorkSchedule> | null;
 
     @Column({ type: 'varchar', default: UsageLedgerTriggerType.MANUAL })
     triggerType: UsageLedgerTriggerType;
 
-    @Column({ type: 'varchar', default: DirectoryScheduleBillingMode.USAGE })
-    billingMode: DirectoryScheduleBillingMode;
+    @Column({ type: 'varchar', default: WorkScheduleBillingMode.USAGE })
+    billingMode: WorkScheduleBillingMode;
 
     @Column({ type: 'int', default: 1 })
     units: number;
@@ -80,9 +80,9 @@ export class UsageLedgerEntry {
     @Column({ nullable: true })
     generationHistoryId?: string | null;
 
-    @ManyToOne(() => DirectoryGenerationHistory, { nullable: true })
+    @ManyToOne(() => WorkGenerationHistory, { nullable: true })
     @JoinColumn({ name: 'generationHistoryId' })
-    generationHistory?: ClassToObject<DirectoryGenerationHistory> | null;
+    generationHistory?: ClassToObject<WorkGenerationHistory> | null;
 
     @Column({ type: 'json', nullable: true })
     metadata?: Record<string, any> | null;

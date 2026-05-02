@@ -9,12 +9,12 @@ import {
     JoinColumn,
 } from 'typeorm';
 import type { ClassToObject } from './types';
-import { Directory } from './directory.entity';
-import { DirectoryGenerationHistory } from './directory-generation-history.entity';
+import { Work } from './work.entity';
+import { WorkGenerationHistory } from './work-generation-history.entity';
 import { UserSubscription } from './user-subscription.entity';
 import { SubscriptionPlan } from './subscription-plan.entity';
-import { DirectorySchedule } from './directory-schedule.entity';
-import { DirectoryMember } from './directory-member.entity';
+import { WorkSchedule } from './work-schedule.entity';
+import { WorkMember } from './work-member.entity';
 
 @Entity({ name: 'users' })
 export class User {
@@ -77,20 +77,20 @@ export class User {
     @UpdateDateColumn()
     updatedAt: Date;
 
-    @OneToMany(() => Directory, (directory) => directory.user, { lazy: true })
-    directories: Promise<ClassToObject<Directory>[]>;
+    @OneToMany(() => Work, (work) => work.user, { lazy: true })
+    works: Promise<ClassToObject<Work>[]>;
 
-    @OneToMany(() => DirectoryGenerationHistory, (history) => history.user, { lazy: true })
-    generationHistory?: Promise<ClassToObject<DirectoryGenerationHistory>[]>;
+    @OneToMany(() => WorkGenerationHistory, (history) => history.user, { lazy: true })
+    generationHistory?: Promise<ClassToObject<WorkGenerationHistory>[]>;
 
     @OneToMany(() => UserSubscription, (subscription) => subscription.user, { lazy: true })
     subscriptions?: Promise<ClassToObject<UserSubscription>[]>;
 
-    @OneToMany(() => DirectorySchedule, (schedule) => schedule.user, { lazy: true })
-    directorySchedules?: Promise<ClassToObject<DirectorySchedule>[]>;
+    @OneToMany(() => WorkSchedule, (schedule) => schedule.user, { lazy: true })
+    workSchedules?: Promise<ClassToObject<WorkSchedule>[]>;
 
-    @OneToMany(() => DirectoryMember, (member) => member.user, { lazy: true })
-    directoryMemberships?: Promise<ClassToObject<DirectoryMember>[]>;
+    @OneToMany(() => WorkMember, (member) => member.user, { lazy: true })
+    workMemberships?: Promise<ClassToObject<WorkMember>[]>;
 
     @Column({ nullable: true })
     defaultPlanId?: string | null;

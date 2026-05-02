@@ -6,7 +6,7 @@ import { WorksConfigService } from '../services/works-config.service';
 import { WorksConfigWriterService } from '../services/works-config-writer.service';
 
 describe('WorksConfigWriterService', () => {
-    const createDirectory = () =>
+    const createWork = () =>
         ({
             name: 'Compare Cloud Pricing',
             getRepoOwner: jest.fn((role?: string) =>
@@ -24,7 +24,7 @@ describe('WorksConfigWriterService', () => {
         const service = new WorksConfigWriterService(new WorksConfigService({} as any));
 
         await service.writeToDataRepository({
-            directory: createDirectory(),
+            work: createWork(),
             dataRepository: { dir: repoDir } as any,
             request: {
                 name: 'Compare Cloud Pricing',
@@ -68,7 +68,7 @@ describe('WorksConfigWriterService', () => {
         const service = new WorksConfigWriterService(new WorksConfigService({} as any));
 
         await service.writeToDataRepository({
-            directory: createDirectory(),
+            work: createWork(),
             dataRepository: { dir: repoDir } as any,
             request: {
                 prompt: 'New prompt',
@@ -102,7 +102,7 @@ describe('WorksConfigWriterService', () => {
         const service = new WorksConfigWriterService(new WorksConfigService({} as any));
 
         await service.writeToDataRepository({
-            directory: createDirectory(),
+            work: createWork(),
             dataRepository: { dir: repoDir } as any,
         });
 
@@ -132,7 +132,7 @@ describe('WorksConfigWriterService', () => {
         const service = new WorksConfigWriterService(new WorksConfigService({} as any));
 
         await service.writeToDataRepository({
-            directory: createDirectory(),
+            work: createWork(),
             dataRepository: { dir: repoDir } as any,
             request: {
                 providers: null,
@@ -157,7 +157,7 @@ describe('WorksConfigWriterService', () => {
         const service = new WorksConfigWriterService(new WorksConfigService({} as any));
 
         await service.writeToDataRepository({
-            directory: createDirectory(),
+            work: createWork(),
             dataRepository: { dir: repoDir } as any,
             request: {
                 model: null,
@@ -171,17 +171,17 @@ describe('WorksConfigWriterService', () => {
         await fs.rm(repoDir, { recursive: true, force: true });
     });
 
-    it('writes imported works.yml-only state before schedule is applied to the directory', async () => {
+    it('writes imported works.yml-only state before schedule is applied to the work', async () => {
         const repoDir = await fs.mkdtemp(path.join(os.tmpdir(), 'works-config-writer-'));
-        const directory = {
-            ...createDirectory(),
+        const work = {
+            ...createWork(),
             scheduledUpdatesEnabled: false,
             scheduledCadence: null,
         };
         const service = new WorksConfigWriterService(new WorksConfigService({} as any));
 
         await service.writeToDataRepository({
-            directory,
+            work,
             dataRepository: { dir: repoDir } as any,
             importedWorksConfig: {
                 initialPrompt: 'Imported prompt',

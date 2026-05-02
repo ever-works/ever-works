@@ -1,12 +1,12 @@
 import { Logger, Optional } from '@nestjs/common';
-import { Directory, User, GenerateStatusType } from '@ever-works/agent/entities';
-import { DirectoryOperationsService } from '@ever-works/agent/directory-operations';
+import { Work, User, GenerateStatusType } from '@ever-works/agent/entities';
+import { WorkOperationsService } from '@ever-works/agent/work-operations';
 import { NotificationService } from '@ever-works/agent/notifications';
 import { classifyGenerationError, notifyForClassifiedError } from '@ever-works/agent/services';
 import { calculateDurationSeconds } from '@ever-works/agent/utils';
 
 export type OrchestratorTerminalOptions = {
-    directory: Directory;
+    work: Work;
     historyId: string;
     historyStartedAt?: string;
 };
@@ -20,7 +20,7 @@ export abstract class BaseOrchestrator {
     protected abstract readonly operationLabel: string;
 
     constructor(
-        protected readonly directoryOperations: DirectoryOperationsService,
+        protected readonly workOperations: WorkOperationsService,
         @Optional()
         protected readonly notificationService?: NotificationService,
     ) {}
@@ -43,21 +43,21 @@ export abstract class BaseOrchestrator {
     }
 
     async handleFailure({
-        directory,
+        work,
         historyId,
         historyStartedAt,
         errorMessage,
     }: OrchestratorFailureOptions): Promise<void> {
-        // Always attempt to write the terminal state for both directory and history.
-        // We cannot rely on directory.status === ERROR implying history.status === ERROR:
-        // if the orchestrator's catch block wrote directory=ERROR but then the history
+        // Always attempt to write the terminal state for both work and history.
+        // We cannot rely on work.status === ERROR implying history.status === ERROR:
+        // if the orchestrator's catch block wrote work=ERROR but then the history
         // update threw, history stays in GENERATING. Writing ERROR twice is idempotent.
         const finishedAt = new Date();
         const startTime = this.resolveStartTime(historyStartedAt);
         const duration = Math.max(0, calculateDurationSeconds(startTime, finishedAt));
 
         await this.recordTerminalState({
-            directoryId: directory.id,
+            workId: work.id,
             historyId,
             finishedAt,
             duration,
@@ -65,11 +65,11 @@ export abstract class BaseOrchestrator {
             message: errorMessage,
         });
 
-        await this.directoryOperations.emitGenerationCompleted(directory.id);
+        await this.workOperations.emitGenerationCompleted(work.id);
     }
 
     async handleCancellation({
-        directory,
+        work,
         historyId,
         historyStartedAt,
     }: OrchestratorTerminalOptions): Promise<void> {
@@ -79,7 +79,7 @@ export abstract class BaseOrchestrator {
         const message = `${this.operationLabel} cancelled`;
 
         await this.recordTerminalState({
-            directoryId: directory.id,
+            workId: work.id,
             historyId,
             finishedAt,
             duration,
@@ -87,13 +87,13 @@ export abstract class BaseOrchestrator {
             message,
         });
 
-        await this.directoryOperations.emitGenerationCompleted(directory.id);
+        await this.workOperations.emitGenerationCompleted(work.id);
     }
 
     protected async handleErrorNotification(
         error: unknown,
         user: User,
-        directory: Directory,
+        work: Work,
     ): Promise<void> {
         if (!this.notificationService) {
             return;
@@ -105,15 +105,15 @@ export abstract class BaseOrchestrator {
             await notifyForClassifiedError(
                 this.notificationService,
                 user.id,
-                directory.id,
-                directory.name,
+                work.id,
+                work.name,
                 classification,
             );
         }
     }
 
     private async recordTerminalState(opts: {
-        directoryId: string;
+        workId: string;
         historyId: string;
         finishedAt: Date;
         duration: number;
@@ -121,13 +121,13 @@ export abstract class BaseOrchestrator {
         message: string;
     }): Promise<void> {
         await Promise.all([
-            this.directoryOperations.recordGenerationFinishTime(opts.directoryId, opts.finishedAt),
-            this.directoryOperations.updateGenerateStatus(opts.directoryId, {
+            this.workOperations.recordGenerationFinishTime(opts.workId, opts.finishedAt),
+            this.workOperations.updateGenerateStatus(opts.workId, {
                 status: opts.status,
                 error: opts.message,
                 step: null,
             }),
-            this.directoryOperations.updateGenerationHistory(opts.directoryId, opts.historyId, {
+            this.workOperations.updateGenerationHistory(opts.workId, opts.historyId, {
                 status: opts.status,
                 finishedAt: opts.finishedAt,
                 durationInSeconds: opts.duration,

@@ -234,7 +234,7 @@ export function ImportFlow({ onClose, initialPreview, isPullMode }: ImportFlowPr
                                         {t('works')}
                                     </span>
                                     <span className="font-semibold text-text dark:text-text-dark tabular-nums">
-                                        {preview.directoryCount}
+                                        {preview.workCount}
                                     </span>
                                 </div>
                                 <div className="px-4 py-2.5 flex items-center justify-between text-sm">
@@ -409,38 +409,38 @@ export function ImportFlow({ onClose, initialPreview, isPullMode }: ImportFlowPr
                         </h3>
                     </div>
 
-                    {(result.directoriesCreated > 0 ||
-                        result.directoriesUpdated > 0 ||
-                        result.directoriesSkipped > 0 ||
+                    {(result.worksCreated > 0 ||
+                        result.worksUpdated > 0 ||
+                        result.worksSkipped > 0 ||
                         result.userPluginsImported > 0) && (
                         <div className="divide-y divide-border/30 dark:divide-border-dark/30">
-                            {result.directoriesCreated > 0 && (
+                            {result.worksCreated > 0 && (
                                 <div className="px-5 py-2.5 flex items-center justify-between text-sm">
                                     <span className="text-text-muted dark:text-text-muted-dark">
                                         {t('worksCreated')}
                                     </span>
                                     <span className="font-semibold tabular-nums text-text dark:text-text-dark">
-                                        {result.directoriesCreated}
+                                        {result.worksCreated}
                                     </span>
                                 </div>
                             )}
-                            {result.directoriesUpdated > 0 && (
+                            {result.worksUpdated > 0 && (
                                 <div className="px-5 py-2.5 flex items-center justify-between text-sm">
                                     <span className="text-text-muted dark:text-text-muted-dark">
                                         {t('worksUpdated')}
                                     </span>
                                     <span className="font-semibold tabular-nums text-text dark:text-text-dark">
-                                        {result.directoriesUpdated}
+                                        {result.worksUpdated}
                                     </span>
                                 </div>
                             )}
-                            {result.directoriesSkipped > 0 && (
+                            {result.worksSkipped > 0 && (
                                 <div className="px-5 py-2.5 flex items-center justify-between text-sm">
                                     <span className="text-text-muted dark:text-text-muted-dark">
                                         {t('worksSkipped')}
                                     </span>
                                     <span className="font-semibold tabular-nums text-text dark:text-text-dark">
-                                        {result.directoriesSkipped}
+                                        {result.worksSkipped}
                                     </span>
                                 </div>
                             )}

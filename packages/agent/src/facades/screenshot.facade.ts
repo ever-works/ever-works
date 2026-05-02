@@ -11,7 +11,7 @@ import type {
 import { PLUGIN_CAPABILITIES } from '@ever-works/plugin';
 import { PluginRegistryService } from '../plugins/services/plugin-registry.service';
 import { PluginSettingsService } from '../plugins/services/plugin-settings.service';
-import { DirectoryPluginRepository } from '../plugins/repositories/directory-plugin.repository';
+import { WorkPluginRepository } from '../plugins/repositories/work-plugin.repository';
 import { BaseFacadeService, FacadeError } from './base.facade';
 
 export class ScreenshotFacadeError extends FacadeError {
@@ -29,9 +29,9 @@ export class ScreenshotFacadeService extends BaseFacadeService implements IScree
     constructor(
         registry: PluginRegistryService,
         settingsService: PluginSettingsService,
-        @Optional() directoryPluginRepository?: DirectoryPluginRepository,
+        @Optional() workPluginRepository?: WorkPluginRepository,
     ) {
-        super(registry, settingsService, directoryPluginRepository);
+        super(registry, settingsService, workPluginRepository);
     }
 
     async capture(
@@ -41,7 +41,7 @@ export class ScreenshotFacadeService extends BaseFacadeService implements IScree
         const plugin = await this.resolvePlugin<IScreenshotPlugin>(
             facadeOptions.providerOverride,
             facadeOptions.userId,
-            facadeOptions.directoryId,
+            facadeOptions.workId,
         );
 
         const settings = await this.getResolvedSettings(plugin.id, facadeOptions);
@@ -100,7 +100,7 @@ export class ScreenshotFacadeService extends BaseFacadeService implements IScree
         const plugin = await this.resolvePlugin<IScreenshotPlugin>(
             facadeOptions.providerOverride,
             facadeOptions.userId,
-            facadeOptions.directoryId,
+            facadeOptions.workId,
         );
 
         if (!plugin.getScreenshotUrl) {

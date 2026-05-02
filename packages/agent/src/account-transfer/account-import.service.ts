@@ -1,28 +1,28 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { DataSource } from 'typeorm';
-import { DirectoryRepository } from '../database/repositories/directory.repository';
-import { DirectoryMemberRepository } from '../database/repositories/directory-member.repository';
-import { DirectoryCustomDomainRepository } from '../database/repositories/directory-custom-domain.repository';
+import { WorkRepository } from '../database/repositories/work.repository';
+import { WorkMemberRepository } from '../database/repositories/work-member.repository';
+import { WorkCustomDomainRepository } from '../database/repositories/work-custom-domain.repository';
 import { UserPluginRepository } from '../plugins/repositories/user-plugin.repository';
-import { DirectoryPluginRepository } from '../plugins/repositories/directory-plugin.repository';
+import { WorkPluginRepository } from '../plugins/repositories/work-plugin.repository';
 import { PluginRepository } from '../plugins/repositories/plugin.repository';
 import { UserRepository } from '../database/repositories/user.repository';
-import { DirectoryAdvancedPromptsRepository } from '../database/repositories/directory-advanced-prompts.repository';
-import { DirectoryScheduleRepository } from '../database/repositories/directory-schedule.repository';
+import { WorkAdvancedPromptsRepository } from '../database/repositories/work-advanced-prompts.repository';
+import { WorkScheduleRepository } from '../database/repositories/work-schedule.repository';
 import { GitFacadeService } from '../facades/git.facade';
 import { DataRepository } from '../generators/data-generator/data-repository';
-import { Directory } from '../entities/directory.entity';
-import { DirectoryMember } from '../entities/directory-member.entity';
-import { DirectoryCustomDomain } from '../entities/directory-custom-domain.entity';
+import { Work } from '../entities/work.entity';
+import { WorkMember } from '../entities/work-member.entity';
+import { WorkCustomDomain } from '../entities/work-custom-domain.entity';
 import { UserPluginEntity } from '../plugins/entities/user-plugin.entity';
-import { DirectoryPluginEntity } from '../plugins/entities/directory-plugin.entity';
+import { WorkPluginEntity } from '../plugins/entities/work-plugin.entity';
 import type {
     AccountExportPayload,
     ImportPreview,
     ImportConflict,
     ConflictResolution,
     ImportResult,
-    ExportedDirectory,
+    ExportedWork,
 } from './types';
 import { containsMaskedSecrets, MASKED_SECRET_PREFIX } from './types';
 
@@ -32,15 +32,15 @@ export class AccountImportService {
 
     constructor(
         private readonly dataSource: DataSource,
-        private readonly directoryRepository: DirectoryRepository,
-        private readonly directoryMemberRepository: DirectoryMemberRepository,
-        private readonly directoryCustomDomainRepository: DirectoryCustomDomainRepository,
+        private readonly workRepository: WorkRepository,
+        private readonly workMemberRepository: WorkMemberRepository,
+        private readonly workCustomDomainRepository: WorkCustomDomainRepository,
         private readonly userPluginRepository: UserPluginRepository,
-        private readonly directoryPluginRepository: DirectoryPluginRepository,
+        private readonly workPluginRepository: WorkPluginRepository,
         private readonly pluginRepository: PluginRepository,
         private readonly userRepository: UserRepository,
-        private readonly advancedPromptsRepository: DirectoryAdvancedPromptsRepository,
-        private readonly scheduleRepository: DirectoryScheduleRepository,
+        private readonly advancedPromptsRepository: WorkAdvancedPromptsRepository,
+        private readonly scheduleRepository: WorkScheduleRepository,
         private readonly gitFacade: GitFacadeService,
     ) {}
 
@@ -55,7 +55,7 @@ export class AccountImportService {
                 includesSecrets: false,
                 hasMaskedSecrets: false,
                 profile: { username: '', email: '' },
-                directoryCount: 0,
+                workCount: 0,
                 totalItemCount: 0,
                 userPluginCount: 0,
                 conflicts: [],
@@ -73,7 +73,7 @@ export class AccountImportService {
                 includesSecrets: false,
                 hasMaskedSecrets: false,
                 profile: { username: '', email: '' },
-                directoryCount: 0,
+                workCount: 0,
                 totalItemCount: 0,
                 userPluginCount: 0,
                 conflicts: [],
@@ -89,8 +89,8 @@ export class AccountImportService {
             errors.push('Missing profile data');
         }
 
-        if (!Array.isArray(payload.data?.directories)) {
-            errors.push('Missing or invalid directories array');
+        if (!Array.isArray(payload.data?.works)) {
+            errors.push('Missing or invalid works array');
         }
 
         if (!Array.isArray(payload.data?.userPlugins)) {
@@ -105,7 +105,7 @@ export class AccountImportService {
                 includesSecrets: payload.includesSecrets || false,
                 hasMaskedSecrets: false,
                 profile: payload.data?.profile || { username: '', email: '' },
-                directoryCount: 0,
+                workCount: 0,
                 totalItemCount: 0,
                 userPluginCount: 0,
                 conflicts: [],
@@ -115,10 +115,10 @@ export class AccountImportService {
 
         // Detect slug conflicts
         const conflicts: ImportConflict[] = [];
-        const existingDirectories = await this.directoryRepository.findByUser(userId);
-        const existingSlugs = new Map(existingDirectories.map((d) => [d.slug, d.name]));
+        const existingWorks = await this.workRepository.findByUser(userId);
+        const existingSlugs = new Map(existingWorks.map((d) => [d.slug, d.name]));
 
-        for (const dir of payload.data.directories) {
+        for (const dir of payload.data.works) {
             if (existingSlugs.has(dir.slug)) {
                 conflicts.push({
                     slug: dir.slug,
@@ -135,8 +135,8 @@ export class AccountImportService {
         for (const up of payload.data.userPlugins) {
             allPluginIds.add(up.pluginId);
         }
-        for (const dir of payload.data.directories) {
-            for (const dp of dir.directoryPlugins || []) {
+        for (const dir of payload.data.works) {
+            for (const dp of dir.workPlugins || []) {
                 allPluginIds.add(dp.pluginId);
             }
         }
@@ -148,7 +148,7 @@ export class AccountImportService {
             }
         }
 
-        const totalItemCount = payload.data.directories.reduce(
+        const totalItemCount = payload.data.works.reduce(
             (sum, d) => sum + (d.items?.length || 0),
             0,
         );
@@ -162,8 +162,8 @@ export class AccountImportService {
             }
         }
         if (!hasMaskedSecrets) {
-            for (const dir of payload.data.directories) {
-                for (const dp of dir.directoryPlugins || []) {
+            for (const dir of payload.data.works) {
+                for (const dp of dir.workPlugins || []) {
                     if (containsMaskedSecrets(dp.secretSettings)) {
                         hasMaskedSecrets = true;
                         break;
@@ -180,7 +180,7 @@ export class AccountImportService {
             includesSecrets: payload.includesSecrets || false,
             hasMaskedSecrets,
             profile: payload.data.profile,
-            directoryCount: payload.data.directories.length,
+            workCount: payload.data.works.length,
             totalItemCount,
             userPluginCount: payload.data.userPlugins.length,
             conflicts,
@@ -195,9 +195,9 @@ export class AccountImportService {
     ): Promise<ImportResult> {
         const result: ImportResult = {
             success: true,
-            directoriesCreated: 0,
-            directoriesUpdated: 0,
-            directoriesSkipped: 0,
+            worksCreated: 0,
+            worksUpdated: 0,
+            worksSkipped: 0,
             userPluginsImported: 0,
             errors: [],
             warnings: [],
@@ -217,10 +217,10 @@ export class AccountImportService {
         await queryRunner.startTransaction();
 
         try {
-            // Import directories
-            for (const dir of payload.data.directories) {
+            // Import works
+            for (const dir of payload.data.works) {
                 try {
-                    await this.importDirectory(
+                    await this.importWork(
                         userId,
                         user,
                         dir,
@@ -230,7 +230,7 @@ export class AccountImportService {
                     );
                 } catch (error) {
                     result.errors.push(
-                        `Failed to import directory "${dir.slug}": ${error instanceof Error ? error.message : String(error)}`,
+                        `Failed to import work "${dir.slug}": ${error instanceof Error ? error.message : String(error)}`,
                     );
                 }
             }
@@ -251,7 +251,7 @@ export class AccountImportService {
                         pluginId: up.pluginId,
                         pluginEntityId: pluginEntity.id,
                         enabled: up.enabled,
-                        autoEnableForDirectories: up.autoEnableForDirectories,
+                        autoEnableForWorks: up.autoEnableForWorks,
                         settings: up.settings || {},
                     };
                     if (payload.includesSecrets && up.secretSettings) {
@@ -288,16 +288,16 @@ export class AccountImportService {
         return result;
     }
 
-    private async importDirectory(
+    private async importWork(
         userId: string,
         user: any,
-        dir: ExportedDirectory,
+        dir: ExportedWork,
         resolutionMap: Map<string, ConflictResolution>,
         includesSecrets: boolean,
         result: ImportResult,
     ): Promise<void> {
         let slug = dir.slug;
-        const existing = await this.directoryRepository.findByOwnerAndSlug({
+        const existing = await this.workRepository.findByOwnerAndSlug({
             userId,
             owner: dir.owner || user.username,
             slug,
@@ -306,14 +306,14 @@ export class AccountImportService {
         if (existing) {
             const resolution = resolutionMap.get(dir.slug);
             if (!resolution || resolution.strategy === 'skip') {
-                result.directoriesSkipped++;
+                result.worksSkipped++;
                 return;
             }
 
             if (resolution.strategy === 'rename') {
                 slug = resolution.newSlug || `${dir.slug}-imported`;
                 // Check the new slug doesn't conflict either
-                const newExisting = await this.directoryRepository.existsByUserAndSlug(
+                const newExisting = await this.workRepository.existsByUserAndSlug(
                     userId,
                     slug,
                 );
@@ -321,14 +321,14 @@ export class AccountImportService {
                     result.errors.push(
                         `Cannot rename "${dir.slug}" to "${slug}" - slug already exists`,
                     );
-                    result.directoriesSkipped++;
+                    result.worksSkipped++;
                     return;
                 }
             }
 
             if (resolution.strategy === 'overwrite') {
-                // Update existing directory
-                await this.directoryRepository.update(existing.id, {
+                // Update existing work
+                await this.workRepository.update(existing.id, {
                     name: dir.name,
                     description: dir.description,
                     gitProvider: dir.gitProvider,
@@ -343,21 +343,21 @@ export class AccountImportService {
                     comparisonsEnabled: dir.comparisonsEnabled,
                 });
 
-                await this.importDirectoryRelations(
+                await this.importWorkRelations(
                     existing.id,
                     userId,
                     dir,
                     includesSecrets,
                     result,
                 );
-                await this.importDirectoryRepoData(existing, dir, user, result);
-                result.directoriesUpdated++;
+                await this.importWorkRepoData(existing, dir, user, result);
+                result.worksUpdated++;
                 return;
             }
         }
 
-        // Create new directory
-        const newDir = await this.directoryRepository.create(
+        // Create new work
+        const newDir = await this.workRepository.create(
             {
                 name: dir.name,
                 slug,
@@ -378,15 +378,15 @@ export class AccountImportService {
             user,
         );
 
-        await this.importDirectoryRelations(newDir.id, userId, dir, includesSecrets, result);
-        await this.importDirectoryRepoData(newDir, dir, user, result);
-        result.directoriesCreated++;
+        await this.importWorkRelations(newDir.id, userId, dir, includesSecrets, result);
+        await this.importWorkRepoData(newDir, dir, user, result);
+        result.worksCreated++;
     }
 
-    private async importDirectoryRelations(
-        directoryId: string,
+    private async importWorkRelations(
+        workId: string,
         userId: string,
-        dir: ExportedDirectory,
+        dir: ExportedWork,
         includesSecrets: boolean,
         result: ImportResult,
     ): Promise<void> {
@@ -400,20 +400,20 @@ export class AccountImportService {
                     );
                     continue;
                 }
-                const exists = await this.directoryMemberRepository.isMember(
-                    directoryId,
+                const exists = await this.workMemberRepository.isMember(
+                    workId,
                     member.userId,
                 );
                 if (!exists) {
-                    await this.directoryMemberRepository.addMember(
-                        directoryId,
+                    await this.workMemberRepository.addMember(
+                        workId,
                         member.userId,
                         member.role as any,
                     );
                 }
             } catch (error) {
                 result.warnings.push(
-                    `Failed to import member for directory: ${error instanceof Error ? error.message : String(error)}`,
+                    `Failed to import member for work: ${error instanceof Error ? error.message : String(error)}`,
                 );
             }
         }
@@ -421,13 +421,13 @@ export class AccountImportService {
         // Import custom domains
         for (const cd of dir.customDomains || []) {
             try {
-                const existingDomain = await this.directoryCustomDomainRepository.findOne(
-                    directoryId,
+                const existingDomain = await this.workCustomDomainRepository.findOne(
+                    workId,
                     cd.domain,
                 );
                 if (!existingDomain) {
-                    await this.directoryCustomDomainRepository.addDomain(
-                        directoryId,
+                    await this.workCustomDomainRepository.addDomain(
+                        workId,
                         cd.domain,
                         cd.provider,
                     );
@@ -442,7 +442,7 @@ export class AccountImportService {
         // Import advanced prompts
         if (dir.advancedPrompts && Object.keys(dir.advancedPrompts).length > 0) {
             try {
-                await this.advancedPromptsRepository.createOrUpdate(directoryId, {
+                await this.advancedPromptsRepository.createOrUpdate(workId, {
                     relevanceAssessment: dir.advancedPrompts.relevanceAssessment,
                     itemGeneration: dir.advancedPrompts.itemGeneration,
                     itemExtraction: dir.advancedPrompts.itemExtraction,
@@ -453,7 +453,7 @@ export class AccountImportService {
                 });
             } catch (error) {
                 result.warnings.push(
-                    `Failed to import advanced prompts for directory "${dir.slug}": ${error instanceof Error ? error.message : String(error)}`,
+                    `Failed to import advanced prompts for work "${dir.slug}": ${error instanceof Error ? error.message : String(error)}`,
                 );
             }
         }
@@ -461,7 +461,7 @@ export class AccountImportService {
         // Import schedule
         if (dir.schedule) {
             try {
-                await this.scheduleRepository.upsert(directoryId, {
+                await this.scheduleRepository.upsert(workId, {
                     userId,
                     cadence: dir.schedule.cadence as any,
                     status: dir.schedule.status as any,
@@ -472,13 +472,13 @@ export class AccountImportService {
                 });
             } catch (error) {
                 result.warnings.push(
-                    `Failed to import schedule for directory "${dir.slug}": ${error instanceof Error ? error.message : String(error)}`,
+                    `Failed to import schedule for work "${dir.slug}": ${error instanceof Error ? error.message : String(error)}`,
                 );
             }
         }
 
-        // Import directory plugins
-        for (const dp of dir.directoryPlugins || []) {
+        // Import work plugins
+        for (const dp of dir.workPlugins || []) {
             try {
                 const pluginEntity = await this.pluginRepository.findByPluginId(dp.pluginId);
                 if (!pluginEntity) {
@@ -493,15 +493,15 @@ export class AccountImportService {
                 if (includesSecrets && dp.secretSettings) {
                     if (containsMaskedSecrets(dp.secretSettings)) {
                         result.warnings.push(
-                            `Directory plugin "${dp.pluginId}" has masked secret values. Replace "${MASKED_SECRET_PREFIX}..." values with real credentials in the JSON file and re-import.`,
+                            `Work plugin "${dp.pluginId}" has masked secret values. Replace "${MASKED_SECRET_PREFIX}..." values with real credentials in the JSON file and re-import.`,
                         );
                     } else {
                         secretSettings = dp.secretSettings;
                     }
                 }
 
-                await this.directoryPluginRepository.upsert({
-                    directoryId,
+                await this.workPluginRepository.upsert({
+                    workId,
                     pluginId: dp.pluginId,
                     pluginEntityId: pluginEntity.id,
                     enabled: dp.enabled,
@@ -513,15 +513,15 @@ export class AccountImportService {
                 });
             } catch (error) {
                 result.warnings.push(
-                    `Failed to import directory plugin "${dp.pluginId}": ${error instanceof Error ? error.message : String(error)}`,
+                    `Failed to import work plugin "${dp.pluginId}": ${error instanceof Error ? error.message : String(error)}`,
                 );
             }
         }
     }
 
-    private async importDirectoryRepoData(
-        directory: any,
-        dir: ExportedDirectory,
+    private async importWorkRepoData(
+        work: any,
+        dir: ExportedWork,
         user: any,
         result: ImportResult,
     ): Promise<void> {
@@ -536,17 +536,17 @@ export class AccountImportService {
         }
 
         try {
-            const repoOwner = directory.getRepoOwner?.() || dir.owner || user.username;
-            const dataRepo = `${directory.slug || dir.slug}-data`;
+            const repoOwner = work.getRepoOwner?.() || dir.owner || user.username;
+            const dataRepo = `${work.slug || dir.slug}-data`;
             const committer = user.asCommitter?.() || { name: user.username, email: user.email };
 
             const dest = await this.gitFacade.cloneOrPull(
                 { owner: repoOwner, repo: dataRepo, committer },
-                { userId: user.id || directory.userId, providerId: dir.gitProvider },
+                { userId: user.id || work.userId, providerId: dir.gitProvider },
             );
 
             const data = await DataRepository.create(dest);
-            await data.ensureDirectoriesExist();
+            await data.ensureWorksExist();
 
             // Write site config
             if (hasSiteConfig) {
@@ -612,15 +612,15 @@ export class AccountImportService {
                 );
                 await this.gitFacade.push(
                     { dir: dest },
-                    { userId: user.id || directory.userId, providerId: dir.gitProvider },
+                    { userId: user.id || work.userId, providerId: dir.gitProvider },
                 );
             }
         } catch (error) {
             this.logger.warn(
-                `Failed to import repo data for directory "${dir.slug}": ${error instanceof Error ? error.message : String(error)}`,
+                `Failed to import repo data for work "${dir.slug}": ${error instanceof Error ? error.message : String(error)}`,
             );
             result.warnings.push(
-                `Repo data for directory "${dir.slug}" could not be imported: ${error instanceof Error ? error.message : String(error)}`,
+                `Repo data for work "${dir.slug}" could not be imported: ${error instanceof Error ? error.message : String(error)}`,
             );
         }
     }

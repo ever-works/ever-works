@@ -1,9 +1,9 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { GitFacadeService } from '../../facades/git.facade';
 import { getWebsiteTemplateConfig, WebsiteTemplateConfig } from './config/website-template.config';
-import { getDirectoryOwner } from '../../utils/directory.utils';
+import { getWorkOwner } from '../../utils/work.utils';
 import type { GitCommitter } from '@ever-works/plugin';
-import { Directory } from '../../entities/directory.entity';
+import { Work } from '../../entities/work.entity';
 import { User } from '../../entities/user.entity';
 import * as fs from 'node:fs/promises';
 
@@ -32,17 +32,17 @@ export class BranchSyncService {
     constructor(private readonly gitFacade: GitFacadeService) {}
 
     async syncFromTemplate(
-        directory: Directory,
+        work: Work,
         user: User,
         cleanupExtraBranches = false,
     ): Promise<BranchSyncSummary | null> {
-        const directoryOwner = getDirectoryOwner(directory);
-        const websiteOwner = directory.getRepoOwner('website');
-        const websiteRepo = directory.getWebsiteRepo();
-        const template = getWebsiteTemplateConfig(directory.websiteTemplateId);
+        const workOwner = getWorkOwner(work);
+        const websiteOwner = work.getRepoOwner('website');
+        const websiteRepo = work.getWebsiteRepo();
+        const template = getWebsiteTemplateConfig(work.websiteTemplateId);
 
         const branchMapping =
-            directory.websiteTemplateUseBeta && template.betaBranch
+            work.websiteTemplateUseBeta && template.betaBranch
                 ? { [template.betaBranch]: 'main' }
                 : undefined;
 
@@ -55,13 +55,13 @@ export class BranchSyncService {
             const result = await this.syncAllBranches({
                 targetOwner: websiteOwner,
                 targetRepo: websiteRepo,
-                userId: directoryOwner.id,
-                committer: directory.resolveCommitter(user),
+                userId: workOwner.id,
+                committer: work.resolveCommitter(user),
                 forcePush: true,
                 branchMapping,
                 template,
-                providerId: directory.gitProvider,
-                directoryId: directory.id,
+                providerId: work.gitProvider,
+                workId: work.id,
                 cleanupExtraBranches,
             });
 
@@ -90,7 +90,7 @@ export class BranchSyncService {
         branchMapping?: { [sourceBranch: string]: string };
         template: WebsiteTemplateConfig;
         providerId?: string;
-        directoryId?: string;
+        workId?: string;
         /** Delete target branches not in syncBranches; needed after CREATE_USING_TEMPLATE copies all template branches */
         cleanupExtraBranches?: boolean;
     }): Promise<BranchSyncSummary> {
@@ -103,7 +103,7 @@ export class BranchSyncService {
             branchMapping = {},
             template,
             providerId,
-            directoryId,
+            workId,
             cleanupExtraBranches = false,
         } = params;
 
@@ -152,7 +152,7 @@ export class BranchSyncService {
                         committer,
                         forcePush,
                         providerId,
-                        directoryId,
+                        workId,
                     }),
                 ),
             );
@@ -251,7 +251,7 @@ export class BranchSyncService {
         committer: GitCommitter;
         forcePush?: boolean;
         providerId?: string;
-        directoryId?: string;
+        workId?: string;
     }): Promise<BranchSyncResult> {
         const {
             branchName,
@@ -263,7 +263,7 @@ export class BranchSyncService {
             committer,
             forcePush = true,
             providerId,
-            directoryId,
+            workId,
         } = params;
 
         const mappingInfo = targetBranch !== branchName ? ` (mapped to '${targetBranch}')` : '';
@@ -282,7 +282,7 @@ export class BranchSyncService {
                     branch: branchName,
                     committer,
                 },
-                { userId, providerId, directoryId },
+                { userId, providerId, workId },
             );
 
             // Rename branch if needed
@@ -297,7 +297,7 @@ export class BranchSyncService {
             // Push to target
             await this.gitFacade.push(
                 { dir: tempDir, force: forcePush },
-                { userId, providerId, directoryId },
+                { userId, providerId, workId },
             );
 
             return {

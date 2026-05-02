@@ -19,7 +19,7 @@ export const STEP_DEFINITIONS: readonly PipelineStepDefinition<MakeStepId>[] = [
 	{
 		id: 'prepare-payload',
 		name: 'Prepare Scenario Payload',
-		description: 'Build input payload from directory context, existing items, and config',
+		description: 'Build input payload from work context, existing items, and config',
 		position: { type: 'after', stepId: 'validate-make' },
 		dependencies: [{ stepId: 'validate-make', required: true }],
 		optional: false,

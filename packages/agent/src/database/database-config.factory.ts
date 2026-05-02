@@ -20,7 +20,7 @@ export function createDatabaseModuleWithEnv(envVars: Record<string, string>) {
  */
 export const DatabaseConfigurations = {
     /**
-     * CLI configuration - uses persistent SQLite file in user's home directory
+     * CLI configuration - uses persistent SQLite file in user's home work
      */
     cli: () => {
         return createDatabaseModuleWithEnv({

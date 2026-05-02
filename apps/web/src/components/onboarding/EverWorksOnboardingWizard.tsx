@@ -39,7 +39,7 @@ interface EverWorksOnboardingWizardProps {
 type WizardStep =
     | { kind: 'welcome' }
     | { kind: 'plugin'; plugin: UserPlugin }
-    | { kind: 'directory' };
+    | { kind: 'work' };
 
 function isPluginConnected(
     plugin: UserPlugin,
@@ -78,7 +78,7 @@ export function EverWorksOnboardingWizard({
         () => [
             { kind: 'welcome' },
             ...plugins.map((p) => ({ kind: 'plugin' as const, plugin: p })),
-            { kind: 'directory' },
+            { kind: 'work' },
         ],
         [plugins],
     );
@@ -137,7 +137,7 @@ export function EverWorksOnboardingWizard({
 
                                 const label = (() => {
                                     if (step.kind === 'welcome') return t('steps.welcome.title');
-                                    if (step.kind === 'directory')
+                                    if (step.kind === 'work')
                                         return t('steps.work.title');
                                     return step.plugin.name;
                                 })();
@@ -302,8 +302,8 @@ export function EverWorksOnboardingWizard({
                                 </div>
                             )}
 
-                            {/* Directory */}
-                            {currentStep.kind === 'directory' && (
+                            {/* Work */}
+                            {currentStep.kind === 'work' && (
                                 <div className="space-y-5 max-w-lg">
                                     <div className="flex items-start gap-4">
                                         <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-surface-secondary dark:bg-white/5">

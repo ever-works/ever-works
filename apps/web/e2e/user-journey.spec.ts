@@ -3,7 +3,7 @@ import { test, expect } from '@playwright/test';
 /**
  * Full user journey E2E test.
  *
- * Tests the complete lifecycle: register -> dashboard -> create directory -> view -> settings.
+ * Tests the complete lifecycle: register -> dashboard -> create work -> view -> settings.
  * This runs WITHOUT pre-authenticated state (fresh user).
  */
 
@@ -15,7 +15,7 @@ test.describe('Complete user journey', () => {
         password: 'JourneyPass1!secure',
     };
 
-    test('register, create directory, browse, visit settings', async ({ page }) => {
+    test('register, create work, browse, visit settings', async ({ page }) => {
         // ---- Step 1: Register ----
         await page.goto('/en/register');
 
@@ -27,10 +27,10 @@ test.describe('Complete user journey', () => {
         await page.locator('button[type="submit"]').click();
 
         // Should arrive at dashboard
-        await page.waitForURL(/\/(en\/)?(directories|$)/, { timeout: 15_000 });
+        await page.waitForURL(/\/(en\/)?(works|$)/, { timeout: 15_000 });
 
-        // ---- Step 2: Navigate to create directory ----
-        await page.goto('/en/directories/new');
+        // ---- Step 2: Navigate to create work ----
+        await page.goto('/en/works/new');
 
         // Select manual creation mode
         const manualCard = page
@@ -40,7 +40,7 @@ test.describe('Complete user journey', () => {
         await expect(manualCard).toBeVisible({ timeout: 10_000 });
         await manualCard.click();
 
-        // Fill directory form
+        // Fill work form
         const dirSlug = `journey-${suffix}`;
         await expect(page.locator('form')).toBeVisible({ timeout: 5_000 });
 
@@ -48,20 +48,20 @@ test.describe('Complete user journey', () => {
         await nameInput.fill(`Journey Dir ${dirSlug}`);
 
         const descriptionTextarea = page.locator('form textarea').first();
-        await descriptionTextarea.fill('Full journey test directory');
+        await descriptionTextarea.fill('Full journey test work');
 
         // Submit
         const submitButton = page.locator('form button[type="submit"]');
         await submitButton.click();
 
         // Wait for redirect or error
-        await page.waitForURL(/\/directories\/(?!new)/, { timeout: 15_000 }).catch(() => {
+        await page.waitForURL(/\/works\/(?!new)/, { timeout: 15_000 }).catch(() => {
             // May fail if git provider not configured — that's ok for e2e
         });
 
-        // ---- Step 3: Visit directories list ----
-        await page.goto('/en/directories');
-        await expect(page).toHaveURL(/\/directories/);
+        // ---- Step 3: Visit works list ----
+        await page.goto('/en/works');
+        await expect(page).toHaveURL(/\/works/);
 
         // ---- Step 4: Visit settings ----
         await page.goto('/en/settings');

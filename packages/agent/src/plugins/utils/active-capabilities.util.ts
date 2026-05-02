@@ -1,28 +1,28 @@
-import type { DirectoryPluginEntity } from '../entities/directory-plugin.entity';
+import type { WorkPluginEntity } from '../entities/work-plugin.entity';
 
-type ActiveCapabilitiesRecord = Pick<DirectoryPluginEntity, 'activeCapabilities'>;
+type ActiveCapabilitiesRecord = Pick<WorkPluginEntity, 'activeCapabilities'>;
 
-export function getActiveCapabilities(directoryPlugin?: ActiveCapabilitiesRecord | null): string[] {
-    return Array.from(new Set((directoryPlugin?.activeCapabilities ?? []).filter(Boolean)));
+export function getActiveCapabilities(workPlugin?: ActiveCapabilitiesRecord | null): string[] {
+    return Array.from(new Set((workPlugin?.activeCapabilities ?? []).filter(Boolean)));
 }
 
 export function hasActiveCapability(
-    directoryPlugin: ActiveCapabilitiesRecord | null,
+    workPlugin: ActiveCapabilitiesRecord | null,
     capability: string,
 ): boolean {
-    return getActiveCapabilities(directoryPlugin).includes(capability);
+    return getActiveCapabilities(workPlugin).includes(capability);
 }
 
 export function addActiveCapability(
-    directoryPlugin: ActiveCapabilitiesRecord,
+    workPlugin: ActiveCapabilitiesRecord,
     capability: string,
 ): string[] {
-    return Array.from(new Set([...getActiveCapabilities(directoryPlugin), capability]));
+    return Array.from(new Set([...getActiveCapabilities(workPlugin), capability]));
 }
 
 export function removeActiveCapability(
-    directoryPlugin: ActiveCapabilitiesRecord,
+    workPlugin: ActiveCapabilitiesRecord,
     capability: string,
 ): string[] {
-    return getActiveCapabilities(directoryPlugin).filter((active) => active !== capability);
+    return getActiveCapabilities(workPlugin).filter((active) => active !== capability);
 }

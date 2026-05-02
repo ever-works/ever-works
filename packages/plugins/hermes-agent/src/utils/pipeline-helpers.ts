@@ -81,14 +81,14 @@ function updatePipelineStepState<TStepId extends string>(
 async function resolveScopedSettings(
 	context: PluginContext | null,
 	userId: string,
-	directoryId: string
+	workId: string
 ): Promise<PluginSettings> {
 	if (!context) {
 		return {};
 	}
 
 	const loadResolvedSettings = async (
-		scope: 'global' | 'user' | 'directory',
+		scope: 'global' | 'user' | 'work',
 		scopeId?: string
 	): Promise<ResolvedSettings> => {
 		try {
@@ -98,10 +98,10 @@ async function resolveScopedSettings(
 		}
 	};
 
-	const [globalSettings, userSettings, directorySettings] = await Promise.all([
+	const [globalSettings, userSettings, workSettings] = await Promise.all([
 		loadResolvedSettings('global'),
 		loadResolvedSettings('user', userId),
-		loadResolvedSettings('directory', directoryId)
+		loadResolvedSettings('work', workId)
 	]);
 
 	const merged: PluginSettings = {};
@@ -118,8 +118,8 @@ async function resolveScopedSettings(
 		}
 	}
 
-	for (const [key, entry] of Object.entries(directorySettings)) {
-		if (entry?.source === 'directory' && entry.value !== undefined && entry.value !== null) {
+	for (const [key, entry] of Object.entries(workSettings)) {
+		if (entry?.source === 'work' && entry.value !== undefined && entry.value !== null) {
 			merged[key] = entry.value;
 		}
 	}
@@ -161,9 +161,9 @@ export function reportProgress(
 export async function resolveSettings(
 	context: PluginContext | null,
 	userId: string,
-	directoryId: string
+	workId: string
 ): Promise<PluginSettings> {
-	return resolveScopedSettings(context, userId, directoryId);
+	return resolveScopedSettings(context, userId, workId);
 }
 
 export function buildMetrics(

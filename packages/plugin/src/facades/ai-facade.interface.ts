@@ -31,9 +31,9 @@ export interface AiRoutingOptions {
 
 /**
  * Model routing configuration for AI providers.
- * Configurable at user or directory level via plugin settings.
+ * Configurable at user or work level via plugin settings.
  *
- * Resolution priority: directory > user > admin > plugin defaults
+ * Resolution priority: work > user > admin > plugin defaults
  */
 export interface AiModelRoutingSettings {
 	/** Default model when no complexity specified */
@@ -118,7 +118,7 @@ export interface IAiFacade extends IBaseFacade {
 	 *         variables: { text: 'Hello world' },
 	 *         routing: { complexity: 'simple' }
 	 *     },
-	 *     { userId: user.id, directoryId: directory.id }
+	 *     { userId: user.id, workId: work.id }
 	 * );
 	 * ```
 	 */

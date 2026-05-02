@@ -3,9 +3,9 @@ import { serverFetch, serverMutation } from './server-api';
 import type {
     PluginResponse,
     UserPluginResponse,
-    DirectoryPluginResponse,
+    WorkPluginResponse,
     PluginListResponse as IPluginListResponse,
-    DirectoryPluginListResponse as IDirectoryPluginListResponse,
+    WorkPluginListResponse as IWorkPluginListResponse,
     SettingsMenuResponse as ISettingsMenuResponse,
     SettingsMenuCategory as ISettingsMenuCategory,
     SettingsMenuPlugin as ISettingsMenuPlugin,
@@ -29,9 +29,9 @@ export type UserPlugin = UserPluginResponse & {
     metadata?: Record<string, unknown>;
     resolvedSettings?: Record<string, unknown>;
 };
-export type DirectoryPlugin = DirectoryPluginResponse;
+export type WorkPlugin = WorkPluginResponse;
 export type PluginListResponse = IPluginListResponse;
-export type DirectoryPluginListResponse = IDirectoryPluginListResponse;
+export type WorkPluginListResponse = IWorkPluginListResponse;
 export type SettingsMenuResponse = ISettingsMenuResponse;
 export type SettingsMenuCategory = ISettingsMenuCategory;
 export type SettingsMenuPlugin = ISettingsMenuPlugin;
@@ -99,7 +99,7 @@ export const pluginsAPI = {
         data?: {
             settings?: Record<string, unknown>;
             secretSettings?: Record<string, unknown>;
-            autoEnableForDirectories?: boolean;
+            autoEnableForWorks?: boolean;
         },
     ): Promise<UserPlugin> => {
         return serverMutation<UserPlugin>({
@@ -160,30 +160,30 @@ export const pluginsAPI = {
     },
 
     // ============================================
-    // Directory Plugin Management
+    // Work Plugin Management
     // ============================================
 
     /**
-     * List plugins for a directory with directory-specific status
+     * List plugins for a work with work-specific status
      */
-    listForDirectory: async (directoryId: string): Promise<DirectoryPluginListResponse> => {
-        return serverFetch<DirectoryPluginListResponse>(`/directories/${directoryId}/plugins`);
+    listForWork: async (workId: string): Promise<WorkPluginListResponse> => {
+        return serverFetch<WorkPluginListResponse>(`/works/${workId}/plugins`);
     },
 
     /**
-     * Enable a plugin for a directory
+     * Enable a plugin for a work
      */
-    enableForDirectory: async (
-        directoryId: string,
+    enableForWork: async (
+        workId: string,
         pluginId: string,
         data?: {
             settings?: Record<string, unknown>;
             activeCapability?: string;
             priority?: number;
         },
-    ): Promise<DirectoryPlugin> => {
-        return serverMutation<DirectoryPlugin>({
-            endpoint: `/directories/${directoryId}/plugins/${pluginId}/enable`,
+    ): Promise<WorkPlugin> => {
+        return serverMutation<WorkPlugin>({
+            endpoint: `/works/${workId}/plugins/${pluginId}/enable`,
             data: data || {},
             method: 'POST',
             wrapInData: false,
@@ -191,14 +191,14 @@ export const pluginsAPI = {
     },
 
     /**
-     * Disable a plugin for a directory
+     * Disable a plugin for a work
      */
-    disableForDirectory: async (
-        directoryId: string,
+    disableForWork: async (
+        workId: string,
         pluginId: string,
-    ): Promise<DirectoryPlugin> => {
-        return serverMutation<DirectoryPlugin>({
-            endpoint: `/directories/${directoryId}/plugins/${pluginId}/disable`,
+    ): Promise<WorkPlugin> => {
+        return serverMutation<WorkPlugin>({
+            endpoint: `/works/${workId}/plugins/${pluginId}/disable`,
             data: {},
             method: 'POST',
             wrapInData: false,
@@ -206,19 +206,19 @@ export const pluginsAPI = {
     },
 
     /**
-     * Update directory plugin settings
+     * Update work plugin settings
      */
-    updateDirectorySettings: async (
-        directoryId: string,
+    updateWorkSettings: async (
+        workId: string,
         pluginId: string,
         data: {
             settings?: Record<string, unknown>;
             secretSettings?: Record<string, unknown>;
             metadata?: Record<string, unknown>;
         },
-    ): Promise<DirectoryPlugin> => {
-        return serverMutation<DirectoryPlugin>({
-            endpoint: `/directories/${directoryId}/plugins/${pluginId}/settings`,
+    ): Promise<WorkPlugin> => {
+        return serverMutation<WorkPlugin>({
+            endpoint: `/works/${workId}/plugins/${pluginId}/settings`,
             data,
             method: 'PATCH',
             wrapInData: false,
@@ -238,15 +238,15 @@ export const pluginsAPI = {
     },
 
     /**
-     * Set active capability for a directory plugin
+     * Set active capability for a work plugin
      */
     setActiveCapability: async (
-        directoryId: string,
+        workId: string,
         pluginId: string,
         capability: string,
-    ): Promise<DirectoryPlugin> => {
-        return serverMutation<DirectoryPlugin>({
-            endpoint: `/directories/${directoryId}/plugins/${pluginId}/capability`,
+    ): Promise<WorkPlugin> => {
+        return serverMutation<WorkPlugin>({
+            endpoint: `/works/${workId}/plugins/${pluginId}/capability`,
             data: { capability },
             method: 'POST',
             wrapInData: false,

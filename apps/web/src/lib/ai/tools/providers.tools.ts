@@ -10,12 +10,12 @@ export const listAvailablePipelines = tool({
         'Pass a pipelineId to see the specific providers that pipeline supports.',
     ].join(' '),
     inputSchema: z.object({
-        directoryId: z.string().optional().describe('Work ID for Work-specific schema'),
+        workId: z.string().optional().describe('Work ID for Work-specific schema'),
         pipelineId: z.string().optional().describe('Pipeline ID to see its specific providers'),
     }),
-    execute: async ({ directoryId, pipelineId }) => {
-        const result = directoryId
-            ? await getFormSchema(directoryId, pipelineId)
+    execute: async ({ workId, pipelineId }) => {
+        const result = workId
+            ? await getFormSchema(workId, pipelineId)
             : await getGlobalFormSchema(pipelineId);
 
         if (!result.success || !result.data) {

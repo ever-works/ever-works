@@ -1,6 +1,6 @@
 // Prompt services
 export * from './prompts/base-prompt.service';
-export * from './prompts/directory-prompt.service';
+export * from './prompts/work-prompt.service';
 
 // Utilities
 export * from './utils/config-check';

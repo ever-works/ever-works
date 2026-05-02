@@ -222,14 +222,14 @@ describe('ContentExtractorFacadeService', () => {
 
             registry.getByCapability.mockReturnValue([pdfRegistered, tavilyRegistered]);
             registry.get.mockReturnValue(tavilyRegistered);
-            // PDF extractor disabled for this directory
+            // PDF extractor disabled for this work
             registry.isPluginEnabledForScope.mockImplementation((id) =>
                 Promise.resolve(id !== 'pdf-extractor'),
             );
 
             await service.extractContent('https://example.com/doc.pdf', undefined, {
                 userId: 'test-user',
-                directoryId: 'dir-1',
+                workId: 'dir-1',
                 providerOverride: 'tavily',
             });
 

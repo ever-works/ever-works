@@ -22,8 +22,8 @@ export class ComparisonGeneratorPlugin implements IPlugin {
 				type: 'string',
 				title: 'Generation Cadence',
 				description: 'How often to auto-generate comparisons',
-				enum: ['use_directory', 'daily', 'weekly', 'monthly'],
-				default: 'use_directory'
+				enum: ['use_work', 'daily', 'weekly', 'monthly'],
+				default: 'use_work'
 			},
 			max_comparisons_mode: {
 				type: 'string',
@@ -53,7 +53,7 @@ export class ComparisonGeneratorPlugin implements IPlugin {
 				type: 'string',
 				title: 'AI Provider',
 				description:
-					'Override the AI provider used for comparison generation (leave empty for directory default)',
+					'Override the AI provider used for comparison generation (leave empty for work default)',
 				'x-hidden': true
 			},
 			ai_model: {
@@ -102,7 +102,7 @@ export class ComparisonGeneratorPlugin implements IPlugin {
 			id: this.id,
 			name: this.name,
 			version: this.version,
-			description: 'Auto-generates SEO-optimized A vs B comparison pages between directory items',
+			description: 'Auto-generates SEO-optimized A vs B comparison pages between work items',
 			category: this.category,
 			capabilities: [...this.capabilities],
 			author: { name: 'Ever Works Team' },
@@ -114,7 +114,7 @@ export class ComparisonGeneratorPlugin implements IPlugin {
 			readme: [
 				'## What is the Comparison Generator?',
 				'',
-				'The Comparison Generator is a system plugin that automatically creates detailed A vs B comparison pages between items in your directories. Each comparison includes structured dimensions with scores, a verdict, and a full SEO-optimized markdown article.',
+				'The Comparison Generator is a system plugin that automatically creates detailed A vs B comparison pages between items in your works. Each comparison includes structured dimensions with scores, a verdict, and a full SEO-optimized markdown article.',
 				'',
 				'## How it works',
 				'',
@@ -125,7 +125,7 @@ export class ComparisonGeneratorPlugin implements IPlugin {
 				'',
 				'## Features',
 				'',
-				'- **Scheduled generation** — runs automatically based on your directory schedule or a custom cadence (daily, weekly, monthly)',
+				'- **Scheduled generation** — runs automatically based on your work schedule or a custom cadence (daily, weekly, monthly)',
 				'- **Manual comparisons** — pick any two items and generate a comparison on demand from the Comparisons tab',
 				'- **Dimension scoring** — each comparison breaks down into multiple dimensions with per-item scores and summaries',
 				'- **Duplicate prevention** — tracks previously generated pairs so no comparison is repeated',
@@ -133,9 +133,9 @@ export class ComparisonGeneratorPlugin implements IPlugin {
 				'',
 				'## Configuration',
 				'',
-				'Enable comparison generation per directory from the directory Generator settings. You can configure:',
+				'Enable comparison generation per work from the work Generator settings. You can configure:',
 				'',
-				'- **Cadence** — how often to auto-generate a new comparison (or follow the directory schedule)',
+				'- **Cadence** — how often to auto-generate a new comparison (or follow the work schedule)',
 				'- **Max comparisons** — cap at a custom limit (1–500) or set to "All" to generate every possible pair',
 				'- **Min items** — minimum items required in a category before comparisons are generated'
 			].join('\n')

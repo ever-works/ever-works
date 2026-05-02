@@ -20,17 +20,17 @@ afterEach(async () => {
 });
 
 describe('workspace-manager', () => {
-	it('creates a workspace with the _meta directory', async () => {
+	it('creates a workspace with the _meta work', async () => {
 		const userId = `user-${Date.now()}`;
-		const directoryId = `dir-${Date.now()}`;
-		const workspacePath = await createWorkspace(userId, directoryId);
+		const workId = `dir-${Date.now()}`;
+		const workspacePath = await createWorkspace(userId, workId);
 		cleanupPaths.push(path.join('/tmp/codex-generator', userId));
 
-		expect(workspacePath.startsWith(path.join('/tmp/codex-generator', userId, `${directoryId}-`))).toBe(true);
+		expect(workspacePath.startsWith(path.join('/tmp/codex-generator', userId, `${workId}-`))).toBe(true);
 		expect(path.dirname(workspacePath)).toBe(path.join('/tmp/codex-generator', userId));
 
 		const metaStats = await fs.stat(path.join(workspacePath, '_meta'));
-		expect(metaStats.isDirectory()).toBe(true);
+		expect(metaStats.isWork()).toBe(true);
 	});
 
 	it('writes metadata files when provided', async () => {
@@ -39,14 +39,14 @@ describe('workspace-manager', () => {
 		await fs.mkdir(path.join(tempRoot, '_meta'), { recursive: true });
 
 		await seedMetadata(tempRoot, {
-			directory: { name: 'Directory', description: 'Desc' },
+			work: { name: 'Work', description: 'Desc' },
 			request: { name: 'Prompt name', prompt: 'Prompt text' },
 			categories: [{ id: 'cat', name: 'Cat' }],
 			tags: [{ id: 'tag', name: 'Tag' }]
 		});
 
-		await expect(fs.readFile(path.join(tempRoot, '_meta', 'directory.json'), 'utf-8')).resolves.toContain(
-			'Directory'
+		await expect(fs.readFile(path.join(tempRoot, '_meta', 'work.json'), 'utf-8')).resolves.toContain(
+			'Work'
 		);
 		await expect(fs.readFile(path.join(tempRoot, '_meta', 'request.json'), 'utf-8')).resolves.toContain(
 			'Prompt text'

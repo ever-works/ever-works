@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import type {
-    DirectoryReference,
+    WorkReference,
     GenerationRequest,
     ExistingItems,
     PipelineExecutionOptions,
@@ -40,7 +40,7 @@ export class PipelineOrchestratorService {
     ) {}
 
     async execute(
-        directory: DirectoryReference,
+        work: WorkReference,
         request: GenerationRequest,
         existing: ExistingItems,
         options?: PipelineExecutionOptions,
@@ -50,20 +50,20 @@ export class PipelineOrchestratorService {
 
         const plugin = await this.resolvePipelinePlugin(
             pipelineId,
-            directory.id,
-            directory.user?.id,
+            work.id,
+            work.user?.id,
         );
 
         const mode: PipelineExecutionMode = isStepOrchestratablePipeline(plugin) ? 'step' : 'full';
 
         this.logger.log(
-            `Executing pipeline for directory "${directory.id}" in ${mode} mode (via plugin: ${plugin.id})`,
+            `Executing pipeline for work "${work.id}" in ${mode} mode (via plugin: ${plugin.id})`,
         );
 
         if (mode === 'step') {
             return this.stepExecutor.execute(
                 plugin,
-                directory,
+                work,
                 request,
                 existing,
                 options,
@@ -71,20 +71,20 @@ export class PipelineOrchestratorService {
             );
         }
 
-        return this.fullExecutor.execute(plugin, directory, request, existing, options, onProgress);
+        return this.fullExecutor.execute(plugin, work, request, existing, options, onProgress);
     }
 
     /** Execute with explicit mode selection */
     async executeWithMode(
         mode: PipelineExecutionMode,
-        directory: DirectoryReference,
+        work: WorkReference,
         request: GenerationRequest,
         existing: ExistingItems,
         options?: PipelineExecutionOptions,
         onProgress?: PipelineProgressCallback,
     ): Promise<PipelineResult> {
         this.logger.log(
-            `Executing pipeline for directory "${directory.id}" in forced ${mode} mode`,
+            `Executing pipeline for work "${work.id}" in forced ${mode} mode`,
         );
 
         if (mode === 'full') {
@@ -95,7 +95,7 @@ export class PipelineOrchestratorService {
             if (fullPlugin) {
                 return this.fullExecutor.execute(
                     fullPlugin,
-                    directory,
+                    work,
                     request,
                     existing,
                     options,
@@ -110,14 +110,14 @@ export class PipelineOrchestratorService {
         // Step mode (or fallback from full mode)
         const plugin = await this.resolvePipelinePlugin(
             undefined,
-            directory.id,
-            directory.user?.id,
+            work.id,
+            work.user?.id,
         );
-        return this.stepExecutor.execute(plugin, directory, request, existing, options, onProgress);
+        return this.stepExecutor.execute(plugin, work, request, existing, options, onProgress);
     }
 
     async getRecommendedMode(
-        directoryId?: string,
+        workId?: string,
         userId?: string,
     ): Promise<{
         mode: PipelineExecutionMode;
@@ -155,24 +155,24 @@ export class PipelineOrchestratorService {
     }
 
     async resumeFromCheckpoint(
-        directoryId: string,
+        workId: string,
         pipelineId: string,
         options?: PipelineExecutionOptions,
         onProgress?: PipelineProgressCallback,
     ): Promise<PipelineResult | null> {
         // Resume is only supported in step mode — resolve the pipeline plugin that owns the checkpoint
-        const plugin = await this.resolvePipelinePlugin(pipelineId, directoryId);
+        const plugin = await this.resolvePipelinePlugin(pipelineId, workId);
         return this.stepExecutor.resumeFromCheckpoint(
             plugin,
-            directoryId,
+            workId,
             pipelineId,
             options,
             onProgress,
         );
     }
 
-    async clearCheckpoint(directoryId: string, pipelineId: string): Promise<void> {
-        await this.stepExecutor.clearCheckpoint(directoryId, pipelineId);
+    async clearCheckpoint(workId: string, pipelineId: string): Promise<void> {
+        await this.stepExecutor.clearCheckpoint(workId, pipelineId);
     }
 
     /**
@@ -180,7 +180,7 @@ export class PipelineOrchestratorService {
      * Only step-orchestratable pipelines support checkpoint resume.
      */
     async resumeOrExecute(
-        directory: DirectoryReference,
+        work: WorkReference,
         request: GenerationRequest,
         existing: ExistingItems,
         options?: PipelineExecutionOptions,
@@ -188,29 +188,29 @@ export class PipelineOrchestratorService {
     ): Promise<PipelineResult> {
         const plugin = await this.resolvePipelinePlugin(
             request.providers?.pipeline,
-            directory.id,
-            directory.user?.id,
+            work.id,
+            work.user?.id,
         );
 
         // Only step-orchestratable pipelines support checkpoint resume
         if (isStepOrchestratablePipeline(plugin)) {
             const resumed = await this.stepExecutor.resumeFromCheckpoint(
                 plugin,
-                directory.id,
+                work.id,
                 plugin.id,
                 options,
                 onProgress,
             );
             if (resumed) {
                 this.logger.log(
-                    `Resumed from checkpoint for "${directory.id}", success=${resumed.success}`,
+                    `Resumed from checkpoint for "${work.id}", success=${resumed.success}`,
                 );
                 return resumed;
             }
         }
 
         // No checkpoint or not resumable — fresh execution
-        return this.execute(directory, request, existing, options, onProgress);
+        return this.execute(work, request, existing, options, onProgress);
     }
 
     /**
@@ -223,7 +223,7 @@ export class PipelineOrchestratorService {
      */
     private async resolvePipelinePlugin(
         pipelineId?: string | null,
-        directoryId?: string,
+        workId?: string,
         userId?: string,
     ): Promise<IPipelinePlugin> {
         if (typeof pipelineId === 'string') {
@@ -231,7 +231,7 @@ export class PipelineOrchestratorService {
             if (registered?.state === 'loaded' && isPipelinePlugin(registered.plugin)) {
                 const isEnabled = await this.registry.isPluginEnabledForScope(
                     registered.plugin.id,
-                    directoryId,
+                    workId,
                     userId,
                 );
                 if (isEnabled) {
@@ -254,7 +254,7 @@ export class PipelineOrchestratorService {
             if (!registered.manifest.defaultForCapabilities?.includes('pipeline')) continue;
             const isEnabled = await this.registry.isPluginEnabledForScope(
                 registered.plugin.id,
-                directoryId,
+                workId,
                 userId,
             );
             if (isEnabled) return registered.plugin;
@@ -266,7 +266,7 @@ export class PipelineOrchestratorService {
             if (!isPipelinePlugin(registered.plugin)) continue;
             const isEnabled = await this.registry.isPluginEnabledForScope(
                 registered.plugin.id,
-                directoryId,
+                workId,
                 userId,
             );
             if (isEnabled) return registered.plugin;

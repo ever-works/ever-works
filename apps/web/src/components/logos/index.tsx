@@ -4,7 +4,7 @@ import Image from 'next/image';
 import { Link } from '@/i18n/navigation';
 import { cn } from '@/lib/utils/cn';
 import { getSiteConfig } from '@/lib/constants';
-import { DirectoryConfig } from '@/lib/api';
+import { WorkConfig } from '@/lib/api';
 import { useTheme } from '@/lib/hooks/use-theme';
 
 interface LogoEverWorkProps {
@@ -14,7 +14,7 @@ interface LogoEverWorkProps {
     /** Intrinsic height hint for Next.js Image (px). Actual render size is controlled by CSS. */
     height?: number;
     priority?: boolean;
-    config?: DirectoryConfig | null;
+    config?: WorkConfig | null;
 }
 
 export function LogoEverWork({
@@ -54,7 +54,7 @@ export function FaviconEverWork({
     config: configProps,
 }: {
     className?: string;
-    config?: DirectoryConfig | null;
+    config?: WorkConfig | null;
 }) {
     const siteConfig = getSiteConfig(configProps);
     const { isDark, mounted } = useTheme();

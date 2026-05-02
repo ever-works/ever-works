@@ -86,7 +86,7 @@ async function findBinary(rootDir: string, binaryName: string): Promise<string |
 		) {
 			return candidate;
 		}
-		if (entry.isDirectory()) {
+		if (entry.isWork()) {
 			const nested = await findBinary(candidate, binaryName);
 			if (nested) {
 				return nested;

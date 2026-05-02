@@ -11,10 +11,10 @@ import { ChevronDown, ChevronRight, Loader2 } from 'lucide-react';
 import { Tooltip } from '@/components/ui/tooltip';
 import { Link } from '@/i18n/navigation';
 import { ROUTES } from '@/lib/constants';
-import { TerminalLogViewer } from '@/components/directories/detail/shared/TerminalLogViewer';
+import { TerminalLogViewer } from '@/components/works/detail/shared/TerminalLogViewer';
 import type { GenerationStepLog } from '@/lib/api/types-only';
 import { useMounted } from '@/lib/hooks/use-mounted';
-import { CancelGenerationButton } from '@/components/directories/detail/generator/CancelGenerationButton';
+import { CancelGenerationButton } from '@/components/works/detail/generator/CancelGenerationButton';
 
 interface ActivityTableProps {
     activities: ActivityLogEntry[];
@@ -363,15 +363,15 @@ export function ActivityTable({ activities, loading, onStopRequested }: Activity
                                             />
                                         </td>
                                         <td className="px-4 py-3 text-xs">
-                                            {activity.directory ? (
+                                            {activity.work ? (
                                                 <Link
-                                                    href={ROUTES.DASHBOARD_DIRECTORY(
-                                                        activity.directoryId!,
+                                                    href={ROUTES.DASHBOARD_WORK(
+                                                        activity.workId!,
                                                     )}
                                                     className="text-primary text-xs hover:underline font-medium"
                                                     onClick={(e) => e.stopPropagation()}
                                                 >
-                                                    {activity.directory.name}
+                                                    {activity.work.name}
                                                 </Link>
                                             ) : (
                                                 <span className="text-text-muted dark:text-text-muted-dark">
@@ -389,10 +389,10 @@ export function ActivityTable({ activities, loading, onStopRequested }: Activity
                                                 </div>
                                                 {activity.actionType === 'generation' &&
                                                 activity.status === 'in_progress' &&
-                                                activity.directoryId ? (
+                                                activity.workId ? (
                                                     <div onClick={(e) => e.stopPropagation()}>
                                                         <CancelGenerationButton
-                                                            directoryId={activity.directoryId}
+                                                            workId={activity.workId}
                                                             labels={{
                                                                 stop: t('actions.stop'),
                                                                 stopping: t('actions.stopping'),

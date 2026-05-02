@@ -123,7 +123,7 @@ export class MailService {
     @OnEvent(UserConfirmedEvent.EVENT_NAME)
     async sendWelcomeEmail(data: UserConfirmedEvent): Promise<void> {
         try {
-            const dashboardUrl = data.dashboardUrl || `${config.webAppUrl()}/directories/new`;
+            const dashboardUrl = data.dashboardUrl || `${config.webAppUrl()}/works/new`;
             const appName = config.branding.appName();
 
             await this.mailerService.sendMail({
@@ -219,15 +219,15 @@ export class MailService {
 
             await this.mailerService.sendMail({
                 to: data.invitee.email,
-                subject: `You've been invited to collaborate on ${data.directory.name}`,
+                subject: `You've been invited to collaborate on ${data.work.name}`,
                 template: 'member-invitation',
                 context: {
                     ...this.getBrandingContext(),
                     inviteeName: data.invitee.username,
                     inviterName: data.inviter.username,
-                    directoryName: data.directory.name,
+                    workName: data.work.name,
                     roleName: this.formatRoleName(data.role),
-                    directoryUrl: data.directoryUrl,
+                    workUrl: data.workUrl,
                 },
             });
         } catch (error) {

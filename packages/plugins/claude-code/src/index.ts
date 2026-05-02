@@ -1,7 +1,7 @@
 /**
  * Claude Code Generator Plugin
  *
- * Full pipeline plugin that delegates the entire directory generation
+ * Full pipeline plugin that delegates the entire work generation
  * to Claude Code CLI. Instead of the standard 15-step pipeline, this
  * plugin runs a single Claude Code session that autonomously handles
  * web search, content creation, and file generation.

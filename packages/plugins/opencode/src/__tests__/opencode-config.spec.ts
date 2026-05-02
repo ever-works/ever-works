@@ -22,7 +22,7 @@ describe('opencode-config', () => {
 	it('writes model identifiers in provider/model format for the generated OpenCode config', async () => {
 		const session = await prepareOpenCodeSessionConfig({
 			userId: 'user-1',
-			directoryId: 'dir-1',
+			workId: 'dir-1',
 			providerConfig,
 			model: 'gemini-2.5-flash'
 		});

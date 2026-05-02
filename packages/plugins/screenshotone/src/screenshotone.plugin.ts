@@ -39,13 +39,13 @@ interface ScreenshotOneSettings {
  *
  * Settings Resolution:
  * The API keys are resolved through the 4-level hierarchy:
- * 1. Directory settings (highest priority)
+ * 1. Work settings (highest priority)
  * 2. User settings
  * 3. Admin settings
  * 4. Environment variables: PLUGIN_SCREENSHOTONE_ACCESS_KEY, PLUGIN_SCREENSHOTONE_SECRET_KEY
  * 5. Not configured (plugin unavailable)
  *
- * Configuration mode: hybrid - allows admin-level defaults with user/directory overrides.
+ * Configuration mode: hybrid - allows admin-level defaults with user/work overrides.
  */
 export class ScreenshotOnePlugin implements IPlugin, IScreenshotPlugin {
 	// ============================================================================
@@ -455,7 +455,7 @@ export class ScreenshotOnePlugin implements IPlugin, IScreenshotPlugin {
 			id: this.id,
 			name: this.name,
 			version: this.version,
-			description: 'Automatically capture website screenshots for your directory items',
+			description: 'Automatically capture website screenshots for your work items',
 			category: this.category,
 			capabilities: [...this.capabilities],
 			author: { name: 'Ever Works Team' },
@@ -465,18 +465,18 @@ export class ScreenshotOnePlugin implements IPlugin, IScreenshotPlugin {
 			readme: [
 				'## What does ScreenshotOne do?',
 				'',
-				'ScreenshotOne is a screenshot capture API. When directory items include source URLs, this plugin automatically generates preview images by capturing a screenshot of each page.',
+				'ScreenshotOne is a screenshot capture API. When work items include source URLs, this plugin automatically generates preview images by capturing a screenshot of each page.',
 				'',
 				'## Why use it?',
 				'',
-				'- **Automated capture** — preview images are generated for each directory item without manual effort',
+				'- **Automated capture** — preview images are generated for each work item without manual effort',
 				'- **Consistent output** — every screenshot uses the same viewport size, format, and rendering settings',
 				'- **Ad and tracker blocking** — captures clean screenshots free of ads and cookie banners',
 				'- **Multiple formats** — supports PNG, JPG, and WebP output with configurable resolution',
 				'',
 				'## How it works in Ever Works',
 				'',
-				'During directory generation, the screenshot facade sends capture requests to ScreenshotOne for items that have a source URL. The resulting images are used as item preview thumbnails. You can configure viewport dimensions, image format, device scale factor, and caching behavior.',
+				'During work generation, the screenshot facade sends capture requests to ScreenshotOne for items that have a source URL. The resulting images are used as item preview thumbnails. You can configure viewport dimensions, image format, device scale factor, and caching behavior.',
 				'',
 				'## Getting started',
 				'',

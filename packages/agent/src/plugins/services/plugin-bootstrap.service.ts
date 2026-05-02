@@ -61,7 +61,7 @@ export class PluginBootstrapService {
      * 2. Loads and validates all discovered plugins
      * 3. Calls onLoad lifecycle hook for each plugin
      *
-     * Once loaded, plugins are ready. Per-user/per-directory enable/disable
+     * Once loaded, plugins are ready. Per-user/per-work enable/disable
      * is handled by the DB scope system (isPluginEnabledForScope).
      *
      * Safe to call multiple times - subsequent calls are no-ops.

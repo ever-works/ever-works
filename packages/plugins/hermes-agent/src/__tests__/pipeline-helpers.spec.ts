@@ -75,9 +75,9 @@ describe('buildHermesArgs', () => {
 });
 
 describe('resolveSettings', () => {
-	it('merges global, user, then directory settings by actual source precedence', async () => {
+	it('merges global, user, then work settings by actual source precedence', async () => {
 		const context = {
-			getResolvedSettings: vi.fn(async (scope: 'global' | 'user' | 'directory') => {
+			getResolvedSettings: vi.fn(async (scope: 'global' | 'user' | 'work') => {
 				if (scope === 'global') {
 					return {
 						model: { value: 'global-model', source: 'default' },
@@ -95,15 +95,15 @@ describe('resolveSettings', () => {
 				}
 
 				return {
-					model: { value: 'directory-model', source: 'directory' },
-					maxTurns: { value: 25, source: 'directory' },
+					model: { value: 'work-model', source: 'work' },
+					maxTurns: { value: 25, source: 'work' },
 					profile: { value: 'default', source: 'default' }
 				};
 			})
 		};
 
 		await expect(resolveSettings(context as never, 'user-1', 'dir-1')).resolves.toEqual({
-			model: 'directory-model',
+			model: 'work-model',
 			binaryPath: '/usr/bin/hermes',
 			toolsets: 'web',
 			profile: 'work',
@@ -111,9 +111,9 @@ describe('resolveSettings', () => {
 		});
 	});
 
-	it('keeps user and directory settings when global settings lookup fails', async () => {
+	it('keeps user and work settings when global settings lookup fails', async () => {
 		const context = {
-			getResolvedSettings: vi.fn(async (scope: 'global' | 'user' | 'directory') => {
+			getResolvedSettings: vi.fn(async (scope: 'global' | 'user' | 'work') => {
 				if (scope === 'global') {
 					throw new Error('global settings unavailable');
 				}
@@ -126,7 +126,7 @@ describe('resolveSettings', () => {
 				}
 
 				return {
-					maxTurns: { value: 25, source: 'directory' }
+					maxTurns: { value: 25, source: 'work' }
 				};
 			})
 		};
@@ -138,9 +138,9 @@ describe('resolveSettings', () => {
 		});
 	});
 
-	it('does not let directory fallback values override explicit user settings', async () => {
+	it('does not let work fallback values override explicit user settings', async () => {
 		const context = {
-			getResolvedSettings: vi.fn(async (scope: 'global' | 'user' | 'directory') => {
+			getResolvedSettings: vi.fn(async (scope: 'global' | 'user' | 'work') => {
 				if (scope === 'global') {
 					return {
 						profile: { value: 'default', source: 'default' }

@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { DataAggregationStep } from '../steps/data-aggregation.step';
-import type { StepExecutionContext, DirectoryReference, GenerationRequest, MutableItemData } from '@ever-works/plugin';
+import type { StepExecutionContext, WorkReference, GenerationRequest, MutableItemData } from '@ever-works/plugin';
 import type { MutableGenerationContext } from '../context/index.js';
 
 describe('DataAggregationStep', () => {
@@ -60,7 +60,7 @@ describe('DataAggregationStep', () => {
 
 	const createMockContext = (overrides?: Partial<MutableGenerationContext>): MutableGenerationContext =>
 		({
-			directory: { id: 'test-dir-id', slug: 'test-directory', name: 'Test Directory' } as DirectoryReference,
+			work: { id: 'test-dir-id', slug: 'test-work', name: 'Test Work' } as WorkReference,
 			request: { prompt: 'Test prompt', config: {} } as GenerationRequest,
 			existing: { items: [] },
 			initialAiItems: [],
@@ -83,7 +83,7 @@ describe('DataAggregationStep', () => {
 			aiFacade: createMockAiFacade(),
 			dataSourceFacade: createMockDataSourceFacade(),
 			user: { id: 'test-user-id' },
-			directory: { id: 'test-dir-id' }
+			work: { id: 'test-dir-id' }
 		} as unknown as StepExecutionContext;
 	});
 
@@ -273,7 +273,7 @@ describe('DataAggregationStep', () => {
 			const result = await step.run(mockContext, mockExecContext);
 
 			expect(result.shouldStop).toBe(true);
-			expect(result.warnings).toContain('No new items found. The directory already has existing items.');
+			expect(result.warnings).toContain('No new items found. The work already has existing items.');
 		});
 
 		it('should not set shouldStop when aggregated items exist', async () => {

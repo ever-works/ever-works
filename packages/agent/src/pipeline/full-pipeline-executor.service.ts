@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import type {
-    DirectoryReference,
+    WorkReference,
     GenerationRequest,
     ExistingItems,
     PipelineExecutionOptions,
@@ -41,7 +41,7 @@ export class FullPipelineExecutorService {
      */
     async execute(
         plugin: IPipelinePlugin,
-        directory: DirectoryReference,
+        work: WorkReference,
         request: GenerationRequest,
         existing: ExistingItems,
         options?: PipelineExecutionOptions,
@@ -50,12 +50,12 @@ export class FullPipelineExecutorService {
         const startTime = Date.now();
 
         this.logger.log(
-            `Starting full pipeline execution via plugin "${plugin.id}" for directory: ${directory.id}`,
+            `Starting full pipeline execution via plugin "${plugin.id}" for work: ${work.id}`,
         );
 
         // Emit pipeline:started event
         this.emitPipelineEvent(PipelineEvents.STARTED, {
-            directoryId: directory.id,
+            workId: work.id,
             pipelineId: plugin.id,
         });
 
@@ -80,7 +80,7 @@ export class FullPipelineExecutorService {
         try {
             // Create execContext for the plugin to use facades
             const execContext = this.facadeService.createStepExecutionContext(
-                directory,
+                work,
                 request.providers,
                 request.aiModel,
                 options?.signal,
@@ -88,7 +88,7 @@ export class FullPipelineExecutorService {
 
             // Delegate to the plugin's execute method with execContext
             const rawResult = await plugin.execute(
-                directory,
+                work,
                 request,
                 existing,
                 { ...options, execContext, onLogEntry: options?.onLogEntry },
@@ -111,7 +111,7 @@ export class FullPipelineExecutorService {
 
             // Emit pipeline:completed event
             this.emitPipelineCompleted(
-                directory.id,
+                work.id,
                 duration,
                 result.stepsCompleted,
                 result,
@@ -132,7 +132,7 @@ export class FullPipelineExecutorService {
             const duration = Date.now() - startTime;
 
             // Emit pipeline:failed event
-            this.emitPipelineFailed(directory.id, err, undefined, 0, plugin.id);
+            this.emitPipelineFailed(work.id, err, undefined, 0, plugin.id);
 
             this.logger.error(`Full pipeline failed via plugin "${plugin.id}": ${err.message}`);
 
@@ -160,7 +160,7 @@ export class FullPipelineExecutorService {
      */
     async executeWithCancellation(
         plugin: IPipelinePlugin,
-        directory: DirectoryReference,
+        work: WorkReference,
         request: GenerationRequest,
         existing: ExistingItems,
         options: PipelineExecutionOptions & { signal: AbortSignal },
@@ -179,7 +179,7 @@ export class FullPipelineExecutorService {
             try {
                 return await this.execute(
                     plugin,
-                    directory,
+                    work,
                     request,
                     existing,
                     options,
@@ -190,7 +190,7 @@ export class FullPipelineExecutorService {
             }
         }
 
-        return this.execute(plugin, directory, request, existing, options, onProgress);
+        return this.execute(plugin, work, request, existing, options, onProgress);
     }
 
     /**
@@ -217,7 +217,7 @@ export class FullPipelineExecutorService {
     }
 
     private emitPipelineCompleted(
-        directoryId: string,
+        workId: string,
         duration: number,
         stepsCompleted: number,
         result: PipelineResult,
@@ -225,7 +225,7 @@ export class FullPipelineExecutorService {
     ): void {
         this.eventEmitter.emit(PipelineEvents.COMPLETED, {
             timestamp: new Date().toISOString(),
-            directoryId,
+            workId,
             pipelineId: source,
             duration,
             stepsCompleted,
@@ -234,7 +234,7 @@ export class FullPipelineExecutorService {
     }
 
     private emitPipelineFailed(
-        directoryId: string,
+        workId: string,
         error: Error,
         failedStep: string | undefined,
         completedSteps: number,
@@ -242,7 +242,7 @@ export class FullPipelineExecutorService {
     ): void {
         this.eventEmitter.emit(PipelineEvents.FAILED, {
             timestamp: new Date().toISOString(),
-            directoryId,
+            workId,
             pipelineId: source,
             error: error.message,
             failedStep,

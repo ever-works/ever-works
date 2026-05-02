@@ -1,59 +1,59 @@
-import { DirectoryMemberRole } from './api/enums';
+import { WorkMemberRole } from './api/enums';
 
 /**
  * Role hierarchy values for comparison.
  * Higher number = more permissions.
  */
-const ROLE_HIERARCHY: Record<DirectoryMemberRole, number> = {
-    [DirectoryMemberRole.OWNER]: 4,
-    [DirectoryMemberRole.MANAGER]: 3,
-    [DirectoryMemberRole.EDITOR]: 2,
-    [DirectoryMemberRole.VIEWER]: 1,
+const ROLE_HIERARCHY: Record<WorkMemberRole, number> = {
+    [WorkMemberRole.OWNER]: 4,
+    [WorkMemberRole.MANAGER]: 3,
+    [WorkMemberRole.EDITOR]: 2,
+    [WorkMemberRole.VIEWER]: 1,
 };
 
 /**
  * Check if a role has at least the specified minimum role level.
  */
 export function hasRoleOrHigher(
-    userRole: DirectoryMemberRole | undefined,
-    minimumRole: DirectoryMemberRole,
+    userRole: WorkMemberRole | undefined,
+    minimumRole: WorkMemberRole,
 ): boolean {
     if (!userRole) return false;
     return ROLE_HIERARCHY[userRole] >= ROLE_HIERARCHY[minimumRole];
 }
 
 /**
- * Check if user can view the directory (any role).
+ * Check if user can view the work (any role).
  */
-export function canView(userRole: DirectoryMemberRole | undefined): boolean {
-    return hasRoleOrHigher(userRole, DirectoryMemberRole.VIEWER);
+export function canView(userRole: WorkMemberRole | undefined): boolean {
+    return hasRoleOrHigher(userRole, WorkMemberRole.VIEWER);
 }
 
 /**
- * Check if user can edit directory content (editor, manager, or owner).
+ * Check if user can edit work content (editor, manager, or owner).
  */
-export function canEdit(userRole: DirectoryMemberRole | undefined): boolean {
-    return hasRoleOrHigher(userRole, DirectoryMemberRole.EDITOR);
+export function canEdit(userRole: WorkMemberRole | undefined): boolean {
+    return hasRoleOrHigher(userRole, WorkMemberRole.EDITOR);
 }
 
 /**
  * Check if user can manage members (manager or owner).
  */
-export function canManageMembers(userRole: DirectoryMemberRole | undefined): boolean {
-    return hasRoleOrHigher(userRole, DirectoryMemberRole.MANAGER);
+export function canManageMembers(userRole: WorkMemberRole | undefined): boolean {
+    return hasRoleOrHigher(userRole, WorkMemberRole.MANAGER);
 }
 
 /**
  * Check if user is the owner.
  */
-export function isOwner(userRole: DirectoryMemberRole | undefined): boolean {
-    return userRole === DirectoryMemberRole.OWNER;
+export function isOwner(userRole: WorkMemberRole | undefined): boolean {
+    return userRole === WorkMemberRole.OWNER;
 }
 
 /**
- * Check if user can delete the directory (owner only).
+ * Check if user can delete the work (owner only).
  */
-export function canDelete(userRole: DirectoryMemberRole | undefined): boolean {
+export function canDelete(userRole: WorkMemberRole | undefined): boolean {
     return isOwner(userRole);
 }
 
@@ -61,35 +61,35 @@ export function canDelete(userRole: DirectoryMemberRole | undefined): boolean {
  * Check if user can access settings (managers and owners can view and edit settings).
  * Note: Delete is still owner-only and handled separately by canDelete.
  */
-export function canAccessSettings(userRole: DirectoryMemberRole | undefined): boolean {
-    return hasRoleOrHigher(userRole, DirectoryMemberRole.MANAGER);
+export function canAccessSettings(userRole: WorkMemberRole | undefined): boolean {
+    return hasRoleOrHigher(userRole, WorkMemberRole.MANAGER);
 }
 
 /**
  * Check if user can deploy (editor or higher).
  */
-export function canDeploy(userRole: DirectoryMemberRole | undefined): boolean {
-    return hasRoleOrHigher(userRole, DirectoryMemberRole.EDITOR);
+export function canDeploy(userRole: WorkMemberRole | undefined): boolean {
+    return hasRoleOrHigher(userRole, WorkMemberRole.EDITOR);
 }
 
 /**
  * Check if user can generate/update items (editor or higher).
  */
-export function canGenerate(userRole: DirectoryMemberRole | undefined): boolean {
-    return hasRoleOrHigher(userRole, DirectoryMemberRole.EDITOR);
+export function canGenerate(userRole: WorkMemberRole | undefined): boolean {
+    return hasRoleOrHigher(userRole, WorkMemberRole.EDITOR);
 }
 
 /**
  * Check if user can manage schedules (editor or higher).
  */
-export function canManageSchedule(userRole: DirectoryMemberRole | undefined): boolean {
-    return hasRoleOrHigher(userRole, DirectoryMemberRole.EDITOR);
+export function canManageSchedule(userRole: WorkMemberRole | undefined): boolean {
+    return hasRoleOrHigher(userRole, WorkMemberRole.EDITOR);
 }
 
 /**
  * Permission object for easy use in components.
  */
-export interface DirectoryPermissions {
+export interface WorkPermissions {
     canView: boolean;
     canEdit: boolean;
     canManageMembers: boolean;
@@ -99,13 +99,13 @@ export interface DirectoryPermissions {
     canGenerate: boolean;
     canManageSchedule: boolean;
     isOwner: boolean;
-    role: DirectoryMemberRole | undefined;
+    role: WorkMemberRole | undefined;
 }
 
 /**
  * Get all permissions for a user role.
  */
-export function getPermissions(userRole: DirectoryMemberRole | undefined): DirectoryPermissions {
+export function getPermissions(userRole: WorkMemberRole | undefined): WorkPermissions {
     return {
         canView: canView(userRole),
         canEdit: canEdit(userRole),

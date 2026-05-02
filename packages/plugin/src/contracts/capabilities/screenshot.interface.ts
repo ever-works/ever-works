@@ -48,7 +48,7 @@ export interface ScreenshotOptions {
 	readonly cookies?: readonly ScreenshotCookie[];
 	/**
 	 * Resolved settings for this operation.
-	 * Passed by the facade with user/directory-scoped settings.
+	 * Passed by the facade with user/work-scoped settings.
 	 * Plugins should use these settings instead of their stored defaults.
 	 */
 	readonly settings?: PluginSettings;

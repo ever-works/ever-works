@@ -1,6 +1,6 @@
 import type {
 	ConnectionValidationResult,
-	DirectoryReference,
+	WorkReference,
 	ExistingItems,
 	FacadeOptions,
 	FormFieldDefinition,
@@ -78,7 +78,7 @@ const MANIFEST: PluginManifest = {
 	version: '1.0.0',
 	category: 'pipeline',
 	capabilities: ['pipeline', 'form-schema-provider'],
-	description: 'Self-managed pipeline plugin that delegates directory generation to Hermes Agent',
+	description: 'Self-managed pipeline plugin that delegates work generation to Hermes Agent',
 	author: { name: 'Ever Works Team' },
 	license: 'MIT',
 	builtIn: true,
@@ -98,11 +98,11 @@ const MANIFEST: PluginManifest = {
 	readme: [
 		'# Hermes Agent Plugin',
 		'',
-		'Use a preconfigured Hermes Agent installation on the backend machine as the directory generation engine for Ever Works.',
+		'Use a preconfigured Hermes Agent installation on the backend machine as the work generation engine for Ever Works.',
 		'',
 		'## How it works',
 		'',
-		'- Ever Works creates an isolated workspace for the directory run.',
+		'- Ever Works creates an isolated workspace for the work run.',
 		'- Hermes is launched in one-shot CLI mode against that workspace.',
 		'- Hermes researches the topic and writes a structured result file back into the workspace.',
 		'- Ever Works validates the result and stores the generated items.',
@@ -353,7 +353,7 @@ export class HermesAgentPlugin implements IPlugin, IPipelinePlugin, IFormSchemaP
 	}
 
 	async execute(
-		directory: DirectoryReference,
+		work: WorkReference,
 		request: GenerationRequest,
 		existing: ExistingItems,
 		options?: PipelineExecutionOptions,
@@ -364,7 +364,7 @@ export class HermesAgentPlugin implements IPlugin, IPipelinePlugin, IFormSchemaP
 		const { signal, cleanup: cleanupSignal } = createExecutionSignal(abortController, options?.signal);
 		const logger = this.context?.logger ?? console;
 		const onLogEntry = options?.onLogEntry;
-		const userId = directory.user?.id;
+		const userId = work.user?.id;
 
 		if (!userId) {
 			return this.handleError(new Error('User ID is required for Hermes generation'), startTime);
@@ -383,7 +383,7 @@ export class HermesAgentPlugin implements IPlugin, IPipelinePlugin, IFormSchemaP
 		let workspacePath: string | null = null;
 
 		try {
-			const settings = await resolveSettings(this.context, userId, directory.id);
+			const settings = await resolveSettings(this.context, userId, work.id);
 			const runtimeSettings = resolveHermesRuntimeSettings(settings);
 			const binaryPath = await this.runSetupStep(runtimeSettings, logger, onProgress, onLogEntry);
 
@@ -392,7 +392,7 @@ export class HermesAgentPlugin implements IPlugin, IPipelinePlugin, IFormSchemaP
 			}
 
 			workspacePath = await this.runPrepareContextStep(
-				directory,
+				work,
 				request,
 				existing,
 				userId,
@@ -407,11 +407,11 @@ export class HermesAgentPlugin implements IPlugin, IPipelinePlugin, IFormSchemaP
 				return this.handleCancel(startTime);
 			}
 
-			const facadeOptions: FacadeOptions = { userId, directoryId: directory.id };
+			const facadeOptions: FacadeOptions = { userId, workId: work.id };
 			const execResult = await this.runGenerationStep(
 				binaryPath,
 				runtimeSettings,
-				directory,
+				work,
 				request,
 				existing,
 				workspacePath,
@@ -442,7 +442,7 @@ export class HermesAgentPlugin implements IPlugin, IPipelinePlugin, IFormSchemaP
 				options?.execContext,
 				items,
 				userId,
-				directory.id,
+				work.id,
 				signal,
 				onProgress,
 				logger,
@@ -521,7 +521,7 @@ export class HermesAgentPlugin implements IPlugin, IPipelinePlugin, IFormSchemaP
 	}
 
 	private async runPrepareContextStep(
-		directory: DirectoryReference,
+		work: WorkReference,
 		request: GenerationRequest,
 		existing: ExistingItems,
 		userId: string,
@@ -531,10 +531,10 @@ export class HermesAgentPlugin implements IPlugin, IPipelinePlugin, IFormSchemaP
 		const startedAt = this.startStep('prepare-context', onLogEntry);
 		reportProgress(onProgress, 1, 20, 'Prepare Context');
 
-		const workspacePath = await createWorkspace(userId, directory.id);
+		const workspacePath = await createWorkspace(userId, work.id);
 		await seedExistingItems(workspacePath, existing.items);
 		await seedMetadata(workspacePath, {
-			directory: { name: directory.name, description: directory.description },
+			work: { name: work.name, description: work.description },
 			request: { prompt: request.prompt, name: request.name },
 			categories: existing.categories,
 			tags: existing.tags,
@@ -549,7 +549,7 @@ export class HermesAgentPlugin implements IPlugin, IPipelinePlugin, IFormSchemaP
 	private async runGenerationStep(
 		binaryPath: string,
 		runtimeSettings: ReturnType<typeof resolveHermesRuntimeSettings>,
-		directory: DirectoryReference,
+		work: WorkReference,
 		request: GenerationRequest,
 		existing: ExistingItems,
 		workspacePath: string,
@@ -563,7 +563,7 @@ export class HermesAgentPlugin implements IPlugin, IPipelinePlugin, IFormSchemaP
 		reportProgress(onProgress, 2, 30, 'Generate Items');
 
 		const promptFacade = execContext?.promptFacade;
-		const promptInput = { directory, request, existing };
+		const promptInput = { work, request, existing };
 
 		const sysTemplate = promptFacade
 			? ((await promptFacade.getPrompt(PROMPT_KEYS.SYSTEM, DEFAULT_SYSTEM_PROMPT, facadeOptions)) as string)
@@ -633,7 +633,7 @@ export class HermesAgentPlugin implements IPlugin, IPipelinePlugin, IFormSchemaP
 		execContext: PipelineExecutionOptions['execContext'],
 		items: ItemData[],
 		userId: string,
-		directoryId: string,
+		workId: string,
 		signal: AbortSignal,
 		onProgress: PipelineProgressCallback | undefined,
 		logger: { log(...args: unknown[]): void; warn(...args: unknown[]): void },
@@ -661,7 +661,7 @@ export class HermesAgentPlugin implements IPlugin, IPipelinePlugin, IFormSchemaP
 
 		const { status, errors } = await captureScreenshots(items, {
 			screenshotFacade,
-			facadeOptions: { userId, directoryId },
+			facadeOptions: { userId, workId },
 			signal,
 			logger
 		});

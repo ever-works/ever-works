@@ -1,9 +1,9 @@
 import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
-import { DirectoryRepository } from '../database/repositories/directory.repository';
-import { DirectoryScheduleService } from './directory-schedule.service';
+import { WorkRepository } from '../database/repositories/work.repository';
+import { WorkScheduleService } from './work-schedule.service';
 import { ItemHealthService } from './item-health.service';
 import { User } from '@src/entities/user.entity';
-import type { DirectoryScheduleAllowedCadence } from '@ever-works/contracts/api';
+import type { WorkScheduleAllowedCadence } from '@ever-works/contracts/api';
 import type { SourceValidationSettingsDto } from '@ever-works/contracts/api';
 import { UpdateSourceValidationDto } from '@src/dto/update-source-validation.dto';
 
@@ -12,7 +12,7 @@ export type ItemSourceValidationSchedulerResult = {
     skipped: number;
     itemsChecked: number;
     itemsChanged: number;
-    errors: { directoryId: string; message: string }[];
+    errors: { workId: string; message: string }[];
 };
 
 @Injectable()
@@ -21,13 +21,13 @@ export class ItemSourceValidationSchedulerService {
     private readonly LIMIT = 50;
 
     constructor(
-        private readonly directoryRepository: DirectoryRepository,
-        private readonly scheduleService: DirectoryScheduleService,
+        private readonly workRepository: WorkRepository,
+        private readonly scheduleService: WorkScheduleService,
         private readonly itemHealthService: ItemHealthService,
     ) {}
 
     async processDueSchedules(): Promise<ItemSourceValidationSchedulerResult> {
-        const directories = await this.directoryRepository.findDueSourceValidation(this.LIMIT);
+        const works = await this.workRepository.findDueSourceValidation(this.LIMIT);
 
         const result: ItemSourceValidationSchedulerResult = {
             processed: 0,
@@ -37,31 +37,31 @@ export class ItemSourceValidationSchedulerService {
             errors: [],
         };
 
-        for (const directory of directories) {
-            const user = directory.user as User | undefined;
+        for (const work of works) {
+            const user = work.user as User | undefined;
 
-            if (!user || !directory.sourceValidationCadence) {
+            if (!user || !work.sourceValidationCadence) {
                 result.skipped += 1;
                 continue;
             }
 
             try {
-                const checkResult = await this.itemHealthService.runScheduledCheck(directory, user);
+                const checkResult = await this.itemHealthService.runScheduledCheck(work, user);
                 const nextRunAt = this.scheduleService.calculateNextRun(
-                    directory.sourceValidationCadence,
+                    work.sourceValidationCadence,
                     0,
                     new Date(),
                 );
-                await this.directoryRepository.updateSourceValidationRun(directory.id, nextRunAt);
+                await this.workRepository.updateSourceValidationRun(work.id, nextRunAt);
 
                 result.processed += 1;
                 result.itemsChecked += checkResult.checkedCount;
                 result.itemsChanged += checkResult.changedCount;
             } catch (error) {
                 const message = error instanceof Error ? error.message : String(error);
-                result.errors.push({ directoryId: directory.id, message });
+                result.errors.push({ workId: work.id, message });
                 this.logger.error(
-                    `Source validation failed for directory ${directory.id}`,
+                    `Source validation failed for work ${work.id}`,
                     error instanceof Error ? error.stack : undefined,
                 );
             }
@@ -71,34 +71,34 @@ export class ItemSourceValidationSchedulerService {
     }
 
     async getSettings(
-        directoryId: string,
-        allowedCadences: DirectoryScheduleAllowedCadence[],
+        workId: string,
+        allowedCadences: WorkScheduleAllowedCadence[],
     ): Promise<SourceValidationSettingsDto> {
-        const directory = await this.directoryRepository.findById(directoryId);
-        if (!directory) {
-            throw new NotFoundException(`Directory ${directoryId} not found`);
+        const work = await this.workRepository.findById(workId);
+        if (!work) {
+            throw new NotFoundException(`Work ${workId} not found`);
         }
 
         return {
-            enabled: directory.sourceValidationEnabled,
-            cadence: directory.sourceValidationCadence ?? null,
-            nextRunAt: directory.sourceValidationNextRunAt?.toISOString() ?? null,
-            lastRunAt: directory.sourceValidationLastRunAt?.toISOString() ?? null,
+            enabled: work.sourceValidationEnabled,
+            cadence: work.sourceValidationCadence ?? null,
+            nextRunAt: work.sourceValidationNextRunAt?.toISOString() ?? null,
+            lastRunAt: work.sourceValidationLastRunAt?.toISOString() ?? null,
             allowedCadences,
         };
     }
 
     async updateSettings(
-        directoryId: string,
+        workId: string,
         dto: UpdateSourceValidationDto,
-        allowedCadences: DirectoryScheduleAllowedCadence[],
+        allowedCadences: WorkScheduleAllowedCadence[],
     ): Promise<SourceValidationSettingsDto> {
-        const directory = await this.directoryRepository.findById(directoryId);
-        if (!directory) {
-            throw new NotFoundException(`Directory ${directoryId} not found`);
+        const work = await this.workRepository.findById(workId);
+        if (!work) {
+            throw new NotFoundException(`Work ${workId} not found`);
         }
 
-        const cadence = dto.cadence ?? directory.sourceValidationCadence ?? null;
+        const cadence = dto.cadence ?? work.sourceValidationCadence ?? null;
 
         if (
             cadence &&
@@ -113,7 +113,7 @@ export class ItemSourceValidationSchedulerService {
         const nextRunAt =
             dto.enabled && cadence ? this.scheduleService.calculateNextRun(cadence) : null;
 
-        await this.directoryRepository.update(directory.id, {
+        await this.workRepository.update(work.id, {
             sourceValidationEnabled: dto.enabled,
             sourceValidationCadence: cadence,
             sourceValidationNextRunAt: nextRunAt,
@@ -123,7 +123,7 @@ export class ItemSourceValidationSchedulerService {
             enabled: dto.enabled,
             cadence,
             nextRunAt: nextRunAt?.toISOString() ?? null,
-            lastRunAt: directory.sourceValidationLastRunAt?.toISOString() ?? null,
+            lastRunAt: work.sourceValidationLastRunAt?.toISOString() ?? null,
             allowedCadences,
         };
     }

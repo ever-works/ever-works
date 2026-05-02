@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { AiFacadeService, type FacadeOptions } from '@ever-works/agent/facades';
 import { ConversationRepository } from '@ever-works/agent/database';
-import { DirectoryRepository } from '@ever-works/agent/database';
+import { WorkRepository } from '@ever-works/agent/database';
 
 @Injectable()
 export class ConversationTitleService {
@@ -10,7 +10,7 @@ export class ConversationTitleService {
     constructor(
         private readonly conversationRepo: ConversationRepository,
         private readonly aiFacade: AiFacadeService,
-        private readonly directoryRepository: DirectoryRepository,
+        private readonly workRepository: WorkRepository,
     ) {}
 
     /**
@@ -85,10 +85,10 @@ export class ConversationTitleService {
 
     private async resolveFacadeOptions(userId: string): Promise<FacadeOptions> {
         try {
-            const directories = await this.directoryRepository.findByUser(userId);
+            const works = await this.workRepository.findByUser(userId);
             return {
                 userId,
-                directoryId: directories[0]?.id,
+                workId: works[0]?.id,
             };
         } catch {
             return { userId };

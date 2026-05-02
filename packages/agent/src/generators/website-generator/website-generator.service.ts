@@ -2,10 +2,10 @@ import { Injectable, Logger } from '@nestjs/common';
 import { GitFacadeService } from '../../facades/git.facade';
 import { BranchSyncService } from './branch-sync.service';
 import { WebsiteRepositoryCreationMethod } from '../../items-generator/dto/create-items-generator.dto';
-import { Directory } from '../../entities/directory.entity';
+import { Work } from '../../entities/work.entity';
 import { User } from '../../entities/user.entity';
 import { getWebsiteTemplateConfig } from './config/website-template.config';
-import { getDirectoryOwner } from '../../utils/directory.utils';
+import { getWorkOwner } from '../../utils/work.utils';
 import * as fs from 'node:fs/promises';
 import { cloneFreshRepository } from '../../utils/fresh-repository-clone.utils';
 import { assertCreatedRepositoryTarget } from '../../utils/git-repository.utils';
@@ -25,7 +25,7 @@ export class WebsiteGeneratorService {
     ) {}
 
     private async waitForTargetRepository(
-        directory: Directory,
+        work: Work,
         user: User,
         owner: string,
         repo: string,
@@ -33,8 +33,8 @@ export class WebsiteGeneratorService {
     ) {
         throwIfGenerationCancelled(options.signal);
 
-        const directoryOwner = getDirectoryOwner(directory);
-        const committer = directory.resolveCommitter(user);
+        const workOwner = getWorkOwner(work);
+        const committer = work.resolveCommitter(user);
 
         const repoDir = await cloneFreshRepository(
             this.gitFacade,
@@ -42,9 +42,9 @@ export class WebsiteGeneratorService {
                 owner,
                 repo,
                 committer,
-                userId: directoryOwner.id,
-                providerId: directory.gitProvider,
-                directoryId: directory.id,
+                userId: workOwner.id,
+                providerId: work.gitProvider,
+                workId: work.id,
             },
             this.logger,
         );
@@ -53,17 +53,17 @@ export class WebsiteGeneratorService {
         await fs.rm(repoDir, { recursive: true, force: true }).catch(() => {});
     }
 
-    private async ensureTemplateDefaultBranch(directory: Directory, userId: string): Promise<void> {
-        const template = getWebsiteTemplateConfig(directory.websiteTemplateId);
+    private async ensureTemplateDefaultBranch(work: Work, userId: string): Promise<void> {
+        const template = getWebsiteTemplateConfig(work.websiteTemplateId);
         const targetBranch = template.branch;
-        const websiteOwner = directory.getRepoOwner('website');
-        const websiteRepo = directory.getWebsiteRepo();
+        const websiteOwner = work.getRepoOwner('website');
+        const websiteRepo = work.getWebsiteRepo();
 
         try {
             const branches = await this.gitFacade.listBranches(websiteOwner, websiteRepo, {
                 userId,
-                providerId: directory.gitProvider,
-                directoryId: directory.id,
+                providerId: work.gitProvider,
+                workId: work.id,
             });
 
             if (!branches.some((branch) => branch.name === targetBranch)) {
@@ -77,7 +77,7 @@ export class WebsiteGeneratorService {
                 websiteOwner,
                 websiteRepo,
                 { defaultBranch: targetBranch },
-                { userId, providerId: directory.gitProvider, directoryId: directory.id },
+                { userId, providerId: work.gitProvider, workId: work.id },
             );
         } catch (error) {
             this.logger.warn(
@@ -87,17 +87,17 @@ export class WebsiteGeneratorService {
     }
 
     private async duplicate(
-        directory: Directory,
+        work: Work,
         user: User,
         options: WebsiteGenerationOptions = {},
     ) {
         throwIfGenerationCancelled(options.signal);
 
-        const directoryOwner = getDirectoryOwner(directory);
-        const committer = directory.resolveCommitter(user);
-        const template = getWebsiteTemplateConfig(directory.websiteTemplateId);
+        const workOwner = getWorkOwner(work);
+        const committer = work.resolveCommitter(user);
+        const template = getWebsiteTemplateConfig(work.websiteTemplateId);
 
-        await this.cleanup(directory);
+        await this.cleanup(work);
         throwIfGenerationCancelled(options.signal);
 
         // Clone template repo
@@ -109,28 +109,28 @@ export class WebsiteGeneratorService {
                 committer,
             },
             {
-                userId: directoryOwner.id,
-                providerId: directory.gitProvider,
-                directoryId: directory.id,
+                userId: workOwner.id,
+                providerId: work.gitProvider,
+                workId: work.id,
             },
         );
         throwIfGenerationCancelled(options.signal);
 
         // Create target repo
-        const websiteOwner = directory.getRepoOwner('website');
-        const websiteRepo = directory.getWebsiteRepo();
+        const websiteOwner = work.getRepoOwner('website');
+        const websiteRepo = work.getWebsiteRepo();
         const websiteRepository = assertCreatedRepositoryTarget(
             await this.gitFacade.createRepository(
                 {
                     name: websiteRepo,
-                    description: `Website for ${directory.name}`,
-                    organization: directory.organization ? websiteOwner : undefined,
+                    description: `Website for ${work.name}`,
+                    organization: work.organization ? websiteOwner : undefined,
                     isPrivate: true,
                 },
                 {
-                    userId: directoryOwner.id,
-                    providerId: directory.gitProvider,
-                    directoryId: directory.id,
+                    userId: workOwner.id,
+                    providerId: work.gitProvider,
+                    workId: work.id,
                 },
             ),
             websiteOwner,
@@ -139,7 +139,7 @@ export class WebsiteGeneratorService {
         );
 
         await this.waitForTargetRepository(
-            directory,
+            work,
             user,
             websiteRepository.owner,
             websiteRepository.name,
@@ -149,14 +149,14 @@ export class WebsiteGeneratorService {
 
         // Push template to target repo
         const targetCloneUrl = this.gitFacade.getCloneUrl(
-            directory.gitProvider,
+            work.gitProvider,
             websiteRepository.owner,
             websiteRepository.name,
         );
 
         // Remove origin and add new one pointing to target
         await this.gitFacade.replaceRemote(
-            directory.gitProvider,
+            work.gitProvider,
             templateDir,
             'origin',
             targetCloneUrl,
@@ -166,42 +166,42 @@ export class WebsiteGeneratorService {
         await this.gitFacade.push(
             { dir: templateDir, force: true },
             {
-                userId: directoryOwner.id,
-                providerId: directory.gitProvider,
-                directoryId: directory.id,
+                userId: workOwner.id,
+                providerId: work.gitProvider,
+                workId: work.id,
             },
         );
         throwIfGenerationCancelled(options.signal);
 
-        await this.ensureTemplateDefaultBranch(directory, directoryOwner.id);
+        await this.ensureTemplateDefaultBranch(work, workOwner.id);
 
         return templateDir;
     }
 
     private async createUsingTemplate(
-        directory: Directory,
+        work: Work,
         user: User,
         options: WebsiteGenerationOptions = {},
     ) {
         throwIfGenerationCancelled(options.signal);
 
-        const directoryOwner = getDirectoryOwner(directory);
-        const websiteOwner = directory.getRepoOwner('website');
-        const websiteRepo = directory.getWebsiteRepo();
-        const template = getWebsiteTemplateConfig(directory.websiteTemplateId);
+        const workOwner = getWorkOwner(work);
+        const websiteOwner = work.getRepoOwner('website');
+        const websiteRepo = work.getWebsiteRepo();
+        const template = getWebsiteTemplateConfig(work.websiteTemplateId);
 
         const createdWebsiteRepository = await this.gitFacade.createRepositoryFromTemplate(
             template.owner,
             template.repo,
             {
                 name: websiteRepo,
-                organization: directory.organization ? websiteOwner : undefined,
+                organization: work.organization ? websiteOwner : undefined,
                 isPrivate: true,
             },
             {
-                userId: directoryOwner.id,
-                providerId: directory.gitProvider,
-                directoryId: directory.id,
+                userId: workOwner.id,
+                providerId: work.gitProvider,
+                workId: work.id,
             },
         );
         throwIfGenerationCancelled(options.signal);
@@ -215,7 +215,7 @@ export class WebsiteGeneratorService {
             );
 
             await this.waitForTargetRepository(
-                directory,
+                work,
                 user,
                 createdWebsiteRepository.owner,
                 createdWebsiteRepository.name,
@@ -225,34 +225,34 @@ export class WebsiteGeneratorService {
     }
 
     async initialize(
-        directory: Directory,
+        work: Work,
         user: User,
         operation: WebsiteRepositoryCreationMethod = WebsiteRepositoryCreationMethod.DUPLICATE,
         options: WebsiteGenerationOptions = {},
     ) {
         let path: string | undefined;
-        const directoryOwner = getDirectoryOwner(directory);
+        const workOwner = getWorkOwner(work);
 
         try {
             throwIfGenerationCancelled(options.signal);
 
             if (operation === WebsiteRepositoryCreationMethod.DUPLICATE) {
-                path = await this.duplicate(directory, user, options);
+                path = await this.duplicate(work, user, options);
             } else if (operation === WebsiteRepositoryCreationMethod.CREATE_USING_TEMPLATE) {
                 try {
-                    await this.createUsingTemplate(directory, user, options);
+                    await this.createUsingTemplate(work, user, options);
                 } catch {
                     throwIfGenerationCancelled(options.signal);
-                    path = await this.duplicate(directory, user, options);
+                    path = await this.duplicate(work, user, options);
                 }
             } else {
-                path = await this.duplicate(directory, user, options);
+                path = await this.duplicate(work, user, options);
             }
 
             throwIfGenerationCancelled(options.signal);
-            await this.syncAllBranchesFromTemplate(directory, user, true);
+            await this.syncAllBranchesFromTemplate(work, user, true);
             throwIfGenerationCancelled(options.signal);
-            await this.ensureTemplateDefaultBranch(directory, directoryOwner.id);
+            await this.ensureTemplateDefaultBranch(work, workOwner.id);
         } finally {
             if (path) {
                 await fs.rm(path, { recursive: true, force: true });
@@ -260,34 +260,34 @@ export class WebsiteGeneratorService {
         }
     }
 
-    /** Sync all branches from template to directory's website repo */
+    /** Sync all branches from template to work's website repo */
     async syncAllBranchesFromTemplate(
-        directory: Directory,
+        work: Work,
         user: User,
         cleanupExtraBranches = false,
     ) {
-        return this.branchSyncService.syncFromTemplate(directory, user, cleanupExtraBranches);
+        return this.branchSyncService.syncFromTemplate(work, user, cleanupExtraBranches);
     }
 
-    async removeRepository(directory: Directory, _user: User): Promise<void> {
-        const directoryOwner = getDirectoryOwner(directory);
+    async removeRepository(work: Work, _user: User): Promise<void> {
+        const workOwner = getWorkOwner(work);
 
         await this.gitFacade.deleteRepository(
-            directory.getRepoOwner('website'),
-            directory.getWebsiteRepo(),
+            work.getRepoOwner('website'),
+            work.getWebsiteRepo(),
             {
-                userId: directoryOwner.id,
-                providerId: directory.gitProvider,
-                directoryId: directory.id,
+                userId: workOwner.id,
+                providerId: work.gitProvider,
+                workId: work.id,
             },
         );
     }
 
-    public cleanup(directory: Directory) {
+    public cleanup(work: Work) {
         const dataDir = this.gitFacade.getLocalDir(
-            directory.gitProvider,
-            directory.getRepoOwner('website'),
-            directory.getWebsiteRepo(),
+            work.gitProvider,
+            work.getRepoOwner('website'),
+            work.getWebsiteRepo(),
         );
 
         return fs.rm(dataDir, { recursive: true, force: true });

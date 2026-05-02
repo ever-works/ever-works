@@ -1,7 +1,7 @@
 import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
-import { DirectoryGenerationHistoryRepository } from '@src/database/repositories/directory-generation-history.repository';
+import { WorkGenerationHistoryRepository } from '@src/database/repositories/work-generation-history.repository';
 import { ActivityLogRepository } from '@src/database/repositories/activity-log.repository';
-import { DirectoryRepository } from '@src/database/repositories/directory.repository';
+import { WorkRepository } from '@src/database/repositories/work.repository';
 import { formatGenerationCountsSummary, formatStoredActivitySummary } from './activity-log-summary';
 import {
     ActivityActionType,
@@ -10,7 +10,7 @@ import {
     type ActivityLogQueryOptions,
 } from '../entities/activity-log.types';
 import type { ActivityLog } from '../entities/activity-log.entity';
-import type { Directory } from '../entities/directory.entity';
+import type { Work } from '../entities/work.entity';
 import { GenerateStatusType } from '@src/entities/types';
 import {
     ACTIVITY_LOG_ANALYTICS_DISPATCHER,
@@ -23,8 +23,8 @@ export class ActivityLogService {
 
     constructor(
         private readonly repository: ActivityLogRepository,
-        private readonly directoryRepository: DirectoryRepository,
-        private readonly generationHistoryRepository: DirectoryGenerationHistoryRepository,
+        private readonly workRepository: WorkRepository,
+        private readonly generationHistoryRepository: WorkGenerationHistoryRepository,
         @Optional()
         @Inject(ACTIVITY_LOG_ANALYTICS_DISPATCHER)
         private readonly analyticsDispatcher?: ActivityLogAnalyticsDispatcher,
@@ -45,13 +45,13 @@ export class ActivityLogService {
     }
 
     resolveGenerationActivityStatus(
-        directory?: Pick<Directory, 'generateStatus'> | null,
+        work?: Pick<Work, 'generateStatus'> | null,
     ): ActivityStatus {
-        if (!directory) {
+        if (!work) {
             return ActivityStatus.FAILED;
         }
 
-        switch (directory.generateStatus?.status) {
+        switch (work.generateStatus?.status) {
             case GenerateStatusType.CANCELLED:
                 return ActivityStatus.CANCELLED;
             case GenerateStatusType.ERROR:
@@ -62,22 +62,22 @@ export class ActivityLogService {
     }
 
     formatGenerationCompletionSummary(
-        directory: Pick<Directory, 'name' | 'generateStatus'> | null | undefined,
+        work: Pick<Work, 'name' | 'generateStatus'> | null | undefined,
         counts?: {
             newItemsCount?: number | null;
             updatedItemsCount?: number | null;
             totalItemsCount?: number | null;
         },
     ): string {
-        if (!directory) {
-            return 'Generation state is no longer available for this directory';
+        if (!work) {
+            return 'Generation state is no longer available for this work';
         }
 
-        switch (directory.generateStatus?.status) {
+        switch (work.generateStatus?.status) {
             case GenerateStatusType.CANCELLED:
-                return `Generation cancelled for ${directory.name}`;
+                return `Generation cancelled for ${work.name}`;
             case GenerateStatusType.ERROR:
-                return `Generation failed for ${directory.name}`;
+                return `Generation failed for ${work.name}`;
             default:
                 return this.formatGenerationSummary(counts);
         }
@@ -131,13 +131,13 @@ export class ActivityLogService {
                 return 0;
             }
 
-            const directories = await this.directoryRepository.findByIds(
+            const works = await this.workRepository.findByIds(
                 activities
-                    .map((activity) => activity.directoryId)
-                    .filter((directoryId): directoryId is string => !!directoryId),
+                    .map((activity) => activity.workId)
+                    .filter((workId): workId is string => !!workId),
             );
-            const directoriesById = new Map(
-                directories.map((directory) => [directory.id, directory]),
+            const worksById = new Map(
+                works.map((work) => [work.id, work]),
             );
 
             let reconciledCount = 0;
@@ -145,26 +145,26 @@ export class ActivityLogService {
             for (const activity of activities) {
                 try {
                     if (
-                        !activity.directoryId ||
+                        !activity.workId ||
                         activity.actionType !== ActivityActionType.GENERATION
                     ) {
                         continue;
                     }
 
-                    const directory = directoriesById.get(activity.directoryId);
+                    const work = worksById.get(activity.workId);
 
-                    if (directory?.generateStatus?.status === GenerateStatusType.GENERATING) {
+                    if (work?.generateStatus?.status === GenerateStatusType.GENERATING) {
                         continue;
                     }
 
-                    const latestHistory = activity.directoryId
-                        ? await this.generationHistoryRepository.findLatestCompletedByDirectory(
-                              activity.directoryId,
+                    const latestHistory = activity.workId
+                        ? await this.generationHistoryRepository.findLatestCompletedByWork(
+                              activity.workId,
                           )
                         : null;
-                    const resolvedStatus = this.resolveGenerationActivityStatus(directory);
+                    const resolvedStatus = this.resolveGenerationActivityStatus(work);
                     const summary = this.formatGenerationCompletionSummary(
-                        directory,
+                        work,
                         latestHistory,
                     );
                     const existingDetails =
@@ -180,10 +180,10 @@ export class ActivityLogService {
                         {
                             ...existingDetails,
                             itemsCount:
-                                latestHistory?.totalItemsCount ?? directory?.itemsCount ?? 0,
+                                latestHistory?.totalItemsCount ?? work?.itemsCount ?? 0,
                             newItemsCount: latestHistory?.newItemsCount ?? 0,
                             updatedItemsCount: latestHistory?.updatedItemsCount ?? 0,
-                            generateStatus: directory?.generateStatus ?? null,
+                            generateStatus: work?.generateStatus ?? null,
                         },
                         {
                             action: 'generation.completed',
@@ -242,13 +242,13 @@ export class ActivityLogService {
         return this.repository.findByIdAndUserId(id, userId);
     }
 
-    async findLatestByUserDirectoryActionStatus(params: {
+    async findLatestByUserWorkActionStatus(params: {
         userId: string;
-        directoryId: string;
+        workId: string;
         actionType: ActivityActionType;
         status: ActivityStatus;
     }): Promise<ActivityLog | null> {
-        return this.repository.findLatestByUserDirectoryActionStatus(params);
+        return this.repository.findLatestByUserWorkActionStatus(params);
     }
 
     async exportCsv(query: ActivityLogQueryOptions): Promise<string> {
@@ -258,19 +258,19 @@ export class ActivityLogService {
             offset: 0,
         });
 
-        const headers = ['Date', 'Action Type', 'Action', 'Status', 'Directory', 'Summary'].join(
+        const headers = ['Date', 'Action Type', 'Action', 'Status', 'Work', 'Summary'].join(
             ',',
         );
 
         const rows = activities.map((a) => {
-            const directoryName = (a.directory?.name || '').replace(/"/g, '""');
+            const workName = (a.work?.name || '').replace(/"/g, '""');
             const summary = this.formatSummary(a).replace(/"/g, '""');
             return [
                 a.createdAt.toISOString(),
                 a.actionType,
                 a.action,
                 a.status,
-                `"${directoryName}"`,
+                `"${workName}"`,
                 `"${summary}"`,
             ].join(',');
         });

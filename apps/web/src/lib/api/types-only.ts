@@ -16,28 +16,28 @@ export type {
 } from './auth';
 
 export type {
-    // From directory.ts
+    // From work.ts
     MarkdownReadmeConfig,
     WebsiteTemplateOption,
-    CreateDirectoryDto,
-    UpdateDirectoryDto,
-    DeleteDirectoryDto,
-    GenerateDirectoryDetailDto,
+    CreateWorkDto,
+    UpdateWorkDto,
+    DeleteWorkDto,
+    GenerateWorkDetailDto,
     GenerateStatus,
-    Directory,
-    DirectoriesResponse,
-    DeleteDirectoryResponse,
-    DirectoryDetails,
-    DirectoryConfig,
+    Work,
+    WorksResponse,
+    DeleteWorkResponse,
+    WorkDetails,
+    WorkConfig,
     PRUpdate,
     GenerationMetrics,
     GenerationStepLog,
-    DirectoryGenerationHistoryEntry,
-    DirectoryGenerationHistoryResponse,
-    DirectoryScheduleDto,
-    DirectoryScheduleAllowedCadence,
+    WorkGenerationHistoryEntry,
+    WorkGenerationHistoryResponse,
+    WorkScheduleDto,
+    WorkScheduleAllowedCadence,
     UpdateReadmeResponse,
-    SyncDirectoryResponse,
+    SyncWorkResponse,
     ImportSourceType,
     RepositoryTarget,
     RelatedRepositories,
@@ -46,13 +46,13 @@ export type {
     RepoVisibility,
     ImportEnrichmentConfig,
     AnalyzeRepositoryResponseDto,
-    ImportDirectoryDto,
+    ImportWorkDto,
     AnalyzeForLinkingResponseDto,
     RepositoryStatus,
     RepositoryType,
     SourceValidationSettingsDto,
     // GenerateStatus now has dynamic step support
-} from './directory';
+} from './work';
 
 export type {
     // From items-generator.ts

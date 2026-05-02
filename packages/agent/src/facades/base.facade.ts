@@ -4,7 +4,7 @@ import {
     RegisteredPlugin,
 } from '../plugins/services/plugin-registry.service';
 import { PluginSettingsService } from '../plugins/services/plugin-settings.service';
-import { DirectoryPluginRepository } from '../plugins/repositories/directory-plugin.repository';
+import { WorkPluginRepository } from '../plugins/repositories/work-plugin.repository';
 import type { IPlugin, FacadeOptions } from '@ever-works/plugin';
 
 // Common error classes for all facades
@@ -53,11 +53,11 @@ export abstract class BaseFacadeService {
     constructor(
         protected readonly registry: PluginRegistryService,
         protected readonly settingsService: PluginSettingsService | undefined,
-        protected readonly directoryPluginRepository?: DirectoryPluginRepository,
+        protected readonly workPluginRepository?: WorkPluginRepository,
     ) {}
 
     async getActiveProviderName(facadeOptions: FacadeOptions): Promise<string | null> {
-        const info = await this.getDefaultProvider(facadeOptions.directoryId, facadeOptions.userId);
+        const info = await this.getDefaultProvider(facadeOptions.workId, facadeOptions.userId);
         return info?.name ?? null;
     }
 
@@ -80,23 +80,23 @@ export abstract class BaseFacadeService {
     }
 
     async getDefaultProvider(
-        directoryId?: string,
+        workId?: string,
         userId?: string,
     ): Promise<DefaultProviderInfo | null> {
-        if (directoryId && this.directoryPluginRepository) {
+        if (workId && this.workPluginRepository) {
             try {
-                const activePlugin = await this.directoryPluginRepository.findActiveByCapability(
-                    directoryId,
+                const activePlugin = await this.workPluginRepository.findActiveByCapability(
+                    workId,
                     this.CAPABILITY,
                 );
 
                 if (activePlugin) {
                     const registered = this.registry.get(activePlugin.pluginId);
                     if (registered && registered.state === 'loaded') {
-                        // Verify plugin is enabled for this scope (directory + user)
+                        // Verify plugin is enabled for this scope (work + user)
                         const isEnabled = await this.isPluginEnabled(
                             activePlugin.pluginId,
-                            directoryId,
+                            workId,
                             userId,
                         );
                         if (isEnabled) {
@@ -112,7 +112,7 @@ export abstract class BaseFacadeService {
             }
         }
 
-        const enabledPlugins = await this.getEnabledPlugins(directoryId, userId);
+        const enabledPlugins = await this.getEnabledPlugins(workId, userId);
 
         if (enabledPlugins.length > 0) {
             return {
@@ -126,13 +126,13 @@ export abstract class BaseFacadeService {
 
     protected async isPluginEnabled(
         pluginId: string,
-        directoryId: string,
+        workId: string,
         userId: string,
     ): Promise<boolean> {
-        return this.registry.isPluginEnabledForScope(pluginId, directoryId, userId);
+        return this.registry.isPluginEnabledForScope(pluginId, workId, userId);
     }
 
-    // Get resolved settings using 4-level hierarchy: Directory > User > Admin > Plugin defaults
+    // Get resolved settings using 4-level hierarchy: Work > User > Admin > Plugin defaults
     protected async getResolvedSettings(
         pluginId: string,
         options: FacadeOptions,
@@ -142,7 +142,7 @@ export abstract class BaseFacadeService {
         }
         return this.settingsService.getSettings(pluginId, {
             userId: options.userId,
-            directoryId: options.directoryId,
+            workId: options.workId,
             includeSecrets: true,
         });
     }
@@ -210,16 +210,16 @@ export abstract class BaseFacadeService {
         return value ?? defaultValue;
     }
 
-    protected async findActivePluginForDirectory(
-        directoryId: string,
+    protected async findActivePluginForWork(
+        workId: string,
     ): Promise<RegisteredPlugin | null> {
-        if (!this.directoryPluginRepository) {
+        if (!this.workPluginRepository) {
             return null;
         }
 
         try {
-            const activePlugin = await this.directoryPluginRepository.findActiveByCapability(
-                directoryId,
+            const activePlugin = await this.workPluginRepository.findActiveByCapability(
+                workId,
                 this.CAPABILITY,
             );
 
@@ -237,7 +237,7 @@ export abstract class BaseFacadeService {
     }
 
     protected async getEnabledPlugins(
-        directoryId: string,
+        workId: string,
         userId: string,
     ): Promise<RegisteredPlugin[]> {
         const plugins = this.registry.getByCapability(this.CAPABILITY);
@@ -246,7 +246,7 @@ export abstract class BaseFacadeService {
         for (const p of plugins) {
             if (p.state !== 'loaded') continue;
 
-            const isEnabled = await this.isPluginEnabled(p.plugin.id, directoryId, userId);
+            const isEnabled = await this.isPluginEnabled(p.plugin.id, workId, userId);
             if (isEnabled) {
                 result.push(p);
             }
@@ -262,11 +262,11 @@ export abstract class BaseFacadeService {
         return result;
     }
 
-    // Resolve plugin: providerOverride > directory active > defaultForCapabilities > first enabled
+    // Resolve plugin: providerOverride > work active > defaultForCapabilities > first enabled
     protected async resolvePlugin<T extends IPlugin>(
         providerOverride?: string,
         userId?: string,
-        directoryId?: string,
+        workId?: string,
     ): Promise<T> {
         if (providerOverride) {
             const registered = this.registry.get(providerOverride);
@@ -275,18 +275,18 @@ export abstract class BaseFacadeService {
                 registered.manifest.capabilities.includes(this.CAPABILITY) &&
                 registered.state === 'loaded'
             ) {
-                const isEnabled = await this.isPluginEnabled(providerOverride, directoryId, userId);
+                const isEnabled = await this.isPluginEnabled(providerOverride, workId, userId);
                 if (isEnabled) return registered.plugin as T;
             }
             throw new ProviderNotFoundError(providerOverride, this.CAPABILITY);
         }
 
-        if (directoryId) {
-            const activePlugin = await this.findActivePluginForDirectory(directoryId);
+        if (workId) {
+            const activePlugin = await this.findActivePluginForWork(workId);
             if (activePlugin) return activePlugin.plugin as T;
         }
 
-        const enabledPlugins = await this.getEnabledPlugins(directoryId, userId);
+        const enabledPlugins = await this.getEnabledPlugins(workId, userId);
         if (enabledPlugins.length > 0) {
             return enabledPlugins[0].plugin as T;
         }

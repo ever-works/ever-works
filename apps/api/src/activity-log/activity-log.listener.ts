@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
 import { ActivityLogService } from '@ever-works/agent/activity-log';
-import { DirectoryGenerationHistoryRepository } from '@ever-works/agent/database';
+import { WorkGenerationHistoryRepository } from '@ever-works/agent/database';
 import { ActivityActionType, ActivityStatus } from '@ever-works/agent/entities';
 import {
     UserCreatedEvent,
@@ -10,8 +10,8 @@ import {
     MemberInvitedEvent,
 } from '../events';
 import {
-    DirectoryCreatedEvent,
-    DirectoryGenerationCompletedEvent,
+    WorkCreatedEvent,
+    WorkGenerationCompletedEvent,
     WorksConfigSyncFailedEvent,
 } from '@ever-works/agent/events';
 
@@ -21,48 +21,48 @@ export class ActivityLogListener {
 
     constructor(
         private readonly activityLogService: ActivityLogService,
-        private readonly generationHistoryRepository: DirectoryGenerationHistoryRepository,
+        private readonly generationHistoryRepository: WorkGenerationHistoryRepository,
     ) {}
 
-    @OnEvent(DirectoryCreatedEvent.EVENT_NAME)
-    async onDirectoryCreated(event: DirectoryCreatedEvent) {
+    @OnEvent(WorkCreatedEvent.EVENT_NAME)
+    async onWorkCreated(event: WorkCreatedEvent) {
         try {
             await this.activityLogService.log({
-                userId: event.directory.userId,
-                directoryId: event.directory.id,
-                actionType: ActivityActionType.DIRECTORY_CREATED,
-                action: 'directory.created',
+                userId: event.work.userId,
+                workId: event.work.id,
+                actionType: ActivityActionType.WORK_CREATED,
+                action: 'work.created',
                 status: ActivityStatus.COMPLETED,
-                summary: `Created directory: ${event.directory.name}`,
+                summary: `Created work: ${event.work.name}`,
             });
         } catch (error) {
-            this.logger.error('Failed to log directory created activity:', error);
+            this.logger.error('Failed to log work created activity:', error);
         }
     }
 
-    @OnEvent(DirectoryGenerationCompletedEvent.EVENT_NAME)
-    async onGenerationCompleted(event: DirectoryGenerationCompletedEvent) {
+    @OnEvent(WorkGenerationCompletedEvent.EVENT_NAME)
+    async onGenerationCompleted(event: WorkGenerationCompletedEvent) {
         try {
-            const directory = event.directory;
+            const work = event.work;
             const latestHistory =
-                await this.generationHistoryRepository.findLatestCompletedByDirectory(directory.id);
-            const status = this.activityLogService.resolveGenerationActivityStatus(directory);
+                await this.generationHistoryRepository.findLatestCompletedByWork(work.id);
+            const status = this.activityLogService.resolveGenerationActivityStatus(work);
             const summary = this.activityLogService.formatGenerationCompletionSummary(
-                directory,
+                work,
                 latestHistory,
             );
 
             const details = {
-                itemsCount: latestHistory?.totalItemsCount ?? directory.itemsCount ?? 0,
+                itemsCount: latestHistory?.totalItemsCount ?? work.itemsCount ?? 0,
                 newItemsCount: latestHistory?.newItemsCount ?? 0,
                 updatedItemsCount: latestHistory?.updatedItemsCount ?? 0,
-                generateStatus: directory.generateStatus,
+                generateStatus: work.generateStatus,
             };
 
             const inProgressEntry =
-                await this.activityLogService.findLatestByUserDirectoryActionStatus({
-                    userId: directory.userId,
-                    directoryId: directory.id,
+                await this.activityLogService.findLatestByUserWorkActionStatus({
+                    userId: work.userId,
+                    workId: work.id,
                     actionType: ActivityActionType.GENERATION,
                     status: ActivityStatus.IN_PROGRESS,
                 });
@@ -76,8 +76,8 @@ export class ActivityLogListener {
             }
 
             await this.activityLogService.log({
-                userId: directory.userId,
-                directoryId: directory.id,
+                userId: work.userId,
+                workId: work.id,
                 actionType: ActivityActionType.GENERATION,
                 action: 'generation.completed',
                 status,
@@ -94,7 +94,7 @@ export class ActivityLogListener {
         try {
             await this.activityLogService.log({
                 userId: event.userId,
-                directoryId: event.directoryId,
+                workId: event.workId,
                 actionType: ActivityActionType.WORKS_CONFIG_SYNC,
                 action: 'works_config.sync_failed',
                 status: ActivityStatus.FAILED,
@@ -161,11 +161,11 @@ export class ActivityLogListener {
         try {
             await this.activityLogService.log({
                 userId: event.inviter.id,
-                directoryId: event.directory.id,
+                workId: event.work.id,
                 actionType: ActivityActionType.MEMBER_INVITED,
                 action: 'member.invited',
                 status: ActivityStatus.COMPLETED,
-                summary: `Invited ${event.invitee.email} as ${event.role} to ${event.directory.name}`,
+                summary: `Invited ${event.invitee.email} as ${event.role} to ${event.work.name}`,
                 details: {
                     inviteeEmail: event.invitee.email,
                     role: event.role,

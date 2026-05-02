@@ -22,7 +22,7 @@ test.describe('Dashboard', () => {
         await page.goto('/en');
 
         // StatsOverview component should render
-        // It shows totalDirectories, totalItems, activeWebsites
+        // It shows totalWorks, totalItems, activeWebsites
         await expect(page.locator('h1')).toBeVisible({ timeout: 10_000 });
     });
 
@@ -34,15 +34,15 @@ test.describe('Dashboard', () => {
         await expect(nav.first()).toBeVisible({ timeout: 10_000 });
     });
 
-    test('should navigate to directories page', async ({ page }) => {
+    test('should navigate to works page', async ({ page }) => {
         await page.goto('/en');
         await page.waitForLoadState('networkidle');
 
-        // Find and click a link to directories
-        const dirLink = page.locator('a[href*="/directories"]').first();
+        // Find and click a link to works
+        const dirLink = page.locator('a[href*="/works"]').first();
         if (await dirLink.isVisible()) {
             await dirLink.click();
-            await expect(page).toHaveURL(/\/directories/);
+            await expect(page).toHaveURL(/\/works/);
         }
     });
 

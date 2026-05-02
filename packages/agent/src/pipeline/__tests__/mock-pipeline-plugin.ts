@@ -17,7 +17,7 @@ import type {
     StepProgressCallback,
     IPipelineContext,
     StepExecutionContext,
-    DirectoryReference,
+    WorkReference,
     GenerationRequest,
     ExistingItems,
     PluginCategory,
@@ -31,7 +31,7 @@ import { createEmptyPipelineOutputs } from '@ever-works/plugin';
  * Stores step data in a generic record rather than typed fields.
  */
 class MockPipelineContext implements IPipelineContext {
-    directory: DirectoryReference;
+    work: WorkReference;
     request: GenerationRequest;
     existing: ExistingItems;
     shouldStop?: boolean;
@@ -41,11 +41,11 @@ class MockPipelineContext implements IPipelineContext {
     data: Record<string, unknown> = {};
 
     constructor(
-        directory: DirectoryReference,
+        work: WorkReference,
         request: GenerationRequest,
         existing: ExistingItems,
     ) {
-        this.directory = directory;
+        this.work = work;
         this.request = request;
         this.existing = existing;
     }
@@ -80,7 +80,7 @@ export class MockPipelinePlugin implements IPipelinePlugin<string> {
     }
 
     async execute(
-        _directory: DirectoryReference,
+        _work: WorkReference,
         _request: GenerationRequest,
         _existing: ExistingItems,
         _options?: PipelineExecutionOptions,
@@ -132,11 +132,11 @@ export class MockPipelinePlugin implements IPipelinePlugin<string> {
     // --- Lifecycle hooks for engine-orchestrated execution ---
 
     createContext(
-        directory: DirectoryReference,
+        work: WorkReference,
         request: GenerationRequest,
         existing: ExistingItems,
     ): IPipelineContext {
-        return new MockPipelineContext(directory, request, existing);
+        return new MockPipelineContext(work, request, existing);
     }
 
     contextToSnapshot(context: IPipelineContext): unknown {
@@ -145,7 +145,7 @@ export class MockPipelinePlugin implements IPipelinePlugin<string> {
 
     contextFromSnapshot(snapshot: unknown): IPipelineContext {
         const s = snapshot as any;
-        const ctx = new MockPipelineContext(s.directory, s.request, s.existing);
+        const ctx = new MockPipelineContext(s.work, s.request, s.existing);
         ctx.shouldStop = s.shouldStop;
         ctx.warnings = s.warnings ?? [];
         ctx.data = s.data ?? {};

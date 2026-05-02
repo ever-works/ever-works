@@ -46,7 +46,7 @@ export interface UrlWorkerContext {
 	maxContextTokens: number;
 	contentExtractorFacade: IContentExtractorFacade;
 	facadeOptions: FacadeOptions;
-	directoryContext: WorkerPromptOptions;
+	workContext: WorkerPromptOptions;
 	workspacePath: string;
 	logger: PluginLogger;
 	breaker: ToolCircuitBreaker;
@@ -89,7 +89,7 @@ export async function processUrlWorker(url: string, ctx: UrlWorkerContext): Prom
 		maxContextTokens,
 		contentExtractorFacade,
 		facadeOptions,
-		directoryContext,
+		workContext,
 		workspacePath,
 		breaker,
 		logger,
@@ -210,7 +210,7 @@ export async function processUrlWorker(url: string, ctx: UrlWorkerContext): Prom
 					)
 				: DEFAULT_WORKER_SYSTEM_PROMPT
 		) as typeof DEFAULT_WORKER_SYSTEM_PROMPT;
-		const systemPrompt = substituteVariables(sysTemplate, buildWorkerSystemPromptVariables(directoryContext));
+		const systemPrompt = substituteVariables(sysTemplate, buildWorkerSystemPromptVariables(workContext));
 
 		const chunkTemplate = (
 			ctx.promptFacade && ctx.facadeOptions
