@@ -150,7 +150,7 @@
         },
         "register": {
             "title": "Créez votre compte",
-            "subtitle": "Commencez à créer des annuaires incroyables dès aujourd'hui",
+            "subtitle": "Commencez à créer des travaux incroyables dès aujourd'hui",
             "form": {
                 "name": {
                     "label": "Nom complet",
@@ -197,18 +197,18 @@
     "onboarding": {
         "label": "Mise en route",
         "title": "Bienvenue sur Ever Works",
-        "subtitle": "Créez et publiez votre premier répertoire en quelques minutes.",
+        "subtitle": "Créez et publiez votre premier travail en quelques minutes.",
         "skipButton": "Ignorer pour l'instant",
         "nextButton": "Suivant",
         "stepIndex": "Étape {index}",
         "steps": {
             "welcome": {
                 "title": "Qu'est-ce qu'Ever Works ?",
-                "description": "Ever Works est un constructeur de répertoires open-source. Créez des répertoires de contenu structurés — outils, emplois, liens, produits — et publiez-les sous forme de sites web en direct.",
-                "detail": "Mise en place. Connectez vos fournisseurs ci-dessous, puis créez votre premier répertoire.",
+                "description": "Ever Works est un constructeur de travaux open-source. Créez des travaux de contenu structurés — outils, emplois, liens, produits — et publiez-les sous forme de sites web en direct.",
+                "detail": "Mise en place. Connectez vos fournisseurs ci-dessous, puis créez votre premier travail.",
                 "feature1": {
                     "title": "Contenu alimenté par l'IA",
-                    "description": "Générez et enrichissez automatiquement les éléments du répertoire en utilisant votre fournisseur d'IA."
+                    "description": "Générez et enrichissez automatiquement les éléments du travail en utilisant votre fournisseur d'IA."
                 },
                 "feature2": {
                     "title": "Publication instantanée",
@@ -216,18 +216,18 @@
                 },
                 "feature3": {
                     "title": "Basé sur Git",
-                    "description": "Chaque répertoire est un dépôt GitHub que vous possédez et contrôlez."
+                    "description": "Chaque travail est un dépôt GitHub que vous possédez et contrôlez."
                 }
             },
             "work": {
-                "title": "Créez votre premier répertoire",
-                "description": "Un répertoire est votre hub de contenu. Ajoutez des éléments, configurez la mise en page et publiez-le en un clic.",
-                "detail": "Tout est prêt ! Créez votre premier répertoire pour commencer à créer et publier du contenu.",
-                "action": "Créer un répertoire"
+                "title": "Créez votre premier travail",
+                "description": "Un travail est votre hub de contenu. Ajoutez des éléments, configurez la mise en page et publiez-le en un clic.",
+                "detail": "Tout est prêt ! Créez votre premier travail pour commencer à créer et publier du contenu.",
+                "action": "Créer un travail"
             },
             "publish": {
                 "title": "Passer en direct",
-                "description": "Connectez Vercel ou GitHub pour déployer votre répertoire en tant que site web public — aucune configuration d'hébergement requise.",
+                "description": "Connectez Vercel ou GitHub pour déployer votre travail en tant que site web public — aucune configuration d'hébergement requise.",
                 "action": "Configurer la publication"
             }
         },
@@ -336,7 +336,7 @@
             "steps": {
                 "model": {
                     "title": "Choisissez un modèle",
-                    "description": "Choisissez le modèle Codex que vous voulez exécuter pour la génération de répertoire de bout en bout."
+                    "description": "Choisissez le modèle Codex que vous voulez exécuter pour la génération de travail de bout en bout."
                 },
                 "credentials": {
                     "title": "Ajouter des identifiants",
@@ -408,7 +408,7 @@
         "simWizard": {
             "label": "Configuration de SIM AI",
             "title": "Configurez SIM AI en deux étapes",
-            "subtitle": "Ajoutez votre clé API SIM AI et vérifiez la connexion pour commencer à déléguer la génération de répertoires aux workflows SIM.",
+            "subtitle": "Ajoutez votre clé API SIM AI et vérifiez la connexion pour commencer à déléguer la génération de travaux aux workflows SIM.",
             "stepIndex": "Étape {index}",
             "continueButton": "Continuer",
             "steps": {
@@ -431,7 +431,7 @@
         "title": "Tableau de bord",
         "connectGithub": {
             "title": "Connectez votre compte GitHub",
-            "description": "GitHub est requis pour créer et gérer les référentiels de répertoires. Connectez votre compte pour commencer.",
+            "description": "GitHub est requis pour créer et gérer les référentiels de travaux. Connectez votre compte pour commencer.",
             "connect": "Connecter GitHub",
             "dismiss": "Je le ferai plus tard"
         },
@@ -465,7 +465,7 @@
         },
         "header": {
             "welcome": "Bienvenue de retour, {username} !",
-            "subtitle": "Gérez vos répertoires alimentés par l'IA et suivez leurs performances",
+            "subtitle": "Gérez vos travaux alimentés par l'IA et suivez leurs performances",
             "onboarding": {
                 "badge": "Initiation {currentStep}/{totalSteps}",
                 "dismiss": "Masquer le raccourci d'initiation"
@@ -490,14 +490,14 @@
                 },
                 "quickTips": {
                     "title": "Conseils rapides",
-                    "tip1": "Créez votre premier répertoire en cliquant sur le bouton « Créer un répertoire » dans le tableau de bord.",
-                    "tip2": "Utilisez le générateur IA pour peupler automatiquement votre répertoire avec des éléments pertinents.",
-                    "tip3": "Connectez votre compte GitHub pour synchroniser et déployer vos répertoires en tant que référentiels."
+                    "tip1": "Créez votre premier travail en cliquant sur le bouton « Créer un travail » dans le tableau de bord.",
+                    "tip2": "Utilisez le générateur IA pour peupler automatiquement votre travail avec des éléments pertinents.",
+                    "tip3": "Connectez votre compte GitHub pour synchroniser et déployer vos travaux en tant que référentiels."
                 },
                 "shortcuts": {
                     "title": "Raccourcis clavier",
-                    "search": "Rechercher des répertoires",
-                    "newWork": "Créer un nouveau répertoire",
+                    "search": "Rechercher des travaux",
+                    "newWork": "Créer un nouveau travail",
                     "help": "Ouvrir l'aide",
                     "hint": "Utilisez Cmd sur Mac ou Ctrl sur Windows/Linux"
                 },
@@ -513,7 +513,7 @@
         },
         "activity": {
             "title": "Journal d'activité",
-            "subtitle": "Suivez toutes les opérations sur vos répertoires",
+            "subtitle": "Suivez toutes les opérations sur vos travaux",
             "loading": "Chargement...",
             "fetchFailed": "Échec du chargement des activités",
             "exportFailed": "Échec de l'exportation du journal d'activité",
@@ -521,7 +521,7 @@
             "columns": {
                 "status": "Statut",
                 "dateTime": "Date / Heure",
-                "work": "Répertoire",
+                "work": "Travail",
                 "type": "Type",
                 "summary": "Résumé"
             },
@@ -532,9 +532,9 @@
                     "generation": "Génération",
                     "comparison": "Comparaison",
                     "deployment": "Déploiement",
-                    "workCreated": "Répertoire créé",
-                    "workUpdated": "Répertoire mis à jour",
-                    "workDeleted": "Répertoire supprimé",
+                    "workCreated": "Travail créé",
+                    "workUpdated": "Travail mis à jour",
+                    "workDeleted": "Travail supprimé",
                     "pluginEnabled": "Plugin activé",
                     "pluginDisabled": "Plugin désactivé",
                     "pluginConfigured": "Plugin configuré",
@@ -597,31 +597,31 @@
             }
         },
         "works": {
-            "title": "Répertoires",
-            "subtitle": "Gérez et organisez vos répertoires alimentés par l'IA",
+            "title": "Travaux",
+            "subtitle": "Gérez et organisez vos travaux alimentés par l'IA",
             "summary": {
-                "totalWorks": "Total des répertoires",
+                "totalWorks": "Total des travaux",
                 "generating": "En génération",
                 "totalItems": "Total des éléments"
             },
-            "recent": "Répertoires récents",
+            "recent": "Travaux récents",
             "viewAll": "Voir tout ({count})",
-            "search": "Rechercher des répertoires...",
-            "create": "Créer un répertoire",
-            "showing": "Affichage de {current} répertoires sur {total}",
-            "searchFailed": "Échec de la recherche de répertoires. Veuillez réessayer.",
+            "search": "Rechercher des travaux...",
+            "create": "Créer un travail",
+            "showing": "Affichage de {current} travaux sur {total}",
+            "searchFailed": "Échec de la recherche de travaux. Veuillez réessayer.",
             "pagination": {
                 "previous": "Précédent",
                 "next": "Suivant"
             },
             "empty": {
-                "title": "Aucun répertoire pour le moment",
-                "description": "Créez votre premier répertoire alimenté par l'IA pour commencer à organiser et mettre en valeur votre contenu.",
-                "action": "Créez votre premier répertoire",
+                "title": "Aucun travail pour le moment",
+                "description": "Créez votre premier travail alimenté par l'IA pour commencer à organiser et mettre en valeur votre contenu.",
+                "action": "Créez votre premier travail",
                 "notFound": {
-                    "title": "Aucun répertoire trouvé",
+                    "title": "Aucun travail trouvé",
                     "withSearch": "Essayez d'ajuster vos termes de recherche",
-                    "withoutSearch": "Créez votre premier répertoire alimenté par l'IA pour commencer"
+                    "withoutSearch": "Créez votre premier travail alimenté par l'IA pour commencer"
                 }
             }
         },
@@ -638,7 +638,7 @@
             },
             "data": {
                 "exportTitle": "Exporter les données",
-                "exportDescription": "Téléchargez vos données de compte incluant les répertoires, les paramètres des plugins et les informations de profil sous forme de fichier JSON.",
+                "exportDescription": "Téléchargez vos données de compte incluant les travaux, les paramètres des plugins et les informations de profil sous forme de fichier JSON.",
                 "includeSecrets": "Inclure les paramètres secrets (clés API, jetons) — exportés comme valeurs masquées",
                 "secretsWarning": "Les paramètres secrets seront exportés comme valeurs masquées. Vous devrez les remplacer manuellement par de véritables identifiants avant l’importation.",
                 "exportButton": "Exporter les données",
@@ -646,7 +646,7 @@
                 "exportSuccess": "Données exportées avec succès",
                 "exportError": "Échec de l’exportation des données",
                 "importTitle": "Importer les données",
-                "importDescription": "Importez des données depuis un fichier JSON précédemment exporté. Vous pouvez résoudre les conflits pour les répertoires ayant des slugs correspondants.",
+                "importDescription": "Importez des données depuis un fichier JSON précédemment exporté. Vous pouvez résoudre les conflits pour les travaux ayant des slugs correspondants.",
                 "importButton": "Importer les données",
                 "syncTitle": "Synchronisation GitHub",
                 "syncDescription": "Synchronisez la configuration de votre compte avec un dépôt GitHub privé pour la sauvegarde et la migration entre instances.",
@@ -658,7 +658,7 @@
                     "invalidJson": "Fichier JSON invalide",
                     "previewError": "Échec de l’analyse du fichier d’importation",
                     "summary": "Résumé de l’importation",
-                    "works": "Répertoires",
+                    "works": "Travaux",
                     "items": "Éléments",
                     "userPlugins": "Plugins utilisateur",
                     "version": "Version du format",
@@ -681,9 +681,9 @@
                     "validationErrors": "Erreurs de validation",
                     "resultSuccess": "Importation terminée avec succès",
                     "resultFailed": "Échec de l’importation",
-                    "worksCreated": "Répertoires créés",
-                    "worksUpdated": "Répertoires mis à jour",
-                    "worksSkipped": "Répertoires ignorés",
+                    "worksCreated": "Travaux créés",
+                    "worksUpdated": "Travaux mis à jour",
+                    "worksSkipped": "Travaux ignorés",
                     "pluginsImported": "Plugins importés",
                     "warnings": "Avertissements",
                     "errors": "Erreurs"
@@ -732,11 +732,11 @@
                 "backToCategory": "Retour à {category}",
                 "pipelineDefault": {
                     "title": "Pipeline par défaut",
-                    "description": "Choisissez quel pipeline est utilisé par défaut lors de la génération des éléments de répertoire.",
+                    "description": "Choisissez quel pipeline est utilisé par défaut lors de la génération des éléments de travail.",
                     "autoLabel": "Auto",
-                    "autoDescription": "Utiliser le pipeline résolu par le système pour chaque répertoire",
+                    "autoDescription": "Utiliser le pipeline résolu par le système pour chaque travail",
                     "enforceLabel": "Imposer cette valeur par défaut",
-                    "enforceDescription": "Toujours pré-sélectionner ce pipeline, même lorsqu’un répertoire a son propre pipeline configuré. Vous pouvez toujours changer manuellement de pipeline dans le formulaire.",
+                    "enforceDescription": "Toujours pré-sélectionner ce pipeline, même lorsqu’un travail a son propre pipeline configuré. Vous pouvez toujours changer manuellement de pipeline dans le formulaire.",
                     "saveFailed": "Échec de la sauvegarde du pipeline par défaut"
                 }
             },
@@ -819,8 +819,8 @@
                 "subtitle": "Connectez vos comptes externes pour une fonctionnalité améliorée",
                 "github": {
                     "name": "GitHub",
-                    "connected": "Créez et gérez des répertoires avec des dépôts GitHub",
-                    "disconnected": "Connectez-vous pour créer des répertoires à partir de dépôts",
+                    "connected": "Créez et gérez des travaux avec des dépôts GitHub",
+                    "disconnected": "Connectez-vous pour créer des travaux à partir de dépôts",
                     "scopes": "Permissions",
                     "organizations": "Organisations connectées",
                     "organizationsHint": "Utilisez Reconnecter pour accorder l’accès à des organisations supplémentaires",
@@ -881,7 +881,7 @@
             }
         },
         "stats": {
-            "totalWorks": "Total des répertoires",
+            "totalWorks": "Total des travaux",
             "totalItems": "Total des éléments",
             "activeWebsites": "Sites web actifs",
             "fromLastMonth": "par rapport au mois dernier"
@@ -911,12 +911,12 @@
             "views": "{count} vues",
             "updated": "Mis à jour {date}",
             "viewAction": "Voir →",
-            "openingTitle": "Ouverture du répertoire",
-            "openingMessage": "Préparation de votre répertoire. Les détails s’ouvriront sous peu. Restez sur cette page."
+            "openingTitle": "Ouverture du travail",
+            "openingMessage": "Préparation de votre travail. Les détails s’ouvriront sous peu. Restez sur cette page."
         },
         "workList": {
-            "title": "Vos répertoires",
-            "createButton": "Créer un répertoire"
+            "title": "Vos travaux",
+            "createButton": "Créer un travail"
         },
         "workDetail": {
             "failedToGenerateItems": "Échec de la génération des éléments. Veuillez réessayer.",
@@ -953,7 +953,7 @@
             },
             "members": {
                 "title": "Membres de l'équipe",
-                "subtitle": "Gérez qui a accès à ce répertoire et leurs permissions.",
+                "subtitle": "Gérez qui a accès à ce travail et leurs permissions.",
                 "inviteMember": "Inviter un membre",
                 "noMembers": "Aucun membre d'équipe pour le moment. Invitez quelqu'un pour collaborer.",
                 "roles": {
@@ -965,13 +965,13 @@
                 },
                 "roleDescriptions": {
                     "owner": "Contrôle total incluant la suppression et la gestion des membres.",
-                    "manager": "Peut modifier le répertoire et gérer les membres, mais ne peut pas supprimer.",
-                    "editor": "Peut modifier le contenu du répertoire et lancer des générations.",
-                    "viewer": "Accès en lecture seule pour visualiser le répertoire."
+                    "manager": "Peut modifier le travail et gérer les membres, mais ne peut pas supprimer.",
+                    "editor": "Peut modifier le contenu du travail et lancer des générations.",
+                    "viewer": "Accès en lecture seule pour visualiser le travail."
                 },
                 "invite": {
                     "title": "Inviter un membre de l'équipe",
-                    "description": "Ajouter un nouveau membre pour collaborer sur ce répertoire.",
+                    "description": "Ajouter un nouveau membre pour collaborer sur ce travail.",
                     "emailLabel": "Adresse e-mail",
                     "emailPlaceholder": "colleague@example.com",
                     "roleLabel": "Rôle",
@@ -985,7 +985,7 @@
                 },
                 "confirmRemove": {
                     "title": "Supprimer le membre",
-                    "description": "Êtes-vous sûr de vouloir supprimer {username} de ce répertoire ? Ils perdront tout accès.",
+                    "description": "Êtes-vous sûr de vouloir supprimer {username} de ce travail ? Ils perdront tout accès.",
                     "confirm": "Supprimer",
                     "cancel": "Annuler"
                 },
@@ -1000,7 +1000,7 @@
                 "page": {
                     "title": "Mises à jour programmées",
                     "subtitle": "Automatisez les actualisations de {name} avec une cadence dédiée et une gestion des échecs.",
-                    "fallbackName": "ce répertoire",
+                    "fallbackName": "ce travail",
                     "loadFailed": "Échec du chargement des paramètres de programmation.",
                     "providerCategories": {
                         "pipeline": "Pipeline",
@@ -1101,7 +1101,7 @@
                     },
                     "empty": {
                         "title": "Exécutez d'abord une génération manuelle",
-                        "description": "Terminez une exécution manuelle réussie pour débloquer la programmation automatisée. Une fois que votre répertoire a des données, nous pouvons le maintenir à jour pour vous.",
+                        "description": "Terminez une exécution manuelle réussie pour débloquer la programmation automatisée. Une fois que votre travail a des données, nous pouvons le maintenir à jour pour vous.",
                         "refresh": "Actualiser le statut"
                     },
                     "requiresGeneration": "Exécutez au moins une génération d'élément avant d'activer les programmations."
@@ -1119,7 +1119,7 @@
             "statusCard": {
                 "notStarted": {
                     "title": "Génération non démarrée",
-                    "description": "Commencez à générer des éléments pour votre répertoire afin de le peupler de contenu.",
+                    "description": "Commencez à générer des éléments pour votre travail afin de le peupler de contenu.",
                     "action": "Démarrer la génération"
                 },
                 "generating": {
@@ -1133,7 +1133,7 @@
                 },
                 "generated": {
                     "title": "Génération terminée",
-                    "description": "Votre répertoire a été peuplé avec succès d'éléments.",
+                    "description": "Votre travail a été peuplé avec succès d'éléments.",
                     "withWarnings": "Terminé avec avertissements :",
                     "viewItems": "Voir les éléments",
                     "regenerate": "Régénérer"
@@ -1159,7 +1159,7 @@
             },
             "comparisons": {
                 "title": "Comparaisons",
-                "subtitle": "Pages de comparaison A vs B entre les éléments du répertoire",
+                "subtitle": "Pages de comparaison A vs B entre les éléments du travail",
                 "vs": "vs",
                 "winner": "Gagnant : {name}",
                 "tie": "Égalité",
@@ -1307,7 +1307,7 @@
                 }
             },
             "info": {
-                "title": "Informations du répertoire",
+                "title": "Informations du travail",
                 "yourRole": "Votre rôle",
                 "role": {
                     "owner": "Propriétaire",
@@ -1357,15 +1357,15 @@
             "activity": {
                 "title": "Activité récente",
                 "noActivity": "Aucune activité pour le moment",
-                "created": "Répertoire créé",
-                "workCreated": "Répertoire créé avec succès",
+                "created": "Travail créé",
+                "workCreated": "Travail créé avec succès",
                 "justNow": "À l'instant"
             },
             "items": {
-                "title": "Éléments du répertoire",
-                "subtitle": "Gérer et organiser les éléments de votre répertoire",
+                "title": "Éléments du travail",
+                "subtitle": "Gérer et organiser les éléments de votre travail",
                 "noItemsTitle": "Aucun élément pour le moment",
-                "noItemsDescription": "Votre répertoire ne contient aucun élément pour le moment. Générez des éléments pour peupler votre répertoire de contenu.",
+                "noItemsDescription": "Votre travail ne contient aucun élément pour le moment. Générez des éléments pour peupler votre travail de contenu.",
                 "generateItems": "Générer des éléments",
                 "searchPlaceholder": "Rechercher des éléments...",
                 "allCategories": "Toutes les catégories",
@@ -1427,14 +1427,14 @@
                     "screenshotFailed": "Échec de la capture d’écran",
                     "screenshotError": "Une erreur s’est produite lors de la capture d’écran",
                     "featured": "Élément mis en avant",
-                    "featuredHelp": "Marquer cet élément comme mis en avant dans le répertoire",
+                    "featuredHelp": "Marquer cet élément comme mis en avant dans le travail",
                     "updateWithPR": "Créer une demande de tirage",
                     "updateWithPRHelp": "Soumettre les modifications sous forme de demande de tirage au lieu d’un commit direct",
                     "cancel": "Annuler",
                     "adding": "Ajout en cours...",
                     "addItem": "Ajouter l’élément",
                     "success": "Élément ajouté avec succès",
-                    "successDescription": "L’élément a été ajouté à votre répertoire",
+                    "successDescription": "L’élément a été ajouté à votre travail",
                     "failed": "Échec de l’ajout de l’élément",
                     "error": "Une erreur s’est produite lors de l’ajout de l’élément",
                     "errors": {
@@ -1653,7 +1653,7 @@
                     "navigationLabel": "Onglets du générateur"
                 },
                 "regenerationWarning": "Avertissement de régénération",
-                "regenerationWarningDescription": "Ce répertoire a déjà été généré. Lancer une nouvelle génération remplacera les éléments existants.",
+                "regenerationWarningDescription": "Ce travail a déjà été généré. Lancer une nouvelle génération remplacera les éléments existants.",
                 "requiredInfo": "Informations requises",
                 "updateConfiguration": "Mettre à jour la configuration",
                 "promptRequired": "Le prompt est requis",
@@ -1663,20 +1663,20 @@
                 "loadingFormSchema": "Chargement de la configuration du formulaire...",
                 "failedToLoadFormSchema": "Échec du chargement de la configuration du formulaire",
                 "selectOption": "Sélectionner une option",
-                "workName": "Nom du répertoire",
+                "workName": "Nom du travail",
                 "generationPrompt": "Prompt de génération",
                 "modelOverride": "Remplacement du modèle IA",
                 "modelOverridePlaceholder": "par ex. openai/gpt-4.1 ou openrouter/openai/gpt-4.1",
                 "modelOverrideHelperText": "Optionnel. Utilise par défaut le modèle importé ou précédent, sauf si vous le remplacez ici.",
                 "recommended": "Recommandé",
-                "promptPlaceholder": "Décrivez les éléments qui doivent être générés pour ce répertoire...",
+                "promptPlaceholder": "Décrivez les éléments qui doivent être générés pour ce travail...",
                 "promptHelperText": "Soyez précis sur le type de contenu que vous souhaitez générer",
                 "repositoryDescription": "Description du dépôt",
                 "repositoryPlaceholder": "Brève description du dépôt (optionnel)",
                 "startGeneration": "Démarrer la génération",
                 "regenerateItems": "Régénérer les éléments",
                 "updateItems": "Exécuter la génération",
-                "recreateWork": "Recréer le répertoire",
+                "recreateWork": "Recréer le travail",
                 "showAdvancedOptions": "Afficher les options avancées",
                 "hideAdvancedOptions": "Masquer les options avancées",
                 "cancel": "Annuler",
@@ -1714,7 +1714,7 @@
                 "websiteRepositoryCreationMethod": "Méthode de création du dépôt du site web",
                 "methodDuplicate": "Dupliquer",
                 "methodFork": "Fork",
-                "workNamePlaceholder": "Saisir le nom du répertoire",
+                "workNamePlaceholder": "Saisir le nom du travail",
                 "methodCreateFromTemplate": "Créer à partir d'un modèle",
                 "aiProcessingConfiguration": "Configuration du traitement IA",
                 "maxSearchQueries": "Requêtes de recherche max",
@@ -1725,7 +1725,7 @@
                 "aiFirstGenerationDescription": "Activer la génération IA des éléments initiaux avant la recherche web.",
                 "contentFiltering": "Filtrage du contenu",
                 "contentFilteringDescription": "Activer le filtrage de la qualité du contenu",
-                "recreateConfirmTitle": "Recréer les données du répertoire ?",
+                "recreateConfirmTitle": "Recréer les données du travail ?",
                 "recreateConfirmDescription": "Recréer supprimera les éléments existants et les régénérera à partir de zéro. Cette action est irréversible.",
                 "confirmRecreate": "Oui, recréer",
                 "recreateInlineTitle": "Recréer supprimera les éléments existants",
@@ -1769,7 +1769,7 @@
                 "aiProviderDescription": "Fournisseur de modèle IA pour la génération et l'extraction de contenu",
                 "contentExtractorProvider": "Extracteur de contenu",
                 "contentExtractorProviderDescription": "Fournisseur pour extraire le contenu des pages web",
-                "useWorkDefault": "Utiliser la valeur par défaut du répertoire",
+                "useWorkDefault": "Utiliser la valeur par défaut du travail",
                 "default": "Par défaut",
                 "notConfigured": "Non configuré",
                 "notConfiguredTooltip": "Ce fournisseur nécessite une configuration. Visitez Paramètres → Plugins pour le configurer.",
@@ -1837,7 +1837,7 @@
                 },
                 "generalSettings": "Paramètres généraux",
                 "generalTitle": "Paramètres généraux",
-                "workName": "Nom du répertoire",
+                "workName": "Nom du travail",
                 "description": "Description",
                 "organizationRepository": "Dépôt d'organisation",
                 "organizationHelp": "Créer des dépôts sous une organisation au lieu de votre compte personnel",
@@ -1849,13 +1849,13 @@
                 "customHeaderPlaceholder": "Ajouter du contenu personnalisé à l'en-tête du README",
                 "overwriteDefaultHeader": "Remplacer l'en-tête par défaut",
                 "customFooter": "Pied de page personnalisé",
-                "cantDeleteWhileGenerating": "Impossible de supprimer le répertoire pendant la génération d'éléments.",
+                "cantDeleteWhileGenerating": "Impossible de supprimer le travail pendant la génération d'éléments.",
                 "customFooterPlaceholder": "Ajouter du contenu personnalisé au pied de page du README",
                 "overwriteDefaultFooter": "Remplacer le pied de page par défaut",
                 "dangerZone": "Zone de danger",
                 "dangerTitle": "Zone de danger",
-                "deleteWarning": "Une fois le répertoire supprimé, il n'y a pas de retour en arrière. Veuillez être certain.",
-                "dangerDescription": "Une fois le répertoire supprimé, il n'y a pas de retour en arrière. Veuillez être certain.",
+                "deleteWarning": "Une fois le travail supprimé, il n'y a pas de retour en arrière. Veuillez être certain.",
+                "dangerDescription": "Une fois le travail supprimé, il n'y a pas de retour en arrière. Veuillez être certain.",
                 "deleteOptions": "Sélectionnez ce qu'il faut supprimer :",
                 "deleteDataRepository": "Supprimer le dépôt de données",
                 "deleteDataRepositoryDescription": "Supprimer le dépôt de données JSON de GitHub",
@@ -1864,14 +1864,14 @@
                 "deleteWebsiteRepository": "Supprimer le dépôt du site web",
                 "deleteWebsiteRepositoryDescription": "Supprimer le dépôt du site web déployé",
                 "deleteConfirm": "Êtes-vous absolument sûr ?",
-                "deleteConfirmDetail": "Cette action ne peut pas être annulée. Le répertoire et les dépôts sélectionnés seront définitivement supprimés.",
-                "confirmWorkName": "Saisir le nom du répertoire pour confirmer",
+                "deleteConfirmDetail": "Cette action ne peut pas être annulée. Le travail et les dépôts sélectionnés seront définitivement supprimés.",
+                "confirmWorkName": "Saisir le nom du travail pour confirmer",
                 "confirmWorkNameDescription": "Saisir \"{name}\" pour confirmer la suppression",
-                "deleteNameMismatch": "Le nom du répertoire ne correspond pas",
-                "deleteButton": "Supprimer le répertoire",
+                "deleteNameMismatch": "Le nom du travail ne correspond pas",
+                "deleteButton": "Supprimer le travail",
                 "deleteConfirmButton": "Oui, supprimer",
-                "deleteSuccess": "Répertoire supprimé avec succès",
-                "deleteFailed": "Échec de la suppression du répertoire",
+                "deleteSuccess": "Travail supprimé avec succès",
+                "deleteFailed": "Échec de la suppression du travail",
                 "yesDelete": "Oui, supprimer",
                 "cancel": "Annuler",
                 "saveChanges": "Enregistrer les modifications",
@@ -1880,7 +1880,7 @@
                 "updateFailed": "Échec de la mise à jour des paramètres",
                 "deployProvider": {
                     "title": "Fournisseur de déploiement",
-                    "description": "Sélectionnez où déployer le site web de votre répertoire",
+                    "description": "Sélectionnez où déployer le site web de votre travail",
                     "configure": "Configurer",
                     "ready": "Prêt à déployer",
                     "notConfigured": "Non configuré",
@@ -1917,7 +1917,7 @@
                     "prompts": {
                         "relevanceAssessment": {
                             "title": "Évaluation de la pertinence",
-                            "description": "Instructions supplémentaires pour filtrer les pages web par pertinence par rapport au sujet de votre répertoire.",
+                            "description": "Instructions supplémentaires pour filtrer les pages web par pertinence par rapport au sujet de votre travail.",
                             "placeholder": "p. ex., N'inclure que les pages axées sur des projets open-source..."
                         },
                         "itemGeneration": {
@@ -1968,7 +1968,7 @@
                 "communityPrUpdateFailed": "Échec de la mise à jour des paramètres des PR communautaires",
                 "websiteConfig": {
                     "title": "Configuration du site web",
-                    "subtitle": "Personnaliser l'apparence et le comportement de votre site web de répertoire",
+                    "subtitle": "Personnaliser l'apparence et le comportement de votre site web de travail",
                     "loadFailed": "Échec du chargement des paramètres du site web",
                     "saveSuccess": "Paramètres du site web enregistrés avec succès",
                     "saveFailed": "Échec de l'enregistrement des paramètres du site web",
@@ -1983,13 +1983,13 @@
                         "siteName": {
                             "title": "Identité du site",
                             "label": "Nom du site",
-                            "placeholder": "Mon Annuaire",
+                            "placeholder": "Mon Travail",
                             "helper": "Le nom affiché dans l'en-tête de votre site web et l'onglet du navigateur"
                         },
                         "siteUrl": {
                             "label": "URL du site",
                             "placeholder": "https://example.com",
-                            "helper": "L'URL de votre site web d'entreprise ou d'annuaire"
+                            "helper": "L'URL de votre site web d'entreprise ou d'travail"
                         },
                         "global": {
                             "title": "Fonctionnalités globales",
@@ -2071,7 +2071,7 @@
                 },
                 "committer": {
                     "title": "Committeur Git",
-                    "description": "Remplacer le nom et l'email du commiteur pour les commits git dans ce répertoire. Laisser vide pour utiliser les paramètres au niveau utilisateur ou les valeurs par défaut du compte.",
+                    "description": "Remplacer le nom et l'email du commiteur pour les commits git dans ce travail. Laisser vide pour utiliser les paramètres au niveau utilisateur ou les valeurs par défaut du compte.",
                     "nameLabel": "Nom du commiteur",
                     "emailLabel": "Email du commiteur",
                     "save": "Enregistrer le commiteur",
@@ -2082,13 +2082,13 @@
             "deploy": {
                 "noProviderAlert": {
                     "title": "Aucun fournisseur de déploiement",
-                    "description": "Sélectionnez un fournisseur de déploiement pour déployer votre site web d'annuaire.",
+                    "description": "Sélectionnez un fournisseur de déploiement pour déployer votre site web d'travail.",
                     "selectButton": "Sélectionner & Continuer",
                     "noProviders": "Aucun fournisseur de déploiement disponible. Installez d'abord un plugin de déploiement."
                 },
                 "noTokenAlert": {
                     "title": "Jeton {provider} requis",
-                    "description": "Pour déployer votre annuaire, vous devez configurer votre jeton API {provider} dans les Paramètres du plugin.",
+                    "description": "Pour déployer votre travail, vous devez configurer votre jeton API {provider} dans les Paramètres du plugin.",
                     "configureButton": "Configurer dans les Paramètres du plugin",
                     "getTokenButton": "Obtenir le jeton API",
                     "howTo": {
@@ -2096,25 +2096,25 @@
                         "step1": "Cliquez sur « Obtenir le jeton API » pour ouvrir le tableau de bord de votre fournisseur",
                         "step2": "Créez un nouveau jeton avec les permissions de déploiement",
                         "step3": "Configurez votre jeton API {provider} dans Paramètres du plugin > {provider}",
-                        "step4": "Revenez ici pour déployer votre annuaire"
+                        "step4": "Revenez ici pour déployer votre travail"
                     }
                 },
                 "sharedNoTokenAlert": {
                     "title": "Déploiement non disponible",
-                    "description": "Le propriétaire de l'annuaire n'a pas configuré le déploiement. Veuillez contacter le propriétaire de l'annuaire pour configurer le déploiement.",
+                    "description": "Le propriétaire de l'travail n'a pas configuré le déploiement. Veuillez contacter le propriétaire de l'travail pour configurer le déploiement.",
                     "hint": "En tant que collaborateur, vous pouvez déclencher des déploiements une fois que le propriétaire aura configuré son fournisseur de déploiement."
                 },
                 "form": {
                     "deployment": {
                         "title": "Déployer le site web",
-                        "description": "Déployez le dépôt de votre site web d'annuaire.",
+                        "description": "Déployez le dépôt de votre site web d'travail.",
                         "deployButton": "Déployer sur {provider}",
                         "deployingButton": "Déploiement en cours...",
                         "deployingStateButton": "Déploiement ({state}) en cours...",
                         "successMessage": "Votre site web a été déployé avec succès !",
                         "teamSelection": {
                             "title": "Sélectionner l'équipe",
-                            "description": "Choisissez l'équipe pour déployer cet annuaire.",
+                            "description": "Choisissez l'équipe pour déployer cet travail.",
                             "label": "Équipe",
                             "placeholder": "Sélectionner une équipe",
                             "confirmButton": "Déployer vers l'équipe",
@@ -2141,7 +2141,7 @@
                     },
                     "info": {
                         "deployInfo": "Le déploiement prend généralement 1 à 3 minutes. Vous recevrez une URL une fois terminé.",
-                        "updateInfo": "Les mises à jour synchronisent le contenu de votre annuaire vers le dépôt du site web pour le prochain déploiement."
+                        "updateInfo": "Les mises à jour synchronisent le contenu de votre travail vers le dépôt du site web pour le prochain déploiement."
                     },
                     "websiteTemplate": {
                         "title": "Mises à jour automatiques du modèle",
@@ -2161,7 +2161,7 @@
                         "title": "Configurer avant déploiement",
                         "description": "Vérifiez et personnalisez les paramètres de votre site web avant le déploiement",
                         "siteName": "Nom du site",
-                        "siteNamePlaceholder": "Mon Annuaire",
+                        "siteNamePlaceholder": "Mon Travail",
                         "siteNameHelper": "Le nom affiché sur votre site web (par défaut : Acme)",
                         "tabGeneral": "Général",
                         "tabHeader": "En-tête",
@@ -2209,8 +2209,8 @@
             }
         },
         "workCreation": {
-            "title": "Créer un nouvel annuaire",
-            "subtitle": "Choisissez comment vous souhaitez créer votre annuaire",
+            "title": "Créer un nouvel travail",
+            "subtitle": "Choisissez comment vous souhaitez créer votre travail",
             "backToOptions": "Retour aux options",
             "sidebar": {
                 "selectedProvider": "Fournisseur Git",
@@ -2218,7 +2218,7 @@
             },
             "deployProvider": {
                 "title": "Fournisseur de déploiement",
-                "description": "Sélectionnez où déployer votre site web d'annuaire",
+                "description": "Sélectionnez où déployer votre site web d'travail",
                 "noProviders": "Aucun fournisseur de déploiement disponible",
                 "notConfigured": "Non configuré",
                 "configured": "Prêt à déployer",
@@ -2236,21 +2236,21 @@
             },
             "ai": {
                 "title": "Créer avec l'IA",
-                "subtitle": "Décrivez votre idée d'annuaire en langage naturel et laissez l'IA s'occuper de la configuration",
+                "subtitle": "Décrivez votre idée d'travail en langage naturel et laissez l'IA s'occuper de la configuration",
                 "getStarted": "Commencer",
-                "formTitle": "Créer un annuaire avec l'IA",
-                "formSubtitle": "Décrivez votre idée d'annuaire et laissez l'IA s'occuper de la configuration et de la génération du contenu initial",
-                "workNameLabel": "Nom de l'annuaire",
+                "formTitle": "Créer un travail avec l'IA",
+                "formSubtitle": "Décrivez votre idée d'travail et laissez l'IA s'occuper de la configuration et de la génération du contenu initial",
+                "workNameLabel": "Nom de l'travail",
                 "workNamePlaceholder": "p. ex., Awesome AI Tools",
                 "workNameHelp": "L'IA suggérera un nom si vous laissez cela vide",
-                "promptLabel": "Décrivez votre annuaire",
+                "promptLabel": "Décrivez votre travail",
                 "githubRequired": "Veuillez connecter votre compte GitHub en premier.",
-                "promptPlaceholder": "Décrivez le type d'annuaire que vous souhaitez créer, les éléments qu'il doit contenir et toute exigence spécifique...",
+                "promptPlaceholder": "Décrivez le type d'travail que vous souhaitez créer, les éléments qu'il doit contenir et toute exigence spécifique...",
                 "inspirationText": "Besoin d'inspiration ? Essayez l'un de ces :",
                 "examplePrompts": {
                     "0": {
                         "name": "Outils IA pour développeurs",
-                        "prompt": "Créer un annuaire des meilleurs outils IA pour les développeurs"
+                        "prompt": "Créer un travail des meilleurs outils IA pour les développeurs"
                     },
                     "1": {
                         "name": "Hub de composants React",
@@ -2258,7 +2258,7 @@
                     },
                     "2": {
                         "name": "Outils pour équipes à distance",
-                        "prompt": "Générer un annuaire d'applications de productivité pour équipes à distance"
+                        "prompt": "Générer un travail d'applications de productivité pour équipes à distance"
                     },
                     "3": {
                         "name": "Mode durable",
@@ -2273,23 +2273,23 @@
                     "3": "Configurer le dépôt GitHub avec la documentation appropriée"
                 },
                 "generateButton": "Générer avec l'IA",
-                "generatingButton": "Génération de l'annuaire...",
+                "generatingButton": "Génération de l'travail...",
                 "cancelButton": "Annuler",
                 "noteTitle": "Note :",
-                "noteText": "La génération par IA prend généralement 2 à 5 minutes selon la complexité de votre demande. Vous serez notifié lorsque votre annuaire sera prêt.",
+                "noteText": "La génération par IA prend généralement 2 à 5 minutes selon la complexité de votre demande. Vous serez notifié lorsque votre travail sera prêt.",
                 "errors": {
-                    "promptRequired": "Veuillez décrire le type d'annuaire que vous souhaitez créer",
+                    "promptRequired": "Veuillez décrire le type d'travail que vous souhaitez créer",
                     "unconfiguredProviders": "{providers} non configurés. Visitez Paramètres → Plugins pour les configurer avant de générer.",
-                    "nameRequired": "Le nom de l'annuaire est requis",
-                    "slugRequired": "Le slug de l'annuaire est requis",
-                    "descriptionRequired": "La description de l'annuaire est requise",
+                    "nameRequired": "Le nom de l'travail est requis",
+                    "slugRequired": "Le slug de l'travail est requis",
+                    "descriptionRequired": "La description de l'travail est requise",
                     "githubRequired": "Veuillez connecter votre compte GitHub en premier.",
-                    "createFailed": "Échec de la création de l'annuaire"
+                    "createFailed": "Échec de la création de l'travail"
                 },
                 "success": {
-                    "started": "Création de l'annuaire commencée !",
+                    "started": "Création de l'travail commencée !",
                     "generating": "L'IA génère le contenu. Cela peut prendre quelques minutes...",
-                    "created": "Annuaire créé avec succès !"
+                    "created": "Travail créé avec succès !"
                 },
                 "advancedSettings": "Paramètres avancés",
                 "advancedSubtitle": "Configurer les paramètres d'organisation et de dépôt",
@@ -2300,14 +2300,14 @@
             },
             "manual": {
                 "title": "Créer manuellement",
-                "subtitle": "Configurez votre annuaire avec un contrôle total sur chaque paramètre et option",
+                "subtitle": "Configurez votre travail avec un contrôle total sur chaque paramètre et option",
                 "configureNow": "Configurer maintenant",
-                "formTitle": "Créer un annuaire manuellement",
-                "formSubtitle": "Configurez votre annuaire avec un contrôle total sur chaque paramètre",
+                "formTitle": "Créer un travail manuellement",
+                "formSubtitle": "Configurez votre travail avec un contrôle total sur chaque paramètre",
                 "basicInfo": "Informations de base",
-                "nameLabel": "Nom de l'annuaire *",
+                "nameLabel": "Nom de l'travail *",
                 "namePlaceholder": "p. ex., Awesome AI Tools",
-                "slugLabel": "Slug de l'annuaire *",
+                "slugLabel": "Slug de l'travail *",
                 "slugPlaceholder": "awesome-ai-tools",
                 "githubRequired": "Veuillez connecter votre compte GitHub en premier.",
                 "slugHelp": "Identifiant convivial pour URL (lettres minuscules, chiffres et tirets uniquement)",
@@ -2316,7 +2316,7 @@
                 "advancedSettings": "Paramètres avancés",
                 "advancedSubtitle": "Organisation, en-têtes personnalisés, et plus",
                 "organizationLabel": "Créer sous l'organisation",
-                "organizationHelp": "Créer cet annuaire sous une organisation GitHub au lieu de votre compte personnel",
+                "organizationHelp": "Créer cet travail sous une organisation GitHub au lieu de votre compte personnel",
                 "organizationNameLabel": "Nom de l'organisation",
                 "organizationNamePlaceholder": "my-organization",
                 "headerLabel": "En-tête README personnalisé",
@@ -2325,25 +2325,25 @@
                 "footerLabel": "Pied de page README personnalisé",
                 "footerPlaceholder": "Ajouter du contenu personnalisé en bas de votre fichier README",
                 "footerOverwrite": "Remplacer complètement le pied de page par défaut",
-                "createButton": "Créer l'annuaire",
-                "creatingButton": "Création de l'annuaire...",
+                "createButton": "Créer l'travail",
+                "creatingButton": "Création de l'travail...",
                 "cancelButton": "Annuler",
-                "nameRequired": "Le nom de l'annuaire est requis",
-                "slugRequired": "Le slug de l'annuaire est requis",
-                "descriptionRequired": "La description de l'annuaire est requise",
-                "createFailed": "Échec de la création de l'annuaire",
+                "nameRequired": "Le nom de l'travail est requis",
+                "slugRequired": "Le slug de l'travail est requis",
+                "descriptionRequired": "La description de l'travail est requise",
+                "createFailed": "Échec de la création de l'travail",
                 "success": {
-                    "created": "Annuaire créé avec succès !"
+                    "created": "Travail créé avec succès !"
                 }
             },
             "import": {
                 "title": "Importer existant",
-                "subtitle": "Importer un annuaire depuis un dépôt GitHub existant",
+                "subtitle": "Importer un travail depuis un dépôt GitHub existant",
                 "importNow": "Importer maintenant",
                 "aiProviderSettings": "Fournisseur IA",
                 "aiProviderSettingsDescription": "Choisissez quel fournisseur IA utiliser pour analyser le README",
-                "formTitle": "Importer un annuaire depuis GitHub",
-                "formSubtitle": "Importer des éléments depuis un dépôt GitHub existant pour créer votre annuaire",
+                "formTitle": "Importer un travail depuis GitHub",
+                "formSubtitle": "Importer des éléments depuis un dépôt GitHub existant pour créer votre travail",
                 "sync": {
                     "title": "Rester synchronisé",
                     "description": "Récupérer automatiquement les mises à jour du dépôt source."
@@ -2396,13 +2396,13 @@
                     "schedule": "Planification : {cadence}",
                     "providers": "Fournisseurs : {providers}"
                 },
-                "nameLabel": "Nom de l'annuaire",
-                "namePlaceholder": "p. ex., Mon annuaire Awesome",
+                "nameLabel": "Nom de l'travail",
+                "namePlaceholder": "p. ex., Mon travail Awesome",
                 "advancedSettings": "Paramètres avancés",
                 "advancedSubtitle": "Configurer les paramètres d'organisation et de dépôt",
                 "attribution": {
                     "title": "Attribution de la source :",
-                    "text": "Cet annuaire référencera {url} comme source"
+                    "text": "Cet travail référencera {url} comme source"
                 },
                 "research": {
                     "title": "Mode Importer & Recherche",
@@ -2425,13 +2425,13 @@
                     "importingButton": "Démarrage du pipeline de recherche..."
                 },
                 "analyzeButton": "Analyser le dépôt",
-                "importButton": "Importer l'annuaire",
+                "importButton": "Importer l'travail",
                 "importingButton": "Importation...",
                 "backButton": "Retour",
                 "cancelButton": "Annuler",
                 "importing": {
-                    "title": "Importation de l'annuaire",
-                    "subtitle": "Configuration de votre annuaire depuis le dépôt source..."
+                    "title": "Importation de l'travail",
+                    "subtitle": "Configuration de votre travail depuis le dépôt source..."
                 },
                 "repositorySelector": {
                     "title": "Sélectionner le dépôt",
@@ -2498,17 +2498,17 @@
                     "unsupportedFormat": "Ce format de dépôt n'est pas pris en charge. Veuillez utiliser un format Dépôt de données ou Liste Awesome.",
                     "analyzeFailed": "Échec de l'analyse du dépôt",
                     "analyzeForLinkingFailed": "Échec de l'analyse pour la liaison",
-                    "nameRequired": "Le nom de l'annuaire est requis",
+                    "nameRequired": "Le nom de l'travail est requis",
                     "noAnalysis": "Veuillez analyser un dépôt en premier",
                     "githubRequired": "Veuillez connecter votre compte GitHub en premier",
                     "providerRequired": "Veuillez d'abord sélectionner un fournisseur git",
-                    "importFailed": "Échec de l'import de l'annuaire",
-                    "linkFailed": "Échec de la liaison de l'annuaire",
+                    "importFailed": "Échec de l'import de l'travail",
+                    "linkFailed": "Échec de la liaison de l'travail",
                     "providerNotConfigured": "{provider} n'est pas configuré. Visitez Paramètres → Plugins pour le configurer avant d'importer."
                 },
                 "success": {
-                    "started": "Import commencé ! Redirection vers votre annuaire...",
-                    "linked": "Annuaire lié avec succès"
+                    "started": "Import commencé ! Redirection vers votre travail...",
+                    "linked": "Travail lié avec succès"
                 },
                 "slugConflict": {
                     "title": "Conflit de nom de dépôt",
@@ -2521,7 +2521,7 @@
             "connection": {
                 "alert": {
                     "title": "{provider} non connecté",
-                    "subtitle": "Connectez votre compte {provider} pour créer des annuaires",
+                    "subtitle": "Connectez votre compte {provider} pour créer des travaux",
                     "connectButton": "Connecter {provider}",
                     "connectingButton": "Connexion en cours..."
                 }
@@ -2537,7 +2537,7 @@
             },
             "settings": {
                 "title": "Connexions aux fournisseurs Git",
-                "subtitle": "Connectez vos comptes de fournisseurs Git pour importer des dépôts, créer des annuaires et gérer vos projets.",
+                "subtitle": "Connectez vos comptes de fournisseurs Git pour importer des dépôts, créer des travaux et gérer vos projets.",
                 "connectedCount": "{count, plural, =0 {Aucun fournisseur connecté} =1 {1 fournisseur connecté} other {# fournisseurs connectés}}",
                 "noProvidersConnected": "Aucun fournisseur connecté",
                 "canImport": "Vous pouvez importer et gérer des dépôts",
@@ -2568,7 +2568,7 @@
                 "subtitle": "Configurez les fournisseurs de déploiement dans les paramètres des plugins",
                 "connected": "Connecté",
                 "notConnected": "Non connecté",
-                "connectedMessage": "Votre fournisseur de déploiement est configuré. Vous pouvez maintenant déployer des annuaires.",
+                "connectedMessage": "Votre fournisseur de déploiement est configuré. Vous pouvez maintenant déployer des travaux.",
                 "disconnect": "Déconnecter",
                 "disconnecting": "Suppression en cours...",
                 "apiTokenLabel": "Jeton API",
@@ -2605,16 +2605,16 @@
             "email": {
                 "title": "Notifications par e-mail",
                 "workUpdates": {
-                    "label": "Mises à jour des annuaires",
-                    "description": "Soyez notifié des mises à jour importantes de vos annuaires"
+                    "label": "Mises à jour des travaux",
+                    "description": "Soyez notifié des mises à jour importantes de vos travaux"
                 },
                 "newItems": {
                     "label": "Nouveaux éléments",
-                    "description": "Soyez notifié lorsque de nouveaux éléments sont ajoutés à vos annuaires"
+                    "description": "Soyez notifié lorsque de nouveaux éléments sont ajoutés à vos travaux"
                 },
                 "weeklyDigest": {
                     "label": "Résumé hebdomadaire",
-                    "description": "Recevez un résumé hebdomadaire de l'activité de vos annuaires"
+                    "description": "Recevez un résumé hebdomadaire de l'activité de vos travaux"
                 },
                 "marketing": {
                     "label": "Marketing et promotions",
@@ -2625,11 +2625,11 @@
                 "title": "Notifications dans l'application",
                 "newItems": {
                     "label": "Nouveaux éléments",
-                    "description": "Afficher les notifications pour les nouveaux éléments d'annuaire"
+                    "description": "Afficher les notifications pour les nouveaux éléments d'travail"
                 },
                 "comments": {
                     "label": "Commentaires",
-                    "description": "Soyez notifié des commentaires sur vos annuaires"
+                    "description": "Soyez notifié des commentaires sur vos travaux"
                 },
                 "mentions": {
                     "label": "Mentions",
@@ -2653,12 +2653,12 @@
         "sidebar": {
             "menu": "Menu",
             "aiChat": "Chat IA",
-            "newWork": "Nouvel annuaire",
-            "activityIndicator": "Génération d'annuaire",
+            "newWork": "Nouvel travail",
+            "activityIndicator": "Génération d'travail",
             "navigation": {
                 "dashboard": "Tableau de bord",
                 "activity": "Activité",
-                "works": "Annuaires",
+                "works": "Travaux",
                 "plugins": "Plugins",
                 "settings": "Paramètres"
             },
@@ -2680,7 +2680,7 @@
             "subtitle": "Actions irréversibles et destructives",
             "export": {
                 "title": "Exporter vos données",
-                "subtitle": "Téléchargez tous vos annuaires, éléments et paramètres",
+                "subtitle": "Téléchargez tous vos travaux, éléments et paramètres",
                 "action": "Exporter les données (Bientôt disponible)"
             },
             "delete": {
@@ -2690,8 +2690,8 @@
                 "confirmTitle": "⚠️ Cela supprimera définitivement :",
                 "confirmItems": [
                     "Votre compte et profil",
-                    "Tous vos annuaires",
-                    "Tous les éléments et données des annuaires",
+                    "Tous vos travaux",
+                    "Tous les éléments et données des travaux",
                     "Clés API et intégrations",
                     "Tous les sites web associés"
                 ],
@@ -2711,13 +2711,13 @@
         "aiChat": {
             "title": "Assistant IA",
             "panelTitle": "Chat",
-            "subtitle": "Créez des annuaires avec un langage naturel",
+            "subtitle": "Créez des travaux avec un langage naturel",
             "welcomeTitle": "Bienvenue dans l'Assistant IA 👋",
-            "welcomeSubtitle": "Votre assistant alimenté par l'IA. Demandez-moi tout sur la création d'annuaires, la génération de contenu ou l'organisation de vos données.",
-            "welcomeMessage": "Salut ! Je peux vous aider à créer des annuaires en utilisant un langage naturel. Demandez quelque chose comme « Créez un annuaire pour les outils IA » ou décrivez ce dont vous avez besoin.",
+            "welcomeSubtitle": "Votre assistant alimenté par l'IA. Demandez-moi tout sur la création d'travaux, la génération de contenu ou l'organisation de vos données.",
+            "welcomeMessage": "Salut ! Je peux vous aider à créer des travaux en utilisant un langage naturel. Demandez quelque chose comme « Créez un travail pour les outils IA » ou décrivez ce dont vous avez besoin.",
             "capabilities": {
-                "workCreation": "Création d'annuaire",
-                "workCreationDesc": "Construisez des annuaires à partir de descriptions en langage naturel",
+                "workCreation": "Création d'travail",
+                "workCreationDesc": "Construisez des travaux à partir de descriptions en langage naturel",
                 "webResearch": "Recherche web",
                 "webResearchDesc": "Recherchez et collectez des données sur le web",
                 "contentGeneration": "Génération de contenu",
@@ -2747,11 +2747,11 @@
             "selectProvider": "Fournisseur",
             "notConfigured": "Non configuré",
             "gitNotConnected": "Fournisseur Git non connecté",
-            "gitNotConnectedDesc": "Connectez votre fournisseur Git pour créer et gérer des annuaires.",
+            "gitNotConnectedDesc": "Connectez votre fournisseur Git pour créer et gérer des travaux.",
             "connectGithub": "Connecter GitHub",
             "gitConnectedAs": "Connecté en tant que {username} via {provider}",
             "deployNotConfigured": "Fournisseur de déploiement non configuré",
-            "deployNotConfiguredDesc": "Configurez un fournisseur de déploiement pour publier vos sites web d'annuaires.",
+            "deployNotConfiguredDesc": "Configurez un fournisseur de déploiement pour publier vos sites web d'travaux.",
             "configureDeployProvider": "Configurer le fournisseur de déploiement",
             "deployConfigured": "Fournisseur de déploiement configuré ({provider})",
             "opened": "Ouvert",
@@ -2761,12 +2761,12 @@
             "historyYesterday": "Hier",
             "historyDaysAgo": "il y a {days}j",
             "suggestions": {
-                "s1": "Afficher mes annuaires",
-                "s2": "Créer un annuaire d'outils IA",
+                "s1": "Afficher mes travaux",
+                "s2": "Créer un travail d'outils IA",
                 "s3": "Vérifier ma connexion Git",
                 "s4": "Afficher mes statistiques"
             },
-            "feelingLucky": "Suggérer un annuaire à créer",
+            "feelingLucky": "Suggérer un travail à créer",
             "errors": {
                 "unableToSend": "Impossible d'envoyer le message"
             }
@@ -2779,7 +2779,7 @@
             "enabled": "Activé",
             "disabled": "Désactivé",
             "enable": "Activer",
-            "enableDescription": "Configurez la manière dont ce greffon est activé dans vos répertoires.",
+            "enableDescription": "Configurez la manière dont ce greffon est activé dans vos travaux.",
             "disable": "Désactiver",
             "settings": "Paramètres",
             "saveSettings": "Enregistrer les paramètres",
@@ -2811,11 +2811,11 @@
                 "pipeline": "Pipeline"
             },
             "alwaysEnabled": "Toujours activé",
-            "disableWarning": "Désactiver ce greffon le désactivera également dans tous vos répertoires",
+            "disableWarning": "Désactiver ce greffon le désactivera également dans tous vos travaux",
             "cannotDisableSystem": "Les greffons système ne peuvent pas être désactivés",
             "disableFailed": "Échec de la désactivation du greffon",
-            "autoEnableForWorks": "Activer également pour tous les répertoires",
-            "autoEnableForWorksDescription": "Ce greffon sera automatiquement actif dans tous vos répertoires. Vous pouvez toujours le désactiver par répertoire.",
+            "autoEnableForWorks": "Activer également pour tous les travaux",
+            "autoEnableForWorksDescription": "Ce greffon sera automatiquement actif dans tous vos travaux. Vous pouvez toujours le désactiver par travail.",
             "confirmDisable": "Confirmer la désactivation",
             "cancel": "Annuler",
             "missingRequiredFields": "Champs obligatoires manquants : {fields}",
@@ -2891,19 +2891,19 @@
             }
         },
         "workPlugins": {
-            "title": "Greffons des répertoires",
-            "subtitle": "Configurez les greffons pour ce répertoire",
+            "title": "Greffons des travaux",
+            "subtitle": "Configurez les greffons pour ce travail",
             "active": "Actif",
             "enable": "Activer",
             "disable": "Désactiver",
-            "enableForWork": "Activer pour ce répertoire",
-            "disableForWork": "Désactiver pour ce répertoire",
+            "enableForWork": "Activer pour ce travail",
+            "disableForWork": "Désactiver pour ce travail",
             "enableAtUserLevelFirst": "Activez d'abord ce greffon dans vos paramètres",
             "disabledByUser": "Désactivé au niveau utilisateur",
             "systemAlwaysEnabled": "Greffon système - toujours activé",
             "showSettings": "Afficher les paramètres",
             "hideSettings": "Masquer les paramètres",
-            "workSettingsInfo": "Configurez ici les paramètres spécifiques au répertoire",
+            "workSettingsInfo": "Configurez ici les paramètres spécifiques au travail",
             "save": "Enregistrer",
             "saved": "Enregistré",
             "showInstalledOnly": "Afficher uniquement les installés",
@@ -2911,7 +2911,7 @@
             "noPlugins": "Aucun greffon disponible",
             "showAllPlugins": "Afficher tous les greffons",
             "capabilityProviders": "Fournisseurs de capacités",
-            "capabilityProvidersDescription": "Sélectionnez quel greffon fournit chaque capacité pour ce répertoire",
+            "capabilityProvidersDescription": "Sélectionnez quel greffon fournit chaque capacité pour ce travail",
             "noProvidersAvailable": "Aucun fournisseur disponible",
             "categories": {
                 "git": "Git",
@@ -2929,12 +2929,12 @@
             "errors": {
                 "unableToSend": "Impossible d'envoyer le message."
             },
-            "settingsModalTitle": "Paramètres du répertoire",
-            "settingsModalDescription": "Surchargez les paramètres pour ce répertoire. Les champs non définis héritent de vos paramètres utilisateur.",
+            "settingsModalTitle": "Paramètres du travail",
+            "settingsModalDescription": "Surchargez les paramètres pour ce travail. Les champs non définis héritent de vos paramètres utilisateur.",
             "inheritedFrom": "Hérité : {value}",
             "inheritedSecret": "Hérité : ••••••••",
             "resetToDefaults": "Réinitialiser par défaut",
-            "resetConfirm": "Cela effacera toutes les surcharges spécifiques au répertoire. Les paramètres reviendront à vos valeurs au niveau utilisateur.",
+            "resetConfirm": "Cela effacera toutes les surcharges spécifiques au travail. Les paramètres reviendront à vos valeurs au niveau utilisateur.",
             "resetSuccess": "Paramètres réinitialisés par défaut",
             "cancel": "Annuler",
             "clickToConfigure": "Cliquez pour configurer",
@@ -2949,8 +2949,8 @@
         "auth": {
             "backToHome": "Retour à l'accueil",
             "feature": {
-                "title": "Créez des annuaires avec l'IA",
-                "subtitle": "Créez de beaux annuaires recherchables en quelques minutes en utilisant un langage naturel. Aucune programmation requise.",
+                "title": "Créez des travaux avec l'IA",
+                "subtitle": "Créez de beaux travaux recherchables en quelques minutes en utilisant un langage naturel. Aucune programmation requise.",
                 "badge": "Alimenté par l'IA",
                 "benefits": {
                     "ai": {
@@ -3002,8 +3002,8 @@
         }
     },
     "metadata": {
-        "title": "{companyName} - Constructeur d'annuaires",
-        "description": "Une plateforme SaaS pour créer et gérer des annuaires",
+        "title": "{companyName} - Constructeur d'travaux",
+        "description": "Une plateforme SaaS pour créer et gérer des travaux",
         "pages": {
             "signIn": "Se connecter",
             "createAccount": "Créer un compte",
@@ -3012,9 +3012,9 @@
             "authError": "Erreur d'authentification",
             "dashboard": "Tableau de bord",
             "activity": "Journal d'activité",
-            "works": "Annuaires",
-            "newWork": "Nouvel annuaire",
-            "work": "Annuaire",
+            "works": "Travaux",
+            "newWork": "Nouvel travail",
+            "work": "Travail",
             "overview": "Aperçu",
             "items": "Éléments",
             "generator": "Générateur",
@@ -3067,16 +3067,16 @@
             },
             "oauthRequired": "Connexion OAuth requise. Veuillez connecter votre compte {provider} en premier.",
             "githubRequired": "Connexion GitHub requise. Veuillez connecter votre compte GitHub en premier.",
-            "createSuccess": "Annuaire créé avec succès !",
-            "createFailed": "Échec de la création de l'annuaire",
-            "updateSuccess": "Annuaire mis à jour avec succès !",
-            "updateFailed": "Échec de la mise à jour de l'annuaire",
-            "invalidGeneratedData": "Échec de la génération de données d'annuaire valides",
-            "aiGenerationStarted": "Création de l'annuaire commencée ! L'IA génère le contenu...",
-            "invalidId": "ID d'annuaire invalide",
-            "deleteSuccess": "Annuaire supprimé avec succès",
-            "deleteFailed": "Échec de la suppression de l'annuaire",
-            "fetchFailed": "Échec de la récupération des annuaires",
+            "createSuccess": "Travail créé avec succès !",
+            "createFailed": "Échec de la création de l'travail",
+            "updateSuccess": "Travail mis à jour avec succès !",
+            "updateFailed": "Échec de la mise à jour de l'travail",
+            "invalidGeneratedData": "Échec de la génération de données d'travail valides",
+            "aiGenerationStarted": "Création de l'travail commencée ! L'IA génère le contenu...",
+            "invalidId": "ID d'travail invalide",
+            "deleteSuccess": "Travail supprimé avec succès",
+            "deleteFailed": "Échec de la suppression de l'travail",
+            "fetchFailed": "Échec de la récupération des travaux",
             "organization": {
                 "requiredWhenOwnerProvided": "L'organisation doit être activée lorsque le propriétaire est fourni"
             },
@@ -3084,7 +3084,7 @@
                 "invalidUrl": "Veuillez saisir une URL valide",
                 "analyzeFailed": "Échec de l'analyse du dépôt",
                 "started": "Import commencé avec succès",
-                "failed": "Échec de l'import de l'annuaire",
+                "failed": "Échec de l'import de l'travail",
                 "fetchReposFailed": "Échec de la récupération des dépôts"
             }
         },

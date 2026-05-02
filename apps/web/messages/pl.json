@@ -150,7 +150,7 @@
         },
         "register": {
             "title": "Utwórz konto",
-            "subtitle": "Zacznij budować niesamowite katalogi już dziś",
+            "subtitle": "Zacznij budować niesamowite prace już dziś",
             "form": {
                 "name": {
                     "label": "Imię i nazwisko",
@@ -197,18 +197,18 @@
     "onboarding": {
         "label": "Rozpoczynanie",
         "title": "Witamy w Ever Works",
-        "subtitle": "Stwórz i opublikuj swój pierwszy katalog w kilka minut.",
+        "subtitle": "Stwórz i opublikuj swój pierwszy praca w kilka minut.",
         "skipButton": "Pomiń na razie",
         "nextButton": "Dalej",
         "stepIndex": "Krok {index}",
         "steps": {
             "welcome": {
                 "title": "Czym jest Ever Works?",
-                "description": "Ever Works to otwartoźródłowy kreator katalogów. Twórz uporządkowane katalogi treści — narzędzia, oferty pracy, linki, produkty — i publikuj je jako działające strony internetowe.",
-                "detail": "Przygotujmy cię do pracy. Połącz swoich dostawców poniżej, a następnie utwórz swój pierwszy katalog.",
+                "description": "Ever Works to otwartoźródłowy kreator prac. Twórz uporządkowane prace treści — narzędzia, oferty pracy, linki, produkty — i publikuj je jako działające strony internetowe.",
+                "detail": "Przygotujmy cię do pracy. Połącz swoich dostawców poniżej, a następnie utwórz swój pierwszy praca.",
                 "feature1": {
                     "title": "Treść generowana przez AI",
-                    "description": "Automatycznie generuj i wzbogacaj elementy katalogu za pomocą swojego dostawcy AI."
+                    "description": "Automatycznie generuj i wzbogacaj elementy pracy za pomocą swojego dostawcy AI."
                 },
                 "feature2": {
                     "title": "Natychmiastowa publikacja",
@@ -216,18 +216,18 @@
                 },
                 "feature3": {
                     "title": "Oparty na Git",
-                    "description": "Każdy katalog to repozytorium GitHub, które posiadasz i kontrolujesz."
+                    "description": "Każdy praca to repozytorium GitHub, które posiadasz i kontrolujesz."
                 }
             },
             "work": {
-                "title": "Utwórz swój pierwszy katalog",
-                "description": "Katalog to twój ośrodek treści. Dodawaj elementy, konfiguruj układ i publikuj jednym kliknięciem.",
-                "detail": "Jesteś gotowy! Utwórz swój pierwszy katalog, aby zacząć budować i publikować treści.",
-                "action": "Utwórz katalog"
+                "title": "Utwórz swój pierwszy praca",
+                "description": "Praca to twój ośrodek treści. Dodawaj elementy, konfiguruj układ i publikuj jednym kliknięciem.",
+                "detail": "Jesteś gotowy! Utwórz swój pierwszy praca, aby zacząć budować i publikować treści.",
+                "action": "Utwórz praca"
             },
             "publish": {
                 "title": "Opublikuj",
-                "description": "Połącz Vercel lub GitHub, aby wdrożyć swój katalog jako publiczną stronę internetową — bez potrzeby konfiguracji hostingu.",
+                "description": "Połącz Vercel lub GitHub, aby wdrożyć swój praca jako publiczną stronę internetową — bez potrzeby konfiguracji hostingu.",
                 "action": "Skonfiguruj publikację"
             }
         },
@@ -336,7 +336,7 @@
             "steps": {
                 "model": {
                     "title": "Wybierz model",
-                    "description": "Wybierz model Codex, który chcesz uruchomić do generowania katalogu end-to-end."
+                    "description": "Wybierz model Codex, który chcesz uruchomić do generowania pracy end-to-end."
                 },
                 "credentials": {
                     "title": "Dodaj poświadczenia",
@@ -408,7 +408,7 @@
         "simWizard": {
             "label": "Konfiguracja SIM AI",
             "title": "Skonfiguruj SIM AI w dwóch krokach",
-            "subtitle": "Dodaj swój klucz API SIM AI i zweryfikuj połączenie, aby zacząć delegować generowanie katalogu do przepływów pracy SIM.",
+            "subtitle": "Dodaj swój klucz API SIM AI i zweryfikuj połączenie, aby zacząć delegować generowanie pracy do przepływów pracy SIM.",
             "stepIndex": "Krok {index}",
             "continueButton": "Kontynuuj",
             "steps": {
@@ -431,7 +431,7 @@
         "title": "Pulpit",
         "connectGithub": {
             "title": "Połącz konto GitHub",
-            "description": "GitHub jest wymagany do tworzenia i zarządzania repozytoriami katalogów. Połącz konto, aby zacząć.",
+            "description": "GitHub jest wymagany do tworzenia i zarządzania repozytoriami prac. Połącz konto, aby zacząć.",
             "connect": "Połącz GitHub",
             "dismiss": "Zrobię to później"
         },
@@ -465,7 +465,7 @@
         },
         "header": {
             "welcome": "Witaj z powrotem, {username}!",
-            "subtitle": "Zarządzaj katalogami zasilanymi AI i śledź ich wydajność",
+            "subtitle": "Zarządzaj pracaami zasilanymi AI i śledź ich wydajność",
             "onboarding": {
                 "badge": "Wprowadzenie {currentStep}/{totalSteps}",
                 "dismiss": "Ukryj skrót wprowadzenia"
@@ -490,14 +490,14 @@
                 },
                 "quickTips": {
                     "title": "Szybkie wskazówki",
-                    "tip1": "Utwórz swój pierwszy katalog, klikając przycisk „Utwórz katalog” na pulpicie.",
-                    "tip2": "Użyj generatora AI, aby automatycznie wypełnić katalog odpowiednimi elementami.",
-                    "tip3": "Połącz konto GitHub, aby synchronizować i wdrażać katalogi jako repozytoria."
+                    "tip1": "Utwórz swój pierwszy praca, klikając przycisk „Utwórz praca” na pulpicie.",
+                    "tip2": "Użyj generatora AI, aby automatycznie wypełnić praca odpowiednimi elementami.",
+                    "tip3": "Połącz konto GitHub, aby synchronizować i wdrażać prace jako repozytoria."
                 },
                 "shortcuts": {
                     "title": "Skróty klawiaturowe",
-                    "search": "Wyszukaj katalogi",
-                    "newWork": "Utwórz nowy katalog",
+                    "search": "Wyszukaj prace",
+                    "newWork": "Utwórz nowy praca",
                     "help": "Otwórz pomoc",
                     "hint": "Użyj Cmd na Mac lub Ctrl na Windows/Linux"
                 },
@@ -513,7 +513,7 @@
         },
         "activity": {
             "title": "Dziennik aktywności",
-            "subtitle": "Śledź wszystkie operacje w swoich katalogach",
+            "subtitle": "Śledź wszystkie operacje w swoich pracaach",
             "loading": "Ładowanie…",
             "fetchFailed": "Nie udało się załadować aktywności",
             "exportFailed": "Nie udało się wyeksportować dziennika aktywności",
@@ -521,7 +521,7 @@
             "columns": {
                 "status": "Status",
                 "dateTime": "Data / Godzina",
-                "work": "Katalog",
+                "work": "Praca",
                 "type": "Typ",
                 "summary": "Podsumowanie"
             },
@@ -532,9 +532,9 @@
                     "generation": "Generowanie",
                     "comparison": "Porównanie",
                     "deployment": "Wdrożenie",
-                    "workCreated": "Katalog utworzony",
-                    "workUpdated": "Katalog zaktualizowany",
-                    "workDeleted": "Katalog usunięty",
+                    "workCreated": "Praca utworzony",
+                    "workUpdated": "Praca zaktualizowany",
+                    "workDeleted": "Praca usunięty",
                     "pluginEnabled": "Wtyczka włączona",
                     "pluginDisabled": "Wtyczka wyłączona",
                     "pluginConfigured": "Wtyczka skonfigurowana",
@@ -597,31 +597,31 @@
             }
         },
         "works": {
-            "title": "Katalogi",
-            "subtitle": "Zarządzaj i organizuj katalogi zasilane AI",
+            "title": "Prace",
+            "subtitle": "Zarządzaj i organizuj prace zasilane AI",
             "summary": {
-                "totalWorks": "Łączna liczba katalogów",
+                "totalWorks": "Łączna liczba prac",
                 "generating": "Generowanie",
                 "totalItems": "Łączna liczba elementów"
             },
-            "recent": "Ostatnie katalogi",
+            "recent": "Ostatnie prace",
             "viewAll": "Zobacz wszystkie ({count})",
-            "search": "Wyszukaj katalogi…",
-            "create": "Utwórz katalog",
-            "showing": "Pokazywanie {current} z {total} katalogów",
-            "searchFailed": "Nie udało się wyszukać katalogów. Spróbuj ponownie.",
+            "search": "Wyszukaj prace…",
+            "create": "Utwórz praca",
+            "showing": "Pokazywanie {current} z {total} prac",
+            "searchFailed": "Nie udało się wyszukać prac. Spróbuj ponownie.",
             "pagination": {
                 "previous": "Poprzednia",
                 "next": "Następna"
             },
             "empty": {
-                "title": "Brak katalogów",
-                "description": "Utwórz swój pierwszy katalog zasilany AI, aby zacząć organizować i prezentować treści.",
-                "action": "Utwórz swój pierwszy katalog",
+                "title": "Brak prac",
+                "description": "Utwórz swój pierwszy praca zasilany AI, aby zacząć organizować i prezentować treści.",
+                "action": "Utwórz swój pierwszy praca",
                 "notFound": {
-                    "title": "Nie znaleziono katalogów",
+                    "title": "Nie znaleziono prac",
                     "withSearch": "Spróbuj dostosować warunki wyszukiwania",
-                    "withoutSearch": "Utwórz swój pierwszy katalog zasilany AI, aby zacząć"
+                    "withoutSearch": "Utwórz swój pierwszy praca zasilany AI, aby zacząć"
                 }
             }
         },
@@ -638,7 +638,7 @@
             },
             "data": {
                 "exportTitle": "Eksportuj dane",
-                "exportDescription": "Pobierz dane konta, w tym katalogi, ustawienia wtyczek i informacje profilu, jako plik JSON.",
+                "exportDescription": "Pobierz dane konta, w tym prace, ustawienia wtyczek i informacje profilu, jako plik JSON.",
                 "includeSecrets": "Dołącz tajne ustawienia (klucze API, tokeny) — eksportowane jako zamaskowane wartości",
                 "secretsWarning": "Tajne ustawienia zostaną wyeksportowane jako zamaskowane wartości. Będziesz musiał ręcznie zastąpić je prawdziwymi poświadczeniami przed importem.",
                 "exportButton": "Eksportuj dane",
@@ -646,7 +646,7 @@
                 "exportSuccess": "Dane wyeksportowane pomyślnie",
                 "exportError": "Nie udało się wyeksportować danych",
                 "importTitle": "Importuj dane",
-                "importDescription": "Importuj dane z wcześniej wyeksportowanego pliku JSON. Możesz rozwiązać konflikty dla katalogów o identycznych identyfikatorach.",
+                "importDescription": "Importuj dane z wcześniej wyeksportowanego pliku JSON. Możesz rozwiązać konflikty dla prac o identycznych identyfikatorach.",
                 "importButton": "Importuj dane",
                 "syncTitle": "Synchronizacja z GitHub",
                 "syncDescription": "Synchronizuj konfigurację konta z prywatnym repozytorium GitHub w celu tworzenia kopii zapasowych i migracji między instancjami.",
@@ -658,7 +658,7 @@
                     "invalidJson": "Nieprawidłowy plik JSON",
                     "previewError": "Nie udało się przeanalizować pliku importu",
                     "summary": "Podsumowanie importu",
-                    "works": "Katalogi",
+                    "works": "Prace",
                     "items": "Elementy",
                     "userPlugins": "Wtyczki użytkownika",
                     "version": "Wersja formatu",
@@ -681,9 +681,9 @@
                     "validationErrors": "Błędy walidacji",
                     "resultSuccess": "Import zakończony pomyślnie",
                     "resultFailed": "Import nie powiódł się",
-                    "worksCreated": "Katalogi utworzone",
-                    "worksUpdated": "Katalogi zaktualizowane",
-                    "worksSkipped": "Katalogi pominięte",
+                    "worksCreated": "Prace utworzone",
+                    "worksUpdated": "Prace zaktualizowane",
+                    "worksSkipped": "Prace pominięte",
                     "pluginsImported": "Wtyczki zaimportowane",
                     "warnings": "Ostrzeżenia",
                     "errors": "Błędy"
@@ -732,11 +732,11 @@
                 "backToCategory": "Powrót do {category}",
                 "pipelineDefault": {
                     "title": "Domyślny potok",
-                    "description": "Wybierz domyślny potok używany podczas generowania elementów katalogu.",
+                    "description": "Wybierz domyślny potok używany podczas generowania elementów pracy.",
                     "autoLabel": "Automatycznie",
-                    "autoDescription": "Użyj potoku rozwiązywanego przez system dla każdego katalogu",
+                    "autoDescription": "Użyj potoku rozwiązywanego przez system dla każdego pracy",
                     "enforceLabel": "Wymuś ten domyślny",
-                    "enforceDescription": "Zawsze wstępnie wybieraj ten potok, nawet gdy katalog ma skonfigurowany własny potok. Nadal możesz ręcznie przełączać potoki w formularzu.",
+                    "enforceDescription": "Zawsze wstępnie wybieraj ten potok, nawet gdy praca ma skonfigurowany własny potok. Nadal możesz ręcznie przełączać potoki w formularzu.",
                     "saveFailed": "Nie udało się zapisać domyślnego potoku"
                 }
             },
@@ -819,8 +819,8 @@
                 "subtitle": "Połącz zewnętrzne konta w celu rozszerzenia funkcjonalności",
                 "github": {
                     "name": "GitHub",
-                    "connected": "Twórz i zarządzaj katalogami z repozytoriami GitHub",
-                    "disconnected": "Połącz, aby tworzyć katalogi z repozytoriów",
+                    "connected": "Twórz i zarządzaj pracaami z repozytoriami GitHub",
+                    "disconnected": "Połącz, aby tworzyć prace z repozytoriów",
                     "scopes": "Zakresy",
                     "organizations": "Połączone organizacje",
                     "organizationsHint": "Użyj Ponowne połączenie, aby nadać dostęp do dodatkowych organizacji",
@@ -881,7 +881,7 @@
             }
         },
         "stats": {
-            "totalWorks": "Łączna liczba katalogów",
+            "totalWorks": "Łączna liczba prac",
             "totalItems": "Łączna liczba elementów",
             "activeWebsites": "Aktywne witryny",
             "fromLastMonth": "z ostatniego miesiąca"
@@ -911,12 +911,12 @@
             "views": "{count} wyświetleń",
             "updated": "Zaktualizowano {date}",
             "viewAction": "Wyświetl →",
-            "openingTitle": "Otwieranie katalogu",
-            "openingMessage": "Przygotowywanie katalogu. Szczegóły otworzą się za chwilę. Pozostań na tej stronie."
+            "openingTitle": "Otwieranie pracy",
+            "openingMessage": "Przygotowywanie pracy. Szczegóły otworzą się za chwilę. Pozostań na tej stronie."
         },
         "workList": {
-            "title": "Twoje katalogi",
-            "createButton": "Utwórz katalog"
+            "title": "Twoje prace",
+            "createButton": "Utwórz praca"
         },
         "workDetail": {
             "failedToGenerateItems": "Nie udało się wygenerować elementów. Spróbuj ponownie.",
@@ -953,7 +953,7 @@
             },
             "members": {
                 "title": "Członkowie zespołu",
-                "subtitle": "Zarządzaj dostępem do tego katalogu i uprawnieniami.",
+                "subtitle": "Zarządzaj dostępem do tego pracy i uprawnieniami.",
                 "inviteMember": "Zaproś członka",
                 "noMembers": "Brak członków zespołu. Zaproś kogoś do współpracy.",
                 "roles": {
@@ -965,13 +965,13 @@
                 },
                 "roleDescriptions": {
                     "owner": "Pełna kontrola, w tym usuwanie i zarządzanie członkami.",
-                    "manager": "Może edytować katalog i zarządzać członkami, ale nie może usuwać.",
-                    "editor": "Może edytować zawartość katalogu i uruchamiać generacje.",
-                    "viewer": "Tylko do odczytu, dostęp do przeglądania katalogu."
+                    "manager": "Może edytować praca i zarządzać członkami, ale nie może usuwać.",
+                    "editor": "Może edytować zawartość pracy i uruchamiać generacje.",
+                    "viewer": "Tylko do odczytu, dostęp do przeglądania pracy."
                 },
                 "invite": {
                     "title": "Zaproś członka zespołu",
-                    "description": "Dodaj nowego członka do współpracy nad tym katalogiem.",
+                    "description": "Dodaj nowego członka do współpracy nad tym praceem.",
                     "emailLabel": "Adres e-mail",
                     "emailPlaceholder": "colleague@example.com",
                     "roleLabel": "Rola",
@@ -985,7 +985,7 @@
                 },
                 "confirmRemove": {
                     "title": "Usuń członka",
-                    "description": "Czy na pewno chcesz usunąć {username} z tego katalogu? Straci cały dostęp.",
+                    "description": "Czy na pewno chcesz usunąć {username} z tego pracy? Straci cały dostęp.",
                     "confirm": "Usuń",
                     "cancel": "Anuluj"
                 },
@@ -1000,7 +1000,7 @@
                 "page": {
                     "title": "Planowane aktualizacje",
                     "subtitle": "Automatyzuj odświeżanie {name} z dedykowanym interwałem i obsługą błędów.",
-                    "fallbackName": "tego katalogu",
+                    "fallbackName": "tego pracy",
                     "loadFailed": "Nie udało się załadować ustawień harmonogramu.",
                     "providerCategories": {
                         "pipeline": "Potok",
@@ -1101,7 +1101,7 @@
                     },
                     "empty": {
                         "title": "Najpierw uruchom ręczną generację",
-                        "description": "Ukończ jedno udane ręczne uruchomienie, aby odblokować automatyczne planowanie. Gdy katalog będzie miał dane, możemy go utrzymywać w aktualności.",
+                        "description": "Ukończ jedno udane ręczne uruchomienie, aby odblokować automatyczne planowanie. Gdy praca będzie miał dane, możemy go utrzymywać w aktualności.",
                         "refresh": "Odśwież status"
                     },
                     "requiresGeneration": "Uruchom co najmniej jedną generację elementów przed włączeniem harmonogramów."
@@ -1119,7 +1119,7 @@
             "statusCard": {
                 "notStarted": {
                     "title": "Generowanie nie rozpoczęte",
-                    "description": "Rozpocznij generowanie elementów dla katalogu, aby wypełnić go zawartością.",
+                    "description": "Rozpocznij generowanie elementów dla pracy, aby wypełnić go zawartością.",
                     "action": "Rozpocznij generowanie"
                 },
                 "generating": {
@@ -1133,7 +1133,7 @@
                 },
                 "generated": {
                     "title": "Generowanie zakończone",
-                    "description": "Katalog został pomyślnie wypełniony elementami.",
+                    "description": "Praca został pomyślnie wypełniony elementami.",
                     "withWarnings": "Zakończono z ostrzeżeniami:",
                     "viewItems": "Zobacz elementy",
                     "regenerate": "Wygeneruj ponownie"
@@ -1159,7 +1159,7 @@
             },
             "comparisons": {
                 "title": "Porównania",
-                "subtitle": "Strony porównań A vs B między elementami katalogu",
+                "subtitle": "Strony porównań A vs B między elementami pracy",
                 "vs": "vs",
                 "winner": "Zwycięzca: {name}",
                 "tie": "Remis",
@@ -1307,7 +1307,7 @@
                 }
             },
             "info": {
-                "title": "Informacje o katalogu",
+                "title": "Informacje o pracy",
                 "yourRole": "Twoja rola",
                 "role": {
                     "owner": "Właściciel",
@@ -1357,15 +1357,15 @@
             "activity": {
                 "title": "Ostatnia aktywność",
                 "noActivity": "Brak aktywności",
-                "created": "Katalog utworzony",
-                "workCreated": "Katalog został pomyślnie utworzony",
+                "created": "Praca utworzony",
+                "workCreated": "Praca został pomyślnie utworzony",
                 "justNow": "Przed chwilą"
             },
             "items": {
-                "title": "Elementy katalogu",
-                "subtitle": "Zarządzaj i organizuj elementy w swoim katalogu",
+                "title": "Elementy pracy",
+                "subtitle": "Zarządzaj i organizuj elementy w swoim pracy",
                 "noItemsTitle": "Brak elementów",
-                "noItemsDescription": "Twój katalog nie ma jeszcze żadnych elementów. Wygeneruj elementy, aby wypełnić katalog treścią.",
+                "noItemsDescription": "Twój praca nie ma jeszcze żadnych elementów. Wygeneruj elementy, aby wypełnić praca treścią.",
                 "generateItems": "Wygeneruj elementy",
                 "searchPlaceholder": "Wyszukaj elementy...",
                 "allCategories": "Wszystkie kategorie",
@@ -1427,14 +1427,14 @@
                     "screenshotFailed": "Nie udało się zrobić zrzutu ekranu",
                     "screenshotError": "Wystąpił błąd podczas robienia zrzutu ekranu",
                     "featured": "Polecany element",
-                    "featuredHelp": "Oznacz ten element jako polecany w katalogu",
+                    "featuredHelp": "Oznacz ten element jako polecany w pracy",
                     "updateWithPR": "Utwórz Pull Request",
                     "updateWithPRHelp": "Prześlij zmiany jako pull request zamiast bezpośredniego commita",
                     "cancel": "Anuluj",
                     "adding": "Dodawanie...",
                     "addItem": "Dodaj element",
                     "success": "Element dodany pomyślnie",
-                    "successDescription": "Element został dodany do katalogu",
+                    "successDescription": "Element został dodany do pracy",
                     "failed": "Nie udało się dodać elementu",
                     "error": "Wystąpił błąd podczas dodawania elementu",
                     "errors": {
@@ -1653,7 +1653,7 @@
                     "navigationLabel": "Zakładki generatora"
                 },
                 "regenerationWarning": "Ostrzeżenie przed ponowną generacją",
-                "regenerationWarningDescription": "Ten katalog został już wygenerowany. Rozpoczęcie nowej generacji zastąpi istniejące elementy.",
+                "regenerationWarningDescription": "Ten praca został już wygenerowany. Rozpoczęcie nowej generacji zastąpi istniejące elementy.",
                 "requiredInfo": "Wymagane informacje",
                 "updateConfiguration": "Konfiguracja aktualizacji",
                 "promptRequired": "Wymagany jest prompt",
@@ -1663,20 +1663,20 @@
                 "loadingFormSchema": "Ładowanie konfiguracji formularza...",
                 "failedToLoadFormSchema": "Nie udało się załadować konfiguracji formularza",
                 "selectOption": "Wybierz opcję",
-                "workName": "Nazwa katalogu",
+                "workName": "Nazwa pracy",
                 "generationPrompt": "Prompt generacji",
                 "modelOverride": "Nadpisanie modelu AI",
                 "modelOverridePlaceholder": "np. openai/gpt-4.1 lub openrouter/openai/gpt-4.1",
                 "modelOverrideHelperText": "Opcjonalne. Domyślnie używa importowanego lub poprzedniego modelu, chyba że nadpiszesz go tutaj.",
                 "recommended": "Zalecane",
-                "promptPlaceholder": "Opisz, jakie elementy powinny być wygenerowane dla tego katalogu...",
+                "promptPlaceholder": "Opisz, jakie elementy powinny być wygenerowane dla tego pracy...",
                 "promptHelperText": "Bądź precyzyjny co do typu treści, którą chcesz wygenerować",
                 "repositoryDescription": "Opis repozytorium",
                 "repositoryPlaceholder": "Krótki opis repozytorium (opcjonalnie)",
                 "startGeneration": "Rozpocznij generację",
                 "regenerateItems": "Zregeneruj elementy",
                 "updateItems": "Uruchom generację",
-                "recreateWork": "Odtwórz katalog",
+                "recreateWork": "Odtwórz praca",
                 "showAdvancedOptions": "Pokaż zaawansowane opcje",
                 "hideAdvancedOptions": "Ukryj zaawansowane opcje",
                 "cancel": "Anuluj",
@@ -1714,7 +1714,7 @@
                 "websiteRepositoryCreationMethod": "Metoda tworzenia repozytorium witryny",
                 "methodDuplicate": "Duplikuj",
                 "methodFork": "Fork",
-                "workNamePlaceholder": "Wprowadź nazwę katalogu",
+                "workNamePlaceholder": "Wprowadź nazwę pracy",
                 "methodCreateFromTemplate": "Utwórz z szablonu",
                 "aiProcessingConfiguration": "Konfiguracja przetwarzania AI",
                 "maxSearchQueries": "Maks. zapytań wyszukiwania",
@@ -1725,7 +1725,7 @@
                 "aiFirstGenerationDescription": "Włącz generowanie początkowych elementów przez AI przed wyszukiwaniem w sieci.",
                 "contentFiltering": "Filtrowanie treści",
                 "contentFilteringDescription": "Włącz filtrowanie jakości treści",
-                "recreateConfirmTitle": "Odtworzyć dane katalogu?",
+                "recreateConfirmTitle": "Odtworzyć dane pracy?",
                 "recreateConfirmDescription": "Odtworzenie usunie istniejące elementy i zregeneruje je od zera. Tej czynności nie można cofnąć.",
                 "confirmRecreate": "Tak, odtwórz",
                 "recreateInlineTitle": "Odtworzenie usunie istniejące elementy",
@@ -1769,7 +1769,7 @@
                 "aiProviderDescription": "Dostawca modelu AI do generowania i wyodrębniania treści",
                 "contentExtractorProvider": "Wyodrębnianie treści",
                 "contentExtractorProviderDescription": "Dostawca do wyodrębniania treści ze stron internetowych",
-                "useWorkDefault": "Użyj domyślnego katalogu",
+                "useWorkDefault": "Użyj domyślnego pracy",
                 "default": "Domyślny",
                 "notConfigured": "Nieskonfigurowany",
                 "notConfiguredTooltip": "Ten dostawca wymaga konfiguracji. Odwiedź Ustawienia → Wtyczki, aby go skonfigurować.",
@@ -1837,7 +1837,7 @@
                 },
                 "generalSettings": "Ustawienia ogólne",
                 "generalTitle": "Ustawienia ogólne",
-                "workName": "Nazwa katalogu",
+                "workName": "Nazwa pracy",
                 "description": "Opis",
                 "organizationRepository": "Repozytorium organizacji",
                 "organizationHelp": "Twórz repozytoria pod organizacją zamiast na koncie osobistym",
@@ -1849,13 +1849,13 @@
                 "customHeaderPlaceholder": "Dodaj niestandardową zawartość do nagłówka README",
                 "overwriteDefaultHeader": "Nadpisz domyślny nagłówek",
                 "customFooter": "Niestandardowa stopka",
-                "cantDeleteWhileGenerating": "Nie można usunąć katalogu podczas generowania elementów.",
+                "cantDeleteWhileGenerating": "Nie można usunąć pracy podczas generowania elementów.",
                 "customFooterPlaceholder": "Dodaj niestandardową zawartość do stopki README",
                 "overwriteDefaultFooter": "Nadpisz domyślną stopkę",
                 "dangerZone": "Strefa niebezpieczeństwa",
                 "dangerTitle": "Strefa niebezpieczeństwa",
-                "deleteWarning": "Po usunięciu katalogu nie ma powrotu. Upewnij się.",
-                "dangerDescription": "Po usunięciu katalogu nie ma powrotu. Upewnij się.",
+                "deleteWarning": "Po usunięciu pracy nie ma powrotu. Upewnij się.",
+                "dangerDescription": "Po usunięciu pracy nie ma powrotu. Upewnij się.",
                 "deleteOptions": "Wybierz, co usunąć:",
                 "deleteDataRepository": "Usuń repozytorium danych",
                 "deleteDataRepositoryDescription": "Usuń repozytorium danych JSON z GitHub",
@@ -1864,14 +1864,14 @@
                 "deleteWebsiteRepository": "Usuń repozytorium strony internetowej",
                 "deleteWebsiteRepositoryDescription": "Usuń wdrożone repozytorium strony internetowej",
                 "deleteConfirm": "Czy na pewno?",
-                "deleteConfirmDetail": "Ta akcja jest nieodwracalna. Katalog i wybrane repozytoria zostaną trwale usunięte.",
-                "confirmWorkName": "Wpisz nazwę katalogu, aby potwierdzić",
+                "deleteConfirmDetail": "Ta akcja jest nieodwracalna. Praca i wybrane repozytoria zostaną trwale usunięte.",
+                "confirmWorkName": "Wpisz nazwę pracy, aby potwierdzić",
                 "confirmWorkNameDescription": "Wpisz \"{name}\", aby potwierdzić usunięcie",
-                "deleteNameMismatch": "Nazwa katalogu nie pasuje",
-                "deleteButton": "Usuń katalog",
+                "deleteNameMismatch": "Nazwa pracy nie pasuje",
+                "deleteButton": "Usuń praca",
                 "deleteConfirmButton": "Tak, usuń",
-                "deleteSuccess": "Katalog usunięty pomyślnie",
-                "deleteFailed": "Nie udało się usunąć katalogu",
+                "deleteSuccess": "Praca usunięty pomyślnie",
+                "deleteFailed": "Nie udało się usunąć pracy",
                 "yesDelete": "Tak, usuń",
                 "cancel": "Anuluj",
                 "saveChanges": "Zapisz zmiany",
@@ -1880,7 +1880,7 @@
                 "updateFailed": "Nie udało się zaktualizować ustawień",
                 "deployProvider": {
                     "title": "Dostawca wdrożenia",
-                    "description": "Wybierz, gdzie wdrożyć stronę katalogu",
+                    "description": "Wybierz, gdzie wdrożyć stronę pracy",
                     "configure": "Konfiguruj",
                     "ready": "Gotowy do wdrożenia",
                     "notConfigured": "Nieskonfigurowany",
@@ -1917,7 +1917,7 @@
                     "prompts": {
                         "relevanceAssessment": {
                             "title": "Ocena trafności",
-                            "description": "Dodatkowe instrukcje do filtrowania stron internetowych pod kątem trafności do tematu katalogu.",
+                            "description": "Dodatkowe instrukcje do filtrowania stron internetowych pod kątem trafności do tematu pracy.",
                             "placeholder": "np. Dołącz tylko strony skupiające się na projektach open-source..."
                         },
                         "itemGeneration": {
@@ -1968,7 +1968,7 @@
                 "communityPrUpdateFailed": "Nie udało się zaktualizować ustawień PR społeczności",
                 "websiteConfig": {
                     "title": "Konfiguracja strony internetowej",
-                    "subtitle": "Dostosuj wygląd i zachowanie strony katalogu",
+                    "subtitle": "Dostosuj wygląd i zachowanie strony pracy",
                     "loadFailed": "Nie udało się załadować ustawień strony",
                     "saveSuccess": "Ustawienia strony zapisane pomyślnie",
                     "saveFailed": "Nie udało się zapisać ustawień strony",
@@ -1983,13 +1983,13 @@
                         "siteName": {
                             "title": "Tożsamość strony",
                             "label": "Nazwa strony",
-                            "placeholder": "Mój katalog",
+                            "placeholder": "Mój praca",
                             "helper": "Nazwa wyświetlana w nagłówku strony i karcie przeglądarki"
                         },
                         "siteUrl": {
                             "label": "URL strony",
                             "placeholder": "https://example.com",
-                            "helper": "URL Twojej firmy lub strony katalogu"
+                            "helper": "URL Twojej firmy lub strony pracy"
                         },
                         "global": {
                             "title": "Funkcje globalne",
@@ -2071,7 +2071,7 @@
                 },
                 "committer": {
                     "title": "Autor komita Git",
-                    "description": "Nadpisz nazwę i e-mail autora komita dla komitów Git w tym katalogu. Pozostaw puste, aby użyć ustawień użytkownika lub domyślnych konta.",
+                    "description": "Nadpisz nazwę i e-mail autora komita dla komitów Git w tym pracy. Pozostaw puste, aby użyć ustawień użytkownika lub domyślnych konta.",
                     "nameLabel": "Nazwa autora",
                     "emailLabel": "E-mail autora",
                     "save": "Zapisz autora",
@@ -2082,13 +2082,13 @@
             "deploy": {
                 "noProviderAlert": {
                     "title": "Brak dostawcy wdrożenia",
-                    "description": "Wybierz dostawcę wdrożenia, aby wdrożyć swoją stronę katalogu.",
+                    "description": "Wybierz dostawcę wdrożenia, aby wdrożyć swoją stronę pracy.",
                     "selectButton": "Wybierz i kontynuuj",
                     "noProviders": "Brak dostępnych dostawców wdrożenia. Najpierw zainstaluj wtyczkę wdrożenia"
                 },
                 "noTokenAlert": {
                     "title": "{provider} Token wymagany",
-                    "description": "Aby wdrożyć katalog, musisz skonfigurować token API {provider} w Ustawieniach wtyczek.",
+                    "description": "Aby wdrożyć praca, musisz skonfigurować token API {provider} w Ustawieniach wtyczek.",
                     "configureButton": "Konfiguruj w ustawieniach wtyczek",
                     "getTokenButton": "Pobierz token API",
                     "howTo": {
@@ -2096,25 +2096,25 @@
                         "step1": "Kliknij „Pobierz token API”, aby otworzyć panel dostawcy",
                         "step2": "Utwórz nowy token z uprawnieniami do wdrożenia",
                         "step3": "Skonfiguruj token API {provider} w Ustawieniach wtyczek > {provider}",
-                        "step4": "Wróć tutaj, aby wdrożyć katalog"
+                        "step4": "Wróć tutaj, aby wdrożyć praca"
                     }
                 },
                 "sharedNoTokenAlert": {
                     "title": "Wdrożenie niedostępne",
-                    "description": "Właściciel katalogu nie skonfigurował wdrożenia. Skontaktuj się z właścicielem katalogu, aby skonfigurować wdrożenie.",
+                    "description": "Właściciel pracy nie skonfigurował wdrożenia. Skontaktuj się z właścicielem pracy, aby skonfigurować wdrożenie.",
                     "hint": "Jako współpracownik możesz uruchamiać wdrożenia, gdy właściciel skonfiguruje dostawcę wdrożenia"
                 },
                 "form": {
                     "deployment": {
                         "title": "Wdróż stronę",
-                        "description": "Wdróż repozytorium strony katalogu.",
+                        "description": "Wdróż repozytorium strony pracy.",
                         "deployButton": "Wdróż do {provider}",
                         "deployingButton": "Wdróż...",
                         "deployingStateButton": "Wdróż ({state})...",
                         "successMessage": "Twoja strona została pomyślnie wdrożona!",
                         "teamSelection": {
                             "title": "Wybierz zespół",
-                            "description": "Wybierz zespół, do którego wdrożyć ten katalog.",
+                            "description": "Wybierz zespół, do którego wdrożyć ten praca.",
                             "label": "Zespół",
                             "placeholder": "Wybierz zespół",
                             "confirmButton": "Wdróż do zespołu",
@@ -2141,7 +2141,7 @@
                     },
                     "info": {
                         "deployInfo": "Wdrożenie zazwyczaj trwa 1-3 minuty. Otrzymasz URL po zakończeniu.",
-                        "updateInfo": "Aktualizacje synchronizują zawartość katalogu z repozytorium strony na następne wdrożenie"
+                        "updateInfo": "Aktualizacje synchronizują zawartość pracy z repozytorium strony na następne wdrożenie"
                     },
                     "websiteTemplate": {
                         "title": "Automatyczne aktualizacje szablonu",
@@ -2161,7 +2161,7 @@
                         "title": "Skonfiguruj przed wdrożeniem",
                         "description": "Przejrzyj i dostosuj ustawienia strony przed wdrożeniem",
                         "siteName": "Nazwa strony",
-                        "siteNamePlaceholder": "Mój katalog",
+                        "siteNamePlaceholder": "Mój praca",
                         "siteNameHelper": "Nazwa wyświetlona na stronie (domyślnie: Acme)",
                         "tabGeneral": "Ogólne",
                         "tabHeader": "Nagłówek",
@@ -2209,8 +2209,8 @@
             }
         },
         "workCreation": {
-            "title": "Utwórz nowy katalog",
-            "subtitle": "Wybierz sposób utworzenia katalogu",
+            "title": "Utwórz nowy praca",
+            "subtitle": "Wybierz sposób utworzenia pracy",
             "backToOptions": "Powrót do opcji",
             "sidebar": {
                 "selectedProvider": "Dostawca Git",
@@ -2218,7 +2218,7 @@
             },
             "deployProvider": {
                 "title": "Dostawca wdrożenia",
-                "description": "Wybierz miejsce wdrożenia strony katalogu",
+                "description": "Wybierz miejsce wdrożenia strony pracy",
                 "noProviders": "Brak dostępnych dostawców wdrożenia",
                 "notConfigured": "Nie skonfigurowany",
                 "configured": "Gotowy do wdrożenia",
@@ -2236,21 +2236,21 @@
             },
             "ai": {
                 "title": "Utwórz z AI",
-                "subtitle": "Opisz pomysł na katalog w naturalnym języku, a AI zajmie się konfiguracją",
+                "subtitle": "Opisz pomysł na praca w naturalnym języku, a AI zajmie się konfiguracją",
                 "getStarted": "Rozpocznij",
-                "formTitle": "Utwórz katalog z AI",
-                "formSubtitle": "Opisz pomysł na katalog, a AI zajmie się konfiguracją i generowaniem początkowej zawartości",
-                "workNameLabel": "Nazwa katalogu",
+                "formTitle": "Utwórz praca z AI",
+                "formSubtitle": "Opisz pomysł na praca, a AI zajmie się konfiguracją i generowaniem początkowej zawartości",
+                "workNameLabel": "Nazwa pracy",
                 "workNamePlaceholder": "np. Świetne narzędzia AI",
                 "workNameHelp": "AI zasugeruje nazwę, jeśli zostawisz to puste",
-                "promptLabel": "Opisz swój katalog",
+                "promptLabel": "Opisz swój praca",
                 "githubRequired": "Najpierw połącz konto GitHub.",
-                "promptPlaceholder": "Opisz, jaki katalog chcesz utworzyć, jakie elementy powinien zawierać i wszelkie konkretne wymagania...",
+                "promptPlaceholder": "Opisz, jaki praca chcesz utworzyć, jakie elementy powinien zawierać i wszelkie konkretne wymagania...",
                 "inspirationText": "Potrzebujesz inspiracji? Wypróbuj jedną z tych:",
                 "examplePrompts": {
                     "0": {
                         "name": "Narzędzia AI dla programistów",
-                        "prompt": "Utwórz katalog najlepszych narzędzi AI dla programistów"
+                        "prompt": "Utwórz praca najlepszych narzędzi AI dla programistów"
                     },
                     "1": {
                         "name": "Centrum komponentów React",
@@ -2258,7 +2258,7 @@
                     },
                     "2": {
                         "name": "Narzędzia dla zdalnych zespołów",
-                        "prompt": "Wygeneruj katalog aplikacji zwiększających produktywność dla zdalnych zespołów"
+                        "prompt": "Wygeneruj praca aplikacji zwiększających produktywność dla zdalnych zespołów"
                     },
                     "3": {
                         "name": "Zrównoważona moda",
@@ -2273,23 +2273,23 @@
                     "3": "Skonfiguruje repozytorium GitHub z odpowiednią dokumentacją"
                 },
                 "generateButton": "Generuj z AI",
-                "generatingButton": "Generowanie katalogu...",
+                "generatingButton": "Generowanie pracy...",
                 "cancelButton": "Anuluj",
                 "noteTitle": "Uwaga:",
-                "noteText": "Generowanie AI zazwyczaj trwa 2-5 minut w zależności od złożoności żądania. Zostaniesz powiadomiony, gdy katalog będzie gotowy.",
+                "noteText": "Generowanie AI zazwyczaj trwa 2-5 minut w zależności od złożoności żądania. Zostaniesz powiadomiony, gdy praca będzie gotowy.",
                 "errors": {
-                    "promptRequired": "Opisz, jaki katalog chcesz utworzyć",
+                    "promptRequired": "Opisz, jaki praca chcesz utworzyć",
                     "unconfiguredProviders": "{providers} nie skonfigurowane. Odwiedź Ustawienia → Wtyczki, aby skonfigurować przed generowaniem.",
-                    "nameRequired": "Nazwa katalogu jest wymagana",
-                    "slugRequired": "Slug katalogu jest wymagany",
-                    "descriptionRequired": "Opis katalogu jest wymagany",
+                    "nameRequired": "Nazwa pracy jest wymagana",
+                    "slugRequired": "Slug pracy jest wymagany",
+                    "descriptionRequired": "Opis pracy jest wymagany",
                     "githubRequired": "Najpierw połącz konto GitHub.",
-                    "createFailed": "Nie udało się utworzyć katalogu"
+                    "createFailed": "Nie udało się utworzyć pracy"
                 },
                 "success": {
-                    "started": "Rozpoczęto tworzenie katalogu!",
+                    "started": "Rozpoczęto tworzenie pracy!",
                     "generating": "AI generuje zawartość. Może to zająć kilka minut...",
-                    "created": "Katalog utworzony pomyślnie!"
+                    "created": "Praca utworzony pomyślnie!"
                 },
                 "advancedSettings": "Zaawansowane ustawienia",
                 "advancedSubtitle": "Skonfiguruj ustawienia organizacji i repozytorium",
@@ -2300,14 +2300,14 @@
             },
             "manual": {
                 "title": "Utwórz ręcznie",
-                "subtitle": "Skonfiguruj katalog z pełną kontrolą nad każdą opcją",
+                "subtitle": "Skonfiguruj praca z pełną kontrolą nad każdą opcją",
                 "configureNow": "Skonfiguruj teraz",
-                "formTitle": "Utwórz katalog ręcznie",
-                "formSubtitle": "Skonfiguruj katalog z pełną kontrolą nad ustawieniami",
+                "formTitle": "Utwórz praca ręcznie",
+                "formSubtitle": "Skonfiguruj praca z pełną kontrolą nad ustawieniami",
                 "basicInfo": "Podstawowe informacje",
-                "nameLabel": "Nazwa katalogu *",
+                "nameLabel": "Nazwa pracy *",
                 "namePlaceholder": "np. Świetne narzędzia AI",
-                "slugLabel": "Slug katalogu *",
+                "slugLabel": "Slug pracy *",
                 "slugPlaceholder": "awesome-ai-tools",
                 "githubRequired": "Najpierw połącz konto GitHub.",
                 "slugHelp": "Identyfikator przyjazny dla URL (tylko małe litery, cyfry i myślniki)",
@@ -2316,7 +2316,7 @@
                 "advancedSettings": "Zaawansowane ustawienia",
                 "advancedSubtitle": "Organizacja, niestandardowe nagłówki i więcej",
                 "organizationLabel": "Utwórz w organizacji",
-                "organizationHelp": "Utwórz ten katalog w organizacji GitHub zamiast na koncie osobistym",
+                "organizationHelp": "Utwórz ten praca w organizacji GitHub zamiast na koncie osobistym",
                 "organizationNameLabel": "Nazwa organizacji",
                 "organizationNamePlaceholder": "my-organization",
                 "headerLabel": "Niestandardowy nagłówek README",
@@ -2325,25 +2325,25 @@
                 "footerLabel": "Niestandardowa stopka README",
                 "footerPlaceholder": "Dodaj niestandardową zawartość na dół pliku README",
                 "footerOverwrite": "Całkowicie zastąp domyślną stopkę",
-                "createButton": "Utwórz katalog",
-                "creatingButton": "Tworzenie katalogu...",
+                "createButton": "Utwórz praca",
+                "creatingButton": "Tworzenie pracy...",
                 "cancelButton": "Anuluj",
-                "nameRequired": "Nazwa katalogu jest wymagana",
-                "slugRequired": "Slug katalogu jest wymagany",
-                "descriptionRequired": "Opis katalogu jest wymagany",
-                "createFailed": "Nie udało się utworzyć katalogu",
+                "nameRequired": "Nazwa pracy jest wymagana",
+                "slugRequired": "Slug pracy jest wymagany",
+                "descriptionRequired": "Opis pracy jest wymagany",
+                "createFailed": "Nie udało się utworzyć pracy",
                 "success": {
-                    "created": "Katalog utworzony pomyślnie!"
+                    "created": "Praca utworzony pomyślnie!"
                 }
             },
             "import": {
                 "title": "Importuj istniejący",
-                "subtitle": "Importuj katalog z istniejącego repozytorium GitHub",
+                "subtitle": "Importuj praca z istniejącego repozytorium GitHub",
                 "importNow": "Importuj teraz",
                 "aiProviderSettings": "Dostawca AI",
                 "aiProviderSettingsDescription": "Wybierz dostawcę AI do parsowania README",
-                "formTitle": "Importuj katalog z GitHub",
-                "formSubtitle": "Importuj elementy z istniejącego repozytorium GitHub, aby utworzyć katalog",
+                "formTitle": "Importuj praca z GitHub",
+                "formSubtitle": "Importuj elementy z istniejącego repozytorium GitHub, aby utworzyć praca",
                 "sync": {
                     "title": "Utrzymuj synchronizację",
                     "description": "Automatycznie pobieraj aktualizacje z repozytorium źródłowego."
@@ -2396,13 +2396,13 @@
                     "schedule": "Harmonogram: {cadence}",
                     "providers": "Dostawcy: {providers}"
                 },
-                "nameLabel": "Nazwa katalogu",
-                "namePlaceholder": "np. Mój świetny katalog",
+                "nameLabel": "Nazwa pracy",
+                "namePlaceholder": "np. Mój świetny praca",
                 "advancedSettings": "Zaawansowane ustawienia",
                 "advancedSubtitle": "Skonfiguruj ustawienia organizacji i repozytorium",
                 "attribution": {
                     "title": "Atrybucja źródła:",
-                    "text": "Ten katalog będzie odnosił się do {url} jako źródła"
+                    "text": "Ten praca będzie odnosił się do {url} jako źródła"
                 },
                 "research": {
                     "title": "Tryb importu i badań",
@@ -2425,13 +2425,13 @@
                     "importingButton": "Rozpoczynanie potoku badań..."
                 },
                 "analyzeButton": "Analizuj repozytorium",
-                "importButton": "Importuj katalog",
+                "importButton": "Importuj praca",
                 "importingButton": "Importowanie...",
                 "backButton": "Wstecz",
                 "cancelButton": "Anuluj",
                 "importing": {
-                    "title": "Importowanie katalogu",
-                    "subtitle": "Konfigurowanie katalogu z repozytorium źródłowego..."
+                    "title": "Importowanie pracy",
+                    "subtitle": "Konfigurowanie pracy z repozytorium źródłowego..."
                 },
                 "repositorySelector": {
                     "title": "Wybierz repozytorium",
@@ -2498,17 +2498,17 @@
                     "unsupportedFormat": "Ten format repozytorium nie jest obsługiwany. Użyj formatu Repozytorium danych lub Lista Awesome.",
                     "analyzeFailed": "Nie udało się analizować repozytorium",
                     "analyzeForLinkingFailed": "Nie udało się analizować do łączenia",
-                    "nameRequired": "Nazwa katalogu jest wymagana",
+                    "nameRequired": "Nazwa pracy jest wymagana",
                     "noAnalysis": "Najpierw przeanalizuj repozytorium",
                     "githubRequired": "Najpierw połącz konto GitHub",
                     "providerRequired": "Najpierw wybierz dostawcę Git",
-                    "importFailed": "Nie udało się zaimportować katalogu",
-                    "linkFailed": "Nie udało się połączyć katalogu",
+                    "importFailed": "Nie udało się zaimportować pracy",
+                    "linkFailed": "Nie udało się połączyć pracy",
                     "providerNotConfigured": "{provider} nie jest skonfigurowany. Odwiedź Ustawienia → Wtyczki, aby go skonfigurować przed importem."
                 },
                 "success": {
-                    "started": "Import rozpoczęty! Przekierowuję do katalogu...",
-                    "linked": "Katalog pomyślnie połączony"
+                    "started": "Import rozpoczęty! Przekierowuję do pracy...",
+                    "linked": "Praca pomyślnie połączony"
                 },
                 "slugConflict": {
                     "title": "Konflikt nazwy repozytorium",
@@ -2521,7 +2521,7 @@
             "connection": {
                 "alert": {
                     "title": "{provider} nie jest podłączony",
-                    "subtitle": "Podłącz konto {provider}, aby tworzyć katalogi",
+                    "subtitle": "Podłącz konto {provider}, aby tworzyć prace",
                     "connectButton": "Podłącz {provider}",
                     "connectingButton": "Łączenie..."
                 }
@@ -2537,7 +2537,7 @@
             },
             "settings": {
                 "title": "Połączenia dostawców Git",
-                "subtitle": "Podłącz konta dostawców git, aby importować repozytoria, tworzyć katalogi i zarządzać projektami.",
+                "subtitle": "Podłącz konta dostawców git, aby importować repozytoria, tworzyć prace i zarządzać projektami.",
                 "connectedCount": "{count, plural, =0 {Brak podłączonych dostawców} =1 {1 podłączony dostawca} other {# podłączonych dostawców}}",
                 "noProvidersConnected": "Brak podłączonych dostawców",
                 "canImport": "Możesz importować i zarządzać repozytoriami",
@@ -2568,7 +2568,7 @@
                 "subtitle": "Skonfiguruj dostawców wdrożeń w ustawieniach wtyczek",
                 "connected": "Podłączony",
                 "notConnected": "Niepodłączony",
-                "connectedMessage": "Twój dostawca wdrożeń jest skonfigurowany. Teraz możesz wdrażać katalogi.",
+                "connectedMessage": "Twój dostawca wdrożeń jest skonfigurowany. Teraz możesz wdrażać prace.",
                 "disconnect": "Rozłącz",
                 "disconnecting": "Usuwanie...",
                 "apiTokenLabel": "Token API",
@@ -2605,16 +2605,16 @@
             "email": {
                 "title": "Powiadomienia e-mail",
                 "workUpdates": {
-                    "label": "Aktualizacje katalogów",
-                    "description": "Otrzymuj powiadomienia o ważnych aktualizacjach swoich katalogów"
+                    "label": "Aktualizacje prac",
+                    "description": "Otrzymuj powiadomienia o ważnych aktualizacjach swoich prac"
                 },
                 "newItems": {
                     "label": "Nowe elementy",
-                    "description": "Otrzymuj powiadomienia, gdy nowe elementy są dodawane do katalogów"
+                    "description": "Otrzymuj powiadomienia, gdy nowe elementy są dodawane do prac"
                 },
                 "weeklyDigest": {
                     "label": "Tygodniowe podsumowanie",
-                    "description": "Otrzymuj tygodniowe podsumowanie aktywności katalogów"
+                    "description": "Otrzymuj tygodniowe podsumowanie aktywności prac"
                 },
                 "marketing": {
                     "label": "Marketing i promocje",
@@ -2625,11 +2625,11 @@
                 "title": "Powiadomienia w aplikacji",
                 "newItems": {
                     "label": "Nowe elementy",
-                    "description": "Pokaż powiadomienia dla nowych elementów katalogów"
+                    "description": "Pokaż powiadomienia dla nowych elementów prac"
                 },
                 "comments": {
                     "label": "Komentarze",
-                    "description": "Otrzymuj powiadomienia o komentarzach do swoich katalogów"
+                    "description": "Otrzymuj powiadomienia o komentarzach do swoich prac"
                 },
                 "mentions": {
                     "label": "Wzmianki",
@@ -2653,12 +2653,12 @@
         "sidebar": {
             "menu": "Menu",
             "aiChat": "Czaty AI",
-            "newWork": "Nowy katalog",
-            "activityIndicator": "Generowanie katalogu",
+            "newWork": "Nowy praca",
+            "activityIndicator": "Generowanie pracy",
             "navigation": {
                 "dashboard": "Panel główny",
                 "activity": "Aktywność",
-                "works": "Katalogi",
+                "works": "Prace",
                 "plugins": "Wtyczki",
                 "settings": "Ustawienia"
             },
@@ -2680,7 +2680,7 @@
             "subtitle": "Nieodwracalne i destrukcyjne działania",
             "export": {
                 "title": "Eksportuj swoje dane",
-                "subtitle": "Pobierz wszystkie swoje katalogi, elementy i ustawienia",
+                "subtitle": "Pobierz wszystkie swoje prace, elementy i ustawienia",
                 "action": "Eksportuj dane (Wkrótce)"
             },
             "delete": {
@@ -2690,8 +2690,8 @@
                 "confirmTitle": "⚠️ To trwale usunie:",
                 "confirmItems": [
                     "Twoje konto i profil",
-                    "Wszystkie twoje katalogi",
-                    "Wszystkie elementy i dane katalogów",
+                    "Wszystkie twoje prace",
+                    "Wszystkie elementy i dane prac",
                     "Klucz API i integracje",
                     "Wszystkie powiązane strony internetowe"
                 ],
@@ -2711,13 +2711,13 @@
         "aiChat": {
             "title": "Asystent AI",
             "panelTitle": "Czat",
-            "subtitle": "Twórz katalogi za pomocą języka naturalnego",
+            "subtitle": "Twórz prace za pomocą języka naturalnego",
             "welcomeTitle": "Witaj w Asystencie AI 👋",
-            "welcomeSubtitle": "Twój asystent napędzany AI. Pytaj o cokolwiek związanego z tworzeniem katalogów, generowaniem treści lub organizacją danych.",
-            "welcomeMessage": "Cześć! Mogę pomóc ci tworzyć katalogi za pomocą języka naturalnego. Poproś np. „Stwórz katalog narzędzi AI” lub opisz, czego potrzebujesz.",
+            "welcomeSubtitle": "Twój asystent napędzany AI. Pytaj o cokolwiek związanego z tworzeniem prac, generowaniem treści lub organizacją danych.",
+            "welcomeMessage": "Cześć! Mogę pomóc ci tworzyć prace za pomocą języka naturalnego. Poproś np. „Stwórz praca narzędzi AI” lub opisz, czego potrzebujesz.",
             "capabilities": {
-                "workCreation": "Tworzenie katalogów",
-                "workCreationDesc": "Buduj katalogi na podstawie opisów w języku naturalnym",
+                "workCreation": "Tworzenie prac",
+                "workCreationDesc": "Buduj prace na podstawie opisów w języku naturalnym",
                 "webResearch": "Badania internetowe",
                 "webResearchDesc": "Szukaj i zbieraj dane z internetu",
                 "contentGeneration": "Generowanie treści",
@@ -2747,11 +2747,11 @@
             "selectProvider": "Dostawca",
             "notConfigured": "Nieskonfigurowany",
             "gitNotConnected": "Dostawca Git niepodłączony",
-            "gitNotConnectedDesc": "Podłącz dostawcę Git, aby tworzyć i zarządzać katalogami.",
+            "gitNotConnectedDesc": "Podłącz dostawcę Git, aby tworzyć i zarządzać pracaami.",
             "connectGithub": "Podłącz GitHub",
             "gitConnectedAs": "Podłączony jako {username} przez {provider}",
             "deployNotConfigured": "Dostawca wdrożeń nieskonfigurowany",
-            "deployNotConfiguredDesc": "Skonfiguruj dostawcę wdrożeń, aby publikować strony katalogów.",
+            "deployNotConfiguredDesc": "Skonfiguruj dostawcę wdrożeń, aby publikować strony prac.",
             "configureDeployProvider": "Skonfiguruj dostawcę wdrożeń",
             "deployConfigured": "Dostawca wdrożeń skonfigurowany ({provider})",
             "opened": "Otwarty",
@@ -2761,12 +2761,12 @@
             "historyYesterday": "Wczoraj",
             "historyDaysAgo": "{days} dni temu",
             "suggestions": {
-                "s1": "Pokaż moje katalogi",
-                "s2": "Stwórz katalog narzędzi AI",
+                "s1": "Pokaż moje prace",
+                "s2": "Stwórz praca narzędzi AI",
                 "s3": "Sprawdź połączenie git",
                 "s4": "Pokaż moje statystyki"
             },
-            "feelingLucky": "Zasugeruj katalog do stworzenia",
+            "feelingLucky": "Zasugeruj praca do stworzenia",
             "errors": {
                 "unableToSend": "Nie można wysłać wiadomości"
             }
@@ -2779,7 +2779,7 @@
             "enabled": "Włączone",
             "disabled": "Wyłączone",
             "enable": "Włącz",
-            "enableDescription": "Skonfiguruj sposób włączania tej wtyczki w katalogach.",
+            "enableDescription": "Skonfiguruj sposób włączania tej wtyczki w pracaach.",
             "disable": "Wyłącz",
             "settings": "Ustawienia",
             "saveSettings": "Zapisz ustawienia",
@@ -2811,11 +2811,11 @@
                 "pipeline": "Potok"
             },
             "alwaysEnabled": "Zawsze włączone",
-            "disableWarning": "Wyłączenie tej wtyczki wyłączy ją również we wszystkich katalogach",
+            "disableWarning": "Wyłączenie tej wtyczki wyłączy ją również we wszystkich pracaach",
             "cannotDisableSystem": "Wtyczek systemowych nie można wyłączyć",
             "disableFailed": "Nie udało się wyłączyć wtyczki",
-            "autoEnableForWorks": "Włącz również dla wszystkich katalogów",
-            "autoEnableForWorksDescription": "Ta wtyczka będzie automatycznie aktywna we wszystkich katalogach. Nadal możesz ją wyłączyć dla konkretnego katalogu.",
+            "autoEnableForWorks": "Włącz również dla wszystkich prac",
+            "autoEnableForWorksDescription": "Ta wtyczka będzie automatycznie aktywna we wszystkich pracaach. Nadal możesz ją wyłączyć dla konkretnego pracy.",
             "confirmDisable": "Potwierdź wyłączenie",
             "cancel": "Anuluj",
             "missingRequiredFields": "Brakujące wymagane pola: {fields}",
@@ -2891,19 +2891,19 @@
             }
         },
         "workPlugins": {
-            "title": "Wtyczki katalogu",
-            "subtitle": "Skonfiguruj wtyczki dla tego katalogu",
+            "title": "Wtyczki pracy",
+            "subtitle": "Skonfiguruj wtyczki dla tego pracy",
             "active": "Aktywne",
             "enable": "Włącz",
             "disable": "Wyłącz",
-            "enableForWork": "Włącz dla tego katalogu",
-            "disableForWork": "Wyłącz dla tego katalogu",
+            "enableForWork": "Włącz dla tego pracy",
+            "disableForWork": "Wyłącz dla tego pracy",
             "enableAtUserLevelFirst": "Najpierw włącz tę wtyczkę w swoich ustawieniach",
             "disabledByUser": "Wyłączone na poziomie użytkownika",
             "systemAlwaysEnabled": "Wtyczka systemowa – zawsze włączona",
             "showSettings": "Pokaż ustawienia",
             "hideSettings": "Ukryj ustawienia",
-            "workSettingsInfo": "Skonfiguruj ustawienia specyficzne dla katalogu tutaj",
+            "workSettingsInfo": "Skonfiguruj ustawienia specyficzne dla pracy tutaj",
             "save": "Zapisz",
             "saved": "Zapisano",
             "showInstalledOnly": "Pokaż tylko zainstalowane",
@@ -2911,7 +2911,7 @@
             "noPlugins": "Brak dostępnych wtyczek",
             "showAllPlugins": "Pokaż wszystkie wtyczki",
             "capabilityProviders": "Dostawcy możliwości",
-            "capabilityProvidersDescription": "Wybierz, która wtyczka dostarcza każdą możliwość dla tego katalogu",
+            "capabilityProvidersDescription": "Wybierz, która wtyczka dostarcza każdą możliwość dla tego pracy",
             "noProvidersAvailable": "Brak dostępnych dostawców",
             "categories": {
                 "git": "Git",
@@ -2929,12 +2929,12 @@
             "errors": {
                 "unableToSend": "Nie można wysłać wiadomości."
             },
-            "settingsModalTitle": "Ustawienia katalogu",
-            "settingsModalDescription": "Nadpisz ustawienia dla tego katalogu. Nieustawione pola dziedziczą z ustawień użytkownika.",
+            "settingsModalTitle": "Ustawienia pracy",
+            "settingsModalDescription": "Nadpisz ustawienia dla tego pracy. Nieustawione pola dziedziczą z ustawień użytkownika.",
             "inheritedFrom": "Dziedziczone: {value}",
             "inheritedSecret": "Dziedziczone: ••••••••",
             "resetToDefaults": "Resetuj do domyślnych",
-            "resetConfirm": "To wyczyści wszystkie nadpisania specyficzne dla katalogu. Ustawienia wrócą do wartości na poziomie użytkownika.",
+            "resetConfirm": "To wyczyści wszystkie nadpisania specyficzne dla pracy. Ustawienia wrócą do wartości na poziomie użytkownika.",
             "resetSuccess": "Ustawienia zresetowane do domyślnych",
             "cancel": "Anuluj",
             "clickToConfigure": "Kliknij, aby skonfigurować",
@@ -2949,8 +2949,8 @@
         "auth": {
             "backToHome": "Powrót do strony głównej",
             "feature": {
-                "title": "Buduj katalogi z AI",
-                "subtitle": "Twórz piękne, wyszukiwalne katalogi w kilka minut za pomocą języka naturalnego. Bez kodowania.",
+                "title": "Buduj prace z AI",
+                "subtitle": "Twórz piękne, wyszukiwalne prace w kilka minut za pomocą języka naturalnego. Bez kodowania.",
                 "badge": "Napędzane AI",
                 "benefits": {
                     "ai": {
@@ -3002,8 +3002,8 @@
         }
     },
     "metadata": {
-        "title": "{companyName} - Kreator katalogów",
-        "description": "Platforma SaaS do budowania i zarządzania katalogami",
+        "title": "{companyName} - Kreator prac",
+        "description": "Platforma SaaS do budowania i zarządzania pracaami",
         "pages": {
             "signIn": "Zaloguj się",
             "createAccount": "Utwórz konto",
@@ -3012,9 +3012,9 @@
             "authError": "Błąd uwierzytelniania",
             "dashboard": "Pulpit",
             "activity": "Dziennik aktywności",
-            "works": "Katalogi",
-            "newWork": "Nowy katalog",
-            "work": "Katalog",
+            "works": "Prace",
+            "newWork": "Nowy praca",
+            "work": "Praca",
             "overview": "Przegląd",
             "items": "Elementy",
             "generator": "Generator",
@@ -3067,16 +3067,16 @@
             },
             "oauthRequired": "Wymagane połączenie OAuth. Najpierw połącz konto {provider}.",
             "githubRequired": "Wymagane połączenie GitHub. Najpierw połącz konto GitHub.",
-            "createSuccess": "Katalog utworzony pomyślnie!",
-            "createFailed": "Nie udało się utworzyć katalogu",
-            "updateSuccess": "Katalog zaktualizowany pomyślnie!",
-            "updateFailed": "Nie udało się zaktualizować katalogu",
-            "invalidGeneratedData": "Nie udało się wygenerować poprawnych danych katalogu",
-            "aiGenerationStarted": "Rozpoczęto tworzenie katalogu! AI generuje treści...",
-            "invalidId": "Nieprawidłowe ID katalogu",
-            "deleteSuccess": "Katalog usunięty pomyślnie",
-            "deleteFailed": "Nie udało się usunąć katalogu",
-            "fetchFailed": "Nie udało się pobrać katalogów",
+            "createSuccess": "Praca utworzony pomyślnie!",
+            "createFailed": "Nie udało się utworzyć pracy",
+            "updateSuccess": "Praca zaktualizowany pomyślnie!",
+            "updateFailed": "Nie udało się zaktualizować pracy",
+            "invalidGeneratedData": "Nie udało się wygenerować poprawnych danych pracy",
+            "aiGenerationStarted": "Rozpoczęto tworzenie pracy! AI generuje treści...",
+            "invalidId": "Nieprawidłowe ID pracy",
+            "deleteSuccess": "Praca usunięty pomyślnie",
+            "deleteFailed": "Nie udało się usunąć pracy",
+            "fetchFailed": "Nie udało się pobrać prac",
             "organization": {
                 "requiredWhenOwnerProvided": "Organizacja musi być włączona, gdy podano właściciela"
             },
@@ -3084,7 +3084,7 @@
                 "invalidUrl": "Wprowadź poprawny adres URL",
                 "analyzeFailed": "Nie udało się przeanalizować repozytorium",
                 "started": "Import rozpoczęty pomyślnie",
-                "failed": "Nie udało się zaimportować katalogu",
+                "failed": "Nie udało się zaimportować pracy",
                 "fetchReposFailed": "Nie udało się pobrać repozytoriów"
             }
         },

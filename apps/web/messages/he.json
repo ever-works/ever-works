@@ -150,7 +150,7 @@
         },
         "register": {
             "title": "צור את החשבון שלך",
-            "subtitle": "התחל לבנות ספריות מדהימות היום",
+            "subtitle": "התחל לבנות עבודות מדהימות היום",
             "form": {
                 "name": {
                     "label": "שם מלא",
@@ -197,18 +197,18 @@
     "onboarding": {
         "label": "מתחילים",
         "title": "ברוכים הבאים ל-Ever Works",
-        "subtitle": "בנו ופרסמו את המדריך הראשון שלכם תוך דקות.",
+        "subtitle": "בנו ופרסמו את העבודה הראשון שלכם תוך דקות.",
         "skipButton": "דלג כרגע",
         "nextButton": "הבא",
         "stepIndex": "שלב {index}",
         "steps": {
             "welcome": {
                 "title": "מה זה Ever Works?",
-                "description": "Ever Works היא בונה מדריכים קוד פתוח. צרו מדריכי תוכן מובנים — כלים, משרות, קישורים, מוצרים — ופרסמו אותם כאתרי אינטרנט חיים.",
-                "detail": "בואו נגדיר אתכם. חברו את הספקים שלכם למטה, ואז צרו את המדריך הראשון שלכם.",
+                "description": "Ever Works היא בונה עבודות קוד פתוח. צרו מדריכי תוכן מובנים — כלים, משרות, קישורים, מוצרים — ופרסמו אותם כאתרי אינטרנט חיים.",
+                "detail": "בואו נגדיר אתכם. חברו את הספקים שלכם למטה, ואז צרו את העבודה הראשון שלכם.",
                 "feature1": {
                     "title": "תוכן המופעל על ידי AI",
-                    "description": "הפקו ועשירו פריטי מדריך באופן אוטומטי באמצעות ספק ה-AI שלכם"
+                    "description": "הפקו ועשירו פריטי עבודה באופן אוטומטי באמצעות ספק ה-AI שלכם"
                 },
                 "feature2": {
                     "title": "פרסום מיידי",
@@ -216,18 +216,18 @@
                 },
                 "feature3": {
                     "title": "מבוסס Git",
-                    "description": "כל מדריך הוא מאגר GitHub שבבעלותכם ובשליטתכם"
+                    "description": "כל עבודה הוא מאגר GitHub שבבעלותכם ובשליטתכם"
                 }
             },
             "work": {
-                "title": "צרו את המדריך הראשון שלכם",
-                "description": "מדריך הוא מרכז התוכן שלכם. הוסיפו פריטים, הגדירו את הפריסה ופרסמו אותו בקליק אחד.",
-                "detail": "אתם מוכנים לחלוטין! צרו את המדריך הראשון שלכם כדי להתחיל לבנות ולפרסם תוכן.",
-                "action": "צור מדריך"
+                "title": "צרו את העבודה הראשון שלכם",
+                "description": "עבודה הוא מרכז התוכן שלכם. הוסיפו פריטים, הגדירו את הפריסה ופרסמו אותו בקליק אחד.",
+                "detail": "אתם מוכנים לחלוטין! צרו את העבודה הראשון שלכם כדי להתחיל לבנות ולפרסם תוכן.",
+                "action": "צור עבודה"
             },
             "publish": {
                 "title": "עלו לאוויר",
-                "description": "חברו Vercel או GitHub כדי לפרוס את המדריך שלכם כאתר ציבורי — ללא צורך בהגדרת אירוח.",
+                "description": "חברו Vercel או GitHub כדי לפרוס את העבודה שלכם כאתר ציבורי — ללא צורך בהגדרת אירוח.",
                 "action": "הגדר פרסום"
             }
         },
@@ -336,7 +336,7 @@
             "steps": {
                 "model": {
                     "title": "בחרו מודל",
-                    "description": "בחרו את מודל Codex שתרצו להריץ לדור מדריכים מקצה לקצה"
+                    "description": "בחרו את מודל Codex שתרצו להריץ לדור עבודות מקצה לקצה"
                 },
                 "credentials": {
                     "title": "הוסף אישורים",
@@ -408,7 +408,7 @@
         "simWizard": {
             "label": "הגדרת SIM AI",
             "title": "הגדירו SIM AI בשני שלבים",
-            "subtitle": "הוסיפו את מפתח API של SIM AI ואמתו את החיבור כדי להתחיל להעביר דור מדריכים לזרימות עבודה של SIM.",
+            "subtitle": "הוסיפו את מפתח API של SIM AI ואמתו את החיבור כדי להתחיל להעביר דור עבודות לזרימות עבודה של SIM.",
             "stepIndex": "שלב {index}",
             "continueButton": "המשך",
             "steps": {
@@ -431,7 +431,7 @@
         "title": "לוח מחוונים",
         "connectGithub": {
             "title": "חבר את חשבון GitHub שלך",
-            "description": "GitHub נדרש ליצירה וניהול מאגרי ספריות. חבר את החשבון שלך כדי להתחיל.",
+            "description": "GitHub נדרש ליצירה וניהול מאגרי עבודות. חבר את החשבון שלך כדי להתחיל.",
             "connect": "חבר GitHub",
             "dismiss": "אעשה זאת מאוחר יותר"
         },
@@ -465,7 +465,7 @@
         },
         "header": {
             "welcome": "ברוך שובך, {username}!",
-            "subtitle": "נהל את ספריות ה-AI שלך ועקוב אחר הביצועים שלהן",
+            "subtitle": "נהל את עבודות ה-AI שלך ועקוב אחר הביצועים שלהן",
             "onboarding": {
                 "badge": "הדרכה {currentStep}/{totalSteps}",
                 "dismiss": "הסתר קיצור הדרכה"
@@ -490,14 +490,14 @@
                 },
                 "quickTips": {
                     "title": "טיפים מהירים",
-                    "tip1": "צור את ספרייתך הראשונה על ידי לחיצה על כפתור 'צור ספרייה' בלוח המחוונים.",
+                    "tip1": "צור את ספרייתך הראשונה על ידי לחיצה על כפתור 'צור עבודה' בלוח המחוונים.",
                     "tip2": "השתמש במחולל ה-AI כדי למלא אוטומטית את ספרייתך בפריטים רלוונטיים.",
-                    "tip3": "חבר את חשבון GitHub שלך כדי לסנכרן ולפרוס את ספריותיך כמאגרים."
+                    "tip3": "חבר את חשבון GitHub שלך כדי לסנכרן ולפרוס את עבודותיך כמאגרים."
                 },
                 "shortcuts": {
                     "title": "קיצורי מקלדת",
-                    "search": "חיפוש ספריות",
-                    "newWork": "צור ספרייה חדשה",
+                    "search": "חיפוש עבודות",
+                    "newWork": "צור עבודה חדשה",
                     "help": "פתח עזרה",
                     "hint": "השתמש ב-Cmd ב-Mac או Ctrl ב-Windows/Linux"
                 },
@@ -513,7 +513,7 @@
         },
         "activity": {
             "title": "יומן פעילות",
-            "subtitle": "עקוב אחר כל הפעולות בספריות שלך",
+            "subtitle": "עקוב אחר כל הפעולות בעבודות שלך",
             "loading": "טוען...",
             "fetchFailed": "נכשל בטעינת הפעילויות",
             "exportFailed": "נכשל ביצוא יומן הפעילות",
@@ -521,7 +521,7 @@
             "columns": {
                 "status": "סטטוס",
                 "dateTime": "תאריך / שעה",
-                "work": "ספרייה",
+                "work": "עבודה",
                 "type": "סוג",
                 "summary": "סיכום"
             },
@@ -532,9 +532,9 @@
                     "generation": "יצירה",
                     "comparison": "השוואה",
                     "deployment": "פריסה",
-                    "workCreated": "ספרייה נוצרה",
-                    "workUpdated": "ספרייה עודכנה",
-                    "workDeleted": "ספרייה נמחקה",
+                    "workCreated": "עבודה נוצרה",
+                    "workUpdated": "עבודה עודכנה",
+                    "workDeleted": "עבודה נמחקה",
                     "pluginEnabled": "תוסף הופעל",
                     "pluginDisabled": "תוסף הושבת",
                     "pluginConfigured": "תוסף הוגדר",
@@ -597,29 +597,29 @@
             }
         },
         "works": {
-            "title": "ספריות",
-            "subtitle": "נהל וארגן את ספריות ה-AI שלך",
+            "title": "עבודות",
+            "subtitle": "נהל וארגן את עבודות ה-AI שלך",
             "summary": {
-                "totalWorks": "סה\"כ ספריות",
+                "totalWorks": "סה\"כ עבודות",
                 "generating": "מייצר",
                 "totalItems": "סה\"כ פריטים"
             },
-            "recent": "ספריות אחרונות",
+            "recent": "עבודות אחרונות",
             "viewAll": "הצג הכל ({count})",
-            "search": "חפש ספריות...",
-            "create": "צור ספרייה",
-            "showing": "מציג {current} מתוך {total} ספריות",
-            "searchFailed": "נכשל בחיפוש ספריות. נא נסה שוב.",
+            "search": "חפש עבודות...",
+            "create": "צור עבודה",
+            "showing": "מציג {current} מתוך {total} עבודות",
+            "searchFailed": "נכשל בחיפוש עבודות. נא נסה שוב.",
             "pagination": {
                 "previous": "קודם",
                 "next": "הבא"
             },
             "empty": {
-                "title": "עדיין אין ספריות",
+                "title": "עדיין אין עבודות",
                 "description": "צור את ספריית ה-AI הראשונה שלך כדי להתחיל לארגן ולהציג את התוכן שלך.",
                 "action": "צור את ספרייתך הראשונה",
                 "notFound": {
-                    "title": "לא נמצאו ספריות",
+                    "title": "לא נמצאו עבודות",
                     "withSearch": "נסה להתאים את מונחי החיפוש",
                     "withoutSearch": "צור את ספריית ה-AI הראשונה שלך כדי להתחיל"
                 }
@@ -638,7 +638,7 @@
             },
             "data": {
                 "exportTitle": "ייצוא נתונים",
-                "exportDescription": "הורד את נתוני החשבון שלך כולל ספריות, הגדרות תוספים ומידע פרופיל כקובץ JSON.",
+                "exportDescription": "הורד את נתוני החשבון שלך כולל עבודות, הגדרות תוספים ומידע פרופיל כקובץ JSON.",
                 "includeSecrets": "כלול הגדרות סודיות (מפתחות API, אסימונים) — מיוצאות כערכים מוסתרים",
                 "secretsWarning": "הגדרות סודיות ייוצאו כערכים מוסתרים. תצטרך להחליף אותם באופן ידני באישורים אמיתיים לפני ייבוא.",
                 "exportButton": "ייצוא נתונים",
@@ -646,7 +646,7 @@
                 "exportSuccess": "נתונים יוצאו בהצלחה",
                 "exportError": "נכשל לייצא נתונים",
                 "importTitle": "ייבוא נתונים",
-                "importDescription": "ייבא נתונים מקובץ JSON שיוצא קודם. אתה יכול לפתור קונפליקטים עבור ספריות עם slugs תואמים.",
+                "importDescription": "ייבא נתונים מקובץ JSON שיוצא קודם. אתה יכול לפתור קונפליקטים עבור עבודות עם slugs תואמים.",
                 "importButton": "ייבוא נתונים",
                 "syncTitle": "סנכרון GitHub",
                 "syncDescription": "סנכרן את תצורת החשבון שלך למאגר GitHub פרטי לגיבוי והעברה בין מופעים.",
@@ -658,7 +658,7 @@
                     "invalidJson": "קובץ JSON לא תקין",
                     "previewError": "נכשל לנתח קובץ ייבוא",
                     "summary": "סיכום ייבוא",
-                    "works": "ספריות",
+                    "works": "עבודות",
                     "items": "פריטים",
                     "userPlugins": "תוספי משתמש",
                     "version": "גרסת פורמט",
@@ -681,9 +681,9 @@
                     "validationErrors": "שגיאות ולידציה",
                     "resultSuccess": "ייבוא הושלם בהצלחה",
                     "resultFailed": "ייבוא נכשל",
-                    "worksCreated": "ספריות נוצרו",
-                    "worksUpdated": "ספריות עודכנו",
-                    "worksSkipped": "ספריות דולגו",
+                    "worksCreated": "עבודות נוצרו",
+                    "worksUpdated": "עבודות עודכנו",
+                    "worksSkipped": "עבודות דולגו",
                     "pluginsImported": "תוספים יובאו",
                     "warnings": "אזהרות",
                     "errors": "שגיאות"
@@ -732,11 +732,11 @@
                 "backToCategory": "חזור ל-{category}",
                 "pipelineDefault": {
                     "title": "צינור ברירת מחדל",
-                    "description": "בחר איזה צינור משמש כברירת מחדל בעת יצירת פריטי ספרייה.",
+                    "description": "בחר איזה צינור משמש כברירת מחדל בעת יצירת פריטי עבודה.",
                     "autoLabel": "אוטו",
-                    "autoDescription": "השתמש בצינור שמתפתר על ידי המערכת לכל ספרייה",
+                    "autoDescription": "השתמש בצינור שמתפתר על ידי המערכת לכל עבודה",
                     "enforceLabel": "אכף ברירת מחדל זו",
-                    "enforceDescription": "תמיד בחר מראש צינור זה, אפילו כאשר לספרייה יש צינור משלה מוגדר. עדיין תוכל להחליף צינורות ידנית בטופס.",
+                    "enforceDescription": "תמיד בחר מראש צינור זה, אפילו כאשר לעבודה יש צינור משלה מוגדר. עדיין תוכל להחליף צינורות ידנית בטופס.",
                     "saveFailed": "נכשל לשמור צינור ברירת מחדל"
                 }
             },
@@ -819,8 +819,8 @@
                 "subtitle": "חבר חשבונות חיצוניים לשיפור הפונקציונליות",
                 "github": {
                     "name": "GitHub",
-                    "connected": "צור ונהל ספריות עם מאגרי GitHub",
-                    "disconnected": "חבר כדי ליצור ספריות ממאגרים",
+                    "connected": "צור ונהל עבודות עם מאגרי GitHub",
+                    "disconnected": "חבר כדי ליצור עבודות ממאגרים",
                     "scopes": "היקפים",
                     "organizations": "ארגונים מחוברים",
                     "organizationsHint": "השתמש בחיבור מחדש כדי לתת גישה לארגונים נוספים",
@@ -881,7 +881,7 @@
             }
         },
         "stats": {
-            "totalWorks": "סה\"ס ספריות",
+            "totalWorks": "סה\"ס עבודות",
             "totalItems": "סה\"ס פריטים",
             "activeWebsites": "אתרים פעילים",
             "fromLastMonth": "מהחודש שעבר"
@@ -911,12 +911,12 @@
             "views": "{count} צפיות",
             "updated": "עודכן {date}",
             "viewAction": "צפה →",
-            "openingTitle": "פותח ספרייה",
-            "openingMessage": "מכין את הספרייה שלך. הפרטים ייפתחו בקרוב. נשאר בעמוד זה."
+            "openingTitle": "פותח עבודה",
+            "openingMessage": "מכין את העבודה שלך. הפרטים ייפתחו בקרוב. נשאר בעמוד זה."
         },
         "workList": {
-            "title": "הספריות שלך",
-            "createButton": "צור ספרייה"
+            "title": "העבודות שלך",
+            "createButton": "צור עבודה"
         },
         "workDetail": {
             "failedToGenerateItems": "נכשל ביצירת פריטים. נסה שוב.",
@@ -953,7 +953,7 @@
             },
             "members": {
                 "title": "חברי צוות",
-                "subtitle": "נהל מי יש לו גישה לספרייה זו והרשאותיהם.",
+                "subtitle": "נהל מי יש לו גישה לעבודה זו והרשאותיהם.",
                 "inviteMember": "הזמן חבר",
                 "noMembers": "עדיין אין חברי צוות. הזמן מישהו לשיתוף פעולה.",
                 "roles": {
@@ -965,13 +965,13 @@
                 },
                 "roleDescriptions": {
                     "owner": "שליטה מלאה כולל מחיקה וניהול חברים.",
-                    "manager": "יכול לערוך ספרייה ולנהל חברים, אך לא יכול למחוק.",
-                    "editor": "יכול לערוך תוכן ספרייה ולהריץ יצירות.",
-                    "viewer": "גישה לקריאה בלבד לצפייה בספרייה."
+                    "manager": "יכול לערוך עבודה ולנהל חברים, אך לא יכול למחוק.",
+                    "editor": "יכול לערוך תוכן עבודה ולהריץ יצירות.",
+                    "viewer": "גישה לקריאה בלבד לצפייה בעבודה."
                 },
                 "invite": {
                     "title": "הזמן חבר צוות",
-                    "description": "הוסף חבר חדש לשיתוף פעולה בספרייה זו.",
+                    "description": "הוסף חבר חדש לשיתוף פעולה בעבודה זו.",
                     "emailLabel": "כתובת דוא\"ל",
                     "emailPlaceholder": "עמית@example.com",
                     "roleLabel": "תפקיד",
@@ -985,7 +985,7 @@
                 },
                 "confirmRemove": {
                     "title": "הסר חבר",
-                    "description": "האם אתה בטוח שברצונך להסיר את {username} מספרייה זו? הם יאבדו את כל הגישה.",
+                    "description": "האם אתה בטוח שברצונך להסיר את {username} מעבודה זו? הם יאבדו את כל הגישה.",
                     "confirm": "הסר",
                     "cancel": "בטל"
                 },
@@ -1000,7 +1000,7 @@
                 "page": {
                     "title": "עדכונים מתוזמנים",
                     "subtitle": "אוטומציה של רענונים עבור {name} עם קצב ייעודי וטיפול בתקלות.",
-                    "fallbackName": "ספרייה זו",
+                    "fallbackName": "עבודה זו",
                     "loadFailed": "נכשל בטעינת הגדרות לוח הזמנים.",
                     "providerCategories": {
                         "pipeline": "צינור",
@@ -1101,7 +1101,7 @@
                     },
                     "empty": {
                         "title": "הרץ יצירה ידנית ראשונה",
-                        "description": "השלם הרצה ידנית מוצלחת אחת כדי לפתוח תזמון אוטומטי. לאחר שיהיו נתונים בספרייה שלך נוכל לשמור אותה טרייה.",
+                        "description": "השלם הרצה ידנית מוצלחת אחת כדי לפתוח תזמון אוטומטי. לאחר שיהיו נתונים בעבודה שלך נוכל לשמור אותה טרייה.",
                         "refresh": "רענן סטטוס"
                     },
                     "requiresGeneration": "הרץ לפחות יצירת פריט אחת לפני הפעלת תזמונים."
@@ -1119,7 +1119,7 @@
             "statusCard": {
                 "notStarted": {
                     "title": "יצירה לא התחילה",
-                    "description": "התחל לייצר פריטים לספרייה שלך כדי לאכלס אותה בתוכן.",
+                    "description": "התחל לייצר פריטים לעבודה שלך כדי לאכלס אותה בתוכן.",
                     "action": "התחל יצירה"
                 },
                 "generating": {
@@ -1133,7 +1133,7 @@
                 },
                 "generated": {
                     "title": "יצירה הושלמה",
-                    "description": "הספרייה שלך אוכלסה בהצלחה בפריטים.",
+                    "description": "העבודה שלך אוכלסה בהצלחה בפריטים.",
                     "withWarnings": "הושלם עם אזהרות:",
                     "viewItems": "צפה בפריטים",
                     "regenerate": "ייצר מחדש"
@@ -1159,7 +1159,7 @@
             },
             "comparisons": {
                 "title": "השוואות",
-                "subtitle": "דפי השוואה A לעומת B בין פריטי ספרייה",
+                "subtitle": "דפי השוואה A לעומת B בין פריטי עבודה",
                 "vs": "מול",
                 "winner": "מנצח: {name}",
                 "tie": "תיקו",
@@ -1307,7 +1307,7 @@
                 }
             },
             "info": {
-                "title": "מידע על הספרייה",
+                "title": "מידע על העבודה",
                 "yourRole": "התפקיד שלך",
                 "role": {
                     "owner": "בעלים",
@@ -1357,15 +1357,15 @@
             "activity": {
                 "title": "פעילות אחרונה",
                 "noActivity": "עדיין אין פעילות",
-                "created": "ספרייה נוצרה",
-                "workCreated": "הספרייה נוצרה בהצלחה",
+                "created": "עבודה נוצרה",
+                "workCreated": "העבודה נוצרה בהצלחה",
                 "justNow": "רק עכשיו"
             },
             "items": {
-                "title": "פריטי המדריך",
-                "subtitle": "נהל וארגן את הפריטים במדריך שלך",
+                "title": "פריטי העבודה",
+                "subtitle": "נהל וארגן את הפריטים בעבודה שלך",
                 "noItemsTitle": "עדיין אין פריטים",
-                "noItemsDescription": "המדריך שלך עדיין לא מכיל פריטים כלשהם. צור פריטים כדי למלא את המדריך בתוכן.",
+                "noItemsDescription": "העבודה שלך עדיין לא מכיל פריטים כלשהם. צור פריטים כדי למלא את העבודה בתוכן.",
                 "generateItems": "צור פריטים",
                 "searchPlaceholder": "חפש פריטים...",
                 "allCategories": "כל הקטגוריות",
@@ -1427,14 +1427,14 @@
                     "screenshotFailed": "נכשל בלכידת צילום המסך",
                     "screenshotError": "אירעה שגיאה במהלך לכידת צילום המסך",
                     "featured": "פריט מומלץ",
-                    "featuredHelp": "סמן פריט זה כמומלץ במדריך",
+                    "featuredHelp": "סמן פריט זה כמומלץ בעבודה",
                     "updateWithPR": "צור בקשת משיכה",
                     "updateWithPRHelp": "שלח שינויים כבקשת משיכה במקום מחויב ישיר",
                     "cancel": "בטל",
                     "adding": "מוסיף...",
                     "addItem": "הוסף פריט",
                     "success": "הפריט הוסף בהצלחה",
-                    "successDescription": "הפריט נוסף למדריך שלך",
+                    "successDescription": "הפריט נוסף לעבודה שלך",
                     "failed": "נכשל בהוספת הפריט",
                     "error": "אירעה שגיאה במהלך הוספת הפריט",
                     "errors": {
@@ -1837,7 +1837,7 @@
                 },
                 "generalSettings": "הגדרות כלליות",
                 "generalTitle": "הגדרות כלליות",
-                "workName": "שם ספרייה",
+                "workName": "שם עבודה",
                 "description": "תיאור",
                 "organizationRepository": "מאגר ארגון",
                 "organizationHelp": "יצירת מאגרים תחת ארגון במקום חשבון אישי",
@@ -1849,13 +1849,13 @@
                 "customHeaderPlaceholder": "הוסף תוכן מותאם אישית לכותרת ה-README",
                 "overwriteDefaultHeader": "דריסת כותרת ברירת מחדל",
                 "customFooter": "תחתית מותאמת אישית",
-                "cantDeleteWhileGenerating": "לא ניתן למחוק את הספרייה בזמן יצירת פריטים.",
+                "cantDeleteWhileGenerating": "לא ניתן למחוק את העבודה בזמן יצירת פריטים.",
                 "customFooterPlaceholder": "הוסף תוכן מותאם אישית לתחתית ה-README",
                 "overwriteDefaultFooter": "דריסת תחתית ברירת מחדל",
                 "dangerZone": "אזור סכנה",
                 "dangerTitle": "אזור סכנה",
-                "deleteWarning": "לאחר מחיקת ספרייה אין דרך חזרה. ודא בבקשה.",
-                "dangerDescription": "לאחר מחיקת ספרייה אין דרך חזרה. ודא בבקשה.",
+                "deleteWarning": "לאחר מחיקת עבודה אין דרך חזרה. ודא בבקשה.",
+                "dangerDescription": "לאחר מחיקת עבודה אין דרך חזרה. ודא בבקשה.",
                 "deleteOptions": "בחר מה למחוק:",
                 "deleteDataRepository": "מחק מאגר נתונים",
                 "deleteDataRepositoryDescription": "הסר את מאגר נתוני ה-JSON מ-GitHub",
@@ -1864,14 +1864,14 @@
                 "deleteWebsiteRepository": "מחק מאגר אתר",
                 "deleteWebsiteRepositoryDescription": "הסר את מאגר אתר הפריסה",
                 "deleteConfirm": "האם אתה בטוח לחלוטין?",
-                "deleteConfirmDetail": "פעולה זו אינה ניתנת לביטול. הספרייה והמאגרים הנבחרים יימחקו לצמיתות.",
-                "confirmWorkName": "הקלד שם ספרייה לאישור",
+                "deleteConfirmDetail": "פעולה זו אינה ניתנת לביטול. העבודה והמאגרים הנבחרים יימחקו לצמיתות.",
+                "confirmWorkName": "הקלד שם עבודה לאישור",
                 "confirmWorkNameDescription": "הקלד \"{name}\" לאישור מחיקה",
-                "deleteNameMismatch": "שם ספרייה לא תואם",
-                "deleteButton": "מחק ספרייה",
+                "deleteNameMismatch": "שם עבודה לא תואם",
+                "deleteButton": "מחק עבודה",
                 "deleteConfirmButton": "כן, מחק",
-                "deleteSuccess": "ספרייה נמחקה בהצלחה",
-                "deleteFailed": "נכשל במחיקת ספרייה",
+                "deleteSuccess": "עבודה נמחקה בהצלחה",
+                "deleteFailed": "נכשל במחיקת עבודה",
                 "yesDelete": "כן, מחק",
                 "cancel": "ביטול",
                 "saveChanges": "שמור שינויים",
@@ -1938,7 +1938,7 @@
                         "categorization": {
                             "title": "קטגוריזציה",
                             "description": "הנחיות נוספות לקטגוריזציה ותיוג פריטים מחולצים.",
-                            "placeholder": "למשל, השתמש בקטגוריות טכניות כמו 'כלי CLI', 'ספריות', 'מסגרות'..."
+                            "placeholder": "למשל, השתמש בקטגוריות טכניות כמו 'כלי CLI', 'עבודות', 'מסגרות'..."
                         },
                         "deduplication": {
                             "title": "הסרת כפילויות",
@@ -1983,13 +1983,13 @@
                         "siteName": {
                             "title": "זהות אתר",
                             "label": "שם אתר",
-                            "placeholder": "הספרייה שלי",
+                            "placeholder": "העבודה שלי",
                             "helper": "השם המוצג בכותרת האתר ובלשונית הדפדפן"
                         },
                         "siteUrl": {
                             "label": "כתובת URL של אתר",
                             "placeholder": "https://example.com",
-                            "helper": "כתובת ה-URL של החברה או אתר הספרייה שלך"
+                            "helper": "כתובת ה-URL של החברה או אתר העבודה שלך"
                         },
                         "global": {
                             "title": "תכונות גלובליות",
@@ -2071,7 +2071,7 @@
                 },
                 "committer": {
                     "title": "מבצע Git Commit",
-                    "description": "דרוס את שם האימייל ומבצע ה-Git commits בספרייה זו. השאר ריק כדי להשתמש בהגדרות רמת המשתמש או ברירות מחדל של החשבון.",
+                    "description": "דרוס את שם האימייל ומבצע ה-Git commits בעבודה זו. השאר ריק כדי להשתמש בהגדרות רמת המשתמש או ברירות מחדל של החשבון.",
                     "nameLabel": "שם מבצע",
                     "emailLabel": "אימייל מבצע",
                     "save": "שמור מבצע",
@@ -2082,13 +2082,13 @@
             "deploy": {
                 "noProviderAlert": {
                     "title": "אין ספק פריסה",
-                    "description": "בחר ספק פריסה כדי לפרוס את אתר הספרייה שלך.",
+                    "description": "בחר ספק פריסה כדי לפרוס את אתר העבודה שלך.",
                     "selectButton": "בחר והמשך",
                     "noProviders": "אין ספקי פריסה זמינים. התקן תוסף פריסה קודם."
                 },
                 "noTokenAlert": {
                     "title": "נדרש אסימון {provider}",
-                    "description": "כדי לפרוס את הספרייה שלך, עליך להגדיר את אסימון API של {provider} בהגדרות התוסף.",
+                    "description": "כדי לפרוס את העבודה שלך, עליך להגדיר את אסימון API של {provider} בהגדרות התוסף.",
                     "configureButton": "הגדר בהגדרות התוסף",
                     "getTokenButton": "קבל אסימון API",
                     "howTo": {
@@ -2096,25 +2096,25 @@
                         "step1": "לחץ על 'קבל אסימון API' כדי לפתוח את לוח הבקרה של הספק שלך",
                         "step2": "צור אסימון חדש עם הרשאות פריסה",
                         "step3": "הגדר את אסימון API של {provider} בהגדרות התוסף > {provider}",
-                        "step4": "חזור לכאן כדי לפרוס את הספרייה שלך"
+                        "step4": "חזור לכאן כדי לפרוס את העבודה שלך"
                     }
                 },
                 "sharedNoTokenAlert": {
                     "title": "פריסה לא זמינה",
-                    "description": "בעל הספרייה לא הגדיר פריסה. נא פנה לבעל הספרייה כדי להגדיר פריסה.",
+                    "description": "בעל העבודה לא הגדיר פריסה. נא פנה לבעל העבודה כדי להגדיר פריסה.",
                     "hint": "כמשתף פעולה, תוכל להפעיל פריסות לאחר שהבעלים יגדיר את ספק הפריסה שלו."
                 },
                 "form": {
                     "deployment": {
                         "title": "פרוס אתר",
-                        "description": "פרוס את מאגר אתר הספרייה שלך.",
+                        "description": "פרוס את מאגר אתר העבודה שלך.",
                         "deployButton": "פרוס ל-{provider}",
                         "deployingButton": "מפריס...",
                         "deployingStateButton": "מפריס ({state})...",
                         "successMessage": "האתר שלך פורס בהצלחה!",
                         "teamSelection": {
                             "title": "בחר צוות",
-                            "description": "בחר את הצוות לפרוס אליו את הספרייה הזו.",
+                            "description": "בחר את הצוות לפרוס אליו את העבודה הזו.",
                             "label": "צוות",
                             "placeholder": "בחר צוות",
                             "confirmButton": "פרוס לצוות",
@@ -2141,7 +2141,7 @@
                     },
                     "info": {
                         "deployInfo": "פריסה לוקחת בדרך כלל 1-3 דקות. תקבל קישור ברגע שהיא תסתיים.",
-                        "updateInfo": "עדכונים מסנכרנים את תוכן הספרייה שלך למאגר האתר לפריסה הבאה."
+                        "updateInfo": "עדכונים מסנכרנים את תוכן העבודה שלך למאגר האתר לפריסה הבאה."
                     },
                     "websiteTemplate": {
                         "title": "עדכוני תבנית אוטומטיים",
@@ -2161,7 +2161,7 @@
                         "title": "הגדר לפני פריסה",
                         "description": "סקור והתאם אישית את הגדרות האתר שלך לפני פריסה",
                         "siteName": "שם אתר",
-                        "siteNamePlaceholder": "הספרייה שלי",
+                        "siteNamePlaceholder": "העבודה שלי",
                         "siteNameHelper": "השם המוצג באתר שלך (ברירת מחדל: Acme)",
                         "tabGeneral": "כללי",
                         "tabHeader": "כותרת עליונה",
@@ -2209,8 +2209,8 @@
             }
         },
         "workCreation": {
-            "title": "צור ספרייה חדשה",
-            "subtitle": "בחר כיצד ברצונך ליצור את הספרייה שלך",
+            "title": "צור עבודה חדשה",
+            "subtitle": "בחר כיצד ברצונך ליצור את העבודה שלך",
             "backToOptions": "חזור לאפשרויות",
             "sidebar": {
                 "selectedProvider": "ספק Git",
@@ -2218,7 +2218,7 @@
             },
             "deployProvider": {
                 "title": "ספק פריסה",
-                "description": "בחר לאן לפרוס את אתר הספרייה שלך",
+                "description": "בחר לאן לפרוס את אתר העבודה שלך",
                 "noProviders": "אין ספקי פריסה זמינים",
                 "notConfigured": "לא מוגדר",
                 "configured": "מוכן לפריסה",
@@ -2236,21 +2236,21 @@
             },
             "ai": {
                 "title": "צור עם AI",
-                "subtitle": "תאר את רעיון הספרייה שלך בשפה טבעית ותן ל-AI לטפל בהגדרה",
+                "subtitle": "תאר את רעיון העבודה שלך בשפה טבעית ותן ל-AI לטפל בהגדרה",
                 "getStarted": "התחל",
-                "formTitle": "צור ספרייה עם AI",
-                "formSubtitle": "תאר את רעיון הספרייה שלך ותן ל-AI לטפל בהגדרה וביצירת התוכן הראשוני",
-                "workNameLabel": "שם ספרייה",
+                "formTitle": "צור עבודה עם AI",
+                "formSubtitle": "תאר את רעיון העבודה שלך ותן ל-AI לטפל בהגדרה וביצירת התוכן הראשוני",
+                "workNameLabel": "שם עבודה",
                 "workNamePlaceholder": "למשל, כלי AI מדהימים",
                 "workNameHelp": "AI יציע שם אם תשאיר זאת ריק",
-                "promptLabel": "תאר את הספרייה שלך",
+                "promptLabel": "תאר את העבודה שלך",
                 "githubRequired": "נא לחבר את חשבון GitHub שלך תחילה.",
-                "promptPlaceholder": "תאר איזו ספרייה ברצונך ליצור, אילו פריטים היא צריכה להכיל, וכל דרישות ספציפיות...",
+                "promptPlaceholder": "תאר איזו עבודה ברצונך ליצור, אילו פריטים היא צריכה להכיל, וכל דרישות ספציפיות...",
                 "inspirationText": "צריך השראה? נסה אחד מאלה:",
                 "examplePrompts": {
                     "0": {
                         "name": "כלי פיתוח AI",
-                        "prompt": "צור ספרייה של הכלים הטובים ביותר של AI למפתחים"
+                        "prompt": "צור עבודה של הכלים הטובים ביותר של AI למפתחים"
                     },
                     "1": {
                         "name": "מרכז רכיבי React",
@@ -2258,7 +2258,7 @@
                     },
                     "2": {
                         "name": "כלים לצוותים מרוחקים",
-                        "prompt": "צור ספרייה של אפליקציות פרודוקטיביות לצוותים מרוחקים"
+                        "prompt": "צור עבודה של אפליקציות פרודוקטיביות לצוותים מרוחקים"
                     },
                     "3": {
                         "name": "אופנה בת קיימא",
@@ -2273,23 +2273,23 @@
                     "3": "יגדיר מאגר GitHub עם תיעוד מתאים"
                 },
                 "generateButton": "צור עם AI",
-                "generatingButton": "יוצר ספרייה...",
+                "generatingButton": "יוצר עבודה...",
                 "cancelButton": "בטל",
                 "noteTitle": "הערה:",
-                "noteText": "יצירה עם AI לוקחת בדרך כלל 2-5 דקות בהתאם למורכבות הבקשה. תקבל הודעה כשהספרייה מוכנה.",
+                "noteText": "יצירה עם AI לוקחת בדרך כלל 2-5 דקות בהתאם למורכבות הבקשה. תקבל הודעה כשהעבודה מוכנה.",
                 "errors": {
-                    "promptRequired": "נא תאר איזו ספרייה ברצונך ליצור",
+                    "promptRequired": "נא תאר איזו עבודה ברצונך ליצור",
                     "unconfiguredProviders": "{providers} לא מוגדרים. בקר בהגדרות → תוספים כדי להגדיר לפני יצירה.",
-                    "nameRequired": "שם ספרייה נדרש",
-                    "slugRequired": "Slug ספרייה נדרש",
-                    "descriptionRequired": "תיאור ספרייה נדרש",
+                    "nameRequired": "שם עבודה נדרש",
+                    "slugRequired": "Slug עבודה נדרש",
+                    "descriptionRequired": "תיאור עבודה נדרש",
                     "githubRequired": "נא לחבר את חשבון GitHub שלך תחילה.",
-                    "createFailed": "נכשל ביצירת ספרייה"
+                    "createFailed": "נכשל ביצירת עבודה"
                 },
                 "success": {
-                    "started": "התחילה יצירת ספרייה!",
+                    "started": "התחילה יצירת עבודה!",
                     "generating": "AI יוצר תוכן. זה עשוי לקחת כמה דקות...",
-                    "created": "ספרייה נוצרה בהצלחה!"
+                    "created": "עבודה נוצרה בהצלחה!"
                 },
                 "advancedSettings": "הגדרות מתקדמות",
                 "advancedSubtitle": "הגדר ארגון והגדרות מאגר",
@@ -2300,14 +2300,14 @@
             },
             "manual": {
                 "title": "צור ידנית",
-                "subtitle": "הגדר את הספרייה שלך עם שליטה מלאה בכל הגדרה ואפשרות",
+                "subtitle": "הגדר את העבודה שלך עם שליטה מלאה בכל הגדרה ואפשרות",
                 "configureNow": "הגדר עכשיו",
-                "formTitle": "צור ספרייה ידנית",
-                "formSubtitle": "הגדר את הספרייה שלך עם שליטה מלאה בכל הגדרה",
+                "formTitle": "צור עבודה ידנית",
+                "formSubtitle": "הגדר את העבודה שלך עם שליטה מלאה בכל הגדרה",
                 "basicInfo": "מידע בסיסי",
-                "nameLabel": "שם ספרייה *",
+                "nameLabel": "שם עבודה *",
                 "namePlaceholder": "למשל, כלי AI מדהימים",
-                "slugLabel": "Slug ספרייה *",
+                "slugLabel": "Slug עבודה *",
                 "slugPlaceholder": "awesome-ai-tools",
                 "githubRequired": "נא לחבר את חשבון GitHub שלך תחילה.",
                 "slugHelp": "זיהוי ידידותי ל-URL (אותיות קטנות, מספרים ומקפים בלבד)",
@@ -2316,7 +2316,7 @@
                 "advancedSettings": "הגדרות מתקדמות",
                 "advancedSubtitle": "ארגון, כותרות מותאמות אישית ועוד",
                 "organizationLabel": "צור תחת ארגון",
-                "organizationHelp": "צור ספרייה זו תחת ארגון GitHub במקום חשבון אישי",
+                "organizationHelp": "צור עבודה זו תחת ארגון GitHub במקום חשבון אישי",
                 "organizationNameLabel": "שם ארגון",
                 "organizationNamePlaceholder": "my-organization",
                 "headerLabel": "כותרת README מותאמת",
@@ -2325,25 +2325,25 @@
                 "footerLabel": "תחתית README מותאמת",
                 "footerPlaceholder": "הוסף תוכן מותאם לחלק התחתון של קובץ README שלך",
                 "footerOverwrite": "החלף את התחתית המוגדרת מראש לחלוטין",
-                "createButton": "צור ספרייה",
-                "creatingButton": "יוצר ספרייה...",
+                "createButton": "צור עבודה",
+                "creatingButton": "יוצר עבודה...",
                 "cancelButton": "בטל",
-                "nameRequired": "שם ספרייה נדרש",
-                "slugRequired": "Slug ספרייה נדרש",
-                "descriptionRequired": "תיאור ספרייה נדרש",
-                "createFailed": "נכשל ביצירת ספרייה",
+                "nameRequired": "שם עבודה נדרש",
+                "slugRequired": "Slug עבודה נדרש",
+                "descriptionRequired": "תיאור עבודה נדרש",
+                "createFailed": "נכשל ביצירת עבודה",
                 "success": {
-                    "created": "ספרייה נוצרה בהצלחה!"
+                    "created": "עבודה נוצרה בהצלחה!"
                 }
             },
             "import": {
                 "title": "ייבא קיים",
-                "subtitle": "ייבא ספרייה ממאגר GitHub קיים",
+                "subtitle": "ייבא עבודה ממאגר GitHub קיים",
                 "importNow": "ייבא עכשיו",
                 "aiProviderSettings": "ספק AI",
                 "aiProviderSettingsDescription": "בחר איזה ספק AI להשתמש לפרסינג ה-README",
-                "formTitle": "ייבא ספרייה מ-GitHub",
-                "formSubtitle": "ייבא פריטים ממאגר GitHub קיים כדי ליצור את הספרייה שלך",
+                "formTitle": "ייבא עבודה מ-GitHub",
+                "formSubtitle": "ייבא פריטים ממאגר GitHub קיים כדי ליצור את העבודה שלך",
                 "sync": {
                     "title": "שמור מסונכרן",
                     "description": "משוך עדכונים אוטומטית ממאגר המקור."
@@ -2396,13 +2396,13 @@
                     "schedule": "תזמון: {cadence}",
                     "providers": "ספקים: {providers}"
                 },
-                "nameLabel": "שם ספרייה",
-                "namePlaceholder": "למשל, הספרייה המדהימה שלי",
+                "nameLabel": "שם עבודה",
+                "namePlaceholder": "למשל, העבודה המדהימה שלי",
                 "advancedSettings": "הגדרות מתקדמות",
                 "advancedSubtitle": "הגדר ארגון והגדרות מאגר",
                 "attribution": {
                     "title": "ייחוס מקור:",
-                    "text": "ספרייה זו תפנה ל-{url} כמקור שלה"
+                    "text": "עבודה זו תפנה ל-{url} כמקור שלה"
                 },
                 "research": {
                     "title": "מצב ייבוא ומחקר",
@@ -2425,13 +2425,13 @@
                     "importingButton": "מתחיל צינור מחקר..."
                 },
                 "analyzeButton": "נתח מאגר",
-                "importButton": "ייבא ספרייה",
+                "importButton": "ייבא עבודה",
                 "importingButton": "מייבא...",
                 "backButton": "חזור",
                 "cancelButton": "בטל",
                 "importing": {
-                    "title": "מייבא ספרייה",
-                    "subtitle": "מגדיר את הספרייה שלך ממאגר המקור..."
+                    "title": "מייבא עבודה",
+                    "subtitle": "מגדיר את העבודה שלך ממאגר המקור..."
                 },
                 "repositorySelector": {
                     "title": "בחר מאגר",
@@ -2498,17 +2498,17 @@
                     "unsupportedFormat": "פורמט מאגר זה לא נתמך. נא השתמש בפורמט מאגר נתונים או רשימת Awesome.",
                     "analyzeFailed": "נכשל בניתוח מאגר",
                     "analyzeForLinkingFailed": "נכשל בניתוח לקישור",
-                    "nameRequired": "שם ספרייה נדרש",
+                    "nameRequired": "שם עבודה נדרש",
                     "noAnalysis": "נא נתח מאגר תחילה",
                     "githubRequired": "נא לחבר את חשבון GitHub שלך תחילה",
                     "providerRequired": "אנא בחר ספק Git קודם",
-                    "importFailed": "נכשל בייבוא ספרייה",
-                    "linkFailed": "נכשל בקישור ספרייה",
+                    "importFailed": "נכשל בייבוא עבודה",
+                    "linkFailed": "נכשל בקישור עבודה",
                     "providerNotConfigured": "{provider} לא מוגדר. בקר בהגדרות → תוספים כדי להגדיר לפני ייבוא."
                 },
                 "success": {
-                    "started": "ייבוא התחיל! מפנה לספרייה שלך...",
-                    "linked": "ספרייה קושרה בהצלחה"
+                    "started": "ייבוא התחיל! מפנה לעבודה שלך...",
+                    "linked": "עבודה קושרה בהצלחה"
                 },
                 "slugConflict": {
                     "title": "קונפליקט שם מאגר",
@@ -2521,7 +2521,7 @@
             "connection": {
                 "alert": {
                     "title": "{provider} לא מחובר",
-                    "subtitle": "חבר את חשבון ה-{provider} שלך ליצירת ספריות",
+                    "subtitle": "חבר את חשבון ה-{provider} שלך ליצירת עבודות",
                     "connectButton": "חבר {provider}",
                     "connectingButton": "מתחבר..."
                 }
@@ -2537,7 +2537,7 @@
             },
             "settings": {
                 "title": "חיבורי ספקי Git",
-                "subtitle": "חבר את חשבונות ספקי ה-git שלך לייבוא מאגרים, יצירת ספריות וניהול הפרויקטים שלך.",
+                "subtitle": "חבר את חשבונות ספקי ה-git שלך לייבוא מאגרים, יצירת עבודות וניהול הפרויקטים שלך.",
                 "connectedCount": "{count, plural, =0 {אין ספקים מחוברים} =1 {1 ספק מחובר} other {# ספקים מחוברים}}",
                 "noProvidersConnected": "אין ספקים מחוברים",
                 "canImport": "ניתן לייבא ולנהל מאגרים",
@@ -2568,7 +2568,7 @@
                 "subtitle": "הגדר ספקי פריסה בהגדרות תוספים",
                 "connected": "מחובר",
                 "notConnected": "לא מחובר",
-                "connectedMessage": "ספק הפריסה שלך מוגדר. כעת ניתן לפרוס ספריות.",
+                "connectedMessage": "ספק הפריסה שלך מוגדר. כעת ניתן לפרוס עבודות.",
                 "disconnect": "נתק",
                 "disconnecting": "מסיר...",
                 "apiTokenLabel": "טוקן API",
@@ -2605,16 +2605,16 @@
             "email": {
                 "title": "התראות דוא\"ל",
                 "workUpdates": {
-                    "label": "עדכוני ספריות",
-                    "description": "קבל התראות על עדכונים חשובים לספריות שלך"
+                    "label": "עדכוני עבודות",
+                    "description": "קבל התראות על עדכונים חשובים לעבודות שלך"
                 },
                 "newItems": {
                     "label": "פריטים חדשים",
-                    "description": "קבל התראות כאשר פריטים חדשים מתווספים לספריות שלך"
+                    "description": "קבל התראות כאשר פריטים חדשים מתווספים לעבודות שלך"
                 },
                 "weeklyDigest": {
                     "label": "סיכום שבועי",
-                    "description": "קבל סיכום שבועי של פעילות הספריות שלך"
+                    "description": "קבל סיכום שבועי של פעילות העבודות שלך"
                 },
                 "marketing": {
                     "label": "שיווק ומבצעים",
@@ -2625,11 +2625,11 @@
                 "title": "התראות בתוך האפליקציה",
                 "newItems": {
                     "label": "פריטים חדשים",
-                    "description": "הצג התראות לפריטי ספריות חדשים"
+                    "description": "הצג התראות לפריטי עבודות חדשים"
                 },
                 "comments": {
                     "label": "הערות",
-                    "description": "קבל התראות על הערות בספריות שלך"
+                    "description": "קבל התראות על הערות בעבודות שלך"
                 },
                 "mentions": {
                     "label": "אזכורים",
@@ -2653,12 +2653,12 @@
         "sidebar": {
             "menu": "תפריט",
             "aiChat": "צ'אט AI",
-            "newWork": "ספרייה חדשה",
-            "activityIndicator": "מייצר ספרייה",
+            "newWork": "עבודה חדשה",
+            "activityIndicator": "מייצר עבודה",
             "navigation": {
                 "dashboard": "לוח מחוונים",
                 "activity": "פעילות",
-                "works": "ספריות",
+                "works": "עבודות",
                 "plugins": "תוספים",
                 "settings": "הגדרות"
             },
@@ -2680,7 +2680,7 @@
             "subtitle": "פעולות בלתי הפיכות והרסניות",
             "export": {
                 "title": "ייצא את הנתונים שלך",
-                "subtitle": "הורד את כל הספריות, הפריטים וההגדרות שלך",
+                "subtitle": "הורד את כל העבודות, הפריטים וההגדרות שלך",
                 "action": "ייצא נתונים (בקרוב)"
             },
             "delete": {
@@ -2690,8 +2690,8 @@
                 "confirmTitle": "⚠️ זה ימחק לצמיתות:",
                 "confirmItems": [
                     "את החשבון והפרופיל שלך",
-                    "את כל הספריות שלך",
-                    "את כל פריטי הספריות והנתונים",
+                    "את כל העבודות שלך",
+                    "את כל פריטי העבודות והנתונים",
                     "מפתחות API ושילובים",
                     "את כל האתרים הקשורים"
                 ],
@@ -2711,13 +2711,13 @@
         "aiChat": {
             "title": "עוזר AI",
             "panelTitle": "צ'אט",
-            "subtitle": "צור ספריות בשפה טבעית",
+            "subtitle": "צור עבודות בשפה טבעית",
             "welcomeTitle": "ברוך בואך לעוזר AI 👋",
-            "welcomeSubtitle": "העוזר המופעל על ידי AI שלך. שאל אותי כל דבר על יצירת ספריות, יצירת תוכן או ארגון הנתונים שלך.",
-            "welcomeMessage": "שלום! אני יכול לעזור לך ליצור ספריות בשפה טבעית. שאל משהו כמו \"צור ספרייה לכלי AI\" או תאר מה אתה צריך.",
+            "welcomeSubtitle": "העוזר המופעל על ידי AI שלך. שאל אותי כל דבר על יצירת עבודות, יצירת תוכן או ארגון הנתונים שלך.",
+            "welcomeMessage": "שלום! אני יכול לעזור לך ליצור עבודות בשפה טבעית. שאל משהו כמו \"צור עבודה לכלי AI\" או תאר מה אתה צריך.",
             "capabilities": {
-                "workCreation": "יצירת ספריות",
-                "workCreationDesc": "בנה ספריות מתיאורים בשפה טבעית",
+                "workCreation": "יצירת עבודות",
+                "workCreationDesc": "בנה עבודות מתיאורים בשפה טבעית",
                 "webResearch": "מחקר אינטרנט",
                 "webResearchDesc": "חפש ואסוף נתונים מכל האינטרנט",
                 "contentGeneration": "יצירת תוכן",
@@ -2747,11 +2747,11 @@
             "selectProvider": "ספק",
             "notConfigured": "לא מוגדר",
             "gitNotConnected": "ספק Git לא מחובר",
-            "gitNotConnectedDesc": "חבר את ספק ה-Git שלך כדי ליצור ולנהל ספריות.",
+            "gitNotConnectedDesc": "חבר את ספק ה-Git שלך כדי ליצור ולנהל עבודות.",
             "connectGithub": "חבר GitHub",
             "gitConnectedAs": "מחובר כ-{username} דרך {provider}",
             "deployNotConfigured": "ספק פריסה לא מוגדר",
-            "deployNotConfiguredDesc": "הגדר ספק פריסה כדי לפרסם אתרי ספריות שלך.",
+            "deployNotConfiguredDesc": "הגדר ספק פריסה כדי לפרסם אתרי עבודות שלך.",
             "configureDeployProvider": "הגדר ספק פריסה",
             "deployConfigured": "ספק פריסה מוגדר ({provider})",
             "opened": "נפתח",
@@ -2761,12 +2761,12 @@
             "historyYesterday": "אתמול",
             "historyDaysAgo": "לפני {days} ימים",
             "suggestions": {
-                "s1": "הצג את הספריות שלי",
-                "s2": "צור ספרייה של כלי AI",
+                "s1": "הצג את העבודות שלי",
+                "s2": "צור עבודה של כלי AI",
                 "s3": "בדוק את חיבור ה-git שלי",
                 "s4": "הצג את הסטטיסטיקות שלי"
             },
-            "feelingLucky": "הצע ספרייה ליצירה",
+            "feelingLucky": "הצע עבודה ליצירה",
             "errors": {
                 "unableToSend": "לא ניתן לשלוח הודעה"
             }
@@ -2779,7 +2779,7 @@
             "enabled": "מופעל",
             "disabled": "כבוי",
             "enable": "הפעל",
-            "enableDescription": "הגדר כיצד התוסף הזה מופעל בכל ספריות שלך.",
+            "enableDescription": "הגדר כיצד התוסף הזה מופעל בכל עבודות שלך.",
             "disable": "כבה",
             "settings": "הגדרות",
             "saveSettings": "שמור הגדרות",
@@ -2811,11 +2811,11 @@
                 "pipeline": "זרימת עבודה"
             },
             "alwaysEnabled": "מופעל תמיד",
-            "disableWarning": "כיבוי תוסף זה יכבה אותו גם בכל ספריות שלך",
+            "disableWarning": "כיבוי תוסף זה יכבה אותו גם בכל עבודות שלך",
             "cannotDisableSystem": "תוספי מערכת אינם ניתנים לכיבוי",
             "disableFailed": "נכשל בכיבוי התוסף",
-            "autoEnableForWorks": "הפעל גם לכל הספריות",
-            "autoEnableForWorksDescription": "תוסף זה יהיה פעיל אוטומטית בכל ספריות שלך. ניתן עדיין לכבות אותו פר ספרייה.",
+            "autoEnableForWorks": "הפעל גם לכל העבודות",
+            "autoEnableForWorksDescription": "תוסף זה יהיה פעיל אוטומטית בכל עבודות שלך. ניתן עדיין לכבות אותו פר עבודה.",
             "confirmDisable": "אשר כיבוי",
             "cancel": "ביטול",
             "missingRequiredFields": "שדות נדרשים חסרים: {fields}",
@@ -2891,19 +2891,19 @@
             }
         },
         "workPlugins": {
-            "title": "תוספי ספרייה",
-            "subtitle": "הגדר תוספים עבור ספרייה זו",
+            "title": "תוספי עבודה",
+            "subtitle": "הגדר תוספים עבור עבודה זו",
             "active": "פעיל",
             "enable": "הפעל",
             "disable": "כבה",
-            "enableForWork": "הפעל עבור ספרייה זו",
-            "disableForWork": "כבה עבור ספרייה זו",
+            "enableForWork": "הפעל עבור עבודה זו",
+            "disableForWork": "כבה עבור עבודה זו",
             "enableAtUserLevelFirst": "הפעל תוסף זה בהגדרות שלך תחילה",
             "disabledByUser": "כבוי ברמת משתמש",
             "systemAlwaysEnabled": "תוסף מערכת - מופעל תמיד",
             "showSettings": "הצג הגדרות",
             "hideSettings": "הסתר הגדרות",
-            "workSettingsInfo": "הגדר כאן הגדרות ספציפיות לספרייה",
+            "workSettingsInfo": "הגדר כאן הגדרות ספציפיות לעבודה",
             "save": "שמור",
             "saved": "נשמר",
             "showInstalledOnly": "הצג מותקנים בלבד",
@@ -2911,7 +2911,7 @@
             "noPlugins": "אין תוספים זמינים",
             "showAllPlugins": "הצג את כל התוספים",
             "capabilityProviders": "ספקי יכולות",
-            "capabilityProvidersDescription": "בחר איזה תוסף מספק כל יכולת עבור ספרייה זו",
+            "capabilityProvidersDescription": "בחר איזה תוסף מספק כל יכולת עבור עבודה זו",
             "noProvidersAvailable": "אין ספקים זמינים",
             "categories": {
                 "git": "גיט",
@@ -2929,12 +2929,12 @@
             "errors": {
                 "unableToSend": "לא ניתן לשלוח הודעה."
             },
-            "settingsModalTitle": "הגדרות ספרייה",
-            "settingsModalDescription": "עקף הגדרות עבור ספרייה זו. שדות לא מוגדרים יורשים מהגדרות המשתמש שלך.",
+            "settingsModalTitle": "הגדרות עבודה",
+            "settingsModalDescription": "עקף הגדרות עבור עבודה זו. שדות לא מוגדרים יורשים מהגדרות המשתמש שלך.",
             "inheritedFrom": "ירושה: {value}",
             "inheritedSecret": "ירושה: ••••••••",
             "resetToDefaults": "אפס לברירת מחדל",
-            "resetConfirm": "פעולה זו תנקה את כל העקיפות הספציפיות לספרייה. ההגדרות יחזרו לערכי רמת המשתמש.",
+            "resetConfirm": "פעולה זו תנקה את כל העקיפות הספציפיות לעבודה. ההגדרות יחזרו לערכי רמת המשתמש.",
             "resetSuccess": "ההגדרות אופסו לברירת מחדל",
             "cancel": "ביטול",
             "clickToConfigure": "לחץ כדי להגדיר",
@@ -2949,8 +2949,8 @@
         "auth": {
             "backToHome": "חזור לדף הבית",
             "feature": {
-                "title": "בנה ספריות עם AI",
-                "subtitle": "צור ספריות יפות וניתנות לחיפוש תוך דקות באמצעות שפה טבעית. ללא צורך בקידוד.",
+                "title": "בנה עבודות עם AI",
+                "subtitle": "צור עבודות יפות וניתנות לחיפוש תוך דקות באמצעות שפה טבעית. ללא צורך בקידוד.",
                 "badge": "מופעל על ידי AI",
                 "benefits": {
                     "ai": {
@@ -3002,8 +3002,8 @@
         }
     },
     "metadata": {
-        "title": "{companyName} - בונה ספריות",
-        "description": "פלטפורמת SaaS לבנייה וניהול ספריות",
+        "title": "{companyName} - בונה עבודות",
+        "description": "פלטפורמת SaaS לבנייה וניהול עבודות",
         "pages": {
             "signIn": "התחבר",
             "createAccount": "צור חשבון",
@@ -3012,9 +3012,9 @@
             "authError": "שגיאת אימות",
             "dashboard": "לוח בקרה",
             "activity": "יומן פעילות",
-            "works": "ספריות",
-            "newWork": "ספרייה חדשה",
-            "work": "ספרייה",
+            "works": "עבודות",
+            "newWork": "עבודה חדשה",
+            "work": "עבודה",
             "overview": "סקירה כללית",
             "items": "פריטים",
             "generator": "מחולל",
@@ -3067,16 +3067,16 @@
             },
             "oauthRequired": "חיבור OAuth נדרש. נא לחבר את חשבון {provider} שלך תחילה.",
             "githubRequired": "חיבור GitHub נדרש. נא לחבר את חשבון GitHub שלך תחילה.",
-            "createSuccess": "ספרייה נוצרה בהצלחה!",
-            "createFailed": "נכשל ביצירת ספרייה",
-            "updateSuccess": "ספרייה עודכנה בהצלחה!",
-            "updateFailed": "נכשל בעדכון ספרייה",
-            "invalidGeneratedData": "נכשל ביצירת נתוני ספרייה תקינים",
-            "aiGenerationStarted": "יצירת ספרייה התחילה! AI מייצר תוכן...",
-            "invalidId": "מזהה ספרייה לא תקין",
-            "deleteSuccess": "ספרייה נמחקה בהצלחה",
-            "deleteFailed": "נכשל במחיקת ספרייה",
-            "fetchFailed": "נכשל בקבלת ספריות",
+            "createSuccess": "עבודה נוצרה בהצלחה!",
+            "createFailed": "נכשל ביצירת עבודה",
+            "updateSuccess": "עבודה עודכנה בהצלחה!",
+            "updateFailed": "נכשל בעדכון עבודה",
+            "invalidGeneratedData": "נכשל ביצירת נתוני עבודה תקינים",
+            "aiGenerationStarted": "יצירת עבודה התחילה! AI מייצר תוכן...",
+            "invalidId": "מזהה עבודה לא תקין",
+            "deleteSuccess": "עבודה נמחקה בהצלחה",
+            "deleteFailed": "נכשל במחיקת עבודה",
+            "fetchFailed": "נכשל בקבלת עבודות",
             "organization": {
                 "requiredWhenOwnerProvided": "ארגון חייב להיות מופעל כאשר הבעלים מסופק"
             },
@@ -3084,7 +3084,7 @@
                 "invalidUrl": "נא להזין כתובת URL תקינה",
                 "analyzeFailed": "נכשל בניתוח מאגר",
                 "started": "ייבוא התחיל בהצלחה",
-                "failed": "נכשל בייבוא ספרייה",
+                "failed": "נכשל בייבוא עבודה",
                 "fetchReposFailed": "נכשל בקבלת מאגרים"
             }
         },

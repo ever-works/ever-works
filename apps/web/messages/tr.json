@@ -150,7 +150,7 @@
         },
         "register": {
             "title": "Hesabınızı oluşturun",
-            "subtitle": "Bugün harika dizinler oluşturmaya başlayın",
+            "subtitle": "Bugün harika işler oluşturmaya başlayın",
             "form": {
                 "name": {
                     "label": "Tam ad",
@@ -197,18 +197,18 @@
     "onboarding": {
         "label": "Başlarken",
         "title": "Ever Works'e Hoş Geldiniz",
-        "subtitle": "İlk dizininizi dakikalar içinde oluşturun ve yayınlayın.",
+        "subtitle": "İlk işinizi dakikalar içinde oluşturun ve yayınlayın.",
         "skipButton": "Şimdi atla",
         "nextButton": "İleri",
         "stepIndex": "Adım {index}",
         "steps": {
             "welcome": {
                 "title": "Ever Works nedir?",
-                "description": "Ever Works açık kaynaklı bir dizin oluşturucudur. Yapılandırılmış içerik dizinleri — araçlar, işler, bağlantılar, ürünler — oluşturun ve bunları canlı web siteleri olarak yayınlayın.",
-                "detail": "Sizi ayarlayalım. Aşağıdaki sağlayıcılarınızı bağlayın, ardından ilk dizininizi oluşturun.",
+                "description": "Ever Works açık kaynaklı bir iş oluşturucudur. Yapılandırılmış içerik işleri — araçlar, işler, bağlantılar, ürünler — oluşturun ve bunları canlı web siteleri olarak yayınlayın.",
+                "detail": "Sizi ayarlayalım. Aşağıdaki sağlayıcılarınızı bağlayın, ardından ilk işinizi oluşturun.",
                 "feature1": {
                     "title": "AI destekli içerik",
-                    "description": "AI sağlayıcınızı kullanarak dizin öğelerini otomatik olarak üretin ve zenginleştirin"
+                    "description": "AI sağlayıcınızı kullanarak iş öğelerini otomatik olarak üretin ve zenginleştirin"
                 },
                 "feature2": {
                     "title": "Anında yayınlama",
@@ -216,18 +216,18 @@
                 },
                 "feature3": {
                     "title": "Git destekli",
-                    "description": "Her dizin, sahip olduğunuz ve kontrol ettiğiniz bir GitHub deposudur"
+                    "description": "Her iş, sahip olduğunuz ve kontrol ettiğiniz bir GitHub deposudur"
                 }
             },
             "work": {
-                "title": "İlk dizininizi oluşturun",
-                "description": "Bir dizin, içerik merkezinizdir. Öğeler ekleyin, düzeni yapılandırın ve bir tıkla yayınlayın.",
-                "detail": "Tamam hazır! İçerik oluşturmaya ve yayınlamaya başlamak için ilk dizininizi oluşturun.",
-                "action": "Dizin oluştur"
+                "title": "İlk işinizi oluşturun",
+                "description": "Bir iş, içerik merkezinizdir. Öğeler ekleyin, düzeni yapılandırın ve bir tıkla yayınlayın.",
+                "detail": "Tamam hazır! İçerik oluşturmaya ve yayınlamaya başlamak için ilk işinizi oluşturun.",
+                "action": "İş oluştur"
             },
             "publish": {
                 "title": "Canlıya al",
-                "description": "Dizininizi genel bir web sitesi olarak dağıtmak için Vercel veya GitHub'ı bağlayın — barındırma yapılandırması gerekmez.",
+                "description": "İşinizi genel bir web sitesi olarak dağıtmak için Vercel veya GitHub'ı bağlayın — barındırma yapılandırması gerekmez.",
                 "action": "Yayınlamayı ayarla"
             }
         },
@@ -336,7 +336,7 @@
             "steps": {
                 "model": {
                     "title": "Bir model seçin",
-                    "description": "Uçtan uca dizin üretimi için çalıştırmak istediğiniz Codex modelini seçin"
+                    "description": "Uçtan uca iş üretimi için çalıştırmak istediğiniz Codex modelini seçin"
                 },
                 "credentials": {
                     "title": "Kimlik bilgileri ekleyin",
@@ -408,7 +408,7 @@
         "simWizard": {
             "label": "SIM AI kurulumu",
             "title": "SIM AI'yi iki adımda kurun",
-            "subtitle": "Dizin üretimini SIM iş akışlarına devretmeye başlamak için SIM AI API anahtarınızı ekleyin ve bağlantıyı doğrulayın.",
+            "subtitle": "İş üretimini SIM iş akışlarına devretmeye başlamak için SIM AI API anahtarınızı ekleyin ve bağlantıyı doğrulayın.",
             "stepIndex": "Adım {index}",
             "continueButton": "Devam Et",
             "steps": {
@@ -431,7 +431,7 @@
         "title": "Pano",
         "connectGithub": {
             "title": "GitHub hesabınızı bağlayın",
-            "description": "Dizin depolarını oluşturmak ve yönetmek için GitHub gereklidir. Başlamak için hesabınızı bağlayın.",
+            "description": "İş depolarını oluşturmak ve yönetmek için GitHub gereklidir. Başlamak için hesabınızı bağlayın.",
             "connect": "GitHub'ı Bağla",
             "dismiss": "Bunu sonra yapacağım"
         },
@@ -465,7 +465,7 @@
         },
         "header": {
             "welcome": "Tekrar hoş geldiniz, {username}!",
-            "subtitle": "AI destekli dizinlerinizi yönetin ve performanslarını izleyin",
+            "subtitle": "AI destekli işlerinizi yönetin ve performanslarını izleyin",
             "onboarding": {
                 "badge": "Başlangıç {currentStep}/{totalSteps}",
                 "dismiss": "Başlangıç kısayolunu gizle"
@@ -490,14 +490,14 @@
                 },
                 "quickTips": {
                     "title": "Hızlı İpuçları",
-                    "tip1": "Panodaki 'Dizin Oluştur' düğmesine tıklayarak ilk dizininizi oluşturun.",
-                    "tip2": "Dizinizi ilgili öğelerle otomatik olarak doldurmak için AI üretecisini kullanın.",
-                    "tip3": "Dizinlerinizi depolar olarak senkronize etmek ve dağıtmak için GitHub hesabınızı bağlayın."
+                    "tip1": "Panodaki 'İş Oluştur' düğmesine tıklayarak ilk işinizi oluşturun.",
+                    "tip2": "İşizi ilgili öğelerle otomatik olarak doldurmak için AI üretecisini kullanın.",
+                    "tip3": "İşlerinizi depolar olarak senkronize etmek ve dağıtmak için GitHub hesabınızı bağlayın."
                 },
                 "shortcuts": {
                     "title": "Klavye Kısayolları",
-                    "search": "Dizinleri ara",
-                    "newWork": "Yeni dizin oluştur",
+                    "search": "İşleri ara",
+                    "newWork": "Yeni iş oluştur",
                     "help": "Yardımı aç",
                     "hint": "Mac'te Cmd veya Windows/Linux'ta Ctrl kullanın"
                 },
@@ -513,7 +513,7 @@
         },
         "activity": {
             "title": "Etkinlik Günlüğü",
-            "subtitle": "Dizinlerinizdeki tüm işlemleri izleyin",
+            "subtitle": "İşlerinizdeki tüm işlemleri izleyin",
             "loading": "Yükleniyor...",
             "fetchFailed": "Etkinlikler yüklenemedi",
             "exportFailed": "Etkinlik günlüğü dışa aktarılamadı",
@@ -521,7 +521,7 @@
             "columns": {
                 "status": "Durum",
                 "dateTime": "Tarih / Saat",
-                "work": "Dizin",
+                "work": "İş",
                 "type": "Tür",
                 "summary": "Özet"
             },
@@ -532,9 +532,9 @@
                     "generation": "Üretim",
                     "comparison": "Karşılaştırma",
                     "deployment": "Dağıtım",
-                    "workCreated": "Dizin Oluşturuldu",
-                    "workUpdated": "Dizin Güncellendi",
-                    "workDeleted": "Dizin Silindi",
+                    "workCreated": "İş Oluşturuldu",
+                    "workUpdated": "İş Güncellendi",
+                    "workDeleted": "İş Silindi",
                     "pluginEnabled": "Eklenti Etkinleştirildi",
                     "pluginDisabled": "Eklenti Devre Dışı",
                     "pluginConfigured": "Eklenti Yapılandırıldı",
@@ -597,31 +597,31 @@
             }
         },
         "works": {
-            "title": "Dizinler",
-            "subtitle": "AI destekli dizinlerinizi yönetin ve düzenleyin",
+            "title": "İşler",
+            "subtitle": "AI destekli işlerinizi yönetin ve düzenleyin",
             "summary": {
-                "totalWorks": "Toplam Dizin",
+                "totalWorks": "Toplam İş",
                 "generating": "Üretiliyor",
                 "totalItems": "Toplam Öğe"
             },
-            "recent": "Son Dizinler",
+            "recent": "Son İşler",
             "viewAll": "Tümünü görüntüle ({count})",
-            "search": "Dizinleri ara...",
-            "create": "Dizin Oluştur",
-            "showing": "{total} dizinin {current}'i gösteriliyor",
-            "searchFailed": "Dizinler aranamadı. Lütfen tekrar deneyin.",
+            "search": "İşleri ara...",
+            "create": "İş Oluştur",
+            "showing": "{total} işin {current}'i gösteriliyor",
+            "searchFailed": "İşler aranamadı. Lütfen tekrar deneyin.",
             "pagination": {
                 "previous": "Önceki",
                 "next": "Sonraki"
             },
             "empty": {
-                "title": "Henüz dizin yok",
-                "description": "İçeriğinizi düzenlemeye ve sergilemeye başlamak için ilk AI destekli dizininizi oluşturun.",
-                "action": "İlk Dizininizi Oluşturun",
+                "title": "Henüz iş yok",
+                "description": "İçeriğinizi düzenlemeye ve sergilemeye başlamak için ilk AI destekli işinizi oluşturun.",
+                "action": "İlk İşinizi Oluşturun",
                 "notFound": {
-                    "title": "Dizin bulunamadı",
+                    "title": "İş bulunamadı",
                     "withSearch": "Arama terimlerinizi ayarlamayı deneyin",
-                    "withoutSearch": "Başlamak için ilk AI destekli dizininizi oluşturun"
+                    "withoutSearch": "Başlamak için ilk AI destekli işinizi oluşturun"
                 }
             }
         },
@@ -638,7 +638,7 @@
             },
             "data": {
                 "exportTitle": "Veriyi Dışa Aktar",
-                "exportDescription": "Dizinler, eklenti ayarları ve profil bilgilerini içeren hesap verilerinizi JSON dosyası olarak indirin.",
+                "exportDescription": "İşler, eklenti ayarları ve profil bilgilerini içeren hesap verilerinizi JSON dosyası olarak indirin.",
                 "includeSecrets": "Gizli ayarları dahil et (API anahtarları, token'lar) — maskelenmiş değerler olarak dışa aktarılır",
                 "secretsWarning": "Gizli ayarlar maskelenmiş değerler olarak dışa aktarılacaktır. İçe aktarmadan önce bunları gerçek kimlik bilgilerinizle manuel olarak değiştirmeniz gerekecek.",
                 "exportButton": "Veriyi Dışa Aktar",
@@ -646,7 +646,7 @@
                 "exportSuccess": "Veri başarıyla dışa aktarıldı",
                 "exportError": "Veri dışa aktarılamadı",
                 "importTitle": "Veriyi İçe Aktar",
-                "importDescription": "Önceki bir JSON dışa aktarma dosyasından veri içe aktarın. Eşleşen slug'lara sahip dizinler için çakışmaları çözebilirsiniz.",
+                "importDescription": "Önceki bir JSON dışa aktarma dosyasından veri içe aktarın. Eşleşen slug'lara sahip işler için çakışmaları çözebilirsiniz.",
                 "importButton": "Veriyi İçe Aktar",
                 "syncTitle": "GitHub Senkronizasyonu",
                 "syncDescription": "Hesap yapılandırmanızı yedekleme ve örnekler arasında geçiş için özel bir GitHub deposuna senkronize edin.",
@@ -658,7 +658,7 @@
                     "invalidJson": "Geçersiz JSON dosyası",
                     "previewError": "İçe aktarma dosyası analiz edilemedi",
                     "summary": "İçe Aktarma Özeti",
-                    "works": "Dizinler",
+                    "works": "İşler",
                     "items": "Öğeler",
                     "userPlugins": "Kullanıcı Eklentileri",
                     "version": "Biçim Sürümü",
@@ -681,9 +681,9 @@
                     "validationErrors": "Doğrulama Hataları",
                     "resultSuccess": "İçe Aktarma Başarıyla Tamamlandı",
                     "resultFailed": "İçe Aktarma Başarısız",
-                    "worksCreated": "Dizinler oluşturuldu",
-                    "worksUpdated": "Dizinler güncellendi",
-                    "worksSkipped": "Dizinler atlandı",
+                    "worksCreated": "İşler oluşturuldu",
+                    "worksUpdated": "İşler güncellendi",
+                    "worksSkipped": "İşler atlandı",
                     "pluginsImported": "Eklentiler içe aktarıldı",
                     "warnings": "Uyarılar",
                     "errors": "Hatalar"
@@ -732,11 +732,11 @@
                 "backToCategory": "{category} 'e Geri",
                 "pipelineDefault": {
                     "title": "Varsayılan İş Akışı",
-                    "description": "Dizin öğeleri oluşturulurken varsayılan olarak kullanılan iş akışını seçin.",
+                    "description": "İş öğeleri oluşturulurken varsayılan olarak kullanılan iş akışını seçin.",
                     "autoLabel": "Otomatik",
-                    "autoDescription": "Her dizin için sistem tarafından çözümlenen iş akışını kullan",
+                    "autoDescription": "Her iş için sistem tarafından çözümlenen iş akışını kullan",
                     "enforceLabel": "Bu varsayılanı zorunlu kıl",
-                    "enforceDescription": "Bir dizinin kendi iş akışı yapılandırılmış olsa bile her zaman bu iş akışını önceden seç. Formda manuel olarak iş akışlarını değiştirebilirsiniz.",
+                    "enforceDescription": "Bir işin kendi iş akışı yapılandırılmış olsa bile her zaman bu iş akışını önceden seç. Formda manuel olarak iş akışlarını değiştirebilirsiniz.",
                     "saveFailed": "Varsayılan iş akışı kaydedilemedi"
                 }
             },
@@ -819,8 +819,8 @@
                 "subtitle": "Gelişmiş işlevsellik için harici hesaplarınızı bağlayın",
                 "github": {
                     "name": "GitHub",
-                    "connected": "GitHub depolarıyla dizin oluşturun ve yönetin",
-                    "disconnected": "Depolardan dizin oluşturmak için bağlanın",
+                    "connected": "GitHub depolarıyla iş oluşturun ve yönetin",
+                    "disconnected": "Depolardan iş oluşturmak için bağlanın",
                     "scopes": "Kapsamlar",
                     "organizations": "Bağlı Organizasyonlar",
                     "organizationsHint": "Ek organizasyonlara erişim sağlamak için Yeniden Bağlan'ı kullanın",
@@ -881,7 +881,7 @@
             }
         },
         "stats": {
-            "totalWorks": "Toplam Dizin",
+            "totalWorks": "Toplam İş",
             "totalItems": "Toplam Öğe",
             "activeWebsites": "Aktif Web Siteleri",
             "fromLastMonth": "geçen aydan"
@@ -911,12 +911,12 @@
             "views": "{count} görüntüleme",
             "updated": "{date} güncellendi",
             "viewAction": "Görüntüle →",
-            "openingTitle": "Dizin açılıyor",
-            "openingMessage": "Dizin hazırlanıyor. Detaylar kısa süre sonra açılacak. Bu sayfada kalın."
+            "openingTitle": "İş açılıyor",
+            "openingMessage": "İş hazırlanıyor. Detaylar kısa süre sonra açılacak. Bu sayfada kalın."
         },
         "workList": {
-            "title": "Dizinleriniz",
-            "createButton": "Dizin Oluştur"
+            "title": "İşleriniz",
+            "createButton": "İş Oluştur"
         },
         "workDetail": {
             "failedToGenerateItems": "Öğeleri oluşturma başarısız oldu. Lütfen tekrar deneyin.",
@@ -953,7 +953,7 @@
             },
             "members": {
                 "title": "Takım Üyeleri",
-                "subtitle": "Bu dizine kimlerin erişebileceğini ve izinlerini yönetin.",
+                "subtitle": "Bu işe kimlerin erişebileceğini ve izinlerini yönetin.",
                 "inviteMember": "Üye Davet Et",
                 "noMembers": "Henüz takım üyesi yok. İşbirliği için birini davet edin.",
                 "roles": {
@@ -965,13 +965,13 @@
                 },
                 "roleDescriptions": {
                     "owner": "Silme ve üye yönetimi dahil tam kontrol.",
-                    "manager": "Dizini ve üyeleri düzenleyebilir, ancak silemez.",
+                    "manager": "İşi ve üyeleri düzenleyebilir, ancak silemez.",
                     "editor": "Dizi içeriğini düzenleyebilir ve oluşturmaları çalıştırabilir.",
-                    "viewer": "Dizini görüntülemek için salt okunur erişim."
+                    "viewer": "İşi görüntülemek için salt okunur erişim."
                 },
                 "invite": {
                     "title": "Takım Üyesi Davet Et",
-                    "description": "Bu dizinde işbirliği yapmak için yeni bir üye ekleyin.",
+                    "description": "Bu işte işbirliği yapmak için yeni bir üye ekleyin.",
                     "emailLabel": "E-posta adresi",
                     "emailPlaceholder": "meslektaş@örnek.com",
                     "roleLabel": "Rol",
@@ -985,7 +985,7 @@
                 },
                 "confirmRemove": {
                     "title": "Üye Kaldır",
-                    "description": "{username}'i bu dizinden kaldırmak istediğinizden emin misiniz? Tüm erişimlerini kaybedecekler.",
+                    "description": "{username}'i bu işten kaldırmak istediğinizden emin misiniz? Tüm erişimlerini kaybedecekler.",
                     "confirm": "Kaldır",
                     "cancel": "İptal"
                 },
@@ -1000,7 +1000,7 @@
                 "page": {
                     "title": "Planlanmış Güncellemeler",
                     "subtitle": "{name} için özel sıklık ve hata yönetimi ile yenilemeleri otomatikleştirin.",
-                    "fallbackName": "bu dizin",
+                    "fallbackName": "bu iş",
                     "loadFailed": "Program ayarları yüklenemedi.",
                     "providerCategories": {
                         "pipeline": "İş Akışı",
@@ -1101,7 +1101,7 @@
                     },
                     "empty": {
                         "title": "Önce manuel bir oluşturma çalıştırın",
-                        "description": "Otomatik programlamayı açmak için başarılı bir manuel çalıştırma tamamlayın. Dizininiz veri sahibi olduğunda sizin için taze tutabiliriz.",
+                        "description": "Otomatik programlamayı açmak için başarılı bir manuel çalıştırma tamamlayın. İşiniz veri sahibi olduğunda sizin için taze tutabiliriz.",
                         "refresh": "Durumu Yenile"
                     },
                     "requiresGeneration": "Programları etkinleştirmeden önce en az bir öğe oluşturma çalıştırın."
@@ -1119,7 +1119,7 @@
             "statusCard": {
                 "notStarted": {
                     "title": "Oluşturma Başlatılmadı",
-                    "description": "Dizinizi içerikle doldurmak için öğe oluşturmaya başlayın.",
+                    "description": "İşizi içerikle doldurmak için öğe oluşturmaya başlayın.",
                     "action": "Oluşturmayı Başlat"
                 },
                 "generating": {
@@ -1133,7 +1133,7 @@
                 },
                 "generated": {
                     "title": "Oluşturma Tamamlandı",
-                    "description": "Dizin başarıyla öğelerle dolduruldu.",
+                    "description": "İş başarıyla öğelerle dolduruldu.",
                     "withWarnings": "Uyarılarla tamamlandı:",
                     "viewItems": "Öğeleri Görüntüle",
                     "regenerate": "Yeniden Oluştur"
@@ -1307,7 +1307,7 @@
                 }
             },
             "info": {
-                "title": "Dizin Bilgileri",
+                "title": "İş Bilgileri",
                 "yourRole": "Rolünüz",
                 "role": {
                     "owner": "Sahip",
@@ -1357,15 +1357,15 @@
             "activity": {
                 "title": "Son Etkinlik",
                 "noActivity": "Henüz etkinlik yok",
-                "created": "Dizin Oluşturuldu",
-                "workCreated": "Dizin başarıyla oluşturuldu",
+                "created": "İş Oluşturuldu",
+                "workCreated": "İş başarıyla oluşturuldu",
                 "justNow": "Az önce"
             },
             "items": {
-                "title": "Dizin Öğeleri",
-                "subtitle": "Dizininizdeki öğeleri yönetin ve düzenleyin",
+                "title": "İş Öğeleri",
+                "subtitle": "İşinizdeki öğeleri yönetin ve düzenleyin",
                 "noItemsTitle": "Henüz Öğeler Yok",
-                "noItemsDescription": "Dizinınızda henüz öğe yok. Dizinizi içerikle doldurmak için öğe oluşturun.",
+                "noItemsDescription": "İşınızda henüz öğe yok. İşizi içerikle doldurmak için öğe oluşturun.",
                 "generateItems": "Öğe Oluştur",
                 "searchPlaceholder": "Öğe ara...",
                 "allCategories": "Tüm Kategoriler",
@@ -1427,14 +1427,14 @@
                     "screenshotFailed": "Ekran görüntüsü alma başarısız",
                     "screenshotError": "Ekran görüntüsü alınırken hata oluştu",
                     "featured": "Öne Çıkan Öğe",
-                    "featuredHelp": "Bu öğeyi dizinde öne çıkan olarak işaretleyin",
+                    "featuredHelp": "Bu öğeyi işte öne çıkan olarak işaretleyin",
                     "updateWithPR": "Pull Request Oluştur",
                     "updateWithPRHelp": "Değişiklikleri doğrudan commit yerine pull request olarak gönderin",
                     "cancel": "İptal",
                     "adding": "Ekleniyor...",
                     "addItem": "Öğe Ekle",
                     "success": "Öğe başarıyla eklendi",
-                    "successDescription": "Öğe dizininize eklendi",
+                    "successDescription": "Öğe işinize eklendi",
                     "failed": "Öğe ekleme başarısız",
                     "error": "Öğe eklenirken hata oluştu",
                     "errors": {
@@ -1653,7 +1653,7 @@
                     "navigationLabel": "Oluşturucu sekmeleri"
                 },
                 "regenerationWarning": "Yeniden Oluşturma Uyarısı",
-                "regenerationWarningDescription": "Bu dizin zaten oluşturulmuş. Yeni bir oluşturma başlatmak mevcut öğeleri değiştirecektir.",
+                "regenerationWarningDescription": "Bu iş zaten oluşturulmuş. Yeni bir oluşturma başlatmak mevcut öğeleri değiştirecektir.",
                 "requiredInfo": "Gerekli Bilgiler",
                 "updateConfiguration": "Yapılandırmayı Güncelle",
                 "promptRequired": "İstem gerekli",
@@ -1663,20 +1663,20 @@
                 "loadingFormSchema": "Form yapılandırması yükleniyor...",
                 "failedToLoadFormSchema": "Form yapılandırması yüklenemedi",
                 "selectOption": "Bir seçenek seçin",
-                "workName": "Dizin Adı",
+                "workName": "İş Adı",
                 "generationPrompt": "Oluşturma İstemı",
                 "modelOverride": "AI Modeli Geçersiz Kılma",
                 "modelOverridePlaceholder": "ör. openai/gpt-4.1 veya openrouter/openai/gpt-4.1",
                 "modelOverrideHelperText": "İsteğe bağlı. Burada geçersiz kılmadığınız sürece varsayılan olarak içe aktarılan veya önceki modeli kullanır.",
                 "recommended": "Önerilen",
-                "promptPlaceholder": "Bu dizin için oluşturulacak öğeleri açıklayın...",
+                "promptPlaceholder": "Bu iş için oluşturulacak öğeleri açıklayın...",
                 "promptHelperText": "Oluşturmak istediğiniz içerik türünü detaylı belirtin",
                 "repositoryDescription": "Depo Tanımı",
                 "repositoryPlaceholder": "Deponun kısa tanımı (isteğe bağlı)",
                 "startGeneration": "Oluşturmayı Başlat",
                 "regenerateItems": "Öğeleri Yeniden Oluştur",
                 "updateItems": "Oluşturmayı Çalıştır",
-                "recreateWork": "Dizini Yeniden Oluştur",
+                "recreateWork": "İşi Yeniden Oluştur",
                 "showAdvancedOptions": "Gelişmiş Seçenekleri Göster",
                 "hideAdvancedOptions": "Gelişmiş Seçenekleri Gizle",
                 "cancel": "İptal",
@@ -1714,7 +1714,7 @@
                 "websiteRepositoryCreationMethod": "Web Sitesi Depo Oluşturma Yöntemi",
                 "methodDuplicate": "Çoğalt",
                 "methodFork": "Fork",
-                "workNamePlaceholder": "Dizin adını girin",
+                "workNamePlaceholder": "İş adını girin",
                 "methodCreateFromTemplate": "Şablondan Oluştur",
                 "aiProcessingConfiguration": "AI İşleme Yapılandırması",
                 "maxSearchQueries": "Maks. Arama Sorguları",
@@ -1725,7 +1725,7 @@
                 "aiFirstGenerationDescription": "Web aramasından önce başlangıç öğelerinin AI ile oluşturulmasını etkinleştir.",
                 "contentFiltering": "İçerik Filtreleme",
                 "contentFilteringDescription": "İçerik kalitesi filtrelemesini etkinleştir",
-                "recreateConfirmTitle": "Dizin verilerini yeniden oluştur?",
+                "recreateConfirmTitle": "İş verilerini yeniden oluştur?",
                 "recreateConfirmDescription": "Yeniden oluşturma mevcut öğeleri siler ve sıfırdan yeniden oluşturur. Bu işlem geri alınamaz.",
                 "confirmRecreate": "Evet, yeniden oluştur",
                 "recreateInlineTitle": "Yeniden oluşturma mevcut öğeleri kaldıracak",
@@ -1769,7 +1769,7 @@
                 "aiProviderDescription": "İçerik oluşturma ve çıkarma için AI model sağlayıcısı",
                 "contentExtractorProvider": "İçerik Çıkarıcı",
                 "contentExtractorProviderDescription": "Web sayfalarından içerik çıkarmak için sağlayıcı",
-                "useWorkDefault": "Dizin Varsayılanını Kullan",
+                "useWorkDefault": "İş Varsayılanını Kullan",
                 "default": "Varsayılan",
                 "notConfigured": "Yapılandırılmamış",
                 "notConfiguredTooltip": "Bu sağlayıcı yapılandırma gerektirir. Ayarlar → Eklentiler'e giderek ayarlayın.",
@@ -1837,7 +1837,7 @@
                 },
                 "generalSettings": "Genel Ayarlar",
                 "generalTitle": "Genel Ayarlar",
-                "workName": "Dizin Adı",
+                "workName": "İş Adı",
                 "description": "Açıklama",
                 "organizationRepository": "Organizasyon Deposu",
                 "organizationHelp": "Kişisel hesabınız yerine bir organizasyon altında depolar oluşturun",
@@ -1849,13 +1849,13 @@
                 "customHeaderPlaceholder": "README üst kısmına özel içerik ekleyin",
                 "overwriteDefaultHeader": "Varsayılan üst kısmı üzerine yaz",
                 "customFooter": "Özel Alt Kısım",
-                "cantDeleteWhileGenerating": "Öğeler oluşturulurken dizini silemezsiniz.",
+                "cantDeleteWhileGenerating": "Öğeler oluşturulurken işi silemezsiniz.",
                 "customFooterPlaceholder": "README alt kısmına özel içerik ekleyin",
                 "overwriteDefaultFooter": "Varsayılan alt kısmı üzerine yaz",
                 "dangerZone": "Tehlike Alanı",
                 "dangerTitle": "Tehlike Alanı",
-                "deleteWarning": "Bir dizini sildikten sonra geri dönüş yoktur. Lütfen emin olun.",
-                "dangerDescription": "Bir dizini sildikten sonra geri dönüş yoktur. Lütfen emin olun.",
+                "deleteWarning": "Bir işi sildikten sonra geri dönüş yoktur. Lütfen emin olun.",
+                "dangerDescription": "Bir işi sildikten sonra geri dönüş yoktur. Lütfen emin olun.",
                 "deleteOptions": "Neyi sileceğinizi seçin:",
                 "deleteDataRepository": "Veri deposunu sil",
                 "deleteDataRepositoryDescription": "GitHub'dan JSON veri deposunu kaldırın",
@@ -1864,14 +1864,14 @@
                 "deleteWebsiteRepository": "Web sitesi deposunu sil",
                 "deleteWebsiteRepositoryDescription": "Dağıtılmış web sitesi deposunu kaldırın",
                 "deleteConfirm": "Tamamen emin misiniz?",
-                "deleteConfirmDetail": "Bu işlem geri alınamaz. Dizin ve seçilen depolar kalıcı olarak silinecek.",
-                "confirmWorkName": "Onaylamak için dizin adını yazın",
+                "deleteConfirmDetail": "Bu işlem geri alınamaz. İş ve seçilen depolar kalıcı olarak silinecek.",
+                "confirmWorkName": "Onaylamak için iş adını yazın",
                 "confirmWorkNameDescription": "Silme işlemini onaylamak için \"{name}\" yazın",
-                "deleteNameMismatch": "Dizin adı eşleşmiyor",
-                "deleteButton": "Dizini Sil",
+                "deleteNameMismatch": "İş adı eşleşmiyor",
+                "deleteButton": "İşi Sil",
                 "deleteConfirmButton": "Evet, Sil",
-                "deleteSuccess": "Dizin başarıyla silindi",
-                "deleteFailed": "Dizin silinemedi",
+                "deleteSuccess": "İş başarıyla silindi",
+                "deleteFailed": "İş silinemedi",
                 "yesDelete": "Evet, Sil",
                 "cancel": "İptal",
                 "saveChanges": "Değişiklikleri Kaydet",
@@ -1880,7 +1880,7 @@
                 "updateFailed": "Ayarlar güncellenemedi",
                 "deployProvider": {
                     "title": "Dağıtım Sağlayıcısı",
-                    "description": "Dizin web sitenizi nereye dağıtacağınızı seçin",
+                    "description": "İş web sitenizi nereye dağıtacağınızı seçin",
                     "configure": "Yapılandır",
                     "ready": "Dağıtıma hazır",
                     "notConfigured": "Yapılandırılmamış",
@@ -1917,7 +1917,7 @@
                     "prompts": {
                         "relevanceAssessment": {
                             "title": "Alaka Değerlendirmesi",
-                            "description": "Dizin konunuza alaka düzeyine göre web sayfalarını filtrelemek için ek talimatlar.",
+                            "description": "İş konunuza alaka düzeyine göre web sayfalarını filtrelemek için ek talimatlar.",
                             "placeholder": "ör., Yalnızca açık kaynak projelerine odaklanan sayfaları dahil edin..."
                         },
                         "itemGeneration": {
@@ -1968,7 +1968,7 @@
                 "communityPrUpdateFailed": "Topluluk PR ayarları güncellenemedi",
                 "websiteConfig": {
                     "title": "Web Sitesi Yapılandırması",
-                    "subtitle": "Dizin web sitenizin görünümünü ve davranışını özelleştirin",
+                    "subtitle": "İş web sitenizin görünümünü ve davranışını özelleştirin",
                     "loadFailed": "Web sitesi ayarları yüklenemedi",
                     "saveSuccess": "Web sitesi ayarları başarıyla kaydedildi",
                     "saveFailed": "Web sitesi ayarları kaydedilemedi",
@@ -1989,7 +1989,7 @@
                         "siteUrl": {
                             "label": "Site URL'si",
                             "placeholder": "https://example.com",
-                            "helper": "Şirketiniz veya dizin web sitenizin URL'si"
+                            "helper": "Şirketiniz veya iş web sitenizin URL'si"
                         },
                         "global": {
                             "title": "Küresel Özellikler",
@@ -2071,7 +2071,7 @@
                 },
                 "committer": {
                     "title": "Git Committer",
-                    "description": "Bu dizindeki git commit'leri için commit yapan adı ve e-postasını geçersiz kılın. Kullanıcı düzeyindeki ayarlarınızı veya hesap varsayılanlarınızı kullanmak için boş bırakın.",
+                    "description": "Bu işteki git commit'leri için commit yapan adı ve e-postasını geçersiz kılın. Kullanıcı düzeyindeki ayarlarınızı veya hesap varsayılanlarınızı kullanmak için boş bırakın.",
                     "nameLabel": "Commit Yapan Adı",
                     "emailLabel": "Commit Yapan E-posta",
                     "save": "Committer'ı Kaydet",
@@ -2082,13 +2082,13 @@
             "deploy": {
                 "noProviderAlert": {
                     "title": "Dağıtım Sağlayıcısı Yok",
-                    "description": "Dizin web sitenizi dağıtmak için bir dağıtım sağlayıcısı seçin.",
+                    "description": "İş web sitenizi dağıtmak için bir dağıtım sağlayıcısı seçin.",
                     "selectButton": "Seç & Devam Et",
                     "noProviders": "Kullanılabilir dağıtım sağlayıcısı yok. Önce bir dağıtım eklentisi yükleyin"
                 },
                 "noTokenAlert": {
                     "title": "{provider} Token Gerekli",
-                    "description": "Dizinini dağıtmak için {provider} API token'ınızı Eklenti Ayarlarında yapılandırmanız gerekir.",
+                    "description": "İşini dağıtmak için {provider} API token'ınızı Eklenti Ayarlarında yapılandırmanız gerekir.",
                     "configureButton": "Eklenti Ayarlarında Yapılandır",
                     "getTokenButton": "API Token Al",
                     "howTo": {
@@ -2096,25 +2096,25 @@
                         "step1": "'API Token Al'a tıklayarak sağlayıcı panonuzu açın",
                         "step2": "Dağıtım izinleriyle yeni bir token oluşturun",
                         "step3": "{provider} API token'ınızı Eklenti Ayarları > {provider} içinde yapılandırın",
-                        "step4": "Dizinini dağıtmak için buraya dönün"
+                        "step4": "İşini dağıtmak için buraya dönün"
                     }
                 },
                 "sharedNoTokenAlert": {
                     "title": "Dağıtım Kullanılabilir Değil",
-                    "description": "Dizin sahibi dağıtımı yapılandırmamış. Dağıtımı ayarlamak için dizin sahibiyle iletişime geçin.",
+                    "description": "İş sahibi dağıtımı yapılandırmamış. Dağıtımı ayarlamak için iş sahibiyle iletişime geçin.",
                     "hint": "İşbirlikçi olarak, sahip dağıtım sağlayıcısını yapılandırdığında dağıtımları tetikleyebilirsiniz"
                 },
                 "form": {
                     "deployment": {
                         "title": "Web Sitesi Dağıt",
-                        "description": "Dizin web sitesi deposunu dağıtın.",
+                        "description": "İş web sitesi deposunu dağıtın.",
                         "deployButton": "{provider}'a Dağıt",
                         "deployingButton": "Dağıtılıyor...",
                         "deployingStateButton": "Dağıtılıyor ({state})...",
                         "successMessage": "Web siteniz başarıyla dağıtıldı!",
                         "teamSelection": {
                             "title": "Takım Seç",
-                            "description": "Bu dizini dağıtmak için takımı seçin.",
+                            "description": "Bu işi dağıtmak için takımı seçin.",
                             "label": "Takım",
                             "placeholder": "Bir takım seçin",
                             "confirmButton": "Takıma dağıt",
@@ -2141,7 +2141,7 @@
                     },
                     "info": {
                         "deployInfo": "Dağıtım genellikle 1-3 dakika sürer. Tamamlandığında bir URL alacaksınız.",
-                        "updateInfo": "Güncellemeler, dizin içeriğinizi bir sonraki dağıtım için web sitesi deposuna senkronize eder"
+                        "updateInfo": "Güncellemeler, iş içeriğinizi bir sonraki dağıtım için web sitesi deposuna senkronize eder"
                     },
                     "websiteTemplate": {
                         "title": "Otomatik Şablon Güncellemeleri",
@@ -2209,8 +2209,8 @@
             }
         },
         "workCreation": {
-            "title": "Yeni Dizin Oluştur",
-            "subtitle": "Dizinizi nasıl oluşturmak istediğinizi seçin",
+            "title": "Yeni İş Oluştur",
+            "subtitle": "İşizi nasıl oluşturmak istediğinizi seçin",
             "backToOptions": "Seçeneklere dön",
             "sidebar": {
                 "selectedProvider": "Git Sağlayıcısı",
@@ -2218,7 +2218,7 @@
             },
             "deployProvider": {
                 "title": "Dağıtım Sağlayıcısı",
-                "description": "Dizin web sitenizi nereye dağıtacağınızı seçin",
+                "description": "İş web sitenizi nereye dağıtacağınızı seçin",
                 "noProviders": "Kullanılabilir dağıtım sağlayıcısı yok",
                 "notConfigured": "Yapılandırılmamış",
                 "configured": "Dağıtıma hazır",
@@ -2236,21 +2236,21 @@
             },
             "ai": {
                 "title": "AI ile Oluştur",
-                "subtitle": "Dizin fikrinizi doğal dilde tarif edin ve AI kurulumun tamamını halletsin",
+                "subtitle": "İş fikrinizi doğal dilde tarif edin ve AI kurulumun tamamını halletsin",
                 "getStarted": "Başla",
-                "formTitle": "AI ile Dizin Oluştur",
-                "formSubtitle": "Dizin fikrinizi tarif edin ve AI kurulum ile ilk içerik üretimini halletsin",
-                "workNameLabel": "Dizin Adı",
+                "formTitle": "AI ile İş Oluştur",
+                "formSubtitle": "İş fikrinizi tarif edin ve AI kurulum ile ilk içerik üretimini halletsin",
+                "workNameLabel": "İş Adı",
                 "workNamePlaceholder": "ör. Harika AI Araçları",
                 "workNameHelp": "Bu alanı boş bırakırsanız AI bir ad önerir",
-                "promptLabel": "Dizinini Tarif Et",
+                "promptLabel": "İşini Tarif Et",
                 "githubRequired": "Lütfen önce GitHub hesabınızı bağlayın.",
-                "promptPlaceholder": "Oluşturmak istediğiniz dizin türünü, içermesi gereken öğeleri ve özel gereksinimleri tarif edin...",
+                "promptPlaceholder": "Oluşturmak istediğiniz iş türünü, içermesi gereken öğeleri ve özel gereksinimleri tarif edin...",
                 "inspirationText": "İlham mı lazım? Bunlardan birini deneyin:",
                 "examplePrompts": {
                     "0": {
                         "name": "AI Geliştirici Araçları",
-                        "prompt": "Geliştiriciler için en iyi AI araçlarının dizinini oluştur"
+                        "prompt": "Geliştiriciler için en iyi AI araçlarının işini oluştur"
                     },
                     "1": {
                         "name": "React Bileşenleri Merkezi",
@@ -2258,7 +2258,7 @@
                     },
                     "2": {
                         "name": "Uzaktan Ekip Araçları",
-                        "prompt": "Uzaktan ekipler için üretkenlik uygulamalarının dizinini üret"
+                        "prompt": "Uzaktan ekipler için üretkenlik uygulamalarının işini üret"
                     },
                     "3": {
                         "name": "Sürdürülebilir Moda",
@@ -2273,23 +2273,23 @@
                     "3": "Uygun dokümantasyonla GitHub deposu kur"
                 },
                 "generateButton": "AI ile Üret",
-                "generatingButton": "Dizin Üretiliyor...",
+                "generatingButton": "İş Üretiliyor...",
                 "cancelButton": "İptal",
                 "noteTitle": "Not:",
-                "noteText": "AI üretimi isteğinizin karmaşıklığına göre genellikle 2-5 dakika sürer. Dizin hazır olduğunda bildirileceksiniz.",
+                "noteText": "AI üretimi isteğinizin karmaşıklığına göre genellikle 2-5 dakika sürer. İş hazır olduğunda bildirileceksiniz.",
                 "errors": {
-                    "promptRequired": "Lütfen oluşturmak istediğiniz dizin türünü tarif edin",
+                    "promptRequired": "Lütfen oluşturmak istediğiniz iş türünü tarif edin",
                     "unconfiguredProviders": "{providers} yapılandırılmamış. Üretmeden önce Ayarlar → Eklentiler'e gidin.",
-                    "nameRequired": "Dizin adı gerekli",
-                    "slugRequired": "Dizin slug'ı gerekli",
-                    "descriptionRequired": "Dizin açıklaması gerekli",
+                    "nameRequired": "İş adı gerekli",
+                    "slugRequired": "İş slug'ı gerekli",
+                    "descriptionRequired": "İş açıklaması gerekli",
                     "githubRequired": "Lütfen önce GitHub hesabınızı bağlayın.",
-                    "createFailed": "Dizin oluşturulamadı"
+                    "createFailed": "İş oluşturulamadı"
                 },
                 "success": {
-                    "started": "Dizin oluşturma başladı!",
+                    "started": "İş oluşturma başladı!",
                     "generating": "AI içerik üretiyor. Birkaç dakika sürebilir...",
-                    "created": "Dizin başarıyla oluşturuldu!"
+                    "created": "İş başarıyla oluşturuldu!"
                 },
                 "advancedSettings": "Gelişmiş Ayarlar",
                 "advancedSubtitle": "Kuruluş ve depo ayarlarını yapılandırın",
@@ -2300,14 +2300,14 @@
             },
             "manual": {
                 "title": "Manuel Oluştur",
-                "subtitle": "Her ayar ve seçenek üzerinde tam kontrolle dizininizi yapılandırın",
+                "subtitle": "Her ayar ve seçenek üzerinde tam kontrolle işinizi yapılandırın",
                 "configureNow": "Şimdi yapılandır",
-                "formTitle": "Dizini Manuel Oluştur",
-                "formSubtitle": "Dizininizi her ayar üzerinde tam kontrolle yapılandırın",
+                "formTitle": "İşi Manuel Oluştur",
+                "formSubtitle": "İşinizi her ayar üzerinde tam kontrolle yapılandırın",
                 "basicInfo": "Temel Bilgiler",
-                "nameLabel": "Dizin Adı *",
+                "nameLabel": "İş Adı *",
                 "namePlaceholder": "ör. Harika AI Araçları",
-                "slugLabel": "Dizin Slug'ı *",
+                "slugLabel": "İş Slug'ı *",
                 "slugPlaceholder": "awesome-ai-tools",
                 "githubRequired": "Lütfen önce GitHub hesabınızı bağlayın.",
                 "slugHelp": "URL dostu tanımlayıcı (sadece küçük harf, rakam ve tire)",
@@ -2316,7 +2316,7 @@
                 "advancedSettings": "Gelişmiş Ayarlar",
                 "advancedSubtitle": "Kuruluş, özel başlıklar ve daha fazlası",
                 "organizationLabel": "Kuruluş altında oluştur",
-                "organizationHelp": "Bu dizini kişisel hesabınız yerine bir GitHub kuruluşu altında oluşturun",
+                "organizationHelp": "Bu işi kişisel hesabınız yerine bir GitHub kuruluşu altında oluşturun",
                 "organizationNameLabel": "Kuruluş Adı",
                 "organizationNamePlaceholder": "my-organization",
                 "headerLabel": "Özel README Başlığı",
@@ -2325,25 +2325,25 @@
                 "footerLabel": "Özel README Altı",
                 "footerPlaceholder": "README dosyanızın altına özel içerik ekleyin",
                 "footerOverwrite": "Varsayılan alt bilgiyi tamamen değiştir",
-                "createButton": "Dizin Oluştur",
-                "creatingButton": "Dizin Oluşturuluyor...",
+                "createButton": "İş Oluştur",
+                "creatingButton": "İş Oluşturuluyor...",
                 "cancelButton": "İptal",
-                "nameRequired": "Dizin adı gerekli",
-                "slugRequired": "Dizin slug'ı gerekli",
-                "descriptionRequired": "Dizin açıklaması gerekli",
-                "createFailed": "Dizin oluşturulamadı",
+                "nameRequired": "İş adı gerekli",
+                "slugRequired": "İş slug'ı gerekli",
+                "descriptionRequired": "İş açıklaması gerekli",
+                "createFailed": "İş oluşturulamadı",
                 "success": {
-                    "created": "Dizin başarıyla oluşturuldu!"
+                    "created": "İş başarıyla oluşturuldu!"
                 }
             },
             "import": {
                 "title": "Mevcut İçe Aktar",
-                "subtitle": "Mevcut bir GitHub deposundan dizin içe aktarın",
+                "subtitle": "Mevcut bir GitHub deposundan iş içe aktarın",
                 "importNow": "Şimdi içe aktar",
                 "aiProviderSettings": "AI Sağlayıcısı",
                 "aiProviderSettingsDescription": "README'yi ayrıştırmak için hangi AI sağlayıcısını kullanacağınızı seçin",
-                "formTitle": "GitHub'dan Dizin İçe Aktar",
-                "formSubtitle": "Dizin oluşturmak için mevcut bir GitHub deposundan öğeleri içe aktarın",
+                "formTitle": "GitHub'dan İş İçe Aktar",
+                "formSubtitle": "İş oluşturmak için mevcut bir GitHub deposundan öğeleri içe aktarın",
                 "sync": {
                     "title": "Senkronize Tut",
                     "description": "Kaynak deposundan güncellemeleri otomatik çekin."
@@ -2396,13 +2396,13 @@
                     "schedule": "Zamanlama: {cadence}",
                     "providers": "Sağlayıcılar: {providers}"
                 },
-                "nameLabel": "Dizin Adı",
-                "namePlaceholder": "ör. Harika Dizinim",
+                "nameLabel": "İş Adı",
+                "namePlaceholder": "ör. Harika İşim",
                 "advancedSettings": "Gelişmiş Ayarlar",
                 "advancedSubtitle": "Kuruluş ve depo ayarlarını yapılandırın",
                 "attribution": {
                     "title": "Kaynak Atıf:",
-                    "text": "Bu dizin {url}'yi kaynak olarak referans verecek"
+                    "text": "Bu iş {url}'yi kaynak olarak referans verecek"
                 },
                 "research": {
                     "title": "İçe Aktar & Araştırma Modu",
@@ -2425,13 +2425,13 @@
                     "importingButton": "Araştırma hattı başlatılıyor..."
                 },
                 "analyzeButton": "Depoyu Analiz Et",
-                "importButton": "Dizin İçe Aktar",
+                "importButton": "İş İçe Aktar",
                 "importingButton": "İçe Aktarılıyor...",
                 "backButton": "Geri",
                 "cancelButton": "İptal",
                 "importing": {
-                    "title": "Dizin İçe Aktarılıyor",
-                    "subtitle": "Dizin kaynak deposundan ayarlanıyor..."
+                    "title": "İş İçe Aktarılıyor",
+                    "subtitle": "İş kaynak deposundan ayarlanıyor..."
                 },
                 "repositorySelector": {
                     "title": "Depo Seç",
@@ -2498,17 +2498,17 @@
                     "unsupportedFormat": "Bu depo formatı desteklenmiyor. Lütfen Veri Deposu veya Harika Liste formatı kullanın.",
                     "analyzeFailed": "Depo analiz edilemedi",
                     "analyzeForLinkingFailed": "Bağlama için analiz edilemedi",
-                    "nameRequired": "Dizin adı gerekli",
+                    "nameRequired": "İş adı gerekli",
                     "noAnalysis": "Lütfen önce bir depo analiz edin",
                     "githubRequired": "Lütfen önce GitHub hesabınızı bağlayın",
                     "providerRequired": "Lütfen önce bir git sağlayıcısı seçin",
-                    "importFailed": "Dizin içe aktarılamadı",
-                    "linkFailed": "Dizin bağlanamadı",
+                    "importFailed": "İş içe aktarılamadı",
+                    "linkFailed": "İş bağlanamadı",
                     "providerNotConfigured": "{provider} yapılandırılmamış. İçe aktarmadan önce Ayarlar → Eklentiler'e gidin."
                 },
                 "success": {
-                    "started": "İçe aktarma başladı! Dizinunuza yönlendiriliyor...",
-                    "linked": "Dizin başarıyla bağlandı"
+                    "started": "İçe aktarma başladı! İşunuza yönlendiriliyor...",
+                    "linked": "İş başarıyla bağlandı"
                 },
                 "slugConflict": {
                     "title": "Depo adı çakışması",
@@ -2521,7 +2521,7 @@
             "connection": {
                 "alert": {
                     "title": "{provider} bağlı değil",
-                    "subtitle": "Dizinler oluşturmak için {provider} hesabınızı bağlayın",
+                    "subtitle": "İşler oluşturmak için {provider} hesabınızı bağlayın",
                     "connectButton": "{provider} Bağla",
                     "connectingButton": "Bağlanıyor..."
                 }
@@ -2537,7 +2537,7 @@
             },
             "settings": {
                 "title": "Git Sağlayıcısı Bağlantıları",
-                "subtitle": "Depoları içe aktarmak, dizinler oluşturmak ve projelerinizi yönetmek için git sağlayıcısı hesaplarınızı bağlayın.",
+                "subtitle": "Depoları içe aktarmak, işler oluşturmak ve projelerinizi yönetmek için git sağlayıcısı hesaplarınızı bağlayın.",
                 "connectedCount": "{count, plural, =0 {Bağlı sağlayıcı yok} =1 {1 sağlayıcı bağlı} other {# sağlayıcı bağlı}}",
                 "noProvidersConnected": "Bağlı sağlayıcı yok",
                 "canImport": "Depoları içe aktarabilir ve yönetebilirsiniz",
@@ -2568,7 +2568,7 @@
                 "subtitle": "Dağıtım sağlayıcılarını Eklenti Ayarlarında yapılandırın",
                 "connected": "Bağlandı",
                 "notConnected": "Bağlı Değil",
-                "connectedMessage": "Dağıtım sağlayıcınız yapılandırıldı. Artık dizinleri dağıtabilirsiniz.",
+                "connectedMessage": "Dağıtım sağlayıcınız yapılandırıldı. Artık işleri dağıtabilirsiniz.",
                 "disconnect": "Bağlantıyı Kes",
                 "disconnecting": "Kaldırılıyor...",
                 "apiTokenLabel": "API Jetonu",
@@ -2605,16 +2605,16 @@
             "email": {
                 "title": "E-posta Bildirimleri",
                 "workUpdates": {
-                    "label": "Dizin Güncellemeleri",
-                    "description": "Dizinlerinizdeki önemli güncellemeler hakkında bildirim alın"
+                    "label": "İş Güncellemeleri",
+                    "description": "İşlerinizdeki önemli güncellemeler hakkında bildirim alın"
                 },
                 "newItems": {
                     "label": "Yeni Ögeler",
-                    "description": "Dizinlerinize yeni ögeler eklendiğinde bildirim alın"
+                    "description": "İşlerinize yeni ögeler eklendiğinde bildirim alın"
                 },
                 "weeklyDigest": {
                     "label": "Haftalık Özet",
-                    "description": "Dizin etkinliğinizin haftalık özetini alın"
+                    "description": "İş etkinliğinizin haftalık özetini alın"
                 },
                 "marketing": {
                     "label": "Pazarlama & Promosyonlar",
@@ -2625,11 +2625,11 @@
                 "title": "Uygulama İçi Bildirimler",
                 "newItems": {
                     "label": "Yeni Ögeler",
-                    "description": "Yeni dizin ögeleri için bildirim gösterin"
+                    "description": "Yeni iş ögeleri için bildirim gösterin"
                 },
                 "comments": {
                     "label": "Yorumlar",
-                    "description": "Dizinlerinizdeki yorumlar hakkında bildirim alın"
+                    "description": "İşlerinizdeki yorumlar hakkında bildirim alın"
                 },
                 "mentions": {
                     "label": "Etiketlemeler",
@@ -2653,12 +2653,12 @@
         "sidebar": {
             "menu": "Menü",
             "aiChat": "AI Sohbet",
-            "newWork": "Yeni Dizin",
-            "activityIndicator": "Dizin oluşturuluyor",
+            "newWork": "Yeni İş",
+            "activityIndicator": "İş oluşturuluyor",
             "navigation": {
                 "dashboard": "Pano",
                 "activity": "Etkinlik",
-                "works": "Dizinler",
+                "works": "İşler",
                 "plugins": "Eklentiler",
                 "settings": "Ayarlar"
             },
@@ -2680,7 +2680,7 @@
             "subtitle": "Geri alınamaz ve yıkıcı eylemler",
             "export": {
                 "title": "Verilerinizi Dışa Aktarın",
-                "subtitle": "Tüm dizinlerinizi, ögelerinizi ve ayarlarınızı indirin",
+                "subtitle": "Tüm işlerinizi, ögelerinizi ve ayarlarınızı indirin",
                 "action": "Verileri Dışa Aktar (Yakında)"
             },
             "delete": {
@@ -2690,8 +2690,8 @@
                 "confirmTitle": "⚠️ Bu kalıcı olarak silecektir:",
                 "confirmItems": [
                     "Hesabınız ve profiliniz",
-                    "Tüm dizinleriniz",
-                    "Tüm dizin ögeleri ve veriler",
+                    "Tüm işleriniz",
+                    "Tüm iş ögeleri ve veriler",
                     "API anahtarları ve entegrasyonlar",
                     "Tüm ilişkili web siteleri"
                 ],
@@ -2711,13 +2711,13 @@
         "aiChat": {
             "title": "AI Asistanı",
             "panelTitle": "Sohbet",
-            "subtitle": "Doğal dil ile dizinler oluşturun",
+            "subtitle": "Doğal dil ile işler oluşturun",
             "welcomeTitle": "AI Asistanına Hoş Geldiniz 👋",
-            "welcomeSubtitle": "AI destekli asistanınız. Dizin oluşturma, içerik üretme veya verilerinizi organize etme hakkında bana her şeyi sorun.",
-            "welcomeMessage": "Merhaba! Doğal dil kullanarak dizinler oluşturmanıza yardımcı olabilirim. \"AI araçları için bir dizin oluştur\" gibi bir şey sorun veya ihtiyacınızı tarif edin.",
+            "welcomeSubtitle": "AI destekli asistanınız. İş oluşturma, içerik üretme veya verilerinizi organize etme hakkında bana her şeyi sorun.",
+            "welcomeMessage": "Merhaba! Doğal dil kullanarak işler oluşturmanıza yardımcı olabilirim. \"AI araçları için bir iş oluştur\" gibi bir şey sorun veya ihtiyacınızı tarif edin.",
             "capabilities": {
-                "workCreation": "Dizin Oluşturma",
-                "workCreationDesc": "Doğal dil açıklamalarından dizinler oluşturun",
+                "workCreation": "İş Oluşturma",
+                "workCreationDesc": "Doğal dil açıklamalarından işler oluşturun",
                 "webResearch": "Web Araştırması",
                 "webResearchDesc": "Web'den veri arayın ve toplayın",
                 "contentGeneration": "İçerik Üretimi",
@@ -2747,11 +2747,11 @@
             "selectProvider": "Sağlayıcı",
             "notConfigured": "Yapılandırılmadı",
             "gitNotConnected": "Git sağlayıcısı bağlı değil",
-            "gitNotConnectedDesc": "Dizinleri oluşturmak ve yönetmek için git sağlayıcınızı bağlayın.",
+            "gitNotConnectedDesc": "İşleri oluşturmak ve yönetmek için git sağlayıcınızı bağlayın.",
             "connectGithub": "GitHub'ı Bağla",
             "gitConnectedAs": "{provider} aracılığıyla {username} olarak bağlı",
             "deployNotConfigured": "Dağıtım sağlayıcısı yapılandırılmadı",
-            "deployNotConfiguredDesc": "Dizin web sitelerinizi yayınlamak için bir dağıtım sağlayıcısı yapılandırın.",
+            "deployNotConfiguredDesc": "İş web sitelerinizi yayınlamak için bir dağıtım sağlayıcısı yapılandırın.",
             "configureDeployProvider": "Dağıtım Sağlayıcısını Yapılandır",
             "deployConfigured": "Dağıtım sağlayıcısı yapılandırıldı ({provider})",
             "opened": "Açıldı",
@@ -2761,12 +2761,12 @@
             "historyYesterday": "Dün",
             "historyDaysAgo": "{days}g önce",
             "suggestions": {
-                "s1": "Dizinlerimi göster",
-                "s2": "AI araçları dizini oluştur",
+                "s1": "İşlerimi göster",
+                "s2": "AI araçları işi oluştur",
                 "s3": "Git bağlantımı kontrol et",
                 "s4": "İstatistiklerimi göster"
             },
-            "feelingLucky": "Oluşturulacak bir dizin öner",
+            "feelingLucky": "Oluşturulacak bir iş öner",
             "errors": {
                 "unableToSend": "Mesaj gönderilemedi"
             }
@@ -2779,7 +2779,7 @@
             "enabled": "Etkin",
             "disabled": "Devre dışı",
             "enable": "Etkinleştir",
-            "enableDescription": "Bu eklentinin dizinlerinizde nasıl etkinleştirileceğini yapılandırın.",
+            "enableDescription": "Bu eklentinin işlerinizde nasıl etkinleştirileceğini yapılandırın.",
             "disable": "Devre dışı bırak",
             "settings": "Ayarlar",
             "saveSettings": "Ayarları Kaydet",
@@ -2811,11 +2811,11 @@
                 "pipeline": "İş Akışı"
             },
             "alwaysEnabled": "Her zaman etkin",
-            "disableWarning": "Bu eklentiyi devre dışı bırakmak, tüm dizinlerdeki eklentiyi de devre dışı bırakacaktır",
+            "disableWarning": "Bu eklentiyi devre dışı bırakmak, tüm işlerdeki eklentiyi de devre dışı bırakacaktır",
             "cannotDisableSystem": "Sistem eklentileri devre dışı bırakılamaz",
             "disableFailed": "Eklenti devre dışı bırakılamadı",
-            "autoEnableForWorks": "Tüm dizinler için de etkinleştir",
-            "autoEnableForWorksDescription": "Bu eklenti, tüm dizinlerinizde otomatik olarak etkin olacaktır. Hala dizin başına devre dışı bırakabilirsiniz.",
+            "autoEnableForWorks": "Tüm işler için de etkinleştir",
+            "autoEnableForWorksDescription": "Bu eklenti, tüm işlerinizde otomatik olarak etkin olacaktır. Hala iş başına devre dışı bırakabilirsiniz.",
             "confirmDisable": "Devre Dışı Bırakmayı Onayla",
             "cancel": "İptal",
             "missingRequiredFields": "Eksik zorunlu alanlar: {fields}",
@@ -2891,19 +2891,19 @@
             }
         },
         "workPlugins": {
-            "title": "Dizin Eklentileri",
-            "subtitle": "Bu dizin için eklentileri yapılandırın",
+            "title": "İş Eklentileri",
+            "subtitle": "Bu iş için eklentileri yapılandırın",
             "active": "Etkin",
             "enable": "Etkinleştir",
             "disable": "Devre dışı bırak",
-            "enableForWork": "Bu dizin için etkinleştir",
-            "disableForWork": "Bu dizin için devre dışı bırak",
+            "enableForWork": "Bu iş için etkinleştir",
+            "disableForWork": "Bu iş için devre dışı bırak",
             "enableAtUserLevelFirst": "Önce ayarlarınızda bu eklentiyi etkinleştirin",
             "disabledByUser": "Kullanıcı düzeyinde devre dışı",
             "systemAlwaysEnabled": "Sistem eklentisi - her zaman etkin",
             "showSettings": "Ayarları Göster",
             "hideSettings": "Ayarları Gizle",
-            "workSettingsInfo": "Dizin özel ayarlarını burada yapılandırın",
+            "workSettingsInfo": "İş özel ayarlarını burada yapılandırın",
             "save": "Kaydet",
             "saved": "Kaydedildi",
             "showInstalledOnly": "Yalnızca yüklenenleri göster",
@@ -2911,7 +2911,7 @@
             "noPlugins": "Kullanılabilir eklenti yok",
             "showAllPlugins": "Tüm eklentileri göster",
             "capabilityProviders": "Yetenek Sağlayıcıları",
-            "capabilityProvidersDescription": "Bu dizin için her yeteneği hangi eklentinin sağladığını seçin",
+            "capabilityProvidersDescription": "Bu iş için her yeteneği hangi eklentinin sağladığını seçin",
             "noProvidersAvailable": "Kullanılabilir sağlayıcı yok",
             "categories": {
                 "git": "Git",
@@ -2929,12 +2929,12 @@
             "errors": {
                 "unableToSend": "Mesaj gönderilemedi."
             },
-            "settingsModalTitle": "Dizin Ayarları",
-            "settingsModalDescription": "Bu dizin için ayarları geçersiz kılın. Ayarlanmamış alanlar kullanıcı ayarlarınızdan devralır.",
+            "settingsModalTitle": "İş Ayarları",
+            "settingsModalDescription": "Bu iş için ayarları geçersiz kılın. Ayarlanmamış alanlar kullanıcı ayarlarınızdan devralır.",
             "inheritedFrom": "Devralınan: {value}",
             "inheritedSecret": "Devralınan: ••••••••",
             "resetToDefaults": "Varsayılana Sıfırla",
-            "resetConfirm": "Bu, tüm dizin özel geçersiz kılmaları temizleyecektir. Ayarlar kullanıcı düzeyindeki değerlere geri dönecektir.",
+            "resetConfirm": "Bu, tüm iş özel geçersiz kılmaları temizleyecektir. Ayarlar kullanıcı düzeyindeki değerlere geri dönecektir.",
             "resetSuccess": "Ayarlar varsayılana sıfırlandı",
             "cancel": "İptal",
             "clickToConfigure": "Yapılandırmak için tıklayın",
@@ -2949,8 +2949,8 @@
         "auth": {
             "backToHome": "Ana sayfaya dön",
             "feature": {
-                "title": "AI ile Dizinler Oluşturun",
-                "subtitle": "Doğal dil kullanarak dakikalar içinde güzel, aranabilir dizinler oluşturun. Kodlama gerekmez.",
+                "title": "AI ile İşler Oluşturun",
+                "subtitle": "Doğal dil kullanarak dakikalar içinde güzel, aranabilir işler oluşturun. Kodlama gerekmez.",
                 "badge": "AI Destekli",
                 "benefits": {
                     "ai": {
@@ -3002,8 +3002,8 @@
         }
     },
     "metadata": {
-        "title": "{companyName} - Dizin Oluşturucu",
-        "description": "Dizin oluşturma ve yönetme için bir SaaS platformu",
+        "title": "{companyName} - İş Oluşturucu",
+        "description": "İş oluşturma ve yönetme için bir SaaS platformu",
         "pages": {
             "signIn": "Oturum Aç",
             "createAccount": "Hesap Oluştur",
@@ -3012,9 +3012,9 @@
             "authError": "Kimlik Doğrulama Hatası",
             "dashboard": "Panel",
             "activity": "Etkinlik Günlüğü",
-            "works": "Dizinler",
-            "newWork": "Yeni Dizin",
-            "work": "Dizin",
+            "works": "İşler",
+            "newWork": "Yeni İş",
+            "work": "İş",
             "overview": "Genel Bakış",
             "items": "Öğeler",
             "generator": "Üretici",
@@ -3067,16 +3067,16 @@
             },
             "oauthRequired": "OAuth bağlantısı gerekli. Lütfen önce {provider} hesabınızı bağlayın.",
             "githubRequired": "GitHub bağlantısı gerekli. Lütfen önce GitHub hesabınızı bağlayın.",
-            "createSuccess": "Dizin başarıyla oluşturuldu!",
-            "createFailed": "Dizin oluşturulamadı",
-            "updateSuccess": "Dizin başarıyla güncellendi!",
-            "updateFailed": "Dizin güncellenemedi",
-            "invalidGeneratedData": "Geçerli dizin verisi üretilemedi",
-            "aiGenerationStarted": "Dizin oluşturma başladı! AI içerik üretiyor...",
-            "invalidId": "Geçersiz dizin kimliği",
-            "deleteSuccess": "Dizin başarıyla silindi",
-            "deleteFailed": "Dizin silinemedi",
-            "fetchFailed": "Dizinler getirilemedi",
+            "createSuccess": "İş başarıyla oluşturuldu!",
+            "createFailed": "İş oluşturulamadı",
+            "updateSuccess": "İş başarıyla güncellendi!",
+            "updateFailed": "İş güncellenemedi",
+            "invalidGeneratedData": "Geçerli iş verisi üretilemedi",
+            "aiGenerationStarted": "İş oluşturma başladı! AI içerik üretiyor...",
+            "invalidId": "Geçersiz iş kimliği",
+            "deleteSuccess": "İş başarıyla silindi",
+            "deleteFailed": "İş silinemedi",
+            "fetchFailed": "İşler getirilemedi",
             "organization": {
                 "requiredWhenOwnerProvided": "Sahip sağlandığında organizasyon etkinleştirilmelidir"
             },
@@ -3084,7 +3084,7 @@
                 "invalidUrl": "Lütfen geçerli bir URL girin",
                 "analyzeFailed": "Depo analiz edilemedi",
                 "started": "İçe aktarma başarıyla başladı",
-                "failed": "Dizin içe aktarılamadı",
+                "failed": "İş içe aktarılamadı",
                 "fetchReposFailed": "Depolar getirilemedi"
             }
         },
