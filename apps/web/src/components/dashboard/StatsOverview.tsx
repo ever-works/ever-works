@@ -2,8 +2,7 @@
 
 import { cn } from '@/lib/utils/cn';
 import { useTranslations } from 'next-intl';
-import { FolderClosed, ListTodo, Globe } from 'lucide-react';
-import type { LucideIcon } from 'lucide-react';
+import { FolderClosed, ListTodo, Globe, type LucideIcon } from 'lucide-react';
 
 interface StatsOverviewProps {
     totalDirectories?: number;

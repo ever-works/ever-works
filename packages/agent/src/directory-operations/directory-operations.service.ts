@@ -22,6 +22,7 @@ export type GenerationHistoryUpdateInput = {
     parameters?: Record<string, any> | null;
     changelog?: DirectoryChangelog | null;
     logs?: GenerationStepLog[] | null;
+    warnings?: string[] | null;
 };
 
 export function buildStatsUpdate(

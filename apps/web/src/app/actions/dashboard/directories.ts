@@ -15,6 +15,7 @@ import {
     UpdateDirectoryAdvancedPromptsDto,
     GitProviderConnectionInfo,
 } from '@/lib/api';
+import type { Directory } from '@/lib/api/types-only';
 import { getAuthFromCookie } from '@/lib/auth';
 import { checkGitProviderConnection } from './oauth';
 import { getTranslations } from 'next-intl/server';
@@ -483,6 +484,21 @@ export async function syncDirectoryData(
         return res;
     } catch (error) {
         console.error('Failed to sync directory data:', error);
+        return null;
+    }
+}
+
+export async function getDirectoryForStatusRefresh(directoryId: string): Promise<Directory | null> {
+    const user = await getAuthFromCookie();
+    if (!user) {
+        return null;
+    }
+
+    try {
+        const { directory } = await directoryAPI.get(directoryId);
+        return directory;
+    } catch (error) {
+        console.error('Failed to refresh directory status:', error);
         return null;
     }
 }

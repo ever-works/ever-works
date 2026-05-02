@@ -4,21 +4,35 @@ import * as React from 'react';
 import { Menu, MenuButton, MenuItems, MenuItem } from '@headlessui/react';
 import { cn } from '@/lib/utils/cn';
 
-function PassThrough({ children }: { children?: React.ReactNode }) {
-    return <>{children}</>;
-}
+const MenuCompat = Menu as unknown as React.ComponentType<{
+    children?: React.ReactNode;
+    as?: React.ElementType;
+    className?: string;
+}>;
+
+const MenuButtonCompat = MenuButton as unknown as React.ComponentType<{
+    children?: React.ReactNode;
+    as?: React.ElementType;
+    className?: string;
+}>;
+
+const MenuItemsCompat = MenuItems as unknown as React.ComponentType<{
+    children?: React.ReactNode;
+    className?: string;
+    transition?: boolean;
+    portal?: boolean;
+    anchor?: { to: string; gap: number };
+}>;
 
 interface DropdownMenuProps {
     children: React.ReactNode;
 }
 
 export function DropdownMenu({ children }: DropdownMenuProps) {
-    const menuChildren = children as React.ComponentProps<typeof Menu>['children'];
-
     return (
-        <Menu as="div" className="relative inline-block text-left w-full">
-            {menuChildren}
-        </Menu>
+        <MenuCompat as="div" className="relative inline-block text-left w-full">
+            {children}
+        </MenuCompat>
     );
 }
 
@@ -29,16 +43,14 @@ interface DropdownMenuTriggerProps {
 }
 
 export function DropdownMenuTrigger({ children, asChild, className }: DropdownMenuTriggerProps) {
-    const triggerChildren = children as React.ComponentProps<typeof MenuButton>['children'];
-
     if (asChild && React.isValidElement(children)) {
-        return <MenuButton as={PassThrough}>{triggerChildren}</MenuButton>;
+        return <MenuButtonCompat as={React.Fragment}>{children}</MenuButtonCompat>;
     }
 
     return (
-        <MenuButton className={cn('inline-flex items-center justify-center', className)}>
-            {triggerChildren}
-        </MenuButton>
+        <MenuButtonCompat className={cn('inline-flex items-center justify-center', className)}>
+            {children}
+        </MenuButtonCompat>
     );
 }
 
@@ -58,10 +70,9 @@ export function DropdownMenuContent({
     const anchorSide = side === 'bottom' ? 'bottom' : 'top';
     const anchorAlign = align === 'center' ? '' : align === 'start' ? ' start' : ' end';
     const anchorTo = `${anchorSide}${anchorAlign}` as const;
-    const menuItemsChildren = children as React.ReactNode;
 
     return (
-        <MenuItems
+        <MenuItemsCompat
             transition
             portal
             anchor={{ to: anchorTo, gap: 8 }}
@@ -78,8 +89,8 @@ export function DropdownMenuContent({
                 className,
             )}
         >
-            <div className="p-1">{menuItemsChildren}</div>
-        </MenuItems>
+            <div className="p-1">{children}</div>
+        </MenuItemsCompat>
     );
 }
 

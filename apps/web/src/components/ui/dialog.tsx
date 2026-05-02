@@ -13,6 +13,16 @@ import { useTranslations } from 'next-intl';
 import { cn } from '@/lib/utils/cn';
 import { X } from 'lucide-react';
 
+const DialogPanelCompat = DialogPanel as unknown as React.ComponentType<{
+    children?: React.ReactNode;
+    className?: string;
+}>;
+
+const DescriptionCompat = Description as unknown as React.ComponentType<{
+    children?: React.ReactNode;
+    className?: string;
+}>;
+
 interface DialogProps {
     open: boolean;
     onOpenChange: (open: boolean) => void;
@@ -52,8 +62,6 @@ interface DialogContentProps {
 }
 
 export function DialogContent({ children, className }: DialogContentProps) {
-    const panelChildren = children as React.ComponentProps<typeof DialogPanel>['children'];
-
     return (
         <TransitionChild
             enter="ease-out duration-300"
@@ -63,7 +71,7 @@ export function DialogContent({ children, className }: DialogContentProps) {
             leaveFrom="opacity-100 scale-100"
             leaveTo="opacity-0 scale-95"
         >
-            <DialogPanel
+            <DialogPanelCompat
                 className={cn(
                     'relative bg-surface dark:bg-surface-dark',
                     'rounded-lg shadow-xl',
@@ -72,8 +80,8 @@ export function DialogContent({ children, className }: DialogContentProps) {
                     className,
                 )}
             >
-                {panelChildren}
-            </DialogPanel>
+                {children}
+            </DialogPanelCompat>
         </TransitionChild>
     );
 }
@@ -100,17 +108,15 @@ interface DialogDescriptionProps {
 }
 
 export function DialogDescription({ children, className }: DialogDescriptionProps) {
-    const descriptionChildren = children as React.ComponentProps<typeof Description>['children'];
-
     return (
-        <Description
+        <DescriptionCompat
             className={cn(
                 'text-sm text-text-secondary dark:text-text-secondary-dark mt-1',
                 className,
             )}
         >
-            {descriptionChildren}
-        </Description>
+            {children}
+        </DescriptionCompat>
     );
 }
 

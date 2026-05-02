@@ -1773,6 +1773,7 @@
                 "default": "Default",
                 "notConfigured": "Belum Dikonfigurasi",
                 "notConfiguredTooltip": "Penyedia ini memerlukan konfigurasi. Kunjungi Pengaturan → Plugin untuk menyiapkannya.",
+                "changeModels": "Ubah",
                 "jsonObjectError": "Nilai harus berupa objek JSON",
                 "invalidJsonError": "Format JSON tidak valid"
             },
@@ -2937,6 +2938,7 @@
             "resetSuccess": "Pengaturan diatur ulang ke default",
             "cancel": "Batal",
             "clickToConfigure": "Klik untuk mengonfigurasi",
+            "changeModels": "Ubah",
             "autoEnabledByUser": "Diaktifkan otomatis melalui pengaturan pengguna",
             "toggleError": "Gagal mengalihkan plugin",
             "system": "Sistem",

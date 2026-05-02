@@ -94,7 +94,7 @@ export const DEFAULT_SETTINGS: WebsiteSettings = {
 };
 
 export const DEFAULT_FORM_DATA: WebsiteSettingsFormData = {
-    company_name: 'Acme',
+    company_name: '',
     company_website: '',
     settings: DEFAULT_SETTINGS,
     custom_menu: {
@@ -119,7 +119,7 @@ export function useWebsiteSettingsForm(directoryId: string, loadErrorMessage: st
             if (result.success && result.data) {
                 const { company_name, company_website, settings, custom_menu } = result.data;
                 setFormData({
-                    company_name: company_name || 'Acme',
+                    company_name: company_name || '',
                     company_website: company_website || '',
                     settings: {
                         ...DEFAULT_SETTINGS,

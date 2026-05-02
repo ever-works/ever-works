@@ -24,6 +24,7 @@ import type {
     ExportOptions,
 } from './types';
 import { maskSecretSettings } from './types';
+import { getActiveCapabilities } from '../plugins/utils/active-capabilities.util';
 
 @Injectable()
 export class AccountExportService {
@@ -162,7 +163,7 @@ export class AccountExportService {
                 const exported: any = {
                     pluginId: dp.pluginId,
                     enabled: dp.enabled,
-                    activeCapability: dp.activeCapability || undefined,
+                    activeCapabilities: getActiveCapabilities(dp),
                     settings: dp.settings || {},
                     priority: dp.priority,
                 };

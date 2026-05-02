@@ -1,6 +1,5 @@
 'use client';
 
-import { Fragment } from 'react';
 import { Dialog, DialogPanel, DialogTitle, Transition, TransitionChild } from '@headlessui/react';
 import { cn } from '@/lib/utils/cn';
 import { useTranslations } from 'next-intl';
@@ -219,8 +218,9 @@ export function HelpDrawer({ open, onClose, onboarding }: HelpDrawerProps) {
                                                             <div className="flex items-center gap-1">
                                                                 {shortcut.keys.map(
                                                                     (key, keyIndex) => (
-                                                                        <Fragment key={keyIndex}>
+                                                                        <>
                                                                             <kbd
+                                                                                key={`key-${keyIndex}`}
                                                                                 className={cn(
                                                                                     'px-2 py-1 text-xs font-medium rounded',
                                                                                     'bg-white dark:bg-surface-dark',
@@ -234,11 +234,14 @@ export function HelpDrawer({ open, onClose, onboarding }: HelpDrawerProps) {
                                                                                 shortcut.keys
                                                                                     .length -
                                                                                     1 && (
-                                                                                <span className="text-text-muted dark:text-text-muted-dark">
+                                                                                <span
+                                                                                    key={`sep-${keyIndex}`}
+                                                                                    className="text-text-muted dark:text-text-muted-dark"
+                                                                                >
                                                                                     +
                                                                                 </span>
                                                                             )}
-                                                                        </Fragment>
+                                                                        </>
                                                                     ),
                                                                 )}
                                                             </div>

@@ -47,8 +47,6 @@ export type UpdateDirectorySchedulePayload = ContractUpdateDirectorySchedulePayl
 export type ImportSourceType = ContractImportSourceType;
 export type RepositoryTarget = ContractRepositoryTarget;
 export type RelatedRepositories = ContractRelatedRepositories;
-export type WorksConfigSnapshot = ContractWorksConfigSnapshot;
-export type SourceRepository = ContractSourceRepository<string>;
 export type RepoVisibility = ContractRepoVisibility;
 export type ImportEnrichmentConfig = ContractImportEnrichmentConfig;
 export type AnalyzeRepositoryResponseDto = ContractAnalyzeRepositoryResponseDto;
@@ -138,6 +136,27 @@ export type GetProjectsReadyState =
     | 'READY'
     | 'CANCELED'
     | 'TIMEOUT';
+
+export type SourceRepositoryAuth =
+    | {
+          mode: 'github_app_installation';
+          providerId: 'github';
+          installationId: string;
+          installationRepositoryId?: string;
+          repoFullName?: string;
+      }
+    | {
+          mode: 'none';
+      };
+
+export type WorksConfigSnapshot = ContractWorksConfigSnapshot & {
+    additionalAgentsCount?: number;
+};
+
+export type SourceRepository = ContractSourceRepository<string> & {
+    worksConfig?: WorksConfigSnapshot;
+    auth?: SourceRepositoryAuth;
+};
 
 // Response Types
 export interface Directory {

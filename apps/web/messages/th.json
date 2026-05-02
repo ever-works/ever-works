@@ -1773,6 +1773,7 @@
                 "default": "ค่าเริ่มต้น",
                 "notConfigured": "ยังไม่ได้ตั้งค่า",
                 "notConfiguredTooltip": "ผู้ให้บริการนี้ต้องตั้งค่า ไปที่การตั้งค่า → ปลั๊กอิน เพื่อตั้งค่า",
+                "changeModels": "เปลี่ยน",
                 "jsonObjectError": "ค่าต้องเป็นออบเจ็กต์ JSON",
                 "invalidJsonError": "รูปแบบ JSON ไม่ถูกต้อง"
             },
@@ -2937,6 +2938,7 @@
             "resetSuccess": "รีเซ็ตการตั้งค่าเป็นค่าเริ่มต้นเรียบร้อยแล้ว",
             "cancel": "ยกเลิก",
             "clickToConfigure": "คลิกเพื่อกำหนดค่า",
+            "changeModels": "เปลี่ยน",
             "autoEnabledByUser": "เปิดใช้งานอัตโนมัติผ่านการตั้งค่าผู้ใช้",
             "toggleError": "ไม่สามารถสลับส่วนเสริมได้",
             "system": "ระบบ",

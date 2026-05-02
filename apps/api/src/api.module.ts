@@ -12,7 +12,7 @@ import { LoggingInterceptor } from './logging.interceptor';
 import { MonitoringModule, SentryInterceptor, PostHogInterceptor } from '@ever-works/monitoring';
 import { APIController } from './api.controller';
 import { TriggerInternalModule } from './trigger/trigger-internal.module';
-import { TwentyCrmModule } from './integrations';
+import { GitHubAppModule, TwentyCrmModule } from './integrations';
 import { SubscriptionsModule } from './subscriptions/subscriptions.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { ScreenshotModule } from './plugins-capabilities/screenshot/screenshot.module';
@@ -38,6 +38,7 @@ import { CacheFactory } from '@ever-works/agent/cache';
         }),
         ScheduleModule.forRoot(),
         TwentyCrmModule.forRoot(),
+        GitHubAppModule,
         ThrottlerModule.forRoot(throttlerConfig),
         EventEmitterModule.forRoot(),
         MonitoringModule.forRoot({

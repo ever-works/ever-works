@@ -1773,6 +1773,7 @@
                 "default": "Standaard",
                 "notConfigured": "Niet geconfigureerd",
                 "notConfiguredTooltip": "Deze provider vereist configuratie. Ga naar Instellingen → Plugins om in te stellen.",
+                "changeModels": "Wijzigen",
                 "jsonObjectError": "Waarde moet een JSON-object zijn",
                 "invalidJsonError": "Ongeldig JSON-formaat"
             },
@@ -2937,6 +2938,7 @@
             "resetSuccess": "Instellingen hersteld naar standaardwaarden",
             "cancel": "Annuleren",
             "clickToConfigure": "Klik om te configureren",
+            "changeModels": "Wijzigen",
             "autoEnabledByUser": "Automatisch ingeschakeld via gebruikersinstellingen",
             "toggleError": "Kon plug-in niet schakelen",
             "system": "Systeem",

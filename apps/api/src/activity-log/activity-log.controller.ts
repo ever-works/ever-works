@@ -21,7 +21,11 @@ import type { AuthenticatedUser } from '../auth/types/auth.types';
 import { ActivityLogService } from '@ever-works/agent/activity-log';
 import { DirectoryRepository } from '@ever-works/agent/database';
 import type { ActivityActionType, ActivityStatus } from '@ever-works/agent/entities';
-import type { Response } from 'express';
+
+type CsvResponse = {
+    setHeader(name: string, value: string): void;
+    send(body: string): void;
+};
 
 const ACTIVITY_RECONCILE_TTL_MS = 5000;
 
@@ -154,7 +158,7 @@ export class ActivityLogController {
     @ApiResponse({ status: 200, description: 'CSV file download' })
     async exportCsv(
         @CurrentUser() auth: AuthenticatedUser,
-        @Res() res: Response,
+        @Res() res: CsvResponse,
         @Query('actionType') actionType?: string,
         @Query('directoryId') directoryId?: string,
         @Query('status') status?: string,

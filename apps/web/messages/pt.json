@@ -1773,6 +1773,7 @@
                 "default": "Padrão",
                 "notConfigured": "Não configurado",
                 "notConfiguredTooltip": "Este provedor requer configuração. Visite Configurações → Plugins para configurá-lo.",
+                "changeModels": "Alterar",
                 "jsonObjectError": "O valor deve ser um objeto JSON",
                 "invalidJsonError": "Formato JSON inválido"
             },
@@ -2937,6 +2938,7 @@
             "resetSuccess": "Definições repostas para predefinições",
             "cancel": "Cancelar",
             "clickToConfigure": "Clique para configurar",
+            "changeModels": "Alterar",
             "autoEnabledByUser": "Auto-ativado via definições do utilizador",
             "toggleError": "Falha ao alternar o plug-in",
             "system": "Sistema",

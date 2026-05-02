@@ -61,6 +61,7 @@ export class BranchSyncService {
                 branchMapping,
                 template,
                 providerId: directory.gitProvider,
+                directoryId: directory.id,
                 cleanupExtraBranches,
             });
 
@@ -89,6 +90,7 @@ export class BranchSyncService {
         branchMapping?: { [sourceBranch: string]: string };
         template: WebsiteTemplateConfig;
         providerId?: string;
+        directoryId?: string;
         /** Delete target branches not in syncBranches; needed after CREATE_USING_TEMPLATE copies all template branches */
         cleanupExtraBranches?: boolean;
     }): Promise<BranchSyncSummary> {
@@ -101,6 +103,7 @@ export class BranchSyncService {
             branchMapping = {},
             template,
             providerId,
+            directoryId,
             cleanupExtraBranches = false,
         } = params;
 
@@ -149,6 +152,7 @@ export class BranchSyncService {
                         committer,
                         forcePush,
                         providerId,
+                        directoryId,
                     }),
                 ),
             );
@@ -247,6 +251,7 @@ export class BranchSyncService {
         committer: GitCommitter;
         forcePush?: boolean;
         providerId?: string;
+        directoryId?: string;
     }): Promise<BranchSyncResult> {
         const {
             branchName,
@@ -258,6 +263,7 @@ export class BranchSyncService {
             committer,
             forcePush = true,
             providerId,
+            directoryId,
         } = params;
 
         const mappingInfo = targetBranch !== branchName ? ` (mapped to '${targetBranch}')` : '';
@@ -276,7 +282,7 @@ export class BranchSyncService {
                     branch: branchName,
                     committer,
                 },
-                { userId, providerId },
+                { userId, providerId, directoryId },
             );
 
             // Rename branch if needed
@@ -289,7 +295,10 @@ export class BranchSyncService {
             await this.gitFacade.replaceRemote(providerId, tempDir, 'origin', targetRepoUrl);
 
             // Push to target
-            await this.gitFacade.push({ dir: tempDir, force: forcePush }, { userId, providerId });
+            await this.gitFacade.push(
+                { dir: tempDir, force: forcePush },
+                { userId, providerId, directoryId },
+            );
 
             return {
                 branch: branchName,

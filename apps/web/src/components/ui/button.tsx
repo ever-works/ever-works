@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { ButtonHTMLAttributes, forwardRef } from 'react';
+import { forwardRef, type ButtonHTMLAttributes, type ReactNode } from 'react';
 import { cn } from '@/lib/utils';
 import { Link } from '@/i18n/navigation';
 
@@ -15,6 +15,16 @@ export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
     target?: string;
     rel?: string;
 }
+
+type ButtonLinkProps = {
+    href: string;
+    className?: string;
+    target?: string;
+    rel?: string;
+    children?: ReactNode;
+};
+
+const LinkComponent = Link as unknown as React.ComponentType<ButtonLinkProps>;
 
 const buttonVariants = {
     primary:
@@ -61,11 +71,10 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
             className,
         );
         const content = children as React.ReactNode;
-        const linkContent = content as React.ComponentProps<typeof Link>['children'];
 
         if (href && !disabled) {
             return (
-                <Link
+                <LinkComponent
                     href={href}
                     className={cn(variant === 'unstyled' ? '' : classes, className)}
                     target={target}
@@ -74,8 +83,8 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
                     {loading && (
                         <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
                     )}
-                    {linkContent}
-                </Link>
+                    {content}
+                </LinkComponent>
             );
         }
 

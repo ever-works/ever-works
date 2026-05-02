@@ -20,6 +20,7 @@ import {
     getSelectableCategories,
 } from '@ever-works/plugin';
 import type { ProvidersDto } from '@src/items-generator/dto/create-items-generator.dto';
+import { buildProviderModelSummaries } from '@src/plugins/utils/plugin-model-settings.utils';
 
 /**
  * Service for resolving dynamic generator form schema based on selected plugins.
@@ -53,7 +54,7 @@ export class GeneratorFormSchemaService {
      * Get the generator form schema based on the selected pipeline.
      *
      * When directoryId is provided, providers are filtered by enable status
-     * and default providers are marked based on activeCapability.
+     * and default providers are marked based on active capabilities.
      *
      * @param pipelineId - Selected pipeline plugin ID (null for default)
      * @param options - Optional directoryId and userId for filtering
@@ -264,7 +265,7 @@ export class GeneratorFormSchemaService {
 
     /**
      * Get available providers for all capability categories.
-     * Filters by enable status and marks default providers based on activeCapability.
+     * Filters by enable status and marks default providers based on active capabilities.
      */
     private async getAvailableProviders(
         options?: FormSchemaOptions,
@@ -286,7 +287,7 @@ export class GeneratorFormSchemaService {
      *
      * When directoryId is provided:
      * - Filters plugins by enable status (Directory > User > autoEnable)
-     * - Marks the default provider based on activeCapability
+     * - Marks the default provider based on active capabilities
      */
     private async getProvidersForCapability(
         capability: string,
@@ -330,7 +331,15 @@ export class GeneratorFormSchemaService {
             }
 
             const configured = await this.isPluginConfigured(registered, options);
-            result.push(this.toProviderOption(registered, activePluginId, configured, capability));
+            result.push(
+                await this.toProviderOption(
+                    registered,
+                    activePluginId,
+                    configured,
+                    capability,
+                    options,
+                ),
+            );
         }
 
         return result;
@@ -339,16 +348,17 @@ export class GeneratorFormSchemaService {
     /**
      * Convert a registered plugin to a provider option.
      */
-    private toProviderOption(
+    private async toProviderOption(
         registered: RegisteredPlugin,
         activePluginId?: string | null,
         configured: boolean = true,
         capability?: string,
-    ): ProviderOption {
+        options?: FormSchemaOptions,
+    ): Promise<ProviderOption> {
         const { plugin, manifest } = registered;
 
         // Mark as default if:
-        // 1. It's the active plugin for the directory (via activeCapability)
+        // 1. It's the active plugin for the directory.
         // 2. OR it declares this capability in defaultForCapabilities
         // 3. OR it's a system plugin (fallback if no capability provided)
         const isDefault = activePluginId
@@ -357,6 +367,17 @@ export class GeneratorFormSchemaService {
               ? manifest.defaultForCapabilities?.includes(capability) || false
               : manifest.systemPlugin || false;
 
+        const models =
+            capability === PLUGIN_CAPABILITIES.AI_PROVIDER && this.pluginSettingsService
+                ? buildProviderModelSummaries(
+                      plugin.settingsSchema,
+                      await this.pluginSettingsService.getResolvedSettings(plugin.id, {
+                          userId: options?.userId,
+                          directoryId: options?.directoryId,
+                      }),
+                  )
+                : undefined;
+
         return {
             id: plugin.id,
             name: manifest.name,
@@ -364,6 +385,7 @@ export class GeneratorFormSchemaService {
             configured,
             isDefault,
             icon: manifest.icon,
+            models,
         };
     }
 
@@ -675,13 +697,17 @@ export class GeneratorFormSchemaService {
         // 1. Explicit pipelineId — from config.yaml or user click in the form
         if (pipelineId) {
             const registered = this.pluginRegistry.get(pipelineId);
-            if (registered && registered.state === 'loaded') {
+            if (
+                registered &&
+                registered.state === 'loaded' &&
+                (await this.isEnabledForScope(registered.plugin.id, options))
+            ) {
                 return registered;
             }
             this.logger.warn(`Pipeline plugin not found or not enabled: ${pipelineId}`);
         }
 
-        // 2. Directory's activeCapability for 'pipeline'
+        // 2. Directory's active provider for 'pipeline'
         if (options?.directoryId && this.directoryPluginRepository) {
             try {
                 const activePlugin = await this.directoryPluginRepository.findActiveByCapability(
@@ -690,7 +716,11 @@ export class GeneratorFormSchemaService {
                 );
                 if (activePlugin) {
                     const registered = this.pluginRegistry.get(activePlugin.pluginId);
-                    if (registered && registered.state === 'loaded') {
+                    if (
+                        registered &&
+                        registered.state === 'loaded' &&
+                        (await this.isEnabledForScope(registered.plugin.id, options))
+                    ) {
                         return registered;
                     }
                 }
@@ -705,18 +735,37 @@ export class GeneratorFormSchemaService {
         for (const registered of pipelines) {
             if (registered.state !== 'loaded') continue;
             if (registered.manifest.defaultForCapabilities?.includes('pipeline')) {
-                return registered;
+                if (await this.isEnabledForScope(registered.plugin.id, options)) {
+                    return registered;
+                }
             }
         }
 
         // 4. Fallback: first loaded pipeline
         for (const registered of pipelines) {
-            if (registered.state === 'loaded') {
+            if (
+                registered.state === 'loaded' &&
+                (await this.isEnabledForScope(registered.plugin.id, options))
+            ) {
                 return registered;
             }
         }
 
         this.logger.warn('No pipeline plugin found');
         return undefined;
+    }
+
+    private async isEnabledForScope(
+        pluginId: string,
+        options?: FormSchemaOptions,
+    ): Promise<boolean> {
+        if (!options?.directoryId && !options?.userId) {
+            return true;
+        }
+        return this.pluginRegistry.isPluginEnabledForScope(
+            pluginId,
+            options.directoryId,
+            options.userId,
+        );
     }
 }

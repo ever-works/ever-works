@@ -15,18 +15,22 @@ type FreshRepositoryCloneOptions = {
     committer?: GitCommitter;
     userId: string;
     providerId: string;
+    directoryId?: string;
 };
 
 export async function cloneFreshRepository(
     gitFacade: CloneFacade,
-    { owner, repo, committer, userId, providerId }: FreshRepositoryCloneOptions,
+    { owner, repo, committer, userId, providerId, directoryId }: FreshRepositoryCloneOptions,
     logger?: Pick<LoggerService, 'warn'>,
 ): Promise<string> {
     let lastError: unknown;
 
     for (let attempt = 1; attempt <= FRESH_REPOSITORY_CLONE_MAX_ATTEMPTS; attempt++) {
         try {
-            return await gitFacade.cloneOrPull({ owner, repo, committer }, { userId, providerId });
+            return await gitFacade.cloneOrPull(
+                { owner, repo, committer },
+                { userId, providerId, directoryId },
+            );
         } catch (error) {
             lastError = error;
 

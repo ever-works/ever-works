@@ -10,6 +10,15 @@ import { PluginSettingsPromptService } from '../plugins/plugin-settings-prompt.s
 import { getVisibleProperties, splitSettingsBySecret } from '@ever-works/plugin/api';
 import type { DirectoryPluginResponse, SettingScopeApi } from '@ever-works/plugin/api';
 
+function getActiveCapabilities(plugin: DirectoryPluginResponse): string[] {
+    return plugin.activeCapabilities ?? [];
+}
+
+function getDefaultActiveCapability(plugin: DirectoryPluginResponse): string | undefined {
+    const activeCapabilities = getActiveCapabilities(plugin);
+    return plugin.capabilities?.find((capability) => activeCapabilities.includes(capability));
+}
+
 export const pluginsCommand = new Command('plugins')
     .description('Manage plugins for a directory')
     .action(async () => {
@@ -84,8 +93,9 @@ async function showDirectoryPluginList(
 
     for (const plugin of plugins) {
         const dirStatus = plugin.directoryEnabled ? chalk.green('●') : chalk.gray('○');
-        const capability = plugin.activeCapability
-            ? chalk.blue(` [${plugin.activeCapability}]`)
+        const activeCapabilities = getActiveCapabilities(plugin);
+        const capability = activeCapabilities.length
+            ? chalk.blue(` [${activeCapabilities.join(', ')}]`)
             : '';
         choices.push({
             name: `${dirStatus} ${plugin.name}${capability} ${chalk.gray(`— ${plugin.category}`)}`,
@@ -132,8 +142,9 @@ async function showDirectoryPluginActions(
     console.log(
         `  ${chalk.gray('Directory:')} ${plugin.directoryEnabled ? chalk.green('Enabled') : chalk.gray('Disabled')}`,
     );
-    if (plugin.activeCapability) {
-        console.log(`  ${chalk.gray('Capability:')} ${plugin.activeCapability}`);
+    const activeCapabilities = getActiveCapabilities(plugin);
+    if (activeCapabilities.length > 0) {
+        console.log(`  ${chalk.gray('Capabilities:')} ${activeCapabilities.join(', ')}`);
     }
     console.log('');
 
@@ -282,6 +293,8 @@ async function handleSetCapability(
     plugin: DirectoryPluginResponse,
 ): Promise<void> {
     const apiService = getApiService();
+    const activeCapabilities = getActiveCapabilities(plugin);
+    const defaultCapability = getDefaultActiveCapability(plugin);
 
     const { capability } = await inquirer.prompt([
         {
@@ -289,10 +302,10 @@ async function handleSetCapability(
             name: 'capability',
             message: 'Select active capability:',
             choices: plugin.capabilities.map((c) => ({
-                name: c === plugin.activeCapability ? `${c} ${chalk.green('(current)')}` : c,
+                name: activeCapabilities.includes(c) ? `${c} ${chalk.green('(current)')}` : c,
                 value: c,
             })),
-            default: plugin.activeCapability,
+            default: defaultCapability,
         },
     ]);
 

@@ -306,6 +306,40 @@ describe('PipelineOrchestratorService', () => {
             );
         });
 
+        it('should fall back when explicit pipeline plugin is not enabled for scope', async () => {
+            const plugin = createMockFullPipelinePlugin('scoped-off-pipeline');
+            registry.register(
+                plugin as unknown as IPlugin,
+                {
+                    ...createMockManifest('scoped-off-pipeline'),
+                    autoEnable: false,
+                },
+                {
+                    state: 'loaded',
+                },
+            );
+
+            const stepExecuteSpy = jest.spyOn(stepExecutor, 'execute');
+            const fullExecuteSpy = jest.spyOn(fullExecutor, 'execute');
+
+            const requestWithPipelineId: GenerationRequest = {
+                ...mockRequest,
+                providers: { pipeline: 'scoped-off-pipeline' },
+            };
+
+            await service.execute(mockDirectory, requestWithPipelineId, mockExisting);
+
+            expect(fullExecuteSpy).not.toHaveBeenCalled();
+            expect(stepExecuteSpy).toHaveBeenCalledWith(
+                standardPlugin,
+                mockDirectory,
+                requestWithPipelineId,
+                mockExisting,
+                undefined,
+                undefined,
+            );
+        });
+
         it('should fall back to step mode when providers.pipeline references unknown plugin', async () => {
             const stepExecuteSpy = jest.spyOn(stepExecutor, 'execute');
 

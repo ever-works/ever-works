@@ -18,6 +18,8 @@ const statusColor: Record<string, string> = {
         'bg-blue-50 text-blue-700 ring-1 ring-blue-200 dark:bg-blue-500/10 dark:text-blue-300 dark:ring-blue-500/20',
     generated:
         'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200 dark:bg-emerald-500/10 dark:text-emerald-300 dark:ring-emerald-500/20',
+    generatedWithWarnings:
+        'bg-amber-50 text-amber-700 ring-1 ring-amber-200 dark:bg-amber-500/10 dark:text-amber-300 dark:ring-amber-500/20',
     error: 'bg-red-50 text-red-700 ring-1 ring-red-200 dark:bg-red-500/10 dark:text-red-300 dark:ring-red-500/20',
     cancelled:
         'bg-muted/60 text-text-muted ring-1 ring-border dark:bg-muted/20 dark:text-text-muted-dark dark:ring-border-dark',
@@ -136,6 +138,7 @@ function renderMetricCount(
 
 export function HistoryTable({ entries, locale }: HistoryTableProps) {
     const t = useTranslations('dashboard.directoryDetail.history');
+    const tStatus = useTranslations('dashboard.directoryDetail.status');
     const [expandedIds, setExpandedIds] = useState<string[]>([]);
 
     function toggleExpanded(id: string) {
@@ -179,11 +182,17 @@ export function HistoryTable({ entries, locale }: HistoryTableProps) {
                     <tbody className="divide-y divide-border dark:divide-border-dark">
                         {entries.map((entry) => {
                             const statusKey = entry.status?.toLowerCase?.() ?? 'unknown';
+                            const hasWarnings = (entry.warnings?.length ?? 0) > 0;
+                            const displayStatusKey =
+                                statusKey === 'generated' && hasWarnings
+                                    ? 'generatedWithWarnings'
+                                    : statusKey;
                             const statusClass =
-                                statusColor[statusKey] ?? 'bg-gray-100 text-gray-700';
+                                statusColor[displayStatusKey] ?? 'bg-gray-100 text-gray-700';
                             const hasDetails =
                                 (entry.changelog?.entries?.length ?? 0) > 0 ||
-                                (entry.logs?.length ?? 0) > 0;
+                                (entry.logs?.length ?? 0) > 0 ||
+                                hasWarnings;
                             const isExpanded = expandedIds.includes(entry.id);
 
                             const addedEntries =
@@ -232,7 +241,10 @@ export function HistoryTable({ entries, locale }: HistoryTableProps) {
                                                                 statusClass,
                                                             )}
                                                         >
-                                                            {getStatusLabel(statusKey, t)}
+                                                            {displayStatusKey ===
+                                                            'generatedWithWarnings'
+                                                                ? tStatus('generatedWithWarnings')
+                                                                : getStatusLabel(statusKey, t)}
                                                         </span>
                                                         <span className="text-xs text-text-secondary dark:text-text-secondary-dark">
                                                             {getActivityLabel(

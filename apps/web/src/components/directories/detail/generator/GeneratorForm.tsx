@@ -35,12 +35,15 @@ import { ProviderSelectionSection } from '@/components/directories/shared/Provid
 import { WebsiteTemplateSelector } from '@/components/directories/shared/WebsiteTemplateSelector';
 import { GenerationProgress } from './GenerationProgress';
 import type { WebsiteTemplateOption } from '@/lib/api/directory';
+import type { DirectoryPlugin } from '@/lib/api/plugins';
+import { useDirectoryDetail } from '../DirectoryDetailContext';
 
 interface GeneratorFormProps {
     directoryId: string;
     directory: Directory;
     config?: DirectoryConfig;
     websiteTemplates: WebsiteTemplateOption[];
+    directoryPlugins?: DirectoryPlugin[];
 }
 
 export function GeneratorForm({
@@ -48,9 +51,11 @@ export function GeneratorForm({
     directory,
     config,
     websiteTemplates,
+    directoryPlugins = [],
 }: GeneratorFormProps) {
     const router = useRouter();
     const t = useTranslations('dashboard.directoryDetail.generator');
+    const { updateGenerateStatus } = useDirectoryDetail();
     const [isPending, startTransition] = useTransition();
     const [optimisticGenerating, setOptimisticGenerating] = useState(false);
     const [showAdvancedOptions, setShowAdvancedOptions] = useState(false);
@@ -180,16 +185,18 @@ export function GeneratorForm({
         setPluginConfig(values);
     }, []);
 
+    const optimisticGenerateStatus: Directory['generateStatus'] =
+        directory.generateStatus?.status === GenerateStatusType.GENERATING
+            ? directory.generateStatus
+            : {
+                  status: GenerateStatusType.GENERATING,
+                  progress: 0,
+                  recentLogs: [],
+              };
+
     const optimisticDirectory: Directory = {
         ...directory,
-        generateStatus:
-            directory.generateStatus?.status === GenerateStatusType.GENERATING
-                ? directory.generateStatus
-                : {
-                      status: GenerateStatusType.GENERATING,
-                      progress: 0,
-                      recentLogs: [],
-                  },
+        generateStatus: optimisticGenerateStatus,
     };
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -273,6 +280,7 @@ export function GeneratorForm({
 
             if (result.success) {
                 setOptimisticGenerating(true);
+                updateGenerateStatus(optimisticGenerateStatus);
                 toast.success(result.message || t('operationStartedSuccessfully'));
                 router.refresh();
             } else {
@@ -324,8 +332,10 @@ export function GeneratorForm({
             {/* Pipeline & Provider Selection — always visible */}
             {formSchema && (
                 <ProviderSelectionSection
+                    directoryId={directoryId}
                     formSchema={formSchema}
                     providers={providers}
+                    directoryPlugins={directoryPlugins}
                     onProviderChange={handleProviderChange}
                 />
             )}

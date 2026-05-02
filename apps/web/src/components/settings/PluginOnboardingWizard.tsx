@@ -426,31 +426,35 @@ export function PluginOnboardingWizard({
     const apiKeyField = credentialFields.find(([key]) => key === 'apiKey');
     const additionalCredentialFields = credentialFields.filter(([key]) => key !== 'apiKey');
 
-    const steps: StepConfig[] = [];
+    const steps: StepConfig[] = (() => {
+        const result: StepConfig[] = [];
 
-    if (configurationFields.length > 0) {
-        steps.push({
-            key: 'configure',
-            title: tWizard('steps.configure.title'),
-            description:
-                plugin.uiHints?.onboardingDescription ||
-                tWizard('steps.configure.description', { pluginName: plugin.name }),
+        if (configurationFields.length > 0) {
+            result.push({
+                key: 'configure',
+                title: tWizard('steps.configure.title'),
+                description:
+                    plugin.uiHints?.onboardingDescription ||
+                    tWizard('steps.configure.description', { pluginName: plugin.name }),
+            });
+        }
+
+        if (supportsDeviceAuth || authModeSchema || credentialFields.length > 0) {
+            result.push({
+                key: 'credentials',
+                title: tWizard('steps.credentials.title'),
+                description: tWizard('steps.credentials.description', { pluginName: plugin.name }),
+            });
+        }
+
+        result.push({
+            key: 'verify',
+            title: tWizard('steps.verify.title'),
+            description: tWizard('steps.verify.description'),
         });
-    }
 
-    if (supportsDeviceAuth || authModeSchema || credentialFields.length > 0) {
-        steps.push({
-            key: 'credentials',
-            title: tWizard('steps.credentials.title'),
-            description: tWizard('steps.credentials.description', { pluginName: plugin.name }),
-        });
-    }
-
-    steps.push({
-        key: 'verify',
-        title: tWizard('steps.verify.title'),
-        description: tWizard('steps.verify.description'),
-    });
+        return result;
+    })();
 
     const currentStep = steps[step];
 

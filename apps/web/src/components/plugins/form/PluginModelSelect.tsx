@@ -87,6 +87,7 @@ export function PluginModelSelect({
     const [customModel, setCustomModel] = useState('');
     const [showCustomInput, setShowCustomInput] = useState(false);
     const containerRef = useRef<HTMLDivElement>(null);
+    const cachedModels = pluginId ? (modelCache.get(pluginId) ?? null) : null;
 
     // Click-outside detection via document listener (replaces fragile z-index overlay)
     const handleClickOutside = useCallback((e: MouseEvent) => {
@@ -105,11 +106,7 @@ export function PluginModelSelect({
 
     useEffect(() => {
         if (!pluginId) return;
-
-        const cached = modelCache.get(pluginId);
-        if (cached) {
-            return;
-        }
+        if (cachedModels) return;
 
         let cancelled = false;
 
@@ -126,10 +123,12 @@ export function PluginModelSelect({
         return () => {
             cancelled = true;
         };
-    }, [pluginId, t]);
+    }, [cachedModels, pluginId, t]);
 
-    const cachedModels = pluginId ? modelCache.get(pluginId) || null : null;
-    const activeModels = cachedModels || (loadedPluginId === pluginId ? models : []);
+    const activeModels = useMemo(
+        () => cachedModels ?? (loadedPluginId === pluginId ? models : []),
+        [cachedModels, loadedPluginId, models, pluginId],
+    );
     const loading = Boolean(pluginId) && !cachedModels && loadedPluginId !== pluginId;
     const activeError = cachedModels ? null : loadedPluginId === pluginId ? error : null;
 

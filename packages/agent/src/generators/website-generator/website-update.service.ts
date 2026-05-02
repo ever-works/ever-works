@@ -30,6 +30,7 @@ export class WebsiteUpdateService {
             const branches = await this.gitFacade.listBranches(websiteOwner, websiteRepo, {
                 userId,
                 providerId: directory.gitProvider,
+                directoryId: directory.id,
             });
 
             if (!branches.some((branch) => branch.name === targetBranch)) {
@@ -43,7 +44,7 @@ export class WebsiteUpdateService {
                 websiteOwner,
                 websiteRepo,
                 { defaultBranch: targetBranch },
-                { userId, providerId: directory.gitProvider },
+                { userId, providerId: directory.gitProvider, directoryId: directory.id },
             );
         } catch (error) {
             this.logger.warn(
@@ -78,6 +79,7 @@ export class WebsiteUpdateService {
         const repositoryExists = await this.gitFacade.repositoryExists(websiteOwner, websiteRepo, {
             userId: directoryOwner.id,
             providerId: directory.gitProvider,
+            directoryId: directory.id,
         });
         if (!repositoryExists) {
             throw new NotFoundException(
@@ -90,7 +92,11 @@ export class WebsiteUpdateService {
             template.owner,
             template.repo,
             branch,
-            { userId: directoryOwner.id, providerId: directory.gitProvider },
+            {
+                userId: directoryOwner.id,
+                providerId: directory.gitProvider,
+                directoryId: directory.id,
+            },
         );
 
         let updateResult: { method: string; message: string; commitSha?: string };
@@ -157,6 +163,7 @@ export class WebsiteUpdateService {
         const hasCredentials = await this.gitFacade.hasValidCredentials({
             userId: directoryOwner.id,
             providerId: directory.gitProvider,
+            directoryId: directory.id,
         });
 
         if (!hasCredentials) {
@@ -171,7 +178,11 @@ export class WebsiteUpdateService {
             template.owner,
             template.repo,
             branch,
-            { userId: directoryOwner.id, providerId: directory.gitProvider },
+            {
+                userId: directoryOwner.id,
+                providerId: directory.gitProvider,
+                directoryId: directory.id,
+            },
         );
 
         if (!latestCommit) {
@@ -204,7 +215,11 @@ export class WebsiteUpdateService {
                     repo: websiteRepo,
                     committer,
                 },
-                { userId: directoryOwner.id, providerId: directory.gitProvider },
+                {
+                    userId: directoryOwner.id,
+                    providerId: directory.gitProvider,
+                    directoryId: directory.id,
+                },
             );
 
             // Check if this is actually a fork by looking for upstream remote
@@ -213,7 +228,11 @@ export class WebsiteUpdateService {
                 websiteRepo,
                 template.owner,
                 template.repo,
-                { userId: directoryOwner.id, providerId: directory.gitProvider },
+                {
+                    userId: directoryOwner.id,
+                    providerId: directory.gitProvider,
+                    directoryId: directory.id,
+                },
             );
 
             if (!isActualFork) {
@@ -253,7 +272,11 @@ export class WebsiteUpdateService {
                 branch: resolvedBranch,
                 committer: directory.resolveCommitter(user),
             },
-            { userId: directoryOwner.id, providerId: directory.gitProvider },
+            {
+                userId: directoryOwner.id,
+                providerId: directory.gitProvider,
+                directoryId: directory.id,
+            },
         );
 
         // Get the target repository URL
@@ -264,7 +287,7 @@ export class WebsiteUpdateService {
         );
 
         // Remove existing origin and add new one
-        await this.gitFacade.switchBranch(directory.gitProvider, originalDir, branch);
+        await this.gitFacade.switchBranch(directory.gitProvider, originalDir, resolvedBranch);
         await this.gitFacade.replaceRemote(
             directory.gitProvider,
             originalDir,
@@ -275,7 +298,11 @@ export class WebsiteUpdateService {
         // Push to the target repository
         await this.gitFacade.push(
             { dir: originalDir, force: true },
-            { userId: directoryOwner.id, providerId: directory.gitProvider },
+            {
+                userId: directoryOwner.id,
+                providerId: directory.gitProvider,
+                directoryId: directory.id,
+            },
         );
 
         this.logger.log(
@@ -303,7 +330,11 @@ export class WebsiteUpdateService {
                     branch: resolvedBranch,
                     committer,
                 },
-                { userId: directoryOwner.id, providerId: directory.gitProvider },
+                {
+                    userId: directoryOwner.id,
+                    providerId: directory.gitProvider,
+                    directoryId: directory.id,
+                },
             ),
 
             this.gitFacade.cloneOrPull(
@@ -313,7 +344,11 @@ export class WebsiteUpdateService {
                     branch: resolvedBranch,
                     committer,
                 },
-                { userId: directoryOwner.id, providerId: directory.gitProvider },
+                {
+                    userId: directoryOwner.id,
+                    providerId: directory.gitProvider,
+                    directoryId: directory.id,
+                },
             ),
         ]);
 
@@ -332,7 +367,11 @@ export class WebsiteUpdateService {
 
         await this.gitFacade.push(
             { dir: targetDir, force: true },
-            { userId: directoryOwner.id, providerId: directory.gitProvider },
+            {
+                userId: directoryOwner.id,
+                providerId: directory.gitProvider,
+                directoryId: directory.id,
+            },
         );
 
         this.logger.log(

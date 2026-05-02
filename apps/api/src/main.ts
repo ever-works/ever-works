@@ -6,6 +6,7 @@ import { apiReference } from '@scalar/nestjs-api-reference';
 import { ApiModule } from './api.module';
 import helmet from 'helmet';
 import { initSentry, initPostHog } from '@ever-works/monitoring';
+import { IncomingMessage, ServerResponse } from 'http';
 import * as path from 'path';
 import { json, urlencoded } from 'express';
 
@@ -19,9 +20,19 @@ async function bootstrap() {
 
     const app = await NestFactory.create(ApiModule);
 
+    const captureRawBody = (
+        req: IncomingMessage & { rawBody?: string },
+        _res: ServerResponse,
+        buffer: Buffer,
+    ) => {
+        if (buffer.length > 0) {
+            req.rawBody = buffer.toString('utf8');
+        }
+    };
+
     // Increase body-parser limit for large payloads
-    app.use(json({ limit: '10mb' }));
-    app.use(urlencoded({ limit: '10mb', extended: true }));
+    app.use(json({ limit: '10mb', verify: captureRawBody }));
+    app.use(urlencoded({ limit: '10mb', extended: true, verify: captureRawBody }));
 
     // Security configurations
     // Use relaxed CSP for API docs to allow Scalar's inline scripts

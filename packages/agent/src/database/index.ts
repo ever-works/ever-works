@@ -14,4 +14,7 @@ export * from './repositories/directory-schedule.repository';
 export * from './repositories/usage-ledger.repository';
 export * from './repositories/notification.repository';
 export * from './repositories/conversation.repository';
+export * from './repositories/github-app-installation.repository';
+export * from './repositories/github-app-installation-repository.repository';
+export * from './repositories/github-app-user-link.repository';
 export * from './database-init.service';
