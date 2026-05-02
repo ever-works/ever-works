@@ -53,7 +53,7 @@ export function ProviderSelectionSection({
 
     return (
         <>
-            {(formSchema.providers.pipeline?.length ?? 0) > 1 && (
+            {(formSchema.providers.pipeline?.length ?? 0) > 0 && (
                 <PipelineModeSelector
                     pipelineProviders={formSchema.providers.pipeline}
                     selectedPipeline={providers.pipeline}
