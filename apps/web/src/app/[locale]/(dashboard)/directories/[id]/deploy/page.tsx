@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import { getTranslations } from 'next-intl/server';
-import { deployAPI, Directory, directoryAPI } from '@/lib/api';
+import { deployAPI, Directory, directoryAPI, type WebsiteTemplateOption } from '@/lib/api';
 import { notFound, redirect } from 'next/navigation';
 import { ROUTES } from '@/lib/constants';
 import { DeployForm } from '@/components/directories/detail/deploy/DeployForm';
@@ -25,6 +25,7 @@ export default async function DeployPage({ params }: DeployPageParams) {
 
     let directory: Directory;
     let deploymentCapability;
+    let websiteTemplates: WebsiteTemplateOption[] = [];
 
     try {
         const [res, capabilityRes] = await Promise.all([
@@ -51,6 +52,13 @@ export default async function DeployPage({ params }: DeployPageParams) {
     // Always fetch providers for the selector
     const providersRes = await deployAPI.getProviders().catch(() => null);
     const providers = providersRes?.providers ?? [];
+
+    try {
+        const websiteTemplatesRes = await directoryAPI.getWebsiteTemplates();
+        websiteTemplates = websiteTemplatesRes.templates;
+    } catch {
+        websiteTemplates = [];
+    }
 
     const providerId = directory.deployProvider || '';
     const provider = providers.find((p) => p.id === providerId);
@@ -114,6 +122,7 @@ export default async function DeployPage({ params }: DeployPageParams) {
                 directory={directory}
                 isDeploying={isDeploying(directory)}
                 providerName={providerName}
+                websiteTemplates={websiteTemplates}
             />
             {directory.website && <DomainManagement directory={directory} />}
         </div>

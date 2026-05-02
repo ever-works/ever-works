@@ -48,7 +48,11 @@ export class MarkdownGeneratorService {
                     organization: directory.organization ? mainRepoOwner : undefined,
                     isPrivate: true,
                 },
-                { userId: directoryOwner.id, providerId: directory.gitProvider },
+                {
+                    userId: directoryOwner.id,
+                    providerId: directory.gitProvider,
+                    directoryId: directory.id,
+                },
             ),
             mainRepoOwner,
             mainRepo,
@@ -65,6 +69,7 @@ export class MarkdownGeneratorService {
                 committer,
                 userId: directoryOwner.id,
                 providerId: directory.gitProvider,
+                directoryId: directory.id,
             },
             this.logger,
         );
@@ -77,7 +82,11 @@ export class MarkdownGeneratorService {
                 repo: directory.getDataRepo(),
                 committer,
             },
-            { userId: directoryOwner.id, providerId: directory.gitProvider },
+            {
+                userId: directoryOwner.id,
+                providerId: directory.gitProvider,
+                directoryId: directory.id,
+            },
         );
         throwIfGenerationCancelled(options.signal);
 
@@ -225,7 +234,11 @@ export class MarkdownGeneratorService {
             throwIfGenerationCancelled(options.signal);
             await this.gitFacade.push(
                 { dir: markdownPath },
-                { userId: directoryOwner.id, providerId: directory.gitProvider },
+                {
+                    userId: directoryOwner.id,
+                    providerId: directory.gitProvider,
+                    directoryId: directory.id,
+                },
             );
 
             throwIfGenerationCancelled(options.signal);
@@ -244,7 +257,11 @@ export class MarkdownGeneratorService {
                             title: pr_update.title,
                             body: pr_update.body,
                         },
-                        { userId: directoryOwner.id, providerId: directory.gitProvider },
+                        {
+                            userId: directoryOwner.id,
+                            providerId: directory.gitProvider,
+                            directoryId: directory.id,
+                        },
                     )
                     .catch((err) => {
                         this.logger.error('Failed to create PR', err);
@@ -283,7 +300,11 @@ export class MarkdownGeneratorService {
                 repo: mainRepo,
                 committer,
             },
-            { userId: directoryOwner.id, providerId: directory.gitProvider },
+            {
+                userId: directoryOwner.id,
+                providerId: directory.gitProvider,
+                directoryId: directory.id,
+            },
         );
 
         const markdownRepo = new MarkdownRepository(markdownPath);
@@ -312,6 +333,7 @@ export class MarkdownGeneratorService {
             await this.gitFacade.deleteRepository(mainRepoOwner, mainRepo, {
                 userId: directoryOwner.id,
                 providerId: directory.gitProvider,
+                directoryId: directory.id,
             });
 
             const dataDir = this.gitFacade.getLocalDir(

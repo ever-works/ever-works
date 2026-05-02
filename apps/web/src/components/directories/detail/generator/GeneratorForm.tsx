@@ -29,9 +29,12 @@ import {
     WebsiteRepositoryCreationMethod,
 } from '@/lib/api/enums';
 import { getFormSchema } from '@/app/actions/dashboard/generator-form';
+import { updateDirectoryTemplate } from '@/app/actions/dashboard/directories';
 import { useProviderSelection } from '@/lib/hooks/use-provider-selection';
 import { ProviderSelectionSection } from '@/components/directories/shared/ProviderSelectionSection';
+import { WebsiteTemplateSelector } from '@/components/directories/shared/WebsiteTemplateSelector';
 import { GenerationProgress } from './GenerationProgress';
+import type { WebsiteTemplateOption } from '@/lib/api/directory';
 import type { DirectoryPlugin } from '@/lib/api/plugins';
 import { useDirectoryDetail } from '../DirectoryDetailContext';
 
@@ -39,6 +42,7 @@ interface GeneratorFormProps {
     directoryId: string;
     directory: Directory;
     config?: DirectoryConfig;
+    websiteTemplates: WebsiteTemplateOption[];
     directoryPlugins?: DirectoryPlugin[];
 }
 
@@ -46,6 +50,7 @@ export function GeneratorForm({
     directoryId,
     directory,
     config,
+    websiteTemplates,
     directoryPlugins = [],
 }: GeneratorFormProps) {
     const router = useRouter();
@@ -64,6 +69,12 @@ export function GeneratorForm({
     const isGenerated = !!config?.metadata;
     const lastRequestData = config?.metadata?.last_request_data;
     const initialPrompt = lastRequestData?.prompt || config?.metadata?.initial_prompt || '';
+    const [selectedWebsiteTemplateId, setSelectedWebsiteTemplateId] = useState(
+        directory.websiteTemplateId ||
+            websiteTemplates.find((template) => template.isDefault)?.id ||
+            websiteTemplates[0]?.id ||
+            '',
+    );
 
     // Core form data (always present)
     const [coreData, setCoreData] = useState<{
@@ -221,6 +232,22 @@ export function GeneratorForm({
                 return;
             }
 
+            if (
+                !isGenerated &&
+                selectedWebsiteTemplateId &&
+                selectedWebsiteTemplateId !== directory.websiteTemplateId
+            ) {
+                const templateUpdate = await updateDirectoryTemplate(
+                    directoryId,
+                    selectedWebsiteTemplateId,
+                );
+
+                if (!templateUpdate.success) {
+                    toast.error(templateUpdate.error || t('failedToStartOperation'));
+                    return;
+                }
+            }
+
             if (isGenerated && !requiresFullGeneration) {
                 // Simple update - only send update-specific fields
                 const updateData: UpdateItemsGeneratorDto = {
@@ -279,7 +306,19 @@ export function GeneratorForm({
 
     return (
         <form onSubmit={handleSubmit} className="space-y-6 max-w-4xl">
-            <RequiredFields formData={coreData} onChange={handleCoreDataChange} />
+            <RequiredFields formData={coreData} onChange={handleCoreDataChange}>
+                <WebsiteTemplateSelector
+                    templates={websiteTemplates}
+                    value={selectedWebsiteTemplateId}
+                    onChange={setSelectedWebsiteTemplateId}
+                    disabled={isGenerated || isPending}
+                    helperText={
+                        isGenerated
+                            ? t('websiteTemplateLockedHelperText')
+                            : t('websiteTemplateHelperText')
+                    }
+                />
+            </RequiredFields>
 
             {/* Update-specific controls for existing directories */}
             {isGenerated && (

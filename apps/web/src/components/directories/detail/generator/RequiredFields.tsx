@@ -1,5 +1,6 @@
 'use client';
 
+import type { ReactNode } from 'react';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils/cn';
@@ -14,9 +15,10 @@ interface CoreFormData {
 interface RequiredFieldsProps {
     formData: Partial<CoreFormData>;
     onChange: (updates: Partial<CoreFormData>) => void;
+    children?: ReactNode;
 }
 
-export function RequiredFields({ formData, onChange }: RequiredFieldsProps) {
+export function RequiredFields({ formData, onChange, children }: RequiredFieldsProps) {
     const t = useTranslations('dashboard.directoryDetail.generator');
 
     return (
@@ -65,6 +67,8 @@ export function RequiredFields({ formData, onChange }: RequiredFieldsProps) {
                         helperText={t('modelOverrideHelperText')}
                     />
                 </div>
+
+                {children}
             </div>
         </div>
     );

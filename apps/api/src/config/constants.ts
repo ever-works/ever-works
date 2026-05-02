@@ -92,6 +92,22 @@ export const config = {
             return process.env.GH_CALLBACK_URL || `${webUrl}/api/oauth/github/callback`;
         },
     },
+    githubApp: {
+        appId: () => process.env.GITHUB_APP_ID,
+        clientId: () => process.env.GITHUB_APP_CLIENT_ID,
+        clientSecret: () => process.env.GITHUB_APP_CLIENT_SECRET,
+        privateKey: () => process.env.GITHUB_APP_PRIVATE_KEY?.replace(/\\n/g, '\n'),
+        webhookSecret: () => process.env.GITHUB_APP_WEBHOOK_SECRET,
+        slug: () => process.env.GITHUB_APP_SLUG || 'ever-works',
+        setupUrl: () => {
+            const webUrl = config.webAppUrl();
+            return process.env.GITHUB_APP_SETUP_URL || `${webUrl}/api/github-app/setup`;
+        },
+        callbackUrl: () => {
+            const webUrl = config.webAppUrl();
+            return process.env.GITHUB_APP_CALLBACK_URL || `${webUrl}/api/github-app/callback`;
+        },
+    },
     facebook: {
         clientId: () => process.env.FACEBOOK_CLIENT_ID,
         clientSecret: () => process.env.FACEBOOK_CLIENT_SECRET,

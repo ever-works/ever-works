@@ -7,4 +7,5 @@ export * from './error.util';
 export * from './prompt.util';
 export * from './time.utils';
 export * from './directory.utils';
+export * from './github-app.utils';
 export * from './generation-cancellation.utils';

@@ -426,7 +426,7 @@ export function PluginOnboardingWizard({
     const apiKeyField = credentialFields.find(([key]) => key === 'apiKey');
     const additionalCredentialFields = credentialFields.filter(([key]) => key !== 'apiKey');
 
-    const steps = useMemo<StepConfig[]>(() => {
+    const steps: StepConfig[] = (() => {
         const result: StepConfig[] = [];
 
         if (configurationFields.length > 0) {
@@ -454,15 +454,7 @@ export function PluginOnboardingWizard({
         });
 
         return result;
-    }, [
-        configurationFields.length,
-        authModeSchema,
-        credentialFields.length,
-        plugin.name,
-        plugin.uiHints?.onboardingDescription,
-        supportsDeviceAuth,
-        tWizard,
-    ]);
+    })();
 
     const currentStep = steps[step];
 

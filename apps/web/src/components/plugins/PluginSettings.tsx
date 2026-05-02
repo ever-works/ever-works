@@ -126,6 +126,7 @@ export function PluginSettings({ plugin, oauthConnection, deviceAuthStatus }: Pl
         (!setupLink.showWhenEmpty || setupLink.showWhenEmpty.every((f) => !displaySettings[f]));
     const hasDeviceAuth =
         plugin.capabilities.includes('device-auth') && deviceAuthStatus !== undefined;
+    const saveBlockedByEnableState = !optimisticEnabled || isPending;
 
     const showsOnboardingWizard = Boolean(plugin.uiHints?.onboardingWizard);
     const deviceAuthModeField = plugin.uiHints?.deviceAuth?.authModeField ?? 'authMode';
@@ -391,12 +392,18 @@ export function PluginSettings({ plugin, oauthConnection, deviceAuthStatus }: Pl
                             <Button
                                 variant="primary"
                                 onClick={handleSave}
-                                disabled={!hasChanges || isSaving}
+                                disabled={!hasChanges || isSaving || saveBlockedByEnableState}
                                 loading={isSaving}
                             >
                                 <Save className="w-4 h-4 mr-2" />
                                 {t('saveSettings')}
                             </Button>
+
+                            {saveBlockedByEnableState && (
+                                <span className="text-sm text-text-muted dark:text-text-muted-dark">
+                                    {t('enableFirstToSave')}
+                                </span>
+                            )}
 
                             {saveSuccess && (
                                 <span className="inline-flex items-center gap-1 text-sm text-success">
