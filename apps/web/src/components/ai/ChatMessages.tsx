@@ -17,21 +17,25 @@ export function ChatMessages({ messages, isStreaming }: ChatMessagesProps) {
     const t = useTranslations('dashboard.aiChat');
     const { scrollRef, contentRef, isAtBottom, scrollToBottom } = useStickToBottom();
     const [isAtTop, setIsAtTop] = useState(true);
-    const setScrollRef = useCallback(
+    const scrollContainerRef = useRef<HTMLDivElement | null>(null);
+
+    const lastMessage = messages[messages.length - 1];
+    const isWaitingForResponse = isStreaming && lastMessage?.role === 'user';
+
+    const setScrollContainerRef = useCallback(
         (node: HTMLDivElement | null) => {
+            scrollContainerRef.current = node;
             scrollRef(node);
         },
         [scrollRef],
     );
-    const setContentRef = useCallback(
+
+    const setContentContainerRef = useCallback(
         (node: HTMLDivElement | null) => {
             contentRef(node);
         },
         [contentRef],
     );
-
-    const lastMessage = messages[messages.length - 1];
-    const isWaitingForResponse = isStreaming && lastMessage?.role === 'user';
 
     // Scroll to bottom when user sends a message
     const prevCountRef = useRef(messages.length);
@@ -44,7 +48,7 @@ export function ChatMessages({ messages, isStreaming }: ChatMessagesProps) {
 
     // Track scroll position to detect if at top
     useEffect(() => {
-        const scrollElement = scrollRef.current;
+        const scrollElement = scrollContainerRef.current;
         if (!scrollElement) return;
 
         const checkScrollTop = () => {
@@ -54,7 +58,7 @@ export function ChatMessages({ messages, isStreaming }: ChatMessagesProps) {
         checkScrollTop();
         scrollElement.addEventListener('scroll', checkScrollTop);
         return () => scrollElement.removeEventListener('scroll', checkScrollTop);
-    }, [scrollRef]);
+    }, []);
 
     return (
         <div className="flex-1 min-h-0 relative">
@@ -76,8 +80,8 @@ export function ChatMessages({ messages, isStreaming }: ChatMessagesProps) {
                 )}
             />
 
-            <div ref={setScrollRef} className="h-full overflow-y-auto">
-                <div ref={setContentRef} className="px-4 py-3 space-y-3">
+            <div ref={setScrollContainerRef} className="h-full overflow-y-auto">
+                <div ref={setContentContainerRef} className="px-4 py-3 space-y-3">
                     {messages.map((message, index) => {
                         const duplicateCount = messages
                             .slice(0, index)

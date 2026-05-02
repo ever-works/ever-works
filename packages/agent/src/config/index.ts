@@ -164,8 +164,23 @@ export const config = {
         autoUpdateEnabled() {
             return process.env.WEBSITE_TEMPLATE_AUTO_UPDATE_ENABLED !== 'false';
         },
+        getDefaultTemplateId() {
+            return process.env.WEBSITE_TEMPLATE_DEFAULT_ID || 'classic';
+        },
         getBetaBranch() {
             return process.env.WEBSITE_TEMPLATE_BETA_BRANCH || 'stage';
+        },
+        getMinimalOwner() {
+            return process.env.WEBSITE_TEMPLATE_MINIMAL_OWNER || 'ever-works';
+        },
+        getMinimalRepo() {
+            return process.env.WEBSITE_TEMPLATE_MINIMAL_REPO;
+        },
+        getMinimalBranch() {
+            return process.env.WEBSITE_TEMPLATE_MINIMAL_BRANCH || 'main';
+        },
+        getMinimalBetaBranch() {
+            return process.env.WEBSITE_TEMPLATE_MINIMAL_BETA_BRANCH || null;
         },
     },
 

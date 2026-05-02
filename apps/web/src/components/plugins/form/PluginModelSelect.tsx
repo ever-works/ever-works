@@ -126,7 +126,7 @@ export function PluginModelSelect({
     }, [cachedModels, pluginId, t]);
 
     const activeModels = useMemo(
-        () => (loadedPluginId === pluginId ? models : (cachedModels ?? [])),
+        () => cachedModels ?? (loadedPluginId === pluginId ? models : []),
         [cachedModels, loadedPluginId, models, pluginId],
     );
     const loading = Boolean(pluginId) && !cachedModels && loadedPluginId !== pluginId;

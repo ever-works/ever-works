@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState, useTransition } from 'react';
-import type { Directory } from '@/lib/api';
+import type { Directory, WebsiteTemplateOption } from '@/lib/api';
 import { cn } from '@/lib/utils/cn';
 import { toast } from 'sonner';
 import { useTranslations } from 'next-intl';
@@ -10,6 +10,7 @@ import {
     deploy,
     getDeploymentTeams,
     lookupExistingDeployment,
+    switchWebsiteTemplate,
     updateWebsiteRepository,
     updateWebsiteTemplateSettings,
 } from '@/app/actions/dashboard/deploy';
@@ -22,14 +23,28 @@ import { TeamSelectionDialog, type DeployTeam } from './TeamSelectionDialog';
 import { DeployConfigDialog, type DeployConfigData } from './DeployConfigDialog';
 import { updateWebsiteSettings } from '@/app/actions/dashboard/directories';
 import { formatDistanceToNow } from 'date-fns';
+import { WebsiteTemplateSelector } from '@/components/directories/shared/WebsiteTemplateSelector';
+import {
+    Dialog,
+    DialogContent,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from '@/components/ui/dialog';
 
 interface DeployFormProps {
     directory: Directory;
     isDeploying?: boolean;
     providerName?: string;
+    websiteTemplates?: WebsiteTemplateOption[];
 }
 
-export function DeployForm({ directory, isDeploying, providerName }: DeployFormProps) {
+export function DeployForm({
+    directory,
+    isDeploying,
+    providerName,
+    websiteTemplates = [],
+}: DeployFormProps) {
     const t = useTranslations('dashboard.directoryDetail.deploy');
     const [isPending, startTransition] = useTransition();
     const router = useRouter();
@@ -237,7 +252,7 @@ export function DeployForm({ directory, isDeploying, providerName }: DeployFormP
             <UpdateWebsiteRepository directory={directory} />
 
             {/* Website Template Settings Section */}
-            <WebsiteTemplateSettings directory={directory} />
+            <WebsiteTemplateSettings directory={directory} websiteTemplates={websiteTemplates} />
 
             {/* Info Section */}
             <div className="p-6 rounded-lg bg-info/5 dark:bg-info-dark/5 border border-info/20 dark:border-info-dark/20 hidden">
@@ -319,12 +334,21 @@ function UpdateWebsiteRepository({ directory }: DeployFormProps) {
     );
 }
 
-function WebsiteTemplateSettings({ directory }: DeployFormProps) {
+function WebsiteTemplateSettings({
+    directory,
+    websiteTemplates = [],
+}: Pick<DeployFormProps, 'directory' | 'websiteTemplates'>) {
     const t = useTranslations('dashboard.directoryDetail.deploy');
     const [isPending, startTransition] = useTransition();
     const router = useRouter();
     const [autoUpdate, setAutoUpdate] = useState(directory.websiteTemplateAutoUpdate ?? false);
     const [useBeta, setUseBeta] = useState(directory.websiteTemplateUseBeta ?? false);
+    const [selectedTemplateId, setSelectedTemplateId] = useState(
+        directory.websiteTemplateId ||
+            websiteTemplates.find((template) => template.isDefault)?.id ||
+            '',
+    );
+    const [confirmSwitchOpen, setConfirmSwitchOpen] = useState(false);
 
     const handleAutoUpdateChange = (checked: boolean) => {
         setAutoUpdate(checked);
@@ -387,9 +411,81 @@ function WebsiteTemplateSettings({ directory }: DeployFormProps) {
     const lastUpdated = formatDate(directory.websiteTemplateLastUpdatedAt);
     const lastChecked = formatDate(directory.websiteTemplateLastCheckedAt);
     const hasError = Boolean(directory.websiteTemplateLastError);
+    const selectedTemplate =
+        websiteTemplates.find((template) => template.id === selectedTemplateId) ||
+        websiteTemplates.find((template) => template.isDefault);
+    const currentTemplate =
+        websiteTemplates.find((template) => template.id === directory.websiteTemplateId) ||
+        websiteTemplates.find((template) => template.isDefault);
+    const hasTemplateChange =
+        Boolean(selectedTemplateId) && selectedTemplateId !== directory.websiteTemplateId;
+
+    const handleSwitchTemplate = () => {
+        if (!hasTemplateChange || !selectedTemplateId) {
+            return;
+        }
+
+        startTransition(async () => {
+            try {
+                const result = await switchWebsiteTemplate(directory.id, selectedTemplateId);
+
+                if (result.success && result.data) {
+                    toast.success(result.data.message || t('form.websiteTemplate.updateSuccess'));
+                    setConfirmSwitchOpen(false);
+                    router.refresh();
+                } else {
+                    toast.error(result.error || t('form.websiteTemplate.updateFailed'));
+                }
+            } catch (error) {
+                console.error('Switch website template failed:', error);
+                toast.error(t('form.websiteTemplate.updateFailed'));
+            }
+        });
+    };
 
     return (
         <div className="rounded-lg bg-surface dark:bg-surface-dark border border-border dark:border-border-dark p-6">
+            <Dialog open={confirmSwitchOpen} onOpenChange={setConfirmSwitchOpen}>
+                <DialogContent className="max-w-lg">
+                    <DialogHeader>
+                        <DialogTitle>
+                            {t('form.websiteTemplate.switchConfirmTitle', {
+                                defaultValue: 'Switch website template?',
+                            })}
+                        </DialogTitle>
+                        <p className="text-sm text-text-secondary dark:text-text-secondary-dark">
+                            {t('form.websiteTemplate.switchConfirmDescription', {
+                                defaultValue:
+                                    'If the website repository already exists, its contents will be replaced from the selected template. Any custom code in that repository will be lost.',
+                            })}
+                        </p>
+                    </DialogHeader>
+                    <DialogFooter>
+                        <Button
+                            type="button"
+                            variant="secondary"
+                            size="sm"
+                            onClick={() => setConfirmSwitchOpen(false)}
+                            disabled={isPending}
+                        >
+                            {t('form.websiteTemplate.switchCancel', { defaultValue: 'Cancel' })}
+                        </Button>
+                        <Button
+                            type="button"
+                            variant="danger"
+                            size="sm"
+                            onClick={handleSwitchTemplate}
+                            disabled={isPending}
+                            loading={isPending}
+                        >
+                            {t('form.websiteTemplate.switchConfirmButton', {
+                                defaultValue: 'Switch template',
+                            })}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
             <div className="flex items-start gap-4">
                 <div
                     className={cn(
@@ -408,6 +504,59 @@ function WebsiteTemplateSettings({ directory }: DeployFormProps) {
                     </p>
 
                     <div className="space-y-4">
+                        <WebsiteTemplateSelector
+                            templates={websiteTemplates}
+                            value={selectedTemplateId}
+                            onChange={setSelectedTemplateId}
+                            disabled={isPending}
+                            label={t('form.websiteTemplate.selectorLabel', {
+                                defaultValue: 'Website template',
+                            })}
+                            helperText={
+                                hasTemplateChange
+                                    ? t('form.websiteTemplate.switchHelperText', {
+                                          defaultValue:
+                                              'Applying a new template will reset the existing website repository from the selected template if it already exists.',
+                                      })
+                                    : t('form.websiteTemplate.currentHelperText', {
+                                          defaultValue:
+                                              'The selected template controls how the website repository is initialized and updated.',
+                                      })
+                            }
+                        />
+
+                        <div className="rounded-lg border border-border dark:border-border-dark p-4 bg-card dark:bg-card-primary-dark/20">
+                            <p className="text-sm font-medium text-text dark:text-text-dark">
+                                {t('form.websiteTemplate.currentTemplateLabel', {
+                                    defaultValue: 'Current template',
+                                })}
+                            </p>
+                            <p className="mt-1 text-sm text-text dark:text-text-dark">
+                                {currentTemplate?.name || directory.websiteTemplateId}
+                            </p>
+                            <p className="mt-1 text-sm text-text-secondary dark:text-text-secondary-dark">
+                                {currentTemplate?.description}
+                            </p>
+                        </div>
+
+                        <div className="flex justify-end">
+                            <Button
+                                type="button"
+                                variant={hasTemplateChange ? 'danger' : 'secondary'}
+                                size="sm"
+                                disabled={!hasTemplateChange || isPending}
+                                onClick={() => setConfirmSwitchOpen(true)}
+                            >
+                                {hasTemplateChange
+                                    ? t('form.websiteTemplate.switchAction', {
+                                          defaultValue: 'Apply template to website repository',
+                                      })
+                                    : t('form.websiteTemplate.switchActionIdle', {
+                                          defaultValue: 'Template is up to date',
+                                      })}
+                            </Button>
+                        </div>
+
                         <Switch
                             checked={autoUpdate}
                             onChange={handleAutoUpdateChange}

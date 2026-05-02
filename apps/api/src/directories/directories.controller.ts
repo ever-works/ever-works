@@ -80,7 +80,11 @@ import {
     GetUserRepositoriesDto,
     GetUserRepositoriesResponseDto,
 } from '@ever-works/agent/dto';
-import { UpdateWebsiteRepositoryResponseDto } from '@ever-works/agent/generators';
+import {
+    SwitchWebsiteTemplateResponseDto,
+    UpdateWebsiteRepositoryResponseDto,
+} from '@ever-works/agent/generators';
+import { getDefaultWebsiteTemplateId, listWebsiteTemplates } from '@ever-works/agent/generators';
 import { CommunityPrProcessorService } from '@ever-works/agent/community-pr';
 import { DirectoryRepository } from '@ever-works/agent/database';
 import { AuthService, CurrentUser, AuthSessionGuard } from '../auth';
@@ -176,6 +180,27 @@ export class DirectoriesController {
     async getDirectoryStats(@CurrentUser() auth: AuthenticatedUser) {
         const user = await this.authService.getUser(auth.userId);
         return this.directoryQueryService.getStats(user);
+    }
+
+    @Get('directories/website-templates')
+    @HttpCode(HttpStatus.OK)
+    @ApiOperation({
+        summary: 'List website templates',
+        description: 'Get the available website templates for directory website generation',
+    })
+    @ApiResponse({ status: 200, description: 'Available website templates' })
+    async getWebsiteTemplates() {
+        const defaultTemplateId = getDefaultWebsiteTemplateId();
+
+        return {
+            status: 'success',
+            templates: listWebsiteTemplates().map((template) => ({
+                id: template.id,
+                name: template.name,
+                description: template.description,
+                isDefault: template.id === defaultTemplateId,
+            })),
+        };
     }
 
     @Post('directories')
@@ -969,6 +994,56 @@ export class DirectoriesController {
                 action: 'directory.website_updated',
                 status: ActivityStatus.COMPLETED,
                 summary: `Updated website repository`,
+            })
+            .catch(() => {});
+
+        return result;
+    }
+
+    @Post('directories/:id/switch-website-template')
+    @HttpCode(HttpStatus.OK)
+    @ApiOperation({
+        summary: 'Switch website template',
+        description:
+            'Update the selected website template and apply it to the existing website repository when it already exists',
+    })
+    @ApiParam({ name: 'id', description: 'Directory ID' })
+    @ApiResponse({ status: 200, description: 'Website template switched' })
+    async switchWebsiteTemplate(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id') id: string,
+        @Body() body: { websiteTemplateId: string },
+    ): Promise<SwitchWebsiteTemplateResponseDto> {
+        const user = await this.authService.getUser(auth.userId);
+
+        const result = await this.directoryLifecycleService.switchWebsiteTemplate(
+            id,
+            body.websiteTemplateId,
+            user,
+        );
+
+        const summaryByMode = {
+            no_change: result.message,
+            saved_for_initialization: `Saved website template change from ${result.previousWebsiteTemplateId} to ${result.websiteTemplateId} for first website creation`,
+            repository_reset: `Switched website template from ${result.previousWebsiteTemplateId} to ${result.websiteTemplateId} and reset the existing website repository`,
+            repository_recreated: `Switched website template from ${result.previousWebsiteTemplateId} to ${result.websiteTemplateId} and recreated the website repository`,
+        } as const;
+
+        this.activityLogService
+            .log({
+                userId: auth.userId,
+                directoryId: id,
+                actionType: ActivityActionType.WEBSITE_SETTINGS_UPDATED,
+                action: 'directory.website_template_switched',
+                status: ActivityStatus.COMPLETED,
+                summary: summaryByMode[result.switchMode],
+                details: {
+                    previousWebsiteTemplateId: result.previousWebsiteTemplateId,
+                    websiteTemplateId: result.websiteTemplateId,
+                    switchMode: result.switchMode,
+                    repositoryRecreated: result.repositoryRecreated,
+                    repository: result.repository,
+                },
             })
             .catch(() => {});
 

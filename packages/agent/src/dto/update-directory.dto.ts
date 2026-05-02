@@ -42,6 +42,12 @@ export class UpdateDirectoryDto {
     @Transform(({ value }) => (typeof value === 'string' ? value.trim().toLowerCase() : value))
     deployProvider?: string;
 
+    @ApiPropertyOptional({ description: 'Website template identifier for this directory' })
+    @IsString()
+    @IsOptional()
+    @Transform(({ value }) => (typeof value === 'string' ? value.trim().toLowerCase() : value))
+    websiteTemplateId?: string;
+
     @ApiPropertyOptional({
         description: 'Custom README configuration',
         type: MarkdownReadmeConfigDto,

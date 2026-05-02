@@ -11,6 +11,7 @@ import { DeployProviderSelector, type DeployProvider } from './deploy-provider-s
 import { useTranslations } from 'next-intl';
 import type { ProviderWithConnection } from './page';
 import { Bot, PenLine, FolderInput, ArrowRight } from 'lucide-react';
+import type { WebsiteTemplateOption } from '@/lib/api/directory';
 
 interface NewDirectoryClientProps {
     user: AuthUser;
@@ -18,6 +19,7 @@ interface NewDirectoryClientProps {
     defaultProviderId: string | null;
     deployProviders: DeployProvider[];
     defaultDeployProviderId: string | null;
+    websiteTemplates: WebsiteTemplateOption[];
 }
 
 export default function NewDirectoryClient({
@@ -26,6 +28,7 @@ export default function NewDirectoryClient({
     defaultProviderId,
     deployProviders,
     defaultDeployProviderId,
+    websiteTemplates,
 }: NewDirectoryClientProps) {
     const [creationMode, setCreationMode] = useState<'ai' | 'manual' | 'import' | null>(null);
     const [selectedProviderId, setSelectedProviderId] = useState<string | null>(
@@ -251,6 +254,7 @@ export default function NewDirectoryClient({
                         gitProvider={selectedProviderId || undefined}
                         gitConnected={gitConnected}
                         deployProvider={selectedDeployProviderId || undefined}
+                        websiteTemplates={websiteTemplates}
                     />
                 )}
                 {creationMode === 'manual' && (
@@ -259,6 +263,7 @@ export default function NewDirectoryClient({
                         gitProvider={selectedProviderId || undefined}
                         gitConnected={gitConnected}
                         deployProvider={selectedDeployProviderId || undefined}
+                        websiteTemplates={websiteTemplates}
                     />
                 )}
                 {creationMode === 'import' && (

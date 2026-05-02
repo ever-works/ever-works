@@ -9,14 +9,23 @@ import { DirectoryRepository } from '@src/database/repositories/directory.reposi
 import { DataGeneratorService } from '@src/generators/data-generator/data-generator.service';
 import { MarkdownGeneratorService } from '@src/generators/markdown-generator/markdown-generator.service';
 import { WebsiteGeneratorService } from '@src/generators/website-generator/website-generator.service';
+import { WebsiteUpdateService } from '@src/generators/website-generator/website-update.service';
 import { CreateDirectoryDto } from '@src/dto/create-directory.dto';
 import { UpdateDirectoryDto } from '@src/dto';
 import { DeleteDirectoryDto, DeleteDirectoryResponseDto } from '@src/items-generator/dto';
+import { Directory } from '@src/entities/directory.entity';
 import { User } from '@src/entities/user.entity';
 import { DirectoryOwnershipService } from './directory-ownership.service';
 import { rethrowAsNormalized } from './utils/error.utils';
 import { GenerateStatusType } from '@src/entities/types';
 import { DeployFacadeService } from '@src/facades/deploy.facade';
+import {
+    findWebsiteTemplateConfig,
+    getDefaultWebsiteTemplateId,
+    SwitchWebsiteTemplateResponseDto,
+} from '@src/generators/website-generator';
+import { GitFacadeService } from '@src/facades/git.facade';
+import { WebsiteRepositoryCreationMethod } from '@src/items-generator/dto/create-items-generator.dto';
 
 @Injectable()
 export class DirectoryLifecycleService {
@@ -27,9 +36,81 @@ export class DirectoryLifecycleService {
         private readonly dataGenerator: DataGeneratorService,
         private readonly markdownGenerator: MarkdownGeneratorService,
         private readonly websiteGenerator: WebsiteGeneratorService,
+        private readonly websiteUpdateService: WebsiteUpdateService,
         private readonly ownershipService: DirectoryOwnershipService,
         private readonly deployFacade: DeployFacadeService,
+        private readonly gitFacade: GitFacadeService,
     ) {}
+
+    private isMissingWebsiteRepositoryError(error: unknown): boolean {
+        if (error instanceof NotFoundException) {
+            return true;
+        }
+
+        const errorStatus =
+            typeof error === 'object' && error !== null && 'status' in error
+                ? Number((error as { status?: unknown }).status)
+                : undefined;
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        const normalizedMessage = errorMessage.toLowerCase();
+
+        return (
+            errorStatus === 404 ||
+            errorMessage.includes('404') ||
+            normalizedMessage.includes('not found') ||
+            normalizedMessage.includes('does not exist')
+        );
+    }
+
+    private async hasInitializedWebsiteRepository(
+        directory: Directory,
+        user: User,
+    ): Promise<boolean> {
+        if (
+            directory.website ||
+            directory.deployProjectId ||
+            directory.websiteTemplateLastCommit ||
+            directory.websiteTemplateLastUpdatedAt ||
+            directory.websiteTemplateLastCheckedAt
+        ) {
+            return true;
+        }
+
+        const userIds = [...new Set([user.id, directory.userId].filter(Boolean))];
+
+        for (const userId of userIds) {
+            const authOptions = {
+                userId,
+                providerId: directory.gitProvider,
+                directoryId: directory.id,
+            };
+
+            const hasCredentials = await this.gitFacade.hasValidCredentials(authOptions);
+            if (!hasCredentials) {
+                continue;
+            }
+
+            try {
+                const exists = await this.gitFacade.repositoryExists(
+                    directory.getRepoOwner('website'),
+                    directory.getWebsiteRepo(),
+                    authOptions,
+                );
+
+                if (exists) {
+                    return true;
+                }
+            } catch (error) {
+                this.logger.warn(
+                    `Failed to verify website repository initialization for directory ${directory.id}: ${
+                        error instanceof Error ? error.message : String(error)
+                    }`,
+                );
+            }
+        }
+
+        return false;
+    }
 
     async createDirectory(createDirectoryDto: CreateDirectoryDto, user: User) {
         const {
@@ -41,7 +122,15 @@ export class DirectoryLifecycleService {
             organization,
             gitProvider,
             deployProvider,
+            websiteTemplateId,
         } = createDirectoryDto;
+
+        if (websiteTemplateId && !findWebsiteTemplateConfig(websiteTemplateId)) {
+            throw new BadRequestException({
+                status: 'error',
+                message: `Unsupported website template: ${websiteTemplateId}`,
+            });
+        }
 
         const directoryData: Partial<CreateDirectoryDto & { userId: string }> = {
             slug,
@@ -51,6 +140,7 @@ export class DirectoryLifecycleService {
             owner,
             gitProvider,
             deployProvider,
+            websiteTemplateId: websiteTemplateId || getDefaultWebsiteTemplateId(),
             readmeConfig,
             organization,
         };
@@ -122,6 +212,34 @@ export class DirectoryLifecycleService {
                 }
             }
 
+            if (updateDto.websiteTemplateId !== undefined) {
+                const nextTemplateId = updateDto.websiteTemplateId || getDefaultWebsiteTemplateId();
+
+                if (!findWebsiteTemplateConfig(nextTemplateId)) {
+                    throw new BadRequestException({
+                        status: 'error',
+                        message: `Unsupported website template: ${nextTemplateId}`,
+                    });
+                }
+
+                if (nextTemplateId !== directory.websiteTemplateId) {
+                    const websiteRepoInitialized = await this.hasInitializedWebsiteRepository(
+                        directory,
+                        user,
+                    );
+
+                    if (websiteRepoInitialized) {
+                        throw new BadRequestException({
+                            status: 'error',
+                            message:
+                                'Website template cannot be changed after the website repository has been initialized.',
+                        });
+                    }
+                }
+
+                updateData.websiteTemplateId = nextTemplateId;
+            }
+
             // Handle community PR processing settings
             if (updateDto.communityPrEnabled !== undefined) {
                 updateData.communityPrEnabled = updateDto.communityPrEnabled;
@@ -153,6 +271,130 @@ export class DirectoryLifecycleService {
         } catch (error) {
             rethrowAsNormalized(error, this.logger, 'updating directory');
         }
+    }
+
+    async switchWebsiteTemplate(
+        id: string,
+        websiteTemplateId: string,
+        user: User,
+    ): Promise<SwitchWebsiteTemplateResponseDto> {
+        const { directory } = await this.ownershipService.ensureCanEdit(id, user.id);
+        const nextTemplateId = websiteTemplateId || getDefaultWebsiteTemplateId();
+
+        if (!findWebsiteTemplateConfig(nextTemplateId)) {
+            throw new BadRequestException({
+                status: 'error',
+                message: `Unsupported website template: ${nextTemplateId}`,
+            });
+        }
+
+        const websiteRepoInitialized = await this.hasInitializedWebsiteRepository(directory, user);
+        const websiteOwner = directory.getRepoOwner('website');
+        const websiteRepo = directory.getWebsiteRepo();
+
+        if (nextTemplateId === directory.websiteTemplateId) {
+            return {
+                status: 'success',
+                slug: directory.slug,
+                owner: websiteOwner,
+                repository: `${websiteOwner}/${websiteRepo}`,
+                previousWebsiteTemplateId: directory.websiteTemplateId,
+                websiteTemplateId: directory.websiteTemplateId,
+                repositoryRecreated: false,
+                switchMode: 'no_change',
+                message: websiteRepoInitialized
+                    ? 'Website template is already selected for this directory.'
+                    : 'Website template saved. It will be used when the website repository is first created.',
+            };
+        }
+
+        const updateData = {
+            websiteTemplateId: nextTemplateId,
+            websiteTemplateLastCommit: null,
+            websiteTemplateLastError: null,
+            websiteTemplateLastUpdatedAt: null,
+            websiteTemplateLastCheckedAt: null,
+        };
+
+        const previousTemplateId = directory.websiteTemplateId;
+        const previousTemplateLastCommit = directory.websiteTemplateLastCommit;
+        const previousTemplateLastError = directory.websiteTemplateLastError;
+        const previousTemplateLastUpdatedAt = directory.websiteTemplateLastUpdatedAt;
+        const previousTemplateLastCheckedAt = directory.websiteTemplateLastCheckedAt;
+
+        directory.websiteTemplateId = nextTemplateId;
+        directory.websiteTemplateLastCommit = null;
+        directory.websiteTemplateLastError = null;
+        directory.websiteTemplateLastUpdatedAt = null;
+        directory.websiteTemplateLastCheckedAt = null;
+
+        if (websiteRepoInitialized) {
+            let repositoryRecreated = false;
+
+            try {
+                await this.websiteUpdateService.updateRepository(directory, user);
+            } catch (error) {
+                if (!this.isMissingWebsiteRepositoryError(error)) {
+                    directory.websiteTemplateId = previousTemplateId;
+                    directory.websiteTemplateLastCommit = previousTemplateLastCommit;
+                    directory.websiteTemplateLastError = previousTemplateLastError;
+                    directory.websiteTemplateLastUpdatedAt = previousTemplateLastUpdatedAt;
+                    directory.websiteTemplateLastCheckedAt = previousTemplateLastCheckedAt;
+                    throw error;
+                }
+
+                this.logger.warn(
+                    `Website repository for directory ${directory.id} was missing during template switch. Recreating from template.`,
+                );
+
+                try {
+                    await this.websiteGenerator.initialize(
+                        directory,
+                        user,
+                        WebsiteRepositoryCreationMethod.CREATE_USING_TEMPLATE,
+                    );
+                    repositoryRecreated = true;
+                } catch (initializeError) {
+                    directory.websiteTemplateId = previousTemplateId;
+                    directory.websiteTemplateLastCommit = previousTemplateLastCommit;
+                    directory.websiteTemplateLastError = previousTemplateLastError;
+                    directory.websiteTemplateLastUpdatedAt = previousTemplateLastUpdatedAt;
+                    directory.websiteTemplateLastCheckedAt = previousTemplateLastCheckedAt;
+                    throw initializeError;
+                }
+            }
+
+            await this.directoryRepository.update(id, updateData);
+
+            return {
+                status: 'success',
+                slug: directory.slug,
+                owner: websiteOwner,
+                repository: `${websiteOwner}/${websiteRepo}`,
+                previousWebsiteTemplateId: previousTemplateId,
+                websiteTemplateId: nextTemplateId,
+                repositoryRecreated,
+                switchMode: repositoryRecreated ? 'repository_recreated' : 'repository_reset',
+                message: repositoryRecreated
+                    ? 'Website template switched successfully. The website repository was recreated from the selected template.'
+                    : 'Website template switched successfully. The existing website repository was reset from the selected template.',
+            };
+        }
+
+        await this.directoryRepository.update(id, updateData);
+
+        return {
+            status: 'success',
+            slug: directory.slug,
+            owner: websiteOwner,
+            repository: `${websiteOwner}/${websiteRepo}`,
+            previousWebsiteTemplateId: previousTemplateId,
+            websiteTemplateId: nextTemplateId,
+            repositoryRecreated: false,
+            switchMode: 'saved_for_initialization',
+            message:
+                'Website template updated successfully. It will be used when the website repository is first created.',
+        };
     }
 
     async syncFromDataRepository(directoryId: string, user: User) {

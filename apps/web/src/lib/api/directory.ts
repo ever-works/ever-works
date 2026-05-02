@@ -59,6 +59,13 @@ export interface MarkdownReadmeConfig {
     overwriteDefaultFooter?: boolean;
 }
 
+export interface WebsiteTemplateOption {
+    id: string;
+    name: string;
+    description: string;
+    isDefault: boolean;
+}
+
 export interface CreateDirectoryDto {
     slug: string;
     name: string;
@@ -67,6 +74,7 @@ export interface CreateDirectoryDto {
     organization: boolean;
     gitProvider?: string;
     deployProvider?: string;
+    websiteTemplateId?: string;
     readmeConfig?: MarkdownReadmeConfig;
 }
 
@@ -76,6 +84,7 @@ export interface UpdateDirectoryDto {
     owner?: string;
     organization?: boolean;
     deployProvider?: string;
+    websiteTemplateId?: string;
     readmeConfig?: MarkdownReadmeConfig;
     websiteTemplateAutoUpdate?: boolean;
     websiteTemplateUseBeta?: boolean;
@@ -176,6 +185,7 @@ export interface Directory {
     // This is computed based on user's access - creator is always 'owner'
     userRole?: DirectoryMemberRole;
     // Website template auto-update settings
+    websiteTemplateId?: string;
     websiteTemplateAutoUpdate?: boolean;
     websiteTemplateUseBeta?: boolean;
     websiteTemplateLastCommit?: string | null;
@@ -508,6 +518,12 @@ export const directoryAPI = {
     // Get a directory by ID
     get: async (id: string) => {
         return serverFetch<APIResponse<{ directory: Directory }>>(`/directories/${id}`);
+    },
+
+    getWebsiteTemplates: async () => {
+        return serverFetch<APIResponse<{ templates: WebsiteTemplateOption[] }>>(
+            `/directories/website-templates`,
+        );
     },
 
     // Create a new directory

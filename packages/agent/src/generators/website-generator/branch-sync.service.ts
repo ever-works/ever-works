@@ -1,8 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { GitFacadeService } from '../../facades/git.facade';
-import { WEBSITE_TEMPLATE_CONFIG } from './config/website-template.config';
+import { getWebsiteTemplateConfig, WebsiteTemplateConfig } from './config/website-template.config';
 import { getDirectoryOwner } from '../../utils/directory.utils';
-import { config } from '../../config';
 import type { GitCommitter } from '@ever-works/plugin';
 import { Directory } from '../../entities/directory.entity';
 import { User } from '../../entities/user.entity';
@@ -40,10 +39,12 @@ export class BranchSyncService {
         const directoryOwner = getDirectoryOwner(directory);
         const websiteOwner = directory.getRepoOwner('website');
         const websiteRepo = directory.getWebsiteRepo();
+        const template = getWebsiteTemplateConfig(directory.websiteTemplateId);
 
-        const branchMapping = directory.websiteTemplateUseBeta
-            ? { [config.websiteTemplate.getBetaBranch()]: 'main' }
-            : undefined;
+        const branchMapping =
+            directory.websiteTemplateUseBeta && template.betaBranch
+                ? { [template.betaBranch]: 'main' }
+                : undefined;
 
         this.logger.log(
             `Syncing all branches from template to ${websiteOwner}/${websiteRepo}` +
@@ -58,6 +59,7 @@ export class BranchSyncService {
                 committer: directory.resolveCommitter(user),
                 forcePush: true,
                 branchMapping,
+                template,
                 providerId: directory.gitProvider,
                 directoryId: directory.id,
                 cleanupExtraBranches,
@@ -86,6 +88,7 @@ export class BranchSyncService {
         committer: GitCommitter;
         forcePush?: boolean;
         branchMapping?: { [sourceBranch: string]: string };
+        template: WebsiteTemplateConfig;
         providerId?: string;
         directoryId?: string;
         /** Delete target branches not in syncBranches; needed after CREATE_USING_TEMPLATE copies all template branches */
@@ -98,12 +101,13 @@ export class BranchSyncService {
             committer,
             forcePush = true,
             branchMapping = {},
+            template,
             providerId,
             directoryId,
             cleanupExtraBranches = false,
         } = params;
 
-        const branchesToSync = [...WEBSITE_TEMPLATE_CONFIG.syncBranches];
+        const branchesToSync = [...template.syncBranches];
         const mappedTargets = Object.values(branchMapping);
 
         this.logger.log(
@@ -143,6 +147,7 @@ export class BranchSyncService {
                         targetBranch: op.targetBranch,
                         targetOwner,
                         targetRepo,
+                        template,
                         userId,
                         committer,
                         forcePush,
@@ -186,7 +191,13 @@ export class BranchSyncService {
         );
 
         if (cleanupExtraBranches) {
-            await this.deleteExtraBranches({ targetOwner, targetRepo, userId, providerId });
+            await this.deleteExtraBranches({
+                targetOwner,
+                targetRepo,
+                userId,
+                providerId,
+                template,
+            });
         }
 
         return summary;
@@ -197,9 +208,10 @@ export class BranchSyncService {
         targetRepo: string;
         userId: string;
         providerId?: string;
+        template: WebsiteTemplateConfig;
     }): Promise<void> {
-        const { targetOwner, targetRepo, userId, providerId } = params;
-        const allowed = new Set<string>(WEBSITE_TEMPLATE_CONFIG.syncBranches);
+        const { targetOwner, targetRepo, userId, providerId, template } = params;
+        const allowed = new Set<string>(template.syncBranches);
 
         let remoteBranches: { name: string }[];
         try {
@@ -234,6 +246,7 @@ export class BranchSyncService {
         targetBranch?: string;
         targetOwner: string;
         targetRepo: string;
+        template: WebsiteTemplateConfig;
         userId: string;
         committer: GitCommitter;
         forcePush?: boolean;
@@ -245,6 +258,7 @@ export class BranchSyncService {
             targetBranch = branchName,
             targetOwner,
             targetRepo,
+            template,
             userId,
             committer,
             forcePush = true,
@@ -263,8 +277,8 @@ export class BranchSyncService {
             // Clone template branch
             tempDir = await this.gitFacade.cloneOrPull(
                 {
-                    owner: WEBSITE_TEMPLATE_CONFIG.owner,
-                    repo: WEBSITE_TEMPLATE_CONFIG.repo,
+                    owner: template.owner,
+                    repo: template.repo,
                     branch: branchName,
                     committer,
                 },
