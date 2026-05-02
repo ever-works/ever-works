@@ -553,7 +553,8 @@
                     "pending": "保留中",
                     "inProgress": "進行中",
                     "completed": "完了",
-                    "failed": "失敗"
+                    "failed": "失敗",
+                    "cancelled": "キャンセル済み"
                 }
             },
             "actions": {
@@ -1799,7 +1800,11 @@
                 "closeNote": "数分かかる場合があります。このページを閉じて後で戻ることができます。",
                 "showLogs": "ステップ ログを表示",
                 "hideLogs": "ステップ ログを非表示",
-                "waitingForLogs": "ライブログの到着を待機中..."
+                "waitingForLogs": "ライブログの到着を待機中...",
+                "stop": "生成を停止",
+                "stopping": "停止中...",
+                "stopRequested": "生成のキャンセルが要求されました",
+                "stopFailed": "生成のキャンセルに失敗しました"
             },
             "settings": {
                 "sourceSettings": "ソース リポジトリ",

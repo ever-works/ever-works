@@ -36,10 +36,11 @@ export function CancelGenerationButton({
             if (!result.success) {
                 toast.error(result.error || labels.stopFailed);
 
-                if (result.error?.includes('is not generating')) {
-                    onAlreadyFinished?.();
-                }
+                return;
+            }
 
+            if (result.data.mode === 'already_finished') {
+                onAlreadyFinished?.();
                 return;
             }
 
