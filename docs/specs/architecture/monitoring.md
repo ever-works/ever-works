@@ -154,11 +154,11 @@ PostHog is **product analytics**, not error tracking. It receives:
 
 snake_case, derived from `ActivityActionType`:
 
-| `ActivityActionType`  | PostHog event name |
-| --------------------- | ------------------ |
-| `DIRECTORY_GENERATED` | `work_generated`   |
-| `ITEM_ADDED`          | `item_added`       |
-| `OAUTH_LINKED`        | `oauth_linked`     |
+| `ActivityActionType` | PostHog event name |
+| -------------------- | ------------------ |
+| `WORK_GENERATED`     | `work_generated`   |
+| `ITEM_ADDED`         | `item_added`       |
+| `OAUTH_LINKED`       | `oauth_linked`     |
 
 Event properties mirror the row's `details` block but **with PII
 stripped** (no email, no IP, no user-agent — only `userId`, opaque

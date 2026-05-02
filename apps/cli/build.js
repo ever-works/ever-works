@@ -43,7 +43,7 @@ async function buildCLI() {
     const buildDir = path.join(__dirname, 'dist');
     const packageJsonPath = path.join(__dirname, 'package.json');
 
-    // Clean build directories
+    // Clean build works
     await fs.remove(buildDir);
     await fs.ensureDir(buildDir);
 
@@ -116,19 +116,19 @@ async function buildCLI() {
     const publishablePackageJson = {
         name: 'ever-works-cli',
         version: currentPackageJson.version,
-        description: 'Ever Works CLI - Open Directory Builder Platform Command Line Interface',
+        description: 'Ever Works CLI - Open Work Builder Platform Command Line Interface',
         author: AUTHOR,
         license: 'MIT',
         homepage: 'https://ever.works',
         repository: {
             type: 'git',
             url: 'https://github.com/ever-works/ever-works.git',
-            directory: 'apps/cli',
+            work: 'apps/cli',
         },
         bugs: {
             url: 'https://github.com/ever-works/ever-works/issues',
         },
-        keywords: ['cli', 'directory', 'builder', 'ever-works', 'automation', 'ai'],
+        keywords: ['cli', 'work', 'builder', 'ever-works', 'automation', 'ai'],
         bin: {
             'ever-works': './cli.js',
         },
@@ -173,7 +173,7 @@ async function buildCLI() {
     }
 
     console.log('CLI build completed successfully!');
-    console.log(`Output directory: ${buildDir}`);
+    console.log(`Output work: ${buildDir}`);
 }
 
 buildCLI().catch((error) => {

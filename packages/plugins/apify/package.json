@@ -47,7 +47,7 @@
 				"data-source",
 				"form-schema-provider"
 			],
-			"description": "Import items from Apify datasets. Supports field mapping and filtering to import relevant items into your directories.",
+			"description": "Import items from Apify datasets. Supports field mapping and filtering to import relevant items into your works.",
 			"author": {
 				"name": "Ever Works Team"
 			},

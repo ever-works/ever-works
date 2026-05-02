@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-**Ever Works** is an open-source directory builder platform with AI-powered content generation.
+**Ever Works** is an open-source work builder platform with AI-powered content generation.
 
 - **Repository**: https://github.com/ever-works/ever-works
 - **Docs site**: https://docs.ever.works (built from `apps/docs/`, content in `docs/`)
@@ -117,7 +117,7 @@ The `AiFacadeService` in `packages/agent/src/facades/` consumes AI provider plug
 
 ### Agent Package
 
-`@ever-works/agent` is the core logic package with 21 sub-module exports (generators, items-generator, pipeline, database, entities, dto, git, directory-operations, import, subscriptions, notifications, events, tasks, cache, config, services, plugins, community-pr, comparison-generator, facades, utils, works-config). It uses:
+`@ever-works/agent` is the core logic package with 21 sub-module exports (generators, items-generator, pipeline, database, entities, dto, git, work-operations, import, subscriptions, notifications, events, tasks, cache, config, services, plugins, community-pr, comparison-generator, facades, utils, works-config). It uses:
 
 - NestJS + SWC for build, plus `tsc -p tsconfig.types.json` for declaration files
 - BullMQ for job queues
@@ -127,7 +127,7 @@ The `AiFacadeService` in `packages/agent/src/facades/` consumes AI provider plug
 
 ### API Structure
 
-`apps/api/src/` modules: account, activity-log, ai-conversation, auth (JWT + OAuth GitHub/Google), config, directories (core domain — CRUD, generation, items, categories, tags, collections, import, scheduled updates, community PR, cancellation), events, integrations, mail, notifications, plugins, plugins-capabilities (AI/Search/Deploy/Screenshot/Content-Extractor facades), subscriptions, templates, trigger. Uses `@Public()` decorator to skip auth, `@CurrentUser()` for user context.
+`apps/api/src/` modules: account, activity-log, ai-conversation, auth (JWT + OAuth GitHub/Google), config, works (core domain — CRUD, generation, items, categories, tags, collections, import, scheduled updates, community PR, cancellation), events, integrations, mail, notifications, plugins, plugins-capabilities (AI/Search/Deploy/Screenshot/Content-Extractor facades), subscriptions, templates, trigger. Uses `@Public()` decorator to skip auth, `@CurrentUser()` for user context.
 
 ### Web Structure
 
@@ -176,7 +176,7 @@ Conventional commits enforced by commitlint: `feat:`, `fix:`, `docs:`, `refactor
 
 - **DTS build failure with conditional spreads**: `...value && { key: value }` produces `string | false` and breaks declaration emit. Use explicit `if` blocks to conditionally add properties instead.
 - **Prettier config conflict**: Root `package.json` uses tabs + 120 width; `.prettierrc` file uses spaces + 100 width. The root `package.json` config takes precedence for most files. Be aware when formatting.
-- **Jest module mappings**: Agent package tests map `@ever-works/plugin` and `@ever-works/contracts` to source directories via `moduleNameMapper`. If tests fail with import errors, check these mappings in `jest.config.js`.
+- **Jest module mappings**: Agent package tests map `@ever-works/plugin` and `@ever-works/contracts` to source works via `moduleNameMapper`. If tests fail with import errors, check these mappings in `jest.config.js`.
 - **Build before test**: Some packages require their workspace dependencies to be built first. Run `pnpm build` from root if you get resolution errors during testing.
 
 <!-- autoskills:start -->

@@ -1,4 +1,4 @@
-const DIRECTORIES_SEGMENT = 'works';
+const WORKS_SEGMENT = 'works';
 const NON_WORK_DETAIL_SEGMENTS = new Set(['new']);
 
 const getPathSegments = (pathname: string): string[] => pathname.split('/').filter(Boolean);
@@ -6,7 +6,7 @@ const getPathSegments = (pathname: string): string[] => pathname.split('/').filt
 export function getWorkIdFromPath(pathname: string): string | null {
     const segments = getPathSegments(pathname);
 
-    if (segments[0] !== DIRECTORIES_SEGMENT || segments.length < 2) {
+    if (segments[0] !== WORKS_SEGMENT || segments.length < 2) {
         return null;
     }
 

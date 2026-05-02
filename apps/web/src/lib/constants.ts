@@ -68,8 +68,8 @@ export const ROUTES = {
     // Dashboard routes (these are under (dashboard) route group)
     DASHBOARD: '/',
     DASHBOARD_ACTIVITY: '/activity',
-    DASHBOARD_DIRECTORIES: '/works',
-    DASHBOARD_DIRECTORIES_NEW: '/works/new',
+    DASHBOARD_WORKS: '/works',
+    DASHBOARD_WORKS_NEW: '/works/new',
     DASHBOARD_WORK: (id: string) => `/works/${id}`,
     DASHBOARD_WORK_ITEMS: (id: string) => `/works/${id}/items`,
     DASHBOARD_WORK_GENERATOR: (id: string) => `/works/${id}/generator`,

@@ -103,7 +103,7 @@ jobs:
 
 ## Alternative: actions/cache
 
-If you can't use remote cache, cache Turborepo's local cache directory:
+If you can't use remote cache, cache Turborepo's local cache work:
 
 ```yaml
 - uses: actions/cache@v4

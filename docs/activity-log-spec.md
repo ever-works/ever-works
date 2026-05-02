@@ -69,9 +69,9 @@ enum ActivityActionType {
 	DEPLOYMENT = 'deployment',
 
 	// Work lifecycle
-	DIRECTORY_CREATED = 'work_created',
-	DIRECTORY_UPDATED = 'work_updated',
-	DIRECTORY_DELETED = 'work_deleted',
+	WORK_CREATED = 'work_created',
+	WORK_UPDATED = 'work_updated',
+	WORK_DELETED = 'work_deleted',
 
 	// Items
 	ITEM_ADDED = 'item_added',

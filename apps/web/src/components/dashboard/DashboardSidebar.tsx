@@ -103,7 +103,7 @@ export function DashboardSidebar({
         { name: t('navigation.dashboard'), href: ROUTES.DASHBOARD, icon: Home },
         {
             name: t('navigation.works'),
-            href: ROUTES.DASHBOARD_DIRECTORIES,
+            href: ROUTES.DASHBOARD_WORKS,
             icon: FolderClosed,
         },
         { name: t('navigation.plugins'), href: ROUTES.DASHBOARD_PLUGINS, icon: Plug },
@@ -206,7 +206,7 @@ export function DashboardSidebar({
                     {isCollapsed ? (
                         <ConditionalTooltip show content={t('newWork')}>
                             <Button
-                                href={ROUTES.DASHBOARD_DIRECTORIES_NEW}
+                                href={ROUTES.DASHBOARD_WORKS_NEW}
                                 variant="primary"
                                 size="icon"
                                 className="w-8 h-8 shadow-sm rounded-xl"
@@ -217,7 +217,7 @@ export function DashboardSidebar({
                         </ConditionalTooltip>
                     ) : (
                         <Button
-                            href={ROUTES.DASHBOARD_DIRECTORIES_NEW}
+                            href={ROUTES.DASHBOARD_WORKS_NEW}
                             variant="primary"
                             size="sm"
                             fullWidth
@@ -269,7 +269,7 @@ export function DashboardSidebar({
                                                 <span className="text-sm">{item.name}</span>
                                             )}
                                             <div className="absolute -top-3 -right-0.5">
-                                                {item.href === ROUTES.DASHBOARD_DIRECTORIES && (
+                                                {item.href === ROUTES.DASHBOARD_WORKS && (
                                                     <SidebarActivityIndicator />
                                                 )}
                                             </div>

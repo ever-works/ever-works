@@ -62,7 +62,7 @@ export function GitProviderSelector({
 
     const handleConnect = (providerId: string) => {
         startTransition(async () => {
-            const result = await connectOAuthProvider(providerId, ROUTES.DASHBOARD_DIRECTORIES_NEW);
+            const result = await connectOAuthProvider(providerId, ROUTES.DASHBOARD_WORKS_NEW);
 
             if (result.success && result.url) {
                 window.location.href = result.url;

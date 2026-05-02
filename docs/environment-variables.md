@@ -178,9 +178,9 @@ Used when `MAILER_PROVIDER=resend`:
 
 ## Work Generation
 
-| Variable                        | Description                                     | Type     | Default | Required |
-| ------------------------------- | ----------------------------------------------- | -------- | ------- | -------- |
-| `DIRECTORY_STALE_TIMEOUT_HOURS` | Timeout before a stale generation is cleaned up | `number` | `2`     | No       |
+| Variable                   | Description                                     | Type     | Default | Required |
+| -------------------------- | ----------------------------------------------- | -------- | ------- | -------- |
+| `WORK_STALE_TIMEOUT_HOURS` | Timeout before a stale generation is cleaned up | `number` | `2`     | No       |
 
 ## Scheduled Work Updates
 
@@ -306,10 +306,10 @@ These variables control branding and metadata for the web dashboard. All are opt
 
 ## Web -- Application Settings
 
-| Variable                           | Description                 | Type                     | Default                       |
-| ---------------------------------- | --------------------------- | ------------------------ | ----------------------------- |
-| `NEXT_PUBLIC_DIRECTORY_LIST_LIMIT` | Works per page (pagination) | `number`                 | `6`                           |
-| `NEXT_BUILD_OUTPUT`                | Next.js build output mode   | `standalone` \| `export` | -- (default Next.js behavior) |
+| Variable                      | Description                 | Type                     | Default                       |
+| ----------------------------- | --------------------------- | ------------------------ | ----------------------------- |
+| `NEXT_PUBLIC_WORK_LIST_LIMIT` | Works per page (pagination) | `number`                 | `6`                           |
+| `NEXT_BUILD_OUTPUT`           | Next.js build output mode   | `standalone` \| `export` | -- (default Next.js behavior) |
 
 ---
 

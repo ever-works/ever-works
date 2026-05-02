@@ -6,7 +6,7 @@ Full docs: https://turborepo.dev/docs/reference/boundaries
 
 Boundaries enforce package isolation by detecting:
 
-1. Imports of files outside the package's directory
+1. Imports of files outside the package's work
 2. Imports of packages not declared in `package.json` dependencies
 
 ## Usage

@@ -57,7 +57,7 @@ interface WorkDetails {
 
 ### AI Prompt Design
 
-The service uses a carefully crafted prompt (`DIRECTORY_DETAIL_PROMPT`) that instructs the AI to:
+The service uses a carefully crafted prompt (`WORK_DETAIL_PROMPT`) that instructs the AI to:
 
 - Generate a clear 1-2 sentence description without filler phrases like "This work is about..."
 - Extract relevant, specific keywords

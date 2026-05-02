@@ -7,7 +7,7 @@ description: |
 
     Use when user: configures tasks/workflows/pipelines, creates packages, sets up
     monorepo, shares code between apps, runs changed/affected packages, debugs cache,
-    or has apps/packages directories.
+    or has apps/packages works.
 metadata:
     version: 2.9.6
 ---

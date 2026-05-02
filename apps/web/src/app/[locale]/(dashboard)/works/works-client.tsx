@@ -253,7 +253,7 @@ export default function WorksClient({ initialWorks, totalWorks, initialStats }: 
                 </div>
 
                 <Link
-                    href={ROUTES.DASHBOARD_DIRECTORIES_NEW}
+                    href={ROUTES.DASHBOARD_WORKS_NEW}
                     className={cn(
                         'px-6 py-2 rounded-lg font-medium transition-colors inline-flex items-center gap-2',
                         'bg-black dark:bg-button-primary-dark hover:bg-button-primary-hover dark:hover:bg-button-primary-hover-dark text-white dark:text-black rounded-sm',
@@ -367,7 +367,7 @@ export default function WorksClient({ initialWorks, totalWorks, initialStats }: 
                     action={{
                         label: t('empty.action'),
                         onClick: () => {
-                            router.push(ROUTES.DASHBOARD_DIRECTORIES_NEW);
+                            router.push(ROUTES.DASHBOARD_WORKS_NEW);
                         },
                     }}
                 />

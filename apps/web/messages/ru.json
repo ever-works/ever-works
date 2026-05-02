@@ -2397,7 +2397,7 @@
                     "providers": "Провайдеры: {providers}"
                 },
                 "nameLabel": "Название работы",
-                "namePlaceholder": "e.g., My Awesome Directory",
+                "namePlaceholder": "e.g., My Awesome Work",
                 "advancedSettings": "Расширенные настройки",
                 "advancedSubtitle": "Настройте организацию и параметры репозитория",
                 "attribution": {

@@ -10,9 +10,9 @@ Built with NestJS.
     - [3. Run application using (cd to root of the whole repo, not backend app)](#3-run-application-using-cd-to-root-of-the-whole-repo-not-backend-app)
 
 - [API Endpoints](#api-endpoints)
-    - [1. Create a directory object](#4-create-a-directory-object)
+    - [1. Create a work object](#4-create-a-work-object)
     - [2. Generate data and GitHub repositories](#5-generate-data-and-github-repositories)
-    - [3. Update Directory](#6-update-directory)
+    - [3. Update Work](#6-update-work)
     - [4. Regenerate Markdown](#7-regenerate-markdown)
     - [5. Submit Individual Items](#8-submit-individual-items)
     - [6. Remove Individual Items](#9-remove-individual-items)
@@ -33,7 +33,7 @@ Make sure you have [pnpm](https://pnpm.io/) installed, then clone the repository
 git clone https://github.com/ever-works/ever-works.git
 ```
 
-Navigate to the `apps/api` directory:
+Navigate to the `apps/api` work:
 
 ```sh
 cd ever-works/apps/api
@@ -47,7 +47,7 @@ pnpm install
 
 ### 2. Create `.env` file
 
-Navigate to the `apps/api` directory and create a `.env` file. You can use the example file as a starting point:
+Navigate to the `apps/api` work and create a `.env` file. You can use the example file as a starting point:
 
 ```shell
 cp .env.example .env
@@ -63,9 +63,9 @@ pnpm start
 
 The application will start running on `http://localhost:3100`.
 
-### 4. Create a directory object
+### 4. Create a work object
 
-To create a new directory object, send a POST request to `http://localhost:3100/api/api/directories` with the following JSON body:
+To create a new work object, send a POST request to `http://localhost:3100/api/api/works` with the following JSON body:
 
 ```json
 {
@@ -86,9 +86,9 @@ To create a new directory object, send a POST request to `http://localhost:3100/
 If you want to overwrite the default header and footer in the README.md file, set `overwriteDefaultHeader` and `overwriteDefaultFooter` to `true`. This will replace the default content with your custom text.
 
 **Request Parameters:**
-By default, the directory will be created with the currently authenticated GitHub user as the owner.
+By default, the work will be created with the currently authenticated GitHub user as the owner.
 
-If you want to initialize the directory within an organization, provide the optional `owner` field:
+If you want to initialize the work within an organization, provide the optional `owner` field:
 
 ```json
 {
@@ -101,13 +101,13 @@ If you want to initialize the directory within an organization, provide the opti
 
 ### 5. Generate data and GitHub repositories
 
-To generate data and create a GitHub repository for the directory, send a POST request to `http://localhost:3100/api/directories/{id}/generate` with the following JSON body.
+To generate data and create a GitHub repository for the work, send a POST request to `http://localhost:3100/api/works/{id}/generate` with the following JSON body.
 
 **URL Parameters:**
 
-| Parameter | Type   | Required   | Description             |
-| --------- | ------ | ---------- | ----------------------- |
-| `id`      | string | `required` | The ID of the directory |
+| Parameter | Type   | Required   | Description        |
+| --------- | ------ | ---------- | ------------------ |
+| `id`      | string | `required` | The ID of the work |
 
 **Request Body:**
 
@@ -164,7 +164,7 @@ To generate data and create a GitHub repository for the directory, send a POST r
 
 | Field                                | Type     | Required   | Default                 | Description                                                                                               |
 | ------------------------------------ | -------- | ---------- | ----------------------- | --------------------------------------------------------------------------------------------------------- |
-| `name`                               | string   | `required` | -                       | Display name for the directory                                                                            |
+| `name`                               | string   | `required` | -                       | Display name for the work                                                                                 |
 | `prompt`                             | string   | `required` | -                       | Description/prompt for item generation. URLs mentioned here will be automatically extracted and processed |
 | `company`                            | object   | `optional` | -                       | Company information (see Company Object below)                                                            |
 | `target_keywords`                    | string[] | `optional` | `[]`                    | Keywords to focus the search and generation                                                               |
@@ -228,14 +228,14 @@ To generate data and create a GitHub repository for the directory, send a POST r
 
 > This is a long-running task that may take 5-15 minutes depending on the configuration and number of items processed. The system uses intelligent batching and rate limiting to ensure reliable processing.
 
-### 6. Update Directory
+### 6. Update Work
 
-This streamlines the process of updating an existing directory without requiring a request body, in contrast to the behavior of the `/generate` endpoint.
+This streamlines the process of updating an existing work without requiring a request body, in contrast to the behavior of the `/generate` endpoint.
 
 **Endpoint:**
 
 ```
-POST /api/directories/{id}/update
+POST /api/works/{id}/update
 ```
 
 **Request Body (Optional):**
@@ -254,15 +254,15 @@ POST /api/directories/{id}/update
     "status": "pending",
     "slug": "awesome-time-tracking",
     "parameters": {...},
-    "message": "Processing update for 'Awesome Time Tracking'. Check logs or data directory for updates."
+    "message": "Processing update for 'Awesome Time Tracking'. Check logs or data folder for updates."
 }
 ```
 
 **URL Parameters:**
 
-| Parameter | Type   | Required   | Description                       |
-| --------- | ------ | ---------- | --------------------------------- |
-| `id`      | string | `required` | The ID of the directory to update |
+| Parameter | Type   | Required   | Description                  |
+| --------- | ------ | ---------- | ---------------------------- |
+| `id`      | string | `required` | The ID of the work to update |
 
 **POST Request Body Parameters:**
 
@@ -273,19 +273,19 @@ POST /api/directories/{id}/update
 
 ### 7. Regenerate Markdown
 
-To regenerate the README markdown file for a GitHub repository, send a POST request to `http://localhost:3100/api/directories/{id}/regenerate-markdown`.
+To regenerate the README markdown file for a GitHub repository, send a POST request to `http://localhost:3100/api/works/{id}/regenerate-markdown`.
 
 **Endpoint:**
 
-```POST /api/directories/{id}/regenerate-markdown
+```POST /api/works/{id}/regenerate-markdown
 
 ```
 
 **URL Parameters:**
 
-| Parameter | Type   | Required   | Description                       |
-| --------- | ------ | ---------- | --------------------------------- |
-| `id`      | string | `required` | The ID of the directory to update |
+| Parameter | Type   | Required   | Description                  |
+| --------- | ------ | ---------- | ---------------------------- |
+| `id`      | string | `required` | The ID of the work to update |
 
 **Response:**
 
@@ -297,19 +297,19 @@ To regenerate the README markdown file for a GitHub repository, send a POST requ
 
 ### 8. Submit Individual Items
 
-To submit individual items to an existing directory, send a POST request to `http://localhost:3100/api/directories/{id}/submit-item` with the item details.
+To submit individual items to an existing work, send a POST request to `http://localhost:3100/api/works/{id}/submit-item` with the item details.
 
 **Endpoint:**
 
 ```
-POST /api/directories/{id}/submit-item
+POST /api/works/{id}/submit-item
 ```
 
 **URL Parameters:**
 
-| Parameter | Type   | Required   | Description                                   |
-| --------- | ------ | ---------- | --------------------------------------------- |
-| `id`      | string | `required` | The ID of the directory to submit the item to |
+| Parameter | Type   | Required   | Description                              |
+| --------- | ------ | ---------- | ---------------------------------------- |
+| `id`      | string | `required` | The ID of the work to submit the item to |
 
 **Request Body:**
 
@@ -358,7 +358,7 @@ POST /api/directories/{id}/submit-item
 | Field         | Type    | Description                                               |
 | ------------- | ------- | --------------------------------------------------------- |
 | `status`      | string  | Status of the operation: `success`, `error`, or `pending` |
-| `slug`        | string  | Directory slug                                            |
+| `slug`        | string  | Work slug                                                 |
 | `item_name`   | string  | Name of the submitted item                                |
 | `message`     | string  | Status message                                            |
 | `pr_number`   | number  | _(Success only)_ GitHub PR number if created              |
@@ -378,7 +378,7 @@ Otherwise, the PR will be created and require manual review.
 **Example with Immediate Publishing:**
 
 ```bash
-curl -X POST http://localhost:3100/api/directories/{directory-id}/submit-item \
+curl -X POST http://localhost:3100/api/works/{work-id}/submit-item \
   -H "Content-Type: application/json" \
   -d '{
     "name": "Premium Tool",
@@ -405,19 +405,19 @@ curl -X POST http://localhost:3100/api/directories/{directory-id}/submit-item \
 
 ### 9. Remove Individual Items
 
-To remove individual items from an existing directory, send a POST request to `http://localhost:3100/api/directories/{id}/remove-item` with the item details.
+To remove individual items from an existing work, send a POST request to `http://localhost:3100/api/works/{id}/remove-item` with the item details.
 
 **Endpoint:**
 
 ```
-POST /api/directories/{id}/remove-item
+POST /api/works/{id}/remove-item
 ```
 
 **URL Parameters:**
 
-| Parameter | Type   | Required   | Description                                     |
-| --------- | ------ | ---------- | ----------------------------------------------- |
-| `id`      | string | `required` | The ID of the directory to remove the item from |
+| Parameter | Type   | Required   | Description                                |
+| --------- | ------ | ---------- | ------------------------------------------ |
+| `id`      | string | `required` | The ID of the work to remove the item from |
 
 **Request Body:**
 
@@ -458,7 +458,7 @@ POST /api/directories/{id}/remove-item
 | Field         | Type   | Description                                               |
 | ------------- | ------ | --------------------------------------------------------- |
 | `status`      | string | Status of the operation: `success`, `error`, or `pending` |
-| `slug`        | string | Directory slug                                            |
+| `slug`        | string | Work slug                                                 |
 | `item_name`   | string | Name of the removed item                                  |
 | `item_slug`   | string | Slug of the removed item                                  |
 | `message`     | string | Status message                                            |
@@ -469,7 +469,7 @@ POST /api/directories/{id}/remove-item
 **Example with Immediate Publishing:**
 
 ```bash
-curl -X POST http://localhost:3100/api/directories/{directory-id}/remove-item \
+curl -X POST http://localhost:3100/api/works/{work-id}/remove-item \
   -H "Content-Type: application/json" \
   -d '{
     "item_slug": "outdated-tool",
@@ -479,7 +479,7 @@ curl -X POST http://localhost:3100/api/directories/{directory-id}/remove-item \
 
 ### 10. Extract Item Details
 
-To extract item details from a single URL without adding it to any directory, send a POST request to `http://localhost:3100/api/extract-item-details` with the URL and optional existing categories.
+To extract item details from a single URL without adding it to any work, send a POST request to `http://localhost:3100/api/extract-item-details` with the URL and optional existing categories.
 
 **Endpoint:**
 
@@ -590,29 +590,29 @@ curl -X POST http://localhost:3100/api/extract-item-details \
 
 **Use Cases:**
 
-- Preview item details before submitting to a directory
+- Preview item details before submitting to a work
 - Extract structured data from URLs for external processing
 - Validate and enrich item information
 - Batch processing of URLs to extract item details
 
 ### 11. Update website repository
 
-To update an existing website repository with the latest changes from the template repository, send a POST request to `http://localhost:3100/api/directories/{id}/update-website`.
-the `id` parameter should be the directory ID.
+To update an existing website repository with the latest changes from the template repository, send a POST request to `http://localhost:3100/api/works/{id}/update-website`.
+the `id` parameter should be the work ID.
 
 This endpoint updates an existing website repository by pulling the latest changes from the template repository. It automatically detects the original creation method and applies the appropriate update strategy.
 
 **Request:**
 
 ```
-POST /api/directories/{id}/update-website
+POST /api/works/{id}/update-website
 ```
 
 **URL Parameters:**
 
-| Parameter | Type   | Required   | Description                                  |
-| --------- | ------ | ---------- | -------------------------------------------- |
-| `id`      | string | `required` | The ID of the directory/repository to update |
+| Parameter | Type   | Required   | Description                             |
+| --------- | ------ | ---------- | --------------------------------------- |
+| `id`      | string | `required` | The ID of the work/repository to update |
 
 **Response:**
 
@@ -632,7 +632,7 @@ POST /api/directories/{id}/update-website
 | Field         | Type   | Description                                                             |
 | ------------- | ------ | ----------------------------------------------------------------------- |
 | `status`      | string | Status of the operation: `success` or `error`                           |
-| `slug`        | string | The directory slug that was updated                                     |
+| `slug`        | string | The work slug that was updated                                          |
 | `owner`       | string | The GitHub owner (user or organization) of the repository               |
 | `repository`  | string | Full repository name in `owner/repo-name` format                        |
 | `message`     | string | Descriptive message about the update operation                          |
@@ -661,6 +661,6 @@ The service automatically tries different update strategies in order of preferen
 
 **Prerequisites:**
 
-- The directory must exist (created via `/directories` endpoint)
+- The work must exist (created via `/works` endpoint)
 - The website repository must exist (created via `/generate` endpoint)
 - Valid GitHub authentication token in environment

@@ -35,7 +35,7 @@ and the routing logic that picks one per run.
                               │   creates WorkGenerationHistory
                               │   builds WorkGenerationPayload
                               ▼
-                 DIRECTORY_GENERATION_DISPATCHER
+                 WORK_GENERATION_DISPATCHER
                               │
                               ▼
                  Trigger.dev workGenerationTask
@@ -320,7 +320,7 @@ same bound facades and the same cancellation signal.
 WorkGenerationService.startGeneration
   ├── insert WorkGenerationHistory(historyId, NOT_STARTED)
   ├── build WorkGenerationPayload
-  └── DIRECTORY_GENERATION_DISPATCHER.dispatch(payload)
+  └── WORK_GENERATION_DISPATCHER.dispatch(payload)
        │
        ▼ (Trigger.dev)
 TriggerGenerationOrchestrator.run({ work, user, dto, historyId, ... })

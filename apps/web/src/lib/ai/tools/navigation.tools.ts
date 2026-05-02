@@ -29,8 +29,8 @@ const TAB_OPTIONS = [
 
 const pageRoutes: Record<(typeof PAGE_OPTIONS)[number], string> = {
     dashboard: ROUTES.DASHBOARD,
-    works: ROUTES.DASHBOARD_DIRECTORIES,
-    'new-work': ROUTES.DASHBOARD_DIRECTORIES_NEW,
+    works: ROUTES.DASHBOARD_WORKS,
+    'new-work': ROUTES.DASHBOARD_WORKS_NEW,
     plugins: ROUTES.DASHBOARD_PLUGINS,
     settings: ROUTES.DASHBOARD_SETTINGS,
     'settings-security': ROUTES.DASHBOARD_SETTINGS_SECURITY,

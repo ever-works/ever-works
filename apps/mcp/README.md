@@ -1,6 +1,6 @@
 # Ever Works MCP Server
 
-A NestJS-based MCP (Model Context Protocol) server that auto-generates tools from the Ever Works API's OpenAPI spec. Connect it to Claude Desktop, Claude Code, or any MCP-compatible client to manage directories, generate content, deploy websites, and configure plugins programmatically.
+A NestJS-based MCP (Model Context Protocol) server that auto-generates tools from the Ever Works API's OpenAPI spec. Connect it to Claude Desktop, Claude Code, or any MCP-compatible client to manage works, generate content, deploy websites, and configure plugins programmatically.
 
 ## Architecture
 
@@ -79,49 +79,49 @@ EVER_WORKS_API_KEY=ew_live_... npx @modelcontextprotocol/inspector node apps/mcp
 
 ## Available Tools (36)
 
-### Directories (12)
+### Works (12)
 
-| Tool                    | Description                                     |
-| ----------------------- | ----------------------------------------------- |
-| `list_directories`      | List all directories with pagination and search |
-| `get_directory`         | Get full details for a directory                |
-| `create_directory`      | Create a new directory                          |
-| `update_directory`      | Update directory settings                       |
-| `delete_directory`      | Delete a directory and optionally its repos     |
-| `get_directory_config`  | Get directory configuration and metadata        |
-| `get_directory_items`   | Get all items in a directory                    |
-| `get_categories_tags`   | Get categories and tags for a directory         |
-| `get_directory_history` | Get generation/update history                   |
-| `regenerate_markdown`   | Regenerate markdown files for all items         |
-| `update_website`        | Trigger a website rebuild and update            |
-| `process_community_prs` | Process pending community pull requests         |
+| Tool                    | Description                               |
+| ----------------------- | ----------------------------------------- |
+| `list_works`            | List all works with pagination and search |
+| `get_work`              | Get full details for a work               |
+| `create_work`           | Create a new work                         |
+| `update_work`           | Update work settings                      |
+| `delete_work`           | Delete a work and optionally its repos    |
+| `get_work_config`       | Get work configuration and metadata       |
+| `get_work_items`        | Get all items in a work                   |
+| `get_categories_tags`   | Get categories and tags for a work        |
+| `get_work_history`      | Get generation/update history             |
+| `regenerate_markdown`   | Regenerate markdown files for all items   |
+| `update_website`        | Trigger a website rebuild and update      |
+| `process_community_prs` | Process pending community pull requests   |
 
 ### Generation (4)
 
-| Tool                         | Description                                         |
-| ---------------------------- | --------------------------------------------------- |
-| `generate_items`             | Start AI-powered item generation                    |
-| `update_items`               | Update existing items using AI                      |
-| `generate_directory_details` | AI-generate directory name, description, categories |
-| `get_generator_form`         | Get the dynamic generator form schema               |
+| Tool                    | Description                                    |
+| ----------------------- | ---------------------------------------------- |
+| `generate_items`        | Start AI-powered item generation               |
+| `update_items`          | Update existing items using AI                 |
+| `generate_work_details` | AI-generate work name, description, categories |
+| `get_generator_form`    | Get the dynamic generator form schema          |
 
 ### Items (4)
 
 | Tool                   | Description                              |
 | ---------------------- | ---------------------------------------- |
-| `submit_item`          | Add a single item to a directory         |
-| `remove_item`          | Remove an item from a directory          |
+| `submit_item`          | Add a single item to a work              |
+| `remove_item`          | Remove an item from a work               |
 | `update_item`          | Update item metadata (featured, order)   |
 | `extract_item_details` | Extract item details from a URL using AI |
 
 ### Deploy (4)
 
-| Tool                      | Description                           |
-| ------------------------- | ------------------------------------- |
-| `deploy_directory`        | Deploy a directory's website          |
-| `list_domains`            | List domains for a deployed directory |
-| `list_deploy_providers`   | List available deploy providers       |
-| `check_deploy_capability` | Check if a directory can be deployed  |
+| Tool                      | Description                      |
+| ------------------------- | -------------------------------- |
+| `deploy_work`             | Deploy a work's website          |
+| `list_domains`            | List domains for a deployed work |
+| `list_deploy_providers`   | List available deploy providers  |
+| `check_deploy_capability` | Check if a work can be deployed  |
 
 ### Plugins (5)
 
@@ -146,7 +146,7 @@ EVER_WORKS_API_KEY=ew_live_... npx @modelcontextprotocol/inspector node apps/mcp
 
 | Tool                         | Description                                    |
 | ---------------------------- | ---------------------------------------------- |
-| `list_comparisons`           | List all comparisons for a directory           |
+| `list_comparisons`           | List all comparisons for a work                |
 | `get_comparison`             | Get a specific comparison by slug              |
 | `generate_comparison`        | Auto-generate comparisons using AI             |
 | `generate_manual_comparison` | Generate comparison between two specific items |

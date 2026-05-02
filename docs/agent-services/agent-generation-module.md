@@ -178,7 +178,7 @@ interface GenerateStatus {
 
 ### Dispatch Configuration
 
-Generation can be dispatched to background workers via the `DIRECTORY_GENERATION_DISPATCHER` token:
+Generation can be dispatched to background workers via the `WORK_GENERATION_DISPATCHER` token:
 
 ```typescript
 interface WorkGenerationPayload {

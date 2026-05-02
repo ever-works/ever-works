@@ -34,11 +34,11 @@ jobs:
         run: pnpm build --filter './packages/**'
 
       - name: Prepare plugins for Trigger.dev
-        working-directory: packages/tasks
+        working-work: packages/tasks
         run: pnpm prepare:plugins
 
       - name: 🚀 Deploy Trigger.dev to Development environment
-        working-directory: packages/tasks
+        working-work: packages/tasks
         env:
           TRIGGER_ACCESS_TOKEN: ${{ secrets.TRIGGER_ACCESS_TOKEN }}
         run: npx trigger.dev@4.4.5 deploy --env staging

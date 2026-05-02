@@ -41,7 +41,7 @@ export const README = [
 	'```json',
 	'{',
 	'  "metadata": {',
-	'    "directoryId": "dir-123",',
+	'    "workId": "dir-123",',
 	'    "workName": "Best AI Tools",',
 	'    "workSlug": "best-ai-tools",',
 	'    "workDescription": "A curated list of the best AI tools",',

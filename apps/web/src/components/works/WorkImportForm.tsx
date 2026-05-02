@@ -215,9 +215,7 @@ export function WorkImportForm({ gitProvider, deployProvider }: WorkImportFormPr
             if (result.success) {
                 toast.success(result.message || t('success.linked'));
                 router.push(
-                    result.workId
-                        ? ROUTES.DASHBOARD_WORK(result.workId)
-                        : ROUTES.DASHBOARD_DIRECTORIES,
+                    result.workId ? ROUTES.DASHBOARD_WORK(result.workId) : ROUTES.DASHBOARD_WORKS,
                 );
             } else {
                 toast.error(result.error || t('errors.linkFailed'));
@@ -262,9 +260,7 @@ export function WorkImportForm({ gitProvider, deployProvider }: WorkImportFormPr
             if (result.success) {
                 toast.success(result.message || t('success.started'));
                 router.push(
-                    result.workId
-                        ? ROUTES.DASHBOARD_WORK(result.workId)
-                        : ROUTES.DASHBOARD_DIRECTORIES,
+                    result.workId ? ROUTES.DASHBOARD_WORK(result.workId) : ROUTES.DASHBOARD_WORKS,
                 );
             } else if (result.requiresGitProvider) {
                 toast.error(result.error || 'Git provider connection required');

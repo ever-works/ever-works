@@ -258,7 +258,7 @@ revokeToken(userId: string, providerId: string): Promise<void>
 
 ### Import Dispatch
 
-Imports can be dispatched to background workers via the `DIRECTORY_IMPORT_DISPATCHER` Symbol token:
+Imports can be dispatched to background workers via the `WORK_IMPORT_DISPATCHER` Symbol token:
 
 ```typescript
 interface WorkImportDispatcher {

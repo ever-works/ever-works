@@ -212,16 +212,16 @@ interface WorkGenerationPayload {
 }
 ```
 
-The dispatcher is injected via the `DIRECTORY_GENERATION_DISPATCHER` Symbol token, decoupling the scheduling logic from the specific background job implementation (Trigger.dev).
+The dispatcher is injected via the `WORK_GENERATION_DISPATCHER` Symbol token, decoupling the scheduling logic from the specific background job implementation (Trigger.dev).
 
 ## Dependencies
 
-| Dependency                        | Purpose                                                   |
-| --------------------------------- | --------------------------------------------------------- |
-| `@ever-works/agent/database`      | `WorkRepository`, `WorkScheduleRepository`                |
-| `@ever-works/agent/subscriptions` | Plan enforcement and billing mode resolution              |
-| `@ever-works/agent/tasks`         | `DIRECTORY_GENERATION_DISPATCHER` for background dispatch |
-| `TypeORM`                         | Entity persistence and queries                            |
+| Dependency                        | Purpose                                              |
+| --------------------------------- | ---------------------------------------------------- |
+| `@ever-works/agent/database`      | `WorkRepository`, `WorkScheduleRepository`           |
+| `@ever-works/agent/subscriptions` | Plan enforcement and billing mode resolution         |
+| `@ever-works/agent/tasks`         | `WORK_GENERATION_DISPATCHER` for background dispatch |
+| `TypeORM`                         | Entity persistence and queries                       |
 
 ## Usage Examples
 
