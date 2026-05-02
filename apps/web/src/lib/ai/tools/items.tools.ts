@@ -12,9 +12,9 @@ import { directoryAPI } from '@/lib/api/directory';
 import { resolveGenerationConfig } from './utils';
 
 export const addItemTool = tool({
-    description: 'Add a single item to a directory from a URL. Extracts details automatically.',
+    description: 'Add a single item to a Work from a URL. Extracts details automatically.',
     inputSchema: z.object({
-        directoryId: z.string().describe('Directory ID'),
+        directoryId: z.string().describe('Work ID'),
         sourceUrl: z.string().describe('URL of the item to add'),
     }),
     execute: async ({ directoryId, sourceUrl }) => {
@@ -44,9 +44,9 @@ export const addItemTool = tool({
 });
 
 export const removeItemTool = tool({
-    description: 'Remove an item from a directory. Ask for confirmation first.',
+    description: 'Remove an item from a Work. Ask for confirmation first.',
     inputSchema: z.object({
-        directoryId: z.string().describe('Directory ID'),
+        directoryId: z.string().describe('Work ID'),
         itemSlug: z.string().describe('Item slug to remove'),
         reason: z.string().optional().describe('Reason for removal'),
     }),
@@ -60,7 +60,7 @@ export const updateItemTool = tool({
     description:
         'Update an item — toggle featured status, change source URL, or set display order.',
     inputSchema: z.object({
-        directoryId: z.string().describe('Directory ID'),
+        directoryId: z.string().describe('Work ID'),
         itemSlug: z.string().describe('Item slug to update'),
         sourceUrl: z.string().optional().describe('New source URL'),
         featured: z.boolean().optional().describe('Whether item is featured'),
@@ -79,13 +79,13 @@ export const updateItemTool = tool({
 
 export const generateItemsTool = tool({
     description: [
-        'Generate or regenerate items for a directory.',
+        'Generate or regenerate items for a Work.',
         'For first-time: call listAvailablePipelines first to let user choose pipeline and providers.',
         'For retries: just pass directoryId — reuses the previous config automatically.',
         'Requires git provider connection.',
     ].join(' '),
     inputSchema: z.object({
-        directoryId: z.string().describe('Directory ID'),
+        directoryId: z.string().describe('Work ID'),
         prompt: z
             .string()
             .optional()
@@ -146,7 +146,7 @@ export const generateItemsTool = tool({
 export const checkItemHealthTool = tool({
     description: 'Check if an item source URL is still accessible and valid.',
     inputSchema: z.object({
-        directoryId: z.string().describe('Directory ID'),
+        directoryId: z.string().describe('Work ID'),
         itemSlug: z.string().describe('Item slug to check'),
     }),
     execute: async ({ directoryId, itemSlug }) => {
@@ -156,9 +156,9 @@ export const checkItemHealthTool = tool({
 });
 
 export const regenerateMarkdownTool = tool({
-    description: 'Regenerate the markdown README for a directory.',
+    description: 'Regenerate the markdown README for a Work.',
     inputSchema: z.object({
-        directoryId: z.string().describe('Directory ID'),
+        directoryId: z.string().describe('Work ID'),
     }),
     execute: async ({ directoryId }) => {
         const result = await regenerateMarkdown(directoryId);

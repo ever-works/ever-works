@@ -100,7 +100,7 @@ export async function enableDirectoryPlugin(
         console.error('Failed to enable directory plugin:', error);
         return {
             success: false,
-            error: error instanceof Error ? error.message : 'Failed to enable directory plugin',
+            error: error instanceof Error ? error.message : 'Failed to enable Work plugin',
         };
     }
 }
@@ -120,7 +120,7 @@ export async function disableDirectoryPlugin(
         console.error('Failed to disable directory plugin:', error);
         return {
             success: false,
-            error: error instanceof Error ? error.message : 'Failed to disable directory plugin',
+            error: error instanceof Error ? error.message : 'Failed to disable Work plugin',
         };
     }
 }
@@ -149,7 +149,7 @@ export async function updateDirectoryPluginSettings(
             error:
                 error instanceof Error
                     ? error.message
-                    : 'Failed to update directory plugin settings',
+                    : 'Failed to update Work plugin settings',
         };
     }
 }

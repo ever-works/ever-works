@@ -15,8 +15,8 @@ const activities: Activity[] = [
     {
         id: '1',
         type: 'directory_created',
-        title: 'New Directory Created',
-        description: 'Created "Awesome AI Tools" directory',
+        title: 'New Work Created',
+        description: 'Created "Awesome AI Tools" Work',
         timestamp: new Date(Date.now() - 1000 * 60 * 30),
     },
     {

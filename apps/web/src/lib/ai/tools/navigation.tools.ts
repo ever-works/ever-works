@@ -56,14 +56,14 @@ export const navigate = tool({
     description: [
         'Navigate the user to a page with optional search query.',
         'ALWAYS use this after fetching data — redirect to the relevant page so the user sees it.',
-        'For directories: use page="directories" with search to filter.',
-        'For items in a directory: use directoryId + tab="items" with search to filter.',
+        'For Works list: use page="directories" with search to filter.',
+        'For items in a Work: use directoryId + tab="items" with search to filter.',
         'The UI handles the redirect. Do NOT output any text after calling this tool.',
     ].join(' '),
     inputSchema: z.object({
         page: z.enum(PAGE_OPTIONS).describe('The page to navigate to'),
-        directoryId: z.string().optional().describe('Directory ID for directory-specific pages'),
-        tab: z.enum(TAB_OPTIONS).optional().describe('Directory tab to navigate to'),
+        directoryId: z.string().optional().describe('Work ID for Work-specific pages'),
+        tab: z.enum(TAB_OPTIONS).optional().describe('Work tab to navigate to'),
         search: z
             .string()
             .optional()

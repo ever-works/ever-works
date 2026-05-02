@@ -8,9 +8,9 @@ import {
 import { DirectoryScheduleCadence, DirectoryScheduleBillingMode } from '@/lib/api/enums';
 
 export const setSchedule = tool({
-    description: 'Enable or update a scheduled generation for a directory.',
+    description: 'Enable or update a scheduled generation for a Work.',
     inputSchema: z.object({
-        directoryId: z.string().describe('Directory ID'),
+        directoryId: z.string().describe('Work ID'),
         enable: z.boolean().describe('Enable or disable schedule'),
         cadence: z
             .enum(['hourly', 'daily', 'weekly', 'monthly'])
@@ -38,9 +38,9 @@ export const setSchedule = tool({
 });
 
 export const runScheduleNow = tool({
-    description: 'Manually trigger a scheduled generation run for a directory.',
+    description: 'Manually trigger a scheduled generation run for a Work.',
     inputSchema: z.object({
-        directoryId: z.string().describe('Directory ID'),
+        directoryId: z.string().describe('Work ID'),
     }),
     execute: async ({ directoryId }) => {
         const result = await runDirectorySchedule(directoryId);
@@ -51,7 +51,7 @@ export const runScheduleNow = tool({
 export const cancelSchedule = tool({
     description: 'Cancel an active scheduled generation.',
     inputSchema: z.object({
-        directoryId: z.string().describe('Directory ID'),
+        directoryId: z.string().describe('Work ID'),
     }),
     execute: async ({ directoryId }) => {
         const result = await cancelDirectorySchedule(directoryId);

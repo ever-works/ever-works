@@ -50,11 +50,11 @@ export const checkDeployConnection = tool({
 
 export const deployDirectory = tool({
     description: [
-        'Deploy a directory website. Check deploy provider connection first with checkDeployConnection.',
+        "Deploy a Work's website. Check deploy provider connection first with checkDeployConnection.",
         'Also check git connection with checkGitConnection — both are required.',
     ].join(' '),
     inputSchema: z.object({
-        directoryId: z.string().describe('Directory ID to deploy'),
+        directoryId: z.string().describe('Work ID to deploy'),
     }),
     execute: async ({ directoryId }) => {
         const result = await deploy(directoryId);
@@ -67,9 +67,9 @@ export const deployDirectory = tool({
 });
 
 export const checkDeploymentStatus = tool({
-    description: 'Check if a directory has an existing deployment.',
+    description: 'Check if a Work has an existing deployment.',
     inputSchema: z.object({
-        directoryId: z.string().describe('Directory ID to check'),
+        directoryId: z.string().describe('Work ID to check'),
     }),
     execute: async ({ directoryId }) => {
         const result = await lookupExistingDeployment(directoryId);
@@ -82,9 +82,9 @@ export const checkDeploymentStatus = tool({
 });
 
 export const listDomains = tool({
-    description: 'List custom domains for a deployed directory.',
+    description: 'List custom domains for a deployed Work.',
     inputSchema: z.object({
-        directoryId: z.string().describe('Directory ID'),
+        directoryId: z.string().describe('Work ID'),
     }),
     execute: async ({ directoryId }) => {
         const result = await getDomains(directoryId);

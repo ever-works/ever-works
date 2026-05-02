@@ -10,7 +10,7 @@ export const listAvailablePipelines = tool({
         'Pass a pipelineId to see the specific providers that pipeline supports.',
     ].join(' '),
     inputSchema: z.object({
-        directoryId: z.string().optional().describe('Directory ID for directory-specific schema'),
+        directoryId: z.string().optional().describe('Work ID for Work-specific schema'),
         pipelineId: z.string().optional().describe('Pipeline ID to see its specific providers'),
     }),
     execute: async ({ directoryId, pipelineId }) => {

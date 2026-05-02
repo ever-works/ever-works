@@ -174,12 +174,12 @@ export const getSiteConfig = (config?: DirectoryConfig | null) => {
         description:
             config?.description ||
             process.env.NEXT_PUBLIC_SITE_DESCRIPTION ||
-            'Build Directories with AI',
+            'Build Works with AI',
         keywords:
             config?.keywords ||
             (process.env.NEXT_PUBLIC_SITE_KEYWORDS
                 ? process.env.NEXT_PUBLIC_SITE_KEYWORDS.split(',').map((k) => k.trim())
-                : ['Ever Works', 'Directories', 'AI', 'Automation', 'Productivity', 'Workflow']),
+                : ['Ever Works', 'Works', 'AI', 'Automation', 'Productivity', 'Workflow']),
         author: config?.author || process.env.NEXT_PUBLIC_SITE_AUTHOR || name,
         url: website,
         image: config?.image || process.env.NEXT_PUBLIC_SITE_IMAGE || '/logo-light.png',
@@ -192,7 +192,7 @@ export const getSiteConfig = (config?: DirectoryConfig | null) => {
                 config?.twitter?.description ||
                 process.env.NEXT_PUBLIC_TWITTER_DESCRIPTION ||
                 process.env.NEXT_PUBLIC_SITE_DESCRIPTION ||
-                'Build Directories with AI',
+                'Build Works with AI',
         },
     } as const;
 };

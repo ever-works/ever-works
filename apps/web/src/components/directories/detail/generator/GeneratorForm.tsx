@@ -400,7 +400,7 @@ export function GeneratorForm({
                     <DialogHeader>
                         <DialogTitle>
                             {t('recreateConfirmTitle', {
-                                defaultValue: 'Recreate directory data?',
+                                defaultValue: 'Recreate Work data?',
                             })}
                         </DialogTitle>
                         <p className="text-sm text-text-secondary dark:text-text-secondary-dark">

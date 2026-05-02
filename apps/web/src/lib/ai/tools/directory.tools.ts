@@ -21,7 +21,7 @@ import { resolveGenerationConfig } from './utils';
 
 export const listDirectories = tool({
     description:
-        'List directories the user has access to. Use to find directories by name before other operations.',
+        'List Works the user has access to. Use to find Works by name before other operations.',
     inputSchema: z.object({
         search: z.string().optional().describe('Search query to filter by name'),
         limit: z.number().optional().describe('Max results (default 20)'),
@@ -52,9 +52,9 @@ export const listDirectories = tool({
 });
 
 export const getDirectoryDetails = tool({
-    description: 'Get detailed info about a specific directory.',
+    description: 'Get detailed info about a specific Work.',
     inputSchema: z.object({
-        directoryId: z.string().describe('Directory ID'),
+        directoryId: z.string().describe('Work ID'),
     }),
     execute: async ({ directoryId }) => {
         const { directory } = await directoryAPI.get(directoryId);
@@ -74,16 +74,16 @@ export const getDirectoryDetails = tool({
 });
 
 export const getStats = tool({
-    description: 'Get aggregated stats — total directories, items, active websites.',
+    description: 'Get aggregated stats — total Works, items, active websites.',
     inputSchema: z.object({}),
     execute: async () => getDirectoryStats(),
 });
 
 export const getDirectoryItemsSummary = tool({
     description:
-        'Get item counts and categories for a directory. For browsing items, navigate to items tab instead.',
+        'Get item counts and categories for a Work. For browsing items, navigate to items tab instead.',
     inputSchema: z.object({
-        directoryId: z.string().describe('Directory ID'),
+        directoryId: z.string().describe('Work ID'),
     }),
     execute: async ({ directoryId }) => {
         try {
@@ -103,7 +103,7 @@ export const getDirectoryItemsSummary = tool({
 export const getGenerationHistory = tool({
     description: 'Get generation history — past runs, status, and metrics.',
     inputSchema: z.object({
-        directoryId: z.string().describe('Directory ID'),
+        directoryId: z.string().describe('Work ID'),
         limit: z.number().optional().describe('Max results (default 10)'),
     }),
     execute: async ({ directoryId, limit }) => {
@@ -113,9 +113,9 @@ export const getGenerationHistory = tool({
 });
 
 export const getScheduleStatus = tool({
-    description: 'Get current schedule configuration and status for a directory.',
+    description: 'Get current schedule configuration and status for a Work.',
     inputSchema: z.object({
-        directoryId: z.string().describe('Directory ID'),
+        directoryId: z.string().describe('Work ID'),
     }),
     execute: async ({ directoryId }) => {
         try {
@@ -128,9 +128,9 @@ export const getScheduleStatus = tool({
 
 export const getDirectoryConfig = tool({
     description:
-        'Get directory configuration — metadata, initial prompt, generation settings, website config.',
+        'Get Work configuration — metadata, initial prompt, generation settings, website config.',
     inputSchema: z.object({
-        directoryId: z.string().describe('Directory ID'),
+        directoryId: z.string().describe('Work ID'),
     }),
     execute: async ({ directoryId }) => {
         try {
@@ -148,14 +148,14 @@ export const getDirectoryConfig = tool({
 
 export const createDirectoryManual = tool({
     description: [
-        'Create a directory manually WITHOUT generating content.',
+        'Create a Work manually WITHOUT generating content.',
         'Just creates the repository structure. User can add items later.',
         'REQUIRES git provider — call checkGitConnection first.',
     ].join(' '),
     inputSchema: z.object({
-        name: z.string().describe('Directory name'),
+        name: z.string().describe('Work name'),
         slug: z.string().describe('URL-friendly slug (lowercase, hyphens only)'),
-        description: z.string().optional().describe('Directory description'),
+        description: z.string().optional().describe('Work description'),
         gitProvider: z.string().describe('Git provider ID from checkGitConnection'),
     }),
     execute: async ({ name, slug, description, gitProvider }) => {
@@ -178,13 +178,13 @@ export const createDirectoryManual = tool({
 
 export const createDirectoryWithAITool = tool({
     description: [
-        'Create a directory AND generate content using AI.',
+        'Create a Work AND generate content using AI.',
         'BEFORE calling: call checkGitConnection, then listAvailablePipelines to let user choose pipeline/providers.',
         'Pass user provider choices. If not provided, uses defaults.',
     ].join(' '),
     inputSchema: z.object({
-        name: z.string().describe('Directory name'),
-        prompt: z.string().describe('What the directory should contain'),
+        name: z.string().describe('Work name'),
+        prompt: z.string().describe('What the Work should contain'),
         gitProvider: z.string().describe('Git provider ID from checkGitConnection'),
         deployProvider: z
             .string()
@@ -223,7 +223,7 @@ export const createDirectoryWithAITool = tool({
 
 export const importDirectoryTool = tool({
     description: [
-        'Import a directory from an existing GitHub repository or awesome list URL.',
+        'Import a Work from an existing GitHub repository or awesome list URL.',
         'First call analyzeImportSource to check the URL, then import.',
         'REQUIRES git provider — call checkGitConnection first.',
     ].join(' '),
@@ -232,7 +232,7 @@ export const importDirectoryTool = tool({
         sourceType: z
             .enum(['data_repo', 'awesome_readme', 'link_existing', 'works_config'])
             .describe('Type of import source'),
-        name: z.string().describe('Directory name'),
+        name: z.string().describe('Work name'),
         gitProvider: z.string().describe('Git provider ID from checkGitConnection'),
     }),
     execute: async ({ sourceUrl, sourceType, name, gitProvider }) => {
@@ -264,9 +264,9 @@ export const analyzeImportSource = tool({
 // ────────────────────────────────────────────────────────────────
 
 export const updateDirectoryTool = tool({
-    description: 'Update a directory name or description.',
+    description: 'Update a Work name or description.',
     inputSchema: z.object({
-        directoryId: z.string().describe('Directory ID'),
+        directoryId: z.string().describe('Work ID'),
         name: z.string().optional().describe('New name'),
         description: z.string().optional().describe('New description'),
     }),
@@ -277,9 +277,9 @@ export const updateDirectoryTool = tool({
 });
 
 export const deleteDirectoryTool = tool({
-    description: 'Delete a directory. ALWAYS ask for confirmation before calling this.',
+    description: 'Delete a Work. ALWAYS ask for confirmation before calling this.',
     inputSchema: z.object({
-        directoryId: z.string().describe('Directory ID to delete'),
+        directoryId: z.string().describe('Work ID to delete'),
     }),
     execute: async ({ directoryId }) => {
         const result = await deleteDirectory(directoryId);
@@ -288,9 +288,9 @@ export const deleteDirectoryTool = tool({
 });
 
 export const syncDirectory = tool({
-    description: 'Sync a directory data repository with the latest changes.',
+    description: 'Sync a Work data repository with the latest changes.',
     inputSchema: z.object({
-        directoryId: z.string().describe('Directory ID'),
+        directoryId: z.string().describe('Work ID'),
     }),
     execute: async ({ directoryId }) => {
         const result = await syncDirectoryData(directoryId);
