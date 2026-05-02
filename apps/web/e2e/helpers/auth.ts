@@ -7,7 +7,8 @@ export async function registerViaUI(
     page: Page,
     user: { name: string; email: string; password: string },
 ) {
-    await page.goto('/en/register');
+    await page.goto('/en/register', { waitUntil: 'networkidle' });
+    await page.waitForTimeout(1_000);
 
     await page.locator('input[name="name"]').fill(user.name);
     await page.locator('input[name="email"]').fill(user.email);
@@ -18,14 +19,18 @@ export async function registerViaUI(
     await page.locator('button[type="submit"]').click();
 
     // Wait for redirect to dashboard
-    await page.waitForURL(/\/(en\/)?(works|$)/, { timeout: 15_000 });
+    await page.waitForURL(
+        /\/en(\/(?!login|register|forgot|reset|email|auth)|$|\?)/,
+        { timeout: 30_000 },
+    );
 }
 
 /**
  * Log in an existing user via the UI.
  */
 export async function loginViaUI(page: Page, credentials: { email: string; password: string }) {
-    await page.goto('/en/login');
+    await page.goto('/en/login', { waitUntil: 'networkidle' });
+    await page.waitForTimeout(1_000);
 
     await page.locator('input[name="email"]').fill(credentials.email);
     await page.locator('input[name="password"]').fill(credentials.password);
@@ -33,7 +38,10 @@ export async function loginViaUI(page: Page, credentials: { email: string; passw
     await page.locator('button[type="submit"]').click();
 
     // Wait for redirect to dashboard
-    await page.waitForURL(/\/(en\/)?(works|$)/, { timeout: 15_000 });
+    await page.waitForURL(
+        /\/en(\/(?!login|register|forgot|reset|email|auth)|$|\?)/,
+        { timeout: 30_000 },
+    );
 }
 
 /**

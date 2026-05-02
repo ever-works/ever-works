@@ -62,24 +62,24 @@ test.describe('Work creation', () => {
             .first();
         await manualCard.click();
 
-        // Wait for form to appear
-        await expect(page.locator('form')).toBeVisible({ timeout: 5_000 });
+        // Wait for the work creation form (scoped to avoid the AI chat input form)
+        const workForm = page.locator('form.space-y-6, form[autocomplete="off"]').first();
+        await expect(workForm).toBeVisible({ timeout: 10_000 });
 
         // Fill in the work form
-        // Name field — the first text input in the form
-        const nameInput = page.locator('form input[type="text"]').first();
+        const nameInput = workForm.locator('input[type="text"]').first();
         await nameInput.fill(`E2E Test Dir ${slug}`);
 
         // Slug should auto-populate, but let's verify it exists
-        const slugInput = page.locator('form input[type="text"]').nth(1);
+        const slugInput = workForm.locator('input[type="text"]').nth(1);
         await expect(slugInput).toHaveValue(/.+/);
 
         // Description — textarea
-        const descriptionTextarea = page.locator('form textarea').first();
+        const descriptionTextarea = workForm.locator('textarea').first();
         await descriptionTextarea.fill('Automated E2E test work for Playwright testing');
 
         // Submit the form
-        const submitButton = page.locator('form button[type="submit"]');
+        const submitButton = workForm.locator('button[type="submit"]');
         await submitButton.click();
 
         // Should either redirect to the new work or show success
@@ -99,8 +99,9 @@ test.describe('Work creation', () => {
             .first();
         await manualCard.click();
 
-        // Wait for form
-        await expect(page.locator('form')).toBeVisible({ timeout: 5_000 });
+        // Wait for the work creation form (scoped to avoid AI chat input form)
+        const workForm = page.locator('form.space-y-6, form[autocomplete="off"]').first();
+        await expect(workForm).toBeVisible({ timeout: 10_000 });
 
         // Click back button
         const backButton = page.locator('button').filter({ hasText: /back/i }).first();

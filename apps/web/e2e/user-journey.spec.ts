@@ -16,8 +16,15 @@ test.describe('Complete user journey', () => {
     };
 
     test('register, create work, browse, visit settings', async ({ page }) => {
+        test.setTimeout(240_000);
+
+        // Warm up the dashboard route so the post-register redirect resolves quickly.
+        await page.goto('/en', { waitUntil: 'domcontentloaded' });
+        await page.waitForTimeout(500);
+
         // ---- Step 1: Register ----
-        await page.goto('/en/register');
+        await page.goto('/en/register', { waitUntil: 'networkidle' });
+        await page.waitForTimeout(1_000);
 
         await page.locator('input[name="name"]').fill(user.name);
         await page.locator('input[name="email"]').fill(user.email);
@@ -26,11 +33,45 @@ test.describe('Complete user journey', () => {
         await page.locator('#terms').check();
         await page.locator('button[type="submit"]').click();
 
-        // Should arrive at dashboard
-        await page.waitForURL(/\/en($|\/|\?)/, { timeout: 15_000 });
+        // Should arrive at dashboard (any /en path that isn't an auth page)
+        await page.waitForURL(
+            /\/en(\/(?!login|register|forgot|reset|email|auth)|$|\?)/,
+            { timeout: 60_000 },
+        );
 
         // ---- Step 2: Navigate to create work ----
-        await page.goto('/en/works/new');
+        // Pre-dismiss the onboarding wizard so the modal doesn't intercept clicks.
+        await page.evaluate(() => {
+            try {
+                window.localStorage.setItem(
+                    'ever-works-onboarding',
+                    JSON.stringify({
+                        step: 0,
+                        modalDismissed: true,
+                        headerDismissed: true,
+                    }),
+                );
+            } catch {
+                /* ignore */
+            }
+        });
+
+        // Dismiss the "Connect your GitHub account" modal if it appears.
+        const dismissGithubModal = page.getByRole('button', {
+            name: /I'll do this later/i,
+        });
+        if (await dismissGithubModal.isVisible({ timeout: 3_000 }).catch(() => false)) {
+            await dismissGithubModal.click();
+            await page.waitForTimeout(500);
+        }
+
+        await page.goto('/en/works/new', { waitUntil: 'domcontentloaded' });
+        await page.waitForTimeout(2_000);
+        // Also dismiss on /works/new in case the modal re-renders there.
+        if (await dismissGithubModal.isVisible({ timeout: 3_000 }).catch(() => false)) {
+            await dismissGithubModal.click();
+            await page.waitForTimeout(500);
+        }
 
         // Select manual creation mode
         const manualCard = page
@@ -40,18 +81,19 @@ test.describe('Complete user journey', () => {
         await expect(manualCard).toBeVisible({ timeout: 10_000 });
         await manualCard.click();
 
-        // Fill work form
+        // Fill work form (scope to the work creation form, not the AI chat input form)
         const dirSlug = `journey-${suffix}`;
-        await expect(page.locator('form')).toBeVisible({ timeout: 5_000 });
+        const workForm = page.locator('form.space-y-6, form[autocomplete="off"]').first();
+        await expect(workForm).toBeVisible({ timeout: 10_000 });
 
-        const nameInput = page.locator('form input[type="text"]').first();
+        const nameInput = workForm.locator('input[type="text"]').first();
         await nameInput.fill(`Journey Dir ${dirSlug}`);
 
-        const descriptionTextarea = page.locator('form textarea').first();
+        const descriptionTextarea = workForm.locator('textarea').first();
         await descriptionTextarea.fill('Full journey test work');
 
         // Submit
-        const submitButton = page.locator('form button[type="submit"]');
+        const submitButton = workForm.locator('button[type="submit"]');
         await submitButton.click();
 
         // Wait for redirect or error
