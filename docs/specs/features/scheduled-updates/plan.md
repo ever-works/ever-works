@@ -94,6 +94,8 @@ See `spec.md` §9 — all gates satisfied.
 ## 11. References
 
 - Spec: `./spec.md`
-- Internal architecture:
-  `docs/agent-services/directory-schedule-dispatcher.md`
+- Internal architecture: `docs/agent-services/directory-schedule-dispatcher.md`
+- Cross-cutting: [`architecture/trigger-integration`](../../architecture/trigger-integration.md) §10
+  (cron dispatcher task), [`architecture/cache`](../../architecture/cache.md)
+  (CAS claim contract uses the same TypeORM tier as the cache table)
 - Implementation files: see spec §10.

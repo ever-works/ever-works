@@ -19,8 +19,11 @@ at the monorepo root.
 docs/specs/
 ├── README.md                       # This file
 ├── decisions/                      # Architecture Decision Records (ADRs)
-│   └── 001-pipeline-checkpointing.md
+│   ├── 001-pipeline-checkpointing.md
+│   ├── 002-trigger-worker-callback-channel.md
+│   └── 003-pnpm-overrides-strategy.md
 ├── architecture/                   # Cross-feature architecture docs
+│   ├── README.md                   # Reading order + companion-pair index
 │   ├── pipeline-overview.md        # High-level generation flow
 │   ├── pipeline-executor.md        # Executor / step / modifier substrate
 │   ├── trigger-integration.md      # Trigger.dev wiring

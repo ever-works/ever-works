@@ -87,4 +87,8 @@ See `spec.md` §9 — all gates satisfied.
 - Implementation:
     - `apps/api/src/directories/directories.controller.ts:516`
     - `packages/agent/src/services/directory-generation.service.ts:330`
+- Cross-cutting: [`architecture/pipeline-executor`](../../architecture/pipeline-executor.md) §7
+  (cancellation propagation in the executor),
+  [`architecture/trigger-integration`](../../architecture/trigger-integration.md) §8
+  (the four-step cancel dance into Trigger.dev)
 - PR: #383
