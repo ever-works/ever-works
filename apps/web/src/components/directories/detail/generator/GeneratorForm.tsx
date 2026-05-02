@@ -306,8 +306,8 @@ export function GeneratorForm({
                     disabled={isGenerated || isPending}
                     helperText={
                         isGenerated
-                            ? 'Template selection is locked after the first website generation.'
-                            : 'Choose the website template that will be used when the website repository is first created.'
+                            ? t('websiteTemplateLockedHelperText')
+                            : t('websiteTemplateHelperText')
                     }
                 />
             </RequiredFields>

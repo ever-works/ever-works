@@ -456,7 +456,7 @@ function WebsiteTemplateSettings({
                         <p className="text-sm text-text-secondary dark:text-text-secondary-dark">
                             {t('form.websiteTemplate.switchConfirmDescription', {
                                 defaultValue:
-                                    'If the website repository already exists, it will be deleted and recreated from the selected template. Any custom code in that repository will be lost.',
+                                    'If the website repository already exists, its contents will be replaced from the selected template. Any custom code in that repository will be lost.',
                             })}
                         </p>
                     </DialogHeader>
@@ -516,7 +516,7 @@ function WebsiteTemplateSettings({
                                 hasTemplateChange
                                     ? t('form.websiteTemplate.switchHelperText', {
                                           defaultValue:
-                                              'Applying a new template will recreate the website repository if it already exists.',
+                                              'Applying a new template will reset the existing website repository from the selected template if it already exists.',
                                       })
                                     : t('form.websiteTemplate.currentHelperText', {
                                           defaultValue:
@@ -549,7 +549,7 @@ function WebsiteTemplateSettings({
                             >
                                 {hasTemplateChange
                                     ? t('form.websiteTemplate.switchAction', {
-                                          defaultValue: 'Apply template and recreate website',
+                                          defaultValue: 'Apply template to website repository',
                                       })
                                     : t('form.websiteTemplate.switchActionIdle', {
                                           defaultValue: 'Template is up to date',

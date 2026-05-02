@@ -10,9 +10,14 @@ jest.mock('@src/generators/website-generator/website-generator.service', () => (
     WebsiteGeneratorService: class WebsiteGeneratorService {},
 }));
 
+jest.mock('@src/generators/website-generator/website-update.service', () => ({
+    WebsiteUpdateService: class WebsiteUpdateService {},
+}));
+
 const previousMinimalRepo = process.env.WEBSITE_TEMPLATE_MINIMAL_REPO;
 process.env.WEBSITE_TEMPLATE_MINIMAL_REPO = 'directory-web-template-minimal';
 
+import { NotFoundException } from '@nestjs/common';
 import { DirectoryLifecycleService } from '../directory-lifecycle.service';
 import { GenerateStatusType } from '@src/entities/types';
 
@@ -23,6 +28,7 @@ describe('DirectoryLifecycleService', () => {
     let dataGenerator: any;
     let markdownGenerator: any;
     let websiteGenerator: any;
+    let websiteUpdateService: any;
     let ownershipService: any;
     let deployFacade: any;
     let gitFacade: any;
@@ -53,6 +59,12 @@ describe('DirectoryLifecycleService', () => {
             removeRepository: jest.fn(),
             initialize: jest.fn(),
         };
+        websiteUpdateService = {
+            updateRepository: jest.fn().mockResolvedValue({
+                method: 'create-using-template',
+                message: 'updated',
+            }),
+        };
         ownershipService = {
             ensureCanEdit: jest.fn(),
             ensureIsOwner: jest.fn(),
@@ -70,6 +82,7 @@ describe('DirectoryLifecycleService', () => {
             dataGenerator,
             markdownGenerator,
             websiteGenerator,
+            websiteUpdateService,
             ownershipService,
             deployFacade,
             gitFacade,
@@ -135,7 +148,7 @@ describe('DirectoryLifecycleService', () => {
         );
     });
 
-    it('recreates the website repository when switching templates after initialization', async () => {
+    it('resets the website repository from the selected template after initialization', async () => {
         const directory = {
             id: 'dir-1',
             slug: 'test-directory',
@@ -170,13 +183,84 @@ describe('DirectoryLifecycleService', () => {
                 websiteTemplateLastCheckedAt: null,
             }),
         );
-        expect(websiteGenerator.removeRepository).toHaveBeenCalledWith(directory, user);
+        expect(websiteUpdateService.updateRepository).toHaveBeenCalledWith(directory, user);
+        expect(websiteGenerator.removeRepository).not.toHaveBeenCalled();
+        expect(websiteGenerator.initialize).not.toHaveBeenCalled();
+        expect(result.repositoryRecreated).toBe(true);
+        expect(result.websiteTemplateId).toBe('minimal');
+    });
+
+    it('recreates the website repository only when the existing website repo is missing', async () => {
+        const directory = {
+            id: 'dir-1',
+            slug: 'test-directory',
+            name: 'Test Directory',
+            description: 'Test description',
+            owner: 'ever-works',
+            organization: false,
+            readmeConfig: {},
+            gitProvider: 'github',
+            userId: user.id,
+            website: 'https://example.com',
+            websiteTemplateId: 'classic',
+            websiteTemplateLastCommit: 'abc123',
+            websiteTemplateLastError: 'old error',
+            websiteTemplateLastUpdatedAt: new Date(),
+            websiteTemplateLastCheckedAt: new Date(),
+            getRepoOwner: jest.fn().mockReturnValue('ever-works'),
+            getWebsiteRepo: jest.fn().mockReturnValue('test-directory-website'),
+        } as any;
+
+        ownershipService.ensureCanEdit.mockResolvedValue({ directory });
+        websiteUpdateService.updateRepository.mockRejectedValueOnce(
+            new NotFoundException(
+                "Website repository 'ever-works/test-directory-website' does not exist",
+            ),
+        );
+
+        const result = await service.switchWebsiteTemplate(directory.id, 'minimal', user);
+
+        expect(websiteUpdateService.updateRepository).toHaveBeenCalledWith(directory, user);
         expect(websiteGenerator.initialize).toHaveBeenCalledWith(
             directory,
             user,
             'create-using-template',
         );
         expect(result.repositoryRecreated).toBe(true);
-        expect(result.websiteTemplateId).toBe('minimal');
+    });
+
+    it('does not persist the template switch when updating the existing website repo fails', async () => {
+        const directory = {
+            id: 'dir-1',
+            slug: 'test-directory',
+            name: 'Test Directory',
+            description: 'Test description',
+            owner: 'ever-works',
+            organization: false,
+            readmeConfig: {},
+            gitProvider: 'github',
+            userId: user.id,
+            website: 'https://example.com',
+            websiteTemplateId: 'classic',
+            websiteTemplateLastCommit: 'abc123',
+            websiteTemplateLastError: 'old error',
+            websiteTemplateLastUpdatedAt: new Date(),
+            websiteTemplateLastCheckedAt: new Date(),
+            getRepoOwner: jest.fn().mockReturnValue('ever-works'),
+            getWebsiteRepo: jest.fn().mockReturnValue('test-directory-website'),
+        } as any;
+
+        ownershipService.ensureCanEdit.mockResolvedValue({ directory });
+        websiteUpdateService.updateRepository.mockRejectedValueOnce(new Error('sync failed'));
+
+        await expect(service.switchWebsiteTemplate(directory.id, 'minimal', user)).rejects.toThrow(
+            'sync failed',
+        );
+
+        expect(directoryRepository.update).not.toHaveBeenCalled();
+        expect(websiteGenerator.initialize).not.toHaveBeenCalled();
+        expect(directory.websiteTemplateId).toBe('classic');
+        expect(directory.websiteTemplateLastCommit).toBe('abc123');
+        expect(directory.websiteTemplateLastError).toBe('old error');
     });
 });

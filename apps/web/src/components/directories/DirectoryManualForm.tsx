@@ -165,7 +165,7 @@ export function DirectoryManualForm({
                             onChange={(websiteTemplateId) =>
                                 setFormData({ ...formData, websiteTemplateId })
                             }
-                            helperText="Choose the website template that will be used when the website repository is first created."
+                            helperText={t('websiteTemplateHelperText')}
                         />
                     </div>
                 </div>

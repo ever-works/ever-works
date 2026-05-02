@@ -9,6 +9,7 @@ import { DirectoryRepository } from '@src/database/repositories/directory.reposi
 import { DataGeneratorService } from '@src/generators/data-generator/data-generator.service';
 import { MarkdownGeneratorService } from '@src/generators/markdown-generator/markdown-generator.service';
 import { WebsiteGeneratorService } from '@src/generators/website-generator/website-generator.service';
+import { WebsiteUpdateService } from '@src/generators/website-generator/website-update.service';
 import { CreateDirectoryDto } from '@src/dto/create-directory.dto';
 import { UpdateDirectoryDto } from '@src/dto';
 import { DeleteDirectoryDto, DeleteDirectoryResponseDto } from '@src/items-generator/dto';
@@ -35,10 +36,31 @@ export class DirectoryLifecycleService {
         private readonly dataGenerator: DataGeneratorService,
         private readonly markdownGenerator: MarkdownGeneratorService,
         private readonly websiteGenerator: WebsiteGeneratorService,
+        private readonly websiteUpdateService: WebsiteUpdateService,
         private readonly ownershipService: DirectoryOwnershipService,
         private readonly deployFacade: DeployFacadeService,
         private readonly gitFacade: GitFacadeService,
     ) {}
+
+    private isMissingWebsiteRepositoryError(error: unknown): boolean {
+        if (error instanceof NotFoundException) {
+            return true;
+        }
+
+        const errorStatus =
+            typeof error === 'object' && error !== null && 'status' in error
+                ? Number((error as { status?: unknown }).status)
+                : undefined;
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        const normalizedMessage = errorMessage.toLowerCase();
+
+        return (
+            errorStatus === 404 ||
+            errorMessage.includes('404') ||
+            normalizedMessage.includes('not found') ||
+            normalizedMessage.includes('does not exist')
+        );
+    }
 
     private async hasInitializedWebsiteRepository(
         directory: Directory,
@@ -292,7 +314,12 @@ export class DirectoryLifecycleService {
             websiteTemplateLastCheckedAt: null,
         };
 
-        await this.directoryRepository.update(id, updateData);
+        const previousTemplateId = directory.websiteTemplateId;
+        const previousTemplateLastCommit = directory.websiteTemplateLastCommit;
+        const previousTemplateLastError = directory.websiteTemplateLastError;
+        const previousTemplateLastUpdatedAt = directory.websiteTemplateLastUpdatedAt;
+        const previousTemplateLastCheckedAt = directory.websiteTemplateLastCheckedAt;
+
         directory.websiteTemplateId = nextTemplateId;
         directory.websiteTemplateLastCommit = null;
         directory.websiteTemplateLastError = null;
@@ -301,32 +328,38 @@ export class DirectoryLifecycleService {
 
         if (websiteRepoInitialized) {
             try {
-                await this.websiteGenerator.removeRepository(directory, user);
+                await this.websiteUpdateService.updateRepository(directory, user);
             } catch (error) {
-                const errorStatus =
-                    typeof error === 'object' && error !== null && 'status' in error
-                        ? Number((error as { status?: unknown }).status)
-                        : undefined;
-                const errorMessage = error instanceof Error ? error.message : String(error);
-
-                if (
-                    errorStatus !== 404 &&
-                    !errorMessage.includes('404') &&
-                    !errorMessage.toLowerCase().includes('not found')
-                ) {
+                if (!this.isMissingWebsiteRepositoryError(error)) {
+                    directory.websiteTemplateId = previousTemplateId;
+                    directory.websiteTemplateLastCommit = previousTemplateLastCommit;
+                    directory.websiteTemplateLastError = previousTemplateLastError;
+                    directory.websiteTemplateLastUpdatedAt = previousTemplateLastUpdatedAt;
+                    directory.websiteTemplateLastCheckedAt = previousTemplateLastCheckedAt;
                     throw error;
                 }
 
                 this.logger.warn(
-                    `Website repository for directory ${directory.id} was already missing during template switch: ${errorMessage}`,
+                    `Website repository for directory ${directory.id} was missing during template switch. Recreating from template.`,
                 );
+
+                try {
+                    await this.websiteGenerator.initialize(
+                        directory,
+                        user,
+                        WebsiteRepositoryCreationMethod.CREATE_USING_TEMPLATE,
+                    );
+                } catch (initializeError) {
+                    directory.websiteTemplateId = previousTemplateId;
+                    directory.websiteTemplateLastCommit = previousTemplateLastCommit;
+                    directory.websiteTemplateLastError = previousTemplateLastError;
+                    directory.websiteTemplateLastUpdatedAt = previousTemplateLastUpdatedAt;
+                    directory.websiteTemplateLastCheckedAt = previousTemplateLastCheckedAt;
+                    throw initializeError;
+                }
             }
 
-            await this.websiteGenerator.initialize(
-                directory,
-                user,
-                WebsiteRepositoryCreationMethod.CREATE_USING_TEMPLATE,
-            );
+            await this.directoryRepository.update(id, updateData);
 
             return {
                 status: 'success',
@@ -336,9 +369,11 @@ export class DirectoryLifecycleService {
                 websiteTemplateId: nextTemplateId,
                 repositoryRecreated: true,
                 message:
-                    'Website template switched successfully. The website repository was recreated from the selected template.',
+                    'Website template switched successfully. The website repository was reset from the selected template.',
             };
         }
+
+        await this.directoryRepository.update(id, updateData);
 
         return {
             status: 'success',
