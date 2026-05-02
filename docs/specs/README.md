@@ -34,7 +34,10 @@ docs/specs/
 │   ├── web-dashboard.md            # Next.js 16 App Router internals
 │   ├── monitoring.md               # Sentry + PostHog + structured logging
 │   ├── cli.md                      # Public + internal CLI architectures
-│   └── notifications-mail.md       # In-app + email delivery
+│   ├── notifications-mail.md       # In-app + email delivery
+│   ├── trigger-worker.md           # Trigger.dev task package + bootstrap
+│   ├── mcp-server-internals.md     # OpenAPI → MCP conversion + sanitiser
+│   └── directory-import.md         # Source analyzer + 3 import paths
 ├── ai/                             # Cross-cutting AI / generation specs
 │   ├── implementation-plan.md
 │   └── tasks-checklist.md
