@@ -40,6 +40,30 @@ const matchesDirectoryQuery = (directory: Directory, query: string): boolean => 
     );
 };
 
+function upsertDirectory(directories: Directory[], nextDirectory: Directory): Directory[] {
+    const existingIndex = directories.findIndex((directory) => directory.id === nextDirectory.id);
+    if (existingIndex === -1) {
+        return [nextDirectory, ...directories];
+    }
+
+    return directories.map((directory) =>
+        directory.id === nextDirectory.id ? nextDirectory : directory,
+    );
+}
+
+function mergeDirectories(
+    currentDirectories: Directory[],
+    nextDirectories: Directory[],
+): Directory[] {
+    const directoryById = new Map(currentDirectories.map((directory) => [directory.id, directory]));
+
+    for (const directory of nextDirectories) {
+        directoryById.set(directory.id, directory);
+    }
+
+    return Array.from(directoryById.values());
+}
+
 export function DirectorySwitcher() {
     const pathname = usePathname();
     const router = useTopLoaderRouter();
@@ -94,6 +118,37 @@ export function DirectorySwitcher() {
     }, [currentDirectoryId]);
 
     useEffect(() => {
+        if (!isVisible || !currentDirectoryId || currentDirectory) {
+            return;
+        }
+
+        let isCancelled = false;
+
+        const loadCurrentDirectory = async () => {
+            try {
+                const refreshedDirectory = await getDirectoryForStatusRefresh(currentDirectoryId);
+                if (isCancelled || !refreshedDirectory) {
+                    return;
+                }
+
+                setDirectories((currentDirectories) =>
+                    upsertDirectory(currentDirectories, refreshedDirectory),
+                );
+            } catch (error) {
+                if (!isCancelled) {
+                    console.error('Failed to load current directory for switcher:', error);
+                }
+            }
+        };
+
+        void loadCurrentDirectory();
+
+        return () => {
+            isCancelled = true;
+        };
+    }, [currentDirectory, currentDirectoryId, isVisible]);
+
+    useEffect(() => {
         if (
             !isVisible ||
             !currentDirectoryId ||
@@ -118,9 +173,7 @@ export function DirectorySwitcher() {
                 }
 
                 setDirectories((currentDirectories) =>
-                    currentDirectories.map((directory) =>
-                        directory.id === refreshedDirectory.id ? refreshedDirectory : directory,
-                    ),
+                    upsertDirectory(currentDirectories, refreshedDirectory),
                 );
             } finally {
                 isRefreshing = false;
@@ -157,7 +210,9 @@ export function DirectorySwitcher() {
                     return;
                 }
 
-                setDirectories(response.directories);
+                setDirectories((currentDirectories) =>
+                    mergeDirectories(currentDirectories, response.directories),
+                );
                 hasLoadedRef.current = true;
             } catch (error) {
                 if (!isCancelled) {
