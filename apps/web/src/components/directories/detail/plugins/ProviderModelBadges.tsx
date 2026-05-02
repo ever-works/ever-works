@@ -11,7 +11,7 @@ export function ProviderModelBadges({ models, maxVisible = 4 }: ProviderModelBad
     if (!models?.length) return null;
 
     return (
-        <span className="mt-0.5 flex max-w-72 flex-wrap gap-1">
+        <span className="flex max-w-72 flex-wrap gap-1">
             {models.slice(0, maxVisible).map((model) => (
                 <span
                     key={`${model.key}-${model.value}`}

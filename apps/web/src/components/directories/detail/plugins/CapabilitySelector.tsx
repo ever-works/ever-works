@@ -8,9 +8,10 @@ import { setActiveCapability } from '@/app/actions/plugins';
 import { getCapabilityLabel, getCategoryIcon } from '@/lib/utils/plugin-category-icons';
 import { DirectoryPluginSettingsModal } from './DirectoryPluginSettingsModal';
 import { ProviderChoiceButton } from './ProviderChoiceButton';
+import { ActiveProviderModels } from './ActiveProviderModels';
 
 interface CapabilitySelectorProps {
-    directoryId: string;
+    directoryId?: string;
     capability: string;
     plugins: DirectoryPlugin[];
     activePluginId?: string;
@@ -31,13 +32,19 @@ export function CapabilitySelector({
     const [selectedPluginId, setSelectedPluginId] = useState(activePluginId);
     const [settingsPluginId, setSettingsPluginId] = useState<string | null>(null);
     const settingsPlugin = plugins.find((plugin) => plugin.pluginId === settingsPluginId) ?? null;
+    const canConfigureDirectoryModels = scope === 'directory' && Boolean(directoryId);
+    const activePlugin = plugins.find((plugin) => plugin.pluginId === selectedPluginId);
+    const activePluginModels =
+        capability === 'ai-provider' && activePlugin?.models?.length
+            ? activePlugin.models
+            : undefined;
 
     useEffect(() => {
         setSelectedPluginId(activePluginId);
     }, [activePluginId]);
 
     const handleSelect = (pluginId: string) => {
-        if (pluginId === selectedPluginId || isPending) return;
+        if (!directoryId || pluginId === selectedPluginId || isPending) return;
 
         const previousPluginId = selectedPluginId;
         setSelectedPluginId(pluginId);
@@ -82,36 +89,38 @@ export function CapabilitySelector({
                 </span>
             </div>
 
-            <div
-                className="flex min-w-0 flex-wrap gap-1.5"
-                role="group"
-                aria-label={getCapabilityLabel(capability)}
-            >
-                {plugins.map((plugin) => {
-                    const isActive = plugin.pluginId === selectedPluginId;
-                    const showModels =
-                        capability === 'ai-provider' && plugin.models && plugin.models.length > 0;
-                    return (
-                        <ProviderChoiceButton
-                            key={plugin.pluginId}
-                            name={plugin.name}
-                            icon={plugin.icon}
-                            models={showModels ? plugin.models : undefined}
-                            isActive={isActive}
-                            disabled={isPending}
-                            nameClassName="max-w-36 truncate"
-                            changeLabel={t('changeModels')}
-                            onSelect={() => handleSelect(plugin.pluginId)}
-                            onConfigure={
-                                showModels && isActive && scope === 'directory'
-                                    ? () => setSettingsPluginId(plugin.pluginId)
-                                    : undefined
-                            }
-                        />
-                    );
-                })}
+            <div className="min-w-0">
+                <div
+                    className="flex min-w-0 flex-wrap gap-1.5"
+                    role="group"
+                    aria-label={getCapabilityLabel(capability)}
+                >
+                    {plugins.map((plugin) => {
+                        const isActive = plugin.pluginId === selectedPluginId;
+                        return (
+                            <ProviderChoiceButton
+                                key={plugin.pluginId}
+                                name={plugin.name}
+                                icon={plugin.icon}
+                                isActive={isActive}
+                                disabled={isPending}
+                                nameClassName="max-w-36 truncate"
+                                onSelect={() => handleSelect(plugin.pluginId)}
+                            />
+                        );
+                    })}
+                </div>
+                <ActiveProviderModels
+                    models={activePluginModels}
+                    changeLabel={t('changeModels')}
+                    onConfigure={
+                        activePluginModels && activePlugin && canConfigureDirectoryModels
+                            ? () => setSettingsPluginId(activePlugin.pluginId)
+                            : undefined
+                    }
+                />
             </div>
-            {settingsPlugin && scope === 'directory' && (
+            {settingsPlugin && canConfigureDirectoryModels && directoryId && (
                 <DirectoryPluginSettingsModal
                     open={settingsPluginId !== null}
                     onOpenChange={(open) => {

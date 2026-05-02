@@ -8,6 +8,7 @@ import { useTranslations } from 'next-intl';
 import { Tooltip } from '@/components/ui/tooltip';
 import { Network } from 'lucide-react';
 import { ProviderChoiceButton } from '@/components/directories/detail/plugins/ProviderChoiceButton';
+import { ActiveProviderModels } from '@/components/directories/detail/plugins/ActiveProviderModels';
 
 interface ProviderSelectorProps {
     label: string;
@@ -37,6 +38,10 @@ export function ProviderSelector({
         return null;
     }
 
+    const activeProvider = providers.find(
+        (provider) => value === provider.id || provider.id === effectiveDefaultId,
+    );
+
     return (
         <div className="flex items-center gap-4 px-5 py-3">
             <div className="w-36 shrink-0">
@@ -45,35 +50,44 @@ export function ProviderSelector({
                 </code>
             </div>
 
-            <div className="flex-1 flex flex-wrap gap-1.5">
-                {providers.map((provider) => {
-                    const isActive = value === provider.id || provider.id === effectiveDefaultId;
-                    const button = (
-                        <ProviderChoiceButton
-                            name={provider.name}
-                            icon={provider.icon}
-                            models={provider.models}
-                            isActive={isActive}
-                            disabled={disabled || provider.id === effectiveDefaultId}
-                            notConfigured={!provider.configured}
-                            notConfiguredLabel={t('notConfigured')}
-                            changeLabel={t('changeModels')}
-                            onSelect={() => {
-                                if (provider.id === effectiveDefaultId) return;
-                                onChange(value === provider.id ? null : provider.id);
-                            }}
-                            onConfigure={onConfigure ? () => onConfigure(provider.id) : undefined}
-                        />
-                    );
+            <div className="min-w-0 flex-1">
+                <div className="flex flex-wrap gap-1.5">
+                    {providers.map((provider) => {
+                        const isActive =
+                            value === provider.id || provider.id === effectiveDefaultId;
+                        const button = (
+                            <ProviderChoiceButton
+                                name={provider.name}
+                                icon={provider.icon}
+                                isActive={isActive}
+                                disabled={disabled || provider.id === effectiveDefaultId}
+                                notConfigured={!provider.configured}
+                                notConfiguredLabel={t('notConfigured')}
+                                onSelect={() => {
+                                    if (provider.id === effectiveDefaultId) return;
+                                    onChange(value === provider.id ? null : provider.id);
+                                }}
+                            />
+                        );
 
-                    return !provider.configured ? (
-                        <Tooltip key={provider.id} content={t('notConfiguredTooltip')}>
-                            {button}
-                        </Tooltip>
-                    ) : (
-                        <span key={provider.id}>{button}</span>
-                    );
-                })}
+                        return !provider.configured ? (
+                            <Tooltip key={provider.id} content={t('notConfiguredTooltip')}>
+                                {button}
+                            </Tooltip>
+                        ) : (
+                            <span key={provider.id}>{button}</span>
+                        );
+                    })}
+                </div>
+                <ActiveProviderModels
+                    models={activeProvider?.models}
+                    changeLabel={t('changeModels')}
+                    onConfigure={
+                        activeProvider && onConfigure
+                            ? () => onConfigure(activeProvider.id)
+                            : undefined
+                    }
+                />
             </div>
         </div>
     );
