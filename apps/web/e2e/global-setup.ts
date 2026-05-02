@@ -25,7 +25,7 @@ setup('authenticate', async ({ page, baseURL }) => {
     await page.locator('button[type="submit"]').click();
 
     // Wait for successful redirect to dashboard
-    await page.waitForURL(/\/(en\/)?(works|$)/, { timeout: 15_000 });
+    await page.waitForURL(/\/en($|\/|\?)/, { timeout: 15_000 });
 
     // Verify we're authenticated
     await expect(page).not.toHaveURL(/\/login/);

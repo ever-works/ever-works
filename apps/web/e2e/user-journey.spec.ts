@@ -27,7 +27,7 @@ test.describe('Complete user journey', () => {
         await page.locator('button[type="submit"]').click();
 
         // Should arrive at dashboard
-        await page.waitForURL(/\/(en\/)?(works|$)/, { timeout: 15_000 });
+        await page.waitForURL(/\/en($|\/|\?)/, { timeout: 15_000 });
 
         // ---- Step 2: Navigate to create work ----
         await page.goto('/en/works/new');
