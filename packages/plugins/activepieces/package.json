@@ -1,7 +1,7 @@
 {
 	"name": "@ever-works/activepieces-plugin",
 	"version": "1.0.0",
-	"description": "Activepieces Automation Pipeline Plugin - Delegates directory generation steps to Activepieces flows",
+	"description": "Activepieces Automation Pipeline Plugin - Delegates Work generation steps to Activepieces flows",
 	"private": true,
 	"type": "module",
 	"main": "./dist/index.cjs",
@@ -46,7 +46,7 @@
 				"pipeline",
 				"form-schema-provider"
 			],
-			"description": "Pipeline plugin that delegates directory generation steps to Activepieces flows",
+			"description": "Pipeline plugin that delegates Work generation steps to Activepieces flows",
 			"author": {
 				"name": "Ever Works Team"
 			},
