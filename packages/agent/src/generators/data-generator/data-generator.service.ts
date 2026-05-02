@@ -658,7 +658,10 @@ export class DataGeneratorService {
             { userId: directoryOwner.id, providerId: directory.gitProvider },
         );
 
-        const dataRepo = await DataRepository.create(dest, getDirectoryDefaultDataConfig(directory));
+        const dataRepo = await DataRepository.create(
+            dest,
+            getDirectoryDefaultDataConfig(directory),
+        );
 
         await dataRepo.ensureDirectoriesExist();
 
@@ -730,8 +733,8 @@ export class DataGeneratorService {
             directory.getDataRepo(),
         );
 
-        return DataRepository.create(dataDir, getDirectoryDefaultDataConfig(directory)).then((data) =>
-            data.cleanup(),
+        return DataRepository.create(dataDir, getDirectoryDefaultDataConfig(directory)).then(
+            (data) => data.cleanup(),
         );
     }
 
@@ -1197,7 +1200,10 @@ export class DataGeneratorService {
                 { owner: directory.getRepoOwner(), repo, committer },
                 { userId: directoryOwner.id, providerId: directory.gitProvider },
             );
-            const data = await DataRepository.create(dest, getDirectoryDefaultDataConfig(directory));
+            const data = await DataRepository.create(
+                dest,
+                getDirectoryDefaultDataConfig(directory),
+            );
 
             const [categories, tags, collections, existingItems, config] = await Promise.all([
                 data.getCategories().catch(() => []),
@@ -1344,7 +1350,10 @@ export class DataGeneratorService {
                 this.logger,
             );
 
-            const data = await DataRepository.create(dest, getDirectoryDefaultDataConfig(directory));
+            const data = await DataRepository.create(
+                dest,
+                getDirectoryDefaultDataConfig(directory),
+            );
             await data.ensureDirectoriesExist();
 
             // Write categories, tags, and collections
@@ -1491,7 +1500,10 @@ export class DataGeneratorService {
                 { userId: user.id, providerId: directory.gitProvider },
             );
 
-            const data = await DataRepository.create(dest, getDirectoryDefaultDataConfig(directory));
+            const data = await DataRepository.create(
+                dest,
+                getDirectoryDefaultDataConfig(directory),
+            );
             await data.ensureDirectoriesExist();
             await data.ensureDefaultConfig();
 
