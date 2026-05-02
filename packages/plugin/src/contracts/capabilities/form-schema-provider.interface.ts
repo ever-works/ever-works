@@ -114,4 +114,14 @@ export interface ProviderOption {
 	isDefault?: boolean;
 	/** Icon for the provider */
 	icon?: PluginIcon;
+	/** Effective model settings for AI providers, resolved for the current scope. */
+	models?: ProviderModelSummary[];
+}
+
+export interface ProviderModelSummary {
+	key: string;
+	label: string;
+	value: string;
+	source?: 'default' | 'env' | 'admin' | 'directory' | 'user';
+	isDirectoryOverride?: boolean;
 }

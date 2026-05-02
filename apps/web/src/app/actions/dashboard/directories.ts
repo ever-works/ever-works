@@ -9,12 +9,13 @@ import {
     DeleteDirectoryDto,
     SyncDirectoryResponse,
     AnalyzeRepositoryResponseDto,
-    ImportSourceType,
+    ImportDirectoryDto,
     GetUserRepositoriesResponseDto,
     UpdateDirectorySchedulePayload,
     UpdateDirectoryAdvancedPromptsDto,
     GitProviderConnectionInfo,
 } from '@/lib/api';
+import type { Directory } from '@/lib/api/types-only';
 import { getAuthFromCookie } from '@/lib/auth';
 import { checkGitProviderConnection } from './oauth';
 import { getTranslations } from 'next-intl/server';
@@ -446,6 +447,21 @@ export async function syncDirectoryData(
     }
 }
 
+export async function getDirectoryForStatusRefresh(directoryId: string): Promise<Directory | null> {
+    const user = await getAuthFromCookie();
+    if (!user) {
+        return null;
+    }
+
+    try {
+        const { directory } = await directoryAPI.get(directoryId);
+        return directory;
+    } catch (error) {
+        console.error('Failed to refresh directory status:', error);
+        return null;
+    }
+}
+
 interface GetDirectoriesParams {
     search?: string;
     limit?: number;
@@ -548,24 +564,7 @@ export async function analyzeRepository(sourceUrl: string, providerId?: string) 
     }
 }
 
-interface ImportEnrichmentConfig {
-    expansionFactor?: number;
-}
-
-interface ImportDirectoryRequest {
-    sourceUrl: string;
-    sourceType: ImportSourceType;
-    name: string;
-    organization?: boolean;
-    owner?: string;
-    createMissingRepos?: boolean;
-    sync?: boolean;
-    restoreWorksConfig?: boolean;
-    gitProvider?: string;
-    deployProvider?: string;
-    providers?: Record<string, string>;
-    enrichmentConfig?: ImportEnrichmentConfig;
-}
+type ImportDirectoryRequest = ImportDirectoryDto;
 
 interface ImportDirectoryProviderErrors {
     ai?: string;

@@ -87,6 +87,7 @@ export class TriggerInternalController implements OnModuleInit {
         const gitToken = await this.gitFacade.getAccessToken({
             userId,
             providerId: directory.gitProvider,
+            directoryId: directory.id,
         });
 
         return {

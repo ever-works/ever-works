@@ -8,6 +8,10 @@ import { getStepProgress, getStepText, getItemsProcessedText } from '@/lib/utils
 import { Terminal, Info, ChevronDown, ChevronUp } from 'lucide-react';
 import { TerminalLogViewer } from '../shared/TerminalLogViewer';
 import { ShinyText } from '@/components/ui/ShinyText';
+import { CancelGenerationButton } from './CancelGenerationButton';
+import { useRouter } from '@/i18n/navigation';
+import { useDirectoryDetail } from '../DirectoryDetailContext';
+import { GenerateStatusType } from '@/lib/api/enums';
 
 // ─── Animated orb ────────────────────────────────────────────────────────────
 
@@ -121,6 +125,8 @@ interface GenerationProgressProps {
 
 export function GenerationProgress({ directory }: GenerationProgressProps) {
     const t = useTranslations('dashboard.directoryDetail.progress');
+    const router = useRouter();
+    const { directory: syncedDirectory } = useDirectoryDetail();
     const [dots, setDots] = useState('');
     const [showLogs, setShowLogs] = useState(true);
 
@@ -131,7 +137,11 @@ export function GenerationProgress({ directory }: GenerationProgressProps) {
         return () => clearInterval(interval);
     }, []);
 
-    const generateStatus = directory.generateStatus;
+    const useSyncedDirectory =
+        syncedDirectory.id === directory.id &&
+        syncedDirectory.generateStatus?.status === GenerateStatusType.GENERATING;
+    const currentDirectory = useSyncedDirectory ? syncedDirectory : directory;
+    const generateStatus = currentDirectory.generateStatus;
     const progressPercentage = getStepProgress(generateStatus);
     const stepText = getStepText(generateStatus, t('steps.processing'));
     const itemsText = getItemsProcessedText(generateStatus);
@@ -185,24 +195,38 @@ export function GenerationProgress({ directory }: GenerationProgressProps) {
                 </div>
 
                 <div className="px-8 pb-4 space-y-3">
-                    <button
-                        type="button"
-                        onClick={() => setShowLogs((prev) => !prev)}
-                        className={cn(
-                            'group inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-all duration-200',
-                            showLogs
-                                ? 'bg-white/6 text-text dark:text-text-dark ring-1 ring-white/15'
-                                : 'bg-surface-secondary dark:bg-surface-secondary-dark text-text-secondary dark:text-text-secondary-dark hover:bg-surface-tertiary dark:hover:bg-surface-tertiary-dark',
-                        )}
-                    >
-                        <Terminal className="h-3.5 w-3.5 transition-transform duration-200 group-hover:scale-110" />
-                        {showLogs ? t('hideLogs') : t('showLogs')}
-                        {showLogs ? (
-                            <ChevronUp className="h-3 w-3 ml-0.5 opacity-40" />
-                        ) : (
-                            <ChevronDown className="h-3 w-3 ml-0.5 opacity-40" />
-                        )}
-                    </button>
+                    <div className="flex items-center justify-between gap-3">
+                        <button
+                            type="button"
+                            onClick={() => setShowLogs((prev) => !prev)}
+                            className={cn(
+                                'group inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-all duration-200',
+                                showLogs
+                                    ? 'bg-white/6 text-text dark:text-text-dark ring-1 ring-white/15'
+                                    : 'bg-surface-secondary dark:bg-surface-secondary-dark text-text-secondary dark:text-text-secondary-dark hover:bg-surface-tertiary dark:hover:bg-surface-tertiary-dark',
+                            )}
+                        >
+                            <Terminal className="h-3.5 w-3.5 transition-transform duration-200 group-hover:scale-110" />
+                            {showLogs ? t('hideLogs') : t('showLogs')}
+                            {showLogs ? (
+                                <ChevronUp className="h-3 w-3 ml-0.5 opacity-40" />
+                            ) : (
+                                <ChevronDown className="h-3 w-3 ml-0.5 opacity-40" />
+                            )}
+                        </button>
+
+                        <CancelGenerationButton
+                            directoryId={currentDirectory.id}
+                            labels={{
+                                stop: t('stop'),
+                                stopping: t('stopping'),
+                                stopRequested: t('stopRequested'),
+                                stopFailed: t('stopFailed'),
+                            }}
+                            onCancelled={() => router.refresh()}
+                            onAlreadyFinished={() => router.refresh()}
+                        />
+                    </div>
 
                     {showLogs && (
                         <div className="space-y-2">

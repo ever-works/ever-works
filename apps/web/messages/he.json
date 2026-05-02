@@ -553,7 +553,8 @@
                     "pending": "ממתין",
                     "inProgress": "בתהליך",
                     "completed": "הושלם",
-                    "failed": "נכשל"
+                    "failed": "נכשל",
+                    "cancelled": "מבוטל"
                 }
             },
             "actions": {
@@ -1772,6 +1773,7 @@
                 "default": "ברירת מחדל",
                 "notConfigured": "לא מוגדר",
                 "notConfiguredTooltip": "ספק זה דורש הגדרה. בקר בהגדרות → תוספים כדי להגדיר אותו.",
+                "changeModels": "שינוי",
                 "jsonObjectError": "הערך חייב להיות אובייקט JSON",
                 "invalidJsonError": "פורמט JSON לא תקין"
             },
@@ -1799,7 +1801,11 @@
                 "closeNote": "זה עשוי לקחת מספר דקות. ניתן לסגור את הדף ולחזור מאוחר יותר.",
                 "showLogs": "הצג יומני שלבים",
                 "hideLogs": "הסתר יומני שלבים",
-                "waitingForLogs": "מחכה ליומנים חיים להגיע..."
+                "waitingForLogs": "מחכה ליומנים חיים להגיע...",
+                "stop": "עצור יצירה",
+                "stopping": "עצירה...",
+                "stopRequested": "נדרש ביטול יצירה",
+                "stopFailed": "נכשל בביטול יצירה"
             },
             "settings": {
                 "sourceSettings": "מאגר מקור",
@@ -1820,8 +1826,7 @@
                         "model": "מודל",
                         "schedule": "תזמון",
                         "providers": "ספקים",
-                        "websiteRepo": "מאגר אתר",
-                        "additionalAgents": "סוכנים נוספים"
+                        "websiteRepo": "מאגר אתר"
                     },
                     "sourceTypes": {
                         "dataRepo": "מאגר נתונים",
@@ -2496,6 +2501,7 @@
                     "nameRequired": "שם ספרייה נדרש",
                     "noAnalysis": "נא נתח מאגר תחילה",
                     "githubRequired": "נא לחבר את חשבון GitHub שלך תחילה",
+                    "providerRequired": "אנא בחר ספק Git קודם",
                     "importFailed": "נכשל בייבוא ספרייה",
                     "linkFailed": "נכשל בקישור ספרייה",
                     "providerNotConfigured": "{provider} לא מוגדר. בקר בהגדרות → תוספים כדי להגדיר לפני ייבוא."
@@ -2932,6 +2938,7 @@
             "resetSuccess": "ההגדרות אופסו לברירת מחדל",
             "cancel": "ביטול",
             "clickToConfigure": "לחץ כדי להגדיר",
+            "changeModels": "שינוי",
             "autoEnabledByUser": "מופעל אוטומטית דרך הגדרות משתמש",
             "toggleError": "נכשל בשינוי מצב התוסף",
             "system": "מערכת",

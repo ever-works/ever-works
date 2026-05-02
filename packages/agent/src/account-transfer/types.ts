@@ -27,7 +27,9 @@ export interface ExportedCustomDomain {
 export interface ExportedDirectoryPlugin {
     pluginId: string;
     enabled: boolean;
+    /** Legacy export shape accepted for backwards-compatible imports. */
     activeCapability?: string;
+    activeCapabilities?: string[];
     settings: Record<string, unknown>;
     secretSettings?: Record<string, unknown>;
     priority: number;

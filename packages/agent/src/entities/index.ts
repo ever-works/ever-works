@@ -20,4 +20,7 @@ export * from './conversation-message.entity';
 export * from './auth-account.entity';
 export * from './auth-session.entity';
 export * from './auth-verification.entity';
+export * from './github-app-installation.entity';
+export * from './github-app-installation-repository.entity';
+export * from './github-app-user-link.entity';
 export * from './types';

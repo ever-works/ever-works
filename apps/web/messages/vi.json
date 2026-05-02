@@ -553,7 +553,8 @@
                     "pending": "Đang chờ",
                     "inProgress": "Đang tiến hành",
                     "completed": "Hoàn thành",
-                    "failed": "Thất bại"
+                    "failed": "Thất bại",
+                    "cancelled": "Đã hủy"
                 }
             },
             "actions": {
@@ -1772,6 +1773,7 @@
                 "default": "Mặc định",
                 "notConfigured": "Chưa cấu hình",
                 "notConfiguredTooltip": "Nhà cung cấp này yêu cầu cấu hình. Truy cập Cài đặt → Plugins để thiết lập.",
+                "changeModels": "Thay đổi",
                 "jsonObjectError": "Giá trị phải là đối tượng JSON",
                 "invalidJsonError": "Định dạng JSON không hợp lệ"
             },
@@ -1799,7 +1801,11 @@
                 "closeNote": "Có thể mất vài phút. Bạn có thể đóng trang này và quay lại sau.",
                 "showLogs": "Hiển thị nhật ký bước",
                 "hideLogs": "Ẩn nhật ký bước",
-                "waitingForLogs": "Đang chờ nhật ký trực tiếp..."
+                "waitingForLogs": "Đang chờ nhật ký trực tiếp...",
+                "stop": "Dừng việc tạo",
+                "stopping": "Đang dừng...",
+                "stopRequested": "Đã yêu cầu hủy việc tạo",
+                "stopFailed": "Không thể hủy việc tạo"
             },
             "settings": {
                 "sourceSettings": "Kho lưu trữ nguồn",
@@ -1820,8 +1826,7 @@
                         "model": "Mô hình",
                         "schedule": "Lịch trình",
                         "providers": "Nhà cung cấp",
-                        "websiteRepo": "Kho trang web",
-                        "additionalAgents": "Tác nhân bổ sung"
+                        "websiteRepo": "Kho trang web"
                     },
                     "sourceTypes": {
                         "dataRepo": "Kho dữ liệu",
@@ -2496,6 +2501,7 @@
                     "nameRequired": "Tên thư mục là bắt buộc",
                     "noAnalysis": "Vui lòng phân tích kho trước",
                     "githubRequired": "Vui lòng kết nối tài khoản GitHub của bạn trước",
+                    "providerRequired": "Vui lòng chọn nhà cung cấp Git trước",
                     "importFailed": "Nhập thư mục thất bại",
                     "linkFailed": "Liên kết thư mục thất bại",
                     "providerNotConfigured": "{provider} chưa được cấu hình. Truy cập Cài Đặt → Plugins để thiết lập trước khi nhập."
@@ -2932,6 +2938,7 @@
             "resetSuccess": "Đã đặt lại cài đặt về mặc định",
             "cancel": "Hủy",
             "clickToConfigure": "Nhấp để cấu hình",
+            "changeModels": "Thay đổi",
             "autoEnabledByUser": "Tự động bật qua cài đặt người dùng",
             "toggleError": "Không thể chuyển đổi plugin",
             "system": "Hệ thống",

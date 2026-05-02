@@ -553,7 +553,8 @@
                     "pending": "In afwachting",
                     "inProgress": "Uitvoeren",
                     "completed": "Voltooid",
-                    "failed": "Mislukt"
+                    "failed": "Mislukt",
+                    "cancelled": "Geannuleerd"
                 }
             },
             "actions": {
@@ -1772,6 +1773,7 @@
                 "default": "Standaard",
                 "notConfigured": "Niet geconfigureerd",
                 "notConfiguredTooltip": "Deze provider vereist configuratie. Ga naar Instellingen → Plugins om in te stellen.",
+                "changeModels": "Wijzigen",
                 "jsonObjectError": "Waarde moet een JSON-object zijn",
                 "invalidJsonError": "Ongeldig JSON-formaat"
             },
@@ -1799,7 +1801,11 @@
                 "closeNote": "Dit kan enkele minuten duren. Je kunt deze pagina sluiten en later terugkomen.",
                 "showLogs": "Staplogs tonen",
                 "hideLogs": "Staplogs verbergen",
-                "waitingForLogs": "Wachten op live logs..."
+                "waitingForLogs": "Wachten op live logs...",
+                "stop": "Generatie stoppen",
+                "stopping": "Stopt...",
+                "stopRequested": "Annulering van generatie aangevraagd",
+                "stopFailed": "Annulering van generatie mislukt"
             },
             "settings": {
                 "sourceSettings": "Bronrepository",
@@ -1820,8 +1826,7 @@
                         "model": "Model",
                         "schedule": "Schema",
                         "providers": "Providers",
-                        "websiteRepo": "Website-repository",
-                        "additionalAgents": "Extra agenten"
+                        "websiteRepo": "Website-repository"
                     },
                     "sourceTypes": {
                         "dataRepo": "Gegevensrepository",
@@ -2496,6 +2501,7 @@
                     "nameRequired": "Directory-naam is verplicht",
                     "noAnalysis": "Analyseer eerst een repository",
                     "githubRequired": "Verbind eerst je GitHub-account",
+                    "providerRequired": "Selecteer eerst een git-provider",
                     "importFailed": "Fout bij importeren directory",
                     "linkFailed": "Fout bij koppelen directory",
                     "providerNotConfigured": "{provider} is niet geconfigureerd. Ga naar Instellingen → Plugins om in te stellen voor importeren."
@@ -2932,6 +2938,7 @@
             "resetSuccess": "Instellingen hersteld naar standaardwaarden",
             "cancel": "Annuleren",
             "clickToConfigure": "Klik om te configureren",
+            "changeModels": "Wijzigen",
             "autoEnabledByUser": "Automatisch ingeschakeld via gebruikersinstellingen",
             "toggleError": "Kon plug-in niet schakelen",
             "system": "Systeem",

@@ -2,6 +2,11 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { DirectoryPluginEntity } from '../entities/directory-plugin.entity';
+import {
+    addActiveCapability,
+    hasActiveCapability,
+    removeActiveCapability,
+} from '../utils/active-capabilities.util';
 
 /**
  * Repository for managing DirectoryPluginEntity persistence.
@@ -74,10 +79,15 @@ export class DirectoryPluginRepository {
         directoryId: string,
         capability: string,
     ): Promise<DirectoryPluginEntity | null> {
-        return this.repository.findOne({
-            where: { directoryId, activeCapability: capability, enabled: true },
+        const directoryPlugins = await this.repository.find({
+            where: { directoryId, enabled: true },
             relations: ['pluginEntity'],
         });
+        return (
+            directoryPlugins.find((directoryPlugin) =>
+                hasActiveCapability(directoryPlugin, capability),
+            ) ?? null
+        );
     }
 
     /**
@@ -146,8 +156,17 @@ export class DirectoryPluginRepository {
         pluginId: string,
         capability: string | null,
     ): Promise<DirectoryPluginEntity | null> {
+        const existing = await this.findByDirectoryAndPlugin(directoryId, pluginId);
+        if (!existing) return null;
+
+        if (capability === null) {
+            return this.updateByDirectoryAndPlugin(directoryId, pluginId, {
+                activeCapabilities: [],
+            });
+        }
+
         return this.updateByDirectoryAndPlugin(directoryId, pluginId, {
-            activeCapability: capability,
+            activeCapabilities: addActiveCapability(existing, capability),
         });
     }
 
@@ -156,11 +175,25 @@ export class DirectoryPluginRepository {
      * This is used before setting a new active plugin for a capability.
      */
     async clearActiveCapability(directoryId: string, capability: string): Promise<number> {
-        const result = await this.repository.update(
-            { directoryId, activeCapability: capability },
-            { activeCapability: null },
+        const directoryPlugins = await this.repository.find({
+            where: { directoryId },
+        });
+
+        const affectedPlugins = directoryPlugins.filter((directoryPlugin) =>
+            hasActiveCapability(directoryPlugin, capability),
         );
-        return result.affected ?? 0;
+
+        await Promise.all(
+            affectedPlugins.map((directoryPlugin) => {
+                directoryPlugin.activeCapabilities = removeActiveCapability(
+                    directoryPlugin,
+                    capability,
+                );
+                return this.repository.save(directoryPlugin);
+            }),
+        );
+
+        return affectedPlugins.length;
     }
 
     /**

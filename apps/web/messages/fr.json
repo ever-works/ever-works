@@ -553,7 +553,8 @@
                     "pending": "En attente",
                     "inProgress": "En cours",
                     "completed": "Terminé",
-                    "failed": "Échoué"
+                    "failed": "Échoué",
+                    "cancelled": "Annulé"
                 }
             },
             "actions": {
@@ -1772,6 +1773,7 @@
                 "default": "Par défaut",
                 "notConfigured": "Non configuré",
                 "notConfiguredTooltip": "Ce fournisseur nécessite une configuration. Visitez Paramètres → Plugins pour le configurer.",
+                "changeModels": "Changer",
                 "jsonObjectError": "La valeur doit être un objet JSON",
                 "invalidJsonError": "Format JSON invalide"
             },
@@ -1799,7 +1801,11 @@
                 "closeNote": "Cela peut prendre quelques minutes. Vous pouvez fermer cette page et revenir plus tard.",
                 "showLogs": "Afficher les journaux des étapes",
                 "hideLogs": "Masquer les journaux des étapes",
-                "waitingForLogs": "Attente des journaux en direct..."
+                "waitingForLogs": "Attente des journaux en direct...",
+                "stop": "Arrêter la génération",
+                "stopping": "Arrêt en cours...",
+                "stopRequested": "Demande d'annulation de la génération",
+                "stopFailed": "Échec de l'annulation de la génération"
             },
             "settings": {
                 "sourceSettings": "Dépôt source",
@@ -1820,8 +1826,7 @@
                         "model": "Modèle",
                         "schedule": "Planification",
                         "providers": "Fournisseurs",
-                        "websiteRepo": "Dépôt du site web",
-                        "additionalAgents": "Agents supplémentaires"
+                        "websiteRepo": "Dépôt du site web"
                     },
                     "sourceTypes": {
                         "dataRepo": "Dépôt de données",
@@ -2496,6 +2501,7 @@
                     "nameRequired": "Le nom de l'annuaire est requis",
                     "noAnalysis": "Veuillez analyser un dépôt en premier",
                     "githubRequired": "Veuillez connecter votre compte GitHub en premier",
+                    "providerRequired": "Veuillez d'abord sélectionner un fournisseur git",
                     "importFailed": "Échec de l'import de l'annuaire",
                     "linkFailed": "Échec de la liaison de l'annuaire",
                     "providerNotConfigured": "{provider} n'est pas configuré. Visitez Paramètres → Plugins pour le configurer avant d'importer."
@@ -2932,6 +2938,7 @@
             "resetSuccess": "Paramètres réinitialisés par défaut",
             "cancel": "Annuler",
             "clickToConfigure": "Cliquez pour configurer",
+            "changeModels": "Changer",
             "autoEnabledByUser": "Auto-activé via les paramètres utilisateur",
             "toggleError": "Échec de la bascule du greffon",
             "system": "Système",

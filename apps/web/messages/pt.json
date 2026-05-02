@@ -553,7 +553,8 @@
                     "pending": "Pendente",
                     "inProgress": "Em Andamento",
                     "completed": "Concluído",
-                    "failed": "Falhou"
+                    "failed": "Falhou",
+                    "cancelled": "Cancelado"
                 }
             },
             "actions": {
@@ -1772,6 +1773,7 @@
                 "default": "Padrão",
                 "notConfigured": "Não configurado",
                 "notConfiguredTooltip": "Este provedor requer configuração. Visite Configurações → Plugins para configurá-lo.",
+                "changeModels": "Alterar",
                 "jsonObjectError": "O valor deve ser um objeto JSON",
                 "invalidJsonError": "Formato JSON inválido"
             },
@@ -1799,7 +1801,11 @@
                 "closeNote": "Isso pode levar alguns minutos. Você pode fechar esta página e voltar depois.",
                 "showLogs": "Mostrar logs de etapas",
                 "hideLogs": "Ocultar logs de etapas",
-                "waitingForLogs": "Aguardando logs ao vivo chegarem..."
+                "waitingForLogs": "Aguardando logs ao vivo chegarem...",
+                "stop": "Parar geração",
+                "stopping": "Parando...",
+                "stopRequested": "Solicitação de cancelamento de geração",
+                "stopFailed": "Falha ao cancelar geração"
             },
             "settings": {
                 "sourceSettings": "Repositório de Origem",
@@ -1820,8 +1826,7 @@
                         "model": "Modelo",
                         "schedule": "Agendamento",
                         "providers": "Provedores",
-                        "websiteRepo": "Repositório do Site",
-                        "additionalAgents": "Agentes Adicionais"
+                        "websiteRepo": "Repositório do Site"
                     },
                     "sourceTypes": {
                         "dataRepo": "Repositório de Dados",
@@ -2496,6 +2501,7 @@
                     "nameRequired": "Nome do diretório é obrigatório",
                     "noAnalysis": "Por favor, analise um repositório primeiro",
                     "githubRequired": "Por favor, conecte sua conta GitHub primeiro",
+                    "providerRequired": "Por favor, selecione um provedor Git primeiro",
                     "importFailed": "Falha ao importar diretório",
                     "linkFailed": "Falha ao vincular diretório",
                     "providerNotConfigured": "{provider} não está configurado. Visite Configurações → Plugins para configurá-lo antes de importar."
@@ -2932,6 +2938,7 @@
             "resetSuccess": "Definições repostas para predefinições",
             "cancel": "Cancelar",
             "clickToConfigure": "Clique para configurar",
+            "changeModels": "Alterar",
             "autoEnabledByUser": "Auto-ativado via definições do utilizador",
             "toggleError": "Falha ao alternar o plug-in",
             "system": "Sistema",

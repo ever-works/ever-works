@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useRouter } from '@/i18n/navigation';
 import { GitProviderConnectionInfo, Directory, DirectoryConfig } from '@/lib/api/types-only';
 import { DirectoryHeader } from './DirectoryHeader';
@@ -9,9 +9,15 @@ import { GenerateStatusType } from '@/lib/api/enums';
 import { DirectoryDetailProvider } from './DirectoryDetailContext';
 import { useTranslations } from 'next-intl';
 import { toast } from 'sonner';
-import { pageIntervalRefresh } from '@/lib/utils';
-import { syncDirectoryData } from '@/app/actions/dashboard/directories';
+import {
+    getDirectoryForStatusRefresh,
+    syncDirectoryData,
+} from '@/app/actions/dashboard/directories';
 import { useBackgroundActivity } from '@/lib/hooks/use-background-activity';
+import {
+    clearDashboardCurrentDirectory,
+    setDashboardCurrentDirectory,
+} from '@/lib/hooks/use-dashboard-current-directory';
 
 interface DirectoryLayoutClientProps {
     directory: Directory;
@@ -28,11 +34,25 @@ export function DirectoryLayoutClient({
 }: DirectoryLayoutClientProps) {
     const router = useRouter();
     const t = useTranslations('dashboard.directoryDetail');
-    const isGenerating = directory.generateStatus?.status === GenerateStatusType.GENERATING;
+    const [syncedDirectory, setSyncedDirectory] = useState(directory);
+    const isGenerating = syncedDirectory.generateStatus?.status === GenerateStatusType.GENERATING;
     const lastGenerateStatus = useRef(directory.generateStatus?.status);
     const hasSyncedOnMount = useRef(false);
-    const generateStatus = directory.generateStatus?.status;
     const { markGenerating, clearGenerating } = useBackgroundActivity();
+
+    useEffect(() => {
+        setSyncedDirectory(directory);
+    }, [directory]);
+
+    useEffect(() => {
+        setDashboardCurrentDirectory(syncedDirectory);
+    }, [syncedDirectory]);
+
+    useEffect(() => {
+        return () => {
+            clearDashboardCurrentDirectory(directory.id);
+        };
+    }, [directory.id]);
 
     // Sync generation state with the global sidebar indicator
     useEffect(() => {
@@ -45,7 +65,7 @@ export function DirectoryLayoutClient({
 
     useEffect(() => {
         const lastStatus = lastGenerateStatus.current;
-        const currentStatus = directory.generateStatus?.status;
+        const currentStatus = syncedDirectory.generateStatus?.status;
 
         if (lastStatus !== currentStatus && currentStatus === GenerateStatusType.ERROR) {
             toast.error(t('failedToGenerateItems'), {
@@ -65,15 +85,51 @@ export function DirectoryLayoutClient({
             });
         }
 
-        lastGenerateStatus.current = directory.generateStatus?.status;
-    }, [directory.generateStatus?.status, t]);
+        if (lastStatus === GenerateStatusType.GENERATING && currentStatus !== lastStatus) {
+            if (currentStatus === GenerateStatusType.GENERATED) {
+                syncDirectoryData(syncedDirectory.id).catch(() => {
+                    // Silent fail; best effort
+                });
+            }
+
+            router.refresh();
+        }
+
+        lastGenerateStatus.current = currentStatus;
+    }, [router, syncedDirectory.generateStatus?.status, syncedDirectory.id, t]);
 
     useEffect(() => {
-        if (isGenerating) {
-            const cleanup = pageIntervalRefresh(router, 10_000);
-            return cleanup;
+        if (!isGenerating) {
+            return;
         }
-    }, [isGenerating, router]);
+
+        let isMounted = true;
+        let isRefreshing = false;
+
+        const refreshDirectoryStatus = async () => {
+            if (isRefreshing) {
+                return;
+            }
+
+            isRefreshing = true;
+            try {
+                const refreshedDirectory = await getDirectoryForStatusRefresh(syncedDirectory.id);
+                if (isMounted && refreshedDirectory) {
+                    setSyncedDirectory(refreshedDirectory);
+                }
+            } finally {
+                isRefreshing = false;
+            }
+        };
+
+        void refreshDirectoryStatus();
+        const interval = window.setInterval(refreshDirectoryStatus, 5_000);
+
+        return () => {
+            isMounted = false;
+            window.clearInterval(interval);
+        };
+    }, [isGenerating, syncedDirectory.id]);
 
     useEffect(() => {
         if (hasSyncedOnMount.current) {
@@ -81,32 +137,21 @@ export function DirectoryLayoutClient({
         }
 
         hasSyncedOnMount.current = true;
-        syncDirectoryData(directory.id).catch(() => {
+        syncDirectoryData(syncedDirectory.id).catch(() => {
             // Silent fail; best effort
         });
-    }, [directory.id]);
-
-    useEffect(() => {
-        const previousGenerateStatus = lastGenerateStatus.current;
-        if (
-            previousGenerateStatus === GenerateStatusType.GENERATING &&
-            generateStatus === GenerateStatusType.GENERATED
-        ) {
-            syncDirectoryData(directory.id).catch(() => {
-                // Silent fail; best effort
-            });
-        }
-    }, [directory.id, generateStatus]);
+    }, [syncedDirectory.id]);
 
     return (
         <DirectoryDetailProvider
-            directory={directory}
+            directory={syncedDirectory}
             oauthConnection={oauthConnection}
             config={config}
+            onDirectoryChange={setSyncedDirectory}
         >
             <div className="w-full">
-                <DirectoryHeader directory={directory} />
-                <DirectoryTabs directory={directory} />
+                <DirectoryHeader directory={syncedDirectory} />
+                <DirectoryTabs directory={syncedDirectory} />
 
                 <div className="mt-6">{children}</div>
             </div>

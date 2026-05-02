@@ -553,7 +553,8 @@
                     "pending": "Beklemede",
                     "inProgress": "Devam Ediyor",
                     "completed": "Tamamlandı",
-                    "failed": "Başarısız"
+                    "failed": "Başarısız",
+                    "cancelled": "İptal"
                 }
             },
             "actions": {
@@ -1772,6 +1773,7 @@
                 "default": "Varsayılan",
                 "notConfigured": "Yapılandırılmamış",
                 "notConfiguredTooltip": "Bu sağlayıcı yapılandırma gerektirir. Ayarlar → Eklentiler'e giderek ayarlayın.",
+                "changeModels": "Değiştir",
                 "jsonObjectError": "Değer JSON nesnesi olmalıdır",
                 "invalidJsonError": "Geçersiz JSON formatı"
             },
@@ -1799,7 +1801,11 @@
                 "closeNote": "Bu birkaç dakika sürebilir. Bu sayfayı kapatıp daha sonra geri dönebilirsiniz.",
                 "showLogs": "Adım günlüklerini göster",
                 "hideLogs": "Adım günlüklerini gizle",
-                "waitingForLogs": "Canlı günlüklerin gelmesini bekliyor..."
+                "waitingForLogs": "Canlı günlüklerin gelmesini bekliyor...",
+                "stop": "Üretimi durdur",
+                "stopping": "Durduruluyor...",
+                "stopRequested": "Üretim iptali istenildi",
+                "stopFailed": "Üretim iptal edilemedi"
             },
             "settings": {
                 "sourceSettings": "Kaynak Deposu",
@@ -1820,8 +1826,7 @@
                         "model": "Model",
                         "schedule": "Zamanlama",
                         "providers": "Sağlayıcılar",
-                        "websiteRepo": "Web Sitesi Deposu",
-                        "additionalAgents": "Ek Ajanlar"
+                        "websiteRepo": "Web Sitesi Deposu"
                     },
                     "sourceTypes": {
                         "dataRepo": "Veri Deposu",
@@ -2496,6 +2501,7 @@
                     "nameRequired": "Dizin adı gerekli",
                     "noAnalysis": "Lütfen önce bir depo analiz edin",
                     "githubRequired": "Lütfen önce GitHub hesabınızı bağlayın",
+                    "providerRequired": "Lütfen önce bir git sağlayıcısı seçin",
                     "importFailed": "Dizin içe aktarılamadı",
                     "linkFailed": "Dizin bağlanamadı",
                     "providerNotConfigured": "{provider} yapılandırılmamış. İçe aktarmadan önce Ayarlar → Eklentiler'e gidin."
@@ -2932,6 +2938,7 @@
             "resetSuccess": "Ayarlar varsayılana sıfırlandı",
             "cancel": "İptal",
             "clickToConfigure": "Yapılandırmak için tıklayın",
+            "changeModels": "Değiştir",
             "autoEnabledByUser": "Kullanıcı ayarları aracılığıyla otomatik etkin",
             "toggleError": "Eklenti geçişi yapılamadı",
             "system": "Sistem",

@@ -11,6 +11,7 @@ import type {
 import { PluginEvents } from '../plugins.constants';
 import { DirectoryPluginRepository } from '../repositories/directory-plugin.repository';
 import { UserPluginRepository } from '../repositories/user-plugin.repository';
+import { hasActiveCapability } from '../utils/active-capabilities.util';
 
 export interface PluginEnableContext {
     systemPlugin?: boolean;
@@ -328,7 +329,7 @@ export class PluginRegistryService {
                         directoryId,
                         registered.plugin.id,
                     );
-                    if (dp?.activeCapability === capability && dp.enabled) {
+                    if (dp?.enabled && hasActiveCapability(dp, capability)) {
                         return registered;
                     }
                 } catch {

@@ -2,7 +2,8 @@ import { Injectable, Logger } from '@nestjs/common';
 import { GitFacadeService } from '../../facades/git.facade';
 import { Directory } from '../../entities/directory.entity';
 import { User } from '../../entities/user.entity';
-import { DataRepository, PRUpdate } from './data-repository';
+import { DataRepository } from './data-repository';
+import type { IDataConfig, PRUpdate } from './data-repository';
 import { slugifyText } from '../../utils/text.utils';
 import type { Identifiable, ItemData, Category, Collection, Tag } from '@ever-works/contracts';
 import {
@@ -31,7 +32,7 @@ import type {
 } from '@ever-works/plugin';
 import type { DirectoryHistoryChangeEntry } from '@ever-works/contracts/api';
 import type { GenerationLogCollector } from './generation-log-collector';
-import { GENERATION_CANCELLED } from '@src/constants/messages';
+import { throwIfGenerationCancelled } from '@src/utils';
 import { WorksConfigWriterService } from '@src/works-config/services/works-config-writer.service';
 import type { ResolvedWorksConfig } from '@src/works-config/services/works-config.service';
 
@@ -60,6 +61,10 @@ export type GenerationStats = {
     metrics?: ItemsGeneratorMetrics;
     changelog?: ReturnType<typeof buildDirectoryChangelog>;
 };
+
+const getDirectoryDefaultDataConfig = (directory: Directory): Partial<IDataConfig> => ({
+    company_name: directory.name || directory.slug,
+});
 
 export type InitializeResult =
     | {
@@ -112,18 +117,7 @@ export class DataGeneratorService {
             `Initializing data repository for directory: ${JSON.stringify(createItemsGeneratorDto)}`,
         );
 
-        const throwIfCancelled = () => {
-            if (options?.signal?.aborted) {
-                const reason = options.signal.reason;
-                if (reason instanceof Error) {
-                    throw reason;
-                }
-
-                const error = new Error(GENERATION_CANCELLED);
-                error.name = 'AbortError';
-                throw error;
-            }
-        };
+        const throwIfCancelled = () => throwIfGenerationCancelled(options?.signal);
 
         let existingData = {
             existingItems: [],
@@ -228,7 +222,11 @@ export class DataGeneratorService {
                     organization: directory.organization ? owner : undefined,
                     isPrivate: true,
                 },
-                { userId: directoryOwner.id, providerId: directory.gitProvider },
+                {
+                    userId: directoryOwner.id,
+                    providerId: directory.gitProvider,
+                    directoryId: directory.id,
+                },
             ),
             owner,
             repo,
@@ -249,6 +247,7 @@ export class DataGeneratorService {
                     committer,
                     userId: directoryOwner.id,
                     providerId: directory.gitProvider,
+                    directoryId: directory.id,
                 },
                 this.logger,
             );
@@ -267,7 +266,7 @@ export class DataGeneratorService {
 
         let data: DataRepository;
         try {
-            data = await DataRepository.create(dest);
+            data = await DataRepository.create(dest, getDirectoryDefaultDataConfig(directory));
         } catch (err) {
             this.logger.error('Failed to create data repository', err);
             return {
@@ -535,7 +534,11 @@ export class DataGeneratorService {
             // Push changes
             await this.gitFacade.push(
                 { dir: dest },
-                { userId: directoryOwner.id, providerId: directory.gitProvider },
+                {
+                    userId: directoryOwner.id,
+                    providerId: directory.gitProvider,
+                    directoryId: directory.id,
+                },
             );
             this.logger.log(`All processed and pushed to ${directory.getRepoOwner()}/${repo}`);
 
@@ -573,7 +576,11 @@ export class DataGeneratorService {
                         title: prTitle,
                         body: prBody,
                     },
-                    { userId: directoryOwner.id, providerId: directory.gitProvider },
+                    {
+                        userId: directoryOwner.id,
+                        providerId: directory.gitProvider,
+                        directoryId: directory.id,
+                    },
                 );
 
                 prUpdate = {
@@ -639,6 +646,7 @@ export class DataGeneratorService {
             .repositoryExists(owner, repo, {
                 userId: directoryOwner.id,
                 providerId: directory.gitProvider,
+                directoryId: directory.id,
             })
             .catch((error) => {
                 this.logger.error(
@@ -661,10 +669,17 @@ export class DataGeneratorService {
 
         const dest = await this.gitFacade.cloneOrPull(
             { owner, repo, committer },
-            { userId: directoryOwner.id, providerId: directory.gitProvider },
+            {
+                userId: directoryOwner.id,
+                providerId: directory.gitProvider,
+                directoryId: directory.id,
+            },
         );
 
-        const dataRepo = await DataRepository.create(dest);
+        const dataRepo = await DataRepository.create(
+            dest,
+            getDirectoryDefaultDataConfig(directory),
+        );
 
         await dataRepo.ensureDirectoriesExist();
 
@@ -692,7 +707,11 @@ export class DataGeneratorService {
 
         await this.gitFacade.push(
             { dir: dest },
-            { userId: directoryOwner.id, providerId: directory.gitProvider },
+            {
+                userId: directoryOwner.id,
+                providerId: directory.gitProvider,
+                directoryId: directory.id,
+            },
         );
 
         return {
@@ -715,6 +734,7 @@ export class DataGeneratorService {
             await this.gitFacade.deleteRepository(directory.getRepoOwner(), repo, {
                 userId: directoryOwner.id,
                 providerId: directory.gitProvider,
+                directoryId: directory.id,
             });
 
             this.logger.log(
@@ -736,7 +756,9 @@ export class DataGeneratorService {
             directory.getDataRepo(),
         );
 
-        return DataRepository.create(dataDir).then((data) => data.cleanup());
+        return DataRepository.create(dataDir, getDirectoryDefaultDataConfig(directory)).then(
+            (data) => data.cleanup(),
+        );
     }
 
     /**
@@ -773,10 +795,14 @@ export class DataGeneratorService {
 
         const dest = await this.gitFacade.cloneOrPull(
             { owner: directory.getRepoOwner(), repo, committer },
-            { userId: directoryOwner.id, providerId: directory.gitProvider },
+            {
+                userId: directoryOwner.id,
+                providerId: directory.gitProvider,
+                directoryId: directory.id,
+            },
         );
 
-        const data = await DataRepository.create(dest);
+        const data = await DataRepository.create(dest, getDirectoryDefaultDataConfig(directory));
 
         await data.writeCategories(categories);
 
@@ -789,7 +815,11 @@ export class DataGeneratorService {
         );
         await this.gitFacade.push(
             { dir: dest },
-            { userId: directoryOwner.id, providerId: directory.gitProvider },
+            {
+                userId: directoryOwner.id,
+                providerId: directory.gitProvider,
+                directoryId: directory.id,
+            },
         );
     }
 
@@ -803,10 +833,14 @@ export class DataGeneratorService {
 
         const dest = await this.gitFacade.cloneOrPull(
             { owner: directory.getRepoOwner(), repo, committer },
-            { userId: directoryOwner.id, providerId: directory.gitProvider },
+            {
+                userId: directoryOwner.id,
+                providerId: directory.gitProvider,
+                directoryId: directory.id,
+            },
         );
 
-        const data = await DataRepository.create(dest);
+        const data = await DataRepository.create(dest, getDirectoryDefaultDataConfig(directory));
 
         await data.writeTags(tags);
 
@@ -814,7 +848,11 @@ export class DataGeneratorService {
         await this.gitFacade.commit(directory.gitProvider, data.dir, 'update tags', committer);
         await this.gitFacade.push(
             { dir: dest },
-            { userId: directoryOwner.id, providerId: directory.gitProvider },
+            {
+                userId: directoryOwner.id,
+                providerId: directory.gitProvider,
+                directoryId: directory.id,
+            },
         );
     }
 
@@ -828,10 +866,14 @@ export class DataGeneratorService {
 
         const dest = await this.gitFacade.cloneOrPull(
             { owner: directory.getRepoOwner(), repo, committer },
-            { userId: directoryOwner.id, providerId: directory.gitProvider },
+            {
+                userId: directoryOwner.id,
+                providerId: directory.gitProvider,
+                directoryId: directory.id,
+            },
         );
 
-        const data = await DataRepository.create(dest);
+        const data = await DataRepository.create(dest, getDirectoryDefaultDataConfig(directory));
 
         await data.writeCollections(collections);
 
@@ -844,7 +886,11 @@ export class DataGeneratorService {
         );
         await this.gitFacade.push(
             { dir: dest },
-            { userId: directoryOwner.id, providerId: directory.gitProvider },
+            {
+                userId: directoryOwner.id,
+                providerId: directory.gitProvider,
+                directoryId: directory.id,
+            },
         );
     }
 
@@ -1014,7 +1060,11 @@ export class DataGeneratorService {
         );
         await this.gitFacade.push(
             { dir: data.dir },
-            { userId: directoryOwner.id, providerId: directory.gitProvider },
+            {
+                userId: directoryOwner.id,
+                providerId: directory.gitProvider,
+                directoryId: directory.id,
+            },
         );
 
         this.logger.log(`Successfully updated website settings for directory ${directory.slug}`);
@@ -1033,10 +1083,14 @@ export class DataGeneratorService {
                 repo,
                 committer,
             },
-            { userId: directoryOwner.id, providerId: directory.gitProvider },
+            {
+                userId: directoryOwner.id,
+                providerId: directory.gitProvider,
+                directoryId: directory.id,
+            },
         );
 
-        const data = await DataRepository.create(dest);
+        const data = await DataRepository.create(dest, getDirectoryDefaultDataConfig(directory));
 
         return data;
     }
@@ -1199,9 +1253,16 @@ export class DataGeneratorService {
         try {
             const dest = await this.gitFacade.cloneOrPull(
                 { owner: directory.getRepoOwner(), repo, committer },
-                { userId: directoryOwner.id, providerId: directory.gitProvider },
+                {
+                    userId: directoryOwner.id,
+                    providerId: directory.gitProvider,
+                    directoryId: directory.id,
+                },
             );
-            const data = await DataRepository.create(dest);
+            const data = await DataRepository.create(
+                dest,
+                getDirectoryDefaultDataConfig(directory),
+            );
 
             const [categories, tags, collections, existingItems, config] = await Promise.all([
                 data.getCategories().catch(() => []),
@@ -1328,7 +1389,11 @@ export class DataGeneratorService {
                         organization: directory.organization ? repoOwner : undefined,
                         isPrivate: true,
                     },
-                    { userId: user.id, providerId: directory.gitProvider },
+                    {
+                        userId: user.id,
+                        providerId: directory.gitProvider,
+                        directoryId: directory.id,
+                    },
                 ),
                 repoOwner,
                 repoName,
@@ -1344,11 +1409,15 @@ export class DataGeneratorService {
                     committer,
                     userId: user.id,
                     providerId: directory.gitProvider,
+                    directoryId: directory.id,
                 },
                 this.logger,
             );
 
-            const data = await DataRepository.create(dest);
+            const data = await DataRepository.create(
+                dest,
+                getDirectoryDefaultDataConfig(directory),
+            );
             await data.ensureDirectoriesExist();
 
             // Write categories, tags, and collections
@@ -1436,7 +1505,7 @@ export class DataGeneratorService {
             // Push to remote
             await this.gitFacade.push(
                 { dir: dest },
-                { userId: user.id, providerId: directory.gitProvider },
+                { userId: user.id, providerId: directory.gitProvider, directoryId: directory.id },
             );
 
             this.logger.log(
@@ -1492,10 +1561,13 @@ export class DataGeneratorService {
             // Clone/Pull the repository
             const dest = await this.gitFacade.cloneOrPull(
                 { owner: repoOwner, repo: repoName, committer },
-                { userId: user.id, providerId: directory.gitProvider },
+                { userId: user.id, providerId: directory.gitProvider, directoryId: directory.id },
             );
 
-            const data = await DataRepository.create(dest);
+            const data = await DataRepository.create(
+                dest,
+                getDirectoryDefaultDataConfig(directory),
+            );
             await data.ensureDirectoriesExist();
             await data.ensureDefaultConfig();
 
@@ -1573,25 +1645,12 @@ export class DataGeneratorService {
                 };
             });
 
-            // Calculate stats
+            // Calculate candidate stats. The final no-op decision is based on git status after
+            // writing, because existing imported items may serialize to identical files.
             const newItemsCount = itemsWithSlugs.filter(
                 (item) => !existingSlugSet.has(item.slug),
             ).length;
             const updatedItemsCount = itemsWithSlugs.length - newItemsCount;
-
-            if (newItemsCount === 0 && updatedItemsCount === 0) {
-                this.logger.log('No new or updated items found during sync.');
-                return {
-                    success: true,
-                    prUpdate: null,
-                    hasExistingItems: existingItems.length > 0,
-                    stats: {
-                        newItemsCount: 0,
-                        updatedItemsCount: 0,
-                        totalItemsCount: existingItems.length,
-                    },
-                };
-            }
 
             // Write items
             await pMap(itemsWithSlugs, (item) => this.writeItemToDisk(data, item), {
@@ -1605,6 +1664,22 @@ export class DataGeneratorService {
                 initialPrompt: importedData.config?.metadata?.initial_prompt,
             });
 
+            const changes = await this.gitFacade.getStatus(provider, data.dir);
+
+            if (changes.length === 0) {
+                this.logger.log('No repository changes found during source sync.');
+                return {
+                    success: true,
+                    prUpdate: null,
+                    hasExistingItems: existingItems.length > 0,
+                    stats: {
+                        newItemsCount: 0,
+                        updatedItemsCount: 0,
+                        totalItemsCount: existingItems.length,
+                    },
+                };
+            }
+
             // Commit
             await this.gitFacade.addAll(provider, data.dir);
             const commitMsg =
@@ -1616,18 +1691,18 @@ export class DataGeneratorService {
             // Push
             await this.gitFacade.push(
                 { dir: dest },
-                { userId: user.id, providerId: directory.gitProvider },
+                { userId: user.id, providerId: directory.gitProvider, directoryId: directory.id },
             );
 
             // Update DB stats
             await this.directoryOperations.updateDirectory(directory.id, {
-                itemsCount: itemsWithSlugs.length, // Approximation, assuming we keep all existing + new
+                itemsCount: existingItems.length + newItemsCount,
             });
 
             const stats: GenerationStats = {
                 newItemsCount,
                 updatedItemsCount,
-                totalItemsCount: itemsWithSlugs.length, // Note: this might be inaccurate if we didn't fetch ALL existing items to merge, but usually import fetches full state
+                totalItemsCount: existingItems.length + newItemsCount,
             };
 
             let prUpdate: PRUpdate | null = null;
@@ -1642,7 +1717,11 @@ export class DataGeneratorService {
                         title: `Sync with source - ${format(new Date(), 'MM/dd/yyyy')}`,
                         body: `Automated sync from source repository.\n\nNew items: ${newItemsCount}\nUpdated items: ${updatedItemsCount}`,
                     },
-                    { userId: user.id, providerId: directory.gitProvider },
+                    {
+                        userId: user.id,
+                        providerId: directory.gitProvider,
+                        directoryId: directory.id,
+                    },
                 );
 
                 prUpdate = {

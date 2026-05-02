@@ -43,6 +43,7 @@ export function ActivityClient({ initialActivities, totalActivities }: ActivityC
         in_progress: 0,
         completed: 0,
         failed: 0,
+        cancelled: 0,
     });
 
     const requestIdRef = useRef(0);
@@ -245,6 +246,7 @@ export function ActivityClient({ initialActivities, totalActivities }: ActivityC
         { key: 'completed', count: summary.completed, label: t('filters.statuses.completed') },
         { key: 'pending', count: summary.pending, label: t('filters.statuses.pending') },
         { key: 'failed', count: summary.failed, label: t('filters.statuses.failed') },
+        { key: 'cancelled', count: summary.cancelled, label: t('filters.statuses.cancelled') },
     ] as const;
 
     const statusConfig = {
@@ -268,6 +270,11 @@ export function ActivityClient({ initialActivities, totalActivities }: ActivityC
             activeBg: 'bg-danger/5 dark:bg-danger/10',
             activeBorder: 'border-danger/40 dark:border-danger/30',
         },
+        cancelled: {
+            dot: 'bg-amber-500',
+            activeBg: 'bg-amber-50 dark:bg-amber-900/10',
+            activeBorder: 'border-amber-400/40 dark:border-amber-500/30',
+        },
     } as const;
 
     return (
@@ -290,7 +297,7 @@ export function ActivityClient({ initialActivities, totalActivities }: ActivityC
                 </button>
             </div>
 
-            <div className="grid gap-2 @sm/main:grid-cols-2 @xl/main:grid-cols-4">
+            <div className="grid gap-2 @sm/main:grid-cols-2 @xl/main:grid-cols-5">
                 {summaryCards.map((card) => {
                     const isActive = status === card.key;
                     const config = statusConfig[card.key];

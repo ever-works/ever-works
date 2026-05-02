@@ -4,7 +4,9 @@ import {
     BadRequestException,
     ForbiddenException,
     Logger,
+    Optional,
 } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import pickBy from 'lodash/pickBy';
@@ -45,6 +47,14 @@ import {
 } from './settings-schema-validator.service';
 import { PluginSettingsService } from './plugin-settings.service';
 import { AiFacadeService } from '../../facades';
+import { WorksConfigSyncRequestedEvent, type WorksConfigSyncReason } from '@src/events';
+import {
+    addActiveCapability,
+    getActiveCapabilities,
+    hasActiveCapability,
+    removeActiveCapability,
+} from '../utils/active-capabilities.util';
+import { buildProviderModelSummaries } from '../utils/plugin-model-settings.utils';
 
 @Injectable()
 export class PluginOperationsService {
@@ -61,6 +71,8 @@ export class PluginOperationsService {
         private readonly settingsValidator: SettingsSchemaValidatorService,
         private readonly settingsService: PluginSettingsService,
         private readonly aiFacade: AiFacadeService,
+        @Optional()
+        private readonly eventEmitter?: EventEmitter2,
     ) {}
 
     // ============================================
@@ -185,10 +197,10 @@ export class PluginOperationsService {
             const category = registered.manifest.category;
             const userPlugin = userPluginMap.get(registered.plugin.id);
 
-            // Check if plugin has required settings that are not configured
-            const hasRequiredSettings = this.checkHasUnconfiguredRequiredSettings(
+            const hasRequiredSettings = await this.hasUnconfiguredRequiredSettings(
+                registered.plugin.id,
                 registered.plugin.settingsSchema,
-                userPlugin?.settings || {},
+                userId,
             );
 
             const pluginItem: SettingsMenuPlugin = {
@@ -198,7 +210,7 @@ export class PluginOperationsService {
                 enabled: resolvePluginEnabled({
                     systemPlugin: registered.manifest?.systemPlugin,
                     autoEnable: registered.manifest?.autoEnable,
-                    userPlugin: userPluginMap.get(registered.plugin.id) ?? null,
+                    userPlugin: userPlugin ?? null,
                     directoryPlugin: null,
                     hasDirectoryContext: false,
                 }),
@@ -237,13 +249,20 @@ export class PluginOperationsService {
     /**
      * Check if plugin has required settings that are not configured
      */
-    private checkHasUnconfiguredRequiredSettings(
+    private async hasUnconfiguredRequiredSettings(
+        pluginId: string,
         schema: JsonSchema | undefined,
-        settings: Record<string, unknown>,
-    ): boolean {
-        if (!schema?.required || !schema.properties) return false;
+        userId: string,
+    ): Promise<boolean> {
+        if (!schema?.properties) return false;
+        if (!schema.required?.length && !schema['x-requiredGroups']?.length) return false;
 
-        for (const field of schema.required) {
+        const resolved = await this.settingsService.getResolvedSettings(pluginId, {
+            userId,
+            includeSecrets: true,
+        });
+
+        for (const field of schema.required ?? []) {
             const propSchema = schema.properties[field];
             if (!propSchema) continue;
 
@@ -254,10 +273,28 @@ export class PluginOperationsService {
             const scope = propSchema['x-scope'] || 'global';
             if (scope !== 'global' && scope !== 'user') continue;
 
-            const value = settings[field];
+            const value = resolved[field]?.value;
             if (value === undefined || value === null || value === '') {
                 return true;
             }
+        }
+
+        for (const group of schema['x-requiredGroups'] ?? []) {
+            const visibleFields = group.fields.filter((field) => {
+                const propSchema = schema.properties?.[field];
+                if (!propSchema) return false;
+                if (propSchema['x-envVar']) return false;
+                if (propSchema['x-adminOnly']) return false;
+                const scope = propSchema['x-scope'] || 'global';
+                return scope === 'global' || scope === 'user';
+            });
+            if (visibleFields.length === 0) continue;
+
+            const hasAny = visibleFields.some((field) => {
+                const value = resolved[field]?.value;
+                return value !== undefined && value !== null && value !== '';
+            });
+            if (!hasAny) return true;
         }
 
         return false;
@@ -662,17 +699,34 @@ export class PluginOperationsService {
         // Build capability providers mapping (exclude supplementary plugins)
         const capabilityProviders: Record<string, string> = {};
         for (const dp of directoryPlugins) {
-            if (!dp.enabled || !dp.activeCapability) continue;
-            if (registryMap.get(dp.pluginId)?.manifest.supplementary) continue;
-            capabilityProviders[dp.activeCapability] = dp.pluginId;
+            if (!dp.enabled) continue;
+            const registered = registryMap.get(dp.pluginId);
+            if (!registered || registered.manifest.supplementary) continue;
+            const userPlugin = userPluginMap.get(dp.pluginId) ?? null;
+            const isEnabled = resolvePluginEnabled({
+                systemPlugin: registered.manifest?.systemPlugin,
+                autoEnable: registered.manifest?.autoEnable,
+                userPlugin,
+                directoryPlugin: dp,
+                hasDirectoryContext: true,
+            });
+            if (!isEnabled) continue;
+            for (const capability of getActiveCapabilities(dp)) {
+                capabilityProviders[capability] = dp.pluginId;
+            }
         }
 
         // Map to response
-        const plugins: DirectoryPluginResponse[] = visiblePlugins.map((registered) => {
-            const userPlugin = userPluginMap.get(registered.plugin.id);
-            const directoryPlugin = directoryPluginMap.get(registered.plugin.id);
-            return this.toDirectoryPluginResponse(registered, userPlugin, directoryPlugin);
-        });
+        const plugins: DirectoryPluginResponse[] = await Promise.all(
+            visiblePlugins.map((registered) => {
+                const userPlugin = userPluginMap.get(registered.plugin.id);
+                const directoryPlugin = directoryPluginMap.get(registered.plugin.id);
+                return this.toDirectoryPluginResponse(registered, userPlugin, directoryPlugin, {
+                    userId,
+                    directoryId,
+                });
+            }),
+        );
 
         return {
             plugins,
@@ -750,7 +804,10 @@ export class PluginOperationsService {
                 directoryPlugin.settings = { ...directoryPlugin.settings, ...options.settings };
             }
             if (options?.activeCapability) {
-                directoryPlugin.activeCapability = options.activeCapability;
+                directoryPlugin.activeCapabilities = addActiveCapability(
+                    directoryPlugin,
+                    options.activeCapability,
+                );
             }
             if (options?.priority !== undefined) {
                 directoryPlugin.priority = options.priority;
@@ -765,7 +822,7 @@ export class PluginOperationsService {
                 settings: options?.settings || {},
                 secretSettings: {},
                 metadata: {},
-                activeCapability: options?.activeCapability,
+                activeCapabilities: options?.activeCapability ? [options.activeCapability] : [],
                 priority: options?.priority || 0,
             });
         }
@@ -773,7 +830,14 @@ export class PluginOperationsService {
         await this.directoryPluginRepository.save(directoryPlugin);
         this.logger.log(`Plugin "${pluginId}" enabled for directory "${directoryId}"`);
 
-        return this.toDirectoryPluginResponse(registered, userPlugin, directoryPlugin);
+        if (getActiveCapabilities(directoryPlugin).length > 0) {
+            this.requestWorksConfigSync(directoryId, userId, 'provider_changed');
+        }
+
+        return this.toDirectoryPluginResponse(registered, userPlugin, directoryPlugin, {
+            userId,
+            directoryId,
+        });
     }
 
     /**
@@ -837,7 +901,14 @@ export class PluginOperationsService {
 
         this.logger.log(`Plugin "${pluginId}" disabled for directory "${directoryId}"`);
 
-        return this.toDirectoryPluginResponse(registered, userPlugin, directoryPlugin);
+        if (getActiveCapabilities(directoryPlugin).length > 0) {
+            this.requestWorksConfigSync(directoryId, userId, 'provider_changed');
+        }
+
+        return this.toDirectoryPluginResponse(registered, userPlugin, directoryPlugin, {
+            userId,
+            directoryId,
+        });
     }
 
     /**
@@ -938,7 +1009,14 @@ export class PluginOperationsService {
         await this.directoryPluginRepository.save(directoryPlugin);
         this.logger.log(`Plugin "${pluginId}" settings updated for directory "${directoryId}"`);
 
-        return this.toDirectoryPluginResponse(registered, userPlugin, directoryPlugin);
+        if (hasActiveCapability(directoryPlugin, 'pipeline') && settings?.model !== undefined) {
+            this.requestWorksConfigSync(directoryId, userId, 'pipeline_settings_changed');
+        }
+
+        return this.toDirectoryPluginResponse(registered, userPlugin, directoryPlugin, {
+            userId,
+            directoryId,
+        });
     }
 
     /**
@@ -980,27 +1058,47 @@ export class PluginOperationsService {
         );
 
         // Clear this capability from other plugins in this directory.
-        // Must use () => 'NULL' — passing undefined is silently swallowed by TypeORM
-        // (UpdateDateColumn fills the SET clause) so activeCapability is never cleared,
-        // leaving stale rows that corrupt the capabilityProviders map on the next read.
-        await this.directoryPluginRepository
-            .createQueryBuilder()
-            .update()
-            .set({ activeCapability: () => 'NULL' })
-            .where('directoryId = :directoryId', { directoryId })
-            .andWhere('activeCapability = :capability', { capability })
-            .andWhere('pluginId != :pluginId', { pluginId })
-            .execute();
+        // Each capability has one provider; each plugin can provide many capabilities.
+        const directoryPlugins = await this.directoryPluginRepository.find({
+            where: { directoryId },
+        });
+        const pluginsToUpdate = directoryPlugins.filter(
+            (otherPlugin) =>
+                otherPlugin.pluginId !== pluginId && hasActiveCapability(otherPlugin, capability),
+        );
+        await Promise.all(
+            pluginsToUpdate.map((otherPlugin) => {
+                otherPlugin.activeCapabilities = removeActiveCapability(otherPlugin, capability);
+                return this.directoryPluginRepository.save(otherPlugin);
+            }),
+        );
 
-        // Set this capability as active for this plugin
-        directoryPlugin.activeCapability = capability;
+        // Selecting a provider is an explicit opt-in to use that plugin for this directory.
+        directoryPlugin.enabled = true;
+        directoryPlugin.activeCapabilities = addActiveCapability(directoryPlugin, capability);
         await this.directoryPluginRepository.save(directoryPlugin);
 
         this.logger.log(
             `Capability "${capability}" set to plugin "${pluginId}" for directory "${directoryId}"`,
         );
 
-        return this.toDirectoryPluginResponse(registered, userPlugin, directoryPlugin);
+        this.requestWorksConfigSync(directoryId, userId, 'provider_changed');
+
+        return this.toDirectoryPluginResponse(registered, userPlugin, directoryPlugin, {
+            userId,
+            directoryId,
+        });
+    }
+
+    private requestWorksConfigSync(
+        directoryId: string,
+        userId: string,
+        reason: WorksConfigSyncReason,
+    ): void {
+        this.eventEmitter?.emit(
+            WorksConfigSyncRequestedEvent.EVENT_NAME,
+            new WorksConfigSyncRequestedEvent(directoryId, userId, reason),
+        );
     }
 
     // ============================================
@@ -1180,12 +1278,13 @@ export class PluginOperationsService {
         userId: string,
     ): Promise<UserPluginResponse> {
         const response = this.toUserPluginResponse(registered, userPlugin);
-        const [resolvedSettings, connectionStatus] = await Promise.all([
+        const [resolvedSettings, connectionStatus, models] = await Promise.all([
             this.getResolvedDisplaySettings(registered, userId),
             this.getConnectionStatus(registered, userId),
+            this.getProviderModelSummaries(registered, { userId }),
         ]);
 
-        if (!resolvedSettings && !connectionStatus) {
+        if (!resolvedSettings && !connectionStatus && !models) {
             return response;
         }
 
@@ -1193,6 +1292,7 @@ export class PluginOperationsService {
             ...response,
             resolvedSettings,
             connectionStatus,
+            models,
         };
     }
 
@@ -1334,15 +1434,30 @@ export class PluginOperationsService {
      * For plugins with autoEnable=true, directoryEnabled defaults to true
      * even without a DirectoryPluginEntity record (unless explicitly disabled).
      */
-    private toDirectoryPluginResponse(
+    private async toDirectoryPluginResponse(
         registered: RegisteredPlugin,
         userPlugin?: UserPluginEntity | null,
         directoryPlugin?: DirectoryPluginEntity | null,
-    ): DirectoryPluginResponse {
+        options?: { userId: string; directoryId: string },
+    ): Promise<DirectoryPluginResponse> {
         const userResponse = this.toUserPluginResponse(registered, userPlugin);
+        const rawDirectorySettings = this.maskSecretSettings(
+            directoryPlugin
+                ? { ...directoryPlugin.settings, ...directoryPlugin.secretSettings }
+                : undefined,
+            registered.plugin.settingsSchema,
+        );
+        const [resolvedSettings, models, directorySettings] = options
+            ? await Promise.all([
+                  this.getResolvedDisplaySettings(registered, options.userId),
+                  this.getProviderModelSummaries(registered, options),
+                  this.getDirectoryOverrideDisplaySettings(registered, options),
+              ])
+            : [undefined, undefined, rawDirectorySettings];
 
         return {
             ...userResponse,
+            resolvedSettings,
             directoryEnabled: resolvePluginEnabled({
                 systemPlugin: registered.manifest?.systemPlugin,
                 autoEnable: registered.manifest?.autoEnable,
@@ -1350,16 +1465,59 @@ export class PluginOperationsService {
                 directoryPlugin: directoryPlugin ?? null,
                 hasDirectoryContext: true,
             }),
-            activeCapability: directoryPlugin?.activeCapability,
-            directorySettings: this.maskSecretSettings(
-                directoryPlugin
-                    ? { ...directoryPlugin.settings, ...directoryPlugin.secretSettings }
-                    : undefined,
-                registered.plugin.settingsSchema,
-            ),
+            activeCapabilities: getActiveCapabilities(directoryPlugin),
+            directorySettings,
             directoryPluginId: directoryPlugin?.id,
             priority: directoryPlugin?.priority,
+            models,
         };
+    }
+
+    private async getProviderModelSummaries(
+        registered: RegisteredPlugin,
+        options: { userId: string; directoryId?: string },
+    ): Promise<DirectoryPluginResponse['models']> {
+        if (!registered.plugin.capabilities.includes(PLUGIN_CAPABILITIES.AI_PROVIDER)) {
+            return undefined;
+        }
+
+        const resolved = await this.settingsService.getResolvedSettings(registered.plugin.id, {
+            userId: options.userId,
+            directoryId: options.directoryId,
+        });
+
+        return buildProviderModelSummaries(registered.plugin.settingsSchema, resolved);
+    }
+
+    private async getDirectoryOverrideDisplaySettings(
+        registered: RegisteredPlugin,
+        options: { userId: string; directoryId: string },
+    ): Promise<Record<string, unknown> | undefined> {
+        const schema = registered.plugin.settingsSchema;
+        if (!schema?.properties) {
+            return undefined;
+        }
+
+        const resolved = await this.settingsService.getResolvedSettings(registered.plugin.id, {
+            userId: options.userId,
+            directoryId: options.directoryId,
+            includeSecrets: true,
+        });
+
+        const directorySettings: Record<string, unknown> = {};
+
+        for (const key of Object.keys(schema.properties)) {
+            const setting = resolved[key];
+            if (setting?.source !== 'directory') continue;
+            if (setting.value === undefined || setting.value === null) continue;
+
+            directorySettings[key] = setting.value;
+        }
+
+        return this.maskSecretSettings(
+            Object.keys(directorySettings).length > 0 ? directorySettings : undefined,
+            schema,
+        );
     }
 
     /**
@@ -1531,6 +1689,7 @@ export class PluginOperationsService {
             settings: {},
             secretSettings: {},
             metadata: {},
+            activeCapabilities: [],
             priority: 0,
         });
     }

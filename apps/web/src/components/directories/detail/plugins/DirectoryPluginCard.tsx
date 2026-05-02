@@ -155,13 +155,13 @@ export function DirectoryPluginCard({ directoryId, plugin }: DirectoryPluginCard
                             key={cap}
                             className={cn(
                                 'text-[11px] px-1.5 py-0.5 rounded-md',
-                                plugin.activeCapability === cap
+                                plugin.activeCapabilities?.includes(cap)
                                     ? 'bg-primary/15 text-primary'
                                     : 'bg-surface-tertiary dark:bg-surface-tertiary-dark text-text-muted dark:text-text-muted-dark',
                             )}
                         >
                             {getCapabilityLabel(cap)}
-                            {plugin.activeCapability === cap && ' \u2713'}
+                            {plugin.activeCapabilities?.includes(cap) && ' \u2713'}
                         </span>
                     ))}
                     {visibleCaps.length > 2 && (

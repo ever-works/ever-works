@@ -28,6 +28,7 @@ const STATUS_OPTIONS = [
     { value: 'in_progress', label: 'inProgress' },
     { value: 'completed', label: 'completed' },
     { value: 'failed', label: 'failed' },
+    { value: 'cancelled', label: 'cancelled' },
 ];
 
 interface ActivityFiltersProps {

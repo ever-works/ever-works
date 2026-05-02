@@ -81,6 +81,7 @@ describe('WebsiteGeneratorService', () => {
         expect(gitFacade.createRepositoryFromTemplate).toHaveBeenCalledTimes(1);
         expect(branchSyncService.syncFromTemplate).toHaveBeenCalledWith(directory, user, true);
         expect(gitFacade.listBranches).toHaveBeenCalledWith('acme', 'test-directory-web', {
+            directoryId: 'dir-1',
             userId: 'user-1',
             providerId: 'github',
         });
@@ -88,7 +89,7 @@ describe('WebsiteGeneratorService', () => {
             'acme',
             'test-directory-web',
             { defaultBranch: 'main' },
-            { userId: 'user-1', providerId: 'github' },
+            { userId: 'user-1', providerId: 'github', directoryId: 'dir-1' },
         );
         expect(branchSyncService.syncFromTemplate.mock.invocationCallOrder[0]).toBeLessThan(
             gitFacade.updateRepository.mock.invocationCallOrder[0],
@@ -155,7 +156,7 @@ describe('WebsiteUpdateService', () => {
             'acme',
             'test-directory-web',
             { defaultBranch: 'main' },
-            { userId: 'user-1', providerId: 'github' },
+            { userId: 'user-1', providerId: 'github', directoryId: 'dir-1' },
         );
         expect(branchSyncService.syncFromTemplate.mock.invocationCallOrder[0]).toBeLessThan(
             gitFacade.updateRepository.mock.invocationCallOrder[0],

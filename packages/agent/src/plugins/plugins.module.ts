@@ -20,6 +20,7 @@ import { PluginVersionCheckerService } from './services/plugin-version-checker.s
 import { PluginClassValidatorService } from './services/plugin-class-validator.service';
 import { PluginLifecycleManagerService } from './services/plugin-lifecycle-manager.service';
 import { PluginSettingsService } from './services/plugin-settings.service';
+import { SettingsSchemaValidatorService } from './services/settings-schema-validator.service';
 import { PluginContextFactoryService } from './services/plugin-context-factory.service';
 import { CustomCapabilityRegistryService } from './services/custom-capability-registry.service';
 import { PluginBootstrapService } from './services/plugin-bootstrap.service';
@@ -53,6 +54,7 @@ const PROVIDERS = [
     PluginManifestValidatorService,
     PluginVersionCheckerService,
     PluginClassValidatorService,
+    SettingsSchemaValidatorService,
     // Core services
     PluginRegistryService,
     PluginLoaderService,
@@ -85,6 +87,7 @@ const EXPORTS = [
     PluginManifestValidatorService,
     PluginVersionCheckerService,
     PluginClassValidatorService,
+    SettingsSchemaValidatorService,
     // Bootstrap service (for explicit initialization)
     PluginBootstrapService,
 ];

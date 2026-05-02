@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useTransition } from 'react';
+import { useState } from 'react';
 import { Directory } from '@/lib/api/types-only';
 import { cn } from '@/lib/utils/cn';
 import { getGenerationStatusConfig } from '@/lib/utils/generation-status';
@@ -13,8 +13,8 @@ import { getStepProgress, getStepText, getItemsProcessedText } from '@/lib/utils
 import { Terminal } from 'lucide-react';
 import { TerminalLogViewer } from './shared/TerminalLogViewer';
 import { ShinyText } from '@/components/ui/ShinyText';
-import { cancelGeneration } from '@/app/actions/dashboard/generator';
-import { toast } from 'sonner';
+import { CancelGenerationButton } from './generator/CancelGenerationButton';
+import { useDirectoryDetail } from './DirectoryDetailContext';
 
 interface DirectoryStatusCardProps {
     directory: Directory;
@@ -25,9 +25,10 @@ export function DirectoryStatusCard({ directory }: DirectoryStatusCardProps) {
     const t = useTranslations('dashboard.directoryDetail.statusCard');
     const tProgress = useTranslations('dashboard.directoryDetail.progress');
     const [showLogs, setShowLogs] = useState(false);
-    const [isCancelling, startCancelling] = useTransition();
+    const { directory: syncedDirectory } = useDirectoryDetail();
+    const currentDirectory = syncedDirectory.id === directory.id ? syncedDirectory : directory;
 
-    const generateStatus = directory.generateStatus;
+    const generateStatus = currentDirectory.generateStatus;
     const hasWarnings = !!generateStatus?.warnings?.length;
     const statusStyle = getGenerationStatusConfig(generateStatus?.status, { hasWarnings });
     const StatusIcon = statusStyle.icon;
@@ -44,7 +45,9 @@ export function DirectoryStatusCard({ directory }: DirectoryStatusCardProps) {
                 action: (
                     <Button
                         onClick={() =>
-                            router.push(`${ROUTES.DASHBOARD_DIRECTORY(directory.id)}/generator`)
+                            router.push(
+                                `${ROUTES.DASHBOARD_DIRECTORY(currentDirectory.id)}/generator`,
+                            )
                         }
                         variant="primary"
                         size="sm"
@@ -122,34 +125,17 @@ export function DirectoryStatusCard({ directory }: DirectoryStatusCardProps) {
                             </div>
                         </div>
                         <div className="flex items-center gap-2">
-                            <Button
-                                variant="danger"
-                                size="sm"
-                                loading={isCancelling}
-                                onClick={() => {
-                                    startCancelling(async () => {
-                                        const result = await cancelGeneration(directory.id);
-
-                                        if (!result.success) {
-                                            if (result.error?.includes('is not generating')) {
-                                                toast.error(result.error);
-                                                router.refresh();
-                                                return;
-                                            }
-
-                                            toast.error(result.error || t('generating.stopFailed'));
-                                            return;
-                                        }
-
-                                        toast.success(
-                                            result.message || t('generating.stopRequested'),
-                                        );
-                                        router.refresh();
-                                    });
+                            <CancelGenerationButton
+                                directoryId={currentDirectory.id}
+                                labels={{
+                                    stop: t('generating.stop'),
+                                    stopping: t('generating.stopping'),
+                                    stopRequested: t('generating.stopRequested'),
+                                    stopFailed: t('generating.stopFailed'),
                                 }}
-                            >
-                                {isCancelling ? t('generating.stopping') : t('generating.stop')}
-                            </Button>
+                                onCancelled={() => router.refresh()}
+                                onAlreadyFinished={() => router.refresh()}
+                            />
                         </div>
                         {logsSection}
                     </div>
@@ -180,14 +166,14 @@ export function DirectoryStatusCard({ directory }: DirectoryStatusCardProps) {
                         ) : null}
                         <div className="flex gap-2">
                             <Button
-                                href={`${ROUTES.DASHBOARD_DIRECTORY(directory.id)}/items`}
+                                href={`${ROUTES.DASHBOARD_DIRECTORY(currentDirectory.id)}/items`}
                                 variant="secondary"
                                 size="sm"
                             >
                                 {t('generated.viewItems')}
                             </Button>
                             <Button
-                                href={`${ROUTES.DASHBOARD_DIRECTORY(directory.id)}/generator`}
+                                href={`${ROUTES.DASHBOARD_DIRECTORY(currentDirectory.id)}/generator`}
                                 variant="ghost"
                                 size="sm"
                             >
@@ -223,7 +209,7 @@ export function DirectoryStatusCard({ directory }: DirectoryStatusCardProps) {
                         ) : null}
                         {logsSection && <div className="mb-3">{logsSection}</div>}
                         <Button
-                            href={`${ROUTES.DASHBOARD_DIRECTORY(directory.id)}/generator`}
+                            href={`${ROUTES.DASHBOARD_DIRECTORY(currentDirectory.id)}/generator`}
                             variant="primary"
                             size="sm"
                         >
@@ -237,7 +223,7 @@ export function DirectoryStatusCard({ directory }: DirectoryStatusCardProps) {
                 description: generateStatus.error || t('cancelled.description'),
                 action: (
                     <Button
-                        href={`${ROUTES.DASHBOARD_DIRECTORY(directory.id)}/generator`}
+                        href={`${ROUTES.DASHBOARD_DIRECTORY(currentDirectory.id)}/generator`}
                         variant="primary"
                         size="sm"
                     >

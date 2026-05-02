@@ -6,6 +6,8 @@ import { createContext, PropsWithChildren, useContext, useMemo } from 'react';
 
 type DirectoryDetailContextType = {
     directory: Directory;
+    updateDirectory: (updates: Partial<Directory>) => void;
+    updateGenerateStatus: (generateStatus: Directory['generateStatus']) => void;
     oauthConnection: GitProviderConnectionInfo | null;
     config: DirectoryConfig | null;
     repoLinks: {
@@ -25,20 +27,33 @@ export const DirectoryDetailProvider = ({
     oauthConnection,
     config,
     children,
+    onDirectoryChange,
 }: PropsWithChildren<{
     directory: Directory;
     oauthConnection: GitProviderConnectionInfo | null;
     config: DirectoryConfig | null;
+    onDirectoryChange?: (directory: Directory) => void;
 }>) => {
     const value = useMemo(() => {
+        const updateDirectory = (updates: Partial<Directory>) => {
+            onDirectoryChange?.({
+                ...directory,
+                ...updates,
+            });
+        };
+
         return {
             directory,
+            updateDirectory,
+            updateGenerateStatus: (generateStatus: Directory['generateStatus']) => {
+                updateDirectory({ generateStatus });
+            },
             oauthConnection,
             config,
             repoLinks: repoLink(directory, oauthConnection),
             permissions: getPermissions(directory.userRole),
         };
-    }, [directory, oauthConnection, config]);
+    }, [directory, oauthConnection, config, onDirectoryChange]);
 
     return (
         <DirectoryDetailContext.Provider value={value}>{children}</DirectoryDetailContext.Provider>

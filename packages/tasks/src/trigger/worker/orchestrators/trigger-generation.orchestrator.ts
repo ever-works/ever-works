@@ -12,7 +12,12 @@ import {
 import { GenerationLogCollector } from '@ever-works/agent/generators';
 import { NotificationService } from '@ever-works/agent/notifications';
 import { normalizeGeneratorError } from '@ever-works/agent/services';
-import { calculateDurationSeconds } from '@ever-works/agent/utils';
+import {
+    calculateDurationSeconds,
+    createGenerationCancelledError,
+    isGenerationCancelledError,
+    throwIfGenerationCancelled,
+} from '@ever-works/agent/utils';
 import { BaseOrchestrator } from './base-orchestrator';
 
 export type TriggerGenerationOptions = {
@@ -49,6 +54,13 @@ export class TriggerGenerationOrchestrator extends BaseOrchestrator {
         signal,
     }: TriggerGenerationOptions): Promise<GenerateStatusType> {
         const startTime = this.resolveStartTime(historyStartedAt);
+
+        if (
+            directory.generateStatus?.status === GenerateStatusType.CANCELLED ||
+            (await this.isDirectoryCancelled(directory.id))
+        ) {
+            return GenerateStatusType.CANCELLED;
+        }
 
         const logCollector = new GenerationLogCollector(
             historyId,
@@ -105,22 +117,21 @@ export class TriggerGenerationOrchestrator extends BaseOrchestrator {
             const newItemsCount = generated.stats?.newItemsCount ?? 0;
             const updatedItemsCount = generated.stats?.updatedItemsCount ?? 0;
 
-            if (signal?.aborted) {
-                throw this.createGenerationCancelledError();
-            }
+            await this.throwIfDirectoryCancelled(directory.id);
+            throwIfGenerationCancelled(signal);
 
             if (newItemsCount > 0 || updatedItemsCount > 0) {
                 logCollector.message('Markdown generation started', 'info', 'orchestrator');
                 await this.markdownGenerator.initialize(directory, user, {
                     generation_method: dto.generation_method,
                     pr_update: generated.prUpdate,
+                    signal,
                 });
                 logCollector.message('Markdown generation completed', 'info', 'orchestrator');
             }
 
-            if (signal?.aborted) {
-                throw this.createGenerationCancelledError();
-            }
+            await this.throwIfDirectoryCancelled(directory.id);
+            throwIfGenerationCancelled(signal);
 
             if (newItemsCount > 0 || generated.hasExistingItems) {
                 logCollector.message('Website generation started', 'info', 'orchestrator');
@@ -128,9 +139,12 @@ export class TriggerGenerationOrchestrator extends BaseOrchestrator {
                     directory,
                     user,
                     dto.website_repository_creation_method,
+                    { signal },
                 );
                 logCollector.message('Website generation completed', 'info', 'orchestrator');
             }
+
+            await this.throwIfDirectoryCancelled(directory.id);
 
             const endTime = new Date();
 
@@ -148,6 +162,7 @@ export class TriggerGenerationOrchestrator extends BaseOrchestrator {
                     status: GenerateStatusType.GENERATED,
                     finishedAt: endTime,
                     durationInSeconds: calculateDurationSeconds(startTime, endTime),
+                    warnings: generationWarnings ?? null,
                     ...buildStatsUpdate(generationStats),
                 }),
             ]);
@@ -155,40 +170,29 @@ export class TriggerGenerationOrchestrator extends BaseOrchestrator {
             return GenerateStatusType.GENERATED;
         } catch (error) {
             const endTime = new Date();
-            const wasCancelled = this.isGenerationCancelledError(error) || Boolean(signal?.aborted);
-            const finalStatus = wasCancelled
-                ? GenerateStatusType.CANCELLED
-                : GenerateStatusType.ERROR;
-            const errorMessage = wasCancelled
-                ? GENERATION_CANCELLED
-                : normalizeGeneratorError(error);
+            const failure = this.resolveGenerationFailure(error, signal);
 
-            logCollector.message(
-                wasCancelled
-                    ? 'Generation cancelled'
-                    : `Generation failed: ${normalizeGeneratorError(error)}`,
-                wasCancelled ? 'warn' : 'error',
-                'orchestrator',
-            );
+            logCollector.message(failure.logMessage, failure.logLevel, 'orchestrator');
 
             await Promise.all([
                 this.directoryOperations.recordGenerationFinishTime(directory.id, endTime),
                 this.directoryOperations.updateGenerateStatus(directory.id, {
-                    status: finalStatus,
-                    error: errorMessage,
+                    status: failure.status,
+                    error: failure.errorMessage,
                     warnings: generationWarnings,
                     recentLogs: logCollector.getRecentLogs(),
                 }),
                 this.directoryOperations.updateGenerationHistory(directory.id, historyId, {
-                    status: finalStatus,
+                    status: failure.status,
                     finishedAt: endTime,
                     durationInSeconds: calculateDurationSeconds(startTime, endTime),
-                    errorMessage,
+                    errorMessage: failure.errorMessage,
+                    warnings: generationWarnings ?? null,
                     ...buildStatsUpdate(generationStats),
                 }),
             ]);
 
-            if (wasCancelled) {
+            if (failure.wasCancelled) {
                 return GenerateStatusType.CANCELLED;
             }
 
@@ -203,20 +207,47 @@ export class TriggerGenerationOrchestrator extends BaseOrchestrator {
         }
     }
 
-    private createGenerationCancelledError(): Error {
-        const error = new Error(GENERATION_CANCELLED);
-        error.name = 'AbortError';
-        return error;
-    }
+    private resolveGenerationFailure(
+        error: unknown,
+        signal?: AbortSignal,
+    ): {
+        status: GenerateStatusType;
+        errorMessage: string;
+        logMessage: string;
+        logLevel: 'warn' | 'error';
+        wasCancelled: boolean;
+    } {
+        const wasCancelled = isGenerationCancelledError(error) || Boolean(signal?.aborted);
 
-    private isGenerationCancelledError(error: unknown): boolean {
-        if (!(error instanceof Error)) {
-            return false;
+        if (wasCancelled) {
+            return {
+                status: GenerateStatusType.CANCELLED,
+                errorMessage: GENERATION_CANCELLED,
+                logMessage: 'Generation cancelled',
+                logLevel: 'warn',
+                wasCancelled: true,
+            };
         }
 
-        return (
-            error.name === 'AbortError' ||
-            error.message.toLowerCase() === GENERATION_CANCELLED.toLowerCase()
-        );
+        const errorMessage = normalizeGeneratorError(error);
+
+        return {
+            status: GenerateStatusType.ERROR,
+            errorMessage,
+            logMessage: `Generation failed: ${errorMessage}`,
+            logLevel: 'error',
+            wasCancelled: false,
+        };
+    }
+
+    private async throwIfDirectoryCancelled(directoryId: string): Promise<void> {
+        if (await this.isDirectoryCancelled(directoryId)) {
+            throw createGenerationCancelledError();
+        }
+    }
+
+    private async isDirectoryCancelled(directoryId: string): Promise<boolean> {
+        const generateStatus = await this.directoryOperations.getGenerateStatus(directoryId);
+        return generateStatus?.status === GenerateStatusType.CANCELLED;
     }
 }

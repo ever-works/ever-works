@@ -4,7 +4,6 @@ import {
     GenerateStatusType,
     DirectoryScheduleCadence,
     DirectoryScheduleStatus,
-    DirectoryScheduleBillingMode,
     DirectoryMemberRole,
 } from './enums';
 import {
@@ -15,7 +14,15 @@ import {
     type SourceValidationSettingsDto,
     type UpdateSourceValidationPayload,
     type GenerationStepLog,
-    type ProvidersDto,
+    type AnalyzeRepositoryResponseDto as ContractAnalyzeRepositoryResponseDto,
+    type ImportDirectoryDto as ContractImportDirectoryDto,
+    type ImportEnrichmentConfig as ContractImportEnrichmentConfig,
+    type ImportSourceType as ContractImportSourceType,
+    type RelatedRepositories as ContractRelatedRepositories,
+    type RepoVisibility as ContractRepoVisibility,
+    type RepositoryTarget as ContractRepositoryTarget,
+    type SourceRepository as ContractSourceRepository,
+    type WorksConfigSnapshot as ContractWorksConfigSnapshot,
 } from '@ever-works/contracts/api';
 import { APIResponse, ItemData, Category, Tag, Collection } from './types';
 import { CreateItemsGeneratorDto, ItemsGeneratorResponse } from './items-generator';
@@ -36,6 +43,14 @@ export type DirectoryScheduleDto = ContractDirectoryScheduleDto;
 export type UpdateDirectorySchedulePayload = ContractUpdateDirectorySchedulePayload & {
     runImmediately?: boolean;
 };
+
+export type ImportSourceType = ContractImportSourceType;
+export type RepositoryTarget = ContractRepositoryTarget;
+export type RelatedRepositories = ContractRelatedRepositories;
+export type RepoVisibility = ContractRepoVisibility;
+export type ImportEnrichmentConfig = ContractImportEnrichmentConfig;
+export type AnalyzeRepositoryResponseDto = ContractAnalyzeRepositoryResponseDto;
+export type ImportDirectoryDto = ContractImportDirectoryDto;
 
 export interface MarkdownReadmeConfig {
     header?: string;
@@ -113,42 +128,26 @@ export type GetProjectsReadyState =
     | 'CANCELED'
     | 'TIMEOUT';
 
-export interface SourceRepository {
-    url: string;
-    owner: string;
-    repo: string;
-    type: ImportSourceType;
-    importedAt: string;
-    relatedRepositories?: RelatedRepositories;
-    worksConfig?: WorksConfigSnapshot;
-}
+export type SourceRepositoryAuth =
+    | {
+          mode: 'github_app_installation';
+          providerId: 'github';
+          installationId: string;
+          installationRepositoryId?: string;
+          repoFullName?: string;
+      }
+    | {
+          mode: 'none';
+      };
 
-export interface RepositoryTarget {
-    owner?: string;
-    repo: string;
-}
-
-export interface RelatedRepositories {
-    data?: RepositoryTarget;
-    directory?: RepositoryTarget;
-    website?: RepositoryTarget;
-}
-
-export interface WorksConfigSnapshot {
-    name?: string;
-    initialPrompt?: string;
-    model?: string;
-    websiteRepo?: string;
-    scheduleCadence?: DirectoryScheduleCadence | null;
-    providers?: Record<string, string>;
+export type WorksConfigSnapshot = ContractWorksConfigSnapshot & {
     additionalAgentsCount?: number;
-}
+};
 
-export interface RepoVisibility {
-    data: boolean;
-    website: boolean;
-    directory: boolean;
-}
+export type SourceRepository = ContractSourceRepository<string> & {
+    worksConfig?: WorksConfigSnapshot;
+    auth?: SourceRepositoryAuth;
+};
 
 // Response Types
 export interface Directory {
@@ -365,66 +364,9 @@ export interface SyncDirectoryResponse {
     message?: string;
 }
 
-// Import types
-export type ImportSourceType = 'data_repo' | 'awesome_readme' | 'link_existing' | 'works_config';
-
-export interface ImportEnrichmentConfig {
-    expansionFactor?: number;
-}
-
 export interface AnalyzeRepositoryDto {
     sourceUrl: string;
     gitProvider?: string;
-}
-
-export interface AnalyzeRepositoryResponseDto {
-    sourceUrl: string;
-    owner: string;
-    repo: string;
-    detectedType: ImportSourceType | null;
-    isPublic: boolean;
-    requiresAuth: boolean;
-    structure?: {
-        hasConfig: boolean;
-        hasDataFolder: boolean;
-        hasReadme: boolean;
-        hasWorksConfig?: boolean;
-        itemCount?: number;
-        categoryCount?: number;
-    };
-    worksConfig?: {
-        name?: string;
-        initialPrompt?: string;
-        model?: string;
-        websiteRepo?: string;
-        scheduleCadence?: string | null;
-        providers?: ProvidersDto;
-        additionalAgentsCount?: number;
-    };
-    relatedDataRepo?: { name: string; owner: string };
-    baseSlug?: string;
-    slugConflict?: {
-        hasConflict: boolean;
-        conflictingRepos: string[];
-        suggestedSlug: string;
-    };
-    hasDataRepoWriteAccess?: boolean;
-    error?: string;
-}
-
-export interface ImportDirectoryDto {
-    sourceUrl: string;
-    sourceType: ImportSourceType;
-    name: string;
-    owner?: string;
-    organization?: boolean;
-    createMissingRepos?: boolean;
-    sync?: boolean;
-    restoreWorksConfig?: boolean;
-    gitProvider: string;
-    deployProvider?: string;
-    providers?: Record<string, string>;
-    enrichmentConfig?: ImportEnrichmentConfig;
 }
 
 export interface ImportDirectoryResponseDto {

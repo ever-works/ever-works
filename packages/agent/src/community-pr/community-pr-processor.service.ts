@@ -169,6 +169,7 @@ export class CommunityPrProcessorService {
                 const gitOptions: GitFacadeOptions = {
                     userId: directory.userId,
                     providerId: directory.gitProvider,
+                    directoryId: directory.id,
                 };
 
                 const openPRs = await this.gitFacade.listPullRequests(

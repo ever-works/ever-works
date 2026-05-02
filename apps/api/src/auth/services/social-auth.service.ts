@@ -1,5 +1,6 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { HttpService } from '@nestjs/axios';
+import { createGitHubOAuthHeaders } from '@ever-works/agent/utils';
 import { firstValueFrom } from 'rxjs';
 import { AuthProvider } from '../../config/constants';
 import { AuthService } from './auth.service';
@@ -8,6 +9,7 @@ import {
     SOCIAL_AUTH_PROVIDERS,
 } from '../config/social-auth.providers';
 import type { SocialAuthProviderId, SocialAuthUser } from '../types/social-auth.types';
+import { resolveGitHubAccountEmail } from '../utils/github-email.utils';
 
 interface OAuthTokenResult {
     accessToken: string;
@@ -33,12 +35,6 @@ interface GitHubUser {
     avatar_url?: string | null;
     node_id?: string;
     type?: string;
-}
-
-interface GitHubEmail {
-    email: string;
-    primary?: boolean;
-    verified?: boolean;
 }
 
 interface FacebookUser {
@@ -184,35 +180,17 @@ export class SocialAuthService {
     }
 
     private async getGitHubUser(accessToken: string) {
-        const headers = {
-            Accept: 'application/json',
-            Authorization: `Bearer ${accessToken}`,
-            'User-Agent': 'Ever Works',
-        };
+        const headers = createGitHubOAuthHeaders(accessToken);
 
         const { data } = await firstValueFrom(
             this.httpService.get<GitHubUser>('https://api.github.com/user', { headers }),
         );
 
-        let email = data.email || null;
-        let emailVerified = true;
-
-        if (!email) {
-            const emailsResponse = await firstValueFrom(
-                this.httpService.get<GitHubEmail[]>('https://api.github.com/user/emails', {
-                    headers,
-                }),
-            );
-
-            const primaryEmail =
-                emailsResponse.data.find((item) => item.primary && item.verified) ||
-                emailsResponse.data.find((item) => item.primary) ||
-                emailsResponse.data.find((item) => item.verified) ||
-                emailsResponse.data[0];
-
-            email = primaryEmail?.email || null;
-            emailVerified = primaryEmail?.verified !== false;
-        }
+        const { email, emailVerified } = await resolveGitHubAccountEmail(
+            this.httpService,
+            accessToken,
+            data.email || null,
+        );
 
         if (!email) {
             throw new BadRequestException('No email found in GitHub profile');

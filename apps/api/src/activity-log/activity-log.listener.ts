@@ -9,8 +9,11 @@ import {
     UserPasswordChangedEvent,
     MemberInvitedEvent,
 } from '../events';
-import { DirectoryCreatedEvent } from '@ever-works/agent/events';
-import { DirectoryGenerationCompletedEvent } from '@ever-works/agent/events';
+import {
+    DirectoryCreatedEvent,
+    DirectoryGenerationCompletedEvent,
+    WorksConfigSyncFailedEvent,
+} from '@ever-works/agent/events';
 
 @Injectable()
 export class ActivityLogListener {
@@ -41,19 +44,13 @@ export class ActivityLogListener {
     async onGenerationCompleted(event: DirectoryGenerationCompletedEvent) {
         try {
             const directory = event.directory;
-            const generateStatus = directory.generateStatus?.status;
             const latestHistory =
                 await this.generationHistoryRepository.findLatestCompletedByDirectory(directory.id);
-            const status =
-                generateStatus === 'error' || generateStatus === 'cancelled'
-                    ? ActivityStatus.FAILED
-                    : ActivityStatus.COMPLETED;
-            const summary =
-                generateStatus === 'cancelled'
-                    ? `Generation cancelled for ${directory.name}`
-                    : status === ActivityStatus.FAILED
-                      ? `Generation failed for ${directory.name}`
-                      : this.activityLogService.formatGenerationSummary(latestHistory);
+            const status = this.activityLogService.resolveGenerationActivityStatus(directory);
+            const summary = this.activityLogService.formatGenerationCompletionSummary(
+                directory,
+                latestHistory,
+            );
 
             const details = {
                 itemsCount: latestHistory?.totalItemsCount ?? directory.itemsCount ?? 0,
@@ -89,6 +86,27 @@ export class ActivityLogListener {
             });
         } catch (error) {
             this.logger.error('Failed to log generation completed activity:', error);
+        }
+    }
+
+    @OnEvent(WorksConfigSyncFailedEvent.EVENT_NAME)
+    async onWorksConfigSyncFailed(event: WorksConfigSyncFailedEvent) {
+        try {
+            await this.activityLogService.log({
+                userId: event.userId,
+                directoryId: event.directoryId,
+                actionType: ActivityActionType.WORKS_CONFIG_SYNC,
+                action: 'works_config.sync_failed',
+                status: ActivityStatus.FAILED,
+                summary: `Failed to sync works.yml to ${event.repository}`,
+                details: {
+                    reason: event.reason,
+                    repository: event.repository,
+                    error: event.errorMessage,
+                },
+            });
+        } catch (error) {
+            this.logger.error('Failed to log works.yml sync failure activity:', error);
         }
     }
 
