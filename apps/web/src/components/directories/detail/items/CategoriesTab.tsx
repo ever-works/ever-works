@@ -26,7 +26,7 @@ export function CategoriesTab({
     items,
     canEdit,
 }: CategoriesTabProps) {
-    const t = useTranslations('dashboard.directoryDetail.items.taxonomy');
+    const t = useTranslations('dashboard.workDetail.items.taxonomy');
     const router = useRouter();
     const [categories, setCategories] = useState<Category[]>(initialCategories);
     const [searchQuery, setSearchQuery] = useState('');

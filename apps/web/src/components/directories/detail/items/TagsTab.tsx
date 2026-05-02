@@ -24,7 +24,7 @@ function getTagName(tag: string | Tag): string {
 }
 
 export function TagsTab({ directoryId, initialTags, items, canEdit }: TagsTabProps) {
-    const t = useTranslations('dashboard.directoryDetail.items.taxonomy');
+    const t = useTranslations('dashboard.workDetail.items.taxonomy');
     const router = useRouter();
     const [tags, setTags] = useState<Tag[]>(initialTags);
     const [searchQuery, setSearchQuery] = useState('');

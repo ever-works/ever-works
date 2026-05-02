@@ -24,7 +24,7 @@ export function DirectoryList({
 }: DirectoryListProps) {
     const [directories, setDirectories] = useState<Directory[]>(initialDirectories);
     const [loading, setLoading] = useState(false);
-    const t = useTranslations('dashboard.directoryList');
+    const t = useTranslations('dashboard.workList');
 
     const fetchDirectories = useCallback(async () => {
         setLoading(true);

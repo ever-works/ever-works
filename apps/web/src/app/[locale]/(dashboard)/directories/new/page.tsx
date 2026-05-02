@@ -14,7 +14,7 @@ import type { DeployProvider } from './deploy-provider-selector';
 
 export async function generateMetadata(): Promise<Metadata> {
     const t = await getTranslations('metadata.pages');
-    return { title: t('newDirectory') };
+    return { title: t('newWork') };
 }
 
 export interface ProviderWithConnection {

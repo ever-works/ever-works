@@ -13,7 +13,7 @@ import {
 } from '@/components/ui/accordion';
 
 export function ReadmeConfiguration() {
-    const t = useTranslations('dashboard.directoryDetail.settings');
+    const t = useTranslations('dashboard.workDetail.settings');
 
     const { context, handleUpdate, isPending } = useSettings();
     const { formData, setFormData } = context;

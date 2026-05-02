@@ -52,8 +52,8 @@ const formatScheduledDate = (date: string, locale: string) => {
 };
 
 export function DirectoryCard({ directory }: DirectoryCardProps) {
-    const t = useTranslations('dashboard.directoryCard');
-    const tStatus = useTranslations('dashboard.directoryDetail.status');
+    const t = useTranslations('dashboard.workCard');
+    const tStatus = useTranslations('dashboard.workDetail.status');
     const pathname = usePathname();
     const [isOpening, setIsOpening] = useState(false);
 

@@ -13,7 +13,7 @@ interface DirectoryTabsProps {
 }
 
 export function DirectoryTabs({ directory }: DirectoryTabsProps) {
-    const t = useTranslations('dashboard.directoryDetail.tabs');
+    const t = useTranslations('dashboard.workDetail.tabs');
     const pathname = usePathname();
     const { config } = useDirectoryDetail();
     const permissions = useDirectoryPermissions();

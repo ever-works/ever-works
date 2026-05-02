@@ -11,7 +11,7 @@ interface ItemsEmptyStateProps {
 
 export function ItemsEmptyState({ directoryId }: ItemsEmptyStateProps) {
     const router = useRouter();
-    const t = useTranslations('dashboard.directoryDetail.items');
+    const t = useTranslations('dashboard.workDetail.items');
 
     return (
         <div className="flex flex-col items-center justify-center py-16">

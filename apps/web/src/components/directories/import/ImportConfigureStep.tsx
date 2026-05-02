@@ -73,7 +73,7 @@ export function ImportConfigureStep({
     onBack,
     onImport,
 }: ImportConfigureStepProps) {
-    const t = useTranslations('dashboard.directoryCreation.import');
+    const t = useTranslations('dashboard.workCreation.import');
 
     // Provider/pipeline selection state
     const [formSchema, setFormSchema] = useState<GeneratorFormSchema | null>(null);

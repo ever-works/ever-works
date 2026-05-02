@@ -90,7 +90,7 @@ function DirectoryHistoryPageClientContent({
     directoryId,
     initialHistory,
 }: DirectoryHistoryPageClientProps) {
-    const t = useTranslations('dashboard.directoryDetail.history');
+    const t = useTranslations('dashboard.workDetail.history');
     const locale = useLocale();
 
     const [entries, setEntries] = useState<DirectoryGenerationHistoryEntry[]>(

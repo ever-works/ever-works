@@ -24,7 +24,7 @@ export async function getDeployProviders(): Promise<DeployProvider[]> {
 }
 
 export async function updateDeployProvider(directoryId: string, deployProvider: string) {
-    const t = await getTranslations('actions.directories');
+    const t = await getTranslations('actions.works');
     const user = await getAuthFromCookie();
 
     if (!user) {

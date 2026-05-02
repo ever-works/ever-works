@@ -20,7 +20,7 @@ interface WebsiteConfigSettingsProps {
 }
 
 export function WebsiteConfigSettings({ directoryId }: WebsiteConfigSettingsProps) {
-    const t = useTranslations('dashboard.directoryDetail.settings.websiteConfig');
+    const t = useTranslations('dashboard.workDetail.settings.websiteConfig');
 
     const [isExpanded, setIsExpanded] = useState(false);
     const [isSaving, setIsSaving] = useState(false);

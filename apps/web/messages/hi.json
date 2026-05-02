@@ -219,7 +219,7 @@
                     "description": "हर डायरेक्टरी एक GitHub रिपॉजिटरी है जिसका आप मालिक हैं और नियंत्रित करते हैं।"
                 }
             },
-            "directory": {
+            "work": {
                 "title": "अपना पहला डायरेक्टरी बनाएं",
                 "description": "डायरेक्टरी आपका सामग्री हब है। आइटम जोड़ें, लेआउट कॉन्फ़िगर करें, और एक क्लिक में इसे प्रकाशित करें।",
                 "detail": "आप तैयार हैं! सामग्री बनाने और प्रकाशित करने के लिए अपना पहला डायरेक्टरी बनाएं।",
@@ -497,7 +497,7 @@
                 "shortcuts": {
                     "title": "कीबोर्ड शॉर्टकट",
                     "search": "डायरेक्टरी खोजें",
-                    "newDirectory": "नई डायरेक्टरी बनाएं",
+                    "newWork": "नई डायरेक्टरी बनाएं",
                     "help": "सहायता खोलें",
                     "hint": "Mac पर Cmd या Windows/Linux पर Ctrl का उपयोग करें"
                 },
@@ -521,7 +521,7 @@
             "columns": {
                 "status": "स्थिति",
                 "dateTime": "तारीख / समय",
-                "directory": "डायरेक्टरी",
+                "work": "डायरेक्टरी",
                 "type": "प्रकार",
                 "summary": "सारांश"
             },
@@ -532,9 +532,9 @@
                     "generation": "जनरेशन",
                     "comparison": "तुलना",
                     "deployment": "तैनाती",
-                    "directoryCreated": "डायरेक्टरी बनाई गई",
-                    "directoryUpdated": "डायरेक्टरी अपडेट की गई",
-                    "directoryDeleted": "डायरेक्टरी हटाई गई",
+                    "workCreated": "डायरेक्टरी बनाई गई",
+                    "workUpdated": "डायरेक्टरी अपडेट की गई",
+                    "workDeleted": "डायरेक्टरी हटाई गई",
                     "pluginEnabled": "प्लगइन सक्षम किया गया",
                     "pluginDisabled": "प्लगइन अक्षम किया गया",
                     "pluginConfigured": "प्लगइन कॉन्फ़िगर किया गया",
@@ -596,11 +596,11 @@
                 "pageOf": "पृष्ठ {page} का {total} में"
             }
         },
-        "directories": {
+        "works": {
             "title": "डायरेक्टरीज़",
             "subtitle": "अपनी AI-संचालित डायरेक्टरी प्रबंधित और व्यवस्थित करें",
             "summary": {
-                "totalDirectories": "कुल डायरेक्टरीज़",
+                "totalWorks": "कुल डायरेक्टरीज़",
                 "generating": "जनरेट हो रही",
                 "totalItems": "कुल आइटम"
             },
@@ -658,13 +658,13 @@
                     "invalidJson": "अमान्य JSON फ़ाइल",
                     "previewError": "आयात फ़ाइल का विश्लेषण करने में विफल",
                     "summary": "आयात सारांश",
-                    "directories": "निर्देशिकाएँ",
+                    "works": "निर्देशिकाएँ",
                     "items": "आइटम",
                     "userPlugins": "उपयोगकर्ता प्लगइन",
                     "version": "फ़ॉर्मेट संस्करण",
                     "missingPlugins": "ये प्लगइन स्थापित नहीं हैं और उन्हें छोड़ दिया जाएगा",
                     "conflicts": "स्लग संघर्ष",
-                    "existingDirectory": "मौजूदा",
+                    "existingWork": "मौजूदा",
                     "incoming": "आगामी",
                     "strategySkip": "छोड़ दें (मौजूदा रखें)",
                     "strategyOverwrite": "मौजूदा को ओवरराइट करें",
@@ -681,9 +681,9 @@
                     "validationErrors": "सत्यापन त्रुटियाँ",
                     "resultSuccess": "आयात सफलतापूर्वक पूरा हुआ",
                     "resultFailed": "आयात विफल",
-                    "directoriesCreated": "निर्देशिकाएँ बनाई गईं",
-                    "directoriesUpdated": "निर्देशिकाएँ अपडेट की गईं",
-                    "directoriesSkipped": "निर्देशिकाएँ छोड़ दी गईं",
+                    "worksCreated": "निर्देशिकाएँ बनाई गईं",
+                    "worksUpdated": "निर्देशिकाएँ अपडेट की गईं",
+                    "worksSkipped": "निर्देशिकाएँ छोड़ दी गईं",
                     "pluginsImported": "प्लगइन आयात किए गए",
                     "warnings": "चेतावनियाँ",
                     "errors": "त्रुटियाँ"
@@ -881,12 +881,12 @@
             }
         },
         "stats": {
-            "totalDirectories": "कुल निर्देशिकाएँ",
+            "totalWorks": "कुल निर्देशिकाएँ",
             "totalItems": "कुल आइटम",
             "activeWebsites": "सक्रिय वेबसाइटें",
             "fromLastMonth": "पिछले महीने से"
         },
-        "directoryCard": {
+        "workCard": {
             "status": {
                 "active": "सक्रिय",
                 "notStarted": "शुरू नहीं हुआ",
@@ -914,11 +914,11 @@
             "openingTitle": "निर्देशिका खोल रहे हैं",
             "openingMessage": "आपकी निर्देशिका तैयार हो रही है। विवरण जल्द ही खुलेंगे। इस पृष्ठ पर रहें।"
         },
-        "directoryList": {
+        "workList": {
             "title": "आपकी निर्देशिकाएँ",
             "createButton": "निर्देशिका बनाएँ"
         },
-        "directoryDetail": {
+        "workDetail": {
             "failedToGenerateItems": "आइटम उत्पन्न करने में विफल। कृपया पुनः प्रयास करें।",
             "generationCompleted": "उत्पत्ति सफलतापूर्वक पूर्ण हुई",
             "generationCancelled": "उत्पत्ति रद्द कर दी गई",
@@ -1358,7 +1358,7 @@
                 "title": "हाल की गतिविधि",
                 "noActivity": "अभी तक कोई गतिविधि नहीं",
                 "created": "निर्देशिका बनाई गई",
-                "directoryCreated": "निर्देशिका सफलतापूर्वक बनाई गई",
+                "workCreated": "निर्देशिका सफलतापूर्वक बनाई गई",
                 "justNow": "अभी"
             },
             "items": {
@@ -1663,7 +1663,7 @@
                 "loadingFormSchema": "फ़ॉर्म कॉन्फ़िगरेशन लोड हो रहा है...",
                 "failedToLoadFormSchema": "फ़ॉर्म कॉन्फ़िगरेशन लोड करने में विफल",
                 "selectOption": "एक विकल्प चुनें",
-                "directoryName": "निर्देशिका का नाम",
+                "workName": "निर्देशिका का नाम",
                 "generationPrompt": "उत्पादन प्रॉम्प्ट",
                 "modelOverride": "एआई मॉडल ओवरराइड",
                 "modelOverridePlaceholder": "जैसे openai/gpt-4.1 या openrouter/openai/gpt-4.1",
@@ -1676,7 +1676,7 @@
                 "startGeneration": "उत्पादन शुरू करें",
                 "regenerateItems": "आइटम पुनःउत्पन्न करें",
                 "updateItems": "उत्पादन चलाएँ",
-                "recreateDirectory": "निर्देशिका पुनःबनाएँ",
+                "recreateWork": "निर्देशिका पुनःबनाएँ",
                 "showAdvancedOptions": "उन्नत विकल्प दिखाएँ",
                 "hideAdvancedOptions": "उन्नत विकल्प छिपाएँ",
                 "cancel": "रद्द करें",
@@ -1714,7 +1714,7 @@
                 "websiteRepositoryCreationMethod": "वेबसाइट रीपॉजिटरी निर्माण विधि",
                 "methodDuplicate": "डुप्लिकेट करें",
                 "methodFork": "फ़ोर्क करें",
-                "directoryNamePlaceholder": "निर्देशिका का नाम दर्ज करें",
+                "workNamePlaceholder": "निर्देशिका का नाम दर्ज करें",
                 "methodCreateFromTemplate": "टेम्पलेट से बनाएँ",
                 "aiProcessingConfiguration": "AI प्रसंस्करण कॉन्फ़िगरेशन",
                 "maxSearchQueries": "अधिकतम खोज क्वेरी",
@@ -1769,7 +1769,7 @@
                 "aiProviderDescription": "कंटेंट उत्पादन और निकासी के लिए AI मॉडल प्रदाता",
                 "contentExtractorProvider": "कंटेंट एक्सट्रैक्टर",
                 "contentExtractorProviderDescription": "वेब पृष्ठों से कंटेंट निकालने के लिए प्रदाता",
-                "useDirectoryDefault": "निर्देशिका डिफ़ॉल्ट का उपयोग करें",
+                "useWorkDefault": "निर्देशिका डिफ़ॉल्ट का उपयोग करें",
                 "default": "डिफ़ॉल्ट",
                 "notConfigured": "कॉन्फ़िगर नहीं किया गया",
                 "notConfiguredTooltip": "इस प्रदाता को कॉन्फ़िगरेशन की आवश्यकता है। इसे सेटअप करने के लिए Settings → Plugins पर जाएँ।",
@@ -1837,7 +1837,7 @@
                 },
                 "generalSettings": "सामान्य सेटिंग्स",
                 "generalTitle": "सामान्य सेटिंग्स",
-                "directoryName": "डायरेक्टरी का नाम",
+                "workName": "डायरेक्टरी का नाम",
                 "description": "विवरण",
                 "organizationRepository": "संगठन रिपॉजिटरी",
                 "organizationHelp": "अपने व्यक्तिगत खाते के बजाय संगठन के तहत रिपॉजिटरी बनाएं",
@@ -1865,8 +1865,8 @@
                 "deleteWebsiteRepositoryDescription": "डिप्लॉय की गई वेबसाइट रिपॉजिटरी हटाएं",
                 "deleteConfirm": "क्या आप बिल्कुल सुनिश्चित हैं?",
                 "deleteConfirmDetail": "यह क्रिया पूर्ववत नहीं की जा सकती। डायरेक्टरी और चयनित रिपॉजिटरी स्थायी रूप से हटा दी जाएंगी।",
-                "confirmDirectoryName": "पुष्टि के लिए डायरेक्टरी का नाम टाइप करें",
-                "confirmDirectoryNameDescription": "हटाने की पुष्टि के लिए \"{name}\" टाइप करें",
+                "confirmWorkName": "पुष्टि के लिए डायरेक्टरी का नाम टाइप करें",
+                "confirmWorkNameDescription": "हटाने की पुष्टि के लिए \"{name}\" टाइप करें",
                 "deleteNameMismatch": "डायरेक्टरी का नाम मेल नहीं खाता",
                 "deleteButton": "डायरेक्टरी हटाएं",
                 "deleteConfirmButton": "हाँ, हटाएं",
@@ -2208,7 +2208,7 @@
                 }
             }
         },
-        "directoryCreation": {
+        "workCreation": {
             "title": "नई निर्देशिका बनाएँ",
             "subtitle": "अपनी निर्देशिका बनाने का तरीका चुनें",
             "backToOptions": "विकल्पों पर वापस",
@@ -2240,9 +2240,9 @@
                 "getStarted": "शुरू करें",
                 "formTitle": "एआई के साथ निर्देशिका बनाएँ",
                 "formSubtitle": "अपने निर्देशिका विचार का वर्णन करें और एआई को सेटअप तथा प्रारंभिक सामग्री उत्पन्न करने दें",
-                "directoryNameLabel": "निर्देशिका का नाम",
-                "directoryNamePlaceholder": "उदाहरण: अद्भुत एआई उपकरण",
-                "directoryNameHelp": "यदि आप इसे खाली छोड़ देते हैं तो एआई एक नाम सुझाएगा",
+                "workNameLabel": "निर्देशिका का नाम",
+                "workNamePlaceholder": "उदाहरण: अद्भुत एआई उपकरण",
+                "workNameHelp": "यदि आप इसे खाली छोड़ देते हैं तो एआई एक नाम सुझाएगा",
                 "promptLabel": "अपनी निर्देशिका का वर्णन करें",
                 "githubRequired": "कृपया पहले अपना GitHub खाता जोड़ें।",
                 "promptPlaceholder": "वर्णन करें कि आप किस प्रकार की निर्देशिका बनाना चाहते हैं, इसमें क्या आइटम होने चाहिए, और कोई विशिष्ट आवश्यकताएँ...",
@@ -2604,7 +2604,7 @@
             "subtitle": "महत्वपूर्ण अपडेट के बारे में सूचित होने का तरीका चुनें",
             "email": {
                 "title": "ईमेल सूचनाएँ",
-                "directoryUpdates": {
+                "workUpdates": {
                     "label": "डायरेक्टरी अपडेट",
                     "description": "अपनी डायरेक्टरी के महत्वपूर्ण अपडेट के बारे में सूचित प्राप्त करें"
                 },
@@ -2653,12 +2653,12 @@
         "sidebar": {
             "menu": "मेनू",
             "aiChat": "एआई चैट",
-            "newDirectory": "नई डायरेक्टरी",
+            "newWork": "नई डायरेक्टरी",
             "activityIndicator": "डायरेक्टरी जेनरेट हो रही है",
             "navigation": {
                 "dashboard": "डैशबोर्ड",
                 "activity": "गतिविधि",
-                "directories": "डायरेक्टरीज़",
+                "works": "डायरेक्टरीज़",
                 "plugins": "प्लगइन्स",
                 "settings": "सेटिंग्स"
             },
@@ -2716,8 +2716,8 @@
             "welcomeSubtitle": "आपका एआई-संचालित सहायक। डायरेक्टरी बनाने, सामग्री उत्पन्न करने या अपने डेटा को व्यवस्थित करने के बारे में कुछ भी पूछें।",
             "welcomeMessage": "नमस्ते! मैं प्राकृतिक भाषा का उपयोग करके डायरेक्टरी बनाने में आपकी सहायता कर सकता हूँ। कुछ ऐसा पूछें जैसे \"AI टूल्स के लिए एक डायरेक्टरी बनाएँ\" या बताएँ कि आपको क्या चाहिए।",
             "capabilities": {
-                "directoryCreation": "डायरेक्टरी निर्माण",
-                "directoryCreationDesc": "प्राकृतिक भाषा विवरणों से डायरेक्टरी बनाएँ",
+                "workCreation": "डायरेक्टरी निर्माण",
+                "workCreationDesc": "प्राकृतिक भाषा विवरणों से डायरेक्टरी बनाएँ",
                 "webResearch": "वेब अनुसंधान",
                 "webResearchDesc": "वेब भर से डेटा खोजें और एकत्र करें",
                 "contentGeneration": "सामग्री उत्पन्न करना",
@@ -2814,8 +2814,8 @@
             "disableWarning": "इस प्लगइन को अक्षम करने से यह सभी आपकी डायरेक्टरीज़ में भी अक्षम हो जाएगा",
             "cannotDisableSystem": "सिस्टम प्लगइन्स को अक्षम नहीं किया जा सकता",
             "disableFailed": "प्लगइन अक्षम करने में विफल",
-            "autoEnableForDirectories": "सभी डायरेक्टरीज़ के लिए भी सक्षम करें",
-            "autoEnableForDirectoriesDescription": "यह प्लगइन सभी आपकी डायरेक्टरीज़ में स्वचालित रूप से सक्रिय रहेगा। आप इसे प्रति डायरेक्टरी अक्षम कर सकते हैं।",
+            "autoEnableForWorks": "सभी डायरेक्टरीज़ के लिए भी सक्षम करें",
+            "autoEnableForWorksDescription": "यह प्लगइन सभी आपकी डायरेक्टरीज़ में स्वचालित रूप से सक्रिय रहेगा। आप इसे प्रति डायरेक्टरी अक्षम कर सकते हैं।",
             "confirmDisable": "अक्षम करने की पुष्टि करें",
             "cancel": "रद्द करें",
             "missingRequiredFields": "अनुपस्थित आवश्यक फ़ील्ड्स: {fields}",
@@ -2890,20 +2890,20 @@
                 "removeLabel": "{login} हटाएँ"
             }
         },
-        "directoryPlugins": {
+        "workPlugins": {
             "title": "डायरेक्टरी प्लगइन्स",
             "subtitle": "इस डायरेक्टरी के लिए प्लगइन्स कॉन्फ़िगर करें",
             "active": "सक्रिय",
             "enable": "सक्षम करें",
             "disable": "अक्षम करें",
-            "enableForDirectory": "इस डायरेक्टरी के लिए सक्षम करें",
-            "disableForDirectory": "इस डायरेक्टरी के लिए अक्षम करें",
+            "enableForWork": "इस डायरेक्टरी के लिए सक्षम करें",
+            "disableForWork": "इस डायरेक्टरी के लिए अक्षम करें",
             "enableAtUserLevelFirst": "पहले अपनी सेटिंग्स में इस प्लगइन को सक्षम करें",
             "disabledByUser": "उपयोगकर्ता स्तर पर अक्षम",
             "systemAlwaysEnabled": "सिस्टम प्लगइन - हमेशा सक्षम",
             "showSettings": "सेटिंग्स दिखाएँ",
             "hideSettings": "सेटिंग्स छिपाएँ",
-            "directorySettingsInfo": "यहाँ डायरेक्टरी-विशिष्ट सेटिंग्स कॉन्फ़िगर करें",
+            "workSettingsInfo": "यहाँ डायरेक्टरी-विशिष्ट सेटिंग्स कॉन्फ़िगर करें",
             "save": "सहेजें",
             "saved": "सहेजा गया",
             "showInstalledOnly": "केवल स्थापित दिखाएँ",
@@ -3012,9 +3012,9 @@
             "authError": "प्रमाणीकरण त्रुटि",
             "dashboard": "डैशबोर्ड",
             "activity": "गतिविधि लॉग",
-            "directories": "डायरेक्टरीज़",
-            "newDirectory": "नई डायरेक्टरी",
-            "directory": "डायरेक्टरी",
+            "works": "डायरेक्टरीज़",
+            "newWork": "नई डायरेक्टरी",
+            "work": "डायरेक्टरी",
             "overview": "अवलोकन",
             "items": "आइटम्स",
             "generator": "जनरेटर",
@@ -3048,7 +3048,7 @@
         }
     },
     "actions": {
-        "directories": {
+        "works": {
             "slug": {
                 "required": "स्लग आवश्यक है",
                 "format": "स्लग केवल लोअरकेस अक्षर, संख्याएँ और हाइफन हो सकते हैं"

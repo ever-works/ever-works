@@ -20,7 +20,7 @@ interface SettingsFormProps {
 }
 
 export function SettingsForm({ directory, user, initialRepositories }: SettingsFormProps) {
-    const t = useTranslations('dashboard.directoryDetail.settings');
+    const t = useTranslations('dashboard.workDetail.settings');
 
     return (
         <SettingsProvider directory={directory} user={user}>

@@ -16,7 +16,7 @@ export function SlugConflictWarning({
     suggestedSlug,
     onAcceptSuggestion,
 }: SlugConflictWarningProps) {
-    const t = useTranslations('dashboard.directoryCreation.import.slugConflict');
+    const t = useTranslations('dashboard.workCreation.import.slugConflict');
 
     const suggestedName = suggestedSlug.replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
 

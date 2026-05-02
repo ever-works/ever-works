@@ -34,7 +34,7 @@ export function DirectoryManualForm({
 }: DirectoryManualFormProps) {
     const [isPending, startTransition] = useTransition();
     const router = useRouter();
-    const t = useTranslations('dashboard.directoryCreation.manual');
+    const t = useTranslations('dashboard.workCreation.manual');
 
     // Form state - gitProvider is determined automatically by backend
     const [formData, setFormData] = useState<CreateDirectoryDto>({

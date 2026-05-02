@@ -53,8 +53,8 @@ export const AddItemForm = memo(function AddItemForm({
     setUpdateWithPR,
     isPending,
 }: AddItemFormProps) {
-    const t = useTranslations('dashboard.directoryDetail.items.addModal');
-    const itemsT = useTranslations('dashboard.directoryDetail.items');
+    const t = useTranslations('dashboard.workDetail.items.addModal');
+    const itemsT = useTranslations('dashboard.workDetail.items');
     const { directoryId, screenshotProviders, activeScreenshotProvider } = useItemsContext();
     const [isExtracting, setIsExtracting] = useState(false);
     const [isCapturingScreenshot, setIsCapturingScreenshot] = useState(false);
@@ -439,7 +439,7 @@ const TagsField = memo(function TagsField({
     onRemoveTag,
     isPending,
 }: TagsFieldProps) {
-    const t = useTranslations('dashboard.directoryDetail.items.addModal');
+    const t = useTranslations('dashboard.workDetail.items.addModal');
 
     return (
         <div className="space-y-2">
@@ -519,7 +519,7 @@ const ImagesField = memo(function ImagesField({
     sourceUrl,
     isPending,
 }: ImagesFieldProps) {
-    const t = useTranslations('dashboard.directoryDetail.items.addModal');
+    const t = useTranslations('dashboard.workDetail.items.addModal');
     const { screenshotProviders } = useItemsContext();
 
     const isValidHttpUrl = (value: string) => {

@@ -32,7 +32,7 @@ export function ImportSourceStep({
     gitProvider,
     isPending,
 }: ImportSourceStepProps) {
-    const t = useTranslations('dashboard.directoryCreation.import');
+    const t = useTranslations('dashboard.workCreation.import');
 
     return (
         <div className="space-y-6">

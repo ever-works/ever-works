@@ -44,7 +44,7 @@ export function ItemsPageClient({
     collections: initialCollections = [],
     sourceValidationSettings,
 }: ItemsPageClientProps) {
-    const t = useTranslations('dashboard.directoryDetail.items');
+    const t = useTranslations('dashboard.workDetail.items');
     const permissions = useDirectoryPermissions();
     const { directory } = useDirectoryDetail();
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);

@@ -5,7 +5,7 @@ import { useDirectoryDetail } from '../DirectoryDetailContext';
 
 export function DirectoryScheduleHeader() {
     const { directory } = useDirectoryDetail();
-    const pageT = useTranslations('dashboard.directoryDetail.schedule.page');
+    const pageT = useTranslations('dashboard.workDetail.schedule.page');
 
     return (
         <header className="rounded-xl border border-card-border dark:border-border-secondary-dark bg-card dark:bg-card-primary-dark/10 p-6 space-y-2">

@@ -45,7 +45,7 @@ export function DeployForm({
     providerName,
     websiteTemplates = [],
 }: DeployFormProps) {
-    const t = useTranslations('dashboard.directoryDetail.deploy');
+    const t = useTranslations('dashboard.workDetail.deploy');
     const [isPending, startTransition] = useTransition();
     const router = useRouter();
     const [isConfigDialogOpen, setIsConfigDialogOpen] = useState(false);
@@ -269,7 +269,7 @@ export function DeployForm({
 }
 
 function UpdateWebsiteRepository({ directory }: DeployFormProps) {
-    const t = useTranslations('dashboard.directoryDetail.deploy');
+    const t = useTranslations('dashboard.workDetail.deploy');
     const { repoLinks } = useDirectoryDetail();
     const [isPending, startTransition] = useTransition();
     const router = useRouter();
@@ -338,7 +338,7 @@ function WebsiteTemplateSettings({
     directory,
     websiteTemplates = [],
 }: Pick<DeployFormProps, 'directory' | 'websiteTemplates'>) {
-    const t = useTranslations('dashboard.directoryDetail.deploy');
+    const t = useTranslations('dashboard.workDetail.deploy');
     const [isPending, startTransition] = useTransition();
     const router = useRouter();
     const [autoUpdate, setAutoUpdate] = useState(directory.websiteTemplateAutoUpdate ?? false);

@@ -219,7 +219,7 @@
                     "description": "Всяка директория е GitHub хранилище, което притежавате и контролирате."
                 }
             },
-            "directory": {
+            "work": {
                 "title": "Създайте първата си директория",
                 "description": "Директорията е вашият център за съдържание. Добавяйте елементи, конфигурирайте оформлението и я публикувайте с един клик.",
                 "detail": "Всичко е готово! Създайте първата си директория, за да започнете да създавате и публикувате съдържание.",
@@ -497,7 +497,7 @@
                 "shortcuts": {
                     "title": "Клавишни комбинации",
                     "search": "Търси директории",
-                    "newDirectory": "Създай нова директория",
+                    "newWork": "Създай нова директория",
                     "help": "Отвори помощ",
                     "hint": "Използвайте Cmd на Mac или Ctrl на Windows/Linux"
                 },
@@ -521,7 +521,7 @@
             "columns": {
                 "status": "Статус",
                 "dateTime": "Дата / Час",
-                "directory": "Директория",
+                "work": "Директория",
                 "type": "Тип",
                 "summary": "Резюме"
             },
@@ -532,9 +532,9 @@
                     "generation": "Генериране",
                     "comparison": "Сравнение",
                     "deployment": "Деплой",
-                    "directoryCreated": "Директория създадена",
-                    "directoryUpdated": "Директория актуализирана",
-                    "directoryDeleted": "Директория изтрита",
+                    "workCreated": "Директория създадена",
+                    "workUpdated": "Директория актуализирана",
+                    "workDeleted": "Директория изтрита",
                     "pluginEnabled": "Плагин активиран",
                     "pluginDisabled": "Плагин деактивиран",
                     "pluginConfigured": "Плагин конфигуриран",
@@ -596,11 +596,11 @@
                 "pageOf": "Страница {page} от {total}"
             }
         },
-        "directories": {
+        "works": {
             "title": "Директории",
             "subtitle": "Управлявайте и организирайте AI-директориите си",
             "summary": {
-                "totalDirectories": "Общо директории",
+                "totalWorks": "Общо директории",
                 "generating": "Генериране",
                 "totalItems": "Общо елементи"
             },
@@ -658,13 +658,13 @@
                     "invalidJson": "Невалиден JSON файл",
                     "previewError": "Грешка при анализ на импорт файла",
                     "summary": "Резюме на импорта",
-                    "directories": "Директории",
+                    "works": "Директории",
                     "items": "Елементи",
                     "userPlugins": "Потребителски плъгини",
                     "version": "Версия на формата",
                     "missingPlugins": "Тези плъгини не са инсталирани и ще бъдат прескочени",
                     "conflicts": "Конфликти на слъгове",
-                    "existingDirectory": "Съществуваща",
+                    "existingWork": "Съществуваща",
                     "incoming": "Входяща",
                     "strategySkip": "Прескочи (запази съществуващата)",
                     "strategyOverwrite": "Презапиши съществуващата",
@@ -681,9 +681,9 @@
                     "validationErrors": "Грешки при валидация",
                     "resultSuccess": "Импортът завърши успешно",
                     "resultFailed": "Импортът се провали",
-                    "directoriesCreated": "Създадени директории",
-                    "directoriesUpdated": "Актуализирани директории",
-                    "directoriesSkipped": "Прескочени директории",
+                    "worksCreated": "Създадени директории",
+                    "worksUpdated": "Актуализирани директории",
+                    "worksSkipped": "Прескочени директории",
                     "pluginsImported": "Импортирани плъгини",
                     "warnings": "Предупреждения",
                     "errors": "Грешки"
@@ -881,12 +881,12 @@
             }
         },
         "stats": {
-            "totalDirectories": "Общо директории",
+            "totalWorks": "Общо директории",
             "totalItems": "Общо елементи",
             "activeWebsites": "Активни уебсайтове",
             "fromLastMonth": "от миналия месец"
         },
-        "directoryCard": {
+        "workCard": {
             "status": {
                 "active": "Активна",
                 "notStarted": "Не започната",
@@ -914,11 +914,11 @@
             "openingTitle": "Отваряне на директория",
             "openingMessage": "Подготвяме вашата директория. Детайлите ще се отворят скоро. Останете на тази страница."
         },
-        "directoryList": {
+        "workList": {
             "title": "Вашите директории",
             "createButton": "Създай директория"
         },
-        "directoryDetail": {
+        "workDetail": {
             "failedToGenerateItems": "Неуспешно генериране на елементи. Моля, опитайте отново.",
             "generationCompleted": "Генерирането завърши успешно",
             "generationCancelled": "Генерирането беше отменено",
@@ -1358,7 +1358,7 @@
                 "title": "Последна активност",
                 "noActivity": "Още няма активност",
                 "created": "Директория създадена",
-                "directoryCreated": "Директорията беше създадена успешно",
+                "workCreated": "Директорията беше създадена успешно",
                 "justNow": "Преди миг"
             },
             "items": {
@@ -1663,7 +1663,7 @@
                 "loadingFormSchema": "Зареждане на конфигурацията на формата...",
                 "failedToLoadFormSchema": "Неуспешно зареждане на конфигурацията на формата",
                 "selectOption": "Изберете опция",
-                "directoryName": "Име на директорията",
+                "workName": "Име на директорията",
                 "generationPrompt": "Подсказка за генериране",
                 "modelOverride": "Презаписване на AI модел",
                 "modelOverridePlaceholder": "нпр. openai/gpt-4.1 или openrouter/openai/gpt-4.1",
@@ -1676,7 +1676,7 @@
                 "startGeneration": "Започни генериране",
                 "regenerateItems": "Регенерирай елементи",
                 "updateItems": "Изпълни генериране",
-                "recreateDirectory": "Създай отново директорията",
+                "recreateWork": "Създай отново директорията",
                 "showAdvancedOptions": "Покажи разширените опции",
                 "hideAdvancedOptions": "Скрий разширените опции",
                 "cancel": "Откажи",
@@ -1714,7 +1714,7 @@
                 "websiteRepositoryCreationMethod": "Метод за създаване на репозиторията за уебсайт",
                 "methodDuplicate": "Дублирай",
                 "methodFork": "Разклоняване",
-                "directoryNamePlaceholder": "Въведете име на директорията",
+                "workNamePlaceholder": "Въведете име на директорията",
                 "methodCreateFromTemplate": "Създай от шаблон",
                 "aiProcessingConfiguration": "Конфигурация на AI обработката",
                 "maxSearchQueries": "Макс. брой търсения",
@@ -1769,7 +1769,7 @@
                 "aiProviderDescription": "Доставчик на AI модели за генериране и извличане на съдържание",
                 "contentExtractorProvider": "Извличане на съдържание",
                 "contentExtractorProviderDescription": "Доставчик за извличане на съдържание от уеб страници",
-                "useDirectoryDefault": "Използвай по подразбиране на директорията",
+                "useWorkDefault": "Използвай по подразбиране на директорията",
                 "default": "По подразбиране",
                 "notConfigured": "Не конфигурирано",
                 "notConfiguredTooltip": "Този доставчик изисква конфигурация. Отидете в Настройки → Добавки, за да го настроите.",
@@ -1837,7 +1837,7 @@
                 },
                 "generalSettings": "Общи настройки",
                 "generalTitle": "Общи настройки",
-                "directoryName": "Име на директория",
+                "workName": "Име на директория",
                 "description": "Описание",
                 "organizationRepository": "Репозиторий на организация",
                 "organizationHelp": "Създавай репозитории под организация вместо в личния си акаунт",
@@ -1865,8 +1865,8 @@
                 "deleteWebsiteRepositoryDescription": "Премахни репозитория с развернат уебсайт",
                 "deleteConfirm": "Наистина ли сте сигурни?",
                 "deleteConfirmDetail": "Това действие не може да бъде отменено. Директорията и избраните репозитории ще бъдат трайно изтрити.",
-                "confirmDirectoryName": "Въведете името на директорията за потвърждение",
-                "confirmDirectoryNameDescription": "Въведете \"{name}\" за потвърждение на изтриването",
+                "confirmWorkName": "Въведете името на директорията за потвърждение",
+                "confirmWorkNameDescription": "Въведете \"{name}\" за потвърждение на изтриването",
                 "deleteNameMismatch": "Името на директорията не съвпада",
                 "deleteButton": "Изтрий директория",
                 "deleteConfirmButton": "Да, изтрий",
@@ -2208,7 +2208,7 @@
                 }
             }
         },
-        "directoryCreation": {
+        "workCreation": {
             "title": "Създаване на нов директорий",
             "subtitle": "Изберете как искате да създадете директорията си",
             "backToOptions": "Назад към опциите",
@@ -2240,9 +2240,9 @@
                 "getStarted": "Започни",
                 "formTitle": "Създай директория с AI",
                 "formSubtitle": "Опишете идеята си за директория и нека AI се погрижи за настройката и генерирането на начално съдържание",
-                "directoryNameLabel": "Име на директория",
-                "directoryNamePlaceholder": "нпр. Awesome AI Tools",
-                "directoryNameHelp": "AI ще предложи име, ако оставите това празно",
+                "workNameLabel": "Име на директория",
+                "workNamePlaceholder": "нпр. Awesome AI Tools",
+                "workNameHelp": "AI ще предложи име, ако оставите това празно",
                 "promptLabel": "Опишете директорията си",
                 "githubRequired": "Моля, свържете първо вашата GitHub сметка.",
                 "promptPlaceholder": "Опишете каква директория искате да създадете, какви елементи трябва да съдържа и всякакви специфични изисквания...",
@@ -2604,7 +2604,7 @@
             "subtitle": "Изберете как искате да бъдете уведомявани за важни актуализации",
             "email": {
                 "title": "Email известия",
-                "directoryUpdates": {
+                "workUpdates": {
                     "label": "Актуализации на директории",
                     "description": "Получавайте известия за важни актуализации на директориите ви"
                 },
@@ -2653,12 +2653,12 @@
         "sidebar": {
             "menu": "Меню",
             "aiChat": "AI чат",
-            "newDirectory": "Нова директория",
+            "newWork": "Нова директория",
             "activityIndicator": "Генериране на директория",
             "navigation": {
                 "dashboard": "Табло",
                 "activity": "Активност",
-                "directories": "Директории",
+                "works": "Директории",
                 "plugins": "Добавки",
                 "settings": "Настройки"
             },
@@ -2716,8 +2716,8 @@
             "welcomeSubtitle": "Вашият AI асистент. Попитайте ме за нещо свързано със създаване на директории, генериране на съдържание или организиране на данните ви.",
             "welcomeMessage": "Здравей! Мога да ви помогна да създавате директории с естествен език. Попитайте нещо като „Създай директория за AI инструменти“ или опишете какво ви трябва.",
             "capabilities": {
-                "directoryCreation": "Създаване на директории",
-                "directoryCreationDesc": "Създавайте директории от естествени езикови описания",
+                "workCreation": "Създаване на директории",
+                "workCreationDesc": "Създавайте директории от естествени езикови описания",
                 "webResearch": "Уеб изследвания",
                 "webResearchDesc": "Търсене и събиране на данни от цялата мрежа",
                 "contentGeneration": "Генериране на съдържание",
@@ -2814,8 +2814,8 @@
             "disableWarning": "Изключването на този плъгин ще го изключи и във всички ваши директории",
             "cannotDisableSystem": "Системните плъгини не могат да бъдат изключени",
             "disableFailed": "Грешка при изключване на плъгина",
-            "autoEnableForDirectories": "Също така включи за всички директории",
-            "autoEnableForDirectoriesDescription": "Този плъгин ще бъде автоматично активен във всички ваши директории. Все още можете да го изключите на ниво директория.",
+            "autoEnableForWorks": "Също така включи за всички директории",
+            "autoEnableForWorksDescription": "Този плъгин ще бъде автоматично активен във всички ваши директории. Все още можете да го изключите на ниво директория.",
             "confirmDisable": "Потвърди изключване",
             "cancel": "Откажи",
             "missingRequiredFields": "Липсват задължителни полета: {fields}",
@@ -2890,20 +2890,20 @@
                 "removeLabel": "Премахни {login}"
             }
         },
-        "directoryPlugins": {
+        "workPlugins": {
             "title": "Плъгини на директория",
             "subtitle": "Настройте плъгини за тази директория",
             "active": "Активен",
             "enable": "Включи",
             "disable": "Изключи",
-            "enableForDirectory": "Включи за тази директория",
-            "disableForDirectory": "Изключи за тази директория",
+            "enableForWork": "Включи за тази директория",
+            "disableForWork": "Изключи за тази директория",
             "enableAtUserLevelFirst": "Първо включете този плъгин в настройките си",
             "disabledByUser": "Изключен на ниво потребител",
             "systemAlwaysEnabled": "Системен плъгин - винаги включен",
             "showSettings": "Покажи настройки",
             "hideSettings": "Скрий настройки",
-            "directorySettingsInfo": "Настройте настройки специфични за директорията тук",
+            "workSettingsInfo": "Настройте настройки специфични за директорията тук",
             "save": "Запази",
             "saved": "Запазено",
             "showInstalledOnly": "Покажи само инсталирани",
@@ -3012,9 +3012,9 @@
             "authError": "Грешка при автентикация",
             "dashboard": "Табло",
             "activity": "Журнал на дейността",
-            "directories": "Директории",
-            "newDirectory": "Нова директория",
-            "directory": "Директория",
+            "works": "Директории",
+            "newWork": "Нова директория",
+            "work": "Директория",
             "overview": "Преглед",
             "items": "Елементи",
             "generator": "Генератор",
@@ -3048,7 +3048,7 @@
         }
     },
     "actions": {
-        "directories": {
+        "works": {
             "slug": {
                 "required": "Slug е задължителен",
                 "format": "Slug трябва да съдържа само малки букви, цифри и тирета"

@@ -219,7 +219,7 @@
                     "description": "每个目录都是您拥有和控制的 GitHub 仓库。"
                 }
             },
-            "directory": {
+            "work": {
                 "title": "创建您的第一个目录",
                 "description": "目录是您的内容中心。添加项目、配置布局，并一键发布。",
                 "detail": "您已准备就绪！创建您的第一个目录，开始构建和发布内容。",
@@ -497,7 +497,7 @@
                 "shortcuts": {
                     "title": "键盘快捷键",
                     "search": "搜索目录",
-                    "newDirectory": "创建新目录",
+                    "newWork": "创建新目录",
                     "help": "打开帮助",
                     "hint": "在 Mac 上使用 Cmd，在 Windows/Linux 上使用 Ctrl"
                 },
@@ -521,7 +521,7 @@
             "columns": {
                 "status": "状态",
                 "dateTime": "日期 / 时间",
-                "directory": "目录",
+                "work": "目录",
                 "type": "类型",
                 "summary": "摘要"
             },
@@ -532,9 +532,9 @@
                     "generation": "生成",
                     "comparison": "比较",
                     "deployment": "部署",
-                    "directoryCreated": "目录已创建",
-                    "directoryUpdated": "目录已更新",
-                    "directoryDeleted": "目录已删除",
+                    "workCreated": "目录已创建",
+                    "workUpdated": "目录已更新",
+                    "workDeleted": "目录已删除",
                     "pluginEnabled": "插件已启用",
                     "pluginDisabled": "插件已禁用",
                     "pluginConfigured": "插件已配置",
@@ -596,11 +596,11 @@
                 "pageOf": "第 {page} 页，共 {total} 页"
             }
         },
-        "directories": {
+        "works": {
             "title": "目录",
             "subtitle": "管理和组织您的 AI 驱动目录",
             "summary": {
-                "totalDirectories": "目录总数",
+                "totalWorks": "目录总数",
                 "generating": "正在生成",
                 "totalItems": "项目总数"
             },
@@ -658,13 +658,13 @@
                     "invalidJson": "无效的 JSON 文件",
                     "previewError": "分析导入文件失败",
                     "summary": "导入摘要",
-                    "directories": "目录",
+                    "works": "目录",
                     "items": "项目",
                     "userPlugins": "用户插件",
                     "version": "格式版本",
                     "missingPlugins": "这些插件未安装，将被跳过",
                     "conflicts": "Slug 冲突",
-                    "existingDirectory": "现有",
+                    "existingWork": "现有",
                     "incoming": "传入",
                     "strategySkip": "跳过（保留现有）",
                     "strategyOverwrite": "覆盖现有",
@@ -681,9 +681,9 @@
                     "validationErrors": "验证错误",
                     "resultSuccess": "导入成功完成",
                     "resultFailed": "导入失败",
-                    "directoriesCreated": "目录已创建",
-                    "directoriesUpdated": "目录已更新",
-                    "directoriesSkipped": "目录已跳过",
+                    "worksCreated": "目录已创建",
+                    "worksUpdated": "目录已更新",
+                    "worksSkipped": "目录已跳过",
                     "pluginsImported": "插件已导入",
                     "warnings": "警告",
                     "errors": "错误"
@@ -881,12 +881,12 @@
             }
         },
         "stats": {
-            "totalDirectories": "总目录数",
+            "totalWorks": "总目录数",
             "totalItems": "总项目数",
             "activeWebsites": "活动网站",
             "fromLastMonth": "上月"
         },
-        "directoryCard": {
+        "workCard": {
             "status": {
                 "active": "活动",
                 "notStarted": "未开始",
@@ -914,11 +914,11 @@
             "openingTitle": "正在打开目录",
             "openingMessage": "正在准备您的目录。详细信息即将打开。请留在此页面。"
         },
-        "directoryList": {
+        "workList": {
             "title": "您的目录",
             "createButton": "创建目录"
         },
-        "directoryDetail": {
+        "workDetail": {
             "failedToGenerateItems": "生成项目失败。请重试。",
             "generationCompleted": "生成成功完成",
             "generationCancelled": "生成已取消",
@@ -1358,7 +1358,7 @@
                 "title": "最近活动",
                 "noActivity": "尚未有活动",
                 "created": "目录已创建",
-                "directoryCreated": "目录创建成功",
+                "workCreated": "目录创建成功",
                 "justNow": "刚刚"
             },
             "items": {
@@ -1663,7 +1663,7 @@
                 "loadingFormSchema": "正在加载表单配置...",
                 "failedToLoadFormSchema": "加载表单配置失败",
                 "selectOption": "选择选项",
-                "directoryName": "目录名称",
+                "workName": "目录名称",
                 "generationPrompt": "生成提示",
                 "modelOverride": "AI 模型覆盖",
                 "modelOverridePlaceholder": "例如 openai/gpt-4.1 或 openrouter/openai/gpt-4.1",
@@ -1676,7 +1676,7 @@
                 "startGeneration": "开始生成",
                 "regenerateItems": "重新生成项目",
                 "updateItems": "运行生成",
-                "recreateDirectory": "重新创建目录",
+                "recreateWork": "重新创建目录",
                 "showAdvancedOptions": "显示高级选项",
                 "hideAdvancedOptions": "隐藏高级选项",
                 "cancel": "取消",
@@ -1714,7 +1714,7 @@
                 "websiteRepositoryCreationMethod": "网站仓库创建方法",
                 "methodDuplicate": "复制",
                 "methodFork": "分叉",
-                "directoryNamePlaceholder": "输入目录名称",
+                "workNamePlaceholder": "输入目录名称",
                 "methodCreateFromTemplate": "从模板创建",
                 "aiProcessingConfiguration": "AI 处理配置",
                 "maxSearchQueries": "最大搜索查询数",
@@ -1769,7 +1769,7 @@
                 "aiProviderDescription": "用于内容生成和提取的 AI 模型提供商",
                 "contentExtractorProvider": "内容提取器",
                 "contentExtractorProviderDescription": "用于从网页提取内容的提供商",
-                "useDirectoryDefault": "使用目录默认",
+                "useWorkDefault": "使用目录默认",
                 "default": "默认",
                 "notConfigured": "未配置",
                 "notConfiguredTooltip": "此提供商需要配置。请访问 设置 → 插件 进行设置。",
@@ -1837,7 +1837,7 @@
                 },
                 "generalSettings": "通用设置",
                 "generalTitle": "通用设置",
-                "directoryName": "目录名称",
+                "workName": "目录名称",
                 "description": "描述",
                 "organizationRepository": "组织仓库",
                 "organizationHelp": "在组织下创建仓库，而不是您的个人账户",
@@ -1865,8 +1865,8 @@
                 "deleteWebsiteRepositoryDescription": "删除已部署的网站仓库",
                 "deleteConfirm": "您确定吗？",
                 "deleteConfirmDetail": "此操作无法撤销。目录和选定的仓库将被永久删除。",
-                "confirmDirectoryName": "输入目录名称以确认",
-                "confirmDirectoryNameDescription": "输入“{name}”以确认删除",
+                "confirmWorkName": "输入目录名称以确认",
+                "confirmWorkNameDescription": "输入“{name}”以确认删除",
                 "deleteNameMismatch": "目录名称不匹配",
                 "deleteButton": "删除目录",
                 "deleteConfirmButton": "是的，删除",
@@ -2208,7 +2208,7 @@
                 }
             }
         },
-        "directoryCreation": {
+        "workCreation": {
             "title": "创建新目录",
             "subtitle": "选择您想要创建目录的方式",
             "backToOptions": "返回选项",
@@ -2240,9 +2240,9 @@
                 "getStarted": "开始",
                 "formTitle": "使用 AI 创建目录",
                 "formSubtitle": "描述您的目录想法，让 AI 处理设置和初始内容生成",
-                "directoryNameLabel": "目录名称",
-                "directoryNamePlaceholder": "例如，Awesome AI Tools",
-                "directoryNameHelp": "如果留空，AI 将建议一个名称",
+                "workNameLabel": "目录名称",
+                "workNamePlaceholder": "例如，Awesome AI Tools",
+                "workNameHelp": "如果留空，AI 将建议一个名称",
                 "promptLabel": "描述您的目录",
                 "githubRequired": "请先连接您的 GitHub 账户。",
                 "promptPlaceholder": "描述您想要创建什么样的目录，它应该包含什么项目，以及任何具体要求...",
@@ -2604,7 +2604,7 @@
             "subtitle": "选择您希望如何接收重要更新的通知",
             "email": {
                 "title": "电子邮件通知",
-                "directoryUpdates": {
+                "workUpdates": {
                     "label": "目录更新",
                     "description": "接收目录重要更新的通知"
                 },
@@ -2653,12 +2653,12 @@
         "sidebar": {
             "menu": "菜单",
             "aiChat": "AI 聊天",
-            "newDirectory": "新建目录",
+            "newWork": "新建目录",
             "activityIndicator": "目录生成中",
             "navigation": {
                 "dashboard": "仪表板",
                 "activity": "活动",
-                "directories": "目录",
+                "works": "目录",
                 "plugins": "插件",
                 "settings": "设置"
             },
@@ -2716,8 +2716,8 @@
             "welcomeSubtitle": "您的 AI 驱动助手。询问我有关创建目录、生成内容或组织数据的任何问题。",
             "welcomeMessage": "嗨！我可以使用自然语言帮助您创建目录。例如询问“为 AI 工具创建一个目录”或描述您的需求。",
             "capabilities": {
-                "directoryCreation": "目录创建",
-                "directoryCreationDesc": "从自然语言描述构建目录",
+                "workCreation": "目录创建",
+                "workCreationDesc": "从自然语言描述构建目录",
                 "webResearch": "网络研究",
                 "webResearchDesc": "在整个网络上搜索和收集数据",
                 "contentGeneration": "内容生成",
@@ -2814,8 +2814,8 @@
             "disableWarning": "禁用此插件也将禁用您所有目录中的插件",
             "cannotDisableSystem": "系统插件无法禁用",
             "disableFailed": "禁用插件失败",
-            "autoEnableForDirectories": "同时为所有目录启用",
-            "autoEnableForDirectoriesDescription": "此插件将在您所有目录中自动激活。您仍可按目录禁用它。",
+            "autoEnableForWorks": "同时为所有目录启用",
+            "autoEnableForWorksDescription": "此插件将在您所有目录中自动激活。您仍可按目录禁用它。",
             "confirmDisable": "确认禁用",
             "cancel": "取消",
             "missingRequiredFields": "缺少必需字段：{fields}",
@@ -2890,20 +2890,20 @@
                 "removeLabel": "移除 {login}"
             }
         },
-        "directoryPlugins": {
+        "workPlugins": {
             "title": "目录插件",
             "subtitle": "为该目录配置插件",
             "active": "已激活",
             "enable": "启用",
             "disable": "禁用",
-            "enableForDirectory": "为此目录启用",
-            "disableForDirectory": "为此目录禁用",
+            "enableForWork": "为此目录启用",
+            "disableForWork": "为此目录禁用",
             "enableAtUserLevelFirst": "先在您的设置中启用此插件",
             "disabledByUser": "用户级已禁用",
             "systemAlwaysEnabled": "系统插件 - 始终启用",
             "showSettings": "显示设置",
             "hideSettings": "隐藏设置",
-            "directorySettingsInfo": "在此配置目录特定设置",
+            "workSettingsInfo": "在此配置目录特定设置",
             "save": "保存",
             "saved": "已保存",
             "showInstalledOnly": "仅显示已安装",
@@ -3012,9 +3012,9 @@
             "authError": "认证错误",
             "dashboard": "仪表板",
             "activity": "活动日志",
-            "directories": "目录",
-            "newDirectory": "新目录",
-            "directory": "目录",
+            "works": "目录",
+            "newWork": "新目录",
+            "work": "目录",
             "overview": "概览",
             "items": "项目",
             "generator": "生成器",
@@ -3048,7 +3048,7 @@
         }
     },
     "actions": {
-        "directories": {
+        "works": {
             "slug": {
                 "required": "Slug 必填",
                 "format": "Slug 只能包含小写字母、数字和连字符"

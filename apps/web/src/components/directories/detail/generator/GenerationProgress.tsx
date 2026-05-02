@@ -124,7 +124,7 @@ interface GenerationProgressProps {
 }
 
 export function GenerationProgress({ directory }: GenerationProgressProps) {
-    const t = useTranslations('dashboard.directoryDetail.progress');
+    const t = useTranslations('dashboard.workDetail.progress');
     const router = useRouter();
     const { directory: syncedDirectory } = useDirectoryDetail();
     const [dots, setDots] = useState('');

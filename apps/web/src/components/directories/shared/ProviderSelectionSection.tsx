@@ -34,7 +34,7 @@ export function ProviderSelectionSection({
     directoryPlugins = [],
     onProviderChange,
 }: ProviderSelectionSectionProps) {
-    const t = useTranslations('dashboard.directoryDetail.generator');
+    const t = useTranslations('dashboard.workDetail.generator');
     const [settingsPluginId, setSettingsPluginId] = useState<string | null>(null);
     const settingsPlugin =
         directoryPlugins.find((plugin) => plugin.pluginId === settingsPluginId) ?? null;

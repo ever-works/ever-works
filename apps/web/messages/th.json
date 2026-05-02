@@ -219,7 +219,7 @@
                     "description": "ไดเรกทอรีทุกอันเป็น repository GitHub ที่คุณเป็นเจ้าของและควบคุม"
                 }
             },
-            "directory": {
+            "work": {
                 "title": "สร้างไดเรกทอรีแรกของคุณ",
                 "description": "ไดเรกทอรีคือศูนย์กลางเนื้อหาของคุณ เพิ่มไอเท็ม ตั้งค่าหน้าตา และเผยแพร่ด้วยคลิกเดียว",
                 "detail": "คุณพร้อมแล้ว! สร้างไดเรกทอรีแรกเพื่อเริ่มสร้างและเผยแพร่เนื้อหา",
@@ -497,7 +497,7 @@
                 "shortcuts": {
                     "title": "ทางลัดคีย์บอร์ด",
                     "search": "ค้นหาไดเรกทอรี",
-                    "newDirectory": "สร้างไดเรกทอรีใหม่",
+                    "newWork": "สร้างไดเรกทอรีใหม่",
                     "help": "เปิดช่วยเหลือ",
                     "hint": "ใช้ Cmd บน Mac หรือ Ctrl บน Windows/Linux"
                 },
@@ -521,7 +521,7 @@
             "columns": {
                 "status": "สถานะ",
                 "dateTime": "วันที่ / เวลา",
-                "directory": "ไดเรกทอรี",
+                "work": "ไดเรกทอรี",
                 "type": "ประเภท",
                 "summary": "สรุป"
             },
@@ -532,9 +532,9 @@
                     "generation": "การสร้าง",
                     "comparison": "การเปรียบเทียบ",
                     "deployment": "การเผยแพร่",
-                    "directoryCreated": "ไดเรกทอรีถูกสร้าง",
-                    "directoryUpdated": "ไดเรกทอรีถูกอัปเดต",
-                    "directoryDeleted": "ไดเรกทอรีถูกลบ",
+                    "workCreated": "ไดเรกทอรีถูกสร้าง",
+                    "workUpdated": "ไดเรกทอรีถูกอัปเดต",
+                    "workDeleted": "ไดเรกทอรีถูกลบ",
                     "pluginEnabled": "เปิดใช้งานส่วนเสริม",
                     "pluginDisabled": "ปิดใช้งานส่วนเสริม",
                     "pluginConfigured": "ตั้งค่าหน่วยเสริม",
@@ -596,11 +596,11 @@
                 "pageOf": "หน้า {page} จาก {total}"
             }
         },
-        "directories": {
+        "works": {
             "title": "ไดเรกทอรี",
             "subtitle": "จัดการและจัดระเบียบไดเรกทอรีที่ใช้ AI ของคุณ",
             "summary": {
-                "totalDirectories": "ไดเรกทอรีทั้งหมด",
+                "totalWorks": "ไดเรกทอรีทั้งหมด",
                 "generating": "กำลังสร้าง",
                 "totalItems": "รายการทั้งหมด"
             },
@@ -658,13 +658,13 @@
                     "invalidJson": "ไฟล์ JSON ไม่ถูกต้อง",
                     "previewError": "ล้มเหลวในการวิเคราะห์ไฟล์นำเข้า",
                     "summary": "สรุปการนำเข้า",
-                    "directories": "ไดเรกทอรี",
+                    "works": "ไดเรกทอรี",
                     "items": "รายการ",
                     "userPlugins": "พลักอินผู้ใช้",
                     "version": "เวอร์ชันรูปแบบ",
                     "missingPlugins": "พลักอินเหล่านี้ไม่ได้ติดตั้งและจะถูกข้าม",
                     "conflicts": "ข้อขัดแย้ง Slug",
-                    "existingDirectory": "ที่มีอยู่",
+                    "existingWork": "ที่มีอยู่",
                     "incoming": "ที่กำลังมา",
                     "strategySkip": "ข้าม (เก็บไว้ที่มีอยู่)",
                     "strategyOverwrite": "เขียนทับที่มีอยู่",
@@ -681,9 +681,9 @@
                     "validationErrors": "ข้อผิดพลาดการตรวจสอบความถูกต้อง",
                     "resultSuccess": "นำเข้าสำเร็จ",
                     "resultFailed": "นำเข้าล้มเหลว",
-                    "directoriesCreated": "ไดเรกทอรีที่สร้าง",
-                    "directoriesUpdated": "ไดเรกทอรีที่อัปเดต",
-                    "directoriesSkipped": "ไดเรกทอรีที่ข้าม",
+                    "worksCreated": "ไดเรกทอรีที่สร้าง",
+                    "worksUpdated": "ไดเรกทอรีที่อัปเดต",
+                    "worksSkipped": "ไดเรกทอรีที่ข้าม",
                     "pluginsImported": "พลักอินที่นำเข้า",
                     "warnings": "คำเตือน",
                     "errors": "ข้อผิดพลาด"
@@ -881,12 +881,12 @@
             }
         },
         "stats": {
-            "totalDirectories": "ไดเรกทอรีทั้งหมด",
+            "totalWorks": "ไดเรกทอรีทั้งหมด",
             "totalItems": "รายการทั้งหมด",
             "activeWebsites": "เว็บไซต์ที่ใช้งานอยู่",
             "fromLastMonth": "จากเดือนที่แล้ว"
         },
-        "directoryCard": {
+        "workCard": {
             "status": {
                 "active": "ใช้งานอยู่",
                 "notStarted": "ยังไม่เริ่ม",
@@ -914,11 +914,11 @@
             "openingTitle": "กำลังเปิดไดเรกทอรี",
             "openingMessage": "กำลังเตรียมไดเรกทอรีของคุณ รายละเอียดจะเปิดในเร็วๆ นี้ อยู่ที่หน้านี้"
         },
-        "directoryList": {
+        "workList": {
             "title": "ไดเรกทอรีของคุณ",
             "createButton": "สร้างไดเรกทอรี"
         },
-        "directoryDetail": {
+        "workDetail": {
             "failedToGenerateItems": "ไม่สามารถสร้างรายการได้ โปรดลองอีกครั้ง",
             "generationCompleted": "การสร้างเสร็จสิ้นเรียบร้อยแล้ว",
             "generationCancelled": "การสร้างถูกยกเลิก",
@@ -1358,7 +1358,7 @@
                 "title": "กิจกรรมล่าสุด",
                 "noActivity": "ยังไม่มีกิจกรรม",
                 "created": "สร้างไดเรกทอรี",
-                "directoryCreated": "สร้างไดเรกทอรีเรียบร้อยแล้ว",
+                "workCreated": "สร้างไดเรกทอรีเรียบร้อยแล้ว",
                 "justNow": "เมื่อครู่นี้"
             },
             "items": {
@@ -1663,7 +1663,7 @@
                 "loadingFormSchema": "กำลังโหลดการตั้งค่าฟอร์ม...",
                 "failedToLoadFormSchema": "ไม่สามารถโหลดการตั้งค่าฟอร์มได้",
                 "selectOption": "เลือกตัวเลือก",
-                "directoryName": "ชื่อไดเรกทอรี",
+                "workName": "ชื่อไดเรกทอรี",
                 "generationPrompt": "พรอมต์การสร้าง",
                 "modelOverride": "แทนที่โมเดล AI",
                 "modelOverridePlaceholder": "เช่น openai/gpt-4.1 หรือ openrouter/openai/gpt-4.1",
@@ -1676,7 +1676,7 @@
                 "startGeneration": "เริ่มสร้าง",
                 "regenerateItems": "สร้างรายการใหม่",
                 "updateItems": "เรียกใช้การสร้าง",
-                "recreateDirectory": "สร้างไดเรกทอรีใหม่",
+                "recreateWork": "สร้างไดเรกทอรีใหม่",
                 "showAdvancedOptions": "แสดงตัวเลือกขั้นสูง",
                 "hideAdvancedOptions": "ซ่อนตัวเลือกขั้นสูง",
                 "cancel": "ยกเลิก",
@@ -1714,7 +1714,7 @@
                 "websiteRepositoryCreationMethod": "วิธีการสร้างคลังเว็บไซต์",
                 "methodDuplicate": "คัดลอก",
                 "methodFork": "Fork",
-                "directoryNamePlaceholder": "ป้อนชื่อไดเรกทอรี",
+                "workNamePlaceholder": "ป้อนชื่อไดเรกทอรี",
                 "methodCreateFromTemplate": "สร้างจากเทมเพลต",
                 "aiProcessingConfiguration": "การตั้งค่าการประมวลผล AI",
                 "maxSearchQueries": "จำนวนการค้นหาสูงสุด",
@@ -1769,7 +1769,7 @@
                 "aiProviderDescription": "ผู้ให้บริการโมเดล AI สำหรับการสร้างและดึงเนื้อหา",
                 "contentExtractorProvider": "ตัวดึงเนื้อหา",
                 "contentExtractorProviderDescription": "ผู้ให้บริการสำหรับดึงเนื้อหาจากหน้าว็บ",
-                "useDirectoryDefault": "ใช้ค่าเริ่มต้นของไดเรกทอรี",
+                "useWorkDefault": "ใช้ค่าเริ่มต้นของไดเรกทอรี",
                 "default": "ค่าเริ่มต้น",
                 "notConfigured": "ยังไม่ได้ตั้งค่า",
                 "notConfiguredTooltip": "ผู้ให้บริการนี้ต้องตั้งค่า ไปที่การตั้งค่า → ปลั๊กอิน เพื่อตั้งค่า",
@@ -1837,7 +1837,7 @@
                 },
                 "generalSettings": "การตั้งค่าทั่วไป",
                 "generalTitle": "การตั้งค่าทั่วไป",
-                "directoryName": "ชื่อไดเรกทอรี",
+                "workName": "ชื่อไดเรกทอรี",
                 "description": "คำอธิบาย",
                 "organizationRepository": "คลังขององค์กร",
                 "organizationHelp": "สร้างคลังภายใต้องค์กรแทนที่จะเป็นบัญชีส่วนตัวของคุณ",
@@ -1865,8 +1865,8 @@
                 "deleteWebsiteRepositoryDescription": "ลบคลังเว็บไซต์ที่ถูก deploy",
                 "deleteConfirm": "คุณแน่ใจหรือไม่?",
                 "deleteConfirmDetail": "การดำเนินการนี้ไม่สามารถย้อนกลับได้ ไดเรกทอรีและคลังที่เลือกจะถูกลบอย่างถาวร",
-                "confirmDirectoryName": "พิมพ์ชื่อไดเรกทอรีเพื่อยืนยัน",
-                "confirmDirectoryNameDescription": "พิมพ์ \"{name}\" เพื่อยืนยันการลบ",
+                "confirmWorkName": "พิมพ์ชื่อไดเรกทอรีเพื่อยืนยัน",
+                "confirmWorkNameDescription": "พิมพ์ \"{name}\" เพื่อยืนยันการลบ",
                 "deleteNameMismatch": "ชื่อไดเรกทอรีไม่ตรงกัน",
                 "deleteButton": "ลบไดเรกทอรี",
                 "deleteConfirmButton": "ใช่ ลบ",
@@ -2208,7 +2208,7 @@
                 }
             }
         },
-        "directoryCreation": {
+        "workCreation": {
             "title": "สร้างไดเรกทอรีใหม่",
             "subtitle": "เลือกวิธีที่คุณต้องการสร้างไดเรกทอรีของคุณ",
             "backToOptions": "กลับไปที่ตัวเลือก",
@@ -2240,9 +2240,9 @@
                 "getStarted": "เริ่มต้น",
                 "formTitle": "สร้างไดเรกทอรีด้วย AI",
                 "formSubtitle": "อธิบายไอเดียไดเรกทอรีของคุณและให้ AI จัดการการตั้งค่าและการสร้างเนื้อหาเริ่มต้น",
-                "directoryNameLabel": "ชื่อไดเรกทอรี",
-                "directoryNamePlaceholder": "เช่น Awesome AI Tools",
-                "directoryNameHelp": "AI จะแนะนำชื่อหากคุณปล่อยว่างไว้",
+                "workNameLabel": "ชื่อไดเรกทอรี",
+                "workNamePlaceholder": "เช่น Awesome AI Tools",
+                "workNameHelp": "AI จะแนะนำชื่อหากคุณปล่อยว่างไว้",
                 "promptLabel": "อธิบายไดเรกทอรีของคุณ",
                 "githubRequired": "กรุณาเชื่อมต่อบัญชี GitHub ของคุณก่อน",
                 "promptPlaceholder": "อธิบายประเภทของไดเรกทอรีที่คุณต้องการสร้าง ไอเท็มที่ควรมี และข้อกำหนดเฉพาะใดๆ...",
@@ -2604,7 +2604,7 @@
             "subtitle": "เลือกวิธีที่คุณต้องการรับการแจ้งเตือนเกี่ยวกับการอัปเดตที่สำคัญ",
             "email": {
                 "title": "การแจ้งเตือนทางอีเมล",
-                "directoryUpdates": {
+                "workUpdates": {
                     "label": "การอัปเดตไดเรกทอรี",
                     "description": "รับการแจ้งเตือนเกี่ยวกับการอัปเดตที่สำคัญของไดเรกทอรีของคุณ"
                 },
@@ -2653,12 +2653,12 @@
         "sidebar": {
             "menu": "เมนู",
             "aiChat": "แชท AI",
-            "newDirectory": "ไดเรกทอรีใหม่",
+            "newWork": "ไดเรกทอรีใหม่",
             "activityIndicator": "กำลังสร้างไดเรกทอรี",
             "navigation": {
                 "dashboard": "แดชบอร์ด",
                 "activity": "กิจกรรม",
-                "directories": "ไดเรกทอรี",
+                "works": "ไดเรกทอรี",
                 "plugins": "ปลั๊กอิน",
                 "settings": "การตั้งค่า"
             },
@@ -2716,8 +2716,8 @@
             "welcomeSubtitle": "ผู้ช่วยที่ขับเคลื่อนด้วย AI ของคุณ ถามฉันเกี่ยวกับการสร้างไดเรกทอรี การสร้างเนื้อหา หรือการจัดระเบียบข้อมูลของคุณได้เลย",
             "welcomeMessage": "สวัสดี! ฉันสามารถช่วยคุณสร้างไดเรกทอรีโดยใช้ภาษาธรรมชาติ ถามบางอย่างเช่น \"สร้างไดเรกทอรีสำหรับเครื่องมือ AI\" หรืออธิบายสิ่งที่คุณต้องการ",
             "capabilities": {
-                "directoryCreation": "การสร้างไดเรกทอรี",
-                "directoryCreationDesc": "สร้างไดเรกทอรีจากคำอธิบายภาษาธรรมชาติ",
+                "workCreation": "การสร้างไดเรกทอรี",
+                "workCreationDesc": "สร้างไดเรกทอรีจากคำอธิบายภาษาธรรมชาติ",
                 "webResearch": "การวิจัยเว็บ",
                 "webResearchDesc": "ค้นหาและรวบรวมข้อมูลจากทั่วเว็บ",
                 "contentGeneration": "การสร้างเนื้อหา",
@@ -2814,8 +2814,8 @@
             "disableWarning": "การปิดใช้งานส่วนเสริมนี้จะปิดใช้งานในไดเรกทอรีทั้งหมดด้วย",
             "cannotDisableSystem": "ไม่สามารถปิดใช้งานส่วนเสริมระบบได้",
             "disableFailed": "ไม่สามารถปิดใช้งานส่วนเสริมได้",
-            "autoEnableForDirectories": "เปิดใช้งานในไดเรกทอรีทั้งหมดด้วย",
-            "autoEnableForDirectoriesDescription": "ส่วนเสริมนี้จะเปิดใช้งานอัตโนมัติในไดเรกทอรีทั้งหมด คุณยังสามารถปิดใช้งานในแต่ละไดเรกทอรีได้",
+            "autoEnableForWorks": "เปิดใช้งานในไดเรกทอรีทั้งหมดด้วย",
+            "autoEnableForWorksDescription": "ส่วนเสริมนี้จะเปิดใช้งานอัตโนมัติในไดเรกทอรีทั้งหมด คุณยังสามารถปิดใช้งานในแต่ละไดเรกทอรีได้",
             "confirmDisable": "ยืนยันการปิดใช้งาน",
             "cancel": "ยกเลิก",
             "missingRequiredFields": "ขาดฟิลด์ที่จำเป็น: {fields}",
@@ -2890,20 +2890,20 @@
                 "removeLabel": "ลบ {login}"
             }
         },
-        "directoryPlugins": {
+        "workPlugins": {
             "title": "ส่วนเสริมไดเรกทอรี",
             "subtitle": "กำหนดค่าส่วนเสริมสำหรับไดเรกทอรีนี้",
             "active": "ใช้งานอยู่",
             "enable": "เปิดใช้งาน",
             "disable": "ปิดใช้งาน",
-            "enableForDirectory": "เปิดใช้งานสำหรับไดเรกทอรีนี้",
-            "disableForDirectory": "ปิดใช้งานสำหรับไดเรกทอรีนี้",
+            "enableForWork": "เปิดใช้งานสำหรับไดเรกทอรีนี้",
+            "disableForWork": "ปิดใช้งานสำหรับไดเรกทอรีนี้",
             "enableAtUserLevelFirst": "เปิดใช้งานส่วนเสริมนี้ในตั้งค่าของคุณก่อน",
             "disabledByUser": "ปิดใช้งานที่ระดับผู้ใช้",
             "systemAlwaysEnabled": "ส่วนเสริมระบบ - เปิดใช้งานเสมอ",
             "showSettings": "แสดงการตั้งค่า",
             "hideSettings": "ซ่อนการตั้งค่า",
-            "directorySettingsInfo": "กำหนดการตั้งค่าเฉพาะไดเรกทอรีที่นี่",
+            "workSettingsInfo": "กำหนดการตั้งค่าเฉพาะไดเรกทอรีที่นี่",
             "save": "บันทึก",
             "saved": "บันทึกแล้ว",
             "showInstalledOnly": "แสดงเฉพาะที่ติดตั้ง",
@@ -3012,9 +3012,9 @@
             "authError": "ข้อผิดพลาดการรับรองตัวตน",
             "dashboard": "แดชบอร์ด",
             "activity": "บันทึกกิจกรรม",
-            "directories": "ไดเรกทอรี",
-            "newDirectory": "ไดเรกทอรีใหม่",
-            "directory": "ไดเรกทอรี",
+            "works": "ไดเรกทอรี",
+            "newWork": "ไดเรกทอรีใหม่",
+            "work": "ไดเรกทอรี",
             "overview": "ภาพรวม",
             "items": "รายการ",
             "generator": "ตัวสร้าง",
@@ -3048,7 +3048,7 @@
         }
     },
     "actions": {
-        "directories": {
+        "works": {
             "slug": {
                 "required": "Slug จำเป็นต้องมี",
                 "format": "Slug ต้องประกอบด้วยตัวอักษรพิมพ์เล็ก ตัวเลข และขีดกลางเท่านั้น"

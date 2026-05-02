@@ -16,7 +16,7 @@ interface ActivityItem {
 }
 
 export function DirectoryActivity({ directoryId }: DirectoryActivityProps) {
-    const t = useTranslations('dashboard.directoryDetail.activity');
+    const t = useTranslations('dashboard.workDetail.activity');
 
     // Mock activity data - in real app would fetch from API
     const activities: ActivityItem[] = [
@@ -24,7 +24,7 @@ export function DirectoryActivity({ directoryId }: DirectoryActivityProps) {
             id: '1',
             type: 'created',
             title: t('created'),
-            description: t('directoryCreated'),
+            description: t('workCreated'),
             timestamp: new Date(),
         },
     ];

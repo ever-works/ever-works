@@ -29,7 +29,7 @@ export function DeployProviderSelector({
     onSelect,
     compact = false,
 }: DeployProviderSelectorProps) {
-    const t = useTranslations('dashboard.directoryCreation.deployProvider');
+    const t = useTranslations('dashboard.workCreation.deployProvider');
 
     if (providers.length === 0) {
         return (

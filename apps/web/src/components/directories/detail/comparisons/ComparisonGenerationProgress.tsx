@@ -17,7 +17,7 @@ export function ComparisonGenerationProgress({
     directoryId,
     isGenerating,
 }: ComparisonGenerationProgressProps) {
-    const t = useTranslations('dashboard.directoryDetail.comparisons');
+    const t = useTranslations('dashboard.workDetail.comparisons');
     const [status, setStatus] = useState<{
         generating: boolean;
         stage?: string;

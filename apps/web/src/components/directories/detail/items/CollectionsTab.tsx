@@ -29,7 +29,7 @@ export function CollectionsTab({
     items,
     canEdit,
 }: CollectionsTabProps) {
-    const t = useTranslations('dashboard.directoryDetail.items.taxonomy');
+    const t = useTranslations('dashboard.workDetail.items.taxonomy');
     const router = useRouter();
     const [collections, setCollections] = useState<Collection[]>(initialCollections);
     const [searchQuery, setSearchQuery] = useState('');

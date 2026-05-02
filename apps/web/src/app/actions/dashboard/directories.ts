@@ -34,7 +34,7 @@ const readmeConfigSchema = z.object({
 });
 
 const getCreateDirectorySchema = async () => {
-    const t = await getTranslations('actions.directories');
+    const t = await getTranslations('actions.works');
 
     const createDirectorySchema = z.object({
         slug: z
@@ -102,7 +102,7 @@ const checkOrganization = (
 };
 
 export async function createDirectory(data: CreateDirectoryDto) {
-    const t = await getTranslations('actions.directories');
+    const t = await getTranslations('actions.works');
 
     const createDirectorySchema = await getCreateDirectorySchema();
 
@@ -183,7 +183,7 @@ interface AIDirectoryOptions {
 }
 
 export async function createDirectoryWithAI(request: AIDirectoryOptions) {
-    const t = await getTranslations('actions.directories');
+    const t = await getTranslations('actions.works');
 
     // AI prompt validation schema
     const aiPromptSchema = z.object({
@@ -333,7 +333,7 @@ export async function fetchDirectoryGenerationHistory(
 }
 
 export async function updateDirectory(directoryId: string, data: UpdateDirectoryDto) {
-    const t = await getTranslations('actions.directories');
+    const t = await getTranslations('actions.works');
 
     const updateDirectorySchema = z.object({
         name: z
@@ -398,7 +398,7 @@ export async function updateDirectory(directoryId: string, data: UpdateDirectory
 }
 
 export async function updateDirectoryTemplate(directoryId: string, websiteTemplateId: string) {
-    const t = await getTranslations('actions.directories');
+    const t = await getTranslations('actions.works');
 
     const schema = z.object({
         directoryId: z.string().uuid(t('invalidId')),
@@ -435,7 +435,7 @@ export async function updateDirectoryTemplate(directoryId: string, websiteTempla
 }
 
 export async function deleteDirectory(directoryId: string, options?: DeleteDirectoryDto) {
-    const t = await getTranslations('actions.directories');
+    const t = await getTranslations('actions.works');
 
     // Delete directory validation schema
     const deleteDirectorySchema = z.object({
@@ -510,7 +510,7 @@ interface GetDirectoriesParams {
 }
 
 export async function getDirectories(params: GetDirectoriesParams = {}) {
-    const t = await getTranslations('actions.directories');
+    const t = await getTranslations('actions.works');
 
     try {
         const { directories, total } = await directoryAPI.getAll({
@@ -557,7 +557,7 @@ export async function getDirectoryStats() {
 // Import actions
 
 export async function analyzeRepository(sourceUrl: string, providerId?: string) {
-    const t = await getTranslations('actions.directories');
+    const t = await getTranslations('actions.works');
 
     const urlSchema = z.string().url(t('import.invalidUrl'));
 
@@ -624,7 +624,7 @@ function isImportDirectoryProviderErrors(value: unknown): value is ImportDirecto
 }
 
 export async function importDirectory(data: ImportDirectoryRequest) {
-    const t = await getTranslations('actions.directories');
+    const t = await getTranslations('actions.works');
 
     const importSchema = z.object({
         sourceUrl: z.string().url(t('import.invalidUrl')),
@@ -739,7 +739,7 @@ interface GetUserRepositoriesParams {
 }
 
 export async function analyzeForLinking(sourceUrl: string, providerId: string) {
-    const t = await getTranslations('actions.directories');
+    const t = await getTranslations('actions.works');
 
     const urlSchema = z.string().url(t('import.invalidUrl'));
 
@@ -780,7 +780,7 @@ export async function analyzeForLinking(sourceUrl: string, providerId: string) {
 }
 
 export async function getUserRepositories(params: GetUserRepositoriesParams) {
-    const t = await getTranslations('actions.directories');
+    const t = await getTranslations('actions.works');
 
     try {
         const { gitProvider } = params;

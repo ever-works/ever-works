@@ -84,7 +84,7 @@ export function LinkExistingConfirm({
     onConfirm,
     isLoading,
 }: LinkExistingConfirmProps) {
-    const t = useTranslations('dashboard.directoryCreation.import.linkConfirm');
+    const t = useTranslations('dashboard.workCreation.import.linkConfirm');
     const hasMissingRepos = !repoStatus.markdown.exists || !repoStatus.website.exists;
 
     return (

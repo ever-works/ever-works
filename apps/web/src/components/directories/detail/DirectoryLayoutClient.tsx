@@ -33,7 +33,7 @@ export function DirectoryLayoutClient({
     children,
 }: DirectoryLayoutClientProps) {
     const router = useRouter();
-    const t = useTranslations('dashboard.directoryDetail');
+    const t = useTranslations('dashboard.workDetail');
     const [syncedDirectory, setSyncedDirectory] = useState(directory);
     const isGenerating = syncedDirectory.generateStatus?.status === GenerateStatusType.GENERATING;
     const lastGenerateStatus = useRef(directory.generateStatus?.status);

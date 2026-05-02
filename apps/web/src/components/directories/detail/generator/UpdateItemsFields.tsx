@@ -23,8 +23,8 @@ export function UpdateItemsFields({
     onChange,
 }: UpdateItemsFieldsProps) {
     const { directory, config } = useDirectoryDetail();
-    const t = useTranslations('dashboard.directoryDetail.generator');
-    const tConf = useTranslations('dashboard.directoryDetail.config');
+    const t = useTranslations('dashboard.workDetail.generator');
+    const tConf = useTranslations('dashboard.workDetail.config');
 
     const mainPR = directory.lastPullRequest?.main;
     const dataPR = directory.lastPullRequest?.data;

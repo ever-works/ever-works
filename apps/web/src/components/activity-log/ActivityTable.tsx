@@ -274,7 +274,7 @@ export function ActivityTable({ activities, loading, onStopRequested }: Activity
                                 scope="col"
                                 className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-text-secondary dark:text-text-secondary-dark"
                             >
-                                {t('columns.directory')}
+                                {t('columns.work')}
                             </th>
                             <th
                                 scope="col"

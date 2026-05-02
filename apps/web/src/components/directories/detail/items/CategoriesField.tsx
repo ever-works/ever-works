@@ -27,7 +27,7 @@ export const CategoriesField = memo(function CategoriesField({
     onRemoveCategory,
     isPending,
 }: CategoriesFieldProps) {
-    const t = useTranslations('dashboard.directoryDetail.items.addModal');
+    const t = useTranslations('dashboard.workDetail.items.addModal');
     const [query, setQuery] = useState('');
 
     // Filter categories based on search query

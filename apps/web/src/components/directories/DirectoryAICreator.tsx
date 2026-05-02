@@ -45,7 +45,7 @@ export function DirectoryAICreator({
     );
     const [isPending, startTransition] = useTransition();
     const router = useRouter();
-    const t = useTranslations('dashboard.directoryCreation.ai');
+    const t = useTranslations('dashboard.workCreation.ai');
 
     // Provider/pipeline selection state
     const [formSchema, setFormSchema] = useState<GeneratorFormSchema | null>(null);
@@ -174,11 +174,11 @@ export function DirectoryAICreator({
                 <div className="space-y-6">
                     {/* Directory Name */}
                     <Input
-                        label={`${t('directoryNameLabel')} *`}
+                        label={`${t('workNameLabel')} *`}
                         type="text"
                         value={directoryName}
                         onChange={(e) => setDirectoryName(e.target.value)}
-                        placeholder={t('directoryNamePlaceholder')}
+                        placeholder={t('workNamePlaceholder')}
                         variant="form"
                     />
 
@@ -327,7 +327,7 @@ function ExamplePrompts({
     onSelect: (prompt: string, name: string) => void;
     selectedName: string;
 }) {
-    const t = useTranslations('dashboard.directoryCreation.ai');
+    const t = useTranslations('dashboard.workCreation.ai');
 
     const examplePrompts = [
         {

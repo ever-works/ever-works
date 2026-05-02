@@ -41,7 +41,7 @@ type FormData = {
 };
 
 export function AdvancedPromptsSettings({ directoryId }: AdvancedPromptsSettingsProps) {
-    const t = useTranslations('dashboard.directoryDetail.settings.advancedPrompts');
+    const t = useTranslations('dashboard.workDetail.settings.advancedPrompts');
 
     // Standard Pipeline state
     const [isStandardExpanded, setIsStandardExpanded] = useState(false);

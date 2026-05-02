@@ -66,7 +66,7 @@ export function ImportModeSelector({
     disabled,
     hasWriteAccess,
 }: ImportModeSelectorProps) {
-    const t = useTranslations('dashboard.directoryCreation.import.chooseMode');
+    const t = useTranslations('dashboard.workCreation.import.chooseMode');
     const showLinkOption = hasWriteAccess !== false;
 
     const repoDescription =

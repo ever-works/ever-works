@@ -219,7 +219,7 @@
                     "description": "Каждый каталог — это репозиторий GitHub, которым вы владеете и управляете."
                 }
             },
-            "directory": {
+            "work": {
                 "title": "Создайте свой первый каталог",
                 "description": "Каталог — это ваш центр контента. Добавляйте элементы, настраивайте макет и публикуйте одним кликом.",
                 "detail": "Вы все настроили! Создайте свой первый каталог, чтобы начать создание и публикацию контента.",
@@ -497,7 +497,7 @@
                 "shortcuts": {
                     "title": "Горячие клавиши",
                     "search": "Поиск каталогов",
-                    "newDirectory": "Создать новый каталог",
+                    "newWork": "Создать новый каталог",
                     "help": "Открыть справку",
                     "hint": "Используйте Cmd на Mac или Ctrl на Windows/Linux"
                 },
@@ -521,7 +521,7 @@
             "columns": {
                 "status": "Статус",
                 "dateTime": "Дата / Время",
-                "directory": "Каталог",
+                "work": "Каталог",
                 "type": "Тип",
                 "summary": "Описание"
             },
@@ -532,9 +532,9 @@
                     "generation": "Генерация",
                     "comparison": "Сравнение",
                     "deployment": "Развертывание",
-                    "directoryCreated": "Каталог создан",
-                    "directoryUpdated": "Каталог обновлён",
-                    "directoryDeleted": "Каталог удалён",
+                    "workCreated": "Каталог создан",
+                    "workUpdated": "Каталог обновлён",
+                    "workDeleted": "Каталог удалён",
                     "pluginEnabled": "Плагин включён",
                     "pluginDisabled": "Плагин выключен",
                     "pluginConfigured": "Плагин настроен",
@@ -596,11 +596,11 @@
                 "pageOf": "Страница {page} из {total}"
             }
         },
-        "directories": {
+        "works": {
             "title": "Каталоги",
             "subtitle": "Управляйте и организуйте AI-каталоги",
             "summary": {
-                "totalDirectories": "Всего каталогов",
+                "totalWorks": "Всего каталогов",
                 "generating": "Генерируется",
                 "totalItems": "Всего элементов"
             },
@@ -658,13 +658,13 @@
                     "invalidJson": "Неверный JSON-файл",
                     "previewError": "Не удалось проанализировать файл импорта",
                     "summary": "Сводка импорта",
-                    "directories": "Каталоги",
+                    "works": "Каталоги",
                     "items": "Элементы",
                     "userPlugins": "Пользовательские плагины",
                     "version": "Версия формата",
                     "missingPlugins": "Эти плагины не установлены и будут пропущены",
                     "conflicts": "Конфликты slug",
-                    "existingDirectory": "Существующий",
+                    "existingWork": "Существующий",
                     "incoming": "Входящий",
                     "strategySkip": "Пропустить (оставить существующий)",
                     "strategyOverwrite": "Перезаписать существующий",
@@ -681,9 +681,9 @@
                     "validationErrors": "Ошибки валидации",
                     "resultSuccess": "Импорт успешно завершен",
                     "resultFailed": "Импорт не удался",
-                    "directoriesCreated": "Каталоги созданы",
-                    "directoriesUpdated": "Каталоги обновлены",
-                    "directoriesSkipped": "Каталоги пропущены",
+                    "worksCreated": "Каталоги созданы",
+                    "worksUpdated": "Каталоги обновлены",
+                    "worksSkipped": "Каталоги пропущены",
                     "pluginsImported": "Плагины импортированы",
                     "warnings": "Предупреждения",
                     "errors": "Ошибки"
@@ -881,12 +881,12 @@
             }
         },
         "stats": {
-            "totalDirectories": "Всего каталогов",
+            "totalWorks": "Всего каталогов",
             "totalItems": "Всего элементов",
             "activeWebsites": "Активные веб-сайты",
             "fromLastMonth": "за последний месяц"
         },
-        "directoryCard": {
+        "workCard": {
             "status": {
                 "active": "Активен",
                 "notStarted": "Не запущен",
@@ -914,11 +914,11 @@
             "openingTitle": "Открытие каталога",
             "openingMessage": "Подготовка вашего каталога. Детали откроются скоро. Оставайтесь на этой странице."
         },
-        "directoryList": {
+        "workList": {
             "title": "Ваши каталоги",
             "createButton": "Создать каталог"
         },
-        "directoryDetail": {
+        "workDetail": {
             "failedToGenerateItems": "Не удалось сгенерировать элементы. Пожалуйста, попробуйте снова.",
             "generationCompleted": "Генерация успешно завершена",
             "generationCancelled": "Генерация была отменена",
@@ -1358,7 +1358,7 @@
                 "title": "Недавняя активность",
                 "noActivity": "Активности пока нет",
                 "created": "Каталог создан",
-                "directoryCreated": "Каталог успешно создан",
+                "workCreated": "Каталог успешно создан",
                 "justNow": "Только что"
             },
             "items": {
@@ -1663,7 +1663,7 @@
                 "loadingFormSchema": "Загрузка конфигурации формы...",
                 "failedToLoadFormSchema": "Не удалось загрузить конфигурацию формы",
                 "selectOption": "Выберите вариант",
-                "directoryName": "Имя директории",
+                "workName": "Имя директории",
                 "generationPrompt": "Промпт генерации",
                 "modelOverride": "Переопределение модели ИИ",
                 "modelOverridePlaceholder": "например, openai/gpt-4.1 или openrouter/openai/gpt-4.1",
@@ -1676,7 +1676,7 @@
                 "startGeneration": "Запустить генерацию",
                 "regenerateItems": "Регенерировать элементы",
                 "updateItems": "Запустить генерацию",
-                "recreateDirectory": "Пересоздать директорию",
+                "recreateWork": "Пересоздать директорию",
                 "showAdvancedOptions": "Показать расширенные опции",
                 "hideAdvancedOptions": "Скрыть расширенные опции",
                 "cancel": "Отмена",
@@ -1714,7 +1714,7 @@
                 "websiteRepositoryCreationMethod": "Метод создания репозитория веб-сайта",
                 "methodDuplicate": "Дублировать",
                 "methodFork": "Форк",
-                "directoryNamePlaceholder": "Введите имя директории",
+                "workNamePlaceholder": "Введите имя директории",
                 "methodCreateFromTemplate": "Создать из шаблона",
                 "aiProcessingConfiguration": "Конфигурация обработки ИИ",
                 "maxSearchQueries": "Макс. поисковых запросов",
@@ -1769,7 +1769,7 @@
                 "aiProviderDescription": "Провайдер модели ИИ для генерации и извлечения контента",
                 "contentExtractorProvider": "Извлекатель контента",
                 "contentExtractorProviderDescription": "Провайдер для извлечения контента из веб-страниц",
-                "useDirectoryDefault": "Использовать значение по умолчанию директории",
+                "useWorkDefault": "Использовать значение по умолчанию директории",
                 "default": "По умолчанию",
                 "notConfigured": "Не настроено",
                 "notConfiguredTooltip": "Этот провайдер требует настройки. Перейдите в Настройки → Плагины, чтобы настроить.",
@@ -1837,7 +1837,7 @@
                 },
                 "generalSettings": "Общие настройки",
                 "generalTitle": "Общие настройки",
-                "directoryName": "Имя каталога",
+                "workName": "Имя каталога",
                 "description": "Описание",
                 "organizationRepository": "Репозиторий организации",
                 "organizationHelp": "Создавать репозитории в организации вместо личного аккаунта",
@@ -1865,8 +1865,8 @@
                 "deleteWebsiteRepositoryDescription": "Удалить развернутый репозиторий сайта",
                 "deleteConfirm": "Вы абсолютно уверены?",
                 "deleteConfirmDetail": "Это действие нельзя отменить. Каталог и выбранные репозитории будут безвозвратно удалены.",
-                "confirmDirectoryName": "Введите имя каталога для подтверждения",
-                "confirmDirectoryNameDescription": "Введите \"{name}\" для подтверждения удаления",
+                "confirmWorkName": "Введите имя каталога для подтверждения",
+                "confirmWorkNameDescription": "Введите \"{name}\" для подтверждения удаления",
                 "deleteNameMismatch": "Имя каталога не совпадает",
                 "deleteButton": "Удалить каталог",
                 "deleteConfirmButton": "Да, удалить",
@@ -2208,7 +2208,7 @@
                 }
             }
         },
-        "directoryCreation": {
+        "workCreation": {
             "title": "Создать новый каталог",
             "subtitle": "Выберите, как вы хотите создать свой каталог",
             "backToOptions": "Назад к вариантам",
@@ -2240,9 +2240,9 @@
                 "getStarted": "Начать",
                 "formTitle": "Создать каталог с помощью ИИ",
                 "formSubtitle": "Опишите идею каталога и позвольте ИИ настроить и сгенерировать начальный контент",
-                "directoryNameLabel": "Название каталога",
-                "directoryNamePlaceholder": "e.g., Awesome AI Tools",
-                "directoryNameHelp": "ИИ предложит название, если оставить пустым",
+                "workNameLabel": "Название каталога",
+                "workNamePlaceholder": "e.g., Awesome AI Tools",
+                "workNameHelp": "ИИ предложит название, если оставить пустым",
                 "promptLabel": "Опишите ваш каталог",
                 "githubRequired": "Сначала подключите аккаунт GitHub.",
                 "promptPlaceholder": "Опишите, какой каталог вы хотите создать, какие элементы он должен содержать и любые конкретные требования...",
@@ -2604,7 +2604,7 @@
             "subtitle": "Выберите, как вы хотите получать уведомления о важных обновлениях",
             "email": {
                 "title": "Уведомления по email",
-                "directoryUpdates": {
+                "workUpdates": {
                     "label": "Обновления директорий",
                     "description": "Получать уведомления об важных обновлениях ваших директорий"
                 },
@@ -2653,12 +2653,12 @@
         "sidebar": {
             "menu": "Меню",
             "aiChat": "Чат ИИ",
-            "newDirectory": "Новая директория",
+            "newWork": "Новая директория",
             "activityIndicator": "Генерация директории",
             "navigation": {
                 "dashboard": "Панель управления",
                 "activity": "Активность",
-                "directories": "Директории",
+                "works": "Директории",
                 "plugins": "Плагины",
                 "settings": "Настройки"
             },
@@ -2716,8 +2716,8 @@
             "welcomeSubtitle": "Ваш ИИ-помощник. Спросите меня что угодно о создании директорий, генерации контента или организации ваших данных.",
             "welcomeMessage": "Привет! Я могу помочь вам создать директории с помощью естественного языка. Спросите что-то вроде «Создай директорию для инструментов ИИ» или опишите, что вам нужно.",
             "capabilities": {
-                "directoryCreation": "Создание директорий",
-                "directoryCreationDesc": "Создавайте директории из описаний на естественном языке",
+                "workCreation": "Создание директорий",
+                "workCreationDesc": "Создавайте директории из описаний на естественном языке",
                 "webResearch": "Веб-исследования",
                 "webResearchDesc": "Ищите и собирайте данные из интернета",
                 "contentGeneration": "Генерация контента",
@@ -2814,8 +2814,8 @@
             "disableWarning": "Отключение этого плагина также отключит его во всех ваших директориях",
             "cannotDisableSystem": "Системные плагины нельзя отключить",
             "disableFailed": "Не удалось отключить плагин",
-            "autoEnableForDirectories": "Также включить для всех директорий",
-            "autoEnableForDirectoriesDescription": "Этот плагин будет автоматически активен во всех ваших директориях. Вы все еще можете отключить его для отдельной директории.",
+            "autoEnableForWorks": "Также включить для всех директорий",
+            "autoEnableForWorksDescription": "Этот плагин будет автоматически активен во всех ваших директориях. Вы все еще можете отключить его для отдельной директории.",
             "confirmDisable": "Подтвердить отключение",
             "cancel": "Отмена",
             "missingRequiredFields": "Отсутствуют обязательные поля: {fields}",
@@ -2890,20 +2890,20 @@
                 "removeLabel": "Удалить {login}"
             }
         },
-        "directoryPlugins": {
+        "workPlugins": {
             "title": "Плагины директории",
             "subtitle": "Настройка плагинов для этой директории",
             "active": "Активен",
             "enable": "Включить",
             "disable": "Отключить",
-            "enableForDirectory": "Включить для этой директории",
-            "disableForDirectory": "Отключить для этой директории",
+            "enableForWork": "Включить для этой директории",
+            "disableForWork": "Отключить для этой директории",
             "enableAtUserLevelFirst": "Сначала включите этот плагин в ваших настройках",
             "disabledByUser": "Отключен на уровне пользователя",
             "systemAlwaysEnabled": "Системный плагин — всегда включен",
             "showSettings": "Показать настройки",
             "hideSettings": "Скрыть настройки",
-            "directorySettingsInfo": "Настройте параметры, специфичные для директории, здесь",
+            "workSettingsInfo": "Настройте параметры, специфичные для директории, здесь",
             "save": "Сохранить",
             "saved": "Сохранено",
             "showInstalledOnly": "Показать только установленные",
@@ -3012,9 +3012,9 @@
             "authError": "Ошибка аутентификации",
             "dashboard": "Панель управления",
             "activity": "Журнал активности",
-            "directories": "Каталоги",
-            "newDirectory": "Новый каталог",
-            "directory": "Каталог",
+            "works": "Каталоги",
+            "newWork": "Новый каталог",
+            "work": "Каталог",
             "overview": "Обзор",
             "items": "Элементы",
             "generator": "Генератор",
@@ -3048,7 +3048,7 @@
         }
     },
     "actions": {
-        "directories": {
+        "works": {
             "slug": {
                 "required": "Слаг обязателен",
                 "format": "Слаг должен содержать только строчные буквы, цифры и дефисы"

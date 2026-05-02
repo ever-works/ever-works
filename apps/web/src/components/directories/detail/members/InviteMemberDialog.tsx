@@ -31,7 +31,7 @@ export function InviteMemberDialog({
     onOpenChange,
     onMemberAdded,
 }: InviteMemberDialogProps) {
-    const t = useTranslations('dashboard.directoryDetail.members');
+    const t = useTranslations('dashboard.workDetail.members');
     const [email, setEmail] = useState('');
     const [role, setRole] = useState<AssignableMemberRole>(DirectoryMemberRole.VIEWER);
     const [isSubmitting, setIsSubmitting] = useState(false);

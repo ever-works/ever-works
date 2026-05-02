@@ -20,7 +20,7 @@ export function DirectoryPluginsList({
     plugins,
     capabilityProviders = {},
 }: DirectoryPluginsListProps) {
-    const t = useTranslations('dashboard.directoryPlugins');
+    const t = useTranslations('dashboard.workPlugins');
     const [showInstalledOnly, setShowInstalledOnly] = useState(true);
 
     const filteredPlugins = useMemo(

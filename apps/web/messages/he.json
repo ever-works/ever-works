@@ -219,7 +219,7 @@
                     "description": "כל מדריך הוא מאגר GitHub שבבעלותכם ובשליטתכם"
                 }
             },
-            "directory": {
+            "work": {
                 "title": "צרו את המדריך הראשון שלכם",
                 "description": "מדריך הוא מרכז התוכן שלכם. הוסיפו פריטים, הגדירו את הפריסה ופרסמו אותו בקליק אחד.",
                 "detail": "אתם מוכנים לחלוטין! צרו את המדריך הראשון שלכם כדי להתחיל לבנות ולפרסם תוכן.",
@@ -497,7 +497,7 @@
                 "shortcuts": {
                     "title": "קיצורי מקלדת",
                     "search": "חיפוש ספריות",
-                    "newDirectory": "צור ספרייה חדשה",
+                    "newWork": "צור ספרייה חדשה",
                     "help": "פתח עזרה",
                     "hint": "השתמש ב-Cmd ב-Mac או Ctrl ב-Windows/Linux"
                 },
@@ -521,7 +521,7 @@
             "columns": {
                 "status": "סטטוס",
                 "dateTime": "תאריך / שעה",
-                "directory": "ספרייה",
+                "work": "ספרייה",
                 "type": "סוג",
                 "summary": "סיכום"
             },
@@ -532,9 +532,9 @@
                     "generation": "יצירה",
                     "comparison": "השוואה",
                     "deployment": "פריסה",
-                    "directoryCreated": "ספרייה נוצרה",
-                    "directoryUpdated": "ספרייה עודכנה",
-                    "directoryDeleted": "ספרייה נמחקה",
+                    "workCreated": "ספרייה נוצרה",
+                    "workUpdated": "ספרייה עודכנה",
+                    "workDeleted": "ספרייה נמחקה",
                     "pluginEnabled": "תוסף הופעל",
                     "pluginDisabled": "תוסף הושבת",
                     "pluginConfigured": "תוסף הוגדר",
@@ -596,11 +596,11 @@
                 "pageOf": "עמוד {page} מתוך {total}"
             }
         },
-        "directories": {
+        "works": {
             "title": "ספריות",
             "subtitle": "נהל וארגן את ספריות ה-AI שלך",
             "summary": {
-                "totalDirectories": "סה\"כ ספריות",
+                "totalWorks": "סה\"כ ספריות",
                 "generating": "מייצר",
                 "totalItems": "סה\"כ פריטים"
             },
@@ -658,13 +658,13 @@
                     "invalidJson": "קובץ JSON לא תקין",
                     "previewError": "נכשל לנתח קובץ ייבוא",
                     "summary": "סיכום ייבוא",
-                    "directories": "ספריות",
+                    "works": "ספריות",
                     "items": "פריטים",
                     "userPlugins": "תוספי משתמש",
                     "version": "גרסת פורמט",
                     "missingPlugins": "תוספים אלה לא מותקנים וידלגו",
                     "conflicts": "קונפליקטי Slug",
-                    "existingDirectory": "קיים",
+                    "existingWork": "קיים",
                     "incoming": "נכנס",
                     "strategySkip": "דלג (שמור קיים)",
                     "strategyOverwrite": "דרוס קיים",
@@ -681,9 +681,9 @@
                     "validationErrors": "שגיאות ולידציה",
                     "resultSuccess": "ייבוא הושלם בהצלחה",
                     "resultFailed": "ייבוא נכשל",
-                    "directoriesCreated": "ספריות נוצרו",
-                    "directoriesUpdated": "ספריות עודכנו",
-                    "directoriesSkipped": "ספריות דולגו",
+                    "worksCreated": "ספריות נוצרו",
+                    "worksUpdated": "ספריות עודכנו",
+                    "worksSkipped": "ספריות דולגו",
                     "pluginsImported": "תוספים יובאו",
                     "warnings": "אזהרות",
                     "errors": "שגיאות"
@@ -881,12 +881,12 @@
             }
         },
         "stats": {
-            "totalDirectories": "סה\"ס ספריות",
+            "totalWorks": "סה\"ס ספריות",
             "totalItems": "סה\"ס פריטים",
             "activeWebsites": "אתרים פעילים",
             "fromLastMonth": "מהחודש שעבר"
         },
-        "directoryCard": {
+        "workCard": {
             "status": {
                 "active": "פעיל",
                 "notStarted": "לא התחיל",
@@ -914,11 +914,11 @@
             "openingTitle": "פותח ספרייה",
             "openingMessage": "מכין את הספרייה שלך. הפרטים ייפתחו בקרוב. נשאר בעמוד זה."
         },
-        "directoryList": {
+        "workList": {
             "title": "הספריות שלך",
             "createButton": "צור ספרייה"
         },
-        "directoryDetail": {
+        "workDetail": {
             "failedToGenerateItems": "נכשל ביצירת פריטים. נסה שוב.",
             "generationCompleted": "היצירה הושלמה בהצלחה",
             "generationCancelled": "היצירה בוטלה",
@@ -1358,7 +1358,7 @@
                 "title": "פעילות אחרונה",
                 "noActivity": "עדיין אין פעילות",
                 "created": "ספרייה נוצרה",
-                "directoryCreated": "הספרייה נוצרה בהצלחה",
+                "workCreated": "הספרייה נוצרה בהצלחה",
                 "justNow": "רק עכשיו"
             },
             "items": {
@@ -1663,7 +1663,7 @@
                 "loadingFormSchema": "טוען הגדרת טופס...",
                 "failedToLoadFormSchema": "נכשל בטעינת הגדרת הטופס",
                 "selectOption": "בחר אפשרות",
-                "directoryName": "שם תיקייה",
+                "workName": "שם תיקייה",
                 "generationPrompt": "הנחיית יצירה",
                 "modelOverride": "עקיפת מודל AI",
                 "modelOverridePlaceholder": "לדוגמה openai/gpt-4.1 או openrouter/openai/gpt-4.1",
@@ -1676,7 +1676,7 @@
                 "startGeneration": "התחל יצירה",
                 "regenerateItems": "צור מחדש פריטים",
                 "updateItems": "הרץ יצירה",
-                "recreateDirectory": "צור מחדש תיקייה",
+                "recreateWork": "צור מחדש תיקייה",
                 "showAdvancedOptions": "הצג אפשרויות מתקדמות",
                 "hideAdvancedOptions": "הסתר אפשרויות מתקדמות",
                 "cancel": "בטל",
@@ -1714,7 +1714,7 @@
                 "websiteRepositoryCreationMethod": "שיטת יצירת מאגר אתר",
                 "methodDuplicate": "שכפל",
                 "methodFork": "פיצול",
-                "directoryNamePlaceholder": "הזן שם תיקייה",
+                "workNamePlaceholder": "הזן שם תיקייה",
                 "methodCreateFromTemplate": "צור מתבנית",
                 "aiProcessingConfiguration": "הגדרת עיבוד AI",
                 "maxSearchQueries": "מקסימום שאילתות חיפוש",
@@ -1769,7 +1769,7 @@
                 "aiProviderDescription": "ספק מודל AI ליצירת תוכן וחילוץ",
                 "contentExtractorProvider": "מחלץ תוכן",
                 "contentExtractorProviderDescription": "ספק לחילוץ תוכן מעמודי אינטרנט",
-                "useDirectoryDefault": "השתמש ברירת מחדל של תיקייה",
+                "useWorkDefault": "השתמש ברירת מחדל של תיקייה",
                 "default": "ברירת מחדל",
                 "notConfigured": "לא מוגדר",
                 "notConfiguredTooltip": "ספק זה דורש הגדרה. בקר בהגדרות → תוספים כדי להגדיר אותו.",
@@ -1837,7 +1837,7 @@
                 },
                 "generalSettings": "הגדרות כלליות",
                 "generalTitle": "הגדרות כלליות",
-                "directoryName": "שם ספרייה",
+                "workName": "שם ספרייה",
                 "description": "תיאור",
                 "organizationRepository": "מאגר ארגון",
                 "organizationHelp": "יצירת מאגרים תחת ארגון במקום חשבון אישי",
@@ -1865,8 +1865,8 @@
                 "deleteWebsiteRepositoryDescription": "הסר את מאגר אתר הפריסה",
                 "deleteConfirm": "האם אתה בטוח לחלוטין?",
                 "deleteConfirmDetail": "פעולה זו אינה ניתנת לביטול. הספרייה והמאגרים הנבחרים יימחקו לצמיתות.",
-                "confirmDirectoryName": "הקלד שם ספרייה לאישור",
-                "confirmDirectoryNameDescription": "הקלד \"{name}\" לאישור מחיקה",
+                "confirmWorkName": "הקלד שם ספרייה לאישור",
+                "confirmWorkNameDescription": "הקלד \"{name}\" לאישור מחיקה",
                 "deleteNameMismatch": "שם ספרייה לא תואם",
                 "deleteButton": "מחק ספרייה",
                 "deleteConfirmButton": "כן, מחק",
@@ -2208,7 +2208,7 @@
                 }
             }
         },
-        "directoryCreation": {
+        "workCreation": {
             "title": "צור ספרייה חדשה",
             "subtitle": "בחר כיצד ברצונך ליצור את הספרייה שלך",
             "backToOptions": "חזור לאפשרויות",
@@ -2240,9 +2240,9 @@
                 "getStarted": "התחל",
                 "formTitle": "צור ספרייה עם AI",
                 "formSubtitle": "תאר את רעיון הספרייה שלך ותן ל-AI לטפל בהגדרה וביצירת התוכן הראשוני",
-                "directoryNameLabel": "שם ספרייה",
-                "directoryNamePlaceholder": "למשל, כלי AI מדהימים",
-                "directoryNameHelp": "AI יציע שם אם תשאיר זאת ריק",
+                "workNameLabel": "שם ספרייה",
+                "workNamePlaceholder": "למשל, כלי AI מדהימים",
+                "workNameHelp": "AI יציע שם אם תשאיר זאת ריק",
                 "promptLabel": "תאר את הספרייה שלך",
                 "githubRequired": "נא לחבר את חשבון GitHub שלך תחילה.",
                 "promptPlaceholder": "תאר איזו ספרייה ברצונך ליצור, אילו פריטים היא צריכה להכיל, וכל דרישות ספציפיות...",
@@ -2604,7 +2604,7 @@
             "subtitle": "בחר כיצד ברצונך לקבל התראות על עדכונים חשובים",
             "email": {
                 "title": "התראות דוא\"ל",
-                "directoryUpdates": {
+                "workUpdates": {
                     "label": "עדכוני ספריות",
                     "description": "קבל התראות על עדכונים חשובים לספריות שלך"
                 },
@@ -2653,12 +2653,12 @@
         "sidebar": {
             "menu": "תפריט",
             "aiChat": "צ'אט AI",
-            "newDirectory": "ספרייה חדשה",
+            "newWork": "ספרייה חדשה",
             "activityIndicator": "מייצר ספרייה",
             "navigation": {
                 "dashboard": "לוח מחוונים",
                 "activity": "פעילות",
-                "directories": "ספריות",
+                "works": "ספריות",
                 "plugins": "תוספים",
                 "settings": "הגדרות"
             },
@@ -2716,8 +2716,8 @@
             "welcomeSubtitle": "העוזר המופעל על ידי AI שלך. שאל אותי כל דבר על יצירת ספריות, יצירת תוכן או ארגון הנתונים שלך.",
             "welcomeMessage": "שלום! אני יכול לעזור לך ליצור ספריות בשפה טבעית. שאל משהו כמו \"צור ספרייה לכלי AI\" או תאר מה אתה צריך.",
             "capabilities": {
-                "directoryCreation": "יצירת ספריות",
-                "directoryCreationDesc": "בנה ספריות מתיאורים בשפה טבעית",
+                "workCreation": "יצירת ספריות",
+                "workCreationDesc": "בנה ספריות מתיאורים בשפה טבעית",
                 "webResearch": "מחקר אינטרנט",
                 "webResearchDesc": "חפש ואסוף נתונים מכל האינטרנט",
                 "contentGeneration": "יצירת תוכן",
@@ -2814,8 +2814,8 @@
             "disableWarning": "כיבוי תוסף זה יכבה אותו גם בכל ספריות שלך",
             "cannotDisableSystem": "תוספי מערכת אינם ניתנים לכיבוי",
             "disableFailed": "נכשל בכיבוי התוסף",
-            "autoEnableForDirectories": "הפעל גם לכל הספריות",
-            "autoEnableForDirectoriesDescription": "תוסף זה יהיה פעיל אוטומטית בכל ספריות שלך. ניתן עדיין לכבות אותו פר ספרייה.",
+            "autoEnableForWorks": "הפעל גם לכל הספריות",
+            "autoEnableForWorksDescription": "תוסף זה יהיה פעיל אוטומטית בכל ספריות שלך. ניתן עדיין לכבות אותו פר ספרייה.",
             "confirmDisable": "אשר כיבוי",
             "cancel": "ביטול",
             "missingRequiredFields": "שדות נדרשים חסרים: {fields}",
@@ -2890,20 +2890,20 @@
                 "removeLabel": "הסר {login}"
             }
         },
-        "directoryPlugins": {
+        "workPlugins": {
             "title": "תוספי ספרייה",
             "subtitle": "הגדר תוספים עבור ספרייה זו",
             "active": "פעיל",
             "enable": "הפעל",
             "disable": "כבה",
-            "enableForDirectory": "הפעל עבור ספרייה זו",
-            "disableForDirectory": "כבה עבור ספרייה זו",
+            "enableForWork": "הפעל עבור ספרייה זו",
+            "disableForWork": "כבה עבור ספרייה זו",
             "enableAtUserLevelFirst": "הפעל תוסף זה בהגדרות שלך תחילה",
             "disabledByUser": "כבוי ברמת משתמש",
             "systemAlwaysEnabled": "תוסף מערכת - מופעל תמיד",
             "showSettings": "הצג הגדרות",
             "hideSettings": "הסתר הגדרות",
-            "directorySettingsInfo": "הגדר כאן הגדרות ספציפיות לספרייה",
+            "workSettingsInfo": "הגדר כאן הגדרות ספציפיות לספרייה",
             "save": "שמור",
             "saved": "נשמר",
             "showInstalledOnly": "הצג מותקנים בלבד",
@@ -3012,9 +3012,9 @@
             "authError": "שגיאת אימות",
             "dashboard": "לוח בקרה",
             "activity": "יומן פעילות",
-            "directories": "ספריות",
-            "newDirectory": "ספרייה חדשה",
-            "directory": "ספרייה",
+            "works": "ספריות",
+            "newWork": "ספרייה חדשה",
+            "work": "ספרייה",
             "overview": "סקירה כללית",
             "items": "פריטים",
             "generator": "מחולל",
@@ -3048,7 +3048,7 @@
         }
     },
     "actions": {
-        "directories": {
+        "works": {
             "slug": {
                 "required": "Slug נדרש",
                 "format": "Slug חייב להכיל אותיות קטנות, מספרים ומקפים בלבד"

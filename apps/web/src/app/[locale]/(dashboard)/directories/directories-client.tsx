@@ -33,7 +33,7 @@ export default function DirectoriesClient({
 }: DirectoriesClientProps) {
     const router = useRouter();
     const searchParams = useSearchParams();
-    const t = useTranslations('dashboard.directories');
+    const t = useTranslations('dashboard.works');
     const [directories, setDirectories] = useState<Directory[]>(initialDirectories);
     const [total, setTotal] = useState(totalDirectories);
     const [loading, setLoading] = useState(false);
@@ -162,7 +162,7 @@ export default function DirectoriesClient({
     const hasDirectories = directories.length > 0;
     const summaryCards = [
         {
-            label: t('summary.totalDirectories'),
+            label: t('summary.totalWorks'),
             value: stats.totalDirectories,
             accent: 'text-blue-600 dark:text-blue-300',
             active: false,

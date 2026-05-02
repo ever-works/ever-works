@@ -26,7 +26,7 @@ interface RepoVisibilitySettingsProps {
 export function RepoVisibilitySettings({ initialRepositories }: RepoVisibilitySettingsProps) {
     const { context } = useSettings();
     const { directory } = context;
-    const t = useTranslations('dashboard.directoryDetail.settings');
+    const t = useTranslations('dashboard.workDetail.settings');
     const tVisibility = useTranslations('common.visibility');
     const [repositories, setRepositories] = useState<RepositoryStatus[]>(initialRepositories);
     const [updating, setUpdating] = useState<RepositoryType | null>(null);

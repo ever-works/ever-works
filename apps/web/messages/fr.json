@@ -219,7 +219,7 @@
                     "description": "Chaque répertoire est un dépôt GitHub que vous possédez et contrôlez."
                 }
             },
-            "directory": {
+            "work": {
                 "title": "Créez votre premier répertoire",
                 "description": "Un répertoire est votre hub de contenu. Ajoutez des éléments, configurez la mise en page et publiez-le en un clic.",
                 "detail": "Tout est prêt ! Créez votre premier répertoire pour commencer à créer et publier du contenu.",
@@ -497,7 +497,7 @@
                 "shortcuts": {
                     "title": "Raccourcis clavier",
                     "search": "Rechercher des répertoires",
-                    "newDirectory": "Créer un nouveau répertoire",
+                    "newWork": "Créer un nouveau répertoire",
                     "help": "Ouvrir l'aide",
                     "hint": "Utilisez Cmd sur Mac ou Ctrl sur Windows/Linux"
                 },
@@ -521,7 +521,7 @@
             "columns": {
                 "status": "Statut",
                 "dateTime": "Date / Heure",
-                "directory": "Répertoire",
+                "work": "Répertoire",
                 "type": "Type",
                 "summary": "Résumé"
             },
@@ -532,9 +532,9 @@
                     "generation": "Génération",
                     "comparison": "Comparaison",
                     "deployment": "Déploiement",
-                    "directoryCreated": "Répertoire créé",
-                    "directoryUpdated": "Répertoire mis à jour",
-                    "directoryDeleted": "Répertoire supprimé",
+                    "workCreated": "Répertoire créé",
+                    "workUpdated": "Répertoire mis à jour",
+                    "workDeleted": "Répertoire supprimé",
                     "pluginEnabled": "Plugin activé",
                     "pluginDisabled": "Plugin désactivé",
                     "pluginConfigured": "Plugin configuré",
@@ -596,11 +596,11 @@
                 "pageOf": "Page {page} sur {total}"
             }
         },
-        "directories": {
+        "works": {
             "title": "Répertoires",
             "subtitle": "Gérez et organisez vos répertoires alimentés par l'IA",
             "summary": {
-                "totalDirectories": "Total des répertoires",
+                "totalWorks": "Total des répertoires",
                 "generating": "En génération",
                 "totalItems": "Total des éléments"
             },
@@ -658,13 +658,13 @@
                     "invalidJson": "Fichier JSON invalide",
                     "previewError": "Échec de l’analyse du fichier d’importation",
                     "summary": "Résumé de l’importation",
-                    "directories": "Répertoires",
+                    "works": "Répertoires",
                     "items": "Éléments",
                     "userPlugins": "Plugins utilisateur",
                     "version": "Version du format",
                     "missingPlugins": "Ces plugins ne sont pas installés et seront ignorés",
                     "conflicts": "Conflits de slug",
-                    "existingDirectory": "Existant",
+                    "existingWork": "Existant",
                     "incoming": "Entrant",
                     "strategySkip": "Ignorer (conserver l’existant)",
                     "strategyOverwrite": "Remplacer l’existant",
@@ -681,9 +681,9 @@
                     "validationErrors": "Erreurs de validation",
                     "resultSuccess": "Importation terminée avec succès",
                     "resultFailed": "Échec de l’importation",
-                    "directoriesCreated": "Répertoires créés",
-                    "directoriesUpdated": "Répertoires mis à jour",
-                    "directoriesSkipped": "Répertoires ignorés",
+                    "worksCreated": "Répertoires créés",
+                    "worksUpdated": "Répertoires mis à jour",
+                    "worksSkipped": "Répertoires ignorés",
                     "pluginsImported": "Plugins importés",
                     "warnings": "Avertissements",
                     "errors": "Erreurs"
@@ -881,12 +881,12 @@
             }
         },
         "stats": {
-            "totalDirectories": "Total des répertoires",
+            "totalWorks": "Total des répertoires",
             "totalItems": "Total des éléments",
             "activeWebsites": "Sites web actifs",
             "fromLastMonth": "par rapport au mois dernier"
         },
-        "directoryCard": {
+        "workCard": {
             "status": {
                 "active": "Actif",
                 "notStarted": "Non démarré",
@@ -914,11 +914,11 @@
             "openingTitle": "Ouverture du répertoire",
             "openingMessage": "Préparation de votre répertoire. Les détails s’ouvriront sous peu. Restez sur cette page."
         },
-        "directoryList": {
+        "workList": {
             "title": "Vos répertoires",
             "createButton": "Créer un répertoire"
         },
-        "directoryDetail": {
+        "workDetail": {
             "failedToGenerateItems": "Échec de la génération des éléments. Veuillez réessayer.",
             "generationCompleted": "Génération terminée avec succès",
             "generationCancelled": "Génération annulée",
@@ -1358,7 +1358,7 @@
                 "title": "Activité récente",
                 "noActivity": "Aucune activité pour le moment",
                 "created": "Répertoire créé",
-                "directoryCreated": "Répertoire créé avec succès",
+                "workCreated": "Répertoire créé avec succès",
                 "justNow": "À l'instant"
             },
             "items": {
@@ -1663,7 +1663,7 @@
                 "loadingFormSchema": "Chargement de la configuration du formulaire...",
                 "failedToLoadFormSchema": "Échec du chargement de la configuration du formulaire",
                 "selectOption": "Sélectionner une option",
-                "directoryName": "Nom du répertoire",
+                "workName": "Nom du répertoire",
                 "generationPrompt": "Prompt de génération",
                 "modelOverride": "Remplacement du modèle IA",
                 "modelOverridePlaceholder": "par ex. openai/gpt-4.1 ou openrouter/openai/gpt-4.1",
@@ -1676,7 +1676,7 @@
                 "startGeneration": "Démarrer la génération",
                 "regenerateItems": "Régénérer les éléments",
                 "updateItems": "Exécuter la génération",
-                "recreateDirectory": "Recréer le répertoire",
+                "recreateWork": "Recréer le répertoire",
                 "showAdvancedOptions": "Afficher les options avancées",
                 "hideAdvancedOptions": "Masquer les options avancées",
                 "cancel": "Annuler",
@@ -1714,7 +1714,7 @@
                 "websiteRepositoryCreationMethod": "Méthode de création du dépôt du site web",
                 "methodDuplicate": "Dupliquer",
                 "methodFork": "Fork",
-                "directoryNamePlaceholder": "Saisir le nom du répertoire",
+                "workNamePlaceholder": "Saisir le nom du répertoire",
                 "methodCreateFromTemplate": "Créer à partir d'un modèle",
                 "aiProcessingConfiguration": "Configuration du traitement IA",
                 "maxSearchQueries": "Requêtes de recherche max",
@@ -1769,7 +1769,7 @@
                 "aiProviderDescription": "Fournisseur de modèle IA pour la génération et l'extraction de contenu",
                 "contentExtractorProvider": "Extracteur de contenu",
                 "contentExtractorProviderDescription": "Fournisseur pour extraire le contenu des pages web",
-                "useDirectoryDefault": "Utiliser la valeur par défaut du répertoire",
+                "useWorkDefault": "Utiliser la valeur par défaut du répertoire",
                 "default": "Par défaut",
                 "notConfigured": "Non configuré",
                 "notConfiguredTooltip": "Ce fournisseur nécessite une configuration. Visitez Paramètres → Plugins pour le configurer.",
@@ -1837,7 +1837,7 @@
                 },
                 "generalSettings": "Paramètres généraux",
                 "generalTitle": "Paramètres généraux",
-                "directoryName": "Nom du répertoire",
+                "workName": "Nom du répertoire",
                 "description": "Description",
                 "organizationRepository": "Dépôt d'organisation",
                 "organizationHelp": "Créer des dépôts sous une organisation au lieu de votre compte personnel",
@@ -1865,8 +1865,8 @@
                 "deleteWebsiteRepositoryDescription": "Supprimer le dépôt du site web déployé",
                 "deleteConfirm": "Êtes-vous absolument sûr ?",
                 "deleteConfirmDetail": "Cette action ne peut pas être annulée. Le répertoire et les dépôts sélectionnés seront définitivement supprimés.",
-                "confirmDirectoryName": "Saisir le nom du répertoire pour confirmer",
-                "confirmDirectoryNameDescription": "Saisir \"{name}\" pour confirmer la suppression",
+                "confirmWorkName": "Saisir le nom du répertoire pour confirmer",
+                "confirmWorkNameDescription": "Saisir \"{name}\" pour confirmer la suppression",
                 "deleteNameMismatch": "Le nom du répertoire ne correspond pas",
                 "deleteButton": "Supprimer le répertoire",
                 "deleteConfirmButton": "Oui, supprimer",
@@ -2208,7 +2208,7 @@
                 }
             }
         },
-        "directoryCreation": {
+        "workCreation": {
             "title": "Créer un nouvel annuaire",
             "subtitle": "Choisissez comment vous souhaitez créer votre annuaire",
             "backToOptions": "Retour aux options",
@@ -2240,9 +2240,9 @@
                 "getStarted": "Commencer",
                 "formTitle": "Créer un annuaire avec l'IA",
                 "formSubtitle": "Décrivez votre idée d'annuaire et laissez l'IA s'occuper de la configuration et de la génération du contenu initial",
-                "directoryNameLabel": "Nom de l'annuaire",
-                "directoryNamePlaceholder": "p. ex., Awesome AI Tools",
-                "directoryNameHelp": "L'IA suggérera un nom si vous laissez cela vide",
+                "workNameLabel": "Nom de l'annuaire",
+                "workNamePlaceholder": "p. ex., Awesome AI Tools",
+                "workNameHelp": "L'IA suggérera un nom si vous laissez cela vide",
                 "promptLabel": "Décrivez votre annuaire",
                 "githubRequired": "Veuillez connecter votre compte GitHub en premier.",
                 "promptPlaceholder": "Décrivez le type d'annuaire que vous souhaitez créer, les éléments qu'il doit contenir et toute exigence spécifique...",
@@ -2604,7 +2604,7 @@
             "subtitle": "Choisissez comment vous souhaitez être notifié des mises à jour importantes",
             "email": {
                 "title": "Notifications par e-mail",
-                "directoryUpdates": {
+                "workUpdates": {
                     "label": "Mises à jour des annuaires",
                     "description": "Soyez notifié des mises à jour importantes de vos annuaires"
                 },
@@ -2653,12 +2653,12 @@
         "sidebar": {
             "menu": "Menu",
             "aiChat": "Chat IA",
-            "newDirectory": "Nouvel annuaire",
+            "newWork": "Nouvel annuaire",
             "activityIndicator": "Génération d'annuaire",
             "navigation": {
                 "dashboard": "Tableau de bord",
                 "activity": "Activité",
-                "directories": "Annuaires",
+                "works": "Annuaires",
                 "plugins": "Plugins",
                 "settings": "Paramètres"
             },
@@ -2716,8 +2716,8 @@
             "welcomeSubtitle": "Votre assistant alimenté par l'IA. Demandez-moi tout sur la création d'annuaires, la génération de contenu ou l'organisation de vos données.",
             "welcomeMessage": "Salut ! Je peux vous aider à créer des annuaires en utilisant un langage naturel. Demandez quelque chose comme « Créez un annuaire pour les outils IA » ou décrivez ce dont vous avez besoin.",
             "capabilities": {
-                "directoryCreation": "Création d'annuaire",
-                "directoryCreationDesc": "Construisez des annuaires à partir de descriptions en langage naturel",
+                "workCreation": "Création d'annuaire",
+                "workCreationDesc": "Construisez des annuaires à partir de descriptions en langage naturel",
                 "webResearch": "Recherche web",
                 "webResearchDesc": "Recherchez et collectez des données sur le web",
                 "contentGeneration": "Génération de contenu",
@@ -2814,8 +2814,8 @@
             "disableWarning": "Désactiver ce greffon le désactivera également dans tous vos répertoires",
             "cannotDisableSystem": "Les greffons système ne peuvent pas être désactivés",
             "disableFailed": "Échec de la désactivation du greffon",
-            "autoEnableForDirectories": "Activer également pour tous les répertoires",
-            "autoEnableForDirectoriesDescription": "Ce greffon sera automatiquement actif dans tous vos répertoires. Vous pouvez toujours le désactiver par répertoire.",
+            "autoEnableForWorks": "Activer également pour tous les répertoires",
+            "autoEnableForWorksDescription": "Ce greffon sera automatiquement actif dans tous vos répertoires. Vous pouvez toujours le désactiver par répertoire.",
             "confirmDisable": "Confirmer la désactivation",
             "cancel": "Annuler",
             "missingRequiredFields": "Champs obligatoires manquants : {fields}",
@@ -2890,20 +2890,20 @@
                 "removeLabel": "Supprimer {login}"
             }
         },
-        "directoryPlugins": {
+        "workPlugins": {
             "title": "Greffons des répertoires",
             "subtitle": "Configurez les greffons pour ce répertoire",
             "active": "Actif",
             "enable": "Activer",
             "disable": "Désactiver",
-            "enableForDirectory": "Activer pour ce répertoire",
-            "disableForDirectory": "Désactiver pour ce répertoire",
+            "enableForWork": "Activer pour ce répertoire",
+            "disableForWork": "Désactiver pour ce répertoire",
             "enableAtUserLevelFirst": "Activez d'abord ce greffon dans vos paramètres",
             "disabledByUser": "Désactivé au niveau utilisateur",
             "systemAlwaysEnabled": "Greffon système - toujours activé",
             "showSettings": "Afficher les paramètres",
             "hideSettings": "Masquer les paramètres",
-            "directorySettingsInfo": "Configurez ici les paramètres spécifiques au répertoire",
+            "workSettingsInfo": "Configurez ici les paramètres spécifiques au répertoire",
             "save": "Enregistrer",
             "saved": "Enregistré",
             "showInstalledOnly": "Afficher uniquement les installés",
@@ -3012,9 +3012,9 @@
             "authError": "Erreur d'authentification",
             "dashboard": "Tableau de bord",
             "activity": "Journal d'activité",
-            "directories": "Annuaires",
-            "newDirectory": "Nouvel annuaire",
-            "directory": "Annuaire",
+            "works": "Annuaires",
+            "newWork": "Nouvel annuaire",
+            "work": "Annuaire",
             "overview": "Aperçu",
             "items": "Éléments",
             "generator": "Générateur",
@@ -3048,7 +3048,7 @@
         }
     },
     "actions": {
-        "directories": {
+        "works": {
             "slug": {
                 "required": "Le slug est requis",
                 "format": "Le slug ne doit contenir que des lettres minuscules, des chiffres et des tirets"

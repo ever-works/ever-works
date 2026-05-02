@@ -37,7 +37,7 @@ export function DomainManagement({ directory }: DomainManagementProps) {
 }
 
 function DomainManagementContent({ directory }: DomainManagementProps) {
-    const t = useTranslations('dashboard.directoryDetail.deploy.domains');
+    const t = useTranslations('dashboard.workDetail.deploy.domains');
     const [isPending, startTransition] = useTransition();
     const router = useRouter();
     const [domains, setDomains] = useState<DeploymentDomain[] | null>(null);

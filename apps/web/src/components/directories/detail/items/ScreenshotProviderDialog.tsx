@@ -32,7 +32,7 @@ export function ScreenshotProviderDialog({
     onConfirm,
     isSubmitting,
 }: ScreenshotProviderDialogProps) {
-    const t = useTranslations('dashboard.directoryDetail.items');
+    const t = useTranslations('dashboard.workDetail.items');
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>

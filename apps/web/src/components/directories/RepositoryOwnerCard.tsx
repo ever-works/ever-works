@@ -20,7 +20,7 @@ export function RepositoryOwnerCard({
     onChange,
     disabled,
 }: RepositoryOwnerCardProps) {
-    const t = useTranslations('dashboard.directoryCreation');
+    const t = useTranslations('dashboard.workCreation');
 
     return (
         <div

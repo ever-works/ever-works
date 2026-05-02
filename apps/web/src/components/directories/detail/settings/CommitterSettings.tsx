@@ -10,7 +10,7 @@ import { useState, useTransition } from 'react';
 import { toast } from 'sonner';
 
 export function CommitterSettings() {
-    const t = useTranslations('dashboard.directoryDetail.settings');
+    const t = useTranslations('dashboard.workDetail.settings');
     const { context } = useSettings();
     const { directory, user } = context;
 

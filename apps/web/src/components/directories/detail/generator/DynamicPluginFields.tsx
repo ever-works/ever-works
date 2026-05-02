@@ -30,7 +30,7 @@ export function DynamicPluginFields({
     values,
     onChange,
 }: DynamicPluginFieldsProps) {
-    const t = useTranslations('dashboard.directoryDetail.generator');
+    const t = useTranslations('dashboard.workDetail.generator');
 
     // Deduplicate fields by name (first occurrence wins)
     const uniqueFields = useMemo(() => {
@@ -362,7 +362,7 @@ interface JsonFieldProps {
 }
 
 function JsonField({ field, value, onChange }: JsonFieldProps) {
-    const t = useTranslations('dashboard.directoryDetail.generator');
+    const t = useTranslations('dashboard.workDetail.generator');
     const [rawText, setRawText] = useState(() =>
         value && Object.keys(value).length > 0 ? JSON.stringify(value, null, 2) : '',
     );

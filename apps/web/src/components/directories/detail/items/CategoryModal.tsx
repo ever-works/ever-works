@@ -42,7 +42,7 @@ function CategoryModalContent({
     category,
     existingNames,
 }: Omit<CategoryModalProps, 'isOpen'>) {
-    const t = useTranslations('dashboard.directoryDetail.items.taxonomy.categories.modal');
+    const t = useTranslations('dashboard.workDetail.items.taxonomy.categories.modal');
     const [name, setName] = useState(() => category?.name ?? '');
     const [description, setDescription] = useState(() => category?.description ?? '');
     const [iconUrl, setIconUrl] = useState(() => category?.icon_url ?? '');

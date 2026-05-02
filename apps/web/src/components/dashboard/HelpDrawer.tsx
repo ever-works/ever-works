@@ -29,7 +29,7 @@ export function HelpDrawer({ open, onClose, onboarding }: HelpDrawerProps) {
 
     const keyboardShortcuts = [
         { keys: ['Ctrl', 'K'], label: t('shortcuts.search') },
-        { keys: ['C'], label: t('shortcuts.newDirectory') },
+        { keys: ['C'], label: t('shortcuts.newWork') },
     ];
 
     const links = [

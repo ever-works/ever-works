@@ -219,7 +219,7 @@
                     "description": "Każdy katalog to repozytorium GitHub, które posiadasz i kontrolujesz."
                 }
             },
-            "directory": {
+            "work": {
                 "title": "Utwórz swój pierwszy katalog",
                 "description": "Katalog to twój ośrodek treści. Dodawaj elementy, konfiguruj układ i publikuj jednym kliknięciem.",
                 "detail": "Jesteś gotowy! Utwórz swój pierwszy katalog, aby zacząć budować i publikować treści.",
@@ -497,7 +497,7 @@
                 "shortcuts": {
                     "title": "Skróty klawiaturowe",
                     "search": "Wyszukaj katalogi",
-                    "newDirectory": "Utwórz nowy katalog",
+                    "newWork": "Utwórz nowy katalog",
                     "help": "Otwórz pomoc",
                     "hint": "Użyj Cmd na Mac lub Ctrl na Windows/Linux"
                 },
@@ -521,7 +521,7 @@
             "columns": {
                 "status": "Status",
                 "dateTime": "Data / Godzina",
-                "directory": "Katalog",
+                "work": "Katalog",
                 "type": "Typ",
                 "summary": "Podsumowanie"
             },
@@ -532,9 +532,9 @@
                     "generation": "Generowanie",
                     "comparison": "Porównanie",
                     "deployment": "Wdrożenie",
-                    "directoryCreated": "Katalog utworzony",
-                    "directoryUpdated": "Katalog zaktualizowany",
-                    "directoryDeleted": "Katalog usunięty",
+                    "workCreated": "Katalog utworzony",
+                    "workUpdated": "Katalog zaktualizowany",
+                    "workDeleted": "Katalog usunięty",
                     "pluginEnabled": "Wtyczka włączona",
                     "pluginDisabled": "Wtyczka wyłączona",
                     "pluginConfigured": "Wtyczka skonfigurowana",
@@ -596,11 +596,11 @@
                 "pageOf": "Strona {page} z {total}"
             }
         },
-        "directories": {
+        "works": {
             "title": "Katalogi",
             "subtitle": "Zarządzaj i organizuj katalogi zasilane AI",
             "summary": {
-                "totalDirectories": "Łączna liczba katalogów",
+                "totalWorks": "Łączna liczba katalogów",
                 "generating": "Generowanie",
                 "totalItems": "Łączna liczba elementów"
             },
@@ -658,13 +658,13 @@
                     "invalidJson": "Nieprawidłowy plik JSON",
                     "previewError": "Nie udało się przeanalizować pliku importu",
                     "summary": "Podsumowanie importu",
-                    "directories": "Katalogi",
+                    "works": "Katalogi",
                     "items": "Elementy",
                     "userPlugins": "Wtyczki użytkownika",
                     "version": "Wersja formatu",
                     "missingPlugins": "Te wtyczki nie są zainstalowane i zostaną pominięte",
                     "conflicts": "Konflikty identyfikatorów",
-                    "existingDirectory": "Istniejący",
+                    "existingWork": "Istniejący",
                     "incoming": "Przychodzący",
                     "strategySkip": "Pomiń (zachowaj istniejący)",
                     "strategyOverwrite": "Nadpisz istniejący",
@@ -681,9 +681,9 @@
                     "validationErrors": "Błędy walidacji",
                     "resultSuccess": "Import zakończony pomyślnie",
                     "resultFailed": "Import nie powiódł się",
-                    "directoriesCreated": "Katalogi utworzone",
-                    "directoriesUpdated": "Katalogi zaktualizowane",
-                    "directoriesSkipped": "Katalogi pominięte",
+                    "worksCreated": "Katalogi utworzone",
+                    "worksUpdated": "Katalogi zaktualizowane",
+                    "worksSkipped": "Katalogi pominięte",
                     "pluginsImported": "Wtyczki zaimportowane",
                     "warnings": "Ostrzeżenia",
                     "errors": "Błędy"
@@ -881,12 +881,12 @@
             }
         },
         "stats": {
-            "totalDirectories": "Łączna liczba katalogów",
+            "totalWorks": "Łączna liczba katalogów",
             "totalItems": "Łączna liczba elementów",
             "activeWebsites": "Aktywne witryny",
             "fromLastMonth": "z ostatniego miesiąca"
         },
-        "directoryCard": {
+        "workCard": {
             "status": {
                 "active": "Aktywny",
                 "notStarted": "Nie rozpoczęty",
@@ -914,11 +914,11 @@
             "openingTitle": "Otwieranie katalogu",
             "openingMessage": "Przygotowywanie katalogu. Szczegóły otworzą się za chwilę. Pozostań na tej stronie."
         },
-        "directoryList": {
+        "workList": {
             "title": "Twoje katalogi",
             "createButton": "Utwórz katalog"
         },
-        "directoryDetail": {
+        "workDetail": {
             "failedToGenerateItems": "Nie udało się wygenerować elementów. Spróbuj ponownie.",
             "generationCompleted": "Wygenerowano pomyślnie",
             "generationCancelled": "Generowanie zostało anulowane",
@@ -1358,7 +1358,7 @@
                 "title": "Ostatnia aktywność",
                 "noActivity": "Brak aktywności",
                 "created": "Katalog utworzony",
-                "directoryCreated": "Katalog został pomyślnie utworzony",
+                "workCreated": "Katalog został pomyślnie utworzony",
                 "justNow": "Przed chwilą"
             },
             "items": {
@@ -1663,7 +1663,7 @@
                 "loadingFormSchema": "Ładowanie konfiguracji formularza...",
                 "failedToLoadFormSchema": "Nie udało się załadować konfiguracji formularza",
                 "selectOption": "Wybierz opcję",
-                "directoryName": "Nazwa katalogu",
+                "workName": "Nazwa katalogu",
                 "generationPrompt": "Prompt generacji",
                 "modelOverride": "Nadpisanie modelu AI",
                 "modelOverridePlaceholder": "np. openai/gpt-4.1 lub openrouter/openai/gpt-4.1",
@@ -1676,7 +1676,7 @@
                 "startGeneration": "Rozpocznij generację",
                 "regenerateItems": "Zregeneruj elementy",
                 "updateItems": "Uruchom generację",
-                "recreateDirectory": "Odtwórz katalog",
+                "recreateWork": "Odtwórz katalog",
                 "showAdvancedOptions": "Pokaż zaawansowane opcje",
                 "hideAdvancedOptions": "Ukryj zaawansowane opcje",
                 "cancel": "Anuluj",
@@ -1714,7 +1714,7 @@
                 "websiteRepositoryCreationMethod": "Metoda tworzenia repozytorium witryny",
                 "methodDuplicate": "Duplikuj",
                 "methodFork": "Fork",
-                "directoryNamePlaceholder": "Wprowadź nazwę katalogu",
+                "workNamePlaceholder": "Wprowadź nazwę katalogu",
                 "methodCreateFromTemplate": "Utwórz z szablonu",
                 "aiProcessingConfiguration": "Konfiguracja przetwarzania AI",
                 "maxSearchQueries": "Maks. zapytań wyszukiwania",
@@ -1769,7 +1769,7 @@
                 "aiProviderDescription": "Dostawca modelu AI do generowania i wyodrębniania treści",
                 "contentExtractorProvider": "Wyodrębnianie treści",
                 "contentExtractorProviderDescription": "Dostawca do wyodrębniania treści ze stron internetowych",
-                "useDirectoryDefault": "Użyj domyślnego katalogu",
+                "useWorkDefault": "Użyj domyślnego katalogu",
                 "default": "Domyślny",
                 "notConfigured": "Nieskonfigurowany",
                 "notConfiguredTooltip": "Ten dostawca wymaga konfiguracji. Odwiedź Ustawienia → Wtyczki, aby go skonfigurować.",
@@ -1837,7 +1837,7 @@
                 },
                 "generalSettings": "Ustawienia ogólne",
                 "generalTitle": "Ustawienia ogólne",
-                "directoryName": "Nazwa katalogu",
+                "workName": "Nazwa katalogu",
                 "description": "Opis",
                 "organizationRepository": "Repozytorium organizacji",
                 "organizationHelp": "Twórz repozytoria pod organizacją zamiast na koncie osobistym",
@@ -1865,8 +1865,8 @@
                 "deleteWebsiteRepositoryDescription": "Usuń wdrożone repozytorium strony internetowej",
                 "deleteConfirm": "Czy na pewno?",
                 "deleteConfirmDetail": "Ta akcja jest nieodwracalna. Katalog i wybrane repozytoria zostaną trwale usunięte.",
-                "confirmDirectoryName": "Wpisz nazwę katalogu, aby potwierdzić",
-                "confirmDirectoryNameDescription": "Wpisz \"{name}\", aby potwierdzić usunięcie",
+                "confirmWorkName": "Wpisz nazwę katalogu, aby potwierdzić",
+                "confirmWorkNameDescription": "Wpisz \"{name}\", aby potwierdzić usunięcie",
                 "deleteNameMismatch": "Nazwa katalogu nie pasuje",
                 "deleteButton": "Usuń katalog",
                 "deleteConfirmButton": "Tak, usuń",
@@ -2208,7 +2208,7 @@
                 }
             }
         },
-        "directoryCreation": {
+        "workCreation": {
             "title": "Utwórz nowy katalog",
             "subtitle": "Wybierz sposób utworzenia katalogu",
             "backToOptions": "Powrót do opcji",
@@ -2240,9 +2240,9 @@
                 "getStarted": "Rozpocznij",
                 "formTitle": "Utwórz katalog z AI",
                 "formSubtitle": "Opisz pomysł na katalog, a AI zajmie się konfiguracją i generowaniem początkowej zawartości",
-                "directoryNameLabel": "Nazwa katalogu",
-                "directoryNamePlaceholder": "np. Świetne narzędzia AI",
-                "directoryNameHelp": "AI zasugeruje nazwę, jeśli zostawisz to puste",
+                "workNameLabel": "Nazwa katalogu",
+                "workNamePlaceholder": "np. Świetne narzędzia AI",
+                "workNameHelp": "AI zasugeruje nazwę, jeśli zostawisz to puste",
                 "promptLabel": "Opisz swój katalog",
                 "githubRequired": "Najpierw połącz konto GitHub.",
                 "promptPlaceholder": "Opisz, jaki katalog chcesz utworzyć, jakie elementy powinien zawierać i wszelkie konkretne wymagania...",
@@ -2604,7 +2604,7 @@
             "subtitle": "Wybierz, jak chcesz być powiadamiany o ważnych aktualizacjach",
             "email": {
                 "title": "Powiadomienia e-mail",
-                "directoryUpdates": {
+                "workUpdates": {
                     "label": "Aktualizacje katalogów",
                     "description": "Otrzymuj powiadomienia o ważnych aktualizacjach swoich katalogów"
                 },
@@ -2653,12 +2653,12 @@
         "sidebar": {
             "menu": "Menu",
             "aiChat": "Czaty AI",
-            "newDirectory": "Nowy katalog",
+            "newWork": "Nowy katalog",
             "activityIndicator": "Generowanie katalogu",
             "navigation": {
                 "dashboard": "Panel główny",
                 "activity": "Aktywność",
-                "directories": "Katalogi",
+                "works": "Katalogi",
                 "plugins": "Wtyczki",
                 "settings": "Ustawienia"
             },
@@ -2716,8 +2716,8 @@
             "welcomeSubtitle": "Twój asystent napędzany AI. Pytaj o cokolwiek związanego z tworzeniem katalogów, generowaniem treści lub organizacją danych.",
             "welcomeMessage": "Cześć! Mogę pomóc ci tworzyć katalogi za pomocą języka naturalnego. Poproś np. „Stwórz katalog narzędzi AI” lub opisz, czego potrzebujesz.",
             "capabilities": {
-                "directoryCreation": "Tworzenie katalogów",
-                "directoryCreationDesc": "Buduj katalogi na podstawie opisów w języku naturalnym",
+                "workCreation": "Tworzenie katalogów",
+                "workCreationDesc": "Buduj katalogi na podstawie opisów w języku naturalnym",
                 "webResearch": "Badania internetowe",
                 "webResearchDesc": "Szukaj i zbieraj dane z internetu",
                 "contentGeneration": "Generowanie treści",
@@ -2814,8 +2814,8 @@
             "disableWarning": "Wyłączenie tej wtyczki wyłączy ją również we wszystkich katalogach",
             "cannotDisableSystem": "Wtyczek systemowych nie można wyłączyć",
             "disableFailed": "Nie udało się wyłączyć wtyczki",
-            "autoEnableForDirectories": "Włącz również dla wszystkich katalogów",
-            "autoEnableForDirectoriesDescription": "Ta wtyczka będzie automatycznie aktywna we wszystkich katalogach. Nadal możesz ją wyłączyć dla konkretnego katalogu.",
+            "autoEnableForWorks": "Włącz również dla wszystkich katalogów",
+            "autoEnableForWorksDescription": "Ta wtyczka będzie automatycznie aktywna we wszystkich katalogach. Nadal możesz ją wyłączyć dla konkretnego katalogu.",
             "confirmDisable": "Potwierdź wyłączenie",
             "cancel": "Anuluj",
             "missingRequiredFields": "Brakujące wymagane pola: {fields}",
@@ -2890,20 +2890,20 @@
                 "removeLabel": "Usuń {login}"
             }
         },
-        "directoryPlugins": {
+        "workPlugins": {
             "title": "Wtyczki katalogu",
             "subtitle": "Skonfiguruj wtyczki dla tego katalogu",
             "active": "Aktywne",
             "enable": "Włącz",
             "disable": "Wyłącz",
-            "enableForDirectory": "Włącz dla tego katalogu",
-            "disableForDirectory": "Wyłącz dla tego katalogu",
+            "enableForWork": "Włącz dla tego katalogu",
+            "disableForWork": "Wyłącz dla tego katalogu",
             "enableAtUserLevelFirst": "Najpierw włącz tę wtyczkę w swoich ustawieniach",
             "disabledByUser": "Wyłączone na poziomie użytkownika",
             "systemAlwaysEnabled": "Wtyczka systemowa – zawsze włączona",
             "showSettings": "Pokaż ustawienia",
             "hideSettings": "Ukryj ustawienia",
-            "directorySettingsInfo": "Skonfiguruj ustawienia specyficzne dla katalogu tutaj",
+            "workSettingsInfo": "Skonfiguruj ustawienia specyficzne dla katalogu tutaj",
             "save": "Zapisz",
             "saved": "Zapisano",
             "showInstalledOnly": "Pokaż tylko zainstalowane",
@@ -3012,9 +3012,9 @@
             "authError": "Błąd uwierzytelniania",
             "dashboard": "Pulpit",
             "activity": "Dziennik aktywności",
-            "directories": "Katalogi",
-            "newDirectory": "Nowy katalog",
-            "directory": "Katalog",
+            "works": "Katalogi",
+            "newWork": "Nowy katalog",
+            "work": "Katalog",
             "overview": "Przegląd",
             "items": "Elementy",
             "generator": "Generator",
@@ -3048,7 +3048,7 @@
         }
     },
     "actions": {
-        "directories": {
+        "works": {
             "slug": {
                 "required": "Slug jest wymagany",
                 "format": "Slug może zawierać tylko małe litery, cyfry i myślniki"

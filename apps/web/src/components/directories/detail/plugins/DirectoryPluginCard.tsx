@@ -24,7 +24,7 @@ interface DirectoryPluginCardProps {
 }
 
 export function DirectoryPluginCard({ directoryId, plugin }: DirectoryPluginCardProps) {
-    const t = useTranslations('dashboard.directoryPlugins');
+    const t = useTranslations('dashboard.workPlugins');
     const router = useRouter();
     const [isPending, startTransition] = useTransition();
     const [showModal, setShowModal] = useState(false);
@@ -203,8 +203,8 @@ export function DirectoryPluginCard({ directoryId, plugin }: DirectoryPluginCard
                                 !canEnable && !isEnabled
                                     ? t('enableAtUserLevelFirst')
                                     : isEnabled
-                                      ? t('disableForDirectory')
-                                      : t('enableForDirectory')
+                                      ? t('disableForWork')
+                                      : t('enableForWork')
                             }
                         >
                             {isEnabled ? (

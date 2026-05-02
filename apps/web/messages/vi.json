@@ -219,7 +219,7 @@
                     "description": "Mọi thư mục đều là kho lưu trữ GitHub mà bạn sở hữu và kiểm soát"
                 }
             },
-            "directory": {
+            "work": {
                 "title": "Tạo thư mục đầu tiên của bạn",
                 "description": "Thư mục là trung tâm nội dung của bạn. Thêm các mục, cấu hình bố cục và xuất bản chỉ với một cú nhấp chuột.",
                 "detail": "Bạn đã sẵn sàng! Tạo thư mục đầu tiên của bạn để bắt đầu xây dựng và xuất bản nội dung.",
@@ -497,7 +497,7 @@
                 "shortcuts": {
                     "title": "Phím Tắt Bàn Phím",
                     "search": "Tìm kiếm thư mục",
-                    "newDirectory": "Tạo thư mục mới",
+                    "newWork": "Tạo thư mục mới",
                     "help": "Mở trợ giúp",
                     "hint": "Sử dụng Cmd trên Mac hoặc Ctrl trên Windows/Linux"
                 },
@@ -521,7 +521,7 @@
             "columns": {
                 "status": "Trạng thái",
                 "dateTime": "Ngày / Giờ",
-                "directory": "Thư mục",
+                "work": "Thư mục",
                 "type": "Loại",
                 "summary": "Tóm tắt"
             },
@@ -532,9 +532,9 @@
                     "generation": "Tạo",
                     "comparison": "So sánh",
                     "deployment": "Triển khai",
-                    "directoryCreated": "Thư mục Đã Tạo",
-                    "directoryUpdated": "Thư mục Đã Cập nhật",
-                    "directoryDeleted": "Thư mục Đã Xóa",
+                    "workCreated": "Thư mục Đã Tạo",
+                    "workUpdated": "Thư mục Đã Cập nhật",
+                    "workDeleted": "Thư mục Đã Xóa",
                     "pluginEnabled": "Plugin Đã Bật",
                     "pluginDisabled": "Plugin Đã Tắt",
                     "pluginConfigured": "Plugin Đã Cấu hình",
@@ -596,11 +596,11 @@
                 "pageOf": "Trang {page} trong {total}"
             }
         },
-        "directories": {
+        "works": {
             "title": "Thư mục",
             "subtitle": "Quản lý và tổ chức các thư mục được hỗ trợ bởi AI của bạn",
             "summary": {
-                "totalDirectories": "Tổng Thư mục",
+                "totalWorks": "Tổng Thư mục",
                 "generating": "Đang tạo",
                 "totalItems": "Tổng Số Mục"
             },
@@ -658,13 +658,13 @@
                     "invalidJson": "Tệp JSON không hợp lệ",
                     "previewError": "Không thể phân tích tệp nhập",
                     "summary": "Tóm tắt nhập",
-                    "directories": "Thư mục",
+                    "works": "Thư mục",
                     "items": "Mục",
                     "userPlugins": "Plugin người dùng",
                     "version": "Phiên bản định dạng",
                     "missingPlugins": "Các plugin này chưa được cài đặt và sẽ bị bỏ qua",
                     "conflicts": "Xung đột Slug",
-                    "existingDirectory": "Hiện có",
+                    "existingWork": "Hiện có",
                     "incoming": "Đang đến",
                     "strategySkip": "Bỏ qua (giữ hiện có)",
                     "strategyOverwrite": "Ghi đè hiện có",
@@ -681,9 +681,9 @@
                     "validationErrors": "Lỗi xác thực",
                     "resultSuccess": "Nhập hoàn tất thành công",
                     "resultFailed": "Nhập thất bại",
-                    "directoriesCreated": "Thư mục được tạo",
-                    "directoriesUpdated": "Thư mục được cập nhật",
-                    "directoriesSkipped": "Thư mục bị bỏ qua",
+                    "worksCreated": "Thư mục được tạo",
+                    "worksUpdated": "Thư mục được cập nhật",
+                    "worksSkipped": "Thư mục bị bỏ qua",
                     "pluginsImported": "Plugin được nhập",
                     "warnings": "Cảnh báo",
                     "errors": "Lỗi"
@@ -881,12 +881,12 @@
             }
         },
         "stats": {
-            "totalDirectories": "Tổng thư mục",
+            "totalWorks": "Tổng thư mục",
             "totalItems": "Tổng mục",
             "activeWebsites": "Trang web hoạt động",
             "fromLastMonth": "từ tháng trước"
         },
-        "directoryCard": {
+        "workCard": {
             "status": {
                 "active": "Hoạt động",
                 "notStarted": "Chưa bắt đầu",
@@ -914,11 +914,11 @@
             "openingTitle": "Đang mở thư mục",
             "openingMessage": "Đang chuẩn bị thư mục của bạn. Chi tiết sẽ mở ngay. Hãy ở lại trang này."
         },
-        "directoryList": {
+        "workList": {
             "title": "Thư mục của bạn",
             "createButton": "Tạo thư mục"
         },
-        "directoryDetail": {
+        "workDetail": {
             "failedToGenerateItems": "Không thể tạo các mục. Vui lòng thử lại.",
             "generationCompleted": "Tạo hoàn tất thành công",
             "generationCancelled": "Tạo đã bị hủy",
@@ -1358,7 +1358,7 @@
                 "title": "Hoạt động gần đây",
                 "noActivity": "Chưa có hoạt động",
                 "created": "Đã tạo thư mục",
-                "directoryCreated": "Thư mục đã được tạo thành công",
+                "workCreated": "Thư mục đã được tạo thành công",
                 "justNow": "Vừa xong"
             },
             "items": {
@@ -1663,7 +1663,7 @@
                 "loadingFormSchema": "Đang tải cấu hình biểu mẫu...",
                 "failedToLoadFormSchema": "Không thể tải cấu hình biểu mẫu",
                 "selectOption": "Chọn một tùy chọn",
-                "directoryName": "Tên Thư mục",
+                "workName": "Tên Thư mục",
                 "generationPrompt": "Prompt Tạo",
                 "modelOverride": "Ghi đè mô hình AI",
                 "modelOverridePlaceholder": "ví dụ: openai/gpt-4.1 hoặc openrouter/openai/gpt-4.1",
@@ -1676,7 +1676,7 @@
                 "startGeneration": "Bắt đầu Tạo",
                 "regenerateItems": "Tái tạo Mục",
                 "updateItems": "Chạy Tạo",
-                "recreateDirectory": "Tái tạo Thư mục",
+                "recreateWork": "Tái tạo Thư mục",
                 "showAdvancedOptions": "Hiển thị Tùy chọn Nâng cao",
                 "hideAdvancedOptions": "Ẩn Tùy chọn Nâng cao",
                 "cancel": "Hủy",
@@ -1714,7 +1714,7 @@
                 "websiteRepositoryCreationMethod": "Phương thức Tạo Kho Trang web",
                 "methodDuplicate": "Nhân bản",
                 "methodFork": "Fork",
-                "directoryNamePlaceholder": "Nhập tên thư mục",
+                "workNamePlaceholder": "Nhập tên thư mục",
                 "methodCreateFromTemplate": "Tạo từ Mẫu",
                 "aiProcessingConfiguration": "Cấu hình Xử lý AI",
                 "maxSearchQueries": "Số truy vấn Tìm kiếm Tối đa",
@@ -1769,7 +1769,7 @@
                 "aiProviderDescription": "Nhà cung cấp mô hình AI cho tạo và trích xuất nội dung",
                 "contentExtractorProvider": "Trích xuất Nội dung",
                 "contentExtractorProviderDescription": "Nhà cung cấp trích xuất nội dung từ trang web",
-                "useDirectoryDefault": "Sử dụng Mặc định Thư mục",
+                "useWorkDefault": "Sử dụng Mặc định Thư mục",
                 "default": "Mặc định",
                 "notConfigured": "Chưa cấu hình",
                 "notConfiguredTooltip": "Nhà cung cấp này yêu cầu cấu hình. Truy cập Cài đặt → Plugins để thiết lập.",
@@ -1837,7 +1837,7 @@
                 },
                 "generalSettings": "Cài đặt chung",
                 "generalTitle": "Cài đặt chung",
-                "directoryName": "Tên thư mục",
+                "workName": "Tên thư mục",
                 "description": "Mô tả",
                 "organizationRepository": "Kho lưu trữ tổ chức",
                 "organizationHelp": "Tạo kho lưu trữ dưới một tổ chức thay vì tài khoản cá nhân của bạn",
@@ -1865,8 +1865,8 @@
                 "deleteWebsiteRepositoryDescription": "Xóa kho lưu trữ trang web đã triển khai",
                 "deleteConfirm": "Bạn có chắc chắn không?",
                 "deleteConfirmDetail": "Hành động này không thể hoàn tác. Thư mục và các kho lưu trữ được chọn sẽ bị xóa vĩnh viễn.",
-                "confirmDirectoryName": "Nhập tên thư mục để xác nhận",
-                "confirmDirectoryNameDescription": "Nhập \"{name}\" để xác nhận xóa",
+                "confirmWorkName": "Nhập tên thư mục để xác nhận",
+                "confirmWorkNameDescription": "Nhập \"{name}\" để xác nhận xóa",
                 "deleteNameMismatch": "Tên thư mục không khớp",
                 "deleteButton": "Xóa Thư mục",
                 "deleteConfirmButton": "Có, Xóa",
@@ -2208,7 +2208,7 @@
                 }
             }
         },
-        "directoryCreation": {
+        "workCreation": {
             "title": "Tạo Thư Mục Mới",
             "subtitle": "Chọn cách bạn muốn tạo thư mục của mình",
             "backToOptions": "Quay lại các tùy chọn",
@@ -2240,9 +2240,9 @@
                 "getStarted": "Bắt đầu",
                 "formTitle": "Tạo Thư Mục Bằng AI",
                 "formSubtitle": "Mô tả ý tưởng thư mục của bạn và để AI xử lý việc thiết lập và tạo nội dung ban đầu",
-                "directoryNameLabel": "Tên Thư Mục",
-                "directoryNamePlaceholder": "ví dụ: Awesome AI Tools",
-                "directoryNameHelp": "AI sẽ gợi ý tên nếu bạn để trống",
+                "workNameLabel": "Tên Thư Mục",
+                "workNamePlaceholder": "ví dụ: Awesome AI Tools",
+                "workNameHelp": "AI sẽ gợi ý tên nếu bạn để trống",
                 "promptLabel": "Mô Tả Thư Mục Của Bạn",
                 "githubRequired": "Vui lòng kết nối tài khoản GitHub của bạn trước.",
                 "promptPlaceholder": "Mô tả loại thư mục bạn muốn tạo, các mục nó nên chứa và bất kỳ yêu cầu cụ thể nào...",
@@ -2604,7 +2604,7 @@
             "subtitle": "Chọn cách bạn muốn nhận thông báo về các cập nhật quan trọng",
             "email": {
                 "title": "Thông báo Email",
-                "directoryUpdates": {
+                "workUpdates": {
                     "label": "Cập nhật Thư mục",
                     "description": "Nhận thông báo về các cập nhật quan trọng cho thư mục của bạn"
                 },
@@ -2653,12 +2653,12 @@
         "sidebar": {
             "menu": "Menu",
             "aiChat": "Trò chuyện AI",
-            "newDirectory": "Thư mục Mới",
+            "newWork": "Thư mục Mới",
             "activityIndicator": "Đang tạo thư mục",
             "navigation": {
                 "dashboard": "Bảng điều khiển",
                 "activity": "Hoạt động",
-                "directories": "Thư mục",
+                "works": "Thư mục",
                 "plugins": "Plugin",
                 "settings": "Cài đặt"
             },
@@ -2716,8 +2716,8 @@
             "welcomeSubtitle": "Trợ lý được hỗ trợ bởi AI của bạn. Hỏi tôi bất cứ điều gì về việc tạo thư mục, tạo nội dung hoặc tổ chức dữ liệu của bạn.",
             "welcomeMessage": "Chào! Tôi có thể giúp bạn tạo thư mục bằng ngôn ngữ tự nhiên. Hỏi điều gì đó như \"Tạo thư mục cho công cụ AI\" hoặc mô tả những gì bạn cần.",
             "capabilities": {
-                "directoryCreation": "Tạo Thư mục",
-                "directoryCreationDesc": "Xây dựng thư mục từ mô tả ngôn ngữ tự nhiên",
+                "workCreation": "Tạo Thư mục",
+                "workCreationDesc": "Xây dựng thư mục từ mô tả ngôn ngữ tự nhiên",
                 "webResearch": "Nghiên cứu Web",
                 "webResearchDesc": "Tìm kiếm và thu thập dữ liệu từ khắp web",
                 "contentGeneration": "Tạo Nội dung",
@@ -2814,8 +2814,8 @@
             "disableWarning": "Tắt plugin này cũng sẽ tắt nó trong tất cả thư mục của bạn",
             "cannotDisableSystem": "Plugin hệ thống không thể bị tắt",
             "disableFailed": "Không thể tắt plugin",
-            "autoEnableForDirectories": "Cũng bật cho tất cả thư mục",
-            "autoEnableForDirectoriesDescription": "Plugin này sẽ tự động hoạt động trong tất cả thư mục của bạn. Bạn vẫn có thể tắt nó từng thư mục.",
+            "autoEnableForWorks": "Cũng bật cho tất cả thư mục",
+            "autoEnableForWorksDescription": "Plugin này sẽ tự động hoạt động trong tất cả thư mục của bạn. Bạn vẫn có thể tắt nó từng thư mục.",
             "confirmDisable": "Xác nhận tắt",
             "cancel": "Hủy",
             "missingRequiredFields": "Thiếu các trường bắt buộc: {fields}",
@@ -2890,20 +2890,20 @@
                 "removeLabel": "Xóa {login}"
             }
         },
-        "directoryPlugins": {
+        "workPlugins": {
             "title": "Plugin thư mục",
             "subtitle": "Cấu hình plugin cho thư mục này",
             "active": "Hoạt động",
             "enable": "Bật",
             "disable": "Tắt",
-            "enableForDirectory": "Bật cho thư mục này",
-            "disableForDirectory": "Tắt cho thư mục này",
+            "enableForWork": "Bật cho thư mục này",
+            "disableForWork": "Tắt cho thư mục này",
             "enableAtUserLevelFirst": "Bật plugin này trong cài đặt của bạn trước",
             "disabledByUser": "Đã tắt ở cấp người dùng",
             "systemAlwaysEnabled": "Plugin hệ thống - luôn bật",
             "showSettings": "Hiển thị cài đặt",
             "hideSettings": "Ẩn cài đặt",
-            "directorySettingsInfo": "Cấu hình cài đặt cụ thể cho thư mục tại đây",
+            "workSettingsInfo": "Cấu hình cài đặt cụ thể cho thư mục tại đây",
             "save": "Lưu",
             "saved": "Đã lưu",
             "showInstalledOnly": "Chỉ hiển thị đã cài đặt",
@@ -3012,9 +3012,9 @@
             "authError": "Lỗi Xác thực",
             "dashboard": "Bảng điều khiển",
             "activity": "Nhật ký Hoạt động",
-            "directories": "Danh bạ",
-            "newDirectory": "Danh bạ Mới",
-            "directory": "Danh bạ",
+            "works": "Danh bạ",
+            "newWork": "Danh bạ Mới",
+            "work": "Danh bạ",
             "overview": "Tổng quan",
             "items": "Mục",
             "generator": "Trình tạo",
@@ -3048,7 +3048,7 @@
         }
     },
     "actions": {
-        "directories": {
+        "works": {
             "slug": {
                 "required": "Slug là bắt buộc",
                 "format": "Slug chỉ được chứa chữ cái thường, số và dấu gạch ngang"

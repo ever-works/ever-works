@@ -12,7 +12,7 @@ interface InheritedValueHintProps {
  * Secrets are always masked; other values are shown as-is.
  */
 export function InheritedValueHint({ value, isSecret }: InheritedValueHintProps) {
-    const t = useTranslations('dashboard.directoryPlugins');
+    const t = useTranslations('dashboard.workPlugins');
 
     if (value === undefined || value === null || value === '') {
         return null;

@@ -25,7 +25,7 @@ export function CapabilitySelector({
     activePluginId,
     scope = 'directory',
 }: CapabilitySelectorProps) {
-    const t = useTranslations('dashboard.directoryPlugins');
+    const t = useTranslations('dashboard.workPlugins');
     const router = useRouter();
     const CapabilityIcon = getCategoryIcon(capability);
     const [isPending, startTransition] = useTransition();

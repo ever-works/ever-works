@@ -27,7 +27,7 @@ export function ProviderSelector({
     onConfigure,
     disabled = false,
 }: ProviderSelectorProps) {
-    const t = useTranslations('dashboard.directoryDetail.generator');
+    const t = useTranslations('dashboard.workDetail.generator');
 
     const effectiveDefaultId = useMemo(() => {
         if (value !== null) return null;
@@ -104,7 +104,7 @@ export function PipelineModeSelector({
     selectedPipeline,
     onChange,
 }: PipelineModeSelectorProps) {
-    const t = useTranslations('dashboard.directoryDetail.generator');
+    const t = useTranslations('dashboard.workDetail.generator');
 
     // When selectedPipeline is null, the default pipeline is active
     const effectiveSelected =

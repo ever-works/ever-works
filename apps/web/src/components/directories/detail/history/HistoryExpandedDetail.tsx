@@ -26,8 +26,8 @@ export function HistoryExpandedDetail({
     updatedEntries,
     removedEntries,
 }: HistoryExpandedDetailProps) {
-    const t = useTranslations('dashboard.directoryDetail.history');
-    const tStatus = useTranslations('dashboard.directoryDetail.status');
+    const t = useTranslations('dashboard.workDetail.history');
+    const tStatus = useTranslations('dashboard.workDetail.status');
     const hasLogs = (entry.logs?.length ?? 0) > 0;
     const hasWarnings = (entry.warnings?.length ?? 0) > 0;
     const hasChanges =
@@ -132,7 +132,7 @@ function ChangeSection({
     prefixColor: string;
     prefix: string;
 }) {
-    const t = useTranslations('dashboard.directoryDetail.history');
+    const t = useTranslations('dashboard.workDetail.history');
 
     if (entries.length === 0) return null;
 

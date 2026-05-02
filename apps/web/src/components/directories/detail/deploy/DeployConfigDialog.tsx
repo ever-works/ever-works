@@ -36,8 +36,8 @@ export function DeployConfigDialog({
     onConfirm,
     onCancel,
 }: DeployConfigDialogProps) {
-    const t = useTranslations('dashboard.directoryDetail.deploy.form.configDialog');
-    const tSettings = useTranslations('dashboard.directoryDetail.settings.websiteConfig');
+    const t = useTranslations('dashboard.workDetail.deploy.form.configDialog');
+    const tSettings = useTranslations('dashboard.workDetail.settings.websiteConfig');
 
     const {
         isLoading,

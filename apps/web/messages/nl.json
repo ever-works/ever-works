@@ -219,7 +219,7 @@
                     "description": "Elke directory is een GitHub-repository die jij bezit en beheert."
                 }
             },
-            "directory": {
+            "work": {
                 "title": "Maak je eerste directory",
                 "description": "Een directory is je contenthub. Voeg items toe, configureer de lay-out en publiceer met één klik.",
                 "detail": "Je bent klaar! Maak je eerste directory om te beginnen met bouwen en publiceren van content.",
@@ -497,7 +497,7 @@
                 "shortcuts": {
                     "title": "Toetsenbord-snelkoppelingen",
                     "search": "Directories doorzoeken",
-                    "newDirectory": "Nieuwe directory maken",
+                    "newWork": "Nieuwe directory maken",
                     "help": "Help openen",
                     "hint": "Gebruik Cmd op Mac of Ctrl op Windows/Linux"
                 },
@@ -521,7 +521,7 @@
             "columns": {
                 "status": "Status",
                 "dateTime": "Datum / tijd",
-                "directory": "Directory",
+                "work": "Directory",
                 "type": "Type",
                 "summary": "Samenvatting"
             },
@@ -532,9 +532,9 @@
                     "generation": "Generatie",
                     "comparison": "Vergelijking",
                     "deployment": "Implementatie",
-                    "directoryCreated": "Directory gemaakt",
-                    "directoryUpdated": "Directory bijgewerkt",
-                    "directoryDeleted": "Directory verwijderd",
+                    "workCreated": "Directory gemaakt",
+                    "workUpdated": "Directory bijgewerkt",
+                    "workDeleted": "Directory verwijderd",
                     "pluginEnabled": "Plugin ingeschakeld",
                     "pluginDisabled": "Plugin uitgeschakeld",
                     "pluginConfigured": "Plugin geconfigureerd",
@@ -596,11 +596,11 @@
                 "pageOf": "Pagina {page} van {total}"
             }
         },
-        "directories": {
+        "works": {
             "title": "Directories",
             "subtitle": "Beheer en organiseer je AI-aangedreven directories",
             "summary": {
-                "totalDirectories": "Totaal directories",
+                "totalWorks": "Totaal directories",
                 "generating": "Genereren",
                 "totalItems": "Totaal items"
             },
@@ -658,13 +658,13 @@
                     "invalidJson": "Ongeldig JSON-bestand",
                     "previewError": "Kon importbestand niet analyseren",
                     "summary": "Importoverzicht",
-                    "directories": "Directories",
+                    "works": "Directories",
                     "items": "Items",
                     "userPlugins": "Gebruikersplugins",
                     "version": "Formaatversie",
                     "missingPlugins": "Deze plugins zijn niet geïnstalleerd en worden overgeslagen",
                     "conflicts": "Slug-conflicten",
-                    "existingDirectory": "Bestaand",
+                    "existingWork": "Bestaand",
                     "incoming": "Binnenkomend",
                     "strategySkip": "Overslaan (bestaande behouden)",
                     "strategyOverwrite": "Bestaande overschrijven",
@@ -681,9 +681,9 @@
                     "validationErrors": "Validatiefouten",
                     "resultSuccess": "Import succesvol voltooid",
                     "resultFailed": "Import mislukt",
-                    "directoriesCreated": "Directories aangemaakt",
-                    "directoriesUpdated": "Directories bijgewerkt",
-                    "directoriesSkipped": "Directories overgeslagen",
+                    "worksCreated": "Directories aangemaakt",
+                    "worksUpdated": "Directories bijgewerkt",
+                    "worksSkipped": "Directories overgeslagen",
                     "pluginsImported": "Plugins geïmporteerd",
                     "warnings": "Waarschuwingen",
                     "errors": "Fouten"
@@ -881,12 +881,12 @@
             }
         },
         "stats": {
-            "totalDirectories": "Totaal directories",
+            "totalWorks": "Totaal directories",
             "totalItems": "Totaal items",
             "activeWebsites": "Actieve websites",
             "fromLastMonth": "van afgelopen maand"
         },
-        "directoryCard": {
+        "workCard": {
             "status": {
                 "active": "Actief",
                 "notStarted": "Nog niet gestart",
@@ -914,11 +914,11 @@
             "openingTitle": "Directory openen",
             "openingMessage": "Je directory wordt voorbereid. Details openen binnenkort. Blijf op deze pagina."
         },
-        "directoryList": {
+        "workList": {
             "title": "Jouw directories",
             "createButton": "Directory aanmaken"
         },
-        "directoryDetail": {
+        "workDetail": {
             "failedToGenerateItems": "Kon items niet genereren. Probeer het opnieuw.",
             "generationCompleted": "Generatie succesvol voltooid",
             "generationCancelled": "Generatie is geannuleerd",
@@ -1358,7 +1358,7 @@
                 "title": "Recente activiteit",
                 "noActivity": "Nog geen activiteit",
                 "created": "Map aangemaakt",
-                "directoryCreated": "Map is succesvol aangemaakt",
+                "workCreated": "Map is succesvol aangemaakt",
                 "justNow": "Zojuist"
             },
             "items": {
@@ -1663,7 +1663,7 @@
                 "loadingFormSchema": "Laden formulierconfiguratie...",
                 "failedToLoadFormSchema": "Kon formulierconfiguratie niet laden",
                 "selectOption": "Selecteer een optie",
-                "directoryName": "Mapnaam",
+                "workName": "Mapnaam",
                 "generationPrompt": "Generatieprompt",
                 "modelOverride": "AI-model overschrijven",
                 "modelOverridePlaceholder": "bijv. openai/gpt-4.1 of openrouter/openai/gpt-4.1",
@@ -1676,7 +1676,7 @@
                 "startGeneration": "Generatie starten",
                 "regenerateItems": "Items opnieuw genereren",
                 "updateItems": "Generatie uitvoeren",
-                "recreateDirectory": "Map opnieuw aanmaken",
+                "recreateWork": "Map opnieuw aanmaken",
                 "showAdvancedOptions": "Geavanceerde opties tonen",
                 "hideAdvancedOptions": "Geavanceerde opties verbergen",
                 "cancel": "Annuleren",
@@ -1714,7 +1714,7 @@
                 "websiteRepositoryCreationMethod": "Website-repository aanmaakmethode",
                 "methodDuplicate": "Dupliceren",
                 "methodFork": "Fork",
-                "directoryNamePlaceholder": "Voer mapnaam in",
+                "workNamePlaceholder": "Voer mapnaam in",
                 "methodCreateFromTemplate": "Aanmaken vanuit sjabloon",
                 "aiProcessingConfiguration": "AI-verwerkingsconfiguratie",
                 "maxSearchQueries": "Max zoekopdrachten",
@@ -1769,7 +1769,7 @@
                 "aiProviderDescription": "AI-modelprovider voor contentgeneratie en -extractie",
                 "contentExtractorProvider": "Content Extractor",
                 "contentExtractorProviderDescription": "Provider voor het extraheren van content uit webpagina's",
-                "useDirectoryDefault": "Gebruik map-standaard",
+                "useWorkDefault": "Gebruik map-standaard",
                 "default": "Standaard",
                 "notConfigured": "Niet geconfigureerd",
                 "notConfiguredTooltip": "Deze provider vereist configuratie. Ga naar Instellingen → Plugins om in te stellen.",
@@ -1837,7 +1837,7 @@
                 },
                 "generalSettings": "Algemene instellingen",
                 "generalTitle": "Algemene instellingen",
-                "directoryName": "Mapnaam",
+                "workName": "Mapnaam",
                 "description": "Beschrijving",
                 "organizationRepository": "Organisatie-repository",
                 "organizationHelp": "Maak repositories onder een organisatie in plaats van je persoonlijke account",
@@ -1865,8 +1865,8 @@
                 "deleteWebsiteRepositoryDescription": "Verwijder de gedeployde website-repository",
                 "deleteConfirm": "Weet je het absoluut zeker?",
                 "deleteConfirmDetail": "Deze actie kan niet ongedaan worden gemaakt. De map en geselecteerde repositories worden permanent verwijderd.",
-                "confirmDirectoryName": "Typ mapnaam om te bevestigen",
-                "confirmDirectoryNameDescription": "Typ \"{name}\" om verwijdering te bevestigen",
+                "confirmWorkName": "Typ mapnaam om te bevestigen",
+                "confirmWorkNameDescription": "Typ \"{name}\" om verwijdering te bevestigen",
                 "deleteNameMismatch": "Mapnaam komt niet overeen",
                 "deleteButton": "Map verwijderen",
                 "deleteConfirmButton": "Ja, verwijderen",
@@ -2208,7 +2208,7 @@
                 }
             }
         },
-        "directoryCreation": {
+        "workCreation": {
             "title": "Nieuwe directory aanmaken",
             "subtitle": "Kies hoe je je directory wilt aanmaken",
             "backToOptions": "Terug naar opties",
@@ -2240,9 +2240,9 @@
                 "getStarted": "Aan de slag",
                 "formTitle": "Directory aanmaken met AI",
                 "formSubtitle": "Beschrijf je directory-idee en laat AI de setup en initiële content-generatie regelen",
-                "directoryNameLabel": "Directory-naam",
-                "directoryNamePlaceholder": "bijv. Awesome AI Tools",
-                "directoryNameHelp": "AI stelt een naam voor als je dit leeg laat",
+                "workNameLabel": "Directory-naam",
+                "workNamePlaceholder": "bijv. Awesome AI Tools",
+                "workNameHelp": "AI stelt een naam voor als je dit leeg laat",
                 "promptLabel": "Beschrijf je directory",
                 "githubRequired": "Verbind eerst je GitHub-account.",
                 "promptPlaceholder": "Beschrijf welk soort directory je wilt aanmaken, welke items het moet bevatten en eventuele specifieke eisen...",
@@ -2604,7 +2604,7 @@
             "subtitle": "Kies hoe je wilt worden geïnformeerd over belangrijke updates",
             "email": {
                 "title": "E-mailmeldingen",
-                "directoryUpdates": {
+                "workUpdates": {
                     "label": "Directory-updates",
                     "description": "Ontvang meldingen over belangrijke updates van je directories"
                 },
@@ -2653,12 +2653,12 @@
         "sidebar": {
             "menu": "Menu",
             "aiChat": "AI-chat",
-            "newDirectory": "Nieuwe directory",
+            "newWork": "Nieuwe directory",
             "activityIndicator": "Directory genereren",
             "navigation": {
                 "dashboard": "Dashboard",
                 "activity": "Activiteit",
-                "directories": "Directories",
+                "works": "Directories",
                 "plugins": "Plugins",
                 "settings": "Instellingen"
             },
@@ -2716,8 +2716,8 @@
             "welcomeSubtitle": "Je AI-aangedreven assistent. Vraag me alles over het maken van directories, genereren van inhoud of organiseren van je gegevens.",
             "welcomeMessage": "Hoi! Ik kan je helpen directories te maken met natuurlijke taal. Vraag iets als \"Maak een directory voor AI-tools\" of beschrijf wat je nodig hebt.",
             "capabilities": {
-                "directoryCreation": "Directory-aanmaak",
-                "directoryCreationDesc": "Bouw directories op uit natuurlijke taalbeschrijvingen",
+                "workCreation": "Directory-aanmaak",
+                "workCreationDesc": "Bouw directories op uit natuurlijke taalbeschrijvingen",
                 "webResearch": "Webonderzoek",
                 "webResearchDesc": "Zoek en verzamel gegevens van over het web",
                 "contentGeneration": "Inhoudgeneratie",
@@ -2814,8 +2814,8 @@
             "disableWarning": "Het uitschakelen van deze plug-in schakelt deze ook uit in al uw mappen",
             "cannotDisableSystem": "Systeemplug-ins kunnen niet worden uitgeschakeld",
             "disableFailed": "Kon plug-in niet uitschakelen",
-            "autoEnableForDirectories": "Ook inschakelen voor alle mappen",
-            "autoEnableForDirectoriesDescription": "Deze plug-in is automatisch actief in al uw mappen. U kunt deze nog steeds per map uitschakelen.",
+            "autoEnableForWorks": "Ook inschakelen voor alle mappen",
+            "autoEnableForWorksDescription": "Deze plug-in is automatisch actief in al uw mappen. U kunt deze nog steeds per map uitschakelen.",
             "confirmDisable": "Bevestig uitschakelen",
             "cancel": "Annuleren",
             "missingRequiredFields": "Ontbrekende vereiste velden: {fields}",
@@ -2890,20 +2890,20 @@
                 "removeLabel": "Verwijder {login}"
             }
         },
-        "directoryPlugins": {
+        "workPlugins": {
             "title": "Mapplug-ins",
             "subtitle": "Configureer plug-ins voor deze map",
             "active": "Actief",
             "enable": "Inschakelen",
             "disable": "Uitschakelen",
-            "enableForDirectory": "Inschakelen voor deze map",
-            "disableForDirectory": "Uitschakelen voor deze map",
+            "enableForWork": "Inschakelen voor deze map",
+            "disableForWork": "Uitschakelen voor deze map",
             "enableAtUserLevelFirst": "Schakel deze plug-in eerst in uw instellingen in",
             "disabledByUser": "Uitgeschakeld op gebruikersniveau",
             "systemAlwaysEnabled": "Systeemplug-in - altijd ingeschakeld",
             "showSettings": "Instellingen tonen",
             "hideSettings": "Instellingen verbergen",
-            "directorySettingsInfo": "Configureer hier mappen-specifieke instellingen",
+            "workSettingsInfo": "Configureer hier mappen-specifieke instellingen",
             "save": "Opslaan",
             "saved": "Opgeslagen",
             "showInstalledOnly": "Alleen geïnstalleerde tonen",
@@ -3012,9 +3012,9 @@
             "authError": "Authenticatiefout",
             "dashboard": "Dashboard",
             "activity": "Activiteitenlogboek",
-            "directories": "Directories",
-            "newDirectory": "Nieuwe directory",
-            "directory": "Directory",
+            "works": "Directories",
+            "newWork": "Nieuwe directory",
+            "work": "Directory",
             "overview": "Overzicht",
             "items": "Items",
             "generator": "Generator",
@@ -3048,7 +3048,7 @@
         }
     },
     "actions": {
-        "directories": {
+        "works": {
             "slug": {
                 "required": "Slug is vereist",
                 "format": "Slug mag alleen kleine letters, cijfers en koppeltekens bevatten"

@@ -3,7 +3,7 @@
 import { useTranslations } from 'next-intl';
 
 export function HistoryEmptyState() {
-    const t = useTranslations('dashboard.directoryDetail.history.empty');
+    const t = useTranslations('dashboard.workDetail.history.empty');
 
     return (
         <div className="rounded-lg border border-dashed border-border dark:border-border-dark p-10 text-center">

@@ -219,7 +219,7 @@
                     "description": "Setiap direktori adalah repositori GitHub yang Anda miliki dan kendalikan."
                 }
             },
-            "directory": {
+            "work": {
                 "title": "Buat direktori pertama Anda",
                 "description": "Direktori adalah pusat konten Anda. Tambahkan item, konfigurasikan tata letak, dan terbitkan dengan satu klik.",
                 "detail": "Anda sudah siap! Buat direktori pertama Anda untuk mulai membangun dan menerbitkan konten.",
@@ -497,7 +497,7 @@
                 "shortcuts": {
                     "title": "Pintasan Keyboard",
                     "search": "Cari direktori",
-                    "newDirectory": "Buat direktori baru",
+                    "newWork": "Buat direktori baru",
                     "help": "Buka bantuan",
                     "hint": "Gunakan Cmd di Mac atau Ctrl di Windows/Linux"
                 },
@@ -521,7 +521,7 @@
             "columns": {
                 "status": "Status",
                 "dateTime": "Tanggal / Waktu",
-                "directory": "Direktori",
+                "work": "Direktori",
                 "type": "Tipe",
                 "summary": "Ringkasan"
             },
@@ -532,9 +532,9 @@
                     "generation": "Generasi",
                     "comparison": "Perbandingan",
                     "deployment": "Penerapan",
-                    "directoryCreated": "Direktori Dibuat",
-                    "directoryUpdated": "Direktori Diperbarui",
-                    "directoryDeleted": "Direktori Dihapus",
+                    "workCreated": "Direktori Dibuat",
+                    "workUpdated": "Direktori Diperbarui",
+                    "workDeleted": "Direktori Dihapus",
                     "pluginEnabled": "Plugin Diaktifkan",
                     "pluginDisabled": "Plugin Dinonaktifkan",
                     "pluginConfigured": "Plugin Dikonfigurasi",
@@ -596,11 +596,11 @@
                 "pageOf": "Halaman {page} dari {total}"
             }
         },
-        "directories": {
+        "works": {
             "title": "Direktori",
             "subtitle": "Kelola dan atur direktori bertenaga AI Anda",
             "summary": {
-                "totalDirectories": "Total Direktori",
+                "totalWorks": "Total Direktori",
                 "generating": "Membuat",
                 "totalItems": "Total Item"
             },
@@ -658,13 +658,13 @@
                     "invalidJson": "File JSON tidak valid",
                     "previewError": "Gagal menganalisis file impor",
                     "summary": "Ringkasan Impor",
-                    "directories": "Direktori",
+                    "works": "Direktori",
                     "items": "Item",
                     "userPlugins": "Plugin Pengguna",
                     "version": "Versi Format",
                     "missingPlugins": "Plugin ini tidak terinstal dan akan dilewati",
                     "conflicts": "Konflik Slug",
-                    "existingDirectory": "Yang Ada",
+                    "existingWork": "Yang Ada",
                     "incoming": "Masuk",
                     "strategySkip": "Lewati (simpan yang ada)",
                     "strategyOverwrite": "Timpa yang ada",
@@ -681,9 +681,9 @@
                     "validationErrors": "Kesalahan Validasi",
                     "resultSuccess": "Impor Selesai dengan Sukses",
                     "resultFailed": "Impor Gagal",
-                    "directoriesCreated": "Direktori dibuat",
-                    "directoriesUpdated": "Direktori diperbarui",
-                    "directoriesSkipped": "Direktori dilewati",
+                    "worksCreated": "Direktori dibuat",
+                    "worksUpdated": "Direktori diperbarui",
+                    "worksSkipped": "Direktori dilewati",
                     "pluginsImported": "Plugin diimpor",
                     "warnings": "Peringatan",
                     "errors": "Kesalahan"
@@ -881,12 +881,12 @@
             }
         },
         "stats": {
-            "totalDirectories": "Total Direktori",
+            "totalWorks": "Total Direktori",
             "totalItems": "Total Item",
             "activeWebsites": "Situs Web Aktif",
             "fromLastMonth": "dari bulan lalu"
         },
-        "directoryCard": {
+        "workCard": {
             "status": {
                 "active": "Aktif",
                 "notStarted": "Belum Dimulai",
@@ -914,11 +914,11 @@
             "openingTitle": "Membuka direktori",
             "openingMessage": "Mempersiapkan direktori Anda. Detail akan segera terbuka. Tetap di halaman ini."
         },
-        "directoryList": {
+        "workList": {
             "title": "Direktori Anda",
             "createButton": "Buat Direktori"
         },
-        "directoryDetail": {
+        "workDetail": {
             "failedToGenerateItems": "Gagal menghasilkan item. Silakan coba lagi.",
             "generationCompleted": "Generasi selesai dengan sukses",
             "generationCancelled": "Generasi dibatalkan",
@@ -1358,7 +1358,7 @@
                 "title": "Aktivitas Terbaru",
                 "noActivity": "Belum ada aktivitas",
                 "created": "Direktori Dibuat",
-                "directoryCreated": "Direktori berhasil dibuat",
+                "workCreated": "Direktori berhasil dibuat",
                 "justNow": "Baru saja"
             },
             "items": {
@@ -1663,7 +1663,7 @@
                 "loadingFormSchema": "Memuat konfigurasi formulir...",
                 "failedToLoadFormSchema": "Gagal memuat konfigurasi formulir",
                 "selectOption": "Pilih opsi",
-                "directoryName": "Nama Direktori",
+                "workName": "Nama Direktori",
                 "generationPrompt": "Prompt Generasi",
                 "modelOverride": "Penggantian Model AI",
                 "modelOverridePlaceholder": "misalnya openai/gpt-4.1 atau openrouter/openai/gpt-4.1",
@@ -1676,7 +1676,7 @@
                 "startGeneration": "Mulai Generasi",
                 "regenerateItems": "Regenerasi Item",
                 "updateItems": "Jalankan Generasi",
-                "recreateDirectory": "Buat Ulang Direktori",
+                "recreateWork": "Buat Ulang Direktori",
                 "showAdvancedOptions": "Tampilkan Opsi Lanjutan",
                 "hideAdvancedOptions": "Sembunyikan Opsi Lanjutan",
                 "cancel": "Batal",
@@ -1714,7 +1714,7 @@
                 "websiteRepositoryCreationMethod": "Metode Pembuatan Repositori Situs Web",
                 "methodDuplicate": "Duplikat",
                 "methodFork": "Fork",
-                "directoryNamePlaceholder": "Masukkan nama direktori",
+                "workNamePlaceholder": "Masukkan nama direktori",
                 "methodCreateFromTemplate": "Buat dari Template",
                 "aiProcessingConfiguration": "Konfigurasi Pemrosesan AI",
                 "maxSearchQueries": "Maksimum Kueri Pencarian",
@@ -1769,7 +1769,7 @@
                 "aiProviderDescription": "Penyedia model AI untuk generasi dan ekstraksi konten",
                 "contentExtractorProvider": "Penyedia Ekstraktor Konten",
                 "contentExtractorProviderDescription": "Penyedia untuk mengekstrak konten dari halaman web",
-                "useDirectoryDefault": "Gunakan Default Direktori",
+                "useWorkDefault": "Gunakan Default Direktori",
                 "default": "Default",
                 "notConfigured": "Belum Dikonfigurasi",
                 "notConfiguredTooltip": "Penyedia ini memerlukan konfigurasi. Kunjungi Pengaturan → Plugin untuk menyiapkannya.",
@@ -1837,7 +1837,7 @@
                 },
                 "generalSettings": "Pengaturan Umum",
                 "generalTitle": "Pengaturan Umum",
-                "directoryName": "Nama Direktori",
+                "workName": "Nama Direktori",
                 "description": "Deskripsi",
                 "organizationRepository": "Repositori Organisasi",
                 "organizationHelp": "Buat repositori di bawah organisasi daripada akun pribadi Anda",
@@ -1865,8 +1865,8 @@
                 "deleteWebsiteRepositoryDescription": "Hapus repositori situs web yang dideploy",
                 "deleteConfirm": "Apakah Anda benar-benar yakin?",
                 "deleteConfirmDetail": "Tindakan ini tidak dapat dibatalkan. Direktori dan repositori yang dipilih akan dihapus secara permanen.",
-                "confirmDirectoryName": "Ketik nama direktori untuk konfirmasi",
-                "confirmDirectoryNameDescription": "Ketik \"{name}\" untuk mengonfirmasi penghapusan",
+                "confirmWorkName": "Ketik nama direktori untuk konfirmasi",
+                "confirmWorkNameDescription": "Ketik \"{name}\" untuk mengonfirmasi penghapusan",
                 "deleteNameMismatch": "Nama direktori tidak cocok",
                 "deleteButton": "Hapus Direktori",
                 "deleteConfirmButton": "Ya, Hapus",
@@ -2208,7 +2208,7 @@
                 }
             }
         },
-        "directoryCreation": {
+        "workCreation": {
             "title": "Buat Direktori Baru",
             "subtitle": "Pilih cara Anda ingin membuat direktori",
             "backToOptions": "Kembali ke opsi",
@@ -2240,9 +2240,9 @@
                 "getStarted": "Mulai",
                 "formTitle": "Buat Direktori dengan AI",
                 "formSubtitle": "Jelaskan ide direktori Anda dan biarkan AI menangani pengaturan dan pembuatan konten awal",
-                "directoryNameLabel": "Nama Direktori",
-                "directoryNamePlaceholder": "misalnya, Awesome AI Tools",
-                "directoryNameHelp": "AI akan menyarankan nama jika Anda biarkan kosong",
+                "workNameLabel": "Nama Direktori",
+                "workNamePlaceholder": "misalnya, Awesome AI Tools",
+                "workNameHelp": "AI akan menyarankan nama jika Anda biarkan kosong",
                 "promptLabel": "Jelaskan Direktori Anda",
                 "githubRequired": "Harap hubungkan akun GitHub Anda terlebih dahulu.",
                 "promptPlaceholder": "Jelaskan jenis direktori yang ingin Anda buat, item apa yang harus dikandung, dan persyaratan khusus apa pun...",
@@ -2604,7 +2604,7 @@
             "subtitle": "Pilih bagaimana Anda ingin diberi tahu tentang pembaruan penting",
             "email": {
                 "title": "Notifikasi Email",
-                "directoryUpdates": {
+                "workUpdates": {
                     "label": "Pembaruan Direktori",
                     "description": "Diberi tahu tentang pembaruan penting pada direktori Anda"
                 },
@@ -2653,12 +2653,12 @@
         "sidebar": {
             "menu": "Menu",
             "aiChat": "Obrolan AI",
-            "newDirectory": "Direktori Baru",
+            "newWork": "Direktori Baru",
             "activityIndicator": "Direktori sedang dibuat",
             "navigation": {
                 "dashboard": "Dasbor",
                 "activity": "Aktivitas",
-                "directories": "Direktori",
+                "works": "Direktori",
                 "plugins": "Plugin",
                 "settings": "Pengaturan"
             },
@@ -2716,8 +2716,8 @@
             "welcomeSubtitle": "Asisten bertenaga AI Anda. Tanyakan apa saja tentang membuat direktori, menghasilkan konten, atau mengatur data Anda.",
             "welcomeMessage": "Hai! Saya dapat membantu Anda membuat direktori menggunakan bahasa alami. Tanyakan seperti \"Buat direktori untuk alat AI\" atau jelaskan apa yang Anda butuhkan.",
             "capabilities": {
-                "directoryCreation": "Pembuatan Direktori",
-                "directoryCreationDesc": "Bangun direktori dari deskripsi bahasa alami",
+                "workCreation": "Pembuatan Direktori",
+                "workCreationDesc": "Bangun direktori dari deskripsi bahasa alami",
                 "webResearch": "Riset Web",
                 "webResearchDesc": "Cari dan kumpulkan data dari seluruh web",
                 "contentGeneration": "Pembangkitan Konten",
@@ -2814,8 +2814,8 @@
             "disableWarning": "Menonaktifkan plugin ini juga akan menonaktifkannya di semua direktori Anda",
             "cannotDisableSystem": "Plugin sistem tidak dapat dinonaktifkan",
             "disableFailed": "Gagal menonaktifkan plugin",
-            "autoEnableForDirectories": "Juga aktifkan untuk semua direktori",
-            "autoEnableForDirectoriesDescription": "Plugin ini akan otomatis aktif di semua direktori Anda. Anda masih bisa menonaktifkannya per direktori.",
+            "autoEnableForWorks": "Juga aktifkan untuk semua direktori",
+            "autoEnableForWorksDescription": "Plugin ini akan otomatis aktif di semua direktori Anda. Anda masih bisa menonaktifkannya per direktori.",
             "confirmDisable": "Konfirmasi Nonaktifkan",
             "cancel": "Batal",
             "missingRequiredFields": "Field yang diperlukan hilang: {fields}",
@@ -2890,20 +2890,20 @@
                 "removeLabel": "Hapus {login}"
             }
         },
-        "directoryPlugins": {
+        "workPlugins": {
             "title": "Plugin Direktori",
             "subtitle": "Konfigurasikan plugin untuk direktori ini",
             "active": "Aktif",
             "enable": "Aktifkan",
             "disable": "Nonaktifkan",
-            "enableForDirectory": "Aktifkan untuk direktori ini",
-            "disableForDirectory": "Nonaktifkan untuk direktori ini",
+            "enableForWork": "Aktifkan untuk direktori ini",
+            "disableForWork": "Nonaktifkan untuk direktori ini",
             "enableAtUserLevelFirst": "Aktifkan plugin ini di pengaturan Anda terlebih dahulu",
             "disabledByUser": "Dinonaktifkan di tingkat pengguna",
             "systemAlwaysEnabled": "Plugin sistem - selalu diaktifkan",
             "showSettings": "Tampilkan Pengaturan",
             "hideSettings": "Sembunyikan Pengaturan",
-            "directorySettingsInfo": "Konfigurasikan pengaturan khusus direktori di sini",
+            "workSettingsInfo": "Konfigurasikan pengaturan khusus direktori di sini",
             "save": "Simpan",
             "saved": "Tersimpan",
             "showInstalledOnly": "Tampilkan yang terinstal saja",
@@ -3012,9 +3012,9 @@
             "authError": "Kesalahan Autentikasi",
             "dashboard": "Dasbor",
             "activity": "Log Aktivitas",
-            "directories": "Direktori",
-            "newDirectory": "Direktori Baru",
-            "directory": "Direktori",
+            "works": "Direktori",
+            "newWork": "Direktori Baru",
+            "work": "Direktori",
             "overview": "Ikhtisar",
             "items": "Item",
             "generator": "Generator",
@@ -3048,7 +3048,7 @@
         }
     },
     "actions": {
-        "directories": {
+        "works": {
             "slug": {
                 "required": "Slug wajib diisi",
                 "format": "Slug harus hanya huruf kecil, angka, dan tanda hubung"

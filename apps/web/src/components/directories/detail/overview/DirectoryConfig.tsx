@@ -13,7 +13,7 @@ interface DirectoryConfigProps {
 
 export function DirectoryConfig({ config }: DirectoryConfigProps) {
     const { directory } = useDirectoryDetail();
-    const t = useTranslations('dashboard.directoryDetail.config');
+    const t = useTranslations('dashboard.workDetail.config');
 
     const mainPR = directory.lastPullRequest?.main;
     const dataPR = directory.lastPullRequest?.data;

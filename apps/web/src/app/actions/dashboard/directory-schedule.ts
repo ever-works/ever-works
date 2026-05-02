@@ -37,7 +37,7 @@ export async function updateDirectorySchedule(
         return { success: false, error: 'Not authenticated' };
     }
 
-    const t = await getTranslations('dashboard.directoryDetail.schedule.actions');
+    const t = await getTranslations('dashboard.workDetail.schedule.actions');
 
     const validation = updateScheduleSchema.safeParse(payload);
     if (!validation.success) {
@@ -66,7 +66,7 @@ export async function runDirectorySchedule(directoryId: string) {
         return { success: false, error: 'Not authenticated' };
     }
 
-    const t = await getTranslations('dashboard.directoryDetail.schedule.actions');
+    const t = await getTranslations('dashboard.workDetail.schedule.actions');
 
     try {
         await directoryAPI.runSchedule(directoryId);
@@ -86,7 +86,7 @@ export async function cancelDirectorySchedule(directoryId: string) {
         return { success: false, error: 'Not authenticated' };
     }
 
-    const t = await getTranslations('dashboard.directoryDetail.schedule.actions');
+    const t = await getTranslations('dashboard.workDetail.schedule.actions');
 
     try {
         await directoryAPI.cancelSchedule(directoryId);

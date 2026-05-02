@@ -25,7 +25,7 @@ export const AddItemModal = memo(function AddItemModal({
     onClose,
     onItemAdded,
 }: AddItemModalProps) {
-    const t = useTranslations('dashboard.directoryDetail.items.addModal');
+    const t = useTranslations('dashboard.workDetail.items.addModal');
     const [isPending, startTransition] = useTransition();
     const [updateWithPR, setUpdateWithPR] = useState(false);
 

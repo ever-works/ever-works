@@ -58,7 +58,7 @@ export function DirectoryScheduleCard({
     activeProviders = [],
 }: DirectoryScheduleCardProps) {
     const { directory } = useDirectoryDetail();
-    const t = useTranslations('dashboard.directoryDetail.schedule.card');
+    const t = useTranslations('dashboard.workDetail.schedule.card');
     const router = useRouter();
 
     if (errorMessage) {
@@ -137,7 +137,7 @@ function ScheduleForm({
     activeProviders: ResolvedProvider[];
 }) {
     const { directory } = useDirectoryDetail();
-    const t = useTranslations('dashboard.directoryDetail.schedule.card');
+    const t = useTranslations('dashboard.workDetail.schedule.card');
     const router = useRouter();
 
     const getCadenceLabel = (cadence: DirectoryScheduleCadence) => {
@@ -237,7 +237,7 @@ function ScheduleFormContent({
         alwaysCreatePullRequest: boolean;
         pipelineOverride?: string;
     };
-    t: ReturnType<typeof useTranslations<'dashboard.directoryDetail.schedule.card'>>;
+    t: ReturnType<typeof useTranslations<'dashboard.workDetail.schedule.card'>>;
     router: ReturnType<typeof useRouter>;
 }) {
     const [form, setForm] = useState(initialForm);
@@ -614,7 +614,7 @@ function PipelineOverrideField({
     disabled?: boolean;
     onChange: (value: string | undefined) => void;
 }) {
-    const t = useTranslations('dashboard.directoryDetail.schedule.card');
+    const t = useTranslations('dashboard.workDetail.schedule.card');
 
     return (
         <FieldCard label={t('fields.pipeline')} helper={t('fields.pipelineHelp')}>

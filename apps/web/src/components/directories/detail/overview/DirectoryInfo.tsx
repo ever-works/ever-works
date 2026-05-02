@@ -50,7 +50,7 @@ function RepoVisibilityIcon({
 }
 
 export function DirectoryInfo({ directory, config }: DirectoryInfoProps) {
-    const t = useTranslations('dashboard.directoryDetail.info');
+    const t = useTranslations('dashboard.workDetail.info');
     const { repoLinks, oauthConnection } = useDirectoryDetail();
 
     const userRole = directory.userRole;

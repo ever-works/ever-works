@@ -11,7 +11,7 @@ export type ResolvedProvider = {
 };
 
 export function ActiveProvidersBar({ providers }: { providers: ResolvedProvider[] }) {
-    const t = useTranslations('dashboard.directoryDetail.schedule.card');
+    const t = useTranslations('dashboard.workDetail.schedule.card');
 
     return (
         <div className="rounded-xl border border-border dark:border-border-dark bg-surface dark:bg-surface-dark px-4 py-3">

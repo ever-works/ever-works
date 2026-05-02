@@ -26,7 +26,7 @@ export async function generateMetadata({
             },
         };
     } catch {
-        return { title: t('directory') };
+        return { title: t('work') };
     }
 }
 

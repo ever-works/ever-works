@@ -27,7 +27,7 @@ export function StatsOverview({
         dotColor?: string;
     }> = [
         {
-            title: t('totalDirectories'),
+            title: t('totalWorks'),
             value: totalDirectories,
             icon: FolderClosed,
             iconColor: 'text-blue-500',

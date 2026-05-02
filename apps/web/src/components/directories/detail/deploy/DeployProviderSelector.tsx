@@ -22,7 +22,7 @@ export function DeployProviderSelector({
     providers,
     currentProviderId,
 }: DeployProviderSelectorProps) {
-    const t = useTranslations('dashboard.directoryDetail.deploy');
+    const t = useTranslations('dashboard.workDetail.deploy');
     const [selectedProvider, setSelectedProvider] = useState(currentProviderId);
     const [isOpen, setIsOpen] = useState(!currentProviderId);
     const [isPending, startTransition] = useTransition();

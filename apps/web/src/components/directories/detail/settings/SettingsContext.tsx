@@ -65,7 +65,7 @@ export const useSettings = () => {
     }
 
     const router = useRouter();
-    const t = useTranslations('dashboard.directoryDetail.settings');
+    const t = useTranslations('dashboard.workDetail.settings');
     const [isPending, startTransition] = useTransition();
 
     const { directory, formData } = context;

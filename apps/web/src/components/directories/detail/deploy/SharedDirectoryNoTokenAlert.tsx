@@ -5,7 +5,7 @@ import { useTranslations } from 'next-intl';
 import { AlertTriangle, Users } from 'lucide-react';
 
 export function SharedDirectoryNoTokenAlert() {
-    const t = useTranslations('dashboard.directoryDetail.deploy');
+    const t = useTranslations('dashboard.workDetail.deploy');
 
     return (
         <div className="max-w-full mx-auto">

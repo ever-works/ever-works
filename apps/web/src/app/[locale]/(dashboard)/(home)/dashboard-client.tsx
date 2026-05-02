@@ -51,14 +51,14 @@ export default function DashboardClient({
                         <>
                             <div className="flex justify-between items-center mb-4">
                                 <h2 className="text-xl font-semibold text-text dark:text-text-dark">
-                                    {t('directories.recent')}
+                                    {t('works.recent')}
                                 </h2>
                                 {totalDirectories > 5 && (
                                     <Link
                                         href={ROUTES.DASHBOARD_DIRECTORIES}
                                         className="text-sm text-primary hover:text-primary-hover transition-colors"
                                     >
-                                        {t('directories.viewAll', { count: totalDirectories })}
+                                        {t('works.viewAll', { count: totalDirectories })}
                                     </Link>
                                 )}
                             </div>
@@ -69,10 +69,10 @@ export default function DashboardClient({
                         </>
                     ) : (
                         <EmptyState
-                            title={t('directories.empty.title')}
-                            description={t('directories.empty.description')}
+                            title={t('works.empty.title')}
+                            description={t('works.empty.description')}
                             action={{
-                                label: t('directories.empty.action'),
+                                label: t('works.empty.action'),
                                 onClick: () => {
                                     router.push(ROUTES.DASHBOARD_DIRECTORIES_NEW);
                                 },

@@ -219,7 +219,7 @@
                     "description": "すべてのディレクトリは、あなたが所有・管理する GitHub リポジトリです。"
                 }
             },
-            "directory": {
+            "work": {
                 "title": "最初のディレクトリを作成",
                 "description": "ディレクトリはコンテンツのハブです。項目を追加し、レイアウトを設定し、1 クリックで公開できます。",
                 "detail": "準備完了です！最初のディレクトリを作成して、コンテンツの構築と公開を始めましょう。",
@@ -497,7 +497,7 @@
                 "shortcuts": {
                     "title": "キーボードショートカット",
                     "search": "ディレクトリを検索",
-                    "newDirectory": "新しいディレクトリを作成",
+                    "newWork": "新しいディレクトリを作成",
                     "help": "ヘルプを開く",
                     "hint": "Mac では Cmd、Windows/Linux では Ctrl を使用"
                 },
@@ -521,7 +521,7 @@
             "columns": {
                 "status": "ステータス",
                 "dateTime": "日時",
-                "directory": "ディレクトリ",
+                "work": "ディレクトリ",
                 "type": "タイプ",
                 "summary": "概要"
             },
@@ -532,9 +532,9 @@
                     "generation": "生成",
                     "comparison": "比較",
                     "deployment": "デプロイ",
-                    "directoryCreated": "ディレクトリ作成",
-                    "directoryUpdated": "ディレクトリ更新",
-                    "directoryDeleted": "ディレクトリ削除",
+                    "workCreated": "ディレクトリ作成",
+                    "workUpdated": "ディレクトリ更新",
+                    "workDeleted": "ディレクトリ削除",
                     "pluginEnabled": "プラグイン有効",
                     "pluginDisabled": "プラグイン無効",
                     "pluginConfigured": "プラグイン設定",
@@ -596,11 +596,11 @@
                 "pageOf": "{total} ページ中 {page} ページ"
             }
         },
-        "directories": {
+        "works": {
             "title": "ディレクトリ",
             "subtitle": "AI 駆動のディレクトリを管理・整理",
             "summary": {
-                "totalDirectories": "ディレクトリ合計",
+                "totalWorks": "ディレクトリ合計",
                 "generating": "生成中",
                 "totalItems": "アイテム合計"
             },
@@ -658,13 +658,13 @@
                     "invalidJson": "無効な JSON ファイルです",
                     "previewError": "インポートファイルの解析に失敗しました",
                     "summary": "インポート要約",
-                    "directories": "ディレクトリ",
+                    "works": "ディレクトリ",
                     "items": "項目",
                     "userPlugins": "ユーザー プラグイン",
                     "version": "フォーマット バージョン",
                     "missingPlugins": "これらのプラグインはインストールされておらず、スキップされます",
                     "conflicts": "スラグ競合",
-                    "existingDirectory": "既存",
+                    "existingWork": "既存",
                     "incoming": "インポート",
                     "strategySkip": "スキップ（既存を保持）",
                     "strategyOverwrite": "既存を上書き",
@@ -681,9 +681,9 @@
                     "validationErrors": "検証エラー",
                     "resultSuccess": "インポートが正常に完了しました",
                     "resultFailed": "インポートに失敗しました",
-                    "directoriesCreated": "ディレクトリが作成されました",
-                    "directoriesUpdated": "ディレクトリが更新されました",
-                    "directoriesSkipped": "ディレクトリがスキップされました",
+                    "worksCreated": "ディレクトリが作成されました",
+                    "worksUpdated": "ディレクトリが更新されました",
+                    "worksSkipped": "ディレクトリがスキップされました",
                     "pluginsImported": "プラグインがインポートされました",
                     "warnings": "警告",
                     "errors": "エラー"
@@ -881,12 +881,12 @@
             }
         },
         "stats": {
-            "totalDirectories": "ディレクトリの合計",
+            "totalWorks": "ディレクトリの合計",
             "totalItems": "項目の合計",
             "activeWebsites": "アクティブなウェブサイト",
             "fromLastMonth": "先月から"
         },
-        "directoryCard": {
+        "workCard": {
             "status": {
                 "active": "アクティブ",
                 "notStarted": "未開始",
@@ -914,11 +914,11 @@
             "openingTitle": "ディレクトリを開いています",
             "openingMessage": "ディレクトリを準備中です。詳細がまもなく開きます。このページに留まってください。"
         },
-        "directoryList": {
+        "workList": {
             "title": "ディレクトリ",
             "createButton": "ディレクトリを作成"
         },
-        "directoryDetail": {
+        "workDetail": {
             "failedToGenerateItems": "アイテムの生成に失敗しました。もう一度お試しください。",
             "generationCompleted": "生成が正常に完了しました",
             "generationCancelled": "生成がキャンセルされました",
@@ -1358,7 +1358,7 @@
                 "title": "最近のアクティビティ",
                 "noActivity": "まだアクティビティなし",
                 "created": "ディレクトリ作成",
-                "directoryCreated": "ディレクトリが正常に作成されました",
+                "workCreated": "ディレクトリが正常に作成されました",
                 "justNow": "たった今"
             },
             "items": {
@@ -1663,7 +1663,7 @@
                 "loadingFormSchema": "フォーム構成を読み込み中...",
                 "failedToLoadFormSchema": "フォーム構成の読み込みに失敗しました",
                 "selectOption": "オプションを選択",
-                "directoryName": "ディレクトリ名",
+                "workName": "ディレクトリ名",
                 "generationPrompt": "生成プロンプト",
                 "modelOverride": "AI モデル上書き",
                 "modelOverridePlaceholder": "例: openai/gpt-4.1 または openrouter/openai/gpt-4.1",
@@ -1676,7 +1676,7 @@
                 "startGeneration": "生成を開始",
                 "regenerateItems": "アイテムを再生成",
                 "updateItems": "生成を実行",
-                "recreateDirectory": "ディレクトリを再作成",
+                "recreateWork": "ディレクトリを再作成",
                 "showAdvancedOptions": "詳細オプションを表示",
                 "hideAdvancedOptions": "詳細オプションを非表示",
                 "cancel": "キャンセル",
@@ -1714,7 +1714,7 @@
                 "websiteRepositoryCreationMethod": "ウェブサイト リポジトリ作成方法",
                 "methodDuplicate": "複製",
                 "methodFork": "フォーク",
-                "directoryNamePlaceholder": "ディレクトリ名を入力",
+                "workNamePlaceholder": "ディレクトリ名を入力",
                 "methodCreateFromTemplate": "テンプレートから作成",
                 "aiProcessingConfiguration": "AI 処理構成",
                 "maxSearchQueries": "最大検索クエリ数",
@@ -1769,7 +1769,7 @@
                 "aiProviderDescription": "コンテンツ生成と抽出のための AI モデルプロバイダ",
                 "contentExtractorProvider": "コンテンツ抽出",
                 "contentExtractorProviderDescription": "ウェブページからコンテンツを抽出するプロバイダ",
-                "useDirectoryDefault": "ディレクトリ既定を使用",
+                "useWorkDefault": "ディレクトリ既定を使用",
                 "default": "既定",
                 "notConfigured": "未設定",
                 "notConfiguredTooltip": "このプロバイダは設定が必要です。Settings → Plugins を訪れて設定してください。",
@@ -1837,7 +1837,7 @@
                 },
                 "generalSettings": "一般設定",
                 "generalTitle": "一般設定",
-                "directoryName": "ディレクトリ名",
+                "workName": "ディレクトリ名",
                 "description": "説明",
                 "organizationRepository": "組織リポジトリ",
                 "organizationHelp": "個人アカウントではなく組織の下にリポジトリを作成",
@@ -1865,8 +1865,8 @@
                 "deleteWebsiteRepositoryDescription": "デプロイされたウェブサイト リポジトリを削除",
                 "deleteConfirm": "本当に削除しますか？",
                 "deleteConfirmDetail": "この操作は元に戻せません。ディレクトリと選択したリポジトリが永久に削除されます。",
-                "confirmDirectoryName": "削除確認のためディレクトリ名を入力",
-                "confirmDirectoryNameDescription": "削除を確認するには「{name}」と入力してください",
+                "confirmWorkName": "削除確認のためディレクトリ名を入力",
+                "confirmWorkNameDescription": "削除を確認するには「{name}」と入力してください",
                 "deleteNameMismatch": "ディレクトリ名が一致しません",
                 "deleteButton": "ディレクトリを削除",
                 "deleteConfirmButton": "はい、削除",
@@ -2208,7 +2208,7 @@
                 }
             }
         },
-        "directoryCreation": {
+        "workCreation": {
             "title": "新しいディレクトリを作成",
             "subtitle": "ディレクトリを作成する方法を選択してください",
             "backToOptions": "オプションに戻る",
@@ -2240,9 +2240,9 @@
                 "getStarted": "開始",
                 "formTitle": "AI でディレクトリを作成",
                 "formSubtitle": "ディレクトリのアイデアを記述し、AI にセットアップと初期コンテンツ生成を任せましょう",
-                "directoryNameLabel": "ディレクトリ名",
-                "directoryNamePlaceholder": "例: Awesome AI Tools",
-                "directoryNameHelp": "空のままにすると AI が名前を提案します",
+                "workNameLabel": "ディレクトリ名",
+                "workNamePlaceholder": "例: Awesome AI Tools",
+                "workNameHelp": "空のままにすると AI が名前を提案します",
                 "promptLabel": "ディレクトリを記述",
                 "githubRequired": "まず GitHub アカウントを接続してください。",
                 "promptPlaceholder": "作成したいディレクトリの種類、含めるべきアイテム、特定の要件などを記述...",
@@ -2604,7 +2604,7 @@
             "subtitle": "重要な更新に関する通知方法を選択",
             "email": {
                 "title": "メール通知",
-                "directoryUpdates": {
+                "workUpdates": {
                     "label": "ディレクトリ更新",
                     "description": "ディレクトリの重要な更新に関する通知を受け取る"
                 },
@@ -2653,12 +2653,12 @@
         "sidebar": {
             "menu": "メニュー",
             "aiChat": "AI チャット",
-            "newDirectory": "新規ディレクトリ",
+            "newWork": "新規ディレクトリ",
             "activityIndicator": "ディレクトリ生成中",
             "navigation": {
                 "dashboard": "ダッシュボード",
                 "activity": "アクティビティ",
-                "directories": "ディレクトリ",
+                "works": "ディレクトリ",
                 "plugins": "プラグイン",
                 "settings": "設定"
             },
@@ -2716,8 +2716,8 @@
             "welcomeSubtitle": "AI 駆動のアシスタントです。ディレクトリの作成、コンテンツ生成、データの整理について何でもお尋ねください。",
             "welcomeMessage": "こんにちは！自然言語を使ってディレクトリを作成するお手伝いをします。「AI ツールのディレクトリを作成」などのように尋ねたり、必要なものを説明してください。",
             "capabilities": {
-                "directoryCreation": "ディレクトリ作成",
-                "directoryCreationDesc": "自然言語の説明からディレクトリを構築",
+                "workCreation": "ディレクトリ作成",
+                "workCreationDesc": "自然言語の説明からディレクトリを構築",
                 "webResearch": "ウェブリサーチ",
                 "webResearchDesc": "ウェブ全体からデータを検索・収集",
                 "contentGeneration": "コンテンツ生成",
@@ -2814,8 +2814,8 @@
             "disableWarning": "このプラグインを無効にすると、すべてのディレクトリで無効になります",
             "cannotDisableSystem": "システムプラグインは無効にできません",
             "disableFailed": "プラグインの無効化に失敗しました",
-            "autoEnableForDirectories": "すべてのディレクトリでも有効化",
-            "autoEnableForDirectoriesDescription": "このプラグインはすべてのディレクトリで自動的に有効になります。ディレクトリごとに無効にすることは可能です。",
+            "autoEnableForWorks": "すべてのディレクトリでも有効化",
+            "autoEnableForWorksDescription": "このプラグインはすべてのディレクトリで自動的に有効になります。ディレクトリごとに無効にすることは可能です。",
             "confirmDisable": "無効化の確認",
             "cancel": "キャンセル",
             "missingRequiredFields": "必須フィールドが不足しています: {fields}",
@@ -2890,20 +2890,20 @@
                 "removeLabel": "{login} を削除"
             }
         },
-        "directoryPlugins": {
+        "workPlugins": {
             "title": "ディレクトリプラグイン",
             "subtitle": "このディレクトリのプラグインを設定",
             "active": "アクティブ",
             "enable": "有効化",
             "disable": "無効化",
-            "enableForDirectory": "このディレクトリで有効化",
-            "disableForDirectory": "このディレクトリで無効化",
+            "enableForWork": "このディレクトリで有効化",
+            "disableForWork": "このディレクトリで無効化",
             "enableAtUserLevelFirst": "まず設定でこのプラグインを有効にしてください",
             "disabledByUser": "ユーザー レベルで無効",
             "systemAlwaysEnabled": "システムプラグイン - 常に有効",
             "showSettings": "設定を表示",
             "hideSettings": "設定を非表示",
-            "directorySettingsInfo": "ここでディレクトリ固有の設定を構成します",
+            "workSettingsInfo": "ここでディレクトリ固有の設定を構成します",
             "save": "保存",
             "saved": "保存済み",
             "showInstalledOnly": "インストール済みのみ表示",
@@ -3012,9 +3012,9 @@
             "authError": "認証エラー",
             "dashboard": "ダッシュボード",
             "activity": "アクティビティログ",
-            "directories": "ディレクトリ",
-            "newDirectory": "新規ディレクトリ",
-            "directory": "ディレクトリ",
+            "works": "ディレクトリ",
+            "newWork": "新規ディレクトリ",
+            "work": "ディレクトリ",
             "overview": "概要",
             "items": "アイテム",
             "generator": "ジェネレーター",
@@ -3048,7 +3048,7 @@
         }
     },
     "actions": {
-        "directories": {
+        "works": {
             "slug": {
                 "required": "スラッグは必須です",
                 "format": "スラッグは小文字の文字、数字、ハイフンのみを含めてください"

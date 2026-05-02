@@ -19,7 +19,7 @@ interface RequiredFieldsProps {
 }
 
 export function RequiredFields({ formData, onChange, children }: RequiredFieldsProps) {
-    const t = useTranslations('dashboard.directoryDetail.generator');
+    const t = useTranslations('dashboard.workDetail.generator');
 
     return (
         <div
@@ -35,11 +35,11 @@ export function RequiredFields({ formData, onChange, children }: RequiredFieldsP
 
             <div className="space-y-4">
                 <Input
-                    label={t('directoryName')}
+                    label={t('workName')}
                     type="text"
                     value={formData.name || ''}
                     onChange={(e) => onChange({ name: e.target.value })}
-                    placeholder={t('directoryNamePlaceholder')}
+                    placeholder={t('workNamePlaceholder')}
                     variant="form"
                     required
                     disabled

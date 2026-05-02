@@ -14,7 +14,7 @@ interface GeneratorSubTabsProps {
 }
 
 export function GeneratorSubTabs({ directoryId }: GeneratorSubTabsProps) {
-    const t = useTranslations('dashboard.directoryDetail.generator.tabs');
+    const t = useTranslations('dashboard.workDetail.generator.tabs');
     const pathname = usePathname();
     const { config } = useDirectoryDetail();
     const permissions = useDirectoryPermissions();

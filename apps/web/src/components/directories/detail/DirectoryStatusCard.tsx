@@ -22,8 +22,8 @@ interface DirectoryStatusCardProps {
 
 export function DirectoryStatusCard({ directory }: DirectoryStatusCardProps) {
     const router = useRouter();
-    const t = useTranslations('dashboard.directoryDetail.statusCard');
-    const tProgress = useTranslations('dashboard.directoryDetail.progress');
+    const t = useTranslations('dashboard.workDetail.statusCard');
+    const tProgress = useTranslations('dashboard.workDetail.progress');
     const [showLogs, setShowLogs] = useState(false);
     const { directory: syncedDirectory } = useDirectoryDetail();
     const currentDirectory = syncedDirectory.id === directory.id ? syncedDirectory : directory;

@@ -70,8 +70,8 @@ export function DirectorySwitcher() {
     const router = useTopLoaderRouter();
     const searchParams = useSearchParams();
     const locale = useLocale();
-    const t = useTranslations('dashboard.directories');
-    const tStatus = useTranslations('dashboard.directoryDetail.status');
+    const t = useTranslations('dashboard.works');
+    const tStatus = useTranslations('dashboard.workDetail.status');
     const [isNavigating, startNavigation] = useTransition();
     const [directories, setDirectories] = useState<Directory[]>([]);
     const [query, setQuery] = useState('');

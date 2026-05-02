@@ -138,7 +138,7 @@ export function EverWorksOnboardingWizard({
                                 const label = (() => {
                                     if (step.kind === 'welcome') return t('steps.welcome.title');
                                     if (step.kind === 'directory')
-                                        return t('steps.directory.title');
+                                        return t('steps.work.title');
                                     return step.plugin.name;
                                 })();
 
@@ -311,23 +311,23 @@ export function EverWorksOnboardingWizard({
                                         </div>
                                         <div>
                                             <h3 className="text-lg font-semibold text-text dark:text-text-dark">
-                                                {t('steps.directory.title')}
+                                                {t('steps.work.title')}
                                             </h3>
                                             <p className="mt-1 text-sm text-text-muted dark:text-text-muted-dark">
-                                                {t('steps.directory.description')}
+                                                {t('steps.work.description')}
                                             </p>
                                         </div>
                                     </div>
                                     <div className="rounded-xl border border-dashed border-border dark:border-border-dark bg-surface-secondary/40 dark:bg-surface-secondary-dark/30 p-5 space-y-4">
                                         <p className="text-sm text-text-secondary dark:text-text-secondary-dark leading-relaxed">
-                                            {t('steps.directory.detail')}
+                                            {t('steps.work.detail')}
                                         </p>
                                         <Link
                                             href={ROUTES.DASHBOARD_DIRECTORIES_NEW}
                                             className="inline-flex items-center gap-2 rounded-lg bg-black dark:bg-button-primary-dark px-4 py-2.5 text-sm font-medium text-white dark:text-black transition-colors hover:bg-button-primary-hover dark:hover:bg-button-primary-hover-dark"
                                             onClick={onClose}
                                         >
-                                            {t('steps.directory.action')}
+                                            {t('steps.work.action')}
                                             <ArrowRight className="w-4 h-4" />
                                         </Link>
                                     </div>

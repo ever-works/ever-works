@@ -14,7 +14,7 @@ type Params = { params: Promise<{ id: string }> };
 
 export default async function DirectoryPluginsPage({ params }: Params) {
     const { id } = await params;
-    const t = await getTranslations('dashboard.directoryPlugins');
+    const t = await getTranslations('dashboard.workPlugins');
 
     let directory;
     let pluginsData;

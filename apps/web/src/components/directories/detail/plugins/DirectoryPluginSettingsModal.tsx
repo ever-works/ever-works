@@ -34,7 +34,7 @@ export function DirectoryPluginSettingsModal({
     directoryId,
     plugin,
 }: DirectoryPluginSettingsModalProps) {
-    const t = useTranslations('dashboard.directoryPlugins');
+    const t = useTranslations('dashboard.workPlugins');
     const router = useRouter();
     const [showResetConfirm, setShowResetConfirm] = useState(false);
     const [isResetting, setIsResetting] = useState(false);

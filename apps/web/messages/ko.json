@@ -219,7 +219,7 @@
                     "description": "모든 디렉토리는 사용자가 소유하고 제어하는 GitHub 저장소입니다."
                 }
             },
-            "directory": {
+            "work": {
                 "title": "첫 번째 디렉토리 생성",
                 "description": "디렉토리는 콘텐츠 허브입니다. 항목을 추가하고 레이아웃을 구성한 후 한 번의 클릭으로 게시하세요.",
                 "detail": "모든 설정이 완료되었습니다! 콘텐츠를 빌드하고 게시하기 위해 첫 번째 디렉토리를 생성하세요.",
@@ -497,7 +497,7 @@
                 "shortcuts": {
                     "title": "키보드 단축키",
                     "search": "디렉토리 검색",
-                    "newDirectory": "새 디렉토리 생성",
+                    "newWork": "새 디렉토리 생성",
                     "help": "도움말 열기",
                     "hint": "Mac에서는 Cmd, Windows/Linux에서는 Ctrl 사용"
                 },
@@ -521,7 +521,7 @@
             "columns": {
                 "status": "상태",
                 "dateTime": "날짜 / 시간",
-                "directory": "디렉토리",
+                "work": "디렉토리",
                 "type": "유형",
                 "summary": "요약"
             },
@@ -532,9 +532,9 @@
                     "generation": "생성",
                     "comparison": "비교",
                     "deployment": "배포",
-                    "directoryCreated": "디렉토리 생성됨",
-                    "directoryUpdated": "디렉토리 업데이트됨",
-                    "directoryDeleted": "디렉토리 삭제됨",
+                    "workCreated": "디렉토리 생성됨",
+                    "workUpdated": "디렉토리 업데이트됨",
+                    "workDeleted": "디렉토리 삭제됨",
                     "pluginEnabled": "플러그인 활성화됨",
                     "pluginDisabled": "플러그인 비활성화됨",
                     "pluginConfigured": "플러그인 설정됨",
@@ -596,11 +596,11 @@
                 "pageOf": "{page}/{total} 페이지"
             }
         },
-        "directories": {
+        "works": {
             "title": "디렉토리",
             "subtitle": "AI 기반 디렉토리 관리 및 정리",
             "summary": {
-                "totalDirectories": "총 디렉토리 수",
+                "totalWorks": "총 디렉토리 수",
                 "generating": "생성 중",
                 "totalItems": "총 항목 수"
             },
@@ -658,13 +658,13 @@
                     "invalidJson": "잘못된 JSON 파일입니다",
                     "previewError": "가져오기 파일 분석에 실패했습니다",
                     "summary": "가져오기 요약",
-                    "directories": "디렉터리",
+                    "works": "디렉터리",
                     "items": "항목",
                     "userPlugins": "사용자 플러그인",
                     "version": "포맷 버전",
                     "missingPlugins": "설치되지 않은 플러그인은 건너뜁니다",
                     "conflicts": "슬러그 충돌",
-                    "existingDirectory": "기존",
+                    "existingWork": "기존",
                     "incoming": "가져오는 중",
                     "strategySkip": "건너뛰기(기존 유지)",
                     "strategyOverwrite": "기존 덮어쓰기",
@@ -681,9 +681,9 @@
                     "validationErrors": "유효성 검사 오류",
                     "resultSuccess": "가져오기가 성공적으로 완료되었습니다",
                     "resultFailed": "가져오기 실패",
-                    "directoriesCreated": "디렉터리 생성됨",
-                    "directoriesUpdated": "디렉터리 업데이트됨",
-                    "directoriesSkipped": "디렉터리 건너뜀",
+                    "worksCreated": "디렉터리 생성됨",
+                    "worksUpdated": "디렉터리 업데이트됨",
+                    "worksSkipped": "디렉터리 건너뜀",
                     "pluginsImported": "플러그인 가져와짐",
                     "warnings": "경고",
                     "errors": "오류"
@@ -881,12 +881,12 @@
             }
         },
         "stats": {
-            "totalDirectories": "총 디렉터리",
+            "totalWorks": "총 디렉터리",
             "totalItems": "총 항목",
             "activeWebsites": "활성 웹사이트",
             "fromLastMonth": "전월 대비"
         },
-        "directoryCard": {
+        "workCard": {
             "status": {
                 "active": "활성",
                 "notStarted": "시작 안됨",
@@ -914,11 +914,11 @@
             "openingTitle": "디렉터리 열기 중",
             "openingMessage": "디렉터리를 준비 중입니다. 곧 세부 정보가 열립니다. 이 페이지를 유지하세요."
         },
-        "directoryList": {
+        "workList": {
             "title": "내 디렉터리",
             "createButton": "디렉터리 생성"
         },
-        "directoryDetail": {
+        "workDetail": {
             "failedToGenerateItems": "항목 생성에 실패했습니다. 다시 시도해 주세요.",
             "generationCompleted": "생성 완료",
             "generationCancelled": "생성이 취소되었습니다",
@@ -1358,7 +1358,7 @@
                 "title": "최근 활동",
                 "noActivity": "아직 활동 없음",
                 "created": "디렉토리 생성",
-                "directoryCreated": "디렉토리가 성공적으로 생성되었습니다",
+                "workCreated": "디렉토리가 성공적으로 생성되었습니다",
                 "justNow": "방금"
             },
             "items": {
@@ -1663,7 +1663,7 @@
                 "loadingFormSchema": "양식 구성 로딩 중...",
                 "failedToLoadFormSchema": "양식 구성 로딩에 실패했습니다",
                 "selectOption": "옵션 선택",
-                "directoryName": "디렉토리 이름",
+                "workName": "디렉토리 이름",
                 "generationPrompt": "생성 프롬프트",
                 "modelOverride": "AI 모델 재정의",
                 "modelOverridePlaceholder": "예: openai/gpt-4.1 또는 openrouter/openai/gpt-4.1",
@@ -1676,7 +1676,7 @@
                 "startGeneration": "생성 시작",
                 "regenerateItems": "항목 재생성",
                 "updateItems": "생성 실행",
-                "recreateDirectory": "디렉토리 재생성",
+                "recreateWork": "디렉토리 재생성",
                 "showAdvancedOptions": "고급 옵션 표시",
                 "hideAdvancedOptions": "고급 옵션 숨기기",
                 "cancel": "취소",
@@ -1714,7 +1714,7 @@
                 "websiteRepositoryCreationMethod": "웹사이트 리포지토리 생성 방법",
                 "methodDuplicate": "복제",
                 "methodFork": "포크",
-                "directoryNamePlaceholder": "디렉토리 이름 입력",
+                "workNamePlaceholder": "디렉토리 이름 입력",
                 "methodCreateFromTemplate": "템플릿에서 생성",
                 "aiProcessingConfiguration": "AI 처리 구성",
                 "maxSearchQueries": "최대 검색 쿼리 수",
@@ -1769,7 +1769,7 @@
                 "aiProviderDescription": "콘텐츠 생성 및 추출을 위한 AI 모델 제공자",
                 "contentExtractorProvider": "콘텐츠 추출기",
                 "contentExtractorProviderDescription": "웹페이지에서 콘텐츠 추출 제공자",
-                "useDirectoryDefault": "디렉토리 기본값 사용",
+                "useWorkDefault": "디렉토리 기본값 사용",
                 "default": "기본",
                 "notConfigured": "구성되지 않음",
                 "notConfiguredTooltip": "이 제공자는 구성이 필요합니다. 설정 → 플러그인으로 이동하여 설정하세요.",
@@ -1837,7 +1837,7 @@
                 },
                 "generalSettings": "일반 설정",
                 "generalTitle": "일반 설정",
-                "directoryName": "디렉토리 이름",
+                "workName": "디렉토리 이름",
                 "description": "설명",
                 "organizationRepository": "조직 저장소",
                 "organizationHelp": "개인 계정 대신 조직 아래에 저장소를 생성합니다",
@@ -1865,8 +1865,8 @@
                 "deleteWebsiteRepositoryDescription": "배포된 웹사이트 저장소 제거",
                 "deleteConfirm": "정말 확실한가요?",
                 "deleteConfirmDetail": "이 작업은 취소할 수 없습니다. 디렉토리와 선택된 저장소가 영구적으로 삭제됩니다.",
-                "confirmDirectoryName": "확인을 위해 디렉토리 이름 입력",
-                "confirmDirectoryNameDescription": "삭제를 확인하려면 \"{name}\" 입력",
+                "confirmWorkName": "확인을 위해 디렉토리 이름 입력",
+                "confirmWorkNameDescription": "삭제를 확인하려면 \"{name}\" 입력",
                 "deleteNameMismatch": "디렉토리 이름이 일치하지 않습니다",
                 "deleteButton": "디렉토리 삭제",
                 "deleteConfirmButton": "예, 삭제",
@@ -2208,7 +2208,7 @@
                 }
             }
         },
-        "directoryCreation": {
+        "workCreation": {
             "title": "새 디렉토리 생성",
             "subtitle": "디렉토리를 생성하는 방법을 선택하세요",
             "backToOptions": "옵션으로 돌아가기",
@@ -2240,9 +2240,9 @@
                 "getStarted": "시작하기",
                 "formTitle": "AI로 디렉토리 생성",
                 "formSubtitle": "디렉토리 아이디어를 설명하고 AI가 설정과 초기 콘텐츠 생성을 처리하게 하세요",
-                "directoryNameLabel": "디렉토리 이름",
-                "directoryNamePlaceholder": "e.g., Awesome AI Tools",
-                "directoryNameHelp": "비워두면 AI가 이름을 제안합니다",
+                "workNameLabel": "디렉토리 이름",
+                "workNamePlaceholder": "e.g., Awesome AI Tools",
+                "workNameHelp": "비워두면 AI가 이름을 제안합니다",
                 "promptLabel": "디렉토리 설명",
                 "githubRequired": "먼저 GitHub 계정을 연결하세요.",
                 "promptPlaceholder": "생성할 디렉토리 종류, 포함할 항목, 특정 요구사항 등을 설명하세요...",
@@ -2604,7 +2604,7 @@
             "subtitle": "중요 업데이트에 대한 알림 방식을 선택하세요",
             "email": {
                 "title": "이메일 알림",
-                "directoryUpdates": {
+                "workUpdates": {
                     "label": "디렉토리 업데이트",
                     "description": "디렉토리의 중요한 업데이트에 대해 알림 받기"
                 },
@@ -2653,12 +2653,12 @@
         "sidebar": {
             "menu": "메뉴",
             "aiChat": "AI 채팅",
-            "newDirectory": "새 디렉토리",
+            "newWork": "새 디렉토리",
             "activityIndicator": "디렉토리 생성 중",
             "navigation": {
                 "dashboard": "대시보드",
                 "activity": "활동",
-                "directories": "디렉토리",
+                "works": "디렉토리",
                 "plugins": "플러그인",
                 "settings": "설정"
             },
@@ -2716,8 +2716,8 @@
             "welcomeSubtitle": "AI 기반 어시스턴트입니다. 디렉토리 생성, 콘텐츠 생성 또는 데이터 정리와 관련하여 무엇이든 물어보세요.",
             "welcomeMessage": "안녕하세요! 자연어를 사용하여 디렉토리를 생성할 수 있도록 도와드리겠습니다. \"AI 도구 디렉토리 생성\" 같은 것을 요청하거나 필요한 것을 설명하세요.",
             "capabilities": {
-                "directoryCreation": "디렉토리 생성",
-                "directoryCreationDesc": "자연어 설명으로 디렉토리 구축",
+                "workCreation": "디렉토리 생성",
+                "workCreationDesc": "자연어 설명으로 디렉토리 구축",
                 "webResearch": "웹 연구",
                 "webResearchDesc": "웹 전반에서 데이터 검색 및 수집",
                 "contentGeneration": "콘텐츠 생성",
@@ -2814,8 +2814,8 @@
             "disableWarning": "이 플러그인을 비활성화하면 모든 디렉터리에서 비활성화됩니다",
             "cannotDisableSystem": "시스템 플러그인은 비활성화할 수 없습니다",
             "disableFailed": "플러그인 비활성화 실패",
-            "autoEnableForDirectories": "모든 디렉터리에 대해서도 활성화",
-            "autoEnableForDirectoriesDescription": "이 플러그인은 모든 디렉터리에서 자동으로 활성화됩니다. 디렉터리별로 비활성화할 수 있습니다.",
+            "autoEnableForWorks": "모든 디렉터리에 대해서도 활성화",
+            "autoEnableForWorksDescription": "이 플러그인은 모든 디렉터리에서 자동으로 활성화됩니다. 디렉터리별로 비활성화할 수 있습니다.",
             "confirmDisable": "비활성화 확인",
             "cancel": "취소",
             "missingRequiredFields": "누락된 필수 필드: {fields}",
@@ -2890,20 +2890,20 @@
                 "removeLabel": "{login} 제거"
             }
         },
-        "directoryPlugins": {
+        "workPlugins": {
             "title": "디렉터리 플러그인",
             "subtitle": "이 디렉터리에 대한 플러그인 구성",
             "active": "활성",
             "enable": "활성화",
             "disable": "비활성화",
-            "enableForDirectory": "이 디렉터리에 대해 활성화",
-            "disableForDirectory": "이 디렉터리에 대해 비활성화",
+            "enableForWork": "이 디렉터리에 대해 활성화",
+            "disableForWork": "이 디렉터리에 대해 비활성화",
             "enableAtUserLevelFirst": "먼저 설정에서 이 플러그인을 활성화하세요",
             "disabledByUser": "사용자 수준에서 비활성화됨",
             "systemAlwaysEnabled": "시스템 플러그인 - 항상 활성화됨",
             "showSettings": "설정 표시",
             "hideSettings": "설정 숨기기",
-            "directorySettingsInfo": "여기서 디렉터리별 설정을 구성하세요",
+            "workSettingsInfo": "여기서 디렉터리별 설정을 구성하세요",
             "save": "저장",
             "saved": "저장됨",
             "showInstalledOnly": "설치된 것만 표시",
@@ -3012,9 +3012,9 @@
             "authError": "인증 오류",
             "dashboard": "대시보드",
             "activity": "활동 로그",
-            "directories": "디렉토리",
-            "newDirectory": "새 디렉토리",
-            "directory": "디렉토리",
+            "works": "디렉토리",
+            "newWork": "새 디렉토리",
+            "work": "디렉토리",
             "overview": "개요",
             "items": "항목",
             "generator": "생성기",
@@ -3048,7 +3048,7 @@
         }
     },
     "actions": {
-        "directories": {
+        "works": {
             "slug": {
                 "required": "슬러그가 필요합니다",
                 "format": "슬러그는 소문자, 숫자, 하이픈만 포함할 수 있습니다"

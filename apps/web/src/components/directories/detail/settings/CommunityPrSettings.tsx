@@ -11,7 +11,7 @@ import { useRouter } from '@/i18n/navigation';
 import { toast } from 'sonner';
 
 export function CommunityPrSettings() {
-    const t = useTranslations('dashboard.directoryDetail.settings');
+    const t = useTranslations('dashboard.workDetail.settings');
     const { context } = useSettings();
     const { directory } = context;
     const router = useRouter();

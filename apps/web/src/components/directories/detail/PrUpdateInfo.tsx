@@ -11,7 +11,7 @@ export function PrUpdateInfo({
     dataPR: any;
     className?: string;
 }) {
-    const tConf = useTranslations('dashboard.directoryDetail.config');
+    const tConf = useTranslations('dashboard.workDetail.config');
 
     if (!mainPR?.url && !dataPR?.url) {
         return null;

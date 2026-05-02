@@ -15,7 +15,7 @@ interface MembersPageProps {
 }
 
 export function MembersPage({ directory, members: initialMembers, owner }: MembersPageProps) {
-    const t = useTranslations('dashboard.directoryDetail.members');
+    const t = useTranslations('dashboard.workDetail.members');
     const [members, setMembers] = useState(initialMembers);
     const [inviteDialogOpen, setInviteDialogOpen] = useState(false);
     const canInvite = canManageMembers(directory.userRole);

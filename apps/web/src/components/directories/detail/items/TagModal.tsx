@@ -30,7 +30,7 @@ export function TagModal({ isOpen, onClose, onSave, tag, existingNames }: TagMod
 }
 
 function TagModalContent({ onClose, onSave, tag, existingNames }: Omit<TagModalProps, 'isOpen'>) {
-    const t = useTranslations('dashboard.directoryDetail.items.taxonomy.tags.modal');
+    const t = useTranslations('dashboard.workDetail.items.taxonomy.tags.modal');
     const [name, setName] = useState(() => tag?.name ?? '');
     const [isSaving, setIsSaving] = useState(false);
     const [error, setError] = useState<string | null>(null);

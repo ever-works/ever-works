@@ -20,7 +20,7 @@ export function DeployTokenAlert({
     providerName,
     providerHomepage,
 }: DeployTokenAlertProps) {
-    const t = useTranslations('dashboard.directoryDetail.deploy');
+    const t = useTranslations('dashboard.workDetail.deploy');
 
     const displayName = providerName || providerId || 'Deployment Provider';
     const tokenUrl = providerHomepage || '';

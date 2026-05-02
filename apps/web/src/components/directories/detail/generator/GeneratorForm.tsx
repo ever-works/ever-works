@@ -54,7 +54,7 @@ export function GeneratorForm({
     directoryPlugins = [],
 }: GeneratorFormProps) {
     const router = useRouter();
-    const t = useTranslations('dashboard.directoryDetail.generator');
+    const t = useTranslations('dashboard.workDetail.generator');
     const { updateGenerateStatus } = useDirectoryDetail();
     const [isPending, startTransition] = useTransition();
     const [optimisticGenerating, setOptimisticGenerating] = useState(false);
@@ -295,7 +295,7 @@ export function GeneratorForm({
             return t('startGeneration');
         }
         if (coreData.generation_method === GenerationMethod.RECREATE) {
-            return t('recreateDirectory');
+            return t('recreateWork');
         }
         return t('updateItems');
     };
@@ -439,7 +439,7 @@ export function GeneratorForm({
 }
 
 function LoadingState() {
-    const t = useTranslations('dashboard.directoryDetail.generator');
+    const t = useTranslations('dashboard.workDetail.generator');
     return (
         <div className="flex items-center justify-center py-12">
             <div className="flex items-center gap-3">

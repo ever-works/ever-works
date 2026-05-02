@@ -25,7 +25,7 @@ export function OrganizationSelector({
     providerId,
     suggestedOwner,
 }: OrganizationSelectorProps) {
-    const t = useTranslations('dashboard.directoryCreation');
+    const t = useTranslations('dashboard.workCreation');
     const cacheKey = providerId;
     const [organizations, setOrganizations] = useState<GitOrganization[]>(
         LOADED_ORGS.get(cacheKey) || [],

@@ -16,7 +16,7 @@ export async function addItem(directoryId: string, data: SubmitItemDto) {
         redirect(ROUTES.AUTH_LOGIN);
     }
 
-    const t = await getTranslations('dashboard.directoryDetail.items.addModal');
+    const t = await getTranslations('dashboard.workDetail.items.addModal');
 
     try {
         const response = await itemsGeneratorAPI.submitItem(directoryId, data);
@@ -55,7 +55,7 @@ export async function removeItem(
         redirect(ROUTES.AUTH_LOGIN);
     }
 
-    const t = await getTranslations('dashboard.directoryDetail.items');
+    const t = await getTranslations('dashboard.workDetail.items');
 
     try {
         const response = await itemsGeneratorAPI.removeItem(directoryId, {
@@ -90,7 +90,7 @@ export async function extractItemDetails(sourceUrl: string, existingCategories?:
         redirect(ROUTES.AUTH_LOGIN);
     }
 
-    const t = await getTranslations('dashboard.directoryDetail.items.addModal');
+    const t = await getTranslations('dashboard.workDetail.items.addModal');
 
     try {
         const response = await itemsGeneratorAPI.extractItemDetails({
@@ -149,7 +149,7 @@ export async function updateItem(directoryId: string, data: UpdateItemDto) {
         redirect(ROUTES.AUTH_LOGIN);
     }
 
-    const t = await getTranslations('dashboard.directoryDetail.items');
+    const t = await getTranslations('dashboard.workDetail.items');
 
     try {
         const response = await itemsGeneratorAPI.updateItem(directoryId, data);
@@ -181,7 +181,7 @@ export async function checkItemHealth(directoryId: string, itemSlug: string) {
         redirect(ROUTES.AUTH_LOGIN);
     }
 
-    const t = await getTranslations('dashboard.directoryDetail.items');
+    const t = await getTranslations('dashboard.workDetail.items');
 
     try {
         const response = await itemsGeneratorAPI.checkItemHealth(directoryId, {
@@ -221,7 +221,7 @@ export async function captureScreenshot(
         redirect(ROUTES.AUTH_LOGIN);
     }
 
-    const t = await getTranslations('dashboard.directoryDetail.items.screenshot');
+    const t = await getTranslations('dashboard.workDetail.items.screenshot');
 
     try {
         const availability = await screenshotAPI.checkAvailability(options?.directoryId);

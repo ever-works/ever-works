@@ -294,7 +294,7 @@ export function RepositorySelector({ providerId, onSelect, selectedUrl }: Reposi
     const [organizations, setOrganizations] = useState<Organization[]>([]);
     const [orgsLoading, setOrgsLoading] = useState(true);
     const requestIdRef = useRef(0);
-    const t = useTranslations('dashboard.directoryCreation.import.repositorySelector');
+    const t = useTranslations('dashboard.workCreation.import.repositorySelector');
 
     const perPage = 30;
 

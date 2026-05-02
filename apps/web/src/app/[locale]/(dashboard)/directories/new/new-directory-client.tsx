@@ -37,7 +37,7 @@ export default function NewDirectoryClient({
     const [selectedDeployProviderId, setSelectedDeployProviderId] = useState<string | null>(
         defaultDeployProviderId || deployProviders[0]?.id || null,
     );
-    const t = useTranslations('dashboard.directoryCreation');
+    const t = useTranslations('dashboard.workCreation');
 
     const gitConnected = useMemo(() => {
         if (!selectedProviderId) return false;

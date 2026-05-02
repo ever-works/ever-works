@@ -56,7 +56,7 @@ type CancelGenerationActionResult =
 
 export async function generateItems(directoryId: string, data: CreateItemsGeneratorDto) {
     const t = await getTranslations('actions.generator');
-    const tDirectories = await getTranslations('actions.directories');
+    const tDirectories = await getTranslations('actions.works');
 
     try {
         // Sanitize core data

@@ -50,7 +50,7 @@ export const ItemActions = memo(function ItemActions({
     onDelete,
     onUpdate,
 }: ItemActionsProps) {
-    const t = useTranslations('dashboard.directoryDetail.items');
+    const t = useTranslations('dashboard.workDetail.items');
     const { directoryId, screenshotProviders, activeScreenshotProvider } = useItemsContext();
     const [isDisplayDialogOpen, setIsDisplayDialogOpen] = useState(false);
     const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
@@ -315,7 +315,7 @@ type DisplayDialogProps = {
 };
 
 const DisplayDialog = ({ open, onOpenChange, item, directoryId, onUpdate }: DisplayDialogProps) => {
-    const t = useTranslations('dashboard.directoryDetail.items');
+    const t = useTranslations('dashboard.workDetail.items');
     const [featured, setFeatured] = useState<boolean>(!!item.featured);
     const [order, setOrder] = useState<string>(
         item.order === undefined || item.order === null ? '' : String(item.order),
@@ -434,7 +434,7 @@ type DeleteDialogProps = {
 };
 
 const DeleteDialog = ({ open, onOpenChange, item, directoryId, onDeleted }: DeleteDialogProps) => {
-    const t = useTranslations('dashboard.directoryDetail.items');
+    const t = useTranslations('dashboard.workDetail.items');
     const [reason, setReason] = useState('');
     const [createPr, setCreatePr] = useState(false);
     const [isDeleting, startTransition] = useTransition();

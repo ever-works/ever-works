@@ -32,7 +32,7 @@ export function MemberRow({
     onRemoved,
     onUpdated,
 }: MemberRowProps) {
-    const t = useTranslations('dashboard.directoryDetail.members');
+    const t = useTranslations('dashboard.workDetail.members');
     const [isUpdating, setIsUpdating] = useState(false);
     const [isRemoving, setIsRemoving] = useState(false);
     const [confirmRemoveOpen, setConfirmRemoveOpen] = useState(false);

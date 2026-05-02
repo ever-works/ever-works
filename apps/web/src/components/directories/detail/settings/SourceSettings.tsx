@@ -13,7 +13,7 @@ import { formatWorksConfigProviders } from '../../shared/works-config';
 import type { RepositoryTarget } from '@/lib/api/types-only';
 
 export function SourceSettings() {
-    const t = useTranslations('dashboard.directoryDetail.settings');
+    const t = useTranslations('dashboard.workDetail.settings');
     const { context } = useSettings();
     const { directory } = context;
     const router = useRouter();

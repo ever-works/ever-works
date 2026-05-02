@@ -231,7 +231,7 @@ export function ImportFlow({ onClose, initialPreview, isPullMode }: ImportFlowPr
                             <div className="divide-y divide-border/30 dark:divide-border-dark/30">
                                 <div className="px-4 py-2.5 flex items-center justify-between text-sm">
                                     <span className="text-text-muted dark:text-text-muted-dark">
-                                        {t('directories')}
+                                        {t('works')}
                                     </span>
                                     <span className="font-semibold text-text dark:text-text-dark tabular-nums">
                                         {preview.directoryCount}
@@ -295,7 +295,7 @@ export function ImportFlow({ onClose, initialPreview, isPullMode }: ImportFlowPr
                                                 {conflict.slug}
                                             </code>
                                             <p className="text-xs text-text-muted dark:text-text-muted-dark mt-0.5 leading-relaxed">
-                                                {t('existingDirectory')}: &quot;
+                                                {t('existingWork')}: &quot;
                                                 {conflict.existingName}&quot; &rarr; &quot;
                                                 {conflict.incomingName}&quot;
                                             </p>
@@ -417,7 +417,7 @@ export function ImportFlow({ onClose, initialPreview, isPullMode }: ImportFlowPr
                             {result.directoriesCreated > 0 && (
                                 <div className="px-5 py-2.5 flex items-center justify-between text-sm">
                                     <span className="text-text-muted dark:text-text-muted-dark">
-                                        {t('directoriesCreated')}
+                                        {t('worksCreated')}
                                     </span>
                                     <span className="font-semibold tabular-nums text-text dark:text-text-dark">
                                         {result.directoriesCreated}
@@ -427,7 +427,7 @@ export function ImportFlow({ onClose, initialPreview, isPullMode }: ImportFlowPr
                             {result.directoriesUpdated > 0 && (
                                 <div className="px-5 py-2.5 flex items-center justify-between text-sm">
                                     <span className="text-text-muted dark:text-text-muted-dark">
-                                        {t('directoriesUpdated')}
+                                        {t('worksUpdated')}
                                     </span>
                                     <span className="font-semibold tabular-nums text-text dark:text-text-dark">
                                         {result.directoriesUpdated}
@@ -437,7 +437,7 @@ export function ImportFlow({ onClose, initialPreview, isPullMode }: ImportFlowPr
                             {result.directoriesSkipped > 0 && (
                                 <div className="px-5 py-2.5 flex items-center justify-between text-sm">
                                     <span className="text-text-muted dark:text-text-muted-dark">
-                                        {t('directoriesSkipped')}
+                                        {t('worksSkipped')}
                                     </span>
                                     <span className="font-semibold tabular-nums text-text dark:text-text-dark">
                                         {result.directoriesSkipped}

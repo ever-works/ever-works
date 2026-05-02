@@ -42,7 +42,7 @@ function CollectionModalContent({
     collection,
     existingNames,
 }: Omit<CollectionModalProps, 'isOpen'>) {
-    const t = useTranslations('dashboard.directoryDetail.items.taxonomy.collections.modal');
+    const t = useTranslations('dashboard.workDetail.items.taxonomy.collections.modal');
     const [name, setName] = useState(() => collection?.name ?? '');
     const [description, setDescription] = useState(() => collection?.description ?? '');
     const [iconUrl, setIconUrl] = useState(() => collection?.icon_url ?? '');

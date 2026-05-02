@@ -5,7 +5,7 @@ import DirectoriesClient from './directories-client';
 
 export async function generateMetadata(): Promise<Metadata> {
     const t = await getTranslations('metadata.pages');
-    return { title: t('directories') };
+    return { title: t('works') };
 }
 
 export default async function DirectoriesPage() {

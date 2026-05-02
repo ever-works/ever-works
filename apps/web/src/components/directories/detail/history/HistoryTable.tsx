@@ -137,8 +137,8 @@ function renderMetricCount(
 }
 
 export function HistoryTable({ entries, locale }: HistoryTableProps) {
-    const t = useTranslations('dashboard.directoryDetail.history');
-    const tStatus = useTranslations('dashboard.directoryDetail.status');
+    const t = useTranslations('dashboard.workDetail.history');
+    const tStatus = useTranslations('dashboard.workDetail.status');
     const [expandedIds, setExpandedIds] = useState<string[]>([]);
 
     function toggleExpanded(id: string) {

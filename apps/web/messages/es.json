@@ -219,7 +219,7 @@
                     "description": "Cada directorio es un repositorio de GitHub que posees y controlas"
                 }
             },
-            "directory": {
+            "work": {
                 "title": "Crea tu primer directorio",
                 "description": "Un directorio es tu centro de contenido. Agrega elementos, configura el diseño y publícalo con un clic.",
                 "detail": "¡Todo listo! Crea tu primer directorio para comenzar a construir y publicar contenido.",
@@ -497,7 +497,7 @@
                 "shortcuts": {
                     "title": "Atajos de teclado",
                     "search": "Buscar directorios",
-                    "newDirectory": "Crear nuevo directorio",
+                    "newWork": "Crear nuevo directorio",
                     "help": "Abrir ayuda",
                     "hint": "Usa Cmd en Mac o Ctrl en Windows/Linux"
                 },
@@ -521,7 +521,7 @@
             "columns": {
                 "status": "Estado",
                 "dateTime": "Fecha / Hora",
-                "directory": "Directorio",
+                "work": "Directorio",
                 "type": "Tipo",
                 "summary": "Resumen"
             },
@@ -532,9 +532,9 @@
                     "generation": "Generación",
                     "comparison": "Comparación",
                     "deployment": "Despliegue",
-                    "directoryCreated": "Directorio creado",
-                    "directoryUpdated": "Directorio actualizado",
-                    "directoryDeleted": "Directorio eliminado",
+                    "workCreated": "Directorio creado",
+                    "workUpdated": "Directorio actualizado",
+                    "workDeleted": "Directorio eliminado",
                     "pluginEnabled": "Plugin activado",
                     "pluginDisabled": "Plugin desactivado",
                     "pluginConfigured": "Plugin configurado",
@@ -596,11 +596,11 @@
                 "pageOf": "Página {page} de {total}"
             }
         },
-        "directories": {
+        "works": {
             "title": "Directorios",
             "subtitle": "Gestiona y organiza tus directorios impulsados por IA",
             "summary": {
-                "totalDirectories": "Total de directorios",
+                "totalWorks": "Total de directorios",
                 "generating": "Generando",
                 "totalItems": "Total de elementos"
             },
@@ -658,13 +658,13 @@
                     "invalidJson": "Archivo JSON inválido",
                     "previewError": "Error al analizar el archivo de importación",
                     "summary": "Resumen de importación",
-                    "directories": "Directorios",
+                    "works": "Directorios",
                     "items": "Elementos",
                     "userPlugins": "Plugins de usuario",
                     "version": "Versión del formato",
                     "missingPlugins": "Estos plugins no están instalados y serán omitidos",
                     "conflicts": "Conflictos de slug",
-                    "existingDirectory": "Existente",
+                    "existingWork": "Existente",
                     "incoming": "Entrante",
                     "strategySkip": "Omitir (mantener existente)",
                     "strategyOverwrite": "Sobrescribir existente",
@@ -681,9 +681,9 @@
                     "validationErrors": "Errores de validación",
                     "resultSuccess": "Importación completada correctamente",
                     "resultFailed": "Importación fallida",
-                    "directoriesCreated": "Directorios creados",
-                    "directoriesUpdated": "Directorios actualizados",
-                    "directoriesSkipped": "Directorios omitidos",
+                    "worksCreated": "Directorios creados",
+                    "worksUpdated": "Directorios actualizados",
+                    "worksSkipped": "Directorios omitidos",
                     "pluginsImported": "Plugins importados",
                     "warnings": "Advertencias",
                     "errors": "Errores"
@@ -881,12 +881,12 @@
             }
         },
         "stats": {
-            "totalDirectories": "Total de directorios",
+            "totalWorks": "Total de directorios",
             "totalItems": "Total de elementos",
             "activeWebsites": "Sitios web activos",
             "fromLastMonth": "del último mes"
         },
-        "directoryCard": {
+        "workCard": {
             "status": {
                 "active": "Activo",
                 "notStarted": "No iniciado",
@@ -914,11 +914,11 @@
             "openingTitle": "Abriendo directorio",
             "openingMessage": "Preparando tu directorio. Los detalles se abrirán en breve. Permanece en esta página."
         },
-        "directoryList": {
+        "workList": {
             "title": "Tus directorios",
             "createButton": "Crear directorio"
         },
-        "directoryDetail": {
+        "workDetail": {
             "failedToGenerateItems": "No se pudieron generar los elementos. Inténtalo de nuevo.",
             "generationCompleted": "Generación completada exitosamente",
             "generationCancelled": "La generación fue cancelada",
@@ -1358,7 +1358,7 @@
                 "title": "Actividad reciente",
                 "noActivity": "Aún no hay actividad",
                 "created": "Directorio creado",
-                "directoryCreated": "El directorio se creó exitosamente",
+                "workCreated": "El directorio se creó exitosamente",
                 "justNow": "Ahora mismo"
             },
             "items": {
@@ -1663,7 +1663,7 @@
                 "loadingFormSchema": "Cargando configuración del formulario...",
                 "failedToLoadFormSchema": "Error al cargar la configuración del formulario",
                 "selectOption": "Selecciona una opción",
-                "directoryName": "Nombre del directorio",
+                "workName": "Nombre del directorio",
                 "generationPrompt": "Prompt de generación",
                 "modelOverride": "Anulación de modelo de IA",
                 "modelOverridePlaceholder": "p. ej. openai/gpt-4.1 o openrouter/openai/gpt-4.1",
@@ -1676,7 +1676,7 @@
                 "startGeneration": "Iniciar generación",
                 "regenerateItems": "Regenerar elementos",
                 "updateItems": "Ejecutar generación",
-                "recreateDirectory": "Recrear directorio",
+                "recreateWork": "Recrear directorio",
                 "showAdvancedOptions": "Mostrar opciones avanzadas",
                 "hideAdvancedOptions": "Ocultar opciones avanzadas",
                 "cancel": "Cancelar",
@@ -1714,7 +1714,7 @@
                 "websiteRepositoryCreationMethod": "Método de creación del repositorio del sitio web",
                 "methodDuplicate": "Duplicar",
                 "methodFork": "Fork",
-                "directoryNamePlaceholder": "Ingresa el nombre del directorio",
+                "workNamePlaceholder": "Ingresa el nombre del directorio",
                 "methodCreateFromTemplate": "Crear desde plantilla",
                 "aiProcessingConfiguration": "Configuración de procesamiento de IA",
                 "maxSearchQueries": "Máx. consultas de búsqueda",
@@ -1769,7 +1769,7 @@
                 "aiProviderDescription": "Proveedor de modelo de IA para generación y extracción de contenido",
                 "contentExtractorProvider": "Extractor de contenido",
                 "contentExtractorProviderDescription": "Proveedor para extraer contenido de páginas web",
-                "useDirectoryDefault": "Usar predeterminado del directorio",
+                "useWorkDefault": "Usar predeterminado del directorio",
                 "default": "Predeterminado",
                 "notConfigured": "No configurado",
                 "notConfiguredTooltip": "Este proveedor requiere configuración. Visita Configuración → Plugins para configurarlo.",
@@ -1837,7 +1837,7 @@
                 },
                 "generalSettings": "Configuración general",
                 "generalTitle": "Configuración general",
-                "directoryName": "Nombre del directorio",
+                "workName": "Nombre del directorio",
                 "description": "Descripción",
                 "organizationRepository": "Repositorio de organización",
                 "organizationHelp": "Crear repositorios bajo una organización en lugar de tu cuenta personal",
@@ -1865,8 +1865,8 @@
                 "deleteWebsiteRepositoryDescription": "Eliminar el repositorio del sitio web desplegado",
                 "deleteConfirm": "¿Estás absolutamente seguro?",
                 "deleteConfirmDetail": "Esta acción no se puede deshacer. El directorio y los repositorios seleccionados se eliminarán permanentemente.",
-                "confirmDirectoryName": "Escribe el nombre del directorio para confirmar",
-                "confirmDirectoryNameDescription": "Escribe \"{name}\" para confirmar la eliminación",
+                "confirmWorkName": "Escribe el nombre del directorio para confirmar",
+                "confirmWorkNameDescription": "Escribe \"{name}\" para confirmar la eliminación",
                 "deleteNameMismatch": "El nombre del directorio no coincide",
                 "deleteButton": "Eliminar directorio",
                 "deleteConfirmButton": "Sí, eliminar",
@@ -2208,7 +2208,7 @@
                 }
             }
         },
-        "directoryCreation": {
+        "workCreation": {
             "title": "Crear Nuevo Directorio",
             "subtitle": "Elige cómo quieres crear tu directorio",
             "backToOptions": "Volver a opciones",
@@ -2240,9 +2240,9 @@
                 "getStarted": "Comenzar",
                 "formTitle": "Crear Directorio con IA",
                 "formSubtitle": "Describe tu idea de directorio y deja que la IA se encargue de la configuración y generación de contenido inicial",
-                "directoryNameLabel": "Nombre del Directorio",
-                "directoryNamePlaceholder": "p. ej., Herramientas de IA Geniales",
-                "directoryNameHelp": "La IA sugerirá un nombre si lo dejas vacío",
+                "workNameLabel": "Nombre del Directorio",
+                "workNamePlaceholder": "p. ej., Herramientas de IA Geniales",
+                "workNameHelp": "La IA sugerirá un nombre si lo dejas vacío",
                 "promptLabel": "Describe Tu Directorio",
                 "githubRequired": "Por favor, conecta tu cuenta de GitHub primero.",
                 "promptPlaceholder": "Describe qué tipo de directorio quieres crear, qué elementos debe contener y cualquier requisito específico...",
@@ -2604,7 +2604,7 @@
             "subtitle": "Elige cómo quieres ser notificado sobre actualizaciones importantes",
             "email": {
                 "title": "Notificaciones por Email",
-                "directoryUpdates": {
+                "workUpdates": {
                     "label": "Actualizaciones de Directorios",
                     "description": "Recibe notificaciones sobre actualizaciones importantes en tus directorios"
                 },
@@ -2653,12 +2653,12 @@
         "sidebar": {
             "menu": "Menú",
             "aiChat": "Chat IA",
-            "newDirectory": "Nuevo Directorio",
+            "newWork": "Nuevo Directorio",
             "activityIndicator": "Generando directorio",
             "navigation": {
                 "dashboard": "Panel",
                 "activity": "Actividad",
-                "directories": "Directorios",
+                "works": "Directorios",
                 "plugins": "Plugins",
                 "settings": "Configuración"
             },
@@ -2716,8 +2716,8 @@
             "welcomeSubtitle": "Tu asistente impulsado por IA. Pregúntame cualquier cosa sobre crear directorios, generar contenido o organizar tus datos.",
             "welcomeMessage": "¡Hola! Puedo ayudarte a crear directorios usando lenguaje natural. Pregunta algo como \"Crea un directorio para herramientas de IA\" o describe lo que necesitas.",
             "capabilities": {
-                "directoryCreation": "Creación de Directorios",
-                "directoryCreationDesc": "Construye directorios a partir de descripciones en lenguaje natural",
+                "workCreation": "Creación de Directorios",
+                "workCreationDesc": "Construye directorios a partir de descripciones en lenguaje natural",
                 "webResearch": "Investigación Web",
                 "webResearchDesc": "Busca y recopila datos de toda la web",
                 "contentGeneration": "Generación de Contenido",
@@ -2814,8 +2814,8 @@
             "disableWarning": "Deshabilitar este complemento también lo deshabilitará en todos tus directorios",
             "cannotDisableSystem": "Los complementos del sistema no se pueden deshabilitar",
             "disableFailed": "Error al deshabilitar el complemento",
-            "autoEnableForDirectories": "También habilitar para todos los directorios",
-            "autoEnableForDirectoriesDescription": "Este complemento estará activo automáticamente en todos tus directorios. Aún puedes deshabilitarlo por directorio.",
+            "autoEnableForWorks": "También habilitar para todos los directorios",
+            "autoEnableForWorksDescription": "Este complemento estará activo automáticamente en todos tus directorios. Aún puedes deshabilitarlo por directorio.",
             "confirmDisable": "Confirmar deshabilitación",
             "cancel": "Cancelar",
             "missingRequiredFields": "Faltan campos obligatorios: {fields}",
@@ -2890,20 +2890,20 @@
                 "removeLabel": "Eliminar {login}"
             }
         },
-        "directoryPlugins": {
+        "workPlugins": {
             "title": "Complementos de directorio",
             "subtitle": "Configurar complementos para este directorio",
             "active": "Activo",
             "enable": "Habilitar",
             "disable": "Deshabilitar",
-            "enableForDirectory": "Habilitar para este directorio",
-            "disableForDirectory": "Deshabilitar para este directorio",
+            "enableForWork": "Habilitar para este directorio",
+            "disableForWork": "Deshabilitar para este directorio",
             "enableAtUserLevelFirst": "Habilita este complemento en tu configuración primero",
             "disabledByUser": "Deshabilitado a nivel de usuario",
             "systemAlwaysEnabled": "Complemento del sistema - siempre habilitado",
             "showSettings": "Mostrar configuración",
             "hideSettings": "Ocultar configuración",
-            "directorySettingsInfo": "Configura aquí la configuración específica del directorio",
+            "workSettingsInfo": "Configura aquí la configuración específica del directorio",
             "save": "Guardar",
             "saved": "Guardado",
             "showInstalledOnly": "Mostrar solo instalados",
@@ -3012,9 +3012,9 @@
             "authError": "Error de autenticación",
             "dashboard": "Panel",
             "activity": "Registro de actividad",
-            "directories": "Directorios",
-            "newDirectory": "Nuevo directorio",
-            "directory": "Directorio",
+            "works": "Directorios",
+            "newWork": "Nuevo directorio",
+            "work": "Directorio",
             "overview": "Resumen",
             "items": "Elementos",
             "generator": "Generador",
@@ -3048,7 +3048,7 @@
         }
     },
     "actions": {
-        "directories": {
+        "works": {
             "slug": {
                 "required": "El slug es requerido",
                 "format": "El slug debe contener solo letras minúsculas, números e hiphens"

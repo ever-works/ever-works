@@ -50,7 +50,7 @@ const ItemCardList = memo(function ItemCardList({
     onUpdate,
 }: ItemCardViewProps) {
     const { directoryWebsite } = useItemsContext();
-    const t = useTranslations('dashboard.directoryDetail.items');
+    const t = useTranslations('dashboard.workDetail.items');
     const isFeatured = item.featured === true;
     const categoryName = getCategoryName(item.category);
 
@@ -138,7 +138,7 @@ const ItemCardGrid = memo(function ItemCardGrid({
     onUpdate,
 }: ItemCardViewProps) {
     const { directoryWebsite } = useItemsContext();
-    const t = useTranslations('dashboard.directoryDetail.items');
+    const t = useTranslations('dashboard.workDetail.items');
     const isFeatured = item.featured === true;
     const categoryName = getCategoryName(item.category);
 
@@ -226,7 +226,7 @@ const ItemCardGrid = memo(function ItemCardGrid({
 // ── Shared components ────────────────────────────────────────────
 
 function ItemHealthBadge({ item }: { item: ItemData }) {
-    const t = useTranslations('dashboard.directoryDetail.items.sourceValidation');
+    const t = useTranslations('dashboard.workDetail.items.sourceValidation');
 
     if (!item.health || item.health.status === 'healthy' || item.health.status === 'unchecked') {
         return null;

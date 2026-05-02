@@ -219,7 +219,7 @@
                     "description": "Her dizin, sahip olduğunuz ve kontrol ettiğiniz bir GitHub deposudur"
                 }
             },
-            "directory": {
+            "work": {
                 "title": "İlk dizininizi oluşturun",
                 "description": "Bir dizin, içerik merkezinizdir. Öğeler ekleyin, düzeni yapılandırın ve bir tıkla yayınlayın.",
                 "detail": "Tamam hazır! İçerik oluşturmaya ve yayınlamaya başlamak için ilk dizininizi oluşturun.",
@@ -497,7 +497,7 @@
                 "shortcuts": {
                     "title": "Klavye Kısayolları",
                     "search": "Dizinleri ara",
-                    "newDirectory": "Yeni dizin oluştur",
+                    "newWork": "Yeni dizin oluştur",
                     "help": "Yardımı aç",
                     "hint": "Mac'te Cmd veya Windows/Linux'ta Ctrl kullanın"
                 },
@@ -521,7 +521,7 @@
             "columns": {
                 "status": "Durum",
                 "dateTime": "Tarih / Saat",
-                "directory": "Dizin",
+                "work": "Dizin",
                 "type": "Tür",
                 "summary": "Özet"
             },
@@ -532,9 +532,9 @@
                     "generation": "Üretim",
                     "comparison": "Karşılaştırma",
                     "deployment": "Dağıtım",
-                    "directoryCreated": "Dizin Oluşturuldu",
-                    "directoryUpdated": "Dizin Güncellendi",
-                    "directoryDeleted": "Dizin Silindi",
+                    "workCreated": "Dizin Oluşturuldu",
+                    "workUpdated": "Dizin Güncellendi",
+                    "workDeleted": "Dizin Silindi",
                     "pluginEnabled": "Eklenti Etkinleştirildi",
                     "pluginDisabled": "Eklenti Devre Dışı",
                     "pluginConfigured": "Eklenti Yapılandırıldı",
@@ -596,11 +596,11 @@
                 "pageOf": "{total} sayfasının {page} sayfası"
             }
         },
-        "directories": {
+        "works": {
             "title": "Dizinler",
             "subtitle": "AI destekli dizinlerinizi yönetin ve düzenleyin",
             "summary": {
-                "totalDirectories": "Toplam Dizin",
+                "totalWorks": "Toplam Dizin",
                 "generating": "Üretiliyor",
                 "totalItems": "Toplam Öğe"
             },
@@ -658,13 +658,13 @@
                     "invalidJson": "Geçersiz JSON dosyası",
                     "previewError": "İçe aktarma dosyası analiz edilemedi",
                     "summary": "İçe Aktarma Özeti",
-                    "directories": "Dizinler",
+                    "works": "Dizinler",
                     "items": "Öğeler",
                     "userPlugins": "Kullanıcı Eklentileri",
                     "version": "Biçim Sürümü",
                     "missingPlugins": "Bu eklentiler yüklü değil ve atlanacak",
                     "conflicts": "Slug Çakışmaları",
-                    "existingDirectory": "Mevcut",
+                    "existingWork": "Mevcut",
                     "incoming": "Gelen",
                     "strategySkip": "Atla (mevcudu koru)",
                     "strategyOverwrite": "Mevcudu üzerine yaz",
@@ -681,9 +681,9 @@
                     "validationErrors": "Doğrulama Hataları",
                     "resultSuccess": "İçe Aktarma Başarıyla Tamamlandı",
                     "resultFailed": "İçe Aktarma Başarısız",
-                    "directoriesCreated": "Dizinler oluşturuldu",
-                    "directoriesUpdated": "Dizinler güncellendi",
-                    "directoriesSkipped": "Dizinler atlandı",
+                    "worksCreated": "Dizinler oluşturuldu",
+                    "worksUpdated": "Dizinler güncellendi",
+                    "worksSkipped": "Dizinler atlandı",
                     "pluginsImported": "Eklentiler içe aktarıldı",
                     "warnings": "Uyarılar",
                     "errors": "Hatalar"
@@ -881,12 +881,12 @@
             }
         },
         "stats": {
-            "totalDirectories": "Toplam Dizin",
+            "totalWorks": "Toplam Dizin",
             "totalItems": "Toplam Öğe",
             "activeWebsites": "Aktif Web Siteleri",
             "fromLastMonth": "geçen aydan"
         },
-        "directoryCard": {
+        "workCard": {
             "status": {
                 "active": "Aktif",
                 "notStarted": "Başlanmadı",
@@ -914,11 +914,11 @@
             "openingTitle": "Dizin açılıyor",
             "openingMessage": "Dizin hazırlanıyor. Detaylar kısa süre sonra açılacak. Bu sayfada kalın."
         },
-        "directoryList": {
+        "workList": {
             "title": "Dizinleriniz",
             "createButton": "Dizin Oluştur"
         },
-        "directoryDetail": {
+        "workDetail": {
             "failedToGenerateItems": "Öğeleri oluşturma başarısız oldu. Lütfen tekrar deneyin.",
             "generationCompleted": "Oluşturma başarıyla tamamlandı",
             "generationCancelled": "Oluşturma iptal edildi",
@@ -1358,7 +1358,7 @@
                 "title": "Son Etkinlik",
                 "noActivity": "Henüz etkinlik yok",
                 "created": "Dizin Oluşturuldu",
-                "directoryCreated": "Dizin başarıyla oluşturuldu",
+                "workCreated": "Dizin başarıyla oluşturuldu",
                 "justNow": "Az önce"
             },
             "items": {
@@ -1663,7 +1663,7 @@
                 "loadingFormSchema": "Form yapılandırması yükleniyor...",
                 "failedToLoadFormSchema": "Form yapılandırması yüklenemedi",
                 "selectOption": "Bir seçenek seçin",
-                "directoryName": "Dizin Adı",
+                "workName": "Dizin Adı",
                 "generationPrompt": "Oluşturma İstemı",
                 "modelOverride": "AI Modeli Geçersiz Kılma",
                 "modelOverridePlaceholder": "ör. openai/gpt-4.1 veya openrouter/openai/gpt-4.1",
@@ -1676,7 +1676,7 @@
                 "startGeneration": "Oluşturmayı Başlat",
                 "regenerateItems": "Öğeleri Yeniden Oluştur",
                 "updateItems": "Oluşturmayı Çalıştır",
-                "recreateDirectory": "Dizini Yeniden Oluştur",
+                "recreateWork": "Dizini Yeniden Oluştur",
                 "showAdvancedOptions": "Gelişmiş Seçenekleri Göster",
                 "hideAdvancedOptions": "Gelişmiş Seçenekleri Gizle",
                 "cancel": "İptal",
@@ -1714,7 +1714,7 @@
                 "websiteRepositoryCreationMethod": "Web Sitesi Depo Oluşturma Yöntemi",
                 "methodDuplicate": "Çoğalt",
                 "methodFork": "Fork",
-                "directoryNamePlaceholder": "Dizin adını girin",
+                "workNamePlaceholder": "Dizin adını girin",
                 "methodCreateFromTemplate": "Şablondan Oluştur",
                 "aiProcessingConfiguration": "AI İşleme Yapılandırması",
                 "maxSearchQueries": "Maks. Arama Sorguları",
@@ -1769,7 +1769,7 @@
                 "aiProviderDescription": "İçerik oluşturma ve çıkarma için AI model sağlayıcısı",
                 "contentExtractorProvider": "İçerik Çıkarıcı",
                 "contentExtractorProviderDescription": "Web sayfalarından içerik çıkarmak için sağlayıcı",
-                "useDirectoryDefault": "Dizin Varsayılanını Kullan",
+                "useWorkDefault": "Dizin Varsayılanını Kullan",
                 "default": "Varsayılan",
                 "notConfigured": "Yapılandırılmamış",
                 "notConfiguredTooltip": "Bu sağlayıcı yapılandırma gerektirir. Ayarlar → Eklentiler'e giderek ayarlayın.",
@@ -1837,7 +1837,7 @@
                 },
                 "generalSettings": "Genel Ayarlar",
                 "generalTitle": "Genel Ayarlar",
-                "directoryName": "Dizin Adı",
+                "workName": "Dizin Adı",
                 "description": "Açıklama",
                 "organizationRepository": "Organizasyon Deposu",
                 "organizationHelp": "Kişisel hesabınız yerine bir organizasyon altında depolar oluşturun",
@@ -1865,8 +1865,8 @@
                 "deleteWebsiteRepositoryDescription": "Dağıtılmış web sitesi deposunu kaldırın",
                 "deleteConfirm": "Tamamen emin misiniz?",
                 "deleteConfirmDetail": "Bu işlem geri alınamaz. Dizin ve seçilen depolar kalıcı olarak silinecek.",
-                "confirmDirectoryName": "Onaylamak için dizin adını yazın",
-                "confirmDirectoryNameDescription": "Silme işlemini onaylamak için \"{name}\" yazın",
+                "confirmWorkName": "Onaylamak için dizin adını yazın",
+                "confirmWorkNameDescription": "Silme işlemini onaylamak için \"{name}\" yazın",
                 "deleteNameMismatch": "Dizin adı eşleşmiyor",
                 "deleteButton": "Dizini Sil",
                 "deleteConfirmButton": "Evet, Sil",
@@ -2208,7 +2208,7 @@
                 }
             }
         },
-        "directoryCreation": {
+        "workCreation": {
             "title": "Yeni Dizin Oluştur",
             "subtitle": "Dizinizi nasıl oluşturmak istediğinizi seçin",
             "backToOptions": "Seçeneklere dön",
@@ -2240,9 +2240,9 @@
                 "getStarted": "Başla",
                 "formTitle": "AI ile Dizin Oluştur",
                 "formSubtitle": "Dizin fikrinizi tarif edin ve AI kurulum ile ilk içerik üretimini halletsin",
-                "directoryNameLabel": "Dizin Adı",
-                "directoryNamePlaceholder": "ör. Harika AI Araçları",
-                "directoryNameHelp": "Bu alanı boş bırakırsanız AI bir ad önerir",
+                "workNameLabel": "Dizin Adı",
+                "workNamePlaceholder": "ör. Harika AI Araçları",
+                "workNameHelp": "Bu alanı boş bırakırsanız AI bir ad önerir",
                 "promptLabel": "Dizinini Tarif Et",
                 "githubRequired": "Lütfen önce GitHub hesabınızı bağlayın.",
                 "promptPlaceholder": "Oluşturmak istediğiniz dizin türünü, içermesi gereken öğeleri ve özel gereksinimleri tarif edin...",
@@ -2604,7 +2604,7 @@
             "subtitle": "Önemli güncellemeler hakkında nasıl bildirileceğinizi seçin",
             "email": {
                 "title": "E-posta Bildirimleri",
-                "directoryUpdates": {
+                "workUpdates": {
                     "label": "Dizin Güncellemeleri",
                     "description": "Dizinlerinizdeki önemli güncellemeler hakkında bildirim alın"
                 },
@@ -2653,12 +2653,12 @@
         "sidebar": {
             "menu": "Menü",
             "aiChat": "AI Sohbet",
-            "newDirectory": "Yeni Dizin",
+            "newWork": "Yeni Dizin",
             "activityIndicator": "Dizin oluşturuluyor",
             "navigation": {
                 "dashboard": "Pano",
                 "activity": "Etkinlik",
-                "directories": "Dizinler",
+                "works": "Dizinler",
                 "plugins": "Eklentiler",
                 "settings": "Ayarlar"
             },
@@ -2716,8 +2716,8 @@
             "welcomeSubtitle": "AI destekli asistanınız. Dizin oluşturma, içerik üretme veya verilerinizi organize etme hakkında bana her şeyi sorun.",
             "welcomeMessage": "Merhaba! Doğal dil kullanarak dizinler oluşturmanıza yardımcı olabilirim. \"AI araçları için bir dizin oluştur\" gibi bir şey sorun veya ihtiyacınızı tarif edin.",
             "capabilities": {
-                "directoryCreation": "Dizin Oluşturma",
-                "directoryCreationDesc": "Doğal dil açıklamalarından dizinler oluşturun",
+                "workCreation": "Dizin Oluşturma",
+                "workCreationDesc": "Doğal dil açıklamalarından dizinler oluşturun",
                 "webResearch": "Web Araştırması",
                 "webResearchDesc": "Web'den veri arayın ve toplayın",
                 "contentGeneration": "İçerik Üretimi",
@@ -2814,8 +2814,8 @@
             "disableWarning": "Bu eklentiyi devre dışı bırakmak, tüm dizinlerdeki eklentiyi de devre dışı bırakacaktır",
             "cannotDisableSystem": "Sistem eklentileri devre dışı bırakılamaz",
             "disableFailed": "Eklenti devre dışı bırakılamadı",
-            "autoEnableForDirectories": "Tüm dizinler için de etkinleştir",
-            "autoEnableForDirectoriesDescription": "Bu eklenti, tüm dizinlerinizde otomatik olarak etkin olacaktır. Hala dizin başına devre dışı bırakabilirsiniz.",
+            "autoEnableForWorks": "Tüm dizinler için de etkinleştir",
+            "autoEnableForWorksDescription": "Bu eklenti, tüm dizinlerinizde otomatik olarak etkin olacaktır. Hala dizin başına devre dışı bırakabilirsiniz.",
             "confirmDisable": "Devre Dışı Bırakmayı Onayla",
             "cancel": "İptal",
             "missingRequiredFields": "Eksik zorunlu alanlar: {fields}",
@@ -2890,20 +2890,20 @@
                 "removeLabel": "{login} öğesini kaldır"
             }
         },
-        "directoryPlugins": {
+        "workPlugins": {
             "title": "Dizin Eklentileri",
             "subtitle": "Bu dizin için eklentileri yapılandırın",
             "active": "Etkin",
             "enable": "Etkinleştir",
             "disable": "Devre dışı bırak",
-            "enableForDirectory": "Bu dizin için etkinleştir",
-            "disableForDirectory": "Bu dizin için devre dışı bırak",
+            "enableForWork": "Bu dizin için etkinleştir",
+            "disableForWork": "Bu dizin için devre dışı bırak",
             "enableAtUserLevelFirst": "Önce ayarlarınızda bu eklentiyi etkinleştirin",
             "disabledByUser": "Kullanıcı düzeyinde devre dışı",
             "systemAlwaysEnabled": "Sistem eklentisi - her zaman etkin",
             "showSettings": "Ayarları Göster",
             "hideSettings": "Ayarları Gizle",
-            "directorySettingsInfo": "Dizin özel ayarlarını burada yapılandırın",
+            "workSettingsInfo": "Dizin özel ayarlarını burada yapılandırın",
             "save": "Kaydet",
             "saved": "Kaydedildi",
             "showInstalledOnly": "Yalnızca yüklenenleri göster",
@@ -3012,9 +3012,9 @@
             "authError": "Kimlik Doğrulama Hatası",
             "dashboard": "Panel",
             "activity": "Etkinlik Günlüğü",
-            "directories": "Dizinler",
-            "newDirectory": "Yeni Dizin",
-            "directory": "Dizin",
+            "works": "Dizinler",
+            "newWork": "Yeni Dizin",
+            "work": "Dizin",
             "overview": "Genel Bakış",
             "items": "Öğeler",
             "generator": "Üretici",
@@ -3048,7 +3048,7 @@
         }
     },
     "actions": {
-        "directories": {
+        "works": {
             "slug": {
                 "required": "Slug gerekli",
                 "format": "Slug sadece küçük harfler, sayılar ve tirelerden oluşmalı"

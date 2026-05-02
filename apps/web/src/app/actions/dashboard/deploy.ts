@@ -15,7 +15,7 @@ export async function deploy(directoryId: string, teamScope?: string) {
     }
 
     const t = await getTranslations('actions.deploy');
-    const tDirectories = await getTranslations('actions.directories');
+    const tDirectories = await getTranslations('actions.works');
 
     try {
         const { directory } = await directoryAPI.get(directoryId);
@@ -266,7 +266,7 @@ export async function updateWebsiteTemplateSettings(
     }
 
     const t = await getTranslations('actions.deploy');
-    const tDirectories = await getTranslations('actions.directories');
+    const tDirectories = await getTranslations('actions.works');
 
     try {
         const { directory } = await directoryAPI.get(directoryId);

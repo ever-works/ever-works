@@ -219,7 +219,7 @@
                     "description": "Every Work is a GitHub repository you own and control."
                 }
             },
-            "directory": {
+            "work": {
                 "title": "Create your first Work",
                 "description": "A Work is your content hub. Add items, configure the layout, and publish it in one click.",
                 "detail": "You're all set! Create your first Work to start building and publishing content.",
@@ -497,7 +497,7 @@
                 "shortcuts": {
                     "title": "Keyboard Shortcuts",
                     "search": "Search works",
-                    "newDirectory": "Create new Work",
+                    "newWork": "Create new Work",
                     "help": "Open help",
                     "hint": "Use Cmd on Mac or Ctrl on Windows/Linux"
                 },
@@ -521,7 +521,7 @@
             "columns": {
                 "status": "Status",
                 "dateTime": "Date / Time",
-                "directory": "Work",
+                "work": "Work",
                 "type": "Type",
                 "summary": "Summary"
             },
@@ -532,9 +532,9 @@
                     "generation": "Generation",
                     "comparison": "Comparison",
                     "deployment": "Deployment",
-                    "directoryCreated": "Work Created",
-                    "directoryUpdated": "Work Updated",
-                    "directoryDeleted": "Work Deleted",
+                    "workCreated": "Work Created",
+                    "workUpdated": "Work Updated",
+                    "workDeleted": "Work Deleted",
                     "pluginEnabled": "Plugin Enabled",
                     "pluginDisabled": "Plugin Disabled",
                     "pluginConfigured": "Plugin Configured",
@@ -596,11 +596,11 @@
                 "pageOf": "Page {page} of {total}"
             }
         },
-        "directories": {
+        "works": {
             "title": "Works",
             "subtitle": "Manage and organize your AI-powered works",
             "summary": {
-                "totalDirectories": "Total Works",
+                "totalWorks": "Total Works",
                 "generating": "Generating",
                 "totalItems": "Total Items"
             },
@@ -683,13 +683,13 @@
                     "invalidJson": "Invalid JSON file",
                     "previewError": "Failed to analyze import file",
                     "summary": "Import Summary",
-                    "directories": "Works",
+                    "works": "Works",
                     "items": "Items",
                     "userPlugins": "User Plugins",
                     "version": "Format Version",
                     "missingPlugins": "These plugins are not installed and will be skipped",
                     "conflicts": "Slug Conflicts",
-                    "existingDirectory": "Existing",
+                    "existingWork": "Existing",
                     "incoming": "Incoming",
                     "strategySkip": "Skip (keep existing)",
                     "strategyOverwrite": "Overwrite existing",
@@ -706,9 +706,9 @@
                     "validationErrors": "Validation Errors",
                     "resultSuccess": "Import Completed Successfully",
                     "resultFailed": "Import Failed",
-                    "directoriesCreated": "Works created",
-                    "directoriesUpdated": "Works updated",
-                    "directoriesSkipped": "Works skipped",
+                    "worksCreated": "Works created",
+                    "worksUpdated": "Works updated",
+                    "worksSkipped": "Works skipped",
                     "pluginsImported": "Plugins imported",
                     "warnings": "Warnings",
                     "errors": "Errors"
@@ -906,12 +906,12 @@
             }
         },
         "stats": {
-            "totalDirectories": "Total Works",
+            "totalWorks": "Total Works",
             "totalItems": "Total Items",
             "activeWebsites": "Active Websites",
             "fromLastMonth": "from last month"
         },
-        "directoryCard": {
+        "workCard": {
             "status": {
                 "active": "Active",
                 "notStarted": "Not Started",
@@ -939,11 +939,11 @@
             "openingTitle": "Opening work",
             "openingMessage": "Preparing your work. Details will open shortly. Stay on this page."
         },
-        "directoryList": {
+        "workList": {
             "title": "Your Works",
             "createButton": "+ New Work"
         },
-        "directoryDetail": {
+        "workDetail": {
             "failedToGenerateItems": "Failed to generate items. Please try again.",
             "generationCompleted": "Generation completed successfully",
             "generationCancelled": "Generation was cancelled",
@@ -1383,7 +1383,7 @@
                 "title": "Recent Activity",
                 "noActivity": "No activity yet",
                 "created": "Work Created",
-                "directoryCreated": "Work was successfully created",
+                "workCreated": "Work was successfully created",
                 "justNow": "Just now"
             },
             "items": {
@@ -1688,7 +1688,7 @@
                 "loadingFormSchema": "Loading form configuration...",
                 "failedToLoadFormSchema": "Failed to load form configuration",
                 "selectOption": "Select an option",
-                "directoryName": "Work Name",
+                "workName": "Work Name",
                 "generationPrompt": "Generation Prompt",
                 "modelOverride": "AI Model Override",
                 "modelOverridePlaceholder": "e.g. openai/gpt-4.1 or openrouter/openai/gpt-4.1",
@@ -1703,7 +1703,7 @@
                 "startGeneration": "Start Generation",
                 "regenerateItems": "Regenerate Items",
                 "updateItems": "Run Generation",
-                "recreateDirectory": "Recreate Work",
+                "recreateWork": "Recreate Work",
                 "showAdvancedOptions": "Show Advanced Options",
                 "hideAdvancedOptions": "Hide Advanced Options",
                 "cancel": "Cancel",
@@ -1741,7 +1741,7 @@
                 "websiteRepositoryCreationMethod": "Website Repository Creation Method",
                 "methodDuplicate": "Duplicate",
                 "methodFork": "Fork",
-                "directoryNamePlaceholder": "Enter Work name",
+                "workNamePlaceholder": "Enter Work name",
                 "methodCreateFromTemplate": "Create from Template",
                 "aiProcessingConfiguration": "AI Processing Configuration",
                 "maxSearchQueries": "Max Search Queries",
@@ -1796,7 +1796,7 @@
                 "aiProviderDescription": "AI model provider for content generation and extraction",
                 "contentExtractorProvider": "Content Extractor",
                 "contentExtractorProviderDescription": "Provider for extracting content from web pages",
-                "useDirectoryDefault": "Use Work Default",
+                "useWorkDefault": "Use Work Default",
                 "default": "Default",
                 "notConfigured": "Not configured",
                 "notConfiguredTooltip": "This provider requires configuration. Visit Settings → Plugins to set it up.",
@@ -1864,7 +1864,7 @@
                 },
                 "generalSettings": "General Settings",
                 "generalTitle": "General Settings",
-                "directoryName": "Work Name",
+                "workName": "Work Name",
                 "description": "Description",
                 "organizationRepository": "Organization Repository",
                 "organizationHelp": "Create repositories under an organization instead of your personal account",
@@ -1892,8 +1892,8 @@
                 "deleteWebsiteRepositoryDescription": "Remove the deployed website repository",
                 "deleteConfirm": "Are you absolutely sure?",
                 "deleteConfirmDetail": "This action cannot be undone. The Work and selected repositories will be permanently deleted.",
-                "confirmDirectoryName": "Type Work name to confirm",
-                "confirmDirectoryNameDescription": "Type \"{name}\" to confirm deletion",
+                "confirmWorkName": "Type Work name to confirm",
+                "confirmWorkNameDescription": "Type \"{name}\" to confirm deletion",
                 "deleteNameMismatch": "Work name does not match",
                 "deleteButton": "Delete Work",
                 "deleteConfirmButton": "Yes, Delete",
@@ -2245,7 +2245,7 @@
                 }
             }
         },
-        "directoryCreation": {
+        "workCreation": {
             "title": "New Work",
             "subtitle": "Choose how you'd like to start your Work",
             "backToOptions": "Back to options",
@@ -2277,9 +2277,9 @@
                 "getStarted": "Get started",
                 "formTitle": "New Work — with AI",
                 "formSubtitle": "Describe your Work and let AI handle the setup and initial content generation",
-                "directoryNameLabel": "Work Name",
-                "directoryNamePlaceholder": "e.g., Awesome AI Tools",
-                "directoryNameHelp": "AI will suggest a name if you leave this empty",
+                "workNameLabel": "Work Name",
+                "workNamePlaceholder": "e.g., Awesome AI Tools",
+                "workNameHelp": "AI will suggest a name if you leave this empty",
                 "promptLabel": "Describe Your Work",
                 "githubRequired": "Please connect your GitHub account first.",
                 "promptPlaceholder": "Describe what kind of Work you want to create, what items it should contain, and any specific requirements...",
@@ -2643,7 +2643,7 @@
             "subtitle": "Choose how you want to be notified about important updates",
             "email": {
                 "title": "Email Notifications",
-                "directoryUpdates": {
+                "workUpdates": {
                     "label": "Work Updates",
                     "description": "Get notified about important updates to your works"
                 },
@@ -2692,12 +2692,12 @@
         "sidebar": {
             "menu": "Menu",
             "aiChat": "AI Chat",
-            "newDirectory": "New Work",
+            "newWork": "New Work",
             "activityIndicator": "Work generating",
             "navigation": {
                 "dashboard": "Dashboard",
                 "activity": "Activity",
-                "directories": "Works",
+                "works": "Works",
                 "plugins": "Plugins",
                 "settings": "Settings"
             },
@@ -2755,8 +2755,8 @@
             "welcomeSubtitle": "Your AI-powered assistant. Ask me anything about creating works, generating content, or organizing your data.",
             "welcomeMessage": "Hi! I can help you create works using natural language. Ask something like \"Create a Work for AI tools\" or describe what you need.",
             "capabilities": {
-                "directoryCreation": "Work Creation",
-                "directoryCreationDesc": "Build works from natural language descriptions",
+                "workCreation": "Work Creation",
+                "workCreationDesc": "Build works from natural language descriptions",
                 "webResearch": "Web Research",
                 "webResearchDesc": "Search and collect data from across the web",
                 "contentGeneration": "Content Generation",
@@ -2853,8 +2853,8 @@
             "disableWarning": "Disabling this plugin will also disable it in all your works",
             "cannotDisableSystem": "System plugins cannot be disabled",
             "disableFailed": "Failed to disable plugin",
-            "autoEnableForDirectories": "Also enable for all works",
-            "autoEnableForDirectoriesDescription": "This plugin will be automatically active in all your works. You can still disable it per Work.",
+            "autoEnableForWorks": "Also enable for all works",
+            "autoEnableForWorksDescription": "This plugin will be automatically active in all your works. You can still disable it per Work.",
             "confirmDisable": "Confirm Disable",
             "cancel": "Cancel",
             "missingRequiredFields": "Missing required fields: {fields}",
@@ -2929,20 +2929,20 @@
                 "removeLabel": "Remove {login}"
             }
         },
-        "directoryPlugins": {
+        "workPlugins": {
             "title": "Work Plugins",
             "subtitle": "Configure plugins for this Work",
             "active": "Active",
             "enable": "Enable",
             "disable": "Disable",
-            "enableForDirectory": "Enable for this Work",
-            "disableForDirectory": "Disable for this Work",
+            "enableForWork": "Enable for this Work",
+            "disableForWork": "Disable for this Work",
             "enableAtUserLevelFirst": "Enable this plugin in your settings first",
             "disabledByUser": "Disabled at user level",
             "systemAlwaysEnabled": "System plugin - always enabled",
             "showSettings": "Show Settings",
             "hideSettings": "Hide Settings",
-            "directorySettingsInfo": "Configure Work-specific settings here",
+            "workSettingsInfo": "Configure Work-specific settings here",
             "save": "Save",
             "saved": "Saved",
             "showInstalledOnly": "Show installed only",
@@ -3051,9 +3051,9 @@
             "authError": "Authentication Error",
             "dashboard": "Dashboard",
             "activity": "Activity Log",
-            "directories": "Works",
-            "newDirectory": "New Work",
-            "directory": "Work",
+            "works": "Works",
+            "newWork": "New Work",
+            "work": "Work",
             "overview": "Overview",
             "items": "Items",
             "generator": "Generator",
@@ -3087,7 +3087,7 @@
         }
     },
     "actions": {
-        "directories": {
+        "works": {
             "slug": {
                 "required": "Slug is required",
                 "format": "Slug must be lowercase letters, numbers, and hyphens only"

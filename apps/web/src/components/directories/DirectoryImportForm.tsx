@@ -87,7 +87,7 @@ export function DirectoryImportForm({ gitProvider, deployProvider }: DirectoryIm
     const [importPath, setImportPath] = useState<ImportPath>('direct');
     const [isPending, startTransition] = useTransition();
     const router = useRouter();
-    const t = useTranslations('dashboard.directoryCreation.import');
+    const t = useTranslations('dashboard.workCreation.import');
 
     const handleRepositorySelect = (repo: GitRepo) => {
         setSourceUrl(repo.html_url);

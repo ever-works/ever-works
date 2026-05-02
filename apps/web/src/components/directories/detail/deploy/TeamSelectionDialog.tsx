@@ -38,7 +38,7 @@ export function TeamSelectionDialog({
     onConfirm,
     onCancel,
 }: TeamSelectionDialogProps) {
-    const t = useTranslations('dashboard.directoryDetail.deploy');
+    const t = useTranslations('dashboard.workDetail.deploy');
     const [selectedTeamScope, setSelectedTeamScope] = useState<string>('');
 
     const options = useMemo(() => teams ?? [], [teams]);

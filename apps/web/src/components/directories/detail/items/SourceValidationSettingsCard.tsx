@@ -31,8 +31,8 @@ export function SourceValidationSettingsCard({
     directoryId: string;
     settings: SourceValidationSettingsDto;
 }) {
-    const t = useTranslations('dashboard.directoryDetail.items.sourceValidationSettings');
-    const tCadence = useTranslations('dashboard.directoryDetail.schedule.card');
+    const t = useTranslations('dashboard.workDetail.items.sourceValidationSettings');
+    const tCadence = useTranslations('dashboard.workDetail.schedule.card');
     const [enabled, setEnabled] = useState(settings.enabled);
     const availableCadences: SourceValidationCadence[] =
         settings.allowedCadences.length > 0

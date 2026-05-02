@@ -80,7 +80,7 @@ export function ComparisonDetailClient({
     markdown,
     extendedAnalysisMarkdown,
 }: ComparisonDetailClientProps) {
-    const t = useTranslations('dashboard.directoryDetail.comparisons');
+    const t = useTranslations('dashboard.workDetail.comparisons');
     const [isExtendedOpen, setIsExtendedOpen] = useState(false);
     const [mounted, setMounted] = useState(false);
 

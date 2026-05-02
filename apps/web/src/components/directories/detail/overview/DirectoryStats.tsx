@@ -87,8 +87,8 @@ export function DirectoryStats({
     comparisonsCount,
     directory,
 }: DirectoryStatsProps) {
-    const t = useTranslations('dashboard.directoryDetail.stats');
-    const tStatus = useTranslations('dashboard.directoryDetail.status');
+    const t = useTranslations('dashboard.workDetail.stats');
+    const tStatus = useTranslations('dashboard.workDetail.status');
     const { directory: syncedDirectory } = useDirectoryDetail();
     const statusDirectory = syncedDirectory.id === directory.id ? syncedDirectory : directory;
 

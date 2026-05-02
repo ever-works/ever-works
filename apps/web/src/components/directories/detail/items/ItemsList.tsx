@@ -55,7 +55,7 @@ function useColumnCount(viewMode: 'grid' | 'list') {
 }
 
 export function ItemsList({ items: initialItems, addItemRef }: ItemsListProps) {
-    const t = useTranslations('dashboard.directoryDetail.items');
+    const t = useTranslations('dashboard.workDetail.items');
     const [items, setItems] = useState(() => sortItems(initialItems));
     const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
     const [selectedCategory, setSelectedCategory] = useState<string | null>(null);

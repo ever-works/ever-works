@@ -7,7 +7,7 @@ import { OrganizationSelector } from '../../OrganizationSelector';
 import { Button } from '@/components/ui/button';
 
 export function GeneralSettings() {
-    const t = useTranslations('dashboard.directoryDetail.settings');
+    const t = useTranslations('dashboard.workDetail.settings');
 
     const { context, handleUpdate, isPending, canEditOrganization } = useSettings();
     const { directory, formData, setFormData, user } = context;
@@ -28,7 +28,7 @@ export function GeneralSettings() {
 
             <form onSubmit={handleUpdate} className="px-5 py-4 space-y-4">
                 <Input
-                    label={t('directoryName')}
+                    label={t('workName')}
                     type="text"
                     value={formData.name}
                     onChange={(e) => setFormData({ ...formData, name: e.target.value })}

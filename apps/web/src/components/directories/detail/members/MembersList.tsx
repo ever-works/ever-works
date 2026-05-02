@@ -20,7 +20,7 @@ export function MembersList({
     onMemberRemoved,
     onMemberUpdated,
 }: MembersListProps) {
-    const t = useTranslations('dashboard.directoryDetail.members');
+    const t = useTranslations('dashboard.workDetail.members');
 
     return (
         <div className="bg-surface dark:bg-surface-dark border border-border dark:border-border-dark rounded-lg overflow-hidden">

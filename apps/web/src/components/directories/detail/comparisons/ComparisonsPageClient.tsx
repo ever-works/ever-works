@@ -66,7 +66,7 @@ export function ComparisonsPageClient({
     availableProviders,
     initialAiConfig,
 }: ComparisonsPageClientProps) {
-    const t = useTranslations('dashboard.directoryDetail.comparisons');
+    const t = useTranslations('dashboard.workDetail.comparisons');
     const [comparisons, setComparisons] = useState<ComparisonData[]>(initialComparisons);
     const [isPending, startTransition] = useTransition();
     const [selectedItemA, setSelectedItemA] = useState('');

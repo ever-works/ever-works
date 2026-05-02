@@ -23,7 +23,7 @@ import { TriangleAlertIcon } from 'lucide-react';
 
 export function DeleteComponent({ directory }: { directory: Directory }) {
     const permissions = useDirectoryPermissions();
-    const t = useTranslations('dashboard.directoryDetail.settings');
+    const t = useTranslations('dashboard.workDetail.settings');
     const router = useRouter();
     const [isPending, startTransition] = useTransition();
     const [showDeleteDialog, setShowDeleteDialog] = useState(false);
@@ -171,10 +171,10 @@ export function DeleteComponent({ directory }: { directory: Directory }) {
                         {/* Name confirmation */}
                         <div className="space-y-2">
                             <p className="text-sm font-medium text-text dark:text-text-dark">
-                                {t('confirmDirectoryName')}
+                                {t('confirmWorkName')}
                             </p>
                             <p className="text-xs text-text-secondary dark:text-text-secondary-dark">
-                                {t('confirmDirectoryNameDescription', { name: directory.name })}
+                                {t('confirmWorkNameDescription', { name: directory.name })}
                             </p>
                             <Input
                                 type="text"

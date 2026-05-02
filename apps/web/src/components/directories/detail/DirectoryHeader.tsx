@@ -17,7 +17,7 @@ interface DirectoryHeaderProps {
 }
 
 export function DirectoryHeader({ directory }: DirectoryHeaderProps) {
-    const t = useTranslations('dashboard.directoryDetail');
+    const t = useTranslations('dashboard.workDetail');
     const { repoLinks } = useDirectoryDetail();
     const { role } = useDirectoryPermissions();
     const pathname = usePathname();

@@ -219,7 +219,7 @@
                     "description": "Jedes Verzeichnis ist ein GitHub-Repository, das Sie besitzen und kontrollieren."
                 }
             },
-            "directory": {
+            "work": {
                 "title": "Erstellen Sie Ihr erstes Verzeichnis",
                 "description": "Ein Verzeichnis ist Ihr Content-Hub. Fügen Sie Elemente hinzu, konfigurieren Sie das Layout und veröffentlichen Sie es mit einem Klick.",
                 "detail": "Sie sind startklar! Erstellen Sie Ihr erstes Verzeichnis, um mit dem Erstellen und Veröffentlichen von Inhalten zu beginnen.",
@@ -497,7 +497,7 @@
                 "shortcuts": {
                     "title": "Tastaturkürzel",
                     "search": "Verzeichnisse durchsuchen",
-                    "newDirectory": "Neues Verzeichnis erstellen",
+                    "newWork": "Neues Verzeichnis erstellen",
                     "help": "Hilfe öffnen",
                     "hint": "Cmd auf Mac oder Ctrl unter Windows/Linux verwenden"
                 },
@@ -521,7 +521,7 @@
             "columns": {
                 "status": "Status",
                 "dateTime": "Datum / Uhrzeit",
-                "directory": "Verzeichnis",
+                "work": "Verzeichnis",
                 "type": "Typ",
                 "summary": "Zusammenfassung"
             },
@@ -532,9 +532,9 @@
                     "generation": "Generierung",
                     "comparison": "Vergleich",
                     "deployment": "Bereitstellung",
-                    "directoryCreated": "Verzeichnis erstellt",
-                    "directoryUpdated": "Verzeichnis aktualisiert",
-                    "directoryDeleted": "Verzeichnis gelöscht",
+                    "workCreated": "Verzeichnis erstellt",
+                    "workUpdated": "Verzeichnis aktualisiert",
+                    "workDeleted": "Verzeichnis gelöscht",
                     "pluginEnabled": "Plugin aktiviert",
                     "pluginDisabled": "Plugin deaktiviert",
                     "pluginConfigured": "Plugin konfiguriert",
@@ -596,11 +596,11 @@
                 "pageOf": "Seite {page} von {total}"
             }
         },
-        "directories": {
+        "works": {
             "title": "Verzeichnisse",
             "subtitle": "Verwalten und organisieren Sie Ihre KI-gestützten Verzeichnisse",
             "summary": {
-                "totalDirectories": "Verzeichnisse gesamt",
+                "totalWorks": "Verzeichnisse gesamt",
                 "generating": "Wird generiert",
                 "totalItems": "Elemente gesamt"
             },
@@ -658,13 +658,13 @@
                     "invalidJson": "Ungültige JSON-Datei",
                     "previewError": "Fehler beim Analysieren der Importdatei",
                     "summary": "Import-Zusammenfassung",
-                    "directories": "Verzeichnisse",
+                    "works": "Verzeichnisse",
                     "items": "Einträge",
                     "userPlugins": "Benutzer-Plugins",
                     "version": "Formatversion",
                     "missingPlugins": "Diese Plugins sind nicht installiert und werden übersprungen",
                     "conflicts": "Slug-Konflikte",
-                    "existingDirectory": "Vorhanden",
+                    "existingWork": "Vorhanden",
                     "incoming": "Eingehend",
                     "strategySkip": "Überspringen (vorhandenes behalten)",
                     "strategyOverwrite": "Vorhandenes überschreiben",
@@ -681,9 +681,9 @@
                     "validationErrors": "Validierungsfehler",
                     "resultSuccess": "Import erfolgreich abgeschlossen",
                     "resultFailed": "Import fehlgeschlagen",
-                    "directoriesCreated": "Verzeichnisse erstellt",
-                    "directoriesUpdated": "Verzeichnisse aktualisiert",
-                    "directoriesSkipped": "Verzeichnisse übersprungen",
+                    "worksCreated": "Verzeichnisse erstellt",
+                    "worksUpdated": "Verzeichnisse aktualisiert",
+                    "worksSkipped": "Verzeichnisse übersprungen",
                     "pluginsImported": "Plugins importiert",
                     "warnings": "Warnungen",
                     "errors": "Fehler"
@@ -881,12 +881,12 @@
             }
         },
         "stats": {
-            "totalDirectories": "Insgesamt Verzeichnisse",
+            "totalWorks": "Insgesamt Verzeichnisse",
             "totalItems": "Insgesamt Einträge",
             "activeWebsites": "Aktive Websites",
             "fromLastMonth": "vom letzten Monat"
         },
-        "directoryCard": {
+        "workCard": {
             "status": {
                 "active": "Aktiv",
                 "notStarted": "Nicht gestartet",
@@ -914,11 +914,11 @@
             "openingTitle": "Verzeichnis wird geöffnet",
             "openingMessage": "Ihr Verzeichnis wird vorbereitet. Details öffnen sich bald. Bleiben Sie auf dieser Seite."
         },
-        "directoryList": {
+        "workList": {
             "title": "Ihre Verzeichnisse",
             "createButton": "Verzeichnis erstellen"
         },
-        "directoryDetail": {
+        "workDetail": {
             "failedToGenerateItems": "Fehler beim Generieren der Elemente. Bitte versuchen Sie es erneut.",
             "generationCompleted": "Generierung erfolgreich abgeschlossen",
             "generationCancelled": "Generierung wurde abgebrochen",
@@ -1358,7 +1358,7 @@
                 "title": "Aktuelle Aktivität",
                 "noActivity": "Noch keine Aktivität",
                 "created": "Verzeichnis erstellt",
-                "directoryCreated": "Verzeichnis erfolgreich erstellt",
+                "workCreated": "Verzeichnis erfolgreich erstellt",
                 "justNow": "Gerade eben"
             },
             "items": {
@@ -1663,7 +1663,7 @@
                 "loadingFormSchema": "Lade Formular-Konfiguration…",
                 "failedToLoadFormSchema": "Fehler beim Laden der Formular-Konfiguration",
                 "selectOption": "Option auswählen",
-                "directoryName": "Ordnername",
+                "workName": "Ordnername",
                 "generationPrompt": "Generierungs-Prompt",
                 "modelOverride": "KI-Modell überschreiben",
                 "modelOverridePlaceholder": "z. B. openai/gpt-4.1 oder openrouter/openai/gpt-4.1",
@@ -1676,7 +1676,7 @@
                 "startGeneration": "Generierung starten",
                 "regenerateItems": "Elemente neu generieren",
                 "updateItems": "Generierung ausführen",
-                "recreateDirectory": "Ordner neu erstellen",
+                "recreateWork": "Ordner neu erstellen",
                 "showAdvancedOptions": "Erweiterte Optionen anzeigen",
                 "hideAdvancedOptions": "Erweiterte Optionen ausblenden",
                 "cancel": "Abbrechen",
@@ -1714,7 +1714,7 @@
                 "websiteRepositoryCreationMethod": "Website-Repository-Erstellungsmethode",
                 "methodDuplicate": "Duplizieren",
                 "methodFork": "Fork",
-                "directoryNamePlaceholder": "Ordnername eingeben",
+                "workNamePlaceholder": "Ordnername eingeben",
                 "methodCreateFromTemplate": "Aus Vorlage erstellen",
                 "aiProcessingConfiguration": "AI-Verarbeitungskonfiguration",
                 "maxSearchQueries": "Max. Suchanfragen",
@@ -1769,7 +1769,7 @@
                 "aiProviderDescription": "AI-Modell-Provider für Inhaltsgenerierung und -extraktion",
                 "contentExtractorProvider": "Inhalts-Extraktor",
                 "contentExtractorProviderDescription": "Provider zum Extrahieren von Inhalt aus Webseiten",
-                "useDirectoryDefault": "Ordner-Standard verwenden",
+                "useWorkDefault": "Ordner-Standard verwenden",
                 "default": "Standard",
                 "notConfigured": "Nicht konfiguriert",
                 "notConfiguredTooltip": "Dieser Provider erfordert Konfiguration. Besuchen Sie Einstellungen → Plugins, um ihn einzurichten.",
@@ -1837,7 +1837,7 @@
                 },
                 "generalSettings": "Allgemeine Einstellungen",
                 "generalTitle": "Allgemeine Einstellungen",
-                "directoryName": "Verzeichnisname",
+                "workName": "Verzeichnisname",
                 "description": "Beschreibung",
                 "organizationRepository": "Organisations-Repository",
                 "organizationHelp": "Repositories unter einer Organisation anstelle Ihres persönlichen Kontos erstellen",
@@ -1865,8 +1865,8 @@
                 "deleteWebsiteRepositoryDescription": "Das bereitgestellte Website-Repository entfernen",
                 "deleteConfirm": "Sind Sie absolut sicher?",
                 "deleteConfirmDetail": "Diese Aktion kann nicht rückgängig gemacht werden. Das Verzeichnis und die ausgewählten Repositories werden dauerhaft gelöscht.",
-                "confirmDirectoryName": "Verzeichnisname zur Bestätigung eingeben",
-                "confirmDirectoryNameDescription": "Geben Sie \"{name}\" ein, um die Löschung zu bestätigen",
+                "confirmWorkName": "Verzeichnisname zur Bestätigung eingeben",
+                "confirmWorkNameDescription": "Geben Sie \"{name}\" ein, um die Löschung zu bestätigen",
                 "deleteNameMismatch": "Verzeichnisname stimmt nicht überein",
                 "deleteButton": "Verzeichnis löschen",
                 "deleteConfirmButton": "Ja, löschen",
@@ -2208,7 +2208,7 @@
                 }
             }
         },
-        "directoryCreation": {
+        "workCreation": {
             "title": "Neues Verzeichnis erstellen",
             "subtitle": "Wählen Sie aus, wie Sie Ihr Verzeichnis erstellen möchten",
             "backToOptions": "Zurück zu den Optionen",
@@ -2240,9 +2240,9 @@
                 "getStarted": "Loslegen",
                 "formTitle": "Verzeichnis mit KI erstellen",
                 "formSubtitle": "Beschreiben Sie Ihre Verzeichnis-Idee und lassen Sie KI den Setup und die anfängliche Inhaltserstellung übernehmen",
-                "directoryNameLabel": "Verzeichnisname",
-                "directoryNamePlaceholder": "z. B. Awesome AI Tools",
-                "directoryNameHelp": "KI schlägt einen Namen vor, wenn Sie dies leer lassen",
+                "workNameLabel": "Verzeichnisname",
+                "workNamePlaceholder": "z. B. Awesome AI Tools",
+                "workNameHelp": "KI schlägt einen Namen vor, wenn Sie dies leer lassen",
                 "promptLabel": "Beschreiben Sie Ihr Verzeichnis",
                 "githubRequired": "Bitte verbinden Sie zuerst Ihr GitHub-Konto.",
                 "promptPlaceholder": "Beschreiben Sie, welches Verzeichnis Sie erstellen möchten, welche Einträge es enthalten soll und spezifische Anforderungen…",
@@ -2604,7 +2604,7 @@
             "subtitle": "Wählen Sie aus, wie Sie über wichtige Updates benachrichtigt werden möchten",
             "email": {
                 "title": "E-Mail-Benachrichtigungen",
-                "directoryUpdates": {
+                "workUpdates": {
                     "label": "Verzeichnis-Updates",
                     "description": "Erhalten Sie Benachrichtigungen über wichtige Updates Ihrer Verzeichnisse"
                 },
@@ -2653,12 +2653,12 @@
         "sidebar": {
             "menu": "Menü",
             "aiChat": "AI-Chat",
-            "newDirectory": "Neues Verzeichnis",
+            "newWork": "Neues Verzeichnis",
             "activityIndicator": "Verzeichnis wird generiert",
             "navigation": {
                 "dashboard": "Dashboard",
                 "activity": "Aktivität",
-                "directories": "Verzeichnisse",
+                "works": "Verzeichnisse",
                 "plugins": "Plugins",
                 "settings": "Einstellungen"
             },
@@ -2716,8 +2716,8 @@
             "welcomeSubtitle": "Ihr KI-gestützter Assistent. Fragen Sie mich alles über das Erstellen von Verzeichnissen, Generieren von Inhalten oder Organisieren Ihrer Daten.",
             "welcomeMessage": "Hallo! Ich kann Ihnen helfen, Verzeichnisse mit natürlicher Sprache zu erstellen. Fragen Sie z. B. „Erstelle ein Verzeichnis für AI-Tools“ oder beschreiben Sie, was Sie brauchen.",
             "capabilities": {
-                "directoryCreation": "Verzeichniserstellung",
-                "directoryCreationDesc": "Verzeichnisse aus natürlichen Sprachbeschreibungen erstellen",
+                "workCreation": "Verzeichniserstellung",
+                "workCreationDesc": "Verzeichnisse aus natürlichen Sprachbeschreibungen erstellen",
                 "webResearch": "Web-Recherche",
                 "webResearchDesc": "Suchen und Sammeln von Daten aus dem gesamten Web",
                 "contentGeneration": "Inhaltsgenerierung",
@@ -2814,8 +2814,8 @@
             "disableWarning": "Das Deaktivieren dieses Plugins deaktiviert es auch in allen Ihren Verzeichnissen",
             "cannotDisableSystem": "System-Plugins können nicht deaktiviert werden",
             "disableFailed": "Plugin konnte nicht deaktiviert werden",
-            "autoEnableForDirectories": "Auch für alle Verzeichnisse aktivieren",
-            "autoEnableForDirectoriesDescription": "Dieses Plugin wird automatisch in allen Ihren Verzeichnissen aktiv sein. Sie können es weiterhin pro Verzeichnis deaktivieren.",
+            "autoEnableForWorks": "Auch für alle Verzeichnisse aktivieren",
+            "autoEnableForWorksDescription": "Dieses Plugin wird automatisch in allen Ihren Verzeichnissen aktiv sein. Sie können es weiterhin pro Verzeichnis deaktivieren.",
             "confirmDisable": "Deaktivierung bestätigen",
             "cancel": "Abbrechen",
             "missingRequiredFields": "Fehlende Pflichtfelder: {fields}",
@@ -2890,20 +2890,20 @@
                 "removeLabel": "{login} entfernen"
             }
         },
-        "directoryPlugins": {
+        "workPlugins": {
             "title": "Verzeichnis-Plugins",
             "subtitle": "Plugins für dieses Verzeichnis konfigurieren",
             "active": "Aktiv",
             "enable": "Aktivieren",
             "disable": "Deaktivieren",
-            "enableForDirectory": "Für dieses Verzeichnis aktivieren",
-            "disableForDirectory": "Für dieses Verzeichnis deaktivieren",
+            "enableForWork": "Für dieses Verzeichnis aktivieren",
+            "disableForWork": "Für dieses Verzeichnis deaktivieren",
             "enableAtUserLevelFirst": "Aktivieren Sie dieses Plugin zuerst in Ihren Einstellungen",
             "disabledByUser": "Auf Benutzerebene deaktiviert",
             "systemAlwaysEnabled": "System-Plugin – immer aktiviert",
             "showSettings": "Einstellungen anzeigen",
             "hideSettings": "Einstellungen ausblenden",
-            "directorySettingsInfo": "Hier verzeichnisspezifische Einstellungen konfigurieren",
+            "workSettingsInfo": "Hier verzeichnisspezifische Einstellungen konfigurieren",
             "save": "Speichern",
             "saved": "Gespeichert",
             "showInstalledOnly": "Nur installierte anzeigen",
@@ -3012,9 +3012,9 @@
             "authError": "Authentifizierungsfehler",
             "dashboard": "Dashboard",
             "activity": "Aktivitätsprotokoll",
-            "directories": "Verzeichnisse",
-            "newDirectory": "Neues Verzeichnis",
-            "directory": "Verzeichnis",
+            "works": "Verzeichnisse",
+            "newWork": "Neues Verzeichnis",
+            "work": "Verzeichnis",
             "overview": "Übersicht",
             "items": "Einträge",
             "generator": "Generator",
@@ -3048,7 +3048,7 @@
         }
     },
     "actions": {
-        "directories": {
+        "works": {
             "slug": {
                 "required": "Slug ist erforderlich",
                 "format": "Slug darf nur Kleinbuchstaben, Zahlen und Bindestriche enthalten"

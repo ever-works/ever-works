@@ -219,7 +219,7 @@
                     "description": "كل دليل هو مستودع GitHub تملكه وتتحكم فيه."
                 }
             },
-            "directory": {
+            "work": {
                 "title": "أنشئ دليلك الأول",
                 "description": "الدليل هو مركز المحتوى الخاص بك. أضف العناصر، قم بتكوين التخطيط، وانشره بنقرة واحدة.",
                 "detail": "أنت جاهز تماماً! أنشئ دليلك الأول لبدء بناء ونشر المحتوى.",
@@ -497,7 +497,7 @@
                 "shortcuts": {
                     "title": "اختصارات لوحة المفاتيح",
                     "search": "البحث في الدلائل",
-                    "newDirectory": "إنشاء دليل جديد",
+                    "newWork": "إنشاء دليل جديد",
                     "help": "فتح المساعدة",
                     "hint": "استخدم Cmd على Mac أو Ctrl على Windows/Linux"
                 },
@@ -521,7 +521,7 @@
             "columns": {
                 "status": "الحالة",
                 "dateTime": "التاريخ / الوقت",
-                "directory": "الدليل",
+                "work": "الدليل",
                 "type": "النوع",
                 "summary": "الملخص"
             },
@@ -532,9 +532,9 @@
                     "generation": "التوليد",
                     "comparison": "المقارنة",
                     "deployment": "النشر",
-                    "directoryCreated": "تم إنشاء الدليل",
-                    "directoryUpdated": "تم تحديث الدليل",
-                    "directoryDeleted": "تم حذف الدليل",
+                    "workCreated": "تم إنشاء الدليل",
+                    "workUpdated": "تم تحديث الدليل",
+                    "workDeleted": "تم حذف الدليل",
                     "pluginEnabled": "تم تفعيل الإضافة",
                     "pluginDisabled": "تم تعطيل الإضافة",
                     "pluginConfigured": "تم تكوين الإضافة",
@@ -596,11 +596,11 @@
                 "pageOf": "صفحة {page} من {total}"
             }
         },
-        "directories": {
+        "works": {
             "title": "الدلائل",
             "subtitle": "إدارة وتنظيم دلائلك المدعومة بالذكاء الاصطناعي",
             "summary": {
-                "totalDirectories": "إجمالي الدلائل",
+                "totalWorks": "إجمالي الدلائل",
                 "generating": "جار التوليد",
                 "totalItems": "إجمالي العناصر"
             },
@@ -658,13 +658,13 @@
                     "invalidJson": "ملف JSON غير صالح",
                     "previewError": "فشل في تحليل ملف الاستيراد",
                     "summary": "ملخص الاستيراد",
-                    "directories": "الدلائل",
+                    "works": "الدلائل",
                     "items": "العناصر",
                     "userPlugins": "إضافات المستخدم",
                     "version": "إصدار الصيغة",
                     "missingPlugins": "هذه الإضافات غير مثبتة وسيتم تجاهلها",
                     "conflicts": "تعارضات Slug",
-                    "existingDirectory": "موجود",
+                    "existingWork": "موجود",
                     "incoming": "وارد",
                     "strategySkip": "تجاهل (الاحتفاظ بالموجود)",
                     "strategyOverwrite": "الكتابة فوق الموجود",
@@ -681,9 +681,9 @@
                     "validationErrors": "أخطاء التحقق",
                     "resultSuccess": "اكتمل الاستيراد بنجاح",
                     "resultFailed": "فشل الاستيراد",
-                    "directoriesCreated": "الدلائل المُنشأة",
-                    "directoriesUpdated": "الدلائل المُحدثة",
-                    "directoriesSkipped": "الدلائل المُتجاهلة",
+                    "worksCreated": "الدلائل المُنشأة",
+                    "worksUpdated": "الدلائل المُحدثة",
+                    "worksSkipped": "الدلائل المُتجاهلة",
                     "pluginsImported": "الإضافات المستوردة",
                     "warnings": "التحذيرات",
                     "errors": "الأخطاء"
@@ -881,12 +881,12 @@
             }
         },
         "stats": {
-            "totalDirectories": "إجمالي الدلائل",
+            "totalWorks": "إجمالي الدلائل",
             "totalItems": "إجمالي العناصر",
             "activeWebsites": "المواقع النشطة",
             "fromLastMonth": "من الشهر الماضي"
         },
-        "directoryCard": {
+        "workCard": {
             "status": {
                 "active": "نشط",
                 "notStarted": "لم يبدأ",
@@ -914,11 +914,11 @@
             "openingTitle": "فتح الدليل",
             "openingMessage": "جاري إعداد دليلك. سيفتح التفاصيل قريبًا. ابقَ على هذه الصفحة."
         },
-        "directoryList": {
+        "workList": {
             "title": "دلائلك",
             "createButton": "إنشاء دليل"
         },
-        "directoryDetail": {
+        "workDetail": {
             "failedToGenerateItems": "فشل في توليد العناصر. يرجى المحاولة مرة أخرى.",
             "generationCompleted": "اكتمل التوليد بنجاح",
             "generationCancelled": "تم إلغاء التوليد",
@@ -1358,7 +1358,7 @@
                 "title": "النشاط الحديث",
                 "noActivity": "لا يوجد نشاط بعد",
                 "created": "تم إنشاء الدليل",
-                "directoryCreated": "تم إنشاء الدليل بنجاح",
+                "workCreated": "تم إنشاء الدليل بنجاح",
                 "justNow": "الآن"
             },
             "items": {
@@ -1663,7 +1663,7 @@
                 "loadingFormSchema": "جارٍ تحميل تكوين النموذج...",
                 "failedToLoadFormSchema": "فشل في تحميل تكوين النموذج",
                 "selectOption": "اختر خيارًا",
-                "directoryName": "اسم المجلد",
+                "workName": "اسم المجلد",
                 "generationPrompt": "موجه التوليد",
                 "modelOverride": "تجاوز نموذج الذكاء الاصطناعي",
                 "modelOverridePlaceholder": "مثل openai/gpt-4.1 أو openrouter/openai/gpt-4.1",
@@ -1676,7 +1676,7 @@
                 "startGeneration": "بدء التوليد",
                 "regenerateItems": "إعادة توليد العناصر",
                 "updateItems": "تشغيل التوليد",
-                "recreateDirectory": "إعادة إنشاء المجلد",
+                "recreateWork": "إعادة إنشاء المجلد",
                 "showAdvancedOptions": "إظهار الخيارات المتقدمة",
                 "hideAdvancedOptions": "إخفاء الخيارات المتقدمة",
                 "cancel": "إلغاء",
@@ -1714,7 +1714,7 @@
                 "websiteRepositoryCreationMethod": "طريقة إنشاء مستودع الموقع",
                 "methodDuplicate": "مكرر",
                 "methodFork": "فرع",
-                "directoryNamePlaceholder": "أدخل اسم المجلد",
+                "workNamePlaceholder": "أدخل اسم المجلد",
                 "methodCreateFromTemplate": "إنشاء من قالب",
                 "aiProcessingConfiguration": "إعدادات معالجة الذكاء الاصطناعي",
                 "maxSearchQueries": "الحد الأقصى لاستعلامات البحث",
@@ -1769,7 +1769,7 @@
                 "aiProviderDescription": "مزود نموذج الذكاء الاصطناعي لتوليد المحتوى واستخراجه",
                 "contentExtractorProvider": "مستخرج المحتوى",
                 "contentExtractorProviderDescription": "مزود لاستخراج المحتوى من صفحات الويب",
-                "useDirectoryDefault": "استخدام الافتراضي للمجلد",
+                "useWorkDefault": "استخدام الافتراضي للمجلد",
                 "default": "افتراضي",
                 "notConfigured": "غير مُهيأ",
                 "notConfiguredTooltip": "هذا المزود يتطلب الإعداد. قم بزيارة الإعدادات → الإضافات لإعداده.",
@@ -1837,7 +1837,7 @@
                 },
                 "generalSettings": "الإعدادات العامة",
                 "generalTitle": "الإعدادات العامة",
-                "directoryName": "اسم الدليل",
+                "workName": "اسم الدليل",
                 "description": "الوصف",
                 "organizationRepository": "مستودع المنظمة",
                 "organizationHelp": "إنشاء مستودعات تحت منظمة بدلاً من حسابك الشخصي",
@@ -1865,8 +1865,8 @@
                 "deleteWebsiteRepositoryDescription": "إزالة مستودع موقع النشر",
                 "deleteConfirm": "هل أنت متأكد تمامًا؟",
                 "deleteConfirmDetail": "هذا الإجراء لا يمكن التراجع عنه. سيتم حذف الدليل والمستودعات المحددة نهائيًا.",
-                "confirmDirectoryName": "اكتب اسم الدليل للتأكيد",
-                "confirmDirectoryNameDescription": "اكتب \"{name}\" لتأكيد الحذف",
+                "confirmWorkName": "اكتب اسم الدليل للتأكيد",
+                "confirmWorkNameDescription": "اكتب \"{name}\" لتأكيد الحذف",
                 "deleteNameMismatch": "اسم الدليل غير متطابق",
                 "deleteButton": "حذف الدليل",
                 "deleteConfirmButton": "نعم، احذف",
@@ -2208,7 +2208,7 @@
                 }
             }
         },
-        "directoryCreation": {
+        "workCreation": {
             "title": "إنشاء دليل جديد",
             "subtitle": "اختر كيفية إنشاء دليلك",
             "backToOptions": "العودة إلى الخيارات",
@@ -2240,9 +2240,9 @@
                 "getStarted": "ابدأ",
                 "formTitle": "إنشاء دليل باستخدام الذكاء الاصطناعي",
                 "formSubtitle": "صف فكرة دليلك ودع الذكاء الاصطناعي يتولى الإعداد وتوليد المحتوى الأولي",
-                "directoryNameLabel": "اسم الدليل",
-                "directoryNamePlaceholder": "مثلًا، أدوات الذكاء الاصطناعي الرائعة",
-                "directoryNameHelp": "سيقترح الذكاء الاصطناعي اسمًا إذا تركت هذا فارغًا",
+                "workNameLabel": "اسم الدليل",
+                "workNamePlaceholder": "مثلًا، أدوات الذكاء الاصطناعي الرائعة",
+                "workNameHelp": "سيقترح الذكاء الاصطناعي اسمًا إذا تركت هذا فارغًا",
                 "promptLabel": "صف دليلك",
                 "githubRequired": "يرجى ربط حساب GitHub الخاص بك أولاً.",
                 "promptPlaceholder": "صف نوع الدليل الذي تريد إنشاءه، والعناصر التي يجب أن يحتويها، وأي متطلبات محددة...",
@@ -2604,7 +2604,7 @@
             "subtitle": "اختر كيفية إخطارك بالتحديثات المهمة",
             "email": {
                 "title": "إشعارات البريد الإلكتروني",
-                "directoryUpdates": {
+                "workUpdates": {
                     "label": "تحديثات الدلائل",
                     "description": "احصل على إشعارات حول التحديثات المهمة لدلائلك"
                 },
@@ -2653,12 +2653,12 @@
         "sidebar": {
             "menu": "القائمة",
             "aiChat": "دردشة الذكاء الاصطناعي",
-            "newDirectory": "دليل جديد",
+            "newWork": "دليل جديد",
             "activityIndicator": "جاري إنشاء الدليل",
             "navigation": {
                 "dashboard": "لوحة التحكم",
                 "activity": "النشاط",
-                "directories": "الدلائل",
+                "works": "الدلائل",
                 "plugins": "الإضافات",
                 "settings": "الإعدادات"
             },
@@ -2716,8 +2716,8 @@
             "welcomeSubtitle": "مساعدك المدعوم بالذكاء الاصطناعي. اسألني أي شيء حول إنشاء الدلائل، أو توليد المحتوى، أو تنظيم بياناتك.",
             "welcomeMessage": "مرحبًا! يمكنني مساعدتك في إنشاء الدلائل بلغة طبيعية. اسأل شيئًا مثل \"إنشاء دليل لأدوات الذكاء الاصطناعي\" أو وصف ما تحتاجه.",
             "capabilities": {
-                "directoryCreation": "إنشاء الدلائل",
-                "directoryCreationDesc": "بناء الدلائل من وصفات بلغة طبيعية",
+                "workCreation": "إنشاء الدلائل",
+                "workCreationDesc": "بناء الدلائل من وصفات بلغة طبيعية",
                 "webResearch": "البحث على الويب",
                 "webResearchDesc": "البحث وجمع البيانات من جميع أنحاء الويب",
                 "contentGeneration": "توليد المحتوى",
@@ -2814,8 +2814,8 @@
             "disableWarning": "إلغاء تفعيل هذه الملحقة سيؤدي أيضًا إلى إلغاء تفعيلها في جميع دلائلك",
             "cannotDisableSystem": "لا يمكن إلغاء تفعيل الملحقات النظامية",
             "disableFailed": "فشل في إلغاء تفعيل الملحقة",
-            "autoEnableForDirectories": "تفعيل أيضًا لجميع الدلائل",
-            "autoEnableForDirectoriesDescription": "ستكون هذه الملحقة نشطة تلقائيًا في جميع دلائلك. يمكنك لا يزال إلغاء تفعيلها لكل دليل.",
+            "autoEnableForWorks": "تفعيل أيضًا لجميع الدلائل",
+            "autoEnableForWorksDescription": "ستكون هذه الملحقة نشطة تلقائيًا في جميع دلائلك. يمكنك لا يزال إلغاء تفعيلها لكل دليل.",
             "confirmDisable": "تأكيد إلغاء التفعيل",
             "cancel": "إلغاء",
             "missingRequiredFields": "حقول مطلوبة مفقودة: {fields}",
@@ -2890,20 +2890,20 @@
                 "removeLabel": "إزالة {login}"
             }
         },
-        "directoryPlugins": {
+        "workPlugins": {
             "title": "ملحقات الدليل",
             "subtitle": "تكوين الملحقات لهذا الدليل",
             "active": "نشط",
             "enable": "تفعيل",
             "disable": "إلغاء التفعيل",
-            "enableForDirectory": "تفعيل لهذا الدليل",
-            "disableForDirectory": "إلغاء التفعيل لهذا الدليل",
+            "enableForWork": "تفعيل لهذا الدليل",
+            "disableForWork": "إلغاء التفعيل لهذا الدليل",
             "enableAtUserLevelFirst": "فعّل هذه الملحقة في إعداداتك أولاً",
             "disabledByUser": "مُعَطَّل على مستوى المستخدم",
             "systemAlwaysEnabled": "ملحقة نظامية - مُفعّلة دائمًا",
             "showSettings": "عرض الإعدادات",
             "hideSettings": "إخفاء الإعدادات",
-            "directorySettingsInfo": "قم بتكوين الإعدادات الخاصة بالدليل هنا",
+            "workSettingsInfo": "قم بتكوين الإعدادات الخاصة بالدليل هنا",
             "save": "حفظ",
             "saved": "تم الحفظ",
             "showInstalledOnly": "عرض المثبتة فقط",
@@ -3012,9 +3012,9 @@
             "authError": "خطأ في المصادقة",
             "dashboard": "لوحة التحكم",
             "activity": "سجل النشاط",
-            "directories": "الدلائل",
-            "newDirectory": "دليل جديد",
-            "directory": "الدليل",
+            "works": "الدلائل",
+            "newWork": "دليل جديد",
+            "work": "الدليل",
             "overview": "نظرة عامة",
             "items": "العناصر",
             "generator": "المولد",
@@ -3048,7 +3048,7 @@
         }
     },
     "actions": {
-        "directories": {
+        "works": {
             "slug": {
                 "required": "المعرف مطلوب",
                 "format": "يجب أن يحتوي المعرف على حروف صغيرة وأرقام وشرطات فاصلة فقط"

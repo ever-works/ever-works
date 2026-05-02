@@ -59,7 +59,7 @@ function resolveActiveProviders(
 
 export default async function DirectorySchedulePage({ params }: Params) {
     const { id } = await params;
-    const t = await getTranslations('dashboard.directoryDetail.schedule.page');
+    const t = await getTranslations('dashboard.workDetail.schedule.page');
 
     let directory;
     let formSchema;

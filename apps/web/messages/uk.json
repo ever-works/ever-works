@@ -219,7 +219,7 @@
                     "description": "Кожен каталог — це репозиторій GitHub, яким ви володієте та керуєте."
                 }
             },
-            "directory": {
+            "work": {
                 "title": "Створіть свій перший каталог",
                 "description": "Каталог — це ваш хаб контенту. Додавайте елементи, налаштовуйте макет та публікуйте одним кліком.",
                 "detail": "Ви все налаштували! Створіть свій перший каталог, щоб почати створювати та публікувати контент.",
@@ -497,7 +497,7 @@
                 "shortcuts": {
                     "title": "Гарячі клавіші",
                     "search": "Пошук каталогів",
-                    "newDirectory": "Створити новий каталог",
+                    "newWork": "Створити новий каталог",
                     "help": "Відкрити довідку",
                     "hint": "Використовуйте Cmd на Mac або Ctrl на Windows/Linux"
                 },
@@ -521,7 +521,7 @@
             "columns": {
                 "status": "Стан",
                 "dateTime": "Дата / Час",
-                "directory": "Каталог",
+                "work": "Каталог",
                 "type": "Тип",
                 "summary": "Опис"
             },
@@ -532,9 +532,9 @@
                     "generation": "Генерація",
                     "comparison": "Порівняння",
                     "deployment": "Розгортання",
-                    "directoryCreated": "Каталог створено",
-                    "directoryUpdated": "Каталог оновлено",
-                    "directoryDeleted": "Каталог видалено",
+                    "workCreated": "Каталог створено",
+                    "workUpdated": "Каталог оновлено",
+                    "workDeleted": "Каталог видалено",
                     "pluginEnabled": "Плагін увімкнено",
                     "pluginDisabled": "Плагін вимкнено",
                     "pluginConfigured": "Плагін налаштовано",
@@ -596,11 +596,11 @@
                 "pageOf": "Сторінка {page} з {total}"
             }
         },
-        "directories": {
+        "works": {
             "title": "Каталоги",
             "subtitle": "Керуйте та організовуйте свої каталоги на базі ШІ",
             "summary": {
-                "totalDirectories": "Всього каталогів",
+                "totalWorks": "Всього каталогів",
                 "generating": "Генерується",
                 "totalItems": "Всього елементів"
             },
@@ -658,13 +658,13 @@
                     "invalidJson": "Невірний файл JSON",
                     "previewError": "Не вдалося проаналізувати файл імпорту",
                     "summary": "Резюме імпорту",
-                    "directories": "Каталоги",
+                    "works": "Каталоги",
                     "items": "Елементи",
                     "userPlugins": "Плагіни користувача",
                     "version": "Версія формату",
                     "missingPlugins": "Ці плагіни не встановлені і будуть пропущені",
                     "conflicts": "Конфлікти слагів",
-                    "existingDirectory": "Існуючий",
+                    "existingWork": "Існуючий",
                     "incoming": "Вхідний",
                     "strategySkip": "Пропустити (зберегти існуючий)",
                     "strategyOverwrite": "Перезаписати існуючий",
@@ -681,9 +681,9 @@
                     "validationErrors": "Помилки валідації",
                     "resultSuccess": "Імпорт успішно завершено",
                     "resultFailed": "Імпорт не вдався",
-                    "directoriesCreated": "Каталоги створено",
-                    "directoriesUpdated": "Каталоги оновлено",
-                    "directoriesSkipped": "Каталоги пропущено",
+                    "worksCreated": "Каталоги створено",
+                    "worksUpdated": "Каталоги оновлено",
+                    "worksSkipped": "Каталоги пропущено",
                     "pluginsImported": "Плагіни імпортовано",
                     "warnings": "Попередження",
                     "errors": "Помилки"
@@ -881,12 +881,12 @@
             }
         },
         "stats": {
-            "totalDirectories": "Всього каталогів",
+            "totalWorks": "Всього каталогів",
             "totalItems": "Всього елементів",
             "activeWebsites": "Активні вебсайти",
             "fromLastMonth": "за останній місяць"
         },
-        "directoryCard": {
+        "workCard": {
             "status": {
                 "active": "Активний",
                 "notStarted": "Не розпочато",
@@ -914,11 +914,11 @@
             "openingTitle": "Відкриття каталогу",
             "openingMessage": "Підготовка вашого каталогу. Деталі відкриються незабаром. Залишайтеся на цій сторінці."
         },
-        "directoryList": {
+        "workList": {
             "title": "Ваші каталоги",
             "createButton": "Створити каталог"
         },
-        "directoryDetail": {
+        "workDetail": {
             "failedToGenerateItems": "Не вдалося згенерувати елементи. Спробуйте ще раз.",
             "generationCompleted": "Генерацію завершено успішно",
             "generationCancelled": "Генерацію скасовано",
@@ -1358,7 +1358,7 @@
                 "title": "Недавня активність",
                 "noActivity": "Активності ще немає",
                 "created": "Каталог створено",
-                "directoryCreated": "Каталог успішно створено",
+                "workCreated": "Каталог успішно створено",
                 "justNow": "Щойно"
             },
             "items": {
@@ -1663,7 +1663,7 @@
                 "loadingFormSchema": "Завантаження конфігурації форми...",
                 "failedToLoadFormSchema": "Не вдалося завантажити конфігурацію форми",
                 "selectOption": "Виберіть опцію",
-                "directoryName": "Назва каталогу",
+                "workName": "Назва каталогу",
                 "generationPrompt": "Запит генерації",
                 "modelOverride": "Перевизначення моделі ШІ",
                 "modelOverridePlaceholder": "наприклад openai/gpt-4.1 або openrouter/openai/gpt-4.1",
@@ -1676,7 +1676,7 @@
                 "startGeneration": "Розпочати генерацію",
                 "regenerateItems": "Регенерувати елементи",
                 "updateItems": "Запустити генерацію",
-                "recreateDirectory": "Перестворити каталог",
+                "recreateWork": "Перестворити каталог",
                 "showAdvancedOptions": "Показати розширені опції",
                 "hideAdvancedOptions": "Приховати розширені опції",
                 "cancel": "Скасувати",
@@ -1714,7 +1714,7 @@
                 "websiteRepositoryCreationMethod": "Метод створення репозиторію вебсайту",
                 "methodDuplicate": "Дублювати",
                 "methodFork": "Fork",
-                "directoryNamePlaceholder": "Введіть назву каталогу",
+                "workNamePlaceholder": "Введіть назву каталогу",
                 "methodCreateFromTemplate": "Створити з шаблону",
                 "aiProcessingConfiguration": "Конфігурація обробки AI",
                 "maxSearchQueries": "Макс. пошукових запитів",
@@ -1769,7 +1769,7 @@
                 "aiProviderDescription": "Постачальник моделей AI для генерації та вилучення контенту",
                 "contentExtractorProvider": "Вилучувач контенту",
                 "contentExtractorProviderDescription": "Постачальник для вилучення контенту з вебсторінок",
-                "useDirectoryDefault": "Використовувати за замовчуванням каталогу",
+                "useWorkDefault": "Використовувати за замовчуванням каталогу",
                 "default": "За замовчуванням",
                 "notConfigured": "Не налаштовано",
                 "notConfiguredTooltip": "Цей постачальник вимагає налаштування. Відвідайте Налаштування → Плагіни, щоб налаштувати.",
@@ -1837,7 +1837,7 @@
                 },
                 "generalSettings": "Загальні налаштування",
                 "generalTitle": "Загальні налаштування",
-                "directoryName": "Назва каталогу",
+                "workName": "Назва каталогу",
                 "description": "Опис",
                 "organizationRepository": "Репозиторій організації",
                 "organizationHelp": "Створювати репозиторії в організації замість вашого особистого облікового запису",
@@ -1865,8 +1865,8 @@
                 "deleteWebsiteRepositoryDescription": "Видалити розгорнутий репозиторій веб-сайту",
                 "deleteConfirm": "Ви впевнені?",
                 "deleteConfirmDetail": "Цю дію не можна скасувати. Каталог та вибрані репозиторії будуть безповоротно видалені.",
-                "confirmDirectoryName": "Введіть назву каталогу для підтвердження",
-                "confirmDirectoryNameDescription": "Введіть \"{name}\" для підтвердження видалення",
+                "confirmWorkName": "Введіть назву каталогу для підтвердження",
+                "confirmWorkNameDescription": "Введіть \"{name}\" для підтвердження видалення",
                 "deleteNameMismatch": "Назва каталогу не співпадає",
                 "deleteButton": "Видалити каталог",
                 "deleteConfirmButton": "Так, видалити",
@@ -2208,7 +2208,7 @@
                 }
             }
         },
-        "directoryCreation": {
+        "workCreation": {
             "title": "Створити новий каталог",
             "subtitle": "Оберіть, як ви хочете створити свій каталог",
             "backToOptions": "Назад до опцій",
@@ -2240,9 +2240,9 @@
                 "getStarted": "Розпочати",
                 "formTitle": "Створити каталог за допомогою ШІ",
                 "formSubtitle": "Опишіть ідею каталогу та дозвольте ШІ взятися за налаштування та генерацію початкового контенту",
-                "directoryNameLabel": "Назва каталогу",
-                "directoryNamePlaceholder": "наприклад, Awesome AI Tools",
-                "directoryNameHelp": "ШІ запропонує назву, якщо залишити це порожнім",
+                "workNameLabel": "Назва каталогу",
+                "workNamePlaceholder": "наприклад, Awesome AI Tools",
+                "workNameHelp": "ШІ запропонує назву, якщо залишити це порожнім",
                 "promptLabel": "Опишіть свій каталог",
                 "githubRequired": "Спочатку підключіть обліковий запис GitHub.",
                 "promptPlaceholder": "Опишіть, який каталог ви хочете створити, які елементи він повинен містити та будь-які конкретні вимоги...",
@@ -2604,7 +2604,7 @@
             "subtitle": "Виберіть, як ви хочете отримувати сповіщення про важливі оновлення",
             "email": {
                 "title": "Сповіщення електронною поштою",
-                "directoryUpdates": {
+                "workUpdates": {
                     "label": "Оновлення каталогів",
                     "description": "Отримуйте сповіщення про важливі оновлення ваших каталогів"
                 },
@@ -2653,12 +2653,12 @@
         "sidebar": {
             "menu": "Меню",
             "aiChat": "Чат з ІІ",
-            "newDirectory": "Новий каталог",
+            "newWork": "Новий каталог",
             "activityIndicator": "Каталог генерується",
             "navigation": {
                 "dashboard": "Панель приладів",
                 "activity": "Активність",
-                "directories": "Каталоги",
+                "works": "Каталоги",
                 "plugins": "Плагіни",
                 "settings": "Налаштування"
             },
@@ -2716,8 +2716,8 @@
             "welcomeSubtitle": "Ваш асистент на основі ІІ. Запитуйте мене про створення каталогів, генерацію контенту чи організацію даних.",
             "welcomeMessage": "Привіт! Я можу допомогти вам створювати каталоги природною мовою. Запитайте щось на кшталт «Створити каталог для інструментів ІІ» або опишіть, що вам потрібно.",
             "capabilities": {
-                "directoryCreation": "Створення каталогів",
-                "directoryCreationDesc": "Створюйте каталоги з описів природною мовою",
+                "workCreation": "Створення каталогів",
+                "workCreationDesc": "Створюйте каталоги з описів природною мовою",
                 "webResearch": "Веб-дослідження",
                 "webResearchDesc": "Шукайте та збирайте дані з усього вебу",
                 "contentGeneration": "Генерація контенту",
@@ -2814,8 +2814,8 @@
             "disableWarning": "Вимкнення цього плагіна також вимкне його в усіх ваших каталогах",
             "cannotDisableSystem": "Системні плагіни не можна вимкнути",
             "disableFailed": "Не вдалося вимкнути плагін",
-            "autoEnableForDirectories": "Також увімкнути для всіх каталогів",
-            "autoEnableForDirectoriesDescription": "Цей плагін буде автоматично активним у всіх ваших каталогах. Ви все ще можете вимкнути його для окремого каталогу.",
+            "autoEnableForWorks": "Також увімкнути для всіх каталогів",
+            "autoEnableForWorksDescription": "Цей плагін буде автоматично активним у всіх ваших каталогах. Ви все ще можете вимкнути його для окремого каталогу.",
             "confirmDisable": "Підтвердити вимкнення",
             "cancel": "Скасувати",
             "missingRequiredFields": "Відсутні обов'язкові поля: {fields}",
@@ -2890,20 +2890,20 @@
                 "removeLabel": "Видалити {login}"
             }
         },
-        "directoryPlugins": {
+        "workPlugins": {
             "title": "Плагіни каталогу",
             "subtitle": "Налаштуйте плагіни для цього каталогу",
             "active": "Активний",
             "enable": "Увімкнути",
             "disable": "Вимкнути",
-            "enableForDirectory": "Увімкнути для цього каталогу",
-            "disableForDirectory": "Вимкнути для цього каталогу",
+            "enableForWork": "Увімкнути для цього каталогу",
+            "disableForWork": "Вимкнути для цього каталогу",
             "enableAtUserLevelFirst": "Спочатку увімкніть цей плагін у ваших налаштуваннях",
             "disabledByUser": "Вимкнено на рівні користувача",
             "systemAlwaysEnabled": "Системний плагін — завжди увімкнено",
             "showSettings": "Показати налаштування",
             "hideSettings": "Приховати налаштування",
-            "directorySettingsInfo": "Налаштуйте налаштування, специфічні для каталогу, тут",
+            "workSettingsInfo": "Налаштуйте налаштування, специфічні для каталогу, тут",
             "save": "Зберегти",
             "saved": "Збережено",
             "showInstalledOnly": "Показати тільки встановлені",
@@ -3012,9 +3012,9 @@
             "authError": "Помилка автентифікації",
             "dashboard": "Панель приладів",
             "activity": "Журнал активності",
-            "directories": "Каталоги",
-            "newDirectory": "Новий каталог",
-            "directory": "Каталог",
+            "works": "Каталоги",
+            "newWork": "Новий каталог",
+            "work": "Каталог",
             "overview": "Огляд",
             "items": "Елементи",
             "generator": "Генератор",
@@ -3048,7 +3048,7 @@
         }
     },
     "actions": {
-        "directories": {
+        "works": {
             "slug": {
                 "required": "Слаг обов'язковий",
                 "format": "Слаг повинен містити лише малі літери, цифри та дефіси"
