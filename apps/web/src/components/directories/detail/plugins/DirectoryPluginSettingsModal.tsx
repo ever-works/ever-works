@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { DirectoryPlugin } from '@/lib/api/plugins';
@@ -28,6 +28,35 @@ interface DirectoryPluginSettingsModalProps {
     plugin: DirectoryPlugin;
 }
 
+function removeInheritedDefaultOverrides(
+    directorySettings: Record<string, unknown> | undefined,
+    inheritedSettings: Record<string, unknown> | undefined,
+    settingsSchema: DirectoryPlugin['settingsSchema'],
+): Record<string, unknown> {
+    if (!directorySettings) {
+        return {};
+    }
+
+    const settings = { ...directorySettings };
+    const properties = settingsSchema?.properties || {};
+
+    for (const [key, value] of Object.entries(directorySettings)) {
+        const schemaDefault = properties[key]?.default;
+        const inheritedValue = inheritedSettings?.[key];
+
+        if (
+            schemaDefault !== undefined &&
+            inheritedValue !== undefined &&
+            value === schemaDefault &&
+            inheritedValue !== value
+        ) {
+            delete settings[key];
+        }
+    }
+
+    return settings;
+}
+
 export function DirectoryPluginSettingsModal({
     open,
     onOpenChange,
@@ -38,6 +67,17 @@ export function DirectoryPluginSettingsModal({
     const router = useRouter();
     const [showResetConfirm, setShowResetConfirm] = useState(false);
     const [isResetting, setIsResetting] = useState(false);
+    const [modifiedFields, setModifiedFields] = useState<Set<string>>(new Set());
+    const inheritedSettings = plugin.resolvedSettings || plugin.settings;
+    const directorySettings = useMemo(
+        () =>
+            removeInheritedDefaultOverrides(
+                plugin.directorySettings,
+                inheritedSettings,
+                plugin.settingsSchema,
+            ),
+        [plugin.directorySettings, inheritedSettings, plugin.settingsSchema],
+    );
 
     const onSave = useCallback(
         async (data: {
@@ -76,12 +116,40 @@ export function DirectoryPluginSettingsModal({
         getFieldValue,
     } = usePluginSettings({
         schema: plugin.settingsSchema,
-        initialSettings: plugin.directorySettings || {},
+        initialSettings: directorySettings,
         scopes: ['global', 'directory'],
         onSave,
-        fallbackSettings: plugin.settings,
+        fallbackSettings: inheritedSettings,
         scope: 'directory',
     });
+
+    useEffect(() => {
+        setModifiedFields(new Set());
+    }, [plugin.pluginId, plugin.directorySettings]);
+
+    const getDirectoryFieldValue = useCallback(
+        (key: string, propSchema: Parameters<typeof getFieldValue>[1]) => {
+            if (modifiedFields.has(key) || key in directorySettings) {
+                return getFieldValue(key, propSchema);
+            }
+
+            const inheritedValue = inheritedSettings?.[key];
+            if (inheritedValue !== undefined && inheritedValue !== null && inheritedValue !== '') {
+                return inheritedValue;
+            }
+
+            return getFieldValue(key, propSchema);
+        },
+        [directorySettings, getFieldValue, inheritedSettings, modifiedFields],
+    );
+
+    const handleDirectoryFieldChange = useCallback(
+        (key: string, value: unknown, isSecret: boolean) => {
+            setModifiedFields((prev) => new Set(prev).add(key));
+            handleFieldChange(key, value, isSecret);
+        },
+        [handleFieldChange],
+    );
 
     const handleSaveAndClose = async () => {
         await handleSave();
@@ -136,8 +204,7 @@ export function DirectoryPluginSettingsModal({
         }
     };
 
-    const hasDirectoryOverrides =
-        plugin.directorySettings && Object.keys(plugin.directorySettings).length > 0;
+    const hasDirectoryOverrides = Object.keys(directorySettings).length > 0;
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
@@ -163,17 +230,34 @@ export function DirectoryPluginSettingsModal({
 
                 <PluginSettingsFormFields
                     visibleProperties={visibleProperties}
-                    getFieldValue={getFieldValue}
-                    handleFieldChange={handleFieldChange}
+                    getFieldValue={getDirectoryFieldValue}
+                    handleFieldChange={handleDirectoryFieldChange}
                     settingsSchema={plugin.settingsSchema}
                     pluginId={plugin.pluginId}
                     validationError={validationError}
-                    renderFieldExtra={(key, propSchema) => (
-                        <InheritedValueHint
-                            value={plugin.settings?.[key]}
-                            isSecret={propSchema.secret || false}
-                        />
-                    )}
+                    renderFieldExtra={(key, propSchema) => {
+                        const inheritedValue = inheritedSettings?.[key];
+                        const hasDirectoryValue =
+                            modifiedFields.has(key) || key in directorySettings;
+                        const fieldValue = getDirectoryFieldValue(key, propSchema);
+
+                        if (
+                            !hasDirectoryValue ||
+                            inheritedValue === undefined ||
+                            inheritedValue === null ||
+                            inheritedValue === '' ||
+                            fieldValue === inheritedValue
+                        ) {
+                            return null;
+                        }
+
+                        return (
+                            <InheritedValueHint
+                                value={inheritedValue}
+                                isSecret={propSchema.secret || false}
+                            />
+                        );
+                    }}
                 />
 
                 {/* Reset confirmation */}

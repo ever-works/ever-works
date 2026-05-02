@@ -1441,12 +1441,16 @@ export class PluginOperationsService {
         options?: { userId: string; directoryId: string },
     ): Promise<DirectoryPluginResponse> {
         const userResponse = this.toUserPluginResponse(registered, userPlugin);
-        const models = options
-            ? await this.getProviderModelSummaries(registered, options)
-            : undefined;
+        const [resolvedSettings, models] = options
+            ? await Promise.all([
+                  this.getResolvedDisplaySettings(registered, options.userId),
+                  this.getProviderModelSummaries(registered, options),
+              ])
+            : [undefined, undefined];
 
         return {
             ...userResponse,
+            resolvedSettings,
             directoryEnabled: resolvePluginEnabled({
                 systemPlugin: registered.manifest?.systemPlugin,
                 autoEnable: registered.manifest?.autoEnable,
