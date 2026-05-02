@@ -148,6 +148,34 @@ describe('DirectoryLifecycleService', () => {
         );
     });
 
+    it('returns a no-op switch mode when the selected template is already active', async () => {
+        const directory = {
+            id: 'dir-1',
+            slug: 'test-directory',
+            name: 'Test Directory',
+            description: 'Test description',
+            owner: 'ever-works',
+            organization: false,
+            readmeConfig: {},
+            gitProvider: 'github',
+            userId: user.id,
+            website: 'https://example.com',
+            websiteTemplateId: 'classic',
+            getRepoOwner: jest.fn().mockReturnValue('ever-works'),
+            getWebsiteRepo: jest.fn().mockReturnValue('test-directory-website'),
+        } as any;
+
+        ownershipService.ensureCanEdit.mockResolvedValue({ directory });
+
+        const result = await service.switchWebsiteTemplate(directory.id, 'classic', user);
+
+        expect(result.switchMode).toBe('no_change');
+        expect(result.repositoryRecreated).toBe(false);
+        expect(directoryRepository.update).not.toHaveBeenCalled();
+        expect(websiteUpdateService.updateRepository).not.toHaveBeenCalled();
+        expect(websiteGenerator.initialize).not.toHaveBeenCalled();
+    });
+
     it('resets the website repository from the selected template after initialization', async () => {
         const directory = {
             id: 'dir-1',

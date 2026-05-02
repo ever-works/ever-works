@@ -1,4 +1,5 @@
 export type WebsiteTemplateSwitchMode =
+    | 'no_change'
     | 'saved_for_initialization'
     | 'repository_reset'
     | 'repository_recreated';

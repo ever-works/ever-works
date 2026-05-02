@@ -1023,6 +1023,7 @@ export class DirectoriesController {
         );
 
         const summaryByMode = {
+            no_change: result.message,
             saved_for_initialization: `Saved website template change from ${result.previousWebsiteTemplateId} to ${result.websiteTemplateId} for first website creation`,
             repository_reset: `Switched website template from ${result.previousWebsiteTemplateId} to ${result.websiteTemplateId} and reset the existing website repository`,
             repository_recreated: `Switched website template from ${result.previousWebsiteTemplateId} to ${result.websiteTemplateId} and recreated the website repository`,

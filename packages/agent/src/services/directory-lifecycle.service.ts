@@ -301,9 +301,7 @@ export class DirectoryLifecycleService {
                 previousWebsiteTemplateId: directory.websiteTemplateId,
                 websiteTemplateId: directory.websiteTemplateId,
                 repositoryRecreated: false,
-                switchMode: websiteRepoInitialized
-                    ? 'repository_reset'
-                    : 'saved_for_initialization',
+                switchMode: 'no_change',
                 message: websiteRepoInitialized
                     ? 'Website template is already selected for this directory.'
                     : 'Website template saved. It will be used when the website repository is first created.',
