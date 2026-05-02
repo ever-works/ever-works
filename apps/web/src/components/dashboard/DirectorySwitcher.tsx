@@ -153,7 +153,7 @@ export function DirectorySwitcher() {
                 );
             } catch (error) {
                 if (!isCancelled) {
-                    console.error('Failed to load current directory for switcher:', error);
+                    console.error('Failed to load current Work for switcher:', error);
                 }
             }
         };
@@ -233,7 +233,7 @@ export function DirectorySwitcher() {
                 hasLoadedRef.current = true;
             } catch (error) {
                 if (!isCancelled) {
-                    console.error('Failed to load directories for switcher:', error);
+                    console.error('Failed to load Works for switcher:', error);
                     toast.error(t('searchFailed'));
                 }
             } finally {

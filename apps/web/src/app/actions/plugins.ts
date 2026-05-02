@@ -97,7 +97,7 @@ export async function enableDirectoryPlugin(
         revalidatePath(`/directories/${directoryId}/plugins`);
         return { success: true, data: result };
     } catch (error) {
-        console.error('Failed to enable directory plugin:', error);
+        console.error('Failed to enable Work plugin:', error);
         return {
             success: false,
             error: error instanceof Error ? error.message : 'Failed to enable directory plugin',
@@ -117,7 +117,7 @@ export async function disableDirectoryPlugin(
         revalidatePath(`/directories/${directoryId}/plugins`);
         return { success: true, data: result };
     } catch (error) {
-        console.error('Failed to disable directory plugin:', error);
+        console.error('Failed to disable Work plugin:', error);
         return {
             success: false,
             error: error instanceof Error ? error.message : 'Failed to disable directory plugin',
@@ -143,7 +143,7 @@ export async function updateDirectoryPluginSettings(
         revalidatePath(`/directories/${directoryId}/plugins`);
         return { success: true, data: result };
     } catch (error) {
-        console.error('Failed to update directory plugin settings:', error);
+        console.error('Failed to update Work plugin settings:', error);
         return {
             success: false,
             error:

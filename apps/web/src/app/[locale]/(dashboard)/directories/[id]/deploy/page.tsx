@@ -35,7 +35,7 @@ export default async function DeployPage({ params }: DeployPageParams) {
         directory = res.directory;
         deploymentCapability = capabilityRes;
     } catch (error) {
-        console.error('Failed to fetch directory or deployment capability:', error);
+        console.error('Failed to fetch Work or deployment capability:', error);
         notFound();
     }
 
