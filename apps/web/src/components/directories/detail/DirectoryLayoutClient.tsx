@@ -14,6 +14,10 @@ import {
     syncDirectoryData,
 } from '@/app/actions/dashboard/directories';
 import { useBackgroundActivity } from '@/lib/hooks/use-background-activity';
+import {
+    clearDashboardCurrentDirectory,
+    setDashboardCurrentDirectory,
+} from '@/lib/hooks/use-dashboard-current-directory';
 
 interface DirectoryLayoutClientProps {
     directory: Directory;
@@ -39,6 +43,16 @@ export function DirectoryLayoutClient({
     useEffect(() => {
         setSyncedDirectory(directory);
     }, [directory]);
+
+    useEffect(() => {
+        setDashboardCurrentDirectory(syncedDirectory);
+    }, [syncedDirectory]);
+
+    useEffect(() => {
+        return () => {
+            clearDashboardCurrentDirectory(directory.id);
+        };
+    }, [directory.id]);
 
     // Sync generation state with the global sidebar indicator
     useEffect(() => {

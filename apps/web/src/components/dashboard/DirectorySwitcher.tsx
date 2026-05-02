@@ -25,6 +25,7 @@ import {
     replaceDirectoryIdInPath,
 } from '@/lib/utils/directory-route';
 import { ShinyText } from '@/components/ui/ShinyText';
+import { useDashboardCurrentDirectory } from '@/lib/hooks/use-dashboard-current-directory';
 
 const DIRECTORY_SWITCHER_LIMIT = 1000;
 
@@ -77,14 +78,20 @@ export function DirectorySwitcher() {
     const [isLoading, setIsLoading] = useState(false);
     const hasLoadedRef = useRef(false);
     const inputRef = useRef<HTMLInputElement | null>(null);
+    const routedDirectory = useDashboardCurrentDirectory();
     const deferredQuery = useDeferredValue(query);
     const isVisible = isDirectoryDetailPath(pathname);
     const currentDirectoryId = getDirectoryIdFromPath(pathname);
 
-    const currentDirectory = useMemo(
-        () => directories.find((directory) => directory.id === currentDirectoryId) ?? null,
-        [currentDirectoryId, directories],
-    );
+    const currentDirectory = useMemo(() => {
+        const listedDirectory =
+            directories.find((directory) => directory.id === currentDirectoryId) ?? null;
+        if (listedDirectory) {
+            return listedDirectory;
+        }
+
+        return routedDirectory?.id === currentDirectoryId ? routedDirectory : null;
+    }, [currentDirectoryId, directories, routedDirectory]);
 
     const filteredDirectories = useMemo(
         () => directories.filter((directory) => matchesDirectoryQuery(directory, deferredQuery)),
@@ -116,6 +123,16 @@ export function DirectorySwitcher() {
     useEffect(() => {
         inputRef.current?.blur();
     }, [currentDirectoryId]);
+
+    useEffect(() => {
+        if (!routedDirectory || routedDirectory.id !== currentDirectoryId) {
+            return;
+        }
+
+        setDirectories((currentDirectories) =>
+            upsertDirectory(currentDirectories, routedDirectory),
+        );
+    }, [currentDirectoryId, routedDirectory]);
 
     useEffect(() => {
         if (!isVisible || !currentDirectoryId || currentDirectory) {
@@ -292,9 +309,7 @@ export function DirectorySwitcher() {
                                 'text-text dark:text-text-dark',
                                 'placeholder:text-text-muted dark:placeholder:text-text-muted-dark',
                             )}
-                            displayValue={(directory: Directory | null) =>
-                                directory?.name ?? currentDirectoryId.slice(0, 8)
-                            }
+                            displayValue={(directory: Directory | null) => directory?.name ?? ''}
                             onChange={(event) => setQuery(event.target.value)}
                             placeholder={t('search')}
                         />
