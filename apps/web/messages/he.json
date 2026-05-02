@@ -1773,6 +1773,7 @@
                 "default": "ברירת מחדל",
                 "notConfigured": "לא מוגדר",
                 "notConfiguredTooltip": "ספק זה דורש הגדרה. בקר בהגדרות → תוספים כדי להגדיר אותו.",
+                "changeModels": "שינוי",
                 "jsonObjectError": "הערך חייב להיות אובייקט JSON",
                 "invalidJsonError": "פורמט JSON לא תקין"
             },
@@ -2937,6 +2938,7 @@
             "resetSuccess": "ההגדרות אופסו לברירת מחדל",
             "cancel": "ביטול",
             "clickToConfigure": "לחץ כדי להגדיר",
+            "changeModels": "שינוי",
             "autoEnabledByUser": "מופעל אוטומטית דרך הגדרות משתמש",
             "toggleError": "נכשל בשינוי מצב התוסף",
             "system": "מערכת",
