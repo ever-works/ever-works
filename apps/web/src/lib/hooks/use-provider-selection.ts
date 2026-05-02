@@ -45,18 +45,27 @@ export function useProviderSelection(initial?: Partial<ProviderSelectionState>) 
 
     /**
      * Sync the pipeline selection to the server-resolved pipeline ID.
-     * Trusts `resolvedPipelineId` from the backend; skips if a pipeline is already selected.
+     * Trusts `resolvedPipelineId` from the backend. Keeps valid user selections, but replaces
+     * stale selections from config/history when the backend resolved a different enabled pipeline.
      * Returns the resolved pipeline ID, or `null` if none was resolved.
      */
     const syncResolvedPipeline = useCallback(
         (formSchema: GeneratorFormSchema): string | null => {
-            if (providers.pipeline) return null;
-
             const resolvedId = formSchema.resolvedPipelineId;
-            if (resolvedId) {
+            if (!resolvedId) return null;
+
+            const selectedPipeline = providers.pipeline;
+            const selectedExists = formSchema.providers.pipeline?.some(
+                (provider) => provider.id === selectedPipeline,
+            );
+            const shouldSync =
+                !selectedPipeline || (selectedPipeline !== resolvedId && !selectedExists);
+
+            if (shouldSync) {
                 handleProviderChange('pipeline', resolvedId);
                 return resolvedId;
             }
+
             return null;
         },
         [providers.pipeline, handleProviderChange],

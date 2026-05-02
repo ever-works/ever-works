@@ -37,6 +37,7 @@ describe('PluginOperationsService', () => {
     let userPluginRepository: Repository<UserPluginEntity>;
     let directoryPluginRepository: Repository<DirectoryPluginEntity>;
     let pluginRegistryService: PluginRegistryService;
+    let settingsService: PluginSettingsService;
 
     const createSettingsSchema = (): JsonSchema =>
         ({
@@ -176,6 +177,7 @@ describe('PluginOperationsService', () => {
             getRepositoryToken(DirectoryPluginEntity),
         );
         pluginRegistryService = module.get<PluginRegistryService>(PluginRegistryService);
+        settingsService = module.get<PluginSettingsService>(PluginSettingsService);
     });
 
     describe('secret settings in API response', () => {
@@ -237,6 +239,20 @@ describe('PluginOperationsService', () => {
                         metadata: {},
                     } as any,
                 ]);
+                jest.spyOn(settingsService, 'getResolvedSettings').mockResolvedValue({
+                    normalSetting: {
+                        key: 'normalSetting',
+                        value: 'should-appear',
+                        source: 'directory',
+                        isFallback: false,
+                    },
+                    secretField: {
+                        key: 'secretField',
+                        value: 'real-dir-secret',
+                        source: 'directory',
+                        isFallback: false,
+                    },
+                });
 
                 const result = await service.listDirectoryPlugins('dir-1', 'user-1');
 
@@ -1355,6 +1371,17 @@ describe('PluginOperationsService', () => {
                     metadata: {},
                 } as any,
             ]);
+            jest.spyOn(settingsService, 'getResolvedSettings').mockImplementation(
+                async (pluginId: string) => ({
+                    apiKey: {
+                        key: 'apiKey',
+                        value: pluginId === 'configured' ? 'configured-key' : undefined,
+                        source:
+                            pluginId === 'configured' ? ('user' as const) : ('default' as const),
+                        isFallback: pluginId !== 'configured',
+                    },
+                }),
+            );
 
             const result = await service.getPluginsForSettingsMenu('user-1');
 
@@ -1366,6 +1393,52 @@ describe('PluginOperationsService', () => {
 
             expect(configured!.hasRequiredSettings).toBe(false);
             expect(unconfigured!.hasRequiredSettings).toBe(true);
+        });
+
+        it('should treat resolved secret settings as configured in settings menu', async () => {
+            const plugin = createPluginWithSettings(
+                'secret-configured',
+                'ai-provider',
+                'hybrid',
+                'public',
+                false,
+                {
+                    type: 'object',
+                    properties: {
+                        apiKey: { type: 'string', 'x-scope': 'user', 'x-secret': true },
+                    },
+                    required: ['apiKey'],
+                } as unknown as JsonSchema,
+            );
+
+            jest.spyOn(pluginRegistryService, 'getAll').mockReturnValue([plugin]);
+            jest.spyOn(userPluginRepository, 'find').mockResolvedValue([
+                {
+                    id: '1',
+                    userId: 'user-1',
+                    pluginId: 'secret-configured',
+                    enabled: true,
+                    settings: {},
+                    secretSettings: { apiKey: 'stored-secret' },
+                    metadata: {},
+                } as any,
+            ]);
+            jest.spyOn(settingsService, 'getResolvedSettings').mockResolvedValue({
+                apiKey: {
+                    key: 'apiKey',
+                    value: 'stored-secret',
+                    source: 'user',
+                    isFallback: false,
+                },
+            });
+
+            const result = await service.getPluginsForSettingsMenu('user-1');
+
+            const category = result.categories.find((c) => c.category === 'ai-provider');
+            expect(category?.plugins[0]).toMatchObject({
+                pluginId: 'secret-configured',
+                hasRequiredSettings: false,
+            });
         });
 
         it('should include autoEnabled plugins even without UserPluginEntity', async () => {
@@ -1771,6 +1844,93 @@ describe('PluginOperationsService', () => {
             await service.setActiveCapability('dir-1', 'test-plugin', 'user-1', 'test');
 
             expect(directoryPluginRepository.save).toHaveBeenCalled();
+        });
+
+        it('should enable an existing directory plugin when selected as capability provider', async () => {
+            const registered = createRegisteredPlugin();
+            jest.spyOn(pluginRegistryService, 'get').mockReturnValue(registered);
+            jest.spyOn(userPluginRepository, 'findOne').mockResolvedValue({
+                id: '1',
+                userId: 'user-1',
+                pluginId: 'test-plugin',
+                enabled: true,
+                settings: {},
+                secretSettings: {},
+                metadata: {},
+            } as any);
+
+            const directoryPlugin = {
+                id: '1',
+                directoryId: 'dir-1',
+                pluginId: 'test-plugin',
+                enabled: false,
+                activeCapabilities: [],
+                settings: {},
+                secretSettings: {},
+                metadata: {},
+            } as any;
+            jest.spyOn(directoryPluginRepository, 'findOne').mockResolvedValue(directoryPlugin);
+            jest.spyOn(directoryPluginRepository, 'find').mockResolvedValue([directoryPlugin]);
+
+            await service.setActiveCapability('dir-1', 'test-plugin', 'user-1', 'test');
+
+            expect(directoryPluginRepository.save).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    enabled: true,
+                    activeCapabilities: ['test'],
+                }),
+            );
+        });
+
+        it('should keep one plugin active for multiple capabilities independently', async () => {
+            const tavilyPlugin = {
+                ...createMockPlugin(),
+                id: 'tavily',
+                name: 'Tavily',
+                capabilities: ['search', 'content-extractor'],
+            } as unknown as IPlugin;
+
+            const registered = createRegisteredPlugin(tavilyPlugin);
+            registered.manifest = {
+                ...registered.manifest,
+                id: 'tavily',
+                name: 'Tavily',
+                capabilities: ['search', 'content-extractor'],
+                category: 'search',
+            } as PluginManifest;
+
+            jest.spyOn(pluginRegistryService, 'getAll').mockReturnValue([registered]);
+            jest.spyOn(userPluginRepository, 'find').mockResolvedValue([
+                {
+                    id: '1',
+                    userId: 'user-1',
+                    pluginId: 'tavily',
+                    enabled: true,
+                    settings: {},
+                    secretSettings: {},
+                    metadata: {},
+                } as any,
+            ]);
+            jest.spyOn(directoryPluginRepository, 'find').mockResolvedValue([
+                {
+                    id: '1',
+                    directoryId: 'dir-1',
+                    pluginId: 'tavily',
+                    enabled: true,
+                    activeCapabilities: ['search', 'content-extractor'],
+                    settings: {},
+                    secretSettings: {},
+                    metadata: {},
+                } as any,
+            ]);
+
+            const result = await service.listDirectoryPlugins('dir-1', 'user-1');
+
+            expect(result.capabilityProviders).toEqual({
+                search: 'tavily',
+                'content-extractor': 'tavily',
+            });
+            expect(result.plugins[0].activeCapabilities).toEqual(['search', 'content-extractor']);
         });
 
         it('should throw in updateDirectoryPluginSettings when user has plugin disabled', async () => {

@@ -2,7 +2,8 @@ import { Injectable, Logger } from '@nestjs/common';
 import { GitFacadeService } from '../../facades/git.facade';
 import { Directory } from '../../entities/directory.entity';
 import { User } from '../../entities/user.entity';
-import { DataRepository, PRUpdate } from './data-repository';
+import { DataRepository } from './data-repository';
+import type { IDataConfig, PRUpdate } from './data-repository';
 import { slugifyText } from '../../utils/text.utils';
 import type { Identifiable, ItemData, Category, Collection, Tag } from '@ever-works/contracts';
 import {
@@ -60,6 +61,10 @@ export type GenerationStats = {
     metrics?: ItemsGeneratorMetrics;
     changelog?: ReturnType<typeof buildDirectoryChangelog>;
 };
+
+const getDirectoryDefaultDataConfig = (directory: Directory): Partial<IDataConfig> => ({
+    company_name: directory.name || directory.slug,
+});
 
 export type InitializeResult =
     | {
@@ -256,7 +261,7 @@ export class DataGeneratorService {
 
         let data: DataRepository;
         try {
-            data = await DataRepository.create(dest);
+            data = await DataRepository.create(dest, getDirectoryDefaultDataConfig(directory));
         } catch (err) {
             this.logger.error('Failed to create data repository', err);
             return {
@@ -653,7 +658,10 @@ export class DataGeneratorService {
             { userId: directoryOwner.id, providerId: directory.gitProvider },
         );
 
-        const dataRepo = await DataRepository.create(dest);
+        const dataRepo = await DataRepository.create(
+            dest,
+            getDirectoryDefaultDataConfig(directory),
+        );
 
         await dataRepo.ensureDirectoriesExist();
 
@@ -725,7 +733,9 @@ export class DataGeneratorService {
             directory.getDataRepo(),
         );
 
-        return DataRepository.create(dataDir).then((data) => data.cleanup());
+        return DataRepository.create(dataDir, getDirectoryDefaultDataConfig(directory)).then(
+            (data) => data.cleanup(),
+        );
     }
 
     /**
@@ -765,7 +775,7 @@ export class DataGeneratorService {
             { userId: directoryOwner.id, providerId: directory.gitProvider },
         );
 
-        const data = await DataRepository.create(dest);
+        const data = await DataRepository.create(dest, getDirectoryDefaultDataConfig(directory));
 
         await data.writeCategories(categories);
 
@@ -795,7 +805,7 @@ export class DataGeneratorService {
             { userId: directoryOwner.id, providerId: directory.gitProvider },
         );
 
-        const data = await DataRepository.create(dest);
+        const data = await DataRepository.create(dest, getDirectoryDefaultDataConfig(directory));
 
         await data.writeTags(tags);
 
@@ -820,7 +830,7 @@ export class DataGeneratorService {
             { userId: directoryOwner.id, providerId: directory.gitProvider },
         );
 
-        const data = await DataRepository.create(dest);
+        const data = await DataRepository.create(dest, getDirectoryDefaultDataConfig(directory));
 
         await data.writeCollections(collections);
 
@@ -1025,7 +1035,7 @@ export class DataGeneratorService {
             { userId: directoryOwner.id, providerId: directory.gitProvider },
         );
 
-        const data = await DataRepository.create(dest);
+        const data = await DataRepository.create(dest, getDirectoryDefaultDataConfig(directory));
 
         return data;
     }
@@ -1190,7 +1200,10 @@ export class DataGeneratorService {
                 { owner: directory.getRepoOwner(), repo, committer },
                 { userId: directoryOwner.id, providerId: directory.gitProvider },
             );
-            const data = await DataRepository.create(dest);
+            const data = await DataRepository.create(
+                dest,
+                getDirectoryDefaultDataConfig(directory),
+            );
 
             const [categories, tags, collections, existingItems, config] = await Promise.all([
                 data.getCategories().catch(() => []),
@@ -1337,7 +1350,10 @@ export class DataGeneratorService {
                 this.logger,
             );
 
-            const data = await DataRepository.create(dest);
+            const data = await DataRepository.create(
+                dest,
+                getDirectoryDefaultDataConfig(directory),
+            );
             await data.ensureDirectoriesExist();
 
             // Write categories, tags, and collections
@@ -1484,7 +1500,10 @@ export class DataGeneratorService {
                 { userId: user.id, providerId: directory.gitProvider },
             );
 
-            const data = await DataRepository.create(dest);
+            const data = await DataRepository.create(
+                dest,
+                getDirectoryDefaultDataConfig(directory),
+            );
             await data.ensureDirectoriesExist();
             await data.ensureDefaultConfig();
 

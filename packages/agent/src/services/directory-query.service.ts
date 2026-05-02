@@ -249,12 +249,13 @@ export class DirectoryQueryService {
     async getWebsiteSettings(directoryId: string, user: User) {
         // Any access level can view settings
         const { directory } = await this.ownershipService.ensureCanView(directoryId, user.id);
+        const defaultCompanyName = directory.name || directory.slug;
 
         try {
             const config = await this.dataGenerator.getConfig(directory, user);
             return {
                 status: 'success',
-                company_name: config?.company_name || 'Acme',
+                company_name: config?.company_name || defaultCompanyName,
                 company_website: config?.company_website || '',
                 settings: config?.settings || {},
                 custom_menu: config?.custom_menu || { header: [], footer: [] },
@@ -268,7 +269,7 @@ export class DirectoryQueryService {
             if (this.isReadOnlyRepoUnavailable(errMessage)) {
                 return {
                     status: 'success',
-                    company_name: 'Acme',
+                    company_name: defaultCompanyName,
                     company_website: '',
                     settings: {},
                     custom_menu: { header: [], footer: [] },
@@ -480,6 +481,7 @@ export class DirectoryQueryService {
             activityType: record.activityType,
             changelog: record.changelog ?? null,
             logs: record.logs ?? null,
+            warnings: record.warnings ?? null,
             triggeredBy: record.triggeredBy ?? null,
         };
     }

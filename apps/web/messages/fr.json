@@ -1773,6 +1773,7 @@
                 "default": "Par défaut",
                 "notConfigured": "Non configuré",
                 "notConfiguredTooltip": "Ce fournisseur nécessite une configuration. Visitez Paramètres → Plugins pour le configurer.",
+                "changeModels": "Changer",
                 "jsonObjectError": "La valeur doit être un objet JSON",
                 "invalidJsonError": "Format JSON invalide"
             },
@@ -2937,6 +2938,7 @@
             "resetSuccess": "Paramètres réinitialisés par défaut",
             "cancel": "Annuler",
             "clickToConfigure": "Cliquez pour configurer",
+            "changeModels": "Changer",
             "autoEnabledByUser": "Auto-activé via les paramètres utilisateur",
             "toggleError": "Échec de la bascule du greffon",
             "system": "Système",

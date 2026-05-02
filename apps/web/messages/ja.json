@@ -1773,6 +1773,7 @@
                 "default": "既定",
                 "notConfigured": "未設定",
                 "notConfiguredTooltip": "このプロバイダは設定が必要です。Settings → Plugins を訪れて設定してください。",
+                "changeModels": "変更",
                 "jsonObjectError": "値は JSON オブジェクトである必要があります",
                 "invalidJsonError": "無効な JSON 形式"
             },
@@ -2937,6 +2938,7 @@
             "resetSuccess": "設定を既定値にリセットしました",
             "cancel": "キャンセル",
             "clickToConfigure": "構成するためにクリック",
+            "changeModels": "変更",
             "autoEnabledByUser": "ユーザー設定により自動有効",
             "toggleError": "プラグインの切り替えに失敗しました",
             "system": "システム",

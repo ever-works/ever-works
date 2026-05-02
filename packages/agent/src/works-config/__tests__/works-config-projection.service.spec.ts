@@ -13,17 +13,17 @@ describe('WorksConfigProjectionService', () => {
             findEnabledByDirectory: jest.fn().mockResolvedValue([
                 {
                     pluginId: 'anthropic',
-                    activeCapability: 'ai-provider',
+                    activeCapabilities: ['ai-provider'],
                     pluginEntity: { manifest: {} },
                 },
                 {
                     pluginId: 'screenshotone',
-                    activeCapability: 'screenshot',
+                    activeCapabilities: ['screenshot'],
                     pluginEntity: { manifest: {} },
                 },
                 {
                     pluginId: 'firecrawl',
-                    activeCapability: 'content-extractor',
+                    activeCapabilities: ['content-extractor'],
                     pluginEntity: { manifest: {} },
                 },
             ]),
@@ -56,17 +56,17 @@ describe('WorksConfigProjectionService', () => {
             findEnabledByDirectory: jest.fn().mockResolvedValue([
                 {
                     pluginId: 'openai',
-                    activeCapability: 'ai-provider',
+                    activeCapabilities: ['ai-provider'],
                     pluginEntity: { manifest: {} },
                 },
                 {
                     pluginId: 'screenshotone',
-                    activeCapability: 'screenshot',
+                    activeCapabilities: ['screenshot'],
                     pluginEntity: { manifest: {} },
                 },
                 {
                     pluginId: 'helper-plugin',
-                    activeCapability: 'search',
+                    activeCapabilities: ['search'],
                     pluginEntity: { manifest: { supplementary: true } },
                 },
             ]),

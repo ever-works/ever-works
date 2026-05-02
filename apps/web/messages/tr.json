@@ -1773,6 +1773,7 @@
                 "default": "Varsayılan",
                 "notConfigured": "Yapılandırılmamış",
                 "notConfiguredTooltip": "Bu sağlayıcı yapılandırma gerektirir. Ayarlar → Eklentiler'e giderek ayarlayın.",
+                "changeModels": "Değiştir",
                 "jsonObjectError": "Değer JSON nesnesi olmalıdır",
                 "invalidJsonError": "Geçersiz JSON formatı"
             },
@@ -2937,6 +2938,7 @@
             "resetSuccess": "Ayarlar varsayılana sıfırlandı",
             "cancel": "İptal",
             "clickToConfigure": "Yapılandırmak için tıklayın",
+            "changeModels": "Değiştir",
             "autoEnabledByUser": "Kullanıcı ayarları aracılığıyla otomatik etkin",
             "toggleError": "Eklenti geçişi yapılamadı",
             "system": "Sistem",

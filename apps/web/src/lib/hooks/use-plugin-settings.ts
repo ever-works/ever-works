@@ -161,13 +161,19 @@ export function usePluginSettings({
         setIsSaving(true);
         setValidationError(null);
         try {
+            const modifiedRegularSettings = Object.fromEntries(
+                Object.entries(settings).filter(([key]) => modifiedFields.has(key)),
+            );
+            const modifiedSecretSettings = Object.fromEntries(
+                Object.entries(secretSettings).filter(([key]) => modifiedFields.has(key)),
+            );
             const sanitizedSettings =
-                Object.keys(settings).length > 0
-                    ? sanitizeSettingsForSave(settings, scope)
+                Object.keys(modifiedRegularSettings).length > 0
+                    ? sanitizeSettingsForSave(modifiedRegularSettings, scope)
                     : undefined;
             const sanitizedSecretSettings =
-                Object.keys(secretSettings).length > 0
-                    ? sanitizeSettingsForSave(secretSettings, scope)
+                Object.keys(modifiedSecretSettings).length > 0
+                    ? sanitizeSettingsForSave(modifiedSecretSettings, scope)
                     : undefined;
 
             const result = await onSave({
@@ -244,6 +250,7 @@ export function usePluginSettings({
         validateConstraints,
         settings,
         secretSettings,
+        modifiedFields,
         onSave,
         router,
         t,

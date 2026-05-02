@@ -302,16 +302,30 @@ export class DeployFacadeService implements IDeployFacade {
      */
     async getDomains(options: DeployFacadeOptions): Promise<DeploymentDomain[]> {
         const dbDomains = await this.domainRepository.findByDirectory(options.directoryId);
+        const hasCustomDomain = dbDomains.some(
+            (domain) => !this.isAutoAssignedDomain(domain.domain),
+        );
+        const shouldAutoImportProviderDomains = !hasCustomDomain;
 
         // Try to enrich with provider verification data
         let providerDomains: DeploymentDomain[] = [];
+        let providerId: string | undefined;
+
         try {
             const { plugin, token, directory } =
                 await this.resolvePluginAndTokenWithDirectory(options);
+            providerId = plugin.id;
             if (plugin.getDomains) {
                 const projectId = await this.resolveProjectId(plugin, token, directory, options);
                 const teamScope = await this.getTeamScope(plugin.id, options);
                 providerDomains = await plugin.getDomains(projectId, token, teamScope);
+                if (shouldAutoImportProviderDomains) {
+                    await this.reconcileProviderDomains(
+                        options.directoryId,
+                        plugin.id,
+                        providerDomains,
+                    );
+                }
             }
         } catch (error) {
             this.logger.warn(`Failed to fetch provider domains for enrichment: ${error}`);
@@ -323,8 +337,7 @@ export class DeployFacadeService implements IDeployFacade {
             providerMap.set(pd.name, pd);
         }
 
-        // Merge: DB domains with provider verification details
-        return dbDomains.map((dbDomain) => {
+        const merged = dbDomains.map((dbDomain) => {
             const providerData = providerMap.get(dbDomain.domain);
             return {
                 name: dbDomain.domain,
@@ -332,11 +345,70 @@ export class DeployFacadeService implements IDeployFacade {
                 verification: providerData?.verification,
             };
         });
+
+        if (shouldAutoImportProviderDomains) {
+            const dbDomainNames = new Set(dbDomains.map((domain) => domain.domain));
+            for (const providerDomain of providerDomains) {
+                if (dbDomainNames.has(providerDomain.name)) continue;
+
+                merged.push({
+                    name: providerDomain.name,
+                    verified: providerDomain.verified,
+                    verification: providerDomain.verification,
+                });
+            }
+        }
+
+        if (providerId && providerDomains.length > 0) {
+            this.logger.debug(
+                `Resolved ${providerDomains.length} domain(s) from provider ${providerId} for directory ${options.directoryId}`,
+            );
+        }
+
+        return this.sortDomainsForDisplay(merged);
+    }
+
+    private async reconcileProviderDomains(
+        directoryId: string,
+        providerId: string,
+        providerDomains: DeploymentDomain[],
+    ): Promise<void> {
+        for (const providerDomain of providerDomains) {
+            try {
+                const existing = await this.domainRepository.findOne(
+                    directoryId,
+                    providerDomain.name,
+                );
+                if (!existing) {
+                    await this.domainRepository.addDomain(
+                        directoryId,
+                        providerDomain.name,
+                        providerId,
+                    );
+                } else if (existing.provider !== providerId) {
+                    await this.domainRepository.updateProvider(
+                        directoryId,
+                        providerDomain.name,
+                        providerId,
+                    );
+                }
+
+                await this.domainRepository.updateVerified(
+                    directoryId,
+                    providerDomain.name,
+                    providerDomain.verified,
+                );
+            } catch (error) {
+                this.logger.warn(
+                    `Failed to reconcile provider domain "${providerDomain.name}" for directory ${directoryId}: ${error}`,
+                );
+            }
+        }
     }
 
     /**
      * Add a domain to a deployed directory.
-     * Saves to DB first, then pushes to provider.
+     * Provider state is checked first so domains already attached outside Ever Works are imported.
      */
     async addDomain(domain: string, options: DeployFacadeOptions): Promise<AddDomainResult> {
         const { plugin, token, directory } = await this.resolvePluginAndTokenWithDirectory(options);
@@ -348,44 +420,108 @@ export class DeployFacadeService implements IDeployFacade {
             );
         }
 
-        // Check for duplicate before inserting
-        const existing = await this.domainRepository.findOne(options.directoryId, domain);
-        if (existing) {
-            throw new DeployFacadeError(
-                `Domain "${domain}" is already added to this directory`,
-                'addDomain',
-                plugin.id,
-            );
-        }
-
-        // Save to DB first (unverified, no provider yet)
-        await this.domainRepository.addDomain(options.directoryId, domain);
-
-        // Push to provider
         const projectId = await this.resolveProjectId(plugin, token, directory, options);
         const teamScope = await this.getTeamScope(plugin.id, options);
+        const existing = await this.domainRepository.findOne(options.directoryId, domain);
+
+        if (plugin.getDomains) {
+            const providerDomain = await this.findProviderDomain(
+                plugin,
+                projectId,
+                token,
+                teamScope,
+                domain,
+            );
+
+            if (providerDomain) {
+                await this.reconcileProviderDomains(options.directoryId, plugin.id, [
+                    providerDomain,
+                ]);
+                await this.promoteVerifiedDomainWebsite(directory, providerDomain);
+                return {
+                    domain: providerDomain,
+                    verified: providerDomain.verified,
+                };
+            }
+        }
+
+        if (existing) {
+            return {
+                domain: {
+                    name: existing.domain,
+                    verified: existing.verified,
+                },
+                verified: existing.verified,
+            };
+        }
+
+        // Push to provider
         let result: AddDomainResult;
         try {
             result = await plugin.addDomain(projectId, domain, token, teamScope);
         } catch (error) {
-            // Provider failed — keep DB record so user can retry, but rethrow
             throw error;
         }
 
-        // Update DB with provider and verified status
-        await this.domainRepository.updateProvider(options.directoryId, domain, plugin.id);
+        await this.domainRepository.addDomain(options.directoryId, domain, plugin.id);
         if (result.verified) {
             await this.domainRepository.updateVerified(options.directoryId, domain, true);
-            // Only promote to primary URL if current website is auto-assigned or unset
-            const isAutoAssigned = !directory.website || directory.website.endsWith('.vercel.app');
-            if (isAutoAssigned) {
-                await this.directoryRepository.update(directory.id, {
-                    website: `https://${result.domain.name}`,
-                });
-            }
+            await this.promoteVerifiedDomainWebsite(directory, result.domain);
         }
 
         return result;
+    }
+
+    private async findProviderDomain(
+        plugin: IDeploymentPlugin,
+        projectId: string,
+        token: string,
+        teamScope: string | undefined,
+        domain: string,
+    ): Promise<DeploymentDomain | undefined> {
+        if (!plugin.getDomains) return undefined;
+
+        try {
+            const providerDomains = await plugin.getDomains(projectId, token, teamScope);
+            return providerDomains.find((item) => item.name === domain);
+        } catch (error) {
+            this.logger.warn(
+                `Failed to check provider domains before adding "${domain}": ${error}`,
+            );
+            return undefined;
+        }
+    }
+
+    private async promoteVerifiedDomainWebsite(
+        directory: Directory,
+        domain: DeploymentDomain,
+    ): Promise<void> {
+        if (!domain.verified) return;
+
+        // Only promote to primary URL if current website is auto-assigned or unset
+        const isAutoAssigned = !directory.website || directory.website.endsWith('.vercel.app');
+        if (!isAutoAssigned) return;
+
+        await this.directoryRepository.update(directory.id, {
+            website: `https://${domain.name}`,
+        });
+    }
+
+    private isAutoAssignedDomain(domain: string): boolean {
+        return domain.endsWith('.vercel.app');
+    }
+
+    private sortDomainsForDisplay(domains: DeploymentDomain[]): DeploymentDomain[] {
+        return [...domains].sort((left, right) => {
+            const leftAutoAssigned = this.isAutoAssignedDomain(left.name);
+            const rightAutoAssigned = this.isAutoAssignedDomain(right.name);
+
+            if (leftAutoAssigned === rightAutoAssigned) {
+                return left.name.localeCompare(right.name);
+            }
+
+            return leftAutoAssigned ? 1 : -1;
+        });
     }
 
     /**

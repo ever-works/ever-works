@@ -15,6 +15,7 @@ export type { PluginUiHints };
 import type { PluginState } from '../contracts/lifecycle.types.js';
 import type { ConfigurationMode } from '../settings/settings.types.js';
 import type { JsonSchema, JsonSchemaType } from '../settings/json-schema.types.js';
+import type { ProviderModelSummary } from '../contracts/capabilities/form-schema-provider.interface.js';
 
 /**
  * Setting scope determines where the setting value is stored and who can configure it.
@@ -226,6 +227,8 @@ export interface UserPluginResponse extends PluginResponse {
 	autoEnableForDirectories?: boolean;
 	/** Generic connection/readiness status used by onboarding and settings UI. */
 	connectionStatus?: PluginConnectionStatus;
+	/** Effective model settings for AI providers, resolved for the current scope. */
+	models?: ProviderModelSummary[];
 }
 
 /**
@@ -234,8 +237,8 @@ export interface UserPluginResponse extends PluginResponse {
 export interface DirectoryPluginResponse extends UserPluginResponse {
 	/** Whether plugin is enabled for this directory */
 	directoryEnabled: boolean;
-	/** Active capability for this directory */
-	activeCapability?: string;
+	/** Active capabilities for this directory */
+	activeCapabilities?: string[];
 	/** Directory-specific settings (masked) */
 	directorySettings?: Record<string, unknown>;
 	/** Directory plugin entity ID */

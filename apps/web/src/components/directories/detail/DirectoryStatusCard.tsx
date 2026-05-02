@@ -14,6 +14,7 @@ import { Terminal } from 'lucide-react';
 import { TerminalLogViewer } from './shared/TerminalLogViewer';
 import { ShinyText } from '@/components/ui/ShinyText';
 import { CancelGenerationButton } from './generator/CancelGenerationButton';
+import { useDirectoryDetail } from './DirectoryDetailContext';
 
 interface DirectoryStatusCardProps {
     directory: Directory;
@@ -24,8 +25,10 @@ export function DirectoryStatusCard({ directory }: DirectoryStatusCardProps) {
     const t = useTranslations('dashboard.directoryDetail.statusCard');
     const tProgress = useTranslations('dashboard.directoryDetail.progress');
     const [showLogs, setShowLogs] = useState(false);
+    const { directory: syncedDirectory } = useDirectoryDetail();
+    const currentDirectory = syncedDirectory.id === directory.id ? syncedDirectory : directory;
 
-    const generateStatus = directory.generateStatus;
+    const generateStatus = currentDirectory.generateStatus;
     const hasWarnings = !!generateStatus?.warnings?.length;
     const statusStyle = getGenerationStatusConfig(generateStatus?.status, { hasWarnings });
     const StatusIcon = statusStyle.icon;
@@ -42,7 +45,9 @@ export function DirectoryStatusCard({ directory }: DirectoryStatusCardProps) {
                 action: (
                     <Button
                         onClick={() =>
-                            router.push(`${ROUTES.DASHBOARD_DIRECTORY(directory.id)}/generator`)
+                            router.push(
+                                `${ROUTES.DASHBOARD_DIRECTORY(currentDirectory.id)}/generator`,
+                            )
                         }
                         variant="primary"
                         size="sm"
@@ -121,7 +126,7 @@ export function DirectoryStatusCard({ directory }: DirectoryStatusCardProps) {
                         </div>
                         <div className="flex items-center gap-2">
                             <CancelGenerationButton
-                                directoryId={directory.id}
+                                directoryId={currentDirectory.id}
                                 labels={{
                                     stop: t('generating.stop'),
                                     stopping: t('generating.stopping'),
@@ -161,14 +166,14 @@ export function DirectoryStatusCard({ directory }: DirectoryStatusCardProps) {
                         ) : null}
                         <div className="flex gap-2">
                             <Button
-                                href={`${ROUTES.DASHBOARD_DIRECTORY(directory.id)}/items`}
+                                href={`${ROUTES.DASHBOARD_DIRECTORY(currentDirectory.id)}/items`}
                                 variant="secondary"
                                 size="sm"
                             >
                                 {t('generated.viewItems')}
                             </Button>
                             <Button
-                                href={`${ROUTES.DASHBOARD_DIRECTORY(directory.id)}/generator`}
+                                href={`${ROUTES.DASHBOARD_DIRECTORY(currentDirectory.id)}/generator`}
                                 variant="ghost"
                                 size="sm"
                             >
@@ -204,7 +209,7 @@ export function DirectoryStatusCard({ directory }: DirectoryStatusCardProps) {
                         ) : null}
                         {logsSection && <div className="mb-3">{logsSection}</div>}
                         <Button
-                            href={`${ROUTES.DASHBOARD_DIRECTORY(directory.id)}/generator`}
+                            href={`${ROUTES.DASHBOARD_DIRECTORY(currentDirectory.id)}/generator`}
                             variant="primary"
                             size="sm"
                         >
@@ -218,7 +223,7 @@ export function DirectoryStatusCard({ directory }: DirectoryStatusCardProps) {
                 description: generateStatus.error || t('cancelled.description'),
                 action: (
                     <Button
-                        href={`${ROUTES.DASHBOARD_DIRECTORY(directory.id)}/generator`}
+                        href={`${ROUTES.DASHBOARD_DIRECTORY(currentDirectory.id)}/generator`}
                         variant="primary"
                         size="sm"
                     >

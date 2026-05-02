@@ -1773,6 +1773,7 @@
                 "default": "Mặc định",
                 "notConfigured": "Chưa cấu hình",
                 "notConfiguredTooltip": "Nhà cung cấp này yêu cầu cấu hình. Truy cập Cài đặt → Plugins để thiết lập.",
+                "changeModels": "Thay đổi",
                 "jsonObjectError": "Giá trị phải là đối tượng JSON",
                 "invalidJsonError": "Định dạng JSON không hợp lệ"
             },
@@ -2937,6 +2938,7 @@
             "resetSuccess": "Đã đặt lại cài đặt về mặc định",
             "cancel": "Hủy",
             "clickToConfigure": "Nhấp để cấu hình",
+            "changeModels": "Thay đổi",
             "autoEnabledByUser": "Tự động bật qua cài đặt người dùng",
             "toggleError": "Không thể chuyển đổi plugin",
             "system": "Hệ thống",

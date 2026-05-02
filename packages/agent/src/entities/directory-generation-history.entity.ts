@@ -83,6 +83,9 @@ export class DirectoryGenerationHistory {
     @Column({ type: 'json', nullable: true })
     logs?: GenerationStepLog[] | null;
 
+    @Column({ type: 'json', nullable: true })
+    warnings?: string[] | null;
+
     @Column({ nullable: true })
     scheduleId?: string | null;
 
