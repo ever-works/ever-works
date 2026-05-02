@@ -1441,12 +1441,19 @@ export class PluginOperationsService {
         options?: { userId: string; directoryId: string },
     ): Promise<DirectoryPluginResponse> {
         const userResponse = this.toUserPluginResponse(registered, userPlugin);
-        const [resolvedSettings, models] = options
+        const rawDirectorySettings = this.maskSecretSettings(
+            directoryPlugin
+                ? { ...directoryPlugin.settings, ...directoryPlugin.secretSettings }
+                : undefined,
+            registered.plugin.settingsSchema,
+        );
+        const [resolvedSettings, models, directorySettings] = options
             ? await Promise.all([
                   this.getResolvedDisplaySettings(registered, options.userId),
                   this.getProviderModelSummaries(registered, options),
+                  this.getDirectoryOverrideDisplaySettings(registered, options),
               ])
-            : [undefined, undefined];
+            : [undefined, undefined, rawDirectorySettings];
 
         return {
             ...userResponse,
@@ -1459,12 +1466,7 @@ export class PluginOperationsService {
                 hasDirectoryContext: true,
             }),
             activeCapabilities: getActiveCapabilities(directoryPlugin),
-            directorySettings: this.maskSecretSettings(
-                directoryPlugin
-                    ? { ...directoryPlugin.settings, ...directoryPlugin.secretSettings }
-                    : undefined,
-                registered.plugin.settingsSchema,
-            ),
+            directorySettings,
             directoryPluginId: directoryPlugin?.id,
             priority: directoryPlugin?.priority,
             models,
@@ -1485,6 +1487,37 @@ export class PluginOperationsService {
         });
 
         return buildProviderModelSummaries(registered.plugin.settingsSchema, resolved);
+    }
+
+    private async getDirectoryOverrideDisplaySettings(
+        registered: RegisteredPlugin,
+        options: { userId: string; directoryId: string },
+    ): Promise<Record<string, unknown> | undefined> {
+        const schema = registered.plugin.settingsSchema;
+        if (!schema?.properties) {
+            return undefined;
+        }
+
+        const resolved = await this.settingsService.getResolvedSettings(registered.plugin.id, {
+            userId: options.userId,
+            directoryId: options.directoryId,
+            includeSecrets: true,
+        });
+
+        const directorySettings: Record<string, unknown> = {};
+
+        for (const key of Object.keys(schema.properties)) {
+            const setting = resolved[key];
+            if (setting?.source !== 'directory') continue;
+            if (setting.value === undefined || setting.value === null) continue;
+
+            directorySettings[key] = setting.value;
+        }
+
+        return this.maskSecretSettings(
+            Object.keys(directorySettings).length > 0 ? directorySettings : undefined,
+            schema,
+        );
     }
 
     /**

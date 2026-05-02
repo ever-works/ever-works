@@ -243,6 +243,92 @@ describe('PluginSettingsService', () => {
             });
         });
 
+        it('should inherit lower-scope values when directory settings only shadow schema defaults', async () => {
+            const schema: JsonSchema = {
+                type: 'object',
+                properties: {
+                    defaultModel: {
+                        type: 'string',
+                        default: 'openai/gpt-5-mini',
+                    },
+                    simpleModel: {
+                        type: 'string',
+                        default: 'openai/gpt-5-mini',
+                    },
+                    mediumModel: {
+                        type: 'string',
+                        default: 'openai/gpt-5-mini',
+                    },
+                    complexModel: {
+                        type: 'string',
+                        default: 'openai/gpt-5',
+                    },
+                    tone: {
+                        type: 'string',
+                        default: 'formal',
+                    },
+                },
+            } as unknown as JsonSchema;
+            const plugin = createMockPlugin(schema);
+            jest.spyOn(registry, 'get').mockReturnValue(createRegisteredPlugin(plugin));
+
+            jest.spyOn(userPluginRepository, 'findByUserAndPlugin').mockResolvedValue({
+                id: '1',
+                userId: 'user-1',
+                pluginId: 'test-plugin',
+                settings: {
+                    defaultModel: 'nvidia/nemotron-3-super-120b-a12b:free',
+                    simpleModel: 'nvidia/nemotron-3-super-120b-a12b:free',
+                    mediumModel: 'nvidia/nemotron-3-super-120b-a12b:free',
+                    complexModel: 'nvidia/nemotron-3-super-120b-a12b:free',
+                    tone: 'casual',
+                },
+                secretSettings: {},
+            } as any);
+
+            jest.spyOn(directoryPluginRepository, 'findByDirectoryAndPlugin').mockResolvedValue({
+                id: '1',
+                directoryId: 'dir-1',
+                pluginId: 'test-plugin',
+                settings: {
+                    defaultModel: 'minimax/minimax-m2.5:free',
+                    simpleModel: 'openai/gpt-5-mini',
+                    mediumModel: 'openai/gpt-5-mini',
+                    complexModel: 'openai/gpt-5',
+                    tone: 'formal',
+                },
+                secretSettings: {},
+            } as any);
+
+            const result = await service.getResolvedSettings('test-plugin', {
+                userId: 'user-1',
+                directoryId: 'dir-1',
+            });
+
+            expect(result.defaultModel).toEqual({
+                key: 'defaultModel',
+                value: 'minimax/minimax-m2.5:free',
+                source: 'directory',
+                isFallback: true,
+            });
+            expect(result.simpleModel).toMatchObject({
+                value: 'nvidia/nemotron-3-super-120b-a12b:free',
+                source: 'user',
+            });
+            expect(result.mediumModel).toMatchObject({
+                value: 'nvidia/nemotron-3-super-120b-a12b:free',
+                source: 'user',
+            });
+            expect(result.complexModel).toMatchObject({
+                value: 'nvidia/nemotron-3-super-120b-a12b:free',
+                source: 'user',
+            });
+            expect(result.tone).toMatchObject({
+                value: 'casual',
+                source: 'user',
+            });
+        });
+
         it('should resolve from environment variable', async () => {
             const originalEnv = process.env.PLUGIN_API_KEY;
             process.env.PLUGIN_API_KEY = 'env-api-key';

@@ -8,6 +8,7 @@ import type {
     SettingDefinition,
     JsonSchema,
 } from '@ever-works/plugin';
+import isEqual from 'lodash/isEqual';
 import pickBy from 'lodash/pickBy';
 import { PluginRepository } from '../repositories/plugin.repository';
 import { UserPluginRepository } from '../repositories/user-plugin.repository';
@@ -511,14 +512,20 @@ export class PluginSettingsService {
     ): ResolvedSetting {
         const { key, envVar, defaultValue, scope: settingScope } = definition;
 
-        // Check if setting scope matches request scope
-        const requestScope = options?.scope || 'global';
-
         // Resolution order based on priority (directory > user > admin > env > default)
         // isFallback indicates when a value comes from a scope that doesn't match the setting's intended scope
+        const inheritedSetting = this.resolveInheritedSetting(definition, sources, options);
 
         // 1. Directory settings (if directoryId provided)
-        if (options?.directoryId && sources.directory[key] !== undefined) {
+        if (
+            options?.directoryId &&
+            sources.directory[key] !== undefined &&
+            !this.isDirectorySchemaDefaultShadow(
+                definition,
+                sources.directory[key],
+                inheritedSetting,
+            )
+        ) {
             return {
                 key,
                 value: sources.directory[key],
@@ -527,6 +534,19 @@ export class PluginSettingsService {
                 isFallback: settingScope !== 'directory',
             };
         }
+
+        return inheritedSetting;
+    }
+
+    private resolveInheritedSetting(
+        definition: SettingDefinition,
+        sources: {
+            user: Record<string, unknown>;
+            admin: Record<string, unknown>;
+        },
+        options?: SettingsResolutionOptions,
+    ): ResolvedSetting {
+        const { key, envVar, defaultValue, scope: settingScope } = definition;
 
         // 2. User settings (if userId provided)
         if (options?.userId && sources.user[key] !== undefined) {
@@ -567,6 +587,24 @@ export class PluginSettingsService {
             source: 'default',
             isFallback: true,
         };
+    }
+
+    /**
+     * Directory forms inherit lower scopes. A stored directory value equal to the
+     * schema default is usually a default-filled form field, not an explicit
+     * override. If a lower scope has a different real value, let inheritance win.
+     */
+    private isDirectorySchemaDefaultShadow(
+        definition: SettingDefinition,
+        directoryValue: unknown,
+        inheritedSetting: ResolvedSetting,
+    ): boolean {
+        if (definition.defaultValue === undefined) return false;
+        if (!isEqual(directoryValue, definition.defaultValue)) return false;
+        if (inheritedSetting.source === 'default') return false;
+        if (isEqual(inheritedSetting.value, directoryValue)) return false;
+
+        return true;
     }
 
     /**

@@ -54,15 +54,17 @@ export function RequiredFields({ formData, onChange }: RequiredFieldsProps) {
                     helperText={t('promptHelperText')}
                 />
 
-                <Input
-                    label={t('modelOverride')}
-                    type="text"
-                    value={formData.model || ''}
-                    onChange={(e) => onChange({ model: e.target.value })}
-                    placeholder={t('modelOverridePlaceholder')}
-                    variant="form"
-                    helperText={t('modelOverrideHelperText')}
-                />
+                <div className="hidden">
+                    <Input
+                        label={t('modelOverride')}
+                        type="text"
+                        value={formData.model || ''}
+                        onChange={(e) => onChange({ model: e.target.value })}
+                        placeholder={t('modelOverridePlaceholder')}
+                        variant="form"
+                        helperText={t('modelOverrideHelperText')}
+                    />
+                </div>
             </div>
         </div>
     );

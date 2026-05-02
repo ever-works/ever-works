@@ -239,6 +239,20 @@ describe('PluginOperationsService', () => {
                         metadata: {},
                     } as any,
                 ]);
+                jest.spyOn(settingsService, 'getResolvedSettings').mockResolvedValue({
+                    normalSetting: {
+                        key: 'normalSetting',
+                        value: 'should-appear',
+                        source: 'directory',
+                        isFallback: false,
+                    },
+                    secretField: {
+                        key: 'secretField',
+                        value: 'real-dir-secret',
+                        source: 'directory',
+                        isFallback: false,
+                    },
+                });
 
                 const result = await service.listDirectoryPlugins('dir-1', 'user-1');
 

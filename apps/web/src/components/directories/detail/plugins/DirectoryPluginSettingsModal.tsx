@@ -28,35 +28,6 @@ interface DirectoryPluginSettingsModalProps {
     plugin: DirectoryPlugin;
 }
 
-function removeInheritedDefaultOverrides(
-    directorySettings: Record<string, unknown> | undefined,
-    inheritedSettings: Record<string, unknown> | undefined,
-    settingsSchema: DirectoryPlugin['settingsSchema'],
-): Record<string, unknown> {
-    if (!directorySettings) {
-        return {};
-    }
-
-    const settings = { ...directorySettings };
-    const properties = settingsSchema?.properties || {};
-
-    for (const [key, value] of Object.entries(directorySettings)) {
-        const schemaDefault = properties[key]?.default;
-        const inheritedValue = inheritedSettings?.[key];
-
-        if (
-            schemaDefault !== undefined &&
-            inheritedValue !== undefined &&
-            value === schemaDefault &&
-            inheritedValue !== value
-        ) {
-            delete settings[key];
-        }
-    }
-
-    return settings;
-}
-
 export function DirectoryPluginSettingsModal({
     open,
     onOpenChange,
@@ -70,13 +41,8 @@ export function DirectoryPluginSettingsModal({
     const [modifiedFields, setModifiedFields] = useState<Set<string>>(new Set());
     const inheritedSettings = plugin.resolvedSettings || plugin.settings;
     const directorySettings = useMemo(
-        () =>
-            removeInheritedDefaultOverrides(
-                plugin.directorySettings,
-                inheritedSettings,
-                plugin.settingsSchema,
-            ),
-        [plugin.directorySettings, inheritedSettings, plugin.settingsSchema],
+        () => plugin.directorySettings || {},
+        [plugin.directorySettings],
     );
 
     const onSave = useCallback(
