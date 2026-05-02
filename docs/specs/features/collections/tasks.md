@@ -9,7 +9,7 @@
 ## Phase 1 — Service
 
 - [x] T1. Add `Collection` shape to taxonomy types in `@ever-works/contracts`.
-- [x] T2. Extend `DirectoryTaxonomyService` with `getCollections / createCollection / updateCollection / deleteCollection`.
+- [x] T2. Extend `WorkTaxonomyService` with `getCollections / createCollection / updateCollection / deleteCollection`.
 - [x] T3. Slug generation + duplicate-name guard.
 - [x] T4. Delete cleanup: clear `collection` field on all referencing items.
 
@@ -20,7 +20,7 @@
 
 ## Phase 3 — API
 
-- [x] T7. Controller endpoints in `apps/api/src/directories/`.
+- [x] T7. Controller endpoints in `apps/api/src/works/`.
 - [x] T8. Include collections in the `categories-tags` list endpoint.
 - [x] T9. e2e tests covering CRUD + delete cascade.
 

@@ -29,10 +29,10 @@ export type DataSourceType = 'inline' | 'github-repo';
 /** Input payload sent to Activepieces flow webhook. */
 export interface ActivepiecesFlowInput {
 	metadata: {
-		directoryId: string;
-		directoryName: string;
-		directorySlug: string;
-		directoryDescription?: string;
+		workId: string;
+		workName: string;
+		workSlug: string;
+		workDescription?: string;
 		prompt?: string;
 		generationMethod?: string;
 		targetItems: number;

@@ -3,8 +3,8 @@ import { ITEM_SCHEMA_PROMPT_TEXT, getCurrentDateString, substituteVariables } fr
 import type { ContentChunk } from './content-chunker.js';
 
 export interface WorkerPromptOptions {
-	directoryName: string;
-	directoryDescription?: string;
+	workName: string;
+	workDescription?: string;
 	requestPrompt?: string;
 }
 
@@ -12,21 +12,21 @@ export interface WorkerPromptOptions {
 
 /**
  * Default template for the content extraction worker system prompt.
- * Variables: {date}, {itemSchemaText}, {directoryName}, {directoryDescription}, {requestPrompt}
+ * Variables: {date}, {itemSchemaText}, {workName}, {workDescription}, {requestPrompt}
  */
-export const DEFAULT_WORKER_SYSTEM_PROMPT = `You are an expert content extractor for a directory of items. Today is {date}.
+export const DEFAULT_WORKER_SYSTEM_PROMPT = `You are an expert content extractor for a work of items. Today is {date}.
 
 ## Item JSON Schema
 
 {itemSchemaText}
 
 ## Workspace Structure
-The workspace contains item JSON files at the root and a \`_meta/\` directory with system-managed files:
+The workspace contains item JSON files at the root and a \`_meta/\` work with system-managed files:
 - \`_meta/categories.json\` — current categories array
 - \`_meta/tags.json\` — current tags array
 - \`_meta/brands.json\` — current brands array
 - \`_meta/existing-items.jsonl\` — index of existing items (one JSON object per line with slug, name, source_url)
-- \`_meta/directory.json\` — directory metadata
+- \`_meta/work.json\` — work metadata
 - \`_meta/request.json\` — generation request details
 Note: \`_meta/\` files are auto-updated when you create items. Do NOT modify them directly.
 
@@ -67,8 +67,8 @@ The \`markdown\` field is for detailed product/service information only:
 - Use ## headings, bullet lists, tables.
 - Do NOT repeat metadata already in other JSON fields (category, tags, brand, source_url).
 
-## Directory
-{directoryName}{directoryDescription}{requestPrompt}`;
+## Work
+{workName}{workDescription}{requestPrompt}`;
 
 /**
  * Build variables for the worker system prompt template.
@@ -79,8 +79,8 @@ export function buildWorkerSystemPromptVariables(
 	return {
 		date: getCurrentDateString(),
 		itemSchemaText: ITEM_SCHEMA_PROMPT_TEXT,
-		directoryName: opts.directoryName,
-		directoryDescription: opts.directoryDescription ? `\n${opts.directoryDescription}` : '',
+		workName: opts.workName,
+		workDescription: opts.workDescription ? `\n${opts.workDescription}` : '',
 		requestPrompt: opts.requestPrompt ? `\nRequest: ${opts.requestPrompt}` : ''
 	};
 }
@@ -99,7 +99,7 @@ export function buildWorkerSystemPrompt(opts: WorkerPromptOptions): string {
  * Default template for the per-chunk extraction user prompt.
  * Variables: {sourceUrl}, {chunkInfo}, {previouslyExtractedList}, {chunkText}
  */
-export const DEFAULT_CHUNK_USER_PROMPT = `Extract ALL directory items from this content. Process every item — do not stop early or skip any.
+export const DEFAULT_CHUNK_USER_PROMPT = `Extract ALL work items from this content. Process every item — do not stop early or skip any.
 Source URL: {sourceUrl}{chunkInfo}{previouslyExtractedList}
 
 ---

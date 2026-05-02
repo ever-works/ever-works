@@ -11,7 +11,7 @@ sidebar_position: 27
 
 The AI/LLM module in `@ever-works/agent` provides the abstraction layer for all AI-powered operations across the platform. Through the `AiFacadeService`, it delivers a unified interface over multiple AI providers (OpenAI, Anthropic, Google, Groq, Ollama, OpenRouter) with features including structured JSON output with Zod validation, streaming responses, complexity-based model routing, automatic model escalation on failure, and cost estimation.
 
-The facade extends the `BaseFacadeService` pattern, resolving AI providers dynamically from the plugin registry based on capability, user preferences, and directory-level configuration.
+The facade extends the `BaseFacadeService` pattern, resolving AI providers dynamically from the plugin registry based on capability, user preferences, and work-level configuration.
 
 ## Module Structure
 
@@ -180,7 +180,7 @@ estimateCost(
 ```typescript
 interface FacadeOptions {
 	userId?: string;
-	directoryId?: string;
+	workId?: string;
 	providerId?: string; // Explicit provider override
 }
 ```
@@ -233,7 +233,7 @@ Each AI provider plugin defines its settings via JSON Schema in `package.json`:
 
 Settings are resolved using the 4-level hierarchy (highest priority first):
 
-1. **Directory settings** -- per-directory AI configuration
+1. **Work settings** -- per-work AI configuration
 2. **User settings** -- user's personal AI preferences
 3. **Admin settings** -- platform-wide defaults set by administrators
 4. **Plugin defaults** -- built-in defaults from the plugin package
@@ -279,7 +279,7 @@ const { result, model } = await aiFacade.askJson(
 	'Extract information about this tool: VS Code is a code editor by Microsoft...',
 	schema,
 	{ temperature: 0.3, complexity: 'simple' },
-	{ userId: user.id, directoryId: directory.id }
+	{ userId: user.id, workId: work.id }
 );
 
 console.log(result.name); // 'VS Code'

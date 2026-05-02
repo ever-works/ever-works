@@ -21,7 +21,7 @@ import { PipelineFacadeService } from '../pipeline-facade.service';
 import { PluginSettingsService } from '../../plugins/services/plugin-settings.service';
 import { PluginContextFactoryService } from '../../plugins/services/plugin-context-factory.service';
 import type {
-    DirectoryReference,
+    WorkReference,
     GenerationRequest,
     ExistingItems,
     IPipelineContext,
@@ -39,10 +39,10 @@ describe('StepPipelineExecutorService', () => {
     let eventEmitter: EventEmitter2;
     let cacheManager: { get: jest.Mock; set: jest.Mock; del: jest.Mock };
 
-    const mockDirectory: DirectoryReference = {
+    const mockWork: WorkReference = {
         id: 'dir-123',
-        name: 'Test Directory',
-        slug: 'test-directory',
+        name: 'Test Work',
+        slug: 'test-work',
         user: { id: 'user-123' },
     };
 
@@ -119,10 +119,10 @@ describe('StepPipelineExecutorService', () => {
                                 warn: jest.fn(),
                                 error: jest.fn(),
                             },
-                            directory: {
+                            work: {
                                 id: 'dir-123',
-                                name: 'Test Directory',
-                                slug: 'test-directory',
+                                name: 'Test Work',
+                                slug: 'test-work',
                                 user: { id: 'user-123' },
                             },
                             user: { id: 'user-123' },
@@ -190,7 +190,7 @@ describe('StepPipelineExecutorService', () => {
         it('should execute pipeline and emit started event', async () => {
             const result = await service.execute(
                 standardPlugin,
-                mockDirectory,
+                mockWork,
                 mockRequest,
                 mockExisting,
             );
@@ -198,14 +198,14 @@ describe('StepPipelineExecutorService', () => {
             expect(eventEmitter.emit).toHaveBeenCalledWith(
                 PipelineEvents.STARTED,
                 expect.objectContaining({
-                    directoryId: mockDirectory.id,
+                    workId: mockWork.id,
                 }),
             );
             expect(result).toBeDefined();
         });
 
         it('should emit step-started event for each step', async () => {
-            await service.execute(standardPlugin, mockDirectory, mockRequest, mockExisting);
+            await service.execute(standardPlugin, mockWork, mockRequest, mockExisting);
 
             expect(eventEmitter.emit).toHaveBeenCalledWith(
                 PipelineEvents.STEP_STARTED,
@@ -218,7 +218,7 @@ describe('StepPipelineExecutorService', () => {
         });
 
         it('should emit step-completed after step success', async () => {
-            await service.execute(standardPlugin, mockDirectory, mockRequest, mockExisting);
+            await service.execute(standardPlugin, mockWork, mockRequest, mockExisting);
 
             expect(eventEmitter.emit).toHaveBeenCalledWith(
                 PipelineEvents.STEP_COMPLETED,
@@ -232,7 +232,7 @@ describe('StepPipelineExecutorService', () => {
         it('should stop pipeline when shouldStop is set', async () => {
             const result = await service.execute(
                 standardPlugin,
-                mockDirectory,
+                mockWork,
                 mockRequest,
                 mockExisting,
             );
@@ -256,7 +256,7 @@ describe('StepPipelineExecutorService', () => {
 
             const result = await service.execute(
                 standardPlugin,
-                mockDirectory,
+                mockWork,
                 mockRequest,
                 mockExisting,
                 options,
@@ -272,11 +272,11 @@ describe('StepPipelineExecutorService', () => {
         });
 
         it('should save checkpoint after each step with pipeline-aware key', async () => {
-            await service.execute(standardPlugin, mockDirectory, mockRequest, mockExisting);
+            await service.execute(standardPlugin, mockWork, mockRequest, mockExisting);
 
             // Verify checkpoint was saved with pipeline-aware key
             expect(cacheManager.set).toHaveBeenCalledWith(
-                `pipeline-checkpoint-${mockDirectory.id}-${standardPlugin.id}`,
+                `pipeline-checkpoint-${mockWork.id}-${standardPlugin.id}`,
                 expect.any(String),
                 expect.any(Number),
             );
@@ -291,11 +291,11 @@ describe('StepPipelineExecutorService', () => {
         });
 
         it('should clear checkpoint after successful pipeline completion', async () => {
-            await service.execute(standardPlugin, mockDirectory, mockRequest, mockExisting);
+            await service.execute(standardPlugin, mockWork, mockRequest, mockExisting);
 
             // Verify checkpoint was cleared on success
             expect(cacheManager.del).toHaveBeenCalledWith(
-                `pipeline-checkpoint-${mockDirectory.id}-${standardPlugin.id}`,
+                `pipeline-checkpoint-${mockWork.id}-${standardPlugin.id}`,
             );
         });
 
@@ -310,13 +310,13 @@ describe('StepPipelineExecutorService', () => {
                 }),
             });
 
-            await service.execute(standardPlugin, mockDirectory, mockRequest, mockExisting);
+            await service.execute(standardPlugin, mockWork, mockRequest, mockExisting);
 
             // Verify contextToSnapshot was called for checkpoint serialization
             expect(snapshotSpy).toHaveBeenCalled();
             expect(snapshotSpy).toHaveBeenCalledWith(
                 expect.objectContaining({
-                    directory: mockDirectory,
+                    work: mockWork,
                     request: mockRequest,
                     warnings: expect.any(Array),
                 }),
@@ -328,14 +328,14 @@ describe('StepPipelineExecutorService', () => {
 
             // Verify the snapshot is stored in the checkpoint
             const savedCheckpoint = superjson.parse<CheckpointData>(serializedCheckpoint);
-            expect((savedCheckpoint.context as any).directory).toEqual(mockDirectory);
+            expect((savedCheckpoint.context as any).work).toEqual(mockWork);
             expect((savedCheckpoint.context as any).request).toEqual(mockRequest);
         });
 
         it('should track per-step metrics', async () => {
             const result = await service.execute(
                 standardPlugin,
-                mockDirectory,
+                mockWork,
                 mockRequest,
                 mockExisting,
             );
@@ -350,7 +350,7 @@ describe('StepPipelineExecutorService', () => {
 
             const result = await service.execute(
                 standardPlugin,
-                mockDirectory,
+                mockWork,
                 mockRequest,
                 mockExisting,
                 {
@@ -374,7 +374,7 @@ describe('StepPipelineExecutorService', () => {
 
             const result = await service.execute(
                 standardPlugin,
-                mockDirectory,
+                mockWork,
                 mockRequest,
                 mockExisting,
                 {
@@ -445,7 +445,7 @@ describe('StepPipelineExecutorService', () => {
             standardPlugin.registerStepExecutor('p2', parallel2);
 
             const startTime = Date.now();
-            await service.execute(standardPlugin, mockDirectory, mockRequest, mockExisting);
+            await service.execute(standardPlugin, mockWork, mockRequest, mockExisting);
             const duration = Date.now() - startTime;
 
             // Verification
@@ -501,16 +501,11 @@ describe('StepPipelineExecutorService', () => {
                 },
             };
 
-            await service.execute(
-                standardPlugin,
-                mockDirectory,
-                requestWithProviders,
-                mockExisting,
-            );
+            await service.execute(standardPlugin, mockWork, requestWithProviders, mockExisting);
 
             // Verify facade service was called with provider overrides
             expect(facadeServiceMock.createStepExecutionContext).toHaveBeenCalledWith(
-                mockDirectory,
+                mockWork,
                 requestWithProviders.providers,
                 undefined,
                 undefined,
@@ -518,11 +513,11 @@ describe('StepPipelineExecutorService', () => {
         });
 
         it('should not include provider overrides when request has no providers', async () => {
-            await service.execute(standardPlugin, mockDirectory, mockRequest, mockExisting);
+            await service.execute(standardPlugin, mockWork, mockRequest, mockExisting);
 
             // Verify facade service was called without provider overrides
             expect(facadeServiceMock.createStepExecutionContext).toHaveBeenCalledWith(
-                mockDirectory,
+                mockWork,
                 undefined,
                 undefined,
                 undefined,
@@ -536,10 +531,10 @@ describe('StepPipelineExecutorService', () => {
                 aiModel: 'openai/gpt-4.1',
             };
 
-            await service.execute(standardPlugin, mockDirectory, requestWithModel, mockExisting);
+            await service.execute(standardPlugin, mockWork, requestWithModel, mockExisting);
 
             expect(facadeServiceMock.createStepExecutionContext).toHaveBeenCalledWith(
-                mockDirectory,
+                mockWork,
                 undefined,
                 'openai/gpt-4.1',
                 undefined,
@@ -547,20 +542,20 @@ describe('StepPipelineExecutorService', () => {
         });
 
         it('should fail when facade service throws for missing user context', async () => {
-            const directoryWithoutUser: DirectoryReference = {
+            const workWithoutUser: WorkReference = {
                 id: 'dir-no-user',
                 name: 'No User Dir',
                 slug: 'no-user-dir',
             };
 
-            // Make facade service throw for directories without user
+            // Make facade service throw for works without user
             facadeServiceMock.createStepExecutionContext.mockImplementation(() => {
                 throw new Error('User context is required for pipeline execution.');
             });
 
             const result = await service.execute(
                 standardPlugin,
-                directoryWithoutUser,
+                workWithoutUser,
                 mockRequest,
                 mockExisting,
             );
@@ -586,7 +581,7 @@ describe('StepPipelineExecutorService', () => {
 
             const result = await service.execute(
                 standardPlugin,
-                mockDirectory,
+                mockWork,
                 mockRequest,
                 mockExisting,
             );
@@ -599,7 +594,7 @@ describe('StepPipelineExecutorService', () => {
         it('should return null when no checkpoint exists', async () => {
             cacheManager.get.mockResolvedValue(undefined);
 
-            const checkpoint = await service.loadCheckpoint(mockDirectory.id, 'standard-pipeline');
+            const checkpoint = await service.loadCheckpoint(mockWork.id, 'standard-pipeline');
 
             expect(checkpoint).toBeNull();
         });
@@ -611,7 +606,7 @@ describe('StepPipelineExecutorService', () => {
                 pipelineId: 'standard-pipeline',
                 timestamp: new Date().toISOString(),
                 context: {
-                    directory: mockDirectory,
+                    work: mockWork,
                     request: mockRequest,
                     existing: mockExisting,
                     shouldStop: false,
@@ -625,7 +620,7 @@ describe('StepPipelineExecutorService', () => {
             // Serialize with superjson as the real implementation does
             cacheManager.get.mockResolvedValue(superjson.stringify(mockCheckpoint));
 
-            const checkpoint = await service.loadCheckpoint(mockDirectory.id, 'standard-pipeline');
+            const checkpoint = await service.loadCheckpoint(mockWork.id, 'standard-pipeline');
 
             expect(checkpoint).not.toBeNull();
             expect(checkpoint!.stepIndex).toBe(mockCheckpoint.stepIndex);
@@ -647,10 +642,10 @@ describe('StepPipelineExecutorService', () => {
 
     describe('clearCheckpoint()', () => {
         it('should delete checkpoint from cache using pipeline-aware key', async () => {
-            await service.clearCheckpoint(mockDirectory.id, 'standard-pipeline');
+            await service.clearCheckpoint(mockWork.id, 'standard-pipeline');
 
             expect(cacheManager.del).toHaveBeenCalledWith(
-                `pipeline-checkpoint-${mockDirectory.id}-standard-pipeline`,
+                `pipeline-checkpoint-${mockWork.id}-standard-pipeline`,
             );
         });
     });
@@ -661,7 +656,7 @@ describe('StepPipelineExecutorService', () => {
 
             const result = await service.resumeFromCheckpoint(
                 standardPlugin,
-                mockDirectory.id,
+                mockWork.id,
                 standardPlugin.id,
             );
 
@@ -684,13 +679,13 @@ describe('StepPipelineExecutorService', () => {
 
             const result = await service.resumeFromCheckpoint(
                 standardPlugin,
-                mockDirectory.id,
+                mockWork.id,
                 standardPlugin.id,
             );
 
             expect(result).toBeNull();
             expect(cacheManager.del).toHaveBeenCalledWith(
-                `pipeline-checkpoint-${mockDirectory.id}-${standardPlugin.id}`,
+                `pipeline-checkpoint-${mockWork.id}-${standardPlugin.id}`,
             );
         });
 
@@ -711,7 +706,7 @@ describe('StepPipelineExecutorService', () => {
                 pipelineId: standardPlugin.id,
                 timestamp: new Date().toISOString(),
                 context: {
-                    directory: mockDirectory,
+                    work: mockWork,
                     request: mockRequest,
                     existing: mockExisting,
                     shouldStop: false,
@@ -742,13 +737,13 @@ describe('StepPipelineExecutorService', () => {
                 });
             }
 
-            await service.resumeFromCheckpoint(standardPlugin, mockDirectory.id, standardPlugin.id);
+            await service.resumeFromCheckpoint(standardPlugin, mockWork.id, standardPlugin.id);
 
             // Verify contextFromSnapshot was called
             expect(fromSnapshotSpy).toHaveBeenCalled();
             expect(capturedContext).not.toBeNull();
             // Verify the restored context has the expected shape
-            expect(capturedContext!.directory).toEqual(mockDirectory);
+            expect(capturedContext!.work).toEqual(mockWork);
             expect(capturedContext!.request).toEqual(mockRequest);
             expect(capturedContext!.warnings).toEqual(['prior warning']);
             expect((capturedContext as any).data).toEqual({ key1: 'value1' });
@@ -771,7 +766,7 @@ describe('StepPipelineExecutorService', () => {
                 pipelineId: standardPlugin.id,
                 timestamp: new Date().toISOString(),
                 context: {
-                    directory: mockDirectory,
+                    work: mockWork,
                     request: mockRequest,
                     existing: mockExisting,
                     shouldStop: false,
@@ -801,10 +796,10 @@ describe('StepPipelineExecutorService', () => {
                 });
             }
 
-            await service.resumeFromCheckpoint(standardPlugin, mockDirectory.id, standardPlugin.id);
+            await service.resumeFromCheckpoint(standardPlugin, mockWork.id, standardPlugin.id);
 
             expect(capturedContext).not.toBeNull();
-            expect(capturedContext!.directory).toEqual(mockDirectory);
+            expect(capturedContext!.work).toEqual(mockWork);
             expect(capturedContext!.warnings).toEqual([]);
             expect((capturedContext as any).data).toEqual({});
         });
@@ -834,7 +829,7 @@ describe('StepPipelineExecutorService', () => {
                 });
             }
 
-            const context = standardPlugin.createContext(mockDirectory, mockRequest, mockExisting);
+            const context = standardPlugin.createContext(mockWork, mockRequest, mockExisting);
 
             const result = await service.executeWithContext(standardPlugin, context);
 

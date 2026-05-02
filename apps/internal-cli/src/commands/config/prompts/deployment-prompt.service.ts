@@ -58,7 +58,7 @@ export class DeploymentPromptService extends BasePromptService {
                     }
 
                     // Accept token without provider-specific validation during setup
-                    // (no directoryId available). Validation happens in `config test` or deploy.
+                    // (no workId available). Validation happens in `config test` or deploy.
                     this.displaySuccess('Deployment token saved');
                     break;
                 } catch (error) {

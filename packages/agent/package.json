@@ -28,9 +28,9 @@
             "types": "./dist/git/index.d.ts",
             "default": "./dist/git/index.js"
         },
-        "./directory-operations": {
-            "types": "./dist/directory-operations/index.d.ts",
-            "default": "./dist/directory-operations/index.js"
+        "./work-operations": {
+            "types": "./dist/work-operations/index.d.ts",
+            "default": "./dist/work-operations/index.js"
         },
         "./items-generator": {
             "types": "./dist/items-generator/index.d.ts",

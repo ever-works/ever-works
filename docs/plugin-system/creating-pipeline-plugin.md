@@ -7,7 +7,7 @@ sidebar_position: 9
 
 # Creating a Pipeline Plugin
 
-Pipeline plugins are the most complex and powerful category in the Ever Works plugin system. They orchestrate the entire directory generation process -- transforming a user prompt into a structured collection of items, categories, tags, and more.
+Pipeline plugins are the most complex and powerful category in the Ever Works plugin system. They orchestrate the entire work generation process -- transforming a user prompt into a structured collection of items, categories, tags, and more.
 
 This guide covers three ways to work with pipelines:
 
@@ -63,7 +63,7 @@ interface IPipelinePlugin<TStepId extends string = string> extends IPlugin {
 
 	// Required: run the full pipeline
 	execute(
-		directory: DirectoryReference,
+		work: WorkReference,
 		request: GenerationRequest,
 		existing: ExistingItems,
 		options?: PipelineExecutionOptions,
@@ -84,7 +84,7 @@ interface IPipelinePlugin<TStepId extends string = string> extends IPlugin {
 	registerStepExecutor?(stepId: TStepId, executor: IBuiltInStepExecutor): void;
 
 	// Optional: context lifecycle hooks
-	createContext?(directory, request, existing): IPipelineContext;
+	createContext?(work, request, existing): IPipelineContext;
 	contextToSnapshot?(context: IPipelineContext): unknown;
 	contextFromSnapshot?(snapshot: unknown): IPipelineContext;
 	extractResult?(context, meta): PipelineResult;
@@ -250,7 +250,7 @@ import type {
 	PipelineExecutionOptions,
 	PipelineProgressCallback,
 	PipelineResult,
-	DirectoryReference,
+	WorkReference,
 	GenerationRequest,
 	ExistingItems,
 	StepStatus,
@@ -312,7 +312,7 @@ export class MyPipelinePlugin implements IPlugin, IPipelinePlugin<MyPipelineStep
 			id: this.id,
 			name: this.name,
 			version: this.version,
-			description: 'Custom pipeline for generating directory items',
+			description: 'Custom pipeline for generating work items',
 			category: this.category,
 			capabilities: [...this.capabilities],
 			author: { name: 'Your Name' },
@@ -331,7 +331,7 @@ export class MyPipelinePlugin implements IPlugin, IPipelinePlugin<MyPipelineStep
 	}
 
 	async execute(
-		directory: DirectoryReference,
+		work: WorkReference,
 		request: GenerationRequest,
 		existing: ExistingItems,
 		options?: PipelineExecutionOptions,
@@ -356,7 +356,7 @@ export class MyPipelinePlugin implements IPlugin, IPipelinePlugin<MyPipelineStep
 
 			// ── Step 2: Fetch Data ────────────────────────────
 			this.reportStep(onProgress, 1, 'Fetch Data');
-			const rawItems = await this.fetchData(execContext, directory, request, signal);
+			const rawItems = await this.fetchData(execContext, work, request, signal);
 
 			if (signal.aborted) return this.buildCancelledResult(startTime);
 
@@ -368,7 +368,7 @@ export class MyPipelinePlugin implements IPlugin, IPipelinePlugin<MyPipelineStep
 
 			// ── Step 4: Enrich ────────────────────────────────
 			this.reportStep(onProgress, 3, 'Enrich Items');
-			const enrichedItems = await this.enrichItems(processedItems, execContext, directory);
+			const enrichedItems = await this.enrichItems(processedItems, execContext, work);
 
 			if (signal.aborted) return this.buildCancelledResult(startTime);
 
@@ -422,7 +422,7 @@ export class MyPipelinePlugin implements IPlugin, IPipelinePlugin<MyPipelineStep
 
 	private async fetchData(
 		execContext: NonNullable<PipelineExecutionOptions['execContext']>,
-		directory: DirectoryReference,
+		work: WorkReference,
 		request: GenerationRequest,
 		signal: AbortSignal
 	): Promise<MutableItemData[]> {
@@ -438,7 +438,7 @@ export class MyPipelinePlugin implements IPlugin, IPipelinePlugin<MyPipelineStep
 	private async enrichItems(
 		items: MutableItemData[],
 		execContext: NonNullable<PipelineExecutionOptions['execContext']>,
-		directory: DirectoryReference
+		work: WorkReference
 	): Promise<MutableItemData[]> {
 		// Your enrichment logic here
 		return items;
@@ -491,7 +491,7 @@ sequenceDiagram
     participant AI as AI Facade
     participant Search as Search Facade
 
-    Engine->>Plugin: execute(directory, request, existing, options)
+    Engine->>Plugin: execute(work, request, existing, options)
     Plugin->>Plugin: Step 1: Initialize
     Plugin->>Search: Query external sources
     Search-->>Plugin: Raw data
@@ -582,7 +582,7 @@ import type {
 	StepProgressCallback,
 	StepExecutionContext,
 	IBuiltInStepExecutor,
-	DirectoryReference,
+	WorkReference,
 	GenerationRequest,
 	ExistingItems
 } from '@ever-works/plugin';
@@ -684,7 +684,7 @@ export class OrchestratedPipelinePlugin implements IPipelinePlugin<MyStepId> {
 	// ── Full execute (throws -- engine should use executeStep) ─
 
 	async execute(
-		_directory: DirectoryReference,
+		_work: WorkReference,
 		_request: GenerationRequest,
 		_existing: ExistingItems,
 		_options?: PipelineExecutionOptions,
@@ -697,13 +697,9 @@ export class OrchestratedPipelinePlugin implements IPipelinePlugin<MyStepId> {
 
 	// ── Context lifecycle hooks ───────────────────────────────
 
-	createContext(
-		directory: DirectoryReference,
-		request: GenerationRequest,
-		existing: ExistingItems
-	): IPipelineContext {
+	createContext(work: WorkReference, request: GenerationRequest, existing: ExistingItems): IPipelineContext {
 		return {
-			directory,
+			work,
 			request,
 			shouldStop: false,
 			warnings: []
@@ -791,7 +787,7 @@ export class AnalyzeStep implements IBuiltInStepExecutor {
 
 	async run(context: IPipelineContext, execContext: StepExecutionContext): Promise<IPipelineContext> {
 		const { aiFacade } = execContext;
-		const userId = execContext.user?.id ?? context.directory.user?.id;
+		const userId = execContext.user?.id ?? context.work.user?.id;
 
 		if (!userId) {
 			throw new Error('User ID is required for AI operations');
@@ -801,7 +797,7 @@ export class AnalyzeStep implements IBuiltInStepExecutor {
 		const analysis = await aiFacade.askJson(
 			'Analyze this prompt and identify the domain, key topics, and item types.',
 			context.request.prompt ?? '',
-			{ userId, directoryId: context.directory.id }
+			{ userId, workId: context.work.id }
 		);
 
 		// Store results on the context for downstream steps
@@ -817,14 +813,14 @@ export class AnalyzeStep implements IBuiltInStepExecutor {
 
 Engine-orchestratable pipelines can optionally implement context lifecycle hooks for checkpoint support:
 
-| Hook                    | Purpose                                                                         |
-| ----------------------- | ------------------------------------------------------------------------------- |
-| `createContext()`       | Create the initial pipeline context from directory, request, and existing items |
-| `contextToSnapshot()`   | Serialize the context for checkpoint storage                                    |
-| `contextFromSnapshot()` | Deserialize a checkpoint back into a live context                               |
-| `extractResult()`       | Convert the final context into a `PipelineResult`                               |
-| `isCheckpointViable()`  | Determine whether a saved checkpoint is worth resuming                          |
-| `canSkipStep()`         | Check if a step can be skipped because its data already exists                  |
+| Hook                    | Purpose                                                                    |
+| ----------------------- | -------------------------------------------------------------------------- |
+| `createContext()`       | Create the initial pipeline context from work, request, and existing items |
+| `contextToSnapshot()`   | Serialize the context for checkpoint storage                               |
+| `contextFromSnapshot()` | Deserialize a checkpoint back into a live context                          |
+| `extractResult()`       | Convert the final context into a `PipelineResult`                          |
+| `isCheckpointViable()`  | Determine whether a saved checkpoint is worth resuming                     |
+| `canSkipStep()`         | Check if a step can be skipped because its data already exists             |
 
 :::tip Checkpoint Resume
 When a pipeline fails mid-execution, the engine saves a checkpoint. On retry, it calls `contextFromSnapshot()` to restore the context and `isCheckpointViable()` to decide whether to resume or start fresh. Steps that already ran are skipped via `canSkipStep()`.
@@ -1275,7 +1271,7 @@ describe('SentimentAnalysisStep', () => {
 	it('should process items and return sentimentScores', async () => {
 		const step = new SentimentAnalysisStep();
 		const context = {
-			directory: { id: 'dir-1', name: 'Test', slug: 'test' },
+			work: { id: 'dir-1', name: 'Test', slug: 'test' },
 			request: { prompt: 'test' },
 			shouldStop: false,
 			warnings: [],
@@ -1295,7 +1291,7 @@ describe('SentimentAnalysisStep', () => {
 	it('should respect abort signal', async () => {
 		const step = new SentimentAnalysisStep();
 		const context = {
-			directory: { id: 'dir-1', name: 'Test', slug: 'test' },
+			work: { id: 'dir-1', name: 'Test', slug: 'test' },
 			request: { prompt: 'test' },
 			shouldStop: true,
 			warnings: [],
@@ -1384,7 +1380,7 @@ The `everworks.plugin` metadata in `package.json` is how the platform discovers 
 			"version": "1.0.0",
 			"category": "pipeline",
 			"capabilities": ["pipeline", "form-schema-provider"],
-			"description": "Custom pipeline for directory generation",
+			"description": "Custom pipeline for work generation",
 			"author": {
 				"name": "Your Name"
 			},

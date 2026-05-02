@@ -38,14 +38,14 @@ flowchart LR
 
 - Item YAML in the data repo gains an optional `source_validation` blob
   with the documented shape.
-- `directory_schedules` adds a `sourceValidationCadence` column
+- `work_schedules` adds a `sourceValidationCadence` column
   (additive nullable).
 
 ## 4. API Surface
 
-| Method | Endpoint                                 | Description            |
-| ------ | ---------------------------------------- | ---------------------- |
-| `POST` | `/api/directories/:id/check-item-health` | Re-check a single item |
+| Method | Endpoint                           | Description            |
+| ------ | ---------------------------------- | ---------------------- |
+| `POST` | `/api/works/:id/check-item-health` | Re-check a single item |
 
 ## 5. Plugin / Web / CLI
 
@@ -56,8 +56,8 @@ flowchart LR
 
 ## 6. Background Jobs
 
-- `directory-source-validation` Trigger.dev task running on the
-  directory's `sourceValidationCadence` (or the main cadence as a
+- `work-source-validation` Trigger.dev task running on the
+  work's `sourceValidationCadence` (or the main cadence as a
   fallback).
 - Post-generation hook calls the same validator inline.
 
@@ -77,7 +77,7 @@ flowchart LR
 | Risk                                          | Mitigation                                               |
 | --------------------------------------------- | -------------------------------------------------------- |
 | False-positive `broken` from transient errors | Only `404`/`410` → `broken`; everything else → `unknown` |
-| AI cost runaway on huge directories           | Validation skips items unchanged since last check        |
+| AI cost runaway on huge works                 | Validation skips items unchanged since last check        |
 | Manual re-check abuse                         | Cooldown cache window                                    |
 
 ## 10. Constitution Reconciliation

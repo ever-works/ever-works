@@ -1,7 +1,7 @@
 import type {
 	AiModel,
 	ConnectionValidationResult,
-	DirectoryReference,
+	WorkReference,
 	ExistingItems,
 	FormFieldDefinition,
 	FormFieldGroup,
@@ -69,7 +69,7 @@ const MANIFEST: PluginManifest = {
 	id: 'claude-managed-agent',
 	name: 'Claude Managed Agent',
 	version: '1.0.0',
-	description: 'Full pipeline plugin that delegates directory generation to Anthropic Claude Managed Agents',
+	description: 'Full pipeline plugin that delegates work generation to Anthropic Claude Managed Agents',
 	category: 'pipeline',
 	capabilities: ['pipeline', 'form-schema-provider'],
 	author: { name: 'Ever Works Team' },
@@ -226,7 +226,7 @@ export class ClaudeManagedAgentPlugin implements IPipelinePlugin<ClaudeManagedAg
 	}
 
 	async execute(
-		directory: DirectoryReference,
+		work: WorkReference,
 		request: GenerationRequest,
 		existing: ExistingItems,
 		options?: PipelineExecutionOptions,
@@ -261,7 +261,7 @@ export class ClaudeManagedAgentPlugin implements IPipelinePlugin<ClaudeManagedAg
 		try {
 			await this.beginStep('configure-managed-agent', onProgress, 5);
 
-			const settings = await resolveManagedAgentSettings(this.context, userId, directory.id);
+			const settings = await resolveManagedAgentSettings(this.context, userId, work.id);
 			const apiKey = getUsableSecret(settings.apiKey);
 			if (!apiKey) {
 				throw new Error('Anthropic API key is required for the Claude Managed Agent plugin.');
@@ -273,12 +273,7 @@ export class ClaudeManagedAgentPlugin implements IPipelinePlugin<ClaudeManagedAg
 			);
 			const model = (settings.model as string | undefined) || DEFAULT_MODEL;
 			const systemPrompt = buildSystemPrompt();
-			const workspaceSeedManifest = buildWorkspaceSeedManifest(
-				DEFAULT_WORKSPACE_PATH,
-				directory,
-				request,
-				existing
-			);
+			const workspaceSeedManifest = buildWorkspaceSeedManifest(DEFAULT_WORKSPACE_PATH, work, request, existing);
 			const uploadedSeedManifest = await client.uploadTextFile(
 				'ever-works-workspace-seed.json',
 				JSON.stringify(workspaceSeedManifest, null, 2)
@@ -287,8 +282,8 @@ export class ClaudeManagedAgentPlugin implements IPipelinePlugin<ClaudeManagedAg
 
 			const agentId = (
 				await client.createAgent({
-					name: `Ever Works Agent: ${directory.slug}`,
-					description: `Managed Ever Works generation agent for ${directory.slug}`,
+					name: `Ever Works Agent: ${work.slug}`,
+					description: `Managed Ever Works generation agent for ${work.slug}`,
 					model,
 					system: systemPrompt
 				})
@@ -297,7 +292,7 @@ export class ClaudeManagedAgentPlugin implements IPipelinePlugin<ClaudeManagedAg
 
 			const environmentId = (
 				await client.createEnvironment({
-					name: `Ever Works Environment: ${directory.slug}`
+					name: `Ever Works Environment: ${work.slug}`
 				})
 			).id;
 			runResources.createdEnvironmentId = environmentId;
@@ -313,7 +308,7 @@ export class ClaudeManagedAgentPlugin implements IPipelinePlugin<ClaudeManagedAg
 			const session = await client.createSession({
 				agentId,
 				environmentId,
-				title: `Ever Works: ${directory.name}`,
+				title: `Ever Works: ${work.name}`,
 				resources: [
 					{
 						type: 'file',
@@ -337,7 +332,7 @@ export class ClaudeManagedAgentPlugin implements IPipelinePlugin<ClaudeManagedAg
 
 			await client.sendUserMessage(
 				session.id,
-				buildUserPrompt(directory, request, existing, targetItems, DEFAULT_WORKSPACE_PATH)
+				buildUserPrompt(work, request, existing, targetItems, DEFAULT_WORKSPACE_PATH)
 			);
 
 			await client.waitForSessionIdle(session.id, {
@@ -419,7 +414,7 @@ export class ClaudeManagedAgentPlugin implements IPipelinePlugin<ClaudeManagedAg
 					execContext.screenshotFacade,
 					{
 						userId,
-						directoryId: directory.id
+						workId: work.id
 					},
 					abortController.signal,
 					logger

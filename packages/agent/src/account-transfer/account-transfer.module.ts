@@ -4,10 +4,10 @@ import { DatabaseModule } from '../database/database.module';
 import { FacadesModule } from '../facades/facades.module';
 import { PluginEntity } from '../plugins/entities/plugin.entity';
 import { UserPluginEntity } from '../plugins/entities/user-plugin.entity';
-import { DirectoryPluginEntity } from '../plugins/entities/directory-plugin.entity';
+import { WorkPluginEntity } from '../plugins/entities/work-plugin.entity';
 import { PluginRepository } from '../plugins/repositories/plugin.repository';
 import { UserPluginRepository } from '../plugins/repositories/user-plugin.repository';
-import { DirectoryPluginRepository } from '../plugins/repositories/directory-plugin.repository';
+import { WorkPluginRepository } from '../plugins/repositories/work-plugin.repository';
 import { AccountExportService } from './account-export.service';
 import { AccountImportService } from './account-import.service';
 import { GitHubSyncService } from './github-sync.service';
@@ -22,7 +22,7 @@ import { UserSyncConfigRepository } from './repositories/user-sync-config.reposi
             UserSyncConfig,
             PluginEntity,
             UserPluginEntity,
-            DirectoryPluginEntity,
+            WorkPluginEntity,
         ]),
     ],
     providers: [
@@ -32,7 +32,7 @@ import { UserSyncConfigRepository } from './repositories/user-sync-config.reposi
         UserSyncConfigRepository,
         PluginRepository,
         UserPluginRepository,
-        DirectoryPluginRepository,
+        WorkPluginRepository,
     ],
     exports: [
         AccountExportService,

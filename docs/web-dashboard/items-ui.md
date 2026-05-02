@@ -7,7 +7,7 @@ sidebar_position: 19
 
 # Items Management
 
-The Items UI is the primary content management interface for directory entries. It provides a tabbed layout with four views -- Browse Items, Categories, Tags, and Collections -- along with search, filtering, virtualized rendering for large lists, and full CRUD operations.
+The Items UI is the primary content management interface for work entries. It provides a tabbed layout with four views -- Browse Items, Categories, Tags, and Collections -- along with search, filtering, virtualized rendering for large lists, and full CRUD operations.
 
 ## Component Hierarchy
 
@@ -59,15 +59,15 @@ ItemsPageClient
 
 ## ItemsContext
 
-**File**: `apps/web/src/components/directories/detail/items/ItemsContext.tsx`
+**File**: `apps/web/src/components/works/detail/items/ItemsContext.tsx`
 
 A React context that shares common state across all items components:
 
 ```typescript
 interface ItemsContextType {
-	directoryId: string;
+	workId: string;
 	canEdit: boolean;
-	directoryWebsite?: string;
+	workWebsite?: string;
 	screenshotAvailable: boolean;
 }
 ```
@@ -78,14 +78,14 @@ interface ItemsContextType {
 
 ### ItemsPageClient
 
-**File**: `apps/web/src/components/directories/detail/items/ItemsPageClient.tsx`
+**File**: `apps/web/src/components/works/detail/items/ItemsPageClient.tsx`
 
 The top-level client component managing tab state and coordinating all sub-views.
 
 ```typescript
 interface ItemsPageClientProps {
 	items: ItemData[];
-	directoryId: string;
+	workId: string;
 	categories?: Category[];
 	tags?: Tag[];
 	collections?: Collection[];
@@ -103,7 +103,7 @@ Each tab is rendered with an icon from `lucide-react`:
 
 ### ItemsList (Virtualized)
 
-**File**: `apps/web/src/components/directories/detail/items/ItemsList.tsx`
+**File**: `apps/web/src/components/works/detail/items/ItemsList.tsx`
 
 The main items browsing view with search, filtering, and virtualized rendering using `@tanstack/react-virtual`.
 
@@ -134,9 +134,9 @@ interface ItemsListProps {
 
 ### AddItemForm
 
-**File**: `apps/web/src/components/directories/detail/items/AddItemForm.tsx`
+**File**: `apps/web/src/components/works/detail/items/AddItemForm.tsx`
 
-A comprehensive form for creating new directory items with AI-powered extraction.
+A comprehensive form for creating new work items with AI-powered extraction.
 
 ```typescript
 interface ItemFormData {
@@ -160,13 +160,13 @@ interface ItemFormData {
 
 ### CategoriesTab
 
-**File**: `apps/web/src/components/directories/detail/items/CategoriesTab.tsx`
+**File**: `apps/web/src/components/works/detail/items/CategoriesTab.tsx`
 
-Manages directory categories with a searchable table and CRUD modal.
+Manages work categories with a searchable table and CRUD modal.
 
 ```typescript
 interface CategoriesTabProps {
-	directoryId: string;
+	workId: string;
 	initialCategories: Category[];
 	items: ItemData[]; // used to compute item counts per category
 	canEdit: boolean;
@@ -179,13 +179,13 @@ interface CategoriesTabProps {
 
 ### TagsTab
 
-**File**: `apps/web/src/components/directories/detail/items/TagsTab.tsx`
+**File**: `apps/web/src/components/works/detail/items/TagsTab.tsx`
 
-Manages directory tags with a searchable table and CRUD modal.
+Manages work tags with a searchable table and CRUD modal.
 
 ```typescript
 interface TagsTabProps {
-	directoryId: string;
+	workId: string;
 	initialTags: Tag[];
 	items: ItemData[];
 	canEdit: boolean;
@@ -196,13 +196,13 @@ interface TagsTabProps {
 
 ### CollectionsTab
 
-**File**: `apps/web/src/components/directories/detail/items/CollectionsTab.tsx`
+**File**: `apps/web/src/components/works/detail/items/CollectionsTab.tsx`
 
-Manages directory collections with a searchable table and CRUD modal.
+Manages work collections with a searchable table and CRUD modal.
 
 ```typescript
 interface CollectionsTabProps {
-	directoryId: string;
+	workId: string;
 	initialCollections: Collection[];
 	items: ItemData[];
 	canEdit: boolean;
@@ -238,28 +238,28 @@ All taxonomy operations (create, update, delete) are performed via server action
 
 ## Related API Endpoints
 
-| Action                        | Server Action Function                              | HTTP Method |
-| ----------------------------- | --------------------------------------------------- | ----------- |
-| Extract item details          | `extractItemDetails(url, categories)`               | POST        |
-| Capture screenshot            | `captureScreenshot(url)`                            | POST        |
-| Check screenshot availability | `checkScreenshotAvailability()`                     | GET         |
-| Create category               | `createCategory(directoryId, data)`                 | POST        |
-| Update category               | `updateCategory(directoryId, categoryId, data)`     | PATCH       |
-| Delete category               | `deleteCategory(directoryId, categoryId)`           | DELETE      |
-| Create tag                    | `createTag(directoryId, data)`                      | POST        |
-| Update tag                    | `updateTag(directoryId, tagId, data)`               | PATCH       |
-| Delete tag                    | `deleteTag(directoryId, tagId)`                     | DELETE      |
-| Create collection             | `createCollection(directoryId, data)`               | POST        |
-| Update collection             | `updateCollection(directoryId, collectionId, data)` | PATCH       |
-| Delete collection             | `deleteCollection(directoryId, collectionId)`       | DELETE      |
+| Action                        | Server Action Function                         | HTTP Method |
+| ----------------------------- | ---------------------------------------------- | ----------- |
+| Extract item details          | `extractItemDetails(url, categories)`          | POST        |
+| Capture screenshot            | `captureScreenshot(url)`                       | POST        |
+| Check screenshot availability | `checkScreenshotAvailability()`                | GET         |
+| Create category               | `createCategory(workId, data)`                 | POST        |
+| Update category               | `updateCategory(workId, categoryId, data)`     | PATCH       |
+| Delete category               | `deleteCategory(workId, categoryId)`           | DELETE      |
+| Create tag                    | `createTag(workId, data)`                      | POST        |
+| Update tag                    | `updateTag(workId, tagId, data)`               | PATCH       |
+| Delete tag                    | `deleteTag(workId, tagId)`                     | DELETE      |
+| Create collection             | `createCollection(workId, data)`               | POST        |
+| Update collection             | `updateCollection(workId, collectionId, data)` | PATCH       |
+| Delete collection             | `deleteCollection(workId, collectionId)`       | DELETE      |
 
 ## Internationalization
 
 All strings use `next-intl` under these namespaces:
 
-- `dashboard.directoryDetail.items` -- page-level labels, tab names, search, counts
-- `dashboard.directoryDetail.items.addModal` -- add item form labels and messages
-- `dashboard.directoryDetail.items.taxonomy` -- categories, tags, collections CRUD
+- `dashboard.workDetail.items` -- page-level labels, tab names, search, counts
+- `dashboard.workDetail.items.addModal` -- add item form labels and messages
+- `dashboard.workDetail.items.taxonomy` -- categories, tags, collections CRUD
 
 ## Cross-References
 

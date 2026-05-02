@@ -13,7 +13,7 @@ export type ConfigurationMode =
  */
 export type SettingScope =
 	| 'global' // Platform-wide settings
-	| 'directory' // Per-directory settings
+	| 'work' // Per-work settings
 	| 'user'; // Per-user settings
 
 export interface SettingCategory {
@@ -48,7 +48,7 @@ export type PluginSettings = Record<string, unknown>;
 /**
  * Setting source indicating where a value came from
  */
-export type SettingSource = 'default' | 'env' | 'admin' | 'directory' | 'user';
+export type SettingSource = 'default' | 'env' | 'admin' | 'work' | 'user';
 
 export interface ResolvedSetting<T = unknown> {
 	readonly key: string;
@@ -65,7 +65,7 @@ export type ResolvedSettings = Record<string, ResolvedSetting>;
 export interface SettingsUpdate {
 	readonly settings: Record<string, unknown>;
 	readonly scope: SettingScope;
-	readonly directoryId?: string;
+	readonly workId?: string;
 	readonly userId?: string;
 }
 

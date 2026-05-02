@@ -84,7 +84,7 @@ describe('PluginLifecycleManagerService', () => {
             getRequired: jest.fn(),
         },
         services: {
-            directory: undefined,
+            work: undefined,
             user: undefined,
         },
         getSettings: jest.fn(),

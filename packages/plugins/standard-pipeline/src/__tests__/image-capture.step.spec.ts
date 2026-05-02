@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { ImageCaptureStep } from '../steps/image-capture.step';
-import type { StepExecutionContext, DirectoryReference, GenerationRequest, MutableItemData } from '@ever-works/plugin';
+import type { StepExecutionContext, WorkReference, GenerationRequest, MutableItemData } from '@ever-works/plugin';
 import type { MutableGenerationContext } from '../context/index.js';
 
 describe('ImageCaptureStep', () => {
@@ -24,10 +24,10 @@ describe('ImageCaptureStep', () => {
 		getActiveProviderName: vi.fn().mockResolvedValue('ScreenshotOne')
 	});
 
-	const createMockDirectory = (): DirectoryReference => ({
+	const createMockWork = (): WorkReference => ({
 		id: 'test-dir-id',
-		slug: 'test-directory',
-		name: 'Test Directory'
+		slug: 'test-work',
+		name: 'Test Work'
 	});
 
 	const createMockRequest = (overrides?: Partial<GenerationRequest>): GenerationRequest =>
@@ -51,7 +51,7 @@ describe('ImageCaptureStep', () => {
 
 	const createMockContext = (overrides?: Partial<MutableGenerationContext>): MutableGenerationContext =>
 		({
-			directory: createMockDirectory(),
+			work: createMockWork(),
 			request: createMockRequest(),
 			finalItems: [createMockItem('Test Item', 'https://example.com')],
 			domainAnalysis: { domain_type: 'software', confidence: 0.9 },
@@ -60,7 +60,7 @@ describe('ImageCaptureStep', () => {
 			...overrides
 		}) as MutableGenerationContext;
 
-	const expectedFacadeOptions = { userId: 'test-user-id', directoryId: 'test-dir-id' };
+	const expectedFacadeOptions = { userId: 'test-user-id', workId: 'test-dir-id' };
 
 	beforeEach(() => {
 		step = new ImageCaptureStep();
@@ -69,7 +69,7 @@ describe('ImageCaptureStep', () => {
 			logger: createMockLogger(),
 			screenshotFacade: createMockScreenshotFacade(),
 			user: { id: 'test-user-id' },
-			directory: { id: 'test-dir-id' }
+			work: { id: 'test-dir-id' }
 		} as unknown as StepExecutionContext;
 	});
 

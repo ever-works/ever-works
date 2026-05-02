@@ -34,7 +34,7 @@ export interface GitHubAppInstallationDto {
 
 export interface GitHubAppOnboardRepositoryResponseDto {
     status: 'pending' | 'success' | 'error';
-    directoryId?: string;
+    workId?: string;
     historyId?: string;
     message: string;
 }

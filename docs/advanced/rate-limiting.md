@@ -137,8 +137,8 @@ Register as an APP_GUARD replacement or apply per-controller:
 
 ```typescript
 @UseGuards(UserThrottlerGuard)
-@Controller('directories')
-export class DirectoriesController {
+@Controller('works')
+export class WorksController {
 	// All routes in this controller use user-based throttling
 }
 ```

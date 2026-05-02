@@ -161,7 +161,7 @@ the lock acquisition primitive.
 
 Steps that declare `checkpoint: true` in their `BasePipelineStep`
 implementation participate in checkpointing. Keys are
-`checkpoint:<directoryId>:<runId>:<stepName>`. Values are the
+`checkpoint:<workId>:<runId>:<stepName>`. Values are the
 JSON-encoded step output. TTL is configurable per step (typically
 24h for "stick around long enough that a retry an hour later still
 benefits"). See [`pipeline-executor`](./pipeline-executor.md#8-checkpointing).
@@ -170,9 +170,9 @@ benefits"). See [`pipeline-executor`](./pipeline-executor.md#8-checkpointing).
 
 The `AiFacadeService` caches:
 
-- **Resolved plugin per `(userId, directoryId)`** — saves the plugin
+- **Resolved plugin per `(userId, workId)`** — saves the plugin
   registry lookup on hot paths.
-- **Resolved provider config per `(userId, directoryId, providerId)`**
+- **Resolved provider config per `(userId, workId, providerId)`**
   — saves the [Settings System §9](./settings-system.md) cascade on
   every AI call.
 

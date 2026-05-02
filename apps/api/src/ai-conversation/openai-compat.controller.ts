@@ -18,7 +18,12 @@ type OpenAiHttpResponse = {
     setHeader(name: string, value: string): void;
     json(body: unknown): void;
     write(chunk: string): void;
-    end(): void;
+    end(payload?: string): void;
+    headersSent: boolean;
+    destroyed: boolean;
+    writableEnded: boolean;
+    status(code: number): void;
+    destroy(error?: Error): void;
 };
 
 @ApiTags('AI - OpenAI Compatible')
@@ -41,13 +46,13 @@ export class OpenAiCompatController {
     async chatCompletions(
         @CurrentUser() auth: AuthenticatedUser,
         @Headers('x-provider-override') providerOverride: string | undefined,
-        @Headers('x-directory-id') directoryId: string | undefined,
+        @Headers('x-work-id') workId: string | undefined,
         @Body() body: OpenAiChatCompletionRequestDto,
         @Res() res: OpenAiHttpResponse,
     ): Promise<void> {
         const facadeOptions = {
             userId: auth.userId,
-            directoryId,
+            workId,
             providerOverride,
         };
 

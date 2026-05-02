@@ -236,7 +236,7 @@ export class TavilySearchPlugin implements IPlugin, ISearchPlugin, IContentExtra
 			id: this.id,
 			name: this.name,
 			version: this.version,
-			description: 'Search the web and extract content from websites to build your directory',
+			description: 'Search the web and extract content from websites to build your work',
 			category: this.category,
 			capabilities: [...this.capabilities],
 			author: { name: 'Ever Works Team' },
@@ -253,7 +253,7 @@ export class TavilySearchPlugin implements IPlugin, ISearchPlugin, IContentExtra
 			readme: [
 				'## What does Tavily do?',
 				'',
-				'Tavily is a search and content extraction service designed for AI applications. It searches the web for relevant results and extracts clean, structured content from web pages, providing the source material that Ever Works uses to generate accurate directory items.',
+				'Tavily is a search and content extraction service designed for AI applications. It searches the web for relevant results and extracts clean, structured content from web pages, providing the source material that Ever Works uses to generate accurate work items.',
 				'',
 				'## Why use it?',
 				'',
@@ -264,14 +264,14 @@ export class TavilySearchPlugin implements IPlugin, ISearchPlugin, IContentExtra
 				'',
 				'## How it works in Ever Works',
 				'',
-				'During directory generation, the search facade uses Tavily to find information about each item, discover relevant source URLs, and extract content from web pages. This powers automatic descriptions, source URL resolution, and content enrichment across the generation pipeline.',
+				'During work generation, the search facade uses Tavily to find information about each item, discover relevant source URLs, and extract content from web pages. This powers automatic descriptions, source URL resolution, and content enrichment across the generation pipeline.',
 				'',
 				'## Getting started',
 				'',
 				'1. Create an account at [tavily.com](https://tavily.com)',
 				'2. Copy your API key from the Tavily dashboard',
 				'3. Enter the key in the **API Key** field below',
-				'4. Tavily will be used automatically during directory generation'
+				'4. Tavily will be used automatically during work generation'
 			].join('\n')
 		};
 	}

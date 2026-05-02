@@ -61,7 +61,7 @@ turbo build --filter=@ever-works/agent
 turbo build --filter=@ever-works/plugin
 ```
 
-The `build` task in `turbo.json` declares `"dependsOn": ["^build"]`, which means Turborepo automatically builds dependencies before their consumers. Output directories (`dist/`, `build/`, `.next/`) are cached.
+The `build` task in `turbo.json` declares `"dependsOn": ["^build"]`, which means Turborepo automatically builds dependencies before their consumers. Output works (`dist/`, `build/`, `.next/`) are cached.
 
 ### Build Order
 
@@ -308,7 +308,7 @@ pnpm format:check
 Commits are enforced by **commitlint** with the Conventional Commits standard via Husky git hooks:
 
 ```
-feat: add new directory template engine
+feat: add new work template engine
 fix: resolve JWT refresh token race condition
 docs: update environment variable reference
 refactor: extract plugin loader into separate module
@@ -318,7 +318,7 @@ chore: bump turbo to 2.8.12
 
 ## Database Migrations
 
-When modifying TypeORM entities, generate and run migrations from the `apps/api/` directory:
+When modifying TypeORM entities, generate and run migrations from the `apps/api/` work:
 
 ```bash
 cd apps/api

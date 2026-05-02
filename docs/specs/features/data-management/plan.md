@@ -12,7 +12,7 @@
 ```mermaid
 flowchart LR
     subgraph Export
-        E1[POST /account/export] --> E2[Aggregate per-directory data]
+        E1[POST /account/export] --> E2[Aggregate per-work data]
         E2 --> E3[Mask or strip secrets]
         E3 --> E4[Stream JSON download]
     end
@@ -20,7 +20,7 @@ flowchart LR
         I1[POST /account/import/preview] --> I2[Validate envelope]
         I2 --> I3[Detect conflicts + missing plugins + masked secrets]
         I3 --> I4[Return preview]
-        I5[POST /account/import/apply] --> I6[Per-directory loop]
+        I5[POST /account/import/apply] --> I6[Per-work loop]
         I6 --> I7[Apply DTO + relations + repo write]
     end
     subgraph Sync
@@ -34,14 +34,14 @@ flowchart LR
 
 ## 2. Tech Choices
 
-| Concern             | Choice                                       | Rationale                            |
-| ------------------- | -------------------------------------------- | ------------------------------------ |
-| Aggregation         | Per-directory iterator over relations + repo | Keeps memory bounded                 |
-| Secret redaction    | `redactSecretsFromSettings(plugin, value)`   | Single helper enforces Principle VII |
-| Masked detection    | Prefix `MASKED:` is reserved                 | Simple, unambiguous                  |
-| Conflict resolution | Stateless: client supplies `resolutions[]`   | Idempotent retries                   |
-| Path safety         | `path.basename(slug)` on every IO            | Cheap defence-in-depth               |
-| Sync transport      | `GitFacadeService` against user's repo       | Principle II                         |
+| Concern             | Choice                                     | Rationale                            |
+| ------------------- | ------------------------------------------ | ------------------------------------ |
+| Aggregation         | Per-work iterator over relations + repo    | Keeps memory bounded                 |
+| Secret redaction    | `redactSecretsFromSettings(plugin, value)` | Single helper enforces Principle VII |
+| Masked detection    | Prefix `MASKED:` is reserved               | Simple, unambiguous                  |
+| Conflict resolution | Stateless: client supplies `resolutions[]` | Idempotent retries                   |
+| Path safety         | `path.basename(slug)` on every IO          | Cheap defence-in-depth               |
+| Sync transport      | `GitFacadeService` against user's repo     | Principle II                         |
 
 ## 3. Data Model
 
@@ -83,8 +83,8 @@ None — all sync operations are user-initiated.
 
 ## 8. Observability
 
-- Import returns `ImportResult` with `directoriesCreated`,
-  `directoriesUpdated`, `directoriesSkipped`, `userPluginsImported`,
+- Import returns `ImportResult` with `worksCreated`,
+  `worksUpdated`, `worksSkipped`, `userPluginsImported`,
   `warnings[]`, `errors[]`.
 - Activity log entries: `account_exported`, `account_imported`,
   `sync_pushed`, `sync_pulled`.

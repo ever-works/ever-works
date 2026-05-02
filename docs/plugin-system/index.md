@@ -9,13 +9,13 @@ sidebar_position: 1
 
 The Ever Works Platform uses a **capability-driven plugin architecture** where all external integrations — AI providers, search engines, deployment targets, screenshot services, and more — are implemented as self-contained plugins.
 
-Instead of hardcoding providers, the platform asks "give me a plugin that can do X" and the system resolves which plugin to use based on admin, user, and directory-level configuration.
+Instead of hardcoding providers, the platform asks "give me a plugin that can do X" and the system resolves which plugin to use based on admin, user, and work-level configuration.
 
 ## How It Works
 
 1. **Plugins declare capabilities** — Each plugin implements one or more capability interfaces (e.g., `ai-provider`, `search`, `deployment`).
 2. **Facades route requests** — When the platform needs to perform an AI completion or a web search, a facade service resolves the active plugin for the current scope.
-3. **Settings cascade** — Plugin configuration follows a three-tier hierarchy: directory settings override user settings, which override admin defaults.
+3. **Settings cascade** — Plugin configuration follows a three-tier hierarchy: work settings override user settings, which override admin defaults.
 4. **Discovery is automatic** — Plugins in `packages/plugins/` are discovered at startup. No manual registration is needed.
 
 ## Built-in Plugins
@@ -82,12 +82,12 @@ Each plugin declares how it should be configured:
 
 ### Scoped Resolution
 
-Each directory can use a different plugin per capability. For example:
+Each work can use a different plugin per capability. For example:
 
-- Directory A uses **OpenAI** for AI and **Brave** for search
-- Directory B uses **Anthropic** for AI and **Tavily** for search
+- Work A uses **OpenAI** for AI and **Brave** for search
+- Work B uses **Anthropic** for AI and **Tavily** for search
 
-This is managed through the [Settings System](./settings) and the directory-level plugin management UI.
+This is managed through the [Settings System](./settings) and the work-level plugin management UI.
 
 ## Documentation
 

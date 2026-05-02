@@ -32,7 +32,7 @@ export * from './api/index.js';
 
 ## Item Types
 
-The `item/item.types.ts` module defines the core data structures for directory items -- the primary content entities in the platform.
+The `item/item.types.ts` module defines the core data structures for work items -- the primary content entities in the platform.
 
 ### Category
 
@@ -211,7 +211,7 @@ interface WebPageData {
 
 ### RelevanceAssessment
 
-Scores how relevant a piece of web content is to the user's directory topic.
+Scores how relevant a piece of web content is to the user's work topic.
 
 ```typescript
 interface RelevanceAssessment {
@@ -224,7 +224,7 @@ interface RelevanceAssessment {
 
 ## Form Field Types
 
-The `form/form-field.types.ts` module defines the form schema system used for dynamic form rendering in the frontend. This powers plugin settings UIs, directory configuration forms, and item editing interfaces.
+The `form/form-field.types.ts` module defines the form schema system used for dynamic form rendering in the frontend. This powers plugin settings UIs, work configuration forms, and item editing interfaces.
 
 ### FormFieldType
 
@@ -350,11 +350,11 @@ interface FormSchema {
 
 ## API Contract Types
 
-The `api/` subdirectory contains types shared between the API and its consumers (frontend, CLI).
+The `api/` subwork contains types shared between the API and its consumers (frontend, CLI).
 
 ### GenerateStatusType
 
-Tracks the state of a directory generation process.
+Tracks the state of a work generation process.
 
 ```typescript
 enum GenerateStatusType {
@@ -369,7 +369,7 @@ enum GenerateStatusType {
 
 ### GenerationMethod
 
-How items are generated for a directory.
+How items are generated for a work.
 
 ```typescript
 enum GenerationMethod {
@@ -392,7 +392,7 @@ Data transfer objects for the generation API.
 
 ```typescript
 interface CreateItemsGeneratorDto {
-	directoryId: string;
+	workId: string;
 	prompt: string;
 	method: GenerationMethod;
 	options?: Record<string, unknown>;
@@ -404,24 +404,24 @@ interface UpdateItemsGeneratorDto {
 }
 ```
 
-### Directory Schedule Types
+### Work Schedule Types
 
-Types for managing automated directory update schedules.
+Types for managing automated work update schedules.
 
 ```typescript
-interface DirectoryScheduleDto {
-	cadence: DirectoryScheduleAllowedCadence;
+interface WorkScheduleDto {
+	cadence: WorkScheduleAllowedCadence;
 	enabled: boolean;
 	nextRunAt?: string;
 	lastRunAt?: string;
 }
 
-interface UpdateDirectorySchedulePayload {
-	cadence?: DirectoryScheduleAllowedCadence;
+interface UpdateWorkSchedulePayload {
+	cadence?: WorkScheduleAllowedCadence;
 	enabled?: boolean;
 }
 
-type DirectoryScheduleAllowedCadence = 'daily' | 'weekly' | 'biweekly' | 'monthly';
+type WorkScheduleAllowedCadence = 'daily' | 'weekly' | 'biweekly' | 'monthly';
 ```
 
 ## Cross-Package Usage
@@ -433,7 +433,7 @@ The contracts package is the foundation that enables type-safe communication acr
 | **API**                 | All types for request/response validation                 |
 | **Frontend**            | `ItemData`, `FormSchema`, `Category`, `Tag` for rendering |
 | **Plugins**             | `DomainType`, `ItemData`, `WebPageData` for generation    |
-| **CLI**                 | `GenerationMethod`, `DirectoryScheduleDto` for commands   |
+| **CLI**                 | `GenerationMethod`, `WorkScheduleDto` for commands        |
 | **Generation pipeline** | `DomainAnalysis`, `RelevanceAssessment`, `ComparisonData` |
 
 ## File Structure
@@ -452,7 +452,7 @@ contracts/src/
     generator/
       generation-method.enum.ts              # GenerationMethod, WebsiteRepositoryCreationMethod
       create-items-generator.dto.ts          # Generator DTOs
-    directory/
+    work/
       generate-status.enum.ts               # GenerateStatusType
-      directory-schedule.dto.ts             # Schedule types
+      work-schedule.dto.ts             # Schedule types
 ```

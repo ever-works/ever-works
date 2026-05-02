@@ -34,7 +34,7 @@ import {
     DropdownMenuLabel,
 } from '@/components/ui/dropdown-menu';
 import { LogoEverWork, FaviconEverWork } from '../logos';
-import { useDirectoryDetail } from '../directories/detail/DirectoryDetailContext';
+import { useWorkDetail } from '../works/detail/WorkDetailContext';
 import { ChatPanelExpandButton } from '@/components/ai/ChatPanel';
 import { SidebarActivityIndicator } from './SidebarActivityIndicator';
 import { useMounted } from '@/lib/hooks/use-mounted';
@@ -85,7 +85,7 @@ export function DashboardSidebar({
     const [avatarError, setAvatarError] = useState(false);
     const mounted = useMounted();
     const t = useTranslations('dashboard.sidebar');
-    const { config } = useDirectoryDetail();
+    const { config } = useWorkDetail();
 
     const handleCollapsedChange = (v: boolean) => {
         onCollapsedChange?.(v);
@@ -102,7 +102,7 @@ export function DashboardSidebar({
     const navigation = [
         { name: t('navigation.dashboard'), href: ROUTES.DASHBOARD, icon: Home },
         {
-            name: t('navigation.directories'),
+            name: t('navigation.works'),
             href: ROUTES.DASHBOARD_DIRECTORIES,
             icon: FolderClosed,
         },
@@ -199,12 +199,12 @@ export function DashboardSidebar({
                     </div>
                 </div>
 
-                {/* New Directory */}
+                {/* New Work */}
                 <div
                     className={cn(isCollapsed ? 'px-2 py-3 flex justify-center' : 'px-4 pt-5 pb-6')}
                 >
                     {isCollapsed ? (
-                        <ConditionalTooltip show content={t('newDirectory')}>
+                        <ConditionalTooltip show content={t('newWork')}>
                             <Button
                                 href={ROUTES.DASHBOARD_DIRECTORIES_NEW}
                                 variant="primary"
@@ -225,7 +225,7 @@ export function DashboardSidebar({
                             onClick={() => onInteraction?.()}
                         >
                             <Plus className="w-5 h-5" />
-                            <span className="font-medium">{t('newDirectory')}</span>
+                            <span className="font-medium">{t('newWork')}</span>
                         </Button>
                     )}
                 </div>

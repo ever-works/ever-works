@@ -5,7 +5,7 @@ import {
     CreateItemsGeneratorDto,
     UpdateItemsGeneratorDto,
     CancelGenerationResponse,
-    directoryAPI,
+    workAPI,
     gitProvidersAPI,
 } from '@/lib/api';
 import { getTranslations } from 'next-intl/server';
@@ -54,9 +54,9 @@ type CancelGenerationActionResult =
           error: string;
       };
 
-export async function generateItems(directoryId: string, data: CreateItemsGeneratorDto) {
+export async function generateItems(workId: string, data: CreateItemsGeneratorDto) {
     const t = await getTranslations('actions.generator');
-    const tDirectories = await getTranslations('actions.directories');
+    const tWorks = await getTranslations('actions.works');
 
     try {
         // Sanitize core data
@@ -86,35 +86,35 @@ export async function generateItems(directoryId: string, data: CreateItemsGenera
             };
         }
 
-        const { directory } = await directoryAPI.get(directoryId);
+        const { work } = await workAPI.get(workId);
 
         // Check git provider connection
-        const connectionCheck = await checkGitProviderConnection(directory.gitProvider);
+        const connectionCheck = await checkGitProviderConnection(work.gitProvider);
         if (!connectionCheck.connected) {
             return {
                 success: false,
-                error: tDirectories('oauthRequired', { provider: directory.gitProvider }),
+                error: tWorks('oauthRequired', { provider: work.gitProvider }),
                 requiresGitProvider: true,
             };
         }
 
         // Get organizations from the git provider
-        const orgsResult = await gitProvidersAPI.getOrganizations(directory.gitProvider);
+        const orgsResult = await gitProvidersAPI.getOrganizations(work.gitProvider);
         const orgs = orgsResult.organizations || [];
 
         // connectionCheck.username is available when connected is true
         const username = 'username' in connectionCheck ? connectionCheck.username : undefined;
-        if (directory.owner && username !== directory.owner) {
-            if (!orgs.some((org) => org.login === directory.owner)) {
+        if (work.owner && username !== work.owner) {
+            if (!orgs.some((org) => org.login === work.owner)) {
                 return {
                     success: false,
-                    error: t('notAuthorizedToAccessOrganization', { owner: directory.owner }),
+                    error: t('notAuthorizedToAccessOrganization', { owner: work.owner }),
                 };
             }
         }
 
         // Call the API to generate items with sanitized data
-        const result = await itemsGeneratorAPI.generate(directoryId, sanitizedData);
+        const result = await itemsGeneratorAPI.generate(workId, sanitizedData);
 
         return {
             success: true,
@@ -130,12 +130,12 @@ export async function generateItems(directoryId: string, data: CreateItemsGenera
     }
 }
 
-export async function updateItems(directoryId: string, data: UpdateItemsGeneratorDto) {
+export async function updateItems(workId: string, data: UpdateItemsGeneratorDto) {
     const t = await getTranslations('actions.generator');
 
     try {
         // Call the API to update items
-        const result = await itemsGeneratorAPI.update(directoryId, data);
+        const result = await itemsGeneratorAPI.update(workId, data);
 
         return {
             success: true,
@@ -151,11 +151,11 @@ export async function updateItems(directoryId: string, data: UpdateItemsGenerato
     }
 }
 
-export async function cancelGeneration(directoryId: string): Promise<CancelGenerationActionResult> {
+export async function cancelGeneration(workId: string): Promise<CancelGenerationActionResult> {
     const t = await getTranslations('actions.generator');
 
     try {
-        const result = await itemsGeneratorAPI.cancel(directoryId);
+        const result = await itemsGeneratorAPI.cancel(workId);
 
         return {
             success: true,
@@ -172,11 +172,11 @@ export async function cancelGeneration(directoryId: string): Promise<CancelGener
     }
 }
 
-export async function regenerateMarkdown(directoryId: string) {
+export async function regenerateMarkdown(workId: string) {
     const t = await getTranslations('actions.generator');
 
     try {
-        const result = await itemsGeneratorAPI.regenerateMarkdown(directoryId);
+        const result = await itemsGeneratorAPI.regenerateMarkdown(workId);
 
         return {
             success: true,

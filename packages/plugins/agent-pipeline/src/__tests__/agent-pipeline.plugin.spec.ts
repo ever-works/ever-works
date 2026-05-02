@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { AgentPipelinePlugin } from '../agent-pipeline.plugin';
 import type {
 	PluginContext,
-	DirectoryReference,
+	WorkReference,
 	GenerationRequest,
 	ExistingItems,
 	MutableItemData
@@ -187,7 +187,7 @@ describe('AgentPipelinePlugin', () => {
 	});
 
 	describe('execute', () => {
-		const directory: DirectoryReference = {
+		const work: WorkReference = {
 			id: 'dir1',
 			name: 'AI Tools',
 			slug: 'ai-tools',
@@ -212,7 +212,7 @@ describe('AgentPipelinePlugin', () => {
 			} as unknown as PluginContext;
 			await plugin.onLoad(context);
 
-			const result = await plugin.execute(directory, request, existing, {});
+			const result = await plugin.execute(work, request, existing, {});
 
 			expect(result.success).toBe(false);
 			expect(result.error).toBeDefined();
@@ -227,7 +227,7 @@ describe('AgentPipelinePlugin', () => {
 			} as unknown as PluginContext;
 			await plugin.onLoad(context);
 
-			const dirNoUser: DirectoryReference = {
+			const dirNoUser: WorkReference = {
 				id: 'dir1',
 				name: 'AI Tools',
 				slug: 'ai-tools'
@@ -240,7 +240,7 @@ describe('AgentPipelinePlugin', () => {
 					screenshotFacade: {} as never,
 					contentExtractorFacade: {} as never,
 					logger: { log: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
-					directory: dirNoUser
+					work: dirNoUser
 				}
 			});
 

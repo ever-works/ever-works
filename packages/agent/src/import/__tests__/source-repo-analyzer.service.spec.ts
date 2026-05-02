@@ -82,7 +82,7 @@ describe('SourceRepoAnalyzerService.analyzeRepository', () => {
                 isPrivate: false,
                 permissions: { push: true },
             }),
-            getDirectoryContents: jest
+            getWorkContents: jest
                 .fn()
                 .mockResolvedValueOnce([
                     { name: 'works_config', type: 'dir', path: 'works_config' },
@@ -121,7 +121,7 @@ describe('SourceRepoAnalyzerService.analyzeRepository', () => {
                 isPrivate: false,
                 permissions: { push: true },
             }),
-            getDirectoryContents: jest
+            getWorkContents: jest
                 .fn()
                 .mockResolvedValue([{ name: 'works_config', type: 'dir', path: 'works_config' }]),
         };
@@ -154,7 +154,7 @@ describe('SourceRepoAnalyzerService.analyzeRepository', () => {
                 isPrivate: false,
                 permissions: { push: true },
             }),
-            getDirectoryContents: jest.fn().mockResolvedValue([
+            getWorkContents: jest.fn().mockResolvedValue([
                 { name: 'works.yml', type: 'file', path: 'works.yml' },
                 { name: 'README.md', type: 'file', path: 'README.md' },
             ]),

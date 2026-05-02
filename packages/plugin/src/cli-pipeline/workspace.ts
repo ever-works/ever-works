@@ -19,7 +19,7 @@ export interface CliPipelineLogger {
 }
 
 export interface WorkspaceMetadataSeed {
-	directory?: { name: string; description?: string };
+	work?: { name: string; description?: string };
 	request?: { prompt?: string; name?: string };
 	categories?: readonly Category[];
 	tags?: readonly Tag[];
@@ -49,12 +49,12 @@ async function parallelBatch<T>(tasks: Array<() => Promise<T>>, concurrency: num
 	return results;
 }
 
-export function getWorkspacePath(baseTempDir: string, userId: string, directoryId: string): string {
-	return path.join(baseTempDir, userId, directoryId);
+export function getWorkspacePath(baseTempDir: string, userId: string, workId: string): string {
+	return path.join(baseTempDir, userId, workId);
 }
 
-export async function createWorkspace(baseTempDir: string, userId: string, directoryId: string): Promise<string> {
-	const workspaceRoot = getWorkspacePath(baseTempDir, userId, directoryId);
+export async function createWorkspace(baseTempDir: string, userId: string, workId: string): Promise<string> {
+	const workspaceRoot = getWorkspacePath(baseTempDir, userId, workId);
 	await fs.mkdir(workspaceRoot, { recursive: true });
 	const workspacePath = await fs.mkdtemp(path.join(workspaceRoot, 'run-'));
 	await fs.mkdir(path.join(workspacePath, '_meta'), { recursive: true });
@@ -94,8 +94,8 @@ export async function seedExistingItems(workspacePath: string, items: readonly I
 export async function seedMetadata(workspacePath: string, metadata: WorkspaceMetadataSeed): Promise<void> {
 	const metaDir = path.join(workspacePath, '_meta');
 
-	if (metadata.directory) {
-		await fs.writeFile(path.join(metaDir, 'directory.json'), JSON.stringify(metadata.directory, null, 2), 'utf-8');
+	if (metadata.work) {
+		await fs.writeFile(path.join(metaDir, 'work.json'), JSON.stringify(metadata.work, null, 2), 'utf-8');
 	}
 
 	if (metadata.request) {
@@ -128,7 +128,7 @@ export async function readGeneratedItems(
 		const dirEntries = await fs.readdir(workspacePath, { withFileTypes: true });
 		entries = dirEntries.filter((e) => !e.isDirectory() && e.name.endsWith('.json')).map((e) => e.name);
 	} catch {
-		logger?.warn('Could not read workspace directory');
+		logger?.warn('Could not read workspace work');
 		return [];
 	}
 

@@ -1,4 +1,4 @@
-# Feature Specification: `works.yml` Source-Controlled Directory Configuration
+# Feature Specification: `works.yml` Source-Controlled Work Configuration
 
 **Feature ID**: `works-config`
 **Branch**: `feat/works-yml-onboarding` (merged via PR #395)
@@ -11,7 +11,7 @@
 
 ## 1. Overview
 
-Each directory's generation configuration (name, prompt, model, providers,
+Each work's generation configuration (name, prompt, model, providers,
 website-repo target, schedule cadence) is mirrored to a YAML file in the
 **data repository** so the configuration is portable, reviewable in PRs, and
 the same across environments. The platform reads the file when importing an
@@ -25,13 +25,13 @@ existing repo and writes it back after every successful generation.
   **when** I import it into the platform, **then** the import flow is
   pre-filled with the values from the file (name, prompt, model, providers,
   schedule), so I don't need to re-enter them.
-- **Given** I generate a directory through the platform UI, **when**
+- **Given** I generate a work through the platform UI, **when**
   generation completes successfully, **then** a fresh `works.yml` is
-  committed to the data repo capturing the directory's current
+  committed to the data repo capturing the work's current
   configuration.
 - **Given** I edit `works.yml` directly in the data repo and trigger an
   import, **when** the import runs, **then** the updated values become the
-  directory's new config.
+  work's new config.
 - **Given** I clear a field (model, prompt) in the platform UI, **when** the
   next generation runs, **then** the field is removed from `works.yml`
   rather than left as an empty value.
@@ -72,7 +72,7 @@ existing repo and writes it back after every successful generation.
   plus alternate keys `frequency` / `interval`.
 - **FR-6** The system MUST treat `schedule.enabled: false` as "no schedule".
 - **FR-7** After every successful generation the system MUST write `works.yml`
-  at the data-repository root capturing the directory's current
+  at the data-repository root capturing the work's current
   configuration.
 - **FR-8** The writer MUST preserve unknown top-level fields present in the
   existing file.
@@ -100,7 +100,7 @@ existing repo and writes it back after every successful generation.
   it MUST NOT contain secrets. Plugin **ids** are committed; plugin
   **credentials** never are.
 - **Observability**: parse errors and sync failures appear in the activity
-  log with action type `directory_import` or `directory_sync` and the
+  log with action type `work_import` or `work_sync` and the
   failing field path / reason.
 - **Compatibility**: schema is forward-compatible — unknown fields are
   preserved; alias fields ensure older hand-authored files keep working.
@@ -132,7 +132,7 @@ existing repo and writes it back after every successful generation.
       file path.
 - [x] Plugin id validation rejects unknown ids before the import completes.
 - [x] After a successful generation, `works.yml` is committed to the data
-      repo with the directory's current config.
+      repo with the work's current config.
 - [x] Round-tripping a file with unknown top-level fields preserves them.
 - [x] Clearing a field in the UI removes the corresponding key from the file
       on the next sync.
@@ -177,7 +177,7 @@ _None — feature is shipped and stable on `develop`._
 - Implementation: `packages/agent/src/works-config/` (service, writer,
   import planner, restore service)
 - Related features:
-    - [`directory-import/spec.md`](../directory-import/spec.md) (consumes the parsed config)
+    - [`work-import/spec.md`](../work-import/spec.md) (consumes the parsed config)
     - [`scheduled-updates/spec.md`](../scheduled-updates/spec.md) (consumes
       the cadence)
 - PR: #395

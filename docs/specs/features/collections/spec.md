@@ -21,12 +21,12 @@ and they can be independently toggled on/off.
 
 ### 2.1 Primary scenarios
 
-- **Given** I run a new directory generation, **when** the Standard
+- **Given** I run a new work generation, **when** the Standard
   Pipeline plugin has `generate_collections: true`, **then** the AI
   proposes collection assignments for items where it sees a clear fit
   and the items get a `collection` field in their YAML.
 - **Given** I want to add an "Editor's Picks" collection manually,
-  **when** I `POST /api/directories/:id/collections` with a name and
+  **when** I `POST /api/works/:id/collections` with a name and
   optional description, **then** the platform stores it in
   `collections.yml` in the data repo and assigns it the slug
   `editors-picks`.
@@ -35,7 +35,7 @@ and they can be independently toggled on/off.
   deployed site renders them; setting it to `false` hides them without
   deleting any data.
 - **Given** an AI-generated collection only has `id` + `name`, **when** I
-  `PUT /api/directories/:id/collections/<id>` with `description`,
+  `PUT /api/works/:id/collections/<id>` with `description`,
   `icon_url`, and `priority`, **then** the collection is enriched.
 
 ### 2.2 Edge cases & failures
@@ -67,13 +67,13 @@ and they can be independently toggled on/off.
   `generate_collections` on the Standard Pipeline plugin settings.
 - **FR-7** Both toggles MUST default to `true`.
 - **FR-8** Collections MUST be persisted to `collections.yml` in the
-  directory's data repository on every CRUD mutation.
+  work's data repository on every CRUD mutation.
 - **FR-9** Items reference collections by slug id in their YAML
   (`collection: editors-picks`).
 - **FR-10** Deleting a collection MUST clear the `collection` field on
   every affected item (no orphans, no item deletion).
 - **FR-11** The list endpoint MUST return collections via
-  `GET /api/directories/:id/categories-tags` alongside categories and
+  `GET /api/works/:id/categories-tags` alongside categories and
   tags (one round-trip for all three taxonomies).
 - **FR-12** AI-assigned collections MUST contain only `id` + `name` until
   a user enriches them via update.
@@ -87,7 +87,7 @@ and they can be independently toggled on/off.
 - **Security & privacy**: edit access required for create/update/delete;
   viewer access for read.
 - **Observability**: collection mutations emit changelog entries
-  (`collection_change`) per the [Directory Changelog](../directory-changelog/spec.md).
+  (`collection_change`) per the [Work Changelog](../work-changelog/spec.md).
 - **Compatibility**: collections are additive to the existing taxonomy;
   items without a collection still validate.
 
@@ -96,7 +96,7 @@ and they can be independently toggled on/off.
 | Entity / concept       | Description                                                         |
 | ---------------------- | ------------------------------------------------------------------- |
 | Collection             | `{id, name, description?, icon_url?, priority?}` editorial grouping |
-| `collections.yml`      | Per-directory file in the data repo holding the collection list     |
+| `collections.yml`      | Per-work file in the data repo holding the collection list          |
 | `collections_enabled`  | Website-side toggle controlling whether collections render          |
 | `generate_collections` | Pipeline-side toggle controlling AI collection assignment           |
 | Item collection ref    | Slug id stored in the item's YAML                                   |
@@ -104,7 +104,7 @@ and they can be independently toggled on/off.
 ## 6. Out of Scope
 
 - Multi-collection items (cardinality is fixed at 0–1).
-- Cross-directory collections.
+- Cross-work collections.
 - Nested collections / sub-collections.
 - Collections-only filtering at the API level (clients filter client-side).
 
@@ -133,7 +133,7 @@ _None on develop._
       background jobs.
 - [x] **V**: no schema changes (data lives in the repo).
 - [x] **VI**: covered in
-      `packages/agent/src/services/__tests__/directory-taxonomy.service.spec.ts`.
+      `packages/agent/src/services/__tests__/work-taxonomy.service.spec.ts`.
 - [x] **VII**: no secrets involved.
 - [x] **VIII**: N/A.
 - [x] **IX**: this spec describes user-observable behaviour.
@@ -144,6 +144,6 @@ _None on develop._
 - User-facing doc: [`../../../features/collections.md`](../../../features/collections.md)
 - Related: [`taxonomy-system/spec.md`](../taxonomy-system/spec.md)
 - Implementation:
-  `packages/agent/src/services/directory-taxonomy.service.ts`
+  `packages/agent/src/services/work-taxonomy.service.ts`
 - Pipeline integration:
   `packages/plugins/standard-pipeline/src/steps/categories-tags-processing.step.ts`

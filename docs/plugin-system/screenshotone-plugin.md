@@ -7,7 +7,7 @@ sidebar_position: 41
 
 # ScreenshotOne Plugin
 
-The ScreenshotOne plugin captures website screenshots using the [ScreenshotOne API](https://screenshotone.com). It generates preview images for directory items automatically during the generation pipeline, with support for signed URLs, ad blocking, and configurable viewport settings.
+The ScreenshotOne plugin captures website screenshots using the [ScreenshotOne API](https://screenshotone.com). It generates preview images for work items automatically during the generation pipeline, with support for signed URLs, ad blocking, and configurable viewport settings.
 
 **Source:** `packages/plugins/screenshotone/src/screenshotone.plugin.ts`
 
@@ -77,7 +77,7 @@ When both an access key and a secret key are configured, the plugin generates **
 
 API keys are resolved through the standard 4-level hierarchy:
 
-1. Directory settings (highest priority)
+1. Work settings (highest priority)
 2. User settings
 3. Admin settings
 4. Environment variables (lowest priority)
@@ -140,7 +140,7 @@ The maximum viewport is 3840 x 2160 pixels (4K UHD).
 
 ## Usage in Pipelines
 
-During directory generation, the screenshot facade delegates capture requests to ScreenshotOne for items with source URLs. The resulting images become item preview thumbnails.
+During work generation, the screenshot facade delegates capture requests to ScreenshotOne for items with source URLs. The resulting images become item preview thumbnails.
 
 ## Comparison with Urlbox
 
@@ -196,7 +196,7 @@ class ScreenshotOnePlugin implements IPlugin, IScreenshotPlugin {
 2. Copy your access key and optional secret key (for signed URLs)
 3. Enable the ScreenshotOne plugin on the Plugins page
 4. Enter your credentials in the plugin settings
-5. Select ScreenshotOne as the screenshot provider for your directory
+5. Select ScreenshotOne as the screenshot provider for your work
 
 ## Troubleshooting
 

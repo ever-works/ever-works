@@ -11,25 +11,25 @@
 
 ```mermaid
 flowchart LR
-    UI[Dashboard / API] --> Svc[DirectoryTaxonomyService]
+    UI[Dashboard / API] --> Svc[WorkTaxonomyService]
     AI[Pipeline categorization step] --> Svc
-    Svc --> Role[DirectoryOwnershipService.ensure*]
+    Svc --> Role[WorkOwnershipService.ensure*]
     Svc --> Read[Read existing YAML]
     Read --> Validate[Slug + uniqueness]
     Validate --> Write[Write updated YAML]
     Write --> Git[GitFacadeService commit + push]
-    Svc --> Changelog[Directory changelog]
+    Svc --> Changelog[Work changelog]
 ```
 
 ## 2. Tech Choices
 
-| Concern            | Choice                              | Rationale                                     |
-| ------------------ | ----------------------------------- | --------------------------------------------- |
-| Storage            | YAML files in the data repo         | Principle III                                 |
-| Slug generation    | `slugifyText()` shared util         | Consistent across categories/tags/collections |
-| Uniqueness check   | Case-insensitive in-memory match    | Cheap; data fits in memory                    |
-| Role enforcement   | `DirectoryOwnershipService.ensure*` | Single source of truth                        |
-| Mutation atomicity | One git commit per CRUD operation   | Simple recovery model                         |
+| Concern            | Choice                            | Rationale                                     |
+| ------------------ | --------------------------------- | --------------------------------------------- |
+| Storage            | YAML files in the data repo       | Principle III                                 |
+| Slug generation    | `slugifyText()` shared util       | Consistent across categories/tags/collections |
+| Uniqueness check   | Case-insensitive in-memory match  | Cheap; data fits in memory                    |
+| Role enforcement   | `WorkOwnershipService.ensure*`    | Single source of truth                        |
+| Mutation atomicity | One git commit per CRUD operation | Simple recovery model                         |
 
 ## 3. Data Model
 
@@ -45,18 +45,18 @@ No DB schema. Storage:
 
 ## 4. API Surface
 
-| Method   | Endpoint                                         | Description       |
-| -------- | ------------------------------------------------ | ----------------- |
-| `GET`    | `/api/directories/:id/categories-tags`           | List all three    |
-| `POST`   | `/api/directories/:id/categories`                | Create category   |
-| `PUT`    | `/api/directories/:id/categories/:categoryId`    | Update category   |
-| `DELETE` | `/api/directories/:id/categories/:categoryId`    | Delete category   |
-| `POST`   | `/api/directories/:id/tags`                      | Create tag        |
-| `PUT`    | `/api/directories/:id/tags/:tagId`               | Update tag        |
-| `DELETE` | `/api/directories/:id/tags/:tagId`               | Delete tag        |
-| `POST`   | `/api/directories/:id/collections`               | Create collection |
-| `PUT`    | `/api/directories/:id/collections/:collectionId` | Update collection |
-| `DELETE` | `/api/directories/:id/collections/:collectionId` | Delete collection |
+| Method   | Endpoint                                   | Description       |
+| -------- | ------------------------------------------ | ----------------- |
+| `GET`    | `/api/works/:id/categories-tags`           | List all three    |
+| `POST`   | `/api/works/:id/categories`                | Create category   |
+| `PUT`    | `/api/works/:id/categories/:categoryId`    | Update category   |
+| `DELETE` | `/api/works/:id/categories/:categoryId`    | Delete category   |
+| `POST`   | `/api/works/:id/tags`                      | Create tag        |
+| `PUT`    | `/api/works/:id/tags/:tagId`               | Update tag        |
+| `DELETE` | `/api/works/:id/tags/:tagId`               | Delete tag        |
+| `POST`   | `/api/works/:id/collections`               | Create collection |
+| `PUT`    | `/api/works/:id/collections/:collectionId` | Update collection |
+| `DELETE` | `/api/works/:id/collections/:collectionId` | Delete collection |
 
 ## 5. Plugin / Web / CLI
 
@@ -73,12 +73,12 @@ None — taxonomy mutations are inline.
 
 - Read: viewer role.
 - Write: editor role.
-- Both via `DirectoryOwnershipService`.
+- Both via `WorkOwnershipService`.
 
 ## 8. Observability
 
 - `category_change`, `tag_change`, `collection_change` entries in the
-  Directory Changelog.
+  Work Changelog.
 
 ## 9. Risks & Mitigations
 
@@ -96,6 +96,6 @@ See `spec.md` §9.
 
 - Spec: `./spec.md`
 - Implementation:
-    - `packages/agent/src/services/directory-taxonomy.service.ts`
-    - `packages/agent/src/services/directory-ownership.service.ts`
+    - `packages/agent/src/services/work-taxonomy.service.ts`
+    - `packages/agent/src/services/work-ownership.service.ts`
 - Related: [`collections/spec.md`](../collections/spec.md)

@@ -3,13 +3,13 @@ import type { ItemData, Category, Tag, Brand } from '@ever-works/contracts';
 import type { PluginSettings } from '../../settings/settings.types.js';
 
 /**
- * Context for filtering items by relevance to the directory's domain/prompt.
+ * Context for filtering items by relevance to the work's domain/prompt.
  * Each data source plugin can use this context to filter items it returns.
  */
 export interface DataSourceFilterContext {
-	/** Directory prompt/description */
+	/** Work prompt/description */
 	readonly prompt?: string;
-	/** Directory subject/topic */
+	/** Work subject/topic */
 	readonly subject?: string;
 	/** Keywords extracted from prompt (for basic keyword matching) */
 	readonly keywords?: readonly string[];
@@ -38,7 +38,7 @@ export interface DataSourceQueryOptions {
 	/**
 	 * Resolved settings for this operation.
 	 * Contains plugin-specific configuration including API keys and options.
-	 * Passed by the facade with user/directory-scoped settings.
+	 * Passed by the facade with user/work-scoped settings.
 	 */
 	readonly settings?: PluginSettings;
 	/**

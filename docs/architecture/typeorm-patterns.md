@@ -63,14 +63,14 @@ The central module that registers all entities via `TypeOrmModule.forFeature(ENT
 		TypeOrmModule.forFeature(ENTITIES)
 	],
 	providers: [
-		DirectoryRepository,
+		WorkRepository,
 		UserRepository,
 		ApiKeyRepository
 		// ... all repositories
 	],
 	exports: [
 		TypeOrmModule,
-		DirectoryRepository,
+		WorkRepository,
 		UserRepository
 		// ... all repositories
 	]
@@ -106,22 +106,22 @@ export class UserRepository {
 Entities use standard TypeORM decorators with UUID primary keys and relationship decorators:
 
 ```typescript
-@Entity({ name: 'directories' })
-export class Directory {
+@Entity({ name: 'works' })
+export class Work {
 	@PrimaryGeneratedColumn('uuid')
 	id: string;
 
 	@Column()
 	name: string;
 
-	@ManyToOne(() => User, (user) => user.directories, {
+	@ManyToOne(() => User, (user) => user.works, {
 		onDelete: 'CASCADE',
 		eager: true
 	})
 	user: User;
 
-	@OneToMany(() => DirectoryMember, (member) => member.directory)
-	members?: DirectoryMember[];
+	@OneToMany(() => WorkMember, (member) => member.work)
+	members?: WorkMember[];
 
 	@Column('simple-json', { nullable: true })
 	generateStatus?: GenerateStatus;
@@ -136,7 +136,7 @@ export class Directory {
 
 ### Cross-Database Case-Insensitive Search
 
-The `DirectoryRepository` implements a `caseInsensitiveLike` helper using `Raw()` that works across SQLite, PostgreSQL, and MySQL:
+The `WorkRepository` implements a `caseInsensitiveLike` helper using `Raw()` that works across SQLite, PostgreSQL, and MySQL:
 
 ```typescript
 function caseInsensitiveLike(search: string) {
@@ -151,21 +151,21 @@ For queries requiring JOINs, OR conditions, or dynamic filtering, the repository
 ```typescript
 async findAllAccessible(options?: {
     userId: string;
-    memberDirectoryIds?: string[];
+    memberWorkIds?: string[];
     limit?: number;
     offset?: number;
     search?: string;
-}): Promise<Directory[]> {
+}): Promise<Work[]> {
     const queryBuilder = this.repository
-        .createQueryBuilder('directory')
-        .leftJoinAndSelect('directory.user', 'user');
+        .createQueryBuilder('work')
+        .leftJoinAndSelect('work.user', 'user');
 
-    if (memberDirectoryIds.length > 0) {
+    if (memberWorkIds.length > 0) {
         queryBuilder.where(
             new Brackets((qb) => {
-                qb.where('directory.userId = :userId', { userId })
-                  .orWhere('directory.id IN (:...memberDirectoryIds)', {
-                      memberDirectoryIds,
+                qb.where('work.userId = :userId', { userId })
+                  .orWhere('work.id IN (:...memberWorkIds)', {
+                      memberWorkIds,
                   });
             }),
         );
@@ -174,13 +174,13 @@ async findAllAccessible(options?: {
     if (search) {
         queryBuilder.andWhere(
             new Brackets((qb) => {
-                qb.where('LOWER(directory.name) LIKE :search', { search: pattern })
-                  .orWhere('LOWER(directory.description) LIKE :search', { search: pattern });
+                qb.where('LOWER(work.name) LIKE :search', { search: pattern })
+                  .orWhere('LOWER(work.description) LIKE :search', { search: pattern });
             }),
         );
     }
 
-    return queryBuilder.orderBy('directory.updatedAt', 'DESC').getMany();
+    return queryBuilder.orderBy('work.updatedAt', 'DESC').getMany();
 }
 ```
 

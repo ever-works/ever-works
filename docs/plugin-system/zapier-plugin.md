@@ -18,11 +18,11 @@ sidebar_position: 70
 
 ## Overview
 
-The Zapier plugin triggers [Zapier](https://zapier.com/) actions during directory generation. Unlike Make.com which can drive an entire generation flow, Zapier is most often used to wire generation events into Zapier's 7000+ integrations — for example, posting "directory generation finished" notifications to Slack, archiving generated items in Airtable, or kicking off downstream marketing workflows.
+The Zapier plugin triggers [Zapier](https://zapier.com/) actions during work generation. Unlike Make.com which can drive an entire generation flow, Zapier is most often used to wire generation events into Zapier's 7000+ integrations — for example, posting "work generation finished" notifications to Slack, archiving generated items in Airtable, or kicking off downstream marketing workflows.
 
 ## Selecting It
 
-In the directory edit screen, set **Generation Pipeline** to `Zapier Automation`. The plugin appears in the dropdown after a Zap webhook URL has been configured.
+In the work edit screen, set **Generation Pipeline** to `Zapier Automation`. The plugin appears in the dropdown after a Zap webhook URL has been configured.
 
 ## Configuration
 
@@ -33,7 +33,7 @@ The settings schema is defined in `packages/plugins/zapier/src/` — see that so
 
 ## Use Cases
 
-- Notifying teammates in Slack/Teams when a directory finishes generating.
+- Notifying teammates in Slack/Teams when a work finishes generating.
 - Archiving generated items to Airtable, Notion, or Google Sheets.
 - Triggering email campaigns or social posts when new items are published.
 - Logging generation runs to an internal dashboard.

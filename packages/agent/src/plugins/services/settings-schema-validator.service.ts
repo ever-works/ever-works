@@ -16,7 +16,7 @@ export interface SettingsValidationResult {
 /**
  * Scope for settings validation
  */
-export type SettingsScope = 'global' | 'user' | 'directory';
+export type SettingsScope = 'global' | 'user' | 'work';
 
 /**
  * Service for validating plugin settings against their JSON Schema definitions.
@@ -164,9 +164,9 @@ export class SettingsSchemaValidatorService {
                 const propSchema = schema.properties?.[field];
                 if (!propSchema) return false;
                 const fieldScope = (propSchema['x-scope'] as SettingsScope) || 'global';
-                // At directory scope, include user-scoped fields because merged
+                // At work scope, include user-scoped fields because merged
                 // settings contain inherited user values that can satisfy the group.
-                if (scope === 'directory' && fieldScope === 'user') return true;
+                if (scope === 'work' && fieldScope === 'user') return true;
                 return this.isScopeApplicable(fieldScope, scope);
             });
 
@@ -252,7 +252,7 @@ export class SettingsSchemaValidatorService {
      * Each scope only validates its own fields plus global fields:
      * - global fields are applicable at all scopes
      * - user fields are applicable only at user scope
-     * - directory fields are applicable only at directory scope
+     * - work fields are applicable only at work scope
      */
     private isScopeApplicable(
         propertyScope: SettingsScope,

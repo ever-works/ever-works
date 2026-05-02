@@ -31,9 +31,9 @@ DTO instance (sanitized + validated)
 Service method
 ```
 
-## CreateDirectoryDto
+## CreateWorkDto
 
-Used when creating a new directory manually.
+Used when creating a new work manually.
 
 ### Fields
 
@@ -57,9 +57,9 @@ Used when creating a new directory manually.
 | `footer`                 | `string`  | No       | Custom footer content for the README |
 | `overwriteDefaultFooter` | `boolean` | No       | Replace the default footer entirely  |
 
-## UpdateDirectoryDto
+## UpdateWorkDto
 
-Used when updating directory metadata.
+Used when updating work metadata.
 
 ### Fields
 
@@ -78,18 +78,18 @@ Used when updating directory metadata.
 
 ## GenerateDataDto
 
-Used to trigger data generation for a directory.
+Used to trigger data generation for a work.
 
 ### Fields
 
-| Field    | Type     | Required | Description               |
-| -------- | -------- | -------- | ------------------------- |
-| `slug`   | `string` | Yes      | Directory slug identifier |
-| `prompt` | `string` | Yes      | Generation prompt         |
+| Field    | Type     | Required | Description          |
+| -------- | -------- | -------- | -------------------- |
+| `slug`   | `string` | Yes      | Work slug identifier |
+| `prompt` | `string` | Yes      | Generation prompt    |
 
-## ImportDirectoryDto
+## ImportWorkDto
 
-Used when importing a directory from an external source.
+Used when importing a work from an external source.
 
 ### Fields
 
@@ -132,18 +132,18 @@ enum ImportSourceTypeEnum {
 | `slugConflict` | `object`                   | Slug conflict details if applicable                                                          |
 | `error`        | `string`                   | Error message if analysis failed                                                             |
 
-**ImportDirectoryResponseDto** -- returned by import initiation:
+**ImportWorkResponseDto** -- returned by import initiation:
 
-| Field         | Type                                | Description                 |
-| ------------- | ----------------------------------- | --------------------------- |
-| `status`      | `'pending' \| 'success' \| 'error'` | Operation status            |
-| `directoryId` | `string`                            | Created directory ID        |
-| `historyId`   | `string`                            | Generation history entry ID |
-| `message`     | `string`                            | Status message              |
+| Field       | Type                                | Description                 |
+| ----------- | ----------------------------------- | --------------------------- |
+| `status`    | `'pending' \| 'success' \| 'error'` | Operation status            |
+| `workId`    | `string`                            | Created work ID             |
+| `historyId` | `string`                            | Generation history entry ID |
+| `message`   | `string`                            | Status message              |
 
-## UpdateDirectoryAdvancedPromptsDto
+## UpdateWorkAdvancedPromptsDto
 
-Used to set custom AI prompts per directory.
+Used to set custom AI prompts per work.
 
 ### Fields
 
@@ -161,24 +161,24 @@ All fields are optional. `null` or empty strings reset the field to use the plat
 
 ### Response DTO
 
-**DirectoryAdvancedPromptsResponseDto** -- all fields plus `directoryId` and `updatedAt` (ISO string or null).
+**WorkAdvancedPromptsResponseDto** -- all fields plus `workId` and `updatedAt` (ISO string or null).
 
-## UpdateDirectoryScheduleDto
+## UpdateWorkScheduleDto
 
-Used to configure scheduled directory updates.
+Used to configure scheduled work updates.
 
 ### Fields
 
-| Field                     | Type                           | Required | Description                                       |
-| ------------------------- | ------------------------------ | -------- | ------------------------------------------------- |
-| `enable`                  | `boolean`                      | No       | Enable or disable the schedule                    |
-| `cadence`                 | `DirectoryScheduleCadence`     | No       | Update frequency                                  |
-| `billingMode`             | `DirectoryScheduleBillingMode` | No       | Billing mode for scheduled runs                   |
-| `maxFailureBeforePause`   | `number`                       | No       | Max consecutive failures before auto-pause (1-10) |
-| `alwaysCreatePullRequest` | `boolean`                      | No       | Always create PRs instead of direct commits       |
-| `providerOverrides`       | `ProvidersDto \| null`         | No       | AI/search provider overrides for scheduled runs   |
+| Field                     | Type                      | Required | Description                                       |
+| ------------------------- | ------------------------- | -------- | ------------------------------------------------- |
+| `enable`                  | `boolean`                 | No       | Enable or disable the schedule                    |
+| `cadence`                 | `WorkScheduleCadence`     | No       | Update frequency                                  |
+| `billingMode`             | `WorkScheduleBillingMode` | No       | Billing mode for scheduled runs                   |
+| `maxFailureBeforePause`   | `number`                  | No       | Max consecutive failures before auto-pause (1-10) |
+| `alwaysCreatePullRequest` | `boolean`                 | No       | Always create PRs instead of direct commits       |
+| `providerOverrides`       | `ProvidersDto \| null`    | No       | AI/search provider overrides for scheduled runs   |
 
-## DirectoryGenerationHistoryDto
+## WorkGenerationHistoryDto
 
 Read-only DTO for generation history entries.
 
@@ -223,7 +223,7 @@ Same fields as category DTOs.
 
 ## UpdateWebsiteSettingsDto
 
-Configures the directory website appearance and features.
+Configures the work website appearance and features.
 
 ### Fields
 
@@ -271,7 +271,7 @@ All DTOs use `class-transformer` `@Transform` decorators to sanitize input befor
 
 ## Related Services
 
-- [Directory Detail Service](/agent-services/directory-detail-service) -- uses `DirectoryDetails` interface (not a class DTO)
-- [Directory Import Service](/agent-services/directory-import-service) -- consumes `ImportDirectoryDto` and related DTOs
-- [Directory Taxonomy](/agent-services/directory-taxonomy-service) -- consumes taxonomy DTOs
-- [Advanced Prompts](/agent-services/directory-advanced-prompts) -- consumes `UpdateDirectoryAdvancedPromptsDto`
+- [Work Detail Service](/agent-services/work-detail-service) -- uses `WorkDetails` interface (not a class DTO)
+- [Work Import Service](/agent-services/work-import-service) -- consumes `ImportWorkDto` and related DTOs
+- [Work Taxonomy](/agent-services/work-taxonomy-service) -- consumes taxonomy DTOs
+- [Advanced Prompts](/agent-services/work-advanced-prompts) -- consumes `UpdateWorkAdvancedPromptsDto`

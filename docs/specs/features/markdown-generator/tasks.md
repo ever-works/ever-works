@@ -67,7 +67,7 @@
     1. Resolve git token via `GitFacadeService`.
     2. Clone (or auto-init then clone) markdown repository.
     3. If the data generator returned a `prUpdate`, switch to that branch.
-    4. Read `Directory.readmeConfig` for header/footer customization.
+    4. Read `Work.readmeConfig` for header/footer customization.
     5. `MarkdownRepository.resetFiles()`.
     6. `ReadmeBuilder.build(...)` and write `README.md`.
     7. For each item, write `details/<slug>.md`.

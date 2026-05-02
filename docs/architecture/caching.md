@@ -165,7 +165,7 @@ All keys are prefixed with the adapter's namespace (defaults to `app-cache`):
 
 ```
 app-cache:user:123
-app-cache:directory:456:config
+app-cache:work:456:config
 ```
 
 This allows multiple cache instances with different namespaces to share the same database table without key collisions.

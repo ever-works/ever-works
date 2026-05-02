@@ -120,6 +120,6 @@ export interface CrmSyncResult {
  */
 export interface CrmTenantContext {
     tenantId: string;
-    directoryId?: string;
+    workId?: string;
     userId?: string;
 }

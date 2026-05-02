@@ -17,21 +17,21 @@ resolution work.
 
 This spec covers the **resolution algorithm**, **scope model**, **secret
 hygiene**, and **environment-variable fallback** that make plugin
-settings safe to use across admin, user, and per-directory contexts.
+settings safe to use across admin, user, and per-work contexts.
 
 ## 2. The Three Tiers
 
 Plugin settings can be set at three scopes:
 
-| Scope       | Storage table       | Configured by    | Lifetime                       |
-| ----------- | ------------------- | ---------------- | ------------------------------ |
-| `global`    | `plugin_settings`   | Admin            | Survives all sessions          |
-| `user`      | `user_plugins`      | The user         | Per-user                       |
-| `directory` | `directory_plugins` | Directory editor | Per-directory (overrides user) |
+| Scope    | Storage table     | Configured by | Lifetime                  |
+| -------- | ----------------- | ------------- | ------------------------- |
+| `global` | `plugin_settings` | Admin         | Survives all sessions     |
+| `user`   | `user_plugins`    | The user      | Per-user                  |
+| `work`   | `work_plugins`    | Work editor   | Per-work (overrides user) |
 
 The **resolution cascade** for a key is, in order of precedence:
 
-1. **Directory** — if the call carries a `directoryId` and the directory
+1. **Work** — if the call carries a `workId` and the work
    has its own value for the key.
 2. **User** — if the call carries a `userId` and the user has their own
    value.
@@ -73,17 +73,17 @@ A plugin's `configurationMode` (set in its manifest, see
 [Plugin SDK §7](./plugin-sdk.md#7-plugin-manifest)) decides which scopes
 are even allowed:
 
-| Mode            | Where settings live                                    | Notes                                                      |
-| --------------- | ------------------------------------------------------ | ---------------------------------------------------------- |
-| `admin-only`    | `plugin_settings` only                                 | UI hides per-user / per-directory editors                  |
-| `user-required` | `user_plugins` (and `directory_plugins` for overrides) | Users must enter their own creds; admin can't pre-populate |
-| `hybrid`        | All three tiers                                        | Admin sets defaults; users / directories may override      |
+| Mode            | Where settings live                               | Notes                                                      |
+| --------------- | ------------------------------------------------- | ---------------------------------------------------------- |
+| `admin-only`    | `plugin_settings` only                            | UI hides per-user / per-work editors                       |
+| `user-required` | `user_plugins` (and `work_plugins` for overrides) | Users must enter their own creds; admin can't pre-populate |
+| `hybrid`        | All three tiers                                   | Admin sets defaults; users / works may override            |
 
 The setting form's "where will this go?" depends on the active page:
 
 - Admin → Plugins → `plugin_settings`.
 - User → Plugins → `user_plugins`.
-- Directory → Plugins → `directory_plugins`.
+- Work → Plugins → `work_plugins`.
 
 Plugins authored as `user-required` reject admin writes server-side;
 `admin-only` plugins reject user writes. This is enforced in
@@ -92,9 +92,9 @@ Plugins authored as `user-required` reject admin writes server-side;
 ## 5. Storage Layer
 
 ```
-plugin_settings              user_plugins              directory_plugins
+plugin_settings              user_plugins              work_plugins
   pluginId   varchar           pluginId   varchar          pluginId   varchar
-  enabled    boolean            userId    uuid             directoryId uuid
+  enabled    boolean            userId    uuid             workId uuid
   settings   jsonb              enabled   boolean          enabled    boolean
   secrets    jsonb (encrypted)  settings  jsonb            settings   jsonb
                                 secrets   jsonb (encrypted) secrets   jsonb (encrypted)
@@ -120,12 +120,12 @@ Two flavours of "settings" coexist:
 - **Plugin settings** — what `settingsSchema` declares: API keys,
   default models, UI preferences. Bound to a plugin id.
 - **Capability settings** — provider-selection bindings: "for this
-  directory, use plugin `openai` for capability `ai-provider`."
+  work, use plugin `openai` for capability `ai-provider`."
   Bound to `(scope, capability)`.
 
 Capability bindings live in:
 
-- `directory_plugins.<capability>` (per-directory provider bindings)
+- `work_plugins.<capability>` (per-work provider bindings)
 - `user_plugins.<capability>` (per-user provider bindings)
 - A platform-wide fallback resolved from each plugin's `defaultFor`
   manifest field.
@@ -172,7 +172,7 @@ apiKey: {
 }
 ```
 
-If no admin / user / directory value is set but `process.env.PLUGIN_OPENAI_API_KEY`
+If no admin / user / work value is set but `process.env.PLUGIN_OPENAI_API_KEY`
 is, the resolver returns that value. **Plugins never read `process.env`
 themselves** — they read settings, and the resolver consults env-vars
 where the schema says it should. This keeps:
@@ -190,23 +190,19 @@ where the schema says it should. This keeps:
 ```ts
 class PluginSettingsService {
 	// Get the entire resolved settings object for a plugin in some scope
-	resolve(pluginId: string, scope: { directoryId?: string; userId?: string }): Promise<PluginSettings>;
+	resolve(pluginId: string, scope: { workId?: string; userId?: string }): Promise<PluginSettings>;
 
 	// Get one key with type narrowing
-	resolveKey<T>(
-		pluginId: string,
-		key: string,
-		scope: { directoryId?: string; userId?: string }
-	): Promise<T | undefined>;
+	resolveKey<T>(pluginId: string, key: string, scope: { workId?: string; userId?: string }): Promise<T | undefined>;
 
 	// Get the source of each key for debugging / UI display
 	resolveWithSources(pluginId: string, scope): Promise<Record<string, { value: unknown; source: SettingSource }>>;
 }
 ```
 
-`SettingSource` is `'directory' | 'user' | 'admin' | 'env' | 'default'`
+`SettingSource` is `'work' | 'user' | 'admin' | 'env' | 'default'`
 — useful in the dashboard's settings UI to label each row with
-"inherited from admin", "set in this directory", etc.
+"inherited from admin", "set in this work", etc.
 
 ## 10. Settings UI
 
@@ -248,7 +244,7 @@ When a user saves settings:
 | --------------------------- | --------------------------------------------------------------------------------- |
 | I — Plugin-first            | Settings schema is defined by the plugin, not the platform.                       |
 | II — Capability-driven      | Capability bindings cascade by the same algorithm.                                |
-| III — Source-of-truth repos | Settings are platform-side metadata (access control), not directory content.      |
+| III — Source-of-truth repos | Settings are platform-side metadata (access control), not work content.           |
 | IV — Trigger.dev            | Resolution is synchronous and inline.                                             |
 | V — Forward-only migrations | Settings shape evolution = adding optional schema properties; no breaking change. |
 | VI — Tests                  | Per-tier resolution covered by `PluginSettingsService` unit tests + e2e.          |

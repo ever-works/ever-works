@@ -155,12 +155,12 @@ The service supports both positional parameters and typed event objects:
 
 ```typescript
 // Positional
-analytics.trackApiUsage(userId, '/api/directories', 'GET', 200, 150);
+analytics.trackApiUsage(userId, '/api/works', 'GET', 200, 150);
 
 // Typed object
 analytics.trackApiUsageEvent({
 	distinctId: userId,
-	endpoint: '/api/directories',
+	endpoint: '/api/works',
 	method: 'GET',
 	statusCode: 200,
 	duration: 150

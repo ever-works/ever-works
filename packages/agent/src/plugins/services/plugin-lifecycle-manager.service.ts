@@ -18,8 +18,8 @@ export interface LifecycleResult {
  * Manages plugin lifecycle state transitions.
  * State machine: unloaded → loading → loaded → unloading → unloaded
  *
- * Per-user/per-directory enable/disable is handled by the DB scope system
- * (UserPluginEntity.enabled, DirectoryPluginEntity.enabled, manifest.autoEnable).
+ * Per-user/per-work enable/disable is handled by the DB scope system
+ * (UserPluginEntity.enabled, WorkPluginEntity.enabled, manifest.autoEnable).
  */
 @Injectable()
 export class PluginLifecycleManagerService {

@@ -150,7 +150,7 @@
         },
         "register": {
             "title": "创建您的帐户",
-            "subtitle": "今天开始构建精彩的目录",
+            "subtitle": "今天开始构建精彩的作品",
             "form": {
                 "name": {
                     "label": "全名",
@@ -197,18 +197,18 @@
     "onboarding": {
         "label": "开始使用",
         "title": "欢迎使用 Ever Works",
-        "subtitle": "几分钟内构建并发布您的第一个目录。",
+        "subtitle": "几分钟内构建并发布您的第一个作品。",
         "skipButton": "暂时跳过",
         "nextButton": "下一步",
         "stepIndex": "步骤 {index}",
         "steps": {
             "welcome": {
                 "title": "什么是 Ever Works？",
-                "description": "Ever Works 是一个开源目录构建器。创建结构化的内容目录——工具、工作、链接、产品——并将它们发布为实时网站。",
-                "detail": "让我们为您设置。下方连接您的提供商，然后创建您的第一个目录。",
+                "description": "Ever Works 是一个开源作品构建器。创建结构化的内容作品——工具、工作、链接、产品——并将它们发布为实时网站。",
+                "detail": "让我们为您设置。下方连接您的提供商，然后创建您的第一个作品。",
                 "feature1": {
                     "title": "AI 驱动的内容",
-                    "description": "使用您的 AI 提供商自动生成和丰富目录项。"
+                    "description": "使用您的 AI 提供商自动生成和丰富作品项。"
                 },
                 "feature2": {
                     "title": "即时发布",
@@ -216,18 +216,18 @@
                 },
                 "feature3": {
                     "title": "基于 Git",
-                    "description": "每个目录都是您拥有和控制的 GitHub 仓库。"
+                    "description": "每个作品都是您拥有和控制的 GitHub 仓库。"
                 }
             },
-            "directory": {
-                "title": "创建您的第一个目录",
-                "description": "目录是您的内容中心。添加项目、配置布局，并一键发布。",
-                "detail": "您已准备就绪！创建您的第一个目录，开始构建和发布内容。",
-                "action": "创建目录"
+            "work": {
+                "title": "创建您的第一个作品",
+                "description": "作品是您的内容中心。添加项目、配置布局，并一键发布。",
+                "detail": "您已准备就绪！创建您的第一个作品，开始构建和发布内容。",
+                "action": "创建作品"
             },
             "publish": {
                 "title": "上线",
-                "description": "连接 Vercel 或 GitHub，将您的目录部署为公共网站 —— 无需托管配置。",
+                "description": "连接 Vercel 或 GitHub，将您的作品部署为公共网站 —— 无需托管配置。",
                 "action": "设置发布"
             }
         },
@@ -336,7 +336,7 @@
             "steps": {
                 "model": {
                     "title": "选择模型",
-                    "description": "选择您想要运行的用于端到端目录生成的 Codex 模型。"
+                    "description": "选择您想要运行的用于端到端作品生成的 Codex 模型。"
                 },
                 "credentials": {
                     "title": "添加凭据",
@@ -408,7 +408,7 @@
         "simWizard": {
             "label": "SIM AI 设置",
             "title": "通过两个步骤设置 SIM AI",
-            "subtitle": "添加您的 SIM AI API 密钥并验证连接，以开始将目录生成委托给 SIM 工作流。",
+            "subtitle": "添加您的 SIM AI API 密钥并验证连接，以开始将作品生成委托给 SIM 工作流。",
             "stepIndex": "步骤 {index}",
             "continueButton": "继续",
             "steps": {
@@ -431,7 +431,7 @@
         "title": "仪表板",
         "connectGithub": {
             "title": "连接您的 GitHub 帐户",
-            "description": "创建和管理目录仓库需要 GitHub。请连接您的帐户以开始使用。",
+            "description": "创建和管理作品仓库需要 GitHub。请连接您的帐户以开始使用。",
             "connect": "连接 GitHub",
             "dismiss": "我稍后做"
         },
@@ -465,7 +465,7 @@
         },
         "header": {
             "welcome": "欢迎回来，{username}！",
-            "subtitle": "管理您的 AI 驱动目录并跟踪其性能",
+            "subtitle": "管理您的 AI 驱动作品并跟踪其性能",
             "onboarding": {
                 "badge": "入门 {currentStep}/{totalSteps}",
                 "dismiss": "隐藏入门快捷方式"
@@ -490,14 +490,14 @@
                 },
                 "quickTips": {
                     "title": "快速提示",
-                    "tip1": "通过点击仪表板上的“创建目录”按钮创建您的第一个目录。",
-                    "tip2": "使用 AI 生成器自动用相关项目填充您的目录。",
-                    "tip3": "连接您的 GitHub 帐户，以将目录作为仓库同步和部署。"
+                    "tip1": "通过点击仪表板上的“创建作品”按钮创建您的第一个作品。",
+                    "tip2": "使用 AI 生成器自动用相关项目填充您的作品。",
+                    "tip3": "连接您的 GitHub 帐户，以将作品作为仓库同步和部署。"
                 },
                 "shortcuts": {
                     "title": "键盘快捷键",
-                    "search": "搜索目录",
-                    "newDirectory": "创建新目录",
+                    "search": "搜索作品",
+                    "newWork": "创建新作品",
                     "help": "打开帮助",
                     "hint": "在 Mac 上使用 Cmd，在 Windows/Linux 上使用 Ctrl"
                 },
@@ -513,7 +513,7 @@
         },
         "activity": {
             "title": "活动日志",
-            "subtitle": "跟踪您的目录中的所有操作",
+            "subtitle": "跟踪您的作品中的所有操作",
             "loading": "加载中...",
             "fetchFailed": "加载活动失败",
             "exportFailed": "导出活动日志失败",
@@ -521,7 +521,7 @@
             "columns": {
                 "status": "状态",
                 "dateTime": "日期 / 时间",
-                "directory": "目录",
+                "work": "作品",
                 "type": "类型",
                 "summary": "摘要"
             },
@@ -532,9 +532,9 @@
                     "generation": "生成",
                     "comparison": "比较",
                     "deployment": "部署",
-                    "directoryCreated": "目录已创建",
-                    "directoryUpdated": "目录已更新",
-                    "directoryDeleted": "目录已删除",
+                    "workCreated": "作品已创建",
+                    "workUpdated": "作品已更新",
+                    "workDeleted": "作品已删除",
                     "pluginEnabled": "插件已启用",
                     "pluginDisabled": "插件已禁用",
                     "pluginConfigured": "插件已配置",
@@ -596,32 +596,32 @@
                 "pageOf": "第 {page} 页，共 {total} 页"
             }
         },
-        "directories": {
-            "title": "目录",
-            "subtitle": "管理和组织您的 AI 驱动目录",
+        "works": {
+            "title": "作品",
+            "subtitle": "管理和组织您的 AI 驱动作品",
             "summary": {
-                "totalDirectories": "目录总数",
+                "totalWorks": "作品总数",
                 "generating": "正在生成",
                 "totalItems": "项目总数"
             },
-            "recent": "最近目录",
+            "recent": "最近作品",
             "viewAll": "查看全部 ({count})",
-            "search": "搜索目录...",
-            "create": "创建目录",
-            "showing": "显示 {total} 个目录中的 {current} 个",
-            "searchFailed": "搜索目录失败。请重试。",
+            "search": "搜索作品...",
+            "create": "创建作品",
+            "showing": "显示 {total} 个作品中的 {current} 个",
+            "searchFailed": "搜索作品失败。请重试。",
             "pagination": {
                 "previous": "上一页",
                 "next": "下一页"
             },
             "empty": {
-                "title": "尚无目录",
-                "description": "创建您的第一个 AI 驱动目录，开始组织和展示您的内容。",
-                "action": "创建您的第一个目录",
+                "title": "尚无作品",
+                "description": "创建您的第一个 AI 驱动作品，开始组织和展示您的内容。",
+                "action": "创建您的第一个作品",
                 "notFound": {
-                    "title": "未找到目录",
+                    "title": "未找到作品",
                     "withSearch": "尝试调整搜索词",
-                    "withoutSearch": "创建您的第一个 AI 驱动目录以开始使用"
+                    "withoutSearch": "创建您的第一个 AI 驱动作品以开始使用"
                 }
             }
         },
@@ -638,7 +638,7 @@
             },
             "data": {
                 "exportTitle": "导出数据",
-                "exportDescription": "以 JSON 文件形式下载您的帐户数据，包括目录、插件设置和个人资料信息。",
+                "exportDescription": "以 JSON 文件形式下载您的帐户数据，包括作品、插件设置和个人资料信息。",
                 "includeSecrets": "包含机密设置（API 密钥、令牌）—以掩码值导出",
                 "secretsWarning": "机密设置将以掩码值导出。导入前，您需要手动用真实凭据替换它们。",
                 "exportButton": "导出数据",
@@ -646,7 +646,7 @@
                 "exportSuccess": "数据导出成功",
                 "exportError": "导出数据失败",
                 "importTitle": "导入数据",
-                "importDescription": "从以前导出的 JSON 文件导入数据。您可以解决具有匹配 slug 的目录冲突。",
+                "importDescription": "从以前导出的 JSON 文件导入数据。您可以解决具有匹配 slug 的作品冲突。",
                 "importButton": "导入数据",
                 "syncTitle": "GitHub 同步",
                 "syncDescription": "将您的帐户配置同步到私有 GitHub 存储库，用于备份和实例间迁移。",
@@ -658,13 +658,13 @@
                     "invalidJson": "无效的 JSON 文件",
                     "previewError": "分析导入文件失败",
                     "summary": "导入摘要",
-                    "directories": "目录",
+                    "works": "作品",
                     "items": "项目",
                     "userPlugins": "用户插件",
                     "version": "格式版本",
                     "missingPlugins": "这些插件未安装，将被跳过",
                     "conflicts": "Slug 冲突",
-                    "existingDirectory": "现有",
+                    "existingWork": "现有",
                     "incoming": "传入",
                     "strategySkip": "跳过（保留现有）",
                     "strategyOverwrite": "覆盖现有",
@@ -681,9 +681,9 @@
                     "validationErrors": "验证错误",
                     "resultSuccess": "导入成功完成",
                     "resultFailed": "导入失败",
-                    "directoriesCreated": "目录已创建",
-                    "directoriesUpdated": "目录已更新",
-                    "directoriesSkipped": "目录已跳过",
+                    "worksCreated": "作品已创建",
+                    "worksUpdated": "作品已更新",
+                    "worksSkipped": "作品已跳过",
                     "pluginsImported": "插件已导入",
                     "warnings": "警告",
                     "errors": "错误"
@@ -732,11 +732,11 @@
                 "backToCategory": "返回 {category}",
                 "pipelineDefault": {
                     "title": "默认管道",
-                    "description": "选择生成目录项目时默认使用的管道。",
+                    "description": "选择生成作品项目时默认使用的管道。",
                     "autoLabel": "自动",
-                    "autoDescription": "为每个目录使用系统解析的管道",
+                    "autoDescription": "为每个作品使用系统解析的管道",
                     "enforceLabel": "强制使用此默认值",
-                    "enforceDescription": "即使目录有自己的管道配置，也始终预选此管道。您仍可在表单中手动切换管道。",
+                    "enforceDescription": "即使作品有自己的管道配置，也始终预选此管道。您仍可在表单中手动切换管道。",
                     "saveFailed": "保存默认管道失败"
                 }
             },
@@ -819,8 +819,8 @@
                 "subtitle": "连接您的外部帐户以增强功能",
                 "github": {
                     "name": "GitHub",
-                    "connected": "使用 GitHub 存储库创建和管理目录",
-                    "disconnected": "连接以从存储库创建目录",
+                    "connected": "使用 GitHub 存储库创建和管理作品",
+                    "disconnected": "连接以从存储库创建作品",
                     "scopes": "权限范围",
                     "organizations": "已连接组织",
                     "organizationsHint": "使用重新连接授予对其他组织的访问权限",
@@ -881,12 +881,12 @@
             }
         },
         "stats": {
-            "totalDirectories": "总目录数",
+            "totalWorks": "总作品数",
             "totalItems": "总项目数",
             "activeWebsites": "活动网站",
             "fromLastMonth": "上月"
         },
-        "directoryCard": {
+        "workCard": {
             "status": {
                 "active": "活动",
                 "notStarted": "未开始",
@@ -911,14 +911,14 @@
             "views": "{count} 次查看",
             "updated": "更新于 {date}",
             "viewAction": "查看 →",
-            "openingTitle": "正在打开目录",
-            "openingMessage": "正在准备您的目录。详细信息即将打开。请留在此页面。"
+            "openingTitle": "正在打开作品",
+            "openingMessage": "正在准备您的作品。详细信息即将打开。请留在此页面。"
         },
-        "directoryList": {
-            "title": "您的目录",
-            "createButton": "创建目录"
+        "workList": {
+            "title": "您的作品",
+            "createButton": "创建作品"
         },
-        "directoryDetail": {
+        "workDetail": {
             "failedToGenerateItems": "生成项目失败。请重试。",
             "generationCompleted": "生成成功完成",
             "generationCancelled": "生成已取消",
@@ -953,7 +953,7 @@
             },
             "members": {
                 "title": "团队成员",
-                "subtitle": "管理谁可以访问此目录及其权限。",
+                "subtitle": "管理谁可以访问此作品及其权限。",
                 "inviteMember": "邀请成员",
                 "noMembers": "尚未有团队成员。邀请某人协作。",
                 "roles": {
@@ -965,13 +965,13 @@
                 },
                 "roleDescriptions": {
                     "owner": "完全控制，包括删除和管理成员。",
-                    "manager": "可以编辑目录和管理成员，但不能删除。",
-                    "editor": "可以编辑目录内容并运行生成。",
-                    "viewer": "只读访问以查看目录。"
+                    "manager": "可以编辑作品和管理成员，但不能删除。",
+                    "editor": "可以编辑作品内容并运行生成。",
+                    "viewer": "只读访问以查看作品。"
                 },
                 "invite": {
                     "title": "邀请团队成员",
-                    "description": "添加新成员以协作此目录。",
+                    "description": "添加新成员以协作此作品。",
                     "emailLabel": "电子邮件地址",
                     "emailPlaceholder": "colleague@example.com",
                     "roleLabel": "角色",
@@ -985,7 +985,7 @@
                 },
                 "confirmRemove": {
                     "title": "移除成员",
-                    "description": "您确定要从此目录移除 {username} 吗？他们将失去所有访问权限。",
+                    "description": "您确定要从此作品移除 {username} 吗？他们将失去所有访问权限。",
                     "confirm": "移除",
                     "cancel": "取消"
                 },
@@ -1000,7 +1000,7 @@
                 "page": {
                     "title": "计划更新",
                     "subtitle": "使用专用节奏和故障处理为 {name} 自动化刷新。",
-                    "fallbackName": "此目录",
+                    "fallbackName": "此作品",
                     "loadFailed": "加载计划设置失败。",
                     "providerCategories": {
                         "pipeline": "管道",
@@ -1101,7 +1101,7 @@
                     },
                     "empty": {
                         "title": "首先运行手动生成",
-                        "description": "完成一次成功的手动运行以解锁自动化计划。一旦目录有数据，我们可以为您保持其新鲜。",
+                        "description": "完成一次成功的手动运行以解锁自动化计划。一旦作品有数据，我们可以为您保持其新鲜。",
                         "refresh": "刷新状态"
                     },
                     "requiresGeneration": "在启用计划前至少运行一次项目生成。"
@@ -1119,7 +1119,7 @@
             "statusCard": {
                 "notStarted": {
                     "title": "生成未开始",
-                    "description": "启动生成项目以用内容填充您的目录。",
+                    "description": "启动生成项目以用内容填充您的作品。",
                     "action": "开始生成"
                 },
                 "generating": {
@@ -1133,7 +1133,7 @@
                 },
                 "generated": {
                     "title": "生成完成",
-                    "description": "您的目录已成功填充项目。",
+                    "description": "您的作品已成功填充项目。",
                     "withWarnings": "完成但有警告：",
                     "viewItems": "查看项目",
                     "regenerate": "重新生成"
@@ -1159,7 +1159,7 @@
             },
             "comparisons": {
                 "title": "比较",
-                "subtitle": "目录项目之间的 A 与 B 比较页面",
+                "subtitle": "作品项目之间的 A 与 B 比较页面",
                 "vs": "与",
                 "winner": "获胜者：{name}",
                 "tie": "平局",
@@ -1307,7 +1307,7 @@
                 }
             },
             "info": {
-                "title": "目录信息",
+                "title": "作品信息",
                 "yourRole": "您的角色",
                 "role": {
                     "owner": "所有者",
@@ -1357,15 +1357,15 @@
             "activity": {
                 "title": "最近活动",
                 "noActivity": "尚未有活动",
-                "created": "目录已创建",
-                "directoryCreated": "目录创建成功",
+                "created": "作品已创建",
+                "workCreated": "作品创建成功",
                 "justNow": "刚刚"
             },
             "items": {
-                "title": "目录项目",
-                "subtitle": "管理和组织您目录中的项目",
+                "title": "作品项目",
+                "subtitle": "管理和组织您作品中的项目",
                 "noItemsTitle": "暂无项目",
-                "noItemsDescription": "您的目录中还没有任何项目。生成项目来填充您的目录内容。",
+                "noItemsDescription": "您的作品中还没有任何项目。生成项目来填充您的作品内容。",
                 "generateItems": "生成项目",
                 "searchPlaceholder": "搜索项目...",
                 "allCategories": "所有类别",
@@ -1427,14 +1427,14 @@
                     "screenshotFailed": "捕获截图失败",
                     "screenshotError": "捕获截图时发生错误",
                     "featured": "精选项目",
-                    "featuredHelp": "在目录中标记此项目为精选",
+                    "featuredHelp": "在作品中标记此项目为精选",
                     "updateWithPR": "创建拉取请求",
                     "updateWithPRHelp": "以拉取请求形式提交更改，而不是直接提交",
                     "cancel": "取消",
                     "adding": "添加中...",
                     "addItem": "添加项目",
                     "success": "项目添加成功",
-                    "successDescription": "项目已添加到您的目录",
+                    "successDescription": "项目已添加到您的作品",
                     "failed": "添加项目失败",
                     "error": "添加项目时发生错误",
                     "errors": {
@@ -1653,7 +1653,7 @@
                     "navigationLabel": "生成器选项卡"
                 },
                 "regenerationWarning": "重新生成警告",
-                "regenerationWarningDescription": "此目录已生成。启动新生成将替换现有项目。",
+                "regenerationWarningDescription": "此作品已生成。启动新生成将替换现有项目。",
                 "requiredInfo": "所需信息",
                 "updateConfiguration": "更新配置",
                 "promptRequired": "提示必填",
@@ -1663,20 +1663,20 @@
                 "loadingFormSchema": "正在加载表单配置...",
                 "failedToLoadFormSchema": "加载表单配置失败",
                 "selectOption": "选择选项",
-                "directoryName": "目录名称",
+                "workName": "作品名称",
                 "generationPrompt": "生成提示",
                 "modelOverride": "AI 模型覆盖",
                 "modelOverridePlaceholder": "例如 openai/gpt-4.1 或 openrouter/openai/gpt-4.1",
                 "modelOverrideHelperText": "可选。默认使用导入或之前的模型，除非在此处覆盖。",
                 "recommended": "推荐",
-                "promptPlaceholder": "描述为此目录应生成哪些项目...",
+                "promptPlaceholder": "描述为此作品应生成哪些项目...",
                 "promptHelperText": "具体说明您想要生成的内容类型",
                 "repositoryDescription": "仓库描述",
                 "repositoryPlaceholder": "仓库的简要描述（可选）",
                 "startGeneration": "开始生成",
                 "regenerateItems": "重新生成项目",
                 "updateItems": "运行生成",
-                "recreateDirectory": "重新创建目录",
+                "recreateWork": "重新创建作品",
                 "showAdvancedOptions": "显示高级选项",
                 "hideAdvancedOptions": "隐藏高级选项",
                 "cancel": "取消",
@@ -1714,7 +1714,7 @@
                 "websiteRepositoryCreationMethod": "网站仓库创建方法",
                 "methodDuplicate": "复制",
                 "methodFork": "分叉",
-                "directoryNamePlaceholder": "输入目录名称",
+                "workNamePlaceholder": "输入作品名称",
                 "methodCreateFromTemplate": "从模板创建",
                 "aiProcessingConfiguration": "AI 处理配置",
                 "maxSearchQueries": "最大搜索查询数",
@@ -1725,7 +1725,7 @@
                 "aiFirstGenerationDescription": "在网络搜索前启用 AI 生成初始项目。",
                 "contentFiltering": "内容过滤",
                 "contentFilteringDescription": "启用内容质量过滤",
-                "recreateConfirmTitle": "重新创建目录数据？",
+                "recreateConfirmTitle": "重新创建作品数据？",
                 "recreateConfirmDescription": "重新创建将删除现有项目并从头重新生成。此操作不可撤销。",
                 "confirmRecreate": "是，重新创建",
                 "recreateInlineTitle": "重新创建将移除现有项目",
@@ -1769,7 +1769,7 @@
                 "aiProviderDescription": "用于内容生成和提取的 AI 模型提供商",
                 "contentExtractorProvider": "内容提取器",
                 "contentExtractorProviderDescription": "用于从网页提取内容的提供商",
-                "useDirectoryDefault": "使用目录默认",
+                "useWorkDefault": "使用作品默认",
                 "default": "默认",
                 "notConfigured": "未配置",
                 "notConfiguredTooltip": "此提供商需要配置。请访问 设置 → 插件 进行设置。",
@@ -1837,7 +1837,7 @@
                 },
                 "generalSettings": "通用设置",
                 "generalTitle": "通用设置",
-                "directoryName": "目录名称",
+                "workName": "作品名称",
                 "description": "描述",
                 "organizationRepository": "组织仓库",
                 "organizationHelp": "在组织下创建仓库，而不是您的个人账户",
@@ -1849,13 +1849,13 @@
                 "customHeaderPlaceholder": "向 README 头部添加自定义内容",
                 "overwriteDefaultHeader": "覆盖默认头部",
                 "customFooter": "自定义底部",
-                "cantDeleteWhileGenerating": "项目生成中无法删除目录。",
+                "cantDeleteWhileGenerating": "项目生成中无法删除作品。",
                 "customFooterPlaceholder": "向 README 底部添加自定义内容",
                 "overwriteDefaultFooter": "覆盖默认底部",
                 "dangerZone": "危险区域",
                 "dangerTitle": "危险区域",
-                "deleteWarning": "删除目录后无法恢复。请确认。",
-                "dangerDescription": "删除目录后无法恢复。请确认。",
+                "deleteWarning": "删除作品后无法恢复。请确认。",
+                "dangerDescription": "删除作品后无法恢复。请确认。",
                 "deleteOptions": "选择要删除的内容：",
                 "deleteDataRepository": "删除数据仓库",
                 "deleteDataRepositoryDescription": "从 GitHub 删除 JSON 数据仓库",
@@ -1864,14 +1864,14 @@
                 "deleteWebsiteRepository": "删除网站仓库",
                 "deleteWebsiteRepositoryDescription": "删除已部署的网站仓库",
                 "deleteConfirm": "您确定吗？",
-                "deleteConfirmDetail": "此操作无法撤销。目录和选定的仓库将被永久删除。",
-                "confirmDirectoryName": "输入目录名称以确认",
-                "confirmDirectoryNameDescription": "输入“{name}”以确认删除",
-                "deleteNameMismatch": "目录名称不匹配",
-                "deleteButton": "删除目录",
+                "deleteConfirmDetail": "此操作无法撤销。作品和选定的仓库将被永久删除。",
+                "confirmWorkName": "输入作品名称以确认",
+                "confirmWorkNameDescription": "输入“{name}”以确认删除",
+                "deleteNameMismatch": "作品名称不匹配",
+                "deleteButton": "删除作品",
                 "deleteConfirmButton": "是的，删除",
-                "deleteSuccess": "目录删除成功",
-                "deleteFailed": "删除目录失败",
+                "deleteSuccess": "作品删除成功",
+                "deleteFailed": "删除作品失败",
                 "yesDelete": "是的，删除",
                 "cancel": "取消",
                 "saveChanges": "保存更改",
@@ -1880,7 +1880,7 @@
                 "updateFailed": "更新设置失败",
                 "deployProvider": {
                     "title": "部署提供商",
-                    "description": "选择部署目录网站的位置",
+                    "description": "选择部署作品网站的位置",
                     "configure": "配置",
                     "ready": "准备部署",
                     "notConfigured": "未配置",
@@ -1917,7 +1917,7 @@
                     "prompts": {
                         "relevanceAssessment": {
                             "title": "相关性评估",
-                            "description": "用于根据目录主题相关性过滤网页的附加说明。",
+                            "description": "用于根据作品主题相关性过滤网页的附加说明。",
                             "placeholder": "例如，仅包括关注开源项目的页面..."
                         },
                         "itemGeneration": {
@@ -1968,7 +1968,7 @@
                 "communityPrUpdateFailed": "更新社区 PR 设置失败",
                 "websiteConfig": {
                     "title": "网站配置",
-                    "subtitle": "自定义目录网站的外观和行为",
+                    "subtitle": "自定义作品网站的外观和行为",
                     "loadFailed": "加载网站设置失败",
                     "saveSuccess": "网站设置保存成功",
                     "saveFailed": "保存网站设置失败",
@@ -1983,13 +1983,13 @@
                         "siteName": {
                             "title": "网站标识",
                             "label": "网站名称",
-                            "placeholder": "我的目录",
+                            "placeholder": "我的作品",
                             "helper": "显示在网站头部和浏览器标签上的名称"
                         },
                         "siteUrl": {
                             "label": "网站 URL",
                             "placeholder": "https://example.com",
-                            "helper": "公司或目录网站的 URL"
+                            "helper": "公司或作品网站的 URL"
                         },
                         "global": {
                             "title": "全局功能",
@@ -2071,7 +2071,7 @@
                 },
                 "committer": {
                     "title": "Git 提交者",
-                    "description": "覆盖此目录中 git 提交的提交者名称和电子邮件。留空以使用用户级设置或账户默认值。",
+                    "description": "覆盖此作品中 git 提交的提交者名称和电子邮件。留空以使用用户级设置或账户默认值。",
                     "nameLabel": "提交者名称",
                     "emailLabel": "提交者电子邮件",
                     "save": "保存提交者",
@@ -2082,13 +2082,13 @@
             "deploy": {
                 "noProviderAlert": {
                     "title": "无部署提供商",
-                    "description": "选择部署提供商来部署您的目录网站。",
+                    "description": "选择部署提供商来部署您的作品网站。",
                     "selectButton": "选择并继续",
                     "noProviders": "没有可用的部署提供商。请先安装部署插件。"
                 },
                 "noTokenAlert": {
                     "title": "{provider} 令牌必需",
-                    "description": "要部署您的目录，您需要在插件设置中配置 {provider} API 令牌。",
+                    "description": "要部署您的作品，您需要在插件设置中配置 {provider} API 令牌。",
                     "configureButton": "在插件设置中配置",
                     "getTokenButton": "获取 API 令牌",
                     "howTo": {
@@ -2096,25 +2096,25 @@
                         "step1": "点击“获取 API 令牌”打开您的提供商仪表板",
                         "step2": "创建具有部署权限的新令牌",
                         "step3": "在插件设置 > {provider} 中配置您的 {provider} API 令牌",
-                        "step4": "返回此处部署您的目录"
+                        "step4": "返回此处部署您的作品"
                     }
                 },
                 "sharedNoTokenAlert": {
                     "title": "部署不可用",
-                    "description": "目录所有者尚未配置部署。请联系目录所有者设置部署。",
+                    "description": "作品所有者尚未配置部署。请联系作品所有者设置部署。",
                     "hint": "作为协作者，一旦所有者配置了他们的部署提供商，您就可以触发部署。"
                 },
                 "form": {
                     "deployment": {
                         "title": "部署网站",
-                        "description": "部署您的目录网站仓库。",
+                        "description": "部署您的作品网站仓库。",
                         "deployButton": "部署到 {provider}",
                         "deployingButton": "正在部署...",
                         "deployingStateButton": "正在部署 ({state})...",
                         "successMessage": "您的网站已成功部署！",
                         "teamSelection": {
                             "title": "选择团队",
-                            "description": "选择部署此目录的团队。",
+                            "description": "选择部署此作品的团队。",
                             "label": "团队",
                             "placeholder": "选择团队",
                             "confirmButton": "部署到团队",
@@ -2141,7 +2141,7 @@
                     },
                     "info": {
                         "deployInfo": "部署通常需要 1-3 分钟。完成后您将收到 URL。",
-                        "updateInfo": "更新将您的目录内容同步到网站仓库，以供下次部署使用。"
+                        "updateInfo": "更新将您的作品内容同步到网站仓库，以供下次部署使用。"
                     },
                     "websiteTemplate": {
                         "title": "自动模板更新",
@@ -2161,7 +2161,7 @@
                         "title": "部署前配置",
                         "description": "在部署前查看和自定义您的网站设置",
                         "siteName": "网站名称",
-                        "siteNamePlaceholder": "我的目录",
+                        "siteNamePlaceholder": "我的作品",
                         "siteNameHelper": "显示在您网站上的名称（默认：Acme）",
                         "tabGeneral": "全局",
                         "tabHeader": "页眉",
@@ -2208,9 +2208,9 @@
                 }
             }
         },
-        "directoryCreation": {
-            "title": "创建新目录",
-            "subtitle": "选择您想要创建目录的方式",
+        "workCreation": {
+            "title": "创建新作品",
+            "subtitle": "选择您想要创建作品的方式",
             "backToOptions": "返回选项",
             "sidebar": {
                 "selectedProvider": "Git 提供商",
@@ -2218,7 +2218,7 @@
             },
             "deployProvider": {
                 "title": "部署提供商",
-                "description": "选择部署目录网站的位置",
+                "description": "选择部署作品网站的位置",
                 "noProviders": "没有可用的部署提供商",
                 "notConfigured": "未配置",
                 "configured": "准备部署",
@@ -2236,21 +2236,21 @@
             },
             "ai": {
                 "title": "使用 AI 创建",
-                "subtitle": "用自然语言描述您的目录想法，让 AI 处理设置",
+                "subtitle": "用自然语言描述您的作品想法，让 AI 处理设置",
                 "getStarted": "开始",
-                "formTitle": "使用 AI 创建目录",
-                "formSubtitle": "描述您的目录想法，让 AI 处理设置和初始内容生成",
-                "directoryNameLabel": "目录名称",
-                "directoryNamePlaceholder": "例如，Awesome AI Tools",
-                "directoryNameHelp": "如果留空，AI 将建议一个名称",
-                "promptLabel": "描述您的目录",
+                "formTitle": "使用 AI 创建作品",
+                "formSubtitle": "描述您的作品想法，让 AI 处理设置和初始内容生成",
+                "workNameLabel": "作品名称",
+                "workNamePlaceholder": "例如，Awesome AI Tools",
+                "workNameHelp": "如果留空，AI 将建议一个名称",
+                "promptLabel": "描述您的作品",
                 "githubRequired": "请先连接您的 GitHub 账户。",
-                "promptPlaceholder": "描述您想要创建什么样的目录，它应该包含什么项目，以及任何具体要求...",
+                "promptPlaceholder": "描述您想要创建什么样的作品，它应该包含什么项目，以及任何具体要求...",
                 "inspirationText": "需要灵感？试试这些：",
                 "examplePrompts": {
                     "0": {
                         "name": "AI 开发者工具",
-                        "prompt": "创建一个最佳 AI 开发者工具目录"
+                        "prompt": "创建一个最佳 AI 开发者工具作品"
                     },
                     "1": {
                         "name": "React 组件中心",
@@ -2258,7 +2258,7 @@
                     },
                     "2": {
                         "name": "远程团队工具",
-                        "prompt": "生成一个远程团队生产力应用的目录"
+                        "prompt": "生成一个远程团队生产力应用的作品"
                     },
                     "3": {
                         "name": "可持续时尚",
@@ -2273,23 +2273,23 @@
                     "3": "设置 GitHub 仓库并附带适当文档"
                 },
                 "generateButton": "使用 AI 生成",
-                "generatingButton": "正在生成目录...",
+                "generatingButton": "正在生成作品...",
                 "cancelButton": "取消",
                 "noteTitle": "注意：",
-                "noteText": "AI 生成通常需要 2-5 分钟，具体取决于您的请求复杂性。目录准备好时会通知您。",
+                "noteText": "AI 生成通常需要 2-5 分钟，具体取决于您的请求复杂性。作品准备好时会通知您。",
                 "errors": {
-                    "promptRequired": "请描述您想要创建什么样的目录",
+                    "promptRequired": "请描述您想要创建什么样的作品",
                     "unconfiguredProviders": "{providers} 未配置。请访问设置 → 插件在生成前进行设置。",
-                    "nameRequired": "目录名称是必填的",
-                    "slugRequired": "目录 slug 是必填的",
-                    "descriptionRequired": "目录描述是必填的",
+                    "nameRequired": "作品名称是必填的",
+                    "slugRequired": "作品 slug 是必填的",
+                    "descriptionRequired": "作品描述是必填的",
                     "githubRequired": "请先连接您的 GitHub 账户。",
-                    "createFailed": "创建目录失败"
+                    "createFailed": "创建作品失败"
                 },
                 "success": {
-                    "started": "目录创建已启动！",
+                    "started": "作品创建已启动！",
                     "generating": "AI 正在生成内容。这可能需要几分钟...",
-                    "created": "目录创建成功！"
+                    "created": "作品创建成功！"
                 },
                 "advancedSettings": "高级设置",
                 "advancedSubtitle": "配置组织和仓库设置",
@@ -2300,14 +2300,14 @@
             },
             "manual": {
                 "title": "手动创建",
-                "subtitle": "完全控制每个设置和选项来配置您的目录",
+                "subtitle": "完全控制每个设置和选项来配置您的作品",
                 "configureNow": "立即配置",
-                "formTitle": "手动创建目录",
-                "formSubtitle": "完全控制每个设置来配置您的目录",
+                "formTitle": "手动创建作品",
+                "formSubtitle": "完全控制每个设置来配置您的作品",
                 "basicInfo": "基本信息",
-                "nameLabel": "目录名称 *",
+                "nameLabel": "作品名称 *",
                 "namePlaceholder": "例如，Awesome AI Tools",
-                "slugLabel": "目录 Slug *",
+                "slugLabel": "作品 Slug *",
                 "slugPlaceholder": "awesome-ai-tools",
                 "githubRequired": "请先连接您的 GitHub 账户。",
                 "slugHelp": "URL 友好的标识符（仅限小写字母、数字和连字符）",
@@ -2316,7 +2316,7 @@
                 "advancedSettings": "高级设置",
                 "advancedSubtitle": "组织、自定义标头等",
                 "organizationLabel": "在组织下创建",
-                "organizationHelp": "在 GitHub 组织下创建此目录，而不是个人账户",
+                "organizationHelp": "在 GitHub 组织下创建此作品，而不是个人账户",
                 "organizationNameLabel": "组织名称",
                 "organizationNamePlaceholder": "my-organization",
                 "headerLabel": "自定义 README 标头",
@@ -2325,25 +2325,25 @@
                 "footerLabel": "自定义 README 尾部",
                 "footerPlaceholder": "在 README 文件底部添加自定义内容",
                 "footerOverwrite": "完全替换默认尾部",
-                "createButton": "创建目录",
-                "creatingButton": "正在创建目录...",
+                "createButton": "创建作品",
+                "creatingButton": "正在创建作品...",
                 "cancelButton": "取消",
-                "nameRequired": "目录名称是必填的",
-                "slugRequired": "目录 slug 是必填的",
-                "descriptionRequired": "目录描述是必填的",
-                "createFailed": "创建目录失败",
+                "nameRequired": "作品名称是必填的",
+                "slugRequired": "作品 slug 是必填的",
+                "descriptionRequired": "作品描述是必填的",
+                "createFailed": "创建作品失败",
                 "success": {
-                    "created": "目录创建成功！"
+                    "created": "作品创建成功！"
                 }
             },
             "import": {
-                "title": "导入现有目录",
-                "subtitle": "从现有 GitHub 仓库导入目录",
+                "title": "导入现有作品",
+                "subtitle": "从现有 GitHub 仓库导入作品",
                 "importNow": "立即导入",
                 "aiProviderSettings": "AI 提供商",
                 "aiProviderSettingsDescription": "选择用于解析 README 的 AI 提供商",
-                "formTitle": "从 GitHub 导入目录",
-                "formSubtitle": "从现有 GitHub 仓库导入项目来创建您的目录",
+                "formTitle": "从 GitHub 导入作品",
+                "formSubtitle": "从现有 GitHub 仓库导入项目来创建您的作品",
                 "sync": {
                     "title": "保持同步",
                     "description": "自动从源仓库拉取更新。"
@@ -2396,13 +2396,13 @@
                     "schedule": "调度：{cadence}",
                     "providers": "提供商：{providers}"
                 },
-                "nameLabel": "目录名称",
-                "namePlaceholder": "例如，我的 Awesome 目录",
+                "nameLabel": "作品名称",
+                "namePlaceholder": "例如，我的 Awesome 作品",
                 "advancedSettings": "高级设置",
                 "advancedSubtitle": "配置组织和仓库设置",
                 "attribution": {
                     "title": "源归属：",
-                    "text": "此目录将引用 {url} 作为其源"
+                    "text": "此作品将引用 {url} 作为其源"
                 },
                 "research": {
                     "title": "导入和研究模式",
@@ -2425,13 +2425,13 @@
                     "importingButton": "正在启动研究管道..."
                 },
                 "analyzeButton": "分析仓库",
-                "importButton": "导入目录",
+                "importButton": "导入作品",
                 "importingButton": "正在导入...",
                 "backButton": "返回",
                 "cancelButton": "取消",
                 "importing": {
-                    "title": "正在导入目录",
-                    "subtitle": "正在从源仓库设置您的目录..."
+                    "title": "正在导入作品",
+                    "subtitle": "正在从源仓库设置您的作品..."
                 },
                 "repositorySelector": {
                     "title": "选择仓库",
@@ -2498,17 +2498,17 @@
                     "unsupportedFormat": "不支持此仓库格式。请使用数据仓库或 Awesome 列表格式。",
                     "analyzeFailed": "分析仓库失败",
                     "analyzeForLinkingFailed": "链接分析失败",
-                    "nameRequired": "目录名称是必填的",
+                    "nameRequired": "作品名称是必填的",
                     "noAnalysis": "请先分析仓库",
                     "githubRequired": "请先连接您的 GitHub 账户",
                     "providerRequired": "请先选择一个 git 提供商",
-                    "importFailed": "导入目录失败",
-                    "linkFailed": "链接目录失败",
+                    "importFailed": "导入作品失败",
+                    "linkFailed": "链接作品失败",
                     "providerNotConfigured": "{provider} 未配置。请访问设置 → 插件在导入前进行设置。"
                 },
                 "success": {
-                    "started": "导入已启动！正在重定向到您的目录...",
-                    "linked": "目录链接成功"
+                    "started": "导入已启动！正在重定向到您的作品...",
+                    "linked": "作品链接成功"
                 },
                 "slugConflict": {
                     "title": "仓库名称冲突",
@@ -2521,7 +2521,7 @@
             "connection": {
                 "alert": {
                     "title": "{provider} 未连接",
-                    "subtitle": "连接您的 {provider} 帐户以创建目录",
+                    "subtitle": "连接您的 {provider} 帐户以创建作品",
                     "connectButton": "连接 {provider}",
                     "connectingButton": "连接中..."
                 }
@@ -2537,7 +2537,7 @@
             },
             "settings": {
                 "title": "Git 提供商连接",
-                "subtitle": "连接您的 git 提供商帐户以导入仓库、创建目录和管理您的项目。",
+                "subtitle": "连接您的 git 提供商帐户以导入仓库、创建作品和管理您的项目。",
                 "connectedCount": "{count, plural, =0 {没有提供商已连接} =1 {1 个提供商已连接} other {# 个提供商已连接}}",
                 "noProvidersConnected": "没有提供商已连接",
                 "canImport": "您可以导入和管理仓库",
@@ -2568,7 +2568,7 @@
                 "subtitle": "在插件设置中配置部署提供商",
                 "connected": "已连接",
                 "notConnected": "未连接",
-                "connectedMessage": "您的部署提供商已配置。您现在可以部署目录。",
+                "connectedMessage": "您的部署提供商已配置。您现在可以部署作品。",
                 "disconnect": "断开连接",
                 "disconnecting": "移除中...",
                 "apiTokenLabel": "API 令牌",
@@ -2604,17 +2604,17 @@
             "subtitle": "选择您希望如何接收重要更新的通知",
             "email": {
                 "title": "电子邮件通知",
-                "directoryUpdates": {
-                    "label": "目录更新",
-                    "description": "接收目录重要更新的通知"
+                "workUpdates": {
+                    "label": "作品更新",
+                    "description": "接收作品重要更新的通知"
                 },
                 "newItems": {
                     "label": "新项目",
-                    "description": "当目录中添加新项目时接收通知"
+                    "description": "当作品中添加新项目时接收通知"
                 },
                 "weeklyDigest": {
                     "label": "每周摘要",
-                    "description": "接收目录活动的每周摘要"
+                    "description": "接收作品活动的每周摘要"
                 },
                 "marketing": {
                     "label": "营销与促销",
@@ -2625,11 +2625,11 @@
                 "title": "应用内通知",
                 "newItems": {
                     "label": "新项目",
-                    "description": "显示新目录项目的通知"
+                    "description": "显示新作品项目的通知"
                 },
                 "comments": {
                     "label": "评论",
-                    "description": "接收目录评论的通知"
+                    "description": "接收作品评论的通知"
                 },
                 "mentions": {
                     "label": "@提及",
@@ -2653,12 +2653,12 @@
         "sidebar": {
             "menu": "菜单",
             "aiChat": "AI 聊天",
-            "newDirectory": "新建目录",
-            "activityIndicator": "目录生成中",
+            "newWork": "新建作品",
+            "activityIndicator": "作品生成中",
             "navigation": {
                 "dashboard": "仪表板",
                 "activity": "活动",
-                "directories": "目录",
+                "works": "作品",
                 "plugins": "插件",
                 "settings": "设置"
             },
@@ -2680,7 +2680,7 @@
             "subtitle": "不可逆的破坏性操作",
             "export": {
                 "title": "导出您的数据",
-                "subtitle": "下载您的所有目录、项目和设置",
+                "subtitle": "下载您的所有作品、项目和设置",
                 "action": "导出数据（即将推出）"
             },
             "delete": {
@@ -2690,8 +2690,8 @@
                 "confirmTitle": "⚠️ 这将永久删除：",
                 "confirmItems": [
                     "您的帐户和个人资料",
-                    "您的所有目录",
-                    "所有目录项目和数据",
+                    "您的所有作品",
+                    "所有作品项目和数据",
                     "API 密钥和集成",
                     "所有相关网站"
                 ],
@@ -2711,13 +2711,13 @@
         "aiChat": {
             "title": "AI 助手",
             "panelTitle": "聊天",
-            "subtitle": "使用自然语言创建目录",
+            "subtitle": "使用自然语言创建作品",
             "welcomeTitle": "欢迎使用 AI 助手 👋",
-            "welcomeSubtitle": "您的 AI 驱动助手。询问我有关创建目录、生成内容或组织数据的任何问题。",
-            "welcomeMessage": "嗨！我可以使用自然语言帮助您创建目录。例如询问“为 AI 工具创建一个目录”或描述您的需求。",
+            "welcomeSubtitle": "您的 AI 驱动助手。询问我有关创建作品、生成内容或组织数据的任何问题。",
+            "welcomeMessage": "嗨！我可以使用自然语言帮助您创建作品。例如询问“为 AI 工具创建一个作品”或描述您的需求。",
             "capabilities": {
-                "directoryCreation": "目录创建",
-                "directoryCreationDesc": "从自然语言描述构建目录",
+                "workCreation": "作品创建",
+                "workCreationDesc": "从自然语言描述构建作品",
                 "webResearch": "网络研究",
                 "webResearchDesc": "在整个网络上搜索和收集数据",
                 "contentGeneration": "内容生成",
@@ -2747,11 +2747,11 @@
             "selectProvider": "提供商",
             "notConfigured": "未配置",
             "gitNotConnected": "Git 提供商未连接",
-            "gitNotConnectedDesc": "连接您的 Git 提供商以创建和管理目录。",
+            "gitNotConnectedDesc": "连接您的 Git 提供商以创建和管理作品。",
             "connectGithub": "连接 GitHub",
             "gitConnectedAs": "通过 {provider} 以 {username} 身份连接",
             "deployNotConfigured": "部署提供商未配置",
-            "deployNotConfiguredDesc": "配置部署提供商以发布您的目录网站。",
+            "deployNotConfiguredDesc": "配置部署提供商以发布您的作品网站。",
             "configureDeployProvider": "配置部署提供商",
             "deployConfigured": "部署提供商已配置 ({provider})",
             "opened": "已打开",
@@ -2761,12 +2761,12 @@
             "historyYesterday": "昨天",
             "historyDaysAgo": "{days} 天前",
             "suggestions": {
-                "s1": "显示我的目录",
-                "s2": "创建一个 AI 工具目录",
+                "s1": "显示我的作品",
+                "s2": "创建一个 AI 工具作品",
                 "s3": "检查我的 Git 连接",
                 "s4": "显示我的统计信息"
             },
-            "feelingLucky": "建议一个要创建的目录",
+            "feelingLucky": "建议一个要创建的作品",
             "errors": {
                 "unableToSend": "无法发送消息"
             }
@@ -2779,7 +2779,7 @@
             "enabled": "已启用",
             "disabled": "已禁用",
             "enable": "启用",
-            "enableDescription": "配置此插件在您的目录中的启用方式。",
+            "enableDescription": "配置此插件在您的作品中的启用方式。",
             "disable": "禁用",
             "settings": "设置",
             "saveSettings": "保存设置",
@@ -2811,11 +2811,11 @@
                 "pipeline": "流水线"
             },
             "alwaysEnabled": "始终启用",
-            "disableWarning": "禁用此插件也将禁用您所有目录中的插件",
+            "disableWarning": "禁用此插件也将禁用您所有作品中的插件",
             "cannotDisableSystem": "系统插件无法禁用",
             "disableFailed": "禁用插件失败",
-            "autoEnableForDirectories": "同时为所有目录启用",
-            "autoEnableForDirectoriesDescription": "此插件将在您所有目录中自动激活。您仍可按目录禁用它。",
+            "autoEnableForWorks": "同时为所有作品启用",
+            "autoEnableForWorksDescription": "此插件将在您所有作品中自动激活。您仍可按作品禁用它。",
             "confirmDisable": "确认禁用",
             "cancel": "取消",
             "missingRequiredFields": "缺少必需字段：{fields}",
@@ -2890,20 +2890,20 @@
                 "removeLabel": "移除 {login}"
             }
         },
-        "directoryPlugins": {
-            "title": "目录插件",
-            "subtitle": "为该目录配置插件",
+        "workPlugins": {
+            "title": "作品插件",
+            "subtitle": "为该作品配置插件",
             "active": "已激活",
             "enable": "启用",
             "disable": "禁用",
-            "enableForDirectory": "为此目录启用",
-            "disableForDirectory": "为此目录禁用",
+            "enableForWork": "为此作品启用",
+            "disableForWork": "为此作品禁用",
             "enableAtUserLevelFirst": "先在您的设置中启用此插件",
             "disabledByUser": "用户级已禁用",
             "systemAlwaysEnabled": "系统插件 - 始终启用",
             "showSettings": "显示设置",
             "hideSettings": "隐藏设置",
-            "directorySettingsInfo": "在此配置目录特定设置",
+            "workSettingsInfo": "在此配置作品特定设置",
             "save": "保存",
             "saved": "已保存",
             "showInstalledOnly": "仅显示已安装",
@@ -2911,7 +2911,7 @@
             "noPlugins": "没有可用的插件",
             "showAllPlugins": "显示所有插件",
             "capabilityProviders": "能力提供者",
-            "capabilityProvidersDescription": "选择为该目录提供每个能力的插件",
+            "capabilityProvidersDescription": "选择为该作品提供每个能力的插件",
             "noProvidersAvailable": "没有可用的提供者",
             "categories": {
                 "git": "Git",
@@ -2929,12 +2929,12 @@
             "errors": {
                 "unableToSend": "无法发送消息。"
             },
-            "settingsModalTitle": "目录设置",
-            "settingsModalDescription": "覆盖此目录的设置。未设置字段将继承自用户设置。",
+            "settingsModalTitle": "作品设置",
+            "settingsModalDescription": "覆盖此作品的设置。未设置字段将继承自用户设置。",
             "inheritedFrom": "继承：{value}",
             "inheritedSecret": "继承：••••••••",
             "resetToDefaults": "重置为默认值",
-            "resetConfirm": "这将清除所有目录特定覆盖。设置将回退到用户级值。",
+            "resetConfirm": "这将清除所有作品特定覆盖。设置将回退到用户级值。",
             "resetSuccess": "设置已重置为默认值",
             "cancel": "取消",
             "clickToConfigure": "点击配置",
@@ -2949,8 +2949,8 @@
         "auth": {
             "backToHome": "返回首页",
             "feature": {
-                "title": "使用 AI 构建目录",
-                "subtitle": "使用自然语言在几分钟内创建美丽、可搜索的目录。无需编码。",
+                "title": "使用 AI 构建作品",
+                "subtitle": "使用自然语言在几分钟内创建美丽、可搜索的作品。无需编码。",
                 "badge": "AI 驱动",
                 "benefits": {
                     "ai": {
@@ -3002,8 +3002,8 @@
         }
     },
     "metadata": {
-        "title": "{companyName} - 目录构建器",
-        "description": "一个用于构建和管理目录的 SaaS 平台",
+        "title": "{companyName} - 作品构建器",
+        "description": "一个用于构建和管理作品的 SaaS 平台",
         "pages": {
             "signIn": "登录",
             "createAccount": "创建账户",
@@ -3012,9 +3012,9 @@
             "authError": "认证错误",
             "dashboard": "仪表板",
             "activity": "活动日志",
-            "directories": "目录",
-            "newDirectory": "新目录",
-            "directory": "目录",
+            "works": "作品",
+            "newWork": "新作品",
+            "work": "作品",
             "overview": "概览",
             "items": "项目",
             "generator": "生成器",
@@ -3048,7 +3048,7 @@
         }
     },
     "actions": {
-        "directories": {
+        "works": {
             "slug": {
                 "required": "Slug 必填",
                 "format": "Slug 只能包含小写字母、数字和连字符"
@@ -3067,16 +3067,16 @@
             },
             "oauthRequired": "需要 OAuth 连接。请先连接您的 {provider} 账户。",
             "githubRequired": "需要 GitHub 连接。请先连接您的 GitHub 账户。",
-            "createSuccess": "目录创建成功！",
-            "createFailed": "创建目录失败",
-            "updateSuccess": "目录更新成功！",
-            "updateFailed": "更新目录失败",
-            "invalidGeneratedData": "生成有效目录数据失败",
-            "aiGenerationStarted": "目录创建已启动！AI 正在生成内容...",
-            "invalidId": "无效的目录 ID",
-            "deleteSuccess": "目录删除成功",
-            "deleteFailed": "删除目录失败",
-            "fetchFailed": "获取目录失败",
+            "createSuccess": "作品创建成功！",
+            "createFailed": "创建作品失败",
+            "updateSuccess": "作品更新成功！",
+            "updateFailed": "更新作品失败",
+            "invalidGeneratedData": "生成有效作品数据失败",
+            "aiGenerationStarted": "作品创建已启动！AI 正在生成内容...",
+            "invalidId": "无效的作品 ID",
+            "deleteSuccess": "作品删除成功",
+            "deleteFailed": "删除作品失败",
+            "fetchFailed": "获取作品失败",
             "organization": {
                 "requiredWhenOwnerProvided": "当提供所有者时，必须启用组织"
             },
@@ -3084,7 +3084,7 @@
                 "invalidUrl": "请输入有效的 URL",
                 "analyzeFailed": "分析仓库失败",
                 "started": "导入已成功启动",
-                "failed": "导入目录失败",
+                "failed": "导入作品失败",
                 "fetchReposFailed": "获取仓库失败"
             }
         },

@@ -14,8 +14,8 @@ test.describe('Route protection', () => {
         await page.waitForURL(/\/(login|register|en\/?$)/, { timeout: 10_000 });
     });
 
-    test('should redirect unauthenticated user from directories to login', async ({ page }) => {
-        await page.goto('/en/directories');
+    test('should redirect unauthenticated user from works to login', async ({ page }) => {
+        await page.goto('/en/works');
 
         await page.waitForURL(/\/(login|register|en\/?$)/, { timeout: 10_000 });
     });
@@ -26,10 +26,8 @@ test.describe('Route protection', () => {
         await page.waitForURL(/\/(login|register|en\/?$)/, { timeout: 10_000 });
     });
 
-    test('should redirect unauthenticated user from new directory page to login', async ({
-        page,
-    }) => {
-        await page.goto('/en/directories/new');
+    test('should redirect unauthenticated user from new work page to login', async ({ page }) => {
+        await page.goto('/en/works/new');
 
         await page.waitForURL(/\/(login|register|en\/?$)/, { timeout: 10_000 });
     });

@@ -2,7 +2,7 @@
 
 **Status**: `Active`
 **Last updated**: 2026-05-02
-**Audience**: AI agents and engineers reasoning about how a directory
+**Audience**: AI agents and engineers reasoning about how a work
 generation request flows from API to GitHub repos. The companion
 [`pipeline-executor`](./pipeline-executor.md) covers the runtime
 substrate (state machine, modifiers, cancellation, checkpointing);
@@ -12,7 +12,7 @@ this spec is the wide-angle view across **all** pipeline categories.
 
 ## 1. Purpose
 
-A directory generation transforms a user's prompt + configuration
+A work generation transforms a user's prompt + configuration
 into three GitHub repositories: a **data repo** (YAML config + JSON
 items), a **markdown repo** (README + per-item detail pages), and a
 **website repo** (Next.js application). The pipeline is the unit of
@@ -31,14 +31,14 @@ and the routing logic that picks one per run.
                        User / Schedule / API
                               │
                               ▼
-       DirectoryGenerationService.startGeneration(...)
-                              │   creates DirectoryGenerationHistory
-                              │   builds DirectoryGenerationPayload
+       WorkGenerationService.startGeneration(...)
+                              │   creates WorkGenerationHistory
+                              │   builds WorkGenerationPayload
                               ▼
                  DIRECTORY_GENERATION_DISPATCHER
                               │
                               ▼
-                 Trigger.dev directoryGenerationTask
+                 Trigger.dev workGenerationTask
                               │
                               ▼
               TriggerGenerationOrchestrator.run({...})
@@ -74,13 +74,13 @@ which routes through `PipelineOrchestratorService.execute`:
 
 ```ts
 // packages/agent/src/pipeline/pipeline-orchestrator.service.ts
-const plugin = await this.resolvePipelinePlugin(pipelineId, directoryId, userId);
+const plugin = await this.resolvePipelinePlugin(pipelineId, workId, userId);
 const mode = isStepOrchestratablePipeline(plugin) ? 'step' : 'full';
 
 if (mode === 'step') {
-	return this.stepExecutor.execute(plugin, directory, request, existing, options, onProgress);
+	return this.stepExecutor.execute(plugin, work, request, existing, options, onProgress);
 }
-return this.fullExecutor.execute(plugin, directory, request, existing, options, onProgress);
+return this.fullExecutor.execute(plugin, work, request, existing, options, onProgress);
 ```
 
 Two execution modes, set by the pipeline plugin's own type signature
@@ -119,21 +119,21 @@ pipeline-plugin (capability)
 ```
 
 All ten pipeline plugins are first-party packages under
-`packages/plugins/`. They're selectable per directory via the
+`packages/plugins/`. They're selectable per work via the
 plugin-settings cascade described in
 [`plugin-sdk` §11](./plugin-sdk.md#11-provider-selection):
-**directory override → user default → platform default**, with
+**work override → user default → platform default**, with
 `standard-pipeline` as the platform default.
 
 The choice surfaces in the dashboard's "Generation method" picker
-on the directory detail page; settings hygiene (secrets, `x-secret`,
+on the work detail page; settings hygiene (secrets, `x-secret`,
 plugin enable/disable) is handled by
 [`settings-system`](./settings-system.md).
 
 ## 5. Pipeline Plugin Selection Cascade
 
 ```
-1. directory-pinned plugin id     (most specific — set per directory)
+1. work-pinned plugin id     (most specific — set per work)
 2. user-default plugin id         (set on the user's profile)
 3. platform default               (standard-pipeline)
 ```
@@ -212,7 +212,7 @@ step executor entirely.
 
 The CLI-based plugins (`claude-code`, `codex`, `gemini`, `opencode`)
 are functionally similar — they shell out to a code-agent CLI binary
-with a directory-scoped working tree, watch stdout for structured
+with a work-scoped working tree, watch stdout for structured
 output, and translate the result back into items + categories +
 tags. The plugins differ in which CLI they shell out to and how they
 parse the CLI's progress output.
@@ -245,7 +245,7 @@ Both step and full executors take the same input shape:
 
 ```ts
 interface GenerationRequest {
-	directoryId: string;
+	workId: string;
 	userId: string;
 	prompt: string;
 	mode: 'create' | 'update';
@@ -279,7 +279,7 @@ interface PipelineResult {
 }
 ```
 
-This shared contract is why a directory can switch from
+This shared contract is why a work can switch from
 `standard-pipeline` to `claude-code` (or vice versa) without any
 schema migration — the data repository writer doesn't know or care
 which pipeline produced the items.
@@ -288,13 +288,13 @@ which pipeline produced the items.
 
 `PipelineFacadeService` constructs a per-run `StepExecutionContext`
 where every facade (AI, search, screenshot, content-extractor,
-data-source, prompt) is **bound** to the directory + user + provider
+data-source, prompt) is **bound** to the work + user + provider
 overrides. Step authors call `ctx.aiFacade.askJson(prompt, schema)`
-without ever passing `directoryId` / `userId` themselves:
+without ever passing `workId` / `userId` themselves:
 
 ```ts
 // packages/agent/src/pipeline/pipeline-facade.service.ts
-createStepExecutionContext(directory, providerOverrides, aiModelOverride, signal): StepExecutionContext {
+createStepExecutionContext(work, providerOverrides, aiModelOverride, signal): StepExecutionContext {
     return {
         aiFacade: this.createBoundAiFacade(facadeContext),
         searchFacade: this.createBoundSearchFacade(facadeContext),
@@ -303,8 +303,8 @@ createStepExecutionContext(directory, providerOverrides, aiModelOverride, signal
         dataSourceFacade: this.createBoundDataSourceFacade(facadeContext),
         promptFacade: this.createBoundPromptFacade(facadeContext),
         logger: stepLogger,
-        directory,
-        user: directory.user,
+        work,
+        user: work.user,
         signal,
     };
 }
@@ -317,13 +317,13 @@ same bound facades and the same cancellation signal.
 ## 11. Run Lifecycle and Persistence
 
 ```
-DirectoryGenerationService.startGeneration
-  ├── insert DirectoryGenerationHistory(historyId, NOT_STARTED)
-  ├── build DirectoryGenerationPayload
+WorkGenerationService.startGeneration
+  ├── insert WorkGenerationHistory(historyId, NOT_STARTED)
+  ├── build WorkGenerationPayload
   └── DIRECTORY_GENERATION_DISPATCHER.dispatch(payload)
        │
        ▼ (Trigger.dev)
-TriggerGenerationOrchestrator.run({ directory, user, dto, historyId, ... })
+TriggerGenerationOrchestrator.run({ work, user, dto, historyId, ... })
   ├── recordGenerationStartTime + updateGenerateStatus(GENERATING)
   ├── DataGeneratorService.initialize(...)         ← runs the pipeline
   │     ├── ItemsGeneratorService.generateItems
@@ -340,7 +340,7 @@ Three classes of progress signal flow back during the run:
 1. **Step-status events** (per-step start/end, metrics) — emitted by
    the executor; consumed by the activity-log writer and the
    dashboard's progress view.
-2. **Recent logs** ring buffer — written to `directory.recentLogs`
+2. **Recent logs** ring buffer — written to `work.recentLogs`
    for the live tail.
 3. **Trigger.dev run logs** — every NestJS log line surfaces in the
    Trigger.dev dashboard via `createTriggerLogger(...)`.
@@ -388,13 +388,13 @@ which append per-step custom instructions for steps 4, 5, 8, 9, 10,
 ## 14. File Index
 
 ```
-apps/api/src/directories/services/
-├── directory-generation.service.ts         # Entry point, history record creation
+apps/api/src/works/services/
+├── work-generation.service.ts         # Entry point, history record creation
 
 packages/agent/src/
 ├── tasks/
-│   ├── directory-generation-dispatcher.ts  # DI symbol for dispatch interface
-│   └── directory-generation.types.ts       # Payload typings
+│   ├── work-generation-dispatcher.ts  # DI symbol for dispatch interface
+│   └── work-generation.types.ts       # Payload typings
 ├── items-generator/
 │   ├── items-generator.service.ts          # Calls into the orchestrator
 │   └── interfaces/pipeline.interface.ts    # GenerationContext + AdvancedPromptsContext
@@ -424,7 +424,7 @@ packages/plugins/{agent-pipeline,claude-code,claude-managed-agent,codex,gemini,o
 └── *.plugin.ts                             # IPipelinePlugin impls (full mode)
 
 packages/tasks/src/
-├── tasks/trigger/directory-generation.task.ts          # Trigger.dev task
+├── tasks/trigger/work-generation.task.ts          # Trigger.dev task
 └── trigger/worker/orchestrators/trigger-generation.orchestrator.ts  # 3-stage orchestrator
 ```
 

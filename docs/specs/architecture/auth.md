@@ -75,10 +75,10 @@ The token payload includes:
 | `exp`   | Expiry (default: 7 days, configurable) |
 | `roles` | Platform roles (`user`, `admin`)       |
 
-There are **no per-directory roles in the JWT** — those are resolved
-fresh on every request via `DirectoryOwnershipService` so role changes
+There are **no per-work roles in the JWT** — those are resolved
+fresh on every request via `WorkOwnershipService` so role changes
 propagate immediately (see
-[`features/directory-members/spec`](../features/directory-members/spec.md)).
+[`features/work-members/spec`](../features/work-members/spec.md)).
 
 Refresh tokens are stored server-side keyed by `userId`. Refresh exchanges
 old → new and rotates the refresh token (one-time-use).
@@ -189,29 +189,29 @@ visitors.
 `AuthSessionGuard` only proves **who** the caller is. **What they can
 do** to a specific resource is enforced separately by domain services:
 
-- `DirectoryOwnershipService.ensureCanRead / ensureCanEdit / ensureCanManage`
-  — see [`features/directory-members/spec`](../features/directory-members/spec.md).
+- `WorkOwnershipService.ensureCanRead / ensureCanEdit / ensureCanManage`
+  — see [`features/work-members/spec`](../features/work-members/spec.md).
 - `SubscriptionService.ensureWithinPlan` — for plan-gated operations.
 - `ApiKeyService` — manages API keys; rejects API-key-authenticated
   requests on its own endpoints (JWT-only by design).
 
 This split makes it possible for an authenticated user to call an
 endpoint they're allowed to call (auth pass) but get `403` because of
-their per-directory role (authorisation fail). The dashboard surfaces
+their per-work role (authorisation fail). The dashboard surfaces
 both as distinct error states.
 
 ## 10. API-Key vs JWT Differences
 
-| Behaviour                    | JWT                   | API key                                                |
-| ---------------------------- | --------------------- | ------------------------------------------------------ |
-| Lifetime                     | 7 days (refreshable)  | Until revoked or `expiresAt`                           |
-| Per-directory role           | Resolved live from DB | Same — keys carry the user's full per-directory rights |
-| Manage other API keys        | Allowed               | Rejected (`403`)                                       |
-| Manage own account / profile | Allowed               | Rejected (`403`)                                       |
-| Connect OAuth providers      | Allowed               | Rejected (`403`)                                       |
-| Trigger directory generation | Allowed               | Allowed                                                |
-| Run MCP tool calls           | N/A                   | The MCP server's only auth path                        |
-| Dashboard sessions           | Yes                   | No                                                     |
+| Behaviour                    | JWT                   | API key                                           |
+| ---------------------------- | --------------------- | ------------------------------------------------- |
+| Lifetime                     | 7 days (refreshable)  | Until revoked or `expiresAt`                      |
+| Per-work role                | Resolved live from DB | Same — keys carry the user's full per-work rights |
+| Manage other API keys        | Allowed               | Rejected (`403`)                                  |
+| Manage own account / profile | Allowed               | Rejected (`403`)                                  |
+| Connect OAuth providers      | Allowed               | Rejected (`403`)                                  |
+| Trigger work generation      | Allowed               | Allowed                                           |
+| Run MCP tool calls           | N/A                   | The MCP server's only auth path                   |
+| Dashboard sessions           | Yes                   | No                                                |
 
 API keys are deliberately **second-class for management endpoints** —
 they can do work but can't bootstrap their own access.
@@ -264,9 +264,9 @@ Everything else requires authentication.
 ## 14. Testing
 
 `apps/api/test/` contains Supertest e2e suites for every front door
-plus the device flow. Per-directory authorisation is covered by both
+plus the device flow. Per-work authorisation is covered by both
 e2e and the
-`directory-ownership.service.spec.ts` unit suite. Mocking strategy:
+`work-ownership.service.spec.ts` unit suite. Mocking strategy:
 
 - **Unit tests** mock `AuthSessionGuard` to inject a known
   `AuthenticatedUser`.
@@ -298,7 +298,7 @@ e2e and the
     - `packages/agent/src/database/repositories/oauth-token.repository.ts`
 - Related specs:
     - [`features/api-keys/spec`](../features/api-keys/spec.md)
-    - [`features/directory-members/spec`](../features/directory-members/spec.md)
+    - [`features/work-members/spec`](../features/work-members/spec.md)
     - [`features/mcp-server/spec`](../features/mcp-server/spec.md)
     - [`plugin-sdk`](./plugin-sdk.md) (`oauth`, `device-auth-provider` capabilities)
 - User docs: [`docs/api/authentication.md`](../../api/authentication.md)

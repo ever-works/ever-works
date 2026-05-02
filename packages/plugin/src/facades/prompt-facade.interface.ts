@@ -14,7 +14,7 @@ export interface IPromptFacade extends IBaseFacade {
 	 *
 	 * @param key - Unique prompt key (e.g., 'standard-pipeline.domain-detection')
 	 * @param defaultPrompt - Hardcoded fallback prompt template
-	 * @param facadeOptions - User/directory context for settings resolution
+	 * @param facadeOptions - User/work context for settings resolution
 	 * @returns The resolved prompt template string (provider or default)
 	 */
 	getPrompt(key: string, defaultPrompt: string, facadeOptions?: FacadeOptions): Promise<string>;

@@ -216,10 +216,10 @@ healthCheck() {
 
 ```typescript
 @UseGuards(JwtAuthGuard)
-@Get('api/directories')
+@Get('api/works')
 @ApiBearerAuth()
-async getDirectories(@CurrentUser() user: AuthenticatedUser) {
-    return this.directoryService.findByUser(user.userId);
+async getWorks(@CurrentUser() user: AuthenticatedUser) {
+    return this.workService.findByUser(user.userId);
 }
 ```
 
@@ -228,7 +228,7 @@ async getDirectories(@CurrentUser() user: AuthenticatedUser) {
 No special configuration needed -- the `JwtAuthGuard` handles both automatically:
 
 ```typescript
-@Post('api/directories/:slug/generate')
+@Post('api/works/:slug/generate')
 @ApiBearerAuth()
 async generate(
     @Param('slug') slug: string,

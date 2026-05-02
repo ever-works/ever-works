@@ -34,28 +34,28 @@ flowchart LR
 
 ## Source Files
 
-| File                                                       | Purpose                                                  |
-| ---------------------------------------------------------- | -------------------------------------------------------- |
-| `packages/agent/src/dto/create-directory.dto.ts`           | Directory creation with slug validation, nested config   |
-| `packages/agent/src/dto/update-directory.dto.ts`           | Partial update DTO with optional fields                  |
-| `packages/agent/src/dto/generate-data.dto.ts`              | Minimal DTO for generation requests                      |
-| `packages/agent/src/dto/website-settings.dto.ts`           | Deeply nested DTO with header, homepage, footer sections |
-| `packages/agent/src/dto/directory-advanced-prompts.dto.ts` | Advanced prompt configuration                            |
-| `packages/agent/src/dto/directory-schedule.dto.ts`         | Schedule cadence configuration                           |
-| `packages/agent/src/dto/taxonomy.dto.ts`                   | Category/collection/tag DTOs                             |
-| `packages/agent/src/dto/import-directory.dto.ts`           | Import source configuration                              |
+| File                                                  | Purpose                                                  |
+| ----------------------------------------------------- | -------------------------------------------------------- |
+| `packages/agent/src/dto/create-work.dto.ts`           | Work creation with slug validation, nested config        |
+| `packages/agent/src/dto/update-work.dto.ts`           | Partial update DTO with optional fields                  |
+| `packages/agent/src/dto/generate-data.dto.ts`         | Minimal DTO for generation requests                      |
+| `packages/agent/src/dto/website-settings.dto.ts`      | Deeply nested DTO with header, homepage, footer sections |
+| `packages/agent/src/dto/work-advanced-prompts.dto.ts` | Advanced prompt configuration                            |
+| `packages/agent/src/dto/work-schedule.dto.ts`         | Schedule cadence configuration                           |
+| `packages/agent/src/dto/taxonomy.dto.ts`              | Category/collection/tag DTOs                             |
+| `packages/agent/src/dto/import-work.dto.ts`           | Import source configuration                              |
 
 ## Key Classes
 
-### CreateDirectoryDto -- Full Validation Example
+### CreateWorkDto -- Full Validation Example
 
 Demonstrates slug regex validation, length limits, transforms, nested objects, and Swagger documentation:
 
 ```typescript
-export class CreateDirectoryDto {
+export class CreateWorkDto {
 	@ApiProperty({
 		description: 'URL-friendly identifier',
-		example: 'my-awesome-directory'
+		example: 'my-awesome-work'
 	})
 	@IsString()
 	@IsNotEmpty()
@@ -89,12 +89,12 @@ export class CreateDirectoryDto {
 }
 ```
 
-### UpdateDirectoryDto -- Partial Updates
+### UpdateWorkDto -- Partial Updates
 
 All fields are `@IsOptional()` for PATCH-style updates:
 
 ```typescript
-export class UpdateDirectoryDto {
+export class UpdateWorkDto {
 	@IsString()
 	@IsOptional()
 	@MaxLength(100)
@@ -204,8 +204,8 @@ DTOs use `@ApiProperty()` and `@ApiPropertyOptional()` to generate OpenAPI docum
 
 ```typescript
 @ApiProperty({
-    description: 'Display name for the directory',
-    example: 'My Awesome Directory',
+    description: 'Display name for the work',
+    example: 'My Awesome Work',
     maxLength: 100,
 })
 @IsString()

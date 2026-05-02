@@ -7,7 +7,7 @@ sidebar_position: 6
 
 # AI Chat Components
 
-The AI chat system provides a conversational interface for creating directories using natural language. It consists of two components in `src/components/ai/` -- a context provider and the chat UI -- backed by the `useAIStream` and `useChatHistory` hooks.
+The AI chat system provides a conversational interface for creating works using natural language. It consists of two components in `src/components/ai/` -- a context provider and the chat UI -- backed by the `useAIStream` and `useChatHistory` hooks.
 
 ## Architecture Overview
 
@@ -210,13 +210,13 @@ The `scrollToBottom` function uses `requestAnimationFrame` and `scrollIntoView` 
 
 ## Integration with Generation System
 
-The AI chat's primary purpose is to help users create directories through natural conversation. When the AI determines the user wants to create a directory, the streaming response metadata may contain directory creation details. The chat endpoint on the backend coordinates with the generation system to:
+The AI chat's primary purpose is to help users create works through natural conversation. When the AI determines the user wants to create a work, the streaming response metadata may contain work creation details. The chat endpoint on the backend coordinates with the generation system to:
 
 1. Parse user intent from the conversation
-2. Generate directory configuration (name, description, categories)
+2. Generate work configuration (name, description, categories)
 3. Optionally trigger item generation
 
-The `providerOverride` field sent with each message allows the user to choose which AI provider processes their request, independent of the directory's default provider configuration.
+The `providerOverride` field sent with each message allows the user to choose which AI provider processes their request, independent of the work's default provider configuration.
 
 ## Styling
 

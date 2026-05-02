@@ -10,77 +10,77 @@ export interface WhitelistEntry {
 }
 
 export const WHITELIST: WhitelistEntry[] = [
-	// Directories (12)
+	// Works (12)
 	{
 		method: 'GET',
-		path: '/api/directories',
-		toolName: 'list_directories',
+		path: '/api/works',
+		toolName: 'list_works',
 		annotations: { readOnlyHint: true }
 	},
-	{ method: 'POST', path: '/api/directories', toolName: 'create_directory' },
+	{ method: 'POST', path: '/api/works', toolName: 'create_work' },
 	{
 		method: 'GET',
-		path: '/api/directories/{id}',
-		toolName: 'get_directory',
+		path: '/api/works/{id}',
+		toolName: 'get_work',
 		annotations: { readOnlyHint: true }
 	},
-	{ method: 'PUT', path: '/api/directories/{id}', toolName: 'update_directory' },
+	{ method: 'PUT', path: '/api/works/{id}', toolName: 'update_work' },
 	{
 		method: 'POST',
-		path: '/api/directories/{id}/delete',
-		toolName: 'delete_directory',
+		path: '/api/works/{id}/delete',
+		toolName: 'delete_work',
 		annotations: { destructiveHint: true }
 	},
 	{
 		method: 'GET',
-		path: '/api/directories/{id}/config',
-		toolName: 'get_directory_config',
+		path: '/api/works/{id}/config',
+		toolName: 'get_work_config',
 		annotations: { readOnlyHint: true }
 	},
 	{
 		method: 'GET',
-		path: '/api/directories/{id}/items',
-		toolName: 'get_directory_items',
+		path: '/api/works/{id}/items',
+		toolName: 'get_work_items',
 		annotations: { readOnlyHint: true }
 	},
 	{
 		method: 'GET',
-		path: '/api/directories/{id}/categories-tags',
+		path: '/api/works/{id}/categories-tags',
 		toolName: 'get_categories_tags',
 		annotations: { readOnlyHint: true }
 	},
 	{
 		method: 'GET',
-		path: '/api/directories/{id}/history',
-		toolName: 'get_directory_history',
+		path: '/api/works/{id}/history',
+		toolName: 'get_work_history',
 		annotations: { readOnlyHint: true }
 	},
-	{ method: 'POST', path: '/api/directories/{id}/regenerate-markdown', toolName: 'regenerate_markdown' },
-	{ method: 'POST', path: '/api/directories/{id}/update-website', toolName: 'update_website' },
-	{ method: 'POST', path: '/api/directories/{id}/process-community-prs', toolName: 'process_community_prs' },
+	{ method: 'POST', path: '/api/works/{id}/regenerate-markdown', toolName: 'regenerate_markdown' },
+	{ method: 'POST', path: '/api/works/{id}/update-website', toolName: 'update_website' },
+	{ method: 'POST', path: '/api/works/{id}/process-community-prs', toolName: 'process_community_prs' },
 
 	// Generation (4)
-	{ method: 'POST', path: '/api/directories/{id}/generate', toolName: 'generate_items' },
-	{ method: 'POST', path: '/api/directories/{id}/update', toolName: 'update_items' },
-	{ method: 'POST', path: '/api/directories/generate-details', toolName: 'generate_directory_details' },
+	{ method: 'POST', path: '/api/works/{id}/generate', toolName: 'generate_items' },
+	{ method: 'POST', path: '/api/works/{id}/update', toolName: 'update_items' },
+	{ method: 'POST', path: '/api/works/generate-details', toolName: 'generate_work_details' },
 	{
 		method: 'GET',
-		path: '/api/directories/{id}/generator-form',
+		path: '/api/works/{id}/generator-form',
 		toolName: 'get_generator_form',
 		annotations: { readOnlyHint: true }
 	},
 
 	// Items (4)
-	{ method: 'POST', path: '/api/directories/{id}/submit-item', toolName: 'submit_item' },
-	{ method: 'POST', path: '/api/directories/{id}/remove-item', toolName: 'remove_item' },
-	{ method: 'POST', path: '/api/directories/{id}/update-item', toolName: 'update_item' },
+	{ method: 'POST', path: '/api/works/{id}/submit-item', toolName: 'submit_item' },
+	{ method: 'POST', path: '/api/works/{id}/remove-item', toolName: 'remove_item' },
+	{ method: 'POST', path: '/api/works/{id}/update-item', toolName: 'update_item' },
 	{ method: 'POST', path: '/api/extract-item-details', toolName: 'extract_item_details' },
 
 	// Deploy (4)
-	{ method: 'POST', path: '/api/deploy/directories/{id}', toolName: 'deploy_directory' },
+	{ method: 'POST', path: '/api/deploy/works/{id}', toolName: 'deploy_work' },
 	{
 		method: 'GET',
-		path: '/api/deploy/directories/{id}/domains',
+		path: '/api/deploy/works/{id}/domains',
 		toolName: 'list_domains',
 		annotations: { readOnlyHint: true }
 	},
@@ -90,7 +90,7 @@ export const WHITELIST: WhitelistEntry[] = [
 		toolName: 'list_deploy_providers',
 		annotations: { readOnlyHint: true }
 	},
-	{ method: 'POST', path: '/api/deploy/directories/{id}/check', toolName: 'check_deploy_capability' },
+	{ method: 'POST', path: '/api/deploy/works/{id}/check', toolName: 'check_deploy_capability' },
 
 	// Plugins (5)
 	{
@@ -112,41 +112,41 @@ export const WHITELIST: WhitelistEntry[] = [
 	// Scheduling (4)
 	{
 		method: 'GET',
-		path: '/api/directories/{id}/schedule',
+		path: '/api/works/{id}/schedule',
 		toolName: 'get_schedule',
 		annotations: { readOnlyHint: true }
 	},
-	{ method: 'PUT', path: '/api/directories/{id}/schedule', toolName: 'update_schedule' },
+	{ method: 'PUT', path: '/api/works/{id}/schedule', toolName: 'update_schedule' },
 	{
 		method: 'DELETE',
-		path: '/api/directories/{id}/schedule',
+		path: '/api/works/{id}/schedule',
 		toolName: 'cancel_schedule',
 		annotations: { destructiveHint: true }
 	},
-	{ method: 'POST', path: '/api/directories/{id}/schedule/run', toolName: 'run_scheduled_update' },
+	{ method: 'POST', path: '/api/works/{id}/schedule/run', toolName: 'run_scheduled_update' },
 
 	// Comparisons (5)
 	{
 		method: 'GET',
-		path: '/api/directories/{id}/comparisons',
+		path: '/api/works/{id}/comparisons',
 		toolName: 'list_comparisons',
 		annotations: { readOnlyHint: true }
 	},
 	{
 		method: 'GET',
-		path: '/api/directories/{id}/comparisons/{slug}',
+		path: '/api/works/{id}/comparisons/{slug}',
 		toolName: 'get_comparison',
 		annotations: { readOnlyHint: true }
 	},
-	{ method: 'POST', path: '/api/directories/{id}/comparisons/generate', toolName: 'generate_comparison' },
+	{ method: 'POST', path: '/api/works/{id}/comparisons/generate', toolName: 'generate_comparison' },
 	{
 		method: 'POST',
-		path: '/api/directories/{id}/comparisons/generate-manual',
+		path: '/api/works/{id}/comparisons/generate-manual',
 		toolName: 'generate_manual_comparison'
 	},
 	{
 		method: 'DELETE',
-		path: '/api/directories/{id}/comparisons/{slug}',
+		path: '/api/works/{id}/comparisons/{slug}',
 		toolName: 'delete_comparison',
 		annotations: { destructiveHint: true }
 	}

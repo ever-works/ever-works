@@ -125,7 +125,7 @@ Each web result is mapped to a `SearchResult` with:
 ```typescript
 // Basic search
 const results = await bravePlugin.search({
-	query: 'open source directory builders',
+	query: 'open source work builders',
 	limit: 10,
 	settings: { apiKey: braveApiKey }
 });

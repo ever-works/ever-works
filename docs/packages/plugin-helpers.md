@@ -116,7 +116,7 @@ Settings are resolved from highest to lowest priority. The first non-null, non-u
 | Priority    | Source                | Description                     |
 | ----------- | --------------------- | ------------------------------- |
 | 1 (highest) | User settings         | Per-user configuration          |
-| 2           | Directory settings    | Per-directory overrides         |
+| 2           | Work settings         | Per-work overrides              |
 | 3           | Admin settings        | Organization-wide defaults      |
 | 4           | Environment variables | `x-envVar` mapped values        |
 | 5 (lowest)  | Schema defaults       | Default values from JSON Schema |
@@ -129,12 +129,12 @@ import { resolveSettings } from '@ever-works/plugin/helpers';
 const resolved = resolveSettings({
 	schema: pluginSettingsSchema,
 	userSettings: { model: 'gpt-4', temperature: 0.7 },
-	directorySettings: { model: 'gpt-3.5-turbo' },
+	workSettings: { model: 'gpt-3.5-turbo' },
 	adminSettings: {},
 	envVars: { OPENAI_API_KEY: 'sk-...' }
 });
 
-// resolved.model => 'gpt-4' (user takes priority over directory)
+// resolved.model => 'gpt-4' (user takes priority over work)
 // resolved.apiKey => 'sk-...' (from env var via x-envVar mapping)
 // resolved.temperature => 0.7 (from user settings)
 ```
@@ -155,7 +155,7 @@ The resolver reads `x-envVar` annotations from the plugin's JSON Schema to map e
     }
 }
 
-// If no user/directory/admin setting provides apiKey,
+// If no user/work/admin setting provides apiKey,
 // the resolver checks process.env.OPENAI_API_KEY
 ```
 
@@ -218,7 +218,7 @@ class MyPlugin implements IPlugin {
 		const settings = resolveSettings({
 			schema: this.settingsSchema,
 			userSettings: context.settings,
-			directorySettings: context.directorySettings,
+			workSettings: context.workSettings,
 			adminSettings: context.adminSettings,
 			envVars: context.envVars
 		});
@@ -235,7 +235,7 @@ async generateContent(prompt: string, context: PluginContext): Promise<string> {
     const settings = resolveSettings({
         schema: this.settingsSchema,
         userSettings: context.settings,
-        directorySettings: context.directorySettings,
+        workSettings: context.workSettings,
         adminSettings: {},
         envVars: context.envVars,
     });

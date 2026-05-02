@@ -89,7 +89,7 @@ interface OpenAiSettings {
 
 ### Tiered Model Resolution
 
-The `BaseAiProvider.resolveConfig()` method (inherited) merges settings from the 4-level hierarchy (directory > user > admin > env) and resolves the correct model for the requested complexity tier:
+The `BaseAiProvider.resolveConfig()` method (inherited) merges settings from the 4-level hierarchy (work > user > admin > env) and resolves the correct model for the requested complexity tier:
 
 - **Simple tier**: `simpleModel` setting (default: `gpt-5-nano`) -- used for tags, short descriptions, quick classifications.
 - **Medium tier**: `mediumModel` setting (default: `gpt-4o-mini`) -- used for listings, summaries, content reformatting.
@@ -116,7 +116,7 @@ Each call to `createChatCompletion` or `createStreamingChatCompletion` calls `re
 // Non-streaming chat completion
 const response = await openaiPlugin.createChatCompletion({
 	messages: [
-		{ role: 'system', content: 'You are a directory content writer.' },
+		{ role: 'system', content: 'You are a work content writer.' },
 		{ role: 'user', content: 'Write a description for Acme Corp.' }
 	],
 	settings: { apiKey: userApiKey, defaultModel: 'gpt-4o-mini' }
@@ -132,7 +132,7 @@ for await (const chunk of openaiPlugin.createStreamingChatCompletion({
 
 // Generate embeddings
 const embedding = await openaiPlugin.createEmbedding({
-	input: 'AI-powered directory builder',
+	input: 'AI-powered work builder',
 	model: 'text-embedding-3-small',
 	settings: { apiKey: userApiKey }
 });

@@ -9,7 +9,7 @@ sidebar_position: 70
 
 ## Overview
 
-The Urlbox plugin (`@ever-works/plugins/urlbox`) is a screenshot capture plugin that uses the Urlbox API to generate website screenshots for directory items. It provides an alternative to the ScreenshotOne plugin, with additional features like retina rendering, cookie banner hiding, and configurable image quality.
+The Urlbox plugin (`@ever-works/plugins/urlbox`) is a screenshot capture plugin that uses the Urlbox API to generate website screenshots for work items. It provides an alternative to the ScreenshotOne plugin, with additional features like retina rendering, cookie banner hiding, and configurable image quality.
 
 The plugin implements the `IScreenshotPlugin` interface and uses the official `urlbox` npm package for API communication. It supports both unsigned and signed render links (when an API secret is provided).
 

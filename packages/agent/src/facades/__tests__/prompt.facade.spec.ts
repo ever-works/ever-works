@@ -13,7 +13,7 @@ describe('PromptFacadeService', () => {
     let settingsService: jest.Mocked<PluginSettingsService>;
 
     const DEFAULT_PROMPT = 'You are an assistant. Topic: {name}';
-    const facadeOptions = { userId: 'user-1', directoryId: 'dir-1' };
+    const facadeOptions = { userId: 'user-1', workId: 'dir-1' };
 
     const createMockPlugin = (
         overrides?: Partial<IPromptProviderPlugin>,
@@ -151,7 +151,7 @@ describe('PromptFacadeService', () => {
 
             expect(settingsService.getSettings).toHaveBeenCalledWith('langfuse', {
                 userId: 'user-1',
-                directoryId: 'dir-1',
+                workId: 'dir-1',
                 includeSecrets: true,
             });
         });

@@ -22,7 +22,7 @@ export interface GitFacadeCloneOptions {
  * Options for pushing to a repository.
  */
 export interface GitFacadePushOptions {
-	/** Local directory path */
+	/** Local work path */
 	readonly dir: string;
 	/** Force push */
 	readonly force?: boolean;
@@ -72,7 +72,7 @@ export interface IGitFacade extends IBaseFacade {
 	 * Stage files for commit.
 	 *
 	 * @param providerId - Git provider ID (e.g., 'github', 'gitlab')
-	 * @param dir - Local repository directory path
+	 * @param dir - Local repository work path
 	 * @param paths - File path(s) to stage
 	 */
 	add(providerId: string, dir: string, paths: string | string[]): Promise<void>;
@@ -81,7 +81,7 @@ export interface IGitFacade extends IBaseFacade {
 	 * Stage all changes for commit.
 	 *
 	 * @param providerId - Git provider ID
-	 * @param dir - Local repository directory path
+	 * @param dir - Local repository work path
 	 */
 	addAll(providerId: string, dir: string): Promise<void>;
 
@@ -89,7 +89,7 @@ export interface IGitFacade extends IBaseFacade {
 	 * Create a commit with staged changes.
 	 *
 	 * @param providerId - Git provider ID
-	 * @param dir - Local repository directory path
+	 * @param dir - Local repository work path
 	 * @param message - Commit message
 	 * @param committer - Optional committer info
 	 * @returns Commit SHA
@@ -100,7 +100,7 @@ export interface IGitFacade extends IBaseFacade {
 	 * Get the current branch name.
 	 *
 	 * @param providerId - Git provider ID
-	 * @param dir - Local repository directory path
+	 * @param dir - Local repository work path
 	 * @returns Current branch name or null if not on a branch
 	 */
 	getCurrentBranch(providerId: string, dir: string): Promise<string | null>;
@@ -109,7 +109,7 @@ export interface IGitFacade extends IBaseFacade {
 	 * Get the main/default branch name.
 	 *
 	 * @param providerId - Git provider ID
-	 * @param dir - Local repository directory path
+	 * @param dir - Local repository work path
 	 * @returns Main branch name or null
 	 */
 	getMainBranch(providerId: string, dir: string): Promise<string | null>;
@@ -118,7 +118,7 @@ export interface IGitFacade extends IBaseFacade {
 	 * Switch to a branch, optionally creating it.
 	 *
 	 * @param providerId - Git provider ID
-	 * @param dir - Local repository directory path
+	 * @param dir - Local repository work path
 	 * @param branch - Branch name to switch to
 	 * @param create - Create the branch if it doesn't exist
 	 * @returns The branch name
@@ -126,10 +126,10 @@ export interface IGitFacade extends IBaseFacade {
 	switchBranch(providerId: string, dir: string, branch: string, create?: boolean): Promise<string>;
 
 	/**
-	 * Get the status of the working directory.
+	 * Get the status of the working work.
 	 *
 	 * @param providerId - Git provider ID
-	 * @param dir - Local repository directory path
+	 * @param dir - Local repository work path
 	 * @returns List of file changes
 	 */
 	getStatus(providerId: string, dir: string): Promise<GitFileChange[]>;
@@ -157,7 +157,7 @@ export interface IGitFacade extends IBaseFacade {
 	getWebUrl(providerId: string, owner: string, repo: string): string;
 
 	/**
-	 * Get the local directory path for a repository.
+	 * Get the local work path for a repository.
 	 *
 	 * @param providerId - Git provider ID
 	 * @param owner - Repository owner
@@ -166,7 +166,7 @@ export interface IGitFacade extends IBaseFacade {
 	getLocalDir(providerId: string, owner: string, repo: string): string;
 
 	/**
-	 * Remove the local directory for a repository.
+	 * Remove the local work for a repository.
 	 *
 	 * @param providerId - Git provider ID
 	 * @param owner - Repository owner

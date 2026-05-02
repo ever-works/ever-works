@@ -1,6 +1,6 @@
 # Ever Works Platform — Specs
 
-This directory holds **internal architectural specs and ADRs** for the Ever
+This work holds **internal architectural specs and ADRs** for the Ever
 Works Platform. It is _not_ user-facing documentation — those live in
 [`../features/`](../features/), [`../api/`](../api/), and the rest of
 [`../`](../). These specs target AI agents and humans who need to understand
@@ -40,7 +40,7 @@ docs/specs/
 │   ├── notifications-mail.md       # In-app + email delivery
 │   ├── trigger-worker.md           # Trigger.dev task package + bootstrap
 │   ├── mcp-server-internals.md     # OpenAPI → MCP conversion + sanitiser
-│   ├── directory-import.md         # Source analyzer + 3 import paths
+│   ├── work-import.md         # Source analyzer + 3 import paths
 │   ├── database.md                 # TypeORM module + repos + migrations
 │   ├── events.md                   # @nestjs/event-emitter + BaseEvent
 │   ├── deployment.md               # Docker + K8s + Compose + env-vars
@@ -48,19 +48,19 @@ docs/specs/
 ├── ai/                             # Cross-cutting AI / generation specs
 │   ├── implementation-plan.md
 │   └── tasks-checklist.md
-└── features/                       # Spec Kit feature directories (spec.md + plan.md + tasks.md)
+└── features/                       # Spec Kit feature works (spec.md + plan.md + tasks.md)
     ├── advanced-prompts/
     ├── api-keys/
     ├── collections/
     ├── community-pr-processing/
     ├── comparisons/
-    ├── creating-a-directory/
+    ├── creating-a-work/
     ├── custom-domains/
     ├── data-generator/
     ├── data-management/
-    ├── directory-changelog/
-    ├── directory-import/
-    ├── directory-members/
+    ├── work-changelog/
+    ├── work-import/
+    ├── work-members/
     ├── generation-cancellation/
     ├── git-operations/
     ├── item-source-validation/
@@ -85,18 +85,18 @@ which now live folded into `tasks.md`).
 
 | Feature                                                            | Status        | Description                                                    |
 | ------------------------------------------------------------------ | ------------- | -------------------------------------------------------------- |
-| [`advanced-prompts`](features/advanced-prompts/spec)               | Retrospective | Per-directory prompt overrides per pipeline step               |
+| [`advanced-prompts`](features/advanced-prompts/spec)               | Retrospective | Per-work prompt overrides per pipeline step                    |
 | [`api-keys`](features/api-keys/spec)                               | Retrospective | Long-lived auth tokens for CI / CLI / MCP                      |
 | [`collections`](features/collections/spec)                         | Retrospective | Editorial groupings cutting across categories                  |
 | [`community-pr-processing`](features/community-pr-processing/spec) | Retrospective | AI-driven processing of community-contributed PRs              |
 | [`comparisons`](features/comparisons/spec)                         | Retrospective | A vs B comparison page generator                               |
-| [`creating-a-directory`](features/creating-a-directory/spec)       | Retrospective | Three creation methods: AI / Manual / Import                   |
+| [`creating-a-work`](features/creating-a-work/spec)                 | Retrospective | Three creation methods: AI / Manual / Import                   |
 | [`custom-domains`](features/custom-domains/spec)                   | Retrospective | Branded domain assignment with provider sync                   |
 | [`data-generator`](features/data-generator/spec)                   | Retrospective | Data repository management and item persistence                |
 | [`data-management`](features/data-management/spec)                 | Retrospective | Export / Import / GitHub Sync with secret hygiene              |
-| [`directory-changelog`](features/directory-changelog/spec)         | Retrospective | Audit trail of all directory mutations                         |
-| [`directory-import`](features/directory-import/spec)               | Retrospective | Bootstrap from existing repo or Awesome List                   |
-| [`directory-members`](features/directory-members/spec)             | Retrospective | Role-based collaboration (Owner / Manager / Editor / Viewer)   |
+| [`work-changelog`](features/work-changelog/spec)                   | Retrospective | Audit trail of all work mutations                              |
+| [`work-import`](features/work-import/spec)                         | Retrospective | Bootstrap from existing repo or Awesome List                   |
+| [`work-members`](features/work-members/spec)                       | Retrospective | Role-based collaboration (Owner / Manager / Editor / Viewer)   |
 | [`generation-cancellation`](features/generation-cancellation/spec) | Retrospective | Mid-flight generation cancel with four mode paths              |
 | [`git-operations`](features/git-operations/spec)                   | Retrospective | `GitFacadeService` and provider plugin contract                |
 | [`item-source-validation`](features/item-source-validation/spec)   | Retrospective | Reachability + AI accuracy checks per item                     |
@@ -106,7 +106,7 @@ which now live folded into `tasks.md`).
 | [`scheduled-updates`](features/scheduled-updates/spec)             | Retrospective | Cron-driven generation with CAS claim and drift correction     |
 | [`taxonomy-system`](features/taxonomy-system/spec)                 | Retrospective | Categories, tags, and collections in the data repo             |
 | [`website-generator`](features/website-generator/spec)             | Retrospective | Static site generation pipeline                                |
-| [`works-config`](features/works-config/spec)                       | Retrospective | `works.yml` source-controlled directory configuration          |
+| [`works-config`](features/works-config/spec)                       | Retrospective | `works.yml` source-controlled work configuration               |
 
 ## Reading order for new contributors
 

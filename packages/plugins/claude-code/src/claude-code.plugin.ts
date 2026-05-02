@@ -11,7 +11,7 @@ import type {
 	PipelineExecutionOptions,
 	PipelineProgressCallback,
 	PipelineResult,
-	DirectoryReference,
+	WorkReference,
 	GenerationRequest,
 	ExistingItems,
 	PluginManifest,
@@ -324,12 +324,12 @@ export class ClaudeCodePlugin implements IPlugin, IPipelinePlugin, IFormSchemaPr
 				onboardingWizard: true,
 				includeInOnboarding: true,
 				onboardingPriority: 1,
-				onboardingDescription: 'Connect your AI assistant to power content generation across your directories.'
+				onboardingDescription: 'Connect your AI assistant to power content generation across your works.'
 			},
 			readme: [
 				'# Claude Code Generator Plugin',
 				'',
-				'Full pipeline plugin that delegates the entire directory generation to Claude Code. This plugin runs a single Claude Code session that autonomously handles web search, content creation, and file generation.',
+				'Full pipeline plugin that delegates the entire work generation to Claude Code. This plugin runs a single Claude Code session that autonomously handles web search, content creation, and file generation.',
 				'',
 				'## How it works',
 				'',
@@ -337,7 +337,7 @@ export class ClaudeCodePlugin implements IPlugin, IPipelinePlugin, IFormSchemaPr
 				'',
 				'1. **Setup Claude Code** - Downloads and caches the Claude Code CLI binary',
 				'2. **Prepare Context** - Creates a temporary workspace and seeds it with existing items and metadata',
-				'3. **Generate Items** - Executes Claude Code CLI to research and generate directory items as JSON files',
+				'3. **Generate Items** - Executes Claude Code CLI to research and generate work items as JSON files',
 				'4. **Collect Results** - Reads the generated JSON files back to build the pipeline result',
 				'5. **Capture Screenshots** - Takes screenshots for items that need images',
 				'6. **Cleanup** - Removes the temporary workspace',
@@ -363,7 +363,7 @@ export class ClaudeCodePlugin implements IPlugin, IPipelinePlugin, IFormSchemaPr
 				'Get one from [console.anthropic.com](https://console.anthropic.com)',
 				'## Usage',
 				'',
-				"Enable the plugin for a directory and trigger generation with `providers.pipeline: 'claude-code'`."
+				"Enable the plugin for a work and trigger generation with `providers.pipeline: 'claude-code'`."
 			].join('\n'),
 			homepage: 'https://github.com/anthropics/claude-code',
 			icon: {
@@ -476,14 +476,14 @@ export class ClaudeCodePlugin implements IPlugin, IPipelinePlugin, IFormSchemaPr
 	}
 
 	async execute(
-		directory: DirectoryReference,
+		work: WorkReference,
 		request: GenerationRequest,
 		existing: ExistingItems,
 		options?: PipelineExecutionOptions,
 		onProgress?: PipelineProgressCallback
 	): Promise<PipelineResult> {
 		const startTime = Date.now();
-		const userId = directory.user?.id;
+		const userId = work.user?.id;
 		if (!userId) {
 			return this.handleError(new Error('User ID is required'), startTime);
 		}
@@ -509,7 +509,7 @@ export class ClaudeCodePlugin implements IPlugin, IPipelinePlugin, IFormSchemaPr
 		let configDir: string | null = null;
 
 		try {
-			const settings = await resolveSettings(this.context, userId, directory.id);
+			const settings = await resolveSettings(this.context, userId, work.id);
 			if (settings.model) {
 				logger.log(`Using model "${settings.model}" for this session as specified in settings`);
 			}
@@ -533,11 +533,11 @@ export class ClaudeCodePlugin implements IPlugin, IPipelinePlugin, IFormSchemaPr
 			reportProgress(onProgress, 1, 20, 'Prepare Context');
 
 			configDir = path.join(BASE_TEMP_DIR, 'config', userId);
-			workspacePath = await createWorkspace(userId, directory.id);
+			workspacePath = await createWorkspace(userId, work.id);
 			await ensureOnboardingConfig(configDir);
 			await seedExistingItems(workspacePath, existing.items);
 			await seedMetadata(workspacePath, {
-				directory: { name: directory.name, description: directory.description },
+				work: { name: work.name, description: work.description },
 				request: { prompt: request.prompt, name: request.name },
 				categories: existing.categories,
 				tags: existing.tags,
@@ -551,10 +551,10 @@ export class ClaudeCodePlugin implements IPlugin, IPipelinePlugin, IFormSchemaPr
 			const generateItemsStepStartedAt = this.startStep('generate-items', onLogEntry);
 			reportProgress(onProgress, 2, 30, 'Generate Items');
 
-			const promptOptions = { directory, request, existing, workspacePath };
+			const promptOptions = { work, request, existing, workspacePath };
 			const execContext = options?.execContext;
 			const promptFacade = execContext?.promptFacade;
-			const facadeOptions = { userId, directoryId: directory.id };
+			const facadeOptions = { userId, workId: work.id };
 
 			const sysTemplate = (
 				promptFacade
@@ -645,7 +645,7 @@ export class ClaudeCodePlugin implements IPlugin, IPipelinePlugin, IFormSchemaPr
 				options?.execContext,
 				items,
 				userId,
-				directory.id,
+				work.id,
 				signal,
 				onProgress,
 				logger,
@@ -726,7 +726,7 @@ export class ClaudeCodePlugin implements IPlugin, IPipelinePlugin, IFormSchemaPr
 		execContext: PipelineExecutionOptions['execContext'],
 		items: ItemData[],
 		userId: string,
-		directoryId: string,
+		workId: string,
 		signal: AbortSignal,
 		onProgress: PipelineProgressCallback | undefined,
 		logger: { log(...args: unknown[]): void; warn(...args: unknown[]): void },
@@ -754,7 +754,7 @@ export class ClaudeCodePlugin implements IPlugin, IPipelinePlugin, IFormSchemaPr
 
 		const { status, errors } = await captureScreenshots(items, {
 			screenshotFacade,
-			facadeOptions: { userId, directoryId },
+			facadeOptions: { userId, workId },
 			signal,
 			logger
 		});
@@ -766,7 +766,7 @@ export class ClaudeCodePlugin implements IPlugin, IPipelinePlugin, IFormSchemaPr
 		}
 
 		if (errors.length > 0) {
-			const facadeOptions = { userId, directoryId };
+			const facadeOptions = { userId, workId };
 			const providerName = await screenshotFacade.getActiveProviderName?.(facadeOptions);
 			const label = providerName ? `Screenshot capture (${providerName})` : 'Screenshot capture';
 			const unique = [...new Set(errors)];

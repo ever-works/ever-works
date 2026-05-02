@@ -1,6 +1,6 @@
 import { Injectable, Logger, Optional } from '@nestjs/common';
 import type {
-    DirectoryReference,
+    WorkReference,
     GenerationRequest,
     StepExecutionContext,
     StepLogger,
@@ -38,10 +38,10 @@ import { DataSourceFacadeService } from '../facades/data-source.facade';
 import { PromptFacadeService } from '../facades/prompt.facade';
 
 /**
- * Context for binding facades to a specific directory/user.
+ * Context for binding facades to a specific work/user.
  */
 export interface FacadeBindingContext {
-    readonly directoryId: string;
+    readonly workId: string;
     readonly userId: string;
     readonly aiModelOverride?: string;
     readonly providerOverrides?: {
@@ -55,7 +55,7 @@ export interface FacadeBindingContext {
 /**
  * Service for creating bound facades for pipeline execution.
  *
- * Facades are "bound" to a specific directory/user context so that
+ * Facades are "bound" to a specific work/user context so that
  * pipeline steps don't need to pass facadeOptions manually.
  *
  * Used by both StepPipelineExecutorService and FullPipelineExecutorService.
@@ -75,36 +75,36 @@ export class PipelineFacadeService {
 
     /**
      * Create a StepExecutionContext for step executors.
-     * Provides access to bound facades that automatically include directory context.
+     * Provides access to bound facades that automatically include work context.
      */
     createStepExecutionContext(
-        directory: DirectoryReference,
+        work: WorkReference,
         providerOverrides?: GenerationRequest['providers'],
         aiModelOverride?: string,
         signal?: AbortSignal,
     ): StepExecutionContext {
         const stepLogger: StepLogger = {
             log: (msg: string, ...args: unknown[]) =>
-                this.logger.log(`[${directory.slug}] ${msg}`, ...args),
+                this.logger.log(`[${work.slug}] ${msg}`, ...args),
             debug: (msg: string, ...args: unknown[]) =>
-                this.logger.debug(`[${directory.slug}] ${msg}`, ...args),
+                this.logger.debug(`[${work.slug}] ${msg}`, ...args),
             warn: (msg: string, ...args: unknown[]) =>
-                this.logger.warn(`[${directory.slug}] ${msg}`, ...args),
+                this.logger.warn(`[${work.slug}] ${msg}`, ...args),
             error: (msg: string, trace?: string, ...args: unknown[]) =>
-                this.logger.error(`[${directory.slug}] ${msg}`, trace, ...args),
+                this.logger.error(`[${work.slug}] ${msg}`, trace, ...args),
             verbose: (msg: string, ...args: unknown[]) =>
-                this.logger.verbose?.(`[${directory.slug}] ${msg}`, ...args),
+                this.logger.verbose?.(`[${work.slug}] ${msg}`, ...args),
         };
 
-        if (!directory.user?.id) {
+        if (!work.user?.id) {
             throw new Error(
                 'User context is required for pipeline execution. ' +
-                    'Ensure DirectoryReference includes a user with an id.',
+                    'Ensure WorkReference includes a user with an id.',
             );
         }
         const facadeContext: FacadeBindingContext = {
-            directoryId: directory.id,
-            userId: directory.user.id,
+            workId: work.id,
+            userId: work.user.id,
             aiModelOverride,
             providerOverrides,
         };
@@ -117,8 +117,8 @@ export class PipelineFacadeService {
             dataSourceFacade: this.createBoundDataSourceFacade(facadeContext),
             promptFacade: this.createBoundPromptFacade(facadeContext),
             logger: stepLogger,
-            directory,
-            user: directory.user,
+            work,
+            user: work.user,
             signal,
         };
     }
@@ -126,7 +126,7 @@ export class PipelineFacadeService {
     private createBoundAiFacade(ctx: FacadeBindingContext): IAiFacade {
         const facade = this.aiFacade;
         const boundFacadeOptions: FacadeOptions = {
-            directoryId: ctx.directoryId,
+            workId: ctx.workId,
             userId: ctx.userId,
             providerOverride: ctx.providerOverrides?.ai,
         };
@@ -195,7 +195,7 @@ export class PipelineFacadeService {
             ): Promise<SearchFacadeResult[]> =>
                 facade.search(query, options, {
                     userId: ctx.userId,
-                    directoryId: ctx.directoryId,
+                    workId: ctx.workId,
                     providerOverride: ctx.providerOverrides?.search,
                 }),
             isConfigured: () => facade.isConfigured(),
@@ -210,7 +210,7 @@ export class PipelineFacadeService {
                 _facadeOptions: FacadeOptions,
             ): Promise<ScreenshotCaptureResult> =>
                 facade.capture(options, {
-                    directoryId: ctx.directoryId,
+                    workId: ctx.workId,
                     userId: ctx.userId,
                     providerOverride: ctx.providerOverrides?.screenshot,
                 }),
@@ -219,7 +219,7 @@ export class PipelineFacadeService {
                 _facadeOptions: FacadeOptions,
             ): Promise<SmartImageResult> =>
                 facade.getSmartImage(options, {
-                    directoryId: ctx.directoryId,
+                    workId: ctx.workId,
                     userId: ctx.userId,
                     providerOverride: ctx.providerOverrides?.screenshot,
                 }),
@@ -228,7 +228,7 @@ export class PipelineFacadeService {
                 _facadeOptions: FacadeOptions,
             ): Promise<string | null> =>
                 facade.getScreenshotUrl(options, {
-                    directoryId: ctx.directoryId,
+                    workId: ctx.workId,
                     userId: ctx.userId,
                     providerOverride: ctx.providerOverrides?.screenshot,
                 }),
@@ -247,7 +247,7 @@ export class PipelineFacadeService {
             ): Promise<FacadeExtractedContent | null> =>
                 facade.extractContent(url, options, {
                     userId: ctx.userId,
-                    directoryId: ctx.directoryId,
+                    workId: ctx.workId,
                     providerOverride: ctx.providerOverrides?.contentExtractor,
                 }),
             extractContentWithDiagnostics: (
@@ -257,7 +257,7 @@ export class PipelineFacadeService {
             ): Promise<FacadeContentExtractionResult> =>
                 facade.extractContentWithDiagnostics(url, options, {
                     userId: ctx.userId,
-                    directoryId: ctx.directoryId,
+                    workId: ctx.workId,
                     providerOverride: ctx.providerOverrides?.contentExtractor,
                 }),
             isConfigured: () => facade.isConfigured(),
@@ -267,7 +267,7 @@ export class PipelineFacadeService {
     private createBoundPromptFacade(ctx: FacadeBindingContext): IPromptFacade {
         const facade = this.promptFacade;
         const boundFacadeOptions: FacadeOptions = {
-            directoryId: ctx.directoryId,
+            workId: ctx.workId,
             userId: ctx.userId,
         };
         return {
@@ -289,14 +289,11 @@ export class PipelineFacadeService {
             queryAll: (options: DataSourceFacadeOptions): Promise<DataSourceFacadeResult> =>
                 facade.queryAll({
                     ...options,
-                    directoryId: ctx.directoryId,
+                    workId: ctx.workId,
                     userId: ctx.userId,
                 }),
-            getEnabledSources: (
-                directoryId: string,
-                userId: string,
-            ): Promise<EnabledDataSource[]> =>
-                facade.getEnabledSources(directoryId, userId || ctx.userId),
+            getEnabledSources: (workId: string, userId: string): Promise<EnabledDataSource[]> =>
+                facade.getEnabledSources(workId, userId || ctx.userId),
             isConfigured: () => facade.isConfigured(),
         };
     }

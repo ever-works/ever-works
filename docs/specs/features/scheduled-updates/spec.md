@@ -1,4 +1,4 @@
-# Feature Specification: Scheduled Directory Updates
+# Feature Specification: Scheduled Work Updates
 
 **Feature ID**: `scheduled-updates`
 **Status**: `Retrospective`
@@ -10,7 +10,7 @@
 
 ## 1. Overview
 
-A directory can be configured to re-run its generation pipeline on a
+A work can be configured to re-run its generation pipeline on a
 recurring cadence (hourly through monthly, plus the every-N-hours variants).
 The platform handles fan-out via a Trigger.dev cron task, atomic per-schedule
 claiming via a single SQL `UPDATE`, drift correction via a `scheduledFor`
@@ -20,10 +20,10 @@ anchor, retry-on-failure with exponential pause, and zombie recovery.
 
 ### 2.1 Primary scenarios
 
-- **Given** I enable "weekly" scheduled updates on my directory, **when**
+- **Given** I enable "weekly" scheduled updates on my work, **when**
   a week passes since my last generation, **then** the platform
   automatically runs a fresh generation and I see the new result on the
-  directory page.
+  work page.
 - **Given** my schedule is `active`, **when** I click "Run Now", **then**
   a generation starts immediately without resetting my upcoming weekly
   slot.
@@ -46,14 +46,14 @@ anchor, retry-on-failure with exponential pause, and zombie recovery.
 - **Given** my plan doesn't include the cadence I want, **when** I select
   `billingMode: usage`, **then** the platform allows the cadence on
   pay-per-use billing.
-- **Given** my directory was deleted between the dispatcher's "find due"
+- **Given** my work was deleted between the dispatcher's "find due"
   query and the actual dispatch, **when** the dispatch tries to run,
-  **then** the outcome is `skipped` with reason `directory_not_found`.
+  **then** the outcome is `skipped` with reason `work_not_found`.
 
 ## 3. Functional Requirements
 
 - **FR-1** The system MUST expose `GET / PUT / DELETE / POST run` endpoints
-  under `/api/directories/:id/schedule` for managing a directory's
+  under `/api/works/:id/schedule` for managing a work's
   schedule.
 - **FR-2** The system MUST accept all seven cadence values: `hourly`,
   `every_3_hours`, `every_8_hours`, `every_12_hours`, `daily`, `weekly`,
@@ -73,7 +73,7 @@ AND nextRunAt IS NOT NULL`. The first updater wins; the loser sees
 - **FR-7** The dispatcher MUST process schedules sequentially (not in
   parallel) within a single tick, capped by
   `config.subscriptions.getMaxBatch()`.
-- **FR-8** The dispatcher MUST return a `DirectoryScheduleDispatchSummary`
+- **FR-8** The dispatcher MUST return a `WorkScheduleDispatchSummary`
   with `dueCount`, `dispatched`, `skipped`, `failed` counts and a per-
   entry breakdown including outcome and reason.
 - **FR-9** On failure, the schedule's `failureCount` MUST increment; when
@@ -93,10 +93,10 @@ AND nextRunAt IS NOT NULL`. The first updater wins; the loser sees
 
 - **Performance**: dispatcher tick completes within the cron interval
   (`getDispatchIntervalMinutes()`) at typical load; a single tick handles
-  `getMaxBatch()` directories.
+  `getMaxBatch()` works.
 - **Reliability**: at-most-once dispatch per `nextRunAt` slot, even with
   overlapping ticks; multi-worker safe via the SQL CAS pattern.
-- **Security & privacy**: schedule endpoints require directory edit rights;
+- **Security & privacy**: schedule endpoints require work edit rights;
   all cron tasks run server-side with elevated DB access.
 - **Observability**: per-tick summary returned to Trigger.dev (visible in
   its dashboard); auto-pause emits a notification.
@@ -105,14 +105,14 @@ AND nextRunAt IS NOT NULL`. The first updater wins; the loser sees
 
 ## 5. Key Entities & Domain Concepts
 
-| Entity / concept                   | Description                                                                       |
-| ---------------------------------- | --------------------------------------------------------------------------------- |
-| `DirectorySchedule`                | Per-directory schedule row: cadence, status, nextRunAt, scheduledFor, billingMode |
-| `DirectoryScheduleStatus`          | Enum: `disabled` / `active` / `paused` / `canceled`                               |
-| `DirectoryScheduleCadence`         | Enum: 7 values from hourly to monthly                                             |
-| `DirectoryScheduleBillingMode`     | Enum: `subscription` / `usage`                                                    |
-| `DirectoryScheduleDispatchSummary` | Trigger.dev task return value with counts + per-entry outcomes                    |
-| `scheduledFor` (anchor)            | The original `nextRunAt` preserved at claim time; drift-correction reference      |
+| Entity / concept              | Description                                                                  |
+| ----------------------------- | ---------------------------------------------------------------------------- |
+| `WorkSchedule`                | Per-work schedule row: cadence, status, nextRunAt, scheduledFor, billingMode |
+| `WorkScheduleStatus`          | Enum: `disabled` / `active` / `paused` / `canceled`                          |
+| `WorkScheduleCadence`         | Enum: 7 values from hourly to monthly                                        |
+| `WorkScheduleBillingMode`     | Enum: `subscription` / `usage`                                               |
+| `WorkScheduleDispatchSummary` | Trigger.dev task return value with counts + per-entry outcomes               |
+| `scheduledFor` (anchor)       | The original `nextRunAt` preserved at claim time; drift-correction reference |
 
 ## 6. Out of Scope
 
@@ -152,7 +152,7 @@ _None on develop._
       `null`.
 - [x] **VI**: covered by repository spec, dispatcher spec, scheduling
       service spec, integration tests (`schedule.repository.spec.ts`,
-      `directory-schedule-dispatcher.spec.ts`, `directory-schedule.service.spec.ts`).
+      `work-schedule-dispatcher.spec.ts`, `work-schedule.service.spec.ts`).
 - [x] **VII**: schedule rows do not store secrets.
 - [x] **VIII**: N/A.
 - [x] **IX**: this spec describes user-observable behaviour.
@@ -162,11 +162,11 @@ _None on develop._
 
 - User-facing doc: [`../../../features/scheduled-updates.md`](../../../features/scheduled-updates.md)
 - Internal architecture:
-  [`../../../agent-services/directory-schedule-dispatcher.md`](../../../agent-services/directory-schedule-dispatcher.md)
+  [`../../../agent-services/work-schedule-dispatcher.md`](../../../agent-services/work-schedule-dispatcher.md)
 - Implementation:
-    - `packages/agent/src/services/directory-schedule.service.ts`
-    - `packages/agent/src/services/directory-schedule-dispatcher.service.ts`
-    - `packages/agent/src/database/repositories/directory-schedule.repository.ts`
-    - `packages/tasks/src/tasks/trigger/directory-schedule-dispatcher.task.ts`
+    - `packages/agent/src/services/work-schedule.service.ts`
+    - `packages/agent/src/services/work-schedule-dispatcher.service.ts`
+    - `packages/agent/src/database/repositories/work-schedule.repository.ts`
+    - `packages/tasks/src/tasks/trigger/work-schedule-dispatcher.task.ts`
 - Related: [`works-config/spec.md`](../works-config/spec.md) (schedule
   cadence is mirrored to `works.yml`)

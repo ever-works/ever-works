@@ -30,7 +30,7 @@ describe('VercelPlugin', () => {
 			const manifest = plugin.getManifest();
 			expect(manifest.id).toBe('vercel');
 			expect(manifest.name).toBe('Vercel');
-			expect(manifest.description).toBe('Publish your directory as a live website on Vercel');
+			expect(manifest.description).toBe('Publish your work as a live website on Vercel');
 			expect(manifest.builtIn).toBe(true);
 			expect(manifest.autoEnable).toBe(true);
 			expect(manifest.defaultForCapabilities).toContain('deployment');

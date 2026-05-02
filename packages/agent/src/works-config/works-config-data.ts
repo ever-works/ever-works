@@ -2,7 +2,7 @@ import type { ResolvedWorksConfig } from './services/works-config.service';
 
 export function mergeWorksConfigIntoDataConfig(
     config: Record<string, unknown>,
-    directoryName: string,
+    workName: string,
     worksConfig?: ResolvedWorksConfig | null,
 ): Record<string, unknown> {
     if (!worksConfig) {
@@ -20,7 +20,7 @@ export function mergeWorksConfigIntoDataConfig(
 
     if (!metadata.last_request_data && worksConfig.initialPrompt) {
         metadata.last_request_data = {
-            name: worksConfig.name || directoryName,
+            name: worksConfig.name || workName,
             prompt: worksConfig.initialPrompt,
             model: worksConfig.model,
             providers: worksConfig.providers,

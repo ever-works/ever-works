@@ -318,7 +318,7 @@ export class ExaSearchPlugin implements IPlugin, ISearchPlugin, IContentExtracto
 				'',
 				'## How it works in Ever Works',
 				'',
-				'When enabled and set as the active search provider, Exa is used during directory generation to find information about each item. Its neural search mode is particularly useful for finding semantically relevant content that keyword-based engines might miss. The content extraction capability can pull text from web pages for enriching directory items.',
+				'When enabled and set as the active search provider, Exa is used during work generation to find information about each item. Its neural search mode is particularly useful for finding semantically relevant content that keyword-based engines might miss. The content extraction capability can pull text from web pages for enriching work items.',
 				'',
 				'## Getting started',
 				'',
@@ -326,7 +326,7 @@ export class ExaSearchPlugin implements IPlugin, ISearchPlugin, IContentExtracto
 				'2. Copy your API key from the Exa dashboard',
 				'3. Enter the key in the **API Key** field below',
 				'4. Choose your preferred search type (auto recommended)',
-				'5. Enable this plugin to use it for directory generation'
+				'5. Enable this plugin to use it for work generation'
 			].join('\n'),
 			homepage: 'https://exa.ai'
 		};

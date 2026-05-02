@@ -24,7 +24,7 @@ cadence.
 
 ### 2.1 Primary scenarios
 
-- **Given** my directory has a fresh generation run, **when** the
+- **Given** my work has a fresh generation run, **when** the
   pipeline finishes, **then** every item's `source_url` is validated
   and the result is stored on the item.
 - **Given** I'm reviewing items in the dashboard, **when** an item has a
@@ -76,11 +76,11 @@ cadence.
 - **FR-6** Validation MUST run automatically after every successful
   generation completion.
 - **FR-7** Validation MUST also support an independent periodic
-  scheduler controlled per-directory by `sourceValidationCadence`.
-- **FR-8** When `sourceValidationCadence` is unset, the directory's
+  scheduler controlled per-work by `sourceValidationCadence`.
+- **FR-8** When `sourceValidationCadence` is unset, the work's
   main schedule cadence is used as the default.
 - **FR-9** Manual single-item re-check via
-  `POST /api/directories/:id/check-item-health` MUST persist the
+  `POST /api/works/:id/check-item-health` MUST persist the
   result on the item.
 - **FR-10** Repeated manual re-checks MUST be cached for a short
   window to avoid hammering external resources.
@@ -106,21 +106,21 @@ cadence.
 
 ## 5. Key Entities & Domain Concepts
 
-| Entity / concept          | Description                                                       |
-| ------------------------- | ----------------------------------------------------------------- |
-| `ItemSourceValidation`    | Per-item blob with reachability + accuracy + AI metadata          |
-| Reachability check        | Deterministic HTTP-based step                                     |
-| Accuracy check            | AI step that runs only if not clearly broken                      |
-| `sourceValidationCadence` | Per-directory schedule field, falls back to main schedule cadence |
-| Manual re-check           | User-initiated single-item re-validation with short-window cache  |
-| `suggested_source_url`    | AI-proposed replacement URL                                       |
+| Entity / concept          | Description                                                      |
+| ------------------------- | ---------------------------------------------------------------- |
+| `ItemSourceValidation`    | Per-item blob with reachability + accuracy + AI metadata         |
+| Reachability check        | Deterministic HTTP-based step                                    |
+| Accuracy check            | AI step that runs only if not clearly broken                     |
+| `sourceValidationCadence` | Per-work schedule field, falls back to main schedule cadence     |
+| Manual re-check           | User-initiated single-item re-validation with short-window cache |
+| `suggested_source_url`    | AI-proposed replacement URL                                      |
 
 ## 6. Out of Scope
 
 - Crawling target sites for content quality beyond the source URL itself.
 - Automatic source replacement (always user-confirmed).
 - Cross-item dedup of sources (future enhancement).
-- Per-user (vs per-directory) validation schedules.
+- Per-user (vs per-work) validation schedules.
 
 ## 7. Acceptance Criteria
 
@@ -144,7 +144,7 @@ _None on develop._
 - [x] **III**: validation result is mirrored back to the item YAML in
       the data repo.
 - [x] **IV**: scheduled validation runs as a Trigger.dev task.
-- [x] **V**: schema additions on the directory schedule (additive
+- [x] **V**: schema additions on the work schedule (additive
       column for `sourceValidationCadence`).
 - [x] **VI**: tested per-step and end-to-end in
       `packages/agent/src/services/__tests__/`.

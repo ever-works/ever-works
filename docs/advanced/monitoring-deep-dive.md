@@ -190,19 +190,19 @@ For custom event tracking beyond automatic request logging, inject `AnalyticsSer
 import { AnalyticsService } from '@ever-works/monitoring';
 
 @Injectable()
-export class DirectoryService {
+export class WorkService {
 	constructor(private readonly analytics: AnalyticsService) {}
 
-	async createDirectory(userId: string, data: CreateDirectoryDto) {
-		const directory = await this.repo.create(data);
+	async createWork(userId: string, data: CreateWorkDto) {
+		const work = await this.repo.create(data);
 
 		// Track business event
-		this.analytics.trackBusinessEvent(userId, 'directory_created', {
-			directoryId: directory.id,
-			directoryName: directory.name
+		this.analytics.trackBusinessEvent(userId, 'work_created', {
+			workId: work.id,
+			workName: work.name
 		});
 
-		return directory;
+		return work;
 	}
 }
 ```
@@ -228,14 +228,14 @@ import { SentryService } from '@ever-works/monitoring';
 export class GenerationService {
 	constructor(private readonly sentry: SentryService) {}
 
-	async generateContent(directoryId: string) {
-		this.sentry.info('Generation started', { directoryId });
+	async generateContent(workId: string) {
+		this.sentry.info('Generation started', { workId });
 
 		try {
 			// ... generation logic
-			this.sentry.info('Generation completed', { directoryId, duration });
+			this.sentry.info('Generation completed', { workId, duration });
 		} catch (error) {
-			this.sentry.error('Generation failed', { directoryId });
+			this.sentry.error('Generation failed', { workId });
 			this.sentry.captureException(error);
 			throw error;
 		}

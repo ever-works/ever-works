@@ -60,15 +60,15 @@ export class ScreenshotController {
         };
     }
 
-    private async listProviders(userId: string, directoryId?: string) {
+    private async listProviders(userId: string, workId?: string) {
         const enabledPlugins = await this.pluginRegistry.getEnabledPluginsScoped(
             PLUGIN_CAPABILITIES.SCREENSHOT,
-            directoryId,
+            workId,
             userId,
         );
         const activeProvider = await this.pluginRegistry.getDefaultForCapabilityScoped(
             PLUGIN_CAPABILITIES.SCREENSHOT,
-            directoryId,
+            workId,
             userId,
         );
         const activePluginId = activeProvider?.plugin.id ?? null;
@@ -78,7 +78,7 @@ export class ScreenshotController {
         for (const registered of enabledPlugins) {
             const settings = await this.pluginSettings.getSettings(registered.plugin.id, {
                 userId,
-                directoryId,
+                workId,
                 includeSecrets: true,
             });
 
@@ -119,9 +119,9 @@ export class ScreenshotController {
     @ApiResponse({ status: 200, description: 'Availability status' })
     async checkAvailability(
         @CurrentUser() auth: AuthenticatedUser,
-        @Query('directoryId') directoryId?: string,
+        @Query('workId') workId?: string,
     ) {
-        const { providers, activeProvider } = await this.listProviders(auth.userId, directoryId);
+        const { providers, activeProvider } = await this.listProviders(auth.userId, workId);
 
         return {
             status: 'success',
@@ -136,7 +136,7 @@ export class ScreenshotController {
     @ApiResponse({ status: 200, description: 'Screenshot captured successfully' })
     @ApiResponse({ status: 400, description: 'Screenshot capture failed' })
     async capture(@CurrentUser() auth: AuthenticatedUser, @Body() dto: CaptureScreenshotDto) {
-        const { providers } = await this.listProviders(auth.userId, dto.directoryId);
+        const { providers } = await this.listProviders(auth.userId, dto.workId);
 
         if (!providers.some((provider) => provider.configured)) {
             throw new BadRequestException({
@@ -161,7 +161,7 @@ export class ScreenshotController {
                 },
                 {
                     userId: auth.userId,
-                    directoryId: dto.directoryId,
+                    workId: dto.workId,
                     providerOverride: dto.providerOverride,
                 },
             );
@@ -196,7 +196,7 @@ export class ScreenshotController {
         @CurrentUser() auth: AuthenticatedUser,
         @Body() dto: GetScreenshotUrlDto,
     ) {
-        const { providers } = await this.listProviders(auth.userId, dto.directoryId);
+        const { providers } = await this.listProviders(auth.userId, dto.workId);
 
         if (!providers.some((provider) => provider.configured)) {
             throw new BadRequestException({
@@ -221,7 +221,7 @@ export class ScreenshotController {
                 },
                 {
                     userId: auth.userId,
-                    directoryId: dto.directoryId,
+                    workId: dto.workId,
                     providerOverride: dto.providerOverride,
                 },
             );

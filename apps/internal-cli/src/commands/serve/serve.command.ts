@@ -3,8 +3,8 @@ import { Logger } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import chalk from 'chalk';
-import { ConfigCheckService } from '../directory/config-check.service';
-import { DirectoriesModule } from '../../directories/directories.module';
+import { ConfigCheckService } from '../work/config-check.service';
+import { WorksModule } from '../../works/works.module';
 
 interface ServeOptions {
     port?: string;
@@ -42,7 +42,7 @@ export class ServeCommand extends CommandRunner {
 
             try {
                 // Create NestJS application
-                const app = await NestFactory.create(DirectoriesModule, {
+                const app = await NestFactory.create(WorksModule, {
                     logger: ['error', 'warn', 'log'],
                 });
 

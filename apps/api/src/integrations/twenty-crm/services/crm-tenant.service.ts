@@ -9,19 +9,17 @@ export class CrmTenantService {
     private readonly logger = new Logger(CrmTenantService.name);
 
     /**
-     * Resolve tenant context from request headers or directory
+     * Resolve tenant context from request headers or work
      */
     resolveTenantContext(
-        directoryId?: string,
+        workId?: string,
         userId?: string,
         globalTenantId?: string,
     ): CrmTenantContext {
-        const tenantId = directoryId
-            ? `directory_${directoryId}`
-            : globalTenantId || 'global_everworks';
+        const tenantId = workId ? `work_${workId}` : globalTenantId || 'global_everworks';
         const context: CrmTenantContext = {
             tenantId,
-            directoryId,
+            workId,
             userId,
         };
 
@@ -55,7 +53,7 @@ export class CrmTenantService {
     getTenantConfig(tenantContext: CrmTenantContext): Record<string, any> {
         return {
             tenantId: tenantContext.tenantId,
-            directoryId: tenantContext.directoryId,
+            workId: tenantContext.workId,
             userId: tenantContext.userId,
         };
     }

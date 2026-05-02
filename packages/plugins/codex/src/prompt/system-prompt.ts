@@ -1,19 +1,19 @@
-import type { DirectoryReference, ExistingItems, GenerationRequest, TemplateVariables } from '@ever-works/plugin';
+import type { WorkReference, ExistingItems, GenerationRequest, TemplateVariables } from '@ever-works/plugin';
 import { ITEM_SCHEMA_PROMPT_TEXT, getCurrentDateString, substituteVariables } from '@ever-works/plugin';
 
 import { DEFAULT_TARGET_ITEMS } from '../form-schema.js';
 
 export interface SystemPromptOptions {
-	readonly directory: DirectoryReference;
+	readonly work: WorkReference;
 	readonly request: GenerationRequest;
 	readonly existing: ExistingItems;
 	readonly workspacePath: string;
 }
 
-export const DEFAULT_SYSTEM_PROMPT = `You are a directory content generator and manager operating through Codex CLI. Your job is to manage directory item JSON files inside the workspace. This includes creating NEW items through research and updating EXISTING items when the request requires refinement or reorganization.
+export const DEFAULT_SYSTEM_PROMPT = `You are a work content generator and manager operating through Codex CLI. Your job is to manage work item JSON files inside the workspace. This includes creating NEW items through research and updating EXISTING items when the request requires refinement or reorganization.
 
 **Workspace path:** \`{workspacePath}\`
-You are sandboxed to this directory. All file operations MUST stay within it.
+You are sandboxed to this work. All file operations MUST stay within it.
 
 Today is {date}. Use this when researching to prefer up-to-date information.
 
@@ -32,8 +32,8 @@ Today is {date}. Use this when researching to prefer up-to-date information.
 ## Workspace Structure
 - Each item is a separate \`.json\` file in the workspace root
 - Existing items may already be present as \`.json\` files
-- The \`_meta/\` directory contains system-managed reference files:
-  - \`_meta/directory.json\`
+- The \`_meta/\` work contains system-managed reference files:
+  - \`_meta/work.json\`
   - \`_meta/request.json\`
   - \`_meta/existing-items.jsonl\`
   - \`_meta/categories.json\`
@@ -72,8 +72,8 @@ Do NOT edit files inside \`_meta/\`. Use them only as reference data.
 ## Existing Item Guidance
 {existingItemsSection}
 
-## Directory Context
-{directorySection}
+## Work Context
+{workSection}
 
 ## Generation Target
 Aim to generate approximately **{targetItems}** new items. Prioritize quality and relevance over hitting the exact number.`;
@@ -81,7 +81,7 @@ Aim to generate approximately **{targetItems}** new items. Prioritize quality an
 export function buildSystemPromptVariables(
 	options: SystemPromptOptions
 ): TemplateVariables<typeof DEFAULT_SYSTEM_PROMPT> {
-	const { directory, request, existing, workspacePath } = options;
+	const { work, request, existing, workspacePath } = options;
 	const targetItems = String(((request.config || {}).target_items as number) || DEFAULT_TARGET_ITEMS);
 
 	const existingItemsSection =
@@ -89,10 +89,10 @@ export function buildSystemPromptVariables(
 			? `The workspace already contains ${existing.items.length} existing items. Treat them as reference data and avoid duplicates. Rewrite or expand existing items only when the request implies updating or reorganizing them.`
 			: 'There are no existing items yet. Build a clean initial taxonomy and item set from research.';
 
-	const directorySection = [
-		`Directory name: ${directory.name}`,
-		`Directory slug: ${directory.slug}`,
-		directory.description ? `Directory description: ${directory.description}` : '',
+	const workSection = [
+		`Work name: ${work.name}`,
+		`Work slug: ${work.slug}`,
+		work.description ? `Work description: ${work.description}` : '',
 		request.prompt ? `Requested topic: ${request.prompt}` : '',
 		request.name ? `Requested name: ${request.name}` : ''
 	]
@@ -104,7 +104,7 @@ export function buildSystemPromptVariables(
 		date: getCurrentDateString(),
 		itemSchemaText: ITEM_SCHEMA_PROMPT_TEXT,
 		existingItemsSection,
-		directorySection,
+		workSection,
 		targetItems
 	};
 }
@@ -114,7 +114,7 @@ export function buildSystemPrompt(options: SystemPromptOptions): string {
 }
 
 export const DEFAULT_USER_PROMPT = `{userInstruction}
-{directoryDescription}
+{workDescription}
 
 Follow the workspace rules from the system prompt. Research thoroughly, write each final item as a JSON file in the workspace root, and preserve consistency with the existing taxonomy when it fits.
 Do not finish with zero output files. Before completing the task, verify that valid item JSON files exist in the workspace root.
@@ -122,22 +122,20 @@ Do not finish with zero output files. Before completing the task, verify that va
 Target: generate approximately {targetItems} new items.`;
 
 export function buildUserPromptVariables(options: SystemPromptOptions): TemplateVariables<typeof DEFAULT_USER_PROMPT> {
-	const { directory, request } = options;
+	const { work, request } = options;
 	const targetItems = String(((request.config || {}).target_items as number) || DEFAULT_TARGET_ITEMS);
 
 	const userInstruction =
 		request.prompt || request.name
-			? request.prompt || `Generate directory items for: ${request.name}`
-			: `Generate directory items for: ${directory.name}`;
+			? request.prompt || `Generate work items for: ${request.name}`
+			: `Generate work items for: ${work.name}`;
 
-	const directoryDescription =
-		directory.description && !request.prompt?.includes(directory.description)
-			? `Directory description: ${directory.description}`
-			: '';
+	const workDescription =
+		work.description && !request.prompt?.includes(work.description) ? `Work description: ${work.description}` : '';
 
 	return {
 		userInstruction,
-		directoryDescription,
+		workDescription,
 		targetItems
 	};
 }

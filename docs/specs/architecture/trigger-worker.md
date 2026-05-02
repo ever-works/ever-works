@@ -9,7 +9,7 @@ debugging worker bootstraps, or wiring new background jobs.
 
 ## 1. Purpose
 
-Every long-running platform operation — directory generation, Awesome
+Every long-running platform operation — work generation, Awesome
 README import, scheduled dispatch, source-validation cadence,
 notification cleanup, cache sweep — runs as a **Trigger.dev task**.
 This spec covers the **task package layout**, the **per-task NestJS
@@ -32,9 +32,9 @@ packages/tasks/
     ├── index.ts
     ├── tasks/
     │   └── trigger/
-    │       ├── directory-generation.task.ts          # Long generation runs
-    │       ├── directory-import.task.ts              # Awesome README import
-    │       ├── directory-schedule-dispatcher.task.ts # Cron entry point
+    │       ├── work-generation.task.ts          # Long generation runs
+    │       ├── work-import.task.ts              # Awesome README import
+    │       ├── work-schedule-dispatcher.task.ts # Cron entry point
     │       └── index.ts
     └── trigger/
         └── worker/
@@ -93,15 +93,15 @@ Key invariants:
    pick something diagnostically useful (counts, ids, durations).
 
 For the canonical example see the
-[Schedule Dispatcher §2](../../agent-services/directory-schedule-dispatcher.md#where-it-runs).
+[Schedule Dispatcher §2](../../agent-services/work-schedule-dispatcher.md#where-it-runs).
 
 ## 4. The Three Shipped Tasks (today)
 
-| Task                            | Trigger                             | Purpose                                                                       |
-| ------------------------------- | ----------------------------------- | ----------------------------------------------------------------------------- |
-| `directory-generation`          | Triggered (one-shot per generation) | Runs the full Standard / Agent / CLI-driven pipeline for a directory          |
-| `directory-import`              | Triggered (one-shot per import)     | Awesome README import flow + post-processing                                  |
-| `directory-schedule-dispatcher` | Cron (`*/N * * * *`)                | Polls due schedules and dispatches them; runs on every worker every N minutes |
+| Task                       | Trigger                             | Purpose                                                                       |
+| -------------------------- | ----------------------------------- | ----------------------------------------------------------------------------- |
+| `work-generation`          | Triggered (one-shot per generation) | Runs the full Standard / Agent / CLI-driven pipeline for a work               |
+| `work-import`              | Triggered (one-shot per import)     | Awesome README import flow + post-processing                                  |
+| `work-schedule-dispatcher` | Cron (`*/N * * * *`)                | Polls due schedules and dispatches them; runs on every worker every N minutes |
 
 `packages/tasks/src/tasks/trigger/index.ts` re-exports all three so
 `trigger.config.ts` can register them with the Trigger.dev runtime.
@@ -112,10 +112,10 @@ under `tasks/trigger/`, export it from the index, deploy.
 
 ## 5. Cron vs One-Shot Tasks
 
-| Style    | Trigger.dev primitive | Examples                                   |
-| -------- | --------------------- | ------------------------------------------ |
-| One-shot | `task(...)`           | `directory-generation`, `directory-import` |
-| Cron     | `schedules.task(...)` | `directory-schedule-dispatcher`            |
+| Style    | Trigger.dev primitive | Examples                         |
+| -------- | --------------------- | -------------------------------- |
+| One-shot | `task(...)`           | `work-generation`, `work-import` |
+| Cron     | `schedules.task(...)` | `work-schedule-dispatcher`       |
 
 The cron API takes a `cron: <expression>` field that Trigger.dev
 converts into a managed schedule. The platform reads the **interval
@@ -130,7 +130,7 @@ const cronExpression = `*/${interval} * * * *`;
 Trigger.dev guarantees **single firing per cron tick across the whole
 worker pool** — but a slow tick can overlap the next tick. The
 schedule dispatcher's CAS-claim pattern (see
-[`agent-services/directory-schedule-dispatcher`](../../agent-services/directory-schedule-dispatcher.md))
+[`agent-services/work-schedule-dispatcher`](../../agent-services/work-schedule-dispatcher.md))
 handles the overlap case race-free.
 
 ## 6. The `TriggerInternalModule`
@@ -143,7 +143,7 @@ is the **bootstrap-only** NestJS module the worker uses. It composes:
 - `CacheFactory.TypeORM(...)` — same `cache_entries` table
 - `PluginsModule` — plugin registry + settings
 - `FacadesModule` — every facade (AI, search, content extractor, deploy, screenshot, git, prompt)
-- `DirectoryModule`, `ScheduleModule`, `ImportModule`, `ActivityLogModule`, `NotificationsModule`, `SubscriptionsModule` — the domain services tasks call
+- `WorkModule`, `ScheduleModule`, `ImportModule`, `ActivityLogModule`, `NotificationsModule`, `SubscriptionsModule` — the domain services tasks call
 
 The module is **not** the same as the API's `AppModule`. It deliberately
 omits HTTP-only concerns:
@@ -191,9 +191,9 @@ surfaces the error in the dashboard. The platform also wants the
 failure visible in the user-facing activity log. The pattern:
 
 1. The task wraps the inner service call in `try/catch`.
-2. On error, the task calls `directoryGenerationService.finalizeGeneration({outcome: 'failed', reason})` (or the equivalent for the operation type).
+2. On error, the task calls `workGenerationService.finalizeGeneration({outcome: 'failed', reason})` (or the equivalent for the operation type).
 3. The finalize call writes both:
-    - A `directory_generation_history` row with `status: ERROR`.
+    - A `work_generation_history` row with `status: ERROR`.
     - An `activity_log` row with `status: FAILED` and `details.runId` pointing at the Trigger.dev run id.
 4. The task **re-throws** the original error so Trigger.dev still
    marks the run failed.
@@ -215,7 +215,7 @@ Every task returns a structured object Trigger.dev captures. Conventions:
 // Generation
 {
     runId: string;
-    directoryId: string;
+    workId: string;
     outcome: 'completed' | 'failed' | 'cancelled';
     durationMs: number;
     itemCount?: number;
@@ -230,13 +230,13 @@ Every task returns a structured object Trigger.dev captures. Conventions:
     dispatched: number;
     skipped: number;
     failed: number;
-    entries: DirectoryScheduleDispatchEntry[];
+    entries: WorkScheduleDispatchEntry[];
 }
 
 // Import
 {
     runId: string;
-    directoryId: string;
+    workId: string;
     sourceType: 'data-repo' | 'awesome-readme' | 'link-existing';
     importedItemCount: number;
     durationMs: number;
@@ -250,7 +250,7 @@ the last hour" without spelunking logs.
 ## 10. Cancellation
 
 Trigger.dev exposes an `AbortSignal` via `ctx.signal` (in v4) or the
-SDK's cancel API. The pattern in directory-generation:
+SDK's cancel API. The pattern in work-generation:
 
 1. The task captures `ctx.signal`.
 2. Passes it through to the orchestrator.
@@ -267,11 +267,11 @@ Trigger.dev queues tasks per-task-id by default. The platform
 configures **per-organisation concurrency limits** so one user's
 generation queue can't starve another's:
 
-| Task                            | Concurrency limit             |
-| ------------------------------- | ----------------------------- |
-| `directory-generation`          | 5 per organisation, 50 global |
-| `directory-import`              | 3 per organisation, 30 global |
-| `directory-schedule-dispatcher` | 1 globally (cron-driven)      |
+| Task                       | Concurrency limit             |
+| -------------------------- | ----------------------------- |
+| `work-generation`          | 5 per organisation, 50 global |
+| `work-import`              | 3 per organisation, 30 global |
+| `work-schedule-dispatcher` | 1 globally (cron-driven)      |
 
 When a queue is full, additional submissions sit in `queued` state
 until a slot frees. Trigger.dev surfaces queue depth in the dashboard.
@@ -319,7 +319,7 @@ Trigger.dev, not in the same container as the API.
     - `packages/tasks/trigger.config.ts`
 - Related specs:
     - [`trigger-integration`](./trigger-integration.md) (overview)
-    - [`agent-services/directory-schedule-dispatcher`](../../agent-services/directory-schedule-dispatcher.md)
+    - [`agent-services/work-schedule-dispatcher`](../../agent-services/work-schedule-dispatcher.md)
     - [`pipeline-executor`](./pipeline-executor.md)
     - [`features/scheduled-updates/spec`](../features/scheduled-updates/spec.md)
     - [`features/generation-cancellation/spec`](../features/generation-cancellation/spec.md)

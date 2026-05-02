@@ -187,10 +187,10 @@ This per-request approach ensures that user-scoped API keys are always applied c
 
 ## Usage in the Platform
 
-Exa serves dual roles during directory generation:
+Exa serves dual roles during work generation:
 
-1. **Search provider** -- Finds semantically relevant information about directory items using neural search.
-2. **Content extractor** -- Pulls clean text from discovered web pages to enrich directory descriptions.
+1. **Search provider** -- Finds semantically relevant information about work items using neural search.
+2. **Content extractor** -- Pulls clean text from discovered web pages to enrich work descriptions.
 
 ```mermaid
 sequenceDiagram

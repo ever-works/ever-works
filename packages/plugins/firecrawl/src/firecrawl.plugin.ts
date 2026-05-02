@@ -315,7 +315,7 @@ export class FirecrawlPlugin implements IPlugin, ISearchPlugin, IContentExtracto
 				'',
 				'## How it works in Ever Works',
 				'',
-				'When enabled, Firecrawl can be used as both a search provider and content extractor during directory generation. It searches the web for relevant information and extracts high-quality content from web pages, including JavaScript-heavy sites.',
+				'When enabled, Firecrawl can be used as both a search provider and content extractor during work generation. It searches the web for relevant information and extracts high-quality content from web pages, including JavaScript-heavy sites.',
 				'',
 				'## Getting started',
 				'',

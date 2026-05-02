@@ -2,18 +2,18 @@ import { Logger, Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { ApiKeyRepository } from './repositories/api-key.repository';
-import { DirectoryRepository } from './repositories/directory.repository';
-import { DirectoryAdvancedPromptsRepository } from './repositories/directory-advanced-prompts.repository';
-import { DirectoryCustomDomainRepository } from './repositories/directory-custom-domain.repository';
-import { DirectoryMemberRepository } from './repositories/directory-member.repository';
+import { WorkRepository } from './repositories/work.repository';
+import { WorkAdvancedPromptsRepository } from './repositories/work-advanced-prompts.repository';
+import { WorkCustomDomainRepository } from './repositories/work-custom-domain.repository';
+import { WorkMemberRepository } from './repositories/work-member.repository';
 import { RefreshTokenRepository } from './repositories/refresh-token.repository';
 import { AuthAccountRepository } from './repositories/auth-account.repository';
 import { databaseConfig, ENTITIES } from './database.config';
 import { UserRepository } from './repositories/user.repository';
-import { DirectoryGenerationHistoryRepository } from './repositories/directory-generation-history.repository';
+import { WorkGenerationHistoryRepository } from './repositories/work-generation-history.repository';
 import { SubscriptionPlanRepository } from './repositories/subscription-plan.repository';
 import { UserSubscriptionRepository } from './repositories/user-subscription.repository';
-import { DirectoryScheduleRepository } from './repositories/directory-schedule.repository';
+import { WorkScheduleRepository } from './repositories/work-schedule.repository';
 import { UsageLedgerRepository } from './repositories/usage-ledger.repository';
 import { NotificationRepository } from './repositories/notification.repository';
 import { ActivityLogRepository } from './repositories/activity-log.repository';
@@ -39,17 +39,17 @@ import { GitHubAppUserLinkRepository } from './repositories/github-app-user-link
     ],
     providers: [
         ApiKeyRepository,
-        DirectoryRepository,
-        DirectoryAdvancedPromptsRepository,
-        DirectoryCustomDomainRepository,
-        DirectoryMemberRepository,
+        WorkRepository,
+        WorkAdvancedPromptsRepository,
+        WorkCustomDomainRepository,
+        WorkMemberRepository,
         RefreshTokenRepository,
         UserRepository,
         AuthAccountRepository,
-        DirectoryGenerationHistoryRepository,
+        WorkGenerationHistoryRepository,
         SubscriptionPlanRepository,
         UserSubscriptionRepository,
-        DirectoryScheduleRepository,
+        WorkScheduleRepository,
         UsageLedgerRepository,
         NotificationRepository,
         ActivityLogRepository,
@@ -61,17 +61,17 @@ import { GitHubAppUserLinkRepository } from './repositories/github-app-user-link
     exports: [
         TypeOrmModule,
         ApiKeyRepository,
-        DirectoryRepository,
-        DirectoryAdvancedPromptsRepository,
-        DirectoryCustomDomainRepository,
-        DirectoryMemberRepository,
+        WorkRepository,
+        WorkAdvancedPromptsRepository,
+        WorkCustomDomainRepository,
+        WorkMemberRepository,
         UserRepository,
         RefreshTokenRepository,
         AuthAccountRepository,
-        DirectoryGenerationHistoryRepository,
+        WorkGenerationHistoryRepository,
         SubscriptionPlanRepository,
         UserSubscriptionRepository,
-        DirectoryScheduleRepository,
+        WorkScheduleRepository,
         UsageLedgerRepository,
         NotificationRepository,
         ActivityLogRepository,

@@ -67,7 +67,7 @@ interface MockPluginContextOptions {
 	settings?: PluginSettings; // Pre-configured settings
 	env?: MockPluginEnvironmentOptions; // Environment overrides
 	envVars?: Record<string, string>; // Environment variables
-	directories?: Map<string, DirectoryInfo>; // Mock directory data
+	works?: Map<string, WorkInfo>; // Mock work data
 	users?: Map<string, UserInfo>; // Mock user data
 	currentUser?: UserInfo; // Current user for the session
 	httpResponses?: Map<string, HttpResponse>; // Pre-configured HTTP responses
@@ -85,7 +85,7 @@ The mock context includes functional implementations of every platform service:
 | **HTTP Client**           | Returns pre-configured responses by method + URL key                  |
 | **Environment**           | Configurable platform version, environment flags, paths               |
 | **Environment Variables** | In-memory variable store                                              |
-| **Directory Service**     | Lookup by ID or slug from provided `Map`                              |
+| **Work Service**          | Lookup by ID or slug from provided `Map`                              |
 | **User Service**          | Lookup by ID; returns configurable current user                       |
 | **Events**                | Working event subscription and emission                               |
 | **Custom Capabilities**   | Full registration and retrieval                                       |
@@ -100,13 +100,13 @@ const context = createMockPluginContext();
 await myPlugin.onLoad(context);
 
 // Simulate an event from outside the plugin
-context._triggerEvent('directory.created', {
-	directoryId: 'dir-123',
+context._triggerEvent('work.created', {
+	workId: 'dir-123',
 	timestamp: new Date().toISOString()
 });
 
 // Inspect registered handlers
-const handlers = context._eventHandlers.get('directory.created');
+const handlers = context._eventHandlers.get('work.created');
 expect(handlers?.size).toBe(1);
 ```
 

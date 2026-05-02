@@ -15,11 +15,11 @@
 - [ ] Includes table of contents
 - [ ] Groups items by category
 - [ ] Links to detail pages
-- [ ] Includes directory name and description
+- [ ] Includes work name and description
 
 ### AC-3: Detail Page Generation
 
-- [ ] Creates `details/` directory
+- [ ] Creates `details/` work
 - [ ] Generates `{slug}.md` for each item
 - [ ] Includes item name, description, source URL
 - [ ] Includes tags and badges

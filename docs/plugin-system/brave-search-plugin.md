@@ -153,7 +153,7 @@ The `getRateLimitInfo()` method returns `-1` for both `remaining` and `limit`, i
 
 ## Usage in the Platform
 
-When Brave Search is enabled and selected as the active search provider for a directory, the agent pipeline calls `search()` during content generation to find information about each directory item. Its independent index can surface results that other engines miss.
+When Brave Search is enabled and selected as the active search provider for a work, the agent pipeline calls `search()` during content generation to find information about each work item. Its independent index can surface results that other engines miss.
 
 ```typescript
 // Conceptual usage inside the generation pipeline
@@ -173,7 +173,7 @@ The Brave plugin is a built-in plugin (`builtIn: true`) but is not a system plug
 ```mermaid
 graph LR
     A[User enables plugin] --> B[Enters API key]
-    B --> C[Plugin available for directories]
+    B --> C[Plugin available for works]
     C --> D[Selected as search provider]
     D --> E[Used during generation]
 ```

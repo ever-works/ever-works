@@ -11,7 +11,7 @@ import type {
 	PipelineExecutionOptions,
 	PipelineProgressCallback,
 	PipelineResult,
-	DirectoryReference,
+	WorkReference,
 	GenerationRequest,
 	ExistingItems,
 	PluginManifest,
@@ -301,17 +301,17 @@ export class GeminiPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvid
 			readme: [
 				'# Gemini Generator Plugin',
 				'',
-				'Use Gemini as the pipeline engine for directory generation inside Ever Works.',
+				'Use Gemini as the pipeline engine for work generation inside Ever Works.',
 				'',
-				'Gemini researches sources, generates structured directory items, and returns the finished results to Ever Works as a complete pipeline run.',
+				'Gemini researches sources, generates structured work items, and returns the finished results to Ever Works as a complete pipeline run.',
 				'',
-				'Choose this plugin when you want Gemini to handle the full research and generation workflow for a directory.',
+				'Choose this plugin when you want Gemini to handle the full research and generation workflow for a work.',
 				'',
 				'## What It Does',
 				'',
-				'- Researches sources for the current directory topic.',
+				'- Researches sources for the current work topic.',
 				'- Generates structured item data for Ever Works.',
-				'- Reuses your directory context and existing items during generation.',
+				'- Reuses your work context and existing items during generation.',
 				'- Can work with screenshot providers for item imagery.',
 				'',
 				'## Authentication',
@@ -319,11 +319,11 @@ export class GeminiPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvid
 				'- Connect with a Google AI Studio Gemini API key.',
 				'',
 				'Authentication is configured from Ever Works user settings rather than shared host login state.',
-				'The runtime uses an isolated per-user Gemini home/config directory instead of the machine user home.',
+				'The runtime uses an isolated per-user Gemini home/config work instead of the machine user home.',
 				'## Usage',
 				'',
 				'1. Save your Gemini API key in plugin settings.',
-				'2. Enable the plugin for a directory.',
+				'2. Enable the plugin for a work.',
 				'3. Select `gemini` as the pipeline provider for generation.'
 			].join('\n'),
 			homepage: 'https://github.com/google-gemini/gemini-cli',
@@ -390,14 +390,14 @@ export class GeminiPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvid
 	}
 
 	async execute(
-		directory: DirectoryReference,
+		work: WorkReference,
 		request: GenerationRequest,
 		existing: ExistingItems,
 		options?: PipelineExecutionOptions,
 		onProgress?: PipelineProgressCallback
 	): Promise<PipelineResult> {
 		const startTime = Date.now();
-		const userId = directory.user?.id;
+		const userId = work.user?.id;
 		if (!userId) {
 			return this.handleError(new Error('User ID is required'), startTime);
 		}
@@ -423,7 +423,7 @@ export class GeminiPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvid
 		let configDir: string | null = null;
 
 		try {
-			const settings = await resolveSettings(this.context, userId, directory.id);
+			const settings = await resolveSettings(this.context, userId, work.id);
 			if (settings.model) {
 				logger.log(`Using model "${settings.model}" for this session as specified in settings`);
 			}
@@ -444,11 +444,11 @@ export class GeminiPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvid
 			reportProgress(onProgress, 1, 20, 'Prepare Context');
 
 			configDir = path.join(BASE_TEMP_DIR, 'config', userId);
-			workspacePath = await createWorkspace(userId, directory.id);
+			workspacePath = await createWorkspace(userId, work.id);
 			await ensureOnboardingConfig(configDir);
 			await seedExistingItems(workspacePath, existing.items);
 			await seedMetadata(workspacePath, {
-				directory: { name: directory.name, description: directory.description },
+				work: { name: work.name, description: work.description },
 				request: { prompt: request.prompt, name: request.name },
 				categories: existing.categories,
 				tags: existing.tags,
@@ -468,10 +468,10 @@ export class GeminiPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvid
 			const generateItemsStepStartedAt = this.startStep('generate-items', onLogEntry);
 			reportProgress(onProgress, 2, 30, 'Generate Items');
 
-			const promptOptions = { directory, request, existing, workspacePath };
+			const promptOptions = { work, request, existing, workspacePath };
 			const execContext = options?.execContext;
 			const promptFacade = execContext?.promptFacade;
-			const facadeOptions = { userId, directoryId: directory.id };
+			const facadeOptions = { userId, workId: work.id };
 
 			const sysTemplate = (
 				promptFacade
@@ -577,7 +577,7 @@ export class GeminiPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvid
 				options?.execContext,
 				items,
 				userId,
-				directory.id,
+				work.id,
 				signal,
 				onProgress,
 				logger,
@@ -658,7 +658,7 @@ export class GeminiPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvid
 		execContext: PipelineExecutionOptions['execContext'],
 		items: ItemData[],
 		userId: string,
-		directoryId: string,
+		workId: string,
 		signal: AbortSignal,
 		onProgress: PipelineProgressCallback | undefined,
 		logger: { log(...args: unknown[]): void; warn(...args: unknown[]): void },
@@ -686,7 +686,7 @@ export class GeminiPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvid
 
 		const { status, errors } = await captureScreenshots(items, {
 			screenshotFacade,
-			facadeOptions: { userId, directoryId },
+			facadeOptions: { userId, workId },
 			signal,
 			logger
 		});
@@ -698,7 +698,7 @@ export class GeminiPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvid
 		}
 
 		if (errors.length > 0) {
-			const facadeOptions = { userId, directoryId };
+			const facadeOptions = { userId, workId };
 			const providerName = await screenshotFacade.getActiveProviderName?.(facadeOptions);
 			const label = providerName ? `Screenshot capture (${providerName})` : 'Screenshot capture';
 			const unique = [...new Set(errors)];

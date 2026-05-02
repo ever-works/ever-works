@@ -13,16 +13,16 @@ export type PluginLifecycleEvent =
 	| 'plugin:settings-changed';
 
 /**
- * Directory-related event names
+ * Work-related event names
  */
-export type DirectoryEvent =
-	| 'directory:created'
-	| 'directory:updated'
-	| 'directory:deleted'
-	| 'directory:deployed'
-	| 'directory:generation-started'
-	| 'directory:generation-completed'
-	| 'directory:generation-failed';
+export type WorkEvent =
+	| 'work:created'
+	| 'work:updated'
+	| 'work:deleted'
+	| 'work:deployed'
+	| 'work:generation-started'
+	| 'work:generation-completed'
+	| 'work:generation-failed';
 
 /**
  * Item-related event names
@@ -49,7 +49,7 @@ export type SystemEvent = 'system:startup' | 'system:shutdown' | 'system:health-
 /**
  * All plugin event names
  */
-export type PluginEventName = PluginLifecycleEvent | DirectoryEvent | ItemEvent | PipelineEvent | SystemEvent;
+export type PluginEventName = PluginLifecycleEvent | WorkEvent | ItemEvent | PipelineEvent | SystemEvent;
 
 /**
  * Base event payload interface
@@ -78,36 +78,36 @@ export interface PluginErrorPayload extends BaseEventPayload {
 export interface PluginSettingsChangedPayload extends BaseEventPayload {
 	readonly pluginId: string;
 	readonly changedKeys: readonly string[];
-	readonly scope: 'global' | 'directory' | 'user';
+	readonly scope: 'global' | 'work' | 'user';
 	/** Whether any changed settings require plugin restart */
 	readonly requiresRestart?: boolean;
 	/** User ID when scope is 'user' */
 	readonly userId?: string;
-	/** Directory ID when scope is 'directory' */
-	readonly directoryId?: string;
+	/** Work ID when scope is 'work' */
+	readonly workId?: string;
 }
 
 /**
- * Directory event payloads
+ * Work event payloads
  */
-export interface DirectoryEventPayload extends BaseEventPayload {
-	readonly directoryId: string;
-	readonly directoryName?: string;
+export interface WorkEventPayload extends BaseEventPayload {
+	readonly workId: string;
+	readonly workName?: string;
 }
 
-export interface DirectoryGenerationStartedPayload extends DirectoryEventPayload {
+export interface WorkGenerationStartedPayload extends WorkEventPayload {
 	readonly itemCount?: number;
 	readonly options?: Record<string, unknown>;
 }
 
-export interface DirectoryGenerationCompletedPayload extends DirectoryEventPayload {
+export interface WorkGenerationCompletedPayload extends WorkEventPayload {
 	readonly itemsGenerated: number;
 	readonly categoriesGenerated: number;
 	readonly tagsGenerated: number;
 	readonly duration: number;
 }
 
-export interface DirectoryGenerationFailedPayload extends DirectoryEventPayload {
+export interface WorkGenerationFailedPayload extends WorkEventPayload {
 	readonly error: Error | string;
 	readonly step?: string;
 }
@@ -116,7 +116,7 @@ export interface DirectoryGenerationFailedPayload extends DirectoryEventPayload 
  * Item event payloads
  */
 export interface ItemEventPayload extends BaseEventPayload {
-	readonly directoryId: string;
+	readonly workId: string;
 	readonly itemId?: string;
 	readonly item: ItemData;
 }
@@ -130,7 +130,7 @@ export interface ItemValidatedPayload extends ItemEventPayload {
  * Pipeline event payloads
  */
 export interface PipelineEventPayload extends BaseEventPayload {
-	readonly directoryId: string;
+	readonly workId: string;
 	readonly pipelineId?: string;
 }
 
@@ -182,14 +182,14 @@ export interface PluginEventPayloads {
 	'plugin:error': PluginErrorPayload;
 	'plugin:settings-changed': PluginSettingsChangedPayload;
 
-	// Directory events
-	'directory:created': DirectoryEventPayload;
-	'directory:updated': DirectoryEventPayload;
-	'directory:deleted': DirectoryEventPayload;
-	'directory:deployed': DirectoryEventPayload;
-	'directory:generation-started': DirectoryGenerationStartedPayload;
-	'directory:generation-completed': DirectoryGenerationCompletedPayload;
-	'directory:generation-failed': DirectoryGenerationFailedPayload;
+	// Work events
+	'work:created': WorkEventPayload;
+	'work:updated': WorkEventPayload;
+	'work:deleted': WorkEventPayload;
+	'work:deployed': WorkEventPayload;
+	'work:generation-started': WorkGenerationStartedPayload;
+	'work:generation-completed': WorkGenerationCompletedPayload;
+	'work:generation-failed': WorkGenerationFailedPayload;
 
 	// Item events
 	'item:created': ItemEventPayload;

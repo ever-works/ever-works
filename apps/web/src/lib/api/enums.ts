@@ -3,9 +3,9 @@ export { GenerationMethod, WebsiteRepositoryCreationMethod } from '@ever-works/c
 
 export {
     GenerateStatusType,
-    DirectoryScheduleCadence,
-    DirectoryScheduleStatus,
-    DirectoryScheduleBillingMode,
+    WorkScheduleCadence,
+    WorkScheduleStatus,
+    WorkScheduleBillingMode,
 } from '@ever-works/contracts/api';
 
 export enum OAuthProvider {
@@ -16,16 +16,16 @@ export enum OAuthProvider {
 }
 
 /**
- * Roles for directory access.
- * - OWNER: Reserved for directory creator only (implicit, not assignable to members)
- * - MANAGER: Can edit directory and manage content, invite/remove members
- * - EDITOR: Can edit directory content but cannot manage members
- * - VIEWER: Read-only access to directory
+ * Roles for work access.
+ * - OWNER: Reserved for work creator only (implicit, not assignable to members)
+ * - MANAGER: Can edit work and manage content, invite/remove members
+ * - EDITOR: Can edit work content but cannot manage members
+ * - VIEWER: Read-only access to work
  *
- * Note: OWNER role is returned for the directory creator when querying userRole.
+ * Note: OWNER role is returned for the work creator when querying userRole.
  * Members can only be assigned MANAGER, EDITOR, or VIEWER roles.
  */
-export enum DirectoryMemberRole {
+export enum WorkMemberRole {
     OWNER = 'owner',
     MANAGER = 'manager',
     EDITOR = 'editor',
@@ -33,11 +33,11 @@ export enum DirectoryMemberRole {
 }
 
 /**
- * Roles that can be assigned to directory members.
- * OWNER is excluded as it's reserved for the directory creator.
+ * Roles that can be assigned to work members.
+ * OWNER is excluded as it's reserved for the work creator.
  */
 export const ASSIGNABLE_MEMBER_ROLES = [
-    DirectoryMemberRole.MANAGER,
-    DirectoryMemberRole.EDITOR,
-    DirectoryMemberRole.VIEWER,
+    WorkMemberRole.MANAGER,
+    WorkMemberRole.EDITOR,
+    WorkMemberRole.VIEWER,
 ] as const;

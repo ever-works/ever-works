@@ -6,7 +6,7 @@ import { PluginsModule, PLUGIN_ENTITIES } from '../plugins.module';
 import { PLUGINS_MODULE_OPTIONS } from '../plugins.constants';
 import { PluginEntity } from '../entities/plugin.entity';
 import { UserPluginEntity } from '../entities/user-plugin.entity';
-import { DirectoryPluginEntity } from '../entities/directory-plugin.entity';
+import { WorkPluginEntity } from '../entities/work-plugin.entity';
 import { PluginRegistryService } from '../services/plugin-registry.service';
 import { PluginLoaderService } from '../services/plugin-loader.service';
 import { PluginLifecycleManagerService } from '../services/plugin-lifecycle-manager.service';
@@ -128,13 +128,13 @@ describe('PluginsModule', () => {
             const userPluginRepo = module.get<Repository<UserPluginEntity>>(
                 getRepositoryToken(UserPluginEntity),
             );
-            const directoryPluginRepo = module.get<Repository<DirectoryPluginEntity>>(
-                getRepositoryToken(DirectoryPluginEntity),
+            const workPluginRepo = module.get<Repository<WorkPluginEntity>>(
+                getRepositoryToken(WorkPluginEntity),
             );
 
             expect(pluginRepo).toBeDefined();
             expect(userPluginRepo).toBeDefined();
-            expect(directoryPluginRepo).toBeDefined();
+            expect(workPluginRepo).toBeDefined();
         });
     });
 

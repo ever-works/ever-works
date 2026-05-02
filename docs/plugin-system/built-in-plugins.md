@@ -436,7 +436,7 @@ Repository management, cloning, pushing, pull requests, and OAuth authentication
 
 ### Vercel
 
-Deploy directory websites to Vercel. This is the **default deployment provider** and is always enabled.
+Deploy work websites to Vercel. This is the **default deployment provider** and is always enabled.
 
 | Field              | Value           |
 | ------------------ | --------------- |
@@ -455,7 +455,7 @@ Deploy directory websites to Vercel. This is the **default deployment provider**
 
 ## Screenshot
 
-Screenshot plugins capture website images for directory item previews.
+Screenshot plugins capture website images for work item previews.
 
 ### ScreenshotOne
 
@@ -680,7 +680,7 @@ The 15 pipeline steps, organized into 8 phases:
 
 ### Agent Pipeline
 
-Autonomous AI agent pipeline using the Vercel AI SDK with tool calling. The agent independently researches and generates directory items using a parent/worker model architecture.
+Autonomous AI agent pipeline using the Vercel AI SDK with tool calling. The agent independently researches and generates work items using a parent/worker model architecture.
 
 | Field              | Value                              |
 | ------------------ | ---------------------------------- |
@@ -697,7 +697,7 @@ Autonomous AI agent pipeline using the Vercel AI SDK with tool calling. The agen
 
 ### Claude Code Generator
 
-Generation pipeline that uses the Claude Code CLI to autonomously research and generate directory items. Requires either an OAuth token or Anthropic API key.
+Generation pipeline that uses the Claude Code CLI to autonomously research and generate work items. Requires either an OAuth token or Anthropic API key.
 
 | Field              | Value                              |
 | ------------------ | ---------------------------------- |
@@ -725,7 +725,7 @@ Generation pipeline that uses the Claude Code CLI to autonomously research and g
 
 ### Claude Managed Agent
 
-Hosted Claude Managed Agent pipeline. Delegates the full directory generation to Anthropic's managed agent runtime instead of orchestrating the steps locally.
+Hosted Claude Managed Agent pipeline. Delegates the full work generation to Anthropic's managed agent runtime instead of orchestrating the steps locally.
 
 | Field              | Value                              |
 | ------------------ | ---------------------------------- |
@@ -777,7 +777,7 @@ See [OpenCode Plugin](./opencode-plugin.md) for setup. Refer to `packages/plugin
 
 ### Make.com Workflows
 
-Pipeline plugin that triggers Make.com (formerly Integromat) scenarios via webhooks to handle directory generation. Use this to plug in a no-code/low-code workflow as the source of generated items.
+Pipeline plugin that triggers Make.com (formerly Integromat) scenarios via webhooks to handle work generation. Use this to plug in a no-code/low-code workflow as the source of generated items.
 
 | Field              | Value                              |
 | ------------------ | ---------------------------------- |
@@ -790,7 +790,7 @@ See [Make.com Plugin](./make-plugin.md) for setup. Refer to `packages/plugins/ma
 
 ### SIM AI Workflows
 
-Pipeline plugin that delegates directory generation to a SIM AI workflow defined in the SIM Studio platform.
+Pipeline plugin that delegates work generation to a SIM AI workflow defined in the SIM Studio platform.
 
 | Field              | Value                              |
 | ------------------ | ---------------------------------- |
@@ -803,7 +803,7 @@ See [SIM AI Workflows Plugin](./sim-ai-plugin.md) for setup. Refer to `packages/
 
 ### Zapier Automation
 
-Pipeline plugin that triggers Zapier actions during directory generation. Lets you wire generation events to any of Zapier's 7000+ integrations.
+Pipeline plugin that triggers Zapier actions during work generation. Lets you wire generation events to any of Zapier's 7000+ integrations.
 
 | Field              | Value                              |
 | ------------------ | ---------------------------------- |
@@ -833,7 +833,7 @@ See [Langfuse Plugin](./langfuse-plugin.md) for setup, label conventions, and fa
 
 ### Comparison Generator
 
-Auto-generates SEO-optimized A vs B comparison pages between directory items.
+Auto-generates SEO-optimized A vs B comparison pages between work items.
 
 | Field              | Value                  |
 | ------------------ | ---------------------- |
@@ -845,15 +845,15 @@ Auto-generates SEO-optimized A vs B comparison pages between directory items.
 
 **Settings:**
 
-| Setting                    | Type    | Default         | Description                                                       |
-| -------------------------- | ------- | --------------- | ----------------------------------------------------------------- |
-| `cadence_override`         | string  | `use_directory` | Generation cadence: `use_directory`, `daily`, `weekly`, `monthly` |
-| `max_comparisons_mode`     | string  | `custom`        | `custom` or `unlimited`                                           |
-| `max_comparisons`          | number  | `50`            | Max total comparisons (1–500, only used in Custom mode)           |
-| `min_items_for_comparison` | number  | `3`             | Min items in category before generating (2–20)                    |
-| `ai_provider`              | string  | —               | Override AI provider for comparison generation                    |
-| `ai_model`                 | string  | —               | Override AI model for comparison generation                       |
-| `custom_prompt`            | string  | —               | Additional instructions appended to comparison prompts            |
-| `extended_analysis`        | boolean | `false`         | Enable deep-dive 7-section extended analysis                      |
+| Setting                    | Type    | Default    | Description                                                  |
+| -------------------------- | ------- | ---------- | ------------------------------------------------------------ |
+| `cadence_override`         | string  | `use_work` | Generation cadence: `use_work`, `daily`, `weekly`, `monthly` |
+| `max_comparisons_mode`     | string  | `custom`   | `custom` or `unlimited`                                      |
+| `max_comparisons`          | number  | `50`       | Max total comparisons (1–500, only used in Custom mode)      |
+| `min_items_for_comparison` | number  | `3`        | Min items in category before generating (2–20)               |
+| `ai_provider`              | string  | —          | Override AI provider for comparison generation               |
+| `ai_model`                 | string  | —          | Override AI model for comparison generation                  |
+| `custom_prompt`            | string  | —          | Additional instructions appended to comparison prompts       |
+| `extended_analysis`        | boolean | `false`    | Enable deep-dive 7-section extended analysis                 |
 
 See [Comparisons](/features/comparisons) for the full feature documentation.

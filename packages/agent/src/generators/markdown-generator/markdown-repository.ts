@@ -23,7 +23,7 @@ export class MarkdownRepository {
 
     /**
      * Remove all files except allowlisted ones
-     * and ensure all needed directories exist
+     * and ensure all needed works exist
      */
     async resetFiles() {
         const files = await fs.readdir(this.dir);
@@ -37,10 +37,10 @@ export class MarkdownRepository {
             await fs.rm(path.join(this.dir, file), { recursive: true, force: true });
         }
 
-        await this.ensureDirectoriesExist();
+        await this.ensureWorksExist();
     }
 
-    async ensureDirectoriesExist() {
+    async ensureWorksExist() {
         await fs.mkdir(this.detailsPath, { recursive: true });
     }
 

@@ -150,7 +150,7 @@
         },
         "register": {
             "title": "Crie sua conta",
-            "subtitle": "Comece a criar diretórios incríveis hoje",
+            "subtitle": "Comece a criar trabalhos incríveis hoje",
             "form": {
                 "name": {
                     "label": "Nome completo",
@@ -197,18 +197,18 @@
     "onboarding": {
         "label": "Primeiros passos",
         "title": "Bem-vindo ao Ever Works",
-        "subtitle": "Crie e publique seu primeiro diretório em minutos.",
+        "subtitle": "Crie e publique seu primeiro trabalho em minutos.",
         "skipButton": "Pular por enquanto",
         "nextButton": "Próximo",
         "stepIndex": "Passo {index}",
         "steps": {
             "welcome": {
                 "title": "O que é Ever Works?",
-                "description": "Ever Works é um construtor de diretórios de código aberto. Crie diretórios de conteúdo estruturado — ferramentas, vagas de emprego, links, produtos — e publique-os como sites ao vivo.",
-                "detail": "Vamos configurá-lo. Conecte seus provedores abaixo, depois crie seu primeiro diretório.",
+                "description": "Ever Works é um construtor de trabalhos de código aberto. Crie trabalhos de conteúdo estruturado — ferramentas, vagas de emprego, links, produtos — e publique-os como sites ao vivo.",
+                "detail": "Vamos configurá-lo. Conecte seus provedores abaixo, depois crie seu primeiro trabalho.",
                 "feature1": {
                     "title": "Conteúdo com IA",
-                    "description": "Gere e enriqueça itens do diretório automaticamente usando seu provedor de IA"
+                    "description": "Gere e enriqueça itens do trabalho automaticamente usando seu provedor de IA"
                 },
                 "feature2": {
                     "title": "Publicação instantânea",
@@ -216,18 +216,18 @@
                 },
                 "feature3": {
                     "title": "Suportado por Git",
-                    "description": "Cada diretório é um repositório GitHub que você possui e controla"
+                    "description": "Cada trabalho é um repositório GitHub que você possui e controla"
                 }
             },
-            "directory": {
-                "title": "Crie seu primeiro diretório",
-                "description": "Um diretório é o seu hub de conteúdo. Adicione itens, configure o layout e publique com um clique.",
-                "detail": "Você está pronto! Crie seu primeiro diretório para começar a construir e publicar conteúdo.",
-                "action": "Criar um diretório"
+            "work": {
+                "title": "Crie seu primeiro trabalho",
+                "description": "Um trabalho é o seu hub de conteúdo. Adicione itens, configure o layout e publique com um clique.",
+                "detail": "Você está pronto! Crie seu primeiro trabalho para começar a construir e publicar conteúdo.",
+                "action": "Criar um trabalho"
             },
             "publish": {
                 "title": "Publicar",
-                "description": "Conecte Vercel ou GitHub para implantar seu diretório como um site público — sem configuração de hospedagem necessária.",
+                "description": "Conecte Vercel ou GitHub para implantar seu trabalho como um site público — sem configuração de hospedagem necessária.",
                 "action": "Configurar publicação"
             }
         },
@@ -336,7 +336,7 @@
             "steps": {
                 "model": {
                     "title": "Escolha um modelo",
-                    "description": "Escolha o modelo Codex que você deseja executar para geração de diretório de ponta a ponta"
+                    "description": "Escolha o modelo Codex que você deseja executar para geração de trabalho de ponta a ponta"
                 },
                 "credentials": {
                     "title": "Adicionar credenciais",
@@ -408,7 +408,7 @@
         "simWizard": {
             "label": "Configuração do SIM AI",
             "title": "Configure o SIM AI em dois passos",
-            "subtitle": "Adicione sua chave de API SIM AI e verifique a conexão para começar a delegar a geração de diretórios para fluxos de trabalho SIM.",
+            "subtitle": "Adicione sua chave de API SIM AI e verifique a conexão para começar a delegar a geração de trabalhos para fluxos de trabalho SIM.",
             "stepIndex": "Passo {index}",
             "continueButton": "Continuar",
             "steps": {
@@ -431,7 +431,7 @@
         "title": "Painel",
         "connectGithub": {
             "title": "Conecte sua conta do GitHub",
-            "description": "O GitHub é necessário para criar e gerenciar repositórios de diretórios. Conecte sua conta para começar.",
+            "description": "O GitHub é necessário para criar e gerenciar repositórios de trabalhos. Conecte sua conta para começar.",
             "connect": "Conectar GitHub",
             "dismiss": "Vou fazer isso depois"
         },
@@ -465,7 +465,7 @@
         },
         "header": {
             "welcome": "Bem-vindo de volta, {username}!",
-            "subtitle": "Gerencie seus diretórios alimentados por IA e acompanhe seu desempenho",
+            "subtitle": "Gerencie seus trabalhos alimentados por IA e acompanhe seu desempenho",
             "onboarding": {
                 "badge": "Introdução {currentStep}/{totalSteps}",
                 "dismiss": "Ocultar atalho de introdução"
@@ -490,14 +490,14 @@
                 },
                 "quickTips": {
                     "title": "Dicas Rápidas",
-                    "tip1": "Crie seu primeiro diretório clicando no botão 'Criar Diretório' no painel.",
-                    "tip2": "Use o gerador de IA para popular automaticamente seu diretório com itens relevantes.",
-                    "tip3": "Conecte sua conta do GitHub para sincronizar e implantar seus diretórios como repositórios."
+                    "tip1": "Crie seu primeiro trabalho clicando no botão 'Criar Trabalho' no painel.",
+                    "tip2": "Use o gerador de IA para popular automaticamente seu trabalho com itens relevantes.",
+                    "tip3": "Conecte sua conta do GitHub para sincronizar e implantar seus trabalhos como repositórios."
                 },
                 "shortcuts": {
                     "title": "Atalhos de Teclado",
-                    "search": "Pesquisar diretórios",
-                    "newDirectory": "Criar novo diretório",
+                    "search": "Pesquisar trabalhos",
+                    "newWork": "Criar novo trabalho",
                     "help": "Abrir ajuda",
                     "hint": "Use Cmd no Mac ou Ctrl no Windows/Linux"
                 },
@@ -513,7 +513,7 @@
         },
         "activity": {
             "title": "Registro de Atividades",
-            "subtitle": "Acompanhe todas as operações em seus diretórios",
+            "subtitle": "Acompanhe todas as operações em seus trabalhos",
             "loading": "Carregando...",
             "fetchFailed": "Falha ao carregar atividades",
             "exportFailed": "Falha ao exportar registro de atividades",
@@ -521,7 +521,7 @@
             "columns": {
                 "status": "Status",
                 "dateTime": "Data / Hora",
-                "directory": "Diretório",
+                "work": "Trabalho",
                 "type": "Tipo",
                 "summary": "Resumo"
             },
@@ -532,9 +532,9 @@
                     "generation": "Geração",
                     "comparison": "Comparação",
                     "deployment": "Implantação",
-                    "directoryCreated": "Diretório Criado",
-                    "directoryUpdated": "Diretório Atualizado",
-                    "directoryDeleted": "Diretório Excluído",
+                    "workCreated": "Trabalho Criado",
+                    "workUpdated": "Trabalho Atualizado",
+                    "workDeleted": "Trabalho Excluído",
                     "pluginEnabled": "Plugin Ativado",
                     "pluginDisabled": "Plugin Desativado",
                     "pluginConfigured": "Plugin Configurado",
@@ -596,32 +596,32 @@
                 "pageOf": "Página {page} de {total}"
             }
         },
-        "directories": {
-            "title": "Diretórios",
-            "subtitle": "Gerencie e organize seus diretórios alimentados por IA",
+        "works": {
+            "title": "Trabalhos",
+            "subtitle": "Gerencie e organize seus trabalhos alimentados por IA",
             "summary": {
-                "totalDirectories": "Total de Diretórios",
+                "totalWorks": "Total de Trabalhos",
                 "generating": "Gerando",
                 "totalItems": "Total de Itens"
             },
-            "recent": "Diretórios Recentes",
+            "recent": "Trabalhos Recentes",
             "viewAll": "Ver todos ({count})",
-            "search": "Pesquisar diretórios...",
-            "create": "Criar Diretório",
-            "showing": "Mostrando {current} de {total} diretórios",
-            "searchFailed": "Falha ao pesquisar diretórios. Tente novamente.",
+            "search": "Pesquisar trabalhos...",
+            "create": "Criar Trabalho",
+            "showing": "Mostrando {current} de {total} trabalhos",
+            "searchFailed": "Falha ao pesquisar trabalhos. Tente novamente.",
             "pagination": {
                 "previous": "Anterior",
                 "next": "Próximo"
             },
             "empty": {
-                "title": "Nenhum diretório ainda",
-                "description": "Crie seu primeiro diretório alimentado por IA para começar a organizar e exibir seu conteúdo.",
-                "action": "Criar Seu Primeiro Diretório",
+                "title": "Nenhum trabalho ainda",
+                "description": "Crie seu primeiro trabalho alimentado por IA para começar a organizar e exibir seu conteúdo.",
+                "action": "Criar Seu Primeiro Trabalho",
                 "notFound": {
-                    "title": "Nenhum diretório encontrado",
+                    "title": "Nenhum trabalho encontrado",
                     "withSearch": "Tente ajustar seus termos de pesquisa",
-                    "withoutSearch": "Crie seu primeiro diretório alimentado por IA para começar"
+                    "withoutSearch": "Crie seu primeiro trabalho alimentado por IA para começar"
                 }
             }
         },
@@ -638,7 +638,7 @@
             },
             "data": {
                 "exportTitle": "Exportar Dados",
-                "exportDescription": "Baixe os dados da sua conta, incluindo diretórios, configurações de plugins e informações de perfil, em um arquivo JSON.",
+                "exportDescription": "Baixe os dados da sua conta, incluindo trabalhos, configurações de plugins e informações de perfil, em um arquivo JSON.",
                 "includeSecrets": "Incluir configurações secretas (chaves de API, tokens) — exportadas como valores mascarados",
                 "secretsWarning": "As configurações secretas serão exportadas como valores mascarados. Você precisará substituí-las manualmente pelas credenciais reais antes de importar.",
                 "exportButton": "Exportar Dados",
@@ -646,7 +646,7 @@
                 "exportSuccess": "Dados exportados com sucesso",
                 "exportError": "Falha ao exportar dados",
                 "importTitle": "Importar Dados",
-                "importDescription": "Importe dados de um arquivo JSON exportado anteriormente. Você pode resolver conflitos para diretórios com slugs correspondentes.",
+                "importDescription": "Importe dados de um arquivo JSON exportado anteriormente. Você pode resolver conflitos para trabalhos com slugs correspondentes.",
                 "importButton": "Importar Dados",
                 "syncTitle": "Sincronização do GitHub",
                 "syncDescription": "Sincronize a configuração da sua conta com um repositório privado do GitHub para backup e migração entre instâncias.",
@@ -658,13 +658,13 @@
                     "invalidJson": "Arquivo JSON inválido",
                     "previewError": "Falha ao analisar arquivo de importação",
                     "summary": "Resumo da Importação",
-                    "directories": "Diretórios",
+                    "works": "Trabalhos",
                     "items": "Itens",
                     "userPlugins": "Plugins do Usuário",
                     "version": "Versão do Formato",
                     "missingPlugins": "Esses plugins não estão instalados e serão ignorados",
                     "conflicts": "Conflitos de Slug",
-                    "existingDirectory": "Existente",
+                    "existingWork": "Existente",
                     "incoming": "Entrante",
                     "strategySkip": "Ignorar (manter existente)",
                     "strategyOverwrite": "Substituir existente",
@@ -681,9 +681,9 @@
                     "validationErrors": "Erros de Validação",
                     "resultSuccess": "Importação Concluída com Sucesso",
                     "resultFailed": "Importação Falhou",
-                    "directoriesCreated": "Diretórios criados",
-                    "directoriesUpdated": "Diretórios atualizados",
-                    "directoriesSkipped": "Diretórios ignorados",
+                    "worksCreated": "Trabalhos criados",
+                    "worksUpdated": "Trabalhos atualizados",
+                    "worksSkipped": "Trabalhos ignorados",
                     "pluginsImported": "Plugins importados",
                     "warnings": "Avisos",
                     "errors": "Erros"
@@ -732,11 +732,11 @@
                 "backToCategory": "Voltar para {category}",
                 "pipelineDefault": {
                     "title": "Pipeline Padrão",
-                    "description": "Escolha qual pipeline é usado por padrão ao gerar itens de diretório.",
+                    "description": "Escolha qual pipeline é usado por padrão ao gerar itens de trabalho.",
                     "autoLabel": "Automático",
-                    "autoDescription": "Use o pipeline resolvido pelo sistema para cada diretório",
+                    "autoDescription": "Use o pipeline resolvido pelo sistema para cada trabalho",
                     "enforceLabel": "Forçar este padrão",
-                    "enforceDescription": "Sempre pré-selecionar este pipeline, mesmo quando um diretório tem seu próprio pipeline configurado. Você ainda pode trocar pipelines manualmente no formulário.",
+                    "enforceDescription": "Sempre pré-selecionar este pipeline, mesmo quando um trabalho tem seu próprio pipeline configurado. Você ainda pode trocar pipelines manualmente no formulário.",
                     "saveFailed": "Falha ao salvar pipeline padrão"
                 }
             },
@@ -819,8 +819,8 @@
                 "subtitle": "Conecte suas contas externas para funcionalidades aprimoradas",
                 "github": {
                     "name": "GitHub",
-                    "connected": "Crie e gerencie diretórios com repositórios GitHub",
-                    "disconnected": "Conecte-se para criar diretórios a partir de repositórios",
+                    "connected": "Crie e gerencie trabalhos com repositórios GitHub",
+                    "disconnected": "Conecte-se para criar trabalhos a partir de repositórios",
                     "scopes": "Escopos",
                     "organizations": "Organizações Conectadas",
                     "organizationsHint": "Use Reconectar para conceder acesso a organizações adicionais",
@@ -881,12 +881,12 @@
             }
         },
         "stats": {
-            "totalDirectories": "Total de Diretórios",
+            "totalWorks": "Total de Trabalhos",
             "totalItems": "Total de Itens",
             "activeWebsites": "Sites Ativos",
             "fromLastMonth": "do último mês"
         },
-        "directoryCard": {
+        "workCard": {
             "status": {
                 "active": "Ativo",
                 "notStarted": "Não Iniciado",
@@ -911,14 +911,14 @@
             "views": "{count} visualizações",
             "updated": "Atualizado em {date}",
             "viewAction": "Ver →",
-            "openingTitle": "Abrindo diretório",
-            "openingMessage": "Preparando seu diretório. Detalhes abrirão em breve. Fique nesta página."
+            "openingTitle": "Abrindo trabalho",
+            "openingMessage": "Preparando seu trabalho. Detalhes abrirão em breve. Fique nesta página."
         },
-        "directoryList": {
-            "title": "Seus Diretórios",
-            "createButton": "Criar Diretório"
+        "workList": {
+            "title": "Seus Trabalhos",
+            "createButton": "Criar Trabalho"
         },
-        "directoryDetail": {
+        "workDetail": {
             "failedToGenerateItems": "Falha ao gerar itens. Tente novamente.",
             "generationCompleted": "Geração concluída com sucesso",
             "generationCancelled": "Geração cancelada",
@@ -953,7 +953,7 @@
             },
             "members": {
                 "title": "Membros da Equipe",
-                "subtitle": "Gerencie quem tem acesso a este diretório e suas permissões.",
+                "subtitle": "Gerencie quem tem acesso a este trabalho e suas permissões.",
                 "inviteMember": "Convidar Membro",
                 "noMembers": "Nenhum membro da equipe ainda. Convide alguém para colaborar.",
                 "roles": {
@@ -965,13 +965,13 @@
                 },
                 "roleDescriptions": {
                     "owner": "Controle total incluindo exclusão e gerenciamento de membros.",
-                    "manager": "Pode editar o diretório e gerenciar membros, mas não pode excluir.",
-                    "editor": "Pode editar o conteúdo do diretório e executar gerações.",
-                    "viewer": "Acesso somente leitura para visualizar o diretório."
+                    "manager": "Pode editar o trabalho e gerenciar membros, mas não pode excluir.",
+                    "editor": "Pode editar o conteúdo do trabalho e executar gerações.",
+                    "viewer": "Acesso somente leitura para visualizar o trabalho."
                 },
                 "invite": {
                     "title": "Convidar Membro da Equipe",
-                    "description": "Adicione um novo membro para colaborar neste diretório.",
+                    "description": "Adicione um novo membro para colaborar neste trabalho.",
                     "emailLabel": "Endereço de e-mail",
                     "emailPlaceholder": "colleague@example.com",
                     "roleLabel": "Função",
@@ -985,7 +985,7 @@
                 },
                 "confirmRemove": {
                     "title": "Remover Membro",
-                    "description": "Tem certeza de que deseja remover {username} deste diretório? Eles perderão todo o acesso.",
+                    "description": "Tem certeza de que deseja remover {username} deste trabalho? Eles perderão todo o acesso.",
                     "confirm": "Remover",
                     "cancel": "Cancelar"
                 },
@@ -1000,7 +1000,7 @@
                 "page": {
                     "title": "Atualizações agendadas",
                     "subtitle": "Automatize atualizações para {name} com um ritmo dedicado e tratamento de falhas.",
-                    "fallbackName": "este diretório",
+                    "fallbackName": "este trabalho",
                     "loadFailed": "Falha ao carregar configurações de agendamento.",
                     "providerCategories": {
                         "pipeline": "Pipeline",
@@ -1101,7 +1101,7 @@
                     },
                     "empty": {
                         "title": "Execute uma geração manual primeiro",
-                        "description": "Complete uma execução manual com sucesso para desbloquear agendamento automatizado. Uma vez que seu diretório tenha dados, podemos mantê-lo atualizado.",
+                        "description": "Complete uma execução manual com sucesso para desbloquear agendamento automatizado. Uma vez que seu trabalho tenha dados, podemos mantê-lo atualizado.",
                         "refresh": "Atualizar status"
                     },
                     "requiresGeneration": "Execute pelo menos uma geração de item antes de ativar agendamentos."
@@ -1119,7 +1119,7 @@
             "statusCard": {
                 "notStarted": {
                     "title": "Geração Não Iniciada",
-                    "description": "Inicie a geração de itens para seu diretório para preenchê-lo com conteúdo.",
+                    "description": "Inicie a geração de itens para seu trabalho para preenchê-lo com conteúdo.",
                     "action": "Iniciar Geração"
                 },
                 "generating": {
@@ -1133,7 +1133,7 @@
                 },
                 "generated": {
                     "title": "Geração Concluída",
-                    "description": "Seu diretório foi preenchido com sucesso com itens.",
+                    "description": "Seu trabalho foi preenchido com sucesso com itens.",
                     "withWarnings": "Concluído com avisos:",
                     "viewItems": "Ver Itens",
                     "regenerate": "Regenerar"
@@ -1159,7 +1159,7 @@
             },
             "comparisons": {
                 "title": "Comparações",
-                "subtitle": "Páginas de comparação A vs B entre itens do diretório",
+                "subtitle": "Páginas de comparação A vs B entre itens do trabalho",
                 "vs": "vs",
                 "winner": "Vencedor: {name}",
                 "tie": "Empate",
@@ -1307,7 +1307,7 @@
                 }
             },
             "info": {
-                "title": "Informações do Diretório",
+                "title": "Informações do Trabalho",
                 "yourRole": "Sua Função",
                 "role": {
                     "owner": "Proprietário",
@@ -1357,15 +1357,15 @@
             "activity": {
                 "title": "Atividade Recente",
                 "noActivity": "Nenhuma atividade ainda",
-                "created": "Diretório Criado",
-                "directoryCreated": "Diretório criado com sucesso",
+                "created": "Trabalho Criado",
+                "workCreated": "Trabalho criado com sucesso",
                 "justNow": "Agora mesmo"
             },
             "items": {
-                "title": "Itens do Diretório",
-                "subtitle": "Gerencie e organize os itens no seu diretório",
+                "title": "Itens do Trabalho",
+                "subtitle": "Gerencie e organize os itens no seu trabalho",
                 "noItemsTitle": "Ainda Sem Itens",
-                "noItemsDescription": "Seu diretório ainda não tem itens. Gere itens para popular seu diretório com conteúdo.",
+                "noItemsDescription": "Seu trabalho ainda não tem itens. Gere itens para popular seu trabalho com conteúdo.",
                 "generateItems": "Gerar Itens",
                 "searchPlaceholder": "Pesquisar itens...",
                 "allCategories": "Todas as Categorias",
@@ -1427,14 +1427,14 @@
                     "screenshotFailed": "Falha ao capturar screenshot",
                     "screenshotError": "Ocorreu um erro ao capturar screenshot",
                     "featured": "Item em Destaque",
-                    "featuredHelp": "Marque este item como em destaque no diretório",
+                    "featuredHelp": "Marque este item como em destaque no trabalho",
                     "updateWithPR": "Criar Pull Request",
                     "updateWithPRHelp": "Envie alterações como pull request em vez de commit direto",
                     "cancel": "Cancelar",
                     "adding": "Adicionando...",
                     "addItem": "Adicionar Item",
                     "success": "Item adicionado com sucesso",
-                    "successDescription": "O item foi adicionado ao seu diretório",
+                    "successDescription": "O item foi adicionado ao seu trabalho",
                     "failed": "Falha ao adicionar item",
                     "error": "Ocorreu um erro ao adicionar o item",
                     "errors": {
@@ -1653,7 +1653,7 @@
                     "navigationLabel": "Abas do Gerador"
                 },
                 "regenerationWarning": "Aviso de Regeneração",
-                "regenerationWarningDescription": "Este diretório já foi gerado. Iniciar uma nova geração substituirá os itens existentes.",
+                "regenerationWarningDescription": "Este trabalho já foi gerado. Iniciar uma nova geração substituirá os itens existentes.",
                 "requiredInfo": "Informações Obrigatórias",
                 "updateConfiguration": "Atualizar Configuração",
                 "promptRequired": "Prompt é obrigatório",
@@ -1663,20 +1663,20 @@
                 "loadingFormSchema": "Carregando configuração do formulário...",
                 "failedToLoadFormSchema": "Falha ao carregar configuração do formulário",
                 "selectOption": "Selecione uma opção",
-                "directoryName": "Nome do Diretório",
+                "workName": "Nome do Trabalho",
                 "generationPrompt": "Prompt de Geração",
                 "modelOverride": "Substituição de Modelo de IA",
                 "modelOverridePlaceholder": "ex.: openai/gpt-4.1 ou openrouter/openai/gpt-4.1",
                 "modelOverrideHelperText": "Opcional. Usa o modelo importado ou anterior por padrão, a menos que você o substitua aqui.",
                 "recommended": "Recomendado",
-                "promptPlaceholder": "Descreva quais itens devem ser gerados para este diretório...",
+                "promptPlaceholder": "Descreva quais itens devem ser gerados para este trabalho...",
                 "promptHelperText": "Seja específico sobre o tipo de conteúdo que deseja gerar",
                 "repositoryDescription": "Descrição do Repositório",
                 "repositoryPlaceholder": "Breve descrição do repositório (opcional)",
                 "startGeneration": "Iniciar Geração",
                 "regenerateItems": "Regenerar Itens",
                 "updateItems": "Executar Geração",
-                "recreateDirectory": "Recriar Diretório",
+                "recreateWork": "Recriar Trabalho",
                 "showAdvancedOptions": "Mostrar Opções Avançadas",
                 "hideAdvancedOptions": "Ocultar Opções Avançadas",
                 "cancel": "Cancelar",
@@ -1714,7 +1714,7 @@
                 "websiteRepositoryCreationMethod": "Método de Criação do Repositório do Site",
                 "methodDuplicate": "Duplicar",
                 "methodFork": "Fork",
-                "directoryNamePlaceholder": "Digite o nome do diretório",
+                "workNamePlaceholder": "Digite o nome do trabalho",
                 "methodCreateFromTemplate": "Criar a partir de Modelo",
                 "aiProcessingConfiguration": "Configuração de Processamento de IA",
                 "maxSearchQueries": "Máx. Consultas de Pesquisa",
@@ -1725,7 +1725,7 @@
                 "aiFirstGenerationDescription": "Habilitar geração por IA de itens iniciais antes da pesquisa na web.",
                 "contentFiltering": "Filtragem de Conteúdo",
                 "contentFilteringDescription": "Habilitar filtragem de qualidade de conteúdo",
-                "recreateConfirmTitle": "Recriar dados do diretório?",
+                "recreateConfirmTitle": "Recriar dados do trabalho?",
                 "recreateConfirmDescription": "Recriar excluirá itens existentes e os regenerará do zero. Esta ação não pode ser desfeita.",
                 "confirmRecreate": "Sim, recriar",
                 "recreateInlineTitle": "Recriar removerá itens existentes",
@@ -1769,7 +1769,7 @@
                 "aiProviderDescription": "Provedor de modelo de IA para geração e extração de conteúdo",
                 "contentExtractorProvider": "Extrator de Conteúdo",
                 "contentExtractorProviderDescription": "Provedor para extrair conteúdo de páginas da web",
-                "useDirectoryDefault": "Usar Padrão do Diretório",
+                "useWorkDefault": "Usar Padrão do Trabalho",
                 "default": "Padrão",
                 "notConfigured": "Não configurado",
                 "notConfiguredTooltip": "Este provedor requer configuração. Visite Configurações → Plugins para configurá-lo.",
@@ -1837,7 +1837,7 @@
                 },
                 "generalSettings": "Configurações Gerais",
                 "generalTitle": "Configurações Gerais",
-                "directoryName": "Nome do Diretório",
+                "workName": "Nome do Trabalho",
                 "description": "Descrição",
                 "organizationRepository": "Repositório da Organização",
                 "organizationHelp": "Criar repositórios sob uma organização em vez da sua conta pessoal",
@@ -1849,13 +1849,13 @@
                 "customHeaderPlaceholder": "Adicionar conteúdo personalizado ao cabeçalho do README",
                 "overwriteDefaultHeader": "Substituir cabeçalho padrão",
                 "customFooter": "Rodapé Personalizado",
-                "cantDeleteWhileGenerating": "Não é possível excluir o diretório enquanto itens estão sendo gerados.",
+                "cantDeleteWhileGenerating": "Não é possível excluir o trabalho enquanto itens estão sendo gerados.",
                 "customFooterPlaceholder": "Adicionar conteúdo personalizado ao rodapé do README",
                 "overwriteDefaultFooter": "Substituir rodapé padrão",
                 "dangerZone": "Zona de Perigo",
                 "dangerTitle": "Zona de Perigo",
-                "deleteWarning": "Uma vez que você exclua um diretório, não há volta. Por favor, certifique-se.",
-                "dangerDescription": "Uma vez que você exclua um diretório, não há volta. Por favor, certifique-se.",
+                "deleteWarning": "Uma vez que você exclua um trabalho, não há volta. Por favor, certifique-se.",
+                "dangerDescription": "Uma vez que você exclua um trabalho, não há volta. Por favor, certifique-se.",
                 "deleteOptions": "Selecione o que excluir:",
                 "deleteDataRepository": "Excluir repositório de dados",
                 "deleteDataRepositoryDescription": "Remover o repositório de dados JSON do GitHub",
@@ -1864,14 +1864,14 @@
                 "deleteWebsiteRepository": "Excluir repositório do site",
                 "deleteWebsiteRepositoryDescription": "Remover o repositório do site implantado",
                 "deleteConfirm": "Você tem certeza absoluta?",
-                "deleteConfirmDetail": "Esta ação não pode ser desfeita. O diretório e os repositórios selecionados serão permanentemente excluídos.",
-                "confirmDirectoryName": "Digite o nome do diretório para confirmar",
-                "confirmDirectoryNameDescription": "Digite \"{name}\" para confirmar a exclusão",
-                "deleteNameMismatch": "Nome do diretório não corresponde",
-                "deleteButton": "Excluir Diretório",
+                "deleteConfirmDetail": "Esta ação não pode ser desfeita. O trabalho e os repositórios selecionados serão permanentemente excluídos.",
+                "confirmWorkName": "Digite o nome do trabalho para confirmar",
+                "confirmWorkNameDescription": "Digite \"{name}\" para confirmar a exclusão",
+                "deleteNameMismatch": "Nome do trabalho não corresponde",
+                "deleteButton": "Excluir Trabalho",
                 "deleteConfirmButton": "Sim, Excluir",
-                "deleteSuccess": "Diretório excluído com sucesso",
-                "deleteFailed": "Falha ao excluir diretório",
+                "deleteSuccess": "Trabalho excluído com sucesso",
+                "deleteFailed": "Falha ao excluir trabalho",
                 "yesDelete": "Sim, Excluir",
                 "cancel": "Cancelar",
                 "saveChanges": "Salvar Alterações",
@@ -1880,7 +1880,7 @@
                 "updateFailed": "Falha ao atualizar configurações",
                 "deployProvider": {
                     "title": "Provedor de Implantação",
-                    "description": "Selecione onde implantar o site do seu diretório",
+                    "description": "Selecione onde implantar o site do seu trabalho",
                     "configure": "Configurar",
                     "ready": "Pronto para implantar",
                     "notConfigured": "Não configurado",
@@ -1917,7 +1917,7 @@
                     "prompts": {
                         "relevanceAssessment": {
                             "title": "Avaliação de Relevância",
-                            "description": "Instruções adicionais para filtrar páginas da web por relevância ao tópico do seu diretório.",
+                            "description": "Instruções adicionais para filtrar páginas da web por relevância ao tópico do seu trabalho.",
                             "placeholder": "p. ex., Incluir apenas páginas que focam em projetos open-source..."
                         },
                         "itemGeneration": {
@@ -1968,7 +1968,7 @@
                 "communityPrUpdateFailed": "Falha ao atualizar configurações de PR da comunidade",
                 "websiteConfig": {
                     "title": "Configuração do Site",
-                    "subtitle": "Personalize como o site do seu diretório aparece e se comporta",
+                    "subtitle": "Personalize como o site do seu trabalho aparece e se comporta",
                     "loadFailed": "Falha ao carregar configurações do site",
                     "saveSuccess": "Configurações do site salvas com sucesso",
                     "saveFailed": "Falha ao salvar configurações do site",
@@ -1983,13 +1983,13 @@
                         "siteName": {
                             "title": "Identidade do Site",
                             "label": "Nome do Site",
-                            "placeholder": "Meu Diretório",
+                            "placeholder": "Meu Trabalho",
                             "helper": "O nome exibido no cabeçalho do site e na aba do navegador"
                         },
                         "siteUrl": {
                             "label": "URL do Site",
                             "placeholder": "https://example.com",
-                            "helper": "A URL do site da sua empresa ou diretório"
+                            "helper": "A URL do site da sua empresa ou trabalho"
                         },
                         "global": {
                             "title": "Recursos Globais",
@@ -2071,7 +2071,7 @@
                 },
                 "committer": {
                     "title": "Committer Git",
-                    "description": "Substituir o nome e email do committer para commits git neste diretório. Deixe vazio para usar configurações de nível de usuário ou padrões da conta.",
+                    "description": "Substituir o nome e email do committer para commits git neste trabalho. Deixe vazio para usar configurações de nível de usuário ou padrões da conta.",
                     "nameLabel": "Nome do Committer",
                     "emailLabel": "Email do Committer",
                     "save": "Salvar Committer",
@@ -2082,13 +2082,13 @@
             "deploy": {
                 "noProviderAlert": {
                     "title": "Nenhum Provedor de Implantação",
-                    "description": "Selecione um provedor de implantação para implantar seu site de diretório.",
+                    "description": "Selecione um provedor de implantação para implantar seu site de trabalho.",
                     "selectButton": "Selecionar e Continuar",
                     "noProviders": "Nenhum provedor de implantação disponível. Instale um plugin de implantação primeiro."
                 },
                 "noTokenAlert": {
                     "title": "Token do {provider} Necessário",
-                    "description": "Para implantar seu diretório, você precisa configurar seu token de API do {provider} em Configurações do Plugin.",
+                    "description": "Para implantar seu trabalho, você precisa configurar seu token de API do {provider} em Configurações do Plugin.",
                     "configureButton": "Configurar em Configurações do Plugin",
                     "getTokenButton": "Obter Token de API",
                     "howTo": {
@@ -2096,25 +2096,25 @@
                         "step1": "Clique em 'Obter Token de API' para abrir o painel do seu provedor",
                         "step2": "Crie um novo token com permissões de implantação",
                         "step3": "Configure seu token de API do {provider} em Configurações do Plugin > {provider}",
-                        "step4": "Retorne aqui para implantar seu diretório"
+                        "step4": "Retorne aqui para implantar seu trabalho"
                     }
                 },
                 "sharedNoTokenAlert": {
                     "title": "Implantação Não Disponível",
-                    "description": "O proprietário do diretório não configurou a implantação. Entre em contato com o proprietário do diretório para configurar a implantação.",
+                    "description": "O proprietário do trabalho não configurou a implantação. Entre em contato com o proprietário do trabalho para configurar a implantação.",
                     "hint": "Como colaborador, você pode acionar implantações assim que o proprietário configurar seu provedor de implantação."
                 },
                 "form": {
                     "deployment": {
                         "title": "Implantar Site",
-                        "description": "Implantar o repositório do seu site de diretório.",
+                        "description": "Implantar o repositório do seu site de trabalho.",
                         "deployButton": "Implantar no {provider}",
                         "deployingButton": "Implantando...",
                         "deployingStateButton": "Implantando ({state})...",
                         "successMessage": "Seu site foi implantado com sucesso!",
                         "teamSelection": {
                             "title": "Selecionar Equipe",
-                            "description": "Escolha a equipe para implantar este diretório.",
+                            "description": "Escolha a equipe para implantar este trabalho.",
                             "label": "Equipe",
                             "placeholder": "Selecionar uma equipe",
                             "confirmButton": "Implantar na equipe",
@@ -2141,7 +2141,7 @@
                     },
                     "info": {
                         "deployInfo": "A implantação geralmente leva de 1 a 3 minutos. Você receberá uma URL assim que estiver concluída.",
-                        "updateInfo": "As atualizações sincronizam o conteúdo do seu diretório com o repositório do site para a próxima implantação."
+                        "updateInfo": "As atualizações sincronizam o conteúdo do seu trabalho com o repositório do site para a próxima implantação."
                     },
                     "websiteTemplate": {
                         "title": "Atualizações Automáticas de Template",
@@ -2161,7 +2161,7 @@
                         "title": "Configurar Antes de Implantar",
                         "description": "Revise e personalize as configurações do seu site antes da implantação",
                         "siteName": "Nome do Site",
-                        "siteNamePlaceholder": "Meu Diretório",
+                        "siteNamePlaceholder": "Meu Trabalho",
                         "siteNameHelper": "O nome exibido no seu site (padrão: Acme)",
                         "tabGeneral": "Geral",
                         "tabHeader": "Cabeçalho",
@@ -2208,9 +2208,9 @@
                 }
             }
         },
-        "directoryCreation": {
-            "title": "Criar Novo Diretório",
-            "subtitle": "Escolha como deseja criar seu diretório",
+        "workCreation": {
+            "title": "Criar Novo Trabalho",
+            "subtitle": "Escolha como deseja criar seu trabalho",
             "backToOptions": "Voltar às opções",
             "sidebar": {
                 "selectedProvider": "Provedor Git",
@@ -2218,7 +2218,7 @@
             },
             "deployProvider": {
                 "title": "Provedor de Implantação",
-                "description": "Selecione onde implantar o site do seu diretório",
+                "description": "Selecione onde implantar o site do seu trabalho",
                 "noProviders": "Nenhum provedor de implantação disponível",
                 "notConfigured": "Não configurado",
                 "configured": "Pronto para implantar",
@@ -2236,21 +2236,21 @@
             },
             "ai": {
                 "title": "Criar com IA",
-                "subtitle": "Descreva sua ideia de diretório em linguagem natural e deixe a IA cuidar da configuração",
+                "subtitle": "Descreva sua ideia de trabalho em linguagem natural e deixe a IA cuidar da configuração",
                 "getStarted": "Começar",
-                "formTitle": "Criar Diretório com IA",
-                "formSubtitle": "Descreva sua ideia de diretório e deixe a IA cuidar da configuração e geração de conteúdo inicial",
-                "directoryNameLabel": "Nome do Diretório",
-                "directoryNamePlaceholder": "p. ex., Ferramentas de IA Incríveis",
-                "directoryNameHelp": "A IA sugerirá um nome se você deixar isso vazio",
-                "promptLabel": "Descreva Seu Diretório",
+                "formTitle": "Criar Trabalho com IA",
+                "formSubtitle": "Descreva sua ideia de trabalho e deixe a IA cuidar da configuração e geração de conteúdo inicial",
+                "workNameLabel": "Nome do Trabalho",
+                "workNamePlaceholder": "p. ex., Ferramentas de IA Incríveis",
+                "workNameHelp": "A IA sugerirá um nome se você deixar isso vazio",
+                "promptLabel": "Descreva Seu Trabalho",
                 "githubRequired": "Por favor, conecte sua conta GitHub primeiro.",
-                "promptPlaceholder": "Descreva que tipo de diretório você quer criar, quais itens ele deve conter e quaisquer requisitos específicos...",
+                "promptPlaceholder": "Descreva que tipo de trabalho você quer criar, quais itens ele deve conter e quaisquer requisitos específicos...",
                 "inspirationText": "Precisa de inspiração? Experimente um destes:",
                 "examplePrompts": {
                     "0": {
                         "name": "Ferramentas de IA para Desenvolvedores",
-                        "prompt": "Crie um diretório das melhores ferramentas de IA para desenvolvedores"
+                        "prompt": "Crie um trabalho das melhores ferramentas de IA para desenvolvedores"
                     },
                     "1": {
                         "name": "Hub de Componentes React",
@@ -2258,7 +2258,7 @@
                     },
                     "2": {
                         "name": "Ferramentas para Equipes Remotas",
-                        "prompt": "Gere um diretório de aplicativos de produtividade para equipes remotas"
+                        "prompt": "Gere um trabalho de aplicativos de produtividade para equipes remotas"
                     },
                     "3": {
                         "name": "Moda Sustentável",
@@ -2273,23 +2273,23 @@
                     "3": "Configurar repositório GitHub com documentação adequada"
                 },
                 "generateButton": "Gerar com IA",
-                "generatingButton": "Gerando Diretório...",
+                "generatingButton": "Gerando Trabalho...",
                 "cancelButton": "Cancelar",
                 "noteTitle": "Nota:",
-                "noteText": "A geração por IA geralmente leva 2-5 minutos dependendo da complexidade da sua solicitação. Você será notificado quando seu diretório estiver pronto.",
+                "noteText": "A geração por IA geralmente leva 2-5 minutos dependendo da complexidade da sua solicitação. Você será notificado quando seu trabalho estiver pronto.",
                 "errors": {
-                    "promptRequired": "Por favor, descreva que tipo de diretório você quer criar",
+                    "promptRequired": "Por favor, descreva que tipo de trabalho você quer criar",
                     "unconfiguredProviders": "{providers} não configurado. Visite Configurações → Plugins para configurar antes de gerar.",
-                    "nameRequired": "Nome do diretório é obrigatório",
-                    "slugRequired": "Slug do diretório é obrigatório",
-                    "descriptionRequired": "Descrição do diretório é obrigatória",
+                    "nameRequired": "Nome do trabalho é obrigatório",
+                    "slugRequired": "Slug do trabalho é obrigatório",
+                    "descriptionRequired": "Descrição do trabalho é obrigatória",
                     "githubRequired": "Por favor, conecte sua conta GitHub primeiro.",
-                    "createFailed": "Falha ao criar diretório"
+                    "createFailed": "Falha ao criar trabalho"
                 },
                 "success": {
-                    "started": "Criação do diretório iniciada!",
+                    "started": "Criação do trabalho iniciada!",
                     "generating": "A IA está gerando conteúdo. Isso pode levar alguns minutos...",
-                    "created": "Diretório criado com sucesso!"
+                    "created": "Trabalho criado com sucesso!"
                 },
                 "advancedSettings": "Configurações Avançadas",
                 "advancedSubtitle": "Configure configurações de organização e repositório",
@@ -2300,14 +2300,14 @@
             },
             "manual": {
                 "title": "Criar Manualmente",
-                "subtitle": "Configure seu diretório com controle total sobre cada configuração e opção",
+                "subtitle": "Configure seu trabalho com controle total sobre cada configuração e opção",
                 "configureNow": "Configurar agora",
-                "formTitle": "Criar Diretório Manualmente",
-                "formSubtitle": "Configure seu diretório com controle total sobre cada configuração",
+                "formTitle": "Criar Trabalho Manualmente",
+                "formSubtitle": "Configure seu trabalho com controle total sobre cada configuração",
                 "basicInfo": "Informações Básicas",
-                "nameLabel": "Nome do Diretório *",
+                "nameLabel": "Nome do Trabalho *",
                 "namePlaceholder": "p. ex., Ferramentas de IA Incríveis",
-                "slugLabel": "Slug do Diretório *",
+                "slugLabel": "Slug do Trabalho *",
                 "slugPlaceholder": "awesome-ai-tools",
                 "githubRequired": "Por favor, conecte sua conta GitHub primeiro.",
                 "slugHelp": "Identificador amigável para URL (apenas letras minúsculas, números e hifens)",
@@ -2316,7 +2316,7 @@
                 "advancedSettings": "Configurações Avançadas",
                 "advancedSubtitle": "Organização, cabeçalhos personalizados e mais",
                 "organizationLabel": "Criar sob organização",
-                "organizationHelp": "Criar este diretório sob uma organização GitHub em vez da sua conta pessoal",
+                "organizationHelp": "Criar este trabalho sob uma organização GitHub em vez da sua conta pessoal",
                 "organizationNameLabel": "Nome da Organização",
                 "organizationNamePlaceholder": "my-organization",
                 "headerLabel": "Cabeçalho README Personalizado",
@@ -2325,25 +2325,25 @@
                 "footerLabel": "Rodapé README Personalizado",
                 "footerPlaceholder": "Adicione conteúdo personalizado na parte inferior do seu arquivo README",
                 "footerOverwrite": "Substituir rodapé padrão completamente",
-                "createButton": "Criar Diretório",
-                "creatingButton": "Criando Diretório...",
+                "createButton": "Criar Trabalho",
+                "creatingButton": "Criando Trabalho...",
                 "cancelButton": "Cancelar",
-                "nameRequired": "Nome do diretório é obrigatório",
-                "slugRequired": "Slug do diretório é obrigatório",
-                "descriptionRequired": "Descrição do diretório é obrigatória",
-                "createFailed": "Falha ao criar diretório",
+                "nameRequired": "Nome do trabalho é obrigatório",
+                "slugRequired": "Slug do trabalho é obrigatório",
+                "descriptionRequired": "Descrição do trabalho é obrigatória",
+                "createFailed": "Falha ao criar trabalho",
                 "success": {
-                    "created": "Diretório criado com sucesso!"
+                    "created": "Trabalho criado com sucesso!"
                 }
             },
             "import": {
                 "title": "Importar Existente",
-                "subtitle": "Importar um diretório de um repositório GitHub existente",
+                "subtitle": "Importar um trabalho de um repositório GitHub existente",
                 "importNow": "Importar agora",
                 "aiProviderSettings": "Provedor de IA",
                 "aiProviderSettingsDescription": "Escolha qual provedor de IA usar para analisar o README",
-                "formTitle": "Importar Diretório do GitHub",
-                "formSubtitle": "Importar itens de um repositório GitHub existente para criar seu diretório",
+                "formTitle": "Importar Trabalho do GitHub",
+                "formSubtitle": "Importar itens de um repositório GitHub existente para criar seu trabalho",
                 "sync": {
                     "title": "Manter sincronizado",
                     "description": "Puxar atualizações automaticamente do repositório de origem."
@@ -2396,13 +2396,13 @@
                     "schedule": "Agendamento: {cadence}",
                     "providers": "Provedores: {providers}"
                 },
-                "nameLabel": "Nome do Diretório",
-                "namePlaceholder": "p. ex., Meu Diretório Awesome",
+                "nameLabel": "Nome do Trabalho",
+                "namePlaceholder": "p. ex., Meu Trabalho Awesome",
                 "advancedSettings": "Configurações Avançadas",
                 "advancedSubtitle": "Configure configurações de organização e repositório",
                 "attribution": {
                     "title": "Atribuição da Fonte:",
-                    "text": "Este diretório referenciará {url} como sua fonte"
+                    "text": "Este trabalho referenciará {url} como sua fonte"
                 },
                 "research": {
                     "title": "Modo Importar & Pesquisar",
@@ -2425,13 +2425,13 @@
                     "importingButton": "Iniciando pipeline de pesquisa..."
                 },
                 "analyzeButton": "Analisar Repositório",
-                "importButton": "Importar Diretório",
+                "importButton": "Importar Trabalho",
                 "importingButton": "Importando...",
                 "backButton": "Voltar",
                 "cancelButton": "Cancelar",
                 "importing": {
-                    "title": "Importando Diretório",
-                    "subtitle": "Configurando seu diretório a partir do repositório de origem..."
+                    "title": "Importando Trabalho",
+                    "subtitle": "Configurando seu trabalho a partir do repositório de origem..."
                 },
                 "repositorySelector": {
                     "title": "Selecionar Repositório",
@@ -2498,17 +2498,17 @@
                     "unsupportedFormat": "Este formato de repositório não é suportado. Por favor, use formato Repositório de Dados ou Lista Awesome.",
                     "analyzeFailed": "Falha ao analisar repositório",
                     "analyzeForLinkingFailed": "Falha ao analisar para vinculação",
-                    "nameRequired": "Nome do diretório é obrigatório",
+                    "nameRequired": "Nome do trabalho é obrigatório",
                     "noAnalysis": "Por favor, analise um repositório primeiro",
                     "githubRequired": "Por favor, conecte sua conta GitHub primeiro",
                     "providerRequired": "Por favor, selecione um provedor Git primeiro",
-                    "importFailed": "Falha ao importar diretório",
-                    "linkFailed": "Falha ao vincular diretório",
+                    "importFailed": "Falha ao importar trabalho",
+                    "linkFailed": "Falha ao vincular trabalho",
                     "providerNotConfigured": "{provider} não está configurado. Visite Configurações → Plugins para configurá-lo antes de importar."
                 },
                 "success": {
-                    "started": "Importação iniciada! Redirecionando para seu diretório...",
-                    "linked": "Diretório vinculado com sucesso"
+                    "started": "Importação iniciada! Redirecionando para seu trabalho...",
+                    "linked": "Trabalho vinculado com sucesso"
                 },
                 "slugConflict": {
                     "title": "Conflito de nome de repositório",
@@ -2521,7 +2521,7 @@
             "connection": {
                 "alert": {
                     "title": "{provider} não conectado",
-                    "subtitle": "Conecte sua conta {provider} para criar diretórios",
+                    "subtitle": "Conecte sua conta {provider} para criar trabalhos",
                     "connectButton": "Conectar {provider}",
                     "connectingButton": "Conectando..."
                 }
@@ -2537,7 +2537,7 @@
             },
             "settings": {
                 "title": "Conexões de Provedor Git",
-                "subtitle": "Conecte suas contas de provedor git para importar repositórios, criar diretórios e gerenciar seus projetos.",
+                "subtitle": "Conecte suas contas de provedor git para importar repositórios, criar trabalhos e gerenciar seus projetos.",
                 "connectedCount": "{count, plural, =0 {Nenhum provedor conectado} =1 {1 provedor conectado} other {# provedores conectados}}",
                 "noProvidersConnected": "Nenhum provedor conectado",
                 "canImport": "Você pode importar e gerenciar repositórios",
@@ -2568,7 +2568,7 @@
                 "subtitle": "Configure provedores de implantação em Configurações de Plugin",
                 "connected": "Conectado",
                 "notConnected": "Não Conectado",
-                "connectedMessage": "Seu provedor de implantação está configurado. Você pode implantar diretórios agora.",
+                "connectedMessage": "Seu provedor de implantação está configurado. Você pode implantar trabalhos agora.",
                 "disconnect": "Desconectar",
                 "disconnecting": "Removendo...",
                 "apiTokenLabel": "Token de API",
@@ -2604,17 +2604,17 @@
             "subtitle": "Escolha como deseja ser notificado sobre atualizações importantes",
             "email": {
                 "title": "Notificações por Email",
-                "directoryUpdates": {
-                    "label": "Atualizações de Diretório",
-                    "description": "Receba notificações sobre atualizações importantes em seus diretórios"
+                "workUpdates": {
+                    "label": "Atualizações de Trabalho",
+                    "description": "Receba notificações sobre atualizações importantes em seus trabalhos"
                 },
                 "newItems": {
                     "label": "Novos Itens",
-                    "description": "Receba notificações quando novos itens forem adicionados aos seus diretórios"
+                    "description": "Receba notificações quando novos itens forem adicionados aos seus trabalhos"
                 },
                 "weeklyDigest": {
                     "label": "Resumo Semanal",
-                    "description": "Receba um resumo semanal da atividade do seu diretório"
+                    "description": "Receba um resumo semanal da atividade do seu trabalho"
                 },
                 "marketing": {
                     "label": "Marketing e Promoções",
@@ -2625,11 +2625,11 @@
                 "title": "Notificações no App",
                 "newItems": {
                     "label": "Novos Itens",
-                    "description": "Mostrar notificações para novos itens de diretório"
+                    "description": "Mostrar notificações para novos itens de trabalho"
                 },
                 "comments": {
                     "label": "Comentários",
-                    "description": "Receba notificações sobre comentários em seus diretórios"
+                    "description": "Receba notificações sobre comentários em seus trabalhos"
                 },
                 "mentions": {
                     "label": "Menções",
@@ -2653,12 +2653,12 @@
         "sidebar": {
             "menu": "Menu",
             "aiChat": "Chat IA",
-            "newDirectory": "Novo Diretório",
-            "activityIndicator": "Diretório gerando",
+            "newWork": "Novo Trabalho",
+            "activityIndicator": "Trabalho gerando",
             "navigation": {
                 "dashboard": "Painel",
                 "activity": "Atividade",
-                "directories": "Diretórios",
+                "works": "Trabalhos",
                 "plugins": "Plugins",
                 "settings": "Configurações"
             },
@@ -2680,7 +2680,7 @@
             "subtitle": "Ações irreversíveis e destrutivas",
             "export": {
                 "title": "Exportar Seus Dados",
-                "subtitle": "Baixe todos os seus diretórios, itens e configurações",
+                "subtitle": "Baixe todos os seus trabalhos, itens e configurações",
                 "action": "Exportar Dados (Em Breve)"
             },
             "delete": {
@@ -2690,8 +2690,8 @@
                 "confirmTitle": "⚠️ Isso excluirá permanentemente:",
                 "confirmItems": [
                     "Sua conta e perfil",
-                    "Todos os seus diretórios",
-                    "Todos os itens e dados do diretório",
+                    "Todos os seus trabalhos",
+                    "Todos os itens e dados do trabalho",
                     "Chaves de API e integrações",
                     "Todos os sites associados"
                 ],
@@ -2711,13 +2711,13 @@
         "aiChat": {
             "title": "Assistente IA",
             "panelTitle": "Chat",
-            "subtitle": "Crie diretórios com linguagem natural",
+            "subtitle": "Crie trabalhos com linguagem natural",
             "welcomeTitle": "Bem-vindo ao Assistente IA 👋",
-            "welcomeSubtitle": "Seu assistente alimentado por IA. Pergunte-me qualquer coisa sobre criar diretórios, gerar conteúdo ou organizar seus dados.",
-            "welcomeMessage": "Oi! Posso ajudá-lo a criar diretórios usando linguagem natural. Pergunte algo como \"Crie um diretório para ferramentas de IA\" ou descreva o que você precisa.",
+            "welcomeSubtitle": "Seu assistente alimentado por IA. Pergunte-me qualquer coisa sobre criar trabalhos, gerar conteúdo ou organizar seus dados.",
+            "welcomeMessage": "Oi! Posso ajudá-lo a criar trabalhos usando linguagem natural. Pergunte algo como \"Crie um trabalho para ferramentas de IA\" ou descreva o que você precisa.",
             "capabilities": {
-                "directoryCreation": "Criação de Diretório",
-                "directoryCreationDesc": "Construa diretórios a partir de descrições em linguagem natural",
+                "workCreation": "Criação de Trabalho",
+                "workCreationDesc": "Construa trabalhos a partir de descrições em linguagem natural",
                 "webResearch": "Pesquisa na Web",
                 "webResearchDesc": "Pesquise e colete dados de toda a web",
                 "contentGeneration": "Geração de Conteúdo",
@@ -2747,11 +2747,11 @@
             "selectProvider": "Provedor",
             "notConfigured": "Não configurado",
             "gitNotConnected": "Provedor Git não conectado",
-            "gitNotConnectedDesc": "Conecte seu provedor git para criar e gerenciar diretórios.",
+            "gitNotConnectedDesc": "Conecte seu provedor git para criar e gerenciar trabalhos.",
             "connectGithub": "Conectar GitHub",
             "gitConnectedAs": "Conectado como {username} via {provider}",
             "deployNotConfigured": "Provedor de implantação não configurado",
-            "deployNotConfiguredDesc": "Configure um provedor de implantação para publicar seus sites de diretórios.",
+            "deployNotConfiguredDesc": "Configure um provedor de implantação para publicar seus sites de trabalhos.",
             "configureDeployProvider": "Configurar Provedor de Implantação",
             "deployConfigured": "Provedor de implantação configurado ({provider})",
             "opened": "Aberto",
@@ -2761,12 +2761,12 @@
             "historyYesterday": "Ontem",
             "historyDaysAgo": "{days}d atrás",
             "suggestions": {
-                "s1": "Mostrar meus diretórios",
-                "s2": "Criar um diretório de ferramentas de IA",
+                "s1": "Mostrar meus trabalhos",
+                "s2": "Criar um trabalho de ferramentas de IA",
                 "s3": "Verificar minha conexão git",
                 "s4": "Mostrar minhas estatísticas"
             },
-            "feelingLucky": "Sugerir um diretório para criar",
+            "feelingLucky": "Sugerir um trabalho para criar",
             "errors": {
                 "unableToSend": "Não foi possível enviar a mensagem"
             }
@@ -2779,7 +2779,7 @@
             "enabled": "Ativado",
             "disabled": "Desativado",
             "enable": "Ativar",
-            "enableDescription": "Configure como este plug-in é ativado em todos os seus diretórios.",
+            "enableDescription": "Configure como este plug-in é ativado em todos os seus trabalhos.",
             "disable": "Desativar",
             "settings": "Definições",
             "saveSettings": "Guardar Definições",
@@ -2811,11 +2811,11 @@
                 "pipeline": "Pipeline"
             },
             "alwaysEnabled": "Sempre ativado",
-            "disableWarning": "Desativar este plug-in também o desativará em todos os seus diretórios",
+            "disableWarning": "Desativar este plug-in também o desativará em todos os seus trabalhos",
             "cannotDisableSystem": "Os plug-ins do sistema não podem ser desativados",
             "disableFailed": "Falha ao desativar o plug-in",
-            "autoEnableForDirectories": "Ativar também para todos os diretórios",
-            "autoEnableForDirectoriesDescription": "Este plug-in estará automaticamente ativo em todos os seus diretórios. Ainda pode desativá-lo por diretório.",
+            "autoEnableForWorks": "Ativar também para todos os trabalhos",
+            "autoEnableForWorksDescription": "Este plug-in estará automaticamente ativo em todos os seus trabalhos. Ainda pode desativá-lo por trabalho.",
             "confirmDisable": "Confirmar Desativação",
             "cancel": "Cancelar",
             "missingRequiredFields": "Campos obrigatórios em falta: {fields}",
@@ -2890,20 +2890,20 @@
                 "removeLabel": "Remover {login}"
             }
         },
-        "directoryPlugins": {
-            "title": "Plug-ins do Diretório",
-            "subtitle": "Configure os plug-ins para este diretório",
+        "workPlugins": {
+            "title": "Plug-ins do Trabalho",
+            "subtitle": "Configure os plug-ins para este trabalho",
             "active": "Ativo",
             "enable": "Ativar",
             "disable": "Desativar",
-            "enableForDirectory": "Ativar para este diretório",
-            "disableForDirectory": "Desativar para este diretório",
+            "enableForWork": "Ativar para este trabalho",
+            "disableForWork": "Desativar para este trabalho",
             "enableAtUserLevelFirst": "Ative primeiro este plug-in nas suas definições",
             "disabledByUser": "Desativado ao nível do utilizador",
             "systemAlwaysEnabled": "Plug-in do sistema - sempre ativado",
             "showSettings": "Mostrar Definições",
             "hideSettings": "Ocultar Definições",
-            "directorySettingsInfo": "Configure aqui as definições específicas do diretório",
+            "workSettingsInfo": "Configure aqui as definições específicas do trabalho",
             "save": "Guardar",
             "saved": "Guardado",
             "showInstalledOnly": "Mostrar apenas instalados",
@@ -2911,7 +2911,7 @@
             "noPlugins": "Nenhum plug-in disponível",
             "showAllPlugins": "Mostrar todos os plug-ins",
             "capabilityProviders": "Fornecedores de Capacidades",
-            "capabilityProvidersDescription": "Selecione qual plug-in fornece cada capacidade para este diretório",
+            "capabilityProvidersDescription": "Selecione qual plug-in fornece cada capacidade para este trabalho",
             "noProvidersAvailable": "Nenhum fornecedor disponível",
             "categories": {
                 "git": "Git",
@@ -2929,12 +2929,12 @@
             "errors": {
                 "unableToSend": "Não é possível enviar a mensagem."
             },
-            "settingsModalTitle": "Definições do Diretório",
-            "settingsModalDescription": "Substitua as definições para este diretório. Os campos não definidos herdam das suas definições de utilizador.",
+            "settingsModalTitle": "Definições do Trabalho",
+            "settingsModalDescription": "Substitua as definições para este trabalho. Os campos não definidos herdam das suas definições de utilizador.",
             "inheritedFrom": "Herdado: {value}",
             "inheritedSecret": "Herdado: ••••••••",
             "resetToDefaults": "Repor Predefinições",
-            "resetConfirm": "Isto limpará todas as sobrescritas específicas do diretório. As definições reverterão para os valores ao nível do utilizador.",
+            "resetConfirm": "Isto limpará todas as sobrescritas específicas do trabalho. As definições reverterão para os valores ao nível do utilizador.",
             "resetSuccess": "Definições repostas para predefinições",
             "cancel": "Cancelar",
             "clickToConfigure": "Clique para configurar",
@@ -2949,8 +2949,8 @@
         "auth": {
             "backToHome": "Voltar ao início",
             "feature": {
-                "title": "Crie Diretórios com IA",
-                "subtitle": "Crie diretórios bonitos e pesquisáveis em minutos usando linguagem natural. Nenhuma programação necessária.",
+                "title": "Crie Trabalhos com IA",
+                "subtitle": "Crie trabalhos bonitos e pesquisáveis em minutos usando linguagem natural. Nenhuma programação necessária.",
                 "badge": "Impulsionado por IA",
                 "benefits": {
                     "ai": {
@@ -3002,8 +3002,8 @@
         }
     },
     "metadata": {
-        "title": "{companyName} - Construtor de Diretórios",
-        "description": "Uma plataforma SaaS para construir e gerenciar diretórios",
+        "title": "{companyName} - Construtor de Trabalhos",
+        "description": "Uma plataforma SaaS para construir e gerenciar trabalhos",
         "pages": {
             "signIn": "Entrar",
             "createAccount": "Criar Conta",
@@ -3012,9 +3012,9 @@
             "authError": "Erro de Autenticação",
             "dashboard": "Painel",
             "activity": "Registro de Atividades",
-            "directories": "Diretórios",
-            "newDirectory": "Novo Diretório",
-            "directory": "Diretório",
+            "works": "Trabalhos",
+            "newWork": "Novo Trabalho",
+            "work": "Trabalho",
             "overview": "Visão Geral",
             "items": "Itens",
             "generator": "Gerador",
@@ -3048,7 +3048,7 @@
         }
     },
     "actions": {
-        "directories": {
+        "works": {
             "slug": {
                 "required": "Slug é obrigatório",
                 "format": "O slug deve conter apenas letras minúsculas, números e hifens"
@@ -3067,16 +3067,16 @@
             },
             "oauthRequired": "Conexão OAuth necessária. Conecte sua conta {provider} primeiro.",
             "githubRequired": "Conexão GitHub necessária. Conecte sua conta GitHub primeiro.",
-            "createSuccess": "Diretório criado com sucesso!",
-            "createFailed": "Falha ao criar diretório",
-            "updateSuccess": "Diretório atualizado com sucesso!",
-            "updateFailed": "Falha ao atualizar diretório",
-            "invalidGeneratedData": "Falha ao gerar dados válidos do diretório",
-            "aiGenerationStarted": "Criação do diretório iniciada! A IA está gerando conteúdo...",
-            "invalidId": "ID de diretório inválido",
-            "deleteSuccess": "Diretório excluído com sucesso",
-            "deleteFailed": "Falha ao excluir diretório",
-            "fetchFailed": "Falha ao buscar diretórios",
+            "createSuccess": "Trabalho criado com sucesso!",
+            "createFailed": "Falha ao criar trabalho",
+            "updateSuccess": "Trabalho atualizado com sucesso!",
+            "updateFailed": "Falha ao atualizar trabalho",
+            "invalidGeneratedData": "Falha ao gerar dados válidos do trabalho",
+            "aiGenerationStarted": "Criação do trabalho iniciada! A IA está gerando conteúdo...",
+            "invalidId": "ID de trabalho inválido",
+            "deleteSuccess": "Trabalho excluído com sucesso",
+            "deleteFailed": "Falha ao excluir trabalho",
+            "fetchFailed": "Falha ao buscar trabalhos",
             "organization": {
                 "requiredWhenOwnerProvided": "Organização deve estar ativada quando proprietário é fornecido"
             },
@@ -3084,7 +3084,7 @@
                 "invalidUrl": "Digite uma URL válida",
                 "analyzeFailed": "Falha ao analisar repositório",
                 "started": "Importação iniciada com sucesso",
-                "failed": "Falha ao importar diretório",
+                "failed": "Falha ao importar trabalho",
                 "fetchReposFailed": "Falha ao buscar repositórios"
             }
         },

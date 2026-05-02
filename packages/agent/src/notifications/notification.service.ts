@@ -187,8 +187,8 @@ export class NotificationService {
 
     async notifyGenerationAccountError(
         userId: string,
-        directoryId: string,
-        directoryName: string,
+        workId: string,
+        workName: string,
         errorMessage: string,
     ): Promise<void> {
         await this.create({
@@ -196,18 +196,18 @@ export class NotificationService {
             type: NotificationType.ERROR,
             category: NotificationCategory.GENERATION,
             title: 'Generation Failed',
-            message: `Generation for "${directoryName}" failed: ${errorMessage}`,
-            actionUrl: `/directories/${directoryId}`,
-            actionLabel: 'View Directory',
-            metadata: { directoryId, directoryName },
-            deduplicationKey: `generation_error_${directoryId}`,
+            message: `Generation for "${workName}" failed: ${errorMessage}`,
+            actionUrl: `/works/${workId}`,
+            actionLabel: 'View Work',
+            metadata: { workId, workName },
+            deduplicationKey: `generation_error_${workId}`,
         });
     }
 
     async notifySchedulePaused(
         userId: string,
-        directoryId: string,
-        directoryName: string,
+        workId: string,
+        workName: string,
         reason: string,
     ): Promise<void> {
         await this.create({
@@ -215,11 +215,11 @@ export class NotificationService {
             type: NotificationType.WARNING,
             category: NotificationCategory.GENERATION,
             title: 'Schedule Paused',
-            message: `Scheduled updates for "${directoryName}" paused: ${reason}`,
-            actionUrl: `/directories/${directoryId}/generator/schedule`,
+            message: `Scheduled updates for "${workName}" paused: ${reason}`,
+            actionUrl: `/works/${workId}/generator/schedule`,
             actionLabel: 'View Schedule',
-            metadata: { directoryId, directoryName },
-            deduplicationKey: `schedule_paused_${directoryId}`,
+            metadata: { workId, workName },
+            deduplicationKey: `schedule_paused_${workId}`,
         });
     }
 

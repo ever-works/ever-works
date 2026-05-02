@@ -2,7 +2,7 @@
  * Generator modules barrel export.
  *
  * This folder contains all content generation modules:
- * - data-generator: Generates directory data (items, categories, tags)
+ * - data-generator: Generates work data (items, categories, tags)
  * - markdown-generator: Generates markdown content for items
  * - website-generator: Generates and manages website repositories
  */

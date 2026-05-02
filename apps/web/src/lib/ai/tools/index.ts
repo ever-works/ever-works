@@ -1,26 +1,26 @@
 import type { LanguageModel } from 'ai';
 import {
-    listDirectories,
-    getDirectoryDetails,
+    listWorks,
+    getWorkDetails,
     getStats,
-    getDirectoryItemsSummary,
-    getDirectoryConfig,
+    getWorkItemsSummary,
+    getWorkConfig,
     getGenerationHistory,
     getScheduleStatus,
-    createDirectoryManual,
-    createDirectoryWithAITool,
-    importDirectoryTool,
+    createWorkManual,
+    createWorkWithAITool,
+    importWorkTool,
     analyzeImportSource,
-    updateDirectoryTool,
-    deleteDirectoryTool,
-    syncDirectory,
-} from './directory.tools';
+    updateWorkTool,
+    deleteWorkTool,
+    syncWork,
+} from './work.tools';
 import { checkGitConnection, listGitProviders } from './git.tools';
 import { listAvailablePipelines } from './providers.tools';
 import { navigate, reloadPage } from './navigation.tools';
 import {
     checkDeployConnection,
-    deployDirectory,
+    deployWork,
     checkDeploymentStatus,
     listDomains,
 } from './deploy.tools';
@@ -35,34 +35,34 @@ import {
 import { setSchedule, runScheduleNow, cancelSchedule } from './schedule.tools';
 import { webSearch } from './search.tools';
 import { getUserInfo } from './user.tools';
-import { createSuggestDirectoriesTool } from './suggest.tools';
+import { createSuggestWorksTool } from './suggest.tools';
 
 /**
  * Build the full tool set for the chat agent.
- * The model parameter is needed by the suggestDirectories subagent
+ * The model parameter is needed by the suggestWorks subagent
  * which runs its own generateText loop internally.
  */
 export function buildChatTools(model: LanguageModel) {
     return {
         // Read
-        listDirectories,
-        getDirectoryDetails,
+        listWorks,
+        getWorkDetails,
         getStats,
-        getDirectoryItemsSummary,
-        getDirectoryConfig,
+        getWorkItemsSummary,
+        getWorkConfig,
         getGenerationHistory,
         getScheduleStatus,
 
         // Create
-        createDirectoryManual,
-        createDirectoryWithAI: createDirectoryWithAITool,
-        importDirectory: importDirectoryTool,
+        createWorkManual,
+        createWorkWithAI: createWorkWithAITool,
+        importWork: importWorkTool,
         analyzeImportSource,
 
         // Update / Delete
-        updateDirectory: updateDirectoryTool,
-        deleteDirectory: deleteDirectoryTool,
-        syncDirectory,
+        updateWork: updateWorkTool,
+        deleteWork: deleteWorkTool,
+        syncWork,
 
         // Providers
         checkGitConnection,
@@ -79,7 +79,7 @@ export function buildChatTools(model: LanguageModel) {
         regenerateMarkdown: regenerateMarkdownTool,
 
         // Deploy
-        deployDirectory,
+        deployWork,
         checkDeploymentStatus,
         listDomains,
 
@@ -91,7 +91,7 @@ export function buildChatTools(model: LanguageModel) {
         // Search & User
         webSearch,
         getUserInfo,
-        suggestDirectories: createSuggestDirectoriesTool(model),
+        suggestWorks: createSuggestWorksTool(model),
 
         // Navigation
         navigate,

@@ -270,7 +270,7 @@ export class ScrapflyPlugin implements IPlugin, IScreenshotPlugin, IContentExtra
 				'',
 				'## How it works in Ever Works',
 				'',
-				'Scrapfly serves dual purposes during directory generation: capturing screenshots for item preview images and extracting content from web pages. Its anti-bot capabilities make it effective for scraping sites that block standard HTTP requests.',
+				'Scrapfly serves dual purposes during work generation: capturing screenshots for item preview images and extracting content from web pages. Its anti-bot capabilities make it effective for scraping sites that block standard HTTP requests.',
 				'',
 				'## Getting started',
 				'',

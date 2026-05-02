@@ -9,7 +9,7 @@ sidebar_position: 58
 
 ## Overview
 
-The Apify plugin imports items from Apify web scraping datasets into Ever Works directories. It implements both `IDataSourcePlugin` for querying external data and `IFormSchemaProvider` for contributing form fields to the directory generation UI. Users provide an Apify API token and a dataset or actor run ID, and the plugin fetches, transforms, and optionally filters the scraped items by relevance to the directory topic.
+The Apify plugin imports items from Apify web scraping datasets into Ever Works works. It implements both `IDataSourcePlugin` for querying external data and `IFormSchemaProvider` for contributing form fields to the work generation UI. Users provide an Apify API token and a dataset or actor run ID, and the plugin fetches, transforms, and optionally filters the scraped items by relevance to the work topic.
 
 ## Architecture
 
@@ -27,7 +27,7 @@ ApifyPlugin
 The plugin operates at three configuration levels:
 
 1. **Level 1 -- API token**: Configured in Settings > Plugins (admin or user scope).
-2. **Level 2 -- Enable/disable**: Toggled per-directory via the `DirectoryPlugin` entity.
+2. **Level 2 -- Enable/disable**: Toggled per-work via the `WorkPlugin` entity.
 3. **Level 3 -- Dataset ID and filters**: Provided through the GeneratorForm via `IFormSchemaProvider`.
 
 ## Configuration
@@ -54,14 +54,14 @@ interface ApifySettings {
 ```
 
 - The plugin is **not** a system plugin and must be explicitly enabled by the user.
-- `defaultFieldMapping` allows administrators to customize how Apify dataset fields map to directory item fields.
+- `defaultFieldMapping` allows administrators to customize how Apify dataset fields map to work item fields.
 
 ## Capabilities
 
-| Capability             | Description                                              |
-| ---------------------- | -------------------------------------------------------- |
-| `data-source`          | Queries items from Apify datasets and actor runs         |
-| `form-schema-provider` | Contributes form fields to the directory generation form |
+| Capability             | Description                                         |
+| ---------------------- | --------------------------------------------------- |
+| `data-source`          | Queries items from Apify datasets and actor runs    |
+| `form-schema-provider` | Contributes form fields to the work generation form |
 
 ## API Reference
 
@@ -85,12 +85,12 @@ interface ApifySettings {
 
 ### Form Fields
 
-| Field Name                | Type    | Default | Description                               |
-| ------------------------- | ------- | ------- | ----------------------------------------- |
-| `apify_datasetId`         | text    | --      | Apify dataset ID to import from           |
-| `apify_actorRunId`        | text    | --      | Actor run ID (alternative to dataset ID)  |
-| `apify_maxItems`          | number  | 100     | Maximum items to import (0-10000)         |
-| `apify_filterByRelevance` | boolean | true    | Filter items by directory topic relevance |
+| Field Name                | Type    | Default | Description                              |
+| ------------------------- | ------- | ------- | ---------------------------------------- |
+| `apify_datasetId`         | text    | --      | Apify dataset ID to import from          |
+| `apify_actorRunId`        | text    | --      | Actor run ID (alternative to dataset ID) |
+| `apify_maxItems`          | number  | 100     | Maximum items to import (0-10000)        |
+| `apify_filterByRelevance` | boolean | true    | Filter items by work topic relevance     |
 
 ## Implementation Details
 

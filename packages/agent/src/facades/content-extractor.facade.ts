@@ -14,7 +14,7 @@ import {
     type RegisteredPlugin,
 } from '../plugins/services/plugin-registry.service';
 import { PluginSettingsService } from '../plugins/services/plugin-settings.service';
-import { DirectoryPluginRepository } from '../plugins/repositories/directory-plugin.repository';
+import { WorkPluginRepository } from '../plugins/repositories/work-plugin.repository';
 import {
     BaseFacadeService,
     FacadeError,
@@ -60,9 +60,9 @@ export class ContentExtractorFacadeService
     constructor(
         registry: PluginRegistryService,
         settingsService: PluginSettingsService,
-        @Optional() directoryPluginRepository?: DirectoryPluginRepository,
+        @Optional() workPluginRepository?: WorkPluginRepository,
     ) {
-        super(registry, settingsService, directoryPluginRepository);
+        super(registry, settingsService, workPluginRepository);
     }
 
     async extractContent(
@@ -88,7 +88,7 @@ export class ContentExtractorFacadeService
                 url,
                 providerOverride,
                 facadeOptions.userId,
-                facadeOptions.directoryId,
+                facadeOptions.workId,
             );
         } catch (error) {
             const message = error instanceof Error ? error.message : String(error);
@@ -209,7 +209,7 @@ export class ContentExtractorFacadeService
      *   0. Supplementary (pdf-extractor, notion-extractor) — intercept by URL pattern first,
      *      regardless of any explicit override. Only active when enabled for the scope.
      *   1. Explicit providerOverride (user's selected provider)
-     *   2. Directory's configured default provider
+     *   2. Work's configured default provider
      *   3. General non-system extractors (Jina, Firecrawl, Tavily, …)
      *   4. System/default extractor (local-content-extractor)
      *   5. Last resort: any enabled extractor that accepts the URL
@@ -218,7 +218,7 @@ export class ContentExtractorFacadeService
         url: string,
         providerOverride?: string,
         userId?: string,
-        directoryId?: string,
+        workId?: string,
     ): Promise<ExtractorCandidate[]> {
         const loadedPlugins = this.registry
             .getByCapability(this.CAPABILITY)
@@ -240,7 +240,7 @@ export class ContentExtractorFacadeService
         //    Checked before the user's chosen provider so they can intercept their URL types.
         for (const registered of loadedPlugins) {
             if (!registered.manifest.supplementary) continue;
-            if (!(await this.isPluginEnabled(registered.plugin.id, directoryId, userId))) continue;
+            if (!(await this.isPluginEnabled(registered.plugin.id, workId, userId))) continue;
 
             const plugin = registered.plugin as IContentExtractorPlugin;
             if (await this.canExtractSafe(plugin, url, registered.plugin.id)) {
@@ -259,7 +259,7 @@ export class ContentExtractorFacadeService
                 throw new ContentExtractorProviderNotFoundError(providerOverride);
             }
 
-            if (!(await this.isPluginEnabled(providerOverride, directoryId, userId))) {
+            if (!(await this.isPluginEnabled(providerOverride, workId, userId))) {
                 throw new ContentExtractorProviderNotFoundError(providerOverride);
             }
 
@@ -268,9 +268,9 @@ export class ContentExtractorFacadeService
             addCandidate(registered);
         }
 
-        // 2. Directory's configured default
-        if (directoryId) {
-            const active = await this.findActivePluginForDirectory(directoryId);
+        // 2. Work's configured default
+        if (workId) {
+            const active = await this.findActivePluginForWork(workId);
             if (active) {
                 const plugin = active.plugin as IContentExtractorPlugin;
                 if (await this.canExtractSafe(plugin, url, active.plugin.id)) {
@@ -287,7 +287,7 @@ export class ContentExtractorFacadeService
                 !p.manifest.defaultForCapabilities?.includes(this.CAPABILITY),
         );
         for (const registered of general) {
-            if (!(await this.isPluginEnabled(registered.plugin.id, directoryId, userId))) continue;
+            if (!(await this.isPluginEnabled(registered.plugin.id, workId, userId))) continue;
 
             const plugin = registered.plugin as IContentExtractorPlugin;
             if (await this.canExtractSafe(plugin, url, registered.plugin.id)) {
@@ -318,7 +318,7 @@ export class ContentExtractorFacadeService
 
         // 5. Last resort
         for (const registered of loadedPlugins) {
-            if (!(await this.isPluginEnabled(registered.plugin.id, directoryId, userId))) continue;
+            if (!(await this.isPluginEnabled(registered.plugin.id, workId, userId))) continue;
 
             const plugin = registered.plugin as IContentExtractorPlugin;
             if (await this.canExtractSafe(plugin, url, registered.plugin.id)) {

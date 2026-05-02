@@ -105,7 +105,7 @@ Ollama supports embeddings through models such as `nomic-embed-text`. The `creat
 
 ## Tiered Model Assignment
 
-Ever Works uses a three-tier model system to balance speed and quality during directory generation:
+Ever Works uses a three-tier model system to balance speed and quality during work generation:
 
 ```mermaid
 flowchart LR
@@ -177,7 +177,7 @@ The `isAvailable()` method calls `AiOperations.testConnection()` with the resolv
 3. Enable the Ollama plugin in the Ever Works dashboard under **Settings > Plugins**.
 4. Set the **Ollama Server URL** to your instance address (defaults to `http://localhost:11434/v1`).
 5. Select your preferred models for each task complexity tier.
-6. Ollama will be used automatically during directory generation and AI conversations.
+6. Ollama will be used automatically during work generation and AI conversations.
 
 ## Troubleshooting
 

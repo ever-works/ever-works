@@ -139,13 +139,13 @@ Alert: Generation Task Failure
 The `PostHogInterceptor` in `packages/monitoring/src/interceptors/posthog.interceptor.ts` captures every API request as two events:
 
 1. **`api_request`**: Generic request with method, endpoint, status code, duration, user agent, IP
-2. **`api_{method}_{endpoint_name}`**: Specific endpoint event (e.g., `api_get_directories_:id`)
+2. **`api_{method}_{endpoint_name}`**: Specific endpoint event (e.g., `api_get_works_:id`)
 
 ```typescript
 // Event properties captured:
 {
     method: 'GET',
-    endpoint: '/api/directories/abc-123',
+    endpoint: '/api/works/abc-123',
     statusCode: 200,
     duration: 145,           // milliseconds
     userAgent: 'Mozilla/5.0...',
@@ -198,12 +198,12 @@ Build the following dashboards in PostHog for operational visibility:
 
 - Daily active users (trend)
 - Feature adoption funnel (funnel)
-- Directory generation frequency (histogram)
+- Work generation frequency (histogram)
 - Deployment success rate (pie chart)
 
 **Business Metrics Dashboard**:
 
-- New directory creations per day
+- New work creations per day
 - Generation runs per user
 - Deployment frequency by provider
 - Subscription plan distribution
@@ -215,7 +215,7 @@ Build the following dashboards in PostHog for operational visibility:
 Background tasks (Trigger.dev) emit structured metrics visible in the Trigger.dev dashboard:
 
 ```typescript
-// directory-schedule-dispatcher.task.ts returns metrics:
+// work-schedule-dispatcher.task.ts returns metrics:
 return {
 	dispatched: 5, // number of schedules dispatched
 	intervalMinutes: 10 // dispatcher interval
@@ -224,16 +224,16 @@ return {
 
 ### Generation History Metrics
 
-Each generation run stores metrics in the `DirectoryGenerationHistoryEntry`:
+Each generation run stores metrics in the `WorkGenerationHistoryEntry`:
 
-| Metric                      | Description                        |
-| --------------------------- | ---------------------------------- |
-| `durationInSeconds`         | Total generation wall-clock time   |
-| `newItemsCount`             | Items created during this run      |
-| `updatedItemsCount`         | Items updated during this run      |
-| `totalItemsCount`           | Total items in directory after run |
-| `metrics.total_tokens_used` | LLM token consumption              |
-| `metrics.total_cost`        | Estimated LLM cost (USD)           |
+| Metric                      | Description                      |
+| --------------------------- | -------------------------------- |
+| `durationInSeconds`         | Total generation wall-clock time |
+| `newItemsCount`             | Items created during this run    |
+| `updatedItemsCount`         | Items updated during this run    |
+| `totalItemsCount`           | Total items in work after run    |
+| `metrics.total_tokens_used` | LLM token consumption            |
+| `metrics.total_cost`        | Estimated LLM cost (USD)         |
 
 These metrics are displayed in the [Generation History UI](../web-dashboard/history-ui.md).
 

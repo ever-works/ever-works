@@ -71,7 +71,7 @@ export function getRequiredFields(schema: PluginSettingsSchema | undefined, scop
 
 /**
  * Returns human-readable labels for missing required fields.
- * At directory scope, allows inheritance from fallbackSettings.
+ * At work scope, allows inheritance from fallbackSettings.
  * Also validates requiredGroups.
  */
 export function validateRequiredSettings(
@@ -79,7 +79,7 @@ export function validateRequiredSettings(
 	secretSettings: Record<string, unknown>,
 	schema: PluginSettingsSchema | undefined,
 	scopes: SettingScopeApi[],
-	scope: 'user' | 'directory',
+	scope: 'user' | 'work',
 	fallbackSettings?: Record<string, unknown>
 ): string[] {
 	const errors: string[] = [];
@@ -90,7 +90,7 @@ export function validateRequiredSettings(
 		const isEmpty = value === undefined || value === null || value === '';
 
 		if (isEmpty) {
-			if (scope === 'directory' && fallbackSettings) {
+			if (scope === 'work' && fallbackSettings) {
 				const inheritedValue = fallbackSettings[field];
 				if (inheritedValue !== undefined && inheritedValue !== null && inheritedValue !== '') {
 					continue;
@@ -111,7 +111,7 @@ export function validateRequiredSettings(
 		});
 
 		let hasAnyInherited = false;
-		if (scope === 'directory' && fallbackSettings) {
+		if (scope === 'work' && fallbackSettings) {
 			hasAnyInherited = group.fields.some((field) => {
 				const value = fallbackSettings[field];
 				return value !== undefined && value !== null && value !== '';
@@ -131,12 +131,12 @@ export function validateRequiredSettings(
 }
 
 /**
- * Sanitize settings for save: undefined → null, empty string → null at directory scope.
+ * Sanitize settings for save: undefined → null, empty string → null at work scope.
  * Strips masked placeholder values (containing '••••') so they are never sent to the API.
  */
 export function sanitizeSettingsForSave(
 	settings: Record<string, unknown>,
-	scope: 'user' | 'directory'
+	scope: 'user' | 'work'
 ): Record<string, unknown> {
 	const result: Record<string, unknown> = {};
 	for (const [key, value] of Object.entries(settings)) {
@@ -146,7 +146,7 @@ export function sanitizeSettingsForSave(
 		}
 		if (value === undefined) {
 			result[key] = null;
-		} else if (scope === 'directory' && value === '') {
+		} else if (scope === 'work' && value === '') {
 			result[key] = null;
 		} else {
 			result[key] = value;

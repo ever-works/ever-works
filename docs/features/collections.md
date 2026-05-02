@@ -7,7 +7,7 @@ sidebar_position: 3
 
 # Collections
 
-Collections let you curate directory items into named groups like "Editor's Picks", "Best for Beginners", or "Top Open Source". Unlike categories (which classify what an item _is_) and tags (which describe its features), collections are editorial groupings that cut across categories.
+Collections let you curate work items into named groups like "Editor's Picks", "Best for Beginners", or "Top Open Source". Unlike categories (which classify what an item _is_) and tags (which describe its features), collections are editorial groupings that cut across categories.
 
 ## Taxonomy Overview
 
@@ -25,10 +25,10 @@ An item belongs to exactly one category, can have multiple tags, and may optiona
 
 Collections are controlled by two independent toggles:
 
-| Toggle                     | Where                                                          | Effect                                                             |
-| -------------------------- | -------------------------------------------------------------- | ------------------------------------------------------------------ |
-| **`collections_enabled`**  | Website Settings (`PUT /api/directories/:id/website-settings`) | Controls whether collections are displayed on the deployed website |
-| **`generate_collections`** | Standard Pipeline plugin settings                              | Controls whether the AI assigns collections during generation      |
+| Toggle                     | Where                                                    | Effect                                                             |
+| -------------------------- | -------------------------------------------------------- | ------------------------------------------------------------------ |
+| **`collections_enabled`**  | Website Settings (`PUT /api/works/:id/website-settings`) | Controls whether collections are displayed on the deployed website |
+| **`generate_collections`** | Standard Pipeline plugin settings                        | Controls whether the AI assigns collections during generation      |
 
 Both default to `true`. You can disable AI-generated collections while still managing collections manually, or vice versa.
 
@@ -55,12 +55,12 @@ All collection endpoints require JWT authentication.
 
 ### Create a Collection
 
-| Method | Endpoint                           | Description             |
-| ------ | ---------------------------------- | ----------------------- |
-| `POST` | `/api/directories/:id/collections` | Create a new collection |
+| Method | Endpoint                     | Description             |
+| ------ | ---------------------------- | ----------------------- |
+| `POST` | `/api/works/:id/collections` | Create a new collection |
 
 ```bash
-curl -X POST http://localhost:3100/api/directories/<directory-id>/collections \
+curl -X POST http://localhost:3100/api/works/<work-id>/collections \
   -H "Authorization: Bearer <token>" \
   -H "Content-Type: application/json" \
   -d '{
@@ -72,12 +72,12 @@ curl -X POST http://localhost:3100/api/directories/<directory-id>/collections \
 
 ### Update a Collection
 
-| Method | Endpoint                                         | Description                   |
-| ------ | ------------------------------------------------ | ----------------------------- |
-| `PUT`  | `/api/directories/:id/collections/:collectionId` | Update an existing collection |
+| Method | Endpoint                                   | Description                   |
+| ------ | ------------------------------------------ | ----------------------------- |
+| `PUT`  | `/api/works/:id/collections/:collectionId` | Update an existing collection |
 
 ```bash
-curl -X PUT http://localhost:3100/api/directories/<directory-id>/collections/editors-picks \
+curl -X PUT http://localhost:3100/api/works/<work-id>/collections/editors-picks \
   -H "Authorization: Bearer <token>" \
   -H "Content-Type: application/json" \
   -d '{
@@ -88,12 +88,12 @@ curl -X PUT http://localhost:3100/api/directories/<directory-id>/collections/edi
 
 ### Delete a Collection
 
-| Method   | Endpoint                                         | Description         |
-| -------- | ------------------------------------------------ | ------------------- |
-| `DELETE` | `/api/directories/:id/collections/:collectionId` | Delete a collection |
+| Method   | Endpoint                                   | Description         |
+| -------- | ------------------------------------------ | ------------------- |
+| `DELETE` | `/api/works/:id/collections/:collectionId` | Delete a collection |
 
 ```bash
-curl -X DELETE http://localhost:3100/api/directories/<directory-id>/collections/editors-picks \
+curl -X DELETE http://localhost:3100/api/works/<work-id>/collections/editors-picks \
   -H "Authorization: Bearer <token>"
 ```
 
@@ -105,12 +105,12 @@ Deleting a collection does not remove items — it only removes the grouping. It
 
 Collections are returned as part of the existing categories-tags endpoint:
 
-| Method | Endpoint                               | Description                               |
-| ------ | -------------------------------------- | ----------------------------------------- |
-| `GET`  | `/api/directories/:id/categories-tags` | Returns categories, tags, and collections |
+| Method | Endpoint                         | Description                               |
+| ------ | -------------------------------- | ----------------------------------------- |
+| `GET`  | `/api/works/:id/categories-tags` | Returns categories, tags, and collections |
 
 ```bash
-curl http://localhost:3100/api/directories/<directory-id>/categories-tags \
+curl http://localhost:3100/api/works/<work-id>/categories-tags \
   -H "Authorization: Bearer <token>"
 ```
 
@@ -142,10 +142,10 @@ To disable AI-generated collections, set `generate_collections` to `false` in th
 
 ## Data Storage
 
-Collections are stored as a `collections.yml` file in the directory's data repository, alongside `categories.yml` and `tags.yml`. Each item's YAML file includes an optional `collection` field containing the collection's slug ID.
+Collections are stored as a `collections.yml` file in the work's data repository, alongside `categories.yml` and `tags.yml`. Each item's YAML file includes an optional `collection` field containing the collection's slug ID.
 
 ## Related
 
-- [Directories API](/api/directories) — Full endpoint reference including collection CRUD
+- [Works API](/api/works) — Full endpoint reference including collection CRUD
 - [Community PR Processing](./community-pr-processing) — Automatically extract items from community contributions
 - [AI & Generation](/ai-agents) — AI pipeline that assigns collections during generation

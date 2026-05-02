@@ -23,7 +23,7 @@ The `@ever-works/agent` package is the core logic layer of the Ever Works platfo
 
 ## Module Structure
 
-The package is organized into 20 sub-module directories, each published as a separate export path:
+The package is organized into 20 sub-module works, each published as a separate export path:
 
 ```
 packages/agent/src/
@@ -33,13 +33,13 @@ packages/agent/src/
 ├── config/                   # Configuration management
 ├── constants/                # Shared constants
 ├── database/                 # TypeORM database module and repositories
-├── directory-operations/     # Directory lifecycle state management
+├── work-operations/     # Work lifecycle state management
 ├── dto/                      # Data transfer objects and validation schemas
 ├── entities/                 # TypeORM entity definitions
 ├── events/                   # Domain event classes
 ├── facades/                  # AI facade service (plugin consumer)
 ├── generators/               # AI content generation engine
-├── import/                   # Directory import from external sources
+├── import/                   # Work import from external sources
 ├── items-generator/          # Item-level content generation
 ├── notifications/            # Notification system
 ├── pipeline/                 # Generation pipeline orchestration
@@ -57,9 +57,9 @@ Each sub-module is exposed as a dedicated export path in `package.json`, enablin
 ```typescript
 // Import specific sub-modules
 import { DataGeneratorService } from '@ever-works/agent/generators';
-import { DirectoryRepository } from '@ever-works/agent/database';
-import { Directory } from '@ever-works/agent/entities';
-import { DirectoryOperationsService } from '@ever-works/agent/directory-operations';
+import { WorkRepository } from '@ever-works/agent/database';
+import { Work } from '@ever-works/agent/entities';
+import { WorkOperationsService } from '@ever-works/agent/work-operations';
 import { PluginsModule } from '@ever-works/agent/plugins';
 import { AiFacadeService } from '@ever-works/agent/facades';
 import { PipelineModule } from '@ever-works/agent/pipeline';
@@ -74,7 +74,7 @@ The full list of export paths:
 | `@ever-works/agent/dto`                  | Data transfer objects with class-validator decorators    |
 | `@ever-works/agent/entities`             | TypeORM entity definitions for all domain models         |
 | `@ever-works/agent/git`                  | Git operations (isomorphic-git based)                    |
-| `@ever-works/agent/directory-operations` | Directory generation state management                    |
+| `@ever-works/agent/work-operations`      | Work generation state management                         |
 | `@ever-works/agent/items-generator`      | Item-level content generation                            |
 | `@ever-works/agent/tasks`                | Background task type definitions                         |
 | `@ever-works/agent/events`               | Domain event classes                                     |
@@ -83,7 +83,7 @@ The full list of export paths:
 | `@ever-works/agent/config`               | Configuration management                                 |
 | `@ever-works/agent/cache`                | Persistent caching layer                                 |
 | `@ever-works/agent/notifications`        | Notification delivery                                    |
-| `@ever-works/agent/import`               | Directory import system                                  |
+| `@ever-works/agent/import`               | Work import system                                       |
 | `@ever-works/agent/facades`              | AI facade (consumes AI provider plugins)                 |
 | `@ever-works/agent/plugins`              | Plugin runtime infrastructure                            |
 | `@ever-works/agent/pipeline`             | Generation pipeline orchestration                        |
@@ -97,13 +97,13 @@ The full list of export paths:
 
 The `database/` sub-module provides the `DatabaseModule` and a comprehensive set of TypeORM repositories:
 
-- `DirectoryRepository` -- CRUD for directories
-- `DirectoryGenerationHistoryRepository` -- Generation run history
-- `DirectoryMemberRepository` -- Directory team membership
+- `WorkRepository` -- CRUD for works
+- `WorkGenerationHistoryRepository` -- Generation run history
+- `WorkMemberRepository` -- Work team membership
 - `UserRepository` -- User records
 - `ApiKeyRepository` -- API key management
 - `SubscriptionPlanRepository` and `UserSubscriptionRepository` -- Subscription data
-- `DirectoryScheduleRepository` -- Scheduled generation configuration
+- `WorkScheduleRepository` -- Scheduled generation configuration
 - `UsageLedgerRepository` -- Usage and quota tracking
 - `NotificationRepository` -- User notifications
 
@@ -114,7 +114,7 @@ The `plugins/` sub-module provides the `PluginsModule`, a global NestJS dynamic 
 - **PluginRegistryService** -- In-memory registry of loaded plugin instances
 - **PluginLoaderService** -- Discovers and loads plugins from file system or built-in sources
 - **PluginLifecycleManagerService** -- State machine for plugin load/unload transitions
-- **PluginSettingsService** -- Multi-layer settings resolution (directory > user > admin > env > default)
+- **PluginSettingsService** -- Multi-layer settings resolution (work > user > admin > env > default)
 - **PluginBootstrapService** -- Application-level bootstrap and shutdown coordination
 - **PluginContextFactoryService** -- Creates isolated `PluginContext` for each plugin
 - **CustomCapabilityRegistryService** -- Registry for plugin-defined capabilities
@@ -131,14 +131,14 @@ The `pipeline/` sub-module orchestrates multi-step content generation workflows.
 
 Core TypeORM entities defined in `entities/`:
 
-| Entity                       | Table                          | Description                                            |
-| ---------------------------- | ------------------------------ | ------------------------------------------------------ |
-| `Directory`                  | `directories`                  | Central domain entity representing a directory project |
-| `DirectoryGenerationHistory` | `directory_generation_history` | Audit log of every generation run                      |
-| `DirectorySchedule`          | `directory_schedules`          | Scheduled update configuration                         |
-| `DirectoryMember`            | `directory_members`            | Team membership and roles                              |
-| `DirectoryCustomDomain`      | `directory_custom_domains`     | Custom domain mappings                                 |
-| `User`                       | `users`                        | Platform user accounts                                 |
+| Entity                  | Table                     | Description                                       |
+| ----------------------- | ------------------------- | ------------------------------------------------- |
+| `Work`                  | `works`                   | Central domain entity representing a work project |
+| `WorkGenerationHistory` | `work_generation_history` | Audit log of every generation run                 |
+| `WorkSchedule`          | `work_schedules`          | Scheduled update configuration                    |
+| `WorkMember`            | `work_members`            | Team membership and roles                         |
+| `WorkCustomDomain`      | `work_custom_domains`     | Custom domain mappings                            |
+| `User`                  | `users`                   | Platform user accounts                            |
 
 ## Configuration
 
@@ -225,7 +225,7 @@ The `build` script runs `nest build -b swc` followed by `tsc -p tsconfig.types.j
 cd packages/agent && pnpm test
 
 # Run tests matching a pattern
-cd packages/agent && npx jest --testPathPattern='directory-operations'
+cd packages/agent && npx jest --testPathPattern='work-operations'
 
 # Watch mode
 cd packages/agent && pnpm test:watch
@@ -234,7 +234,7 @@ cd packages/agent && pnpm test:watch
 cd packages/agent && pnpm test:cov
 ```
 
-Jest is configured with `moduleNameMapper` entries that resolve `@ever-works/plugin` and `@ever-works/contracts` to their source directories, avoiding the need to build workspace dependencies before running tests.
+Jest is configured with `moduleNameMapper` entries that resolve `@ever-works/plugin` and `@ever-works/contracts` to their source works, avoiding the need to build workspace dependencies before running tests.
 
 ## Usage Examples
 
@@ -243,13 +243,13 @@ Jest is configured with `moduleNameMapper` entries that resolve `@ever-works/plu
 ```typescript
 import { Module } from '@nestjs/common';
 import { DatabaseModule } from '@ever-works/agent/database';
-import { DirectoryOperationsModule } from '@ever-works/agent/directory-operations';
+import { WorkOperationsModule } from '@ever-works/agent/work-operations';
 import { PluginsModule } from '@ever-works/agent/plugins';
 
 @Module({
 	imports: [
 		DatabaseModule.forRoot(/* config */),
-		DirectoryOperationsModule,
+		WorkOperationsModule,
 		PluginsModule.forRoot({
 			autoLoadBuiltIn: true,
 			environment: 'production'
@@ -262,15 +262,15 @@ export class ApiModule {}
 ### Working with Entities
 
 ```typescript
-import { Directory } from '@ever-works/agent/entities';
-import { DirectoryRepository } from '@ever-works/agent/database';
+import { Work } from '@ever-works/agent/entities';
+import { WorkRepository } from '@ever-works/agent/database';
 
 @Injectable()
-export class DirectoryService {
-	constructor(private readonly directoryRepo: DirectoryRepository) {}
+export class WorkService {
+	constructor(private readonly workRepo: WorkRepository) {}
 
-	async findBySlug(slug: string): Promise<Directory | null> {
-		return this.directoryRepo.findOne({ where: { slug } });
+	async findBySlug(slug: string): Promise<Work | null> {
+		return this.workRepo.findOne({ where: { slug } });
 	}
 }
 ```

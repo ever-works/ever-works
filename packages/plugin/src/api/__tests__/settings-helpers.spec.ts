@@ -13,7 +13,7 @@ const makeSchema = (overrides?: Partial<PluginSettingsSchema>): PluginSettingsSc
 	properties: {
 		apiKey: { type: 'string', title: 'API Key', secret: true, scope: 'user' },
 		model: { type: 'string', title: 'Model', default: 'gpt-4', scope: 'user' },
-		temperature: { type: 'number', title: 'Temperature', default: 0.7, scope: 'directory' },
+		temperature: { type: 'number', title: 'Temperature', default: 0.7, scope: 'work' },
 		internalFlag: { type: 'string', hidden: true, scope: 'global' },
 		globalSetting: { type: 'string', title: 'Global Setting', scope: 'global' }
 	},
@@ -85,7 +85,7 @@ describe('getVisibleProperties', () => {
 
 	it('should return all scoped properties when multiple scopes given', () => {
 		const schema = makeSchema();
-		const result = getVisibleProperties(schema, ['global', 'user', 'directory']);
+		const result = getVisibleProperties(schema, ['global', 'user', 'work']);
 		expect(Object.keys(result)).toEqual(['apiKey', 'model', 'temperature', 'globalSetting']);
 	});
 });
@@ -99,7 +99,7 @@ describe('getRequiredFields', () => {
 
 	it('should exclude required fields not in scope', () => {
 		const schema = makeSchema();
-		const result = getRequiredFields(schema, ['directory']);
+		const result = getRequiredFields(schema, ['work']);
 		expect(result).toEqual([]);
 	});
 
@@ -126,7 +126,7 @@ describe('validateRequiredSettings', () => {
 		expect(errors).toEqual(['API Key', 'Model']);
 	});
 
-	it('should allow inheritance from fallbackSettings at directory scope', () => {
+	it('should allow inheritance from fallbackSettings at work scope', () => {
 		const schema: PluginSettingsSchema = {
 			type: 'object',
 			properties: {
@@ -134,7 +134,7 @@ describe('validateRequiredSettings', () => {
 			},
 			required: ['apiKey']
 		};
-		const errors = validateRequiredSettings({}, {}, schema, ['user'], 'directory', { apiKey: 'inherited-key' });
+		const errors = validateRequiredSettings({}, {}, schema, ['user'], 'work', { apiKey: 'inherited-key' });
 		expect(errors).toEqual([]);
 	});
 
@@ -196,8 +196,8 @@ describe('sanitizeSettingsForSave', () => {
 		expect(result).toEqual({ foo: null, bar: 'value' });
 	});
 
-	it('should convert empty string to null at directory scope', () => {
-		const result = sanitizeSettingsForSave({ foo: '', bar: 'value' }, 'directory');
+	it('should convert empty string to null at work scope', () => {
+		const result = sanitizeSettingsForSave({ foo: '', bar: 'value' }, 'work');
 		expect(result).toEqual({ foo: null, bar: 'value' });
 	});
 
@@ -216,8 +216,8 @@ describe('sanitizeSettingsForSave', () => {
 		expect(result).toEqual({ model: 'gpt-4' });
 	});
 
-	it('should strip masked values at directory scope too', () => {
-		const result = sanitizeSettingsForSave({ secretField: '••••••••', normalField: 'value' }, 'directory');
+	it('should strip masked values at work scope too', () => {
+		const result = sanitizeSettingsForSave({ secretField: '••••••••', normalField: 'value' }, 'work');
 		expect(result).toEqual({ normalField: 'value' });
 	});
 });

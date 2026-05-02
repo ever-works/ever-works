@@ -22,7 +22,7 @@ Ever Works uses a multi-layer caching approach built on NestJS `CacheModule` wit
 graph TD
     subgraph "Cache Layers"
         A["Plugin Cache<br/>(scoped per plugin)"]
-        B["Pipeline Checkpoint Cache<br/>(scoped per directory)"]
+        B["Pipeline Checkpoint Cache<br/>(scoped per work)"]
         C["NestJS CACHE_MANAGER<br/>(cache-manager)"]
     end
 
@@ -157,7 +157,7 @@ sequenceDiagram
 ### Checkpoint Key Format
 
 ```
-pipeline-checkpoint-{directoryId}-{pipelineId}
+pipeline-checkpoint-{workId}-{pipelineId}
 ```
 
 ### Checkpoint Configuration
@@ -236,7 +236,7 @@ This allows pipeline plugins running in Trigger.dev workers to use the same `CAC
 await context.cache.delete('expensive-computation-result');
 
 // Pipeline checkpoint cleared after completion
-await this.clearCheckpoint(directoryId, pipelineId);
+await this.clearCheckpoint(workId, pipelineId);
 ```
 
 ## Best Practices

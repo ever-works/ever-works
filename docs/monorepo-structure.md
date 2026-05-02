@@ -88,7 +88,7 @@ packages:
     - packages/plugins/*
 ```
 
-This means pnpm treats every directory matching these globs as a workspace package. Each has its own `package.json` and can depend on other workspace packages using the `workspace:*` protocol:
+This means pnpm treats every work matching these globs as a workspace package. Each has its own `package.json` and can depend on other workspace packages using the `workspace:*` protocol:
 
 ```json
 {
@@ -320,7 +320,7 @@ Once linked, build artifacts are shared across team members and CI runners, sign
 
 ### Adding a New Shared Package
 
-1. Create the package directory:
+1. Create the package work:
 
     ```bash
     mkdir packages/my-new-package
@@ -361,7 +361,7 @@ Once linked, build artifacts are shared across team members and CI runners, sign
 
 ### Adding a New Plugin
 
-1. Create the plugin directory under `packages/plugins/`:
+1. Create the plugin work under `packages/plugins/`:
 
     ```bash
     mkdir packages/plugins/my-plugin

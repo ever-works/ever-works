@@ -299,7 +299,7 @@ export class ValyuSearchPlugin implements IPlugin, ISearchPlugin, IContentExtrac
 			readme: [
 				'## What does Valyu do?',
 				'',
-				'Valyu is an AI-native search and content extraction service that searches across web and proprietary data sources. It returns results optimized for AI applications and RAG pipelines, providing the source material that Ever Works uses to generate accurate directory items.',
+				'Valyu is an AI-native search and content extraction service that searches across web and proprietary data sources. It returns results optimized for AI applications and RAG pipelines, providing the source material that Ever Works uses to generate accurate work items.',
 				'',
 				'## Why use it?',
 				'',
@@ -311,14 +311,14 @@ export class ValyuSearchPlugin implements IPlugin, ISearchPlugin, IContentExtrac
 				'',
 				'## How it works in Ever Works',
 				'',
-				'During directory generation, the search facade uses Valyu to find information about each item, discover relevant source URLs, and extract content from web pages. This powers automatic descriptions, source URL resolution, and content enrichment across the generation pipeline.',
+				'During work generation, the search facade uses Valyu to find information about each item, discover relevant source URLs, and extract content from web pages. This powers automatic descriptions, source URL resolution, and content enrichment across the generation pipeline.',
 				'',
 				'## Getting started',
 				'',
 				'1. Create an account at [valyu.ai](https://valyu.ai)',
 				'2. Copy your API key from the Valyu dashboard',
 				'3. Enter the key in the **API Key** field below',
-				'4. Valyu will be used during directory generation when selected as the search provider'
+				'4. Valyu will be used during work generation when selected as the search provider'
 			].join('\n')
 		};
 	}

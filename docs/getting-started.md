@@ -7,7 +7,7 @@ sidebar_position: 3
 
 # Getting Started
 
-This guide takes you from a fresh clone to a running local instance with a working directory. For detailed installation steps, database options, Docker setup, and troubleshooting, see [Installation](./installation).
+This guide takes you from a fresh clone to a running local instance with a working work. For detailed installation steps, database options, Docker setup, and troubleshooting, see [Installation](./installation).
 
 ## Quick Start
 
@@ -77,7 +77,7 @@ You can also start apps individually: `pnpm dev:api` for the API only, or `pnpm 
 
 ## Configuring Plugins
 
-The platform uses a **plugin system** for all external integrations. Out of the box, most plugins are disabled or unconfigured. To create and generate directories, you need to configure at least a **git provider** and an **AI provider**.
+The platform uses a **plugin system** for all external integrations. Out of the box, most plugins are disabled or unconfigured. To create and generate works, you need to configure at least a **git provider** and an **AI provider**.
 
 ### GitHub Plugin (Git Provider) — Required
 
@@ -101,7 +101,7 @@ The GitHub plugin uses separate OAuth credentials from the login GitHub OAuth (`
 
 ### AI Provider — Required for Generation
 
-You need at least one AI provider to generate directory content. The simplest option is **OpenRouter** (one API key gives access to 400+ models):
+You need at least one AI provider to generate work content. The simplest option is **OpenRouter** (one API key gives access to 400+ models):
 
 ```bash
 PLUGIN_OPENROUTER_API_KEY=your_openrouter_api_key
@@ -132,13 +132,13 @@ Without a search provider, the pipeline can still generate items using the AI's 
 
 ### Screenshot Provider — Optional
 
-Screenshot plugins capture website previews for directory items:
+Screenshot plugins capture website previews for work items:
 
 ```bash
 PLUGIN_SCREENSHOTONE_ACCESS_KEY=your_access_key
 ```
 
-Without a screenshot provider, directories are fully functional but items won't have visual previews.
+Without a screenshot provider, works are fully functional but items won't have visual previews.
 
 ### Minimum Viable Configuration
 
@@ -150,9 +150,9 @@ PLUGIN_GITHUB_CLIENT_SECRET=...    # From your GitHub OAuth App
 PLUGIN_OPENROUTER_API_KEY=...      # From openrouter.ai
 ```
 
-Then connect your GitHub account via the dashboard, and you can create directories.
+Then connect your GitHub account via the dashboard, and you can create works.
 
-## Your First Directory
+## Your First Work
 
 Once the dev server is running and plugins are configured:
 
@@ -160,16 +160,16 @@ Once the dev server is running and plugins are configured:
 
 2. **Connect GitHub** — Go to **Settings > Plugins > GitHub** and click **Connect**. This authorizes the platform to create repositories on your behalf.
 
-3. **Create a directory** — Navigate to **Directories > New Directory**. You'll see three options:
+3. **Create a work** — Navigate to **Works > New Work**. You'll see three options:
     - **AI Creation** — enter a name (e.g., "Best React Libraries") and a prompt describing what to include. The AI pipeline handles everything.
-    - **Manual** — enter name, slug, and description. Creates an empty directory you populate later.
+    - **Manual** — enter name, slug, and description. Creates an empty work you populate later.
     - **Import** — provide a GitHub repository URL to import from.
 
 4. **Select providers** — In AI Creation mode, expand **Advanced Settings** to choose which pipeline, AI provider, and search provider to use. The defaults work out of the box if you configured OpenRouter.
 
-5. **Watch generation** — After submission, you're redirected to the directory detail page. Generation runs in the background — you can watch progress in real time.
+5. **Watch generation** — After submission, you're redirected to the work detail page. Generation runs in the background — you can watch progress in real time.
 
-For a detailed explanation of each creation method, provider selection, and pipeline plugins, see [Creating a Directory](./features/creating-a-directory).
+For a detailed explanation of each creation method, provider selection, and pipeline plugins, see [Creating a Work](./features/creating-a-work).
 
 ## Development Commands
 
@@ -208,7 +208,7 @@ Once the API is running:
 
 - [Installation](./installation) — Detailed setup: database options, Docker Compose, troubleshooting
 - [Environment Variables](./environment-variables) — Complete variable reference (80+ vars)
-- [Creating a Directory](./features/creating-a-directory) — The three creation methods, providers, and pipeline plugins
+- [Creating a Work](./features/creating-a-work) — The three creation methods, providers, and pipeline plugins
 - [Architecture](./architecture) — Monorepo structure, modules, and data flow
 - [Plugin System](./plugin-system/) — Plugin architecture and creating custom plugins
 - [API Reference](./api/) — REST API endpoints

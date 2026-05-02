@@ -3,7 +3,7 @@ import {
     PluginRegistryService,
     RegisteredPlugin,
 } from '@src/plugins/services/plugin-registry.service';
-import { DirectoryPluginRepository } from '@src/plugins/repositories/directory-plugin.repository';
+import { WorkPluginRepository } from '@src/plugins/repositories/work-plugin.repository';
 import { PluginSettingsService } from '@src/plugins/services/plugin-settings.service';
 import type {
     GeneratorFormSchema,
@@ -34,8 +34,8 @@ import { buildProviderModelSummaries } from '@src/plugins/utils/plugin-model-set
  * Options for form schema generation.
  */
 export interface FormSchemaOptions {
-    /** Directory ID for enable filtering and default provider resolution */
-    directoryId?: string;
+    /** Work ID for enable filtering and default provider resolution */
+    workId?: string;
     /** User ID for enable filtering */
     userId?: string;
 }
@@ -46,18 +46,18 @@ export class GeneratorFormSchemaService {
 
     constructor(
         private readonly pluginRegistry: PluginRegistryService,
-        @Optional() private readonly directoryPluginRepository?: DirectoryPluginRepository,
+        @Optional() private readonly workPluginRepository?: WorkPluginRepository,
         @Optional() private readonly pluginSettingsService?: PluginSettingsService,
     ) {}
 
     /**
      * Get the generator form schema based on the selected pipeline.
      *
-     * When directoryId is provided, providers are filtered by enable status
+     * When workId is provided, providers are filtered by enable status
      * and default providers are marked based on active capabilities.
      *
      * @param pipelineId - Selected pipeline plugin ID (null for default)
-     * @param options - Optional directoryId and userId for filtering
+     * @param options - Optional workId and userId for filtering
      * @returns Complete form schema for rendering the generator form
      */
     async getFormSchema(
@@ -242,7 +242,7 @@ export class GeneratorFormSchemaService {
 
             const isEnabled = await this.pluginRegistry.isPluginEnabledForScope(
                 registered.plugin.id,
-                options.directoryId,
+                options.workId,
                 options.userId,
             );
             if (!isEnabled) continue;
@@ -285,8 +285,8 @@ export class GeneratorFormSchemaService {
     /**
      * Get enabled provider options for a specific capability.
      *
-     * When directoryId is provided:
-     * - Filters plugins by enable status (Directory > User > autoEnable)
+     * When workId is provided:
+     * - Filters plugins by enable status (Work > User > autoEnable)
      * - Marks the default provider based on active capabilities
      */
     private async getProvidersForCapability(
@@ -297,12 +297,12 @@ export class GeneratorFormSchemaService {
         const enabledPlugins = plugins.filter((p) => p.state === 'loaded');
         const result: ProviderOption[] = [];
 
-        // Get the active (default) plugin for this capability in the directory
+        // Get the active (default) plugin for this capability in the work
         let activePluginId: string | null = null;
-        if (options?.directoryId && this.directoryPluginRepository) {
+        if (options?.workId && this.workPluginRepository) {
             try {
-                const activePlugin = await this.directoryPluginRepository.findActiveByCapability(
-                    options.directoryId,
+                const activePlugin = await this.workPluginRepository.findActiveByCapability(
+                    options.workId,
                     capability,
                 );
                 if (activePlugin) {
@@ -319,10 +319,10 @@ export class GeneratorFormSchemaService {
             if (registered.manifest.supplementary) continue;
 
             // Check if plugin is enabled for this context
-            if (options?.directoryId || options?.userId) {
+            if (options?.workId || options?.userId) {
                 const isEnabled = await this.pluginRegistry.isPluginEnabledForScope(
                     registered.plugin.id,
-                    options.directoryId,
+                    options.workId,
                     options.userId,
                 );
                 if (!isEnabled) {
@@ -358,7 +358,7 @@ export class GeneratorFormSchemaService {
         const { plugin, manifest } = registered;
 
         // Mark as default if:
-        // 1. It's the active plugin for the directory.
+        // 1. It's the active plugin for the work.
         // 2. OR it declares this capability in defaultForCapabilities
         // 3. OR it's a system plugin (fallback if no capability provided)
         const isDefault = activePluginId
@@ -373,7 +373,7 @@ export class GeneratorFormSchemaService {
                       plugin.settingsSchema,
                       await this.pluginSettingsService.getResolvedSettings(plugin.id, {
                           userId: options?.userId,
-                          directoryId: options?.directoryId,
+                          workId: options?.workId,
                       }),
                   )
                 : undefined;
@@ -414,7 +414,7 @@ export class GeneratorFormSchemaService {
                 registered.plugin.id,
                 {
                     userId: options?.userId,
-                    directoryId: options?.directoryId,
+                    workId: options?.workId,
                     includeSecrets: true,
                 },
             );
@@ -607,10 +607,10 @@ export class GeneratorFormSchemaService {
             return `Provider "${pluginId}" is not loaded (state: ${registered.state}).`;
         }
 
-        if (options.directoryId || options.userId) {
+        if (options.workId || options.userId) {
             const isEnabled = await this.pluginRegistry.isPluginEnabledForScope(
                 pluginId,
-                options.directoryId,
+                options.workId,
                 options.userId,
             );
             if (!isEnabled) {
@@ -675,10 +675,10 @@ export class GeneratorFormSchemaService {
             if (registered.state !== 'loaded') continue;
             if (pipelineIds.has(registered.plugin.id)) continue;
 
-            if (options?.directoryId || options?.userId) {
+            if (options?.workId || options?.userId) {
                 const isEnabled = await this.pluginRegistry.isPluginEnabledForScope(
                     registered.plugin.id,
-                    options.directoryId,
+                    options.workId,
                     options.userId,
                 );
                 if (!isEnabled) continue;
@@ -707,11 +707,11 @@ export class GeneratorFormSchemaService {
             this.logger.warn(`Pipeline plugin not found or not enabled: ${pipelineId}`);
         }
 
-        // 2. Directory's active provider for 'pipeline'
-        if (options?.directoryId && this.directoryPluginRepository) {
+        // 2. Work's active provider for 'pipeline'
+        if (options?.workId && this.workPluginRepository) {
             try {
-                const activePlugin = await this.directoryPluginRepository.findActiveByCapability(
-                    options.directoryId,
+                const activePlugin = await this.workPluginRepository.findActiveByCapability(
+                    options.workId,
                     'pipeline',
                 );
                 if (activePlugin) {
@@ -725,7 +725,7 @@ export class GeneratorFormSchemaService {
                     }
                 }
             } catch {
-                // No active pipeline set for this directory
+                // No active pipeline set for this work
             }
         }
 
@@ -759,12 +759,12 @@ export class GeneratorFormSchemaService {
         pluginId: string,
         options?: FormSchemaOptions,
     ): Promise<boolean> {
-        if (!options?.directoryId && !options?.userId) {
+        if (!options?.workId && !options?.userId) {
             return true;
         }
         return this.pluginRegistry.isPluginEnabledForScope(
             pluginId,
-            options.directoryId,
+            options.workId,
             options.userId,
         );
     }

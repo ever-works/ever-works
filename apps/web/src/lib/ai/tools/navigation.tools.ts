@@ -4,8 +4,8 @@ import { ROUTES } from '@/lib/constants';
 
 const PAGE_OPTIONS = [
     'dashboard',
-    'directories',
-    'new-directory',
+    'works',
+    'new-work',
     'plugins',
     'settings',
     'settings-security',
@@ -29,8 +29,8 @@ const TAB_OPTIONS = [
 
 const pageRoutes: Record<(typeof PAGE_OPTIONS)[number], string> = {
     dashboard: ROUTES.DASHBOARD,
-    directories: ROUTES.DASHBOARD_DIRECTORIES,
-    'new-directory': ROUTES.DASHBOARD_DIRECTORIES_NEW,
+    works: ROUTES.DASHBOARD_DIRECTORIES,
+    'new-work': ROUTES.DASHBOARD_DIRECTORIES_NEW,
     plugins: ROUTES.DASHBOARD_PLUGINS,
     settings: ROUTES.DASHBOARD_SETTINGS,
     'settings-security': ROUTES.DASHBOARD_SETTINGS_SECURITY,
@@ -40,43 +40,43 @@ const pageRoutes: Record<(typeof PAGE_OPTIONS)[number], string> = {
 };
 
 const tabRoutes: Record<(typeof TAB_OPTIONS)[number], (id: string) => string> = {
-    overview: ROUTES.DASHBOARD_DIRECTORY,
-    items: ROUTES.DASHBOARD_DIRECTORY_ITEMS,
-    generator: ROUTES.DASHBOARD_DIRECTORY_GENERATOR,
-    history: ROUTES.DASHBOARD_DIRECTORY_HISTORY,
-    deploy: ROUTES.DASHBOARD_DIRECTORY_DEPLOY,
-    members: ROUTES.DASHBOARD_DIRECTORY_MEMBERS,
-    settings: ROUTES.DASHBOARD_DIRECTORY_SETTINGS,
-    plugins: ROUTES.DASHBOARD_DIRECTORY_PLUGINS,
-    schedule: ROUTES.DASHBOARD_DIRECTORY_SCHEDULE,
-    comparisons: ROUTES.DASHBOARD_DIRECTORY_COMPARISONS,
+    overview: ROUTES.DASHBOARD_WORK,
+    items: ROUTES.DASHBOARD_WORK_ITEMS,
+    generator: ROUTES.DASHBOARD_WORK_GENERATOR,
+    history: ROUTES.DASHBOARD_WORK_HISTORY,
+    deploy: ROUTES.DASHBOARD_WORK_DEPLOY,
+    members: ROUTES.DASHBOARD_WORK_MEMBERS,
+    settings: ROUTES.DASHBOARD_WORK_SETTINGS,
+    plugins: ROUTES.DASHBOARD_WORK_PLUGINS,
+    schedule: ROUTES.DASHBOARD_WORK_SCHEDULE,
+    comparisons: ROUTES.DASHBOARD_WORK_COMPARISONS,
 };
 
 export const navigate = tool({
     description: [
         'Navigate the user to a page with optional search query.',
         'ALWAYS use this after fetching data — redirect to the relevant page so the user sees it.',
-        'For directories: use page="directories" with search to filter.',
-        'For items in a directory: use directoryId + tab="items" with search to filter.',
+        'For Works list: use page="works" with search to filter.',
+        'For items in a Work: use workId + tab="items" with search to filter.',
         'The UI handles the redirect. Do NOT output any text after calling this tool.',
     ].join(' '),
     inputSchema: z.object({
         page: z.enum(PAGE_OPTIONS).describe('The page to navigate to'),
-        directoryId: z.string().optional().describe('Directory ID for directory-specific pages'),
-        tab: z.enum(TAB_OPTIONS).optional().describe('Directory tab to navigate to'),
+        workId: z.string().optional().describe('Work ID for Work-specific pages'),
+        tab: z.enum(TAB_OPTIONS).optional().describe('Work tab to navigate to'),
         search: z
             .string()
             .optional()
             .describe('Search query to pre-fill on the target page (passed as ?q=...)'),
     }),
-    execute: async ({ page, directoryId, tab, search }) => {
+    execute: async ({ page, workId, tab, search }) => {
         let url = pageRoutes[page] ?? ROUTES.DASHBOARD;
 
-        if (directoryId && tab) {
+        if (workId && tab) {
             const routeFn = tabRoutes[tab];
-            if (routeFn) url = routeFn(directoryId);
-        } else if (directoryId) {
-            url = ROUTES.DASHBOARD_DIRECTORY(directoryId);
+            if (routeFn) url = routeFn(workId);
+        } else if (workId) {
+            url = ROUTES.DASHBOARD_WORK(workId);
         }
 
         if (search) {

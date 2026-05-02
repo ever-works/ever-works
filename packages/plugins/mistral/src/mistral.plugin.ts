@@ -235,7 +235,7 @@ export class MistralPlugin extends BaseAiProvider {
 				'',
 				'## How it works in Ever Works',
 				'',
-				'When enabled, Mistral handles content creation, item descriptions, categorization, and summarization during directory generation. It also powers the conversational AI assistant and structured data extraction. You can configure three model tiers — simple, standard, and complex — to balance cost and output quality across different pipeline steps.',
+				'When enabled, Mistral handles content creation, item descriptions, categorization, and summarization during work generation. It also powers the conversational AI assistant and structured data extraction. You can configure three model tiers — simple, standard, and complex — to balance cost and output quality across different pipeline steps.',
 				'',
 				'## Getting started',
 				'',

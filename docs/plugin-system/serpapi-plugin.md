@@ -80,7 +80,7 @@ The plugin constructs a query URL with parameters, sends a single HTTP request t
 
 API keys are resolved through the standard 4-level hierarchy:
 
-1. Directory settings (highest priority)
+1. Work settings (highest priority)
 2. User settings
 3. Admin settings
 4. Environment variables (lowest priority)
@@ -155,7 +155,7 @@ SerpAPI supports multi-page results:
 
 ## Usage in Pipelines
 
-When enabled and set as the active search provider, SerpAPI is used during directory generation to find information about each item. It is called by the search facade, which manages provider selection and settings resolution.
+When enabled and set as the active search provider, SerpAPI is used during work generation to find information about each item. It is called by the search facade, which manages provider selection and settings resolution.
 
 SerpAPI is a good choice when:
 
@@ -170,7 +170,7 @@ SerpAPI is a good choice when:
 3. Enable the SerpAPI plugin on the Plugins page
 4. Enter your API key in the settings panel
 5. Optionally select a preferred search engine
-6. Set SerpAPI as the active search provider for your directory
+6. Set SerpAPI as the active search provider for your work
 
 ## API Reference
 

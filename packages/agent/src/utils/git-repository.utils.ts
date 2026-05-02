@@ -11,7 +11,7 @@ export function assertCreatedRepositoryTarget(
     }
 
     throw new Error(
-        `${contextLabel} was created as ${createdRepository.fullName}, but the directory expects ${expectedOwner}/${expectedName}. ` +
-            'This usually means the connected Git account does not match the directory owner.',
+        `${contextLabel} was created as ${createdRepository.fullName}, but the work expects ${expectedOwner}/${expectedName}. ` +
+            'This usually means the connected Git account does not match the work owner.',
     );
 }

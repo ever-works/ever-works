@@ -1,17 +1,17 @@
 import 'server-only';
 import { serverFetch, serverMutation } from './server-api';
-import { DirectoryMemberRole, ASSIGNABLE_MEMBER_ROLES } from './enums';
+import { WorkMemberRole, ASSIGNABLE_MEMBER_ROLES } from './enums';
 import { APIResponse } from './types';
 
 export type AssignableMemberRole = (typeof ASSIGNABLE_MEMBER_ROLES)[number];
 
-export interface DirectoryMember {
+export interface WorkMember {
     id: string;
     userId: string;
     username: string;
     email: string;
     avatar?: string;
-    role: DirectoryMemberRole;
+    role: WorkMemberRole;
     invitedBy?: {
         id: string;
         username: string;
@@ -19,7 +19,7 @@ export interface DirectoryMember {
     createdAt: string;
 }
 
-export interface DirectoryOwner {
+export interface WorkOwner {
     id: string;
     username: string;
     email: string;
@@ -27,8 +27,8 @@ export interface DirectoryOwner {
 }
 
 export interface MembersListResponse {
-    members: DirectoryMember[];
-    owner: DirectoryOwner;
+    members: WorkMember[];
+    owner: WorkOwner;
 }
 
 export interface InviteMemberDto {
@@ -41,46 +41,46 @@ export interface UpdateMemberRoleDto {
 }
 
 export const membersAPI = {
-    list: async (directoryId: string) => {
-        return serverFetch<APIResponse<MembersListResponse>>(`/directories/${directoryId}/members`);
+    list: async (workId: string) => {
+        return serverFetch<APIResponse<MembersListResponse>>(`/works/${workId}/members`);
     },
 
-    invite: async (directoryId: string, data: InviteMemberDto) => {
-        return serverMutation<APIResponse<{ member: DirectoryMember }>>({
-            endpoint: `/directories/${directoryId}/members`,
+    invite: async (workId: string, data: InviteMemberDto) => {
+        return serverMutation<APIResponse<{ member: WorkMember }>>({
+            endpoint: `/works/${workId}/members`,
             data,
             method: 'POST',
             wrapInData: false,
         });
     },
 
-    get: async (directoryId: string, memberId: string) => {
-        return serverFetch<APIResponse<{ member: DirectoryMember }>>(
-            `/directories/${directoryId}/members/${memberId}`,
+    get: async (workId: string, memberId: string) => {
+        return serverFetch<APIResponse<{ member: WorkMember }>>(
+            `/works/${workId}/members/${memberId}`,
         );
     },
 
-    updateRole: async (directoryId: string, memberId: string, data: UpdateMemberRoleDto) => {
-        return serverMutation<APIResponse<{ member: DirectoryMember }>>({
-            endpoint: `/directories/${directoryId}/members/${memberId}`,
+    updateRole: async (workId: string, memberId: string, data: UpdateMemberRoleDto) => {
+        return serverMutation<APIResponse<{ member: WorkMember }>>({
+            endpoint: `/works/${workId}/members/${memberId}`,
             data,
             method: 'PUT',
             wrapInData: false,
         });
     },
 
-    remove: async (directoryId: string, memberId: string) => {
+    remove: async (workId: string, memberId: string) => {
         return serverMutation<APIResponse<{ message: string }>>({
-            endpoint: `/directories/${directoryId}/members/${memberId}`,
+            endpoint: `/works/${workId}/members/${memberId}`,
             data: {},
             method: 'DELETE',
             wrapInData: false,
         });
     },
 
-    leave: async (directoryId: string) => {
+    leave: async (workId: string) => {
         return serverMutation<APIResponse<{ message: string }>>({
-            endpoint: `/directories/${directoryId}/members/leave`,
+            endpoint: `/works/${workId}/members/leave`,
             data: {},
             method: 'POST',
             wrapInData: false,

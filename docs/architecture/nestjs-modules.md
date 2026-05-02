@@ -15,12 +15,12 @@ The Ever Works platform follows NestJS module conventions to organize the agent 
 
 ```mermaid
 graph TD
-    API[ApiModule - apps/api] --> DM[DirectoriesModule]
+    API[ApiModule - apps/api] --> DM[WorksModule]
     API --> AM[AuthModule]
     API --> PM_API[PluginsController]
     API --> SM[SubscriptionsModule]
 
-    DM --> DS[DirectoryServicesModule]
+    DM --> DS[WorkServicesModule]
     DS --> PipeM[PipelineModule]
     DS --> FM[FacadesModule]
     DS --> GenM[Generators Modules]
@@ -47,7 +47,7 @@ graph TD
 | `packages/agent/src/plugins/plugins.module.ts`             | Global plugin system with dynamic module pattern  |
 | `packages/agent/src/facades/facades.module.ts`             | Facade services for AI, Search, Git, Deploy, etc. |
 | `packages/agent/src/pipeline/pipeline.module.ts`           | Pipeline builder, executors, orchestrator         |
-| `packages/agent/src/services/directory.module.ts`          | Core directory business logic services            |
+| `packages/agent/src/services/work.module.ts`               | Core work business logic services                 |
 | `packages/agent/src/generators/*/`                         | Generator modules (data, markdown, website)       |
 | `packages/agent/src/notifications/notifications.module.ts` | Notification system                               |
 | `packages/agent/src/subscriptions/subscriptions.module.ts` | Subscription and billing                          |
@@ -69,8 +69,8 @@ Registers all TypeORM entities and provides repository services. Every module th
 		}),
 		TypeOrmModule.forFeature(ENTITIES)
 	],
-	providers: [DirectoryRepository, UserRepository /* ... */],
-	exports: [TypeOrmModule, DirectoryRepository, UserRepository /* ... */]
+	providers: [WorkRepository, UserRepository /* ... */],
+	exports: [TypeOrmModule, WorkRepository, UserRepository /* ... */]
 })
 export class DatabaseModule {}
 ```
@@ -114,12 +114,12 @@ Provides unified access to plugin capabilities without direct plugin imports. Th
  *
  * Resolution priority:
  * 1. Provider override (explicit request)
- * 2. Directory default provider
+ * 2. Work default provider
  * 3. User default provider
  * 4. First enabled provider
  *
  * Settings are resolved using the 4-level hierarchy:
- * 1. Directory settings
+ * 1. Work settings
  * 2. User settings
  * 3. Admin settings
  * 4. Plugin defaults
@@ -174,7 +174,7 @@ The NestJS dependency injection container resolves modules in import order. The 
 		// 4. Feature modules (consume plugins via facades)
 		FacadesModule,
 		PipelineModule,
-		DirectoryServicesModule
+		WorkServicesModule
 		// ...
 	]
 })

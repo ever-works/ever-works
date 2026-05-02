@@ -7,7 +7,7 @@ Each item must be a JSON file with the following structure:
 
 {
   "name": "string (required) - The item's canonical display name",
-  "description": "string (required) - A concise, informative summary of the item and its relevance to the directory topic (2-4 sentences). Generate from page content if not directly available.",
+  "description": "string (required) - A concise, informative summary of the item and its relevance to the work topic (2-4 sentences). Generate from page content if not directly available.",
   "source_url": "string (required) - The most direct, canonical URL for the item itself (homepage or official page). Must be real and working. Never use blog posts or articles *about* the item.",
   "category": "string (required) - ONE primary category based on the item's core function (e.g., 'Monitoring', 'CI/CD', 'Data Visualization')",
   "tags": ["string"] - 1-3 specific, descriptive tags (e.g., "open-source", "real-time", "cloud-native"),

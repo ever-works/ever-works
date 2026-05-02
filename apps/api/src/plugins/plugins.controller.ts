@@ -14,17 +14,17 @@ import {
 import { ApiTags, ApiBearerAuth, ApiOperation, ApiResponse, ApiParam } from '@nestjs/swagger';
 import { AuthSessionGuard, CurrentUser } from '../auth';
 import { AuthenticatedUser } from '@src/auth/types/auth.types';
-import { DirectoryOwnershipService } from '@ever-works/agent/services';
+import { WorkOwnershipService } from '@ever-works/agent/services';
 import { PluginOperationsService } from '@ever-works/agent/plugins';
 import {
     PluginListResponseDto,
     UserPluginResponseDto,
-    DirectoryPluginListResponseDto,
-    DirectoryPluginResponseDto,
+    WorkPluginListResponseDto,
+    WorkPluginResponseDto,
     UpdateUserPluginSettingsDto,
     EnableUserPluginDto,
-    UpdateDirectoryPluginSettingsDto,
-    EnableDirectoryPluginDto,
+    UpdateWorkPluginSettingsDto,
+    EnableWorkPluginDto,
     SetActiveCapabilityDto,
     SettingsMenuResponseDto,
     SetGlobalPipelineDefaultDto,
@@ -40,7 +40,7 @@ import { ActivityActionType, ActivityStatus } from '@ever-works/agent/entities';
 export class PluginsController {
     constructor(
         private readonly pluginsService: PluginOperationsService,
-        private readonly ownershipService: DirectoryOwnershipService,
+        private readonly ownershipService: WorkOwnershipService,
         private readonly pluginValidationService: PluginValidationService,
         private readonly activityLogService: ActivityLogService,
     ) {}
@@ -137,7 +137,7 @@ export class PluginsController {
             auth.userId,
             dto.settings,
             dto.secretSettings,
-            dto.autoEnableForDirectories,
+            dto.autoEnableForWorks,
         );
         this.activityLogService
             .log({
@@ -253,53 +253,53 @@ export class PluginsController {
     }
 
     // ============================================
-    // Directory Plugin Management
+    // Work Plugin Management
     // ============================================
 
-    @Get('directories/:directoryId/plugins')
+    @Get('works/:workId/plugins')
     @HttpCode(HttpStatus.OK)
     @ApiOperation({
-        summary: 'List directory plugins',
-        description: 'Get all plugins with directory-specific configuration',
+        summary: 'List work plugins',
+        description: 'Get all plugins with work-specific configuration',
     })
-    @ApiParam({ name: 'directoryId', description: 'Directory ID' })
+    @ApiParam({ name: 'workId', description: 'Work ID' })
     @ApiResponse({
         status: 200,
-        description: 'List of directory plugins',
-        type: DirectoryPluginListResponseDto,
+        description: 'List of work plugins',
+        type: WorkPluginListResponseDto,
     })
-    async listDirectoryPlugins(
+    async listWorkPlugins(
         @CurrentUser() auth: AuthenticatedUser,
-        @Param('directoryId') directoryId: string,
-    ): Promise<DirectoryPluginListResponseDto> {
-        await this.ownershipService.ensureCanView(directoryId, auth.userId);
-        return this.pluginsService.listDirectoryPlugins(directoryId, auth.userId);
+        @Param('workId') workId: string,
+    ): Promise<WorkPluginListResponseDto> {
+        await this.ownershipService.ensureCanView(workId, auth.userId);
+        return this.pluginsService.listWorkPlugins(workId, auth.userId);
     }
 
-    @Post('directories/:directoryId/plugins/:pluginId/enable')
+    @Post('works/:workId/plugins/:pluginId/enable')
     @HttpCode(HttpStatus.OK)
     @ApiOperation({
-        summary: 'Enable plugin for directory',
-        description: 'Enable a plugin for a specific directory',
+        summary: 'Enable plugin for work',
+        description: 'Enable a plugin for a specific work',
     })
-    @ApiParam({ name: 'directoryId', description: 'Directory ID' })
+    @ApiParam({ name: 'workId', description: 'Work ID' })
     @ApiParam({ name: 'pluginId', description: 'Plugin ID' })
     @ApiResponse({
         status: 200,
-        description: 'Plugin enabled for directory',
-        type: DirectoryPluginResponseDto,
+        description: 'Plugin enabled for work',
+        type: WorkPluginResponseDto,
     })
     @ApiResponse({ status: 400, description: 'Plugin not installed at user level' })
-    @ApiResponse({ status: 404, description: 'Plugin or directory not found' })
-    async enableDirectoryPlugin(
+    @ApiResponse({ status: 404, description: 'Plugin or work not found' })
+    async enableWorkPlugin(
         @CurrentUser() auth: AuthenticatedUser,
-        @Param('directoryId') directoryId: string,
+        @Param('workId') workId: string,
         @Param('pluginId') pluginId: string,
-        @Body() dto: EnableDirectoryPluginDto,
-    ): Promise<DirectoryPluginResponseDto> {
-        await this.ownershipService.ensureCanEdit(directoryId, auth.userId);
-        const result = await this.pluginsService.enablePluginForDirectory(
-            directoryId,
+        @Body() dto: EnableWorkPluginDto,
+    ): Promise<WorkPluginResponseDto> {
+        await this.ownershipService.ensureCanEdit(workId, auth.userId);
+        const result = await this.pluginsService.enablePluginForWork(
+            workId,
             pluginId,
             auth.userId,
             {
@@ -312,38 +312,38 @@ export class PluginsController {
         this.activityLogService
             .log({
                 userId: auth.userId,
-                directoryId,
+                workId,
                 actionType: ActivityActionType.PLUGIN_ENABLED,
-                action: 'directory.plugin_enabled',
+                action: 'work.plugin_enabled',
                 status: ActivityStatus.COMPLETED,
-                summary: `Enabled plugin ${pluginId} for directory`,
+                summary: `Enabled plugin ${pluginId} for work`,
             })
             .catch(() => {});
 
         return result;
     }
 
-    @Post('directories/:directoryId/plugins/:pluginId/disable')
+    @Post('works/:workId/plugins/:pluginId/disable')
     @HttpCode(HttpStatus.OK)
     @ApiOperation({
-        summary: 'Disable plugin for directory',
-        description: 'Disable a plugin for a specific directory',
+        summary: 'Disable plugin for work',
+        description: 'Disable a plugin for a specific work',
     })
-    @ApiParam({ name: 'directoryId', description: 'Directory ID' })
+    @ApiParam({ name: 'workId', description: 'Work ID' })
     @ApiParam({ name: 'pluginId', description: 'Plugin ID' })
     @ApiResponse({
         status: 200,
-        description: 'Plugin disabled for directory',
-        type: DirectoryPluginResponseDto,
+        description: 'Plugin disabled for work',
+        type: WorkPluginResponseDto,
     })
-    async disableDirectoryPlugin(
+    async disableWorkPlugin(
         @CurrentUser() auth: AuthenticatedUser,
-        @Param('directoryId') directoryId: string,
+        @Param('workId') workId: string,
         @Param('pluginId') pluginId: string,
-    ): Promise<DirectoryPluginResponseDto> {
-        await this.ownershipService.ensureCanEdit(directoryId, auth.userId);
-        const result = await this.pluginsService.disablePluginForDirectory(
-            directoryId,
+    ): Promise<WorkPluginResponseDto> {
+        await this.ownershipService.ensureCanEdit(workId, auth.userId);
+        const result = await this.pluginsService.disablePluginForWork(
+            workId,
             pluginId,
             auth.userId,
         );
@@ -351,40 +351,40 @@ export class PluginsController {
         this.activityLogService
             .log({
                 userId: auth.userId,
-                directoryId,
+                workId,
                 actionType: ActivityActionType.PLUGIN_DISABLED,
-                action: 'directory.plugin_disabled',
+                action: 'work.plugin_disabled',
                 status: ActivityStatus.COMPLETED,
-                summary: `Disabled plugin ${pluginId} for directory`,
+                summary: `Disabled plugin ${pluginId} for work`,
             })
             .catch(() => {});
 
         return result;
     }
 
-    @Patch('directories/:directoryId/plugins/:pluginId/settings')
+    @Patch('works/:workId/plugins/:pluginId/settings')
     @HttpCode(HttpStatus.OK)
     @ApiOperation({
-        summary: 'Update directory plugin settings',
-        description: 'Update directory-specific settings for a plugin',
+        summary: 'Update work plugin settings',
+        description: 'Update work-specific settings for a plugin',
     })
-    @ApiParam({ name: 'directoryId', description: 'Directory ID' })
+    @ApiParam({ name: 'workId', description: 'Work ID' })
     @ApiParam({ name: 'pluginId', description: 'Plugin ID' })
     @ApiResponse({
         status: 200,
         description: 'Settings updated',
-        type: DirectoryPluginResponseDto,
+        type: WorkPluginResponseDto,
     })
-    @ApiResponse({ status: 400, description: 'Plugin not enabled for directory' })
-    async updateDirectoryPluginSettings(
+    @ApiResponse({ status: 400, description: 'Plugin not enabled for work' })
+    async updateWorkPluginSettings(
         @CurrentUser() auth: AuthenticatedUser,
-        @Param('directoryId') directoryId: string,
+        @Param('workId') workId: string,
         @Param('pluginId') pluginId: string,
-        @Body() dto: UpdateDirectoryPluginSettingsDto,
+        @Body() dto: UpdateWorkPluginSettingsDto,
     ) {
-        await this.ownershipService.ensureCanEdit(directoryId, auth.userId);
-        const result = await this.pluginsService.updateDirectoryPluginSettings(
-            directoryId,
+        await this.ownershipService.ensureCanEdit(workId, auth.userId);
+        const result = await this.pluginsService.updateWorkPluginSettings(
+            workId,
             pluginId,
             auth.userId,
             dto.settings,
@@ -395,15 +395,15 @@ export class PluginsController {
         const validation = await this.pluginValidationService.tryValidateConnection(
             pluginId,
             auth.userId,
-            directoryId,
+            workId,
         );
 
         this.activityLogService
             .log({
                 userId: auth.userId,
-                directoryId,
+                workId,
                 actionType: ActivityActionType.PLUGIN_CONFIGURED,
-                action: 'directory.plugin_configured',
+                action: 'work.plugin_configured',
                 status: ActivityStatus.COMPLETED,
                 summary: `Updated plugin settings for ${pluginId}`,
             })
@@ -412,29 +412,29 @@ export class PluginsController {
         return { ...result, validation };
     }
 
-    @Post('directories/:directoryId/plugins/:pluginId/capability')
+    @Post('works/:workId/plugins/:pluginId/capability')
     @HttpCode(HttpStatus.OK)
     @ApiOperation({
         summary: 'Set active capability',
-        description: 'Set this plugin as the active provider for a capability in this directory',
+        description: 'Set this plugin as the active provider for a capability in this work',
     })
-    @ApiParam({ name: 'directoryId', description: 'Directory ID' })
+    @ApiParam({ name: 'workId', description: 'Work ID' })
     @ApiParam({ name: 'pluginId', description: 'Plugin ID' })
     @ApiResponse({
         status: 200,
         description: 'Capability set',
-        type: DirectoryPluginResponseDto,
+        type: WorkPluginResponseDto,
     })
     @ApiResponse({ status: 400, description: 'Plugin does not have this capability' })
     async setActiveCapability(
         @CurrentUser() auth: AuthenticatedUser,
-        @Param('directoryId') directoryId: string,
+        @Param('workId') workId: string,
         @Param('pluginId') pluginId: string,
         @Body() dto: SetActiveCapabilityDto,
-    ): Promise<DirectoryPluginResponseDto> {
-        await this.ownershipService.ensureCanEdit(directoryId, auth.userId);
+    ): Promise<WorkPluginResponseDto> {
+        await this.ownershipService.ensureCanEdit(workId, auth.userId);
         return this.pluginsService.setActiveCapability(
-            directoryId,
+            workId,
             pluginId,
             auth.userId,
             dto.capability,

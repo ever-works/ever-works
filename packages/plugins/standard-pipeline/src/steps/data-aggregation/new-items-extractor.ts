@@ -23,7 +23,7 @@ export class NewItemsExtractor {
 		this.promptFacade = execContext.promptFacade;
 		this.facadeOptions = {
 			userId: execContext.user!.id,
-			directoryId: execContext.directory.id
+			workId: execContext.work.id
 		};
 	}
 

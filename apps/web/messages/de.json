@@ -150,7 +150,7 @@
         },
         "register": {
             "title": "Erstellen Sie Ihr Konto",
-            "subtitle": "Beginnen Sie heute mit dem Erstellen toller Verzeichnisse",
+            "subtitle": "Beginnen Sie heute mit dem Erstellen toller Werke",
             "form": {
                 "name": {
                     "label": "Vollständiger Name",
@@ -197,18 +197,18 @@
     "onboarding": {
         "label": "Erste Schritte",
         "title": "Willkommen bei Ever Works",
-        "subtitle": "Erstellen und veröffentlichen Sie Ihr erstes Verzeichnis in Minuten.",
+        "subtitle": "Erstellen und veröffentlichen Sie Ihr erstes Werk in Minuten.",
         "skipButton": "Überspringen",
         "nextButton": "Weiter",
         "stepIndex": "Schritt {index}",
         "steps": {
             "welcome": {
                 "title": "Was ist Ever Works?",
-                "description": "Ever Works ist ein Open-Source-Verzeichnisersteller. Erstellen Sie strukturierte Inhaltsverzeichnisse – Tools, Jobs, Links, Produkte – und veröffentlichen Sie sie als Live-Websites.",
-                "detail": "Lassen Sie uns Sie einrichten. Verbinden Sie Ihre Anbieter unten, dann erstellen Sie Ihr erstes Verzeichnis.",
+                "description": "Ever Works ist ein Open-Source-Werkersteller. Erstellen Sie strukturierte Inhaltswerkse – Tools, Jobs, Links, Produkte – und veröffentlichen Sie sie als Live-Websites.",
+                "detail": "Lassen Sie uns Sie einrichten. Verbinden Sie Ihre Anbieter unten, dann erstellen Sie Ihr erstes Werk.",
                 "feature1": {
                     "title": "KI-gestützter Inhalt",
-                    "description": "Generieren und bereichern Sie Verzeichniseinträge automatisch mit Ihrem KI-Anbieter."
+                    "description": "Generieren und bereichern Sie Werkeinträge automatisch mit Ihrem KI-Anbieter."
                 },
                 "feature2": {
                     "title": "Sofortige Veröffentlichung",
@@ -216,18 +216,18 @@
                 },
                 "feature3": {
                     "title": "Git-gestützt",
-                    "description": "Jedes Verzeichnis ist ein GitHub-Repository, das Sie besitzen und kontrollieren."
+                    "description": "Jedes Werk ist ein GitHub-Repository, das Sie besitzen und kontrollieren."
                 }
             },
-            "directory": {
-                "title": "Erstellen Sie Ihr erstes Verzeichnis",
-                "description": "Ein Verzeichnis ist Ihr Content-Hub. Fügen Sie Elemente hinzu, konfigurieren Sie das Layout und veröffentlichen Sie es mit einem Klick.",
-                "detail": "Sie sind startklar! Erstellen Sie Ihr erstes Verzeichnis, um mit dem Erstellen und Veröffentlichen von Inhalten zu beginnen.",
-                "action": "Verzeichnis erstellen"
+            "work": {
+                "title": "Erstellen Sie Ihr erstes Werk",
+                "description": "Ein Werk ist Ihr Content-Hub. Fügen Sie Elemente hinzu, konfigurieren Sie das Layout und veröffentlichen Sie es mit einem Klick.",
+                "detail": "Sie sind startklar! Erstellen Sie Ihr erstes Werk, um mit dem Erstellen und Veröffentlichen von Inhalten zu beginnen.",
+                "action": "Werk erstellen"
             },
             "publish": {
                 "title": "Live schalten",
-                "description": "Verbinden Sie Vercel oder GitHub, um Ihr Verzeichnis als öffentliche Website bereitzustellen – keine Hosting-Konfiguration erforderlich.",
+                "description": "Verbinden Sie Vercel oder GitHub, um Ihr Werk als öffentliche Website bereitzustellen – keine Hosting-Konfiguration erforderlich.",
                 "action": "Veröffentlichung einrichten"
             }
         },
@@ -336,7 +336,7 @@
             "steps": {
                 "model": {
                     "title": "Modell auswählen",
-                    "description": "Wählen Sie das Codex-Modell aus, das Sie für die End-to-End-Verzeichniserstellung ausführen möchten."
+                    "description": "Wählen Sie das Codex-Modell aus, das Sie für die End-to-End-Werkerstellung ausführen möchten."
                 },
                 "credentials": {
                     "title": "Anmeldedaten hinzufügen",
@@ -408,7 +408,7 @@
         "simWizard": {
             "label": "SIM AI Einrichtung",
             "title": "SIM AI in zwei Schritten einrichten",
-            "subtitle": "Fügen Sie Ihren SIM AI API-Schlüssel hinzu und überprüfen Sie die Verbindung, um die Verzeichniserstellung an SIM-Workflows zu delegieren.",
+            "subtitle": "Fügen Sie Ihren SIM AI API-Schlüssel hinzu und überprüfen Sie die Verbindung, um die Werkerstellung an SIM-Workflows zu delegieren.",
             "stepIndex": "Schritt {index}",
             "continueButton": "Fortfahren",
             "steps": {
@@ -431,7 +431,7 @@
         "title": "Übersicht",
         "connectGithub": {
             "title": "Verbinden Sie Ihr GitHub-Konto",
-            "description": "GitHub ist erforderlich, um Verzeichnis-Repositories zu erstellen und zu verwalten. Verbinden Sie Ihr Konto, um loszulegen.",
+            "description": "GitHub ist erforderlich, um Werk-Repositories zu erstellen und zu verwalten. Verbinden Sie Ihr Konto, um loszulegen.",
             "connect": "GitHub verbinden",
             "dismiss": "Ich mache das später"
         },
@@ -465,7 +465,7 @@
         },
         "header": {
             "welcome": "Willkommen zurück, {username}!",
-            "subtitle": "Verwalten Sie Ihre KI-gestützten Verzeichnisse und verfolgen Sie deren Leistung",
+            "subtitle": "Verwalten Sie Ihre KI-gestützten Werke und verfolgen Sie deren Leistung",
             "onboarding": {
                 "badge": "Einführung {currentStep}/{totalSteps}",
                 "dismiss": "Einführungsverknüpfung ausblenden"
@@ -490,14 +490,14 @@
                 },
                 "quickTips": {
                     "title": "Schnelle Tipps",
-                    "tip1": "Erstellen Sie Ihr erstes Verzeichnis, indem Sie die Schaltfläche „Verzeichnis erstellen“ auf der Übersicht klicken.",
-                    "tip2": "Verwenden Sie den KI-Generator, um Ihr Verzeichnis automatisch mit relevanten Elementen zu füllen.",
-                    "tip3": "Verbinden Sie Ihr GitHub-Konto, um Ihre Verzeichnisse als Repositories zu synchronisieren und bereitzustellen."
+                    "tip1": "Erstellen Sie Ihr erstes Werk, indem Sie die Schaltfläche „Werk erstellen“ auf der Übersicht klicken.",
+                    "tip2": "Verwenden Sie den KI-Generator, um Ihr Werk automatisch mit relevanten Elementen zu füllen.",
+                    "tip3": "Verbinden Sie Ihr GitHub-Konto, um Ihre Werke als Repositories zu synchronisieren und bereitzustellen."
                 },
                 "shortcuts": {
                     "title": "Tastaturkürzel",
-                    "search": "Verzeichnisse durchsuchen",
-                    "newDirectory": "Neues Verzeichnis erstellen",
+                    "search": "Werke durchsuchen",
+                    "newWork": "Neues Werk erstellen",
                     "help": "Hilfe öffnen",
                     "hint": "Cmd auf Mac oder Ctrl unter Windows/Linux verwenden"
                 },
@@ -513,7 +513,7 @@
         },
         "activity": {
             "title": "Aktivitätsprotokoll",
-            "subtitle": "Verfolgen Sie alle Vorgänge in Ihren Verzeichnissen",
+            "subtitle": "Verfolgen Sie alle Vorgänge in Ihren Werken",
             "loading": "Laden…",
             "fetchFailed": "Aktivitäten konnten nicht geladen werden",
             "exportFailed": "Export des Aktivitätsprotokolls fehlgeschlagen",
@@ -521,7 +521,7 @@
             "columns": {
                 "status": "Status",
                 "dateTime": "Datum / Uhrzeit",
-                "directory": "Verzeichnis",
+                "work": "Werk",
                 "type": "Typ",
                 "summary": "Zusammenfassung"
             },
@@ -532,9 +532,9 @@
                     "generation": "Generierung",
                     "comparison": "Vergleich",
                     "deployment": "Bereitstellung",
-                    "directoryCreated": "Verzeichnis erstellt",
-                    "directoryUpdated": "Verzeichnis aktualisiert",
-                    "directoryDeleted": "Verzeichnis gelöscht",
+                    "workCreated": "Werk erstellt",
+                    "workUpdated": "Werk aktualisiert",
+                    "workDeleted": "Werk gelöscht",
                     "pluginEnabled": "Plugin aktiviert",
                     "pluginDisabled": "Plugin deaktiviert",
                     "pluginConfigured": "Plugin konfiguriert",
@@ -596,32 +596,32 @@
                 "pageOf": "Seite {page} von {total}"
             }
         },
-        "directories": {
-            "title": "Verzeichnisse",
-            "subtitle": "Verwalten und organisieren Sie Ihre KI-gestützten Verzeichnisse",
+        "works": {
+            "title": "Werke",
+            "subtitle": "Verwalten und organisieren Sie Ihre KI-gestützten Werke",
             "summary": {
-                "totalDirectories": "Verzeichnisse gesamt",
+                "totalWorks": "Werke gesamt",
                 "generating": "Wird generiert",
                 "totalItems": "Elemente gesamt"
             },
-            "recent": "Letzte Verzeichnisse",
+            "recent": "Letzte Werke",
             "viewAll": "Alle anzeigen ({count})",
-            "search": "Verzeichnisse durchsuchen…",
-            "create": "Verzeichnis erstellen",
-            "showing": "{current} von {total} Verzeichnissen anzeigen",
-            "searchFailed": "Suche nach Verzeichnissen fehlgeschlagen. Bitte versuchen Sie es erneut.",
+            "search": "Werke durchsuchen…",
+            "create": "Werk erstellen",
+            "showing": "{current} von {total} Werken anzeigen",
+            "searchFailed": "Suche nach Werken fehlgeschlagen. Bitte versuchen Sie es erneut.",
             "pagination": {
                 "previous": "Vorherige",
                 "next": "Nächste"
             },
             "empty": {
-                "title": "Noch keine Verzeichnisse",
-                "description": "Erstellen Sie Ihr erstes KI-gestütztes Verzeichnis, um mit der Organisation und Präsentation Ihres Inhalts zu beginnen.",
-                "action": "Erstes Verzeichnis erstellen",
+                "title": "Noch keine Werke",
+                "description": "Erstellen Sie Ihr erstes KI-gestütztes Werk, um mit der Organisation und Präsentation Ihres Inhalts zu beginnen.",
+                "action": "Erstes Werk erstellen",
                 "notFound": {
-                    "title": "Keine Verzeichnisse gefunden",
+                    "title": "Keine Werke gefunden",
                     "withSearch": "Versuchen Sie, Ihre Suchbegriffe anzupassen",
-                    "withoutSearch": "Erstellen Sie Ihr erstes KI-gestütztes Verzeichnis, um loszulegen"
+                    "withoutSearch": "Erstellen Sie Ihr erstes KI-gestütztes Werk, um loszulegen"
                 }
             }
         },
@@ -638,7 +638,7 @@
             },
             "data": {
                 "exportTitle": "Daten exportieren",
-                "exportDescription": "Laden Sie Ihre Kontodaten inklusive Verzeichnisse, Plugin-Einstellungen und Profilinformationen als JSON-Datei herunter.",
+                "exportDescription": "Laden Sie Ihre Kontodaten inklusive Werke, Plugin-Einstellungen und Profilinformationen als JSON-Datei herunter.",
                 "includeSecrets": "Geheime Einstellungen (API-Schlüssel, Tokens) einbeziehen — als maskierte Werte exportiert",
                 "secretsWarning": "Geheime Einstellungen werden als maskierte Werte exportiert. Sie müssen sie manuell vor dem Importieren durch echte Anmeldeinformationen ersetzen.",
                 "exportButton": "Daten exportieren",
@@ -646,7 +646,7 @@
                 "exportSuccess": "Daten erfolgreich exportiert",
                 "exportError": "Fehler beim Exportieren der Daten",
                 "importTitle": "Daten importieren",
-                "importDescription": "Importieren Sie Daten aus einer zuvor exportierten JSON-Datei. Sie können Konflikte für Verzeichnisse mit übereinstimmenden Slugs auflösen.",
+                "importDescription": "Importieren Sie Daten aus einer zuvor exportierten JSON-Datei. Sie können Konflikte für Werke mit übereinstimmenden Slugs auflösen.",
                 "importButton": "Daten importieren",
                 "syncTitle": "GitHub-Synchronisation",
                 "syncDescription": "Synchronisieren Sie Ihre Konto-Konfiguration mit einem privaten GitHub-Repository für Backup und Migration zwischen Instanzen.",
@@ -658,13 +658,13 @@
                     "invalidJson": "Ungültige JSON-Datei",
                     "previewError": "Fehler beim Analysieren der Importdatei",
                     "summary": "Import-Zusammenfassung",
-                    "directories": "Verzeichnisse",
+                    "works": "Werke",
                     "items": "Einträge",
                     "userPlugins": "Benutzer-Plugins",
                     "version": "Formatversion",
                     "missingPlugins": "Diese Plugins sind nicht installiert und werden übersprungen",
                     "conflicts": "Slug-Konflikte",
-                    "existingDirectory": "Vorhanden",
+                    "existingWork": "Vorhanden",
                     "incoming": "Eingehend",
                     "strategySkip": "Überspringen (vorhandenes behalten)",
                     "strategyOverwrite": "Vorhandenes überschreiben",
@@ -681,9 +681,9 @@
                     "validationErrors": "Validierungsfehler",
                     "resultSuccess": "Import erfolgreich abgeschlossen",
                     "resultFailed": "Import fehlgeschlagen",
-                    "directoriesCreated": "Verzeichnisse erstellt",
-                    "directoriesUpdated": "Verzeichnisse aktualisiert",
-                    "directoriesSkipped": "Verzeichnisse übersprungen",
+                    "worksCreated": "Werke erstellt",
+                    "worksUpdated": "Werke aktualisiert",
+                    "worksSkipped": "Werke übersprungen",
                     "pluginsImported": "Plugins importiert",
                     "warnings": "Warnungen",
                     "errors": "Fehler"
@@ -732,11 +732,11 @@
                 "backToCategory": "Zurück zu {category}",
                 "pipelineDefault": {
                     "title": "Standard-Pipeline",
-                    "description": "Wählen Sie, welche Pipeline standardmäßig beim Generieren von Verzeichniseinträgen verwendet wird.",
+                    "description": "Wählen Sie, welche Pipeline standardmäßig beim Generieren von Werkeinträgen verwendet wird.",
                     "autoLabel": "Auto",
-                    "autoDescription": "Systemaufgelöste Pipeline für jedes Verzeichnis verwenden",
+                    "autoDescription": "Systemaufgelöste Pipeline für jedes Werk verwenden",
                     "enforceLabel": "Diesen Standard durchsetzen",
-                    "enforceDescription": "Diese Pipeline immer vorauswählen, auch wenn ein Verzeichnis eine eigene Pipeline konfiguriert hat. Sie können Pipelines weiterhin manuell im Formular wechseln.",
+                    "enforceDescription": "Diese Pipeline immer vorauswählen, auch wenn ein Werk eine eigene Pipeline konfiguriert hat. Sie können Pipelines weiterhin manuell im Formular wechseln.",
                     "saveFailed": "Fehler beim Speichern der Standard-Pipeline"
                 }
             },
@@ -819,8 +819,8 @@
                 "subtitle": "Verbinden Sie Ihre externen Konten für erweiterte Funktionalität",
                 "github": {
                     "name": "GitHub",
-                    "connected": "Verzeichnisse mit GitHub-Repositories erstellen und verwalten",
-                    "disconnected": "Verbinden, um Verzeichnisse aus Repositories zu erstellen",
+                    "connected": "Werke mit GitHub-Repositories erstellen und verwalten",
+                    "disconnected": "Verbinden, um Werke aus Repositories zu erstellen",
                     "scopes": "Berechtigungen",
                     "organizations": "Verbundene Organisationen",
                     "organizationsHint": "Verwenden Sie „Erneut verbinden“, um Zugriff auf zusätzliche Organisationen zu gewähren",
@@ -881,12 +881,12 @@
             }
         },
         "stats": {
-            "totalDirectories": "Insgesamt Verzeichnisse",
+            "totalWorks": "Insgesamt Werke",
             "totalItems": "Insgesamt Einträge",
             "activeWebsites": "Aktive Websites",
             "fromLastMonth": "vom letzten Monat"
         },
-        "directoryCard": {
+        "workCard": {
             "status": {
                 "active": "Aktiv",
                 "notStarted": "Nicht gestartet",
@@ -911,14 +911,14 @@
             "views": "{count} Ansichten",
             "updated": "Aktualisiert {date}",
             "viewAction": "Ansehen →",
-            "openingTitle": "Verzeichnis wird geöffnet",
-            "openingMessage": "Ihr Verzeichnis wird vorbereitet. Details öffnen sich bald. Bleiben Sie auf dieser Seite."
+            "openingTitle": "Werk wird geöffnet",
+            "openingMessage": "Ihr Werk wird vorbereitet. Details öffnen sich bald. Bleiben Sie auf dieser Seite."
         },
-        "directoryList": {
-            "title": "Ihre Verzeichnisse",
-            "createButton": "Verzeichnis erstellen"
+        "workList": {
+            "title": "Ihre Werke",
+            "createButton": "Werk erstellen"
         },
-        "directoryDetail": {
+        "workDetail": {
             "failedToGenerateItems": "Fehler beim Generieren der Elemente. Bitte versuchen Sie es erneut.",
             "generationCompleted": "Generierung erfolgreich abgeschlossen",
             "generationCancelled": "Generierung wurde abgebrochen",
@@ -953,7 +953,7 @@
             },
             "members": {
                 "title": "Teammitglieder",
-                "subtitle": "Verwalten Sie, wer Zugriff auf dieses Verzeichnis hat und deren Berechtigungen.",
+                "subtitle": "Verwalten Sie, wer Zugriff auf dieses Werk hat und deren Berechtigungen.",
                 "inviteMember": "Mitglied einladen",
                 "noMembers": "Noch keine Teammitglieder. Laden Sie jemanden zur Zusammenarbeit ein.",
                 "roles": {
@@ -965,13 +965,13 @@
                 },
                 "roleDescriptions": {
                     "owner": "Vollständige Kontrolle inklusive Löschung und Mitgliederverwaltung.",
-                    "manager": "Kann Verzeichnis bearbeiten und Mitglieder verwalten, aber nicht löschen.",
-                    "editor": "Kann Verzeichnisinhalt bearbeiten und Generierungen ausführen.",
-                    "viewer": "Schreibgeschützter Zugriff zum Anzeigen des Verzeichnisses."
+                    "manager": "Kann Werk bearbeiten und Mitglieder verwalten, aber nicht löschen.",
+                    "editor": "Kann Werkinhalt bearbeiten und Generierungen ausführen.",
+                    "viewer": "Schreibgeschützter Zugriff zum Anzeigen des Werks."
                 },
                 "invite": {
                     "title": "Teammitglied einladen",
-                    "description": "Fügen Sie ein neues Mitglied hinzu, um an diesem Verzeichnis zusammenzuarbeiten.",
+                    "description": "Fügen Sie ein neues Mitglied hinzu, um an diesem Werk zusammenzuarbeiten.",
                     "emailLabel": "E-Mail-Adresse",
                     "emailPlaceholder": "colleague@example.com",
                     "roleLabel": "Rolle",
@@ -985,7 +985,7 @@
                 },
                 "confirmRemove": {
                     "title": "Mitglied entfernen",
-                    "description": "Sind Sie sicher, dass Sie {username} aus diesem Verzeichnis entfernen möchten? Sie verlieren allen Zugriff.",
+                    "description": "Sind Sie sicher, dass Sie {username} aus diesem Werk entfernen möchten? Sie verlieren allen Zugriff.",
                     "confirm": "Entfernen",
                     "cancel": "Abbrechen"
                 },
@@ -1000,7 +1000,7 @@
                 "page": {
                     "title": "Geplante Updates",
                     "subtitle": "Automatisieren Sie Aktualisierungen für {name} mit einem dedizierten Intervall und Fehlerbehandlung.",
-                    "fallbackName": "dieses Verzeichnis",
+                    "fallbackName": "dieses Werk",
                     "loadFailed": "Fehler beim Laden der Zeitplaneinstellungen.",
                     "providerCategories": {
                         "pipeline": "Pipeline",
@@ -1101,7 +1101,7 @@
                     },
                     "empty": {
                         "title": "Zuerst eine manuelle Generierung ausführen",
-                        "description": "Schließen Sie einen erfolgreichen manuellen Lauf ab, um automatisches Scheduling freizuschalten. Sobald Ihr Verzeichnis Daten hat, halten wir es für Sie frisch.",
+                        "description": "Schließen Sie einen erfolgreichen manuellen Lauf ab, um automatisches Scheduling freizuschalten. Sobald Ihr Werk Daten hat, halten wir es für Sie frisch.",
                         "refresh": "Status aktualisieren"
                     },
                     "requiresGeneration": "Mindestens eine Elementgenerierung ausführen, bevor Zeitpläne aktiviert werden."
@@ -1119,7 +1119,7 @@
             "statusCard": {
                 "notStarted": {
                     "title": "Generierung nicht gestartet",
-                    "description": "Starten Sie die Generierung von Elementen für Ihr Verzeichnis, um es mit Inhalten zu füllen.",
+                    "description": "Starten Sie die Generierung von Elementen für Ihr Werk, um es mit Inhalten zu füllen.",
                     "action": "Generierung starten"
                 },
                 "generating": {
@@ -1133,7 +1133,7 @@
                 },
                 "generated": {
                     "title": "Generierung abgeschlossen",
-                    "description": "Ihr Verzeichnis wurde erfolgreich mit Elementen befüllt.",
+                    "description": "Ihr Werk wurde erfolgreich mit Elementen befüllt.",
                     "withWarnings": "Abgeschlossen mit Warnungen:",
                     "viewItems": "Elemente anzeigen",
                     "regenerate": "Neu generieren"
@@ -1159,7 +1159,7 @@
             },
             "comparisons": {
                 "title": "Vergleiche",
-                "subtitle": "A-gegen-B-Vergleichsseiten zwischen Verzeichniselementen",
+                "subtitle": "A-gegen-B-Vergleichsseiten zwischen Werkelementen",
                 "vs": "gegen",
                 "winner": "Gewinner: {name}",
                 "tie": "Unentschieden",
@@ -1307,7 +1307,7 @@
                 }
             },
             "info": {
-                "title": "Verzeichnisinformationen",
+                "title": "Werkinformationen",
                 "yourRole": "Ihre Rolle",
                 "role": {
                     "owner": "Eigentümer",
@@ -1357,15 +1357,15 @@
             "activity": {
                 "title": "Aktuelle Aktivität",
                 "noActivity": "Noch keine Aktivität",
-                "created": "Verzeichnis erstellt",
-                "directoryCreated": "Verzeichnis erfolgreich erstellt",
+                "created": "Werk erstellt",
+                "workCreated": "Werk erfolgreich erstellt",
                 "justNow": "Gerade eben"
             },
             "items": {
-                "title": "Verzeichniseinträge",
-                "subtitle": "Verwalten und organisieren Sie die Einträge in Ihrem Verzeichnis",
+                "title": "Werkeinträge",
+                "subtitle": "Verwalten und organisieren Sie die Einträge in Ihrem Werk",
                 "noItemsTitle": "Noch keine Einträge",
-                "noItemsDescription": "Ihr Verzeichnis enthält noch keine Einträge. Generieren Sie Einträge, um Ihr Verzeichnis mit Inhalten zu füllen.",
+                "noItemsDescription": "Ihr Werk enthält noch keine Einträge. Generieren Sie Einträge, um Ihr Werk mit Inhalten zu füllen.",
                 "generateItems": "Einträge generieren",
                 "searchPlaceholder": "Einträge suchen…",
                 "allCategories": "Alle Kategorien",
@@ -1427,14 +1427,14 @@
                     "screenshotFailed": "Screenshot konnte nicht aufgenommen werden",
                     "screenshotError": "Beim Aufnehmen des Screenshots ist ein Fehler aufgetreten",
                     "featured": "Empfohlener Eintrag",
-                    "featuredHelp": "Diesen Eintrag als empfohlen im Verzeichnis markieren",
+                    "featuredHelp": "Diesen Eintrag als empfohlen im Werk markieren",
                     "updateWithPR": "Pull Request erstellen",
                     "updateWithPRHelp": "Änderungen als Pull Request einreichen statt direkt committen",
                     "cancel": "Abbrechen",
                     "adding": "Wird hinzugefügt…",
                     "addItem": "Eintrag hinzufügen",
                     "success": "Eintrag erfolgreich hinzugefügt",
-                    "successDescription": "Der Eintrag wurde zu Ihrem Verzeichnis hinzugefügt",
+                    "successDescription": "Der Eintrag wurde zu Ihrem Werk hinzugefügt",
                     "failed": "Eintrag konnte nicht hinzugefügt werden",
                     "error": "Beim Hinzufügen des Eintrags ist ein Fehler aufgetreten",
                     "errors": {
@@ -1653,7 +1653,7 @@
                     "navigationLabel": "Generator-Registerkarten"
                 },
                 "regenerationWarning": "Regenerierungswarnung",
-                "regenerationWarningDescription": "Dieses Verzeichnis wurde bereits generiert. Das Starten einer neuen Generierung ersetzt bestehende Elemente.",
+                "regenerationWarningDescription": "Dieses Werk wurde bereits generiert. Das Starten einer neuen Generierung ersetzt bestehende Elemente.",
                 "requiredInfo": "Erforderliche Informationen",
                 "updateConfiguration": "Konfiguration aktualisieren",
                 "promptRequired": "Prompt ist erforderlich",
@@ -1663,7 +1663,7 @@
                 "loadingFormSchema": "Lade Formular-Konfiguration…",
                 "failedToLoadFormSchema": "Fehler beim Laden der Formular-Konfiguration",
                 "selectOption": "Option auswählen",
-                "directoryName": "Ordnername",
+                "workName": "Ordnername",
                 "generationPrompt": "Generierungs-Prompt",
                 "modelOverride": "KI-Modell überschreiben",
                 "modelOverridePlaceholder": "z. B. openai/gpt-4.1 oder openrouter/openai/gpt-4.1",
@@ -1676,7 +1676,7 @@
                 "startGeneration": "Generierung starten",
                 "regenerateItems": "Elemente neu generieren",
                 "updateItems": "Generierung ausführen",
-                "recreateDirectory": "Ordner neu erstellen",
+                "recreateWork": "Ordner neu erstellen",
                 "showAdvancedOptions": "Erweiterte Optionen anzeigen",
                 "hideAdvancedOptions": "Erweiterte Optionen ausblenden",
                 "cancel": "Abbrechen",
@@ -1714,7 +1714,7 @@
                 "websiteRepositoryCreationMethod": "Website-Repository-Erstellungsmethode",
                 "methodDuplicate": "Duplizieren",
                 "methodFork": "Fork",
-                "directoryNamePlaceholder": "Ordnername eingeben",
+                "workNamePlaceholder": "Ordnername eingeben",
                 "methodCreateFromTemplate": "Aus Vorlage erstellen",
                 "aiProcessingConfiguration": "AI-Verarbeitungskonfiguration",
                 "maxSearchQueries": "Max. Suchanfragen",
@@ -1769,7 +1769,7 @@
                 "aiProviderDescription": "AI-Modell-Provider für Inhaltsgenerierung und -extraktion",
                 "contentExtractorProvider": "Inhalts-Extraktor",
                 "contentExtractorProviderDescription": "Provider zum Extrahieren von Inhalt aus Webseiten",
-                "useDirectoryDefault": "Ordner-Standard verwenden",
+                "useWorkDefault": "Ordner-Standard verwenden",
                 "default": "Standard",
                 "notConfigured": "Nicht konfiguriert",
                 "notConfiguredTooltip": "Dieser Provider erfordert Konfiguration. Besuchen Sie Einstellungen → Plugins, um ihn einzurichten.",
@@ -1837,7 +1837,7 @@
                 },
                 "generalSettings": "Allgemeine Einstellungen",
                 "generalTitle": "Allgemeine Einstellungen",
-                "directoryName": "Verzeichnisname",
+                "workName": "Werkname",
                 "description": "Beschreibung",
                 "organizationRepository": "Organisations-Repository",
                 "organizationHelp": "Repositories unter einer Organisation anstelle Ihres persönlichen Kontos erstellen",
@@ -1849,13 +1849,13 @@
                 "customHeaderPlaceholder": "Benutzerdefinierten Inhalt zum README-Header hinzufügen",
                 "overwriteDefaultHeader": "Standard-Header überschreiben",
                 "customFooter": "Benutzerdefinierter Footer",
-                "cantDeleteWhileGenerating": "Verzeichnis kann während der Generierung von Elementen nicht gelöscht werden.",
+                "cantDeleteWhileGenerating": "Werk kann während der Generierung von Elementen nicht gelöscht werden.",
                 "customFooterPlaceholder": "Benutzerdefinierten Inhalt zum README-Footer hinzufügen",
                 "overwriteDefaultFooter": "Standard-Footer überschreiben",
                 "dangerZone": "Gefahrenzone",
                 "dangerTitle": "Gefahrenzone",
-                "deleteWarning": "Sobald Sie ein Verzeichnis löschen, gibt es kein Zurück. Bitte seien Sie sicher.",
-                "dangerDescription": "Sobald Sie ein Verzeichnis löschen, gibt es kein Zurück. Bitte seien Sie sicher.",
+                "deleteWarning": "Sobald Sie ein Werk löschen, gibt es kein Zurück. Bitte seien Sie sicher.",
+                "dangerDescription": "Sobald Sie ein Werk löschen, gibt es kein Zurück. Bitte seien Sie sicher.",
                 "deleteOptions": "Wählen Sie aus, was gelöscht werden soll:",
                 "deleteDataRepository": "Datenspeicher-Repository löschen",
                 "deleteDataRepositoryDescription": "Das JSON-Daten-Repository von GitHub entfernen",
@@ -1864,14 +1864,14 @@
                 "deleteWebsiteRepository": "Website-Repository löschen",
                 "deleteWebsiteRepositoryDescription": "Das bereitgestellte Website-Repository entfernen",
                 "deleteConfirm": "Sind Sie absolut sicher?",
-                "deleteConfirmDetail": "Diese Aktion kann nicht rückgängig gemacht werden. Das Verzeichnis und die ausgewählten Repositories werden dauerhaft gelöscht.",
-                "confirmDirectoryName": "Verzeichnisname zur Bestätigung eingeben",
-                "confirmDirectoryNameDescription": "Geben Sie \"{name}\" ein, um die Löschung zu bestätigen",
-                "deleteNameMismatch": "Verzeichnisname stimmt nicht überein",
-                "deleteButton": "Verzeichnis löschen",
+                "deleteConfirmDetail": "Diese Aktion kann nicht rückgängig gemacht werden. Das Werk und die ausgewählten Repositories werden dauerhaft gelöscht.",
+                "confirmWorkName": "Werkname zur Bestätigung eingeben",
+                "confirmWorkNameDescription": "Geben Sie \"{name}\" ein, um die Löschung zu bestätigen",
+                "deleteNameMismatch": "Werkname stimmt nicht überein",
+                "deleteButton": "Werk löschen",
                 "deleteConfirmButton": "Ja, löschen",
-                "deleteSuccess": "Verzeichnis erfolgreich gelöscht",
-                "deleteFailed": "Fehler beim Löschen des Verzeichnisses",
+                "deleteSuccess": "Werk erfolgreich gelöscht",
+                "deleteFailed": "Fehler beim Löschen des Werks",
                 "yesDelete": "Ja, löschen",
                 "cancel": "Abbrechen",
                 "saveChanges": "Änderungen speichern",
@@ -1880,7 +1880,7 @@
                 "updateFailed": "Fehler beim Aktualisieren der Einstellungen",
                 "deployProvider": {
                     "title": "Bereitsteller",
-                    "description": "Wählen Sie aus, wo Ihre Verzeichnis-Website bereitgestellt werden soll",
+                    "description": "Wählen Sie aus, wo Ihre Werk-Website bereitgestellt werden soll",
                     "configure": "Konfigurieren",
                     "ready": "Bereit zur Bereitstellung",
                     "notConfigured": "Nicht konfiguriert",
@@ -1917,7 +1917,7 @@
                     "prompts": {
                         "relevanceAssessment": {
                             "title": "Relevanzbewertung",
-                            "description": "Zusätzliche Anweisungen zum Filtern von Webseiten nach Relevanz für Ihr Verzeichnisthema.",
+                            "description": "Zusätzliche Anweisungen zum Filtern von Webseiten nach Relevanz für Ihr Werkthema.",
                             "placeholder": "z. B. Nur Seiten einbeziehen, die sich auf Open-Source-Projekte konzentrieren..."
                         },
                         "itemGeneration": {
@@ -1968,7 +1968,7 @@
                 "communityPrUpdateFailed": "Fehler beim Aktualisieren der Community-PR-Einstellungen",
                 "websiteConfig": {
                     "title": "Website-Konfiguration",
-                    "subtitle": "Passen Sie das Aussehen und Verhalten Ihrer Verzeichnis-Website an",
+                    "subtitle": "Passen Sie das Aussehen und Verhalten Ihrer Werk-Website an",
                     "loadFailed": "Fehler beim Laden der Website-Einstellungen",
                     "saveSuccess": "Website-Einstellungen erfolgreich gespeichert",
                     "saveFailed": "Fehler beim Speichern der Website-Einstellungen",
@@ -1983,13 +1983,13 @@
                         "siteName": {
                             "title": "Website-Identität",
                             "label": "Website-Name",
-                            "placeholder": "Mein Verzeichnis",
+                            "placeholder": "Mein Werk",
                             "helper": "Der Name, der im Website-Header und im Browser-Tab angezeigt wird"
                         },
                         "siteUrl": {
                             "label": "Website-URL",
                             "placeholder": "https://example.com",
-                            "helper": "Die URL Ihrer Firmen- oder Verzeichnis-Website"
+                            "helper": "Die URL Ihrer Firmen- oder Werk-Website"
                         },
                         "global": {
                             "title": "Globale Funktionen",
@@ -2071,7 +2071,7 @@
                 },
                 "committer": {
                     "title": "Git-Committer",
-                    "description": "Überschreiben Sie den Committer-Namen und -E-Mail für Git-Commits in diesem Verzeichnis. Leer lassen, um Benutzerebene-Einstellungen oder Konto-Standards zu verwenden.",
+                    "description": "Überschreiben Sie den Committer-Namen und -E-Mail für Git-Commits in diesem Werk. Leer lassen, um Benutzerebene-Einstellungen oder Konto-Standards zu verwenden.",
                     "nameLabel": "Committer-Name",
                     "emailLabel": "Committer-E-Mail",
                     "save": "Committer speichern",
@@ -2082,13 +2082,13 @@
             "deploy": {
                 "noProviderAlert": {
                     "title": "Kein Bereitstellungsanbieter",
-                    "description": "Wählen Sie einen Bereitstellungsanbieter aus, um Ihre Verzeichnis-Website bereitzustellen.",
+                    "description": "Wählen Sie einen Bereitstellungsanbieter aus, um Ihre Werk-Website bereitzustellen.",
                     "selectButton": "Auswählen & Fortfahren",
                     "noProviders": "Keine Bereitstellungsanbieter verfügbar. Installieren Sie zuerst ein Bereitstellungs-Plugin."
                 },
                 "noTokenAlert": {
                     "title": "{provider} Token erforderlich",
-                    "description": "Um Ihr Verzeichnis bereitzustellen, müssen Sie Ihr {provider}-API-Token in den Plugin-Einstellungen konfigurieren.",
+                    "description": "Um Ihr Werk bereitzustellen, müssen Sie Ihr {provider}-API-Token in den Plugin-Einstellungen konfigurieren.",
                     "configureButton": "In Plugin-Einstellungen konfigurieren",
                     "getTokenButton": "API-Token abrufen",
                     "howTo": {
@@ -2096,25 +2096,25 @@
                         "step1": "Klicken Sie auf 'API-Token abrufen', um Ihr Provider-Dashboard zu öffnen",
                         "step2": "Erstellen Sie ein neues Token mit Bereitstellungs-Berechtigungen",
                         "step3": "Konfigurieren Sie Ihr {provider}-API-Token in Plugin-Einstellungen > {provider}",
-                        "step4": "Kehren Sie hierher zurück, um Ihr Verzeichnis bereitzustellen"
+                        "step4": "Kehren Sie hierher zurück, um Ihr Werk bereitzustellen"
                     }
                 },
                 "sharedNoTokenAlert": {
                     "title": "Bereitstellung nicht verfügbar",
-                    "description": "Der Verzeichnisbesitzer hat die Bereitstellung nicht konfiguriert. Bitte kontaktieren Sie den Verzeichnisbesitzer, um die Bereitstellung einzurichten.",
+                    "description": "Der Werkbesitzer hat die Bereitstellung nicht konfiguriert. Bitte kontaktieren Sie den Werkbesitzer, um die Bereitstellung einzurichten.",
                     "hint": "Als Kollaborateur können Sie Bereitstellungen auslösen, sobald der Besitzer seinen Bereitstellungsanbieter konfiguriert hat."
                 },
                 "form": {
                     "deployment": {
                         "title": "Website bereitstellen",
-                        "description": "Stellen Sie Ihr Verzeichnis-Website-Repository bereit.",
+                        "description": "Stellen Sie Ihr Werk-Website-Repository bereit.",
                         "deployButton": "Zu {provider} bereitstellen",
                         "deployingButton": "Wird bereitgestellt…",
                         "deployingStateButton": "Wird bereitgestellt ({state})…",
                         "successMessage": "Ihre Website wurde erfolgreich bereitgestellt!",
                         "teamSelection": {
                             "title": "Team auswählen",
-                            "description": "Wählen Sie das Team aus, zu dem dieses Verzeichnis bereitgestellt werden soll.",
+                            "description": "Wählen Sie das Team aus, zu dem dieses Werk bereitgestellt werden soll.",
                             "label": "Team",
                             "placeholder": "Team auswählen",
                             "confirmButton": "Zu Team bereitstellen",
@@ -2141,7 +2141,7 @@
                     },
                     "info": {
                         "deployInfo": "Die Bereitstellung dauert in der Regel 1-3 Minuten. Sie erhalten eine URL, sobald sie abgeschlossen ist.",
-                        "updateInfo": "Updates synchronisieren den Inhalt Ihres Verzeichnisses mit dem Website-Repository für die nächste Bereitstellung."
+                        "updateInfo": "Updates synchronisieren den Inhalt Ihres Werks mit dem Website-Repository für die nächste Bereitstellung."
                     },
                     "websiteTemplate": {
                         "title": "Automatische Template-Updates",
@@ -2161,7 +2161,7 @@
                         "title": "Vor der Bereitstellung konfigurieren",
                         "description": "Überprüfen und passen Sie Ihre Website-Einstellungen vor der Bereitstellung an",
                         "siteName": "Website-Name",
-                        "siteNamePlaceholder": "Mein Verzeichnis",
+                        "siteNamePlaceholder": "Mein Werk",
                         "siteNameHelper": "Der Name, der auf Ihrer Website angezeigt wird (Standard: Acme)",
                         "tabGeneral": "Allgemein",
                         "tabHeader": "Header",
@@ -2208,9 +2208,9 @@
                 }
             }
         },
-        "directoryCreation": {
-            "title": "Neues Verzeichnis erstellen",
-            "subtitle": "Wählen Sie aus, wie Sie Ihr Verzeichnis erstellen möchten",
+        "workCreation": {
+            "title": "Neues Werk erstellen",
+            "subtitle": "Wählen Sie aus, wie Sie Ihr Werk erstellen möchten",
             "backToOptions": "Zurück zu den Optionen",
             "sidebar": {
                 "selectedProvider": "Git-Anbieter",
@@ -2218,7 +2218,7 @@
             },
             "deployProvider": {
                 "title": "Deploy-Anbieter",
-                "description": "Wählen Sie aus, wo Ihre Verzeichnis-Website bereitgestellt werden soll",
+                "description": "Wählen Sie aus, wo Ihre Werk-Website bereitgestellt werden soll",
                 "noProviders": "Keine Deploy-Anbieter verfügbar",
                 "notConfigured": "Nicht konfiguriert",
                 "configured": "Bereit zum Bereitstellen",
@@ -2236,21 +2236,21 @@
             },
             "ai": {
                 "title": "Mit KI erstellen",
-                "subtitle": "Beschreiben Sie Ihre Verzeichnis-Idee in natürlicher Sprache und lassen Sie KI den Setup übernehmen",
+                "subtitle": "Beschreiben Sie Ihre Werk-Idee in natürlicher Sprache und lassen Sie KI den Setup übernehmen",
                 "getStarted": "Loslegen",
-                "formTitle": "Verzeichnis mit KI erstellen",
-                "formSubtitle": "Beschreiben Sie Ihre Verzeichnis-Idee und lassen Sie KI den Setup und die anfängliche Inhaltserstellung übernehmen",
-                "directoryNameLabel": "Verzeichnisname",
-                "directoryNamePlaceholder": "z. B. Awesome AI Tools",
-                "directoryNameHelp": "KI schlägt einen Namen vor, wenn Sie dies leer lassen",
-                "promptLabel": "Beschreiben Sie Ihr Verzeichnis",
+                "formTitle": "Werk mit KI erstellen",
+                "formSubtitle": "Beschreiben Sie Ihre Werk-Idee und lassen Sie KI den Setup und die anfängliche Inhaltserstellung übernehmen",
+                "workNameLabel": "Werkname",
+                "workNamePlaceholder": "z. B. Awesome AI Tools",
+                "workNameHelp": "KI schlägt einen Namen vor, wenn Sie dies leer lassen",
+                "promptLabel": "Beschreiben Sie Ihr Werk",
                 "githubRequired": "Bitte verbinden Sie zuerst Ihr GitHub-Konto.",
-                "promptPlaceholder": "Beschreiben Sie, welches Verzeichnis Sie erstellen möchten, welche Einträge es enthalten soll und spezifische Anforderungen…",
+                "promptPlaceholder": "Beschreiben Sie, welches Werk Sie erstellen möchten, welche Einträge es enthalten soll und spezifische Anforderungen…",
                 "inspirationText": "Brauchen Sie Inspiration? Probieren Sie eines davon aus:",
                 "examplePrompts": {
                     "0": {
                         "name": "KI-Entwicklertools",
-                        "prompt": "Erstellen Sie ein Verzeichnis der besten KI-Tools für Entwickler"
+                        "prompt": "Erstellen Sie ein Werk der besten KI-Tools für Entwickler"
                     },
                     "1": {
                         "name": "React-Komponenten-Hub",
@@ -2258,7 +2258,7 @@
                     },
                     "2": {
                         "name": "Tools für Remote-Teams",
-                        "prompt": "Generieren Sie ein Verzeichnis von Produktivitäts-Apps für Remote-Teams"
+                        "prompt": "Generieren Sie ein Werk von Produktivitäts-Apps für Remote-Teams"
                     },
                     "3": {
                         "name": "Nachhaltige Mode",
@@ -2273,23 +2273,23 @@
                     "3": "GitHub-Repository mit ordnungsgemäßer Dokumentation einrichten"
                 },
                 "generateButton": "Mit KI generieren",
-                "generatingButton": "Verzeichnis wird generiert…",
+                "generatingButton": "Werk wird generiert…",
                 "cancelButton": "Abbrechen",
                 "noteTitle": "Hinweis:",
-                "noteText": "KI-Generierung dauert normalerweise 2-5 Minuten, abhängig von der Komplexität Ihrer Anfrage. Sie werden benachrichtigt, wenn Ihr Verzeichnis bereit ist.",
+                "noteText": "KI-Generierung dauert normalerweise 2-5 Minuten, abhängig von der Komplexität Ihrer Anfrage. Sie werden benachrichtigt, wenn Ihr Werk bereit ist.",
                 "errors": {
-                    "promptRequired": "Bitte beschreiben Sie, welches Verzeichnis Sie erstellen möchten",
+                    "promptRequired": "Bitte beschreiben Sie, welches Werk Sie erstellen möchten",
                     "unconfiguredProviders": "{providers} nicht konfiguriert. Besuchen Sie Einstellungen → Plugins, um es vor der Generierung einzurichten.",
-                    "nameRequired": "Verzeichnisname ist erforderlich",
-                    "slugRequired": "Verzeichnisslug ist erforderlich",
-                    "descriptionRequired": "Verzeichnisbeschreibung ist erforderlich",
+                    "nameRequired": "Werkname ist erforderlich",
+                    "slugRequired": "Werkslug ist erforderlich",
+                    "descriptionRequired": "Werkbeschreibung ist erforderlich",
                     "githubRequired": "Bitte verbinden Sie zuerst Ihr GitHub-Konto.",
-                    "createFailed": "Fehler beim Erstellen des Verzeichnisses"
+                    "createFailed": "Fehler beim Erstellen des Werks"
                 },
                 "success": {
-                    "started": "Verzeichniserstellung gestartet!",
+                    "started": "Werkerstellung gestartet!",
                     "generating": "KI generiert Inhalt. Dies kann ein paar Minuten dauern…",
-                    "created": "Verzeichnis erfolgreich erstellt!"
+                    "created": "Werk erfolgreich erstellt!"
                 },
                 "advancedSettings": "Erweiterte Einstellungen",
                 "advancedSubtitle": "Organisation und Repository-Einstellungen konfigurieren",
@@ -2300,14 +2300,14 @@
             },
             "manual": {
                 "title": "Manuell erstellen",
-                "subtitle": "Konfigurieren Sie Ihr Verzeichnis mit voller Kontrolle über jede Einstellung und Option",
+                "subtitle": "Konfigurieren Sie Ihr Werk mit voller Kontrolle über jede Einstellung und Option",
                 "configureNow": "Jetzt konfigurieren",
-                "formTitle": "Verzeichnis manuell erstellen",
-                "formSubtitle": "Konfigurieren Sie Ihr Verzeichnis mit voller Kontrolle über jede Einstellung",
+                "formTitle": "Werk manuell erstellen",
+                "formSubtitle": "Konfigurieren Sie Ihr Werk mit voller Kontrolle über jede Einstellung",
                 "basicInfo": "Grundlegende Informationen",
-                "nameLabel": "Verzeichnisname *",
+                "nameLabel": "Werkname *",
                 "namePlaceholder": "z. B. Awesome AI Tools",
-                "slugLabel": "Verzeichnisslug *",
+                "slugLabel": "Werkslug *",
                 "slugPlaceholder": "awesome-ai-tools",
                 "githubRequired": "Bitte verbinden Sie zuerst Ihr GitHub-Konto.",
                 "slugHelp": "URL-freundlicher Bezeichner (nur Kleinbuchstaben, Zahlen und Bindestriche)",
@@ -2316,7 +2316,7 @@
                 "advancedSettings": "Erweiterte Einstellungen",
                 "advancedSubtitle": "Organisation, benutzerdefinierte Header und mehr",
                 "organizationLabel": "Unter Organisation erstellen",
-                "organizationHelp": "Dieses Verzeichnis unter einer GitHub-Organisation statt Ihrem persönlichen Konto erstellen",
+                "organizationHelp": "Dieses Werk unter einer GitHub-Organisation statt Ihrem persönlichen Konto erstellen",
                 "organizationNameLabel": "Organisationsname",
                 "organizationNamePlaceholder": "my-organization",
                 "headerLabel": "Benutzerdefinierter README-Header",
@@ -2325,25 +2325,25 @@
                 "footerLabel": "Benutzerdefinierter README-Footer",
                 "footerPlaceholder": "Benutzerdefinierten Inhalt unten in Ihre README-Datei hinzufügen",
                 "footerOverwrite": "Standard-Footer vollständig ersetzen",
-                "createButton": "Verzeichnis erstellen",
-                "creatingButton": "Verzeichnis wird erstellt…",
+                "createButton": "Werk erstellen",
+                "creatingButton": "Werk wird erstellt…",
                 "cancelButton": "Abbrechen",
-                "nameRequired": "Verzeichnisname ist erforderlich",
-                "slugRequired": "Verzeichnisslug ist erforderlich",
-                "descriptionRequired": "Verzeichnisbeschreibung ist erforderlich",
-                "createFailed": "Fehler beim Erstellen des Verzeichnisses",
+                "nameRequired": "Werkname ist erforderlich",
+                "slugRequired": "Werkslug ist erforderlich",
+                "descriptionRequired": "Werkbeschreibung ist erforderlich",
+                "createFailed": "Fehler beim Erstellen des Werks",
                 "success": {
-                    "created": "Verzeichnis erfolgreich erstellt!"
+                    "created": "Werk erfolgreich erstellt!"
                 }
             },
             "import": {
                 "title": "Vorhandenes importieren",
-                "subtitle": "Ein Verzeichnis aus einem vorhandenen GitHub-Repository importieren",
+                "subtitle": "Ein Werk aus einem vorhandenen GitHub-Repository importieren",
                 "importNow": "Jetzt importieren",
                 "aiProviderSettings": "KI-Anbieter",
                 "aiProviderSettingsDescription": "Wählen Sie den KI-Anbieter für das Parsen der README aus",
-                "formTitle": "Verzeichnis von GitHub importieren",
-                "formSubtitle": "Einträge aus einem vorhandenen GitHub-Repository importieren, um Ihr Verzeichnis zu erstellen",
+                "formTitle": "Werk von GitHub importieren",
+                "formSubtitle": "Einträge aus einem vorhandenen GitHub-Repository importieren, um Ihr Werk zu erstellen",
                 "sync": {
                     "title": "Synchron halten",
                     "description": "Automatisch Updates aus dem Quell-Repository ziehen."
@@ -2396,13 +2396,13 @@
                     "schedule": "Zeitplan: {cadence}",
                     "providers": "Anbieter: {providers}"
                 },
-                "nameLabel": "Verzeichnisname",
+                "nameLabel": "Werkname",
                 "namePlaceholder": "z. B. Mein Awesome Directory",
                 "advancedSettings": "Erweiterte Einstellungen",
                 "advancedSubtitle": "Organisation und Repository-Einstellungen konfigurieren",
                 "attribution": {
                     "title": "Quellenangabe:",
-                    "text": "Dieses Verzeichnis wird {url} als Quelle referenzieren"
+                    "text": "Dieses Werk wird {url} als Quelle referenzieren"
                 },
                 "research": {
                     "title": "Import- & Research-Modus",
@@ -2425,13 +2425,13 @@
                     "importingButton": "Research-Pipeline wird gestartet…"
                 },
                 "analyzeButton": "Repository analysieren",
-                "importButton": "Verzeichnis importieren",
+                "importButton": "Werk importieren",
                 "importingButton": "Wird importiert…",
                 "backButton": "Zurück",
                 "cancelButton": "Abbrechen",
                 "importing": {
-                    "title": "Verzeichnis wird importiert",
-                    "subtitle": "Richte Ihr Verzeichnis aus dem Quell-Repository ein…"
+                    "title": "Werk wird importiert",
+                    "subtitle": "Richte Ihr Werk aus dem Quell-Repository ein…"
                 },
                 "repositorySelector": {
                     "title": "Repository auswählen",
@@ -2498,17 +2498,17 @@
                     "unsupportedFormat": "Dieses Repository-Format wird nicht unterstützt. Bitte verwenden Sie Data-Repository oder Awesome List-Format.",
                     "analyzeFailed": "Fehler beim Analysieren des Repositories",
                     "analyzeForLinkingFailed": "Fehler beim Analysieren für Verknüpfung",
-                    "nameRequired": "Verzeichnisname ist erforderlich",
+                    "nameRequired": "Werkname ist erforderlich",
                     "noAnalysis": "Bitte analysieren Sie zuerst ein Repository",
                     "githubRequired": "Bitte verbinden Sie zuerst Ihr GitHub-Konto",
                     "providerRequired": "Bitte wählen Sie zuerst einen Git-Provider aus",
-                    "importFailed": "Fehler beim Importieren des Verzeichnisses",
-                    "linkFailed": "Fehler beim Verknüpfen des Verzeichnisses",
+                    "importFailed": "Fehler beim Importieren des Werks",
+                    "linkFailed": "Fehler beim Verknüpfen des Werks",
                     "providerNotConfigured": "{provider} ist nicht konfiguriert. Besuchen Sie Einstellungen → Plugins, um es vor dem Import einzurichten."
                 },
                 "success": {
-                    "started": "Import gestartet! Weiterleitung zu Ihrem Verzeichnis…",
-                    "linked": "Verzeichnis erfolgreich verknüpft"
+                    "started": "Import gestartet! Weiterleitung zu Ihrem Werk…",
+                    "linked": "Werk erfolgreich verknüpft"
                 },
                 "slugConflict": {
                     "title": "Repository-Namenskonflikt",
@@ -2521,7 +2521,7 @@
             "connection": {
                 "alert": {
                     "title": "{provider} nicht verbunden",
-                    "subtitle": "Verbinden Sie Ihr {provider}-Konto, um Verzeichnisse zu erstellen",
+                    "subtitle": "Verbinden Sie Ihr {provider}-Konto, um Werke zu erstellen",
                     "connectButton": "{provider} verbinden",
                     "connectingButton": "Verbinde..."
                 }
@@ -2537,7 +2537,7 @@
             },
             "settings": {
                 "title": "Git-Provider-Verbindungen",
-                "subtitle": "Verbinden Sie Ihre Git-Provider-Konten, um Repositories zu importieren, Verzeichnisse zu erstellen und Ihre Projekte zu verwalten.",
+                "subtitle": "Verbinden Sie Ihre Git-Provider-Konten, um Repositories zu importieren, Werke zu erstellen und Ihre Projekte zu verwalten.",
                 "connectedCount": "{count, plural, =0 {Keine Provider verbunden} =1 {1 Provider verbunden} other {# Provider verbunden}}",
                 "noProvidersConnected": "Keine Provider verbunden",
                 "canImport": "Sie können Repositories importieren und verwalten",
@@ -2568,7 +2568,7 @@
                 "subtitle": "Konfigurieren Sie Deployment-Provider in den Plugin-Einstellungen",
                 "connected": "Verbunden",
                 "notConnected": "Nicht verbunden",
-                "connectedMessage": "Ihr Deployment-Provider ist konfiguriert. Sie können jetzt Verzeichnisse bereitstellen.",
+                "connectedMessage": "Ihr Deployment-Provider ist konfiguriert. Sie können jetzt Werke bereitstellen.",
                 "disconnect": "Trennen",
                 "disconnecting": "Entferne...",
                 "apiTokenLabel": "API-Token",
@@ -2604,17 +2604,17 @@
             "subtitle": "Wählen Sie aus, wie Sie über wichtige Updates benachrichtigt werden möchten",
             "email": {
                 "title": "E-Mail-Benachrichtigungen",
-                "directoryUpdates": {
-                    "label": "Verzeichnis-Updates",
-                    "description": "Erhalten Sie Benachrichtigungen über wichtige Updates Ihrer Verzeichnisse"
+                "workUpdates": {
+                    "label": "Werk-Updates",
+                    "description": "Erhalten Sie Benachrichtigungen über wichtige Updates Ihrer Werke"
                 },
                 "newItems": {
                     "label": "Neue Elemente",
-                    "description": "Erhalten Sie Benachrichtigungen, wenn neue Elemente zu Ihren Verzeichnissen hinzugefügt werden"
+                    "description": "Erhalten Sie Benachrichtigungen, wenn neue Elemente zu Ihren Werken hinzugefügt werden"
                 },
                 "weeklyDigest": {
                     "label": "Wöchentliche Übersicht",
-                    "description": "Erhalten Sie eine wöchentliche Zusammenfassung Ihrer Verzeichnis-Aktivitäten"
+                    "description": "Erhalten Sie eine wöchentliche Zusammenfassung Ihrer Werk-Aktivitäten"
                 },
                 "marketing": {
                     "label": "Marketing & Promotionen",
@@ -2625,11 +2625,11 @@
                 "title": "In-App-Benachrichtigungen",
                 "newItems": {
                     "label": "Neue Elemente",
-                    "description": "Zeigen Sie Benachrichtigungen für neue Verzeichniselemente"
+                    "description": "Zeigen Sie Benachrichtigungen für neue Werkelemente"
                 },
                 "comments": {
                     "label": "Kommentare",
-                    "description": "Erhalten Sie Benachrichtigungen über Kommentare zu Ihren Verzeichnissen"
+                    "description": "Erhalten Sie Benachrichtigungen über Kommentare zu Ihren Werken"
                 },
                 "mentions": {
                     "label": "Erwähnungen",
@@ -2653,12 +2653,12 @@
         "sidebar": {
             "menu": "Menü",
             "aiChat": "AI-Chat",
-            "newDirectory": "Neues Verzeichnis",
-            "activityIndicator": "Verzeichnis wird generiert",
+            "newWork": "Neues Werk",
+            "activityIndicator": "Werk wird generiert",
             "navigation": {
                 "dashboard": "Dashboard",
                 "activity": "Aktivität",
-                "directories": "Verzeichnisse",
+                "works": "Werke",
                 "plugins": "Plugins",
                 "settings": "Einstellungen"
             },
@@ -2680,7 +2680,7 @@
             "subtitle": "Unwiderrufliche und destruktive Aktionen",
             "export": {
                 "title": "Ihre Daten exportieren",
-                "subtitle": "Laden Sie all Ihre Verzeichnisse, Elemente und Einstellungen herunter",
+                "subtitle": "Laden Sie all Ihre Werke, Elemente und Einstellungen herunter",
                 "action": "Daten exportieren (Bald verfügbar)"
             },
             "delete": {
@@ -2690,8 +2690,8 @@
                 "confirmTitle": "⚠️ Dies löscht dauerhaft:",
                 "confirmItems": [
                     "Ihr Konto und Profil",
-                    "Alle Ihre Verzeichnisse",
-                    "Alle Verzeichniselemente und Daten",
+                    "Alle Ihre Werke",
+                    "Alle Werkelemente und Daten",
                     "API-Schlüssel und Integrationen",
                     "Alle zugehörigen Websites"
                 ],
@@ -2711,13 +2711,13 @@
         "aiChat": {
             "title": "AI-Assistent",
             "panelTitle": "Chat",
-            "subtitle": "Verzeichnisse mit natürlicher Sprache erstellen",
+            "subtitle": "Werke mit natürlicher Sprache erstellen",
             "welcomeTitle": "Willkommen beim AI-Assistenten 👋",
-            "welcomeSubtitle": "Ihr KI-gestützter Assistent. Fragen Sie mich alles über das Erstellen von Verzeichnissen, Generieren von Inhalten oder Organisieren Ihrer Daten.",
-            "welcomeMessage": "Hallo! Ich kann Ihnen helfen, Verzeichnisse mit natürlicher Sprache zu erstellen. Fragen Sie z. B. „Erstelle ein Verzeichnis für AI-Tools“ oder beschreiben Sie, was Sie brauchen.",
+            "welcomeSubtitle": "Ihr KI-gestützter Assistent. Fragen Sie mich alles über das Erstellen von Werken, Generieren von Inhalten oder Organisieren Ihrer Daten.",
+            "welcomeMessage": "Hallo! Ich kann Ihnen helfen, Werke mit natürlicher Sprache zu erstellen. Fragen Sie z. B. „Erstelle ein Werk für AI-Tools“ oder beschreiben Sie, was Sie brauchen.",
             "capabilities": {
-                "directoryCreation": "Verzeichniserstellung",
-                "directoryCreationDesc": "Verzeichnisse aus natürlichen Sprachbeschreibungen erstellen",
+                "workCreation": "Werkerstellung",
+                "workCreationDesc": "Werke aus natürlichen Sprachbeschreibungen erstellen",
                 "webResearch": "Web-Recherche",
                 "webResearchDesc": "Suchen und Sammeln von Daten aus dem gesamten Web",
                 "contentGeneration": "Inhaltsgenerierung",
@@ -2747,11 +2747,11 @@
             "selectProvider": "Provider",
             "notConfigured": "Nicht konfiguriert",
             "gitNotConnected": "Git-Provider nicht verbunden",
-            "gitNotConnectedDesc": "Verbinden Sie Ihren Git-Provider, um Verzeichnisse zu erstellen und zu verwalten.",
+            "gitNotConnectedDesc": "Verbinden Sie Ihren Git-Provider, um Werke zu erstellen und zu verwalten.",
             "connectGithub": "GitHub verbinden",
             "gitConnectedAs": "Verbunden als {username} über {provider}",
             "deployNotConfigured": "Deploy-Provider nicht konfiguriert",
-            "deployNotConfiguredDesc": "Konfigurieren Sie einen Deployment-Provider, um Ihre Verzeichnis-Websites zu veröffentlichen.",
+            "deployNotConfiguredDesc": "Konfigurieren Sie einen Deployment-Provider, um Ihre Werk-Websites zu veröffentlichen.",
             "configureDeployProvider": "Deploy-Provider konfigurieren",
             "deployConfigured": "Deploy-Provider konfiguriert ({provider})",
             "opened": "Geöffnet",
@@ -2761,12 +2761,12 @@
             "historyYesterday": "Gestern",
             "historyDaysAgo": "{days}T vor",
             "suggestions": {
-                "s1": "Zeige meine Verzeichnisse",
-                "s2": "Erstelle ein Verzeichnis von AI-Tools",
+                "s1": "Zeige meine Werke",
+                "s2": "Erstelle ein Werk von AI-Tools",
                 "s3": "Überprüfe meine Git-Verbindung",
                 "s4": "Zeige meine Statistiken"
             },
-            "feelingLucky": "Schlage ein zu erstellendes Verzeichnis vor",
+            "feelingLucky": "Schlage ein zu erstellendes Werk vor",
             "errors": {
                 "unableToSend": "Nachricht konnte nicht gesendet werden"
             }
@@ -2779,7 +2779,7 @@
             "enabled": "Aktiviert",
             "disabled": "Deaktiviert",
             "enable": "Aktivieren",
-            "enableDescription": "Konfigurieren Sie, wie dieses Plugin in Ihren Verzeichnissen aktiviert wird.",
+            "enableDescription": "Konfigurieren Sie, wie dieses Plugin in Ihren Werken aktiviert wird.",
             "disable": "Deaktivieren",
             "settings": "Einstellungen",
             "saveSettings": "Einstellungen speichern",
@@ -2811,11 +2811,11 @@
                 "pipeline": "Pipeline"
             },
             "alwaysEnabled": "Immer aktiviert",
-            "disableWarning": "Das Deaktivieren dieses Plugins deaktiviert es auch in allen Ihren Verzeichnissen",
+            "disableWarning": "Das Deaktivieren dieses Plugins deaktiviert es auch in allen Ihren Werken",
             "cannotDisableSystem": "System-Plugins können nicht deaktiviert werden",
             "disableFailed": "Plugin konnte nicht deaktiviert werden",
-            "autoEnableForDirectories": "Auch für alle Verzeichnisse aktivieren",
-            "autoEnableForDirectoriesDescription": "Dieses Plugin wird automatisch in allen Ihren Verzeichnissen aktiv sein. Sie können es weiterhin pro Verzeichnis deaktivieren.",
+            "autoEnableForWorks": "Auch für alle Werke aktivieren",
+            "autoEnableForWorksDescription": "Dieses Plugin wird automatisch in allen Ihren Werken aktiv sein. Sie können es weiterhin pro Werk deaktivieren.",
             "confirmDisable": "Deaktivierung bestätigen",
             "cancel": "Abbrechen",
             "missingRequiredFields": "Fehlende Pflichtfelder: {fields}",
@@ -2890,20 +2890,20 @@
                 "removeLabel": "{login} entfernen"
             }
         },
-        "directoryPlugins": {
-            "title": "Verzeichnis-Plugins",
-            "subtitle": "Plugins für dieses Verzeichnis konfigurieren",
+        "workPlugins": {
+            "title": "Werk-Plugins",
+            "subtitle": "Plugins für dieses Werk konfigurieren",
             "active": "Aktiv",
             "enable": "Aktivieren",
             "disable": "Deaktivieren",
-            "enableForDirectory": "Für dieses Verzeichnis aktivieren",
-            "disableForDirectory": "Für dieses Verzeichnis deaktivieren",
+            "enableForWork": "Für dieses Werk aktivieren",
+            "disableForWork": "Für dieses Werk deaktivieren",
             "enableAtUserLevelFirst": "Aktivieren Sie dieses Plugin zuerst in Ihren Einstellungen",
             "disabledByUser": "Auf Benutzerebene deaktiviert",
             "systemAlwaysEnabled": "System-Plugin – immer aktiviert",
             "showSettings": "Einstellungen anzeigen",
             "hideSettings": "Einstellungen ausblenden",
-            "directorySettingsInfo": "Hier verzeichnisspezifische Einstellungen konfigurieren",
+            "workSettingsInfo": "Hier werkspezifische Einstellungen konfigurieren",
             "save": "Speichern",
             "saved": "Gespeichert",
             "showInstalledOnly": "Nur installierte anzeigen",
@@ -2911,7 +2911,7 @@
             "noPlugins": "Keine Plugins verfügbar",
             "showAllPlugins": "Alle Plugins anzeigen",
             "capabilityProviders": "Funktionsanbieter",
-            "capabilityProvidersDescription": "Wählen Sie aus, welches Plugin jede Funktion für dieses Verzeichnis bereitstellt",
+            "capabilityProvidersDescription": "Wählen Sie aus, welches Plugin jede Funktion für dieses Werk bereitstellt",
             "noProvidersAvailable": "Keine Anbieter verfügbar",
             "categories": {
                 "git": "Git",
@@ -2929,12 +2929,12 @@
             "errors": {
                 "unableToSend": "Nachricht konnte nicht gesendet werden."
             },
-            "settingsModalTitle": "Verzeichniseinstellungen",
-            "settingsModalDescription": "Einstellungen für dieses Verzeichnis überschreiben. Nicht gesetzte Felder erben von Ihren Benutzereinstellungen.",
+            "settingsModalTitle": "Werkeinstellungen",
+            "settingsModalDescription": "Einstellungen für dieses Werk überschreiben. Nicht gesetzte Felder erben von Ihren Benutzereinstellungen.",
             "inheritedFrom": "Geerbt: {value}",
             "inheritedSecret": "Geerbt: ••••••••",
             "resetToDefaults": "Auf Standard zurücksetzen",
-            "resetConfirm": "Dies löscht alle verzeichnisspezifischen Überschreibungen. Einstellungen fallen auf Ihre Benutzerebene-Werte zurück.",
+            "resetConfirm": "Dies löscht alle werkspezifischen Überschreibungen. Einstellungen fallen auf Ihre Benutzerebene-Werte zurück.",
             "resetSuccess": "Einstellungen auf Standard zurückgesetzt",
             "cancel": "Abbrechen",
             "clickToConfigure": "Zum Konfigurieren klicken",
@@ -2949,8 +2949,8 @@
         "auth": {
             "backToHome": "Zurück zur Startseite",
             "feature": {
-                "title": "Verzeichnisse mit KI erstellen",
-                "subtitle": "Erstellen Sie wunderschöne, durchsuchbare Verzeichnisse in Minuten mit natürlicher Sprache. Kein Coding erforderlich.",
+                "title": "Werke mit KI erstellen",
+                "subtitle": "Erstellen Sie wunderschöne, durchsuchbare Werke in Minuten mit natürlicher Sprache. Kein Coding erforderlich.",
                 "badge": "KI-gestützt",
                 "benefits": {
                     "ai": {
@@ -3002,8 +3002,8 @@
         }
     },
     "metadata": {
-        "title": "{companyName} - Verzeichnisersteller",
-        "description": "Eine SaaS-Plattform zum Erstellen und Verwalten von Verzeichnissen",
+        "title": "{companyName} - Werkersteller",
+        "description": "Eine SaaS-Plattform zum Erstellen und Verwalten von Werken",
         "pages": {
             "signIn": "Anmelden",
             "createAccount": "Konto erstellen",
@@ -3012,9 +3012,9 @@
             "authError": "Authentifizierungsfehler",
             "dashboard": "Dashboard",
             "activity": "Aktivitätsprotokoll",
-            "directories": "Verzeichnisse",
-            "newDirectory": "Neues Verzeichnis",
-            "directory": "Verzeichnis",
+            "works": "Werke",
+            "newWork": "Neues Werk",
+            "work": "Werk",
             "overview": "Übersicht",
             "items": "Einträge",
             "generator": "Generator",
@@ -3048,7 +3048,7 @@
         }
     },
     "actions": {
-        "directories": {
+        "works": {
             "slug": {
                 "required": "Slug ist erforderlich",
                 "format": "Slug darf nur Kleinbuchstaben, Zahlen und Bindestriche enthalten"
@@ -3067,16 +3067,16 @@
             },
             "oauthRequired": "OAuth-Verbindung erforderlich. Bitte verbinden Sie zuerst Ihr {provider}-Konto.",
             "githubRequired": "GitHub-Verbindung erforderlich. Bitte verbinden Sie zuerst Ihr GitHub-Konto.",
-            "createSuccess": "Verzeichnis erfolgreich erstellt!",
-            "createFailed": "Verzeichniserstellung fehlgeschlagen",
-            "updateSuccess": "Verzeichnis erfolgreich aktualisiert!",
-            "updateFailed": "Verzeichnisaktualisierung fehlgeschlagen",
-            "invalidGeneratedData": "Gültige Verzeichnisdaten konnten nicht generiert werden",
-            "aiGenerationStarted": "Verzeichniserstellung gestartet! KI generiert Inhalt...",
-            "invalidId": "Ungültige Verzeichnis-ID",
-            "deleteSuccess": "Verzeichnis erfolgreich gelöscht",
-            "deleteFailed": "Verzeichnis konnte nicht gelöscht werden",
-            "fetchFailed": "Verzeichnisse konnten nicht abgerufen werden",
+            "createSuccess": "Werk erfolgreich erstellt!",
+            "createFailed": "Werkerstellung fehlgeschlagen",
+            "updateSuccess": "Werk erfolgreich aktualisiert!",
+            "updateFailed": "Werkaktualisierung fehlgeschlagen",
+            "invalidGeneratedData": "Gültige Werkdaten konnten nicht generiert werden",
+            "aiGenerationStarted": "Werkerstellung gestartet! KI generiert Inhalt...",
+            "invalidId": "Ungültige Werk-ID",
+            "deleteSuccess": "Werk erfolgreich gelöscht",
+            "deleteFailed": "Werk konnte nicht gelöscht werden",
+            "fetchFailed": "Werke konnten nicht abgerufen werden",
             "organization": {
                 "requiredWhenOwnerProvided": "Organisation muss aktiviert sein, wenn Eigentümer angegeben ist"
             },
@@ -3084,7 +3084,7 @@
                 "invalidUrl": "Bitte geben Sie eine gültige URL ein",
                 "analyzeFailed": "Repository-Analyse fehlgeschlagen",
                 "started": "Import erfolgreich gestartet",
-                "failed": "Verzeichnisimport fehlgeschlagen",
+                "failed": "Werkimport fehlgeschlagen",
                 "fetchReposFailed": "Repositories konnten nicht abgerufen werden"
             }
         },

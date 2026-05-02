@@ -9,7 +9,7 @@ sidebar_position: 62
 
 ## Overview
 
-The Agent Pipeline plugin (`@ever-works/plugins/agent-pipeline`) is an autonomous, AI-driven directory generation engine that uses tool calling to discover, extract, and organize directory items. Unlike the Standard Pipeline's deterministic 15-step flow, the Agent Pipeline gives an AI "parent" agent full autonomy to decide which tools to call, in what order, and how many times.
+The Agent Pipeline plugin (`@ever-works/plugins/agent-pipeline`) is an autonomous, AI-driven work generation engine that uses tool calling to discover, extract, and organize work items. Unlike the Standard Pipeline's deterministic 15-step flow, the Agent Pipeline gives an AI "parent" agent full autonomy to decide which tools to call, in what order, and how many times.
 
 The plugin uses the Vercel AI SDK's `generateText()` with tool definitions, allowing the AI model to iteratively search the web, process URLs, extract items, and modify results until it reaches the target item count or exhausts its step budget.
 
@@ -118,7 +118,7 @@ The `getWorkerContentBudgetRatio()` function dynamically adjusts how much of the
 
 ### Core Capabilities
 
-- **`pipeline`** - Full autonomous directory generation via tool calling
+- **`pipeline`** - Full autonomous work generation via tool calling
 - **`form-schema`** - Dynamic form field definitions for the generation UI
 
 ### Tools Available to the Parent Agent
@@ -137,7 +137,7 @@ parameters: {
 
 #### 2. `findItems`
 
-Extracts directory items from search result content using the worker model.
+Extracts work items from search result content using the worker model.
 
 ```typescript
 parameters: {
@@ -153,7 +153,7 @@ parameters: {
 
 #### 3. `processUrls`
 
-Extracts content from specific URLs and finds directory items. Processes 1-10 URLs with concurrency of 2 (via `p-map`).
+Extracts content from specific URLs and finds work items. Processes 1-10 URLs with concurrency of 2 (via `p-map`).
 
 ```typescript
 parameters: {
@@ -249,14 +249,14 @@ class TokenUsageAccumulator {
 
 The system prompt is built dynamically from the generation context with these sections:
 
-1. **Role & Scope** - Defines the agent as a directory curator
+1. **Role & Scope** - Defines the agent as a work curator
 2. **Existing Items Context** - Seeds existing items for `CREATE_UPDATE` mode (includes slugs and names for deduplication)
 3. **Tools Description** - Documents available tools and their constraints
-4. **Generation Workflow** - Step-by-step instructions for new directory creation
-5. **Modification Workflow** - Instructions for updating existing directories
+4. **Generation Workflow** - Step-by-step instructions for new work creation
+5. **Modification Workflow** - Instructions for updating existing works
 6. **Category & Tag Rules** - Constraints on category/tag naming and assignment
 7. **Generation Target** - Target item count and remaining budget
-8. **Directory Context** - Directory name, description, domain analysis
+8. **Work Context** - Work name, description, domain analysis
 
 Critical rules embedded in the system prompt:
 
@@ -335,7 +335,7 @@ Concurrency is limited to 2 simultaneous URL processes via `p-map` to avoid over
 
 ```typescript
 const request = {
-	prompt: 'Create a directory of machine learning frameworks',
+	prompt: 'Create a work of machine learning frameworks',
 	config: {
 		target_items: 30,
 		max_pages_to_process: 20,
@@ -344,7 +344,7 @@ const request = {
 };
 ```
 
-### Update Existing Directory
+### Update Existing Work
 
 ```typescript
 const request = {

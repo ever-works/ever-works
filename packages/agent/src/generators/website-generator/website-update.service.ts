@@ -1,7 +1,7 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { GitFacadeService } from '../../facades/git.facade';
 import { BranchSyncService, BranchSyncSummary } from './branch-sync.service';
-import { Directory } from '../../entities/directory.entity';
+import { Work } from '../../entities/work.entity';
 import { User } from '../../entities/user.entity';
 import {
     getWebsiteTemplateBranch,
@@ -9,7 +9,7 @@ import {
 } from './config/website-template.config';
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
-import { getDirectoryOwner } from '../../utils/directory.utils';
+import { getWorkOwner } from '../../utils/work.utils';
 
 @Injectable()
 export class WebsiteUpdateService {
@@ -20,17 +20,17 @@ export class WebsiteUpdateService {
         private readonly branchSyncService: BranchSyncService,
     ) {}
 
-    private async ensureTemplateDefaultBranch(directory: Directory, userId: string): Promise<void> {
-        const template = getWebsiteTemplateConfig(directory.websiteTemplateId);
+    private async ensureTemplateDefaultBranch(work: Work, userId: string): Promise<void> {
+        const template = getWebsiteTemplateConfig(work.websiteTemplateId);
         const targetBranch = template.branch;
-        const websiteOwner = directory.getRepoOwner('website');
-        const websiteRepo = directory.getWebsiteRepo();
+        const websiteOwner = work.getRepoOwner('website');
+        const websiteRepo = work.getWebsiteRepo();
 
         try {
             const branches = await this.gitFacade.listBranches(websiteOwner, websiteRepo, {
                 userId,
-                providerId: directory.gitProvider,
-                directoryId: directory.id,
+                providerId: work.gitProvider,
+                workId: work.id,
             });
 
             if (!branches.some((branch) => branch.name === targetBranch)) {
@@ -44,7 +44,7 @@ export class WebsiteUpdateService {
                 websiteOwner,
                 websiteRepo,
                 { defaultBranch: targetBranch },
-                { userId, providerId: directory.gitProvider, directoryId: directory.id },
+                { userId, providerId: work.gitProvider, workId: work.id },
             );
         } catch (error) {
             this.logger.warn(
@@ -55,12 +55,12 @@ export class WebsiteUpdateService {
 
     /**
      * Updates an existing website repository based on the original creation method
-     * @param directory - The directory to update
+     * @param work - The work to update
      * @param user - The user performing the update
      * @param options - Optional configuration (branch to use from template)
      */
     async updateRepository(
-        directory: Directory,
+        work: Work,
         user: User,
         options?: { branch?: string },
     ): Promise<{
@@ -69,17 +69,17 @@ export class WebsiteUpdateService {
         commitSha?: string;
         branchSync?: BranchSyncSummary;
     }> {
-        const directoryOwner = getDirectoryOwner(directory);
-        const websiteOwner = directory.getRepoOwner('website');
-        const websiteRepo = directory.getWebsiteRepo();
-        const template = getWebsiteTemplateConfig(directory.websiteTemplateId);
+        const workOwner = getWorkOwner(work);
+        const websiteOwner = work.getRepoOwner('website');
+        const websiteRepo = work.getWebsiteRepo();
+        const template = getWebsiteTemplateConfig(work.websiteTemplateId);
         const branch = options?.branch || template.branch;
 
         // Check if the target repository exists
         const repositoryExists = await this.gitFacade.repositoryExists(websiteOwner, websiteRepo, {
-            userId: directoryOwner.id,
-            providerId: directory.gitProvider,
-            directoryId: directory.id,
+            userId: workOwner.id,
+            providerId: work.gitProvider,
+            workId: work.id,
         });
         if (!repositoryExists) {
             throw new NotFoundException(
@@ -93,9 +93,9 @@ export class WebsiteUpdateService {
             template.repo,
             branch,
             {
-                userId: directoryOwner.id,
-                providerId: directory.gitProvider,
-                directoryId: directory.id,
+                userId: workOwner.id,
+                providerId: work.gitProvider,
+                workId: work.id,
             },
         );
 
@@ -103,7 +103,7 @@ export class WebsiteUpdateService {
 
         try {
             // If fork fails, try duplicate method (clone original, replace remote)
-            await this.updateDuplicate(directory, user, branch);
+            await this.updateDuplicate(work, user, branch);
             updateResult = {
                 method: 'duplicate',
                 message: 'Successfully updated using duplicate method',
@@ -114,7 +114,7 @@ export class WebsiteUpdateService {
 
             try {
                 // If duplicate fails, try template method (clone both, replace files)
-                await this.updateTemplate(directory, user, branch);
+                await this.updateTemplate(work, user, branch);
                 updateResult = {
                     method: 'create-using-template',
                     message: 'Successfully updated using template method',
@@ -127,8 +127,8 @@ export class WebsiteUpdateService {
         }
 
         // Sync all branches from template to website repo
-        const branchSync = await this.syncAllBranchesFromTemplate(directory, user);
-        await this.ensureTemplateDefaultBranch(directory, directoryOwner.id);
+        const branchSync = await this.syncAllBranchesFromTemplate(work, user);
+        await this.ensureTemplateDefaultBranch(work, workOwner.id);
 
         return {
             ...updateResult,
@@ -136,34 +136,31 @@ export class WebsiteUpdateService {
         };
     }
 
-    /** Sync all branches from template to directory's website repo */
-    async syncAllBranchesFromTemplate(
-        directory: Directory,
-        user: User,
-    ): Promise<BranchSyncSummary | null> {
-        return this.branchSyncService.syncFromTemplate(directory, user);
+    /** Sync all branches from template to work's website repo */
+    async syncAllBranchesFromTemplate(work: Work, user: User): Promise<BranchSyncSummary | null> {
+        return this.branchSyncService.syncFromTemplate(work, user);
     }
 
     /**
      * Checks if an update is available from the template repository
-     * @param directory - The directory to check
+     * @param work - The work to check
      * @returns Information about whether an update is available
      */
-    async checkForUpdate(directory: Directory): Promise<{
+    async checkForUpdate(work: Work): Promise<{
         updateAvailable: boolean;
         latestCommit?: string;
         currentCommit?: string;
         branch: string;
         error?: string;
     }> {
-        const directoryOwner = getDirectoryOwner(directory);
-        const template = getWebsiteTemplateConfig(directory.websiteTemplateId);
-        const branch = getWebsiteTemplateBranch(template, directory.websiteTemplateUseBeta);
+        const workOwner = getWorkOwner(work);
+        const template = getWebsiteTemplateConfig(work.websiteTemplateId);
+        const branch = getWebsiteTemplateBranch(template, work.websiteTemplateUseBeta);
 
         const hasCredentials = await this.gitFacade.hasValidCredentials({
-            userId: directoryOwner.id,
-            providerId: directory.gitProvider,
-            directoryId: directory.id,
+            userId: workOwner.id,
+            providerId: work.gitProvider,
+            workId: work.id,
         });
 
         if (!hasCredentials) {
@@ -179,9 +176,9 @@ export class WebsiteUpdateService {
             template.repo,
             branch,
             {
-                userId: directoryOwner.id,
-                providerId: directory.gitProvider,
-                directoryId: directory.id,
+                userId: workOwner.id,
+                providerId: work.gitProvider,
+                workId: work.id,
             },
         );
 
@@ -190,9 +187,9 @@ export class WebsiteUpdateService {
         }
 
         return {
-            updateAvailable: latestCommit.sha !== directory.websiteTemplateLastCommit,
+            updateAvailable: latestCommit.sha !== work.websiteTemplateLastCommit,
             latestCommit: latestCommit.sha,
-            currentCommit: directory.websiteTemplateLastCommit || undefined,
+            currentCommit: work.websiteTemplateLastCommit || undefined,
             branch,
         };
     }
@@ -200,12 +197,12 @@ export class WebsiteUpdateService {
     /**
      * Updates a forked repository by pulling from upstream
      */
-    private async updateFork(directory: Directory, user: User): Promise<boolean> {
-        const directoryOwner = getDirectoryOwner(directory);
-        const committer = directory.resolveCommitter(user);
-        const websiteOwner = directory.getRepoOwner('website');
-        const websiteRepo = directory.getWebsiteRepo();
-        const template = getWebsiteTemplateConfig(directory.websiteTemplateId);
+    private async updateFork(work: Work, user: User): Promise<boolean> {
+        const workOwner = getWorkOwner(work);
+        const committer = work.resolveCommitter(user);
+        const websiteOwner = work.getRepoOwner('website');
+        const websiteRepo = work.getWebsiteRepo();
+        const template = getWebsiteTemplateConfig(work.websiteTemplateId);
 
         try {
             // Clone the target repository
@@ -216,9 +213,9 @@ export class WebsiteUpdateService {
                     committer,
                 },
                 {
-                    userId: directoryOwner.id,
-                    providerId: directory.gitProvider,
-                    directoryId: directory.id,
+                    userId: workOwner.id,
+                    providerId: work.gitProvider,
+                    workId: work.id,
                 },
             );
 
@@ -229,9 +226,9 @@ export class WebsiteUpdateService {
                 template.owner,
                 template.repo,
                 {
-                    userId: directoryOwner.id,
-                    providerId: directory.gitProvider,
-                    directoryId: directory.id,
+                    userId: workOwner.id,
+                    providerId: work.gitProvider,
+                    workId: work.id,
                 },
             );
 
@@ -251,18 +248,14 @@ export class WebsiteUpdateService {
     /**
      * Updates using duplicate method: clone original, replace remote, push
      */
-    private async updateDuplicate(
-        directory: Directory,
-        user: User,
-        branch?: string,
-    ): Promise<void> {
-        const directoryOwner = getDirectoryOwner(directory);
-        const websiteOwner = directory.getRepoOwner('website');
-        const websiteRepo = directory.getWebsiteRepo();
-        const template = getWebsiteTemplateConfig(directory.websiteTemplateId);
+    private async updateDuplicate(work: Work, user: User, branch?: string): Promise<void> {
+        const workOwner = getWorkOwner(work);
+        const websiteOwner = work.getRepoOwner('website');
+        const websiteRepo = work.getWebsiteRepo();
+        const template = getWebsiteTemplateConfig(work.websiteTemplateId);
         const resolvedBranch = branch || template.branch;
 
-        await this.gitFacade.removeLocalDir(directory.gitProvider, template.owner, template.repo);
+        await this.gitFacade.removeLocalDir(work.gitProvider, template.owner, template.repo);
 
         // Clone the original template repository
         const originalDir = await this.gitFacade.cloneOrPull(
@@ -270,38 +263,33 @@ export class WebsiteUpdateService {
                 owner: template.owner,
                 repo: template.repo,
                 branch: resolvedBranch,
-                committer: directory.resolveCommitter(user),
+                committer: work.resolveCommitter(user),
             },
             {
-                userId: directoryOwner.id,
-                providerId: directory.gitProvider,
-                directoryId: directory.id,
+                userId: workOwner.id,
+                providerId: work.gitProvider,
+                workId: work.id,
             },
         );
 
         // Get the target repository URL
         const targetRepoUrl = this.gitFacade.getCloneUrl(
-            directory.gitProvider,
+            work.gitProvider,
             websiteOwner,
             websiteRepo,
         );
 
         // Remove existing origin and add new one
-        await this.gitFacade.switchBranch(directory.gitProvider, originalDir, resolvedBranch);
-        await this.gitFacade.replaceRemote(
-            directory.gitProvider,
-            originalDir,
-            'origin',
-            targetRepoUrl,
-        );
+        await this.gitFacade.switchBranch(work.gitProvider, originalDir, resolvedBranch);
+        await this.gitFacade.replaceRemote(work.gitProvider, originalDir, 'origin', targetRepoUrl);
 
         // Push to the target repository
         await this.gitFacade.push(
             { dir: originalDir, force: true },
             {
-                userId: directoryOwner.id,
-                providerId: directory.gitProvider,
-                directoryId: directory.id,
+                userId: workOwner.id,
+                providerId: work.gitProvider,
+                workId: work.id,
             },
         );
 
@@ -313,12 +301,12 @@ export class WebsiteUpdateService {
     /**
      * Updates using template method: clone both repos, replace files, commit and push
      */
-    private async updateTemplate(directory: Directory, user: User, branch?: string): Promise<void> {
-        const directoryOwner = getDirectoryOwner(directory);
-        const committer = directory.resolveCommitter(user);
-        const websiteOwner = directory.getRepoOwner('website');
-        const websiteRepo = directory.getWebsiteRepo();
-        const template = getWebsiteTemplateConfig(directory.websiteTemplateId);
+    private async updateTemplate(work: Work, user: User, branch?: string): Promise<void> {
+        const workOwner = getWorkOwner(work);
+        const committer = work.resolveCommitter(user);
+        const websiteOwner = work.getRepoOwner('website');
+        const websiteRepo = work.getWebsiteRepo();
+        const template = getWebsiteTemplateConfig(work.websiteTemplateId);
         const resolvedBranch = branch || template.branch;
 
         // Clone both repositories
@@ -331,9 +319,9 @@ export class WebsiteUpdateService {
                     committer,
                 },
                 {
-                    userId: directoryOwner.id,
-                    providerId: directory.gitProvider,
-                    directoryId: directory.id,
+                    userId: workOwner.id,
+                    providerId: work.gitProvider,
+                    workId: work.id,
                 },
             ),
 
@@ -345,21 +333,21 @@ export class WebsiteUpdateService {
                     committer,
                 },
                 {
-                    userId: directoryOwner.id,
-                    providerId: directory.gitProvider,
-                    directoryId: directory.id,
+                    userId: workOwner.id,
+                    providerId: work.gitProvider,
+                    workId: work.id,
                 },
             ),
         ]);
 
-        // Copy files from original to target (excluding .git directory)
+        // Copy files from original to target (excluding .git work)
         await this.copyRepositoryFiles(originalDir, targetDir);
 
         // Add, commit, and push changes
-        await this.gitFacade.add(directory.gitProvider, targetDir, '.');
+        await this.gitFacade.add(work.gitProvider, targetDir, '.');
 
         await this.gitFacade.commit(
-            directory.gitProvider,
+            work.gitProvider,
             targetDir,
             `Update website from template (${resolvedBranch})`,
             committer,
@@ -368,9 +356,9 @@ export class WebsiteUpdateService {
         await this.gitFacade.push(
             { dir: targetDir, force: true },
             {
-                userId: directoryOwner.id,
-                providerId: directory.gitProvider,
-                directoryId: directory.id,
+                userId: workOwner.id,
+                providerId: work.gitProvider,
+                workId: work.id,
             },
         );
 
@@ -380,28 +368,28 @@ export class WebsiteUpdateService {
     }
 
     /**
-     * Copies files from source to destination, excluding .git directory
+     * Copies files from source to destination, excluding .git work
      */
     private async copyRepositoryFiles(sourceDir: string, targetDir: string): Promise<void> {
         const entries = await fs.readdir(sourceDir, { withFileTypes: true });
 
         for (const entry of entries) {
             if (entry.name === '.git') {
-                continue; // Skip .git directory
+                continue; // Skip .git work
             }
 
             const sourcePath = path.join(sourceDir, entry.name);
             const targetPath = path.join(targetDir, entry.name);
 
             if (entry.isDirectory()) {
-                // Remove existing directory if it exists
+                // Remove existing work if it exists
                 try {
                     await fs.rm(targetPath, { recursive: true, force: true });
                 } catch (error) {
-                    // Directory might not exist, which is fine
+                    // Work might not exist, which is fine
                 }
 
-                // Create new directory and copy contents
+                // Create new work and copy contents
                 await fs.mkdir(targetPath, { recursive: true });
                 await this.copyRepositoryFiles(sourcePath, targetPath);
             } else {

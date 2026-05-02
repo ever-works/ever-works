@@ -16,12 +16,12 @@ export class PluginValidationService {
     /**
      * Non-throwing validation for use after settings save.
      * Returns the validation result or null if the plugin has no validation capability.
-     * When directoryId is provided, settings are resolved with directory overrides merged on top of user settings.
+     * When workId is provided, settings are resolved with work overrides merged on top of user settings.
      */
     async tryValidateConnection(
         pluginId: string,
         userId: string,
-        directoryId?: string,
+        workId?: string,
     ): Promise<ConnectionValidationResult | null> {
         const registered = this.pluginRegistry.get(pluginId);
         if (!registered || registered.state !== 'loaded') {
@@ -42,7 +42,7 @@ export class PluginValidationService {
         try {
             let timeoutHandle: ReturnType<typeof setTimeout>;
             const result = await Promise.race([
-                this.validatePluginConnection(pluginId, userId, directoryId).then((r) => {
+                this.validatePluginConnection(pluginId, userId, workId).then((r) => {
                     clearTimeout(timeoutHandle);
                     return r;
                 }),
@@ -85,13 +85,13 @@ export class PluginValidationService {
     }
 
     /**
-     * Core validation logic. Resolves settings with optional directory scope
-     * so directory-level model overrides are tested correctly.
+     * Core validation logic. Resolves settings with optional work scope
+     * so work-level model overrides are tested correctly.
      */
     private async validatePluginConnection(
         pluginId: string,
         userId: string,
-        directoryId?: string,
+        workId?: string,
     ): Promise<ConnectionValidationResult> {
         const registered = this.pluginRegistry.get(pluginId);
         if (!registered || registered.state !== 'loaded') {
@@ -100,7 +100,7 @@ export class PluginValidationService {
 
         const settings = await this.pluginSettingsService.getSettings(pluginId, {
             userId,
-            directoryId,
+            workId,
             includeSecrets: true,
         });
 

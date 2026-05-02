@@ -34,20 +34,20 @@ function assertWithinBaseDir(targetPath: string): string {
 	const resolvedTargetPath = path.resolve(targetPath);
 
 	if (resolvedTargetPath !== resolvedBaseDir && !resolvedTargetPath.startsWith(`${resolvedBaseDir}${path.sep}`)) {
-		throw new Error(`Resolved Hermes workspace path escaped the base temp directory: ${resolvedTargetPath}`);
+		throw new Error(`Resolved Hermes workspace path escaped the base temp work: ${resolvedTargetPath}`);
 	}
 
 	return resolvedTargetPath;
 }
 
-export function getWorkspacePath(userId: string, directoryId: string): string {
+export function getWorkspacePath(userId: string, workId: string): string {
 	return assertWithinBaseDir(
-		path.join(BASE_TEMP_DIR, sanitizePathSegment(userId, 'userId'), sanitizePathSegment(directoryId, 'directoryId'))
+		path.join(BASE_TEMP_DIR, sanitizePathSegment(userId, 'userId'), sanitizePathSegment(workId, 'workId'))
 	);
 }
 
-export async function createWorkspace(userId: string, directoryId: string): Promise<string> {
-	const workspaceRoot = getWorkspacePath(userId, directoryId);
+export async function createWorkspace(userId: string, workId: string): Promise<string> {
+	const workspaceRoot = getWorkspacePath(userId, workId);
 	await fs.mkdir(workspaceRoot, { recursive: true });
 
 	const workspacePath = assertWithinBaseDir(await fs.mkdtemp(path.join(workspaceRoot, `run-${randomUUID()}-`)));

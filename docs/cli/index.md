@@ -7,7 +7,7 @@ sidebar_position: 1
 
 # Ever Works CLI
 
-The **Ever Works CLI** (`ever-works-cli`) is a command-line interface that allows you to interact with the Ever Works Platform directly from your terminal. It provides convenient commands for managing directories, authentication, and content generation workflows.
+The **Ever Works CLI** (`ever-works-cli`) is a command-line interface that allows you to interact with the Ever Works Platform directly from your terminal. It provides convenient commands for managing works, authentication, and content generation workflows.
 
 ## Installation
 
@@ -41,7 +41,7 @@ Options:
   -h, --help      display help for command
 
 Commands:
-  directory       Directory management commands
+  work       Work management commands
   auth            Authentication commands
   help [command]  display help for command
 ```

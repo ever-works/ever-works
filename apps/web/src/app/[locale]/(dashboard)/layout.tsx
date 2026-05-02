@@ -2,7 +2,7 @@ import { cookies } from 'next/headers';
 import { getAuthFromCookie } from '@/lib/auth';
 import { DashboardLayoutClient } from './layout-client';
 import { authAPI } from '@/lib/api';
-import { getDirectoryStats } from '@/app/actions/dashboard/directories';
+import { getWorkStats } from '@/app/actions/dashboard/works';
 import { pluginsAPI } from '@/lib/api/plugins';
 import type { OAuthConnectionInfo } from '@/lib/api/plugins-capabilities/oauth';
 import type { GitProviderConnectionInfo } from '@/lib/api/plugins-capabilities/git-providers';
@@ -18,16 +18,16 @@ export default async function DashboardLayout({ children }: { children: React.Re
 
     const [profile, statsResponse, pluginsResponse] = await Promise.all([
         authAPI.getFreshProfile().catch(() => null),
-        getDirectoryStats().catch(() => ({
+        getWorkStats().catch(() => ({
             success: false,
-            totalDirectories: 0,
+            totalWorks: 0,
         })),
         pluginsAPI.list().catch(() => ({ plugins: [] as UserPlugin[], total: 0 })),
     ]);
 
     const hasGithubConnected =
         profile?.oauthTokens?.some((token) => token.provider === 'github') ?? false;
-    const onboardingTotalDirectories = statsResponse.success ? statsResponse.totalDirectories : 0;
+    const onboardingTotalWorks = statsResponse.success ? statsResponse.totalWorks : 0;
     const onboardingPlugins = pluginsResponse.plugins
         .filter((plugin) => plugin.uiHints?.includeInOnboarding)
         .sort(
@@ -60,7 +60,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
             initialChatOpen={chatPanelOpen}
             initialSidebarCollapsed={sidebarCollapsed}
             hasGithubConnected={hasGithubConnected}
-            onboardingTotalDirectories={onboardingTotalDirectories}
+            onboardingTotalWorks={onboardingTotalWorks}
             onboardingPlugins={onboardingPlugins}
             initialOnboardingConnections={onboardingConnections}
             initialOnboardingDeviceAuthStatuses={onboardingDeviceAuthStatuses}

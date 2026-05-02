@@ -151,7 +151,7 @@ export abstract class BaseGitProvider extends BasePlugin implements IGitOperatio
 	}
 
 	/**
-	 * Check if a directory is a valid git repository.
+	 * Check if a work is a valid git repository.
 	 */
 	protected async isGitRepository(dir: string): Promise<boolean> {
 		try {

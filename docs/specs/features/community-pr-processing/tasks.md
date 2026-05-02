@@ -8,13 +8,13 @@
 
 ## Phase 1 — Schema
 
-- [x] T1. Add `communityPrState` jsonb column to `directories` (additive
+- [x] T1. Add `communityPrState` jsonb column to `works` (additive
       migration).
 
 ## Phase 2 — Service
 
-- [x] T2. `CommunityPrProcessorService.processDirectory` with per-
-      directory `runExclusive` lock.
+- [x] T2. `CommunityPrProcessorService.processWork` with per-
+      work `runExclusive` lock.
 - [x] T3. PR listing + skip-already-processed logic.
 - [x] T4. AI extraction via `AiFacadeService`.
 - [x] T5. Schema validation + comment-on-failure path.
@@ -24,7 +24,7 @@
 ## Phase 3 — API + cron
 
 - [x] T8. Manual trigger endpoint.
-- [x] T9. Trigger.dev cron task fanning out per directory.
+- [x] T9. Trigger.dev cron task fanning out per work.
 
 ## Phase 4 — Web / CLI
 

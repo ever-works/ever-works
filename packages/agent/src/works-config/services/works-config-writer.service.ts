@@ -4,7 +4,7 @@ import * as path from 'path';
 import * as yaml from 'yaml';
 import type { CreateItemsGeneratorDto } from '@src/items-generator/dto';
 import type { ProvidersDto } from '@ever-works/contracts/api';
-import { Directory, type RepositoryTarget } from '@src/entities/directory.entity';
+import { Work, type RepositoryTarget } from '@src/entities/work.entity';
 import type { DataRepository } from '@src/generators/data-generator/data-repository';
 import { WorksConfigService, type ResolvedWorksConfig } from './works-config.service';
 
@@ -17,7 +17,7 @@ export type WorksConfigWriteRequest = Partial<Pick<CreateItemsGeneratorDto, 'nam
 };
 
 export type WriteWorksConfigOptions = {
-    directory: Directory;
+    work: Work;
     dataRepository: DataRepository;
     request?: WorksConfigWriteRequest | null;
     importedWorksConfig?: ResolvedWorksConfig | null;
@@ -59,27 +59,27 @@ export class WorksConfigWriterService {
             existing: existingRaw.providers,
         });
         const websiteRepo =
-            imported?.websiteRepo || this.formatRepositoryTarget(options.directory, 'website');
+            imported?.websiteRepo || this.formatRepositoryTarget(options.work, 'website');
 
         return this.withoutUndefined({
             ...existingRaw,
-            name: request.name || imported?.name || options.directory.name,
+            name: request.name || imported?.name || options.work.name,
             initial_prompt: initialPrompt,
             model,
             providers,
             website_repo: websiteRepo,
-            schedule: this.buildSchedule(options.directory, imported),
+            schedule: this.buildSchedule(options.work, imported),
         });
     }
 
     private buildSchedule(
-        directory: Directory,
+        work: Work,
         imported?: ResolvedWorksConfig | null,
     ): Record<string, unknown> | undefined {
-        if (directory.scheduledUpdatesEnabled && directory.scheduledCadence) {
+        if (work.scheduledUpdatesEnabled && work.scheduledCadence) {
             return {
                 enabled: true,
-                cadence: directory.scheduledCadence,
+                cadence: work.scheduledCadence,
             };
         }
 
@@ -93,34 +93,31 @@ export class WorksConfigWriterService {
         return undefined;
     }
 
-    private formatRepositoryTarget(
-        directory: Directory,
-        role: 'data' | 'directory' | 'website',
-    ): string {
-        const target = this.getRepositoryTarget(directory, role);
+    private formatRepositoryTarget(work: Work, role: 'data' | 'work' | 'website'): string {
+        const target = this.getRepositoryTarget(work, role);
         return `${target.owner}/${target.repo}`;
     }
 
     private getRepositoryTarget(
-        directory: Directory,
-        role: 'data' | 'directory' | 'website',
+        work: Work,
+        role: 'data' | 'work' | 'website',
     ): Required<RepositoryTarget> {
         switch (role) {
-            case 'directory':
+            case 'work':
                 return {
-                    owner: directory.getRepoOwner('directory'),
-                    repo: directory.getMainRepo(),
+                    owner: work.getRepoOwner('work'),
+                    repo: work.getMainRepo(),
                 };
             case 'website':
                 return {
-                    owner: directory.getRepoOwner('website'),
-                    repo: directory.getWebsiteRepo(),
+                    owner: work.getRepoOwner('website'),
+                    repo: work.getWebsiteRepo(),
                 };
             case 'data':
             default:
                 return {
-                    owner: directory.getRepoOwner('data'),
-                    repo: directory.getDataRepo(),
+                    owner: work.getRepoOwner('data'),
+                    repo: work.getDataRepo(),
                 };
         }
     }

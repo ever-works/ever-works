@@ -1,5 +1,5 @@
 /**
- * DTO for submitting a new item to a directory
+ * DTO for submitting a new item to a work
  *
  * Note: Either `category` (single) or `categories` (array) must be provided.
  * The backend validates this with conditional validation.

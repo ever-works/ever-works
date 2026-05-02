@@ -154,7 +154,7 @@ export const CLAUDE_MANAGED_AGENT_SUPPORTED_MODELS: readonly AiModel[] = [
 	buildClaudeModel(
 		'claude-sonnet-4-6',
 		'Claude Sonnet 4.6',
-		'Best balance of speed and intelligence for managed agent directory workflows.',
+		'Best balance of speed and intelligence for managed agent work workflows.',
 		1000000,
 		64000
 	),

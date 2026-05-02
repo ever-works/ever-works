@@ -6,9 +6,9 @@ import { MarkdownGeneratorService } from '@src/generators/markdown-generator/mar
 import { WebsiteGeneratorService } from '@src/generators/website-generator/website-generator.service';
 import { SourceRepoAnalyzerService } from './source-repo-analyzer.service';
 import { buildImportGenerationDto } from './enrichment-prompt.utils';
-import { Directory, ImportSourceType } from '@src/entities/directory.entity';
+import { Work, ImportSourceType } from '@src/entities/work.entity';
 import { User } from '@src/entities/user.entity';
-import { DirectoryImportResult, DirectoryImportErrorCode } from '@src/tasks/directory-import.types';
+import { WorkImportResult, WorkImportErrorCode } from '@src/tasks/work-import.types';
 import { GIT_TOKEN_NOT_AVAILABLE } from '@src/constants/messages';
 import type { ProvidersDto } from '@ever-works/contracts/api';
 import { CreateItemsGeneratorDto } from '@src/items-generator/dto';
@@ -20,7 +20,7 @@ import {
 import { mergeWorksConfigIntoDataConfig } from '@src/works-config/works-config-data';
 
 export interface ExecuteBySourceTypeOptions {
-    directory: Directory;
+    work: Work;
     user: User;
     sourceType: ImportSourceType;
     sourceOwner: string;
@@ -34,7 +34,7 @@ export interface ExecuteBySourceTypeOptions {
 }
 
 export interface ImportFromDataRepoOptions {
-    directory: Directory;
+    work: Work;
     user: User;
     source: { owner: string; repo: string };
     token: string;
@@ -42,7 +42,7 @@ export interface ImportFromDataRepoOptions {
 }
 
 export interface ImportFromAwesomeReadmeOptions {
-    directory: Directory;
+    work: Work;
     user: User;
     sourceUrl: string;
     expansionFactor?: number;
@@ -52,7 +52,7 @@ export interface ImportFromAwesomeReadmeOptions {
 }
 
 export interface LinkExistingDataRepoOptions {
-    directory: Directory;
+    work: Work;
     user: User;
     source: { owner: string; repo: string };
     token: string;
@@ -60,7 +60,7 @@ export interface LinkExistingDataRepoOptions {
 }
 
 export interface ImportFromWorksConfigOptions {
-    directory: Directory;
+    work: Work;
     user: User;
     source: { owner: string; repo: string };
     token?: string;
@@ -81,8 +81,8 @@ export class ImportExecutorService {
         private readonly worksConfigService: WorksConfigService,
     ) {}
 
-    async importFromDataRepo(options: ImportFromDataRepoOptions): Promise<DirectoryImportResult> {
-        const { directory, user, source, token, worksConfig } = options;
+    async importFromDataRepo(options: ImportFromDataRepoOptions): Promise<WorkImportResult> {
+        const { work, user, source, token, worksConfig } = options;
 
         try {
             this.logger.log(`Cloning source repo: ${source.owner}/${source.repo}`);
@@ -91,9 +91,9 @@ export class ImportExecutorService {
                 {
                     owner: source.owner,
                     repo: source.repo,
-                    committer: directory.resolveCommitter(user),
+                    committer: work.resolveCommitter(user),
                 },
-                { userId: user.id, providerId: directory.gitProvider, token },
+                { userId: user.id, providerId: work.gitProvider, token },
             );
 
             const sourceData = await DataRepository.create(sourceDir);
@@ -103,7 +103,7 @@ export class ImportExecutorService {
             const config = await sourceData.getConfig().catch(() => ({}));
             const configWithWorksState = mergeWorksConfigIntoDataConfig(
                 config as Record<string, any>,
-                directory.name,
+                work.name,
                 worksConfig,
             );
 
@@ -114,58 +114,54 @@ export class ImportExecutorService {
             if (items.length === 0) {
                 return {
                     success: false,
-                    directoryId: directory.id,
+                    workId: work.id,
                     error: 'No items found in source repository',
-                    errorCode: DirectoryImportErrorCode.PARSE_FAILED,
+                    errorCode: WorkImportErrorCode.PARSE_FAILED,
                 };
             }
 
             const configWithMeta = configWithWorksState as Record<string, any>;
-            const initResult = await this.dataGenerator.initializeWithImportedData(
-                directory,
-                user,
-                {
-                    items,
-                    categories,
-                    tags,
-                    config: {
-                        ...configWithMeta,
-                        metadata: {
-                            ...(configWithMeta.metadata || {}),
-                            imported_from: `${source.owner}/${source.repo}`,
-                            imported_at: new Date().toISOString(),
-                            import_type: 'data_repo',
-                        },
-                    },
-                    worksConfig,
-                    importRequest: {
-                        sourceUrl: this.gitFacade.getWebUrl(
-                            directory.gitProvider,
-                            source.owner,
-                            source.repo,
-                        ),
-                        sourceType: 'data_repo' as ImportSourceType,
-                        sourceOwner: source.owner,
-                        sourceRepo: source.repo,
+            const initResult = await this.dataGenerator.initializeWithImportedData(work, user, {
+                items,
+                categories,
+                tags,
+                config: {
+                    ...configWithMeta,
+                    metadata: {
+                        ...(configWithMeta.metadata || {}),
+                        imported_from: `${source.owner}/${source.repo}`,
+                        imported_at: new Date().toISOString(),
+                        import_type: 'data_repo',
                     },
                 },
-            );
+                worksConfig,
+                importRequest: {
+                    sourceUrl: this.gitFacade.getWebUrl(
+                        work.gitProvider,
+                        source.owner,
+                        source.repo,
+                    ),
+                    sourceType: 'data_repo' as ImportSourceType,
+                    sourceOwner: source.owner,
+                    sourceRepo: source.repo,
+                },
+            });
 
             if (initResult.success === false) {
                 return {
                     success: false,
-                    directoryId: directory.id,
+                    workId: work.id,
                     error: initResult.error.message || 'Failed to initialize data repository',
-                    errorCode: DirectoryImportErrorCode.CREATE_REPO_FAILED,
+                    errorCode: WorkImportErrorCode.CREATE_REPO_FAILED,
                 };
             }
 
-            await this.markdownGenerator.initialize(directory, user);
-            await this.websiteGenerator.initialize(directory, user);
+            await this.markdownGenerator.initialize(work, user);
+            await this.websiteGenerator.initialize(work, user);
 
             return {
                 success: true,
-                directoryId: directory.id,
+                workId: work.id,
                 itemsImported: items.length,
                 categoriesImported: categories.length,
                 tagsImported: tags.length,
@@ -174,9 +170,9 @@ export class ImportExecutorService {
             this.logger.error('Failed to import from data repo', error);
             return {
                 success: false,
-                directoryId: directory.id,
+                workId: work.id,
                 error: (error as Error).message,
-                errorCode: DirectoryImportErrorCode.CLONE_FAILED,
+                errorCode: WorkImportErrorCode.CLONE_FAILED,
             };
         }
     }
@@ -186,13 +182,13 @@ export class ImportExecutorService {
      *
      * Delegates entirely to the pipeline plugin — no pre-parsing or seeding.
      * The pipeline fetches the source URL, uses it as research input, and builds
-     * a significantly larger and fully-enriched directory.
+     * a significantly larger and fully-enriched work.
      */
     async importFromAwesomeReadme(
         options: ImportFromAwesomeReadmeOptions,
-    ): Promise<DirectoryImportResult> {
+    ): Promise<WorkImportResult> {
         const {
-            directory,
+            work,
             user,
             sourceUrl,
             expansionFactor,
@@ -203,7 +199,7 @@ export class ImportExecutorService {
 
         try {
             const generationDto = buildImportGenerationDto({
-                directory,
+                work,
                 sourceUrl,
                 expansionFactor,
                 providers: {
@@ -220,53 +216,49 @@ export class ImportExecutorService {
                     `pipeline=${generationDto.providers?.pipeline}`,
             );
 
-            const genResult = await this.dataGenerator.initialize(directory, user, generationDto, {
+            const genResult = await this.dataGenerator.initialize(work, user, generationDto, {
                 worksConfig,
             });
 
             if (genResult.success !== false) {
-                await this.markdownGenerator.initialize(directory, user);
-                await this.websiteGenerator.initialize(directory, user);
+                await this.markdownGenerator.initialize(work, user);
+                await this.websiteGenerator.initialize(work, user);
             }
 
             return {
                 success: genResult.success !== false,
-                directoryId: directory.id,
+                workId: work.id,
                 itemsImported: genResult.success ? genResult.stats.totalItemsCount : 0,
                 error: genResult.success === false ? genResult.error.message : undefined,
                 errorCode:
-                    genResult.success === false
-                        ? DirectoryImportErrorCode.ENRICHMENT_FAILED
-                        : undefined,
+                    genResult.success === false ? WorkImportErrorCode.ENRICHMENT_FAILED : undefined,
             };
         } catch (error) {
             this.logger.error('Failed to import from awesome readme', error);
             return {
                 success: false,
-                directoryId: directory.id,
+                workId: work.id,
                 error: (error as Error).message,
-                errorCode: DirectoryImportErrorCode.ENRICHMENT_FAILED,
+                errorCode: WorkImportErrorCode.ENRICHMENT_FAILED,
             };
         }
     }
 
-    async linkExistingDataRepo(
-        options: LinkExistingDataRepoOptions,
-    ): Promise<DirectoryImportResult> {
-        const { directory, user, source, token, createMissingRepos = false } = options;
+    async linkExistingDataRepo(options: LinkExistingDataRepoOptions): Promise<WorkImportResult> {
+        const { work, user, source, token, createMissingRepos = false } = options;
 
         try {
             const linkAnalysis = await this.sourceRepoAnalyzer.analyzeForLinking(
-                this.gitFacade.getWebUrl(directory.gitProvider, source.owner, source.repo),
+                this.gitFacade.getWebUrl(work.gitProvider, source.owner, source.repo),
                 token,
             );
 
             if (!linkAnalysis.canLink) {
                 return {
                     success: false,
-                    directoryId: directory.id,
+                    workId: work.id,
                     error: linkAnalysis.error || 'Cannot link to this repository',
-                    errorCode: DirectoryImportErrorCode.REPO_ACCESS_DENIED,
+                    errorCode: WorkImportErrorCode.REPO_ACCESS_DENIED,
                 };
             }
 
@@ -276,9 +268,9 @@ export class ImportExecutorService {
                 {
                     owner: source.owner,
                     repo: source.repo,
-                    committer: directory.resolveCommitter(user),
+                    committer: work.resolveCommitter(user),
                 },
-                { userId: user.id, providerId: directory.gitProvider, token },
+                { userId: user.id, providerId: work.gitProvider, token },
             );
 
             const sourceData = await DataRepository.create(dataRepoDir);
@@ -291,16 +283,16 @@ export class ImportExecutorService {
             );
 
             if (!linkAnalysis.relatedRepos.markdown.exists && createMissingRepos) {
-                await this.markdownGenerator.initialize(directory, user);
+                await this.markdownGenerator.initialize(work, user);
             }
 
             if (!linkAnalysis.relatedRepos.website.exists && createMissingRepos) {
-                await this.websiteGenerator.initialize(directory, user);
+                await this.websiteGenerator.initialize(work, user);
             }
 
             return {
                 success: true,
-                directoryId: directory.id,
+                workId: work.id,
                 itemsImported: items.length,
                 categoriesImported: categories.length,
                 tagsImported: tags.length,
@@ -309,17 +301,15 @@ export class ImportExecutorService {
             this.logger.error('Failed to link existing data repo', error);
             return {
                 success: false,
-                directoryId: directory.id,
+                workId: work.id,
                 error: (error as Error).message,
-                errorCode: DirectoryImportErrorCode.CLONE_FAILED,
+                errorCode: WorkImportErrorCode.CLONE_FAILED,
             };
         }
     }
 
-    async importFromWorksConfig(
-        options: ImportFromWorksConfigOptions,
-    ): Promise<DirectoryImportResult> {
-        const { directory, user, source, token, providers, worksConfig } = options;
+    async importFromWorksConfig(options: ImportFromWorksConfigOptions): Promise<WorkImportResult> {
+        const { work, user, source, token, providers, worksConfig } = options;
 
         try {
             const resolvedWorksConfig =
@@ -327,21 +317,21 @@ export class ImportExecutorService {
                 (await this.worksConfigService.loadFromRepository(
                     source.owner,
                     source.repo,
-                    directory.gitProvider,
+                    work.gitProvider,
                     token,
                 ));
 
             if (!resolvedWorksConfig?.initialPrompt) {
                 return {
                     success: false,
-                    directoryId: directory.id,
+                    workId: work.id,
                     error: 'works.yml is missing initial_prompt',
-                    errorCode: DirectoryImportErrorCode.PARSE_FAILED,
+                    errorCode: WorkImportErrorCode.PARSE_FAILED,
                 };
             }
 
             const generationDto: CreateItemsGeneratorDto = {
-                name: directory.name,
+                name: work.name,
                 prompt: resolvedWorksConfig.initialPrompt,
                 model: resolvedWorksConfig.model,
                 providers: {
@@ -355,39 +345,37 @@ export class ImportExecutorService {
                 delete generationDto.providers;
             }
 
-            const genResult = await this.dataGenerator.initialize(directory, user, generationDto, {
+            const genResult = await this.dataGenerator.initialize(work, user, generationDto, {
                 worksConfig: resolvedWorksConfig,
             });
 
             if (genResult.success !== false) {
-                await this.markdownGenerator.initialize(directory, user);
-                await this.websiteGenerator.initialize(directory, user);
+                await this.markdownGenerator.initialize(work, user);
+                await this.websiteGenerator.initialize(work, user);
             }
 
             return {
                 success: genResult.success !== false,
-                directoryId: directory.id,
+                workId: work.id,
                 itemsImported: genResult.success ? genResult.stats.totalItemsCount : 0,
                 stats: genResult.success ? genResult.stats : undefined,
                 error: genResult.success === false ? genResult.error.message : undefined,
                 errorCode:
-                    genResult.success === false
-                        ? DirectoryImportErrorCode.GENERATION_FAILED
-                        : undefined,
+                    genResult.success === false ? WorkImportErrorCode.GENERATION_FAILED : undefined,
             };
         } catch (error) {
             this.logger.error('Failed to import from works config', error);
             return {
                 success: false,
-                directoryId: directory.id,
+                workId: work.id,
                 error: (error as Error).message,
-                errorCode: DirectoryImportErrorCode.GENERATION_FAILED,
+                errorCode: WorkImportErrorCode.GENERATION_FAILED,
             };
         }
     }
 
-    async executeBySourceType(opts: ExecuteBySourceTypeOptions): Promise<DirectoryImportResult> {
-        const { directory, user, sourceType, token } = opts;
+    async executeBySourceType(opts: ExecuteBySourceTypeOptions): Promise<WorkImportResult> {
+        const { work, user, sourceType, token } = opts;
 
         switch (sourceType) {
             case 'data_repo': {
@@ -395,7 +383,7 @@ export class ImportExecutorService {
                     throw new Error(GIT_TOKEN_NOT_AVAILABLE);
                 }
                 return this.importFromDataRepo({
-                    directory,
+                    work,
                     user,
                     source: { owner: opts.sourceOwner, repo: opts.sourceRepo },
                     token,
@@ -404,7 +392,7 @@ export class ImportExecutorService {
             }
             case 'awesome_readme':
                 return this.importFromAwesomeReadme({
-                    directory,
+                    work,
                     user,
                     sourceUrl: opts.sourceUrl,
                     expansionFactor: opts.expansionFactor,
@@ -416,7 +404,7 @@ export class ImportExecutorService {
                     throw new Error(GIT_TOKEN_NOT_AVAILABLE);
                 }
                 return this.linkExistingDataRepo({
-                    directory,
+                    work,
                     user,
                     source: { owner: opts.sourceOwner, repo: opts.sourceRepo },
                     token,
@@ -425,7 +413,7 @@ export class ImportExecutorService {
             }
             case 'works_config':
                 return this.importFromWorksConfig({
-                    directory,
+                    work,
                     user,
                     source: { owner: opts.sourceOwner, repo: opts.sourceRepo },
                     token,

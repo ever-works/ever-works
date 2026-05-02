@@ -105,10 +105,10 @@ function createMockContext(overrides?: Partial<UrlWorkerContext>): UrlWorkerCont
 				images: []
 			})
 		} as unknown as IContentExtractorFacade,
-		facadeOptions: { userId: 'u1', directoryId: 'd1' } as FacadeOptions,
-		directoryContext: {
-			directoryName: 'AI Tools',
-			directoryDescription: 'Best AI tools'
+		facadeOptions: { userId: 'u1', workId: 'd1' } as FacadeOptions,
+		workContext: {
+			workName: 'AI Tools',
+			workDescription: 'Best AI tools'
 		},
 		workspacePath: '/tmp/workspace',
 		logger: { log: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() } as unknown as PluginLogger,

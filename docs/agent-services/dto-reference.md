@@ -11,13 +11,13 @@ This page documents all Data Transfer Objects (DTOs) in the agent package. DTOs 
 
 **Source:** `packages/agent/src/dto/`
 
-## Directory DTOs
+## Work DTOs
 
-### CreateDirectoryDto
+### CreateWorkDto
 
-Used when creating a new directory.
+Used when creating a new work.
 
-**Source:** `dto/create-directory.dto.ts`
+**Source:** `dto/create-work.dto.ts`
 
 | Field            | Type                      | Required | Validation                                                              | Description                                 |
 | ---------------- | ------------------------- | -------- | ----------------------------------------------------------------------- | ------------------------------------------- |
@@ -41,11 +41,11 @@ Nested configuration for README customization.
 | `footer`                 | `string`  | No       | Custom footer content (preserves newlines)       |
 | `overwriteDefaultFooter` | `boolean` | No       | Replace default footer entirely (default: false) |
 
-### UpdateDirectoryDto
+### UpdateWorkDto
 
-Used when updating an existing directory.
+Used when updating an existing work.
 
-**Source:** `dto/update-directory.dto.ts`
+**Source:** `dto/update-work.dto.ts`
 
 | Field                       | Type                      | Required | Description                             |
 | --------------------------- | ------------------------- | -------- | --------------------------------------- |
@@ -62,17 +62,17 @@ Used when updating an existing directory.
 
 ## Import DTOs
 
-### ImportDirectoryDto
+### ImportWorkDto
 
-Used when importing a directory from an external repository.
+Used when importing a work from an external repository.
 
-**Source:** `dto/import-directory.dto.ts`
+**Source:** `dto/import-work.dto.ts`
 
 | Field                | Type                   | Required | Description                                       |
 | -------------------- | ---------------------- | -------- | ------------------------------------------------- |
 | `sourceUrl`          | `string`               | Yes      | Repository URL to import from                     |
 | `sourceType`         | `ImportSourceTypeEnum` | Yes      | `data_repo`, `awesome_readme`, or `link_existing` |
-| `name`               | `string`               | Yes      | Directory name (max 100 chars)                    |
+| `name`               | `string`               | Yes      | Work name (max 100 chars)                         |
 | `owner`              | `string`               | No       | Repo owner override                               |
 | `organization`       | `boolean`              | No       | Organization flag                                 |
 | `createMissingRepos` | `boolean`              | No       | Create repos that do not exist                    |
@@ -120,26 +120,26 @@ Used to list repositories from a Git provider.
 
 ## Schedule DTOs
 
-### UpdateDirectoryScheduleDto
+### UpdateWorkScheduleDto
 
-Used to create or update a directory schedule.
+Used to create or update a work schedule.
 
-**Source:** `dto/directory-schedule.dto.ts`
+**Source:** `dto/work-schedule.dto.ts`
 
-| Field                     | Type                           | Required | Validation                                   | Description                            |
-| ------------------------- | ------------------------------ | -------- | -------------------------------------------- | -------------------------------------- |
-| `enable`                  | `boolean`                      | No       | --                                           | Activate or deactivate the schedule    |
-| `cadence`                 | `DirectoryScheduleCadence`     | No       | Enum: `hourly`, `daily`, `weekly`, `monthly` | Update frequency                       |
-| `billingMode`             | `DirectoryScheduleBillingMode` | No       | Enum: `subscription`, `usage`                | How runs are billed                    |
-| `maxFailureBeforePause`   | `number`                       | No       | Integer, min: 1, max: 10                     | Consecutive failures before auto-pause |
-| `alwaysCreatePullRequest` | `boolean`                      | No       | --                                           | Force PR creation on scheduled runs    |
-| `providerOverrides`       | `ProvidersDto \| null`         | No       | Nested validation                            | Override providers for scheduled runs  |
+| Field                     | Type                      | Required | Validation                                   | Description                            |
+| ------------------------- | ------------------------- | -------- | -------------------------------------------- | -------------------------------------- |
+| `enable`                  | `boolean`                 | No       | --                                           | Activate or deactivate the schedule    |
+| `cadence`                 | `WorkScheduleCadence`     | No       | Enum: `hourly`, `daily`, `weekly`, `monthly` | Update frequency                       |
+| `billingMode`             | `WorkScheduleBillingMode` | No       | Enum: `subscription`, `usage`                | How runs are billed                    |
+| `maxFailureBeforePause`   | `number`                  | No       | Integer, min: 1, max: 10                     | Consecutive failures before auto-pause |
+| `alwaysCreatePullRequest` | `boolean`                 | No       | --                                           | Force PR creation on scheduled runs    |
+| `providerOverrides`       | `ProvidersDto \| null`    | No       | Nested validation                            | Override providers for scheduled runs  |
 
 ## Generation History DTOs
 
-### DirectoryGenerationHistoryDto
+### WorkGenerationHistoryDto
 
-**Source:** `dto/directory-generation-history.dto.ts`
+**Source:** `dto/work-generation-history.dto.ts`
 
 | Field               | Type                          | Description                           |
 | ------------------- | ----------------------------- | ------------------------------------- |
@@ -159,11 +159,11 @@ Used to create or update a directory schedule.
 | `updatedAt`         | `string`                      | Last update time                      |
 | `triggerRunId`      | `string`                      | Background task run ID                |
 
-### DirectoryGenerationHistoryListDto
+### WorkGenerationHistoryListDto
 
 ```typescript
-interface DirectoryGenerationHistoryListDto {
-	history: DirectoryGenerationHistoryDto[];
+interface WorkGenerationHistoryListDto {
+	history: WorkGenerationHistoryDto[];
 	total: number;
 	limit: number;
 	offset: number;

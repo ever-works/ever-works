@@ -24,7 +24,7 @@ export interface ComparisonGenerationResult {
 }
 
 export interface ComparisonPluginSettings {
-    readonly cadence_override: 'use_directory' | 'daily' | 'weekly' | 'monthly';
+    readonly cadence_override: 'use_work' | 'daily' | 'weekly' | 'monthly';
     readonly max_comparisons_mode: 'custom' | 'unlimited';
     readonly max_comparisons: number;
     readonly min_items_for_comparison: number;
@@ -35,7 +35,7 @@ export interface ComparisonPluginSettings {
 }
 
 export const DEFAULT_COMPARISON_SETTINGS: ComparisonPluginSettings = {
-    cadence_override: 'use_directory',
+    cadence_override: 'use_work',
     max_comparisons_mode: 'custom',
     max_comparisons: 50,
     min_items_for_comparison: 3,

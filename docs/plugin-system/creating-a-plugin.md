@@ -25,9 +25,9 @@ For detailed, category-specific instructions, see these dedicated guides:
 
 The rest of this page covers the **common patterns** shared by all plugin categories.
 
-## Directory Structure
+## Work Structure
 
-Create a new directory under `packages/plugins/`:
+Create a new work under `packages/plugins/`:
 
 ```
 packages/plugins/my-search/
@@ -339,7 +339,7 @@ export default MySearchPlugin;
 
 ### Settings are resolved at call time
 
-Settings are passed to capability methods via `options.settings`, **not** stored on the plugin instance. This allows different directories to use different configurations:
+Settings are passed to capability methods via `options.settings`, **not** stored on the plugin instance. This allows different works to use different configurations:
 
 ```typescript
 async search(options: SearchOptions): Promise<SearchResponse> {

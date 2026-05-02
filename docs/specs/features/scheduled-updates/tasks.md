@@ -1,4 +1,4 @@
-# Task Breakdown: Scheduled Directory Updates
+# Task Breakdown: Scheduled Work Updates
 
 **Feature ID**: `scheduled-updates`
 **Status**: `Done` (Retrospective)
@@ -8,15 +8,15 @@
 
 ## Phase 1 — Schema & contracts
 
-- [x] T1. `DirectorySchedule` entity, repository, contracts DTO.
+- [x] T1. `WorkSchedule` entity, repository, contracts DTO.
 - [x] T2. Migrations: initial table, cadence enum additions, `scheduledFor`,
       `providerOverrides`.
 
 ## Phase 2 — Service
 
-- [x] T3. `DirectoryScheduleService` (CRUD + state transitions).
-- [x] T4. `DirectoryScheduleRepository.tryMarkDispatched` — CAS claim.
-- [x] T5. `DirectoryScheduleDispatcherService.dispatchDue`.
+- [x] T3. `WorkScheduleService` (CRUD + state transitions).
+- [x] T4. `WorkScheduleRepository.tryMarkDispatched` — CAS claim.
+- [x] T5. `WorkScheduleDispatcherService.dispatchDue`.
 - [x] T6. Drift correction (`scheduledFor` anchor + `resolveAnchorDate`).
 - [x] T7. Zombie recovery (`recoverStuckSchedules`).
 - [x] T8. Auto-pause + notification.
@@ -24,8 +24,8 @@
 
 ## Phase 3 — Trigger.dev
 
-- [x] T10. `directoryScheduleDispatcherTask` (`schedules.task`) at
-      `packages/tasks/src/tasks/trigger/directory-schedule-dispatcher.task.ts`.
+- [x] T10. `workScheduleDispatcherTask` (`schedules.task`) at
+      `packages/tasks/src/tasks/trigger/work-schedule-dispatcher.task.ts`.
 
 ## Phase 4 — API
 
@@ -34,14 +34,14 @@
 
 ## Phase 5 — Web / CLI
 
-- [x] T13. Schedule UI on directory detail page.
-- [x] T14. CLI `directory schedule` commands.
+- [x] T13. Schedule UI on work detail page.
+- [x] T14. CLI `work schedule` commands.
 
 ## Phase 6 — Docs
 
 - [x] T15. User-facing doc `docs/features/scheduled-updates.md`.
 - [x] T16. Architectural deep-dive
-      `docs/agent-services/directory-schedule-dispatcher.md`.
+      `docs/agent-services/work-schedule-dispatcher.md`.
 - [x] T17. Retrospective spec/plan/tasks.
 
 ## Definition of Done

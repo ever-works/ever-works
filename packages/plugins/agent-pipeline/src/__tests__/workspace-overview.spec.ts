@@ -57,7 +57,7 @@ describe('readWorkspaceOverview', () => {
 		expect(result.brands).toEqual([]);
 	});
 
-	it('handles missing workspace directory', async () => {
+	it('handles missing workspace work', async () => {
 		mockReaddir.mockRejectedValue(new Error('ENOENT'));
 		mockReadFile.mockRejectedValue(new Error('ENOENT'));
 

@@ -1,7 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { PluginRegistryService, resolvePluginEnabled } from '../services/plugin-registry.service';
-import { DirectoryPluginRepository } from '../repositories/directory-plugin.repository';
+import { WorkPluginRepository } from '../repositories/work-plugin.repository';
 import { UserPluginRepository } from '../repositories/user-plugin.repository';
 import { PluginEvents } from '../plugins.constants';
 import type { IPlugin, PluginManifest, PluginCategory } from '@ever-works/plugin';
@@ -9,7 +9,7 @@ import type { IPlugin, PluginManifest, PluginCategory } from '@ever-works/plugin
 describe('PluginRegistryService', () => {
     let service: PluginRegistryService;
     let eventEmitter: EventEmitter2;
-    let directoryPluginRepository: jest.Mocked<DirectoryPluginRepository>;
+    let workPluginRepository: jest.Mocked<WorkPluginRepository>;
     let userPluginRepository: jest.Mocked<UserPluginRepository>;
 
     const createMockPlugin = (id: string, category: PluginCategory = 'utility'): IPlugin =>
@@ -38,9 +38,9 @@ describe('PluginRegistryService', () => {
     });
 
     beforeEach(async () => {
-        directoryPluginRepository = {
-            findByDirectoryAndPlugin: jest.fn(),
-        } as unknown as jest.Mocked<DirectoryPluginRepository>;
+        workPluginRepository = {
+            findByWorkAndPlugin: jest.fn(),
+        } as unknown as jest.Mocked<WorkPluginRepository>;
 
         userPluginRepository = {
             findByUserAndPlugin: jest.fn(),
@@ -58,8 +58,8 @@ describe('PluginRegistryService', () => {
                     },
                 },
                 {
-                    provide: DirectoryPluginRepository,
-                    useValue: directoryPluginRepository,
+                    provide: WorkPluginRepository,
+                    useValue: workPluginRepository,
                 },
                 {
                     provide: UserPluginRepository,
@@ -393,7 +393,7 @@ describe('PluginRegistryService', () => {
     });
 
     describe('getDefaultForCapabilityScoped', () => {
-        it('should return plugin enabled at directory level first', async () => {
+        it('should return plugin enabled at work level first', async () => {
             const plugin = createMockPlugin('search-plugin');
             const manifest: PluginManifest = {
                 ...createMockManifest('search-plugin'),
@@ -401,9 +401,9 @@ describe('PluginRegistryService', () => {
             };
             service.register(plugin, manifest, { state: 'loaded' });
 
-            directoryPluginRepository.findByDirectoryAndPlugin.mockResolvedValue({
+            workPluginRepository.findByWorkAndPlugin.mockResolvedValue({
                 id: '1',
-                directoryId: 'dir-1',
+                workId: 'dir-1',
                 pluginId: 'search-plugin',
                 enabled: true,
                 activeCapabilities: ['search'],
@@ -412,13 +412,13 @@ describe('PluginRegistryService', () => {
             const result = await service.getDefaultForCapabilityScoped('search', 'dir-1');
 
             expect(result?.plugin.id).toBe('search-plugin');
-            expect(directoryPluginRepository.findByDirectoryAndPlugin).toHaveBeenCalledWith(
+            expect(workPluginRepository.findByWorkAndPlugin).toHaveBeenCalledWith(
                 'dir-1',
                 'search-plugin',
             );
         });
 
-        it('should skip plugin disabled at directory level', async () => {
+        it('should skip plugin disabled at work level', async () => {
             const plugin1 = createMockPlugin('plugin-1');
             const plugin2 = createMockPlugin('plugin-2');
             const manifest1: PluginManifest = {
@@ -432,22 +432,20 @@ describe('PluginRegistryService', () => {
             service.register(plugin1, manifest1, { state: 'loaded' });
             service.register(plugin2, manifest2, { state: 'loaded' });
 
-            // plugin-1 is disabled at directory level
-            directoryPluginRepository.findByDirectoryAndPlugin.mockImplementation(
-                async (dirId, pluginId) => {
-                    if (pluginId === 'plugin-1') {
-                        return { enabled: false, directoryId: dirId, pluginId } as any;
-                    }
-                    return { enabled: true, directoryId: dirId, pluginId } as any;
-                },
-            );
+            // plugin-1 is disabled at work level
+            workPluginRepository.findByWorkAndPlugin.mockImplementation(async (dirId, pluginId) => {
+                if (pluginId === 'plugin-1') {
+                    return { enabled: false, workId: dirId, pluginId } as any;
+                }
+                return { enabled: true, workId: dirId, pluginId } as any;
+            });
 
             const result = await service.getDefaultForCapabilityScoped('search', 'dir-1');
 
             expect(result?.plugin.id).toBe('plugin-2');
         });
 
-        it('should check user level when directory level returns null', async () => {
+        it('should check user level when work level returns null', async () => {
             const plugin = createMockPlugin('search-plugin');
             const manifest: PluginManifest = {
                 ...createMockManifest('search-plugin'),
@@ -456,12 +454,12 @@ describe('PluginRegistryService', () => {
             };
             service.register(plugin, manifest, { state: 'loaded' });
 
-            // No directory-level config
-            directoryPluginRepository.findByDirectoryAndPlugin.mockResolvedValue(null);
-            // User has it enabled with autoEnableForDirectories
+            // No work-level config
+            workPluginRepository.findByWorkAndPlugin.mockResolvedValue(null);
+            // User has it enabled with autoEnableForWorks
             userPluginRepository.findByUserAndPlugin.mockResolvedValue({
                 enabled: true,
-                autoEnableForDirectories: true,
+                autoEnableForWorks: true,
                 userId: 'user-1',
                 pluginId: 'search-plugin',
             } as any);
@@ -480,7 +478,7 @@ describe('PluginRegistryService', () => {
             };
             service.register(plugin, manifest, { state: 'loaded' });
 
-            directoryPluginRepository.findByDirectoryAndPlugin.mockResolvedValue(null);
+            workPluginRepository.findByWorkAndPlugin.mockResolvedValue(null);
             userPluginRepository.findByUserAndPlugin.mockResolvedValue(null);
 
             const result = await service.getDefaultForCapabilityScoped('search');
@@ -497,7 +495,7 @@ describe('PluginRegistryService', () => {
             };
             service.register(plugin, manifest, { state: 'loaded' });
 
-            directoryPluginRepository.findByDirectoryAndPlugin.mockResolvedValue(null);
+            workPluginRepository.findByWorkAndPlugin.mockResolvedValue(null);
             userPluginRepository.findByUserAndPlugin.mockResolvedValue(null);
 
             const result = await service.getDefaultForCapabilityScoped('search');
@@ -522,8 +520,8 @@ describe('PluginRegistryService', () => {
             service.register(plugin1, manifest1, { state: 'loaded' });
             service.register(plugin2, manifest2, { state: 'loaded' });
 
-            // No directory-level config (returns null)
-            directoryPluginRepository.findByDirectoryAndPlugin.mockResolvedValue(null);
+            // No work-level config (returns null)
+            workPluginRepository.findByWorkAndPlugin.mockResolvedValue(null);
             userPluginRepository.findByUserAndPlugin.mockResolvedValue(null);
 
             const result = await service.getDefaultForCapabilityScoped('search');
@@ -557,7 +555,7 @@ describe('PluginRegistryService', () => {
             expect(result).toBe(true);
         });
 
-        it('should cascade user-level disable to directory level', async () => {
+        it('should cascade user-level disable to work level', async () => {
             const plugin = createMockPlugin('test-plugin');
             const manifest: PluginManifest = {
                 ...createMockManifest('test-plugin'),
@@ -565,24 +563,24 @@ describe('PluginRegistryService', () => {
             };
             service.register(plugin, manifest, { state: 'loaded' });
 
-            // User disabled, but directory enabled
+            // User disabled, but work enabled
             userPluginRepository.findByUserAndPlugin.mockResolvedValue({
                 enabled: false,
                 userId: 'user-1',
                 pluginId: 'test-plugin',
             } as any);
-            directoryPluginRepository.findByDirectoryAndPlugin.mockResolvedValue({
+            workPluginRepository.findByWorkAndPlugin.mockResolvedValue({
                 enabled: true,
-                directoryId: 'dir-1',
+                workId: 'dir-1',
                 pluginId: 'test-plugin',
             } as any);
 
             const result = await service.isPluginEnabledForScope('test-plugin', 'dir-1', 'user-1');
-            // User disable cascades: should be false despite directory being enabled
+            // User disable cascades: should be false despite work being enabled
             expect(result).toBe(false);
         });
 
-        it('should allow directory override when user has not disabled', async () => {
+        it('should allow work override when user has not disabled', async () => {
             const plugin = createMockPlugin('test-plugin');
             const manifest: PluginManifest = {
                 ...createMockManifest('test-plugin'),
@@ -590,24 +588,24 @@ describe('PluginRegistryService', () => {
             };
             service.register(plugin, manifest, { state: 'loaded' });
 
-            // User enabled, directory disabled
+            // User enabled, work disabled
             userPluginRepository.findByUserAndPlugin.mockResolvedValue({
                 enabled: true,
                 userId: 'user-1',
                 pluginId: 'test-plugin',
             } as any);
-            directoryPluginRepository.findByDirectoryAndPlugin.mockResolvedValue({
+            workPluginRepository.findByWorkAndPlugin.mockResolvedValue({
                 enabled: false,
-                directoryId: 'dir-1',
+                workId: 'dir-1',
                 pluginId: 'test-plugin',
             } as any);
 
             const result = await service.isPluginEnabledForScope('test-plugin', 'dir-1', 'user-1');
-            // Directory override: should be false because directory disabled
+            // Work override: should be false because work disabled
             expect(result).toBe(false);
         });
 
-        it('should allow directory enable when user has not disabled and no user record', async () => {
+        it('should allow work enable when user has not disabled and no user record', async () => {
             const plugin = createMockPlugin('test-plugin');
             const manifest: PluginManifest = {
                 ...createMockManifest('test-plugin'),
@@ -615,11 +613,11 @@ describe('PluginRegistryService', () => {
             };
             service.register(plugin, manifest, { state: 'loaded' });
 
-            // No user record (null), directory enabled
+            // No user record (null), work enabled
             userPluginRepository.findByUserAndPlugin.mockResolvedValue(null);
-            directoryPluginRepository.findByDirectoryAndPlugin.mockResolvedValue({
+            workPluginRepository.findByWorkAndPlugin.mockResolvedValue({
                 enabled: true,
-                directoryId: 'dir-1',
+                workId: 'dir-1',
                 pluginId: 'test-plugin',
             } as any);
 
@@ -627,7 +625,7 @@ describe('PluginRegistryService', () => {
             expect(result).toBe(true);
         });
 
-        it('should not cascade user enabled to directory when autoEnableForDirectories is absent', async () => {
+        it('should not cascade user enabled to work when autoEnableForWorks is absent', async () => {
             const plugin = createMockPlugin('test-plugin');
             const manifest: PluginManifest = {
                 ...createMockManifest('test-plugin'),
@@ -635,14 +633,14 @@ describe('PluginRegistryService', () => {
             };
             service.register(plugin, manifest, { state: 'loaded' });
 
-            directoryPluginRepository.findByDirectoryAndPlugin.mockResolvedValue(null);
+            workPluginRepository.findByWorkAndPlugin.mockResolvedValue(null);
             userPluginRepository.findByUserAndPlugin.mockResolvedValue({
                 enabled: true,
                 userId: 'user-1',
                 pluginId: 'test-plugin',
             } as any);
 
-            // User-level enabled does NOT cascade to directory scope
+            // User-level enabled does NOT cascade to work scope
             const result = await service.isPluginEnabledForScope('test-plugin', 'dir-1', 'user-1');
             expect(result).toBe(false);
         });
@@ -655,7 +653,7 @@ describe('PluginRegistryService', () => {
             };
             service.register(plugin, manifest, { state: 'loaded' });
 
-            directoryPluginRepository.findByDirectoryAndPlugin.mockResolvedValue(null);
+            workPluginRepository.findByWorkAndPlugin.mockResolvedValue(null);
             userPluginRepository.findByUserAndPlugin.mockResolvedValue(null);
 
             const result = await service.isPluginEnabledForScope('test-plugin');
@@ -670,14 +668,14 @@ describe('PluginRegistryService', () => {
             };
             service.register(plugin, manifest, { state: 'loaded' });
 
-            directoryPluginRepository.findByDirectoryAndPlugin.mockResolvedValue(null);
+            workPluginRepository.findByWorkAndPlugin.mockResolvedValue(null);
             userPluginRepository.findByUserAndPlugin.mockResolvedValue(null);
 
             const result = await service.isPluginEnabledForScope('test-plugin');
             expect(result).toBe(false);
         });
 
-        it('should return true in directory context when autoEnableForDirectories is true', async () => {
+        it('should return true in work context when autoEnableForWorks is true', async () => {
             const plugin = createMockPlugin('test-plugin');
             const manifest: PluginManifest = {
                 ...createMockManifest('test-plugin'),
@@ -689,15 +687,15 @@ describe('PluginRegistryService', () => {
                 enabled: true,
                 userId: 'user-1',
                 pluginId: 'test-plugin',
-                autoEnableForDirectories: true,
+                autoEnableForWorks: true,
             } as any);
-            directoryPluginRepository.findByDirectoryAndPlugin.mockResolvedValue(null);
+            workPluginRepository.findByWorkAndPlugin.mockResolvedValue(null);
 
             const result = await service.isPluginEnabledForScope('test-plugin', 'dir-1', 'user-1');
             expect(result).toBe(true);
         });
 
-        it('should respect directory explicit disable over autoEnableForDirectories', async () => {
+        it('should respect work explicit disable over autoEnableForWorks', async () => {
             const plugin = createMockPlugin('test-plugin');
             const manifest: PluginManifest = {
                 ...createMockManifest('test-plugin'),
@@ -709,11 +707,11 @@ describe('PluginRegistryService', () => {
                 enabled: true,
                 userId: 'user-1',
                 pluginId: 'test-plugin',
-                autoEnableForDirectories: true,
+                autoEnableForWorks: true,
             } as any);
-            directoryPluginRepository.findByDirectoryAndPlugin.mockResolvedValue({
+            workPluginRepository.findByWorkAndPlugin.mockResolvedValue({
                 enabled: false,
-                directoryId: 'dir-1',
+                workId: 'dir-1',
                 pluginId: 'test-plugin',
             } as any);
 
@@ -721,7 +719,7 @@ describe('PluginRegistryService', () => {
             expect(result).toBe(false);
         });
 
-        it('should not apply autoEnableForDirectories without directory context', async () => {
+        it('should not apply autoEnableForWorks without work context', async () => {
             const plugin = createMockPlugin('test-plugin');
             const manifest: PluginManifest = {
                 ...createMockManifest('test-plugin'),
@@ -733,7 +731,7 @@ describe('PluginRegistryService', () => {
                 enabled: true,
                 userId: 'user-1',
                 pluginId: 'test-plugin',
-                autoEnableForDirectories: true,
+                autoEnableForWorks: true,
             } as any);
 
             const result = await service.isPluginEnabledForScope(
@@ -756,9 +754,9 @@ describe('PluginRegistryService', () => {
                 enabled: true,
                 userId: 'user-1',
                 pluginId: 'test-plugin',
-                autoEnableForDirectories: false,
+                autoEnableForWorks: false,
             } as any);
-            directoryPluginRepository.findByDirectoryAndPlugin.mockResolvedValue(null);
+            workPluginRepository.findByWorkAndPlugin.mockResolvedValue(null);
 
             await service.isPluginEnabledForScope('test-plugin', 'dir-1', 'user-1');
             expect(userPluginRepository.findByUserAndPlugin).toHaveBeenCalledTimes(1);
@@ -772,8 +770,8 @@ describe('PluginRegistryService', () => {
                     systemPlugin: true,
                     autoEnable: false,
                     userPlugin: { enabled: false },
-                    directoryPlugin: { enabled: false },
-                    hasDirectoryContext: true,
+                    workPlugin: { enabled: false },
+                    hasWorkContext: true,
                 }),
             ).toBe(true);
         });
@@ -783,19 +781,19 @@ describe('PluginRegistryService', () => {
                 resolvePluginEnabled({
                     autoEnable: true,
                     userPlugin: { enabled: false },
-                    directoryPlugin: { enabled: true },
-                    hasDirectoryContext: true,
+                    workPlugin: { enabled: true },
+                    hasWorkContext: true,
                 }),
             ).toBe(false);
         });
 
-        it('should use directory explicit record when user has not disabled', () => {
+        it('should use work explicit record when user has not disabled', () => {
             expect(
                 resolvePluginEnabled({
                     autoEnable: false,
                     userPlugin: { enabled: true },
-                    directoryPlugin: { enabled: false },
-                    hasDirectoryContext: true,
+                    workPlugin: { enabled: false },
+                    hasWorkContext: true,
                 }),
             ).toBe(false);
 
@@ -803,41 +801,41 @@ describe('PluginRegistryService', () => {
                 resolvePluginEnabled({
                     autoEnable: false,
                     userPlugin: { enabled: true },
-                    directoryPlugin: { enabled: true },
-                    hasDirectoryContext: true,
+                    workPlugin: { enabled: true },
+                    hasWorkContext: true,
                 }),
             ).toBe(true);
         });
 
-        it('should use autoEnableForDirectories when no directory record exists', () => {
+        it('should use autoEnableForWorks when no work record exists', () => {
             expect(
                 resolvePluginEnabled({
                     autoEnable: false,
-                    userPlugin: { enabled: true, autoEnableForDirectories: true },
-                    directoryPlugin: null,
-                    hasDirectoryContext: true,
+                    userPlugin: { enabled: true, autoEnableForWorks: true },
+                    workPlugin: null,
+                    hasWorkContext: true,
                 }),
             ).toBe(true);
         });
 
-        it('should not apply autoEnableForDirectories without directory context', () => {
+        it('should not apply autoEnableForWorks without work context', () => {
             expect(
                 resolvePluginEnabled({
                     autoEnable: false,
-                    userPlugin: { enabled: true, autoEnableForDirectories: true },
-                    directoryPlugin: null,
-                    hasDirectoryContext: false,
+                    userPlugin: { enabled: true, autoEnableForWorks: true },
+                    workPlugin: null,
+                    hasWorkContext: false,
                 }),
             ).toBe(true); // falls through to step 5 (user enabled)
         });
 
-        it('should fall back to user enabled status without directory context', () => {
+        it('should fall back to user enabled status without work context', () => {
             expect(
                 resolvePluginEnabled({
                     autoEnable: false,
                     userPlugin: { enabled: true },
-                    directoryPlugin: null,
-                    hasDirectoryContext: false,
+                    workPlugin: null,
+                    hasWorkContext: false,
                 }),
             ).toBe(true);
 
@@ -845,19 +843,19 @@ describe('PluginRegistryService', () => {
                 resolvePluginEnabled({
                     autoEnable: true,
                     userPlugin: { enabled: false },
-                    directoryPlugin: null,
-                    hasDirectoryContext: false,
+                    workPlugin: null,
+                    hasWorkContext: false,
                 }),
             ).toBe(false);
         });
 
-        it('should fall back to autoEnable when no user/directory records', () => {
+        it('should fall back to autoEnable when no user/work records', () => {
             expect(
                 resolvePluginEnabled({
                     autoEnable: true,
                     userPlugin: null,
-                    directoryPlugin: null,
-                    hasDirectoryContext: false,
+                    workPlugin: null,
+                    hasWorkContext: false,
                 }),
             ).toBe(true);
 
@@ -865,8 +863,8 @@ describe('PluginRegistryService', () => {
                 resolvePluginEnabled({
                     autoEnable: false,
                     userPlugin: null,
-                    directoryPlugin: null,
-                    hasDirectoryContext: false,
+                    workPlugin: null,
+                    hasWorkContext: false,
                 }),
             ).toBe(false);
         });
@@ -875,8 +873,8 @@ describe('PluginRegistryService', () => {
             expect(
                 resolvePluginEnabled({
                     userPlugin: null,
-                    directoryPlugin: null,
-                    hasDirectoryContext: false,
+                    workPlugin: null,
+                    hasWorkContext: false,
                 }),
             ).toBe(false);
         });
@@ -902,7 +900,7 @@ describe('PluginRegistryService', () => {
             );
 
             // With no scope IDs, falls back to autoEnable
-            directoryPluginRepository.findByDirectoryAndPlugin.mockResolvedValue(null);
+            workPluginRepository.findByWorkAndPlugin.mockResolvedValue(null);
             userPluginRepository.findByUserAndPlugin.mockResolvedValue(null);
 
             const result = await service.getEnabledPluginsScoped();
@@ -926,7 +924,7 @@ describe('PluginRegistryService', () => {
             service.register(plugin1, manifest1 as PluginManifest, { state: 'loaded' });
             service.register(plugin2, manifest2 as PluginManifest, { state: 'loaded' });
 
-            directoryPluginRepository.findByDirectoryAndPlugin.mockResolvedValue(null);
+            workPluginRepository.findByWorkAndPlugin.mockResolvedValue(null);
             userPluginRepository.findByUserAndPlugin.mockResolvedValue(null);
 
             const result = await service.getEnabledPluginsScoped('cap-a');
@@ -935,7 +933,7 @@ describe('PluginRegistryService', () => {
             expect(result[0].plugin.id).toBe('plugin-1');
         });
 
-        it('should exclude plugins disabled at directory level', async () => {
+        it('should exclude plugins disabled at work level', async () => {
             const plugin1 = createMockPlugin('plugin-1');
             const plugin2 = createMockPlugin('plugin-2');
             service.register(
@@ -953,14 +951,12 @@ describe('PluginRegistryService', () => {
                 },
             );
 
-            directoryPluginRepository.findByDirectoryAndPlugin.mockImplementation(
-                async (dirId, pluginId) => {
-                    if (pluginId === 'plugin-1') {
-                        return { enabled: false, directoryId: dirId, pluginId } as any;
-                    }
-                    return { enabled: true, directoryId: dirId, pluginId } as any;
-                },
-            );
+            workPluginRepository.findByWorkAndPlugin.mockImplementation(async (dirId, pluginId) => {
+                if (pluginId === 'plugin-1') {
+                    return { enabled: false, workId: dirId, pluginId } as any;
+                }
+                return { enabled: true, workId: dirId, pluginId } as any;
+            });
 
             const result = await service.getEnabledPluginsScoped(undefined, 'dir-1');
 
@@ -968,14 +964,14 @@ describe('PluginRegistryService', () => {
             expect(result[0].plugin.id).toBe('plugin-2');
         });
 
-        it('should include plugins with autoEnableForDirectories in directory context', async () => {
+        it('should include plugins with autoEnableForWorks in work context', async () => {
             const plugin = createMockPlugin('plugin-1');
             service.register(plugin, createMockManifest('plugin-1'), { state: 'loaded' });
 
-            directoryPluginRepository.findByDirectoryAndPlugin.mockResolvedValue(null);
+            workPluginRepository.findByWorkAndPlugin.mockResolvedValue(null);
             userPluginRepository.findByUserAndPlugin.mockResolvedValue({
                 enabled: true,
-                autoEnableForDirectories: true,
+                autoEnableForWorks: true,
                 userId: 'user-1',
                 pluginId: 'plugin-1',
             } as any);
@@ -985,11 +981,11 @@ describe('PluginRegistryService', () => {
             expect(result).toHaveLength(1);
         });
 
-        it('should exclude plugins disabled at user level when no directory config', async () => {
+        it('should exclude plugins disabled at user level when no work config', async () => {
             const plugin = createMockPlugin('plugin-1');
             service.register(plugin, createMockManifest('plugin-1'), { state: 'loaded' });
 
-            directoryPluginRepository.findByDirectoryAndPlugin.mockResolvedValue(null);
+            workPluginRepository.findByWorkAndPlugin.mockResolvedValue(null);
             userPluginRepository.findByUserAndPlugin.mockResolvedValue({
                 enabled: false,
                 userId: 'user-1',
@@ -1005,7 +1001,7 @@ describe('PluginRegistryService', () => {
             const plugin = createMockPlugin('plugin-1');
             service.register(plugin, createMockManifest('plugin-1')); // default 'unloaded' state
 
-            directoryPluginRepository.findByDirectoryAndPlugin.mockResolvedValue(null);
+            workPluginRepository.findByWorkAndPlugin.mockResolvedValue(null);
             userPluginRepository.findByUserAndPlugin.mockResolvedValue(null);
 
             const result = await service.getEnabledPluginsScoped();

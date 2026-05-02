@@ -4,7 +4,7 @@ import { serverFetch } from './server-api';
 export interface ActivityLogEntry {
     id: string;
     userId: string;
-    directoryId?: string;
+    workId?: string;
     actionType: string;
     action: string;
     status: string;
@@ -15,7 +15,7 @@ export interface ActivityLogEntry {
     userAgent?: string;
     createdAt: string;
     updatedAt: string;
-    directory?: {
+    work?: {
         id: string;
         name: string;
     };
@@ -36,7 +36,7 @@ export interface ActivitySummaryResponse {
 
 export interface GetActivityLogParams {
     actionType?: string;
-    directoryId?: string;
+    workId?: string;
     status?: string;
     dateFrom?: string;
     dateTo?: string;
@@ -49,7 +49,7 @@ export const activityLogAPI = {
     getAll: async (params?: GetActivityLogParams): Promise<ActivityLogResponse> => {
         const searchParams = new URLSearchParams();
         if (params?.actionType) searchParams.set('actionType', params.actionType);
-        if (params?.directoryId) searchParams.set('directoryId', params.directoryId);
+        if (params?.workId) searchParams.set('workId', params.workId);
         if (params?.status) searchParams.set('status', params.status);
         if (params?.dateFrom) searchParams.set('dateFrom', params.dateFrom);
         if (params?.dateTo) searchParams.set('dateTo', params.dateTo);
