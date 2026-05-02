@@ -37,7 +37,11 @@ docs/specs/
 │   ├── notifications-mail.md       # In-app + email delivery
 │   ├── trigger-worker.md           # Trigger.dev task package + bootstrap
 │   ├── mcp-server-internals.md     # OpenAPI → MCP conversion + sanitiser
-│   └── directory-import.md         # Source analyzer + 3 import paths
+│   ├── directory-import.md         # Source analyzer + 3 import paths
+│   ├── database.md                 # TypeORM module + repos + migrations
+│   ├── events.md                   # @nestjs/event-emitter + BaseEvent
+│   ├── deployment.md               # Docker + K8s + Compose + env-vars
+│   └── plugin-testing.md           # @ever-works/plugin/testing harness
 ├── ai/                             # Cross-cutting AI / generation specs
 │   ├── implementation-plan.md
 │   └── tasks-checklist.md
