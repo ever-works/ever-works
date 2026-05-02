@@ -13,6 +13,7 @@ import pickBy from 'lodash/pickBy';
 import { PluginRepository } from '../repositories/plugin.repository';
 import { UserPluginRepository } from '../repositories/user-plugin.repository';
 import { DirectoryPluginRepository } from '../repositories/directory-plugin.repository';
+import { DirectoryPluginEntity } from '../entities/directory-plugin.entity';
 import { PluginRegistryService } from './plugin-registry.service';
 import { PluginEvents } from '../plugins.constants';
 import {
@@ -22,6 +23,7 @@ import {
 
 /** Placeholder for masked secrets in API responses */
 const MASKED_SECRET_PLACEHOLDER = '********';
+const DIRECTORY_DEFAULT_SHADOWS_NORMALIZED_AT = 'settingsDefaultShadowsNormalizedAt';
 
 /**
  * Options for resolving settings
@@ -111,8 +113,10 @@ export class PluginSettingsService {
 
         let directorySettings: Record<string, unknown> = {};
         let directorySecrets: Record<string, unknown> = {};
+        let dirEntity: DirectoryPluginEntity | null = null;
+
         if (effectiveOptions?.directoryId && configMode !== 'admin-only') {
-            const dirEntity = await this.directoryPluginRepository.findByDirectoryAndPlugin(
+            dirEntity = await this.directoryPluginRepository.findByDirectoryAndPlugin(
                 effectiveOptions.directoryId,
                 pluginId,
             );
@@ -125,6 +129,20 @@ export class PluginSettingsService {
         // Resolve each setting
         const resolved: ResolvedSettings = {};
         const definitions = this.extractSettingDefinitions(settingsSchema);
+        if (dirEntity) {
+            const normalized = await this.normalizeDirectoryDefaultShadows(
+                pluginId,
+                dirEntity,
+                definitions,
+                {
+                    user: { ...userSettings, ...userSecrets },
+                    admin: { ...adminSettings, ...adminSecrets },
+                },
+                effectiveOptions,
+            );
+            directorySettings = normalized.settings;
+            directorySecrets = effectiveOptions?.includeSecrets ? normalized.secretSettings : {};
+        }
 
         for (const def of definitions) {
             resolved[def.key] = this.resolveSetting(
@@ -514,18 +532,9 @@ export class PluginSettingsService {
 
         // Resolution order based on priority (directory > user > admin > env > default)
         // isFallback indicates when a value comes from a scope that doesn't match the setting's intended scope
-        const inheritedSetting = this.resolveInheritedSetting(definition, sources, options);
 
         // 1. Directory settings (if directoryId provided)
-        if (
-            options?.directoryId &&
-            sources.directory[key] !== undefined &&
-            !this.isDirectorySchemaDefaultShadow(
-                definition,
-                sources.directory[key],
-                inheritedSetting,
-            )
-        ) {
+        if (options?.directoryId && sources.directory[key] !== undefined) {
             return {
                 key,
                 value: sources.directory[key],
@@ -535,7 +544,7 @@ export class PluginSettingsService {
             };
         }
 
-        return inheritedSetting;
+        return this.resolveInheritedSetting(definition, sources, options);
     }
 
     private resolveInheritedSetting(
@@ -589,22 +598,61 @@ export class PluginSettingsService {
         };
     }
 
-    /**
-     * Directory forms inherit lower scopes. A stored directory value equal to the
-     * schema default is usually a default-filled form field, not an explicit
-     * override. If a lower scope has a different real value, let inheritance win.
-     */
-    private isDirectorySchemaDefaultShadow(
-        definition: SettingDefinition,
-        directoryValue: unknown,
-        inheritedSetting: ResolvedSetting,
-    ): boolean {
-        if (definition.defaultValue === undefined) return false;
-        if (!isEqual(directoryValue, definition.defaultValue)) return false;
-        if (inheritedSetting.source === 'default') return false;
-        if (isEqual(inheritedSetting.value, directoryValue)) return false;
+    private async normalizeDirectoryDefaultShadows(
+        pluginId: string,
+        directoryPlugin: DirectoryPluginEntity,
+        definitions: SettingDefinition[],
+        inheritedSources: {
+            user: Record<string, unknown>;
+            admin: Record<string, unknown>;
+        },
+        options?: SettingsResolutionOptions,
+    ): Promise<{ settings: Record<string, unknown>; secretSettings: Record<string, unknown> }> {
+        const settings = { ...(directoryPlugin.settings || {}) };
+        const secretSettings = { ...(directoryPlugin.secretSettings || {}) };
+        const metadata = directoryPlugin.metadata || {};
 
-        return true;
+        if (metadata[DIRECTORY_DEFAULT_SHADOWS_NORMALIZED_AT]) {
+            return { settings, secretSettings };
+        }
+
+        let changed = false;
+        for (const definition of definitions) {
+            const key = definition.key;
+            const hasSetting = settings[key] !== undefined;
+            const hasSecret = secretSettings[key] !== undefined;
+            const directoryValue = hasSecret ? secretSettings[key] : settings[key];
+            if (!hasSetting && !hasSecret) continue;
+            if (definition.defaultValue === undefined) continue;
+            if (!isEqual(directoryValue, definition.defaultValue)) continue;
+
+            const inheritedSetting = this.resolveInheritedSetting(
+                definition,
+                inheritedSources,
+                options,
+            );
+            if (inheritedSetting.source === 'default') continue;
+            if (isEqual(inheritedSetting.value, directoryValue)) continue;
+
+            delete settings[key];
+            delete secretSettings[key];
+            changed = true;
+        }
+
+        const normalizedMetadata = {
+            ...metadata,
+            [DIRECTORY_DEFAULT_SHADOWS_NORMALIZED_AT]: new Date().toISOString(),
+        };
+
+        await this.directoryPluginRepository.updateByDirectoryAndPlugin(
+            directoryPlugin.directoryId,
+            pluginId,
+            changed
+                ? { settings, secretSettings, metadata: normalizedMetadata }
+                : { metadata: normalizedMetadata },
+        );
+
+        return { settings, secretSettings };
     }
 
     /**

@@ -113,6 +113,7 @@ describe('PluginSettingsService', () => {
                     provide: DirectoryPluginRepository,
                     useValue: {
                         findByDirectoryAndPlugin: jest.fn().mockResolvedValue(null),
+                        updateByDirectoryAndPlugin: jest.fn().mockResolvedValue({}),
                         updateSettings: jest.fn().mockResolvedValue({}),
                         create: jest.fn().mockResolvedValue({}),
                         deleteByDirectoryAndPlugin: jest.fn().mockResolvedValue(true),
@@ -298,6 +299,7 @@ describe('PluginSettingsService', () => {
                     tone: 'formal',
                 },
                 secretSettings: {},
+                metadata: {},
             } as any);
 
             const result = await service.getResolvedSettings('test-plugin', {
@@ -327,6 +329,65 @@ describe('PluginSettingsService', () => {
                 value: 'casual',
                 source: 'user',
             });
+            expect(directoryPluginRepository.updateByDirectoryAndPlugin).toHaveBeenCalledWith(
+                'dir-1',
+                'test-plugin',
+                expect.objectContaining({
+                    settings: { defaultModel: 'minimax/minimax-m2.5:free' },
+                    secretSettings: {},
+                    metadata: expect.objectContaining({
+                        settingsDefaultShadowsNormalizedAt: expect.any(String),
+                    }),
+                }),
+            );
+        });
+
+        it('should respect schema default directory values after directory settings are normalized', async () => {
+            const schema: JsonSchema = {
+                type: 'object',
+                properties: {
+                    simpleModel: {
+                        type: 'string',
+                        default: 'openai/gpt-5-mini',
+                    },
+                },
+            } as unknown as JsonSchema;
+            const plugin = createMockPlugin(schema);
+            jest.spyOn(registry, 'get').mockReturnValue(createRegisteredPlugin(plugin));
+
+            jest.spyOn(userPluginRepository, 'findByUserAndPlugin').mockResolvedValue({
+                id: '1',
+                userId: 'user-1',
+                pluginId: 'test-plugin',
+                settings: {
+                    simpleModel: 'nvidia/nemotron-3-super-120b-a12b:free',
+                },
+                secretSettings: {},
+            } as any);
+
+            jest.spyOn(directoryPluginRepository, 'findByDirectoryAndPlugin').mockResolvedValue({
+                id: '1',
+                directoryId: 'dir-1',
+                pluginId: 'test-plugin',
+                settings: {
+                    simpleModel: 'openai/gpt-5-mini',
+                },
+                secretSettings: {},
+                metadata: {
+                    settingsDefaultShadowsNormalizedAt: '2026-05-02T00:00:00.000Z',
+                },
+            } as any);
+
+            const result = await service.getResolvedSettings('test-plugin', {
+                userId: 'user-1',
+                directoryId: 'dir-1',
+            });
+
+            expect(result.simpleModel).toMatchObject({
+                value: 'openai/gpt-5-mini',
+                source: 'directory',
+            });
+            expect(directoryPluginRepository.updateByDirectoryAndPlugin).not.toHaveBeenCalled();
         });
 
         it('should resolve from environment variable', async () => {
