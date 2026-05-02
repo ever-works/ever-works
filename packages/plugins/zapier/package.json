@@ -1,7 +1,7 @@
 {
 	"name": "@ever-works/zapier-plugin",
 	"version": "1.0.0",
-	"description": "Zapier Automation Pipeline Plugin - Triggers Zapier actions during directory generation",
+	"description": "Zapier Automation Pipeline Plugin - Triggers Zapier actions during Work generation",
 	"private": true,
 	"type": "module",
 	"main": "./dist/index.cjs",
@@ -50,7 +50,7 @@
 				"pipeline",
 				"form-schema-provider"
 			],
-			"description": "Pipeline plugin that triggers Zapier actions during directory generation",
+			"description": "Pipeline plugin that triggers Zapier actions during Work generation",
 			"author": {
 				"name": "Ever Works Team"
 			},

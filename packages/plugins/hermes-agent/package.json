@@ -46,7 +46,7 @@
 				"pipeline",
 				"form-schema-provider"
 			],
-			"description": "Self-managed pipeline plugin that delegates directory generation to Hermes Agent",
+			"description": "Self-managed pipeline plugin that delegates Work generation to Hermes Agent",
 			"author": {
 				"name": "Ever Works Team"
 			},
