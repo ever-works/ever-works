@@ -1,7 +1,11 @@
 import { Injectable, Logger, BadRequestException } from '@nestjs/common';
 import { randomBytes } from 'crypto';
 import { OAuthFacadeService } from '@ever-works/agent/facades';
-import { AuthAccountRepository, buildPluginProviderId } from '@ever-works/agent/database';
+import {
+    AuthAccountRepository,
+    PLUGIN_PROVIDER_PREFIX,
+    buildPluginProviderId,
+} from '@ever-works/agent/database';
 import { PluginSettingsService } from '@ever-works/agent/plugins';
 import type { OAuthConfig, OAuthProviderInfo } from '@ever-works/plugin';
 
@@ -10,6 +14,7 @@ export interface OAuthConnectionInfo extends OAuthProviderInfo {
     username?: string;
     email?: string;
     avatarUrl?: string;
+    connectionSource?: 'plugin' | 'social';
 }
 
 @Injectable()
@@ -42,25 +47,32 @@ export class OAuthService {
             };
         }
 
-        const hasCredentials = await this.oauthFacade.hasValidCredentials(userId, providerId);
-
-        if (!hasCredentials) {
-            return { ...provider, connected: false };
-        }
-
         try {
-            const token = await this.oauthFacade.getAccessToken(userId, providerId);
-            if (!token) {
+            const account = await this.authAccountRepository.findConnectedProviderAccount(
+                userId,
+                providerId,
+                { usePluginProviderId: true },
+            );
+            if (!account?.accessToken) {
                 return { ...provider, connected: false };
             }
 
-            const user = await this.oauthFacade.getAuthenticatedUser(providerId, token);
+            const user = await this.oauthFacade.getAuthenticatedUser(
+                providerId,
+                account.accessToken,
+            );
+
+            const connectionSource = account.providerId.startsWith(PLUGIN_PROVIDER_PREFIX)
+                ? 'plugin'
+                : 'social';
+
             return {
                 ...provider,
                 connected: true,
                 username: user.username,
                 email: user.email,
                 avatarUrl: user.avatarUrl,
+                connectionSource,
             };
         } catch (error) {
             this.logger.warn(`Failed to get user info for provider ${providerId}:`, error);
@@ -154,6 +166,7 @@ export class OAuthService {
             username: user.username,
             email: user.email,
             avatarUrl: user.avatarUrl,
+            connectionSource: 'plugin',
         };
     }
 

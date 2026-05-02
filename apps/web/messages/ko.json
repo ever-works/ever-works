@@ -553,7 +553,8 @@
                     "pending": "대기 중",
                     "inProgress": "진행 중",
                     "completed": "완료",
-                    "failed": "실패"
+                    "failed": "실패",
+                    "cancelled": "취소됨"
                 }
             },
             "actions": {
@@ -1772,6 +1773,7 @@
                 "default": "기본",
                 "notConfigured": "구성되지 않음",
                 "notConfiguredTooltip": "이 제공자는 구성이 필요합니다. 설정 → 플러그인으로 이동하여 설정하세요.",
+                "changeModels": "변경",
                 "jsonObjectError": "값은 JSON 객체여야 합니다",
                 "invalidJsonError": "잘못된 JSON 형식"
             },
@@ -1799,7 +1801,11 @@
                 "closeNote": "몇 분 정도 걸릴 수 있습니다. 이 페이지를 닫고 나중에 다시 방문할 수 있습니다.",
                 "showLogs": "단계 로그 표시",
                 "hideLogs": "단계 로그 숨기기",
-                "waitingForLogs": "실시간 로그 대기 중..."
+                "waitingForLogs": "실시간 로그 대기 중...",
+                "stop": "생성 중지",
+                "stopping": "중지 중...",
+                "stopRequested": "생성 취소가 요청되었습니다",
+                "stopFailed": "생성 취소에 실패했습니다"
             },
             "settings": {
                 "sourceSettings": "소스 저장소",
@@ -2932,6 +2938,7 @@
             "resetSuccess": "설정이 기본값으로 재설정되었습니다",
             "cancel": "취소",
             "clickToConfigure": "구성 클릭",
+            "changeModels": "변경",
             "autoEnabledByUser": "사용자 설정을 통해 자동 활성화됨",
             "toggleError": "플러그인 토글 실패",
             "system": "시스템",

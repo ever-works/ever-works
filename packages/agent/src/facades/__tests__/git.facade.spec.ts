@@ -276,6 +276,32 @@ describe('GitFacadeService', () => {
                     provide: AuthAccountRepository,
                     useValue: {
                         findProviderAccount: jest.fn(),
+                        findConnectedProviderAccount: jest.fn(
+                            async (userId, providerId, options = {}) => {
+                                const providerIds = options.usePluginProviderId
+                                    ? [`plugin:${providerId}`, providerId]
+                                    : [providerId];
+
+                                for (const candidateProviderId of providerIds) {
+                                    const account = await authAccountRepository.findProviderAccount(
+                                        userId,
+                                        candidateProviderId,
+                                    );
+                                    if (
+                                        account?.accessToken &&
+                                        !authAccountRepository.isAccessTokenExpired(account) &&
+                                        authAccountRepository.hasRequiredScopes(
+                                            account,
+                                            options.requiredScopes ?? [],
+                                        )
+                                    ) {
+                                        return account;
+                                    }
+                                }
+
+                                return null;
+                            },
+                        ),
                         isAccessTokenExpired: jest.fn().mockReturnValue(false),
                         hasRequiredScopes: jest.fn().mockReturnValue(true),
                     },

@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { GitFacadeService, GitProviderInfo, OAuthFacadeService } from '@ever-works/agent/facades';
+import { GitFacadeService, GitProviderInfo } from '@ever-works/agent/facades';
+import { AuthAccountRepository } from '@ever-works/agent/database';
 import type { GitOrganization, GitUser, GitRepositoryWithPermissions } from '@ever-works/plugin';
 
 export type GitAuthMethod = 'oauth' | 'personal-access-token';
@@ -18,7 +19,7 @@ export class GitProviderService {
 
     constructor(
         private readonly gitFacade: GitFacadeService,
-        private readonly oauthFacade: OAuthFacadeService,
+        private readonly authAccountRepository: AuthAccountRepository,
     ) {}
 
     isConfigured(): boolean {
@@ -41,25 +42,33 @@ export class GitProviderService {
             };
         }
 
-        // Check OAuth credentials first
-        const hasOAuthCredentials = await this.oauthFacade.hasValidCredentials(userId, providerId);
+        const oauthAccount = await this.authAccountRepository.findConnectedProviderAccount(
+            userId,
+            providerId,
+            { usePluginProviderId: true },
+        );
 
         // Check for PAT credentials via GitFacade (which checks plugin settings)
-        const hasAnyCredentials = await this.gitFacade.hasValidCredentials({ userId, providerId });
+        const hasAnyCredentials =
+            !!oauthAccount || (await this.gitFacade.hasValidCredentials({ userId, providerId }));
 
         if (!hasAnyCredentials) {
             return { ...provider, connected: false };
         }
 
         try {
-            const user = await this.gitFacade.getUser({ userId, providerId });
+            const user = await this.gitFacade.getUser(
+                oauthAccount?.accessToken
+                    ? { providerId, token: oauthAccount.accessToken }
+                    : { userId, providerId },
+            );
             return {
                 ...provider,
                 connected: true,
                 username: user.login,
                 email: user.email,
                 avatarUrl: user.avatarUrl,
-                authMethod: hasOAuthCredentials ? 'oauth' : 'personal-access-token',
+                authMethod: oauthAccount ? 'oauth' : 'personal-access-token',
             };
         } catch (error) {
             this.logger.warn(`Failed to get user info for provider ${providerId}:`, error);

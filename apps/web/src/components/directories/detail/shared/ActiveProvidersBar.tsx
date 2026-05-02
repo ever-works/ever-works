@@ -7,7 +7,7 @@ export type ResolvedProvider = {
     category: string;
     id: string;
     name: string;
-    source: 'override' | 'lastRun';
+    source: 'override' | 'default';
 };
 
 export function ActiveProvidersBar({ providers }: { providers: ResolvedProvider[] }) {

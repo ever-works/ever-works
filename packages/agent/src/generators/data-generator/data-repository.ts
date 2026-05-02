@@ -219,9 +219,13 @@ export class DataRepository {
         private readonly collectionsPath: string,
         private readonly markdownTemplatePath: string,
         public readonly dataDir: string,
+        private readonly defaultConfigOverrides: Partial<IDataConfig>,
     ) {}
 
-    static async create(dir: string): Promise<DataRepository> {
+    static async create(
+        dir: string,
+        defaultConfigOverrides: Partial<IDataConfig> = {},
+    ): Promise<DataRepository> {
         /*
          *   File structure:
          *      - config.yml
@@ -252,6 +256,7 @@ export class DataRepository {
             collectionsPath,
             path.join(dir, 'markdown'),
             path.join(dir, 'data'),
+            defaultConfigOverrides,
         );
 
         return repo;
@@ -355,7 +360,7 @@ export class DataRepository {
                     return fallbackConfig;
                 }
 
-                const defaultConfig = createDefaultConfig();
+                const defaultConfig = createDefaultConfig(this.defaultConfigOverrides);
                 await this.writeConfig(defaultConfig);
                 return defaultConfig;
             }
@@ -517,7 +522,10 @@ export class DataRepository {
         const exists = await this.fileExists(this.configPath);
 
         if (!exists) {
-            const defaultConfig = createDefaultConfig(overrides);
+            const defaultConfig = createDefaultConfig({
+                ...this.defaultConfigOverrides,
+                ...overrides,
+            });
             await this.writeConfig(defaultConfig);
             return defaultConfig;
         }

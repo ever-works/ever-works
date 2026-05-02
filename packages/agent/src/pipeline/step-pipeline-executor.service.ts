@@ -188,7 +188,7 @@ export class StepPipelineExecutorService {
 
                 if (groupSteps.length === 0) continue;
 
-                const concurrency = group.maxConcurrent;
+                const concurrency = this.resolveGroupConcurrency(group.maxConcurrent, options);
                 if (!concurrency || concurrency >= groupSteps.length) {
                     await Promise.all(
                         groupSteps.map((step, idx) =>
@@ -537,6 +537,16 @@ export class StepPipelineExecutorService {
             }
         }
         await Promise.all(executing);
+    }
+
+    private resolveGroupConcurrency(
+        groupConcurrency: number | undefined,
+        options?: PipelineExecutionOptions,
+    ): number | undefined {
+        if (options?.maxConcurrent !== undefined) {
+            return Math.max(1, Math.floor(options.maxConcurrent));
+        }
+        return groupConcurrency;
     }
 
     // ============================================================================

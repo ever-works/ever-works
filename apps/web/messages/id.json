@@ -553,7 +553,8 @@
                     "pending": "Menunggu",
                     "inProgress": "Sedang Berlangsung",
                     "completed": "Selesai",
-                    "failed": "Gagal"
+                    "failed": "Gagal",
+                    "cancelled": "Dibatalkan"
                 }
             },
             "actions": {
@@ -1772,6 +1773,7 @@
                 "default": "Default",
                 "notConfigured": "Belum Dikonfigurasi",
                 "notConfiguredTooltip": "Penyedia ini memerlukan konfigurasi. Kunjungi Pengaturan → Plugin untuk menyiapkannya.",
+                "changeModels": "Ubah",
                 "jsonObjectError": "Nilai harus berupa objek JSON",
                 "invalidJsonError": "Format JSON tidak valid"
             },
@@ -1799,7 +1801,11 @@
                 "closeNote": "Ini mungkin memakan waktu beberapa menit. Anda dapat menutup halaman ini dan kembali nanti.",
                 "showLogs": "Tampilkan log langkah",
                 "hideLogs": "Sembunyikan log langkah",
-                "waitingForLogs": "Menunggu log langsung tiba..."
+                "waitingForLogs": "Menunggu log langsung tiba...",
+                "stop": "Berhenti menghasilkan",
+                "stopping": "Menghentikan...",
+                "stopRequested": "Pembatalan pembuatan diminta",
+                "stopFailed": "Gagal membatalkan pembuatan"
             },
             "settings": {
                 "sourceSettings": "Repositori Sumber",
@@ -2932,6 +2938,7 @@
             "resetSuccess": "Pengaturan diatur ulang ke default",
             "cancel": "Batal",
             "clickToConfigure": "Klik untuk mengonfigurasi",
+            "changeModels": "Ubah",
             "autoEnabledByUser": "Diaktifkan otomatis melalui pengaturan pengguna",
             "toggleError": "Gagal mengalihkan plugin",
             "system": "Sistem",

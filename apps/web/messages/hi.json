@@ -553,7 +553,8 @@
                     "pending": "लंबित",
                     "inProgress": "चल रही",
                     "completed": "पूरा",
-                    "failed": "विफल"
+                    "failed": "विफल",
+                    "cancelled": "रद्द"
                 }
             },
             "actions": {
@@ -1772,6 +1773,7 @@
                 "default": "डिफ़ॉल्ट",
                 "notConfigured": "कॉन्फ़िगर नहीं किया गया",
                 "notConfiguredTooltip": "इस प्रदाता को कॉन्फ़िगरेशन की आवश्यकता है। इसे सेटअप करने के लिए Settings → Plugins पर जाएँ।",
+                "changeModels": "परिवर्तन",
                 "jsonObjectError": "मान JSON ऑब्जेक्ट होना चाहिए",
                 "invalidJsonError": "अमान्य JSON फ़ॉर्मेट"
             },
@@ -1799,7 +1801,11 @@
                 "closeNote": "इसमें कुछ मिनट लग सकते हैं। आप इस पृष्ठ को बंद कर सकते हैं और बाद में वापस आ सकते हैं।",
                 "showLogs": "चरण लॉग दिखाएँ",
                 "hideLogs": "चरण लॉग छिपाएँ",
-                "waitingForLogs": "लाइव लॉग आने का इंतज़ार कर रहे हैं..."
+                "waitingForLogs": "लाइव लॉग आने का इंतज़ार कर रहे हैं...",
+                "stop": "जनरेशन रोकें",
+                "stopping": "रोक रहा है...",
+                "stopRequested": "जनरेशन रद्दीकरण का अनुरोध किया गया",
+                "stopFailed": "जनरेशन रद्द करने में विफल"
             },
             "settings": {
                 "sourceSettings": "स्रोत रिपॉजिटरी",
@@ -2932,6 +2938,7 @@
             "resetSuccess": "सेटिंग्स को पूर्वनिर्धारित पर रीसेट कर दिया गया",
             "cancel": "रद्द करें",
             "clickToConfigure": "कॉन्फ़िगर करने के लिए क्लिक करें",
+            "changeModels": "परिवर्तन",
             "autoEnabledByUser": "उपयोगकर्ता सेटिंग्स के माध्यम से स्वचालित रूप से सक्षम",
             "toggleError": "प्लगइन टॉगल करने में विफल",
             "system": "सिस्टम",

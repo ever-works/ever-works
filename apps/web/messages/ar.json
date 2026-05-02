@@ -553,7 +553,8 @@
                     "pending": "معلق",
                     "inProgress": "جار التنفيذ",
                     "completed": "مكتمل",
-                    "failed": "فشل"
+                    "failed": "فشل",
+                    "cancelled": "ملغي"
                 }
             },
             "actions": {
@@ -1772,6 +1773,7 @@
                 "default": "افتراضي",
                 "notConfigured": "غير مُهيأ",
                 "notConfiguredTooltip": "هذا المزود يتطلب الإعداد. قم بزيارة الإعدادات → الإضافات لإعداده.",
+                "changeModels": "تغيير",
                 "jsonObjectError": "يجب أن تكون القيمة كائن JSON",
                 "invalidJsonError": "تنسيق JSON غير صالح"
             },
@@ -1799,7 +1801,11 @@
                 "closeNote": "قد يستغرق هذا بضع دقائق. يمكنك إغلاق هذه الصفحة والعودة لاحقًا.",
                 "showLogs": "إظهار سجلات الخطوات",
                 "hideLogs": "إخفاء سجلات الخطوات",
-                "waitingForLogs": "انتظار وصول السجلات الحية..."
+                "waitingForLogs": "انتظار وصول السجلات الحية...",
+                "stop": "إيقاف التوليد",
+                "stopping": "جاري الإيقاف...",
+                "stopRequested": "تم طلب إلغاء التوليد",
+                "stopFailed": "فشل إلغاء التوليد"
             },
             "settings": {
                 "sourceSettings": "مستودع المصدر",
@@ -2932,6 +2938,7 @@
             "resetSuccess": "تم إعادة تعيين الإعدادات إلى الافتراضيات",
             "cancel": "إلغاء",
             "clickToConfigure": "انقر للتكوين",
+            "changeModels": "تغيير",
             "autoEnabledByUser": "مُفعّل تلقائيًا عبر إعدادات المستخدم",
             "toggleError": "فشل في تبديل الملحقة",
             "system": "نظامي",

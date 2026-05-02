@@ -42,6 +42,11 @@ export type ProviderAccountUpsertData = {
     metadata?: Record<string, unknown> | null;
 };
 
+export type ConnectedProviderAccountLookupOptions = {
+    usePluginProviderId?: boolean;
+    requiredScopes?: readonly string[];
+};
+
 @Injectable()
 export class AuthAccountRepository {
     constructor(
@@ -158,6 +163,29 @@ export class AuthAccountRepository {
                 accountId,
             },
         });
+    }
+
+    async findConnectedProviderAccount(
+        userId: string,
+        providerId: string,
+        options: ConnectedProviderAccountLookupOptions = {},
+    ): Promise<AuthAccount | null> {
+        const providerIds = options.usePluginProviderId
+            ? [buildPluginProviderId(providerId), providerId]
+            : [providerId];
+
+        for (const candidateProviderId of providerIds) {
+            const account = await this.findProviderAccount(userId, candidateProviderId);
+            if (
+                account?.accessToken &&
+                !this.isAccessTokenExpired(account) &&
+                this.hasRequiredScopes(account, options.requiredScopes ?? [])
+            ) {
+                return account;
+            }
+        }
+
+        return null;
     }
 
     async findProviderAccountsByUserId(userId: string): Promise<AuthAccount[]> {

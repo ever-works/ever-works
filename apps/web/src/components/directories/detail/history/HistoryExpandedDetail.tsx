@@ -27,7 +27,9 @@ export function HistoryExpandedDetail({
     removedEntries,
 }: HistoryExpandedDetailProps) {
     const t = useTranslations('dashboard.directoryDetail.history');
+    const tStatus = useTranslations('dashboard.directoryDetail.status');
     const hasLogs = (entry.logs?.length ?? 0) > 0;
+    const hasWarnings = (entry.warnings?.length ?? 0) > 0;
     const hasChanges =
         addedEntries.length > 0 || updatedEntries.length > 0 || removedEntries.length > 0;
     const totalChanges = addedEntries.length + updatedEntries.length + removedEntries.length;
@@ -37,10 +39,29 @@ export function HistoryExpandedDetail({
     if (hasLogs) tabs.push({ id: 'logs', label: t('detail.stepLogs') });
     if (hasChanges) tabs.push({ id: 'changes', label: `${t('detail.changes')} (${totalChanges})` });
 
-    if (tabs.length === 0) return null;
+    if (tabs.length === 0 && !hasWarnings) return null;
 
     return (
         <div>
+            {hasWarnings && (
+                <div className="mb-4 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 dark:border-amber-800 dark:bg-amber-900/20">
+                    <p className="mb-1 text-xs font-medium text-amber-800 dark:text-amber-300">
+                        {tStatus('generatedWithWarnings')}
+                    </p>
+                    <ul className="space-y-0.5">
+                        {entry.warnings!.map((warning, index) => (
+                            <li
+                                key={`${warning}-${index}`}
+                                className="flex items-start gap-1.5 text-xs text-amber-700 dark:text-amber-400"
+                            >
+                                <span className="mt-0.5 shrink-0">&#x2022;</span>
+                                <span>{warning}</span>
+                            </li>
+                        ))}
+                    </ul>
+                </div>
+            )}
+
             {tabs.length > 1 && (
                 <div className="flex gap-1 mb-3">
                     {tabs.map((tab) => (

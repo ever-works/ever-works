@@ -29,7 +29,10 @@ import {
     ExtractItemDetailsResponseDto,
     UpdateItemDto,
 } from '@src/items-generator/dto';
-import { ItemsGeneratorResponseDto } from '@src/items-generator/dto/items-generator-response.dto';
+import {
+    CancelGenerationResponseDto,
+    ItemsGeneratorResponseDto,
+} from '@src/items-generator/dto/items-generator-response.dto';
 import { ItemSubmissionService } from '@src/items-generator/item-submission.service';
 import { Directory } from '@src/entities/directory.entity';
 import { User } from '@src/entities/user.entity';
@@ -333,18 +336,15 @@ export class DirectoryGenerationService {
         };
     }
 
-    async cancelGeneration(
-        directoryId: string,
-        user: User,
-    ): Promise<{
-        status: 'success';
-        message: string;
-        mode: 'trigger' | 'in_process' | 'stale' | 'already_finished';
-    }> {
+    async cancelGeneration(directoryId: string, user: User): Promise<CancelGenerationResponseDto> {
         const { directory } = await this.ownershipService.ensureCanEdit(directoryId, user.id);
 
         if (directory.generateStatus?.status !== GenerateStatusType.GENERATING) {
-            throw new ConflictException(`Directory "${directory.name}" is not generating`);
+            return {
+                status: 'success',
+                message: `Directory "${directory.name}" is no longer generating.`,
+                mode: 'already_finished',
+            };
         }
 
         const history =
@@ -352,10 +352,17 @@ export class DirectoryGenerationService {
 
         if (history?.triggerRunId) {
             if (!this.generationDispatcher) {
-                throw new BadRequestException({
-                    status: 'error',
-                    message: 'Generation cancellation is not available in this environment.',
-                });
+                await this.finalizeCancelledGeneration(
+                    directory.id,
+                    history,
+                    history.scheduleId ?? null,
+                );
+
+                return {
+                    status: 'success',
+                    message: 'Generation was marked as cancelled.',
+                    mode: 'stale',
+                };
             }
 
             const cancelled = await this.generationDispatcher.cancelDirectoryGeneration(
@@ -363,9 +370,15 @@ export class DirectoryGenerationService {
             );
 
             if (cancelled) {
+                await this.finalizeCancelledGeneration(
+                    directory.id,
+                    history,
+                    history.scheduleId ?? null,
+                );
+
                 return {
                     status: 'success',
-                    message: 'Cancellation requested. The generation will stop shortly.',
+                    message: 'Cancellation requested. The generation was marked as cancelled.',
                     mode: 'trigger',
                 };
             }
@@ -383,10 +396,18 @@ export class DirectoryGenerationService {
                 };
             }
 
-            throw new BadRequestException({
-                status: 'error',
-                message: 'Failed to cancel the active generation run. Please try again.',
-            });
+            await this.finalizeCancelledGeneration(
+                directory.id,
+                history,
+                history.scheduleId ?? null,
+            );
+
+            return {
+                status: 'success',
+                message:
+                    'Generation was marked as cancelled. The remote cancellation request could not be confirmed.',
+                mode: 'stale',
+            };
         }
 
         const controller = this.generationAbortControllers.get(directoryId);
@@ -1547,6 +1568,7 @@ Only include image URLs that are absolute URLs (starting with http).`;
                 finishedAt: endTime,
                 durationInSeconds,
                 ...(errorMessage ? { errorMessage } : {}),
+                warnings: warnings ?? null,
                 ...buildStatsUpdate(stats),
             });
         }

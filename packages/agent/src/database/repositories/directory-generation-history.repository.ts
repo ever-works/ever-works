@@ -20,6 +20,7 @@ type HistoryCreateParams = {
     scheduleId?: string | null;
     activityType?: DirectoryHistoryActivityType;
     changelog?: DirectoryChangelog | null;
+    warnings?: string[] | null;
     finishedAt?: Date | null;
     durationInSeconds?: number | null;
     newItemsCount?: number;
@@ -42,9 +43,14 @@ type HistoryUpdateParams = {
     activityType?: DirectoryHistoryActivityType;
     changelog?: DirectoryChangelog | null;
     logs?: GenerationStepLog[] | null;
+    warnings?: string[] | null;
 };
 
 const LATEST_POSITIVE_ITEM_COUNTS_BATCH_MULTIPLIER = 10;
+
+function normalizeWarnings(warnings?: string[] | null): string[] | null {
+    return warnings?.length ? [...new Set(warnings)] : null;
+}
 
 @Injectable()
 export class DirectoryGenerationHistoryRepository {
@@ -65,6 +71,7 @@ export class DirectoryGenerationHistoryRepository {
             scheduleId: params.scheduleId ?? null,
             activityType: params.activityType ?? DirectoryHistoryActivityType.GENERATION,
             changelog: params.changelog ?? null,
+            warnings: normalizeWarnings(params.warnings),
             finishedAt: params.finishedAt ?? null,
             durationInSeconds: params.durationInSeconds ?? null,
             newItemsCount: params.newItemsCount ?? 0,
@@ -79,8 +86,17 @@ export class DirectoryGenerationHistoryRepository {
         id: string,
         updates: HistoryUpdateParams,
     ): Promise<DirectoryGenerationHistory | null> {
-        await this.repository.update(id, {
+        const normalizedUpdates = {
             ...updates,
+            ...('warnings' in updates
+                ? {
+                      warnings: normalizeWarnings(updates.warnings),
+                  }
+                : {}),
+        };
+
+        await this.repository.update(id, {
+            ...normalizedUpdates,
         });
 
         return this.repository.findOne({ where: { id } });

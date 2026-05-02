@@ -135,24 +135,6 @@ export class GitFacadeService implements IGitFacade {
         }
     }
 
-    private canUseOAuthAccountForGit(
-        providerId: string,
-        account: {
-            accessToken?: string | null;
-            scope?: string | null;
-            accessTokenExpiresAt?: Date | null;
-        },
-    ): boolean {
-        return (
-            !!account.accessToken &&
-            !this.authAccountRepository.isAccessTokenExpired(account) &&
-            this.authAccountRepository.hasRequiredScopes(
-                account,
-                this.getRequiredOAuthScopes(providerId),
-            )
-        );
-    }
-
     isConfigured(): boolean {
         const plugins = this.registry.getByCapability(this.CAPABILITY);
         return plugins.length > 0 && plugins.some((p) => p.state === 'loaded');
@@ -178,29 +160,11 @@ export class GitFacadeService implements IGitFacade {
         return this.authAccountRepository.findProviderAccount(userId, pluginId);
     }
 
-    private async findUsableGitProviderAccount(
-        userId: string,
-        pluginId: string,
-    ): Promise<AuthAccount | null> {
-        const pluginAccount = await this.authAccountRepository.findProviderAccount(
-            userId,
-            buildPluginProviderId(pluginId),
-        );
-
-        if (pluginAccount && this.canUseOAuthAccountForGit(pluginId, pluginAccount)) {
-            return pluginAccount;
-        }
-
-        const providerAccount = await this.authAccountRepository.findProviderAccount(
-            userId,
-            pluginId,
-        );
-
-        if (providerAccount && this.canUseOAuthAccountForGit(pluginId, providerAccount)) {
-            return providerAccount;
-        }
-
-        return null;
+    private async findUsableGitProviderAccount(userId: string, pluginId: string) {
+        return this.authAccountRepository.findConnectedProviderAccount(userId, pluginId, {
+            usePluginProviderId: true,
+            requiredScopes: this.getRequiredOAuthScopes(pluginId),
+        });
     }
 
     getAvailableProviders(): GitProviderInfo[] {

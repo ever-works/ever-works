@@ -553,7 +553,8 @@
                     "pending": "Ausstehend",
                     "inProgress": "In Bearbeitung",
                     "completed": "Abgeschlossen",
-                    "failed": "Fehlgeschlagen"
+                    "failed": "Fehlgeschlagen",
+                    "cancelled": "Storniert"
                 }
             },
             "actions": {
@@ -1772,6 +1773,7 @@
                 "default": "Standard",
                 "notConfigured": "Nicht konfiguriert",
                 "notConfiguredTooltip": "Dieser Provider erfordert Konfiguration. Besuchen Sie Einstellungen → Plugins, um ihn einzurichten.",
+                "changeModels": "Ändern",
                 "jsonObjectError": "Wert muss ein JSON-Objekt sein",
                 "invalidJsonError": "Ungültiges JSON-Format"
             },
@@ -1799,7 +1801,11 @@
                 "closeNote": "Dies kann einige Minuten dauern. Sie können diese Seite schließen und später zurückkommen.",
                 "showLogs": "Schritt-Logs anzeigen",
                 "hideLogs": "Schritt-Logs ausblenden",
-                "waitingForLogs": "Warte auf Live-Logs…"
+                "waitingForLogs": "Warte auf Live-Logs…",
+                "stop": "Generierung stoppen",
+                "stopping": "Wird gestoppt...",
+                "stopRequested": "Stornierung der Generierung angefordert",
+                "stopFailed": "Stornierung der Generierung fehlgeschlagen"
             },
             "settings": {
                 "sourceSettings": "Quell-Repository",
@@ -2932,6 +2938,7 @@
             "resetSuccess": "Einstellungen auf Standard zurückgesetzt",
             "cancel": "Abbrechen",
             "clickToConfigure": "Zum Konfigurieren klicken",
+            "changeModels": "Ändern",
             "autoEnabledByUser": "Automatisch aktiviert über Benutzereinstellungen",
             "toggleError": "Plugin konnte nicht umgeschaltet werden",
             "system": "System",

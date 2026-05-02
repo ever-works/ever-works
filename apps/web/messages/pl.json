@@ -553,7 +553,8 @@
                     "pending": "Oczekujące",
                     "inProgress": "W toku",
                     "completed": "Zakończone",
-                    "failed": "Nie powiodło się"
+                    "failed": "Nie powiodło się",
+                    "cancelled": "Anulowane"
                 }
             },
             "actions": {
@@ -1772,6 +1773,7 @@
                 "default": "Domyślny",
                 "notConfigured": "Nieskonfigurowany",
                 "notConfiguredTooltip": "Ten dostawca wymaga konfiguracji. Odwiedź Ustawienia → Wtyczki, aby go skonfigurować.",
+                "changeModels": "Zmiana",
                 "jsonObjectError": "Wartość musi być obiektem JSON",
                 "invalidJsonError": "Nieprawidłowy format JSON"
             },
@@ -1799,7 +1801,11 @@
                 "closeNote": "To może zająć kilka minut. Możesz zamknąć tę stronę i wrócić później.",
                 "showLogs": "Pokaż logi kroków",
                 "hideLogs": "Ukryj logi kroków",
-                "waitingForLogs": "Oczekiwanie na logi na żywo..."
+                "waitingForLogs": "Oczekiwanie na logi na żywo...",
+                "stop": "Zatrzymaj generowanie",
+                "stopping": "Zatrzymywanie...",
+                "stopRequested": "Żądano anulowania generowania",
+                "stopFailed": "Nie udało się anulować generowania"
             },
             "settings": {
                 "sourceSettings": "Repozytorium źródłowe",
@@ -2932,6 +2938,7 @@
             "resetSuccess": "Ustawienia zresetowane do domyślnych",
             "cancel": "Anuluj",
             "clickToConfigure": "Kliknij, aby skonfigurować",
+            "changeModels": "Zmiana",
             "autoEnabledByUser": "Automatycznie włączone przez ustawienia użytkownika",
             "toggleError": "Nie udało się przełączyć wtyczki",
             "system": "System",

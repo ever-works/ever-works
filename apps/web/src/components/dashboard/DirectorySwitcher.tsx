@@ -13,8 +13,9 @@ import { useSearchParams } from 'next/navigation';
 import { useLocale, useTranslations } from 'next-intl';
 import { useRouter as useTopLoaderRouter } from 'nextjs-toploader/app';
 import { toast } from 'sonner';
-import { getDirectories } from '@/app/actions/dashboard/directories';
+import { getDirectories, getDirectoryForStatusRefresh } from '@/app/actions/dashboard/directories';
 import { Directory } from '@/lib/api/directory';
+import { GenerateStatusType } from '@/lib/api/enums';
 import { getPathname, usePathname } from '@/i18n/navigation';
 import { cn } from '@/lib/utils/cn';
 import { getGenerationStatusConfig } from '@/lib/utils/generation-status';
@@ -24,6 +25,7 @@ import {
     replaceDirectoryIdInPath,
 } from '@/lib/utils/directory-route';
 import { ShinyText } from '@/components/ui/ShinyText';
+import { useDashboardCurrentDirectory } from '@/lib/hooks/use-dashboard-current-directory';
 
 const DIRECTORY_SWITCHER_LIMIT = 1000;
 
@@ -39,6 +41,30 @@ const matchesDirectoryQuery = (directory: Directory, query: string): boolean => 
     );
 };
 
+function upsertDirectory(directories: Directory[], nextDirectory: Directory): Directory[] {
+    const existingIndex = directories.findIndex((directory) => directory.id === nextDirectory.id);
+    if (existingIndex === -1) {
+        return [nextDirectory, ...directories];
+    }
+
+    return directories.map((directory) =>
+        directory.id === nextDirectory.id ? nextDirectory : directory,
+    );
+}
+
+function mergeDirectories(
+    currentDirectories: Directory[],
+    nextDirectories: Directory[],
+): Directory[] {
+    const directoryById = new Map(currentDirectories.map((directory) => [directory.id, directory]));
+
+    for (const directory of nextDirectories) {
+        directoryById.set(directory.id, directory);
+    }
+
+    return Array.from(directoryById.values());
+}
+
 export function DirectorySwitcher() {
     const pathname = usePathname();
     const router = useTopLoaderRouter();
@@ -52,14 +78,20 @@ export function DirectorySwitcher() {
     const [isLoading, setIsLoading] = useState(false);
     const hasLoadedRef = useRef(false);
     const inputRef = useRef<HTMLInputElement | null>(null);
+    const routedDirectory = useDashboardCurrentDirectory();
     const deferredQuery = useDeferredValue(query);
     const isVisible = isDirectoryDetailPath(pathname);
     const currentDirectoryId = getDirectoryIdFromPath(pathname);
 
-    const currentDirectory = useMemo(
-        () => directories.find((directory) => directory.id === currentDirectoryId) ?? null,
-        [currentDirectoryId, directories],
-    );
+    const currentDirectory = useMemo(() => {
+        const listedDirectory =
+            directories.find((directory) => directory.id === currentDirectoryId) ?? null;
+        if (listedDirectory) {
+            return listedDirectory;
+        }
+
+        return routedDirectory?.id === currentDirectoryId ? routedDirectory : null;
+    }, [currentDirectoryId, directories, routedDirectory]);
 
     const filteredDirectories = useMemo(
         () => directories.filter((directory) => matchesDirectoryQuery(directory, deferredQuery)),
@@ -93,6 +125,88 @@ export function DirectorySwitcher() {
     }, [currentDirectoryId]);
 
     useEffect(() => {
+        if (!routedDirectory || routedDirectory.id !== currentDirectoryId) {
+            return;
+        }
+
+        setDirectories((currentDirectories) =>
+            upsertDirectory(currentDirectories, routedDirectory),
+        );
+    }, [currentDirectoryId, routedDirectory]);
+
+    useEffect(() => {
+        if (!isVisible || !currentDirectoryId || currentDirectory) {
+            return;
+        }
+
+        let isCancelled = false;
+
+        const loadCurrentDirectory = async () => {
+            try {
+                const refreshedDirectory = await getDirectoryForStatusRefresh(currentDirectoryId);
+                if (isCancelled || !refreshedDirectory) {
+                    return;
+                }
+
+                setDirectories((currentDirectories) =>
+                    upsertDirectory(currentDirectories, refreshedDirectory),
+                );
+            } catch (error) {
+                if (!isCancelled) {
+                    console.error('Failed to load current directory for switcher:', error);
+                }
+            }
+        };
+
+        void loadCurrentDirectory();
+
+        return () => {
+            isCancelled = true;
+        };
+    }, [currentDirectory, currentDirectoryId, isVisible]);
+
+    useEffect(() => {
+        if (
+            !isVisible ||
+            !currentDirectoryId ||
+            currentDirectory?.generateStatus?.status !== GenerateStatusType.GENERATING
+        ) {
+            return;
+        }
+
+        let isCancelled = false;
+        let isRefreshing = false;
+
+        const refreshCurrentDirectory = async () => {
+            if (isRefreshing) {
+                return;
+            }
+
+            isRefreshing = true;
+            try {
+                const refreshedDirectory = await getDirectoryForStatusRefresh(currentDirectoryId);
+                if (isCancelled || !refreshedDirectory) {
+                    return;
+                }
+
+                setDirectories((currentDirectories) =>
+                    upsertDirectory(currentDirectories, refreshedDirectory),
+                );
+            } finally {
+                isRefreshing = false;
+            }
+        };
+
+        void refreshCurrentDirectory();
+        const interval = window.setInterval(refreshCurrentDirectory, 5_000);
+
+        return () => {
+            isCancelled = true;
+            window.clearInterval(interval);
+        };
+    }, [currentDirectory?.generateStatus?.status, currentDirectoryId, isVisible]);
+
+    useEffect(() => {
         if (!isVisible || hasLoadedRef.current) {
             return;
         }
@@ -113,7 +227,9 @@ export function DirectorySwitcher() {
                     return;
                 }
 
-                setDirectories(response.directories);
+                setDirectories((currentDirectories) =>
+                    mergeDirectories(currentDirectories, response.directories),
+                );
                 hasLoadedRef.current = true;
             } catch (error) {
                 if (!isCancelled) {
@@ -193,9 +309,7 @@ export function DirectorySwitcher() {
                                 'text-text dark:text-text-dark',
                                 'placeholder:text-text-muted dark:placeholder:text-text-muted-dark',
                             )}
-                            displayValue={(directory: Directory | null) =>
-                                directory?.name ?? currentDirectoryId.slice(0, 8)
-                            }
+                            displayValue={(directory: Directory | null) => directory?.name ?? ''}
                             onChange={(event) => setQuery(event.target.value)}
                             placeholder={t('search')}
                         />

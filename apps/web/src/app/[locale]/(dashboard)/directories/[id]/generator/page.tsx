@@ -1,6 +1,8 @@
 import type { Metadata } from 'next';
 import { getTranslations } from 'next-intl/server';
 import { directoryAPI } from '@/lib/api';
+import { pluginsAPI } from '@/lib/api/plugins';
+import type { DirectoryPlugin } from '@/lib/api/plugins';
 import { GeneratorForm } from '@/components/directories/detail/generator/GeneratorForm';
 import { GenerationProgress } from '@/components/directories/detail/generator/GenerationProgress';
 import { GenerateStatusType } from '@/lib/api/enums';
@@ -36,14 +38,19 @@ export default async function DirectoryGeneratorPage({ params }: Params) {
         return <GenerationProgress directory={directory} />;
     }
 
-    let config;
+    const [configRes, pluginsRes] = await Promise.all([
+        directoryAPI.getConfig(id).catch(() => ({ config: undefined })),
+        pluginsAPI
+            .listForDirectory(id)
+            .catch((): { plugins: DirectoryPlugin[] } => ({ plugins: [] })),
+    ]);
 
-    try {
-        const configRes = await directoryAPI.getConfig(id).catch(() => ({ config: undefined }));
-        config = configRes.config;
-    } catch {
-        config = undefined;
-    }
-
-    return <GeneratorForm directoryId={id} directory={directory} config={config} />;
+    return (
+        <GeneratorForm
+            directoryId={id}
+            directory={directory}
+            config={configRes.config}
+            directoryPlugins={pluginsRes.plugins}
+        />
+    );
 }

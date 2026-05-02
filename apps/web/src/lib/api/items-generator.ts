@@ -18,6 +18,7 @@ import type {
 export type {
     PluginIcon,
     ProviderOption,
+    ProviderModelSummary,
     GeneratorFormSchema,
     FormSchemaProvidersType,
     ProviderSelectionState,

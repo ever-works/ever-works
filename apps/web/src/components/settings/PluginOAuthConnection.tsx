@@ -33,6 +33,11 @@ export function PluginOAuthConnection({
     const pathname = usePathname();
 
     const isConnected = connection?.connected ?? false;
+    const isSocialConnection =
+        !!connection &&
+        'connectionSource' in connection &&
+        connection.connectionSource === 'social';
+    const canDisconnect = allowDisconnect && !isSocialConnection;
     const username = connection?.username;
     const avatarUrl = connection?.avatarUrl;
     const email = connection?.email;
@@ -182,7 +187,7 @@ export function PluginOAuthConnection({
                                 />
                                 {isPending ? t('reconnecting') : t('reconnect')}
                             </Button>
-                            {allowDisconnect && (
+                            {canDisconnect && (
                                 <Button
                                     onClick={handleDisconnect}
                                     disabled={isPending}

@@ -1,23 +1,29 @@
-import { Injectable, Logger, BadRequestException } from '@nestjs/common';
+import { Injectable, Logger, BadRequestException, Optional } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import type {
     PluginSettings,
     ResolvedSettings,
     ResolvedSetting,
     SettingScope,
-    SettingSource,
     SettingDefinition,
     JsonSchema,
 } from '@ever-works/plugin';
+import isEqual from 'lodash/isEqual';
 import pickBy from 'lodash/pickBy';
 import { PluginRepository } from '../repositories/plugin.repository';
 import { UserPluginRepository } from '../repositories/user-plugin.repository';
 import { DirectoryPluginRepository } from '../repositories/directory-plugin.repository';
+import { DirectoryPluginEntity } from '../entities/directory-plugin.entity';
 import { PluginRegistryService } from './plugin-registry.service';
-import { PluginEvents, SETTING_SOURCE_PRIORITY } from '../plugins.constants';
+import { PluginEvents } from '../plugins.constants';
+import {
+    SettingsSchemaValidatorService,
+    type SettingsScope as ValidatorSettingsScope,
+} from './settings-schema-validator.service';
 
 /** Placeholder for masked secrets in API responses */
 const MASKED_SECRET_PLACEHOLDER = '********';
+const DIRECTORY_DEFAULT_SHADOWS_NORMALIZED_AT = 'settingsDefaultShadowsNormalizedAt';
 
 /**
  * Options for resolving settings
@@ -58,6 +64,8 @@ export class PluginSettingsService {
         private readonly userPluginRepository: UserPluginRepository,
         private readonly directoryPluginRepository: DirectoryPluginRepository,
         private readonly eventEmitter: EventEmitter2,
+        @Optional()
+        private readonly settingsValidator?: SettingsSchemaValidatorService,
     ) {}
 
     /**
@@ -105,8 +113,10 @@ export class PluginSettingsService {
 
         let directorySettings: Record<string, unknown> = {};
         let directorySecrets: Record<string, unknown> = {};
+        let dirEntity: DirectoryPluginEntity | null = null;
+
         if (effectiveOptions?.directoryId && configMode !== 'admin-only') {
-            const dirEntity = await this.directoryPluginRepository.findByDirectoryAndPlugin(
+            dirEntity = await this.directoryPluginRepository.findByDirectoryAndPlugin(
                 effectiveOptions.directoryId,
                 pluginId,
             );
@@ -119,6 +129,20 @@ export class PluginSettingsService {
         // Resolve each setting
         const resolved: ResolvedSettings = {};
         const definitions = this.extractSettingDefinitions(settingsSchema);
+        if (dirEntity) {
+            const normalized = await this.normalizeDirectoryDefaultShadows(
+                pluginId,
+                dirEntity,
+                definitions,
+                {
+                    user: { ...userSettings, ...userSecrets },
+                    admin: { ...adminSettings, ...adminSecrets },
+                },
+                effectiveOptions,
+            );
+            directorySettings = normalized.settings;
+            directorySecrets = effectiveOptions?.includeSecrets ? normalized.secretSettings : {};
+        }
 
         for (const def of definitions) {
             resolved[def.key] = this.resolveSetting(
@@ -186,10 +210,21 @@ export class PluginSettingsService {
         settings: Record<string, unknown>,
         options?: { secretKeys?: string[] },
     ): Promise<void> {
-        const { regularSettings, secretSettings, filteredSettings } =
-            await this.validateAndSeparateSettings(pluginId, settings, 'global', options);
-
         const entity = await this.pluginRepository.findByPluginId(pluginId);
+        const validationSettings = {
+            ...(entity?.settings || {}),
+            ...(entity?.secretSettings || {}),
+            ...settings,
+        };
+        const { regularSettings, secretSettings, filteredSettings } =
+            await this.validateAndSeparateSettings(
+                pluginId,
+                settings,
+                'global',
+                options,
+                validationSettings,
+            );
+
         if (entity) {
             await this.pluginRepository.updateSettings(
                 pluginId,
@@ -217,15 +252,26 @@ export class PluginSettingsService {
         settings: Record<string, unknown>,
         options?: { secretKeys?: string[] },
     ): Promise<void> {
+        const existing = await this.userPluginRepository.findByUserAndPlugin(userId, pluginId);
+        const validationSettings = {
+            ...(existing?.settings || {}),
+            ...(existing?.secretSettings || {}),
+            ...settings,
+        };
         const { regularSettings, secretSettings, filteredSettings } =
-            await this.validateAndSeparateSettings(pluginId, settings, 'user', options);
+            await this.validateAndSeparateSettings(
+                pluginId,
+                settings,
+                'user',
+                options,
+                validationSettings,
+            );
 
         const pluginEntity = await this.pluginRepository.findByPluginId(pluginId);
         if (!pluginEntity) {
             throw new Error(`Plugin entity not found for ${pluginId}`);
         }
 
-        const existing = await this.userPluginRepository.findByUserAndPlugin(userId, pluginId);
         if (existing) {
             await this.userPluginRepository.updateSettings(
                 userId,
@@ -263,18 +309,29 @@ export class PluginSettingsService {
         settings: Record<string, unknown>,
         options?: { secretKeys?: string[] },
     ): Promise<void> {
+        const existing = await this.directoryPluginRepository.findByDirectoryAndPlugin(
+            directoryId,
+            pluginId,
+        );
+        const validationSettings = {
+            ...(existing?.settings || {}),
+            ...(existing?.secretSettings || {}),
+            ...settings,
+        };
         const { regularSettings, secretSettings, filteredSettings } =
-            await this.validateAndSeparateSettings(pluginId, settings, 'directory', options);
+            await this.validateAndSeparateSettings(
+                pluginId,
+                settings,
+                'directory',
+                options,
+                validationSettings,
+            );
 
         const pluginEntity = await this.pluginRepository.findByPluginId(pluginId);
         if (!pluginEntity) {
             throw new Error(`Plugin entity not found for ${pluginId}`);
         }
 
-        const existing = await this.directoryPluginRepository.findByDirectoryAndPlugin(
-            directoryId,
-            pluginId,
-        );
         if (existing) {
             await this.directoryPluginRepository.updateSettings(
                 directoryId,
@@ -315,6 +372,7 @@ export class PluginSettingsService {
         settings: Record<string, unknown>,
         scope: SettingScope,
         options?: { secretKeys?: string[] },
+        settingsForValidation: Record<string, unknown> = settings,
     ): Promise<{
         regularSettings: Record<string, unknown>;
         secretSettings: Record<string, unknown>;
@@ -340,6 +398,11 @@ export class PluginSettingsService {
 
         let filteredSettings = this.filterEnvVarFields(settings, schema);
         filteredSettings = this.stripMaskedPlaceholders(filteredSettings, schema);
+        let filteredValidationSettings = this.filterEnvVarFields(settingsForValidation, schema);
+        filteredValidationSettings = this.stripMaskedPlaceholders(
+            filteredValidationSettings,
+            schema,
+        );
 
         const scopeValidation = this.validateSettingsScope(
             definitions,
@@ -348,6 +411,31 @@ export class PluginSettingsService {
         );
         if (!scopeValidation.valid) {
             throw new Error(`Scope violation: ${scopeValidation.violations.join(', ')}`);
+        }
+
+        if (this.settingsValidator) {
+            const schemaValidation = this.settingsValidator.validate(
+                filteredValidationSettings,
+                schema,
+                scope as ValidatorSettingsScope,
+            );
+            if (!schemaValidation.valid) {
+                throw new Error(`Invalid settings: ${schemaValidation.errors.join(', ')}`);
+            }
+        }
+
+        if (registered.plugin.validateSettings) {
+            const pluginValidation = await registered.plugin.validateSettings(
+                filteredValidationSettings,
+            );
+            if (!pluginValidation.valid) {
+                throw new Error(
+                    `Invalid settings: ${
+                        pluginValidation.errors?.map((error) => error.message).join(', ') ??
+                        'Custom validation failed'
+                    }`,
+                );
+            }
         }
 
         const regularSettings: Record<string, unknown> = {};
@@ -442,9 +530,6 @@ export class PluginSettingsService {
     ): ResolvedSetting {
         const { key, envVar, defaultValue, scope: settingScope } = definition;
 
-        // Check if setting scope matches request scope
-        const requestScope = options?.scope || 'global';
-
         // Resolution order based on priority (directory > user > admin > env > default)
         // isFallback indicates when a value comes from a scope that doesn't match the setting's intended scope
 
@@ -458,6 +543,19 @@ export class PluginSettingsService {
                 isFallback: settingScope !== 'directory',
             };
         }
+
+        return this.resolveInheritedSetting(definition, sources, options);
+    }
+
+    private resolveInheritedSetting(
+        definition: SettingDefinition,
+        sources: {
+            user: Record<string, unknown>;
+            admin: Record<string, unknown>;
+        },
+        options?: SettingsResolutionOptions,
+    ): ResolvedSetting {
+        const { key, envVar, defaultValue, scope: settingScope } = definition;
 
         // 2. User settings (if userId provided)
         if (options?.userId && sources.user[key] !== undefined) {
@@ -498,6 +596,63 @@ export class PluginSettingsService {
             source: 'default',
             isFallback: true,
         };
+    }
+
+    private async normalizeDirectoryDefaultShadows(
+        pluginId: string,
+        directoryPlugin: DirectoryPluginEntity,
+        definitions: SettingDefinition[],
+        inheritedSources: {
+            user: Record<string, unknown>;
+            admin: Record<string, unknown>;
+        },
+        options?: SettingsResolutionOptions,
+    ): Promise<{ settings: Record<string, unknown>; secretSettings: Record<string, unknown> }> {
+        const settings = { ...(directoryPlugin.settings || {}) };
+        const secretSettings = { ...(directoryPlugin.secretSettings || {}) };
+        const metadata = directoryPlugin.metadata || {};
+
+        if (metadata[DIRECTORY_DEFAULT_SHADOWS_NORMALIZED_AT]) {
+            return { settings, secretSettings };
+        }
+
+        let changed = false;
+        for (const definition of definitions) {
+            const key = definition.key;
+            const hasSetting = settings[key] !== undefined;
+            const hasSecret = secretSettings[key] !== undefined;
+            const directoryValue = hasSecret ? secretSettings[key] : settings[key];
+            if (!hasSetting && !hasSecret) continue;
+            if (definition.defaultValue === undefined) continue;
+            if (!isEqual(directoryValue, definition.defaultValue)) continue;
+
+            const inheritedSetting = this.resolveInheritedSetting(
+                definition,
+                inheritedSources,
+                options,
+            );
+            if (inheritedSetting.source === 'default') continue;
+            if (isEqual(inheritedSetting.value, directoryValue)) continue;
+
+            delete settings[key];
+            delete secretSettings[key];
+            changed = true;
+        }
+
+        const normalizedMetadata = {
+            ...metadata,
+            [DIRECTORY_DEFAULT_SHADOWS_NORMALIZED_AT]: new Date().toISOString(),
+        };
+
+        await this.directoryPluginRepository.updateByDirectoryAndPlugin(
+            directoryPlugin.directoryId,
+            pluginId,
+            changed
+                ? { settings, secretSettings, metadata: normalizedMetadata }
+                : { metadata: normalizedMetadata },
+        );
+
+        return { settings, secretSettings };
     }
 
     /**

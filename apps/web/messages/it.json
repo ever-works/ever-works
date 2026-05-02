@@ -553,7 +553,8 @@
                     "pending": "In Attesa",
                     "inProgress": "In Corso",
                     "completed": "Completato",
-                    "failed": "Fallito"
+                    "failed": "Fallito",
+                    "cancelled": "Annullato"
                 }
             },
             "actions": {
@@ -1772,6 +1773,7 @@
                 "default": "Predefinito",
                 "notConfigured": "Non configurato",
                 "notConfiguredTooltip": "Questo provider richiede configurazione. Visita Impostazioni → Plugin per configurarlo.",
+                "changeModels": "Cambia",
                 "jsonObjectError": "Il valore deve essere un oggetto JSON",
                 "invalidJsonError": "Formato JSON non valido"
             },
@@ -1799,7 +1801,11 @@
                 "closeNote": "Potrebbe richiedere alcuni minuti. Puoi chiudere questa pagina e tornare dopo.",
                 "showLogs": "Mostra log passi",
                 "hideLogs": "Nascondi log passi",
-                "waitingForLogs": "In attesa di log live..."
+                "waitingForLogs": "In attesa di log live...",
+                "stop": "Arresta la generazione",
+                "stopping": "Interruzione in corso...",
+                "stopRequested": "Richiesta di annullamento della generazione",
+                "stopFailed": "Impossibile annullare la generazione"
             },
             "settings": {
                 "sourceSettings": "Repository di origine",
@@ -2932,6 +2938,7 @@
             "resetSuccess": "Impostazioni reimpostate sui valori predefiniti",
             "cancel": "Annulla",
             "clickToConfigure": "Clicca per configurare",
+            "changeModels": "Cambia",
             "autoEnabledByUser": "Auto-abilitato tramite impostazioni utente",
             "toggleError": "Impossibile attivare/disattivare il plugin",
             "system": "Sistema",
