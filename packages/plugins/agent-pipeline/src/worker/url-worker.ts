@@ -4,6 +4,8 @@ import { streamText, stepCountIs, ToolSet } from 'ai';
 import type { LanguageModelV3 } from '@ai-sdk/provider';
 import type {
 	IContentExtractorFacade,
+	FacadeContentExtractionResult,
+	FacadeExtractionAttempt,
 	FacadeOptions,
 	PluginLogger,
 	IPromptFacade,
@@ -59,6 +61,26 @@ export interface UrlWorkerResult {
 	files: string[];
 	count: number;
 	error?: string;
+	errorKind?: 'extraction' | 'empty' | 'worker' | 'aborted';
+	extractionProvider?: string;
+	extractionAttempts?: readonly FacadeExtractionAttempt[];
+}
+
+async function extractContentForUrl(
+	url: string,
+	contentExtractorFacade: IContentExtractorFacade,
+	facadeOptions: FacadeOptions
+): Promise<FacadeContentExtractionResult> {
+	if (typeof contentExtractorFacade.extractContentWithDiagnostics === 'function') {
+		return contentExtractorFacade.extractContentWithDiagnostics(url, undefined, facadeOptions);
+	}
+
+	const content = await contentExtractorFacade.extractContent(url, undefined, facadeOptions);
+	return {
+		content,
+		attempts: content?.extraction?.attempts ?? [],
+		error: content ? undefined : `Content extraction failed for URL: ${url}`
+	};
 }
 
 export async function processUrlWorker(url: string, ctx: UrlWorkerContext): Promise<UrlWorkerResult> {
@@ -75,27 +97,51 @@ export async function processUrlWorker(url: string, ctx: UrlWorkerContext): Prom
 	} = ctx;
 
 	try {
-		if (signal?.aborted) return { url, files: [], count: 0, error: 'Aborted' };
+		if (signal?.aborted) return { url, files: [], count: 0, error: 'Aborted', errorKind: 'aborted' };
 
 		let extractionError: string | null = null;
-		const extracted = await contentExtractorFacade.extractContent(url, undefined, facadeOptions).catch((err) => {
+		const extractionResult = await extractContentForUrl(url, contentExtractorFacade, facadeOptions).catch((err) => {
 			extractionError = err instanceof Error ? err.message : String(err);
 			logger.warn(`Worker: content extraction threw for ${url}: ${extractionError}`);
 			breaker.recordFailure('contentExtractor', extractionError);
-			return null;
+			return {
+				content: null,
+				attempts: [],
+				error: extractionError
+			};
 		});
+		const extracted = extractionResult.content;
+		const extractionAttempts = extractionResult.attempts;
 
 		if (!extracted) {
 			if (!extractionError) {
 				logger.warn(`Worker: content extraction returned null for ${url} (no provider or extraction failed)`);
-				breaker.recordFailure('contentExtractor', `extraction returned null for ${url}`);
+				breaker.recordFailure(
+					'contentExtractor',
+					extractionResult.error ?? `extraction returned null for ${url}`
+				);
 			}
-			return { url, files: [], count: 0, error: extractionError ?? `Content extraction failed for URL: ${url}` };
+			return {
+				url,
+				files: [],
+				count: 0,
+				error: extractionError ?? extractionResult.error ?? `Content extraction failed for URL: ${url}`,
+				errorKind: 'extraction',
+				extractionAttempts
+			};
 		}
 
 		if (!extracted.rawContent) {
 			logger.warn(`Worker: content extraction returned empty content for ${url}`);
-			return { url, files: [], count: 0, error: 'Content extraction returned empty content' };
+			return {
+				url,
+				files: [],
+				count: 0,
+				error: 'Content extraction returned empty content',
+				errorKind: 'empty',
+				extractionProvider: extracted.extraction?.providerName,
+				extractionAttempts
+			};
 		}
 
 		breaker.recordSuccess('contentExtractor');
@@ -256,7 +302,15 @@ export async function processUrlWorker(url: string, ctx: UrlWorkerContext): Prom
 		}
 
 		if (createdFiles.length === 0) {
-			return { url, files: [], count: 0, error: 'No items extracted' };
+			return {
+				url,
+				files: [],
+				count: 0,
+				error: 'No items extracted',
+				errorKind: 'empty',
+				extractionProvider: extracted.extraction?.providerName,
+				extractionAttempts
+			};
 		}
 
 		logger.log(`Worker: created ${createdFiles.length} items from ${url}`);
@@ -264,6 +318,6 @@ export async function processUrlWorker(url: string, ctx: UrlWorkerContext): Prom
 	} catch (err) {
 		const msg = err instanceof Error ? err.message : String(err);
 		logger.warn(`Worker: failed to process ${url}: ${msg}`);
-		return { url, files: [], count: 0, error: msg };
+		return { url, files: [], count: 0, error: msg, errorKind: 'worker' };
 	}
 }

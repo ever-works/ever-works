@@ -1,13 +1,18 @@
 import { Injectable, Logger, Optional } from '@nestjs/common';
 import type {
     IContentExtractorPlugin,
+    FacadeContentExtractionResult,
     FacadeExtractedContent,
+    FacadeExtractionAttempt,
     FacadeExtractionOptions,
     IContentExtractorFacade,
     FacadeOptions,
 } from '@ever-works/plugin';
 import { PLUGIN_CAPABILITIES } from '@ever-works/plugin';
-import { PluginRegistryService } from '../plugins/services/plugin-registry.service';
+import {
+    PluginRegistryService,
+    type RegisteredPlugin,
+} from '../plugins/services/plugin-registry.service';
 import { PluginSettingsService } from '../plugins/services/plugin-settings.service';
 import { DirectoryPluginRepository } from '../plugins/repositories/directory-plugin.repository';
 import {
@@ -38,6 +43,12 @@ export class ContentExtractorProviderNotFoundError extends ProviderNotFoundError
     }
 }
 
+interface ExtractorCandidate {
+    readonly plugin: IContentExtractorPlugin;
+    readonly id: string;
+    readonly name: string;
+}
+
 @Injectable()
 export class ContentExtractorFacadeService
     extends BaseFacadeService
@@ -56,43 +67,132 @@ export class ContentExtractorFacadeService
 
     async extractContent(
         url: string,
-        _options: FacadeExtractionOptions | undefined,
+        options: FacadeExtractionOptions | undefined,
         facadeOptions: FacadeOptions,
     ): Promise<FacadeExtractedContent | null> {
+        const result = await this.extractContentWithDiagnostics(url, options, facadeOptions);
+        return result.content;
+    }
+
+    async extractContentWithDiagnostics(
+        url: string,
+        options: FacadeExtractionOptions | undefined,
+        facadeOptions: FacadeOptions,
+    ): Promise<FacadeContentExtractionResult> {
+        const attempts: FacadeExtractionAttempt[] = [];
+        const providerOverride = facadeOptions.providerOverride ?? options?.providerOverride;
+        let candidates: ExtractorCandidate[];
+
         try {
-            const plugin = await this.resolveExtractorPlugin(
+            candidates = await this.resolveExtractorCandidates(
                 url,
-                facadeOptions.providerOverride,
+                providerOverride,
                 facadeOptions.userId,
                 facadeOptions.directoryId,
             );
-
-            const settings = await this.getResolvedSettings(plugin.id, facadeOptions);
-            const result = await plugin.extract({ url, settings });
-
-            if (!result.success) {
-                this.logger.warn(
-                    `Content extraction returned failure for ${url} (plugin: ${plugin.id}): ${result.error || 'unknown error'}`,
-                );
-                return null;
-            }
-
-            return {
-                url: result.url,
-                rawContent: result.content || result.markdown || '',
-                images: result.images?.map((img) => img.src),
-                metadata: result.metadata as Record<string, unknown> | undefined,
-            };
         } catch (error) {
-            if (error instanceof NoContentExtractorProviderError) {
-                this.logger.debug(`No content extractor available for URL: ${url}`);
-                return null;
-            }
-            this.logger.warn(
-                `Content extraction failed: ${error instanceof Error ? error.message : String(error)}`,
-            );
-            return null;
+            const message = error instanceof Error ? error.message : String(error);
+            this.logger.warn(`Content extractor resolution failed for ${url}: ${message}`);
+            return {
+                content: null,
+                attempts,
+                error: message,
+            };
         }
+
+        if (candidates.length === 0) {
+            this.logger.debug(`No content extractor available for URL: ${url}`);
+            return {
+                content: null,
+                attempts,
+                error: `No content extractor available for URL: ${url}`,
+            };
+        }
+
+        for (const candidate of candidates) {
+            try {
+                const settings = await this.getResolvedSettings(candidate.id, facadeOptions);
+                const result = await candidate.plugin.extract({
+                    url,
+                    settings,
+                    includeImages: options?.includeImages,
+                    includeLinks: options?.includeLinks,
+                });
+                const rawContent = result.content || result.markdown || '';
+
+                if (!result.success) {
+                    const error = result.error || 'unknown error';
+                    attempts.push({
+                        providerId: candidate.id,
+                        providerName: candidate.name,
+                        success: false,
+                        error,
+                    });
+                    this.logger.warn(
+                        `Content extraction returned failure for ${url} (plugin: ${candidate.id}): ${error}`,
+                    );
+                    continue;
+                }
+
+                if (!rawContent.trim()) {
+                    attempts.push({
+                        providerId: candidate.id,
+                        providerName: candidate.name,
+                        success: false,
+                        error: 'empty content',
+                        contentLength: 0,
+                    });
+                    this.logger.warn(
+                        `Content extraction returned empty content for ${url} (plugin: ${candidate.id})`,
+                    );
+                    continue;
+                }
+
+                attempts.push({
+                    providerId: candidate.id,
+                    providerName: candidate.name,
+                    success: true,
+                    contentLength: rawContent.length,
+                });
+
+                return {
+                    content: {
+                        url: result.url,
+                        rawContent,
+                        images: result.images?.map((img) => img.src),
+                        metadata: result.metadata as Record<string, unknown> | undefined,
+                        extraction: {
+                            providerId: candidate.id,
+                            providerName: candidate.name,
+                            attempts,
+                        },
+                    },
+                    attempts,
+                };
+            } catch (error) {
+                const message = error instanceof Error ? error.message : String(error);
+                attempts.push({
+                    providerId: candidate.id,
+                    providerName: candidate.name,
+                    success: false,
+                    error: message,
+                });
+                this.logger.warn(
+                    `Content extraction failed for ${url} (plugin: ${candidate.id}): ${message}`,
+                );
+            }
+        }
+
+        this.logger.warn(
+            `Content extraction failed for ${url}; tried ${attempts
+                .map((attempt) => `${attempt.providerId}: ${attempt.error || 'failed'}`)
+                .join(', ')}`,
+        );
+        return {
+            content: null,
+            attempts,
+            error: `Content extraction failed for URL: ${url}`,
+        };
     }
 
     override getAvailableProviders(): Array<{ id: string; name: string; enabled: boolean }> {
@@ -114,15 +214,27 @@ export class ContentExtractorFacadeService
      *   4. System/default extractor (local-content-extractor)
      *   5. Last resort: any enabled extractor that accepts the URL
      */
-    private async resolveExtractorPlugin(
+    private async resolveExtractorCandidates(
         url: string,
         providerOverride?: string,
         userId?: string,
         directoryId?: string,
-    ): Promise<IContentExtractorPlugin> {
+    ): Promise<ExtractorCandidate[]> {
         const loadedPlugins = this.registry
             .getByCapability(this.CAPABILITY)
             .filter((p) => p.state === 'loaded');
+        const candidates: ExtractorCandidate[] = [];
+        const seen = new Set<string>();
+
+        const addCandidate = (registered: RegisteredPlugin): void => {
+            if (seen.has(registered.plugin.id)) return;
+            seen.add(registered.plugin.id);
+            candidates.push({
+                plugin: registered.plugin as IContentExtractorPlugin,
+                id: registered.plugin.id,
+                name: this.getProviderName(registered.plugin),
+            });
+        };
 
         // 0. Supplementary plugins: URL-pattern specialists (pdf, notion, …).
         //    Checked before the user's chosen provider so they can intercept their URL types.
@@ -131,7 +243,9 @@ export class ContentExtractorFacadeService
             if (!(await this.isPluginEnabled(registered.plugin.id, directoryId, userId))) continue;
 
             const plugin = registered.plugin as IContentExtractorPlugin;
-            if (await this.canExtractSafe(plugin, url, registered.plugin.id)) return plugin;
+            if (await this.canExtractSafe(plugin, url, registered.plugin.id)) {
+                addCandidate(registered);
+            }
         }
 
         // 1. Explicit provider override
@@ -151,7 +265,7 @@ export class ContentExtractorFacadeService
 
             const plugin = registered.plugin as IContentExtractorPlugin;
             await this.assertCanExtractForOverride(plugin, url, providerOverride);
-            return plugin;
+            addCandidate(registered);
         }
 
         // 2. Directory's configured default
@@ -159,7 +273,9 @@ export class ContentExtractorFacadeService
             const active = await this.findActivePluginForDirectory(directoryId);
             if (active) {
                 const plugin = active.plugin as IContentExtractorPlugin;
-                if (await this.canExtractSafe(plugin, url, active.plugin.id)) return plugin;
+                if (await this.canExtractSafe(plugin, url, active.plugin.id)) {
+                    addCandidate(active);
+                }
             }
         }
 
@@ -174,26 +290,30 @@ export class ContentExtractorFacadeService
             if (!(await this.isPluginEnabled(registered.plugin.id, directoryId, userId))) continue;
 
             const plugin = registered.plugin as IContentExtractorPlugin;
-            if (await this.canExtractSafe(plugin, url, registered.plugin.id)) return plugin;
+            if (await this.canExtractSafe(plugin, url, registered.plugin.id)) {
+                addCandidate(registered);
+            }
         }
 
         // 4. System/default extractor (e.g., local-content-extractor)
         const defaultExtractor = this.registry.getDefaultForCapability(this.CAPABILITY);
         if (defaultExtractor) {
             const plugin = defaultExtractor.plugin as IContentExtractorPlugin;
+            let canExtract = true;
             if (typeof plugin.canExtract === 'function') {
                 try {
-                    if (!(await plugin.canExtract(url)))
-                        throw new NoContentExtractorProviderError();
+                    canExtract = await plugin.canExtract(url);
                 } catch (err) {
-                    if (err instanceof NoContentExtractorProviderError) throw err;
                     // canExtract itself threw — log and still attempt extraction
                     this.logger.warn(
                         `canExtract error on default extractor: ${(err as Error).message}`,
                     );
                 }
             }
-            return plugin;
+
+            if (canExtract) {
+                addCandidate(defaultExtractor);
+            }
         }
 
         // 5. Last resort
@@ -201,10 +321,12 @@ export class ContentExtractorFacadeService
             if (!(await this.isPluginEnabled(registered.plugin.id, directoryId, userId))) continue;
 
             const plugin = registered.plugin as IContentExtractorPlugin;
-            if (await this.canExtractSafe(plugin, url, registered.plugin.id)) return plugin;
+            if (await this.canExtractSafe(plugin, url, registered.plugin.id)) {
+                addCandidate(registered);
+            }
         }
 
-        throw new NoContentExtractorProviderError();
+        return candidates;
     }
 
     /**
