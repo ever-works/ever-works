@@ -13,8 +13,9 @@ import { useSearchParams } from 'next/navigation';
 import { useLocale, useTranslations } from 'next-intl';
 import { useRouter as useTopLoaderRouter } from 'nextjs-toploader/app';
 import { toast } from 'sonner';
-import { getDirectories } from '@/app/actions/dashboard/directories';
+import { getDirectories, getDirectoryForStatusRefresh } from '@/app/actions/dashboard/directories';
 import { Directory } from '@/lib/api/directory';
+import { GenerateStatusType } from '@/lib/api/enums';
 import { getPathname, usePathname } from '@/i18n/navigation';
 import { cn } from '@/lib/utils/cn';
 import { getGenerationStatusConfig } from '@/lib/utils/generation-status';
@@ -91,6 +92,49 @@ export function DirectorySwitcher() {
     useEffect(() => {
         inputRef.current?.blur();
     }, [currentDirectoryId]);
+
+    useEffect(() => {
+        if (
+            !isVisible ||
+            !currentDirectoryId ||
+            currentDirectory?.generateStatus?.status !== GenerateStatusType.GENERATING
+        ) {
+            return;
+        }
+
+        let isCancelled = false;
+        let isRefreshing = false;
+
+        const refreshCurrentDirectory = async () => {
+            if (isRefreshing) {
+                return;
+            }
+
+            isRefreshing = true;
+            try {
+                const refreshedDirectory = await getDirectoryForStatusRefresh(currentDirectoryId);
+                if (isCancelled || !refreshedDirectory) {
+                    return;
+                }
+
+                setDirectories((currentDirectories) =>
+                    currentDirectories.map((directory) =>
+                        directory.id === refreshedDirectory.id ? refreshedDirectory : directory,
+                    ),
+                );
+            } finally {
+                isRefreshing = false;
+            }
+        };
+
+        void refreshCurrentDirectory();
+        const interval = window.setInterval(refreshCurrentDirectory, 5_000);
+
+        return () => {
+            isCancelled = true;
+            window.clearInterval(interval);
+        };
+    }, [currentDirectory?.generateStatus?.status, currentDirectoryId, isVisible]);
 
     useEffect(() => {
         if (!isVisible || hasLoadedRef.current) {
