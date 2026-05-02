@@ -1,5 +1,6 @@
 'use client';
 
+import { useMemo, useState } from 'react';
 import { PipelineModeSelector, ProviderSelector } from '../detail/generator/ProviderSelector';
 import {
     Accordion,
@@ -15,24 +16,40 @@ import type {
 } from '@/lib/api/types-only';
 import { getIndividualProviderCategories } from '@ever-works/plugin';
 import { Sliders } from 'lucide-react';
+import type { DirectoryPlugin } from '@/lib/api/plugins';
+import { DirectoryPluginSettingsModal } from '../detail/plugins/DirectoryPluginSettingsModal';
 
 interface ProviderSelectionSectionProps {
+    directoryId?: string;
     formSchema: GeneratorFormSchema;
     providers: ProviderSelectionState;
+    directoryPlugins?: DirectoryPlugin[];
     onProviderChange: (category: SelectableProviderCategory, value: string | null) => void;
 }
 
 export function ProviderSelectionSection({
+    directoryId,
     formSchema,
     providers,
+    directoryPlugins = [],
     onProviderChange,
 }: ProviderSelectionSectionProps) {
     const t = useTranslations('dashboard.directoryDetail.generator');
+    const [settingsPluginId, setSettingsPluginId] = useState<string | null>(null);
+    const settingsPlugin =
+        directoryPlugins.find((plugin) => plugin.pluginId === settingsPluginId) ?? null;
 
     const individualCategories = getIndividualProviderCategories().filter(({ uiKey }) => {
         const options = formSchema.providers[uiKey as keyof GeneratorFormSchema['providers']];
         return options && options.length > 0;
     });
+    const directoryPluginModelsById = useMemo(() => {
+        return new Map(
+            directoryPlugins
+                .filter((plugin) => plugin.models?.length)
+                .map((plugin) => [plugin.pluginId, plugin.models]),
+        );
+    }, [directoryPlugins]);
 
     return (
         <>
@@ -72,13 +89,29 @@ export function ProviderSelectionSection({
                                         formSchema.providers[
                                             uiKey as keyof GeneratorFormSchema['providers']
                                         ];
+
+                                    const providerOptions =
+                                        uiKey === 'ai'
+                                            ? options.map((option) => ({
+                                                  ...option,
+                                                  models:
+                                                      directoryPluginModelsById.get(option.id) ??
+                                                      option.models,
+                                              }))
+                                            : options;
+
                                     const labelKey = `${uiKey}Provider` as Parameters<typeof t>[0];
                                     return (
                                         <ProviderSelector
                                             key={uiKey}
                                             label={t(labelKey)}
-                                            providers={options}
+                                            providers={providerOptions}
                                             value={providers[uiKey as keyof ProviderSelectionState]}
+                                            onConfigure={
+                                                directoryId
+                                                    ? (pluginId) => setSettingsPluginId(pluginId)
+                                                    : undefined
+                                            }
                                             onChange={(id) =>
                                                 onProviderChange(
                                                     uiKey as SelectableProviderCategory,
@@ -92,6 +125,17 @@ export function ProviderSelectionSection({
                         </AccordionContent>
                     </AccordionItem>
                 </Accordion>
+            )}
+
+            {directoryId && settingsPlugin && (
+                <DirectoryPluginSettingsModal
+                    open={settingsPluginId !== null}
+                    onOpenChange={(open) => {
+                        if (!open) setSettingsPluginId(null);
+                    }}
+                    directoryId={directoryId}
+                    plugin={settingsPlugin}
+                />
             )}
         </>
     );

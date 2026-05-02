@@ -54,6 +54,7 @@ import {
     hasActiveCapability,
     removeActiveCapability,
 } from '../utils/active-capabilities.util';
+import { buildProviderModelSummaries } from '../utils/plugin-model-settings.utils';
 
 @Injectable()
 export class PluginOperationsService {
@@ -716,11 +717,16 @@ export class PluginOperationsService {
         }
 
         // Map to response
-        const plugins: DirectoryPluginResponse[] = visiblePlugins.map((registered) => {
-            const userPlugin = userPluginMap.get(registered.plugin.id);
-            const directoryPlugin = directoryPluginMap.get(registered.plugin.id);
-            return this.toDirectoryPluginResponse(registered, userPlugin, directoryPlugin);
-        });
+        const plugins: DirectoryPluginResponse[] = await Promise.all(
+            visiblePlugins.map((registered) => {
+                const userPlugin = userPluginMap.get(registered.plugin.id);
+                const directoryPlugin = directoryPluginMap.get(registered.plugin.id);
+                return this.toDirectoryPluginResponse(registered, userPlugin, directoryPlugin, {
+                    userId,
+                    directoryId,
+                });
+            }),
+        );
 
         return {
             plugins,
@@ -828,7 +834,10 @@ export class PluginOperationsService {
             this.requestWorksConfigSync(directoryId, userId, 'provider_changed');
         }
 
-        return this.toDirectoryPluginResponse(registered, userPlugin, directoryPlugin);
+        return this.toDirectoryPluginResponse(registered, userPlugin, directoryPlugin, {
+            userId,
+            directoryId,
+        });
     }
 
     /**
@@ -896,7 +905,10 @@ export class PluginOperationsService {
             this.requestWorksConfigSync(directoryId, userId, 'provider_changed');
         }
 
-        return this.toDirectoryPluginResponse(registered, userPlugin, directoryPlugin);
+        return this.toDirectoryPluginResponse(registered, userPlugin, directoryPlugin, {
+            userId,
+            directoryId,
+        });
     }
 
     /**
@@ -1001,7 +1013,10 @@ export class PluginOperationsService {
             this.requestWorksConfigSync(directoryId, userId, 'pipeline_settings_changed');
         }
 
-        return this.toDirectoryPluginResponse(registered, userPlugin, directoryPlugin);
+        return this.toDirectoryPluginResponse(registered, userPlugin, directoryPlugin, {
+            userId,
+            directoryId,
+        });
     }
 
     /**
@@ -1069,7 +1084,10 @@ export class PluginOperationsService {
 
         this.requestWorksConfigSync(directoryId, userId, 'provider_changed');
 
-        return this.toDirectoryPluginResponse(registered, userPlugin, directoryPlugin);
+        return this.toDirectoryPluginResponse(registered, userPlugin, directoryPlugin, {
+            userId,
+            directoryId,
+        });
     }
 
     private requestWorksConfigSync(
@@ -1260,12 +1278,13 @@ export class PluginOperationsService {
         userId: string,
     ): Promise<UserPluginResponse> {
         const response = this.toUserPluginResponse(registered, userPlugin);
-        const [resolvedSettings, connectionStatus] = await Promise.all([
+        const [resolvedSettings, connectionStatus, models] = await Promise.all([
             this.getResolvedDisplaySettings(registered, userId),
             this.getConnectionStatus(registered, userId),
+            this.getProviderModelSummaries(registered, { userId }),
         ]);
 
-        if (!resolvedSettings && !connectionStatus) {
+        if (!resolvedSettings && !connectionStatus && !models) {
             return response;
         }
 
@@ -1273,6 +1292,7 @@ export class PluginOperationsService {
             ...response,
             resolvedSettings,
             connectionStatus,
+            models,
         };
     }
 
@@ -1414,12 +1434,16 @@ export class PluginOperationsService {
      * For plugins with autoEnable=true, directoryEnabled defaults to true
      * even without a DirectoryPluginEntity record (unless explicitly disabled).
      */
-    private toDirectoryPluginResponse(
+    private async toDirectoryPluginResponse(
         registered: RegisteredPlugin,
         userPlugin?: UserPluginEntity | null,
         directoryPlugin?: DirectoryPluginEntity | null,
-    ): DirectoryPluginResponse {
+        options?: { userId: string; directoryId: string },
+    ): Promise<DirectoryPluginResponse> {
         const userResponse = this.toUserPluginResponse(registered, userPlugin);
+        const models = options
+            ? await this.getProviderModelSummaries(registered, options)
+            : undefined;
 
         return {
             ...userResponse,
@@ -1439,7 +1463,24 @@ export class PluginOperationsService {
             ),
             directoryPluginId: directoryPlugin?.id,
             priority: directoryPlugin?.priority,
+            models,
         };
+    }
+
+    private async getProviderModelSummaries(
+        registered: RegisteredPlugin,
+        options: { userId: string; directoryId?: string },
+    ): Promise<DirectoryPluginResponse['models']> {
+        if (!registered.plugin.capabilities.includes(PLUGIN_CAPABILITIES.AI_PROVIDER)) {
+            return undefined;
+        }
+
+        const resolved = await this.settingsService.getResolvedSettings(registered.plugin.id, {
+            userId: options.userId,
+            directoryId: options.directoryId,
+        });
+
+        return buildProviderModelSummaries(registered.plugin.settingsSchema, resolved);
     }
 
     /**

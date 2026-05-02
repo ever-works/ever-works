@@ -4,17 +4,17 @@ import { useEffect, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { DirectoryPlugin } from '@/lib/api/plugins';
-import { cn } from '@/lib/utils/cn';
 import { setActiveCapability } from '@/app/actions/plugins';
-import { PluginIcon } from '@/components/plugins/PluginIcon';
 import { getCapabilityLabel, getCategoryIcon } from '@/lib/utils/plugin-category-icons';
-import { Check } from 'lucide-react';
+import { DirectoryPluginSettingsModal } from './DirectoryPluginSettingsModal';
+import { ProviderChoiceButton } from './ProviderChoiceButton';
 
 interface CapabilitySelectorProps {
     directoryId: string;
     capability: string;
     plugins: DirectoryPlugin[];
     activePluginId?: string;
+    scope?: 'directory' | 'user';
 }
 
 export function CapabilitySelector({
@@ -22,12 +22,15 @@ export function CapabilitySelector({
     capability,
     plugins,
     activePluginId,
+    scope = 'directory',
 }: CapabilitySelectorProps) {
     const t = useTranslations('dashboard.directoryPlugins');
     const router = useRouter();
     const CapabilityIcon = getCategoryIcon(capability);
     const [isPending, startTransition] = useTransition();
     const [selectedPluginId, setSelectedPluginId] = useState(activePluginId);
+    const [settingsPluginId, setSettingsPluginId] = useState<string | null>(null);
+    const settingsPlugin = plugins.find((plugin) => plugin.pluginId === settingsPluginId) ?? null;
 
     useEffect(() => {
         setSelectedPluginId(activePluginId);
@@ -86,29 +89,38 @@ export function CapabilitySelector({
             >
                 {plugins.map((plugin) => {
                     const isActive = plugin.pluginId === selectedPluginId;
+                    const showModels =
+                        capability === 'ai-provider' && plugin.models && plugin.models.length > 0;
                     return (
-                        <button
+                        <ProviderChoiceButton
                             key={plugin.pluginId}
-                            type="button"
-                            aria-pressed={isActive}
-                            onClick={() => handleSelect(plugin.pluginId)}
+                            name={plugin.name}
+                            icon={plugin.icon}
+                            models={showModels ? plugin.models : undefined}
+                            isActive={isActive}
                             disabled={isPending}
-                            className={cn(
-                                'inline-flex h-7 items-center gap-1.5 rounded-md border px-2.5 text-xs font-medium transition-colors duration-150',
-                                'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50',
-                                isActive
-                                    ? 'border-primary/40 bg-primary/10 text-primary'
-                                    : 'border-border dark:border-border-dark bg-transparent text-text-secondary dark:text-text-secondary-dark hover:bg-surface-secondary dark:hover:bg-surface-secondary-dark hover:text-text dark:hover:text-text-dark hover:border-primary/30',
-                                isPending && 'opacity-50 cursor-wait',
-                            )}
-                        >
-                            <PluginIcon icon={plugin.icon} name={plugin.name} size={14} plain />
-                            <span className="max-w-36 truncate">{plugin.name}</span>
-                            {isActive && <Check className="w-3 h-3 ml-0.5" />}
-                        </button>
+                            nameClassName="max-w-36 truncate"
+                            changeLabel={t('changeModels')}
+                            onSelect={() => handleSelect(plugin.pluginId)}
+                            onConfigure={
+                                showModels && isActive && scope === 'directory'
+                                    ? () => setSettingsPluginId(plugin.pluginId)
+                                    : undefined
+                            }
+                        />
                     );
                 })}
             </div>
+            {settingsPlugin && scope === 'directory' && (
+                <DirectoryPluginSettingsModal
+                    open={settingsPluginId !== null}
+                    onOpenChange={(open) => {
+                        if (!open) setSettingsPluginId(null);
+                    }}
+                    directoryId={directoryId}
+                    plugin={settingsPlugin}
+                />
+            )}
         </div>
     );
 }

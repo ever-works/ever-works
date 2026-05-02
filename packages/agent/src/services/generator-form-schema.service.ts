@@ -20,6 +20,7 @@ import {
     getSelectableCategories,
 } from '@ever-works/plugin';
 import type { ProvidersDto } from '@src/items-generator/dto/create-items-generator.dto';
+import { buildProviderModelSummaries } from '@src/plugins/utils/plugin-model-settings.utils';
 
 /**
  * Service for resolving dynamic generator form schema based on selected plugins.
@@ -330,7 +331,15 @@ export class GeneratorFormSchemaService {
             }
 
             const configured = await this.isPluginConfigured(registered, options);
-            result.push(this.toProviderOption(registered, activePluginId, configured, capability));
+            result.push(
+                await this.toProviderOption(
+                    registered,
+                    activePluginId,
+                    configured,
+                    capability,
+                    options,
+                ),
+            );
         }
 
         return result;
@@ -339,12 +348,13 @@ export class GeneratorFormSchemaService {
     /**
      * Convert a registered plugin to a provider option.
      */
-    private toProviderOption(
+    private async toProviderOption(
         registered: RegisteredPlugin,
         activePluginId?: string | null,
         configured: boolean = true,
         capability?: string,
-    ): ProviderOption {
+        options?: FormSchemaOptions,
+    ): Promise<ProviderOption> {
         const { plugin, manifest } = registered;
 
         // Mark as default if:
@@ -357,6 +367,17 @@ export class GeneratorFormSchemaService {
               ? manifest.defaultForCapabilities?.includes(capability) || false
               : manifest.systemPlugin || false;
 
+        const models =
+            capability === PLUGIN_CAPABILITIES.AI_PROVIDER && this.pluginSettingsService
+                ? buildProviderModelSummaries(
+                      plugin.settingsSchema,
+                      await this.pluginSettingsService.getResolvedSettings(plugin.id, {
+                          userId: options?.userId,
+                          directoryId: options?.directoryId,
+                      }),
+                  )
+                : undefined;
+
         return {
             id: plugin.id,
             name: manifest.name,
@@ -364,6 +385,7 @@ export class GeneratorFormSchemaService {
             configured,
             isDefault,
             icon: manifest.icon,
+            models,
         };
     }
 

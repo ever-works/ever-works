@@ -5,15 +5,16 @@ import { cn } from '@/lib/utils/cn';
 import type { ProviderOption } from '@/lib/api/types-only';
 import { resolveEffectiveDefault } from '@ever-works/plugin';
 import { useTranslations } from 'next-intl';
-import { PluginIcon } from '@/components/plugins/PluginIcon';
 import { Tooltip } from '@/components/ui/tooltip';
-import { Check, Network } from 'lucide-react';
+import { Network } from 'lucide-react';
+import { ProviderChoiceButton } from '@/components/directories/detail/plugins/ProviderChoiceButton';
 
 interface ProviderSelectorProps {
     label: string;
     providers: ProviderOption[];
     value: string | null;
     onChange: (providerId: string | null) => void;
+    onConfigure?: (providerId: string) => void;
     disabled?: boolean;
 }
 
@@ -22,6 +23,7 @@ export function ProviderSelector({
     providers,
     value,
     onChange,
+    onConfigure,
     disabled = false,
 }: ProviderSelectorProps) {
     const t = useTranslations('dashboard.directoryDetail.generator');
@@ -47,45 +49,21 @@ export function ProviderSelector({
                 {providers.map((provider) => {
                     const isActive = value === provider.id || provider.id === effectiveDefaultId;
                     const button = (
-                        <button
-                            type="button"
-                            onClick={() => {
+                        <ProviderChoiceButton
+                            name={provider.name}
+                            icon={provider.icon}
+                            models={provider.models}
+                            isActive={isActive}
+                            disabled={disabled || provider.id === effectiveDefaultId}
+                            notConfigured={!provider.configured}
+                            notConfiguredLabel={t('notConfigured')}
+                            changeLabel={t('changeModels')}
+                            onSelect={() => {
                                 if (provider.id === effectiveDefaultId) return;
-                                if (value === provider.id) {
-                                    onChange(null);
-                                } else {
-                                    onChange(provider.id);
-                                }
+                                onChange(value === provider.id ? null : provider.id);
                             }}
-                            disabled={
-                                disabled ||
-                                !provider.configured ||
-                                provider.id === effectiveDefaultId
-                            }
-                            className={cn(
-                                'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium border transition-all duration-150',
-                                'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50',
-                                isActive
-                                    ? 'border-primary/40 bg-primary/10 text-primary shadow-sm'
-                                    : 'border-border dark:border-border-dark bg-transparent text-text-secondary dark:text-text-secondary-dark hover:bg-surface-secondary dark:hover:bg-surface-secondary-dark hover:text-text dark:hover:text-text-dark hover:border-primary/30',
-                                !provider.configured && 'opacity-40 cursor-not-allowed',
-                                disabled && 'opacity-50 cursor-not-allowed',
-                            )}
-                        >
-                            {provider.icon && (
-                                <PluginIcon
-                                    icon={provider.icon}
-                                    name={provider.name}
-                                    size={14}
-                                    plain
-                                />
-                            )}
-                            <span>
-                                {provider.name}
-                                {!provider.configured && ` (${t('notConfigured')})`}
-                            </span>
-                            {isActive && <Check className="w-3 h-3 ml-0.5" />}
-                        </button>
+                            onConfigure={onConfigure ? () => onConfigure(provider.id) : undefined}
+                        />
                     );
 
                     return !provider.configured ? (

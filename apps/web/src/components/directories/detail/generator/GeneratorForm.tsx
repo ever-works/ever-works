@@ -32,14 +32,21 @@ import { getFormSchema } from '@/app/actions/dashboard/generator-form';
 import { useProviderSelection } from '@/lib/hooks/use-provider-selection';
 import { ProviderSelectionSection } from '@/components/directories/shared/ProviderSelectionSection';
 import { GenerationProgress } from './GenerationProgress';
+import type { DirectoryPlugin } from '@/lib/api/plugins';
 
 interface GeneratorFormProps {
     directoryId: string;
     directory: Directory;
     config?: DirectoryConfig;
+    directoryPlugins?: DirectoryPlugin[];
 }
 
-export function GeneratorForm({ directoryId, directory, config }: GeneratorFormProps) {
+export function GeneratorForm({
+    directoryId,
+    directory,
+    config,
+    directoryPlugins = [],
+}: GeneratorFormProps) {
     const router = useRouter();
     const t = useTranslations('dashboard.directoryDetail.generator');
     const [isPending, startTransition] = useTransition();
@@ -281,8 +288,10 @@ export function GeneratorForm({ directoryId, directory, config }: GeneratorFormP
             {/* Pipeline & Provider Selection — always visible */}
             {formSchema && (
                 <ProviderSelectionSection
+                    directoryId={directoryId}
                     formSchema={formSchema}
                     providers={providers}
+                    directoryPlugins={directoryPlugins}
                     onProviderChange={handleProviderChange}
                 />
             )}
