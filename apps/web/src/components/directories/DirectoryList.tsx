@@ -35,7 +35,7 @@ export function DirectoryList({
                 onUpdate?.(response.directories);
             }
         } catch (error) {
-            console.error('Failed to fetch directories:', error);
+            console.error('Failed to fetch works:', error);
         } finally {
             setLoading(false);
         }

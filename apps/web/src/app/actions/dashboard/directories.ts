@@ -145,7 +145,7 @@ export async function createDirectory(data: CreateDirectoryDto) {
         validation.data.gitProvider = providerId;
         validation.data.deployProvider = data.deployProvider || undefined;
 
-        console.log('Creating directory:', validation.data);
+        console.log('Creating Work:', validation.data);
 
         // Create the directory with validated data
         const { directory } = await directoryAPI.create(validation.data);
@@ -156,7 +156,7 @@ export async function createDirectory(data: CreateDirectoryDto) {
             message: t('createSuccess'),
         };
     } catch (error) {
-        console.error('Failed to create directory:', error);
+        console.error('Failed to create Work:', error);
         return {
             success: false,
             error: error instanceof Error ? error.message : t('createFailed'),
@@ -300,7 +300,7 @@ export async function createDirectoryWithAI(request: AIDirectoryOptions) {
             isGenerating: true,
         };
     } catch (error) {
-        console.error('Failed to create directory with AI:', error);
+        console.error('Failed to create Work with AI:', error);
         return {
             success: false,
             error: error instanceof Error ? error.message : t('createFailed'),
@@ -324,7 +324,7 @@ export async function fetchDirectoryGenerationHistory(
             data: response,
         };
     } catch (error) {
-        console.error('Failed to fetch directory generation history:', error);
+        console.error('Failed to fetch Work generation history:', error);
         return {
             success: false,
             error: error instanceof Error ? error.message : 'Unknown error',
@@ -389,7 +389,7 @@ export async function updateDirectory(directoryId: string, data: UpdateDirectory
             message: readmeUpdate?.message || t('updateSuccess'),
         };
     } catch (error) {
-        console.error('Failed to update directory:', error);
+        console.error('Failed to update Work:', error);
         return {
             success: false,
             error: error instanceof Error ? error.message : t('updateFailed'),
@@ -426,7 +426,7 @@ export async function updateDirectoryTemplate(directoryId: string, websiteTempla
             message: t('updateSuccess'),
         };
     } catch (error) {
-        console.error('Failed to update directory template:', error);
+        console.error('Failed to update Work template:', error);
         return {
             success: false,
             error: error instanceof Error ? error.message : t('updateFailed'),
@@ -459,7 +459,7 @@ export async function deleteDirectory(directoryId: string, options?: DeleteDirec
             message: t('deleteSuccess'),
         };
     } catch (error) {
-        console.error('Failed to delete directory:', error);
+        console.error('Failed to delete Work:', error);
         return {
             success: false,
             error: error instanceof Error ? error.message : t('deleteFailed'),
@@ -483,7 +483,7 @@ export async function syncDirectoryData(
         }
         return res;
     } catch (error) {
-        console.error('Failed to sync directory data:', error);
+        console.error('Failed to sync Work data:', error);
         return null;
     }
 }
@@ -498,7 +498,7 @@ export async function getDirectoryForStatusRefresh(directoryId: string): Promise
         const { directory } = await directoryAPI.get(directoryId);
         return directory;
     } catch (error) {
-        console.error('Failed to refresh directory status:', error);
+        console.error('Failed to refresh Work status:', error);
         return null;
     }
 }
@@ -525,7 +525,7 @@ export async function getDirectories(params: GetDirectoriesParams = {}) {
             total,
         };
     } catch (error) {
-        console.error('Failed to fetch directories:', error);
+        console.error('Failed to fetch works:', error);
         return {
             success: false,
             directories: [],
@@ -543,7 +543,7 @@ export async function getDirectoryStats() {
             ...stats,
         };
     } catch (error) {
-        console.error('Failed to fetch directory stats:', error);
+        console.error('Failed to fetch Work stats:', error);
         return {
             success: false,
             totalDirectories: 0,
@@ -705,7 +705,7 @@ export async function importDirectory(data: ImportDirectoryRequest) {
             error: result.status === 'error' ? result.message : undefined,
         };
     } catch (error) {
-        console.error('Failed to import directory:', error);
+        console.error('Failed to import Work:', error);
 
         if (error instanceof ApiResponseError) {
             const providerErrors = error.details?.providerErrors;
@@ -833,7 +833,7 @@ export async function updateDirectorySchedule(
             data: result,
         };
     } catch (error) {
-        console.error('Failed to update directory schedule:', error);
+        console.error('Failed to update Work schedule:', error);
         return {
             success: false,
             error: error instanceof Error ? error.message : 'Failed to update schedule',

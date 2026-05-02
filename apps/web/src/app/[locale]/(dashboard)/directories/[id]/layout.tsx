@@ -67,7 +67,7 @@ export default async function DirectoryLayout({ params, children }: LayoutParams
             }
         }
     } catch (error) {
-        console.error('Failed to fetch directory:', error);
+        console.error('Failed to fetch Work:', error);
         notFound();
     }
 

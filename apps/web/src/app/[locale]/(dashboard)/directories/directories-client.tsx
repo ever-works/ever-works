@@ -88,7 +88,7 @@ export default function DirectoriesClient({
             } catch (error) {
                 // Only show error if this is still the latest request
                 if (currentRequestId === requestIdRef.current) {
-                    console.error('Failed to search directories:', error);
+                    console.error('Failed to search works:', error);
                     toast.error(t('searchFailed'));
                 }
             } finally {
@@ -112,7 +112,7 @@ export default function DirectoriesClient({
                 });
             }
         } catch (error) {
-            console.error('Failed to refresh directory stats:', error);
+            console.error('Failed to refresh Work stats:', error);
         }
     }, []);
 
