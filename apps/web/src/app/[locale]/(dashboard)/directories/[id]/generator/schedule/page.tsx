@@ -7,18 +7,33 @@ import { DirectoryScheduleHeader } from '@/components/directories/detail/schedul
 import { canManageSchedule } from '@/lib/permissions';
 import { getTranslations } from 'next-intl/server';
 import { notFound } from 'next/navigation';
-import type { ProviderOption } from '@/lib/api/types-only';
+import type { GeneratorFormSchema, ProviderOption } from '@/lib/api/types-only';
 import type { ProvidersDto } from '@ever-works/contracts/api';
-import { SELECTABLE_PROVIDER_CATEGORIES, type ProviderCategoryKey } from '@ever-works/plugin';
+import {
+    buildSelectedProviders,
+    SELECTABLE_PROVIDER_CATEGORIES,
+    type ProviderCategoryKey,
+} from '@ever-works/plugin';
 
 type Params = { params: Promise<{ id: string }> };
 
 function resolveActiveProviders(
-    lastRunProviders: ProvidersDto | undefined,
     overrides: ProvidersDto | null | undefined,
-    allProviders: Record<string, ProviderOption[]>,
+    formSchema: GeneratorFormSchema | null,
     labels: Record<ProviderCategoryKey, string>,
 ): ResolvedProvider[] {
+    if (!formSchema) {
+        return [];
+    }
+
+    const selectedProviders = buildSelectedProviders(overrides ?? {}, formSchema) as
+        | ProvidersDto
+        | undefined;
+    if (!selectedProviders) {
+        return [];
+    }
+
+    const allProviders = formSchema.providers;
     const categories = Object.entries(SELECTABLE_PROVIDER_CATEGORIES).map(([key, def]) => ({
         key: def.uiKey as keyof ProvidersDto,
         label: labels[key as ProviderCategoryKey],
@@ -28,8 +43,7 @@ function resolveActiveProviders(
     const result: ResolvedProvider[] = [];
     for (const { key, label, options } of categories) {
         const overrideId = overrides?.[key];
-        const lastRunId = lastRunProviders?.[key];
-        const activeId = overrideId ?? lastRunId;
+        const activeId = selectedProviders[key];
         if (!activeId) continue;
 
         const name = options?.find((p) => p.id === activeId)?.name ?? activeId;
@@ -37,7 +51,7 @@ function resolveActiveProviders(
             category: label,
             id: activeId,
             name,
-            source: overrideId ? 'override' : 'lastRun',
+            source: overrideId ? 'override' : 'default',
         });
     }
     return result;
@@ -49,20 +63,12 @@ export default async function DirectorySchedulePage({ params }: Params) {
 
     let directory;
     let formSchema;
-    let configRes;
     let scheduleRes = null;
     let scheduleErrorMessage: string | null = null;
 
     try {
-        const [directoryResult, formSchemaResult, configResult] = await Promise.all([
-            directoryAPI.get(id),
-            itemsGeneratorAPI.getFormSchema(id).catch(() => null),
-            directoryAPI.getConfig(id).catch(() => null),
-        ]);
-
+        const directoryResult = await directoryAPI.get(id);
         directory = directoryResult.directory;
-        formSchema = formSchemaResult;
-        configRes = configResult;
     } catch {
         notFound();
     }
@@ -77,9 +83,12 @@ export default async function DirectorySchedulePage({ params }: Params) {
         notFound();
     }
 
-    const pipelineProviders = formSchema?.providers?.pipeline ?? [];
-    const lastRunProviders = configRes?.config?.metadata?.last_request_data?.providers;
     const schedule = scheduleRes?.schedule || null;
+    formSchema = await itemsGeneratorAPI
+        .getFormSchema(id, schedule?.providerOverrides?.pipeline)
+        .catch(() => null);
+
+    const pipelineProviders = formSchema?.providers?.pipeline ?? [];
 
     const providerLabels: Record<ProviderCategoryKey, string> = {
         pipeline: t('providerCategories.pipeline'),
@@ -90,9 +99,8 @@ export default async function DirectorySchedulePage({ params }: Params) {
     };
 
     const activeProviders = resolveActiveProviders(
-        lastRunProviders,
         schedule?.providerOverrides,
-        formSchema?.providers ?? {},
+        formSchema,
         providerLabels,
     );
 

@@ -3,6 +3,7 @@ import type { ProvidersDto } from '@ever-works/contracts/api';
 import { getUIKeyFromCapability } from '@ever-works/plugin';
 import { DirectoryScheduleRepository } from '@src/database/repositories/directory-schedule.repository';
 import { DirectoryPluginRepository } from '@src/plugins/repositories/directory-plugin.repository';
+import { getActiveCapabilities } from '@src/plugins/utils/active-capabilities.util';
 import { Directory } from '@src/entities/directory.entity';
 import type { WorksConfigWriteRequest } from './works-config-writer.service';
 
@@ -49,12 +50,15 @@ export class WorksConfigProjectionService {
         const providers: ProvidersDto = {};
 
         for (const plugin of directoryPlugins) {
-            const providerKey = this.getProviderKey(plugin.activeCapability);
-            if (!providerKey || this.isSupplementaryPlugin(plugin.pluginEntity?.manifest)) {
+            if (this.isSupplementaryPlugin(plugin.pluginEntity?.manifest)) {
                 continue;
             }
 
-            providers[providerKey] = plugin.pluginId;
+            for (const capability of getActiveCapabilities(plugin)) {
+                const providerKey = this.getProviderKey(capability);
+                if (!providerKey) continue;
+                providers[providerKey] = plugin.pluginId;
+            }
         }
 
         return this.hasProviders(providers) ? providers : undefined;

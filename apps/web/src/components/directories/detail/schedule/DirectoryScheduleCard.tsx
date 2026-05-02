@@ -269,9 +269,7 @@ function ScheduleFormContent({
         // Auto-save the toggle immediately
         startSaving(async () => {
             const providerOverrides =
-                form.pipelineOverride !== undefined
-                    ? { pipeline: form.pipelineOverride }
-                    : undefined;
+                form.pipelineOverride !== undefined ? { pipeline: form.pipelineOverride } : null;
 
             const result = await updateDirectorySchedule(directoryId, {
                 enable: !form.enable,
@@ -330,9 +328,7 @@ function ScheduleFormContent({
             }
 
             const providerOverrides =
-                form.pipelineOverride !== undefined
-                    ? { pipeline: form.pipelineOverride }
-                    : undefined;
+                form.pipelineOverride !== undefined ? { pipeline: form.pipelineOverride } : null;
 
             const result = await updateDirectorySchedule(directoryId, {
                 enable: form.enable,

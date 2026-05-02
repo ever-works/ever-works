@@ -70,6 +70,7 @@ export type {
     // Generator form schema types (re-exported from @ever-works/plugin)
     PluginIcon,
     ProviderOption,
+    ProviderModelSummary,
     FormFieldDefinition,
     FormFieldGroup,
     GeneratorFormSchema,

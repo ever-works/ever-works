@@ -1773,6 +1773,7 @@
                 "default": "डिफ़ॉल्ट",
                 "notConfigured": "कॉन्फ़िगर नहीं किया गया",
                 "notConfiguredTooltip": "इस प्रदाता को कॉन्फ़िगरेशन की आवश्यकता है। इसे सेटअप करने के लिए Settings → Plugins पर जाएँ।",
+                "changeModels": "परिवर्तन",
                 "jsonObjectError": "मान JSON ऑब्जेक्ट होना चाहिए",
                 "invalidJsonError": "अमान्य JSON फ़ॉर्मेट"
             },
@@ -2937,6 +2938,7 @@
             "resetSuccess": "सेटिंग्स को पूर्वनिर्धारित पर रीसेट कर दिया गया",
             "cancel": "रद्द करें",
             "clickToConfigure": "कॉन्फ़िगर करने के लिए क्लिक करें",
+            "changeModels": "परिवर्तन",
             "autoEnabledByUser": "उपयोगकर्ता सेटिंग्स के माध्यम से स्वचालित रूप से सक्षम",
             "toggleError": "प्लगइन टॉगल करने में विफल",
             "system": "सिस्टम",

@@ -74,6 +74,7 @@ interface ProcessUrlExecutionResult {
 	files: string[];
 	count: number;
 	error?: string;
+	errorKind?: 'extraction' | 'empty' | 'worker' | 'aborted';
 }
 
 export class AgentPipelinePlugin implements IPlugin, IPipelinePlugin<AgentPipelineStepId>, IFormSchemaProvider {
@@ -652,11 +653,16 @@ export class AgentPipelinePlugin implements IPlugin, IPipelinePlugin<AgentPipeli
 				processUrlFailures.sampleErrors.length > 0
 					? ` Errors: ${processUrlFailures.sampleErrors.join('; ')}`
 					: '';
+			const causes =
+				processUrlFailures.failureCauses.length > 0
+					? ` Causes: ${processUrlFailures.failureCauses.join(', ')}.`
+					: '';
 
 			if (processUrlFailures.failedUrls === processUrlFailures.totalUrls) {
 				warnings.push(
 					`URL processing had failures (${processUrlFailures.failedUrls}/${processUrlFailures.totalUrls} URLs failed). ` +
 						'Some relevant items may be missing.' +
+						causes +
 						samples
 				);
 			}
@@ -789,10 +795,12 @@ export class AgentPipelinePlugin implements IPlugin, IPipelinePlugin<AgentPipeli
 		totalUrls: number;
 		failedUrls: number;
 		sampleErrors: string[];
+		failureCauses: string[];
 	} {
 		let totalUrls = 0;
 		let failedUrls = 0;
 		const uniqueErrors = new Set<string>();
+		const failuresByKind = new Map<string, number>();
 
 		for (const step of steps) {
 			const toolResults = (step as { toolResults?: unknown[] }).toolResults;
@@ -808,6 +816,8 @@ export class AgentPipelinePlugin implements IPlugin, IPipelinePlugin<AgentPipeli
 				if (typeof result.error === 'string' && result.error.trim()) {
 					failedUrls++;
 					uniqueErrors.add(result.error.trim());
+					const kind = result.errorKind ?? this.classifyProcessUrlError(result.error);
+					failuresByKind.set(kind, (failuresByKind.get(kind) ?? 0) + 1);
 				}
 			}
 		}
@@ -815,8 +825,32 @@ export class AgentPipelinePlugin implements IPlugin, IPipelinePlugin<AgentPipeli
 		return {
 			totalUrls,
 			failedUrls,
-			sampleErrors: [...uniqueErrors].slice(0, 3)
+			sampleErrors: [...uniqueErrors].slice(0, 3),
+			failureCauses: [...failuresByKind.entries()].map(([kind, count]) => this.formatFailureCause(kind, count))
 		};
+	}
+
+	private classifyProcessUrlError(error: string): string {
+		const normalized = error.toLowerCase();
+		if (normalized.includes('content extraction')) return 'extraction';
+		if (normalized.includes('no items extracted') || normalized.includes('empty content')) return 'empty';
+		if (normalized.includes('aborted')) return 'aborted';
+		return 'worker';
+	}
+
+	private formatFailureCause(kind: string, count: number): string {
+		const plural = count === 1 ? '' : 's';
+
+		switch (kind) {
+			case 'extraction':
+				return `${count} extraction failure${plural}`;
+			case 'empty':
+				return `${count} extracted page${plural} with no items`;
+			case 'aborted':
+				return `${count} aborted URL${plural}`;
+			default:
+				return `${count} worker failure${plural}`;
+		}
 	}
 
 	private async runScreenshotCapture(

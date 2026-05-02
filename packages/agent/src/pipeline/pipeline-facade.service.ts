@@ -22,6 +22,7 @@ import type {
     ScreenshotCaptureResult,
     SmartImageOptions,
     SmartImageResult,
+    FacadeContentExtractionResult,
     FacadeExtractionOptions,
     FacadeExtractedContent,
     DataSourceFacadeOptions,
@@ -245,6 +246,16 @@ export class PipelineFacadeService {
                 _facadeOptions: FacadeOptions,
             ): Promise<FacadeExtractedContent | null> =>
                 facade.extractContent(url, options, {
+                    userId: ctx.userId,
+                    directoryId: ctx.directoryId,
+                    providerOverride: ctx.providerOverrides?.contentExtractor,
+                }),
+            extractContentWithDiagnostics: (
+                url: string,
+                options: FacadeExtractionOptions | undefined,
+                _facadeOptions: FacadeOptions,
+            ): Promise<FacadeContentExtractionResult> =>
+                facade.extractContentWithDiagnostics(url, options, {
                     userId: ctx.userId,
                     directoryId: ctx.directoryId,
                     providerOverride: ctx.providerOverrides?.contentExtractor,

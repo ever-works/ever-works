@@ -1,12 +1,12 @@
 'use client';
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { DirectoryPlugin } from '@/lib/api/plugins';
 import { DirectoryPluginCard } from './DirectoryPluginCard';
 import { CapabilitySelector } from './CapabilitySelector';
 import { cn } from '@/lib/utils/cn';
-import { HIDDEN_CAPABILITIES } from '@/lib/utils/plugin-category-icons';
+import { compareCategoryOrder, HIDDEN_CAPABILITIES } from '@/lib/utils/plugin-category-icons';
 import { Layers } from 'lucide-react';
 
 interface DirectoryPluginsListProps {
@@ -23,38 +23,46 @@ export function DirectoryPluginsList({
     const t = useTranslations('dashboard.directoryPlugins');
     const [showInstalledOnly, setShowInstalledOnly] = useState(true);
 
-    // Filter to show only user-installed plugins or all plugins
-    const filteredPlugins = showInstalledOnly
-        ? plugins.filter((p) => p.systemPlugin || (p.installed && p.enabled))
-        : plugins;
-
-    // Get unique user-facing capabilities from all plugins (exclude internal ones)
-    const allCapabilities = new Set<string>();
-    plugins.forEach((p) =>
-        p.capabilities
-            .filter((c) => !HIDDEN_CAPABILITIES.has(c))
-            .forEach((c) => allCapabilities.add(c)),
+    const filteredPlugins = useMemo(
+        () =>
+            showInstalledOnly
+                ? plugins.filter(
+                      (plugin) => plugin.systemPlugin || (plugin.installed && plugin.enabled),
+                  )
+                : plugins,
+        [plugins, showInstalledOnly],
     );
-    const capabilities = Array.from(allCapabilities);
 
-    // Group enabled plugins by capability for the selector
-    const pluginsByCapability = capabilities.reduce(
-        (acc, capability) => {
-            acc[capability] = plugins.filter((p) => {
-                return (
-                    p.capabilities.includes(capability) && p.directoryEnabled && !p.supplementary
-                );
-            });
+    const capabilities = useMemo(() => {
+        const visibleCapabilities = new Set<string>();
+        for (const plugin of plugins) {
+            for (const capability of plugin.capabilities) {
+                if (!HIDDEN_CAPABILITIES.has(capability)) {
+                    visibleCapabilities.add(capability);
+                }
+            }
+        }
+
+        return Array.from(visibleCapabilities).sort(compareCategoryOrder);
+    }, [plugins]);
+
+    const pluginsByCapability = useMemo(() => {
+        return capabilities.reduce<Record<string, DirectoryPlugin[]>>((acc, capability) => {
+            acc[capability] = plugins.filter(
+                (plugin) =>
+                    plugin.capabilities.includes(capability) &&
+                    plugin.directoryEnabled &&
+                    !plugin.supplementary,
+            );
             return acc;
-        },
-        {} as Record<string, DirectoryPlugin[]>,
-    );
+        }, {});
+    }, [capabilities, plugins]);
 
     return (
         <div className="space-y-6">
             {/* Capability Providers Section */}
             {capabilities.length > 0 && (
-                <div className="rounded-xl border border-border dark:border-border-dark bg-surface dark:bg-surface-dark overflow-hidden">
+                <div className="overflow-hidden rounded-lg border border-border dark:border-border-dark bg-surface dark:bg-surface-dark">
                     <div className="px-5 py-3.5 border-b border-border dark:border-border-dark bg-surface-secondary/50 dark:bg-surface-secondary-dark/50 flex items-center gap-3">
                         <div className="w-7 h-7 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
                             <Layers className="w-4 h-4 text-primary" />

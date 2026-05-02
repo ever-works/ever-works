@@ -1773,6 +1773,7 @@
                 "default": "Domyślny",
                 "notConfigured": "Nieskonfigurowany",
                 "notConfiguredTooltip": "Ten dostawca wymaga konfiguracji. Odwiedź Ustawienia → Wtyczki, aby go skonfigurować.",
+                "changeModels": "Zmiana",
                 "jsonObjectError": "Wartość musi być obiektem JSON",
                 "invalidJsonError": "Nieprawidłowy format JSON"
             },
@@ -2937,6 +2938,7 @@
             "resetSuccess": "Ustawienia zresetowane do domyślnych",
             "cancel": "Anuluj",
             "clickToConfigure": "Kliknij, aby skonfigurować",
+            "changeModels": "Zmiana",
             "autoEnabledByUser": "Automatycznie włączone przez ustawienia użytkownika",
             "toggleError": "Nie udało się przełączyć wtyczki",
             "system": "System",

@@ -52,12 +52,12 @@ export class DirectoryPluginEntity {
     enabled: boolean;
 
     /**
-     * The active capability this plugin provides for this directory.
-     * Used for capability routing (e.g., which git provider to use).
-     * A directory can only have one active plugin per capability.
+     * Active capabilities this plugin provides for this directory.
+     * A plugin can provide multiple capabilities, while each capability still
+     * resolves to only one active provider per directory.
      */
-    @Column({ nullable: true })
-    activeCapability: string;
+    @Column('simple-json', { nullable: true })
+    activeCapabilities: string[];
 
     /**
      * Directory-specific settings that override admin and user defaults
