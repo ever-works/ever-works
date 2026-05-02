@@ -70,25 +70,25 @@ jobs:
         run: pnpm build
 
       - name: Build Internal CLI
-        working-work: apps/internal-cli
+        working-directory: apps/internal-cli
         run: pnpm build:cli
         env:
           API_URL: ${{ secrets.API_URL }}
           WEB_URL: ${{ secrets.WEB_URL }}
 
       - name: Test Internal CLI build
-        working-work: apps/internal-cli
+        working-directory: apps/internal-cli
         run: pnpm test:cli
 
       - name: Build External CLI
-        working-work: apps/cli
+        working-directory: apps/cli
         run: pnpm build:cli
         env:
           API_URL: ${{ secrets.API_URL }}
           WEB_URL: ${{ secrets.WEB_URL }}
 
       - name: Test External CLI build
-        working-work: apps/cli
+        working-directory: apps/cli
         run: pnpm test:cli
 
       - name: Upload Internal CLI artifact
@@ -135,7 +135,7 @@ jobs:
 
       - name: Bump version if requested
         if: github.event_name == 'workflow_dispatch' && github.event.inputs.do_version_bump == 'true'
-        working-work: apps/internal-cli
+        working-directory: apps/internal-cli
         run: |
           npm version ${{ github.event.inputs.version_bump }} --no-git-tag-version
           # Update the version in the built package.json
@@ -148,7 +148,7 @@ jobs:
           "
 
       - name: Publish to npm (private)
-        working-work: apps/internal-cli/dist
+        working-directory: apps/internal-cli/dist
         run: npm publish --access restricted
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
@@ -183,7 +183,7 @@ jobs:
 
       - name: Bump version if requested
         if: github.event_name == 'workflow_dispatch' && github.event.inputs.do_version_bump == 'true'
-        working-work: apps/cli
+        working-directory: apps/cli
         run: |
           npm version ${{ github.event.inputs.version_bump }} --no-git-tag-version
           # Update the version in the built package.json
@@ -196,7 +196,7 @@ jobs:
           "
 
       - name: Publish to npm (public)
-        working-work: apps/cli/dist
+        working-directory: apps/cli/dist
         run: npm publish --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
