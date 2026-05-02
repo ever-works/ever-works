@@ -45,9 +45,7 @@ describe('workspace-manager', () => {
 			tags: [{ id: 'tag', name: 'Tag' }]
 		});
 
-		await expect(fs.readFile(path.join(tempRoot, '_meta', 'work.json'), 'utf-8')).resolves.toContain(
-			'Work'
-		);
+		await expect(fs.readFile(path.join(tempRoot, '_meta', 'work.json'), 'utf-8')).resolves.toContain('Work');
 		await expect(fs.readFile(path.join(tempRoot, '_meta', 'request.json'), 'utf-8')).resolves.toContain(
 			'Prompt text'
 		);

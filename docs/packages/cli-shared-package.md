@@ -105,13 +105,13 @@ enum WorkMemberRole {
 
 ### Prompt Methods
 
-| Method                                              | Description                                                     |
-| --------------------------------------------------- | --------------------------------------------------------------- |
-| `promptWorkCreation(ownerDefault?, orgs?)`     | Full work creation wizard (name, slug, description, owner) |
-| `promptSlugConflictResolution(original, suggested)` | Handles slug conflicts with 3 options                           |
-| `promptWorkSelection(works?)`            | Interactive work picker with role labels                   |
-| `promptGitProviderSelection(providers)`             | Git provider selection with connection status                   |
-| `promptDeployProviderSelection(providers)`          | Deploy provider selection with "None" option                    |
+| Method                                              | Description                                                |
+| --------------------------------------------------- | ---------------------------------------------------------- |
+| `promptWorkCreation(ownerDefault?, orgs?)`          | Full work creation wizard (name, slug, description, owner) |
+| `promptSlugConflictResolution(original, suggested)` | Handles slug conflicts with 3 options                      |
+| `promptWorkSelection(works?)`                       | Interactive work picker with role labels                   |
+| `promptGitProviderSelection(providers)`             | Git provider selection with connection status              |
+| `promptDeployProviderSelection(providers)`          | Deploy provider selection with "None" option               |
 
 ### Work Creation Flow
 

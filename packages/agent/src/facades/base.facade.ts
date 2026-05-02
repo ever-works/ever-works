@@ -210,9 +210,7 @@ export abstract class BaseFacadeService {
         return value ?? defaultValue;
     }
 
-    protected async findActivePluginForWork(
-        workId: string,
-    ): Promise<RegisteredPlugin | null> {
+    protected async findActivePluginForWork(workId: string): Promise<RegisteredPlugin | null> {
         if (!this.workPluginRepository) {
             return null;
         }
@@ -236,10 +234,7 @@ export abstract class BaseFacadeService {
         return null;
     }
 
-    protected async getEnabledPlugins(
-        workId: string,
-        userId: string,
-    ): Promise<RegisteredPlugin[]> {
+    protected async getEnabledPlugins(workId: string, userId: string): Promise<RegisteredPlugin[]> {
         const plugins = this.registry.getByCapability(this.CAPABILITY);
         const result: RegisteredPlugin[] = [];
 

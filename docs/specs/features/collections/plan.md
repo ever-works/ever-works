@@ -53,8 +53,8 @@ collection: editors-picks
 
 ## 4. API Surface
 
-| Method   | Endpoint                                         | Description            |
-| -------- | ------------------------------------------------ | ---------------------- |
+| Method   | Endpoint                                   | Description            |
+| -------- | ------------------------------------------ | ---------------------- |
 | `GET`    | `/api/works/:id/categories-tags`           | List taxonomy (3 dims) |
 | `POST`   | `/api/works/:id/collections`               | Create                 |
 | `PUT`    | `/api/works/:id/collections/:collectionId` | Update                 |

@@ -74,10 +74,7 @@ import { PluginOperationsService } from '@src/plugins/services/plugin-operations
 import { PluginRegistryService } from '@src/plugins/services/plugin-registry.service';
 import { getCapabilityFromUIKey, SELECTABLE_PROVIDER_CATEGORIES } from '@ever-works/plugin';
 import { ProvidersDto } from '@src/items-generator/dto/create-items-generator.dto';
-import {
-    WorkHistoryActivityType,
-    type WorkHistoryChangeEntry,
-} from '@ever-works/contracts/api';
+import { WorkHistoryActivityType, type WorkHistoryChangeEntry } from '@ever-works/contracts/api';
 import { buildWorkChangelog } from '../utils/work-changelog.utils';
 import { GenerationLogCollector } from '@src/generators/data-generator/generation-log-collector';
 import { GENERATION_CANCELLED } from '@src/constants/messages';
@@ -171,12 +168,7 @@ export class WorkGenerationService {
 
         await this.prepareProviders(dto, scopeOptions);
 
-        const history = await this.createGenerationHistoryRecord(
-            work,
-            user,
-            dto,
-            triggerContext,
-        );
+        const history = await this.createGenerationHistoryRecord(work, user, dto, triggerContext);
 
         if (awaitCompletion) {
             await this.runInProcessGeneration(work, user, dto, history, triggerContext);
@@ -250,10 +242,7 @@ export class WorkGenerationService {
                 prompt: config.metadata.initial_prompt ?? config.metadata.last_request_data.prompt,
             };
         } catch (error) {
-            this.logger.error(
-                `Failed to load last request data for work ${workId}`,
-                error,
-            );
+            this.logger.error(`Failed to load last request data for work ${workId}`, error);
 
             if (context.triggeredBy === 'schedule' && context.scheduleId) {
                 await this.workScheduleService.finalizeScheduleRun(context.scheduleId, {
@@ -347,8 +336,7 @@ export class WorkGenerationService {
             };
         }
 
-        const history =
-            await this.generationHistoryRepository.findLatestInProgressByWork(workId);
+        const history = await this.generationHistoryRepository.findLatestInProgressByWork(workId);
 
         if (history?.triggerRunId) {
             if (!this.generationDispatcher) {
@@ -396,11 +384,7 @@ export class WorkGenerationService {
                 };
             }
 
-            await this.finalizeCancelledGeneration(
-                work.id,
-                history,
-                history.scheduleId ?? null,
-            );
+            await this.finalizeCancelledGeneration(work.id, history, history.scheduleId ?? null);
 
             return {
                 status: 'success',
@@ -975,9 +959,7 @@ Only include image URLs that are absolute URLs (starting with http).`;
         }
     }
 
-    async runScheduledUpdate(
-        schedule: WorkSchedule,
-    ): Promise<ItemsGeneratorResponseDto | void> {
+    async runScheduledUpdate(schedule: WorkSchedule): Promise<ItemsGeneratorResponseDto | void> {
         let user: User | null = null;
         try {
             user = (schedule.user as User) || (await this.userRepository.findById(schedule.userId));
@@ -987,10 +969,7 @@ Only include image URLs that are absolute URLs (starting with http).`;
             }
 
             // Enforce plan limits (e.g. if user downgraded)
-            const allowed = await this.workScheduleService.validateRunEntitlement(
-                schedule,
-                user,
-            );
+            const allowed = await this.workScheduleService.validateRunEntitlement(schedule, user);
             if (!allowed) {
                 // validateRunEntitlement pauses the schedule, but doesn't clear
                 // lastRunStatus from GENERATING or scheduledFor — finalize explicitly.
@@ -1006,14 +985,10 @@ Only include image URLs that are absolute URLs (starting with http).`;
             }
 
             const work =
-                (schedule.work as Work) ||
-                (await this.workRepository.findById(schedule.workId));
+                (schedule.work as Work) || (await this.workRepository.findById(schedule.workId));
 
             // Handle sync for works imported from a separate source repository.
-            if (
-                work?.sourceRepository &&
-                supportsWorkSourceSync(work.sourceRepository.type)
-            ) {
+            if (work?.sourceRepository && supportsWorkSourceSync(work.sourceRepository.type)) {
                 return await this.runScheduledSync(work, user, schedule);
             }
 
@@ -1052,11 +1027,7 @@ Only include image URLs that are absolute URLs (starting with http).`;
      * Run a scheduled sync for a work that has a source repository.
      * This pulls updates from the original source (e.g., awesome-list or data repo).
      */
-    private async runScheduledSync(
-        work: Work,
-        user: User,
-        schedule: WorkSchedule,
-    ): Promise<void> {
+    private async runScheduledSync(work: Work, user: User, schedule: WorkSchedule): Promise<void> {
         // Create history record for Sync
         const history = await this.generationHistoryRepository.createEntry({
             workId: work.id,
@@ -1080,11 +1051,7 @@ Only include image URLs that are absolute URLs (starting with http).`;
         });
 
         try {
-            const result = await this.workImportService.syncWork(
-                work,
-                user,
-                history.id,
-            );
+            const result = await this.workImportService.syncWork(work, user, history.id);
 
             if (result.success) {
                 await this.handleSyncSuccess(work.id, schedule.id, history.id);
@@ -1201,12 +1168,9 @@ Only include image URLs that are absolute URLs (starting with http).`;
 
             try {
                 const capability = getCapabilityFromUIKey(uiKey);
-                await this.pluginOperationsService.enablePluginForWork(
-                    workId,
-                    pluginId,
-                    userId,
-                    { activeCapability: capability },
-                );
+                await this.pluginOperationsService.enablePluginForWork(workId, pluginId, userId, {
+                    activeCapability: capability,
+                });
                 this.logger.debug(
                     `Auto-enabled provider "${pluginId}" (${capability}) for work ${workId}`,
                 );
@@ -1367,9 +1331,7 @@ Only include image URLs that are absolute URLs (starting with http).`;
                   (historyId, logs) => this.generationHistoryRepository.appendLogs(historyId, logs),
                   {
                       onRecentLogsUpdated: async (logs) => {
-                          const currentWork = await this.workRepository.findById(
-                              work.id,
-                          );
+                          const currentWork = await this.workRepository.findById(work.id);
                           if (!currentWork?.generateStatus) {
                               return;
                           }
@@ -1658,9 +1620,7 @@ Only include image URLs that are absolute URLs (starting with http).`;
 
     private ensureNotAlreadyGenerating(work: Work): void {
         if (work.generateStatus?.status === GenerateStatusType.GENERATING) {
-            throw new ConflictException(
-                `Work "${work.name}" already has a generation in progress`,
-            );
+            throw new ConflictException(`Work "${work.name}" already has a generation in progress`);
         }
     }
 
@@ -1676,11 +1636,7 @@ Only include image URLs that are absolute URLs (starting with http).`;
         };
     }
 
-    private async handleErrorNotification(
-        error: unknown,
-        user: User,
-        work: Work,
-    ): Promise<void> {
+    private async handleErrorNotification(error: unknown, user: User, work: Work): Promise<void> {
         if (!this.notificationService) {
             return;
         }

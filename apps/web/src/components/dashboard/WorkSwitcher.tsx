@@ -19,11 +19,7 @@ import { GenerateStatusType } from '@/lib/api/enums';
 import { getPathname, usePathname } from '@/i18n/navigation';
 import { cn } from '@/lib/utils/cn';
 import { getGenerationStatusConfig } from '@/lib/utils/generation-status';
-import {
-    getWorkIdFromPath,
-    isWorkDetailPath,
-    replaceWorkIdInPath,
-} from '@/lib/utils/work-route';
+import { getWorkIdFromPath, isWorkDetailPath, replaceWorkIdInPath } from '@/lib/utils/work-route';
 import { ShinyText } from '@/components/ui/ShinyText';
 import { useDashboardCurrentWork } from '@/lib/hooks/use-dashboard-current-work';
 
@@ -47,15 +43,10 @@ function upsertWork(works: Work[], nextWork: Work): Work[] {
         return [nextWork, ...works];
     }
 
-    return works.map((work) =>
-        work.id === nextWork.id ? nextWork : work,
-    );
+    return works.map((work) => (work.id === nextWork.id ? nextWork : work));
 }
 
-function mergeWorks(
-    currentWorks: Work[],
-    nextWorks: Work[],
-): Work[] {
+function mergeWorks(currentWorks: Work[], nextWorks: Work[]): Work[] {
     const workById = new Map(currentWorks.map((work) => [work.id, work]));
 
     for (const work of nextWorks) {
@@ -84,8 +75,7 @@ export function WorkSwitcher() {
     const currentWorkId = getWorkIdFromPath(pathname);
 
     const currentWork = useMemo(() => {
-        const listedWork =
-            works.find((work) => work.id === currentWorkId) ?? null;
+        const listedWork = works.find((work) => work.id === currentWorkId) ?? null;
         if (listedWork) {
             return listedWork;
         }
@@ -129,9 +119,7 @@ export function WorkSwitcher() {
             return;
         }
 
-        setWorks((currentWorks) =>
-            upsertWork(currentWorks, routedWork),
-        );
+        setWorks((currentWorks) => upsertWork(currentWorks, routedWork));
     }, [currentWorkId, routedWork]);
 
     useEffect(() => {
@@ -148,9 +136,7 @@ export function WorkSwitcher() {
                     return;
                 }
 
-                setWorks((currentWorks) =>
-                    upsertWork(currentWorks, refreshedWork),
-                );
+                setWorks((currentWorks) => upsertWork(currentWorks, refreshedWork));
             } catch (error) {
                 if (!isCancelled) {
                     console.error('Failed to load current Work for switcher:', error);
@@ -189,9 +175,7 @@ export function WorkSwitcher() {
                     return;
                 }
 
-                setWorks((currentWorks) =>
-                    upsertWork(currentWorks, refreshedWork),
-                );
+                setWorks((currentWorks) => upsertWork(currentWorks, refreshedWork));
             } finally {
                 isRefreshing = false;
             }
@@ -227,9 +211,7 @@ export function WorkSwitcher() {
                     return;
                 }
 
-                setWorks((currentWorks) =>
-                    mergeWorks(currentWorks, response.works),
-                );
+                setWorks((currentWorks) => mergeWorks(currentWorks, response.works));
                 hasLoadedRef.current = true;
             } catch (error) {
                 if (!isCancelled) {
@@ -278,11 +260,7 @@ export function WorkSwitcher() {
 
     return (
         <div className="min-w-0 flex-1 max-w-xs sm:max-w-sm lg:max-w-md">
-            <Combobox
-                value={currentWork}
-                onChange={handleWorkChange}
-                disabled={isLoading}
-            >
+            <Combobox value={currentWork} onChange={handleWorkChange} disabled={isLoading}>
                 <div className="relative">
                     <div
                         className={cn(
@@ -357,8 +335,7 @@ export function WorkSwitcher() {
                             ) : (
                                 filteredWorks.map((work) => {
                                     const isCurrentWork = work.id === currentWorkId;
-                                    const hasWarnings =
-                                        !!work.generateStatus?.warnings?.length;
+                                    const hasWarnings = !!work.generateStatus?.warnings?.length;
                                     const statusStyle = getGenerationStatusConfig(
                                         work.generateStatus?.status,
                                         { hasWarnings },

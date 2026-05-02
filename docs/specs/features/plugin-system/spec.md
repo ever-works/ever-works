@@ -109,7 +109,7 @@ settings schemas, and routes capability requests to active plugins through
 | Plugin metadata block       | The `everworks.plugin` section of `package.json`                        |
 | Settings schema             | JSON Schema with `x-secret`, `x-widget`, `x-envVar` extensions          |
 | Plugin context              | Logger, cache, HTTP client, events, settings access — passed at runtime |
-| Three-tier settings cascade | work → user → admin                                                |
+| Three-tier settings cascade | work → user → admin                                                     |
 | Facade                      | Capability-aware resolver/router (e.g. `AiFacadeService`)               |
 | Default plugin              | Per-capability fallback when no scope override is set                   |
 

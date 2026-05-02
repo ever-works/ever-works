@@ -273,11 +273,7 @@ describe('ActivepiecesPlugin', () => {
 		});
 
 		it('should fail without user ID', async () => {
-			const result = await plugin.execute(
-				createWork({ user: undefined }),
-				createRequest(),
-				createExisting()
-			);
+			const result = await plugin.execute(createWork({ user: undefined }), createRequest(), createExisting());
 			expect(result.success).toBe(false);
 		});
 

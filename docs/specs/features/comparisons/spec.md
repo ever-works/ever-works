@@ -91,7 +91,7 @@ website on the next deploy.
 | Entity / concept     | Description                                                  |
 | -------------------- | ------------------------------------------------------------ |
 | Comparison page      | An A vs B page between two items in the same category        |
-| `cadence_override`   | Per-comparison schedule, independent from work schedule |
+| `cadence_override`   | Per-comparison schedule, independent from work schedule      |
 | Pair selection score | Heuristic to rank pairs when `max_comparisons_mode = custom` |
 | Extended analysis    | 7-section deep-dive variant of the standard comparison       |
 

@@ -697,11 +697,7 @@ export class OrchestratedPipelinePlugin implements IPipelinePlugin<MyStepId> {
 
 	// ── Context lifecycle hooks ───────────────────────────────
 
-	createContext(
-		work: WorkReference,
-		request: GenerationRequest,
-		existing: ExistingItems
-	): IPipelineContext {
+	createContext(work: WorkReference, request: GenerationRequest, existing: ExistingItems): IPipelineContext {
 		return {
 			work,
 			request,
@@ -817,14 +813,14 @@ export class AnalyzeStep implements IBuiltInStepExecutor {
 
 Engine-orchestratable pipelines can optionally implement context lifecycle hooks for checkpoint support:
 
-| Hook                    | Purpose                                                                         |
-| ----------------------- | ------------------------------------------------------------------------------- |
+| Hook                    | Purpose                                                                    |
+| ----------------------- | -------------------------------------------------------------------------- |
 | `createContext()`       | Create the initial pipeline context from work, request, and existing items |
-| `contextToSnapshot()`   | Serialize the context for checkpoint storage                                    |
-| `contextFromSnapshot()` | Deserialize a checkpoint back into a live context                               |
-| `extractResult()`       | Convert the final context into a `PipelineResult`                               |
-| `isCheckpointViable()`  | Determine whether a saved checkpoint is worth resuming                          |
-| `canSkipStep()`         | Check if a step can be skipped because its data already exists                  |
+| `contextToSnapshot()`   | Serialize the context for checkpoint storage                               |
+| `contextFromSnapshot()` | Deserialize a checkpoint back into a live context                          |
+| `extractResult()`       | Convert the final context into a `PipelineResult`                          |
+| `isCheckpointViable()`  | Determine whether a saved checkpoint is worth resuming                     |
+| `canSkipStep()`         | Check if a step can be skipped because its data already exists             |
 
 :::tip Checkpoint Resume
 When a pipeline fails mid-execution, the engine saves a checkpoint. On retry, it calls `contextFromSnapshot()` to restore the context and `isCheckpointViable()` to decide whether to resume or start fresh. Steps that already ran are skipped via `canSkipStep()`.

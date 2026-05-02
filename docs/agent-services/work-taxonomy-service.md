@@ -120,12 +120,12 @@ All string inputs are trimmed. Names and descriptions pass through the `sanitize
 
 ## Database Interactions
 
-| Repository / Service        | Method                                          | Purpose                                  |
-| --------------------------- | ----------------------------------------------- | ---------------------------------------- |
+| Repository / Service   | Method                                          | Purpose                                  |
+| ---------------------- | ----------------------------------------------- | ---------------------------------------- |
 | `WorkOwnershipService` | `ensureAccess`, `ensureCanEdit`                 | Authorization checks                     |
-| `UserRepository`            | `findById`                                      | Load the User entity for git operations  |
-| `DataGeneratorService`      | `getCategoriesTags`                             | Read current taxonomy from git data repo |
-| `DataGeneratorService`      | `saveCategories`, `saveTags`, `saveCollections` | Write updated taxonomy to git data repo  |
+| `UserRepository`       | `findById`                                      | Load the User entity for git operations  |
+| `DataGeneratorService` | `getCategoriesTags`                             | Read current taxonomy from git data repo |
+| `DataGeneratorService` | `saveCategories`, `saveTags`, `saveCollections` | Write updated taxonomy to git data repo  |
 
 ## Event System
 

@@ -40,11 +40,7 @@ class MockPipelineContext implements IPipelineContext {
     /** Generic data storage for step provides/requires */
     data: Record<string, unknown> = {};
 
-    constructor(
-        work: WorkReference,
-        request: GenerationRequest,
-        existing: ExistingItems,
-    ) {
+    constructor(work: WorkReference, request: GenerationRequest, existing: ExistingItems) {
         this.work = work;
         this.request = request;
         this.existing = existing;

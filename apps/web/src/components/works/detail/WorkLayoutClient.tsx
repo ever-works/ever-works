@@ -9,10 +9,7 @@ import { GenerateStatusType } from '@/lib/api/enums';
 import { WorkDetailProvider } from './WorkDetailContext';
 import { useTranslations } from 'next-intl';
 import { toast } from 'sonner';
-import {
-    getWorkForStatusRefresh,
-    syncWorkData,
-} from '@/app/actions/dashboard/works';
+import { getWorkForStatusRefresh, syncWorkData } from '@/app/actions/dashboard/works';
 import { useBackgroundActivity } from '@/lib/hooks/use-background-activity';
 import {
     clearDashboardCurrentWork,

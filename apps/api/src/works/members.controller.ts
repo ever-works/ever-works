@@ -38,10 +38,7 @@ export class MembersController {
     @HttpCode(HttpStatus.OK)
     @ApiOperation({ summary: 'List members', description: 'Get all members of a work' })
     @ApiResponse({ status: 200, description: 'List of work members' })
-    async listMembers(
-        @CurrentUser() auth: AuthenticatedUser,
-        @Param('workId') workId: string,
-    ) {
+    async listMembers(@CurrentUser() auth: AuthenticatedUser, @Param('workId') workId: string) {
         const user = await this.authService.getUser(auth.userId);
         const members = await this.memberService.listMembers(workId, user.id);
         const owner = await this.memberService.getWorkOwnerInfo(workId, user.id);
@@ -68,13 +65,7 @@ export class MembersController {
         const workUrl = `${config.webAppUrl()}/works/${workId}`;
         this.eventEmitter.emit(
             MemberInvitedEvent.EVENT_NAME,
-            new MemberInvitedEvent(
-                result.invitee,
-                result.inviter,
-                result.work,
-                dto.role,
-                workUrl,
-            ),
+            new MemberInvitedEvent(result.invitee, result.inviter, result.work, dto.role, workUrl),
         );
 
         return {
@@ -113,12 +104,7 @@ export class MembersController {
         @Body() dto: UpdateMemberRoleDto,
     ) {
         const user = await this.authService.getUser(auth.userId);
-        const member = await this.memberService.updateMemberRole(
-            workId,
-            user.id,
-            memberId,
-            dto,
-        );
+        const member = await this.memberService.updateMemberRole(workId, user.id, memberId, dto);
 
         this.activityLogService
             .log({
@@ -175,10 +161,7 @@ export class MembersController {
         description: 'Leave a work you are a member of',
     })
     @ApiResponse({ status: 200, description: 'Successfully left the work' })
-    async leaveWork(
-        @CurrentUser() auth: AuthenticatedUser,
-        @Param('workId') workId: string,
-    ) {
+    async leaveWork(@CurrentUser() auth: AuthenticatedUser, @Param('workId') workId: string) {
         const user = await this.authService.getUser(auth.userId);
         await this.memberService.leaveWork(workId, user.id);
 

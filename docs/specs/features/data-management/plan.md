@@ -34,14 +34,14 @@ flowchart LR
 
 ## 2. Tech Choices
 
-| Concern             | Choice                                       | Rationale                            |
-| ------------------- | -------------------------------------------- | ------------------------------------ |
-| Aggregation         | Per-work iterator over relations + repo | Keeps memory bounded                 |
-| Secret redaction    | `redactSecretsFromSettings(plugin, value)`   | Single helper enforces Principle VII |
-| Masked detection    | Prefix `MASKED:` is reserved                 | Simple, unambiguous                  |
-| Conflict resolution | Stateless: client supplies `resolutions[]`   | Idempotent retries                   |
-| Path safety         | `path.basename(slug)` on every IO            | Cheap defence-in-depth               |
-| Sync transport      | `GitFacadeService` against user's repo       | Principle II                         |
+| Concern             | Choice                                     | Rationale                            |
+| ------------------- | ------------------------------------------ | ------------------------------------ |
+| Aggregation         | Per-work iterator over relations + repo    | Keeps memory bounded                 |
+| Secret redaction    | `redactSecretsFromSettings(plugin, value)` | Single helper enforces Principle VII |
+| Masked detection    | Prefix `MASKED:` is reserved               | Simple, unambiguous                  |
+| Conflict resolution | Stateless: client supplies `resolutions[]` | Idempotent retries                   |
+| Path safety         | `path.basename(slug)` on every IO          | Cheap defence-in-depth               |
+| Sync transport      | `GitFacadeService` against user's repo     | Principle II                         |
 
 ## 3. Data Model
 

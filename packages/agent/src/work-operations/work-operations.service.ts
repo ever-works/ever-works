@@ -147,9 +147,7 @@ export class WorkOperationsService {
         await this.generationHistoryRepository.updateEntry(historyId, updates);
     }
 
-    private normalizeGenerateStatus(
-        status: Work['generateStatus'],
-    ): Work['generateStatus'] {
+    private normalizeGenerateStatus(status: Work['generateStatus']): Work['generateStatus'] {
         if (!status?.warnings?.length) {
             return status;
         }

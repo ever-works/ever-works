@@ -164,10 +164,10 @@ Enable a plugin for the current user. Optionally provide initial settings.
 }
 ```
 
-| Field                      | Type    | Description                                 |
-| -------------------------- | ------- | ------------------------------------------- |
-| `settings`                 | object  | Non-secret settings to apply                |
-| `secretSettings`           | object  | Secret settings (API keys, tokens)          |
+| Field                | Type    | Description                           |
+| -------------------- | ------- | ------------------------------------- |
+| `settings`           | object  | Non-secret settings to apply          |
+| `secretSettings`     | object  | Secret settings (API keys, tokens)    |
 | `autoEnableForWorks` | boolean | Auto-enable this plugin for all works |
 
 ### Disable Plugin
@@ -262,7 +262,7 @@ Enable a plugin for a specific work. The plugin must already be enabled at the u
 
 | Field              | Type   | Description                                                |
 | ------------------ | ------ | ---------------------------------------------------------- |
-| `settings`         | object | Work-specific settings overrides                      |
+| `settings`         | object | Work-specific settings overrides                           |
 | `activeCapability` | string | Set this plugin as the active provider for this capability |
 | `priority`         | number | Priority when multiple plugins provide the same capability |
 
@@ -271,7 +271,7 @@ Enable a plugin for a specific work. The plugin must already be enabled at the u
 | Status | Description                      |
 | ------ | -------------------------------- |
 | 400    | Plugin not enabled at user level |
-| 404    | Plugin or work not found    |
+| 404    | Plugin or work not found         |
 
 ### Disable Plugin for Work
 
@@ -301,8 +301,8 @@ Update work-specific settings for a plugin. These settings take highest priority
 
 **Errors:**
 
-| Status | Description                           |
-| ------ | ------------------------------------- |
+| Status | Description                      |
+| ------ | -------------------------------- |
 | 400    | Plugin not enabled for this work |
 
 ### Set Active Capability
@@ -329,17 +329,17 @@ Only one plugin can be active per capability per work. Setting a new active plug
 
 ## Endpoint Summary
 
-| Method  | Endpoint                                                     | Description                     |
-| ------- | ------------------------------------------------------------ | ------------------------------- |
-| `GET`   | `/api/plugins`                                               | List all plugins                |
-| `GET`   | `/api/plugins/settings-menu`                                 | Plugins for settings navigation |
-| `GET`   | `/api/plugins/:pluginId`                                     | Plugin details                  |
-| `GET`   | `/api/plugins/:pluginId/models`                              | AI models for plugin            |
-| `POST`  | `/api/plugins/:pluginId/enable`                              | Enable for user                 |
-| `POST`  | `/api/plugins/:pluginId/disable`                             | Disable for user                |
-| `PATCH` | `/api/plugins/:pluginId/settings`                            | Update user settings            |
-| `GET`   | `/api/works/:workId/plugins`                      | Work plugins               |
-| `POST`  | `/api/works/:workId/plugins/:pluginId/enable`     | Enable for work            |
-| `POST`  | `/api/works/:workId/plugins/:pluginId/disable`    | Disable for work           |
-| `PATCH` | `/api/works/:workId/plugins/:pluginId/settings`   | Update work settings       |
+| Method  | Endpoint                                          | Description                     |
+| ------- | ------------------------------------------------- | ------------------------------- |
+| `GET`   | `/api/plugins`                                    | List all plugins                |
+| `GET`   | `/api/plugins/settings-menu`                      | Plugins for settings navigation |
+| `GET`   | `/api/plugins/:pluginId`                          | Plugin details                  |
+| `GET`   | `/api/plugins/:pluginId/models`                   | AI models for plugin            |
+| `POST`  | `/api/plugins/:pluginId/enable`                   | Enable for user                 |
+| `POST`  | `/api/plugins/:pluginId/disable`                  | Disable for user                |
+| `PATCH` | `/api/plugins/:pluginId/settings`                 | Update user settings            |
+| `GET`   | `/api/works/:workId/plugins`                      | Work plugins                    |
+| `POST`  | `/api/works/:workId/plugins/:pluginId/enable`     | Enable for work                 |
+| `POST`  | `/api/works/:workId/plugins/:pluginId/disable`    | Disable for work                |
+| `PATCH` | `/api/works/:workId/plugins/:pluginId/settings`   | Update work settings            |
 | `POST`  | `/api/works/:workId/plugins/:pluginId/capability` | Set active capability           |

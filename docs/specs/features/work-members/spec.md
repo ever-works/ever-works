@@ -95,12 +95,12 @@ appears in the members list.
 
 ## 5. Key Entities & Domain Concepts
 
-| Entity / concept      | Description                                                        |
-| --------------------- | ------------------------------------------------------------------ |
-| `WorkMembership` | Row with `userId`, `workId`, `role`, `invitedBy`, `createdAt` |
-| Owner                 | Implicit membership equal to `work.userId`; never in the list |
-| Permission matrix     | Action → role mapping (see user-facing doc table)                  |
-| Invite                | Synchronous — succeeds or fails, no pending state                  |
+| Entity / concept  | Description                                                   |
+| ----------------- | ------------------------------------------------------------- |
+| `WorkMembership`  | Row with `userId`, `workId`, `role`, `invitedBy`, `createdAt` |
+| Owner             | Implicit membership equal to `work.userId`; never in the list |
+| Permission matrix | Action → role mapping (see user-facing doc table)             |
+| Invite            | Synchronous — succeeds or fails, no pending state             |
 
 ## 6. Out of Scope
 

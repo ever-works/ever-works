@@ -49,10 +49,7 @@ export const ALLOWED_REDIRECT_URLS = (process.env.ALLOWED_REDIRECT_URLS || 'loca
     .split(',')
     .map((url) => url.trim());
 
-export const GET_WORK_LIST_LIMIT = parseInt(
-    process.env.NEXT_PUBLIC_WORK_LIST_LIMIT || '6',
-    10,
-);
+export const GET_WORK_LIST_LIMIT = parseInt(process.env.NEXT_PUBLIC_WORK_LIST_LIMIT || '6', 10);
 
 export const ONBOARDING_STORAGE_KEY = 'ever-works-onboarding';
 

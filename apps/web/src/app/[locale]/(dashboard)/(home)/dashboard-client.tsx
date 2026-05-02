@@ -62,10 +62,7 @@ export default function DashboardClient({
                                     </Link>
                                 )}
                             </div>
-                            <WorkList
-                                initialWorks={initialWorks}
-                                showLimit={GET_WORK_LIST_LIMIT}
-                            />
+                            <WorkList initialWorks={initialWorks} showLimit={GET_WORK_LIST_LIMIT} />
                         </>
                     ) : (
                         <EmptyState

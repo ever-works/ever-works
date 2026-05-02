@@ -33,10 +33,7 @@ import {
     type ComparisonProgressInfo,
     type ComparisonProgressCallback,
 } from './comparison';
-import {
-    WorkHistoryActivityType,
-    type WorkHistoryChangeEntry,
-} from '@ever-works/contracts/api';
+import { WorkHistoryActivityType, type WorkHistoryChangeEntry } from '@ever-works/contracts/api';
 import { buildWorkChangelog } from '../utils/work-changelog.utils';
 import { normalizeGeneratorError } from '../services/utils/error.utils';
 
@@ -199,10 +196,7 @@ export class ComparisonGenerationService {
         }
     }
 
-    private calculateNextComparisonRun(
-        cadence: WorkScheduleCadence,
-        fromDate = new Date(),
-    ): Date {
+    private calculateNextComparisonRun(cadence: WorkScheduleCadence, fromDate = new Date()): Date {
         const next = new Date(fromDate);
 
         switch (cadence) {
@@ -294,10 +288,7 @@ export class ComparisonGenerationService {
         return lockToken;
     }
 
-    private async releaseGenerationLock(
-        workId: string,
-        lockToken: string | null,
-    ): Promise<void> {
+    private async releaseGenerationLock(workId: string, lockToken: string | null): Promise<void> {
         this.activeGenerationLocks.delete(workId);
 
         if (!lockToken || !this.cacheEntryRepository) {
@@ -662,11 +653,7 @@ export class ComparisonGenerationService {
 
         // Commit and push
         await this.gitFacade.add(work.gitProvider, dest, '.');
-        await this.gitFacade.commit(
-            work.gitProvider,
-            dest,
-            `chore: remove comparison - ${slug}`,
-        );
+        await this.gitFacade.commit(work.gitProvider, dest, `chore: remove comparison - ${slug}`);
         await this.gitFacade.push({ dir: dest }, gitOptions);
 
         await this.recordComparisonHistory({
@@ -701,13 +688,9 @@ export class ComparisonGenerationService {
     ): Promise<ComparisonResult> {
         const startedAt = new Date().toISOString();
         const onProgress: ComparisonProgressCallback = (stage) => {
-            this.setProgress(
-                work.id,
-                stage,
-                pair.itemA.name,
-                pair.itemB.name,
-                startedAt,
-            ).catch(() => {});
+            this.setProgress(work.id, stage, pair.itemA.name, pair.itemB.name, startedAt).catch(
+                () => {},
+            );
         };
 
         try {

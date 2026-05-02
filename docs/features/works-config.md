@@ -77,7 +77,7 @@ schedule: weekly
 
 | Field            | Type             | Aliases                                                  | Notes                                                                                                                                           |
 | ---------------- | ---------------- | -------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
-| `name`           | string           | `title`                                                  | Display name for the work.                                                                                                                 |
+| `name`           | string           | `title`                                                  | Display name for the work.                                                                                                                      |
 | `initial_prompt` | string           | `initialPrompt`, `prompt`                                | Natural-language description used as the seed for generation.                                                                                   |
 | `model`          | string           | —                                                        | Model alias to request from the AI provider plugin.                                                                                             |
 | `website_repo`   | string           | `websiteRepo`, `website_repository`, `websiteRepository` | The website-output repo. Accepts a bare slug (`owner/repo`), HTTPS URL, or SSH URL. Trailing `/` and `.git` are stripped.                       |

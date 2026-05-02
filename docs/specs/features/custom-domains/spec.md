@@ -93,9 +93,9 @@ once the custom domain is verified.
 
 | Entity / concept  | Description                                                            |
 | ----------------- | ---------------------------------------------------------------------- |
-| `CustomDomain`    | DB row: `{domain, verified, environment, provider, workId}`       |
+| `CustomDomain`    | DB row: `{domain, verified, environment, provider, workId}`            |
 | Provider sync     | One-way mirror from DB → deploy provider                               |
-| Auto-promote      | Replace work `siteUrl` once a custom domain verifies              |
+| Auto-promote      | Replace work `siteUrl` once a custom domain verifies                   |
 | DNS record advice | Apex → A record; subdomain → CNAME (provider-specific values returned) |
 
 ## 6. Out of Scope

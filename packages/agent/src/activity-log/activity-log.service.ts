@@ -44,9 +44,7 @@ export class ActivityLogService {
         return formatStoredActivitySummary(activity);
     }
 
-    resolveGenerationActivityStatus(
-        work?: Pick<Work, 'generateStatus'> | null,
-    ): ActivityStatus {
+    resolveGenerationActivityStatus(work?: Pick<Work, 'generateStatus'> | null): ActivityStatus {
         if (!work) {
             return ActivityStatus.FAILED;
         }
@@ -136,18 +134,13 @@ export class ActivityLogService {
                     .map((activity) => activity.workId)
                     .filter((workId): workId is string => !!workId),
             );
-            const worksById = new Map(
-                works.map((work) => [work.id, work]),
-            );
+            const worksById = new Map(works.map((work) => [work.id, work]));
 
             let reconciledCount = 0;
 
             for (const activity of activities) {
                 try {
-                    if (
-                        !activity.workId ||
-                        activity.actionType !== ActivityActionType.GENERATION
-                    ) {
+                    if (!activity.workId || activity.actionType !== ActivityActionType.GENERATION) {
                         continue;
                     }
 
@@ -163,10 +156,7 @@ export class ActivityLogService {
                           )
                         : null;
                     const resolvedStatus = this.resolveGenerationActivityStatus(work);
-                    const summary = this.formatGenerationCompletionSummary(
-                        work,
-                        latestHistory,
-                    );
+                    const summary = this.formatGenerationCompletionSummary(work, latestHistory);
                     const existingDetails =
                         activity.details &&
                         typeof activity.details === 'object' &&
@@ -179,8 +169,7 @@ export class ActivityLogService {
                         resolvedStatus,
                         {
                             ...existingDetails,
-                            itemsCount:
-                                latestHistory?.totalItemsCount ?? work?.itemsCount ?? 0,
+                            itemsCount: latestHistory?.totalItemsCount ?? work?.itemsCount ?? 0,
                             newItemsCount: latestHistory?.newItemsCount ?? 0,
                             updatedItemsCount: latestHistory?.updatedItemsCount ?? 0,
                             generateStatus: work?.generateStatus ?? null,
@@ -258,9 +247,7 @@ export class ActivityLogService {
             offset: 0,
         });
 
-        const headers = ['Date', 'Action Type', 'Action', 'Status', 'Work', 'Summary'].join(
-            ',',
-        );
+        const headers = ['Date', 'Action Type', 'Action', 'Status', 'Work', 'Summary'].join(',');
 
         const rows = activities.map((a) => {
             const workName = (a.work?.name || '').replace(/"/g, '""');

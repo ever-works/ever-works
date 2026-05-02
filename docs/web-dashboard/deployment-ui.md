@@ -156,24 +156,24 @@ interface TeamSelectionDialogProps {
 
 ## State Management
 
-| State                | Scope            | Source                                   |
-| -------------------- | ---------------- | ---------------------------------------- |
-| `isDeploying`        | Page-level       | Derived from `work.deploymentState` |
-| `deployTeams`        | DeployForm       | Fetched via `getDeploymentTeams` action  |
-| `isConfigDialogOpen` | DeployForm       | Local `useState`                         |
-| `isTeamDialogOpen`   | DeployForm       | Local `useState`                         |
-| `selectedProvider`   | ProviderSelector | Local `useState`, persisted via action   |
-| `autoUpdate`         | TemplateSettings | Local `useState`, synced via action      |
-| `useBeta`            | TemplateSettings | Local `useState`, synced via action      |
-| `formData`           | ConfigDialog     | `useWebsiteSettingsForm` hook            |
+| State                | Scope            | Source                                  |
+| -------------------- | ---------------- | --------------------------------------- |
+| `isDeploying`        | Page-level       | Derived from `work.deploymentState`     |
+| `deployTeams`        | DeployForm       | Fetched via `getDeploymentTeams` action |
+| `isConfigDialogOpen` | DeployForm       | Local `useState`                        |
+| `isTeamDialogOpen`   | DeployForm       | Local `useState`                        |
+| `selectedProvider`   | ProviderSelector | Local `useState`, persisted via action  |
+| `autoUpdate`         | TemplateSettings | Local `useState`, synced via action     |
+| `useBeta`            | TemplateSettings | Local `useState`, synced via action     |
+| `formData`           | ConfigDialog     | `useWebsiteSettingsForm` hook           |
 
 All server mutations use React `useTransition` for non-blocking updates with `isPending` states.
 
 ## Related API Endpoints
 
-| Action                      | Server Action Function                                 | HTTP Method |
-| --------------------------- | ------------------------------------------------------ | ----------- |
-| Deploy work            | `deploy(workId, teamScope?)`                      | POST        |
+| Action                      | Server Action Function                            | HTTP Method |
+| --------------------------- | ------------------------------------------------- | ----------- |
+| Deploy work                 | `deploy(workId, teamScope?)`                      | POST        |
 | Get deployment teams        | `getDeploymentTeams(workId)`                      | GET         |
 | Look up existing deployment | `lookupExistingDeployment(workId)`                | GET         |
 | Update website repository   | `updateWebsiteRepository(workId)`                 | POST        |

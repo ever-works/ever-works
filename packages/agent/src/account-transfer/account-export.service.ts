@@ -95,14 +95,13 @@ export class AccountExportService {
         dir: any,
         includeSecrets: boolean,
     ): Promise<ExportedWork> {
-        const [members, customDomains, workPlugins, prompts, scheduleEntity] =
-            await Promise.all([
-                this.workMemberRepository.findByWork(workId),
-                this.workCustomDomainRepository.findByWork(workId),
-                this.workPluginRepository.findByWork(workId),
-                this.advancedPromptsRepository.findByWorkId(workId),
-                this.scheduleRepository.findByWorkId(workId),
-            ]);
+        const [members, customDomains, workPlugins, prompts, scheduleEntity] = await Promise.all([
+            this.workMemberRepository.findByWork(workId),
+            this.workCustomDomainRepository.findByWork(workId),
+            this.workPluginRepository.findByWork(workId),
+            this.advancedPromptsRepository.findByWorkId(workId),
+            this.scheduleRepository.findByWorkId(workId),
+        ]);
 
         // Fetch items, config, comparisons, and markdown template from the data repo
         const repoData = await this.fetchWorkRepoData(dir);

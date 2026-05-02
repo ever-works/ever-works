@@ -62,10 +62,7 @@ export class WorkLifecycleService {
         );
     }
 
-    private async hasInitializedWebsiteRepository(
-        work: Work,
-        user: User,
-    ): Promise<boolean> {
+    private async hasInitializedWebsiteRepository(work: Work, user: User): Promise<boolean> {
         if (
             work.website ||
             work.deployProjectId ||
@@ -465,9 +462,7 @@ export class WorkLifecycleService {
             if (deleteWorkDto.delete_data_repository !== false) {
                 try {
                     await this.dataGenerator.removeRepository(work, user);
-                    deletedRepositories.push(
-                        `${work.getRepoOwner()}/${work.getDataRepo()}`,
-                    );
+                    deletedRepositories.push(`${work.getRepoOwner()}/${work.getDataRepo()}`);
                 } catch (error) {
                     if (error instanceof HttpException) {
                         throw error;
@@ -480,9 +475,7 @@ export class WorkLifecycleService {
             if (deleteWorkDto.delete_markdown_repository !== false) {
                 try {
                     await this.markdownGenerator.removeRepository(work, user);
-                    deletedRepositories.push(
-                        `${work.getRepoOwner('work')}/${work.getMainRepo()}`,
-                    );
+                    deletedRepositories.push(`${work.getRepoOwner('work')}/${work.getMainRepo()}`);
                 } catch (error) {
                     if (error instanceof HttpException) {
                         throw error;

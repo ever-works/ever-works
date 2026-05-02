@@ -9,12 +9,7 @@ import {
     DeployCapabilityResponse,
     DeployProviderInfo,
 } from '../../services/api.service';
-import {
-    Work,
-    WorkPromptService,
-    GenerateStatusType,
-    canEdit,
-} from './work-prompt.service';
+import { Work, WorkPromptService, GenerateStatusType, canEdit } from './work-prompt.service';
 import { handleCliError } from '../../utils/error';
 
 export const deployCommand = new Command('deploy')
@@ -78,9 +73,7 @@ export const deployCommand = new Command('deploy')
 
             // Step 4: generateStatus check
             if (work.generateStatus?.status !== GenerateStatusType.GENERATED) {
-                console.log(
-                    chalk.yellow('\n⚠ Work content must be generated before deploying.'),
-                );
+                console.log(chalk.yellow('\n⚠ Work content must be generated before deploying.'));
                 console.log(chalk.gray("  Use 'work generate' first."));
                 return;
             }
@@ -179,14 +172,13 @@ export const deployCommand = new Command('deploy')
                     ]);
 
                     if (switchProvider) {
-                        const selectedProvider =
-                            await workPrompt.promptDeployProviderSelection(
-                                deployProviders.map((p) => ({
-                                    id: p.id,
-                                    name: p.name,
-                                    enabled: p.enabled,
-                                })),
-                            );
+                        const selectedProvider = await workPrompt.promptDeployProviderSelection(
+                            deployProviders.map((p) => ({
+                                id: p.id,
+                                name: p.name,
+                                enabled: p.enabled,
+                            })),
+                        );
 
                         if (!selectedProvider) {
                             console.log(chalk.yellow('\nDeployment skipped.'));
@@ -319,10 +311,7 @@ async function executeDeploy(
     console.log(chalk.gray('  • Deploy the website'));
 
     const websiteRepo = `${work.slug}-website`;
-    console.log(
-        chalk.gray('\nSource repository:'),
-        chalk.white(`${work.owner}/${websiteRepo}`),
-    );
+    console.log(chalk.gray('\nSource repository:'), chalk.white(`${work.owner}/${websiteRepo}`));
 
     const confirmed = await inquirer.prompt([
         {

@@ -492,22 +492,17 @@ describe('GeminiPlugin', () => {
 				getScreenshotUrl: vi.fn()
 			};
 
-			const result = await plugin.execute(
-				work,
-				{ ...request, config: { capture_screenshots: true } },
-				existing,
-				{
-					execContext: {
-						aiFacade: {} as never,
-						searchFacade: {} as never,
-						screenshotFacade: mockScreenshotFacade as never,
-						contentExtractorFacade: {} as never,
-						logger: { log: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
-						work,
-						user: { id: 'user1' }
-					}
+			const result = await plugin.execute(work, { ...request, config: { capture_screenshots: true } }, existing, {
+				execContext: {
+					aiFacade: {} as never,
+					searchFacade: {} as never,
+					screenshotFacade: mockScreenshotFacade as never,
+					contentExtractorFacade: {} as never,
+					logger: { log: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
+					work,
+					user: { id: 'user1' }
 				}
-			);
+			});
 
 			expect(result.success).toBe(true);
 			expect(mockScreenshotFacade.getSmartImage).toHaveBeenCalled();

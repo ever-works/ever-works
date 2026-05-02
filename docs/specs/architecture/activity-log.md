@@ -25,9 +25,9 @@ filter UI.
 
 ## 2. Two Stores, Different Jobs
 
-| Store                          | Granularity            | Drives                                                     |
-| ------------------------------ | ---------------------- | ---------------------------------------------------------- |
-| `activity_log`                 | Per user-action        | Activity feed, security audit, PostHog                     |
+| Store                     | Granularity       | Drives                                                     |
+| ------------------------- | ----------------- | ---------------------------------------------------------- |
+| `activity_log`            | Per user-action   | Activity feed, security audit, PostHog                     |
 | `work_generation_history` | Per work mutation | History tab, schedule failure tracking, generation metrics |
 
 `work_generation_history` rows can carry a `changelog` jsonb
@@ -170,7 +170,7 @@ the snake-case `actionType`:
 
 | `actionType`          | PostHog event name    |
 | --------------------- | --------------------- |
-| `DIRECTORY_GENERATED` | `work_generated` |
+| `DIRECTORY_GENERATED` | `work_generated`      |
 | `ITEM_ADDED`          | `item_added`          |
 | `COMMUNITY_PR_MERGED` | `community_pr_merged` |
 
@@ -198,7 +198,7 @@ the action context.
 | Filter            | Effect                                       |
 | ----------------- | -------------------------------------------- |
 | `userId`          | Required — every query is user-scoped        |
-| `workId`     | Restrict to one work                    |
+| `workId`          | Restrict to one work                         |
 | `actionType`      | Single value or array                        |
 | `actionGroup`     | UI-level group (`generation`, `items`, etc.) |
 | `status`          | One of the four statuses                     |

@@ -82,10 +82,10 @@ Used to trigger data generation for a work.
 
 ### Fields
 
-| Field    | Type     | Required | Description               |
-| -------- | -------- | -------- | ------------------------- |
+| Field    | Type     | Required | Description          |
+| -------- | -------- | -------- | -------------------- |
 | `slug`   | `string` | Yes      | Work slug identifier |
-| `prompt` | `string` | Yes      | Generation prompt         |
+| `prompt` | `string` | Yes      | Generation prompt    |
 
 ## ImportWorkDto
 
@@ -134,12 +134,12 @@ enum ImportSourceTypeEnum {
 
 **ImportWorkResponseDto** -- returned by import initiation:
 
-| Field         | Type                                | Description                 |
-| ------------- | ----------------------------------- | --------------------------- |
-| `status`      | `'pending' \| 'success' \| 'error'` | Operation status            |
-| `workId` | `string`                            | Created work ID        |
-| `historyId`   | `string`                            | Generation history entry ID |
-| `message`     | `string`                            | Status message              |
+| Field       | Type                                | Description                 |
+| ----------- | ----------------------------------- | --------------------------- |
+| `status`    | `'pending' \| 'success' \| 'error'` | Operation status            |
+| `workId`    | `string`                            | Created work ID             |
+| `historyId` | `string`                            | Generation history entry ID |
+| `message`   | `string`                            | Status message              |
 
 ## UpdateWorkAdvancedPromptsDto
 
@@ -169,14 +169,14 @@ Used to configure scheduled work updates.
 
 ### Fields
 
-| Field                     | Type                           | Required | Description                                       |
-| ------------------------- | ------------------------------ | -------- | ------------------------------------------------- |
-| `enable`                  | `boolean`                      | No       | Enable or disable the schedule                    |
+| Field                     | Type                      | Required | Description                                       |
+| ------------------------- | ------------------------- | -------- | ------------------------------------------------- |
+| `enable`                  | `boolean`                 | No       | Enable or disable the schedule                    |
 | `cadence`                 | `WorkScheduleCadence`     | No       | Update frequency                                  |
 | `billingMode`             | `WorkScheduleBillingMode` | No       | Billing mode for scheduled runs                   |
-| `maxFailureBeforePause`   | `number`                       | No       | Max consecutive failures before auto-pause (1-10) |
-| `alwaysCreatePullRequest` | `boolean`                      | No       | Always create PRs instead of direct commits       |
-| `providerOverrides`       | `ProvidersDto \| null`         | No       | AI/search provider overrides for scheduled runs   |
+| `maxFailureBeforePause`   | `number`                  | No       | Max consecutive failures before auto-pause (1-10) |
+| `alwaysCreatePullRequest` | `boolean`                 | No       | Always create PRs instead of direct commits       |
+| `providerOverrides`       | `ProvidersDto \| null`    | No       | AI/search provider overrides for scheduled runs   |
 
 ## WorkGenerationHistoryDto
 

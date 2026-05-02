@@ -83,7 +83,7 @@ Templates use Handlebars (`.hbs`) with inline CSS enabled. All templates receive
 | `welcome`             | `UserConfirmedEvent`       | `firstName`, `dashboardUrl`                                                                                            |
 | `new-device-login`    | `UserNewDeviceLoginEvent`  | `firstName`, `loginTime`, `device`, `browser`, `location`, `ipAddress`, `verifyUrl`, `verifyToken`, `secureAccountUrl` |
 | `account-deletion`    | `UserAccountDeletionEvent` | `firstName`, `deleteUrl`, `deleteToken`, `keepAccountUrl`, `expiresIn`                                                 |
-| `member-invitation`   | `MemberInvitedEvent`       | `inviteeName`, `inviterName`, `workName`, `roleName`, `workUrl`                                              |
+| `member-invitation`   | `MemberInvitedEvent`       | `inviteeName`, `inviterName`, `workName`, `roleName`, `workUrl`                                                        |
 
 ## Event-Driven Delivery
 

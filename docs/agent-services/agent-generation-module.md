@@ -208,7 +208,7 @@ interface BulkCaptureImagesDto {
 | --------------------------------- | ----------------------------------------------------- |
 | `@ever-works/agent/pipeline`      | Pipeline orchestration for generation steps           |
 | `@ever-works/agent/facades`       | AI, Git, Screenshot, Search, ContentExtractor facades |
-| `@ever-works/agent/database`      | Work, GenerationHistory repositories             |
+| `@ever-works/agent/database`      | Work, GenerationHistory repositories                  |
 | `@ever-works/agent/notifications` | Error and completion notifications                    |
 | `@ever-works/agent/subscriptions` | Plan-based generation limits                          |
 | `isomorphic-git`                  | Local git operations for data repositories            |

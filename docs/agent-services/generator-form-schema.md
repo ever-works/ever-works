@@ -85,12 +85,12 @@ const schema = await formSchemaService.getFormSchema(
 
 The service resolves the pipeline plugin through a priority chain:
 
-| Priority | Source                                             | Description             |
-| -------- | -------------------------------------------------- | ----------------------- |
-| 1        | Explicit `pipelineId` parameter                    | User-selected pipeline  |
-| 2        | Work's `activeCapability` for `'pipeline'`    | Work-level default |
-| 3        | Plugin with `defaultForCapabilities: ['pipeline']` | System-level default    |
-| 4        | First loaded pipeline plugin                       | Fallback                |
+| Priority | Source                                             | Description            |
+| -------- | -------------------------------------------------- | ---------------------- |
+| 1        | Explicit `pipelineId` parameter                    | User-selected pipeline |
+| 2        | Work's `activeCapability` for `'pipeline'`         | Work-level default     |
+| 3        | Plugin with `defaultForCapabilities: ['pipeline']` | System-level default   |
+| 4        | First loaded pipeline plugin                       | Fallback               |
 
 ### Provider Filtering
 

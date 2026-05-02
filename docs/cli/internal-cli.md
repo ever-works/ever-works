@@ -92,16 +92,16 @@ Configuration management for the internal CLI environment.
 
 Work management commands that operate directly against the database.
 
-| Subcommand            | Description                                |
-| --------------------- | ------------------------------------------ |
+| Subcommand            | Description                           |
+| --------------------- | ------------------------------------- |
 | `create`              | Create a new work                     |
-| `list`                | List all works                       |
-| `generate`            | Generate data and create a repository      |
+| `list`                | List all works                        |
+| `generate`            | Generate data and create a repository |
 | `update`              | Update a work and its repository      |
 | `submit-item`         | Submit an item to a work              |
 | `remove-item`         | Remove an item from a work            |
 | `regenerate-markdown` | Regenerate readme markdown for a work |
-| `update-website`      | Update the website repository              |
+| `update-website`      | Update the website repository         |
 | `deploy`              | Deploy the website for a work         |
 | `delete`              | Delete a work and its repositories    |
 

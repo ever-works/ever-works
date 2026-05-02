@@ -39,18 +39,18 @@ The export produces a versioned JSON file (currently v1) containing:
 | Data                              | Details                                                            |
 | --------------------------------- | ------------------------------------------------------------------ |
 | **Profile**                       | Username, email, avatar                                            |
-| **Works**                   | Name, slug, description, git/deploy provider, settings             |
-| **Work Items**               | Full item data from the data repository (YAML), including markdown |
+| **Works**                         | Name, slug, description, git/deploy provider, settings             |
+| **Work Items**                    | Full item data from the data repository (YAML), including markdown |
 | **Categories, Tags, Collections** | Taxonomy data from the data repository                             |
 | **Comparisons**                   | Comparison data with dimensions, scores, and markdown content      |
-| **Site Config**                   | Per-work website configuration                                |
+| **Site Config**                   | Per-work website configuration                                     |
 | **Markdown Templates**            | Header and footer markdown templates                               |
 | **Schedules**                     | Update cadence, status, billing mode, failure thresholds           |
 | **Advanced Prompts**              | Custom AI prompt overrides for each pipeline step                  |
-| **Members**                       | Work member user IDs and roles                                |
+| **Members**                       | Work member user IDs and roles                                     |
 | **Custom Domains**                | Domain name, environment, verification status                      |
 | **User Plugins**                  | Plugin ID, enabled state, settings                                 |
-| **Work Plugins**             | Per-work plugin configuration, capability, priority           |
+| **Work Plugins**                  | Per-work plugin configuration, capability, priority                |
 
 ### Secret Handling
 
@@ -135,10 +135,10 @@ Upload a JSON file to analyze its contents before making any changes. The previe
 | `version`          | Export format version                                           |
 | `includesSecrets`  | Whether the file contains secret settings                       |
 | `hasMaskedSecrets` | Whether secret values are masked (need replacing before import) |
-| `workCount`   | Number of works in the file                               |
-| `totalItemCount`   | Total items across all works                              |
+| `workCount`        | Number of works in the file                                     |
+| `totalItemCount`   | Total items across all works                                    |
 | `userPluginCount`  | Number of user plugins                                          |
-| `conflicts`        | Works whose slugs match existing works              |
+| `conflicts`        | Works whose slugs match existing works                          |
 | `missingPlugins`   | Plugin IDs not installed on this instance                       |
 
 ### Masked Secrets Detection
@@ -153,11 +153,11 @@ During import, any secret settings that still contain masked values are **skippe
 
 When a work slug in the import file matches an existing work, you choose a resolution strategy:
 
-| Strategy      | Behavior                                                    |
-| ------------- | ----------------------------------------------------------- |
+| Strategy      | Behavior                                               |
+| ------------- | ------------------------------------------------------ |
 | **Skip**      | Keep the existing work, do not import the incoming one |
 | **Overwrite** | Update the existing work with the imported data        |
-| **Rename**    | Import with a new slug (e.g., `my-dir-imported`)            |
+| **Rename**    | Import with a new slug (e.g., `my-dir-imported`)       |
 
 ### Step 3: Apply
 
@@ -255,13 +255,13 @@ DELETE /api/account/sync
 
 ## Security Considerations
 
-| Concern                        | Mitigation                                                                             |
-| ------------------------------ | -------------------------------------------------------------------------------------- |
-| Secret leakage via export      | Secrets are always masked with `MASKED:` prefix; real values never leave the API       |
-| Secret leakage via GitHub      | Push always writes masked values; pull always ignores secret values                    |
-| Masked values imported as real | Import detects `MASKED:` prefix and skips those values with a warning                  |
+| Concern                        | Mitigation                                                                        |
+| ------------------------------ | --------------------------------------------------------------------------------- |
+| Secret leakage via export      | Secrets are always masked with `MASKED:` prefix; real values never leave the API  |
+| Secret leakage via GitHub      | Push always writes masked values; pull always ignores secret values               |
+| Masked values imported as real | Import detects `MASKED:` prefix and skips those values with a warning             |
 | Path traversal in sync         | Work slugs are validated with `path.basename()` on both write and read operations |
-| Repository tampering           | Pull operations use the same preview/conflict flow as file import                      |
+| Repository tampering           | Pull operations use the same preview/conflict flow as file import                 |
 
 ## Dashboard UI
 

@@ -59,12 +59,12 @@ The `DataGeneratorService` is the primary entry point for work content generatio
 
 ### Key Methods
 
-| Method               | Purpose                                                               |
-| -------------------- | --------------------------------------------------------------------- |
+| Method               | Purpose                                                          |
+| -------------------- | ---------------------------------------------------------------- |
 | `initialize()`       | Full work generation: clone repo, run pipeline, write data, push |
-| `addItems()`         | Add or update individual items                                        |
-| `removeItem()`       | Remove an item from the data repository                               |
-| `removeRepository()` | Delete the data Git repository                                        |
+| `addItems()`         | Add or update individual items                                   |
+| `removeItem()`       | Remove an item from the data repository                          |
+| `removeRepository()` | Delete the data Git repository                                   |
 
 ### Generation Flow
 

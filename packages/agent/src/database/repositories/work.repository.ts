@@ -221,10 +221,7 @@ export class WorkRepository {
         });
     }
 
-    async updateGenerateStatus(
-        id: string,
-        generateStatus: Work['generateStatus'],
-    ): Promise<void> {
+    async updateGenerateStatus(id: string, generateStatus: Work['generateStatus']): Promise<void> {
         if (generateStatus?.warnings?.length) {
             generateStatus = { ...generateStatus, warnings: [...new Set(generateStatus.warnings)] };
         }

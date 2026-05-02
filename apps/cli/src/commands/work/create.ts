@@ -7,11 +7,7 @@ import {
     CreateWorkDto,
     GitProviderConnectionInfo,
 } from '../../services/api.service';
-import {
-    WorkPromptService,
-    GitProviderChoice,
-    DeployProviderChoice,
-} from './work-prompt.service';
+import { WorkPromptService, GitProviderChoice, DeployProviderChoice } from './work-prompt.service';
 import { handleCliError } from '../../utils/error';
 import { WEB_URL } from '../../utils/constants';
 

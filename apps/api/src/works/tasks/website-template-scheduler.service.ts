@@ -30,16 +30,13 @@ export class WebsiteTemplateSchedulerService {
                 }
 
                 try {
-                    const works =
-                        await this.workRepository.findWithWebsiteAutoUpdateEnabled();
+                    const works = await this.workRepository.findWithWebsiteAutoUpdateEnabled();
 
                     if (works.length === 0) {
                         return;
                     }
 
-                    this.logger.log(
-                        `Checking ${works.length} works for website template updates`,
-                    );
+                    this.logger.log(`Checking ${works.length} works for website template updates`);
 
                     for (const work of works) {
                         await this.processWorkUpdate(work);
@@ -78,9 +75,7 @@ export class WebsiteTemplateSchedulerService {
                 await this.workRepository.update(work.id, {
                     websiteTemplateLastError: updateCheck.error,
                 });
-                this.logger.warn(
-                    `Cannot check updates for ${work.slug}: ${updateCheck.error}`,
-                );
+                this.logger.warn(`Cannot check updates for ${work.slug}: ${updateCheck.error}`);
                 return;
             }
 
@@ -103,13 +98,9 @@ export class WebsiteTemplateSchedulerService {
             }
 
             // Perform the update
-            const result = await this.websiteUpdateService.updateRepository(
-                work,
-                workOwner,
-                {
-                    branch: updateCheck.branch,
-                },
-            );
+            const result = await this.websiteUpdateService.updateRepository(work, workOwner, {
+                branch: updateCheck.branch,
+            });
 
             // Update work with success status
             await this.workRepository.update(work.id, {
@@ -128,9 +119,7 @@ export class WebsiteTemplateSchedulerService {
                 websiteTemplateLastError: errorMessage,
             });
 
-            this.logger.error(
-                `Failed to update template for work ${work.slug}: ${errorMessage}`,
-            );
+            this.logger.error(`Failed to update template for work ${work.slug}: ${errorMessage}`);
         }
     }
 }

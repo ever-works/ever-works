@@ -31,9 +31,7 @@ export class WorkCommand extends CommandRunner {
         console.log('Available work commands:');
         console.log('  create              - Create a new work');
         console.log('  list                - List all works');
-        console.log(
-            '  generate            - Generate data and create a repository for a work',
-        );
+        console.log('  generate            - Generate data and create a repository for a work');
         console.log('  update              - Update a work and its repository');
         console.log('  submit-item         - Submit an item to a work');
         console.log('  remove-item         - Remove an item from a work');

@@ -29,7 +29,7 @@ flowchart LR
 | Remote API (GitHub)  | `@octokit/rest`                          | Best-in-class GitHub client           |
 | Plugin contract      | `IGitProviderPlugin` SDK interface       | Principle X — versioned               |
 | Credential lookup    | `OAuthTokenRepository` per user+provider | Reuses existing OAuth token store     |
-| Local cache          | `<workspace>/<userId>/<repo>` work  | Simple, isolated per user             |
+| Local cache          | `<workspace>/<userId>/<repo>` work       | Simple, isolated per user             |
 | Push retry           | Configurable `maxRetries` per call       | Caller controls policy                |
 
 ## 3. Data Model

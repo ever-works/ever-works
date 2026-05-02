@@ -433,14 +433,12 @@ describe('PluginRegistryService', () => {
             service.register(plugin2, manifest2, { state: 'loaded' });
 
             // plugin-1 is disabled at work level
-            workPluginRepository.findByWorkAndPlugin.mockImplementation(
-                async (dirId, pluginId) => {
-                    if (pluginId === 'plugin-1') {
-                        return { enabled: false, workId: dirId, pluginId } as any;
-                    }
-                    return { enabled: true, workId: dirId, pluginId } as any;
-                },
-            );
+            workPluginRepository.findByWorkAndPlugin.mockImplementation(async (dirId, pluginId) => {
+                if (pluginId === 'plugin-1') {
+                    return { enabled: false, workId: dirId, pluginId } as any;
+                }
+                return { enabled: true, workId: dirId, pluginId } as any;
+            });
 
             const result = await service.getDefaultForCapabilityScoped('search', 'dir-1');
 
@@ -953,14 +951,12 @@ describe('PluginRegistryService', () => {
                 },
             );
 
-            workPluginRepository.findByWorkAndPlugin.mockImplementation(
-                async (dirId, pluginId) => {
-                    if (pluginId === 'plugin-1') {
-                        return { enabled: false, workId: dirId, pluginId } as any;
-                    }
-                    return { enabled: true, workId: dirId, pluginId } as any;
-                },
-            );
+            workPluginRepository.findByWorkAndPlugin.mockImplementation(async (dirId, pluginId) => {
+                if (pluginId === 'plugin-1') {
+                    return { enabled: false, workId: dirId, pluginId } as any;
+                }
+                return { enabled: true, workId: dirId, pluginId } as any;
+            });
 
             const result = await service.getEnabledPluginsScoped(undefined, 'dir-1');
 

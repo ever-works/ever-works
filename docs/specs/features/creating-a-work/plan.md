@@ -28,7 +28,7 @@ flowchart TD
 | ------------------- | ------------------------------------------------------- | -------------------------- |
 | Repo provisioning   | `GitFacadeService.createRepository` × 3                 | Principle II               |
 | Atomicity           | DB transaction + best-effort rollback if any repo fails | Avoid orphan rows          |
-| Generation dispatch | Trigger.dev `work-generation` task                 | Principle IV               |
+| Generation dispatch | Trigger.dev `work-generation` task                      | Principle IV               |
 | Slug uniqueness     | Per-user case-insensitive lookup                        | Matches GitHub repo naming |
 | Form schema         | Plugin `form-schema-provider` capability                | Pipelines own their own UI |
 
@@ -43,8 +43,8 @@ flowchart TD
 
 ## 4. API Surface
 
-| Method | Endpoint                          | Description          |
-| ------ | --------------------------------- | -------------------- |
+| Method | Endpoint                    | Description          |
+| ------ | --------------------------- | -------------------- |
 | `POST` | `/api/works`                | Create (AI / Manual) |
 | `POST` | `/api/works/import/preview` | Import dry-run       |
 | `POST` | `/api/works/import`         | Import confirmation  |

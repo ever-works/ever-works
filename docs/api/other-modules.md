@@ -92,9 +92,9 @@ curl "http://localhost:3100/api/oauth/github/connect/url?callbackUrl=http://loca
 
 Dynamic form schema endpoints return the configuration form for the active pipeline plugin, including all form fields, groups, and validation rules.
 
-| Method | Endpoint                              | Description                              |
-| ------ | ------------------------------------- | ---------------------------------------- |
-| `GET`  | `/api/generator-form`                 | Get global generator form schema         |
+| Method | Endpoint                        | Description                         |
+| ------ | ------------------------------- | ----------------------------------- |
+| `GET`  | `/api/generator-form`           | Get global generator form schema    |
 | `GET`  | `/api/works/:id/generator-form` | Get form schema for a specific work |
 
 Both endpoints accept an optional `?pipelineId=` query parameter to get the form for a specific pipeline plugin.

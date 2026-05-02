@@ -200,11 +200,11 @@ Before the plugin list, the command shows the current active provider for each c
 
 ### Work Plugin Actions
 
-| Action                       | Description                                                                                                         |
-| ---------------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| Action                  | Description                                                                                                    |
+| ----------------------- | -------------------------------------------------------------------------------------------------------------- |
 | Enable for work         | Enables the plugin at work scope. If the plugin has multiple capabilities, prompts for which one to activate.  |
 | Disable for work        | Disables the plugin at work scope with confirmation.                                                           |
-| Set active capability        | Shown when a plugin provides more than one capability. Switches which capability is active.                         |
+| Set active capability   | Shown when a plugin provides more than one capability. Switches which capability is active.                    |
 | Configure work settings | Prompts for work-scoped settings. Uses user-level settings as fallback defaults (shown as `Inherited: value`). |
 
 ### Settings Inheritance
@@ -246,19 +246,19 @@ if (!canEdit(role)) {
 
 ## API Methods Used
 
-| Method                                                 | Command             | Description                                       |
-| ------------------------------------------------------ | ------------------- | ------------------------------------------------- |
-| `getPlugins(options?)`                                 | `plugins`           | List all plugins, optionally filtered by category |
-| `getPlugin(pluginId)`                                  | `plugins`           | Get full plugin details with settings             |
-| `enablePlugin(pluginId, data)`                         | `plugins`           | Enable a plugin with optional settings            |
-| `disablePlugin(pluginId)`                              | `plugins`           | Disable a plugin                                  |
-| `updatePluginSettings(pluginId, data)`                 | `plugins`           | Save plugin settings                              |
-| `listPluginModels(pluginId)`                           | `plugins`           | Fetch available AI models for a plugin            |
-| `getWorkPlugins(workId)`                     | `work plugins` | List plugins for a specific work             |
-| `enableWorkPlugin(dirId, pluginId, data)`         | `work plugins` | Enable a plugin at work scope                |
-| `disableWorkPlugin(dirId, pluginId)`              | `work plugins` | Disable a plugin at work scope               |
+| Method                                            | Command        | Description                                       |
+| ------------------------------------------------- | -------------- | ------------------------------------------------- |
+| `getPlugins(options?)`                            | `plugins`      | List all plugins, optionally filtered by category |
+| `getPlugin(pluginId)`                             | `plugins`      | Get full plugin details with settings             |
+| `enablePlugin(pluginId, data)`                    | `plugins`      | Enable a plugin with optional settings            |
+| `disablePlugin(pluginId)`                         | `plugins`      | Disable a plugin                                  |
+| `updatePluginSettings(pluginId, data)`            | `plugins`      | Save plugin settings                              |
+| `listPluginModels(pluginId)`                      | `plugins`      | Fetch available AI models for a plugin            |
+| `getWorkPlugins(workId)`                          | `work plugins` | List plugins for a specific work                  |
+| `enableWorkPlugin(dirId, pluginId, data)`         | `work plugins` | Enable a plugin at work scope                     |
+| `disableWorkPlugin(dirId, pluginId)`              | `work plugins` | Disable a plugin at work scope                    |
 | `setWorkPluginCapability(dirId, pluginId, cap)`   | `work plugins` | Set the active capability for a plugin            |
-| `updateWorkPluginSettings(dirId, pluginId, data)` | `work plugins` | Save work-level plugin settings              |
+| `updateWorkPluginSettings(dirId, pluginId, data)` | `work plugins` | Save work-level plugin settings                   |
 
 ## Utility Functions
 

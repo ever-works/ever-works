@@ -150,10 +150,7 @@ Repository descriptions are sanitized by stripping newlines and truncating to 50
 const user = await githubPlugin.getUser(token);
 
 // Create a repository
-const repo = await githubPlugin.createRepository(
-	{ name: 'my-work', isPrivate: true, organization: 'my-org' },
-	token
-);
+const repo = await githubPlugin.createRepository({ name: 'my-work', isPrivate: true, organization: 'my-org' }, token);
 
 // Create a branch and push changes
 await githubPlugin.cloneOrPull({

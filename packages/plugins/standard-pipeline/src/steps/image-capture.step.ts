@@ -57,9 +57,7 @@ export class ImageCaptureStep extends BasePipelineStep {
 		}
 
 		const domainType = domainAnalysis.domain_type as DomainType;
-		logger.log(
-			`[${work.slug}] Capturing images for ${itemsNeedingImages.length} items (domain: ${domainType})`
-		);
+		logger.log(`[${work.slug}] Capturing images for ${itemsNeedingImages.length} items (domain: ${domainType})`);
 
 		const captureErrors: string[] = [];
 

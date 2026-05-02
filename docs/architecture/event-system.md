@@ -48,8 +48,8 @@ Every domain event declares a static `EVENT_NAME` string that serves as the even
 
 ### Defined Domain Events
 
-| Event Class                         | Event Name                       | Payload                    | Emitted When                  |
-| ----------------------------------- | -------------------------------- | -------------------------- | ----------------------------- |
+| Event Class                    | Event Name                  | Payload          | Emitted When             |
+| ------------------------------ | --------------------------- | ---------------- | ------------------------ |
 | `WorkCreatedEvent`             | `work.created`              | `{ work: Work }` | A new work is created    |
 | `WorkGenerationCompletedEvent` | `work.generation.completed` | `{ work: Work }` | Work generation finishes |
 
@@ -113,12 +113,12 @@ Events are organized into five categories:
 
 #### Work Events
 
-| Event Name                       | Payload                               | Description          |
-| -------------------------------- | ------------------------------------- | -------------------- |
-| `work:created`              | `WorkEventPayload`               | Work created    |
-| `work:updated`              | `WorkEventPayload`               | Work updated    |
-| `work:deleted`              | `WorkEventPayload`               | Work deleted    |
-| `work:deployed`             | `WorkEventPayload`               | Work deployed   |
+| Event Name                  | Payload                          | Description          |
+| --------------------------- | -------------------------------- | -------------------- |
+| `work:created`              | `WorkEventPayload`               | Work created         |
+| `work:updated`              | `WorkEventPayload`               | Work updated         |
+| `work:deleted`              | `WorkEventPayload`               | Work deleted         |
+| `work:deployed`             | `WorkEventPayload`               | Work deployed        |
 | `work:generation-started`   | `WorkGenerationStartedPayload`   | Generation started   |
 | `work:generation-completed` | `WorkGenerationCompletedPayload` | Generation completed |
 | `work:generation-failed`    | `WorkGenerationFailedPayload`    | Generation failed    |

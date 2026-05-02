@@ -25,7 +25,7 @@ export class WorkSchedule {
     @PrimaryGeneratedColumn('uuid')
     id: string;
 
-    @Column({ name: 'directoryId',  unique: true })
+    @Column({ name: 'directoryId', unique: true })
     workId: string;
 
     @OneToOne(() => Work, (work) => work.schedule, { onDelete: 'CASCADE' })

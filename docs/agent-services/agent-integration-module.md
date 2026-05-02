@@ -309,7 +309,7 @@ URLs with `.git` suffix or trailing slashes are automatically cleaned.
 | ------------------------------ | ----------------------------------------------------------------------------- |
 | `@ever-works/agent/facades`    | `GitFacadeService`, `AiFacadeService`, `OAuthFacadeService`                   |
 | `@ever-works/agent/generators` | `DataGeneratorService`, `MarkdownGeneratorService`, `WebsiteGeneratorService` |
-| `@ever-works/agent/database`   | `WorkRepository`, `OAuthTokenRepository`                                 |
+| `@ever-works/agent/database`   | `WorkRepository`, `OAuthTokenRepository`                                      |
 | `@ever-works/plugin`           | `IOAuthPlugin`, `PLUGIN_CAPABILITIES`, plugin interfaces                      |
 | `@ever-works/contracts`        | `Category`, `Tag` type definitions                                            |
 | `zod`                          | Schema validation for AI extraction output                                    |

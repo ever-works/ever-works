@@ -126,8 +126,7 @@ export class AgentPipelinePlugin implements IPlugin, IPipelinePlugin<AgentPipeli
 			id: this.id,
 			name: this.name,
 			version: this.version,
-			description:
-				'Autonomous tool-based pipeline that researches and generates work items using an AI agent',
+			description: 'Autonomous tool-based pipeline that researches and generates work items using an AI agent',
 			category: this.category,
 			capabilities: [...this.capabilities],
 			author: { name: 'Ever Works Team' },

@@ -105,14 +105,14 @@ AND nextRunAt IS NOT NULL`. The first updater wins; the loser sees
 
 ## 5. Key Entities & Domain Concepts
 
-| Entity / concept                   | Description                                                                       |
-| ---------------------------------- | --------------------------------------------------------------------------------- |
+| Entity / concept              | Description                                                                  |
+| ----------------------------- | ---------------------------------------------------------------------------- |
 | `WorkSchedule`                | Per-work schedule row: cadence, status, nextRunAt, scheduledFor, billingMode |
-| `WorkScheduleStatus`          | Enum: `disabled` / `active` / `paused` / `canceled`                               |
-| `WorkScheduleCadence`         | Enum: 7 values from hourly to monthly                                             |
-| `WorkScheduleBillingMode`     | Enum: `subscription` / `usage`                                                    |
-| `WorkScheduleDispatchSummary` | Trigger.dev task return value with counts + per-entry outcomes                    |
-| `scheduledFor` (anchor)            | The original `nextRunAt` preserved at claim time; drift-correction reference      |
+| `WorkScheduleStatus`          | Enum: `disabled` / `active` / `paused` / `canceled`                          |
+| `WorkScheduleCadence`         | Enum: 7 values from hourly to monthly                                        |
+| `WorkScheduleBillingMode`     | Enum: `subscription` / `usage`                                               |
+| `WorkScheduleDispatchSummary` | Trigger.dev task return value with counts + per-entry outcomes               |
+| `scheduledFor` (anchor)       | The original `nextRunAt` preserved at claim time; drift-correction reference |
 
 ## 6. Out of Scope
 

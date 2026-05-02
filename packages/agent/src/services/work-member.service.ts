@@ -62,10 +62,7 @@ export class WorkMemberService {
         userId: string,
         dto: InviteMemberDto,
     ): Promise<InviteMemberResult> {
-        const { work } = await this.ownershipService.ensureCanManageMembers(
-            workId,
-            userId,
-        );
+        const { work } = await this.ownershipService.ensureCanManageMembers(workId, userId);
 
         if (
             !ASSIGNABLE_MEMBER_ROLES.includes(dto.role as (typeof ASSIGNABLE_MEMBER_ROLES)[number])
@@ -101,12 +98,7 @@ export class WorkMemberService {
 
         const inviter = await this.userRepository.findById(userId);
 
-        const member = await this.memberRepository.addMember(
-            workId,
-            invitee.id,
-            dto.role,
-            userId,
-        );
+        const member = await this.memberRepository.addMember(workId, invitee.id, dto.role, userId);
 
         const memberWithRelations = await this.memberRepository.findById(member.id);
         return {
@@ -142,11 +134,7 @@ export class WorkMemberService {
             });
         }
 
-        const updated = await this.memberRepository.updateRole(
-            workId,
-            member.userId,
-            dto.role,
-        );
+        const updated = await this.memberRepository.updateRole(workId, member.userId, dto.role);
         return this.toDto(updated!);
     }
 
@@ -183,11 +171,7 @@ export class WorkMemberService {
         }
     }
 
-    async getMember(
-        workId: string,
-        userId: string,
-        memberId: string,
-    ): Promise<WorkMemberDto> {
+    async getMember(workId: string, userId: string, memberId: string): Promise<WorkMemberDto> {
         await this.ownershipService.ensureCanView(workId, userId);
 
         const member = await this.memberRepository.findById(memberId);

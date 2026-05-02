@@ -90,7 +90,7 @@ These operations use `isomorphic-git` and are the same for all git providers -- 
 | `getMainBranch(dir)`                 | Detect the main/master branch          |
 | `switchBranch(dir, branch, create?)` | Switch or create a branch              |
 | `getStatus(dir)`                     | Get file change status                 |
-| `getLocalDir(owner, repo)`           | Get local clone work path         |
+| `getLocalDir(owner, repo)`           | Get local clone work path              |
 | `removeLocalDir(owner, repo)`        | Clean up local clone                   |
 
 ### OAuth Integration

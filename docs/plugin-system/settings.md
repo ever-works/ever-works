@@ -54,14 +54,14 @@ readonly settingsSchema: JsonSchema = {
 
 The platform extends JSON Schema with `x-*` properties that control security, scoping, and UI behavior:
 
-| Extension     | Type                                | Description                                                                                  |
-| ------------- | ----------------------------------- | -------------------------------------------------------------------------------------------- |
-| `x-secret`    | `boolean`                           | Field is encrypted at rest and masked in API responses. Use for API keys, tokens, passwords. |
-| `x-envVar`    | `string`                            | Environment variable name to check as a fallback when no setting is stored.                  |
+| Extension     | Type                           | Description                                                                                  |
+| ------------- | ------------------------------ | -------------------------------------------------------------------------------------------- |
+| `x-secret`    | `boolean`                      | Field is encrypted at rest and masked in API responses. Use for API keys, tokens, passwords. |
+| `x-envVar`    | `string`                       | Environment variable name to check as a fallback when no setting is stored.                  |
 | `x-scope`     | `'global' \| 'user' \| 'work'` | Which scope level can set this field.                                                        |
-| `x-widget`    | `string`                            | UI rendering hint (e.g., `model-select` renders a model picker dropdown).                    |
-| `x-hidden`    | `boolean`                           | Hide from the settings UI. Used for advanced/internal settings.                              |
-| `x-adminOnly` | `boolean`                           | Only visible to admin users.                                                                 |
+| `x-widget`    | `string`                       | UI rendering hint (e.g., `model-select` renders a model picker dropdown).                    |
+| `x-hidden`    | `boolean`                      | Hide from the settings UI. Used for advanced/internal settings.                              |
+| `x-adminOnly` | `boolean`                      | Only visible to admin users.                                                                 |
 
 ### x-secret
 
@@ -195,11 +195,11 @@ interface ValidationError {
 
 Settings are persisted in three tables, one per scope:
 
-| Table                   | Scope         | Settings Column | Secrets Column   |
-| ----------------------- | ------------- | --------------- | ---------------- |
-| `PluginEntity`          | Admin/system  | `settings`      | `secretSettings` |
-| `UserPluginEntity`      | Per user      | `settings`      | `secretSettings` |
-| `WorkPluginEntity` | Per work | `settings`      | `secretSettings` |
+| Table              | Scope        | Settings Column | Secrets Column   |
+| ------------------ | ------------ | --------------- | ---------------- |
+| `PluginEntity`     | Admin/system | `settings`      | `secretSettings` |
+| `UserPluginEntity` | Per user     | `settings`      | `secretSettings` |
+| `WorkPluginEntity` | Per work     | `settings`      | `secretSettings` |
 
 Secret fields (marked with `x-secret`) are stored in a separate `secretSettings` column at every scope level. During resolution, the system checks work secrets first, then user secrets, then admin secrets, following the same cascading hierarchy as regular settings.
 

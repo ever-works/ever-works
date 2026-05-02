@@ -31,9 +31,7 @@ export class DeleteSubCommand extends CommandRunner {
             await this.configCheck.requireConfiguration();
 
             // Select work
-            const selection = await this.workPrompt.promptWorkSelection(
-                this.workRepository,
-            );
+            const selection = await this.workPrompt.promptWorkSelection(this.workRepository);
             if (selection.cancelled || !selection.work) {
                 console.log(chalk.yellow('\n⚠ Operation cancelled.'));
                 return;
@@ -62,9 +60,7 @@ export class DeleteSubCommand extends CommandRunner {
                 repositoriesToDelete.push(`${work.getRepoOwner()}/${work.getDataRepo()}`);
             }
             if (deleteOptions.delete_markdown_repository) {
-                repositoriesToDelete.push(
-                    `${work.getRepoOwner('work')}/${work.getMainRepo()}`,
-                );
+                repositoriesToDelete.push(`${work.getRepoOwner('work')}/${work.getMainRepo()}`);
             }
             if (deleteOptions.delete_website_repository) {
                 repositoriesToDelete.push(

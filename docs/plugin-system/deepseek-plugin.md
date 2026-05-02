@@ -25,11 +25,11 @@ DeepSeek models are available through two providers in Ever Works:
 
 OpenRouter lists DeepSeek models with the `deepseek/` prefix:
 
-| Model ID                  | Description                 | Best For                                    |
-| ------------------------- | --------------------------- | ------------------------------------------- |
-| `deepseek/deepseek-r1`    | DeepSeek R1 reasoning model | Complex analysis, multi-step reasoning      |
-| `deepseek/deepseek-chat`  | DeepSeek Chat               | General-purpose content generation          |
-| `deepseek/deepseek-coder` | DeepSeek Coder              | Technical content, code-related works |
+| Model ID                  | Description                 | Best For                               |
+| ------------------------- | --------------------------- | -------------------------------------- |
+| `deepseek/deepseek-r1`    | DeepSeek R1 reasoning model | Complex analysis, multi-step reasoning |
+| `deepseek/deepseek-chat`  | DeepSeek Chat               | General-purpose content generation     |
+| `deepseek/deepseek-coder` | DeepSeek Coder              | Technical content, code-related works  |
 
 ### Via Ollama (Local)
 

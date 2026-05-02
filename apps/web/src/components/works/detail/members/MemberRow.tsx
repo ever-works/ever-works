@@ -25,13 +25,7 @@ interface MemberRowProps {
     onUpdated: (member: WorkMember) => void;
 }
 
-export function MemberRow({
-    workId,
-    member,
-    canManage,
-    onRemoved,
-    onUpdated,
-}: MemberRowProps) {
+export function MemberRow({ workId, member, canManage, onRemoved, onUpdated }: MemberRowProps) {
     const t = useTranslations('dashboard.workDetail.members');
     const [isUpdating, setIsUpdating] = useState(false);
     const [isRemoving, setIsRemoving] = useState(false);

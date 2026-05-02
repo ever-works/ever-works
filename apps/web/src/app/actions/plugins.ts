@@ -108,10 +108,7 @@ export async function enableWorkPlugin(
 /**
  * Disable a plugin for a work
  */
-export async function disableWorkPlugin(
-    workId: string,
-    pluginId: string,
-): Promise<ActionResult> {
+export async function disableWorkPlugin(workId: string, pluginId: string): Promise<ActionResult> {
     try {
         const result = await pluginsAPI.disableForWork(workId, pluginId);
         revalidatePath(`/works/${workId}/plugins`);
@@ -146,10 +143,7 @@ export async function updateWorkPluginSettings(
         console.error('Failed to update Work plugin settings:', error);
         return {
             success: false,
-            error:
-                error instanceof Error
-                    ? error.message
-                    : 'Failed to update Work plugin settings',
+            error: error instanceof Error ? error.message : 'Failed to update Work plugin settings',
         };
     }
 }

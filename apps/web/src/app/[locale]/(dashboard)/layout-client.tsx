@@ -76,8 +76,7 @@ export function DashboardLayoutClient({
     const [isMobile, setIsMobile] = useState<boolean>(false);
     const onboardingTotalSteps = onboardingPlugins.length + 2;
     const onboardingCurrentStep = Math.min(onboardingState.step, onboardingTotalSteps - 1) + 1;
-    const shouldAutoOpenOnboarding =
-        onboardingTotalWorks === 0 && !onboardingState.modalDismissed;
+    const shouldAutoOpenOnboarding = onboardingTotalWorks === 0 && !onboardingState.modalDismissed;
     const isOnboardingOpen = onboardingOpen || shouldAutoOpenOnboarding;
     const showOnboardingBadge =
         onboardingTotalWorks === 0 &&

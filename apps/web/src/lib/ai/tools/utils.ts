@@ -20,9 +20,7 @@ export interface ResolvedGenerationConfig {
  * - WorkAICreator (new work) → getGlobalFormSchema
  * - GeneratorForm (existing work) → getFormSchema(workId)
  */
-export async function resolveGenerationConfig(
-    workId?: string,
-): Promise<ResolvedGenerationConfig> {
+export async function resolveGenerationConfig(workId?: string): Promise<ResolvedGenerationConfig> {
     // For existing works, try to reuse last request data first
     if (workId) {
         try {

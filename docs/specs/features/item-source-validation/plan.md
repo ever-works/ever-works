@@ -43,8 +43,8 @@ flowchart LR
 
 ## 4. API Surface
 
-| Method | Endpoint                                 | Description            |
-| ------ | ---------------------------------------- | ---------------------- |
+| Method | Endpoint                           | Description            |
+| ------ | ---------------------------------- | ---------------------- |
 | `POST` | `/api/works/:id/check-item-health` | Re-check a single item |
 
 ## 5. Plugin / Web / CLI
@@ -77,7 +77,7 @@ flowchart LR
 | Risk                                          | Mitigation                                               |
 | --------------------------------------------- | -------------------------------------------------------- |
 | False-positive `broken` from transient errors | Only `404`/`410` → `broken`; everything else → `unknown` |
-| AI cost runaway on huge works           | Validation skips items unchanged since last check        |
+| AI cost runaway on huge works                 | Validation skips items unchanged since last check        |
 | Manual re-check abuse                         | Cooldown cache window                                    |
 
 ## 10. Constitution Reconciliation

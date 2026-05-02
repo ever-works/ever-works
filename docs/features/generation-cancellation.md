@@ -21,20 +21,20 @@ When you cancel a generation, the platform:
 2. **Checks status** — only works currently in the `generating` state can be cancelled. Otherwise the API responds with `409 Conflict`.
 3. **Routes the cancel** — the actual cancellation strategy depends on where the run is executing:
 
-    | Mode               | What it means                                                                                             |
-    | ------------------ | --------------------------------------------------------------------------------------------------------- |
-    | `trigger`          | An active Trigger.dev run was found and a cancellation was requested through the Trigger.dev SDK.         |
-    | `in_process`       | The run is executing in the API process; an in-memory cancellation token is signalled.                    |
+    | Mode               | What it means                                                                                        |
+    | ------------------ | ---------------------------------------------------------------------------------------------------- |
+    | `trigger`          | An active Trigger.dev run was found and a cancellation was requested through the Trigger.dev SDK.    |
+    | `in_process`       | The run is executing in the API process; an in-memory cancellation token is signalled.               |
     | `stale`            | No active run was found, but the work was still flagged as `generating`. Status was forced to ERROR. |
-    | `already_finished` | Between the check and the cancel call, the run completed (success or failure). Nothing more to do.        |
+    | `already_finished` | Between the check and the cancel call, the run completed (success or failure). Nothing more to do.   |
 
 4. **Updates state** — the work's `generateStatus` transitions to `cancelled`, the in-progress generation history record is closed, and an activity-log entry is written ("Generation cancelled for `<work>`").
 5. **Returns immediately** — the endpoint returns `202 Accepted` while the worker tears down. Final state may take a few seconds to settle.
 
 ## API
 
-| Method | Endpoint                                 | Description                                       |
-| ------ | ---------------------------------------- | ------------------------------------------------- |
+| Method | Endpoint                           | Description                                       |
+| ------ | ---------------------------------- | ------------------------------------------------- |
 | `POST` | `/api/works/:id/cancel-generation` | Request cancellation of the active generation run |
 
 ```bash
@@ -56,12 +56,12 @@ The `mode` field tells you which path the cancel took (see the table above) — 
 
 **Errors:**
 
-| Status | Reason                                                                           |
-| ------ | -------------------------------------------------------------------------------- |
-| `403`  | Caller does not have edit rights on the work                                |
-| `404`  | Work not found                                                              |
-| `409`  | Work is not currently generating (`generateStatus.status !== 'generating'`) |
-| `400`  | Cancellation requested but the deployment does not have a generation dispatcher  |
+| Status | Reason                                                                          |
+| ------ | ------------------------------------------------------------------------------- |
+| `403`  | Caller does not have edit rights on the work                                    |
+| `404`  | Work not found                                                                  |
+| `409`  | Work is not currently generating (`generateStatus.status !== 'generating'`)     |
+| `400`  | Cancellation requested but the deployment does not have a generation dispatcher |
 
 ## Statuses After Cancel
 

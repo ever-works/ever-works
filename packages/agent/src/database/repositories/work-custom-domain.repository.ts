@@ -32,11 +32,7 @@ export class WorkCustomDomainRepository {
     /**
      * Add a custom domain to a work.
      */
-    async addDomain(
-        workId: string,
-        domain: string,
-        provider?: string,
-    ): Promise<WorkCustomDomain> {
+    async addDomain(workId: string, domain: string, provider?: string): Promise<WorkCustomDomain> {
         const record = this.repository.create({
             workId,
             domain,

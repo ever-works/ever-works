@@ -372,11 +372,7 @@ export class StandardPipelinePlugin implements IPipelinePlugin<BuiltInStepId>, I
 
 	// --- Context lifecycle hooks ---
 
-	createContext(
-		work: WorkReference,
-		request: GenerationRequest,
-		existing: ExistingItems
-	): IPipelineContext {
+	createContext(work: WorkReference, request: GenerationRequest, existing: ExistingItems): IPipelineContext {
 		return new TypedGenerationContext(work, request, existing);
 	}
 

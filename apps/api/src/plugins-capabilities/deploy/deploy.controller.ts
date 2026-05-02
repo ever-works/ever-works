@@ -487,8 +487,7 @@ export class DeployController {
         if (!work.website) {
             throw new BadRequestException({
                 status: 'error',
-                message:
-                    'No deployment exists for this work. Deploy first before adding domains.',
+                message: 'No deployment exists for this work. Deploy first before adding domains.',
             });
         }
 

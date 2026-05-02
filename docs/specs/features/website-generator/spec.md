@@ -230,8 +230,8 @@ class UpdateWebsiteRepositoryDto {
 
 ## Repository Naming Convention
 
-| Repository Type     | Naming Pattern          |
-| ------------------- | ----------------------- |
+| Repository Type     | Naming Pattern     |
+| ------------------- | ------------------ |
 | Data Repository     | `{work-slug}-data` |
 | Markdown Repository | `{work-slug}`      |
 | Website Repository  | `{work-slug}-web`  |
@@ -269,8 +269,8 @@ class UpdateWebsiteRepositoryDto {
 | Option                               | Source                    | Description                        |
 | ------------------------------------ | ------------------------- | ---------------------------------- |
 | `website_repository_creation_method` | `CreateItemsGeneratorDto` | DUPLICATE or CREATE_USING_TEMPLATE |
-| `autoUpdate`                         | Work settings        | Enable auto-updates                |
-| `useBetaVersion`                     | Work settings        | Use beta template branch           |
+| `autoUpdate`                         | Work settings             | Enable auto-updates                |
+| `useBetaVersion`                     | Work settings             | Use beta template branch           |
 
 ## Integration Points
 

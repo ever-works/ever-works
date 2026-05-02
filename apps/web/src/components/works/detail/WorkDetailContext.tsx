@@ -18,9 +18,7 @@ type WorkDetailContextType = {
     permissions: WorkPermissions;
 };
 
-export const WorkDetailContext = createContext<WorkDetailContextType>(
-    {} as WorkDetailContextType,
-);
+export const WorkDetailContext = createContext<WorkDetailContextType>({} as WorkDetailContextType);
 
 export const WorkDetailProvider = ({
     work,
@@ -55,9 +53,7 @@ export const WorkDetailProvider = ({
         };
     }, [work, oauthConnection, config, onWorkChange]);
 
-    return (
-        <WorkDetailContext.Provider value={value}>{children}</WorkDetailContext.Provider>
-    );
+    return <WorkDetailContext.Provider value={value}>{children}</WorkDetailContext.Provider>;
 };
 
 export const useWorkDetail = () => {
@@ -87,8 +83,7 @@ function repoLink(work: Work, oauthConnection: GitProviderConnectionInfo | null)
 
     // Never fall back to the connected personal username for organization-owned works.
     // That produces incorrect repo links like user/repo when the work actually belongs to an org.
-    const owner =
-        work.owner || (!work.organization ? oauthConnection.username : undefined);
+    const owner = work.owner || (!work.organization ? oauthConnection.username : undefined);
     if (!owner) {
         return null;
     }

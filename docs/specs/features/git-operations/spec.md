@@ -101,9 +101,9 @@ provider REST APIs for remote operations.
 | -------------------- | ------------------------------------------------------------------------- |
 | `GitFacadeService`   | Capability-agnostic entry point for all git operations                    |
 | `IGitProviderPlugin` | Contract every git provider plugin must implement                         |
-| `GitFacadeOptions`   | `{userId, providerId, workId?, token?}` per-call context             |
-| Repository ecosystem | Per-work triple: `<slug>-data`, `<slug>`, `<slug>-website`           |
-| Local cache          | Per-user, per-repo working work reused across calls                  |
+| `GitFacadeOptions`   | `{userId, providerId, workId?, token?}` per-call context                  |
+| Repository ecosystem | Per-work triple: `<slug>-data`, `<slug>`, `<slug>-website`                |
+| Local cache          | Per-user, per-repo working work reused across calls                       |
 | Error hierarchy      | `NoGitProviderError`, `GitProviderNotFoundError`, `NoGitCredentialsError` |
 
 ## 6. Out of Scope

@@ -72,8 +72,8 @@ This turns the History page into a practical review tool instead of a metrics-on
 
 ### Get Work History
 
-| Method | Endpoint                       | Description                                         |
-| ------ | ------------------------------ | --------------------------------------------------- |
+| Method | Endpoint                 | Description                                    |
+| ------ | ------------------------ | ---------------------------------------------- |
 | `GET`  | `/api/works/:id/history` | Get paginated work history with changelog data |
 
 **Query parameters:**

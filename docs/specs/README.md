@@ -85,18 +85,18 @@ which now live folded into `tasks.md`).
 
 | Feature                                                            | Status        | Description                                                    |
 | ------------------------------------------------------------------ | ------------- | -------------------------------------------------------------- |
-| [`advanced-prompts`](features/advanced-prompts/spec)               | Retrospective | Per-work prompt overrides per pipeline step               |
+| [`advanced-prompts`](features/advanced-prompts/spec)               | Retrospective | Per-work prompt overrides per pipeline step                    |
 | [`api-keys`](features/api-keys/spec)                               | Retrospective | Long-lived auth tokens for CI / CLI / MCP                      |
 | [`collections`](features/collections/spec)                         | Retrospective | Editorial groupings cutting across categories                  |
 | [`community-pr-processing`](features/community-pr-processing/spec) | Retrospective | AI-driven processing of community-contributed PRs              |
 | [`comparisons`](features/comparisons/spec)                         | Retrospective | A vs B comparison page generator                               |
-| [`creating-a-work`](features/creating-a-work/spec)       | Retrospective | Three creation methods: AI / Manual / Import                   |
+| [`creating-a-work`](features/creating-a-work/spec)                 | Retrospective | Three creation methods: AI / Manual / Import                   |
 | [`custom-domains`](features/custom-domains/spec)                   | Retrospective | Branded domain assignment with provider sync                   |
 | [`data-generator`](features/data-generator/spec)                   | Retrospective | Data repository management and item persistence                |
 | [`data-management`](features/data-management/spec)                 | Retrospective | Export / Import / GitHub Sync with secret hygiene              |
-| [`work-changelog`](features/work-changelog/spec)         | Retrospective | Audit trail of all work mutations                         |
-| [`work-import`](features/work-import/spec)               | Retrospective | Bootstrap from existing repo or Awesome List                   |
-| [`work-members`](features/work-members/spec)             | Retrospective | Role-based collaboration (Owner / Manager / Editor / Viewer)   |
+| [`work-changelog`](features/work-changelog/spec)                   | Retrospective | Audit trail of all work mutations                              |
+| [`work-import`](features/work-import/spec)                         | Retrospective | Bootstrap from existing repo or Awesome List                   |
+| [`work-members`](features/work-members/spec)                       | Retrospective | Role-based collaboration (Owner / Manager / Editor / Viewer)   |
 | [`generation-cancellation`](features/generation-cancellation/spec) | Retrospective | Mid-flight generation cancel with four mode paths              |
 | [`git-operations`](features/git-operations/spec)                   | Retrospective | `GitFacadeService` and provider plugin contract                |
 | [`item-source-validation`](features/item-source-validation/spec)   | Retrospective | Reachability + AI accuracy checks per item                     |
@@ -106,7 +106,7 @@ which now live folded into `tasks.md`).
 | [`scheduled-updates`](features/scheduled-updates/spec)             | Retrospective | Cron-driven generation with CAS claim and drift correction     |
 | [`taxonomy-system`](features/taxonomy-system/spec)                 | Retrospective | Categories, tags, and collections in the data repo             |
 | [`website-generator`](features/website-generator/spec)             | Retrospective | Static site generation pipeline                                |
-| [`works-config`](features/works-config/spec)                       | Retrospective | `works.yml` source-controlled work configuration          |
+| [`works-config`](features/works-config/spec)                       | Retrospective | `works.yml` source-controlled work configuration               |
 
 ## Reading order for new contributors
 

@@ -15,12 +15,12 @@ The `WorkLifecycleService` manages the complete lifecycle of a work entity -- fr
 
 Every work in Ever Works maps to a set of Git repositories (data, markdown, website). The lifecycle service orchestrates creating these repositories, persisting work metadata in the database, and tearing everything down when a work is deleted.
 
-| Operation                | Required Role      | Description                                                   |
-| ------------------------ | ------------------ | ------------------------------------------------------------- |
-| `createWork`        | Authenticated user | Creates a new work and its backing repositories          |
-| `updateWork`        | Editor or higher   | Modifies work metadata and settings                      |
-| `syncFromDataRepository` | Editor or higher   | Pulls latest state from the data repo into the database       |
-| `deleteWork`        | Owner only         | Removes the work and optionally deletes all repositories |
+| Operation                | Required Role      | Description                                              |
+| ------------------------ | ------------------ | -------------------------------------------------------- |
+| `createWork`             | Authenticated user | Creates a new work and its backing repositories          |
+| `updateWork`             | Editor or higher   | Modifies work metadata and settings                      |
+| `syncFromDataRepository` | Editor or higher   | Pulls latest state from the data repo into the database  |
+| `deleteWork`             | Owner only         | Removes the work and optionally deletes all repositories |
 
 ## Dependencies
 

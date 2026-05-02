@@ -154,10 +154,7 @@ Main orchestrator for markdown generation.
 
 ```typescript
 class MarkdownGeneratorService {
-	async initialize(
-		payload: WorkGenerationPayload,
-		dataResult: DataGeneratorResult
-	): Promise<MarkdownGeneratorResult>;
+	async initialize(payload: WorkGenerationPayload, dataResult: DataGeneratorResult): Promise<MarkdownGeneratorResult>;
 }
 ```
 

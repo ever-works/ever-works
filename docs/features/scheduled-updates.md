@@ -47,7 +47,7 @@ Available cadences may depend on your subscription plan. Cadences not included i
 
 | Mode           | Description                                               |
 | -------------- | --------------------------------------------------------- |
-| `subscription` | Counts against your plan's included scheduled works |
+| `subscription` | Counts against your plan's included scheduled works       |
 | `usage`        | Pay-per-use — bypasses plan limits, any cadence available |
 
 ### Settings
@@ -80,8 +80,8 @@ All endpoints require JWT authentication.
 
 ### Get Schedule
 
-| Method | Endpoint                        | Description                         |
-| ------ | ------------------------------- | ----------------------------------- |
+| Method | Endpoint                  | Description                         |
+| ------ | ------------------------- | ----------------------------------- |
 | `GET`  | `/api/works/:id/schedule` | Get the current schedule and status |
 
 ```bash
@@ -118,8 +118,8 @@ curl http://localhost:3100/api/works/<work-id>/schedule \
 
 ### Create or Update Schedule
 
-| Method | Endpoint                        | Description                 |
-| ------ | ------------------------------- | --------------------------- |
+| Method | Endpoint                  | Description                 |
+| ------ | ------------------------- | --------------------------- |
 | `PUT`  | `/api/works/:id/schedule` | Create or update a schedule |
 
 ```bash
@@ -153,13 +153,13 @@ curl -X PUT http://localhost:3100/api/works/<work-id>/schedule \
 | `400`  | Cadence not available on plan and billing mode is `subscription` |
 | `400`  | `maxFailureBeforePause` outside 1–10                             |
 | `400`  | Provider override references an uninstalled or disabled plugin   |
-| `400`  | Activating would exceed plan's work limit                   |
-| `400`  | Work has not completed initial generation                   |
+| `400`  | Activating would exceed plan's work limit                        |
+| `400`  | Work has not completed initial generation                        |
 
 ### Cancel Schedule
 
-| Method   | Endpoint                        | Description         |
-| -------- | ------------------------------- | ------------------- |
+| Method   | Endpoint                  | Description         |
+| -------- | ------------------------- | ------------------- |
 | `DELETE` | `/api/works/:id/schedule` | Cancel the schedule |
 
 ```bash
@@ -171,8 +171,8 @@ Canceling resets the schedule to its default state (cadence cleared, billing mod
 
 ### Run Immediately
 
-| Method | Endpoint                            | Description                 |
-| ------ | ----------------------------------- | --------------------------- |
+| Method | Endpoint                      | Description                 |
+| ------ | ----------------------------- | --------------------------- |
 | `POST` | `/api/works/:id/schedule/run` | Trigger a scheduled run now |
 
 ```bash

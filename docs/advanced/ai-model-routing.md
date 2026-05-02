@@ -238,12 +238,12 @@ private async calculateCost(
 
 Settings are resolved by `PluginSettingsService` with this precedence:
 
-| Level | Source                    | Scope                   |
-| ----- | ------------------------- | ----------------------- |
-| 1     | Work plugin settings | Per-work overrides |
-| 2     | User plugin settings      | Per-user defaults       |
-| 3     | Admin settings            | Server-wide defaults    |
-| 4     | Plugin manifest defaults  | Built into the plugin   |
+| Level | Source                   | Scope                 |
+| ----- | ------------------------ | --------------------- |
+| 1     | Work plugin settings     | Per-work overrides    |
+| 2     | User plugin settings     | Per-user defaults     |
+| 3     | Admin settings           | Server-wide defaults  |
+| 4     | Plugin manifest defaults | Built into the plugin |
 
 ### Routing Options
 

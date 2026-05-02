@@ -11,13 +11,13 @@ The Work Operations Module (`@ever-works/agent/work-operations`) provides a cent
 
 ## Overview
 
-| Property                | Value                                      |
-| ----------------------- | ------------------------------------------ |
-| **Import path**         | `@ever-works/agent/work-operations`   |
-| **Source location**     | `packages/agent/src/work-operations/` |
-| **NestJS module**       | `WorkOperationsModule`                |
-| **Primary service**     | `WorkOperationsService`               |
-| **Database dependency** | `DatabaseModule` (TypeORM repositories)    |
+| Property                | Value                                   |
+| ----------------------- | --------------------------------------- |
+| **Import path**         | `@ever-works/agent/work-operations`     |
+| **Source location**     | `packages/agent/src/work-operations/`   |
+| **NestJS module**       | `WorkOperationsModule`                  |
+| **Primary service**     | `WorkOperationsService`                 |
+| **Database dependency** | `DatabaseModule` (TypeORM repositories) |
 
 The module acts as the single point of truth for all work state mutations that occur during AI-powered content generation, import operations, and scheduled updates. Other modules -- such as the generators, import system, and pipeline -- depend on this module to record progress and outcomes.
 
@@ -55,11 +55,11 @@ Both `WorkOperationsService` and the underlying `DatabaseModule` are re-exported
 
 The central `@Injectable()` service that coordinates work state changes. It depends on three injected collaborators:
 
-| Dependency                             | Description                                                     |
-| -------------------------------------- | --------------------------------------------------------------- |
-| `WorkRepository`                  | TypeORM repository for the `works` table                  |
+| Dependency                        | Description                                                |
+| --------------------------------- | ---------------------------------------------------------- |
+| `WorkRepository`                  | TypeORM repository for the `works` table                   |
 | `WorkGenerationHistoryRepository` | TypeORM repository for the `work_generation_history` table |
-| `EventEmitter2` (optional)             | NestJS event emitter for broadcasting lifecycle events          |
+| `EventEmitter2` (optional)        | NestJS event emitter for broadcasting lifecycle events     |
 
 The `EventEmitter2` dependency is marked `@Optional()`, which allows the service to function in contexts where the event-emitter module is not registered (such as unit tests or CLI tools).
 
@@ -67,16 +67,16 @@ The `EventEmitter2` dependency is marked `@Optional()`, which allows the service
 
 ### WorkOperationsService Methods
 
-| Method                       | Signature                                                                                          | Description                                                                                                                                       |
-| ---------------------------- | -------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `updateWork`            | `(id: string, updateData: Partial<Work>) => Promise<void>`                                    | Applies a partial update to any fields on the `Work` entity.                                                                                 |
-| `getGenerateStatus`          | `(id: string) => Promise<GenerateStatus \| undefined>`                                             | Retrieves the current generation status object for a work. Returns `undefined` if the work is not found.                                |
-| `updateGenerateStatus`       | `(id: string, status: GenerateStatus) => Promise<void>`                                            | Persists a new generation status. Automatically deduplicates the `warnings` array if present.                                                     |
-| `updateLastPullRequest`      | `(id: string, payload: { main?: PRUpdate; data?: PRUpdate }) => Promise<void>`                     | Records metadata about the most recent pull request(s) created during generation.                                                                 |
-| `recordGenerationStartTime`  | `(id: string, startedAt: Date) => Promise<void>`                                                   | Stamps the `generationStartedAt` timestamp on the work record.                                                                               |
-| `recordGenerationFinishTime` | `(id: string, finishedAt: Date) => Promise<void>`                                                  | Stamps the `generationFinishedAt` timestamp on the work record.                                                                              |
+| Method                       | Signature                                                                                     | Description                                                                                                                             |
+| ---------------------------- | --------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| `updateWork`                 | `(id: string, updateData: Partial<Work>) => Promise<void>`                                    | Applies a partial update to any fields on the `Work` entity.                                                                            |
+| `getGenerateStatus`          | `(id: string) => Promise<GenerateStatus \| undefined>`                                        | Retrieves the current generation status object for a work. Returns `undefined` if the work is not found.                                |
+| `updateGenerateStatus`       | `(id: string, status: GenerateStatus) => Promise<void>`                                       | Persists a new generation status. Automatically deduplicates the `warnings` array if present.                                           |
+| `updateLastPullRequest`      | `(id: string, payload: { main?: PRUpdate; data?: PRUpdate }) => Promise<void>`                | Records metadata about the most recent pull request(s) created during generation.                                                       |
+| `recordGenerationStartTime`  | `(id: string, startedAt: Date) => Promise<void>`                                              | Stamps the `generationStartedAt` timestamp on the work record.                                                                          |
+| `recordGenerationFinishTime` | `(id: string, finishedAt: Date) => Promise<void>`                                             | Stamps the `generationFinishedAt` timestamp on the work record.                                                                         |
 | `emitGenerationCompleted`    | `(workId: string) => Promise<void>`                                                           | Emits a `WorkGenerationCompletedEvent` via the event emitter. No-ops gracefully if the emitter is unavailable or the work is not found. |
-| `updateGenerationHistory`    | `(workId: string, historyId: string, updates: GenerationHistoryUpdateInput) => Promise<void>` | Updates a specific generation history entry with status, item counts, metrics, and timing data.                                                   |
+| `updateGenerationHistory`    | `(workId: string, historyId: string, updates: GenerationHistoryUpdateInput) => Promise<void>` | Updates a specific generation history entry with status, item counts, metrics, and timing data.                                         |
 
 ### Helper Functions
 
@@ -141,8 +141,8 @@ type GenerationMetrics = {
 
 The module emits the following event when generation completes:
 
-| Event                            | Constant                                       | Payload                                                                    |
-| -------------------------------- | ---------------------------------------------- | -------------------------------------------------------------------------- |
+| Event                       | Constant                                  | Payload                                                          |
+| --------------------------- | ----------------------------------------- | ---------------------------------------------------------------- |
 | `work.generation.completed` | `WorkGenerationCompletedEvent.EVENT_NAME` | `WorkGenerationCompletedEvent` containing the full `Work` entity |
 
 Listeners can subscribe via the NestJS `@OnEvent()` decorator:
@@ -170,15 +170,15 @@ The module itself requires no explicit configuration. It inherits database conne
 
 ## Dependencies
 
-| Dependency                                          | Type                       | Purpose                                                                   |
-| --------------------------------------------------- | -------------------------- | ------------------------------------------------------------------------- |
-| `DatabaseModule`                                    | NestJS module              | Provides `WorkRepository` and `WorkGenerationHistoryRepository` |
-| `@nestjs/event-emitter`                             | Peer dependency (optional) | Enables `emitGenerationCompleted` event broadcasting                      |
-| `@src/entities/work.entity`                    | Entity                     | The `Work` TypeORM entity                                            |
-| `@src/entities/work-generation-history.entity` | Entity                     | The `WorkGenerationHistory` TypeORM entity                           |
-| `@src/events`                                       | Event classes              | `WorkGenerationCompletedEvent`                                       |
-| `@src/generators/data-generator`                    | Type import                | `GenerationStats` type                                                    |
-| `@src/tasks/work-import.types`                 | Type import                | `WorkImportResult` type                                              |
+| Dependency                                     | Type                       | Purpose                                                         |
+| ---------------------------------------------- | -------------------------- | --------------------------------------------------------------- |
+| `DatabaseModule`                               | NestJS module              | Provides `WorkRepository` and `WorkGenerationHistoryRepository` |
+| `@nestjs/event-emitter`                        | Peer dependency (optional) | Enables `emitGenerationCompleted` event broadcasting            |
+| `@src/entities/work.entity`                    | Entity                     | The `Work` TypeORM entity                                       |
+| `@src/entities/work-generation-history.entity` | Entity                     | The `WorkGenerationHistory` TypeORM entity                      |
+| `@src/events`                                  | Event classes              | `WorkGenerationCompletedEvent`                                  |
+| `@src/generators/data-generator`               | Type import                | `GenerationStats` type                                          |
+| `@src/tasks/work-import.types`                 | Type import                | `WorkImportResult` type                                         |
 
 ## Usage Examples
 

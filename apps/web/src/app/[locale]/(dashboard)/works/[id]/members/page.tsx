@@ -34,7 +34,5 @@ export default async function WorkMembersPage({ params }: Params) {
         notFound();
     }
 
-    return (
-        <MembersPage work={work} members={membersRes.members} owner={membersRes.owner} />
-    );
+    return <MembersPage work={work} members={membersRes.members} owner={membersRes.owner} />;
 }

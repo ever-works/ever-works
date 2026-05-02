@@ -84,11 +84,7 @@ export async function generateManualComparison(
     }
 
     try {
-        const result = await workAPI.generateManualComparison(
-            workId,
-            itemASlug,
-            itemBSlug,
-        );
+        const result = await workAPI.generateManualComparison(workId, itemASlug, itemBSlug);
 
         if (result.status === 'success') {
             revalidatePath(`/works/${workId}/comparisons`);

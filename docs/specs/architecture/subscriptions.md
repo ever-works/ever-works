@@ -43,12 +43,12 @@ internal CLI) can call the same services without going through HTTP.
 
 ## 3. Plan Model
 
-| Plan tier      | What it gates                                              | Stripe price id source |
-| -------------- | ---------------------------------------------------------- | ---------------------- |
+| Plan tier      | What it gates                                        | Stripe price id source |
+| -------------- | ---------------------------------------------------- | ---------------------- |
 | **Free**       | Default tier; limited active works, limited cadences | None (no Stripe)       |
 | **Pro**        | More works, faster cadences, Agent Pipeline          | `STRIPE_PRICE_PRO_*`   |
-| **Team**       | Everything in Pro + members + custom domains               | `STRIPE_PRICE_TEAM_*`  |
-| **Enterprise** | Custom contracts (handled out-of-band)                     | None (manual)          |
+| **Team**       | Everything in Pro + members + custom domains         | `STRIPE_PRICE_TEAM_*`  |
+| **Enterprise** | Custom contracts (handled out-of-band)               | None (manual)          |
 
 Each plan exposes machine-readable limits (`maxWorks`,
 `maxScheduledWorks`, `allowedCadences`, etc.). The platform

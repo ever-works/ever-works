@@ -398,11 +398,11 @@ The facade then resolves settings for the selected plugin (following the [settin
 
 The plugin system uses three database tables:
 
-| Entity                  | Scope         | Key Fields                                                                       |
-| ----------------------- | ------------- | -------------------------------------------------------------------------------- |
-| `PluginEntity`          | System/admin  | `pluginId`, `state`, `manifest`, `settings`, `secretSettings`                    |
-| `UserPluginEntity`      | Per user      | `userId`, `pluginId`, `enabled`, `autoEnableForWorks`, `settings`          |
-| `WorkPluginEntity` | Per work | `workId`, `pluginId`, `enabled`, `activeCapability`, `priority`, `settings` |
+| Entity             | Scope        | Key Fields                                                                  |
+| ------------------ | ------------ | --------------------------------------------------------------------------- |
+| `PluginEntity`     | System/admin | `pluginId`, `state`, `manifest`, `settings`, `secretSettings`               |
+| `UserPluginEntity` | Per user     | `userId`, `pluginId`, `enabled`, `autoEnableForWorks`, `settings`           |
+| `WorkPluginEntity` | Per work     | `workId`, `pluginId`, `enabled`, `activeCapability`, `priority`, `settings` |
 
 These tables store plugin state, per-scope settings, and enable/disable preferences. The in-memory registry is the source of truth for loaded plugins; the database persists configuration across restarts.
 

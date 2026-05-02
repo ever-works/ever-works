@@ -71,7 +71,7 @@ The Agent Pipeline runs 5 sequential steps:
 | 2    | `generate-items`      | Run the AI agent with tool calling to research and create items                         | ~120s    |
 | 3    | `collect-results`     | Read generated JSON files from the workspace, merge with data source items, deduplicate | ~2s      |
 | 4    | `capture-screenshots` | Capture screenshots for items with source URLs (optional)                               | ~30s     |
-| 5    | `cleanup`             | Remove the temporary workspace work                                                | ~1s      |
+| 5    | `cleanup`             | Remove the temporary workspace work                                                     | ~1s      |
 
 ## Agent Tools
 

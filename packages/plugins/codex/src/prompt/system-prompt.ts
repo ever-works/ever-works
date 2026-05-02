@@ -131,9 +131,7 @@ export function buildUserPromptVariables(options: SystemPromptOptions): Template
 			: `Generate work items for: ${work.name}`;
 
 	const workDescription =
-		work.description && !request.prompt?.includes(work.description)
-			? `Work description: ${work.description}`
-			: '';
+		work.description && !request.prompt?.includes(work.description) ? `Work description: ${work.description}` : '';
 
 	return {
 		userInstruction,

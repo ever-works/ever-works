@@ -375,8 +375,7 @@ export class GitHubSyncService {
                     const members = this.readJsonFile(path.join(dirPath, 'members.json')) || [];
                     const customDomains =
                         this.readJsonFile(path.join(dirPath, 'domains.json')) || [];
-                    const workPlugins =
-                        this.readJsonFile(path.join(dirPath, 'plugins.json')) || [];
+                    const workPlugins = this.readJsonFile(path.join(dirPath, 'plugins.json')) || [];
 
                     const advancedPrompts =
                         this.readJsonFile(path.join(dirPath, 'prompts.json')) || undefined;

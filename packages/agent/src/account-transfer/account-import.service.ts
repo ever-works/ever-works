@@ -313,10 +313,7 @@ export class AccountImportService {
             if (resolution.strategy === 'rename') {
                 slug = resolution.newSlug || `${dir.slug}-imported`;
                 // Check the new slug doesn't conflict either
-                const newExisting = await this.workRepository.existsByUserAndSlug(
-                    userId,
-                    slug,
-                );
+                const newExisting = await this.workRepository.existsByUserAndSlug(userId, slug);
                 if (newExisting) {
                     result.errors.push(
                         `Cannot rename "${dir.slug}" to "${slug}" - slug already exists`,
@@ -343,13 +340,7 @@ export class AccountImportService {
                     comparisonsEnabled: dir.comparisonsEnabled,
                 });
 
-                await this.importWorkRelations(
-                    existing.id,
-                    userId,
-                    dir,
-                    includesSecrets,
-                    result,
-                );
+                await this.importWorkRelations(existing.id, userId, dir, includesSecrets, result);
                 await this.importWorkRepoData(existing, dir, user, result);
                 result.worksUpdated++;
                 return;
@@ -400,10 +391,7 @@ export class AccountImportService {
                     );
                     continue;
                 }
-                const exists = await this.workMemberRepository.isMember(
-                    workId,
-                    member.userId,
-                );
+                const exists = await this.workMemberRepository.isMember(workId, member.userId);
                 if (!exists) {
                     await this.workMemberRepository.addMember(
                         workId,
@@ -426,11 +414,7 @@ export class AccountImportService {
                     cd.domain,
                 );
                 if (!existingDomain) {
-                    await this.workCustomDomainRepository.addDomain(
-                        workId,
-                        cd.domain,
-                        cd.provider,
-                    );
+                    await this.workCustomDomainRepository.addDomain(workId, cd.domain, cd.provider);
                 }
             } catch (error) {
                 result.warnings.push(

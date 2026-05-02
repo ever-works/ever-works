@@ -80,7 +80,7 @@ The binary is cached locally and reused across generations. Version can be overr
 
 | Constant              | Value                          | Description                       |
 | --------------------- | ------------------------------ | --------------------------------- |
-| `BASE_TEMP_DIR`       | `'/tmp/claude-code-generator'` | Root work for workspaces     |
+| `BASE_TEMP_DIR`       | `'/tmp/claude-code-generator'` | Root work for workspaces          |
 | `DEFAULT_CLI_VERSION` | `'2.1.37'`                     | Default CLI binary version        |
 | `DEFAULT_MAX_TURNS`   | `500`                          | Default max conversation turns    |
 | `MAX_BUFFER_SIZE`     | `10 * 1024 * 1024` (10 MB)     | Max stdout/stderr buffer size     |
@@ -253,7 +253,7 @@ const settings = {
 
 | Error                      | Handling                                               |
 | -------------------------- | ------------------------------------------------------ |
-| Work creation failure | Step fails with filesystem error                       |
+| Work creation failure      | Step fails with filesystem error                       |
 | File read failure          | Individual items skipped, valid items collected        |
 | Invalid JSON in item files | Item skipped with warning, others processed            |
 | Missing taxonomy.json      | Falls back to items-only collection without categories |

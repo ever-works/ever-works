@@ -74,7 +74,7 @@ The full list of export paths:
 | `@ever-works/agent/dto`                  | Data transfer objects with class-validator decorators    |
 | `@ever-works/agent/entities`             | TypeORM entity definitions for all domain models         |
 | `@ever-works/agent/git`                  | Git operations (isomorphic-git based)                    |
-| `@ever-works/agent/work-operations` | Work generation state management                    |
+| `@ever-works/agent/work-operations`      | Work generation state management                         |
 | `@ever-works/agent/items-generator`      | Item-level content generation                            |
 | `@ever-works/agent/tasks`                | Background task type definitions                         |
 | `@ever-works/agent/events`               | Domain event classes                                     |
@@ -83,7 +83,7 @@ The full list of export paths:
 | `@ever-works/agent/config`               | Configuration management                                 |
 | `@ever-works/agent/cache`                | Persistent caching layer                                 |
 | `@ever-works/agent/notifications`        | Notification delivery                                    |
-| `@ever-works/agent/import`               | Work import system                                  |
+| `@ever-works/agent/import`               | Work import system                                       |
 | `@ever-works/agent/facades`              | AI facade (consumes AI provider plugins)                 |
 | `@ever-works/agent/plugins`              | Plugin runtime infrastructure                            |
 | `@ever-works/agent/pipeline`             | Generation pipeline orchestration                        |
@@ -131,14 +131,14 @@ The `pipeline/` sub-module orchestrates multi-step content generation workflows.
 
 Core TypeORM entities defined in `entities/`:
 
-| Entity                       | Table                          | Description                                            |
-| ---------------------------- | ------------------------------ | ------------------------------------------------------ |
-| `Work`                  | `works`                  | Central domain entity representing a work project |
-| `WorkGenerationHistory` | `work_generation_history` | Audit log of every generation run                      |
-| `WorkSchedule`          | `work_schedules`          | Scheduled update configuration                         |
-| `WorkMember`            | `work_members`            | Team membership and roles                              |
-| `WorkCustomDomain`      | `work_custom_domains`     | Custom domain mappings                                 |
-| `User`                       | `users`                        | Platform user accounts                                 |
+| Entity                  | Table                     | Description                                       |
+| ----------------------- | ------------------------- | ------------------------------------------------- |
+| `Work`                  | `works`                   | Central domain entity representing a work project |
+| `WorkGenerationHistory` | `work_generation_history` | Audit log of every generation run                 |
+| `WorkSchedule`          | `work_schedules`          | Scheduled update configuration                    |
+| `WorkMember`            | `work_members`            | Team membership and roles                         |
+| `WorkCustomDomain`      | `work_custom_domains`     | Custom domain mappings                            |
+| `User`                  | `users`                   | Platform user accounts                            |
 
 ## Configuration
 

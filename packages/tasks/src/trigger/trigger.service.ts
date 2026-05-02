@@ -82,10 +82,7 @@ export class TriggerService implements WorkGenerationDispatcher, WorkImportDispa
             await runs.cancel(runId);
             return true;
         } catch (error) {
-            this.logger.error(
-                `Failed to cancel work-generation task ${runId}`,
-                error as Error,
-            );
+            this.logger.error(`Failed to cancel work-generation task ${runId}`, error as Error);
             return false;
         }
     }

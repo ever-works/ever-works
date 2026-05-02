@@ -36,20 +36,20 @@ Each plugin declares exactly one category. The category is set on the plugin cla
 
 ### Category Overview
 
-| Category            | Description                                        | Example Plugins                                                                             |
-| ------------------- | -------------------------------------------------- | ------------------------------------------------------------------------------------------- |
-| `ai-provider`       | Provides AI model access for content generation    | OpenAI, Anthropic, Google, Groq, Ollama, Mistral, OpenRouter, Perplexity, Vercel AI Gateway |
-| `search`            | Web search for discovering work items         | Exa, Tavily, SerpAPI, Brave                                                                 |
-| `content-extractor` | Extracts structured content from URLs              | Jina, Firecrawl, Local Content Extractor, Notion Extractor, PDF Extractor                   |
-| `screenshot`        | Captures website screenshots                       | ScreenshotOne, Urlbox, Scrapfly                                                             |
-| `git-provider`      | Git hosting API operations and local git           | GitHub                                                                                      |
-| `deployment`        | Deploys generated works to hosting platforms | Vercel                                                                                      |
-| `data-source`       | Imports items from external data APIs              | Apify, Bright Data, Scrapfly, Valyu                                                         |
-| `pipeline`          | Defines the generation workflow                    | Standard Pipeline (15 steps), Agent Pipeline (5 steps), Claude Code                         |
-| `form`              | Provides custom form fields for the generator UI   | (used by pipeline plugins via `IFormSchemaProvider`)                                        |
-| `integration`       | Third-party service integrations                   | (extensible)                                                                                |
-| `utility`           | General-purpose utilities                          | Comparison Generator                                                                        |
-| `theme`             | Visual theme customization                         | (extensible)                                                                                |
+| Category            | Description                                      | Example Plugins                                                                             |
+| ------------------- | ------------------------------------------------ | ------------------------------------------------------------------------------------------- |
+| `ai-provider`       | Provides AI model access for content generation  | OpenAI, Anthropic, Google, Groq, Ollama, Mistral, OpenRouter, Perplexity, Vercel AI Gateway |
+| `search`            | Web search for discovering work items            | Exa, Tavily, SerpAPI, Brave                                                                 |
+| `content-extractor` | Extracts structured content from URLs            | Jina, Firecrawl, Local Content Extractor, Notion Extractor, PDF Extractor                   |
+| `screenshot`        | Captures website screenshots                     | ScreenshotOne, Urlbox, Scrapfly                                                             |
+| `git-provider`      | Git hosting API operations and local git         | GitHub                                                                                      |
+| `deployment`        | Deploys generated works to hosting platforms     | Vercel                                                                                      |
+| `data-source`       | Imports items from external data APIs            | Apify, Bright Data, Scrapfly, Valyu                                                         |
+| `pipeline`          | Defines the generation workflow                  | Standard Pipeline (15 steps), Agent Pipeline (5 steps), Claude Code                         |
+| `form`              | Provides custom form fields for the generator UI | (used by pipeline plugins via `IFormSchemaProvider`)                                        |
+| `integration`       | Third-party service integrations                 | (extensible)                                                                                |
+| `utility`           | General-purpose utilities                        | Comparison Generator                                                                        |
+| `theme`             | Visual theme customization                       | (extensible)                                                                                |
 
 ## Plugin Capabilities
 
@@ -138,7 +138,7 @@ Each plugin can set a visibility level in its manifest:
 | ----------- | ---------------------------------------------------------------------- |
 | `public`    | Shown to all users in all plugin lists (default)                       |
 | `hidden`    | Never shown in the plugin UI; used for internal infrastructure plugins |
-| `user-only` | Shown in user plugin settings but not in work plugin lists        |
+| `user-only` | Shown in user plugin settings but not in work plugin lists             |
 
 ### Supplementary Plugins
 

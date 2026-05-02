@@ -53,9 +53,9 @@ The work detail page can contain around 70 files across all sub-folders. This do
 
 This component is a React Context provider that wraps the entire work detail page. It accepts the work's core data as props and makes it available to all descendant components via two hooks:
 
-| Hook                        | Returns            | Purpose                                         |
-| --------------------------- | ------------------ | ----------------------------------------------- |
-| `useWorkDetail()`      | Full context value | Access work, config, OAuth, repo links     |
+| Hook                   | Returns            | Purpose                                         |
+| ---------------------- | ------------------ | ----------------------------------------------- |
+| `useWorkDetail()`      | Full context value | Access work, config, OAuth, repo links          |
 | `useWorkPermissions()` | `PermissionsMap`   | Check specific permissions for the current user |
 
 **Context value shape:**
@@ -105,8 +105,8 @@ function SomeChildComponent() {
 
 **File:** `apps/web/src/components/works/detail/WorkHeader.tsx`
 
-| Prop          | Type     | Description               |
-| ------------- | -------- | ------------------------- |
+| Prop     | Type     | Description          |
+| -------- | -------- | -------------------- |
 | `workId` | `string` | The work's unique ID |
 
 This component consumes `useWorkDetail()` and renders the work's header section with:
@@ -133,10 +133,10 @@ This component consumes `useWorkDetail()` and renders the work's header section 
 
 **File:** `apps/web/src/components/works/detail/WorkTabs.tsx`
 
-| Prop          | Type     | Description                     |
-| ------------- | -------- | ------------------------------- |
-| `workId` | `string` | The work's unique ID       |
-| `activeTab`   | `string` | Currently active tab identifier |
+| Prop        | Type     | Description                     |
+| ----------- | -------- | ------------------------------- |
+| `workId`    | `string` | The work's unique ID            |
+| `activeTab` | `string` | Currently active tab identifier |
 
 Renders a horizontal tab navigation bar. Each tab is a link that navigates to a different section of the work detail page. The available tabs are:
 
@@ -249,11 +249,7 @@ export default async function WorkDetailPage({ params, searchParams }) {
 	const { id } = params;
 	const activeTab = searchParams.tab || 'overview';
 
-	const [work, config, oauth] = await Promise.all([
-		getWork(id),
-		getWorkConfig(id),
-		getOAuthConnection(id)
-	]);
+	const [work, config, oauth] = await Promise.all([getWork(id), getWorkConfig(id), getOAuthConnection(id)]);
 
 	return (
 		<WorkDetailProvider work={work} oauthConnection={oauth} config={config}>

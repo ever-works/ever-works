@@ -97,9 +97,9 @@ For the canonical example see the
 
 ## 4. The Three Shipped Tasks (today)
 
-| Task                            | Trigger                             | Purpose                                                                       |
-| ------------------------------- | ----------------------------------- | ----------------------------------------------------------------------------- |
-| `work-generation`          | Triggered (one-shot per generation) | Runs the full Standard / Agent / CLI-driven pipeline for a work          |
+| Task                       | Trigger                             | Purpose                                                                       |
+| -------------------------- | ----------------------------------- | ----------------------------------------------------------------------------- |
+| `work-generation`          | Triggered (one-shot per generation) | Runs the full Standard / Agent / CLI-driven pipeline for a work               |
 | `work-import`              | Triggered (one-shot per import)     | Awesome README import flow + post-processing                                  |
 | `work-schedule-dispatcher` | Cron (`*/N * * * *`)                | Polls due schedules and dispatches them; runs on every worker every N minutes |
 
@@ -112,10 +112,10 @@ under `tasks/trigger/`, export it from the index, deploy.
 
 ## 5. Cron vs One-Shot Tasks
 
-| Style    | Trigger.dev primitive | Examples                                   |
-| -------- | --------------------- | ------------------------------------------ |
+| Style    | Trigger.dev primitive | Examples                         |
+| -------- | --------------------- | -------------------------------- |
 | One-shot | `task(...)`           | `work-generation`, `work-import` |
-| Cron     | `schedules.task(...)` | `work-schedule-dispatcher`            |
+| Cron     | `schedules.task(...)` | `work-schedule-dispatcher`       |
 
 The cron API takes a `cron: <expression>` field that Trigger.dev
 converts into a managed schedule. The platform reads the **interval
@@ -267,8 +267,8 @@ Trigger.dev queues tasks per-task-id by default. The platform
 configures **per-organisation concurrency limits** so one user's
 generation queue can't starve another's:
 
-| Task                            | Concurrency limit             |
-| ------------------------------- | ----------------------------- |
+| Task                       | Concurrency limit             |
+| -------------------------- | ----------------------------- |
 | `work-generation`          | 5 per organisation, 50 global |
 | `work-import`              | 3 per organisation, 30 global |
 | `work-schedule-dispatcher` | 1 globally (cron-driven)      |

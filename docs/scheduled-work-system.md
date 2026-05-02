@@ -192,15 +192,15 @@ This guard ensures scheduled runs always have the context needed to regenerate c
 
 ## 11. Quick Reference
 
-| Component        | File/Location                                                             | Notes                                                                 |
-| ---------------- | ------------------------------------------------------------------------- | --------------------------------------------------------------------- |
-| API endpoints    | `apps/api/src/works/works.controller.ts` (`/schedule` routes) | All authenticated via JWT guard.                                      |
-| Schedule service | `packages/agent/src/services/work-schedule.service.ts`               | Contains validation, DTO mapping, and work syncing.              |
-| Dispatcher       | `packages/agent/src/services/work-schedule-dispatcher.service.ts`    | Handles batching and locking.                                         |
-| Trigger task     | `packages/tasks/src/tasks/trigger/work-schedule-dispatcher.task.ts`  | Cron-based dispatcher runner.                                         |
-| Config           | `packages/agent/src/config/index.ts`                                      | Exposes typed accessors for env vars, including subscription toggles. |
-| Frontend card    | `apps/web/src/components/works/detail/WorkScheduleCard.tsx`    | Client-side UI and server actions.                                    |
-| Env reference    | `apps/api/.env.example`                                                   | Contains every variable described above.                              |
+| Component        | File/Location                                                       | Notes                                                                 |
+| ---------------- | ------------------------------------------------------------------- | --------------------------------------------------------------------- |
+| API endpoints    | `apps/api/src/works/works.controller.ts` (`/schedule` routes)       | All authenticated via JWT guard.                                      |
+| Schedule service | `packages/agent/src/services/work-schedule.service.ts`              | Contains validation, DTO mapping, and work syncing.                   |
+| Dispatcher       | `packages/agent/src/services/work-schedule-dispatcher.service.ts`   | Handles batching and locking.                                         |
+| Trigger task     | `packages/tasks/src/tasks/trigger/work-schedule-dispatcher.task.ts` | Cron-based dispatcher runner.                                         |
+| Config           | `packages/agent/src/config/index.ts`                                | Exposes typed accessors for env vars, including subscription toggles. |
+| Frontend card    | `apps/web/src/components/works/detail/WorkScheduleCard.tsx`         | Client-side UI and server actions.                                    |
+| Env reference    | `apps/api/.env.example`                                             | Contains every variable described above.                              |
 
 ---
 

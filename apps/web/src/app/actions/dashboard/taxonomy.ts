@@ -39,11 +39,7 @@ export async function createCategory(workId: string, data: Partial<Category>) {
     }
 }
 
-export async function updateCategory(
-    workId: string,
-    categoryId: string,
-    data: Partial<Category>,
-) {
+export async function updateCategory(workId: string, categoryId: string, data: Partial<Category>) {
     const user = await getAuthFromCookie();
     if (!user) {
         redirect(ROUTES.AUTH_LOGIN);

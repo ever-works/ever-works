@@ -49,8 +49,8 @@ interface VercelSettings {
 
 ## Capabilities
 
-| Capability   | Description                                   |
-| ------------ | --------------------------------------------- |
+| Capability   | Description                             |
+| ------------ | --------------------------------------- |
 | `deployment` | Deploy works as live websites on Vercel |
 
 This plugin is the default for the `deployment` capability (`defaultForCapabilities: ['deployment']`).

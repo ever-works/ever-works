@@ -38,7 +38,7 @@ The Ever Works Platform provides the backend infrastructure for building, genera
 | Repository                    | Description                                                             |
 | ----------------------------- | ----------------------------------------------------------------------- |
 | `ever-works`                  | Platform monorepo — API, web dashboard, CLI, AI agents, shared packages |
-| `ever-works-website-template` | Next.js template used by generated work websites                   |
+| `ever-works-website-template` | Next.js template used by generated work websites                        |
 | `ever-works-docs`             | This documentation site                                                 |
 
 ## AI Providers

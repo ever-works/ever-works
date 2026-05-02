@@ -6,12 +6,16 @@ import { test, expect } from '@playwright/test';
  */
 
 test.describe('Works rename — routes & copy', () => {
-    test('protected /en/works route exists and redirects unauth user to login', async ({ page }) => {
+    test('protected /en/works route exists and redirects unauth user to login', async ({
+        page,
+    }) => {
         await page.goto('/en/works', { waitUntil: 'networkidle' });
         await expect(page).toHaveURL(/\/login/);
     });
 
-    test('protected /en/works/new route exists and redirects unauth user to login', async ({ page }) => {
+    test('protected /en/works/new route exists and redirects unauth user to login', async ({
+        page,
+    }) => {
         await page.goto('/en/works/new', { waitUntil: 'networkidle' });
         await expect(page).toHaveURL(/\/login/);
     });

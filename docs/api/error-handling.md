@@ -60,13 +60,13 @@ The API uses `class-validator` decorators extensively:
 | Decorator             | Example Usage   | Error Message                             |
 | --------------------- | --------------- | ----------------------------------------- |
 | `@IsUrl()`            | Screenshot URL  | "url must be a URL address"               |
-| `@IsString()`         | Work ID    | "workId must be a string"            |
+| `@IsString()`         | Work ID         | "workId must be a string"                 |
 | `@IsNumber()`         | Viewport width  | "viewportWidth must be a number"          |
 | `@IsBoolean()`        | Full page flag  | "fullPage must be a boolean value"        |
 | `@IsOptional()`       | Optional fields | (no error if absent)                      |
 | `@Min(n)` / `@Max(n)` | Numeric bounds  | "viewportWidth must not be less than 320" |
 | `@IsIn([...])`        | Enum values     | "format must be one of: png, jpg, webp"   |
-| `@IsArray()`          | Batch items     | "works must be an array"            |
+| `@IsArray()`          | Batch items     | "works must be an array"                  |
 | `@ValidateNested()`   | Nested DTOs     | Validates child object properties         |
 
 ## HTTP Exception Types

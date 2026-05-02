@@ -76,23 +76,23 @@ export abstract class BaseEvent {
 
 All user events extend `BaseUserEvent` and are defined in `apps/api/src/events/index.ts`. They are emitted by `AuthService` and consumed by `MailService`.
 
-| Event Class                | Event Name                 | Trigger                            | Consumer                          |
-| -------------------------- | -------------------------- | ---------------------------------- | --------------------------------- |
-| `UserCreatedEvent`         | `user.created`             | User registration                  | Sends signup confirmation email   |
-| `UserConfirmedEvent`       | `user.confirmed`           | Email verification or OAuth signup | Sends welcome email               |
-| `UserForgotPasswordEvent`  | `user.forgot_password`     | Password reset request             | Sends forgot-password email       |
-| `UserPasswordChangedEvent` | `user.password_changed`    | Password change                    | Sends password-changed alert      |
-| `UserNewDeviceLoginEvent`  | `user.new_device_login`    | Login from unrecognized device     | Sends new-device alert            |
-| `UserAccountDeletionEvent` | `user.delete_account`      | Account deletion request           | Sends deletion confirmation email |
-| `MemberInvitedEvent`       | `work.member_invited` | User invited to a work        | Sends invitation email            |
+| Event Class                | Event Name              | Trigger                            | Consumer                          |
+| -------------------------- | ----------------------- | ---------------------------------- | --------------------------------- |
+| `UserCreatedEvent`         | `user.created`          | User registration                  | Sends signup confirmation email   |
+| `UserConfirmedEvent`       | `user.confirmed`        | Email verification or OAuth signup | Sends welcome email               |
+| `UserForgotPasswordEvent`  | `user.forgot_password`  | Password reset request             | Sends forgot-password email       |
+| `UserPasswordChangedEvent` | `user.password_changed` | Password change                    | Sends password-changed alert      |
+| `UserNewDeviceLoginEvent`  | `user.new_device_login` | Login from unrecognized device     | Sends new-device alert            |
+| `UserAccountDeletionEvent` | `user.delete_account`   | Account deletion request           | Sends deletion confirmation email |
+| `MemberInvitedEvent`       | `work.member_invited`   | User invited to a work             | Sends invitation email            |
 
 ### Work Events
 
 Work events extend `BaseEvent` and are defined in `packages/agent/src/events/`.
 
-| Event Class                         | Event Name                       | Trigger                | Consumer            |
-| ----------------------------------- | -------------------------------- | ---------------------- | ------------------- |
-| `WorkCreatedEvent`             | `work.created`              | New work created  | Internal processing |
+| Event Class                    | Event Name                  | Trigger                | Consumer            |
+| ------------------------------ | --------------------------- | ---------------------- | ------------------- |
+| `WorkCreatedEvent`             | `work.created`              | New work created       | Internal processing |
 | `WorkGenerationCompletedEvent` | `work.generation.completed` | AI generation finishes | Cache cleanup       |
 
 ### Plugin Lifecycle Events
@@ -249,7 +249,7 @@ export class Notification {
 | -------------- | --------------------------------------- |
 | `ai_credits`   | AI credit depletion and provider errors |
 | `subscription` | Subscription-related notifications      |
-| `generation`   | Work generation status             |
+| `generation`   | Work generation status                  |
 | `system`       | System-level messages                   |
 | `security`     | Security alerts (auth expiration)       |
 
@@ -273,13 +273,13 @@ Provides CRUD operations with deduplication and lifecycle management:
 
 **Convenience methods** for common notification scenarios:
 
-| Method                                                             | Category     | Persistent |
-| ------------------------------------------------------------------ | ------------ | ---------- |
-| `notifyAiCreditsDepleted(userId, provider)`                        | `ai_credits` | Yes        |
-| `notifyAiProviderError(userId, provider, message)`                 | `ai_credits` | No         |
+| Method                                                        | Category     | Persistent |
+| ------------------------------------------------------------- | ------------ | ---------- |
+| `notifyAiCreditsDepleted(userId, provider)`                   | `ai_credits` | Yes        |
+| `notifyAiProviderError(userId, provider, message)`            | `ai_credits` | No         |
 | `notifyGenerationAccountError(userId, workId, name, message)` | `generation` | No         |
 | `notifySchedulePaused(userId, workId, name, reason)`          | `generation` | No         |
-| `notifyGitAuthExpired(userId, provider)`                           | `security`   | Yes        |
+| `notifyGitAuthExpired(userId, provider)`                      | `security`   | Yes        |
 
 ### Deduplication
 
@@ -362,18 +362,18 @@ PluginSettingsService.upsertSettings()
 
 ## Source Files
 
-| File                                                                | Purpose                          |
-| ------------------------------------------------------------------- | -------------------------------- |
-| `apps/api/src/events/index.ts`                                      | User lifecycle event definitions |
-| `apps/api/src/mail/mail.service.ts`                                 | Email event consumers            |
-| `apps/api/src/works/tasks/work-cleanup.service.ts`       | Generation event consumer        |
-| `apps/api/src/notifications/notifications.controller.ts`            | Notification REST API            |
-| `apps/api/src/auth/services/auth.service.ts`                        | User event emitter               |
-| `apps/api/src/api.module.ts`                                        | EventEmitterModule registration  |
-| `packages/agent/src/events/base.ts`                                 | Base event class                 |
+| File                                                           | Purpose                          |
+| -------------------------------------------------------------- | -------------------------------- |
+| `apps/api/src/events/index.ts`                                 | User lifecycle event definitions |
+| `apps/api/src/mail/mail.service.ts`                            | Email event consumers            |
+| `apps/api/src/works/tasks/work-cleanup.service.ts`             | Generation event consumer        |
+| `apps/api/src/notifications/notifications.controller.ts`       | Notification REST API            |
+| `apps/api/src/auth/services/auth.service.ts`                   | User event emitter               |
+| `apps/api/src/api.module.ts`                                   | EventEmitterModule registration  |
+| `packages/agent/src/events/base.ts`                            | Base event class                 |
 | `packages/agent/src/events/work-generation-completed.event.ts` | Generation completed event       |
-| `packages/agent/src/events/work-created.event.ts`              | Work created event          |
-| `packages/agent/src/plugins/plugins.constants.ts`                   | Plugin event constants           |
-| `packages/agent/src/notifications/notification.service.ts`          | Notification business logic      |
-| `packages/agent/src/entities/notification.entity.ts`                | Notification database entity     |
-| `packages/agent/src/entities/notification.types.ts`                 | Notification types and enums     |
+| `packages/agent/src/events/work-created.event.ts`              | Work created event               |
+| `packages/agent/src/plugins/plugins.constants.ts`              | Plugin event constants           |
+| `packages/agent/src/notifications/notification.service.ts`     | Notification business logic      |
+| `packages/agent/src/entities/notification.entity.ts`           | Notification database entity     |
+| `packages/agent/src/entities/notification.types.ts`            | Notification types and enums     |

@@ -35,10 +35,10 @@ WorkAdvancedPromptsRepository
 
 Retrieves the custom prompts for a work. Requires at least viewer access.
 
-| Parameter     | Type     | Description              |
-| ------------- | -------- | ------------------------ |
-| `workId` | `string` | The work ID         |
-| `userId`      | `string` | The requesting user's ID |
+| Parameter | Type     | Description              |
+| --------- | -------- | ------------------------ |
+| `workId`  | `string` | The work ID              |
+| `userId`  | `string` | The requesting user's ID |
 
 **Returns:** `Promise<WorkAdvancedPromptsResponseDto>`
 
@@ -46,11 +46,11 @@ Retrieves the custom prompts for a work. Requires at least viewer access.
 
 Creates or updates the custom prompts. Requires editor access.
 
-| Parameter     | Type                                | Description              |
-| ------------- | ----------------------------------- | ------------------------ |
-| `workId` | `string`                            | The work ID         |
-| `dto`         | `UpdateWorkAdvancedPromptsDto` | Prompt fields to set     |
-| `userId`      | `string`                            | The requesting user's ID |
+| Parameter | Type                           | Description              |
+| --------- | ------------------------------ | ------------------------ |
+| `workId`  | `string`                       | The work ID              |
+| `dto`     | `UpdateWorkAdvancedPromptsDto` | Prompt fields to set     |
+| `userId`  | `string`                       | The requesting user's ID |
 
 **Returns:** `Promise<WorkAdvancedPromptsResponseDto>`
 
@@ -58,9 +58,9 @@ Creates or updates the custom prompts. Requires editor access.
 
 Internal method for the generation pipeline. No authentication check -- used by background jobs and internal services.
 
-| Parameter     | Type     | Description      |
-| ------------- | -------- | ---------------- |
-| `workId` | `string` | The work ID |
+| Parameter | Type     | Description |
+| --------- | -------- | ----------- |
+| `workId`  | `string` | The work ID |
 
 **Returns:** `Promise<WorkAdvancedPrompts | null>`
 
@@ -68,10 +68,10 @@ Internal method for the generation pipeline. No authentication check -- used by 
 
 Deletes all custom prompts for a work, resetting to platform defaults. Requires editor access.
 
-| Parameter     | Type     | Description              |
-| ------------- | -------- | ------------------------ |
-| `workId` | `string` | The work ID         |
-| `userId`      | `string` | The requesting user's ID |
+| Parameter | Type     | Description              |
+| --------- | -------- | ------------------------ |
+| `workId`  | `string` | The work ID              |
+| `userId`  | `string` | The requesting user's ID |
 
 **Returns:** `Promise<boolean>`
 
@@ -79,15 +79,15 @@ Deletes all custom prompts for a work, resetting to platform defaults. Requires 
 
 Each prompt field corresponds to a specific stage in the AI generation pipeline:
 
-| Field                 | Pipeline Stage         | Description                                                                               |
-| --------------------- | ---------------------- | ----------------------------------------------------------------------------------------- |
+| Field                 | Pipeline Stage         | Description                                                                          |
+| --------------------- | ---------------------- | ------------------------------------------------------------------------------------ |
 | `relevanceAssessment` | Item relevance scoring | Custom instructions for evaluating whether a discovered item is relevant to the work |
-| `itemGeneration`      | Item creation          | Custom instructions for how items should be generated (tone, detail level, format)        |
-| `itemExtraction`      | Content extraction     | Custom rules for extracting structured data from web pages                                |
-| `searchQuery`         | Web search             | Custom instructions for generating search queries to discover new items                   |
-| `categorization`      | Category assignment    | Custom rules for assigning items to categories                                            |
-| `deduplication`       | Duplicate detection    | Custom criteria for determining when two items are duplicates                             |
-| `sourceValidation`    | Source URL validation  | Custom rules for validating whether a source URL is acceptable                            |
+| `itemGeneration`      | Item creation          | Custom instructions for how items should be generated (tone, detail level, format)   |
+| `itemExtraction`      | Content extraction     | Custom rules for extracting structured data from web pages                           |
+| `searchQuery`         | Web search             | Custom instructions for generating search queries to discover new items              |
+| `categorization`      | Category assignment    | Custom rules for assigning items to categories                                       |
+| `deduplication`       | Duplicate detection    | Custom criteria for determining when two items are duplicates                        |
+| `sourceValidation`    | Source URL validation  | Custom rules for validating whether a source URL is acceptable                       |
 
 ## Implementation Details
 
@@ -118,12 +118,12 @@ When a work is deleted, advanced prompts are automatically removed via database 
 
 ## Database Interactions
 
-| Repository                           | Method                          | Purpose                      |
-| ------------------------------------ | ------------------------------- | ---------------------------- |
-| `WorkAdvancedPromptsRepository` | `findByWorkId`             | Load prompts for a work |
-| `WorkAdvancedPromptsRepository` | `createOrUpdate`                | Upsert prompt configuration  |
-| `WorkAdvancedPromptsRepository` | `delete`                        | Remove prompt configuration  |
-| `WorkOwnershipService`          | `ensureAccess`, `ensureCanEdit` | Authorization checks         |
+| Repository                      | Method                          | Purpose                     |
+| ------------------------------- | ------------------------------- | --------------------------- |
+| `WorkAdvancedPromptsRepository` | `findByWorkId`                  | Load prompts for a work     |
+| `WorkAdvancedPromptsRepository` | `createOrUpdate`                | Upsert prompt configuration |
+| `WorkAdvancedPromptsRepository` | `delete`                        | Remove prompt configuration |
+| `WorkOwnershipService`          | `ensureAccess`, `ensureCanEdit` | Authorization checks        |
 
 ## Event System
 
@@ -133,7 +133,7 @@ This service does not emit or consume events.
 
 | Scenario                 | Behavior                                           |
 | ------------------------ | -------------------------------------------------- |
-| Work not found      | `NotFoundException` thrown by ownership service    |
+| Work not found           | `NotFoundException` thrown by ownership service    |
 | Insufficient permissions | `ForbiddenException` thrown by ownership service   |
 | No prompts configured    | Returns response DTO with all fields set to `null` |
 | Prompt text too long     | Rejected at DTO validation layer (max 2,000 chars) |

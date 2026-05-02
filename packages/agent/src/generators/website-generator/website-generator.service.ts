@@ -86,11 +86,7 @@ export class WebsiteGeneratorService {
         }
     }
 
-    private async duplicate(
-        work: Work,
-        user: User,
-        options: WebsiteGenerationOptions = {},
-    ) {
+    private async duplicate(work: Work, user: User, options: WebsiteGenerationOptions = {}) {
         throwIfGenerationCancelled(options.signal);
 
         const workOwner = getWorkOwner(work);
@@ -155,12 +151,7 @@ export class WebsiteGeneratorService {
         );
 
         // Remove origin and add new one pointing to target
-        await this.gitFacade.replaceRemote(
-            work.gitProvider,
-            templateDir,
-            'origin',
-            targetCloneUrl,
-        );
+        await this.gitFacade.replaceRemote(work.gitProvider, templateDir, 'origin', targetCloneUrl);
 
         // Push to target
         await this.gitFacade.push(
@@ -261,26 +252,18 @@ export class WebsiteGeneratorService {
     }
 
     /** Sync all branches from template to work's website repo */
-    async syncAllBranchesFromTemplate(
-        work: Work,
-        user: User,
-        cleanupExtraBranches = false,
-    ) {
+    async syncAllBranchesFromTemplate(work: Work, user: User, cleanupExtraBranches = false) {
         return this.branchSyncService.syncFromTemplate(work, user, cleanupExtraBranches);
     }
 
     async removeRepository(work: Work, _user: User): Promise<void> {
         const workOwner = getWorkOwner(work);
 
-        await this.gitFacade.deleteRepository(
-            work.getRepoOwner('website'),
-            work.getWebsiteRepo(),
-            {
-                userId: workOwner.id,
-                providerId: work.gitProvider,
-                workId: work.id,
-            },
-        );
+        await this.gitFacade.deleteRepository(work.getRepoOwner('website'), work.getWebsiteRepo(), {
+            userId: workOwner.id,
+            providerId: work.gitProvider,
+            workId: work.id,
+        });
     }
 
     public cleanup(work: Work) {

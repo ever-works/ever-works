@@ -57,14 +57,14 @@ Unlike other pipeline plugins that orchestrate multiple internal steps with faca
 
 The plugin runs 6 sequential steps:
 
-| Step | ID                    | Description                                                                   | Duration |
-| ---- | --------------------- | ----------------------------------------------------------------------------- | -------- |
-| 1    | `setup-claude-code`   | Downloads and caches the Claude Code CLI binary for the configured version    | ~5s      |
-| 2    | `prepare-context`     | Creates a temp workspace, seeds it with existing items and work metadata | ~2s      |
-| 3    | `generate-items`      | Runs the Claude Code CLI to research and generate items as JSON files         | ~60-180s |
-| 4    | `collect-results`     | Reads generated JSON files from the workspace work                       | ~2s      |
-| 5    | `capture-screenshots` | Takes screenshots for items that need images (optional)                       | ~30s     |
-| 6    | `cleanup`             | Removes the temporary workspace work                                     | ~1s      |
+| Step | ID                    | Description                                                                | Duration |
+| ---- | --------------------- | -------------------------------------------------------------------------- | -------- |
+| 1    | `setup-claude-code`   | Downloads and caches the Claude Code CLI binary for the configured version | ~5s      |
+| 2    | `prepare-context`     | Creates a temp workspace, seeds it with existing items and work metadata   | ~2s      |
+| 3    | `generate-items`      | Runs the Claude Code CLI to research and generate items as JSON files      | ~60-180s |
+| 4    | `collect-results`     | Reads generated JSON files from the workspace work                         | ~2s      |
+| 5    | `capture-screenshots` | Takes screenshots for items that need images (optional)                    | ~30s     |
+| 6    | `cleanup`             | Removes the temporary workspace work                                       | ~1s      |
 
 ## Configuration
 

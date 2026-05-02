@@ -80,25 +80,25 @@ export interface DatabaseConfig {
 
 **ENTITIES array**: A centralized list of all 18 TypeORM entities registered with the DataSource:
 
-| Entity                       | Table                          |
-| ---------------------------- | ------------------------------ |
-| `User`                       | `users`                        |
-| `Work`                  | `works`                  |
+| Entity                  | Table                     |
+| ----------------------- | ------------------------- |
+| `User`                  | `users`                   |
+| `Work`                  | `works`                   |
 | `WorkAdvancedPrompts`   | `work_advanced_prompts`   |
 | `WorkCustomDomain`      | `work_custom_domains`     |
 | `WorkMember`            | `work_members`            |
 | `WorkGenerationHistory` | `work_generation_history` |
 | `WorkSchedule`          | `work_schedules`          |
-| `ApiKey`                     | `api_keys`                     |
-| `RefreshToken`               | `refresh_tokens`               |
-| `OAuthToken`                 | `oauth_tokens`                 |
-| `SubscriptionPlan`           | `subscription_plans`           |
-| `UserSubscription`           | `user_subscriptions`           |
-| `UsageLedgerEntry`           | `usage_ledger`                 |
-| `Notification`               | `notifications`                |
-| `CacheEntry`                 | `cache_entries`                |
-| `PluginEntity`               | `plugins`                      |
-| `UserPluginEntity`           | `user_plugins`                 |
+| `ApiKey`                | `api_keys`                |
+| `RefreshToken`          | `refresh_tokens`          |
+| `OAuthToken`            | `oauth_tokens`            |
+| `SubscriptionPlan`      | `subscription_plans`      |
+| `UserSubscription`      | `user_subscriptions`      |
+| `UsageLedgerEntry`      | `usage_ledger`            |
+| `Notification`          | `notifications`           |
+| `CacheEntry`            | `cache_entries`           |
+| `PluginEntity`          | `plugins`                 |
+| `UserPluginEntity`      | `user_plugins`            |
 | `WorkPluginEntity`      | `work_plugins`            |
 
 The factory reads environment variables to determine the database type:

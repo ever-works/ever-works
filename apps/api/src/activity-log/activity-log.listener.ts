@@ -44,8 +44,9 @@ export class ActivityLogListener {
     async onGenerationCompleted(event: WorkGenerationCompletedEvent) {
         try {
             const work = event.work;
-            const latestHistory =
-                await this.generationHistoryRepository.findLatestCompletedByWork(work.id);
+            const latestHistory = await this.generationHistoryRepository.findLatestCompletedByWork(
+                work.id,
+            );
             const status = this.activityLogService.resolveGenerationActivityStatus(work);
             const summary = this.activityLogService.formatGenerationCompletionSummary(
                 work,
@@ -59,13 +60,12 @@ export class ActivityLogListener {
                 generateStatus: work.generateStatus,
             };
 
-            const inProgressEntry =
-                await this.activityLogService.findLatestByUserWorkActionStatus({
-                    userId: work.userId,
-                    workId: work.id,
-                    actionType: ActivityActionType.GENERATION,
-                    status: ActivityStatus.IN_PROGRESS,
-                });
+            const inProgressEntry = await this.activityLogService.findLatestByUserWorkActionStatus({
+                userId: work.userId,
+                workId: work.id,
+                actionType: ActivityActionType.GENERATION,
+                status: ActivityStatus.IN_PROGRESS,
+            });
 
             if (inProgressEntry) {
                 await this.activityLogService.updateStatus(inProgressEntry.id, status, details, {

@@ -1,8 +1,5 @@
 import { Module } from '@nestjs/common';
-import {
-    WorkScheduleDispatcherService,
-    WorkScheduleService,
-} from '@ever-works/agent/services';
+import { WorkScheduleDispatcherService, WorkScheduleService } from '@ever-works/agent/services';
 import { TriggerInternalApiClient } from '../services/trigger-internal-api.client';
 import { createRemoteProxy } from '../remote-proxy';
 
@@ -22,10 +19,6 @@ import { createRemoteProxy } from '../remote-proxy';
             inject: [TriggerInternalApiClient],
         },
     ],
-    exports: [
-        TriggerInternalApiClient,
-        WorkScheduleDispatcherService,
-        WorkScheduleService,
-    ],
+    exports: [TriggerInternalApiClient, WorkScheduleDispatcherService, WorkScheduleService],
 })
 export class TriggerInternalModule {}

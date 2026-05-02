@@ -365,9 +365,7 @@ export function ActivityTable({ activities, loading, onStopRequested }: Activity
                                         <td className="px-4 py-3 text-xs">
                                             {activity.work ? (
                                                 <Link
-                                                    href={ROUTES.DASHBOARD_WORK(
-                                                        activity.workId!,
-                                                    )}
+                                                    href={ROUTES.DASHBOARD_WORK(activity.workId!)}
                                                     className="text-primary text-xs hover:underline font-medium"
                                                     onClick={(e) => e.stopPropagation()}
                                                 >

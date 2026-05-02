@@ -135,8 +135,8 @@ Each notification displays an icon based on its type, a title, a message body, a
 
 **File:** `apps/web/src/components/dashboard/StatsOverview.tsx`
 
-| Prop               | Type                | Description                      |
-| ------------------ | ------------------- | -------------------------------- |
+| Prop         | Type                | Description                |
+| ------------ | ------------------- | -------------------------- |
 | `totalWorks` | `number` (optional) | Number of works to display |
 
 Renders a grid of three stat cards: Total Works, Total Items, and Active Websites. Each card has a custom SVG icon, a decorative gradient background circle, and displays its count with a muted subtitle. The `totalItems` and `activeWebsites` values are currently computed as multiples of `totalWorks`.

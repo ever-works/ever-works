@@ -54,13 +54,13 @@ This document describes the issues found and the fixes applied.
 
 **Fix:** Added `WorkOwnershipService` injection to `PluginsController` and added ownership checks to all work-scoped endpoints:
 
-| Route                                       | Guard           |
-| ------------------------------------------- | --------------- |
-| `GET /api/works/:workId/plugins` | `ensureCanView` |
-| `POST .../plugins/:pluginId/enable`         | `ensureCanEdit` |
-| `POST .../plugins/:pluginId/disable`        | `ensureCanEdit` |
-| `PATCH .../plugins/:pluginId/settings`      | `ensureCanEdit` |
-| `POST .../plugins/:pluginId/capability`     | `ensureCanEdit` |
+| Route                                   | Guard           |
+| --------------------------------------- | --------------- |
+| `GET /api/works/:workId/plugins`        | `ensureCanView` |
+| `POST .../plugins/:pluginId/enable`     | `ensureCanEdit` |
+| `POST .../plugins/:pluginId/disable`    | `ensureCanEdit` |
+| `PATCH .../plugins/:pluginId/settings`  | `ensureCanEdit` |
+| `POST .../plugins/:pluginId/capability` | `ensureCanEdit` |
 
 **Files modified:**
 

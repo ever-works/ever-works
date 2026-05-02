@@ -1854,11 +1854,7 @@ describe('GitFacadeService', () => {
             authAccountRepository.findProviderAccount.mockResolvedValue(null);
             settingsService.getResolvedSettings.mockResolvedValue(
                 createMockResolvedSettings({
-                    accessToken: createMockResolvedSetting(
-                        'accessToken',
-                        'work-pat-token',
-                        'work',
-                    ),
+                    accessToken: createMockResolvedSetting('accessToken', 'work-pat-token', 'work'),
                 }),
             );
 

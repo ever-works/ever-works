@@ -12,10 +12,7 @@ import type { Category } from '@ever-works/contracts';
 import { slugifyText } from '../utils/text.utils';
 import { DataRepository } from '../generators/data-generator/data-repository';
 import { GenerateStatusType } from '../entities/types';
-import {
-    WorkHistoryActivityType,
-    type WorkHistoryChangeEntry,
-} from '@ever-works/contracts/api';
+import { WorkHistoryActivityType, type WorkHistoryChangeEntry } from '@ever-works/contracts/api';
 import { buildWorkChangelog } from '../utils/work-changelog.utils';
 
 const MAX_PROCESSED_PR_NUMBERS = 500;
@@ -233,11 +230,7 @@ export class CommunityPrProcessorService {
                 });
 
                 if (totalItemsAdded > 0) {
-                    await this.workRepository.increment(
-                        work.id,
-                        'itemsCount',
-                        totalItemsAdded,
-                    );
+                    await this.workRepository.increment(work.id, 'itemsCount', totalItemsAdded);
                 }
 
                 return totalItemsAdded;

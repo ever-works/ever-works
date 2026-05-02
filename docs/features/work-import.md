@@ -168,7 +168,7 @@ The entire link existing operation completes **synchronously**. The API returns 
 | --------------- | --------------------------------------- | ---------------------------------------------- |
 | Data movement   | None — references the existing repo     | Clones or generates data into new repos        |
 | Processing      | Synchronous, instant                    | Asynchronous via Trigger.dev                   |
-| Work owner | Source repo's owner                     | User's configured git account                  |
+| Work owner      | Source repo's owner                     | User's configured git account                  |
 | Sync support    | No automatic sync schedule              | Yes (weekly for Awesome README)                |
 | Slug conflicts  | Not resolved (no new data repo created) | Auto-resolved with numeric suffixes            |
 | Generate status | Set to `GENERATED` immediately          | Transitions through `GENERATING` → `GENERATED` |
@@ -273,8 +273,8 @@ All endpoints require JWT authentication.
 
 Detect what import type a repository URL supports before importing.
 
-| Method | Endpoint                          |
-| ------ | --------------------------------- |
+| Method | Endpoint                    |
+| ------ | --------------------------- |
 | `POST` | `/api/works/import/analyze` |
 
 **Request body:**
@@ -290,16 +290,16 @@ The response includes `detectedType` (`data_repo`, `awesome_readme`, or `null`),
 
 Check whether a repository can be linked (verifies write access and detects companion repos).
 
-| Method | Endpoint                                      |
-| ------ | --------------------------------------------- |
+| Method | Endpoint                                |
+| ------ | --------------------------------------- |
 | `POST` | `/api/works/import/analyze-for-linking` |
 
 The response includes `canLink`, `hasWriteAccess`, and `relatedRepos` showing which companion repos (data, markdown, website) already exist.
 
 ### Start Import
 
-| Method | Endpoint                  |
-| ------ | ------------------------- |
+| Method | Endpoint            |
+| ------ | ------------------- |
 | `POST` | `/api/works/import` |
 
 **Request body:**
@@ -308,7 +308,7 @@ The response includes `canLink`, `hasWriteAccess`, and `relatedRepos` showing wh
 | -------------------- | ------- | -------- | -------------------------------------------------------------------------------- |
 | `sourceUrl`          | string  | Yes      | Full URL to the source repository                                                |
 | `sourceType`         | string  | Yes      | `data_repo`, `awesome_readme`, or `link_existing`                                |
-| `name`               | string  | Yes      | Work name (max 100 characters)                                              |
+| `name`               | string  | Yes      | Work name (max 100 characters)                                                   |
 | `gitProvider`        | string  | Yes      | Git provider ID, e.g., `github`                                                  |
 | `owner`              | string  | No       | Git account/org to create repos under (defaults to your username)                |
 | `organization`       | boolean | No       | Whether `owner` is an organization                                               |
@@ -323,8 +323,8 @@ Returns `202 Accepted` for `data_repo`/`awesome_readme` (async), `200 OK` for `l
 
 Browse your git repositories to find one to import.
 
-| Method | Endpoint                               |
-| ------ | -------------------------------------- |
+| Method | Endpoint                         |
+| ------ | -------------------------------- |
 | `GET`  | `/api/works/import/repositories` |
 
 **Query parameters:**

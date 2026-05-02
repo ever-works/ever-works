@@ -208,10 +208,7 @@ export class WorksController {
     @ApiOperation({ summary: 'Create work', description: 'Create a new work' })
     @ApiResponse({ status: 200, description: 'Work created successfully' })
     @ApiResponse({ status: 400, description: 'Invalid input data' })
-    async createWork(
-        @CurrentUser() auth: AuthenticatedUser,
-        @Body() createWorkDto: CreateWorkDto,
-    ) {
+    async createWork(@CurrentUser() auth: AuthenticatedUser, @Body() createWorkDto: CreateWorkDto) {
         const user = await this.authService.getUser(auth.userId);
         return this.workLifecycleService.createWork(createWorkDto, user);
     }
@@ -241,11 +238,7 @@ export class WorksController {
         @Body() updateWorkDto: UpdateWorkDto,
     ) {
         const user = await this.authService.getUser(auth.userId);
-        const result = await this.workLifecycleService.updateWork(
-            id,
-            updateWorkDto,
-            user,
-        );
+        const result = await this.workLifecycleService.updateWork(id, updateWorkDto, user);
         this.activityLogService
             .log({
                 userId: auth.userId,
@@ -351,10 +344,7 @@ export class WorksController {
     })
     @ApiParam({ name: 'id', description: 'Work ID' })
     @ApiResponse({ status: 200, description: 'Categories and tags' })
-    async getWorkCategoriesTags(
-        @CurrentUser() auth: AuthenticatedUser,
-        @Param('id') id: string,
-    ) {
+    async getWorkCategoriesTags(@CurrentUser() auth: AuthenticatedUser, @Param('id') id: string) {
         const cacheKey = getWorkCategoriesTagsCacheKey(id, auth.userId);
 
         return this.cacheManager.wrap(
@@ -497,12 +487,7 @@ export class WorksController {
             })
             .catch(() => {});
 
-        return this.workGenerationService.generateItems(
-            id,
-            createItemsGeneratorDto,
-            user,
-            false,
-        );
+        return this.workGenerationService.generateItems(id, createItemsGeneratorDto, user, false);
     }
 
     @Post('works/:id/update')
@@ -588,16 +573,9 @@ export class WorksController {
         @Body() updateScheduleDto: UpdateWorkScheduleDto,
     ) {
         const user = await this.authService.getUser(auth.userId);
-        const schedule = await this.workScheduleService.updateSchedule(
-            id,
-            updateScheduleDto,
-            user,
-        );
+        const schedule = await this.workScheduleService.updateSchedule(id, updateScheduleDto, user);
 
-        if (
-            updateScheduleDto.runImmediately &&
-            schedule.status === WorkScheduleStatus.ACTIVE
-        ) {
+        if (updateScheduleDto.runImmediately && schedule.status === WorkScheduleStatus.ACTIVE) {
             const scheduleEntity = await this.workScheduleService.getScheduleEntity(id, user);
             await this.workGenerationService.runScheduledUpdate(scheduleEntity);
         }
@@ -749,11 +727,7 @@ export class WorksController {
         @Body() updateItemDto: UpdateItemDto,
     ) {
         const user = await this.authService.getUser(auth.userId);
-        const result = await this.workGenerationService.updateItemMetadata(
-            id,
-            updateItemDto,
-            user,
-        );
+        const result = await this.workGenerationService.updateItemMetadata(id, updateItemDto, user);
         await this.invalidateWorkCaches(id);
 
         this.activityLogService
@@ -1064,11 +1038,7 @@ export class WorksController {
         @Body() deleteWorkDto: DeleteWorkDto,
     ): Promise<DeleteWorkResponseDto> {
         const user = await this.authService.getUser(auth.userId);
-        const result = await this.workLifecycleService.deleteWork(
-            id,
-            deleteWorkDto,
-            user,
-        );
+        const result = await this.workLifecycleService.deleteWork(id, deleteWorkDto, user);
         this.activityLogService
             .log({
                 userId: auth.userId,
@@ -1321,11 +1291,7 @@ export class WorksController {
         @Param('id') id: string,
         @Param('categoryId') categoryId: string,
     ) {
-        const result = await this.workTaxonomyService.deleteCategory(
-            id,
-            categoryId,
-            auth.userId,
-        );
+        const result = await this.workTaxonomyService.deleteCategory(id, categoryId, auth.userId);
         await this.invalidateWorkCaches(id);
 
         this.activityLogService
@@ -1523,9 +1489,7 @@ export class WorksController {
             throw new NotFoundException('Work not found');
         }
         if (!work.communityPrEnabled) {
-            throw new BadRequestException(
-                'Community PR processing is not enabled for this work.',
-            );
+            throw new BadRequestException('Community PR processing is not enabled for this work.');
         }
 
         const itemsAdded = await this.communityPrProcessorService.processWork(work);

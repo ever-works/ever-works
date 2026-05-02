@@ -204,9 +204,7 @@ async function showWorkPluginActions(
             break;
         case 'settings_disabled':
             console.log(
-                chalk.yellow(
-                    '\nEnable this plugin for the work first to configure its settings.',
-                ),
+                chalk.yellow('\nEnable this plugin for the work first to configure its settings.'),
             );
             break;
     }
@@ -228,10 +226,7 @@ async function showWorkPluginActions(
     }
 }
 
-async function handleWorkEnable(
-    workId: string,
-    plugin: WorkPluginResponse,
-): Promise<void> {
+async function handleWorkEnable(workId: string, plugin: WorkPluginResponse): Promise<void> {
     const apiService = getApiService();
 
     const data: { activeCapability?: string } = {};
@@ -258,10 +253,7 @@ async function handleWorkEnable(
     }
 }
 
-async function handleWorkDisable(
-    workId: string,
-    plugin: WorkPluginResponse,
-): Promise<void> {
+async function handleWorkDisable(workId: string, plugin: WorkPluginResponse): Promise<void> {
     const apiService = getApiService();
 
     const { confirm } = await inquirer.prompt([
@@ -288,10 +280,7 @@ async function handleWorkDisable(
     }
 }
 
-async function handleSetCapability(
-    workId: string,
-    plugin: WorkPluginResponse,
-): Promise<void> {
+async function handleSetCapability(workId: string, plugin: WorkPluginResponse): Promise<void> {
     const apiService = getApiService();
     const activeCapabilities = getActiveCapabilities(plugin);
     const defaultCapability = getDefaultActiveCapability(plugin);
@@ -319,10 +308,7 @@ async function handleSetCapability(
     }
 }
 
-async function handleWorkSettings(
-    workId: string,
-    plugin: WorkPluginResponse,
-): Promise<void> {
+async function handleWorkSettings(workId: string, plugin: WorkPluginResponse): Promise<void> {
     const apiService = getApiService();
 
     // Fetch user-level plugin for fallback settings

@@ -669,10 +669,7 @@ export class PluginOperationsService {
     /**
      * List plugins for a work with work-specific status
      */
-    async listWorkPlugins(
-        workId: string,
-        userId: string,
-    ): Promise<WorkPluginListResponse> {
+    async listWorkPlugins(workId: string, userId: string): Promise<WorkPluginListResponse> {
         const allPlugins = this.pluginRegistryService.getAll();
 
         // Filter: visible + applicable to work scope
@@ -1442,9 +1439,7 @@ export class PluginOperationsService {
     ): Promise<WorkPluginResponse> {
         const userResponse = this.toUserPluginResponse(registered, userPlugin);
         const rawWorkSettings = this.maskSecretSettings(
-            workPlugin
-                ? { ...workPlugin.settings, ...workPlugin.secretSettings }
-                : undefined,
+            workPlugin ? { ...workPlugin.settings, ...workPlugin.secretSettings } : undefined,
             registered.plugin.settingsSchema,
         );
         const [resolvedSettings, models, workSettings] = options
@@ -1699,10 +1694,7 @@ export class PluginOperationsService {
      * Throws ForbiddenException if the plugin is admin-only and the caller is trying
      * to modify settings at user or work scope.
      */
-    private enforceConfigurationMode(
-        registered: RegisteredPlugin,
-        scope: 'user' | 'work',
-    ): void {
+    private enforceConfigurationMode(registered: RegisteredPlugin, scope: 'user' | 'work'): void {
         const configMode = registered.plugin.configurationMode || 'hybrid';
         if (configMode === 'admin-only') {
             throw new ForbiddenException(

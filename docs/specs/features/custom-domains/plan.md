@@ -51,8 +51,8 @@ Migration: additive, with composite index `(workId, domain)`.
 
 ## 4. API Surface
 
-| Method   | Endpoint                                             | Description          |
-| -------- | ---------------------------------------------------- | -------------------- |
+| Method   | Endpoint                                       | Description          |
+| -------- | ---------------------------------------------- | -------------------- |
 | `GET`    | `/api/deploy/works/:id/domains`                | List domains         |
 | `POST`   | `/api/deploy/works/:id/domains`                | Add domain           |
 | `DELETE` | `/api/deploy/works/:id/domains/:domain`        | Remove domain        |

@@ -87,13 +87,9 @@ export class DomainDetectionStep extends BasePipelineStep {
 				this.accumulateMetrics(metrics, usage, cost);
 			}
 
-			logger.log(
-				`[${work.slug}] Domain Detection Complete: ${result.domain_type} (conf=${result.confidence})`
-			);
+			logger.log(`[${work.slug}] Domain Detection Complete: ${result.domain_type} (conf=${result.confidence})`);
 		} catch (error) {
-			logger.error(
-				`[${work.slug}] Domain detection failed, defaulting to software. ${this.formatError(error)}`
-			);
+			logger.error(`[${work.slug}] Domain detection failed, defaulting to software. ${this.formatError(error)}`);
 			context.domainAnalysis = {
 				domain_type: 'software' as DomainType,
 				confidence: 0

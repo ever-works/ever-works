@@ -106,7 +106,7 @@ The interceptor sets these on every event automatically:
 | -------------- | -------------------------------------------------------- |
 | `app`          | `ever-works-api` / `ever-works-mcp` / `trigger-worker`   |
 | `userId`       | `req.user.userId` if authenticated                       |
-| `workId`  | Route param when present                                 |
+| `workId`       | Route param when present                                 |
 | `pluginId`     | Set by facade interceptors when routing through a plugin |
 | `pipelineStep` | Set by the pipeline executor on step events              |
 | `triggerRunId` | Set by the Trigger.dev task wrapper                      |
@@ -154,11 +154,11 @@ PostHog is **product analytics**, not error tracking. It receives:
 
 snake_case, derived from `ActivityActionType`:
 
-| `ActivityActionType`  | PostHog event name    |
-| --------------------- | --------------------- |
-| `DIRECTORY_GENERATED` | `work_generated` |
-| `ITEM_ADDED`          | `item_added`          |
-| `OAUTH_LINKED`        | `oauth_linked`        |
+| `ActivityActionType`  | PostHog event name |
+| --------------------- | ------------------ |
+| `DIRECTORY_GENERATED` | `work_generated`   |
+| `ITEM_ADDED`          | `item_added`       |
+| `OAUTH_LINKED`        | `oauth_linked`     |
 
 Event properties mirror the row's `details` block but **with PII
 stripped** (no email, no IP, no user-agent — only `userId`, opaque

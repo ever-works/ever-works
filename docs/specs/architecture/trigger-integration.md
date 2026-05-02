@@ -110,9 +110,9 @@ generic-RPC endpoint) is described in §6.
 `packages/tasks/src/tasks/trigger/index.ts` ships exactly three tasks
 on `develop`:
 
-| Task                            | Type     | maxDuration | Purpose                                                        |
-| ------------------------------- | -------- | ----------- | -------------------------------------------------------------- |
-| `work-generation`          | One-shot | 5 hours     | Full Standard / Agent / CLI pipeline run for a work       |
+| Task                       | Type     | maxDuration | Purpose                                                        |
+| -------------------------- | -------- | ----------- | -------------------------------------------------------------- |
+| `work-generation`          | One-shot | 5 hours     | Full Standard / Agent / CLI pipeline run for a work            |
 | `work-import`              | One-shot | 2 hours     | Awesome README / existing repo import + post-processing        |
 | `work-schedule-dispatcher` | Cron     | (short)     | Polls due schedules every N minutes and dispatches generations |
 
@@ -429,12 +429,12 @@ shape.
 
 Three classes of terminal write keep this consistent:
 
-| Where written         | What it sets                                                                           |
-| --------------------- | -------------------------------------------------------------------------------------- |
-| Orchestrator main run | Success path: `GENERATED` on work + history; warnings + recent logs; stats deltas |
-| Orchestrator catch    | Cancel path: `CANCELLED`; Error path: `ERROR` + `errorMessage` + recent logs           |
-| Task `onFailure` hook | Last-resort `ERROR` write if the orchestrator itself crashed before its `catch` ran    |
-| Task `onCancel` hook  | Last-resort `CANCELLED` write if Trigger.dev cancels mid-orchestration                 |
+| Where written         | What it sets                                                                        |
+| --------------------- | ----------------------------------------------------------------------------------- |
+| Orchestrator main run | Success path: `GENERATED` on work + history; warnings + recent logs; stats deltas   |
+| Orchestrator catch    | Cancel path: `CANCELLED`; Error path: `ERROR` + `errorMessage` + recent logs        |
+| Task `onFailure` hook | Last-resort `ERROR` write if the orchestrator itself crashed before its `catch` ran |
+| Task `onCancel` hook  | Last-resort `CANCELLED` write if Trigger.dev cancels mid-orchestration              |
 
 The `BaseOrchestrator` exposes `handleFailure` and `handleCancellation`
 so both paths converge on the same `recordTerminalState` Promise.all
@@ -624,11 +624,11 @@ gracefully than fail dispatch.
 | Concern        | Where to look                                                                                         |
 | -------------- | ----------------------------------------------------------------------------------------------------- |
 | Run logs       | Trigger.dev dashboard (logger bridge surfaces every NestJS log line as run-scoped)                    |
-| Run status     | `WorkGenerationHistory` (status, error, recentLogs, durationInSeconds)                           |
-| User-facing UI | `apps/web` work page streams `recentLogs` + status from the history row                          |
+| Run status     | `WorkGenerationHistory` (status, error, recentLogs, durationInSeconds)                                |
+| User-facing UI | `apps/web` work page streams `recentLogs` + status from the history row                               |
 | Sentry events  | Worker process emits via the same MonitoringModule the API uses (see [`monitoring`](./monitoring.md)) |
-| PostHog events | `event.generation.completed` / `.failed` / `.cancelled` from `workOperations`                    |
-| Manual cancel  | `DELETE /api/works/:id/generation` → `runs.cancel(runId)`                                       |
+| PostHog events | `event.generation.completed` / `.failed` / `.cancelled` from `workOperations`                         |
+| Manual cancel  | `DELETE /api/works/:id/generation` → `runs.cancel(runId)`                                             |
 | Run dashboard  | `https://cloud.trigger.dev/orgs/.../projects/proj_uevrbfmpvojzzazvhffy/runs`                          |
 
 ## 14. File Index

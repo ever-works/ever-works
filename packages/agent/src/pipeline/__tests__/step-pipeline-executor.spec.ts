@@ -501,12 +501,7 @@ describe('StepPipelineExecutorService', () => {
                 },
             };
 
-            await service.execute(
-                standardPlugin,
-                mockWork,
-                requestWithProviders,
-                mockExisting,
-            );
+            await service.execute(standardPlugin, mockWork, requestWithProviders, mockExisting);
 
             // Verify facade service was called with provider overrides
             expect(facadeServiceMock.createStepExecutionContext).toHaveBeenCalledWith(

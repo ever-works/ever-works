@@ -5,10 +5,7 @@ import { MarkdownGeneratorService } from '@ever-works/agent/generators';
 import { WebsiteGeneratorService } from '@ever-works/agent/generators';
 import { Work, User, GenerateStatusType } from '@ever-works/agent/entities';
 import { CreateItemsGeneratorDto } from '@ever-works/agent/items-generator';
-import {
-    WorkOperationsService,
-    buildStatsUpdate,
-} from '@ever-works/agent/work-operations';
+import { WorkOperationsService, buildStatsUpdate } from '@ever-works/agent/work-operations';
 import { GenerationLogCollector } from '@ever-works/agent/generators';
 import { NotificationService } from '@ever-works/agent/notifications';
 import { normalizeGeneratorError } from '@ever-works/agent/services';

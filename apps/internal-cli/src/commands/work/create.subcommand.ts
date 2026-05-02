@@ -60,10 +60,7 @@ export class CreateSubCommand extends CommandRunner {
             loadingSpinner.stop();
 
             // Collect work information
-            const workData = await this.workPrompt.promptWorkCreation(
-                ghOwner.login,
-                orgs,
-            );
+            const workData = await this.workPrompt.promptWorkCreation(ghOwner.login, orgs);
 
             if (workData.cancelled) {
                 console.log(chalk.blue('\nℹ Work creation cancelled.'));

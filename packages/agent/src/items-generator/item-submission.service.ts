@@ -30,9 +30,7 @@ export class ItemSubmissionService {
         user: User,
         submitItemDto: SubmitItemDto,
     ): Promise<SubmitItemResponseDto> {
-        this.logger.debug(
-            `Submitting item for work: ${work.slug}, item: ${submitItemDto.name}`,
-        );
+        this.logger.debug(`Submitting item for work: ${work.slug}, item: ${submitItemDto.name}`);
 
         try {
             // Use work owner's credentials (they set up the repos)
@@ -378,12 +376,7 @@ export class ItemSubmissionService {
             const commitMessage = removeItemDto.reason
                 ? `Remove ${itemData.name} - ${removeItemDto.reason}`
                 : `Remove ${itemData.name}`;
-            await this.gitFacade.commit(
-                provider,
-                dest,
-                commitMessage,
-                work.resolveCommitter(user),
-            );
+            await this.gitFacade.commit(provider, dest, commitMessage, work.resolveCommitter(user));
 
             // Push changes
             await this.gitFacade.push(
@@ -563,12 +556,7 @@ export class ItemSubmissionService {
             const commitMessage = sourceUrlChanged
                 ? `Update ${updatedItem.name} source`
                 : `Update ${updatedItem.name} metadata`;
-            await this.gitFacade.commit(
-                provider,
-                dest,
-                commitMessage,
-                work.resolveCommitter(user),
-            );
+            await this.gitFacade.commit(provider, dest, commitMessage, work.resolveCommitter(user));
             await this.gitFacade.push(
                 { dir: dest },
                 {

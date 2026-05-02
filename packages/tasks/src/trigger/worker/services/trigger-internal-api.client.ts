@@ -21,10 +21,7 @@ export class TriggerInternalApiClient {
         }
     }
 
-    async fetchWorkContext(
-        workId: string,
-        userId: string,
-    ): Promise<WorkContextResponse> {
+    async fetchWorkContext(workId: string, userId: string): Promise<WorkContextResponse> {
         const searchParams = new URLSearchParams({ userId });
 
         return this.request<WorkContextResponse>({

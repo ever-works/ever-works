@@ -64,12 +64,12 @@ strings would silently miss handlers on rename.
 The events shipped today (in
 `packages/agent/src/events/`):
 
-| Event                               | `EVENT_NAME`                     | When                                                     |
-| ----------------------------------- | -------------------------------- | -------------------------------------------------------- |
-| `WorkCreatedEvent`             | `work.created`              | A new work has been persisted (any creation method) |
-| `WorkGenerationCompletedEvent` | `work.generation.completed` | A pipeline run finished successfully                     |
-| `WorksConfigSyncRequestedEvent`     | `works-config.sync.requested`    | A work mutation needs `works.yml` updated           |
-| `WorksConfigSyncFailedEvent`        | `works-config.sync.failed`       | A `works.yml` sync write failed                          |
+| Event                           | `EVENT_NAME`                  | When                                                |
+| ------------------------------- | ----------------------------- | --------------------------------------------------- |
+| `WorkCreatedEvent`              | `work.created`                | A new work has been persisted (any creation method) |
+| `WorkGenerationCompletedEvent`  | `work.generation.completed`   | A pipeline run finished successfully                |
+| `WorksConfigSyncRequestedEvent` | `works-config.sync.requested` | A work mutation needs `works.yml` updated           |
+| `WorksConfigSyncFailedEvent`    | `works-config.sync.failed`    | A `works.yml` sync write failed                     |
 
 Future events follow the same shape — a class extending `BaseEvent`,
 a static `EVENT_NAME`, a constructor capturing the relevant entities
@@ -125,10 +125,7 @@ export class WorksConfigSyncSubscriber {
 				dataRepository: event.dataRepository
 			});
 		} catch (error) {
-			this.events.emit(
-				WorksConfigSyncFailedEvent.EVENT_NAME,
-				new WorksConfigSyncFailedEvent(event.work, error)
-			);
+			this.events.emit(WorksConfigSyncFailedEvent.EVENT_NAME, new WorksConfigSyncFailedEvent(event.work, error));
 		}
 	}
 }
@@ -145,7 +142,7 @@ root with these flags:
 
 | Option              | Value  | Effect                                                  |
 | ------------------- | ------ | ------------------------------------------------------- |
-| `wildcard`          | `true` | Allows `work.*` style listeners                    |
+| `wildcard`          | `true` | Allows `work.*` style listeners                         |
 | `delimiter`         | `.`    | Dot-separated event names                               |
 | `maxListeners`      | 20     | Per-event soft cap; a warning logs at 80% capacity      |
 | `verboseMemoryLeak` | `true` | Logs the event name when the listener cap is approached |
@@ -208,9 +205,9 @@ Some platform features are implemented as event-sourced read models:
 
 | Read model           | Source events                                               |
 | -------------------- | ----------------------------------------------------------- |
-| Activity log         | All `work.*` events + auth + plan events               |
+| Activity log         | All `work.*` events + auth + plan events                    |
 | Notifications drawer | Subset of activity-log events that match `NotificationKind` |
-| `works.yml` sync     | `work.generation.completed` → write back               |
+| `works.yml` sync     | `work.generation.completed` → write back                    |
 | Cost reporting       | `pipeline:step-status-changed` with `aiUsage` accumulators  |
 
 Each read model is a thin subscriber + writer. None of them update
@@ -261,7 +258,7 @@ is rarely an issue.
 | ------------------------- | --------------------------------------------------------------------- |
 | Subscriber unit test      | Construct subscriber + mock dependencies; invoke its handler directly |
 | Producer + subscriber e2e | Boot the test module; emit; assert side effect                        |
-| Wildcard listener test    | Subscribe to `work.*` and assert the right events fire           |
+| Wildcard listener test    | Subscribe to `work.*` and assert the right events fire                |
 
 `@nestjs/event-emitter` exposes a real emitter in the test module —
 no mocking is required for the emitter itself.

@@ -45,9 +45,7 @@ export function WorkStatusCard({ work }: WorkStatusCardProps) {
                 action: (
                     <Button
                         onClick={() =>
-                            router.push(
-                                `${ROUTES.DASHBOARD_WORK(currentWork.id)}/generator`,
-                            )
+                            router.push(`${ROUTES.DASHBOARD_WORK(currentWork.id)}/generator`)
                         }
                         variant="primary"
                         size="sm"

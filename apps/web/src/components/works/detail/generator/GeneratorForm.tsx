@@ -237,10 +237,7 @@ export function GeneratorForm({
                 selectedWebsiteTemplateId &&
                 selectedWebsiteTemplateId !== work.websiteTemplateId
             ) {
-                const templateUpdate = await updateWorkTemplate(
-                    workId,
-                    selectedWebsiteTemplateId,
-                );
+                const templateUpdate = await updateWorkTemplate(workId, selectedWebsiteTemplateId);
 
                 if (!templateUpdate.success) {
                     toast.error(templateUpdate.error || t('failedToStartOperation'));

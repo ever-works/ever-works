@@ -208,7 +208,7 @@ OAuth tokens are stored separately in the `OAuthToken` entity and take priority 
 | ---------------------------- | --------------------------------------------------------------- |
 | `@ever-works/plugin`         | `IDeployPlugin`, `IGitPlugin` interfaces, `PLUGIN_CAPABILITIES` |
 | `@ever-works/agent/plugins`  | `PluginRegistryService`, `PluginSettingsService`                |
-| `@ever-works/agent/database` | `WorkCustomDomain`, `OAuthTokenRepository`                 |
+| `@ever-works/agent/database` | `WorkCustomDomain`, `OAuthTokenRepository`                      |
 | `isomorphic-git`             | Local git clone, commit, push operations                        |
 
 ## Usage Examples

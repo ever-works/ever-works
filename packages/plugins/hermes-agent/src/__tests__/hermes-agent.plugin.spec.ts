@@ -31,9 +31,7 @@ vi.mock('../utils/screenshot-capture.js', () => ({
 	captureScreenshots: vi.fn()
 }));
 
-function createMockContext(
-	overrides?: Partial<Record<'global' | 'user' | 'work', PluginSettings>>
-): PluginContext {
+function createMockContext(overrides?: Partial<Record<'global' | 'user' | 'work', PluginSettings>>): PluginContext {
 	const toResolved = (scope: 'global' | 'user' | 'work', settings: PluginSettings = {}) =>
 		Object.fromEntries(
 			Object.entries(settings).map(([key, value]) => [
@@ -82,9 +80,7 @@ function createMockContext(
 		},
 		services: {},
 		getSettings: vi.fn(async (scope: 'global' | 'user' | 'work') => overrides?.[scope] ?? {}),
-		getResolvedSettings: vi.fn(async (scope: 'global' | 'user' | 'work') =>
-			toResolved(scope, overrides?.[scope])
-		),
+		getResolvedSettings: vi.fn(async (scope: 'global' | 'user' | 'work') => toResolved(scope, overrides?.[scope])),
 		updateSettings: vi.fn(),
 		onEvent: vi.fn().mockReturnValue({ unsubscribe: vi.fn() }),
 		emitEvent: vi.fn(),

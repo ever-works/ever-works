@@ -693,7 +693,7 @@ const handleSaveEdit = async () => {
 | `apps/web/src/lib/api/index.ts`                              | Remove `export * from './ai-conversation'`                             |
 | `apps/web/src/lib/constants.ts`                              | Remove `API_AI_CONVERSATIONS_CHAT_STREAM`, add `API_CHAT: '/api/chat'` |
 | `apps/api/src/ai-conversation/ai-conversation.controller.ts` | Mark `@Deprecated()`, keep for now                                     |
-| `apps/api/src/ai-conversation/ai-conversation.service.ts`    | Keep (shared `resolveWorkContext` logic)                          |
+| `apps/api/src/ai-conversation/ai-conversation.service.ts`    | Keep (shared `resolveWorkContext` logic)                               |
 
 ### Verification Checklist
 

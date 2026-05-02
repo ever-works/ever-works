@@ -16,7 +16,7 @@ Ever Works is split across multiple repositories under the [ever-works](https://
 | Repository                                                                               | Description                                                     |
 | ---------------------------------------------------------------------------------------- | --------------------------------------------------------------- |
 | [ever-works](https://github.com/ever-works/ever-works)                                   | Platform monorepo (API, Web Dashboard, CLI, AI agents, plugins) |
-| [ever-works-website-template](https://github.com/ever-works/ever-works-website-template) | Standalone Next.js work website template                   |
+| [ever-works-website-template](https://github.com/ever-works/ever-works-website-template) | Standalone Next.js work website template                        |
 | [ever-works-docs](https://github.com/ever-works/ever-works-docs)                         | Documentation site (this site)                                  |
 
 Each repository has its own issue tracker. File issues in the repository most relevant to your contribution.
@@ -135,8 +135,8 @@ The Platform uses ESLint with TypeScript-specific rules across all workspaces. T
 | Element                    | Convention       | Example                               |
 | -------------------------- | ---------------- | ------------------------------------- |
 | Files                      | kebab-case       | `auth.service.ts`, `user-profile.tsx` |
-| Classes, Interfaces, Types | PascalCase       | `WorkService`, `UserProfile`     |
-| Functions, Variables       | camelCase        | `getWorkById`, `itemCount`       |
+| Classes, Interfaces, Types | PascalCase       | `WorkService`, `UserProfile`          |
+| Functions, Variables       | camelCase        | `getWorkById`, `itemCount`            |
 | Constants                  | UPPER_SNAKE_CASE | `MAX_RETRY_COUNT`, `DEFAULT_LOCALE`   |
 
 ## Commit Conventions

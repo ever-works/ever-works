@@ -52,8 +52,7 @@ export class ComparisonGeneratorPlugin implements IPlugin {
 			ai_provider: {
 				type: 'string',
 				title: 'AI Provider',
-				description:
-					'Override the AI provider used for comparison generation (leave empty for work default)',
+				description: 'Override the AI provider used for comparison generation (leave empty for work default)',
 				'x-hidden': true
 			},
 			ai_model: {

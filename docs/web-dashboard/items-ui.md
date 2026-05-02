@@ -238,11 +238,11 @@ All taxonomy operations (create, update, delete) are performed via server action
 
 ## Related API Endpoints
 
-| Action                        | Server Action Function                              | HTTP Method |
-| ----------------------------- | --------------------------------------------------- | ----------- |
-| Extract item details          | `extractItemDetails(url, categories)`               | POST        |
-| Capture screenshot            | `captureScreenshot(url)`                            | POST        |
-| Check screenshot availability | `checkScreenshotAvailability()`                     | GET         |
+| Action                        | Server Action Function                         | HTTP Method |
+| ----------------------------- | ---------------------------------------------- | ----------- |
+| Extract item details          | `extractItemDetails(url, categories)`          | POST        |
+| Capture screenshot            | `captureScreenshot(url)`                       | POST        |
+| Check screenshot availability | `checkScreenshotAvailability()`                | GET         |
 | Create category               | `createCategory(workId, data)`                 | POST        |
 | Update category               | `updateCategory(workId, categoryId, data)`     | PATCH       |
 | Delete category               | `deleteCategory(workId, categoryId)`           | DELETE      |

@@ -77,11 +77,11 @@ PLUGIN_OPENROUTER_DEFAULT_MODEL=meta-llama/llama-3.3-70b-instruct
 
 Fireworks AI is known for fast inference times. This benefits Ever Works in several ways:
 
-| Benefit                         | Description                                                |
-| ------------------------------- | ---------------------------------------------------------- |
+| Benefit                    | Description                                                |
+| -------------------------- | ---------------------------------------------------------- |
 | **Faster work generation** | Items are processed more quickly during pipeline execution |
-| **Lower latency AI chat**       | Conversational responses arrive faster                     |
-| **Better throughput**           | More items can be processed in parallel                    |
+| **Lower latency AI chat**  | Conversational responses arrive faster                     |
+| **Better throughput**      | More items can be processed in parallel                    |
 
 ### Speed Comparison
 

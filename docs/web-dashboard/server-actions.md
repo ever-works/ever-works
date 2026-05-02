@@ -103,16 +103,16 @@ interface ActionResult<T = unknown> {
 
 **File**: `src/app/actions/plugins.ts`
 
-| Action                          | Parameters                                                            | Return                | Description                                            |
-| ------------------------------- | --------------------------------------------------------------------- | --------------------- | ------------------------------------------------------ |
-| `enablePlugin`                  | `pluginId, { settings?, secretSettings?, autoEnableForWorks? }` | `ActionResult`        | Enables a plugin for the current user                  |
-| `disablePlugin`                 | `pluginId`                                                            | `ActionResult`        | Disables a plugin for the current user                 |
-| `updatePluginSettings`          | `pluginId, { settings?, secretSettings?, metadata? }`                 | `ActionResult`        | Updates user-level plugin configuration                |
-| `enableWorkPlugin`         | `workId, pluginId, { settings?, activeCapability?, priority? }`  | `ActionResult`        | Enables a plugin for a specific work              |
-| `disableWorkPlugin`        | `workId, pluginId`                                               | `ActionResult`        | Disables a work plugin                            |
-| `updateWorkPluginSettings` | `workId, pluginId, { settings?, secretSettings?, metadata? }`    | `ActionResult`        | Updates work-level plugin settings                |
-| `fetchModels`                   | `pluginId`                                                            | `ActionResult<any[]>` | Lists available AI models for a provider plugin        |
-| `setActiveCapability`           | `workId, pluginId, capability`                                   | `ActionResult`        | Sets which capability is active for a work plugin |
+| Action                     | Parameters                                                      | Return                | Description                                       |
+| -------------------------- | --------------------------------------------------------------- | --------------------- | ------------------------------------------------- |
+| `enablePlugin`             | `pluginId, { settings?, secretSettings?, autoEnableForWorks? }` | `ActionResult`        | Enables a plugin for the current user             |
+| `disablePlugin`            | `pluginId`                                                      | `ActionResult`        | Disables a plugin for the current user            |
+| `updatePluginSettings`     | `pluginId, { settings?, secretSettings?, metadata? }`           | `ActionResult`        | Updates user-level plugin configuration           |
+| `enableWorkPlugin`         | `workId, pluginId, { settings?, activeCapability?, priority? }` | `ActionResult`        | Enables a plugin for a specific work              |
+| `disableWorkPlugin`        | `workId, pluginId`                                              | `ActionResult`        | Disables a work plugin                            |
+| `updateWorkPluginSettings` | `workId, pluginId, { settings?, secretSettings?, metadata? }`   | `ActionResult`        | Updates work-level plugin settings                |
+| `fetchModels`              | `pluginId`                                                      | `ActionResult<any[]>` | Lists available AI models for a provider plugin   |
+| `setActiveCapability`      | `workId, pluginId, capability`                                  | `ActionResult`        | Sets which capability is active for a work plugin |
 
 ## Work Actions
 
@@ -120,35 +120,35 @@ interface ActionResult<T = unknown> {
 
 This is the largest action file with 20+ exported functions covering the full work lifecycle.
 
-| Action                       | Key Parameters                                   | Description                                                                     |
-| ---------------------------- | ------------------------------------------------ | ------------------------------------------------------------------------------- |
-| `createWork`            | `CreateWorkDto`                             | Creates a work with slug, name, description, git/deploy providers          |
-| `createWorkWithAI`      | `AIWorkOptions`                             | AI-generated work: generates details, creates work, starts generation |
-| `updateWork`            | `workId, UpdateWorkDto`                | Updates name, description, owner, readme config                                 |
-| `deleteWork`            | `workId, DeleteWorkDto?`               | Validates UUID, deletes work                                               |
-| `getWorks`             | `{ search?, limit?, offset? }`                   | Paginated work list                                                        |
-| `syncWorkData`          | `workId`                                    | Syncs work data from git repository                                        |
-| `analyzeRepository`          | `sourceUrl, providerId?`                         | Analyzes a repository URL for import                                            |
-| `importWork`            | `ImportWorkRequest`                         | Imports a work from an external source                                     |
-| `getUserRepositories`        | `{ gitProvider, page?, search?, owner?, type? }` | Lists user's git repositories                                                   |
-| `updateWorkSchedule`    | `workId, UpdateWorkSchedulePayload`    | Updates auto-generation schedule                                                |
-| `getAdvancedPrompts`         | `workId`                                    | Fetches custom prompt overrides                                                 |
-| `updateAdvancedPrompts`      | `workId, UpdateWorkAdvancedPromptsDto` | Updates 7 prompt types (max 2000 chars each)                                    |
-| `getWebsiteSettings`         | `workId`                                    | Fetches website configuration                                                   |
-| `updateWebsiteSettings`      | `workId, data`                              | Updates header, homepage, footer, custom menu settings                          |
-| `updateCommunityPrSettings`  | `workId, settings`                          | Toggles community PR and auto-close settings                                    |
-| `getRepositoryVisibility`    | `workId`                                    | Gets visibility status of data/work/website repos                          |
-| `toggleRepositoryVisibility` | `workId, repoType, isPrivate`               | Toggles public/private for a specific repo                                      |
+| Action                       | Key Parameters                                   | Description                                                           |
+| ---------------------------- | ------------------------------------------------ | --------------------------------------------------------------------- |
+| `createWork`                 | `CreateWorkDto`                                  | Creates a work with slug, name, description, git/deploy providers     |
+| `createWorkWithAI`           | `AIWorkOptions`                                  | AI-generated work: generates details, creates work, starts generation |
+| `updateWork`                 | `workId, UpdateWorkDto`                          | Updates name, description, owner, readme config                       |
+| `deleteWork`                 | `workId, DeleteWorkDto?`                         | Validates UUID, deletes work                                          |
+| `getWorks`                   | `{ search?, limit?, offset? }`                   | Paginated work list                                                   |
+| `syncWorkData`               | `workId`                                         | Syncs work data from git repository                                   |
+| `analyzeRepository`          | `sourceUrl, providerId?`                         | Analyzes a repository URL for import                                  |
+| `importWork`                 | `ImportWorkRequest`                              | Imports a work from an external source                                |
+| `getUserRepositories`        | `{ gitProvider, page?, search?, owner?, type? }` | Lists user's git repositories                                         |
+| `updateWorkSchedule`         | `workId, UpdateWorkSchedulePayload`              | Updates auto-generation schedule                                      |
+| `getAdvancedPrompts`         | `workId`                                         | Fetches custom prompt overrides                                       |
+| `updateAdvancedPrompts`      | `workId, UpdateWorkAdvancedPromptsDto`           | Updates 7 prompt types (max 2000 chars each)                          |
+| `getWebsiteSettings`         | `workId`                                         | Fetches website configuration                                         |
+| `updateWebsiteSettings`      | `workId, data`                                   | Updates header, homepage, footer, custom menu settings                |
+| `updateCommunityPrSettings`  | `workId, settings`                               | Toggles community PR and auto-close settings                          |
+| `getRepositoryVisibility`    | `workId`                                         | Gets visibility status of data/work/website repos                     |
+| `toggleRepositoryVisibility` | `workId, repoType, isPrivate`                    | Toggles public/private for a specific repo                            |
 
 ## Generator Actions
 
 **File**: `src/app/actions/dashboard/generator.ts`
 
-| Action               | Parameters                             | Description                                                                    |
-| -------------------- | -------------------------------------- | ------------------------------------------------------------------------------ |
+| Action               | Parameters                        | Description                                                                    |
+| -------------------- | --------------------------------- | ------------------------------------------------------------------------------ |
 | `generateItems`      | `workId, CreateItemsGeneratorDto` | Sanitizes inputs, validates git connection and org access, triggers generation |
 | `updateItems`        | `workId, UpdateItemsGeneratorDto` | Triggers item update generation                                                |
-| `regenerateMarkdown` | `workId`                          | Regenerates markdown for all work items                                   |
+| `regenerateMarkdown` | `workId`                          | Regenerates markdown for all work items                                        |
 
 The `sanitizePluginConfig` helper processes plugin config values, sanitizing string arrays and URL arrays before sending them to the API.
 
@@ -156,14 +156,14 @@ The `sanitizePluginConfig` helper processes plugin config values, sanitizing str
 
 **File**: `src/app/actions/dashboard/items.ts`
 
-| Action                        | Parameters                                                 | Description                                         |
-| ----------------------------- | ---------------------------------------------------------- | --------------------------------------------------- |
+| Action                        | Parameters                                            | Description                                         |
+| ----------------------------- | ----------------------------------------------------- | --------------------------------------------------- |
 | `addItem`                     | `workId, SubmitItemDto`                               | Adds item, returns PR info and merge status         |
 | `removeItem`                  | `workId, itemSlug, { reason?, create_pull_request? }` | Removes item with optional PR creation              |
 | `updateItem`                  | `workId, UpdateItemDto`                               | Updates item metadata                               |
-| `extractItemDetails`          | `sourceUrl, existingCategories?`                           | AI-extracts item details from a URL                 |
-| `captureScreenshot`           | `sourceUrl`                                                | Captures a website screenshot via screenshot plugin |
-| `checkScreenshotAvailability` | none                                                       | Checks if screenshot plugin is configured           |
+| `extractItemDetails`          | `sourceUrl, existingCategories?`                      | AI-extracts item details from a URL                 |
+| `captureScreenshot`           | `sourceUrl`                                           | Captures a website screenshot via screenshot plugin |
+| `checkScreenshotAvailability` | none                                                  | Checks if screenshot plugin is configured           |
 
 ## Taxonomy Actions
 
@@ -181,9 +181,9 @@ Full CRUD for three taxonomy types, all following the same pattern with auth che
 
 **File**: `src/app/actions/dashboard/comparisons.ts`
 
-| Action                        | Parameters                                            | Description                                       |
-| ----------------------------- | ----------------------------------------------------- | ------------------------------------------------- |
-| `listComparisons`             | `workId`                                         | Lists all comparisons for a work             |
+| Action                        | Parameters                                       | Description                                       |
+| ----------------------------- | ------------------------------------------------ | ------------------------------------------------- |
+| `listComparisons`             | `workId`                                         | Lists all comparisons for a work                  |
 | `getRemainingComparisonCount` | `workId`                                         | Gets count of remaining comparisons to generate   |
 | `generateNextComparison`      | `workId`                                         | Auto-generates the next comparison pair           |
 | `generateManualComparison`    | `workId, itemASlug, itemBSlug`                   | Generates comparison for specific item pair       |
@@ -191,14 +191,14 @@ Full CRUD for three taxonomy types, all following the same pattern with auth che
 | `getComparisonAiConfig`       | `workId`                                         | Gets AI provider and model config for comparisons |
 | `saveComparisonAiConfig`      | `workId, { provider, model, extendedAnalysis? }` | Saves AI config, auto-enables plugin if needed    |
 | `saveComparisonCustomPrompt`  | `workId, customPrompt`                           | Saves custom comparison prompt                    |
-| `getAiProviderModels`         | `pluginId`                                            | Lists models for an AI provider                   |
+| `getAiProviderModels`         | `pluginId`                                       | Lists models for an AI provider                   |
 
 ## Deploy Actions
 
 **File**: `src/app/actions/dashboard/deploy.ts`
 
-| Action                          | Parameters                                                             | Description                                           |
-| ------------------------------- | ---------------------------------------------------------------------- | ----------------------------------------------------- |
+| Action                          | Parameters                                                        | Description                                           |
+| ------------------------------- | ----------------------------------------------------------------- | ----------------------------------------------------- |
 | `deploy`                        | `workId, teamScope?`                                              | Triggers deployment, verifies git provider connection |
 | `updateWebsiteRepository`       | `workId`                                                          | Updates the website repository                        |
 | `getDeploymentTeams`            | `workId?`                                                         | Lists available deployment teams                      |

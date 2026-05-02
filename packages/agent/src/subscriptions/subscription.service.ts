@@ -12,11 +12,7 @@ import { config } from '@src/config';
 import { WorkScheduleAllowedCadence } from '@src/dto';
 import { User } from '@src/entities/user.entity';
 import { UserRepository } from '@src/database/repositories/user.repository';
-import {
-    WorkScheduleBillingMode,
-    WorkScheduleCadence,
-    SubscriptionPlanCode,
-} from '@src/entities';
+import { WorkScheduleBillingMode, WorkScheduleCadence, SubscriptionPlanCode } from '@src/entities';
 
 const ALL_CADENCES: WorkScheduleCadence[] = [
     WorkScheduleCadence.MONTHLY,

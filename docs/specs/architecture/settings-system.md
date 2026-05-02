@@ -23,11 +23,11 @@ settings safe to use across admin, user, and per-work contexts.
 
 Plugin settings can be set at three scopes:
 
-| Scope       | Storage table       | Configured by    | Lifetime                       |
-| ----------- | ------------------- | ---------------- | ------------------------------ |
-| `global`    | `plugin_settings`   | Admin            | Survives all sessions          |
-| `user`      | `user_plugins`      | The user         | Per-user                       |
-| `work` | `work_plugins` | Work editor | Per-work (overrides user) |
+| Scope    | Storage table     | Configured by | Lifetime                  |
+| -------- | ----------------- | ------------- | ------------------------- |
+| `global` | `plugin_settings` | Admin         | Survives all sessions     |
+| `user`   | `user_plugins`    | The user      | Per-user                  |
+| `work`   | `work_plugins`    | Work editor   | Per-work (overrides user) |
 
 The **resolution cascade** for a key is, in order of precedence:
 
@@ -73,11 +73,11 @@ A plugin's `configurationMode` (set in its manifest, see
 [Plugin SDK §7](./plugin-sdk.md#7-plugin-manifest)) decides which scopes
 are even allowed:
 
-| Mode            | Where settings live                                    | Notes                                                      |
-| --------------- | ------------------------------------------------------ | ---------------------------------------------------------- |
-| `admin-only`    | `plugin_settings` only                                 | UI hides per-user / per-work editors                  |
+| Mode            | Where settings live                               | Notes                                                      |
+| --------------- | ------------------------------------------------- | ---------------------------------------------------------- |
+| `admin-only`    | `plugin_settings` only                            | UI hides per-user / per-work editors                       |
 | `user-required` | `user_plugins` (and `work_plugins` for overrides) | Users must enter their own creds; admin can't pre-populate |
-| `hybrid`        | All three tiers                                        | Admin sets defaults; users / works may override      |
+| `hybrid`        | All three tiers                                   | Admin sets defaults; users / works may override            |
 
 The setting form's "where will this go?" depends on the active page:
 
@@ -193,11 +193,7 @@ class PluginSettingsService {
 	resolve(pluginId: string, scope: { workId?: string; userId?: string }): Promise<PluginSettings>;
 
 	// Get one key with type narrowing
-	resolveKey<T>(
-		pluginId: string,
-		key: string,
-		scope: { workId?: string; userId?: string }
-	): Promise<T | undefined>;
+	resolveKey<T>(pluginId: string, key: string, scope: { workId?: string; userId?: string }): Promise<T | undefined>;
 
 	// Get the source of each key for debugging / UI display
 	resolveWithSources(pluginId: string, scope): Promise<Record<string, { value: unknown; source: SettingSource }>>;
@@ -248,7 +244,7 @@ When a user saves settings:
 | --------------------------- | --------------------------------------------------------------------------------- |
 | I — Plugin-first            | Settings schema is defined by the plugin, not the platform.                       |
 | II — Capability-driven      | Capability bindings cascade by the same algorithm.                                |
-| III — Source-of-truth repos | Settings are platform-side metadata (access control), not work content.      |
+| III — Source-of-truth repos | Settings are platform-side metadata (access control), not work content.           |
 | IV — Trigger.dev            | Resolution is synchronous and inline.                                             |
 | V — Forward-only migrations | Settings shape evolution = adding optional schema properties; no breaking change. |
 | VI — Tests                  | Per-tier resolution covered by `PluginSettingsService` unit tests + e2e.          |

@@ -137,10 +137,7 @@ export class WebsiteUpdateService {
     }
 
     /** Sync all branches from template to work's website repo */
-    async syncAllBranchesFromTemplate(
-        work: Work,
-        user: User,
-    ): Promise<BranchSyncSummary | null> {
+    async syncAllBranchesFromTemplate(work: Work, user: User): Promise<BranchSyncSummary | null> {
         return this.branchSyncService.syncFromTemplate(work, user);
     }
 
@@ -251,11 +248,7 @@ export class WebsiteUpdateService {
     /**
      * Updates using duplicate method: clone original, replace remote, push
      */
-    private async updateDuplicate(
-        work: Work,
-        user: User,
-        branch?: string,
-    ): Promise<void> {
+    private async updateDuplicate(work: Work, user: User, branch?: string): Promise<void> {
         const workOwner = getWorkOwner(work);
         const websiteOwner = work.getRepoOwner('website');
         const websiteRepo = work.getWebsiteRepo();
@@ -288,12 +281,7 @@ export class WebsiteUpdateService {
 
         // Remove existing origin and add new one
         await this.gitFacade.switchBranch(work.gitProvider, originalDir, resolvedBranch);
-        await this.gitFacade.replaceRemote(
-            work.gitProvider,
-            originalDir,
-            'origin',
-            targetRepoUrl,
-        );
+        await this.gitFacade.replaceRemote(work.gitProvider, originalDir, 'origin', targetRepoUrl);
 
         // Push to the target repository
         await this.gitFacade.push(

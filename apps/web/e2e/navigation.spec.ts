@@ -26,9 +26,7 @@ test.describe('Route protection', () => {
         await page.waitForURL(/\/(login|register|en\/?$)/, { timeout: 10_000 });
     });
 
-    test('should redirect unauthenticated user from new work page to login', async ({
-        page,
-    }) => {
+    test('should redirect unauthenticated user from new work page to login', async ({ page }) => {
         await page.goto('/en/works/new');
 
         await page.waitForURL(/\/(login|register|en\/?$)/, { timeout: 10_000 });

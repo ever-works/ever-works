@@ -32,8 +32,7 @@ export class WorkCacheWarmupService {
             'works:cache-warmup',
             async () => {
                 try {
-                    const totalEligible =
-                        await this.workRepository.countForDetailCacheWarmup();
+                    const totalEligible = await this.workRepository.countForDetailCacheWarmup();
 
                     if (totalEligible === 0) {
                         return;
@@ -72,10 +71,7 @@ export class WorkCacheWarmupService {
                                 this.workQueryService.workItems(work.id, owner),
                                 this.workQueryService.workConfig(work.id, owner),
                                 this.workQueryService.workCount(work.id, owner),
-                                this.workQueryService.workCategoriesTags(
-                                    work.id,
-                                    owner,
-                                ),
+                                this.workQueryService.workCategoriesTags(work.id, owner),
                             ]);
 
                             await Promise.all([
@@ -161,10 +157,7 @@ export class WorkCacheWarmupService {
 
         if (firstBatch.length < CACHE_WARMUP_BATCH_SIZE) {
             const remainder = CACHE_WARMUP_BATCH_SIZE - firstBatch.length;
-            const wrappedBatch = await this.workRepository.findForDetailCacheWarmup(
-                remainder,
-                0,
-            );
+            const wrappedBatch = await this.workRepository.findForDetailCacheWarmup(remainder, 0);
             works = [...firstBatch, ...wrappedBatch];
         }
 

@@ -116,7 +116,7 @@ Settings are resolved from highest to lowest priority. The first non-null, non-u
 | Priority    | Source                | Description                     |
 | ----------- | --------------------- | ------------------------------- |
 | 1 (highest) | User settings         | Per-user configuration          |
-| 2           | Work settings    | Per-work overrides         |
+| 2           | Work settings         | Per-work overrides              |
 | 3           | Admin settings        | Organization-wide defaults      |
 | 4           | Environment variables | `x-envVar` mapped values        |
 | 5 (lowest)  | Schema defaults       | Default values from JSON Schema |

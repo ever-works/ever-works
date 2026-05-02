@@ -58,16 +58,16 @@ graph TD
 
 ### Settings Schema
 
-| Setting                    | Type      | Default           | Description                                                                  |
-| -------------------------- | --------- | ----------------- | ---------------------------------------------------------------------------- |
+| Setting                    | Type      | Default      | Description                                                             |
+| -------------------------- | --------- | ------------ | ----------------------------------------------------------------------- |
 | `cadence_override`         | `string`  | `"use_work"` | How often to auto-generate: `use_work`, `daily`, `weekly`, or `monthly` |
-| `max_comparisons_mode`     | `string`  | `"custom"`        | Cap mode: `custom` (use limit) or `unlimited` (all possible pairs)           |
-| `max_comparisons`          | `number`  | `50`              | Maximum total comparisons (1--500, only in Custom mode)                      |
-| `min_items_for_comparison` | `number`  | `3`               | Minimum items in a category before generating comparisons (2--20)            |
-| `ai_provider`              | `string`  | --                | Override AI provider for comparison generation (hidden)                      |
-| `ai_model`                 | `string`  | --                | Override AI model for comparison generation (hidden)                         |
-| `custom_prompt`            | `string`  | --                | Additional instructions for comparison prompts (hidden)                      |
-| `extended_analysis`        | `boolean` | `false`           | Generate deeper analysis alongside the standard comparison (hidden)          |
+| `max_comparisons_mode`     | `string`  | `"custom"`   | Cap mode: `custom` (use limit) or `unlimited` (all possible pairs)      |
+| `max_comparisons`          | `number`  | `50`         | Maximum total comparisons (1--500, only in Custom mode)                 |
+| `min_items_for_comparison` | `number`  | `3`          | Minimum items in a category before generating comparisons (2--20)       |
+| `ai_provider`              | `string`  | --           | Override AI provider for comparison generation (hidden)                 |
+| `ai_model`                 | `string`  | --           | Override AI model for comparison generation (hidden)                    |
+| `custom_prompt`            | `string`  | --           | Additional instructions for comparison prompts (hidden)                 |
+| `extended_analysis`        | `boolean` | `false`      | Generate deeper analysis alongside the standard comparison (hidden)     |
 
 ### Conditional Visibility
 
@@ -79,12 +79,12 @@ The `max_comparisons` field is only shown when `max_comparisons_mode` is set to 
 
 Comparisons can be generated automatically based on a configurable cadence:
 
-| Cadence         | Behavior                                        |
-| --------------- | ----------------------------------------------- |
+| Cadence    | Behavior                                   |
+| ---------- | ------------------------------------------ |
 | `use_work` | Follows the work's own generation schedule |
-| `daily`         | Generates a new comparison every day            |
-| `weekly`        | Generates a new comparison every week           |
-| `monthly`       | Generates a new comparison every month          |
+| `daily`    | Generates a new comparison every day       |
+| `weekly`   | Generates a new comparison every week      |
+| `monthly`  | Generates a new comparison every month     |
 
 Each scheduled run generates one high-quality comparison per pass to maintain quality and manage API costs.
 

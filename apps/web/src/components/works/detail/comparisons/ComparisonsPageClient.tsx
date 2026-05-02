@@ -184,11 +184,7 @@ export function ComparisonsPageClient({
         }
 
         startTransition(async () => {
-            const result = await generateManualComparison(
-                workId,
-                selectedItemA,
-                selectedItemB,
-            );
+            const result = await generateManualComparison(workId, selectedItemA, selectedItemB);
 
             if (result.status === 'success') {
                 toast.success(result.message);
@@ -797,10 +793,7 @@ export function ComparisonsPageClient({
                             className={`relative rounded-lg border border-border dark:border-border-dark p-4 hover:bg-surface-hover dark:hover:bg-surface-hover-dark transition-colors ${viewMode === 'grid' ? 'flex flex-col' : ''}`}
                         >
                             <Link
-                                href={ROUTES.DASHBOARD_WORK_COMPARISON(
-                                    workId,
-                                    comparison.slug,
-                                )}
+                                href={ROUTES.DASHBOARD_WORK_COMPARISON(workId, comparison.slug)}
                                 className="absolute inset-0 rounded-lg"
                             />
                             <div

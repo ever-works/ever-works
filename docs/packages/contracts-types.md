@@ -433,7 +433,7 @@ The contracts package is the foundation that enables type-safe communication acr
 | **API**                 | All types for request/response validation                 |
 | **Frontend**            | `ItemData`, `FormSchema`, `Category`, `Tag` for rendering |
 | **Plugins**             | `DomainType`, `ItemData`, `WebPageData` for generation    |
-| **CLI**                 | `GenerationMethod`, `WorkScheduleDto` for commands   |
+| **CLI**                 | `GenerationMethod`, `WorkScheduleDto` for commands        |
 | **Generation pipeline** | `DomainAnalysis`, `RelevanceAssessment`, `ComparisonData` |
 
 ## File Structure

@@ -157,12 +157,9 @@ export class PluginContextFactoryService {
                     );
                 }
 
-                await this.settingsService.updateWorkSettings(
-                    pluginId,
-                    targetWorkId,
-                    combined,
-                    { secretKeys },
-                );
+                await this.settingsService.updateWorkSettings(pluginId, targetWorkId, combined, {
+                    secretKeys,
+                });
             },
 
             onEvent: <T extends PluginEventName>(
@@ -397,10 +394,7 @@ export class PluginContextFactoryService {
     /**
      * Create PluginServices for a plugin.
      */
-    private createServices(_scopeOptions?: {
-        userId?: string;
-        workId?: string;
-    }): PluginServices {
+    private createServices(_scopeOptions?: { userId?: string; workId?: string }): PluginServices {
         return {
             work: this.injectedServices.work,
             user: this.injectedServices.user,

@@ -68,7 +68,7 @@ Updates item metadata without changing content:
 
 | Mode          | Behavior                                                                                            |
 | ------------- | --------------------------------------------------------------------------------------------------- |
-| Direct commit | Changes pushed to main branch immediately. Used when the user is the work owner/editor.        |
+| Direct commit | Changes pushed to main branch immediately. Used when the user is the work owner/editor.             |
 | PR-based      | Changes submitted as a pull request. Used for community contributions or when approval is required. |
 
 The mode is determined by the `autoapproval` option and the user's role in the work.

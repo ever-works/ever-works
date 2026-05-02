@@ -687,11 +687,7 @@ export class WorkImportService {
     /**
      * Sync work from original source
      */
-    async syncWork(
-        work: Work,
-        user: User,
-        historyId?: string,
-    ): Promise<WorkImportResult> {
+    async syncWork(work: Work, user: User, historyId?: string): Promise<WorkImportResult> {
         const startTime = new Date();
         const sourceRepo = work.sourceRepository;
 
@@ -914,11 +910,7 @@ export class WorkImportService {
         work.sourceRepository = updatedSourceRepository;
 
         await this.worksConfigRestoreService.applyScheduleOverrides(work, user, worksConfig);
-        await this.worksConfigRestoreService.applyPipelineSettings(
-            work.id,
-            user.id,
-            worksConfig,
-        );
+        await this.worksConfigRestoreService.applyPipelineSettings(work.id, user.id, worksConfig);
 
         return this.importExecutor.importFromWorksConfig({
             work,
@@ -977,11 +969,7 @@ export class WorkImportService {
         });
         work.sourceRepository = updatedSourceRepository;
 
-        await this.worksConfigRestoreService.applyScheduleOverrides(
-            work,
-            user,
-            parsedWorksConfig,
-        );
+        await this.worksConfigRestoreService.applyScheduleOverrides(work, user, parsedWorksConfig);
         await this.worksConfigRestoreService.applyPipelineSettings(
             work.id,
             user.id,

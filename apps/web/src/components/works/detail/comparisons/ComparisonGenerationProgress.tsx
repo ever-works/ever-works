@@ -40,9 +40,7 @@ export function ComparisonGenerationProgress({
                 // Use direct fetch to Route Handler instead of server action
                 // to avoid Next.js server action serialization (which would
                 // block this call while the generation server action is running)
-                const res = await fetch(
-                    `/api/works/${workId}/comparisons/generation-status`,
-                );
+                const res = await fetch(`/api/works/${workId}/comparisons/generation-status`);
                 if (res.ok) {
                     setStatus(await res.json());
                 }

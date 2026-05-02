@@ -61,7 +61,7 @@ The core TypeORM entity mapped to the `works` table. Key fields include:
 | `communityPrEnabled`                           | boolean | Whether community PR processing is active                                      |
 | `comparisonsEnabled`                           | boolean | Whether comparison generation is active                                        |
 | `websiteTemplateAutoUpdate`                    | boolean | Auto-update the website template                                               |
-| `repoVisibility`                               | JSON    | Privacy settings per repo (data, website, work)                           |
+| `repoVisibility`                               | JSON    | Privacy settings per repo (data, website, work)                                |
 | `sourceRepository`                             | JSON    | Import source metadata                                                         |
 
 Helper methods on the entity:
@@ -173,7 +173,7 @@ Optional fields: `name`, `description`, `owner`, `organization`, `deployProvider
 | --------------------------------------- | ---------------------------------------------- |
 | `TypeORM`                               | Entity mapping, repository queries             |
 | `class-validator` / `class-transformer` | DTO validation and sanitization                |
-| `@ever-works/agent/database`            | `WorkRepository` and related repositories |
+| `@ever-works/agent/database`            | `WorkRepository` and related repositories      |
 | `@ever-works/agent/generators`          | Data, Markdown, and Website generator services |
 | `@ever-works/agent/facades`             | `DeployFacadeService`, `GitFacadeService`      |
 | `@ever-works/agent/subscriptions`       | Subscription plan enforcement                  |

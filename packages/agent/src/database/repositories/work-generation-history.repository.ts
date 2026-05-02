@@ -128,10 +128,7 @@ export class WorkGenerationHistoryRepository {
         });
     }
 
-    async countByWork(
-        workId: string,
-        activityTypes?: WorkHistoryActivityType[],
-    ): Promise<number> {
+    async countByWork(workId: string, activityTypes?: WorkHistoryActivityType[]): Promise<number> {
         return this.repository.count({
             where: {
                 workId,
@@ -144,9 +141,7 @@ export class WorkGenerationHistoryRepository {
         return this.repository.findOne({ where: { id } });
     }
 
-    async findLatestInProgressByWork(
-        workId: string,
-    ): Promise<WorkGenerationHistory | null> {
+    async findLatestInProgressByWork(workId: string): Promise<WorkGenerationHistory | null> {
         return this.repository.findOne({
             where: {
                 workId,
@@ -156,9 +151,7 @@ export class WorkGenerationHistoryRepository {
         });
     }
 
-    async findLatestCompletedByWork(
-        workId: string,
-    ): Promise<WorkGenerationHistory | null> {
+    async findLatestCompletedByWork(workId: string): Promise<WorkGenerationHistory | null> {
         return this.repository
             .createQueryBuilder('history')
             .where('history.workId = :workId', { workId })

@@ -61,7 +61,7 @@ Events are defined in two locations based on their scope:
 | Location                     | Scope                              | Events                                                                                                                                                                       |
 | ---------------------------- | ---------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `apps/api/src/events/`       | API-level (user and member events) | `UserCreatedEvent`, `UserForgotPasswordEvent`, `UserPasswordChangedEvent`, `UserConfirmedEvent`, `UserNewDeviceLoginEvent`, `UserAccountDeletionEvent`, `MemberInvitedEvent` |
-| `packages/agent/src/events/` | Agent-level (work lifecycle)  | `WorkCreatedEvent`, `WorkGenerationCompletedEvent`                                                                                                                 |
+| `packages/agent/src/events/` | Agent-level (work lifecycle)       | `WorkCreatedEvent`, `WorkGenerationCompletedEvent`                                                                                                                           |
 
 ### Base Event Classes
 
@@ -114,11 +114,11 @@ Examples:
 
 ### Work Events
 
-| Event Class                         | `EVENT_NAME`                     | Payload Properties                                        | Source |
-| ----------------------------------- | -------------------------------- | --------------------------------------------------------- | ------ |
-| `MemberInvitedEvent`                | `work.member_invited`       | `invitee`, `inviter`, `work`, `role`, `workUrl` | API    |
-| `WorkCreatedEvent`             | `work.created`              | `work`                                               | Agent  |
-| `WorkGenerationCompletedEvent` | `work.generation.completed` | `work`                                               | Agent  |
+| Event Class                    | `EVENT_NAME`                | Payload Properties                              | Source |
+| ------------------------------ | --------------------------- | ----------------------------------------------- | ------ |
+| `MemberInvitedEvent`           | `work.member_invited`       | `invitee`, `inviter`, `work`, `role`, `workUrl` | API    |
+| `WorkCreatedEvent`             | `work.created`              | `work`                                          | Agent  |
+| `WorkGenerationCompletedEvent` | `work.generation.completed` | `work`                                          | Agent  |
 
 ## Emitting Events
 

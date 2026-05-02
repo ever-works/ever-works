@@ -1,9 +1,6 @@
 import { Injectable, Logger, Optional } from '@nestjs/common';
 import { Work, User, GenerateStatusType } from '@ever-works/agent/entities';
-import {
-    WorkOperationsService,
-    buildImportStatsUpdate,
-} from '@ever-works/agent/work-operations';
+import { WorkOperationsService, buildImportStatsUpdate } from '@ever-works/agent/work-operations';
 import { NotificationService } from '@ever-works/agent/notifications';
 import { WorkImportPayload, WorkImportResult } from '@ever-works/agent/tasks';
 import { normalizeGeneratorError } from '@ever-works/agent/services';
@@ -130,17 +127,13 @@ export class TriggerImportOrchestrator extends BaseOrchestrator {
                 }),
             ]);
 
-            await this.workOperations.updateGenerationHistory(
-                work.id,
-                payload.historyId,
-                {
-                    status: GenerateStatusType.ERROR,
-                    finishedAt: endTime,
-                    durationInSeconds: calculateDurationSeconds(startTime, endTime),
-                    errorMessage: normalizeGeneratorError(error),
-                    ...buildImportStatsUpdate(result),
-                },
-            );
+            await this.workOperations.updateGenerationHistory(work.id, payload.historyId, {
+                status: GenerateStatusType.ERROR,
+                finishedAt: endTime,
+                durationInSeconds: calculateDurationSeconds(startTime, endTime),
+                errorMessage: normalizeGeneratorError(error),
+                ...buildImportStatsUpdate(result),
+            });
 
             this.logger.error('Import failed', error as Error);
 

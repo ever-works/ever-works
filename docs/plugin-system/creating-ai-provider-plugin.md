@@ -586,15 +586,15 @@ The pipeline selects the appropriate model tier based on the step being executed
 
 ### x-\* Extension Reference
 
-| Extension     | Type                                | Description                                                                               |
-| ------------- | ----------------------------------- | ----------------------------------------------------------------------------------------- |
-| `x-secret`    | `boolean`                           | Value is encrypted at rest, never returned in API responses, rendered as a password input |
+| Extension     | Type                           | Description                                                                               |
+| ------------- | ------------------------------ | ----------------------------------------------------------------------------------------- |
+| `x-secret`    | `boolean`                      | Value is encrypted at rest, never returned in API responses, rendered as a password input |
 | `x-scope`     | `'global' \| 'user' \| 'work'` | Where the setting is stored. `user` = per-user, `global` = shared across all users        |
-| `x-envVar`    | `string`                            | Environment variable to check as a fallback when no stored setting exists                 |
-| `x-widget`    | `string`                            | UI widget hint. `'model-select'` renders a dropdown that calls `listModels()`             |
-| `x-hidden`    | `boolean`                           | Hides the field from the settings UI (advanced tuning)                                    |
-| `x-adminOnly` | `boolean`                           | Only visible to admin users                                                               |
-| `x-showIf`    | `{ field, value }`                  | Conditionally show based on another field's value                                         |
+| `x-envVar`    | `string`                       | Environment variable to check as a fallback when no stored setting exists                 |
+| `x-widget`    | `string`                       | UI widget hint. `'model-select'` renders a dropdown that calls `listModels()`             |
+| `x-hidden`    | `boolean`                      | Hides the field from the settings UI (advanced tuning)                                    |
+| `x-adminOnly` | `boolean`                      | Only visible to admin users                                                               |
+| `x-showIf`    | `{ field, value }`             | Conditionally show based on another field's value                                         |
 
 ### Configuration Modes
 

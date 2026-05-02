@@ -26,14 +26,14 @@ Copy `.env.example` to `.env.local` and adjust values for your deployment. Varia
 
 These variables support multi-tenant deployments where each instance can have its own branding:
 
-| Variable                       | Default                      | Description                  |
-| ------------------------------ | ---------------------------- | ---------------------------- |
-| `NEXT_PUBLIC_SITE_NAME`        | Uses `APP_NAME`              | Site name                    |
-| `NEXT_PUBLIC_SITE_TITLE`       | Uses `APP_NAME`              | SEO title                    |
+| Variable                       | Default                | Description                  |
+| ------------------------------ | ---------------------- | ---------------------------- |
+| `NEXT_PUBLIC_SITE_NAME`        | Uses `APP_NAME`        | Site name                    |
+| `NEXT_PUBLIC_SITE_TITLE`       | Uses `APP_NAME`        | SEO title                    |
 | `NEXT_PUBLIC_SITE_DESCRIPTION` | `Build Works with AI`  | Meta description             |
 | `NEXT_PUBLIC_SITE_KEYWORDS`    | `Ever Works,Works,...` | Comma-separated SEO keywords |
-| `NEXT_PUBLIC_SITE_AUTHOR`      | Uses `APP_NAME`              | Author meta tag              |
-| `NEXT_PUBLIC_SITE_IMAGE`       | `/logo-light.png`            | Open Graph image path        |
+| `NEXT_PUBLIC_SITE_AUTHOR`      | Uses `APP_NAME`        | Author meta tag              |
+| `NEXT_PUBLIC_SITE_IMAGE`       | `/logo-light.png`      | Open Graph image path        |
 
 ### Logo and Favicon
 
@@ -65,7 +65,7 @@ The dashboard has built-in support for 21 locales: en, ar, bg, de, es, fr, he, h
 
 | Variable                           | Default               | Description                              |
 | ---------------------------------- | --------------------- | ---------------------------------------- |
-| `NEXT_PUBLIC_DIRECTORY_LIST_LIMIT` | `6`                   | Works per page (pagination)        |
+| `NEXT_PUBLIC_DIRECTORY_LIST_LIMIT` | `6`                   | Works per page (pagination)              |
 | `REDIRECT_SEARCH_PARAM`            | `redirect_uri`        | URL param for post-login redirect        |
 | `ALLOWED_REDIRECT_URLS`            | `localhost,127.0.0.1` | Allowed redirect hosts (comma-separated) |
 

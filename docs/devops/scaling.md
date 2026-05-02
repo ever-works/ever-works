@@ -216,10 +216,10 @@ Generation tasks call external AI APIs (OpenAI, Anthropic, etc.) which have thei
 
 Key indexes are defined on entities to optimize common queries:
 
-| Entity                       | Index                   | Query Pattern                   |
-| ---------------------------- | ----------------------- | ------------------------------- |
-| `WorkGenerationHistory` | `[workId, status]` | History by work and status |
-| `WorkSchedule`          | `[status, nextRunAt]`   | Finding due schedules           |
-| `UserSubscription`           | `[userId, status]`      | Active subscription lookup      |
-| `Notification`               | `[userId, isRead]`      | Unread notification count       |
-| `UsageLedgerEntry`           | `[userId, status]`      | Billing aggregation             |
+| Entity                  | Index                 | Query Pattern              |
+| ----------------------- | --------------------- | -------------------------- |
+| `WorkGenerationHistory` | `[workId, status]`    | History by work and status |
+| `WorkSchedule`          | `[status, nextRunAt]` | Finding due schedules      |
+| `UserSubscription`      | `[userId, status]`    | Active subscription lookup |
+| `Notification`          | `[userId, isRead]`    | Unread notification count  |
+| `UsageLedgerEntry`      | `[userId, status]`    | Billing aggregation        |

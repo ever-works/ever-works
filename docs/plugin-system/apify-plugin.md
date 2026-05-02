@@ -46,11 +46,11 @@ graph TD
 
 The plugin uses a three-level configuration approach:
 
-| Level   | Where                     | What                                                  |
-| ------- | ------------------------- | ----------------------------------------------------- |
-| Level 1 | Settings > Plugins        | API token (admin or user scope)                       |
-| Level 2 | Work plugin settings | Enable/disable per work                          |
-| Level 3 | Generation form           | Dataset ID, actor run ID, max items, relevance filter |
+| Level   | Where                | What                                                  |
+| ------- | -------------------- | ----------------------------------------------------- |
+| Level 1 | Settings > Plugins   | API token (admin or user scope)                       |
+| Level 2 | Work plugin settings | Enable/disable per work                               |
+| Level 3 | Generation form      | Dataset ID, actor run ID, max items, relevance filter |
 
 ## Configuration
 
@@ -77,11 +77,11 @@ The field mapping controls how Apify dataset fields are transformed into Ever Wo
 
 The plugin injects these fields into the generation form via `IFormSchemaProvider`:
 
-| Field Name                | Type      | Default | Description                                        |
-| ------------------------- | --------- | ------- | -------------------------------------------------- |
-| `apify_datasetId`         | `text`    | (empty) | Apify dataset ID to import from                    |
-| `apify_actorRunId`        | `text`    | (empty) | Import from a specific actor run instead           |
-| `apify_maxItems`          | `number`  | `100`   | Maximum items to import (0 = no limit)             |
+| Field Name                | Type      | Default | Description                                   |
+| ------------------------- | --------- | ------- | --------------------------------------------- |
+| `apify_datasetId`         | `text`    | (empty) | Apify dataset ID to import from               |
+| `apify_actorRunId`        | `text`    | (empty) | Import from a specific actor run instead      |
+| `apify_maxItems`          | `number`  | `100`   | Maximum items to import (0 = no limit)        |
 | `apify_filterByRelevance` | `boolean` | `true`  | Only import items relevant to the work prompt |
 
 These fields are grouped under a collapsible "Apify" section:
@@ -224,5 +224,5 @@ transformFormValues(values) {
 | Empty import results             | Invalid dataset ID or empty dataset             | Verify the dataset ID in the Apify console            |
 | "Apify API token not configured" | No API token set                                | Enter your token in plugin settings                   |
 | "Apify API error: 401"           | Invalid API token                               | Regenerate the token in Apify Settings > Integrations |
-| Irrelevant items imported        | Relevance filter disabled or keywords too broad | Enable filtering and refine the work prompt      |
+| Irrelevant items imported        | Relevance filter disabled or keywords too broad | Enable filtering and refine the work prompt           |
 | Missing fields in imported items | Field mapping does not match dataset structure  | Update the default field mapping in plugin settings   |

@@ -226,14 +226,14 @@ return {
 
 Each generation run stores metrics in the `WorkGenerationHistoryEntry`:
 
-| Metric                      | Description                        |
-| --------------------------- | ---------------------------------- |
-| `durationInSeconds`         | Total generation wall-clock time   |
-| `newItemsCount`             | Items created during this run      |
-| `updatedItemsCount`         | Items updated during this run      |
-| `totalItemsCount`           | Total items in work after run |
-| `metrics.total_tokens_used` | LLM token consumption              |
-| `metrics.total_cost`        | Estimated LLM cost (USD)           |
+| Metric                      | Description                      |
+| --------------------------- | -------------------------------- |
+| `durationInSeconds`         | Total generation wall-clock time |
+| `newItemsCount`             | Items created during this run    |
+| `updatedItemsCount`         | Items updated during this run    |
+| `totalItemsCount`           | Total items in work after run    |
+| `metrics.total_tokens_used` | LLM token consumption            |
+| `metrics.total_cost`        | Estimated LLM cost (USD)         |
 
 These metrics are displayed in the [Generation History UI](../web-dashboard/history-ui.md).
 

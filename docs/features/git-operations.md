@@ -35,15 +35,15 @@ GitFacadeService
 
 ### Repository Management
 
-| Method                                             | Description                  |
-| -------------------------------------------------- | ---------------------------- |
-| `getRepository(owner, repo, options)`              | Get repository metadata      |
-| `repositoryExists(owner, repo, options)`           | Check if a repository exists |
-| `createRepository(owner, repo, options)`           | Create a new repository      |
-| `hasRepositoryAccess(owner, repo, options)`        | Verify write access          |
-| `getWorkContents(owner, repo, path, options)` | List files in a work    |
-| `getFileContent(owner, repo, path, options)`       | Read a file's content        |
-| `getReadme(owner, repo, options)`                  | Fetch the README file        |
+| Method                                        | Description                  |
+| --------------------------------------------- | ---------------------------- |
+| `getRepository(owner, repo, options)`         | Get repository metadata      |
+| `repositoryExists(owner, repo, options)`      | Check if a repository exists |
+| `createRepository(owner, repo, options)`      | Create a new repository      |
+| `hasRepositoryAccess(owner, repo, options)`   | Verify write access          |
+| `getWorkContents(owner, repo, path, options)` | List files in a work         |
+| `getFileContent(owner, repo, path, options)`  | Read a file's content        |
+| `getReadme(owner, repo, options)`             | Fetch the README file        |
 
 ### Local Git Operations
 

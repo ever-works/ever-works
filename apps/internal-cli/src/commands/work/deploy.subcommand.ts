@@ -33,9 +33,7 @@ export class DeploySubCommand extends CommandRunner {
 
             await this.configCheck.requireConfiguration();
 
-            const selection = await this.workPrompt.promptWorkSelection(
-                this.workRepository,
-            );
+            const selection = await this.workPrompt.promptWorkSelection(this.workRepository);
             if (selection.cancelled || !selection.work) {
                 console.log(chalk.yellow('\n⚠ Operation cancelled.'));
                 return;

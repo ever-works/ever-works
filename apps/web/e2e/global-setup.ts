@@ -41,10 +41,9 @@ setup('authenticate', async ({ page, baseURL }) => {
     // Wait for successful redirect to dashboard. The regex matches `/en`, `/en/`,
     // `/en?...`, or `/en/<dashboard-path>` — but NOT `/en/login` or other auth pages
     // (so we don't accidentally consider the still-on-login state as success).
-    await page.waitForURL(
-        /\/en(\/(?!login|register|forgot|reset|email|auth)|$|\?)/,
-        { timeout: 60_000 },
-    );
+    await page.waitForURL(/\/en(\/(?!login|register|forgot|reset|email|auth)|$|\?)/, {
+        timeout: 60_000,
+    });
 
     // Verify we're authenticated
     await expect(page).not.toHaveURL(/\/login/);

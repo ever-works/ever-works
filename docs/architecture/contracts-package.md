@@ -29,7 +29,7 @@ The package exposes four entry points:
 | `@ever-works/contracts/item`   | `src/item/`    | Item data structures, categories, tags, collections, brands, badges |
 | `@ever-works/contracts/domain` | `src/domain/`  | Domain analysis types, web page data, relevance assessment          |
 | `@ever-works/contracts/form`   | `src/form/`    | Form field definitions, validation rules, field groups              |
-| `@ever-works/contracts/api`    | `src/api/`     | API request/response DTOs for generators and works            |
+| `@ever-works/contracts/api`    | `src/api/`     | API request/response DTOs for generators and works                  |
 
 ## Item Types (`@ever-works/contracts/item`)
 
@@ -313,14 +313,14 @@ interface FormFieldCondition {
 
 ### Work API Types
 
-| Type                                 | Description                                                |
-| ------------------------------------ | ---------------------------------------------------------- |
-| `GenerateStatusType`                 | Enum: generation status (idle, running, completed, failed) |
+| Type                            | Description                                                |
+| ------------------------------- | ---------------------------------------------------------- |
+| `GenerateStatusType`            | Enum: generation status (idle, running, completed, failed) |
 | `WorkScheduleCadence`           | Enum: schedule frequency (daily, weekly, monthly)          |
 | `WorkScheduleStatus`            | Enum: schedule status (active, paused, disabled)           |
 | `WorkScheduleBillingMode`       | Enum: billing mode for scheduled generations               |
-| `WorkScheduleDto`               | DTO for work schedule configuration                   |
-| `GenerationMetrics`                  | Metrics from a generation run                              |
+| `WorkScheduleDto`               | DTO for work schedule configuration                        |
+| `GenerationMetrics`             | Metrics from a generation run                              |
 | `WorkGenerationHistoryEntry`    | Single generation history entry                            |
 | `WorkGenerationHistoryResponse` | Paginated generation history                               |
 

@@ -121,9 +121,7 @@ export class PluginSettingsService {
                 pluginId,
             );
             workSettings = dirEntity?.settings || {};
-            workSecrets = effectiveOptions?.includeSecrets
-                ? dirEntity?.secretSettings || {}
-                : {};
+            workSecrets = effectiveOptions?.includeSecrets ? dirEntity?.secretSettings || {} : {};
         }
 
         // Resolve each setting
@@ -309,10 +307,7 @@ export class PluginSettingsService {
         settings: Record<string, unknown>,
         options?: { secretKeys?: string[] },
     ): Promise<void> {
-        const existing = await this.workPluginRepository.findByWorkAndPlugin(
-            workId,
-            pluginId,
-        );
+        const existing = await this.workPluginRepository.findByWorkAndPlugin(workId, pluginId);
         const validationSettings = {
             ...(existing?.settings || {}),
             ...(existing?.secretSettings || {}),
@@ -357,9 +352,7 @@ export class PluginSettingsService {
             timestamp: Date.now(),
         });
 
-        this.logger.debug(
-            `Updated work settings for plugin ${pluginId}, work ${workId}`,
-        );
+        this.logger.debug(`Updated work settings for plugin ${pluginId}, work ${workId}`);
     }
 
     /**

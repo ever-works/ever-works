@@ -96,11 +96,7 @@ export class WorkMemberRepository {
     /**
      * Check if a user has at least the specified role in a work.
      */
-    async hasRole(
-        workId: string,
-        userId: string,
-        minimumRole: WorkMemberRole,
-    ): Promise<boolean> {
+    async hasRole(workId: string, userId: string, minimumRole: WorkMemberRole): Promise<boolean> {
         const member = await this.findMember(workId, userId);
         if (!member) return false;
 

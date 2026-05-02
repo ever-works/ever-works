@@ -135,10 +135,10 @@ interface InviteMemberDialogProps {
 
 **Available Roles**:
 
-| Role      | Label   | Description                                              |
-| --------- | ------- | -------------------------------------------------------- |
+| Role      | Label   | Description                                         |
+| --------- | ------- | --------------------------------------------------- |
 | `VIEWER`  | Viewer  | Can view work content and settings (read-only)      |
-| `EDITOR`  | Editor  | Can edit items, categories, and content                  |
+| `EDITOR`  | Editor  | Can edit items, categories, and content             |
 | `MANAGER` | Manager | Can manage members, settings, and all work features |
 
 The dialog displays a contextual description panel below the role selector that updates dynamically based on the selected role.
@@ -183,8 +183,8 @@ All server mutations go through Next.js server actions. Optimistic updates are a
 
 ## Related API Endpoints
 
-| Action        | Server Action Function                          | HTTP Method |
-| ------------- | ----------------------------------------------- | ----------- |
+| Action        | Server Action Function                     | HTTP Method |
+| ------------- | ------------------------------------------ | ----------- |
 | Invite member | `inviteMember(workId, email, role)`        | POST        |
 | Update role   | `updateMemberRole(workId, memberId, role)` | PATCH       |
 | Remove member | `removeMember(workId, memberId)`           | DELETE      |

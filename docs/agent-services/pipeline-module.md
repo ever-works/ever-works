@@ -147,9 +147,9 @@ stateDiagram-v2
 
 | Event                 | Payload                         | When              |
 | --------------------- | ------------------------------- | ----------------- |
-| `execution:started`   | `{ workId, totalSteps }`   | Pipeline begins   |
-| `execution:completed` | `{ workId, result }`       | Pipeline finishes |
-| `execution:cancelled` | `{ workId, reason }`       | User cancels      |
+| `execution:started`   | `{ workId, totalSteps }`        | Pipeline begins   |
+| `execution:completed` | `{ workId, result }`            | Pipeline finishes |
+| `execution:cancelled` | `{ workId, reason }`            | User cancels      |
 | `step:started`        | `{ stepId, stepIndex }`         | Step begins       |
 | `step:completed`      | `{ stepId, stepIndex, result }` | Step finishes     |
 | `step:failed`         | `{ stepId, stepIndex, error }`  | Step errors       |

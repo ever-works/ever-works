@@ -80,27 +80,27 @@ Comparisons are configured at two levels:
 
 These fields appear on the work generator settings form (provided by the Comparison Generator plugin's form schema):
 
-| Field                 | Type    | Default         | Description                                             |
-| --------------------- | ------- | --------------- | ------------------------------------------------------- |
-| `comparison_enabled`  | boolean | `false`         | Master switch for comparisons                           |
+| Field                 | Type    | Default    | Description                                        |
+| --------------------- | ------- | ---------- | -------------------------------------------------- |
+| `comparison_enabled`  | boolean | `false`    | Master switch for comparisons                      |
 | `comparison_cadence`  | select  | `use_work` | Cadence: Use Work Schedule, Daily, Weekly, Monthly |
-| `comparison_max_mode` | select  | `custom`        | Custom Limit or All Pairs                               |
-| `comparison_max`      | number  | `50`            | Max comparisons (1–500, only shown in Custom mode)      |
+| `comparison_max_mode` | select  | `custom`   | Custom Limit or All Pairs                          |
+| `comparison_max`      | number  | `50`       | Max comparisons (1–500, only shown in Custom mode) |
 
 ### 2. Plugin Settings
 
 The **Comparison Generator** plugin (`comparison-generator`) provides additional configuration. See [Built-in Plugins](/plugin-system/built-in-plugins#comparison-generator) for the full settings table.
 
-| Setting                    | Type    | Default         | Description                                            |
-| -------------------------- | ------- | --------------- | ------------------------------------------------------ |
-| `cadence_override`         | string  | `use_work` | `use_work`, `daily`, `weekly`, `monthly`          |
-| `max_comparisons_mode`     | string  | `custom`        | `custom` or `unlimited`                                |
-| `max_comparisons`          | number  | `50`            | Max total comparisons (1–500)                          |
-| `min_items_for_comparison` | number  | `3`             | Min items in category before generating (2–20)         |
-| `ai_provider`              | string  | —               | Override AI provider for comparison generation         |
-| `ai_model`                 | string  | —               | Override AI model for comparison generation            |
-| `custom_prompt`            | string  | —               | Additional instructions appended to comparison prompts |
-| `extended_analysis`        | boolean | `false`         | Enable 7-section deep-dive extended analysis           |
+| Setting                    | Type    | Default    | Description                                            |
+| -------------------------- | ------- | ---------- | ------------------------------------------------------ |
+| `cadence_override`         | string  | `use_work` | `use_work`, `daily`, `weekly`, `monthly`               |
+| `max_comparisons_mode`     | string  | `custom`   | `custom` or `unlimited`                                |
+| `max_comparisons`          | number  | `50`       | Max total comparisons (1–500)                          |
+| `min_items_for_comparison` | number  | `3`        | Min items in category before generating (2–20)         |
+| `ai_provider`              | string  | —          | Override AI provider for comparison generation         |
+| `ai_model`                 | string  | —          | Override AI model for comparison generation            |
+| `custom_prompt`            | string  | —          | Additional instructions appended to comparison prompts |
+| `extended_analysis`        | boolean | `false`    | Enable 7-section deep-dive extended analysis           |
 
 ## Scheduling
 
@@ -157,8 +157,8 @@ This is separate from the [Advanced Prompts](./advanced-prompts) that customize 
 
 All endpoints require JWT authentication. Base path: `/api/works/:id/comparisons`.
 
-| Method   | Endpoint                                           | Description                             |
-| -------- | -------------------------------------------------- | --------------------------------------- |
+| Method   | Endpoint                                     | Description                             |
+| -------- | -------------------------------------------- | --------------------------------------- |
 | `GET`    | `/api/works/:id/comparisons`                 | List all comparisons                    |
 | `GET`    | `/api/works/:id/comparisons/remaining-count` | Count remaining un-generated pairs      |
 | `GET`    | `/api/works/:id/comparisons/:slug`           | Get a comparison with markdown          |

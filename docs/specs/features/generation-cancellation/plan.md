@@ -41,8 +41,8 @@ flowchart LR
 
 ## 4. API Surface
 
-| Method | Endpoint                                 | Description                        |
-| ------ | ---------------------------------------- | ---------------------------------- |
+| Method | Endpoint                           | Description                        |
+| ------ | ---------------------------------- | ---------------------------------- |
 | `POST` | `/api/works/:id/cancel-generation` | `202 Accepted` + cancellation mode |
 
 ## 5. Plugin / Web / CLI Surface

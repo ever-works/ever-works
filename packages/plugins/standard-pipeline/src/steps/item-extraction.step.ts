@@ -241,9 +241,7 @@ export class ItemExtractionStep extends BasePipelineStep {
 						const uniqueItems = this.deduplicateItems(validatedItems);
 						extractedItems.push(...uniqueItems);
 					} else {
-						logger.debug(
-							`[${workSlug}] No items extracted by LLM from any chunks in ${page.source_url}`
-						);
+						logger.debug(`[${workSlug}] No items extracted by LLM from any chunks in ${page.source_url}`);
 					}
 				} else {
 					// Process the entire content at once for smaller pages

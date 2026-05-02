@@ -103,10 +103,7 @@ export class WorkOwnershipService {
     /**
      * Ensure user can manage work members.
      */
-    async ensureCanManageMembers(
-        workId: string,
-        userId: string,
-    ): Promise<WorkAccessResult> {
+    async ensureCanManageMembers(workId: string, userId: string): Promise<WorkAccessResult> {
         return this.ensureAccess(workId, userId, WorkMemberRole.MANAGER);
     }
 

@@ -51,9 +51,7 @@ export class GenerateSubCommand extends CommandRunner {
             const user = await this.userRepository.createOrGetLocalUser();
 
             // Select work
-            const selection = await this.workPrompt.promptWorkSelection(
-                this.workRepository,
-            );
+            const selection = await this.workPrompt.promptWorkSelection(this.workRepository);
 
             if (selection.cancelled || !selection.work) {
                 console.log(chalk.blue('\nℹ Generation cancelled.'));
@@ -73,10 +71,7 @@ export class GenerateSubCommand extends CommandRunner {
             if (work.generateStatus?.status === 'generating') {
                 console.log(chalk.yellow('\n⚠ Generation already in progress.'));
                 if (work.generateStatus.step) {
-                    console.log(
-                        chalk.gray('Current step:'),
-                        chalk.white(work.generateStatus.step),
-                    );
+                    console.log(chalk.gray('Current step:'), chalk.white(work.generateStatus.step));
                 }
                 console.log(chalk.gray('Please wait for the current generation to complete.'));
                 return;
@@ -180,10 +175,7 @@ export class GenerateSubCommand extends CommandRunner {
                     return;
                 }
 
-                const { work: freshWork } = await this.workQueryService.getWork(
-                    work.id,
-                    user,
-                );
+                const { work: freshWork } = await this.workQueryService.getWork(work.id, user);
 
                 if (freshWork.generateStatus?.status === GenerateStatusType.GENERATED) {
                     spinner.succeed('\n✓ Generation process finished!');

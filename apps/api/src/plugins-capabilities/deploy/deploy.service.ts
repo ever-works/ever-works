@@ -245,11 +245,7 @@ export class DeployService {
         return randomBytes(this.CRON_SECRET_LENGTH).toString('hex');
     }
 
-    private async dispatchWithRetry(
-        work: Work,
-        user: User,
-        gitToken: string,
-    ): Promise<boolean> {
+    private async dispatchWithRetry(work: Work, user: User, gitToken: string): Promise<boolean> {
         const workflowFilesToTry = ['deploy_vercel.yaml', 'deploy_prod.yaml'];
         const owner = work.getRepoOwner('website');
         const repo = work.getWebsiteRepo();

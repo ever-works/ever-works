@@ -18,10 +18,7 @@ export class WorkScheduleRepository {
         });
     }
 
-    async upsert(
-        workId: string,
-        data: Partial<WorkSchedule>,
-    ): Promise<WorkSchedule> {
+    async upsert(workId: string, data: Partial<WorkSchedule>): Promise<WorkSchedule> {
         await this.repository.upsert(
             {
                 workId,

@@ -43,9 +43,7 @@ export default async function WorkGeneratorPage({ params }: Params) {
         workAPI
             .getWebsiteTemplates()
             .catch((): { templates: WebsiteTemplateOption[] } => ({ templates: [] })),
-        pluginsAPI
-            .listForWork(id)
-            .catch((): { plugins: WorkPlugin[] } => ({ plugins: [] })),
+        pluginsAPI.listForWork(id).catch((): { plugins: WorkPlugin[] } => ({ plugins: [] })),
     ]);
     return (
         <GeneratorForm

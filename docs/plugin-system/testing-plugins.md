@@ -85,7 +85,7 @@ The mock context includes functional implementations of every platform service:
 | **HTTP Client**           | Returns pre-configured responses by method + URL key                  |
 | **Environment**           | Configurable platform version, environment flags, paths               |
 | **Environment Variables** | In-memory variable store                                              |
-| **Work Service**     | Lookup by ID or slug from provided `Map`                              |
+| **Work Service**          | Lookup by ID or slug from provided `Map`                              |
 | **User Service**          | Lookup by ID; returns configurable current user                       |
 | **Events**                | Working event subscription and emission                               |
 | **Custom Capabilities**   | Full registration and retrieval                                       |

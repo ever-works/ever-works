@@ -2,10 +2,7 @@
 
 import { useEffect, useMemo, useState, useTransition } from 'react';
 import { useTranslations, useLocale } from 'next-intl';
-import {
-    WorkGenerationHistoryEntry,
-    WorkGenerationHistoryResponse,
-} from '@/lib/api/types-only';
+import { WorkGenerationHistoryEntry, WorkGenerationHistoryResponse } from '@/lib/api/types-only';
 import { HistoryTable } from './HistoryTable';
 import { HistoryEmptyState } from './HistoryEmptyState';
 import { Button } from '@/components/ui/button';
@@ -42,9 +39,7 @@ type HistoryViewState = {
     pageCache: Record<string, CachedHistoryPage>;
 };
 
-function buildInitialState(
-    initialHistory: WorkGenerationHistoryResponse | null,
-): HistoryViewState {
+function buildInitialState(initialHistory: WorkGenerationHistoryResponse | null): HistoryViewState {
     return {
         entries: initialHistory?.history ?? [],
         total: initialHistory?.total ?? 0,
@@ -63,10 +58,7 @@ function buildInitialState(
     };
 }
 
-export function WorkHistoryPageClient({
-    workId,
-    initialHistory,
-}: WorkHistoryPageClientProps) {
+export function WorkHistoryPageClient({ workId, initialHistory }: WorkHistoryPageClientProps) {
     const historyKey = useMemo(
         () =>
             JSON.stringify({
@@ -86,10 +78,7 @@ export function WorkHistoryPageClient({
     );
 }
 
-function WorkHistoryPageClientContent({
-    workId,
-    initialHistory,
-}: WorkHistoryPageClientProps) {
+function WorkHistoryPageClientContent({ workId, initialHistory }: WorkHistoryPageClientProps) {
     const t = useTranslations('dashboard.workDetail.history');
     const locale = useLocale();
 

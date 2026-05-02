@@ -70,9 +70,7 @@ export class DeploymentVerifierService {
         let inVerification = false;
 
         const cleanup = (state?: DeploymentReadyState) => {
-            this.logger.log(
-                `Cleaning up verification for work ${work.id} - ${state || 'UNKNOWN'}`,
-            );
+            this.logger.log(`Cleaning up verification for work ${work.id} - ${state || 'UNKNOWN'}`);
 
             if (intervalId.value) {
                 clearInterval(intervalId.value);
@@ -122,9 +120,7 @@ export class DeploymentVerifierService {
                 // Check deployment state
                 const state = result.deploymentState as DeploymentReadyState | undefined;
 
-                this.logger.log(
-                    `Deployment for work ${work.id} is ${state || 'UNKNOWN'}`,
-                );
+                this.logger.log(`Deployment for work ${work.id} is ${state || 'UNKNOWN'}`);
 
                 if (state && ['READY', 'ERROR', 'CANCELED'].includes(state)) {
                     cleanup(state);
@@ -158,13 +154,10 @@ export class DeploymentVerifierService {
         deploymentState?: string;
     }> {
         try {
-            const result = await this.deployFacade.lookupExistingDeployment(
-                work.getWebsiteRepo(),
-                {
-                    userId,
-                    workId: work.id,
-                },
-            );
+            const result = await this.deployFacade.lookupExistingDeployment(work.getWebsiteRepo(), {
+                userId,
+                workId: work.id,
+            });
 
             if (result.found && (result.website || result.deploymentState)) {
                 await this.repository.update(work.id, {
@@ -175,10 +168,7 @@ export class DeploymentVerifierService {
 
             return result;
         } catch (error) {
-            this.logger.error(
-                `Failed to lookup existing deployment for work ${work.id}:`,
-                error,
-            );
+            this.logger.error(`Failed to lookup existing deployment for work ${work.id}:`, error);
             return { found: false };
         }
     }

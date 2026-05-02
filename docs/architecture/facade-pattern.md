@@ -87,7 +87,7 @@ The `resolvePlugin<T>()` method follows a four-level priority chain:
 | Priority | Source                   | Description                                                  |
 | -------- | ------------------------ | ------------------------------------------------------------ |
 | 1        | `providerOverride`       | Explicit provider ID from the request                        |
-| 2        | Work default        | Active provider set for the specific work               |
+| 2        | Work default             | Active provider set for the specific work                    |
 | 3        | `defaultForCapabilities` | Plugin declaring itself as the default for a capability      |
 | 4        | First enabled            | First loaded and enabled plugin with the required capability |
 
@@ -97,7 +97,7 @@ Plugin settings are resolved through a four-level hierarchy via `PluginSettingsS
 
 | Level | Scope           | Description                                  |
 | ----- | --------------- | -------------------------------------------- |
-| 1     | Work       | Settings specific to a work             |
+| 1     | Work            | Settings specific to a work                  |
 | 2     | User            | Settings specific to a user                  |
 | 3     | Admin           | Global admin-configured settings             |
 | 4     | Plugin defaults | Default values from the plugin's JSON Schema |

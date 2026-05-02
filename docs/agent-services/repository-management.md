@@ -18,7 +18,7 @@ Each work in Ever Works is backed by up to three Git repositories:
 | Repository Type | Naming Convention | Contents                                      |
 | --------------- | ----------------- | --------------------------------------------- |
 | `data`          | `{slug}-data`     | Item JSON files, config, categories, tags     |
-| `work`     | `{slug}`          | Markdown README and documentation             |
+| `work`          | `{slug}`          | Markdown README and documentation             |
 | `website`       | `{slug}-website`  | Generated website (Astro/Next.js) source code |
 
 The `RepositoryManagementService` allows users to check the status of these repositories and toggle their visibility (public/private).

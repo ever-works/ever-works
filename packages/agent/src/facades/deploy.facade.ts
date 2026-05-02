@@ -214,8 +214,7 @@ export class DeployFacadeService implements IDeployFacade {
         options: DeployFacadeOptions,
     ): Promise<DeploymentLookupResult> {
         try {
-            const { plugin, token, work } =
-                await this.resolvePluginAndTokenWithWork(options);
+            const { plugin, token, work } = await this.resolvePluginAndTokenWithWork(options);
 
             // Get team scope from settings
             const settings = await this.settingsService.getSettings(plugin.id, {
@@ -255,11 +254,7 @@ export class DeployFacadeService implements IDeployFacade {
             if (!work?.deployProvider) {
                 return null;
             }
-            return this.getTokenFromSettings(
-                work.deployProvider,
-                options.userId,
-                options.workId,
-            );
+            return this.getTokenFromSettings(work.deployProvider, options.userId, options.workId);
         } catch {
             return null;
         }
@@ -313,19 +308,14 @@ export class DeployFacadeService implements IDeployFacade {
         let providerId: string | undefined;
 
         try {
-            const { plugin, token, work } =
-                await this.resolvePluginAndTokenWithWork(options);
+            const { plugin, token, work } = await this.resolvePluginAndTokenWithWork(options);
             providerId = plugin.id;
             if (plugin.getDomains) {
                 const projectId = await this.resolveProjectId(plugin, token, work, options);
                 const teamScope = await this.getTeamScope(plugin.id, options);
                 providerDomains = await plugin.getDomains(projectId, token, teamScope);
                 if (shouldAutoImportProviderDomains) {
-                    await this.reconcileProviderDomains(
-                        options.workId,
-                        plugin.id,
-                        providerDomains,
-                    );
+                    await this.reconcileProviderDomains(options.workId, plugin.id, providerDomains);
                 }
             }
         } catch (error) {
@@ -376,16 +366,9 @@ export class DeployFacadeService implements IDeployFacade {
     ): Promise<void> {
         for (const providerDomain of providerDomains) {
             try {
-                const existing = await this.domainRepository.findOne(
-                    workId,
-                    providerDomain.name,
-                );
+                const existing = await this.domainRepository.findOne(workId, providerDomain.name);
                 if (!existing) {
-                    await this.domainRepository.addDomain(
-                        workId,
-                        providerDomain.name,
-                        providerId,
-                    );
+                    await this.domainRepository.addDomain(workId, providerDomain.name, providerId);
                 } else if (existing.provider !== providerId) {
                     await this.domainRepository.updateProvider(
                         workId,
@@ -435,9 +418,7 @@ export class DeployFacadeService implements IDeployFacade {
             );
 
             if (providerDomain) {
-                await this.reconcileProviderDomains(options.workId, plugin.id, [
-                    providerDomain,
-                ]);
+                await this.reconcileProviderDomains(options.workId, plugin.id, [providerDomain]);
                 await this.promoteVerifiedDomainWebsite(work, providerDomain);
                 return {
                     domain: providerDomain,
@@ -621,10 +602,7 @@ export class DeployFacadeService implements IDeployFacade {
     }> {
         const work = await this.workRepository.findById(options.workId);
         if (!work) {
-            throw new DeployFacadeError(
-                `Work not found: ${options.workId}`,
-                'resolvePlugin',
-            );
+            throw new DeployFacadeError(`Work not found: ${options.workId}`, 'resolvePlugin');
         }
 
         const providerId = work.deployProvider;
@@ -642,11 +620,7 @@ export class DeployFacadeService implements IDeployFacade {
         }
 
         // Get token from plugin settings (user-required mode)
-        const token = await this.getTokenFromSettings(
-            providerId,
-            options.userId,
-            options.workId,
-        );
+        const token = await this.getTokenFromSettings(providerId, options.userId, options.workId);
 
         if (!token) {
             const providerName =

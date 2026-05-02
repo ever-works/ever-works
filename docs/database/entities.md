@@ -120,12 +120,12 @@ Implements role-based access control for work collaboration.
 
 **Unique Constraint**: `[workId, userId]` -- A user can only have one membership per work.
 
-| Role      | Level | Capabilities                                              |
-| --------- | ----- | --------------------------------------------------------- |
+| Role      | Level | Capabilities                                         |
+| --------- | ----- | ---------------------------------------------------- |
 | `OWNER`   | 4     | Reserved for work creator (implicit, not assignable) |
-| `MANAGER` | 3     | Edit content, manage members                              |
-| `EDITOR`  | 2     | Edit content only                                         |
-| `VIEWER`  | 1     | Read-only access                                          |
+| `MANAGER` | 3     | Edit content, manage members                         |
+| `EDITOR`  | 2     | Edit content only                                    |
+| `VIEWER`  | 1     | Read-only access                                     |
 
 Helper methods: `hasRoleOrHigher(role)`, `canManageMembers()`, `canEdit()`.
 
@@ -173,7 +173,7 @@ Defines available subscription tiers with pricing and feature limits.
 | -------------------- | ---------------------- | ------------------------------------- |
 | `code`               | `SubscriptionPlanCode` | `free`, `standard`, `premium`         |
 | `displayName`        | `string`               | Human-readable name                   |
-| `maxWorks`     | `int`                  | Work limit for the plan          |
+| `maxWorks`           | `int`                  | Work limit for the plan               |
 | `allowedCadences`    | `simple-json`          | Array of allowed schedule frequencies |
 | `monthlyPrice`       | `decimal(10,2)`        | Plan price                            |
 | `overagePricePerRun` | `decimal(10,2)`        | Cost per extra generation run         |
@@ -203,14 +203,14 @@ Defines available subscription tiers with pricing and feature limits.
 
 Tracks individual generation runs for usage-based billing.
 
-| Column                | Type                           | Purpose                                                |
-| --------------------- | ------------------------------ | ------------------------------------------------------ |
-| `triggerType`         | `UsageLedgerTriggerType`       | `manual` or `scheduled`                                |
+| Column                | Type                      | Purpose                                                |
+| --------------------- | ------------------------- | ------------------------------------------------------ |
+| `triggerType`         | `UsageLedgerTriggerType`  | `manual` or `scheduled`                                |
 | `billingMode`         | `WorkScheduleBillingMode` | `subscription` or `usage`                              |
-| `units`               | `int`                          | Number of generation units consumed                    |
-| `amountCents`         | `int`                          | Charge in cents                                        |
-| `status`              | `UsageLedgerStatus`            | `pending`, `queued_for_settlement`, `paid`, `canceled` |
-| `generationHistoryId` | `string`                       | Links to the specific generation run                   |
+| `units`               | `int`                     | Number of generation units consumed                    |
+| `amountCents`         | `int`                     | Charge in cents                                        |
+| `status`              | `UsageLedgerStatus`       | `pending`, `queued_for_settlement`, `paid`, `canceled` |
+| `generationHistoryId` | `string`                  | Links to the specific generation run                   |
 
 ## Scheduling Entity
 
@@ -222,16 +222,16 @@ Tracks individual generation runs for usage-based billing.
 
 One-to-one with Work. Manages recurring generation runs.
 
-| Column                    | Type                           | Purpose                                          |
-| ------------------------- | ------------------------------ | ------------------------------------------------ |
+| Column                    | Type                      | Purpose                                          |
+| ------------------------- | ------------------------- | ------------------------------------------------ |
 | `cadence`                 | `WorkScheduleCadence`     | Frequency (daily, weekly, monthly, etc.)         |
 | `status`                  | `WorkScheduleStatus`      | `disabled`, `active`, `paused`                   |
 | `billingMode`             | `WorkScheduleBillingMode` | `subscription` or `usage`                        |
-| `nextRunAt`, `lastRunAt`  | `Date`                         | Schedule timing                                  |
-| `failureCount`            | `int`                          | Consecutive failures                             |
-| `maxFailureBeforePause`   | `int`                          | Default: 3, auto-pauses after this many failures |
-| `alwaysCreatePullRequest` | `boolean`                      | Force PR mode for scheduled runs                 |
-| `providerOverrides`       | `simple-json`                  | Override AI/search providers per schedule        |
+| `nextRunAt`, `lastRunAt`  | `Date`                    | Schedule timing                                  |
+| `failureCount`            | `int`                     | Consecutive failures                             |
+| `maxFailureBeforePause`   | `int`                     | Default: 3, auto-pauses after this many failures |
+| `alwaysCreatePullRequest` | `boolean`                 | Force PR mode for scheduled runs                 |
+| `providerOverrides`       | `simple-json`             | Override AI/search providers per schedule        |
 
 ## Support Entities
 

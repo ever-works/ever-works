@@ -11,13 +11,13 @@ The Ever Works dashboard uses several patterns for displaying collections of dat
 
 ## Component Overview
 
-| Component              | Pattern                                  | Virtualized | Source                                                           |
-| ---------------------- | ---------------------------------------- | ----------- | ---------------------------------------------------------------- |
-| `ItemsList`            | Card grid / list with search and filters | Yes         | `components/works/detail/items/ItemsList.tsx`              |
-| `HistoryTable`         | HTML table with status badges            | No          | `components/works/detail/history/HistoryTable.tsx`         |
-| `PluginGrid`           | Card grid with category grouping         | No          | `components/plugins/PluginGrid.tsx`                              |
+| Component         | Pattern                                  | Virtualized | Source                                                |
+| ----------------- | ---------------------------------------- | ----------- | ----------------------------------------------------- |
+| `ItemsList`       | Card grid / list with search and filters | Yes         | `components/works/detail/items/ItemsList.tsx`         |
+| `HistoryTable`    | HTML table with status badges            | No          | `components/works/detail/history/HistoryTable.tsx`    |
+| `PluginGrid`      | Card grid with category grouping         | No          | `components/plugins/PluginGrid.tsx`                   |
 | `WorkPluginsList` | Card list with capability selectors      | No          | `components/works/detail/plugins/WorkPluginsList.tsx` |
-| `MembersList`          | Divided list with role badges            | No          | `components/works/detail/members/MembersList.tsx`          |
+| `MembersList`     | Divided list with role badges            | No          | `components/works/detail/members/MembersList.tsx`     |
 
 ## ItemsList -- Virtualized Item Grid
 

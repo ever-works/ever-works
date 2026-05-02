@@ -52,10 +52,10 @@ interface PluginResponse {
 
 The API provides increasingly detailed plugin responses based on context:
 
-| Type                      | Extends              | Additional Fields                                                                            |
-| ------------------------- | -------------------- | -------------------------------------------------------------------------------------------- |
-| `PluginResponse`          | --                   | Base plugin data                                                                             |
-| `UserPluginResponse`      | `PluginResponse`     | `installed`, `enabled`, `settings`, `userPluginId`, `autoEnableForWorks`               |
+| Type                 | Extends              | Additional Fields                                                             |
+| -------------------- | -------------------- | ----------------------------------------------------------------------------- |
+| `PluginResponse`     | --                   | Base plugin data                                                              |
+| `UserPluginResponse` | `PluginResponse`     | `installed`, `enabled`, `settings`, `userPluginId`, `autoEnableForWorks`      |
 | `WorkPluginResponse` | `UserPluginResponse` | `workEnabled`, `activeCapability`, `workSettings`, `workPluginId`, `priority` |
 
 ### List Response Types
@@ -105,16 +105,16 @@ The `PluginSettingsSchema` and `PluginSettingsSchemaProperty` types are flattene
 
 ### Property Mapping
 
-| JSON Schema Extension | API Property     | Description                                  |
-| --------------------- | ---------------- | -------------------------------------------- |
-| `x-secret`            | `secret`         | Password-masked field                        |
-| `x-adminOnly`         | `adminOnly`      | Admin-only field                             |
-| `x-envVar`            | `envVar`         | Environment variable name                    |
-| `x-scope`             | `scope`          | Setting scope: `global`, `user`, `work` |
-| `x-widget`            | `widget`         | UI widget hint (e.g., `model-select`)        |
-| `x-hidden`            | `hidden`         | Hidden from settings UI                      |
-| `x-showIf`            | `showIf`         | Conditional visibility                       |
-| `x-requiredGroups`    | `requiredGroups` | Groups where at least one field must be set  |
+| JSON Schema Extension | API Property     | Description                                 |
+| --------------------- | ---------------- | ------------------------------------------- |
+| `x-secret`            | `secret`         | Password-masked field                       |
+| `x-adminOnly`         | `adminOnly`      | Admin-only field                            |
+| `x-envVar`            | `envVar`         | Environment variable name                   |
+| `x-scope`             | `scope`          | Setting scope: `global`, `user`, `work`     |
+| `x-widget`            | `widget`         | UI widget hint (e.g., `model-select`)       |
+| `x-hidden`            | `hidden`         | Hidden from settings UI                     |
+| `x-showIf`            | `showIf`         | Conditional visibility                      |
+| `x-requiredGroups`    | `requiredGroups` | Groups where at least one field must be set |
 
 ### Schema Transformation
 

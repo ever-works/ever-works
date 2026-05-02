@@ -84,13 +84,13 @@ The service:
 
 | Kind                     | Description                                          |
 | ------------------------ | ---------------------------------------------------- |
-| `MEMBER_INVITED`         | You were invited to a work                      |
+| `MEMBER_INVITED`         | You were invited to a work                           |
 | `SCHEDULE_PAUSED`        | Schedule auto-paused after consecutive failures      |
 | `GENERATION_COMPLETED`   | Generation finished (opt-in)                         |
 | `GENERATION_FAILED`      | Generation failed                                    |
 | `OAUTH_REAUTH_REQUIRED`  | Provider token revoked; reconnect to keep generating |
 | `PAYMENT_FAILED`         | Stripe payment failed; plan downgrade pending        |
-| `COMMUNITY_PR_PROCESSED` | Community PR was merged into your work          |
+| `COMMUNITY_PR_PROCESSED` | Community PR was merged into your work               |
 | `CUSTOM_DOMAIN_VERIFIED` | Domain DNS verified; site available                  |
 
 Adding a new kind is one enum value + one template + one renderer

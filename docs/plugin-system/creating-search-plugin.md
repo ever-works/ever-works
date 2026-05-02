@@ -550,15 +550,15 @@ The `settingsSchema` property uses JSON Schema extended with Ever Works custom p
 
 ### Custom schema extensions
 
-| Extension     | Type                                | Purpose                                                                                         |
-| ------------- | ----------------------------------- | ----------------------------------------------------------------------------------------------- |
-| `x-secret`    | `boolean`                           | Field value is encrypted at rest, never returned in API responses, rendered as a password input |
-| `x-envVar`    | `string`                            | Environment variable fallback checked when no user or admin value is saved                      |
+| Extension     | Type                           | Purpose                                                                                         |
+| ------------- | ------------------------------ | ----------------------------------------------------------------------------------------------- |
+| `x-secret`    | `boolean`                      | Field value is encrypted at rest, never returned in API responses, rendered as a password input |
+| `x-envVar`    | `string`                       | Environment variable fallback checked when no user or admin value is saved                      |
 | `x-scope`     | `'global' \| 'user' \| 'work'` | Which settings scope this field belongs to                                                      |
-| `x-widget`    | `string`                            | UI widget hint (e.g., `textarea`, `select`, `toggle`)                                           |
-| `x-adminOnly` | `boolean`                           | Only visible to admins                                                                          |
-| `x-hidden`    | `boolean`                           | Never shown in the UI                                                                           |
-| `x-showIf`    | `{ field, value }`                  | Conditional visibility based on another field                                                   |
+| `x-widget`    | `string`                       | UI widget hint (e.g., `textarea`, `select`, `toggle`)                                           |
+| `x-adminOnly` | `boolean`                      | Only visible to admins                                                                          |
+| `x-hidden`    | `boolean`                      | Never shown in the UI                                                                           |
+| `x-showIf`    | `{ field, value }`             | Conditional visibility based on another field                                                   |
 
 ### Example: advanced settings schema
 

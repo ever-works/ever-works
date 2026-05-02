@@ -47,15 +47,15 @@ Community PR Processing is configured per-work through the Settings page or the 
 
 Process all unhandled community PRs for a work on demand.
 
-| Method | Endpoint                                     | Auth |
-| ------ | -------------------------------------------- | ---- |
+| Method | Endpoint                               | Auth |
+| ------ | -------------------------------------- | ---- |
 | `POST` | `/api/works/:id/process-community-prs` | JWT  |
 
 **Path parameters:**
 
-| Parameter | Type   | Description    |
-| --------- | ------ | -------------- |
-| `id`      | string | Work UUID |
+| Parameter | Type   | Description |
+| --------- | ------ | ----------- |
+| `id`      | string | Work UUID   |
 
 **Response** (`200 OK`):
 
@@ -67,8 +67,8 @@ Process all unhandled community PRs for a work on demand.
 
 **Errors:**
 
-| Status | Reason                                                    |
-| ------ | --------------------------------------------------------- |
+| Status | Reason                                               |
+| ------ | ---------------------------------------------------- |
 | `400`  | Community PR processing is not enabled for this work |
 | `404`  | Work not found                                       |
 

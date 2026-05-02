@@ -118,7 +118,7 @@ Controls scheduled updates, plan limits, and billing.
 | Method                                       | Environment Variable                          | Default       | Description                             |
 | -------------------------------------------- | --------------------------------------------- | ------------- | --------------------------------------- |
 | `subscriptions.isEnabled()`                  | `SUBSCRIPTIONS_ENABLED`                       | `false`       | Master toggle for subscription features |
-| `subscriptions.scheduledUpdatesEnabled()`    | `SCHEDULED_UPDATES_ENABLED`                   | `true`        | Enable work scheduling             |
+| `subscriptions.scheduledUpdatesEnabled()`    | `SCHEDULED_UPDATES_ENABLED`                   | `true`        | Enable work scheduling                  |
 | `subscriptions.getDispatchIntervalMinutes()` | `SCHEDULED_UPDATES_DISPATCH_INTERVAL_MINUTES` | `5`           | Cron dispatch interval                  |
 | `subscriptions.getMaxBatch()`                | `SCHEDULED_UPDATES_MAX_BATCH`                 | `25`          | Max schedules per dispatch cycle        |
 | `subscriptions.getDefaultPlanCode()`         | `SUBSCRIPTIONS_DEFAULT_PLAN`                  | `'free'`      | Default subscription plan               |
@@ -179,13 +179,13 @@ import { config } from '@src/config';
 
 ### Key Consumers
 
-| Consumer                             | Config Namespace | Purpose                                |
-| ------------------------------------ | ---------------- | -------------------------------------- |
+| Consumer                        | Config Namespace | Purpose                                |
+| ------------------------------- | ---------------- | -------------------------------------- |
 | `WorkScheduleService`           | `subscriptions`  | Check scheduling enabled, get defaults |
 | `WorkScheduleDispatcherService` | `subscriptions`  | Get batch limits                       |
-| `ItemSubmissionService`              | `branding`       | PR body branding strings               |
-| Database module                      | `database`       | Connection setup                       |
-| Trigger integration                  | `trigger`        | Background task dispatch               |
+| `ItemSubmissionService`         | `branding`       | PR body branding strings               |
+| Database module                 | `database`       | Connection setup                       |
+| Trigger integration             | `trigger`        | Background task dispatch               |
 
 ## Design Decisions
 

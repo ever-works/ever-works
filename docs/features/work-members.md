@@ -13,7 +13,7 @@ Work Members lets you invite collaborators to work on a work together. Each memb
 
 | Role        | Description                                                 | Assignable?   |
 | ----------- | ----------------------------------------------------------- | ------------- |
-| **Owner**   | Full access — reserved for the work creator            | No (implicit) |
+| **Owner**   | Full access — reserved for the work creator                 | No (implicit) |
 | **Manager** | Can invite/remove members, edit content, trigger generation | Yes           |
 | **Editor**  | Can edit content and items, cannot manage members           | Yes           |
 | **Viewer**  | Read-only access                                            | Yes           |
@@ -24,15 +24,15 @@ The work creator is always the Owner and does not appear in the members list. Ow
 
 | Action                                   | Owner | Manager | Editor | Viewer |
 | ---------------------------------------- | :---: | :-----: | :----: | :----: |
-| View work, items, and taxonomy      |  Yes  |   Yes   |  Yes   |  Yes   |
+| View work, items, and taxonomy           |  Yes  |   Yes   |  Yes   |  Yes   |
 | View member list                         |  Yes  |   Yes   |  Yes   |  Yes   |
 | Edit content (items, taxonomy, settings) |  Yes  |   Yes   |  Yes   |   —    |
 | Trigger AI generation                    |  Yes  |   Yes   |  Yes   |   —    |
 | Manage schedules and advanced prompts    |  Yes  |   Yes   |  Yes   |   —    |
 | Invite and remove members                |  Yes  |   Yes   |   —    |   —    |
 | Update member roles                      |  Yes  |   Yes   |   —    |   —    |
-| Delete the work                     |  Yes  |    —    |   —    |   —    |
-| Leave the work                      |   —   |   Yes   |  Yes   |  Yes   |
+| Delete the work                          |  Yes  |    —    |   —    |   —    |
+| Leave the work                           |   —   |   Yes   |  Yes   |  Yes   |
 
 ## How Invitation Works
 
@@ -51,8 +51,8 @@ All endpoints require JWT authentication. Base path: `/api/works/:workId/members
 
 ### List Members
 
-| Method | Endpoint                       | Description                    |
-| ------ | ------------------------------ | ------------------------------ |
+| Method | Endpoint                 | Description                    |
+| ------ | ------------------------ | ------------------------------ |
 | `GET`  | `/api/works/:id/members` | List all members and the owner |
 
 ```bash
@@ -88,8 +88,8 @@ The `owner` field always shows the work creator. The `members` array contains on
 
 ### Invite a Member
 
-| Method | Endpoint                       | Description            |
-| ------ | ------------------------------ | ---------------------- |
+| Method | Endpoint                 | Description            |
+| ------ | ------------------------ | ---------------------- |
 | `POST` | `/api/works/:id/members` | Invite a user by email |
 
 **Required role:** Manager or Owner
@@ -116,20 +116,20 @@ curl -X POST http://localhost:3100/api/works/<work-id>/members \
 | Status | Reason                                  |
 | ------ | --------------------------------------- |
 | `400`  | Role is `owner` or invalid              |
-| `400`  | Email belongs to the work creator  |
+| `400`  | Email belongs to the work creator       |
 | `400`  | User is already a member                |
 | `404`  | No registered user found for that email |
 
 ### Get Member
 
-| Method | Endpoint                                 | Description                   |
-| ------ | ---------------------------------------- | ----------------------------- |
+| Method | Endpoint                           | Description                   |
+| ------ | ---------------------------------- | ----------------------------- |
 | `GET`  | `/api/works/:id/members/:memberId` | Get a single member's details |
 
 ### Update Member Role
 
-| Method | Endpoint                                 | Description            |
-| ------ | ---------------------------------------- | ---------------------- |
+| Method | Endpoint                           | Description            |
+| ------ | ---------------------------------- | ---------------------- |
 | `PUT`  | `/api/works/:id/members/:memberId` | Change a member's role |
 
 **Required role:** Manager or Owner
@@ -143,8 +143,8 @@ curl -X PUT http://localhost:3100/api/works/<work-id>/members/<member-id> \
 
 ### Remove a Member
 
-| Method   | Endpoint                                 | Description                        |
-| -------- | ---------------------------------------- | ---------------------------------- |
+| Method   | Endpoint                           | Description                   |
+| -------- | ---------------------------------- | ----------------------------- |
 | `DELETE` | `/api/works/:id/members/:memberId` | Remove a member from the work |
 
 **Required role:** Manager or Owner
@@ -156,8 +156,8 @@ curl -X DELETE http://localhost:3100/api/works/<work-id>/members/<member-id> \
 
 ### Leave a Work
 
-| Method | Endpoint                             | Description                           |
-| ------ | ------------------------------------ | ------------------------------------- |
+| Method | Endpoint                       | Description                      |
+| ------ | ------------------------------ | -------------------------------- |
 | `POST` | `/api/works/:id/members/leave` | Leave a work you are a member of |
 
 ```bash

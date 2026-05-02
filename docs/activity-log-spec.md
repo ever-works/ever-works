@@ -32,21 +32,21 @@ This is separate from the existing **Work History tab** (which provides detailed
 
 ### Table: `activity_log`
 
-| Column        | Type                    | Nullable | Description                                                                               |
-| ------------- | ----------------------- | -------- | ----------------------------------------------------------------------------------------- |
-| `id`          | UUID (PK)               | No       | Primary key                                                                               |
-| `userId`      | UUID (FK → users)       | No       | Who performed the action                                                                  |
-| `workId` | UUID (FK → works) | Yes      | Which work (null for account-level actions)                                          |
-| `actionType`  | varchar/enum            | No       | Category of action (see enum below)                                                       |
-| `action`      | varchar                 | No       | Specific action identifier (e.g. `items.generated`, `plugin.enabled`)                     |
-| `status`      | varchar/enum            | No       | `pending`, `in_progress`, `completed`, `failed`                                           |
-| `summary`     | varchar                 | No       | Human-readable summary (e.g. "Generated 24 items for Tech Startups")                      |
-| `details`     | JSON                    | Yes      | Structured data — items affected, parameters, error messages, duration, linked history ID |
-| `metadata`    | JSON                    | Yes      | Extra data for analytics/Jitsu                                                            |
-| `ipAddress`   | varchar                 | Yes      | Request IP address                                                                        |
-| `userAgent`   | varchar                 | Yes      | Request user agent                                                                        |
-| `createdAt`   | timestamp               | No       | When the activity was logged                                                              |
-| `updatedAt`   | timestamp               | No       | Last update (for status transitions: pending → completed)                                 |
+| Column       | Type              | Nullable | Description                                                                               |
+| ------------ | ----------------- | -------- | ----------------------------------------------------------------------------------------- |
+| `id`         | UUID (PK)         | No       | Primary key                                                                               |
+| `userId`     | UUID (FK → users) | No       | Who performed the action                                                                  |
+| `workId`     | UUID (FK → works) | Yes      | Which work (null for account-level actions)                                               |
+| `actionType` | varchar/enum      | No       | Category of action (see enum below)                                                       |
+| `action`     | varchar           | No       | Specific action identifier (e.g. `items.generated`, `plugin.enabled`)                     |
+| `status`     | varchar/enum      | No       | `pending`, `in_progress`, `completed`, `failed`                                           |
+| `summary`    | varchar           | No       | Human-readable summary (e.g. "Generated 24 items for Tech Startups")                      |
+| `details`    | JSON              | Yes      | Structured data — items affected, parameters, error messages, duration, linked history ID |
+| `metadata`   | JSON              | Yes      | Extra data for analytics/Jitsu                                                            |
+| `ipAddress`  | varchar           | Yes      | Request IP address                                                                        |
+| `userAgent`  | varchar           | Yes      | Request user agent                                                                        |
+| `createdAt`  | timestamp         | No       | When the activity was logged                                                              |
+| `updatedAt`  | timestamp         | No       | Last update (for status transitions: pending → completed)                                 |
 
 ### Indexes
 
@@ -220,16 +220,16 @@ class ActivityLogService {
 
 ### Query Parameters (GET /api/activity-log)
 
-| Param         | Type       | Description                       |
-| ------------- | ---------- | --------------------------------- |
-| `actionType`  | string     | Filter by action type             |
-| `workId` | string     | Filter by work               |
-| `status`      | string     | Filter by status                  |
-| `dateFrom`    | ISO string | Start of date range               |
-| `dateTo`      | ISO string | End of date range                 |
-| `search`      | string     | Search summary and work name |
-| `limit`       | number     | Page size (default 25, max 100)   |
-| `offset`      | number     | Pagination offset                 |
+| Param        | Type       | Description                     |
+| ------------ | ---------- | ------------------------------- |
+| `actionType` | string     | Filter by action type           |
+| `workId`     | string     | Filter by work                  |
+| `status`     | string     | Filter by status                |
+| `dateFrom`   | ISO string | Start of date range             |
+| `dateTo`     | ISO string | End of date range               |
+| `search`     | string     | Search summary and work name    |
+| `limit`      | number     | Page size (default 25, max 100) |
+| `offset`     | number     | Pagination offset               |
 
 ### Integration Points — Where to Call `activityLogService.log()`
 
@@ -237,38 +237,38 @@ Activities will be logged by **subscribing to existing events** where possible, 
 
 #### Via EventEmitter2 listeners (existing events)
 
-| Event                               | Action Type         | Summary Example                                     |
-| ----------------------------------- | ------------------- | --------------------------------------------------- |
-| `WorkCreatedEvent`             | `work_created` | "Created work: Tech Startups"                  |
-| `WorkGenerationCompletedEvent` | `generation`        | "Generated 24 items for Tech Startups"              |
-| `UserCreatedEvent`                  | `user_signup`       | "Account created"                                   |
-| `UserConfirmedEvent`                | `user_login`        | "Signed in via GitHub"                              |
-| `UserPasswordChangedEvent`          | `password_changed`  | "Password changed"                                  |
-| `MemberInvitedEvent`                | `member_invited`    | "Invited user@email.com as Editor to Tech Startups" |
+| Event                          | Action Type        | Summary Example                                     |
+| ------------------------------ | ------------------ | --------------------------------------------------- |
+| `WorkCreatedEvent`             | `work_created`     | "Created work: Tech Startups"                       |
+| `WorkGenerationCompletedEvent` | `generation`       | "Generated 24 items for Tech Startups"              |
+| `UserCreatedEvent`             | `user_signup`      | "Account created"                                   |
+| `UserConfirmedEvent`           | `user_login`       | "Signed in via GitHub"                              |
+| `UserPasswordChangedEvent`     | `password_changed` | "Password changed"                                  |
+| `MemberInvitedEvent`           | `member_invited`   | "Invited user@email.com as Editor to Tech Startups" |
 
 #### Via direct calls (no existing events — add `activityLogService.log()` calls)
 
-| Location                                              | Action Type                | Summary Example                              |
-| ----------------------------------------------------- | -------------------------- | -------------------------------------------- |
-| `deploy.service.ts` → deploy method                   | `deployment`               | "Deployed Tech Startups to Vercel"           |
-| `deploy.service.ts` → batch deploy                    | `deployment`               | "Batch deployed 3 works"               |
-| `plugin-operations.service.ts` → enable               | `plugin_enabled`           | "Enabled OpenAI plugin"                      |
-| `plugin-operations.service.ts` → disable              | `plugin_disabled`          | "Disabled Tavily plugin"                     |
-| `plugins.controller.ts` → update settings             | `plugin_configured`        | "Updated OpenAI plugin settings"             |
-| `work-lifecycle.service.ts` → update             | `work_updated`        | "Updated work: Tech Startups"           |
-| `work-lifecycle.service.ts` → delete             | `work_deleted`        | "Deleted work: Tech Startups"           |
-| `work-schedule.service.ts` → create              | `schedule_created`         | "Created weekly schedule for Tech Startups"  |
-| `work-schedule.service.ts` → update              | `schedule_updated`         | "Updated schedule for Tech Startups"         |
-| `work-schedule.service.ts` → delete              | `schedule_deleted`         | "Deleted schedule for Tech Startups"         |
-| `work-schedule.service.ts` → execute             | `schedule_executed`        | "Scheduled update started for Tech Startups" |
-| `comparison-generation.service.ts` → generate         | `comparison_generation`    | "Generated comparison: Tool A vs Tool B"     |
-| `work-import.service.ts` → import                | `import`                   | "Imported work from GitHub repo"        |
-| `members.controller.ts` → update role                 | `member_role_changed`      | "Changed user@email.com role to Manager"     |
-| `members.controller.ts` → remove                      | `member_removed`           | "Removed user@email.com from Tech Startups"  |
+| Location                                        | Action Type                | Summary Example                              |
+| ----------------------------------------------- | -------------------------- | -------------------------------------------- |
+| `deploy.service.ts` → deploy method             | `deployment`               | "Deployed Tech Startups to Vercel"           |
+| `deploy.service.ts` → batch deploy              | `deployment`               | "Batch deployed 3 works"                     |
+| `plugin-operations.service.ts` → enable         | `plugin_enabled`           | "Enabled OpenAI plugin"                      |
+| `plugin-operations.service.ts` → disable        | `plugin_disabled`          | "Disabled Tavily plugin"                     |
+| `plugins.controller.ts` → update settings       | `plugin_configured`        | "Updated OpenAI plugin settings"             |
+| `work-lifecycle.service.ts` → update            | `work_updated`             | "Updated work: Tech Startups"                |
+| `work-lifecycle.service.ts` → delete            | `work_deleted`             | "Deleted work: Tech Startups"                |
+| `work-schedule.service.ts` → create             | `schedule_created`         | "Created weekly schedule for Tech Startups"  |
+| `work-schedule.service.ts` → update             | `schedule_updated`         | "Updated schedule for Tech Startups"         |
+| `work-schedule.service.ts` → delete             | `schedule_deleted`         | "Deleted schedule for Tech Startups"         |
+| `work-schedule.service.ts` → execute            | `schedule_executed`        | "Scheduled update started for Tech Startups" |
+| `comparison-generation.service.ts` → generate   | `comparison_generation`    | "Generated comparison: Tool A vs Tool B"     |
+| `work-import.service.ts` → import               | `import`                   | "Imported work from GitHub repo"             |
+| `members.controller.ts` → update role           | `member_role_changed`      | "Changed user@email.com role to Manager"     |
+| `members.controller.ts` → remove                | `member_removed`           | "Removed user@email.com from Tech Startups"  |
 | `works.controller.ts` → update website settings | `website_settings_updated` | "Updated website settings for Tech Startups" |
 | `works.controller.ts` → update advanced prompts | `prompts_updated`          | "Updated prompts for Tech Startups"          |
-| `openai-compat.service.ts` → new conversation         | `chat_conversation`        | "Started AI conversation"                    |
-| `community-pr-processor.service.ts` → merged          | `community_pr_merged`      | "Merged community PR for Tech Startups"      |
+| `openai-compat.service.ts` → new conversation   | `chat_conversation`        | "Started AI conversation"                    |
+| `community-pr-processor.service.ts` → merged    | `community_pr_merged`      | "Merged community PR for Tech Startups"      |
 
 ### Jitsu Integration
 
@@ -380,7 +380,7 @@ apps/web/src/components/activity-log/
 | ----------- | ---------------------------------------------------------------- |
 | Status      | Icon/badge: spinner (in_progress), check (completed), x (failed) |
 | Date/Time   | Relative time (e.g. "2 min ago") with full timestamp tooltip     |
-| Work   | Work name as link, or "—" for account-level actions         |
+| Work        | Work name as link, or "—" for account-level actions              |
 | Action Type | Colored badge (generation, deployment, plugin, etc.)             |
 | Summary     | Human-readable description                                       |
 | Actions     | Expand, retry (if failed), dismiss                               |
@@ -456,13 +456,13 @@ function useActivitySocket(userId: string) {
 
 ## Relationship to Existing Work History Tab
 
-| Aspect          | Work History Tab                                  | Global Activity Log                                                     |
-| --------------- | ------------------------------------------------------ | ----------------------------------------------------------------------- |
-| Scope           | Single work                                       | All works + account                                               |
-| Detail level    | Deep (step logs, changelogs, metrics, tokens, cost)    | Summary (status, summary, JSON details)                                 |
-| Purpose         | Debug/inspect generation execution                     | "What happened across my account?"                                      |
-| Action types    | Generation, items, comparisons, taxonomy, community PR | All operations (including deploy, plugins, auth, settings)              |
-| Entry source    | Created by generation/import services directly         | Created by ActivityLogService from event listeners + direct calls       |
+| Aspect          | Work History Tab                                       | Global Activity Log                                                |
+| --------------- | ------------------------------------------------------ | ------------------------------------------------------------------ |
+| Scope           | Single work                                            | All works + account                                                |
+| Detail level    | Deep (step logs, changelogs, metrics, tokens, cost)    | Summary (status, summary, JSON details)                            |
+| Purpose         | Debug/inspect generation execution                     | "What happened across my account?"                                 |
+| Action types    | Generation, items, comparisons, taxonomy, community PR | All operations (including deploy, plugins, auth, settings)         |
+| Entry source    | Created by generation/import services directly         | Created by ActivityLogService from event listeners + direct calls  |
 | Cross-reference | —                                                      | `details.historyId` links to WorkGenerationHistory when applicable |
 
 Both coexist. The work history tab remains the detailed execution trace. The activity log is the global overview.

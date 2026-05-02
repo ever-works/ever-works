@@ -467,9 +467,7 @@ export async function deleteWork(workId: string, options?: DeleteWorkDto) {
     }
 }
 
-export async function syncWorkData(
-    workId: string,
-): Promise<SyncWorkResponse | null> {
+export async function syncWorkData(workId: string): Promise<SyncWorkResponse | null> {
     const user = await getAuthFromCookie();
     if (!user) {
         return null;
@@ -816,10 +814,7 @@ export async function getUserRepositories(params: GetUserRepositoriesParams) {
     }
 }
 
-export async function updateWorkSchedule(
-    workId: string,
-    data: UpdateWorkSchedulePayload,
-) {
+export async function updateWorkSchedule(workId: string, data: UpdateWorkSchedulePayload) {
     const user = await getAuthFromCookie();
     if (!user) {
         redirect(ROUTES.AUTH_LOGIN);
@@ -914,10 +909,7 @@ export async function getAdvancedPrompts(workId: string) {
     }
 }
 
-export async function updateAdvancedPrompts(
-    workId: string,
-    data: UpdateWorkAdvancedPromptsDto,
-) {
+export async function updateAdvancedPrompts(workId: string, data: UpdateWorkAdvancedPromptsDto) {
     const user = await getAuthFromCookie();
     if (!user) {
         redirect(ROUTES.AUTH_LOGIN);

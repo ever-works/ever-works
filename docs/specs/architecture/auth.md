@@ -202,16 +202,16 @@ both as distinct error states.
 
 ## 10. API-Key vs JWT Differences
 
-| Behaviour                    | JWT                   | API key                                                |
-| ---------------------------- | --------------------- | ------------------------------------------------------ |
-| Lifetime                     | 7 days (refreshable)  | Until revoked or `expiresAt`                           |
-| Per-work role           | Resolved live from DB | Same — keys carry the user's full per-work rights |
-| Manage other API keys        | Allowed               | Rejected (`403`)                                       |
-| Manage own account / profile | Allowed               | Rejected (`403`)                                       |
-| Connect OAuth providers      | Allowed               | Rejected (`403`)                                       |
-| Trigger work generation | Allowed               | Allowed                                                |
-| Run MCP tool calls           | N/A                   | The MCP server's only auth path                        |
-| Dashboard sessions           | Yes                   | No                                                     |
+| Behaviour                    | JWT                   | API key                                           |
+| ---------------------------- | --------------------- | ------------------------------------------------- |
+| Lifetime                     | 7 days (refreshable)  | Until revoked or `expiresAt`                      |
+| Per-work role                | Resolved live from DB | Same — keys carry the user's full per-work rights |
+| Manage other API keys        | Allowed               | Rejected (`403`)                                  |
+| Manage own account / profile | Allowed               | Rejected (`403`)                                  |
+| Connect OAuth providers      | Allowed               | Rejected (`403`)                                  |
+| Trigger work generation      | Allowed               | Allowed                                           |
+| Run MCP tool calls           | N/A                   | The MCP server's only auth path                   |
+| Dashboard sessions           | Yes                   | No                                                |
 
 API keys are deliberately **second-class for management endpoints** —
 they can do work but can't bootstrap their own access.

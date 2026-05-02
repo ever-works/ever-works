@@ -143,16 +143,16 @@ const ctx = createMockPluginContext({
 
 The mock context provides:
 
-| Capability    | Mock implementation                                          |
-| ------------- | ------------------------------------------------------------ |
-| `logger`      | `console`-shaped, captures lines for assertion               |
-| `cache`       | In-memory `Map` with TTL emulation                           |
-| `http`        | Fetch shim returning canned responses; records every request |
-| `events`      | In-memory emitter with `.captured()` for assertions          |
-| `settings`    | `ISettingsAccessor` reading from the seeded `settings` map   |
-| `env`         | `PluginEnvironment` reading from the seeded `env` map        |
-| `workId` | Configurable                                                 |
-| `userId`      | Configurable                                                 |
+| Capability | Mock implementation                                          |
+| ---------- | ------------------------------------------------------------ |
+| `logger`   | `console`-shaped, captures lines for assertion               |
+| `cache`    | In-memory `Map` with TTL emulation                           |
+| `http`     | Fetch shim returning canned responses; records every request |
+| `events`   | In-memory emitter with `.captured()` for assertions          |
+| `settings` | `ISettingsAccessor` reading from the seeded `settings` map   |
+| `env`      | `PluginEnvironment` reading from the seeded `env` map        |
+| `workId`   | Configurable                                                 |
+| `userId`   | Configurable                                                 |
 
 This means plugin tests **don't need a database, don't need an
 HTTP server, don't need a NestJS application context** — just Vitest +

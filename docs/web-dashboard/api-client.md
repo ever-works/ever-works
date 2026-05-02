@@ -103,17 +103,17 @@ async function handleServerError(error: unknown): Promise<never>;
 
 Provides the client for all generation-related endpoints.
 
-| Method                | Endpoint                                | HTTP | Description                   |
-| --------------------- | --------------------------------------- | ---- | ----------------------------- |
+| Method                | Endpoint                          | HTTP | Description                   |
+| --------------------- | --------------------------------- | ---- | ----------------------------- |
 | `generate`            | `/works/{id}/generate`            | POST | Starts item generation        |
 | `update`              | `/works/{id}/update`              | POST | Starts item update generation |
 | `submitItem`          | `/works/{id}/submit-item`         | POST | Submits a new item            |
 | `removeItem`          | `/works/{id}/remove-item`         | POST | Removes an item               |
 | `updateItem`          | `/works/{id}/update-item`         | POST | Updates item metadata         |
-| `extractItemDetails`  | `/extract-item-details`                 | POST | AI-extracts details from URL  |
+| `extractItemDetails`  | `/extract-item-details`           | POST | AI-extracts details from URL  |
 | `regenerateMarkdown`  | `/works/{id}/regenerate-markdown` | POST | Regenerates all markdown      |
-| `getFormSchema`       | `/works/{id}/generator-form`      | GET  | Gets work form schema    |
-| `getFormSchemaGlobal` | `/generator-form`                       | GET  | Gets global form schema       |
+| `getFormSchema`       | `/works/{id}/generator-form`      | GET  | Gets work form schema         |
+| `getFormSchemaGlobal` | `/generator-form`                 | GET  | Gets global form schema       |
 
 **Type Re-exports**: The file re-exports key types from `@ever-works/plugin` and `@ever-works/contracts/api`:
 
@@ -191,11 +191,7 @@ export enum WorkMemberRole {
 	VIEWER = 'viewer' // Read-only access
 }
 
-export const ASSIGNABLE_MEMBER_ROLES = [
-	WorkMemberRole.MANAGER,
-	WorkMemberRole.EDITOR,
-	WorkMemberRole.VIEWER
-] as const;
+export const ASSIGNABLE_MEMBER_ROLES = [WorkMemberRole.MANAGER, WorkMemberRole.EDITOR, WorkMemberRole.VIEWER] as const;
 ```
 
 ## Plugin Capabilities APIs
@@ -211,12 +207,12 @@ The `plugins-capabilities/` work contains API clients for plugin-specific featur
 
 ### Deploy API (`deploy.ts`)
 
-| Method                                  | Description                                |
-| --------------------------------------- | ------------------------------------------ |
-| `deploy(workId, options)`          | Triggers a deployment                      |
-| `getDeploymentTeams()`                  | Lists deployment provider teams            |
-| `getTeamsForWork(workId)`     | Lists teams using work's plugin token |
-| `lookupExistingDeployment(workId)` | Checks for existing deployments            |
+| Method                             | Description                           |
+| ---------------------------------- | ------------------------------------- |
+| `deploy(workId, options)`          | Triggers a deployment                 |
+| `getDeploymentTeams()`             | Lists deployment provider teams       |
+| `getTeamsForWork(workId)`          | Lists teams using work's plugin token |
+| `lookupExistingDeployment(workId)` | Checks for existing deployments       |
 
 ### Git Providers API (`git-providers.ts`)
 

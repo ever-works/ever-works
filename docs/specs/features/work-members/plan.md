@@ -21,12 +21,12 @@ flowchart LR
 
 ## 2. Tech Choices
 
-| Concern          | Choice                                 | Rationale                              |
-| ---------------- | -------------------------------------- | -------------------------------------- |
-| Permission model | Static role matrix in code             | Closed enum; matrix is small           |
+| Concern          | Choice                            | Rationale                              |
+| ---------------- | --------------------------------- | -------------------------------------- |
+| Permission model | Static role matrix in code        | Closed enum; matrix is small           |
 | Auth check       | `WorkOwnershipService.ensureCan*` | Single source of truth across features |
-| Notification     | Mail facade                            | Extensible to in-app notifications     |
-| Invite mechanism | Direct (no pending tokens)             | Simpler UX for collaborators           |
+| Notification     | Mail facade                       | Extensible to in-app notifications     |
+| Invite mechanism | Direct (no pending tokens)        | Simpler UX for collaborators           |
 
 ## 3. Data Model
 
@@ -47,8 +47,8 @@ Migration: additive, with composite unique index `(workId, userId)`.
 
 ## 4. API Surface
 
-| Method   | Endpoint                                 | Required role    |
-| -------- | ---------------------------------------- | ---------------- |
+| Method   | Endpoint                           | Required role    |
+| -------- | ---------------------------------- | ---------------- |
 | `GET`    | `/api/works/:id/members`           | viewer           |
 | `POST`   | `/api/works/:id/members`           | manager / owner  |
 | `GET`    | `/api/works/:id/members/:memberId` | viewer           |
@@ -80,11 +80,11 @@ Activity log: `member_invited`, `member_role_updated`, `member_removed`,
 
 ## 9. Risks & Mitigations
 
-| Risk                                | Mitigation                                              |
-| ----------------------------------- | ------------------------------------------------------- |
+| Risk                                | Mitigation                                         |
+| ----------------------------------- | -------------------------------------------------- |
 | Race: two managers invite same user | Unique index `(workId, userId)` rejects the second |
-| Owner accidentally locked out       | Owner role is implicit and immutable                    |
-| Permission cache lag                | Permission checks read fresh from DB                    |
+| Owner accidentally locked out       | Owner role is implicit and immutable               |
+| Permission cache lag                | Permission checks read fresh from DB               |
 
 ## 10. Constitution Reconciliation
 

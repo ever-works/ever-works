@@ -39,8 +39,8 @@ This means every generated website is based on the `ever-works-website-template`
 
 For a work with slug `my-work`:
 
-| Repository             | Purpose                                          |
-| ---------------------- | ------------------------------------------------ |
+| Repository        | Purpose                                          |
+| ----------------- | ------------------------------------------------ |
 | `my-work-data`    | YAML data repository (items, categories, config) |
 | `my-work`         | Markdown README repository                       |
 | `my-work-website` | Static website repository                        |
@@ -108,9 +108,7 @@ For each branch in `WEBSITE_TEMPLATE_CONFIG.syncBranches`:
 Works that opt into beta templates use branch mapping:
 
 ```typescript
-const branchMapping = work.websiteTemplateUseBeta
-	? { [config.websiteTemplate.getBetaBranch()]: 'main' }
-	: undefined;
+const branchMapping = work.websiteTemplateUseBeta ? { [config.websiteTemplate.getBetaBranch()]: 'main' } : undefined;
 ```
 
 This maps the beta branch (e.g., `stage`) to `main` on the target, so users on the beta channel receive staging template updates as their production content.

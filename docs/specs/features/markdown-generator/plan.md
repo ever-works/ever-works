@@ -34,15 +34,15 @@ GitHub display.
 
 ## 2. Tech Choices
 
-| Concern                     | Choice                                                     | Rationale                                                                  |
-| --------------------------- | ---------------------------------------------------------- | -------------------------------------------------------------------------- |
-| Working tree                | Local clone via `isomorphic-git`                           | Same toolchain as data-generator; no system git binary in worker container |
-| Build approach              | String concatenation in `ReadmeBuilder`                    | No template engine — output shape is well-known and small                  |
-| Header/footer customization | Per-work `readmeConfig` (overwrite or prepend/append) | Lets users brand the work without forking the generator               |
-| Item ordering               | Featured first → `order` field → alphabetical              | Stable, predictable, user-controllable via `featured` and `order`          |
-| Detail-page format          | Title + description + overview + links + tags              | Matches what GitHub renders well; no layout-only JS                        |
-| Repository init             | Auto-create on first run if missing                        | Lowers onboarding friction; gated by Git provider permissions              |
-| Reset before write          | `resetFiles()` clears generated content, keeps `.git`      | Prevents stale files lingering after slug renames or removals              |
+| Concern                     | Choice                                                | Rationale                                                                  |
+| --------------------------- | ----------------------------------------------------- | -------------------------------------------------------------------------- |
+| Working tree                | Local clone via `isomorphic-git`                      | Same toolchain as data-generator; no system git binary in worker container |
+| Build approach              | String concatenation in `ReadmeBuilder`               | No template engine — output shape is well-known and small                  |
+| Header/footer customization | Per-work `readmeConfig` (overwrite or prepend/append) | Lets users brand the work without forking the generator                    |
+| Item ordering               | Featured first → `order` field → alphabetical         | Stable, predictable, user-controllable via `featured` and `order`          |
+| Detail-page format          | Title + description + overview + links + tags         | Matches what GitHub renders well; no layout-only JS                        |
+| Repository init             | Auto-create on first run if missing                   | Lowers onboarding friction; gated by Git provider permissions              |
+| Reset before write          | `resetFiles()` clears generated content, keeps `.git` | Prevents stale files lingering after slug renames or removals              |
 | Commit strategy             | Direct push **or** PR per work setting                | Mirrors data-generator behaviour                                           |
 
 ## 3. Data Model
@@ -132,7 +132,7 @@ additive change (no flag).
 | Slug rename leaves a stale `details/<old-slug>.md`          | `resetFiles()` clears `details/` before rewriting; only current items remain               |
 | Custom header includes Markdown that breaks the TOC anchors | Builder generates anchors from category names independently; user header is opaque         |
 | Repo creation fails (provider permissions)                  | Surface as a structured error; data generator's commit succeeds independently              |
-| Large works (1000+ items) produce a multi-MB README   | Acceptable: GitHub renders multi-MB markdown; future change could split per-category       |
+| Large works (1000+ items) produce a multi-MB README         | Acceptable: GitHub renders multi-MB markdown; future change could split per-category       |
 
 ## 12. Constitution Reconciliation
 

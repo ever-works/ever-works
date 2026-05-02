@@ -112,8 +112,8 @@ This is the primary background task for AI-powered work content generation.
 | Handler     | Purpose                                                                     |
 | ----------- | --------------------------------------------------------------------------- |
 | `run`       | Main execution: bootstraps NestJS context, runs the generation orchestrator |
-| `onFailure` | Captures error, updates work state, marks scheduled run as failed      |
-| `onCancel`  | Updates work state to cancelled, marks scheduled run as failed         |
+| `onFailure` | Captures error, updates work state, marks scheduled run as failed           |
+| `onCancel`  | Updates work state to cancelled, marks scheduled run as failed              |
 
 #### Run Handler
 

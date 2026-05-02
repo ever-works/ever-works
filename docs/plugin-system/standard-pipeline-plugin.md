@@ -136,7 +136,7 @@ The Standard Pipeline exposes a rich set of configuration options through `IForm
 
 | Field                 | Type   | Default | Description                             |
 | --------------------- | ------ | ------- | --------------------------------------- |
-| `initial_categories`  | `tags` | --      | Suggested categories for the work  |
+| `initial_categories`  | `tags` | --      | Suggested categories for the work       |
 | `priority_categories` | `tags` | --      | Categories to prioritize and show first |
 | `target_keywords`     | `tags` | --      | Keywords to guide search and extraction |
 

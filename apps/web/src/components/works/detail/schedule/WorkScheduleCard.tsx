@@ -10,17 +10,10 @@ import { Switch } from '@/components/ui/switch';
 import { Select } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils/cn';
-import {
-    WorkScheduleBillingMode,
-    WorkScheduleCadence,
-    WorkScheduleStatus,
-} from '@/lib/api/enums';
+import { WorkScheduleBillingMode, WorkScheduleCadence, WorkScheduleStatus } from '@/lib/api/enums';
 import { WorkScheduleDto } from '@/lib/api/types-only';
 import type { ProviderOption } from '@/lib/api/types-only';
-import {
-    runWorkSchedule,
-    updateWorkSchedule,
-} from '@/app/actions/dashboard/work-schedule';
+import { runWorkSchedule, updateWorkSchedule } from '@/app/actions/dashboard/work-schedule';
 import { ShowDateTime } from '@/components/ui/show-datetime';
 import { useWorkDetail } from '../WorkDetailContext';
 import { ActiveProvidersBar, FieldCard, HelperPill, type ResolvedProvider } from '../shared';

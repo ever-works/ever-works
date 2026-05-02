@@ -112,7 +112,7 @@ Plugin settings are defined via JSON Schema with custom extensions:
 | `secret`    | Field is never returned in API responses      |
 | `adminOnly` | Restricted to admin users                     |
 | `envVar`    | Environment variable name for env-only fields |
-| `scope`     | `global`, `user`, or `work`              |
+| `scope`     | `global`, `user`, or `work`                   |
 | `widget`    | UI widget hint (e.g., `model-select`)         |
 | `hidden`    | Hide from settings UI                         |
 

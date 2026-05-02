@@ -34,15 +34,15 @@ flowchart LR
 
 ## Source Files
 
-| File                                                       | Purpose                                                  |
-| ---------------------------------------------------------- | -------------------------------------------------------- |
-| `packages/agent/src/dto/create-work.dto.ts`           | Work creation with slug validation, nested config   |
+| File                                                  | Purpose                                                  |
+| ----------------------------------------------------- | -------------------------------------------------------- |
+| `packages/agent/src/dto/create-work.dto.ts`           | Work creation with slug validation, nested config        |
 | `packages/agent/src/dto/update-work.dto.ts`           | Partial update DTO with optional fields                  |
-| `packages/agent/src/dto/generate-data.dto.ts`              | Minimal DTO for generation requests                      |
-| `packages/agent/src/dto/website-settings.dto.ts`           | Deeply nested DTO with header, homepage, footer sections |
+| `packages/agent/src/dto/generate-data.dto.ts`         | Minimal DTO for generation requests                      |
+| `packages/agent/src/dto/website-settings.dto.ts`      | Deeply nested DTO with header, homepage, footer sections |
 | `packages/agent/src/dto/work-advanced-prompts.dto.ts` | Advanced prompt configuration                            |
 | `packages/agent/src/dto/work-schedule.dto.ts`         | Schedule cadence configuration                           |
-| `packages/agent/src/dto/taxonomy.dto.ts`                   | Category/collection/tag DTOs                             |
+| `packages/agent/src/dto/taxonomy.dto.ts`              | Category/collection/tag DTOs                             |
 | `packages/agent/src/dto/import-work.dto.ts`           | Import source configuration                              |
 
 ## Key Classes

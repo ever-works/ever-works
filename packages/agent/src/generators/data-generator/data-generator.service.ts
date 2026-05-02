@@ -134,8 +134,7 @@ export class DataGeneratorService {
             existingData = await this.getExistingData(work, user);
             existingItemsBeforeGeneration = existingData.existingItems;
         } else if (createItemsGeneratorDto.generation_method === GenerationMethod.RECREATE) {
-            existingItemsBeforeGeneration = (await this.getExistingData(work, user))
-                .existingItems;
+            existingItemsBeforeGeneration = (await this.getExistingData(work, user)).existingItems;
         }
 
         throwIfCancelled();
@@ -362,10 +361,7 @@ export class DataGeneratorService {
             // Write markdown template if new/recreate OR if creating a PR branch
             if (isNewOrRecreate || newBranchName) {
                 promises.push(
-                    data.writeMarkdownTemplate(
-                        this.getHeader(work),
-                        this.getFooter(work),
-                    ),
+                    data.writeMarkdownTemplate(this.getHeader(work), this.getFooter(work)),
                 );
             }
 
@@ -632,10 +628,7 @@ export class DataGeneratorService {
         }
     }
 
-    async updateMarkdownTemplate(
-        work: Work,
-        user: User,
-    ): Promise<UpdateMarkdownTemplateResult> {
+    async updateMarkdownTemplate(work: Work, user: User): Promise<UpdateMarkdownTemplateResult> {
         // Use work owner's credentials (they set up the repos)
         const workOwner = this.getWorkOwner(work);
         const committer = work.resolveCommitter(user);
@@ -676,10 +669,7 @@ export class DataGeneratorService {
             },
         );
 
-        const dataRepo = await DataRepository.create(
-            dest,
-            getWorkDefaultDataConfig(work),
-        );
+        const dataRepo = await DataRepository.create(dest, getWorkDefaultDataConfig(work));
 
         await dataRepo.ensureWorksExist();
 
@@ -737,9 +727,7 @@ export class DataGeneratorService {
                 workId: work.id,
             });
 
-            this.logger.log(
-                `Successfully deleted data repository: ${work.getRepoOwner()}/${repo}`,
-            );
+            this.logger.log(`Successfully deleted data repository: ${work.getRepoOwner()}/${repo}`);
         } catch (error) {
             this.logger.error(
                 `Failed to delete data repository ${work.getRepoOwner()}/${repo}:`,
@@ -756,8 +744,8 @@ export class DataGeneratorService {
             work.getDataRepo(),
         );
 
-        return DataRepository.create(dataDir, getWorkDefaultDataConfig(work)).then(
-            (data) => data.cleanup(),
+        return DataRepository.create(dataDir, getWorkDefaultDataConfig(work)).then((data) =>
+            data.cleanup(),
         );
     }
 
@@ -807,12 +795,7 @@ export class DataGeneratorService {
         await data.writeCategories(categories);
 
         await this.gitFacade.addAll(work.gitProvider, data.dir);
-        await this.gitFacade.commit(
-            work.gitProvider,
-            data.dir,
-            'update categories',
-            committer,
-        );
+        await this.gitFacade.commit(work.gitProvider, data.dir, 'update categories', committer);
         await this.gitFacade.push(
             { dir: dest },
             {
@@ -878,12 +861,7 @@ export class DataGeneratorService {
         await data.writeCollections(collections);
 
         await this.gitFacade.addAll(work.gitProvider, data.dir);
-        await this.gitFacade.commit(
-            work.gitProvider,
-            data.dir,
-            'update collections',
-            committer,
-        );
+        await this.gitFacade.commit(work.gitProvider, data.dir, 'update collections', committer);
         await this.gitFacade.push(
             { dir: dest },
             {
@@ -1259,10 +1237,7 @@ export class DataGeneratorService {
                     workId: work.id,
                 },
             );
-            const data = await DataRepository.create(
-                dest,
-                getWorkDefaultDataConfig(work),
-            );
+            const data = await DataRepository.create(dest, getWorkDefaultDataConfig(work));
 
             const [categories, tags, collections, existingItems, config] = await Promise.all([
                 data.getCategories().catch(() => []),
@@ -1414,10 +1389,7 @@ export class DataGeneratorService {
                 this.logger,
             );
 
-            const data = await DataRepository.create(
-                dest,
-                getWorkDefaultDataConfig(work),
-            );
+            const data = await DataRepository.create(dest, getWorkDefaultDataConfig(work));
             await data.ensureWorksExist();
 
             // Write categories, tags, and collections
@@ -1564,10 +1536,7 @@ export class DataGeneratorService {
                 { userId: user.id, providerId: work.gitProvider, workId: work.id },
             );
 
-            const data = await DataRepository.create(
-                dest,
-                getWorkDefaultDataConfig(work),
-            );
+            const data = await DataRepository.create(dest, getWorkDefaultDataConfig(work));
             await data.ensureWorksExist();
             await data.ensureDefaultConfig();
 

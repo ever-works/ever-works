@@ -27,8 +27,8 @@ graph TD
     F --> G
 ```
 
-| Form System            | Source Component               | Schema Source                                      | Used By                                               |
-| ---------------------- | ------------------------------ | -------------------------------------------------- | ----------------------------------------------------- |
+| Form System            | Source Component               | Schema Source                                      | Used By                                          |
+| ---------------------- | ------------------------------ | -------------------------------------------------- | ------------------------------------------------ |
 | Dynamic Plugin Fields  | `DynamicPluginFields.tsx`      | `FormFieldDefinition[]` from `IFormSchemaProvider` | Generator form (per-work pipeline config)        |
 | Plugin Settings Fields | `PluginSettingsFormFields.tsx` | `JsonSchema` from plugin `settingsSchema`          | Plugin settings page, work plugin settings modal |
 

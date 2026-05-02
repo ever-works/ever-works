@@ -16,9 +16,7 @@ export class WorkAdvancedPromptsRepository {
 
     async createOrUpdate(
         workId: string,
-        data: Partial<
-            Omit<WorkAdvancedPrompts, 'id' | 'workId' | 'createdAt' | 'updatedAt'>
-        >,
+        data: Partial<Omit<WorkAdvancedPrompts, 'id' | 'workId' | 'createdAt' | 'updatedAt'>>,
     ): Promise<WorkAdvancedPrompts> {
         const existing = await this.findByWorkId(workId);
 

@@ -93,10 +93,7 @@ export class WorksConfigWriterService {
         return undefined;
     }
 
-    private formatRepositoryTarget(
-        work: Work,
-        role: 'data' | 'work' | 'website',
-    ): string {
+    private formatRepositoryTarget(work: Work, role: 'data' | 'work' | 'website'): string {
         const target = this.getRepositoryTarget(work, role);
         return `${target.owner}/${target.repo}`;
     }

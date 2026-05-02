@@ -1,10 +1,4 @@
-import type {
-	WorkReference,
-	GenerationRequest,
-	ExistingItems,
-	StepMetrics,
-	PipelineOutputs
-} from '@ever-works/plugin';
+import type { WorkReference, GenerationRequest, ExistingItems, StepMetrics, PipelineOutputs } from '@ever-works/plugin';
 import type { MutableGenerationContext, GenerationContextSnapshot } from './mutable-generation-context.js';
 import type { StepDataKey, StepDataTypes, StandardPipelineMetrics } from './step-data-types.js';
 

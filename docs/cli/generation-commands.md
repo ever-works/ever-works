@@ -13,8 +13,8 @@ The CLI provides four commands that cover the full content lifecycle: generating
 
 ## Command Overview
 
-| Command                         | Description                                            | Source File              |
-| ------------------------------- | ------------------------------------------------------ | ------------------------ |
+| Command                    | Description                                            | Source File              |
+| -------------------------- | ------------------------------------------------------ | ------------------------ |
 | `work generate`            | Generate items and create/update the data repository   | `generate.ts`            |
 | `work regenerate-markdown` | Regenerate the README.md from existing data            | `regenerate-markdown.ts` |
 | `work update-website`      | Sync data repository content to the website repository | `update-website.ts`      |
@@ -104,7 +104,7 @@ Two fields are always collected:
 
 | Field    | Description                                                          |
 | -------- | -------------------------------------------------------------------- |
-| `name`   | The work name (read-only, pre-filled)                           |
+| `name`   | The work name (read-only, pre-filled)                                |
 | `prompt` | The generation prompt (pre-filled from last generation if available) |
 
 ### Step 6: Dynamic Plugin Fields
@@ -253,12 +253,12 @@ stateDiagram-v2
     StateD --> ExecuteDeploy
 ```
 
-| State | Condition                                         | Behavior                                                       |
-| ----- | ------------------------------------------------- | -------------------------------------------------------------- |
-| A     | No `deployProvider` set                           | Prompt user to select a provider. If valid, proceed to deploy. |
+| State | Condition                                    | Behavior                                                       |
+| ----- | -------------------------------------------- | -------------------------------------------------------------- |
+| A     | No `deployProvider` set                      | Prompt user to select a provider. If valid, proceed to deploy. |
 | B     | Has provider, `canDeploy=false`, shared work | Tell user the owner must configure their token.                |
 | C     | Has provider, `canDeploy=false`, owned work  | Tell user to configure their token. Offer to switch providers. |
-| D     | Has provider, `canDeploy=true`                    | Execute the deployment.                                        |
+| D     | Has provider, `canDeploy=true`               | Execute the deployment.                                        |
 
 ### Deployment Execution
 
@@ -294,8 +294,7 @@ The `isDeploying()` helper prevents false positives by checking that the deploym
 function isDeploying(work: Work) {
 	const hasDeploymentState = ['INITIALIZING', 'QUEUED', 'BUILDING'].includes(work.deploymentState);
 	const hasStartedAt =
-		work.deploymentStartedAt &&
-		new Date(work.deploymentStartedAt) > new Date(Date.now() - 10 * 60 * 1000);
+		work.deploymentStartedAt && new Date(work.deploymentStartedAt) > new Date(Date.now() - 10 * 60 * 1000);
 	return Boolean(hasDeploymentState && hasStartedAt);
 }
 ```

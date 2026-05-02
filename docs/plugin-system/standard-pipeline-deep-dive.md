@@ -131,8 +131,8 @@ The Standard Pipeline provides a comprehensive form schema through the `IFormSch
 
 #### Volume Settings
 
-| Field       | Type     | Default | Description                      |
-| ----------- | -------- | ------- | -------------------------------- |
+| Field       | Type     | Default | Description                 |
+| ----------- | -------- | ------- | --------------------------- |
 | `max_items` | `number` | `50`    | Target number of work items |
 
 #### Feature Toggles

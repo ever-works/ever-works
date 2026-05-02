@@ -25,11 +25,9 @@ export { WorkMemberRole, GenerateStatusType } from '@ever-works/cli-shared';
 export function canEdit(role?: WorkMemberRole | string): boolean {
     return (
         !!role &&
-        [
-            WorkMemberRole.OWNER,
-            WorkMemberRole.MANAGER,
-            WorkMemberRole.EDITOR,
-        ].includes(role as WorkMemberRole)
+        [WorkMemberRole.OWNER, WorkMemberRole.MANAGER, WorkMemberRole.EDITOR].includes(
+            role as WorkMemberRole,
+        )
     );
 }
 

@@ -234,11 +234,11 @@ All content provider plugins define their settings via JSON Schema with custom e
 
 ## Dependencies
 
-| Dependency                   | Purpose                                                                       |
-| ---------------------------- | ----------------------------------------------------------------------------- |
-| `@ever-works/plugin`         | Facade interfaces, capability constants, plugin types                         |
+| Dependency                   | Purpose                                                                  |
+| ---------------------------- | ------------------------------------------------------------------------ |
+| `@ever-works/plugin`         | Facade interfaces, capability constants, plugin types                    |
 | `@ever-works/agent/plugins`  | `PluginRegistryService`, `PluginSettingsService`, `WorkPluginRepository` |
-| `@ever-works/agent/database` | `WorkPluginRepository` for work-level plugin config                 |
+| `@ever-works/agent/database` | `WorkPluginRepository` for work-level plugin config                      |
 
 ## Usage Examples
 

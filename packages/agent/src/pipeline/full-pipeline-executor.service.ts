@@ -110,13 +110,7 @@ export class FullPipelineExecutorService {
             const duration = Date.now() - startTime;
 
             // Emit pipeline:completed event
-            this.emitPipelineCompleted(
-                work.id,
-                duration,
-                result.stepsCompleted,
-                result,
-                plugin.id,
-            );
+            this.emitPipelineCompleted(work.id, duration, result.stepsCompleted, result, plugin.id);
 
             this.logger.log(
                 `Full pipeline completed via plugin "${plugin.id}": ` +
@@ -177,14 +171,7 @@ export class FullPipelineExecutorService {
             options.signal.addEventListener('abort', abortHandler, { once: true });
 
             try {
-                return await this.execute(
-                    plugin,
-                    work,
-                    request,
-                    existing,
-                    options,
-                    onProgress,
-                );
+                return await this.execute(plugin, work, request, existing, options, onProgress);
             } finally {
                 options.signal.removeEventListener('abort', abortHandler);
             }

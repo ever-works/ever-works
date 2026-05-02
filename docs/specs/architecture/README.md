@@ -33,7 +33,7 @@ wide-angle first.
 | --------------------------------------------- | ----------------------------------------------------------------- |
 | [`pipeline-overview`](./pipeline-overview.md) | Wide-angle: 4 pipeline categories, routing, 3-stage orchestrator  |
 | [`pipeline-executor`](./pipeline-executor.md) | Internals: state machine, step contract, modifiers, checkpointing |
-| [`work-import`](./work-import.md)   | Source-repo analyzer + the three import paths                     |
+| [`work-import`](./work-import.md)             | Source-repo analyzer + the three import paths                     |
 
 ### Trigger.dev & background work
 

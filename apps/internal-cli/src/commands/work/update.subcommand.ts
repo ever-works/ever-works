@@ -31,9 +31,7 @@ export class UpdateSubCommand extends CommandRunner {
             await this.configCheck.requireConfiguration();
 
             // Select work
-            const selection = await this.workPrompt.promptWorkSelection(
-                this.workRepository,
-            );
+            const selection = await this.workPrompt.promptWorkSelection(this.workRepository);
             if (selection.cancelled || !selection.work) {
                 console.log(chalk.yellow('\n⚠ Operation cancelled.'));
                 return;

@@ -176,10 +176,7 @@ export class WorkPromptService extends BasePromptService {
 		return selected === '__none__' ? null : selected;
 	}
 
-	async promptWorkCreation(
-		ownerDefault?: string,
-		orgs?: { name: string; value: any }[]
-	): Promise<WorkInputData> {
+	async promptWorkCreation(ownerDefault?: string, orgs?: { name: string; value: any }[]): Promise<WorkInputData> {
 		this.displaySectionHeader('Work Creation');
 		this.displayInfo('Please provide the following information to create a new work:');
 

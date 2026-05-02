@@ -32,16 +32,16 @@ commit/PR. It does not own the pipeline itself (lives in
 
 ## 2. Tech Choices
 
-| Concern              | Choice                                           | Rationale                                                                |
-| -------------------- | ------------------------------------------------ | ------------------------------------------------------------------------ |
-| Working tree         | Local clone via `isomorphic-git`                 | Pure-JS git; no system git binary required in the worker container       |
-| File format — config | YAML (`js-yaml`)                                 | Human-readable, edits-friendly, the format works grew up with      |
-| File format — items  | One JSON file per item under `items/`            | Diff-friendly, low merge conflict surface, slug == filename              |
-| Item merge unit      | `slug`                                           | Stable identity; preserves user-edited fields (`featured`, `order`)      |
-| Commit strategy      | Direct push **or** PR per work setting      | PR mode supports review-driven works; direct mode for single-owner |
-| Branch naming        | `ever-update-<unix-timestamp>` for PR mode       | Sortable, no collision risk                                              |
-| Version field        | Auto-increment integer in `config.yml`           | Cache-busting signal for the markdown / website / API consumers          |
-| Error recovery       | Idempotent writes; retry clone/push with backoff | Network-related failures are common; everything else fails the run loud  |
+| Concern              | Choice                                           | Rationale                                                               |
+| -------------------- | ------------------------------------------------ | ----------------------------------------------------------------------- |
+| Working tree         | Local clone via `isomorphic-git`                 | Pure-JS git; no system git binary required in the worker container      |
+| File format — config | YAML (`js-yaml`)                                 | Human-readable, edits-friendly, the format works grew up with           |
+| File format — items  | One JSON file per item under `items/`            | Diff-friendly, low merge conflict surface, slug == filename             |
+| Item merge unit      | `slug`                                           | Stable identity; preserves user-edited fields (`featured`, `order`)     |
+| Commit strategy      | Direct push **or** PR per work setting           | PR mode supports review-driven works; direct mode for single-owner      |
+| Branch naming        | `ever-update-<unix-timestamp>` for PR mode       | Sortable, no collision risk                                             |
+| Version field        | Auto-increment integer in `config.yml`           | Cache-busting signal for the markdown / website / API consumers         |
+| Error recovery       | Idempotent writes; retry clone/push with backoff | Network-related failures are common; everything else fails the run loud |
 
 ## 3. Data Model
 
@@ -154,13 +154,13 @@ behaviour. Future changes follow the standard /specify → /plan →
 
 ## 11. Risks & Mitigations
 
-| Risk                                                               | Mitigation                                                                            |
-| ------------------------------------------------------------------ | ------------------------------------------------------------------------------------- |
+| Risk                                                          | Mitigation                                                                            |
+| ------------------------------------------------------------- | ------------------------------------------------------------------------------------- |
 | Concurrent runs on the same work clobber each other's commits | Schedule dispatcher claims runs via CAS; manual triggers respect `GENERATING` status  |
-| User edits to `featured` / `order` get reset by RECREATE           | Documented as expected RECREATE behaviour; UI warns before triggering RECREATE        |
-| GitHub rate limits during many-works generation              | Token rotation + per-user clone cache + retry-with-backoff in `GitFacade`             |
-| Item slug collision between AI-generated names                     | Slugs deduplicated inside the items pipeline (Step 8 — `AiDeduplicator`) before write |
-| Partial write on push failure leaves the working tree dirty        | Commits are atomic; failed push retries the same commit, never a recomputed one       |
+| User edits to `featured` / `order` get reset by RECREATE      | Documented as expected RECREATE behaviour; UI warns before triggering RECREATE        |
+| GitHub rate limits during many-works generation               | Token rotation + per-user clone cache + retry-with-backoff in `GitFacade`             |
+| Item slug collision between AI-generated names                | Slugs deduplicated inside the items pipeline (Step 8 — `AiDeduplicator`) before write |
+| Partial write on push failure leaves the working tree dirty   | Commits are atomic; failed push retries the same commit, never a recomputed one       |
 
 ## 12. Constitution Reconciliation
 

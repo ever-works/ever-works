@@ -126,11 +126,7 @@ export class DataSourceFacadeService implements IDataSourceFacade {
 
         for (const registered of enabledPlugins) {
             const plugin = registered.plugin as IDataSourcePlugin;
-            const isEnabled = await this.isPluginEnabledForWork(
-                plugin.id,
-                workId,
-                userId,
-            );
+            const isEnabled = await this.isPluginEnabledForWork(plugin.id, workId, userId);
 
             if (isEnabled) {
                 result.push({

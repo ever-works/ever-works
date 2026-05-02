@@ -41,9 +41,9 @@
       `packages/agent/src/data-generator/data-generator.service.ts`
       with the public method:
 
-            ```ts
-            initialize(work, user, dto, opts: { logCollector, signal }): Promise<DataGeneratorResult>
-            ```
+              ```ts
+              initialize(work, user, dto, opts: { logCollector, signal }): Promise<DataGeneratorResult>
+              ```
 
 - [x] **T11**. `initialize` flow:
     1. Resolve git token via `GitFacadeService`.

@@ -39,12 +39,12 @@ WorkAccessResult { work, member, role, isCreator }
 
 The service enforces a four-level role hierarchy:
 
-| Role      | Level | Capabilities                       |
-| --------- | ----- | ---------------------------------- |
-| `OWNER`   | 4     | Full control, can delete work |
-| `MANAGER` | 3     | Can manage members and settings    |
-| `EDITOR`  | 2     | Can modify work content       |
-| `VIEWER`  | 1     | Read-only access                   |
+| Role      | Level | Capabilities                    |
+| --------- | ----- | ------------------------------- |
+| `OWNER`   | 4     | Full control, can delete work   |
+| `MANAGER` | 3     | Can manage members and settings |
+| `EDITOR`  | 2     | Can modify work content         |
+| `VIEWER`  | 1     | Read-only access                |
 
 ## API Reference
 
@@ -54,10 +54,10 @@ The service enforces a four-level role hierarchy:
 
 The core authorization method. Verifies a user has at least the specified minimum role.
 
-| Parameter     | Type                             | Description                 |
-| ------------- | -------------------------------- | --------------------------- |
-| `workId` | `string`                         | The work to check      |
-| `userId`      | `string`                         | The user requesting access  |
+| Parameter     | Type                        | Description                 |
+| ------------- | --------------------------- | --------------------------- |
+| `workId`      | `string`                    | The work to check           |
+| `userId`      | `string`                    | The user requesting access  |
 | `minimumRole` | `WorkMemberRole` (optional) | Minimum required role level |
 
 **Returns:** `Promise<WorkAccessResult>`
@@ -96,10 +96,10 @@ Shorthand for `ensureAccess(workId, userId, WorkMemberRole.OWNER)`.
 
 Non-throwing access check. Returns `true` if the user has any level of access, `false` otherwise.
 
-| Parameter     | Type     | Description            |
-| ------------- | -------- | ---------------------- |
-| `workId` | `string` | The work to check |
-| `userId`      | `string` | The user to check      |
+| Parameter | Type     | Description       |
+| --------- | -------- | ----------------- |
+| `workId`  | `string` | The work to check |
+| `userId`  | `string` | The user to check |
 
 **Returns:** `Promise<boolean>`
 
@@ -107,10 +107,10 @@ Non-throwing access check. Returns `true` if the user has any level of access, `
 
 Returns the user's role in a work without throwing exceptions.
 
-| Parameter     | Type     | Description            |
-| ------------- | -------- | ---------------------- |
-| `workId` | `string` | The work to check |
-| `userId`      | `string` | The user to check      |
+| Parameter | Type     | Description       |
+| --------- | -------- | ----------------- |
+| `workId`  | `string` | The work to check |
+| `userId`  | `string` | The user to check |
 
 **Returns:** `Promise<WorkMemberRole | null>` -- `null` if no access.
 
@@ -141,10 +141,10 @@ The `hasAccess()` method wraps `ensureAccess()` in a try-catch, returning a bool
 
 ## Database Interactions
 
-| Repository                  | Method                            | Purpose                                           |
-| --------------------------- | --------------------------------- | ------------------------------------------------- |
-| `WorkRepository`       | `findById(workId)`           | Load the work entity to check creator status |
-| `WorkMemberRepository` | `findMember(workId, userId)` | Look up membership record for non-creator users   |
+| Repository             | Method                       | Purpose                                         |
+| ---------------------- | ---------------------------- | ----------------------------------------------- |
+| `WorkRepository`       | `findById(workId)`           | Load the work entity to check creator status    |
+| `WorkMemberRepository` | `findMember(workId, userId)` | Look up membership record for non-creator users |
 
 ## Event System
 
@@ -154,7 +154,7 @@ This service does not emit or consume any events. It is a pure authorization ser
 
 | Scenario                            | Exception            | HTTP Status |
 | ----------------------------------- | -------------------- | ----------- |
-| Work not found                 | `NotFoundException`  | 404         |
+| Work not found                      | `NotFoundException`  | 404         |
 | User not creator and not a member   | `ForbiddenException` | 403         |
 | User role below minimum requirement | `ForbiddenException` | 403         |
 

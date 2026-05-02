@@ -308,12 +308,10 @@ export class SourceRepoAnalyzerService {
 
         if ((hasConfig || hasWorksConfig) && hasDataFolder) {
             try {
-                const dataContents = await this.gitFacade.getWorkContents(
-                    owner,
-                    repo,
-                    'data',
-                    { token, providerId: provider },
-                );
+                const dataContents = await this.gitFacade.getWorkContents(owner, repo, 'data', {
+                    token,
+                    providerId: provider,
+                });
 
                 if (dataContents) {
                     const itemDirs = dataContents.filter((c) => c.type === 'dir');
@@ -603,12 +601,10 @@ export class SourceRepoAnalyzerService {
             let categoryCount: number | undefined;
 
             try {
-                const dataContents = await this.gitFacade.getWorkContents(
-                    owner,
-                    repo,
-                    'data',
-                    { token, providerId: provider },
-                );
+                const dataContents = await this.gitFacade.getWorkContents(owner, repo, 'data', {
+                    token,
+                    providerId: provider,
+                });
                 if (dataContents) {
                     itemCount = dataContents.filter((c) => c.type === 'dir').length;
                 }
@@ -780,12 +776,10 @@ export class SourceRepoAnalyzerService {
                 return null;
             }
 
-            const contents = await this.gitFacade.getWorkContents(
-                owner,
-                candidateDataRepo,
-                '',
-                { token, providerId: provider },
-            );
+            const contents = await this.gitFacade.getWorkContents(owner, candidateDataRepo, '', {
+                token,
+                providerId: provider,
+            });
 
             if (!contents) {
                 return null;

@@ -29,9 +29,7 @@ export const listCommand = new Command('list')
 
                 if (works.length === 0) {
                     console.log(chalk.yellow('\n⚠ No works found.'));
-                    console.log(
-                        chalk.gray('Create your first work with: ever-works work create'),
-                    );
+                    console.log(chalk.gray('Create your first work with: ever-works work create'));
                     return;
                 }
 

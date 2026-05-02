@@ -271,7 +271,7 @@ Every step receives a `StepContext` that carries:
 | Field                    | Purpose                                                        |
 | ------------------------ | -------------------------------------------------------------- |
 | `signal`                 | `AbortSignal` for cancellation                                 |
-| `work`              | The current work entity                                   |
+| `work`                   | The current work entity                                        |
 | `user`                   | The triggering user                                            |
 | `pluginContext`          | The plugin's own `PluginContext` (logger, cache, http, events) |
 | `aiFacade`               | Resolved `IAiFacade`                                           |
@@ -326,7 +326,7 @@ runner with stubbed steps — see `__tests__/mock-pipeline-plugin.ts`.
 | II — Capability-driven      | Steps consume facades by capability; never plugin id.                           |
 | III — Source-of-truth repos | Steps that write data go through `GitFacadeService`.                            |
 | IV — Trigger.dev            | Production runs are wrapped by Trigger.dev tasks.                               |
-| V — Forward-only migrations | Step state is jsonb on `work_generation_history` — additive.               |
+| V — Forward-only migrations | Step state is jsonb on `work_generation_history` — additive.                    |
 | VI — Tests                  | Executor + builder + every shipped step has a Jest suite.                       |
 | VII — Secret hygiene        | StepContext exposes facades; secret values never appear in `state`.             |
 | VIII — Plugin counts        | N/A.                                                                            |

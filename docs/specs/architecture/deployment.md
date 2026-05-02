@@ -305,11 +305,11 @@ are inlined at Next.js build time, not at runtime.
 
 ## 9. Secrets in Production
 
-| Layer          | Mechanism                                                                                      |
-| -------------- | ---------------------------------------------------------------------------------------------- |
-| Kubernetes     | `Secret` objects, mounted as env vars                                                          |
-| Cloud KMS      | Cluster secrets sourced from cloud provider's secret manager                                   |
-| OAuth tokens   | Encrypted in DB via `PLUGIN_SECRETS_ENCRYPTION_KEY` (see settings system)                      |
+| Layer          | Mechanism                                                                                 |
+| -------------- | ----------------------------------------------------------------------------------------- |
+| Kubernetes     | `Secret` objects, mounted as env vars                                                     |
+| Cloud KMS      | Cluster secrets sourced from cloud provider's secret manager                              |
+| OAuth tokens   | Encrypted in DB via `PLUGIN_SECRETS_ENCRYPTION_KEY` (see settings system)                 |
 | Plugin secrets | Same — the secrets column on plugin_settings / user_plugins / work_plugins is AES-256-GCM |
 
 Operators rotate `PLUGIN_SECRETS_ENCRYPTION_KEY` via the registered-keys

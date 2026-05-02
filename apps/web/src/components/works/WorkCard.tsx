@@ -7,11 +7,7 @@ import { Link, usePathname } from '@/i18n/navigation';
 import { ROUTES } from '@/lib/constants';
 import { useTranslations } from 'next-intl';
 import type { Work } from '@/lib/api/work';
-import {
-    WorkMemberRole,
-    WorkScheduleStatus,
-    WorkScheduleCadence,
-} from '@/lib/api/enums';
+import { WorkMemberRole, WorkScheduleStatus, WorkScheduleCadence } from '@/lib/api/enums';
 import { Github, Users, FolderClosed, AlertTriangle } from 'lucide-react';
 import { ShowDateTime } from '../ui/show-datetime';
 import { Tooltip } from '../ui/tooltip';
@@ -261,10 +257,7 @@ export function WorkCard({ work }: WorkCardProps) {
                         </span>
                     ) : work.updatedAt ? (
                         <span className="text-[11px] text-text-muted dark:text-text-muted-dark">
-                            <ShowDateTime
-                                value={work.updatedAt}
-                                customFormatter={formatDate}
-                            />
+                            <ShowDateTime value={work.updatedAt} customFormatter={formatDate} />
                         </span>
                     ) : null}
                 </div>

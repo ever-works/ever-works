@@ -69,9 +69,9 @@ interface CommunityPrProcessingResult {
 
 Processes open PRs for a single work.
 
-| Parameter   | Type                          | Description                                                                |
-| ----------- | ----------------------------- | -------------------------------------------------------------------------- |
-| `work` | `Work`                   | The work entity to process                                            |
+| Parameter   | Type                          | Description                                                           |
+| ----------- | ----------------------------- | --------------------------------------------------------------------- |
+| `work`      | `Work`                        | The work entity to process                                            |
 | `state`     | `CommunityPrState` (optional) | Existing processing state; loaded from work if not provided           |
 | `autoClose` | `boolean` (optional)          | Whether to auto-close processed PRs; loaded from work if not provided |
 
@@ -149,11 +149,11 @@ The service posts comments on PRs at multiple stages:
 
 ## Database Interactions
 
-| Repository            | Method                               | Purpose                                        |
-| --------------------- | ------------------------------------ | ---------------------------------------------- |
+| Repository       | Method                               | Purpose                                  |
+| ---------------- | ------------------------------------ | ---------------------------------------- |
 | `WorkRepository` | `findWithCommunityPrEnabled()`       | Find all works with community PR enabled |
-| `WorkRepository` | `update(id, { communityPrState })`   | Persist updated processing state               |
-| `WorkRepository` | `increment(id, 'itemsCount', count)` | Atomically increment item count                |
+| `WorkRepository` | `update(id, { communityPrState })`   | Persist updated processing state         |
+| `WorkRepository` | `increment(id, 'itemsCount', count)` | Atomically increment item count          |
 
 ## Event System
 
@@ -180,13 +180,13 @@ const itemsAdded = await communityPrProcessor.processWork(work);
 
 ## Configuration
 
-| Setting                     | Value         | Description                                   |
-| --------------------------- | ------------- | --------------------------------------------- |
-| `MAX_PROCESSED_PR_NUMBERS`  | 500           | Maximum tracked PR numbers before trimming    |
-| `MAX_CHANGE_CONTEXT_LENGTH` | 50,000        | Maximum characters of diff context sent to AI |
-| `communityPrEnabled`        | per-work | Feature flag on the work entity          |
+| Setting                     | Value    | Description                                   |
+| --------------------------- | -------- | --------------------------------------------- |
+| `MAX_PROCESSED_PR_NUMBERS`  | 500      | Maximum tracked PR numbers before trimming    |
+| `MAX_CHANGE_CONTEXT_LENGTH` | 50,000   | Maximum characters of diff context sent to AI |
+| `communityPrEnabled`        | per-work | Feature flag on the work entity               |
 | `communityPrAutoClose`      | per-work | Whether to close PRs after processing         |
-| AI temperature              | 0.3           | Slightly creative for extraction flexibility  |
+| AI temperature              | 0.3      | Slightly creative for extraction flexibility  |
 
 ## Related Services
 

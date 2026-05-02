@@ -15,18 +15,18 @@ The `WorkQueryService` provides read-only access to work data, items, configurat
 
 All query methods enforce role-based access through the `WorkOwnershipService`. Most queries require only **Viewer** level access, while write operations like updating website settings require **Editor** level.
 
-| Method                       | Required Role | Description                                    |
-| ---------------------------- | ------------- | ---------------------------------------------- |
-| `getWorks`             | Authenticated | Lists all works accessible to the user   |
+| Method                  | Required Role | Description                               |
+| ----------------------- | ------------- | ----------------------------------------- |
+| `getWorks`              | Authenticated | Lists all works accessible to the user    |
 | `getWork`               | Viewer        | Gets a single work by ID                  |
 | `workExists`            | Authenticated | Checks if a work with a given slug exists |
 | `workItems`             | Viewer        | Lists all items in a work                 |
-| `workConfig`            | Viewer        | Gets the data repository configuration         |
-| `workCount`             | Viewer        | Gets item, category, and tag counts            |
-| `workCategoriesTags`    | Viewer        | Lists categories, tags, and collections        |
-| `workGenerationHistory` | Viewer        | Paginated generation run history               |
-| `getWebsiteSettings`         | Viewer        | Gets website display settings                  |
-| `updateWebsiteSettings`      | Editor        | Updates website display settings               |
+| `workConfig`            | Viewer        | Gets the data repository configuration    |
+| `workCount`             | Viewer        | Gets item, category, and tag counts       |
+| `workCategoriesTags`    | Viewer        | Lists categories, tags, and collections   |
+| `workGenerationHistory` | Viewer        | Paginated generation run history          |
+| `getWebsiteSettings`    | Viewer        | Gets website display settings             |
+| `updateWebsiteSettings` | Editor        | Updates website display settings          |
 
 ## Listing Works
 

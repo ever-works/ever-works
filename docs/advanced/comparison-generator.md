@@ -113,11 +113,11 @@ The comparison generator is controlled via the `comparison-generator` plugin, wh
 
 The service exposes five operations:
 
-| Method                                                        | Purpose                                      |
-| ------------------------------------------------------------- | -------------------------------------------- |
+| Method                                                   | Purpose                                      |
+| -------------------------------------------------------- | -------------------------------------------- |
 | `generateNextComparison(workId, userId)`                 | Auto-select and generate the next comparison |
 | `generateManualComparison(workId, userId, itemA, itemB)` | Generate comparison for two specific items   |
-| `listComparisons(workId, userId)`                        | List all comparisons for a work         |
+| `listComparisons(workId, userId)`                        | List all comparisons for a work              |
 | `getComparison(workId, userId, slug)`                    | Get a single comparison with markdown        |
 | `deleteComparison(workId, userId, slug)`                 | Delete a comparison and update state         |
 

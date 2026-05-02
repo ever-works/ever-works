@@ -15,10 +15,7 @@ import { UserRepository } from '@src/database/repositories/user.repository';
 import { slugifyText } from '@src/utils/text.utils';
 import { WorkGenerationHistoryRepository } from '@src/database/repositories/work-generation-history.repository';
 import { GenerateStatusType } from '@src/entities/types';
-import {
-    WorkHistoryActivityType,
-    type WorkHistoryChangeEntry,
-} from '@ever-works/contracts/api';
+import { WorkHistoryActivityType, type WorkHistoryChangeEntry } from '@ever-works/contracts/api';
 import { buildWorkChangelog } from '@src/utils/work-changelog.utils';
 
 /**

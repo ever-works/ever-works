@@ -3,10 +3,7 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 import { OnEvent } from '@nestjs/event-emitter';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { CacheEntryRepository, DistributedTaskLockService } from '@ever-works/agent/cache';
-import {
-    WorkRepository,
-    WorkGenerationHistoryRepository,
-} from '@ever-works/agent/database';
+import { WorkRepository, WorkGenerationHistoryRepository } from '@ever-works/agent/database';
 import { Work, GenerateStatusType } from '@ever-works/agent/entities';
 import { WorkGenerationCompletedEvent } from '@ever-works/agent/events';
 import { config } from '@src/config/constants';

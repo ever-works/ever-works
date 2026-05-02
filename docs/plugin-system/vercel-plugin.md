@@ -190,7 +190,7 @@ Searches the personal account and all teams the user belongs to, returning the f
 | `getTeams(token)`                                   | Lists user's Vercel teams.                                                    |
 | `listProjects(token)`                               | Lists projects under the default team scope.                                  |
 | `getProject(projectId, token)`                      | Gets a specific project by ID.                                                |
-| `lookupExistingDeployment(name, token, teamScope?)` | Finds existing deployment for a work.                                    |
+| `lookupExistingDeployment(name, token, teamScope?)` | Finds existing deployment for a work.                                         |
 | `getAuthenticatedUser(token)`                       | Returns username and email for the token.                                     |
 
 ### Direct API Access

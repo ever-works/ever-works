@@ -2,11 +2,7 @@ import { Injectable } from '@nestjs/common';
 import chalk from 'chalk';
 import inquirer from 'inquirer';
 import { MarkdownReadmeConfigDto } from '@ever-works/agent/dto';
-import {
-    WorkRepository,
-    WorkMemberRepository,
-    UserRepository,
-} from '@ever-works/agent/database';
+import { WorkRepository, WorkMemberRepository, UserRepository } from '@ever-works/agent/database';
 import { Work, WorkMemberRole } from '@ever-works/agent/entities';
 import { validateSlug, BasePromptService } from '@ever-works/cli-shared';
 
@@ -219,9 +215,7 @@ export class WorkPromptService extends BasePromptService {
      * Prompts user to select a work from available works.
      * Includes both owned works and works shared with the user.
      */
-    async promptWorkSelection(
-        workRepository: WorkRepository,
-    ): Promise<WorkSelection> {
+    async promptWorkSelection(workRepository: WorkRepository): Promise<WorkSelection> {
         try {
             // Get local user and all accessible works (owned + shared)
             const user = await this.userRepository.createOrGetLocalUser();
@@ -240,8 +234,7 @@ export class WorkPromptService extends BasePromptService {
             if (works.length === 0) {
                 console.log(chalk.yellow('\n⚠ No works found.'));
                 console.log(
-                    chalk.gray('Create your first work with: ') +
-                        chalk.cyan('work create'),
+                    chalk.gray('Create your first work with: ') + chalk.cyan('work create'),
                 );
                 return { work: null, cancelled: true };
             }
@@ -307,11 +300,7 @@ export class WorkPromptService extends BasePromptService {
     /**
      * Formats a work selection message showing the role.
      */
-    formatSelectedWork(
-        work: Work,
-        role: WorkMemberRole,
-        isShared: boolean,
-    ): string {
+    formatSelectedWork(work: Work, role: WorkMemberRole, isShared: boolean): string {
         const roleLabel = this.formatRoleLabel(role, isShared);
         return `${work.name} (${work.slug}) ${roleLabel}`;
     }

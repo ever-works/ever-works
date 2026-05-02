@@ -1,10 +1,6 @@
 import { SubCommand, CommandRunner } from 'nest-commander';
 import chalk from 'chalk';
-import {
-    WorkRepository,
-    WorkMemberRepository,
-    UserRepository,
-} from '@ever-works/agent/database';
+import { WorkRepository, WorkMemberRepository, UserRepository } from '@ever-works/agent/database';
 import { WorkMemberRole } from '@ever-works/agent/entities';
 import { ConfigCheckService } from './config-check.service';
 import { handleCliError } from './error';
@@ -47,8 +43,7 @@ export class ListSubCommand extends CommandRunner {
             if (works.length === 0) {
                 console.log(chalk.yellow('\n⚠ No works found.'));
                 console.log(
-                    chalk.gray('Create your first work with: ') +
-                        chalk.cyan('work create'),
+                    chalk.gray('Create your first work with: ') + chalk.cyan('work create'),
                 );
                 return;
             }

@@ -191,7 +191,7 @@ The `BillingProvider` token is bound to `ManualBillingProvider` by default. Over
 | `description`       | `varchar`          | Plan description                                    |
 | `monthlyPriceCents` | `int`              | Monthly price in cents                              |
 | `yearlyPriceCents`  | `int`              | Yearly price in cents                               |
-| `allowedCadences`   | `json`             | Array of allowed `WorkScheduleCadence` values  |
+| `allowedCadences`   | `json`             | Array of allowed `WorkScheduleCadence` values       |
 | `isActive`          | `boolean`          | Whether the plan is available for new subscriptions |
 
 ### UserSubscription Entity
@@ -213,7 +213,7 @@ The `BillingProvider` token is bound to `ManualBillingProvider` by default. Over
 | --------------------- | -------------------- | ------------------------------------------ |
 | `id`                  | `uuid` (PK)          | Auto-generated                             |
 | `userId`              | `varchar`            | User reference                             |
-| `workId`         | `varchar`            | Work reference                        |
+| `workId`              | `varchar`            | Work reference                             |
 | `scheduleId`          | `varchar` (nullable) | Schedule reference                         |
 | `triggerType`         | `enum`               | `manual`, `scheduled`, `api`               |
 | `billingMode`         | `enum`               | `included`, `usage`                        |
@@ -251,12 +251,7 @@ import { UsageLedgerService } from '@ever-works/agent/subscriptions';
 export class GenerationService {
 	constructor(private readonly usageLedger: UsageLedgerService) {}
 
-	async afterGeneration(options: {
-		userId: string;
-		workId: string;
-		schedule: WorkSchedule;
-		historyId: string;
-	}) {
+	async afterGeneration(options: { userId: string; workId: string; schedule: WorkSchedule; historyId: string }) {
 		await this.usageLedger.recordUsage({
 			userId: options.userId,
 			workId: options.workId,

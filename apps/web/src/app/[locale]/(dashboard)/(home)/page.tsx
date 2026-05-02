@@ -26,9 +26,7 @@ export default async function Dashboard() {
         })),
     ]);
 
-    const totalWorks = statsResponse.success
-        ? statsResponse.totalWorks
-        : worksResponse.total;
+    const totalWorks = statsResponse.success ? statsResponse.totalWorks : worksResponse.total;
 
     return (
         <DashboardClient

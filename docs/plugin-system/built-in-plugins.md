@@ -845,15 +845,15 @@ Auto-generates SEO-optimized A vs B comparison pages between work items.
 
 **Settings:**
 
-| Setting                    | Type    | Default         | Description                                                       |
-| -------------------------- | ------- | --------------- | ----------------------------------------------------------------- |
+| Setting                    | Type    | Default    | Description                                                  |
+| -------------------------- | ------- | ---------- | ------------------------------------------------------------ |
 | `cadence_override`         | string  | `use_work` | Generation cadence: `use_work`, `daily`, `weekly`, `monthly` |
-| `max_comparisons_mode`     | string  | `custom`        | `custom` or `unlimited`                                           |
-| `max_comparisons`          | number  | `50`            | Max total comparisons (1–500, only used in Custom mode)           |
-| `min_items_for_comparison` | number  | `3`             | Min items in category before generating (2–20)                    |
-| `ai_provider`              | string  | —               | Override AI provider for comparison generation                    |
-| `ai_model`                 | string  | —               | Override AI model for comparison generation                       |
-| `custom_prompt`            | string  | —               | Additional instructions appended to comparison prompts            |
-| `extended_analysis`        | boolean | `false`         | Enable deep-dive 7-section extended analysis                      |
+| `max_comparisons_mode`     | string  | `custom`   | `custom` or `unlimited`                                      |
+| `max_comparisons`          | number  | `50`       | Max total comparisons (1–500, only used in Custom mode)      |
+| `min_items_for_comparison` | number  | `3`        | Min items in category before generating (2–20)               |
+| `ai_provider`              | string  | —          | Override AI provider for comparison generation               |
+| `ai_model`                 | string  | —          | Override AI model for comparison generation                  |
+| `custom_prompt`            | string  | —          | Additional instructions appended to comparison prompts       |
+| `extended_analysis`        | boolean | `false`    | Enable deep-dive 7-section extended analysis                 |
 
 See [Comparisons](/features/comparisons) for the full feature documentation.

@@ -175,9 +175,7 @@ export const itemsGeneratorAPI = {
     // Get generator form schema
     getFormSchema: async (workId: string, pipelineId?: string) => {
         const queryParams = pipelineId ? `?pipelineId=${encodeURIComponent(pipelineId)}` : '';
-        return serverFetch<GeneratorFormSchema>(
-            `/works/${workId}/generator-form${queryParams}`,
-        );
+        return serverFetch<GeneratorFormSchema>(`/works/${workId}/generator-form${queryParams}`);
     },
 
     // Get global generator form schema (no work context)

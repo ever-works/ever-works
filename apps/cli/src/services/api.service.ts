@@ -222,10 +222,7 @@ export class ApiService {
     private httpClient = getHttpClient();
 
     // Work operations
-    async getWorks(options?: {
-        limit?: number;
-        offset?: number;
-    }): Promise<WorksResponse> {
+    async getWorks(options?: { limit?: number; offset?: number }): Promise<WorksResponse> {
         const queryParams = new URLSearchParams();
         if (options?.limit) queryParams.append('limit', options.limit.toString());
         if (options?.offset) queryParams.append('offset', options.offset.toString());
@@ -237,17 +234,12 @@ export class ApiService {
     }
 
     async createWork(data: CreateWorkDto) {
-        const response = await this.httpClient.post<ApiResponse<{ work: Work }>>(
-            '/works',
-            data,
-        );
+        const response = await this.httpClient.post<ApiResponse<{ work: Work }>>('/works', data);
         return response.data;
     }
 
     async getWork(id: string) {
-        const response = await this.httpClient.get<ApiResponse<{ work: Work }>>(
-            `/works/${id}`,
-        );
+        const response = await this.httpClient.get<ApiResponse<{ work: Work }>>(`/works/${id}`);
         return response.data;
     }
 
@@ -494,10 +486,7 @@ export class ApiService {
             priority?: number;
         },
     ): Promise<void> {
-        await this.httpClient.post(
-            `/works/${workId}/plugins/${pluginId}/enable`,
-            data || {},
-        );
+        await this.httpClient.post(`/works/${workId}/plugins/${pluginId}/enable`, data || {});
     }
 
     async disableWorkPlugin(workId: string, pluginId: string): Promise<void> {
@@ -512,10 +501,7 @@ export class ApiService {
             secretSettings?: Record<string, unknown>;
         },
     ): Promise<void> {
-        await this.httpClient.patch(
-            `/works/${workId}/plugins/${pluginId}/settings`,
-            data,
-        );
+        await this.httpClient.patch(`/works/${workId}/plugins/${pluginId}/settings`, data);
     }
 
     async setWorkPluginCapability(

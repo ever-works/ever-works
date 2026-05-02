@@ -231,10 +231,7 @@ export class UserPluginResponseDto extends PluginResponseDto implements UserPlug
 /**
  * Response DTO for a plugin in work context
  */
-export class WorkPluginResponseDto
-    extends UserPluginResponseDto
-    implements WorkPluginResponse
-{
+export class WorkPluginResponseDto extends UserPluginResponseDto implements WorkPluginResponse {
     @ApiProperty({ description: 'Whether plugin is enabled for this work' })
     workEnabled: boolean;
 

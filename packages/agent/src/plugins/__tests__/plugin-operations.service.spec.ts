@@ -658,11 +658,7 @@ describe('PluginOperationsService', () => {
                 metadata: {},
             } as any);
 
-            const result = await service.disablePluginForWork(
-                'dir-1',
-                'test-plugin',
-                'user-1',
-            );
+            const result = await service.disablePluginForWork('dir-1', 'test-plugin', 'user-1');
 
             expect(result.workEnabled).toBe(false);
             expect(workPluginRepository.save).toHaveBeenCalled();
@@ -690,11 +686,7 @@ describe('PluginOperationsService', () => {
                 metadata: {},
             } as any);
 
-            const result = await service.disablePluginForWork(
-                'dir-1',
-                'test-plugin',
-                'user-1',
-            );
+            const result = await service.disablePluginForWork('dir-1', 'test-plugin', 'user-1');
 
             expect(result.workEnabled).toBe(false);
             expect(workPluginRepository.save).toHaveBeenCalled();
@@ -934,13 +926,9 @@ describe('PluginOperationsService', () => {
                 metadata: {},
             } as any);
 
-            await service.updateWorkPluginSettings(
-                'dir-1',
-                'test-plugin',
-                'user-1',
-                undefined,
-                { secretField: 'new-secret' },
-            );
+            await service.updateWorkPluginSettings('dir-1', 'test-plugin', 'user-1', undefined, {
+                secretField: 'new-secret',
+            });
 
             expect(workPluginRepository.save).toHaveBeenCalledWith(
                 expect.objectContaining({
@@ -2157,13 +2145,9 @@ describe('PluginOperationsService', () => {
 
             // Work provides apiKey (global scope) — should pass
             await expect(
-                realService.updateWorkPluginSettings(
-                    'dir-1',
-                    'test-plugin',
-                    'user-1',
-                    undefined,
-                    { apiKey: 'sk-123' },
-                ),
+                realService.updateWorkPluginSettings('dir-1', 'test-plugin', 'user-1', undefined, {
+                    apiKey: 'sk-123',
+                }),
             ).resolves.toBeDefined();
         });
 
@@ -2605,11 +2589,7 @@ describe('PluginOperationsService', () => {
                 jest.spyOn(userPluginRepository, 'findOne').mockResolvedValue(null);
                 jest.spyOn(workPluginRepository, 'findOne').mockResolvedValue(null);
 
-                const result = await service.enablePluginForWork(
-                    'dir-1',
-                    'test-plugin',
-                    'user-1',
-                );
+                const result = await service.enablePluginForWork('dir-1', 'test-plugin', 'user-1');
 
                 expect(result.workEnabled).toBe(true);
                 expect(workPluginRepository.save).toHaveBeenCalled();

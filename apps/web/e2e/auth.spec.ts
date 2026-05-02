@@ -42,10 +42,9 @@ test.describe('Registration', () => {
         await page.locator('button[type="submit"]').click();
 
         // Should redirect to dashboard (any /en path that isn't an auth page)
-        await page.waitForURL(
-            /\/en(\/(?!login|register|forgot|reset|email|auth)|$|\?)/,
-            { timeout: 60_000 },
-        );
+        await page.waitForURL(/\/en(\/(?!login|register|forgot|reset|email|auth)|$|\?)/, {
+            timeout: 60_000,
+        });
         await expect(page).not.toHaveURL(/\/register/);
     });
 

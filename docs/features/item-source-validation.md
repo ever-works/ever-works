@@ -100,8 +100,8 @@ The Items UI shows compact validation status without turning every ambiguous cas
 
 ### Check a Single Item Source
 
-| Method | Endpoint                                 | Description                                               |
-| ------ | ---------------------------------------- | --------------------------------------------------------- |
+| Method | Endpoint                           | Description                                               |
+| ------ | ---------------------------------- | --------------------------------------------------------- |
 | `POST` | `/api/works/:id/check-item-health` | Run source validation for one item and persist the result |
 
 **Example:**

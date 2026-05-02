@@ -20,10 +20,10 @@ Ever Works uses a four-level role hierarchy:
 
 | Role      | Level | Permissions                                                        |
 | --------- | ----- | ------------------------------------------------------------------ |
-| `OWNER`   | 4     | Full control: delete work, manage members, edit, view         |
+| `OWNER`   | 4     | Full control: delete work, manage members, edit, view              |
 | `MANAGER` | 3     | Manage members (invite, update roles, remove), edit, view          |
 | `EDITOR`  | 2     | Edit content (generate items, update settings, manage repos), view |
-| `VIEWER`  | 1     | Read-only access to all work data                             |
+| `VIEWER`  | 1     | Read-only access to all work data                                  |
 
 The work **creator** always has `OWNER` level access, even without an explicit membership record. This is enforced at the service level, not via database records.
 
@@ -33,13 +33,13 @@ This service provides the authorization layer used by all other work services.
 
 ### Access Check Methods
 
-| Method                                            | Minimum Role | Used By             |
-| ------------------------------------------------- | ------------ | ------------------- |
+| Method                                       | Minimum Role | Used By             |
+| -------------------------------------------- | ------------ | ------------------- |
 | `ensureAccess(workId, userId, minimumRole?)` | Configurable | Base method         |
 | `ensureCanView(workId, userId)`              | VIEWER       | Query operations    |
 | `ensureCanEdit(workId, userId)`              | EDITOR       | Generation, updates |
 | `ensureCanManageMembers(workId, userId)`     | MANAGER      | Member management   |
-| `ensureIsOwner(workId, userId)`              | OWNER        | Work deletion  |
+| `ensureIsOwner(workId, userId)`              | OWNER        | Work deletion       |
 
 ### WorkAccessResult
 
@@ -185,18 +185,18 @@ Returns the work creator's basic profile information.
 
 Here is how the role system integrates across the agent services:
 
-| Service                    | Operation                | Required Role      |
-| -------------------------- | ------------------------ | ------------------ |
-| WorkLifecycleService  | `createWork`        | Authenticated user |
-| WorkLifecycleService  | `updateWork`        | Editor             |
+| Service               | Operation                | Required Role      |
+| --------------------- | ------------------------ | ------------------ |
+| WorkLifecycleService  | `createWork`             | Authenticated user |
+| WorkLifecycleService  | `updateWork`             | Editor             |
 | WorkLifecycleService  | `syncFromDataRepository` | Editor             |
-| WorkLifecycleService  | `deleteWork`        | Owner              |
+| WorkLifecycleService  | `deleteWork`             | Owner              |
 | WorkGenerationService | `generateItems`          | Editor             |
 | WorkGenerationService | `submitItem`             | Editor             |
 | WorkGenerationService | `removeItem`             | Editor             |
-| WorkQueryService      | `getWorks`         | Authenticated      |
-| WorkQueryService      | `getWork`           | Viewer             |
-| WorkQueryService      | `workItems`         | Viewer             |
+| WorkQueryService      | `getWorks`               | Authenticated      |
+| WorkQueryService      | `getWork`                | Viewer             |
+| WorkQueryService      | `workItems`              | Viewer             |
 | WorkQueryService      | `updateWebsiteSettings`  | Editor             |
 | WorkScheduleService   | `getSchedule`            | Viewer             |
 | WorkScheduleService   | `updateSchedule`         | Editor             |
@@ -210,10 +210,10 @@ Here is how the role system integrates across the agent services:
 
 | Condition                           | Exception             | Message                                                                |
 | ----------------------------------- | --------------------- | ---------------------------------------------------------------------- |
-| Work not found                 | `NotFoundException`   | Work with id 'X' not found                                        |
-| No access (not creator, not member) | `ForbiddenException`  | You do not have permission to access this work                    |
+| Work not found                      | `NotFoundException`   | Work with id 'X' not found                                             |
+| No access (not creator, not member) | `ForbiddenException`  | You do not have permission to access this work                         |
 | Insufficient role                   | `ForbiddenException`  | You do not have the required permission level for this action          |
 | User not found (invite)             | `NotFoundException`   | User with email 'X' not found                                          |
-| Duplicate member                    | `BadRequestException` | User is already a member of this work                             |
+| Duplicate member                    | `BadRequestException` | User is already a member of this work                                  |
 | Invalid role assignment             | `BadRequestException` | Invalid role. Members can only be assigned: viewer, editor, or manager |
-| Creator trying to leave             | `BadRequestException` | Work creator cannot leave the work                           |
+| Creator trying to leave             | `BadRequestException` | Work creator cannot leave the work                                     |

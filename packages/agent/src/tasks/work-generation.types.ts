@@ -7,8 +7,7 @@ export const WORK_GENERATION_MODE = {
     UPDATE: 'update',
 } as const;
 
-export type WorkGenerationMode =
-    (typeof WORK_GENERATION_MODE)[keyof typeof WORK_GENERATION_MODE];
+export type WorkGenerationMode = (typeof WORK_GENERATION_MODE)[keyof typeof WORK_GENERATION_MODE];
 
 export type WorkContextUserDto = Omit<User, 'password'>;
 

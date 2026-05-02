@@ -48,8 +48,8 @@ All endpoints require JWT or API key authentication and work edit permission.
 
 ### List Domains
 
-| Method | Endpoint                              | Description                             |
-| ------ | ------------------------------------- | --------------------------------------- |
+| Method | Endpoint                        | Description                        |
+| ------ | ------------------------------- | ---------------------------------- |
 | `GET`  | `/api/deploy/works/:id/domains` | List all custom domains for a work |
 
 ```bash
@@ -74,8 +74,8 @@ curl http://localhost:3100/api/deploy/works/<work-id>/domains \
 
 ### Add Domain
 
-| Method | Endpoint                              | Description         |
-| ------ | ------------------------------------- | ------------------- |
+| Method | Endpoint                        | Description         |
+| ------ | ------------------------------- | ------------------- |
 | `POST` | `/api/deploy/works/:id/domains` | Add a custom domain |
 
 ```bash
@@ -95,8 +95,8 @@ curl -X POST http://localhost:3100/api/deploy/works/<work-id>/domains \
 
 ### Remove Domain
 
-| Method   | Endpoint                                      | Description            |
-| -------- | --------------------------------------------- | ---------------------- |
+| Method   | Endpoint                                | Description            |
+| -------- | --------------------------------------- | ---------------------- |
 | `DELETE` | `/api/deploy/works/:id/domains/:domain` | Remove a custom domain |
 
 ```bash
@@ -108,8 +108,8 @@ Removes the domain from both the database and the deployment provider.
 
 ### Verify Domain
 
-| Method | Endpoint                                             | Description              |
-| ------ | ---------------------------------------------------- | ------------------------ |
+| Method | Endpoint                                       | Description              |
+| ------ | ---------------------------------------------- | ------------------------ |
 | `POST` | `/api/deploy/works/:id/domains/:domain/verify` | Trigger DNS verification |
 
 ```bash

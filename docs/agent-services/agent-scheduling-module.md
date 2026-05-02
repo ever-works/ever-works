@@ -59,11 +59,11 @@ The core service (~571 lines) managing all scheduling operations:
 
 Four cadence levels are supported:
 
-| Cadence   | Interval         | Typical Use Case                      |
-| --------- | ---------------- | ------------------------------------- |
+| Cadence   | Interval         | Typical Use Case                |
+| --------- | ---------------- | ------------------------------- |
 | `HOURLY`  | Every 60 minutes | High-frequency monitoring works |
 | `DAILY`   | Every 24 hours   | Standard content works          |
-| `WEEKLY`  | Every 7 days     | Slower-moving curated lists           |
+| `WEEKLY`  | Every 7 days     | Slower-moving curated lists     |
 | `MONTHLY` | Every 30 days    | Archival or low-update works    |
 
 ### Drift Correction
@@ -218,7 +218,7 @@ The dispatcher is injected via the `DIRECTORY_GENERATION_DISPATCHER` Symbol toke
 
 | Dependency                        | Purpose                                                   |
 | --------------------------------- | --------------------------------------------------------- |
-| `@ever-works/agent/database`      | `WorkRepository`, `WorkScheduleRepository`      |
+| `@ever-works/agent/database`      | `WorkRepository`, `WorkScheduleRepository`                |
 | `@ever-works/agent/subscriptions` | Plan enforcement and billing mode resolution              |
 | `@ever-works/agent/tasks`         | `DIRECTORY_GENERATION_DISPATCHER` for background dispatch |
 | `TypeORM`                         | Entity persistence and queries                            |

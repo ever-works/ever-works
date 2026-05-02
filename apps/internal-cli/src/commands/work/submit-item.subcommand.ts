@@ -31,9 +31,7 @@ export class SubmitItemSubCommand extends CommandRunner {
             await this.configCheck.requireConfiguration();
 
             // Select work
-            const selection = await this.workPrompt.promptWorkSelection(
-                this.workRepository,
-            );
+            const selection = await this.workPrompt.promptWorkSelection(this.workRepository);
             if (selection.cancelled || !selection.work) {
                 console.log(chalk.yellow('\n⚠ Operation cancelled.'));
                 return;
@@ -97,11 +95,7 @@ export class SubmitItemSubCommand extends CommandRunner {
                 const user = await this.userRepository.createOrGetLocalUser();
 
                 // Call the agent service method directly
-                const result = await this.workGenerationService.submitItem(
-                    work.id,
-                    itemData,
-                    user,
-                );
+                const result = await this.workGenerationService.submitItem(work.id, itemData, user);
 
                 spinner.stop();
 

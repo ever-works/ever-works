@@ -59,8 +59,8 @@ Migration: additive — new columns default to `null` for existing rows.
 
 ## 4. API Surface
 
-| Method | Endpoint                       | Description                                         |
-| ------ | ------------------------------ | --------------------------------------------------- |
+| Method | Endpoint                 | Description                                         |
+| ------ | ------------------------ | --------------------------------------------------- |
 | `GET`  | `/api/works/:id/history` | Paginated history with optional activityType filter |
 
 ## 5. Plugin / Web / CLI

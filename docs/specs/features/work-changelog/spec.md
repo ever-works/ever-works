@@ -90,12 +90,12 @@ exactly what was added, updated, or removed.
 
 ## 5. Key Entities & Domain Concepts
 
-| Entity / concept             | Description                                                                         |
-| ---------------------------- | ----------------------------------------------------------------------------------- |
-| `WorkGenerationHistory` | Per-work log row with status, duration, metrics, activityType, changelog       |
-| `WorkChangelog`         | `{summary?, addedCount, updatedCount, removedCount, entries[]}`                     |
-| `WorkChangelogEntry`    | `{entityType, action, name, slug?, fieldsChanged?[]}`                               |
-| Activity-type filter group   | UI-level grouping: `generation`, `items`, `comparisons`, `taxonomy`, `community_pr` |
+| Entity / concept           | Description                                                                         |
+| -------------------------- | ----------------------------------------------------------------------------------- |
+| `WorkGenerationHistory`    | Per-work log row with status, duration, metrics, activityType, changelog            |
+| `WorkChangelog`            | `{summary?, addedCount, updatedCount, removedCount, entries[]}`                     |
+| `WorkChangelogEntry`       | `{entityType, action, name, slug?, fieldsChanged?[]}`                               |
+| Activity-type filter group | UI-level grouping: `generation`, `items`, `comparisons`, `taxonomy`, `community_pr` |
 
 ## 6. Out of Scope
 

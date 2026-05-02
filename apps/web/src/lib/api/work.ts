@@ -573,9 +573,7 @@ export const workAPI = {
 
     // Get work categories and tags
     getCategoriesTags: async (id: string) => {
-        return serverFetch<APIResponse<WorkCategoriesTags>>(
-            `/works/${id}/categories-tags`,
-        );
+        return serverFetch<APIResponse<WorkCategoriesTags>>(`/works/${id}/categories-tags`);
     },
 
     // Get work generation history
@@ -713,9 +711,7 @@ export const workAPI = {
         if (options.type) params.append('type', options.type);
         const query = params.toString() ? `?${params.toString()}` : '';
 
-        return serverFetch<GetUserRepositoriesResponseDto>(
-            `/works/import/repositories${query}`,
-        );
+        return serverFetch<GetUserRepositoriesResponseDto>(`/works/import/repositories${query}`);
     },
 
     // Repository Visibility
@@ -753,9 +749,7 @@ export const workAPI = {
 
     // Website Settings
     getWebsiteSettings: async (id: string) => {
-        return serverFetch<APIResponse<WebsiteSettingsResponse>>(
-            `/works/${id}/website-settings`,
-        );
+        return serverFetch<APIResponse<WebsiteSettingsResponse>>(`/works/${id}/website-settings`);
     },
 
     updateWebsiteSettings: async (id: string, data: UpdateWebsiteSettingsDto) => {

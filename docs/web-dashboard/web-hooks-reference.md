@@ -188,11 +188,11 @@ function useKeyboardShortcuts(options: { onOpenHelp?: () => void }): void;
 
 Registers global keyboard event listeners on mount. The registered shortcuts are:
 
-| Shortcut              | Action                                               |
-| --------------------- | ---------------------------------------------------- |
-| `Ctrl+K` (or `Cmd+K`) | Open search                                          |
+| Shortcut              | Action                                          |
+| --------------------- | ----------------------------------------------- |
+| `Ctrl+K` (or `Cmd+K`) | Open search                                     |
 | `C`                   | Create new work (only when no input is focused) |
-| `?`                   | Open help drawer (calls `onOpenHelp`)                |
+| `?`                   | Open help drawer (calls `onOpenHelp`)           |
 
 The hook checks `document.activeElement` to avoid triggering shortcuts while the user is typing in an input, textarea, or contenteditable element. Listeners are cleaned up on unmount.
 

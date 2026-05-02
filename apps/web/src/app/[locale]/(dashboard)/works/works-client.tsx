@@ -26,11 +26,7 @@ interface WorksClientProps {
     };
 }
 
-export default function WorksClient({
-    initialWorks,
-    totalWorks,
-    initialStats,
-}: WorksClientProps) {
+export default function WorksClient({ initialWorks, totalWorks, initialStats }: WorksClientProps) {
     const router = useRouter();
     const searchParams = useSearchParams();
     const t = useTranslations('dashboard.works');

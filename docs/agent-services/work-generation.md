@@ -19,14 +19,14 @@ This service handles both initial generation (creating items from scratch) and i
 | ------------------------- | ------------- | ------------------------------------------------------ |
 | `generateItems`           | Editor        | Triggers initial item generation from a prompt         |
 | `updateItemsGenerator`    | Editor        | Re-runs generation with updated parameters             |
-| `submitItem`              | Editor        | Submits a single item to the work                 |
-| `removeItem`              | Editor        | Removes a single item from the work               |
+| `submitItem`              | Editor        | Submits a single item to the work                      |
+| `removeItem`              | Editor        | Removes a single item from the work                    |
 | `updateItemMetadata`      | Editor        | Updates metadata (featured, order) on an existing item |
 | `regenerateMarkdown`      | Editor        | Recreates the markdown repository from data            |
 | `updateReadme`            | Editor        | Updates the README from markdown templates             |
 | `updateWebsiteRepository` | Editor        | Pushes latest changes to the website repository        |
 | `bulkCaptureImages`       | Editor        | Captures screenshots for items missing images          |
-| `updateDomainType`        | Editor        | Sets the domain classification for a work         |
+| `updateDomainType`        | Editor        | Sets the domain classification for a work              |
 | `runScheduledUpdate`      | System        | Executes a scheduled generation run                    |
 
 ## Generation Pipeline

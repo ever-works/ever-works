@@ -66,11 +66,11 @@ export class WorkCreatedEvent extends BaseEvent {
 }
 ```
 
-| Property      | Type     | Description                         |
-| ------------- | -------- | ----------------------------------- |
-| `workId` | `string` | UUID of the newly created work |
-| `userId`      | `string` | UUID of the user who created it     |
-| `slug`        | `string` | URL slug of the work           |
+| Property | Type     | Description                     |
+| -------- | -------- | ------------------------------- |
+| `workId` | `string` | UUID of the newly created work  |
+| `userId` | `string` | UUID of the user who created it |
+| `slug`   | `string` | URL slug of the work            |
 
 **Typical subscribers**: Notification services, analytics, default setup workflows.
 
@@ -93,12 +93,12 @@ export class WorkGenerationCompletedEvent extends BaseEvent {
 }
 ```
 
-| Property      | Type                | Description                                 |
-| ------------- | ------------------- | ------------------------------------------- |
-| `workId` | `string`            | UUID of the work                       |
-| `userId`      | `string`            | UUID of the user who triggered generation   |
-| `success`     | `boolean`           | Whether generation completed without errors |
-| `error`       | `string` (optional) | Error message if `success` is `false`       |
+| Property  | Type                | Description                                 |
+| --------- | ------------------- | ------------------------------------------- |
+| `workId`  | `string`            | UUID of the work                            |
+| `userId`  | `string`            | UUID of the user who triggered generation   |
+| `success` | `boolean`           | Whether generation completed without errors |
+| `error`   | `string` (optional) | Error message if `success` is `false`       |
 
 **Typical subscribers**: Notification services, history recording, schedule advancement, deployment triggers.
 
@@ -117,10 +117,7 @@ export class WorkService {
 	async createWork(dto: CreateWorkDto, userId: string) {
 		const work = await this.save(dto);
 
-		this.eventEmitter.emit(
-			WorkCreatedEvent.EVENT_NAME,
-			new WorkCreatedEvent(work.id, userId, work.slug)
-		);
+		this.eventEmitter.emit(WorkCreatedEvent.EVENT_NAME, new WorkCreatedEvent(work.id, userId, work.slug));
 
 		return work;
 	}

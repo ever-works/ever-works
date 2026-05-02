@@ -34,12 +34,12 @@ flowchart TD
 
 Extracts work details from a name and prompt using AI, then generates a unique slug.
 
-| Parameter    | Type                | Description                                        |
-| ------------ | ------------------- | -------------------------------------------------- |
+| Parameter    | Type                | Description                                   |
+| ------------ | ------------------- | --------------------------------------------- |
 | `name`       | `string`            | The work name provided by the user            |
 | `prompt`     | `string`            | The user prompt describing the work's purpose |
 | `user`       | `User`              | The user entity creating the work             |
-| `aiProvider` | `string` (optional) | Override for the AI provider to use                |
+| `aiProvider` | `string` (optional) | Override for the AI provider to use           |
 
 **Returns:** `Promise<WorkDetails>`
 
@@ -86,8 +86,8 @@ All AI-generated content passes through sanitization utilities (`sanitizeDescrip
 
 ## Database Interactions
 
-| Repository            | Method                              | Purpose                                                |
-| --------------------- | ----------------------------------- | ------------------------------------------------------ |
+| Repository       | Method                              | Purpose                                                |
+| ---------------- | ----------------------------------- | ------------------------------------------------------ |
 | `WorkRepository` | `existsByUserAndSlug(userId, slug)` | Check for slug conflicts during unique slug generation |
 
 ## Event System

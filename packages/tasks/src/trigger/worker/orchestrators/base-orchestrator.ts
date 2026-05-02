@@ -90,11 +90,7 @@ export abstract class BaseOrchestrator {
         await this.workOperations.emitGenerationCompleted(work.id);
     }
 
-    protected async handleErrorNotification(
-        error: unknown,
-        user: User,
-        work: Work,
-    ): Promise<void> {
+    protected async handleErrorNotification(error: unknown, user: User, work: Work): Promise<void> {
         if (!this.notificationService) {
             return;
         }

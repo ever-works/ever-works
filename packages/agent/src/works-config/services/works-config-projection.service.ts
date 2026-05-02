@@ -29,24 +29,19 @@ export class WorksConfigProjectionService {
         };
     }
 
-    private async getScheduleProviderOverrides(
-        workId: string,
-    ): Promise<ProvidersDto | undefined> {
+    private async getScheduleProviderOverrides(workId: string): Promise<ProvidersDto | undefined> {
         const schedule = await this.scheduleRepository.findByWorkId(workId);
         const providers = schedule?.providerOverrides ?? undefined;
 
         return this.hasProviders(providers) ? providers : undefined;
     }
 
-    private async getActiveCapabilityProviders(
-        workId: string,
-    ): Promise<ProvidersDto | undefined> {
+    private async getActiveCapabilityProviders(workId: string): Promise<ProvidersDto | undefined> {
         if (!this.workPluginRepository) {
             return undefined;
         }
 
-        const workPlugins =
-            await this.workPluginRepository.findEnabledByWork(workId);
+        const workPlugins = await this.workPluginRepository.findEnabledByWork(workId);
         const providers: ProvidersDto = {};
 
         for (const plugin of workPlugins) {

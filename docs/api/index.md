@@ -49,21 +49,21 @@ All tiers apply simultaneously. If any tier's limit is exceeded, the API returns
 
 ## Endpoint Groups
 
-| Tag                 | Prefix                             | Description                                           | Details                                                                                 |
-| ------------------- | ---------------------------------- | ----------------------------------------------------- | --------------------------------------------------------------------------------------- |
-| **Health**          | `/api`                             | Health check                                          | `GET /api` returns API status                                                           |
-| **Auth**            | `/api/auth`                        | Registration, login, email verification               | [Authentication](/api/authentication)                                                   |
-| **OAuth**           | `/api/oauth`                       | OAuth flows (GitHub, Google), plugin connections      | [Authentication](/api/authentication), [Other Modules](/api/other-modules#plugin-oauth) |
-| **Works**     | `/api/works`                 | Work CRUD, items, categories, generation, import | [Works](/api/works)                                                         |
-| **Deploy**          | `/api/deploy`                      | Provider-agnostic deployment                          | [Deployment](/api/deployment)                                                           |
-| **AI Conversation** | `/api/ai-conversations`            | Streaming AI chat                                     | [AI Conversation](/api/ai-conversation)                                                 |
-| **Git Providers**   | `/api/git-providers`               | Git provider connections, repos, orgs                 | [Other Modules](/api/other-modules#git-provider-api)                                    |
-| **Generator Form**  | `/api/generator-form`              | Dynamic pipeline form schemas                         | [Other Modules](/api/other-modules#generator-form-schema)                               |
-| **Screenshot**      | `/api/screenshot`                  | Screenshot capture                                    | [Other Modules](/api/other-modules#screenshot-api)                                      |
-| **Subscriptions**   | `/api/subscriptions`               | Plans, billing, usage tracking                        | [Other Modules](/api/other-modules#subscriptions-api)                                   |
-| **Notifications**   | `/api/notifications`               | User notifications                                    | [Other Modules](/api/other-modules#notifications-api)                                   |
-| **Members**         | `/api/works/:id/members`     | Work member management                           | [Works](/api/works)                                                         |
-| **Comparisons**     | `/api/works/:id/comparisons` | A vs B comparison page generation and management      | [Works](/api/works)                                                         |
+| Tag                 | Prefix                       | Description                                      | Details                                                                                 |
+| ------------------- | ---------------------------- | ------------------------------------------------ | --------------------------------------------------------------------------------------- |
+| **Health**          | `/api`                       | Health check                                     | `GET /api` returns API status                                                           |
+| **Auth**            | `/api/auth`                  | Registration, login, email verification          | [Authentication](/api/authentication)                                                   |
+| **OAuth**           | `/api/oauth`                 | OAuth flows (GitHub, Google), plugin connections | [Authentication](/api/authentication), [Other Modules](/api/other-modules#plugin-oauth) |
+| **Works**           | `/api/works`                 | Work CRUD, items, categories, generation, import | [Works](/api/works)                                                                     |
+| **Deploy**          | `/api/deploy`                | Provider-agnostic deployment                     | [Deployment](/api/deployment)                                                           |
+| **AI Conversation** | `/api/ai-conversations`      | Streaming AI chat                                | [AI Conversation](/api/ai-conversation)                                                 |
+| **Git Providers**   | `/api/git-providers`         | Git provider connections, repos, orgs            | [Other Modules](/api/other-modules#git-provider-api)                                    |
+| **Generator Form**  | `/api/generator-form`        | Dynamic pipeline form schemas                    | [Other Modules](/api/other-modules#generator-form-schema)                               |
+| **Screenshot**      | `/api/screenshot`            | Screenshot capture                               | [Other Modules](/api/other-modules#screenshot-api)                                      |
+| **Subscriptions**   | `/api/subscriptions`         | Plans, billing, usage tracking                   | [Other Modules](/api/other-modules#subscriptions-api)                                   |
+| **Notifications**   | `/api/notifications`         | User notifications                               | [Other Modules](/api/other-modules#notifications-api)                                   |
+| **Members**         | `/api/works/:id/members`     | Work member management                           | [Works](/api/works)                                                                     |
+| **Comparisons**     | `/api/works/:id/comparisons` | A vs B comparison page generation and management | [Works](/api/works)                                                                     |
 
 ## Request Format
 

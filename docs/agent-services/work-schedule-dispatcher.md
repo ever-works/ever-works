@@ -201,11 +201,11 @@ The trade-off is that a single batch's wall-clock time grows linearly with `limi
 
 Every schedule processed in a batch produces exactly one entry in `summary.entries`, even if it errors. Outcomes:
 
-| Outcome      | When it happens                                                                                                                                                                                                                      |
-| ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `dispatched` | Generation kicked off successfully.                                                                                                                                                                                                  |
+| Outcome      | When it happens                                                                                                                                                                                                            |
+| ------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `dispatched` | Generation kicked off successfully.                                                                                                                                                                                        |
 | `skipped`    | Either another worker already claimed the schedule (`markRunDispatched` returned `null`), or `WorkGenerationService.runScheduledUpdate` returned `status: skipped` (e.g. the work was deleted between queue and dispatch). |
-| `failed`     | The dispatch threw. The actual finalization (`markRunFailed`) is handled by the inner methods so the dispatcher only logs and counts here.                                                                                           |
+| `failed`     | The dispatch threw. The actual finalization (`markRunFailed`) is handled by the inner methods so the dispatcher only logs and counts here.                                                                                 |
 
 ## Configuration
 
@@ -219,11 +219,11 @@ Every schedule processed in a batch produces exactly one entry in `summary.entri
 
 ## Database Interactions
 
-| Repository / Service          | Method                             | Purpose                                                     |
-| ----------------------------- | ---------------------------------- | ----------------------------------------------------------- |
+| Repository / Service     | Method                             | Purpose                                                     |
+| ------------------------ | ---------------------------------- | ----------------------------------------------------------- |
 | `WorkScheduleService`    | `recoverStuckSchedules()`          | Reset zombie schedules                                      |
 | `WorkScheduleRepository` | `findDue(limit)`                   | `WHERE nextRunAt <= NOW() AND status = ACTIVE`              |
-| `WorkScheduleService`    | `markRunDispatched(id)`            | Wraps the CAS claim and triggers the work sync         |
+| `WorkScheduleService`    | `markRunDispatched(id)`            | Wraps the CAS claim and triggers the work sync              |
 | `WorkScheduleRepository` | `tryMarkDispatched(id)`            | The actual atomic UPDATE (returns the original `nextRunAt`) |
 | `WorkGenerationService`  | `runScheduledUpdate(schedule)`     | Execute the actual generation                               |
 | `WorkScheduleService`    | `finalizeScheduleRun(id, outcome)` | Idempotent finalize (called from inner methods, not here)   |

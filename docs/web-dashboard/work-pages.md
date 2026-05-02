@@ -58,11 +58,11 @@ The list page displays all works owned by or shared with the current user.
 
 The creation page supports three flows:
 
-| Flow               | Description                                                                                |
-| ------------------ | ------------------------------------------------------------------------------------------ |
+| Flow               | Description                                                                           |
+| ------------------ | ------------------------------------------------------------------------------------- |
 | **Create with AI** | User provides a name and prompt; AI generates work details and starts item generation |
-| **Manual Create**  | User fills in slug, name, description, and provider selections manually                    |
-| **Import**         | User provides a repository URL or selects from existing repos to import                    |
+| **Manual Create**  | User fills in slug, name, description, and provider selections manually               |
+| **Import**         | User provides a repository URL or selects from existing repos to import               |
 
 All flows require a connected git provider. If none is connected, the page shows a prompt to connect one via the OAuth flow.
 
@@ -94,17 +94,17 @@ The detail layout wraps all sub-pages with shared navigation:
 
 **Sub-Navigation Tabs**:
 
-| Tab         | Route                           | Description                       |
-| ----------- | ------------------------------- | --------------------------------- |
+| Tab         | Route                     | Description                  |
+| ----------- | ------------------------- | ---------------------------- |
 | Overview    | `/works/[id]`             | Work stats and quick actions |
 | Items       | `/works/[id]/items`       | Manage work items            |
-| Generator   | `/works/[id]/generator`   | Run item generation               |
-| Comparisons | `/works/[id]/comparisons` | Item comparison pages             |
-| History     | `/works/[id]/history`     | Generation run history            |
-| Members     | `/works/[id]/members`     | Team access management            |
+| Generator   | `/works/[id]/generator`   | Run item generation          |
+| Comparisons | `/works/[id]/comparisons` | Item comparison pages        |
+| History     | `/works/[id]/history`     | Generation run history       |
+| Members     | `/works/[id]/members`     | Team access management       |
 | Plugins     | `/works/[id]/plugins`     | Work-level plugin config     |
-| Schedule    | `/works/[id]/schedule`    | Auto-generation scheduling        |
-| Deploy      | `/works/[id]/deploy`      | Website deployment                |
+| Schedule    | `/works/[id]/schedule`    | Auto-generation scheduling   |
+| Deploy      | `/works/[id]/deploy`      | Website deployment           |
 | Settings    | `/works/[id]/settings`    | Work configuration           |
 
 ## Work Overview Page
@@ -175,7 +175,7 @@ Team management interface:
 | Invite member by email | `inviteMember`     | OWNER, MANAGER         |
 | Change member role     | `updateMemberRole` | OWNER, MANAGER         |
 | Remove member          | `removeMember`     | OWNER, MANAGER         |
-| Leave work        | `leaveWork`   | Any member (not OWNER) |
+| Leave work             | `leaveWork`        | Any member (not OWNER) |
 
 **Assignable Roles**: MANAGER, EDITOR, VIEWER (OWNER is implicit and cannot be assigned).
 

@@ -22,7 +22,7 @@ export class WorkAdvancedPrompts {
     @PrimaryGeneratedColumn('uuid')
     id: string;
 
-    @Column({ name: 'directoryId',  unique: true })
+    @Column({ name: 'directoryId', unique: true })
     workId: string;
 
     @OneToOne(() => Work, { onDelete: 'CASCADE' })

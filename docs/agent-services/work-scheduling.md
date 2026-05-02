@@ -24,11 +24,11 @@ Scheduled updates allow works to automatically refresh their content at configur
 
 The system supports four cadence options, defined in `WorkScheduleCadence`:
 
-| Cadence   | Interval       | Typical Use Case                      |
-| --------- | -------------- | ------------------------------------- |
+| Cadence   | Interval       | Typical Use Case                |
+| --------- | -------------- | ------------------------------- |
 | `HOURLY`  | Every hour     | High-frequency monitoring works |
-| `DAILY`   | Every 24 hours | Standard content refresh              |
-| `WEEKLY`  | Every 7 days   | Low-frequency curated lists           |
+| `DAILY`   | Every 24 hours | Standard content refresh        |
+| `WEEKLY`  | Every 7 days   | Low-frequency curated lists     |
 | `MONTHLY` | Every 30 days  | Archival or slow-moving works   |
 
 ### Schedule Statuses

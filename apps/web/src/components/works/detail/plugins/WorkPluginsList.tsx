@@ -141,11 +141,7 @@ export function WorkPluginsList({
             ) : (
                 <div className="grid grid-cols-1 @lg/main:grid-cols-2 @3xl/main:grid-cols-3 gap-4">
                     {filteredPlugins.map((plugin) => (
-                        <WorkPluginCard
-                            key={plugin.pluginId}
-                            workId={workId}
-                            plugin={plugin}
-                        />
+                        <WorkPluginCard key={plugin.pluginId} workId={workId} plugin={plugin} />
                     ))}
                 </div>
             )}

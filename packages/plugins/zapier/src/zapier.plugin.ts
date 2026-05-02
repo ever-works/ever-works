@@ -216,8 +216,7 @@ export class ZapierPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvid
 				includeInOnboarding: true,
 				onboardingPriority: 2,
 				completionFields: ['clientId', 'clientSecret'],
-				onboardingDescription:
-					'Connect Zapier to trigger actions across 9,000+ apps during work generation.'
+				onboardingDescription: 'Connect Zapier to trigger actions across 9,000+ apps during work generation.'
 			},
 			readme: README,
 			homepage: 'https://docs.zapier.com/sdk',

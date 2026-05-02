@@ -11,11 +11,7 @@ import { WorkScheduleRepository } from '@src/database/repositories/work-schedule
 import { WorkRepository } from '@src/database/repositories/work.repository';
 import { WorkOwnershipService } from './work-ownership.service';
 import { SubscriptionService } from '@src/subscriptions/subscription.service';
-import {
-    WorkScheduleDto,
-    WorkScheduleAllowedCadence,
-    UpdateWorkScheduleDto,
-} from '@src/dto';
+import { WorkScheduleDto, WorkScheduleAllowedCadence, UpdateWorkScheduleDto } from '@src/dto';
 import { User } from '@src/entities/user.entity';
 import { config } from '@src/config';
 import {
@@ -141,8 +137,7 @@ export class WorkScheduleService {
         const alwaysCreatePullRequest =
             dto.alwaysCreatePullRequest ?? existing?.alwaysCreatePullRequest ?? false;
 
-        const importedProviderOverrides =
-            work.sourceRepository?.worksConfig?.providers ?? null;
+        const importedProviderOverrides = work.sourceRepository?.worksConfig?.providers ?? null;
 
         const providerOverrides =
             dto.providerOverrides !== undefined
@@ -657,11 +652,7 @@ export class WorkScheduleService {
         return true;
     }
 
-    calculateNextRun(
-        cadence: WorkScheduleCadence,
-        delayMinutes = 0,
-        fromDate = new Date(),
-    ): Date {
+    calculateNextRun(cadence: WorkScheduleCadence, delayMinutes = 0, fromDate = new Date()): Date {
         const next = new Date(fromDate);
         if (delayMinutes) {
             next.setMinutes(next.getMinutes() + delayMinutes);
@@ -751,10 +742,7 @@ export class WorkScheduleService {
         );
     }
 
-    private async getScheduleReadiness(
-        work: Work,
-        user: User,
-    ): Promise<WorkScheduleReadiness> {
+    private async getScheduleReadiness(work: Work, user: User): Promise<WorkScheduleReadiness> {
         if (!config.subscriptions.scheduledUpdatesEnabled()) {
             return {
                 featureEnabled: false,
@@ -774,8 +762,7 @@ export class WorkScheduleService {
             }
         }
 
-        const blockingReason =
-            'Complete an initial work setup before enabling scheduled updates.';
+        const blockingReason = 'Complete an initial work setup before enabling scheduled updates.';
         const unavailableReason =
             'Schedule readiness could not be checked right now. Try again in a moment.';
 

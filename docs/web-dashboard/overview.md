@@ -39,27 +39,27 @@ Pages are located under `app/[locale]/` and are organized into two route groups:
 
 ### Dashboard Pages (`(dashboard)`)
 
-| Route                           | Purpose                               |
-| ------------------------------- | ------------------------------------- |
-| `/`                             | Home dashboard with stats overview    |
-| `/works`                  | List of user works              |
-| `/works/new`              | Create a new work (manual or AI) |
-| `/works/[id]`             | Work overview                    |
-| `/works/[id]/items`       | Browse and manage items               |
-| `/works/[id]/generator`   | Run AI generation                     |
-| `/works/[id]/schedule`    | Configure automated schedules         |
-| `/works/[id]/deploy`      | Deploy the work website          |
-| `/works/[id]/members`     | Manage team members                   |
-| `/works/[id]/settings`    | Work settings                    |
-| `/works/[id]/plugins`     | Per-work plugin configuration    |
-| `/works/[id]/comparisons` | Item comparison pages                 |
-| `/works/[id]/history`     | Generation run history                |
-| `/plugins`                      | Global plugin marketplace             |
-| `/plugins/[pluginId]`           | Plugin detail and configuration       |
-| `/settings`                     | Profile settings                      |
-| `/settings/security`            | Security and password                 |
-| `/settings/danger`              | Danger zone (account deletion)        |
-| `/settings/plugins/[category]`  | Plugin settings by category           |
+| Route                          | Purpose                            |
+| ------------------------------ | ---------------------------------- |
+| `/`                            | Home dashboard with stats overview |
+| `/works`                       | List of user works                 |
+| `/works/new`                   | Create a new work (manual or AI)   |
+| `/works/[id]`                  | Work overview                      |
+| `/works/[id]/items`            | Browse and manage items            |
+| `/works/[id]/generator`        | Run AI generation                  |
+| `/works/[id]/schedule`         | Configure automated schedules      |
+| `/works/[id]/deploy`           | Deploy the work website            |
+| `/works/[id]/members`          | Manage team members                |
+| `/works/[id]/settings`         | Work settings                      |
+| `/works/[id]/plugins`          | Per-work plugin configuration      |
+| `/works/[id]/comparisons`      | Item comparison pages              |
+| `/works/[id]/history`          | Generation run history             |
+| `/plugins`                     | Global plugin marketplace          |
+| `/plugins/[pluginId]`          | Plugin detail and configuration    |
+| `/settings`                    | Profile settings                   |
+| `/settings/security`           | Security and password              |
+| `/settings/danger`             | Danger zone (account deletion)     |
+| `/settings/plugins/[category]` | Plugin settings by category        |
 
 ## Middleware and Proxy
 

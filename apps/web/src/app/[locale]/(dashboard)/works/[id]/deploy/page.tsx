@@ -68,11 +68,7 @@ export default async function DeployPage({ params }: DeployPageParams) {
     // If no provider is selected, show just the selector
     if (!work.deployProvider) {
         return (
-            <DeployProviderSelector
-                workId={work.id}
-                providers={providers}
-                currentProviderId=""
-            />
+            <DeployProviderSelector workId={work.id} providers={providers} currentProviderId="" />
         );
     }
 

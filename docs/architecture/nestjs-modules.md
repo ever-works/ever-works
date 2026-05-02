@@ -47,7 +47,7 @@ graph TD
 | `packages/agent/src/plugins/plugins.module.ts`             | Global plugin system with dynamic module pattern  |
 | `packages/agent/src/facades/facades.module.ts`             | Facade services for AI, Search, Git, Deploy, etc. |
 | `packages/agent/src/pipeline/pipeline.module.ts`           | Pipeline builder, executors, orchestrator         |
-| `packages/agent/src/services/work.module.ts`          | Core work business logic services            |
+| `packages/agent/src/services/work.module.ts`               | Core work business logic services                 |
 | `packages/agent/src/generators/*/`                         | Generator modules (data, markdown, website)       |
 | `packages/agent/src/notifications/notifications.module.ts` | Notification system                               |
 | `packages/agent/src/subscriptions/subscriptions.module.ts` | Subscription and billing                          |

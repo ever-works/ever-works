@@ -35,13 +35,13 @@ curl -X POST http://localhost:3100/api/ai-conversations/chat/stream \
 
 ### Request Body
 
-| Field              | Type   | Required | Description                                    |
-| ------------------ | ------ | -------- | ---------------------------------------------- |
-| `messages`         | array  | Yes      | Array of chat messages (`{ role, content }`)   |
-| `model`            | string | No       | Override the AI model                          |
-| `temperature`      | number | No       | Override the temperature                       |
-| `workId`      | string | No       | Scope the conversation to a specific work |
-| `providerOverride` | string | No       | Override the AI provider plugin                |
+| Field              | Type   | Required | Description                                  |
+| ------------------ | ------ | -------- | -------------------------------------------- |
+| `messages`         | array  | Yes      | Array of chat messages (`{ role, content }`) |
+| `model`            | string | No       | Override the AI model                        |
+| `temperature`      | number | No       | Override the temperature                     |
+| `workId`           | string | No       | Scope the conversation to a specific work    |
+| `providerOverride` | string | No       | Override the AI provider plugin              |
 
 ### Response
 

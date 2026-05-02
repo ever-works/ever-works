@@ -251,19 +251,19 @@ The 4-level settings resolution engine. See [Facades Module](./facades-module.md
 
 **Resolution hierarchy** (highest to lowest priority):
 
-| Level | Source                | When Used                                             |
-| ----- | --------------------- | ----------------------------------------------------- |
-| 1     | Work settings    | `workId` provided, `configMode !== 'admin-only'` |
-| 2     | User settings         | `userId` provided, `configMode !== 'admin-only'`      |
-| 3     | Admin settings        | Always checked                                        |
-| 4     | Environment variables | `x-envVar` schema annotation maps to `process.env`    |
-| 5     | Plugin defaults       | `default` values from JSON Schema                     |
+| Level | Source                | When Used                                          |
+| ----- | --------------------- | -------------------------------------------------- |
+| 1     | Work settings         | `workId` provided, `configMode !== 'admin-only'`   |
+| 2     | User settings         | `userId` provided, `configMode !== 'admin-only'`   |
+| 3     | Admin settings        | Always checked                                     |
+| 4     | Environment variables | `x-envVar` schema annotation maps to `process.env` |
+| 5     | Plugin defaults       | `default` values from JSON Schema                  |
 
 **Configuration modes**:
 
-| Mode               | Description                                                             |
-| ------------------ | ----------------------------------------------------------------------- |
-| `hybrid` (default) | Users and works can override admin settings                       |
+| Mode               | Description                                                        |
+| ------------------ | ------------------------------------------------------------------ |
+| `hybrid` (default) | Users and works can override admin settings                        |
 | `admin-only`       | Only admin-level settings are used; user/work settings are ignored |
 
 **Security features**:
@@ -276,16 +276,16 @@ The 4-level settings resolution engine. See [Facades Module](./facades-module.md
 
 **Key methods**:
 
-| Method                                               | Description                               |
-| ---------------------------------------------------- | ----------------------------------------- |
-| `getResolvedSettings(pluginId, options)`             | Full resolution with source tracking      |
-| `getSettings(pluginId, options)`                     | Plain key-value settings (no source info) |
-| `updateAdminSettings(pluginId, settings)`            | Update global settings                    |
-| `updateUserSettings(pluginId, userId, settings)`     | Update user-level settings                |
-| `updateWorkSettings(pluginId, dirId, settings)` | Update work-level settings           |
-| `getSettingsSchema(pluginId)`                        | Raw JSON Schema                           |
-| `getSettingsSchemaForContext(pluginId, context)`     | Schema filtered by scope context          |
-| `validateSettings(pluginId, settings, options)`      | Validate against schema and scope         |
+| Method                                           | Description                               |
+| ------------------------------------------------ | ----------------------------------------- |
+| `getResolvedSettings(pluginId, options)`         | Full resolution with source tracking      |
+| `getSettings(pluginId, options)`                 | Plain key-value settings (no source info) |
+| `updateAdminSettings(pluginId, settings)`        | Update global settings                    |
+| `updateUserSettings(pluginId, userId, settings)` | Update user-level settings                |
+| `updateWorkSettings(pluginId, dirId, settings)`  | Update work-level settings                |
+| `getSettingsSchema(pluginId)`                    | Raw JSON Schema                           |
+| `getSettingsSchemaForContext(pluginId, context)` | Schema filtered by scope context          |
+| `validateSettings(pluginId, settings, options)`  | Validate against schema and scope         |
 
 ## Plugin Entities
 
@@ -308,31 +308,31 @@ The 4-level settings resolution engine. See [Facades Module](./facades-module.md
 
 ### UserPluginEntity (User Level)
 
-| Column                     | Type        | Description                    |
-| -------------------------- | ----------- | ------------------------------ |
-| `id`                       | `uuid` (PK) | Auto-generated                 |
-| `userId`                   | `varchar`   | Loose coupling (no FK)         |
-| `pluginId`                 | `varchar`   | Plugin identifier              |
-| `pluginEntityId`           | `uuid` (FK) | References PluginEntity        |
-| `enabled`                  | `boolean`   | User-level enable toggle       |
+| Column               | Type        | Description              |
+| -------------------- | ----------- | ------------------------ |
+| `id`                 | `uuid` (PK) | Auto-generated           |
+| `userId`             | `varchar`   | Loose coupling (no FK)   |
+| `pluginId`           | `varchar`   | Plugin identifier        |
+| `pluginEntityId`     | `uuid` (FK) | References PluginEntity  |
+| `enabled`            | `boolean`   | User-level enable toggle |
 | `autoEnableForWorks` | `boolean`   | Auto-enable in new works |
-| `settings`                 | `json`      | User-level settings            |
-| `secretSettings`           | `json`      | User-level secrets             |
-| `metadata`                 | `json`      | User-specific metadata         |
+| `settings`           | `json`      | User-level settings      |
+| `secretSettings`     | `json`      | User-level secrets       |
+| `metadata`           | `json`      | User-specific metadata   |
 
 ### WorkPluginEntity (Work Level)
 
 | Column             | Type                 | Description                                  |
 | ------------------ | -------------------- | -------------------------------------------- |
 | `id`               | `uuid` (PK)          | Auto-generated                               |
-| `workId`      | `varchar`            | Loose coupling (no FK)                       |
+| `workId`           | `varchar`            | Loose coupling (no FK)                       |
 | `pluginId`         | `varchar`            | Plugin identifier                            |
 | `pluginEntityId`   | `uuid` (FK)          | References PluginEntity                      |
-| `enabled`          | `boolean`            | Work-level enable toggle                |
+| `enabled`          | `boolean`            | Work-level enable toggle                     |
 | `activeCapability` | `varchar` (nullable) | Marks this plugin as active for a capability |
-| `settings`         | `json`               | Work-level settings                     |
-| `secretSettings`   | `json`               | Work-level secrets                      |
-| `metadata`         | `json`               | Work-specific metadata                  |
+| `settings`         | `json`               | Work-level settings                          |
+| `secretSettings`   | `json`               | Work-level secrets                           |
+| `metadata`         | `json`               | Work-specific metadata                       |
 | `priority`         | `int`                | Ordering priority                            |
 
 ## Plugin Events

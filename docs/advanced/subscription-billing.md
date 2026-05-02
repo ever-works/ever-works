@@ -22,10 +22,10 @@ The subscription system manages plan tiers, cadence allowances, and usage-based 
 Three plans are seeded on application startup via `OnModuleInit`:
 
 | Plan     | Code       | Max Works | Allowed Cadences               | Monthly Price |
-| -------- | ---------- | --------------- | ------------------------------ | ------------- |
-| Free     | `free`     | 1               | All (currently)                | $0            |
-| Standard | `standard` | 5               | Monthly, Weekly, Daily         | $29           |
-| Premium  | `premium`  | 15              | Monthly, Weekly, Daily, Hourly | $99           |
+| -------- | ---------- | --------- | ------------------------------ | ------------- |
+| Free     | `free`     | 1         | All (currently)                | $0            |
+| Standard | `standard` | 5         | Monthly, Weekly, Daily         | $29           |
+| Premium  | `premium`  | 15        | Monthly, Weekly, Daily, Hourly | $99           |
 
 Each plan defines:
 
@@ -99,7 +99,7 @@ Each ledger entry captures:
 | Field                 | Description                                   |
 | --------------------- | --------------------------------------------- |
 | `userId`              | User who triggered the run                    |
-| `workId`         | Work being generated                     |
+| `workId`              | Work being generated                          |
 | `scheduleId`          | Associated schedule (if applicable)           |
 | `triggerType`         | How the run was triggered (manual, scheduled) |
 | `billingMode`         | `USAGE` for pay-per-use runs                  |

@@ -40,10 +40,7 @@ export function WorkPluginSettingsModal({
     const [isResetting, setIsResetting] = useState(false);
     const [modifiedFields, setModifiedFields] = useState<Set<string>>(new Set());
     const inheritedSettings = plugin.resolvedSettings || plugin.settings;
-    const workSettings = useMemo(
-        () => plugin.workSettings || {},
-        [plugin.workSettings],
-    );
+    const workSettings = useMemo(() => plugin.workSettings || {}, [plugin.workSettings]);
 
     const onSave = useCallback(
         async (data: {
@@ -203,8 +200,7 @@ export function WorkPluginSettingsModal({
                     validationError={validationError}
                     renderFieldExtra={(key, propSchema) => {
                         const inheritedValue = inheritedSettings?.[key];
-                        const hasWorkValue =
-                            modifiedFields.has(key) || key in workSettings;
+                        const hasWorkValue = modifiedFields.has(key) || key in workSettings;
                         const fieldValue = getWorkFieldValue(key, propSchema);
 
                         if (

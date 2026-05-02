@@ -24,18 +24,18 @@ The `@ever-works/agent` package is the core business logic layer of the Ever Wor
 
 The agent package exposes **20 sub-module entry points** via the `exports` field in `package.json`. Each export maps to a distinct module area within `src/`:
 
-| Export Path              | Source Work            | Purpose                                                  |
+| Export Path              | Source Work                 | Purpose                                                  |
 | ------------------------ | --------------------------- | -------------------------------------------------------- |
 | `./generators`           | `src/generators/`           | Three-stage content generation (data, markdown, website) |
 | `./database`             | `src/database/`             | TypeORM entities, repositories, and database module      |
 | `./dto`                  | `src/dto/`                  | Data Transfer Objects for API validation                 |
-| `./entities`             | `src/entities/`             | TypeORM entity definitions (Work, User, etc.)       |
+| `./entities`             | `src/entities/`             | TypeORM entity definitions (Work, User, etc.)            |
 | `./git`                  | `src/git/`                  | Git operations abstraction layer                         |
-| `./work-operations` | `src/work-operations/` | Low-level work CRUD operations                      |
+| `./work-operations`      | `src/work-operations/`      | Low-level work CRUD operations                           |
 | `./items-generator`      | `src/items-generator/`      | Item generation DTOs and utilities                       |
 | `./tasks`                | `src/tasks/`                | Background task definitions                              |
 | `./events`               | `src/events/`               | Domain event classes (NestJS EventEmitter)               |
-| `./services`             | `src/services/`             | Work service layer (14 services)                    |
+| `./services`             | `src/services/`             | Work service layer (14 services)                         |
 | `./subscriptions`        | `src/subscriptions/`        | Subscription and billing logic                           |
 | `./config`               | `src/config/`               | Configuration constants and helpers                      |
 | `./cache`                | `src/cache/`                | Cache management utilities                               |
@@ -136,21 +136,21 @@ The API provides HTTP controllers that delegate to agent services. For example, 
 
 The `services/` work contains 14 specialized services that form the domain logic layer:
 
-| Service                              | Responsibility                        |
-| ------------------------------------ | ------------------------------------- |
-| `WorkLifecycleService`          | Create, update, delete works    |
-| `WorkGenerationService`         | Orchestrate full generation flow      |
-| `WorkQueryService`              | Query and list works            |
-| `WorkDetailService`             | Manage work details and metadata |
-| `WorkOwnershipService`          | Handle ownership and permissions      |
-| `WorkMemberService`             | Manage work members              |
-| `WorkScheduleService`           | CRON-based scheduled regeneration     |
-| `WorkScheduleDispatcherService` | Dispatch scheduled jobs               |
-| `WorkImportService`             | Import data from external sources     |
-| `WorkAdvancedPromptsService`    | Custom AI prompt management           |
-| `WorkTaxonomyService`           | Category and tag management           |
-| `RepositoryManagementService`        | Git repository lifecycle              |
-| `GeneratorFormSchemaService`         | Dynamic form schema generation        |
+| Service                         | Responsibility                    |
+| ------------------------------- | --------------------------------- |
+| `WorkLifecycleService`          | Create, update, delete works      |
+| `WorkGenerationService`         | Orchestrate full generation flow  |
+| `WorkQueryService`              | Query and list works              |
+| `WorkDetailService`             | Manage work details and metadata  |
+| `WorkOwnershipService`          | Handle ownership and permissions  |
+| `WorkMemberService`             | Manage work members               |
+| `WorkScheduleService`           | CRON-based scheduled regeneration |
+| `WorkScheduleDispatcherService` | Dispatch scheduled jobs           |
+| `WorkImportService`             | Import data from external sources |
+| `WorkAdvancedPromptsService`    | Custom AI prompt management       |
+| `WorkTaxonomyService`           | Category and tag management       |
+| `RepositoryManagementService`   | Git repository lifecycle          |
+| `GeneratorFormSchemaService`    | Dynamic form schema generation    |
 
 ## Dependencies
 

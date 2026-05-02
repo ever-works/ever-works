@@ -53,10 +53,7 @@ export class WorksConfigRepositorySyncService {
                 request: await this.projection.buildWriteRequest(work),
             });
 
-            const changes = await this.gitFacade.getStatus(
-                work.gitProvider,
-                dataRepository.dir,
-            );
+            const changes = await this.gitFacade.getStatus(work.gitProvider, dataRepository.dir);
             if (changes.length === 0) {
                 this.logger.debug(`works.yml already up to date for ${owner}/${repo}`);
                 return;

@@ -46,8 +46,8 @@ flowchart TD
 
 ## 4. API Surface
 
-| Method   | Endpoint                            | Description                            |
-| -------- | ----------------------------------- | -------------------------------------- |
+| Method   | Endpoint                      | Description                            |
+| -------- | ----------------------------- | -------------------------------------- |
 | `GET`    | `/api/works/:id/schedule`     | Read schedule + allowed cadences       |
 | `PUT`    | `/api/works/:id/schedule`     | Create/update schedule                 |
 | `DELETE` | `/api/works/:id/schedule`     | Cancel schedule (resets to `disabled`) |

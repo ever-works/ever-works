@@ -36,10 +36,7 @@ interface EverWorksOnboardingWizardProps {
     onClose: () => void;
 }
 
-type WizardStep =
-    | { kind: 'welcome' }
-    | { kind: 'plugin'; plugin: UserPlugin }
-    | { kind: 'work' };
+type WizardStep = { kind: 'welcome' } | { kind: 'plugin'; plugin: UserPlugin } | { kind: 'work' };
 
 function isPluginConnected(
     plugin: UserPlugin,
@@ -137,8 +134,7 @@ export function EverWorksOnboardingWizard({
 
                                 const label = (() => {
                                     if (step.kind === 'welcome') return t('steps.welcome.title');
-                                    if (step.kind === 'work')
-                                        return t('steps.work.title');
+                                    if (step.kind === 'work') return t('steps.work.title');
                                     return step.plugin.name;
                                 })();
 

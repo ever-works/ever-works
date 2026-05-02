@@ -48,10 +48,10 @@ ComparisonGenerationService (NestJS service)
 
 Automatically selects and generates the next comparison pair.
 
-| Parameter     | Type     | Description              |
-| ------------- | -------- | ------------------------ |
-| `workId` | `string` | The work ID         |
-| `userId`      | `string` | The requesting user's ID |
+| Parameter | Type     | Description              |
+| --------- | -------- | ------------------------ |
+| `workId`  | `string` | The work ID              |
+| `userId`  | `string` | The requesting user's ID |
 
 **Returns:** `Promise<ComparisonResult>`
 
@@ -155,11 +155,11 @@ Comparison behavior is configurable per-work via the `comparison-generator` plug
 
 ## Database Interactions
 
-| Repository                  | Method                                                                                                                     | Purpose                         |
-| --------------------------- | -------------------------------------------------------------------------------------------------------------------------- | ------------------------------- |
-| `WorkRepository`       | `findById`                                                                                                                 | Load work entity           |
-| `WorkPluginRepository` | `findByWorkAndPlugin`                                                                                                 | Load comparison plugin settings |
-| `DataRepository`            | `getItems`, `getConfig`, `getComparisons`, `writeComparison`, `writeComparisonMarkdown`, `removeComparison`, `mergeConfig` | Git-backed data operations      |
+| Repository             | Method                                                                                                                     | Purpose                         |
+| ---------------------- | -------------------------------------------------------------------------------------------------------------------------- | ------------------------------- |
+| `WorkRepository`       | `findById`                                                                                                                 | Load work entity                |
+| `WorkPluginRepository` | `findByWorkAndPlugin`                                                                                                      | Load comparison plugin settings |
+| `DataRepository`       | `getItems`, `getConfig`, `getComparisons`, `writeComparison`, `writeComparisonMarkdown`, `removeComparison`, `mergeConfig` | Git-backed data operations      |
 
 ## Event System
 
@@ -169,7 +169,7 @@ This service does not emit domain events. Comparison state is tracked in the dat
 
 | Scenario                       | Result                                                      |
 | ------------------------------ | ----------------------------------------------------------- |
-| Work not found            | `NotFoundException`                                         |
+| Work not found                 | `NotFoundException`                                         |
 | No pairs available             | `{ status: 'skipped', message: 'No more pairs available' }` |
 | Item slugs not found           | `{ status: 'error', message: 'Could not find items...' }`   |
 | Comparison already exists      | `{ status: 'skipped' }` with existing slug                  |
@@ -205,7 +205,7 @@ await comparisonService.deleteComparison(workId, userId, 'netlify--vercel');
 
 | Setting           | Source                            | Description                             |
 | ----------------- | --------------------------------- | --------------------------------------- |
-| Plugin settings   | `WorkPluginRepository`       | Per-work comparison configuration  |
+| Plugin settings   | `WorkPluginRepository`            | Per-work comparison configuration       |
 | AI provider/model | Plugin settings or system default | Controls which AI generates comparisons |
 | Search facade     | System configuration              | Web search provider for research        |
 | Content extractor | System configuration              | Web content extraction provider         |

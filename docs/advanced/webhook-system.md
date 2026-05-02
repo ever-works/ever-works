@@ -95,8 +95,8 @@ Emitted by the plugin registry and lifecycle manager when plugins change state.
 
 Emitted during work lifecycle operations.
 
-| Event Name                       | Payload                               |
-| -------------------------------- | ------------------------------------- |
+| Event Name                  | Payload                          |
+| --------------------------- | -------------------------------- |
 | `work:created`              | `WorkEventPayload`               |
 | `work:updated`              | `WorkEventPayload`               |
 | `work:deleted`              | `WorkEventPayload`               |

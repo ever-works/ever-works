@@ -72,7 +72,7 @@ Used when importing a work from an external repository.
 | -------------------- | ---------------------- | -------- | ------------------------------------------------- |
 | `sourceUrl`          | `string`               | Yes      | Repository URL to import from                     |
 | `sourceType`         | `ImportSourceTypeEnum` | Yes      | `data_repo`, `awesome_readme`, or `link_existing` |
-| `name`               | `string`               | Yes      | Work name (max 100 chars)                    |
+| `name`               | `string`               | Yes      | Work name (max 100 chars)                         |
 | `owner`              | `string`               | No       | Repo owner override                               |
 | `organization`       | `boolean`              | No       | Organization flag                                 |
 | `createMissingRepos` | `boolean`              | No       | Create repos that do not exist                    |
@@ -126,14 +126,14 @@ Used to create or update a work schedule.
 
 **Source:** `dto/work-schedule.dto.ts`
 
-| Field                     | Type                           | Required | Validation                                   | Description                            |
-| ------------------------- | ------------------------------ | -------- | -------------------------------------------- | -------------------------------------- |
-| `enable`                  | `boolean`                      | No       | --                                           | Activate or deactivate the schedule    |
+| Field                     | Type                      | Required | Validation                                   | Description                            |
+| ------------------------- | ------------------------- | -------- | -------------------------------------------- | -------------------------------------- |
+| `enable`                  | `boolean`                 | No       | --                                           | Activate or deactivate the schedule    |
 | `cadence`                 | `WorkScheduleCadence`     | No       | Enum: `hourly`, `daily`, `weekly`, `monthly` | Update frequency                       |
 | `billingMode`             | `WorkScheduleBillingMode` | No       | Enum: `subscription`, `usage`                | How runs are billed                    |
-| `maxFailureBeforePause`   | `number`                       | No       | Integer, min: 1, max: 10                     | Consecutive failures before auto-pause |
-| `alwaysCreatePullRequest` | `boolean`                      | No       | --                                           | Force PR creation on scheduled runs    |
-| `providerOverrides`       | `ProvidersDto \| null`         | No       | Nested validation                            | Override providers for scheduled runs  |
+| `maxFailureBeforePause`   | `number`                  | No       | Integer, min: 1, max: 10                     | Consecutive failures before auto-pause |
+| `alwaysCreatePullRequest` | `boolean`                 | No       | --                                           | Force PR creation on scheduled runs    |
+| `providerOverrides`       | `ProvidersDto \| null`    | No       | Nested validation                            | Override providers for scheduled runs  |
 
 ## Generation History DTOs
 

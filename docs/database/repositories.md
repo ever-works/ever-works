@@ -13,20 +13,20 @@ Ever Works uses the repository pattern to encapsulate database access logic. Eac
 
 The `DatabaseModule` provides and exports 12 repositories:
 
-| Repository                             | Entity                       | Key Responsibilities                                    |
-| -------------------------------------- | ---------------------------- | ------------------------------------------------------- |
+| Repository                        | Entity                  | Key Responsibilities                                    |
+| --------------------------------- | ----------------------- | ------------------------------------------------------- |
 | `WorkRepository`                  | `Work`                  | CRUD, search, member-aware queries, generation tracking |
-| `WorkAdvancedPromptsRepository`   | `WorkAdvancedPrompts`   | Per-work custom prompt overrides                   |
+| `WorkAdvancedPromptsRepository`   | `WorkAdvancedPrompts`   | Per-work custom prompt overrides                        |
 | `WorkMemberRepository`            | `WorkMember`            | Role-based membership management                        |
-| `UserRepository`                       | `User`                       | User CRUD, email lookup, CLI local user                 |
-| `RefreshTokenRepository`               | `RefreshToken`               | Token creation, rotation, revocation                    |
-| `OAuthTokenRepository`                 | `OAuthToken`                 | OAuth token storage per provider                        |
+| `UserRepository`                  | `User`                  | User CRUD, email lookup, CLI local user                 |
+| `RefreshTokenRepository`          | `RefreshToken`          | Token creation, rotation, revocation                    |
+| `OAuthTokenRepository`            | `OAuthToken`            | OAuth token storage per provider                        |
 | `WorkGenerationHistoryRepository` | `WorkGenerationHistory` | Generation run tracking                                 |
-| `SubscriptionPlanRepository`           | `SubscriptionPlan`           | Plan lookup and upsert                                  |
-| `UserSubscriptionRepository`           | `UserSubscription`           | Subscription lifecycle                                  |
+| `SubscriptionPlanRepository`      | `SubscriptionPlan`      | Plan lookup and upsert                                  |
+| `UserSubscriptionRepository`      | `UserSubscription`      | Subscription lifecycle                                  |
 | `WorkScheduleRepository`          | `WorkSchedule`          | Schedule CRUD and status updates                        |
-| `UsageLedgerRepository`                | `UsageLedgerEntry`           | Usage-based billing entries                             |
-| `NotificationRepository`               | `Notification`               | Notification CRUD with deduplication                    |
+| `UsageLedgerRepository`           | `UsageLedgerEntry`      | Usage-based billing entries                             |
+| `NotificationRepository`          | `Notification`          | Notification CRUD with deduplication                    |
 
 ## Repository Pattern
 
@@ -103,28 +103,28 @@ This method builds a WHERE clause using `Brackets` to create an OR condition: ei
 
 ### Feature-Specific Queries
 
-| Method                               | Purpose                                   |
-| ------------------------------------ | ----------------------------------------- |
+| Method                               | Purpose                             |
+| ------------------------------------ | ----------------------------------- |
 | `findWithWebsiteAutoUpdateEnabled()` | Works needing template sync         |
 | `findWithCommunityPrEnabled()`       | Works with community PR processing  |
 | `findWithComparisonsEnabled()`       | Works generating comparison content |
-| `findByIdWithMembers(id)`            | Loads work with full member chain    |
+| `findByIdWithMembers(id)`            | Loads work with full member chain   |
 
 ### Standard CRUD
 
-| Method                                      | Behavior                                               |
-| ------------------------------------------- | ------------------------------------------------------ |
+| Method                                      | Behavior                                          |
+| ------------------------------------------- | ------------------------------------------------- |
 | `create(dto, user)`                         | Creates work, throws if slug+owner already exists |
-| `createOrUpdate(dto, user)`                 | Upserts based on owner+slug match                      |
-| `findById(id)`                              | Loads with `user` relation                             |
-| `findByOwnerAndSlug({userId, owner, slug})` | Exact match lookup                                     |
-| `findAll(options)`                          | Paginated list with optional search                    |
-| `countAll(options)`                         | Count with same filtering                              |
-| `update(id, data)`                          | Partial update, returns refreshed entity               |
-| `delete(id)`                                | Delete by ID                                           |
-| `deleteBySlug(slug, userId)`                | Delete by slug and user                                |
-| `exists(slug, userId)`                      | Boolean existence check                                |
-| `increment(id, column, value)`              | Atomic column increment                                |
+| `createOrUpdate(dto, user)`                 | Upserts based on owner+slug match                 |
+| `findById(id)`                              | Loads with `user` relation                        |
+| `findByOwnerAndSlug({userId, owner, slug})` | Exact match lookup                                |
+| `findAll(options)`                          | Paginated list with optional search               |
+| `countAll(options)`                         | Count with same filtering                         |
+| `update(id, data)`                          | Partial update, returns refreshed entity          |
+| `delete(id)`                                | Delete by ID                                      |
+| `deleteBySlug(slug, userId)`                | Delete by slug and user                           |
+| `exists(slug, userId)`                      | Boolean existence check                           |
+| `increment(id, column, value)`              | Atomic column increment                           |
 
 ## UserRepository
 

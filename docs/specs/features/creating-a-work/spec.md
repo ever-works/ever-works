@@ -123,8 +123,8 @@ and (for AI/Import) generation kicked off as a background job.
 | Entity / concept     | Description                                                               |
 | -------------------- | ------------------------------------------------------------------------- |
 | Creation method      | `ai` / `manual` / `import-data` / `import-awesome` / `link-existing`      |
-| Repository ecosystem | Three repos per work: `<slug>-data`, `<slug>`, `<slug>-website`      |
-| Provider cascade     | form → work defaults → admin-enforced → system defaults              |
+| Repository ecosystem | Three repos per work: `<slug>-data`, `<slug>`, `<slug>-website`           |
+| Provider cascade     | form → work defaults → admin-enforced → system defaults                   |
 | Expansion factor     | Awesome-import knob: how aggressively to discover items beyond the source |
 | Form-schema provider | Plugin capability that contributes pipeline-specific form fields          |
 | Repository owner     | Personal user account or git org under which repos are created            |

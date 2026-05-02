@@ -216,7 +216,8 @@ const config: Config = {
 	customFields: {
 		EVER_WORKS_WEBSITE_TEMPLATE_API_URL: process.env.EVER_WORKS_WEBSITE_TEMPLATE_API_URL,
 		footerData: {
-			description: 'Ever Works is an open agentic runtime that autonomously builds content-rich web apps and Git repositories.',
+			description:
+				'Ever Works is an open agentic runtime that autonomously builds content-rich web apps and Git repositories.',
 			socialLinks: [
 				{
 					title: 'GitHub',

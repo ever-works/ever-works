@@ -55,7 +55,7 @@ flowchart TD
 | `apps/api/src/api.controller.ts`                       | Health check endpoints (`/`, `/api/health`)                          |
 | `apps/api/src/config/throttler.config.ts`              | Tiered rate limiting configuration                                   |
 | `apps/api/src/logging.interceptor.ts`                  | Debug-mode HTTP request/response logging                             |
-| `apps/api/src/works/works.controller.ts`   | Primary domain controller (works, items, taxonomy)             |
+| `apps/api/src/works/works.controller.ts`               | Primary domain controller (works, items, taxonomy)                   |
 | `apps/api/src/auth/controllers/auth.controller.ts`     | Authentication (login, register, password reset)                     |
 | `apps/api/src/auth/controllers/api-keys.controller.ts` | API key management                                                   |
 | `apps/api/src/plugins/plugins.controller.ts`           | Plugin enable/disable and settings management                        |
@@ -147,22 +147,22 @@ export class ApiModule implements OnApplicationBootstrap {
 
 Controllers use a flat `api/` prefix pattern with domain-specific sub-paths:
 
-| Controller                  | Route Prefix                           | Tag              | Auth     |
-| --------------------------- | -------------------------------------- | ---------------- | -------- |
-| `APIController`             | `/`, `/api/health`                     | Health           | Public   |
-| `AuthController`            | `api/auth`                             | Auth             | Mixed    |
-| `ApiKeysController`         | `api/auth/api-keys`                    | API Keys         | JWT      |
-| `WorksController`     | `api`                                  | Works      | JWT      |
+| Controller                  | Route Prefix                | Tag              | Auth     |
+| --------------------------- | --------------------------- | ---------------- | -------- |
+| `APIController`             | `/`, `/api/health`          | Health           | Public   |
+| `AuthController`            | `api/auth`                  | Auth             | Mixed    |
+| `ApiKeysController`         | `api/auth/api-keys`         | API Keys         | JWT      |
+| `WorksController`           | `api`                       | Works            | JWT      |
 | `MembersController`         | `api/works/:workId/members` | Members          | JWT      |
-| `AiConversationController`  | `api/ai-conversations`                 | AI Conversations | JWT      |
-| `PluginsController`         | `api`                                  | Plugins          | JWT      |
-| `DeployController`          | `api/deploy`                           | Deploy           | JWT      |
-| `GitProviderController`     | `api/git-providers`                    | Git Providers    | JWT      |
-| `ScreenshotController`      | `api/screenshot`                       | Screenshot       | JWT      |
-| `OAuthController`           | `api/oauth`                            | OAuth            | Mixed    |
-| `SubscriptionsController`   | `api/subscriptions`                    | Subscriptions    | JWT      |
-| `NotificationsController`   | `api/notifications`                    | Notifications    | JWT      |
-| `TriggerInternalController` | `internal/trigger`                     | --               | Internal |
+| `AiConversationController`  | `api/ai-conversations`      | AI Conversations | JWT      |
+| `PluginsController`         | `api`                       | Plugins          | JWT      |
+| `DeployController`          | `api/deploy`                | Deploy           | JWT      |
+| `GitProviderController`     | `api/git-providers`         | Git Providers    | JWT      |
+| `ScreenshotController`      | `api/screenshot`            | Screenshot       | JWT      |
+| `OAuthController`           | `api/oauth`                 | OAuth            | Mixed    |
+| `SubscriptionsController`   | `api/subscriptions`         | Subscriptions    | JWT      |
+| `NotificationsController`   | `api/notifications`         | Notifications    | JWT      |
+| `TriggerInternalController` | `internal/trigger`          | --               | Internal |
 
 ### Rate Limiting (Throttler)
 
@@ -253,11 +253,7 @@ export class WorksController {
 	@Put('works/:slug')
 	@ApiOperation({ summary: 'Update work' })
 	@ApiParam({ name: 'slug', description: 'Work URL slug' })
-	async updateWork(
-		@Param('slug') slug: string,
-		@Body() dto: UpdateWorkDto,
-		@CurrentUser() user: AuthenticatedUser
-	) {
+	async updateWork(@Param('slug') slug: string, @Body() dto: UpdateWorkDto, @CurrentUser() user: AuthenticatedUser) {
 		return this.lifecycleService.update(slug, dto, user.userId);
 	}
 }

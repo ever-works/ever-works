@@ -81,12 +81,7 @@ function getGenerationStatusStat(
     };
 }
 
-export function WorkStats({
-    categoriesCount,
-    itemsCount,
-    comparisonsCount,
-    work,
-}: WorkStatsProps) {
+export function WorkStats({ categoriesCount, itemsCount, comparisonsCount, work }: WorkStatsProps) {
     const t = useTranslations('dashboard.workDetail.stats');
     const tStatus = useTranslations('dashboard.workDetail.status');
     const { work: syncedWork } = useWorkDetail();
@@ -115,8 +110,7 @@ export function WorkStats({
         {
             title: t('daysActive'),
             value: Math.floor(
-                (new Date().getTime() - new Date(work.createdAt).getTime()) /
-                    (1000 * 60 * 60 * 24),
+                (new Date().getTime() - new Date(work.createdAt).getTime()) / (1000 * 60 * 60 * 24),
             ),
             icon: <Clock className="w-3 h-3 sm:w-4 sm:h-4" />,
             iconColor: 'text-orange-500',

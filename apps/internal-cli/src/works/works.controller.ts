@@ -79,12 +79,7 @@ export class WorksController {
     ): Promise<ItemsGeneratorResponseDto> {
         const user = await this.userRepository.createOrGetLocalUser();
         // We don't await completion here, as the request can take a long time
-        return this.workGenerationService.generateItems(
-            id,
-            createItemsGeneratorDto,
-            user,
-            false,
-        );
+        return this.workGenerationService.generateItems(id, createItemsGeneratorDto, user, false);
     }
 
     @Post('works/:id/update')

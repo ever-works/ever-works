@@ -25,10 +25,10 @@ An item belongs to exactly one category, can have multiple tags, and may optiona
 
 Collections are controlled by two independent toggles:
 
-| Toggle                     | Where                                                          | Effect                                                             |
-| -------------------------- | -------------------------------------------------------------- | ------------------------------------------------------------------ |
+| Toggle                     | Where                                                    | Effect                                                             |
+| -------------------------- | -------------------------------------------------------- | ------------------------------------------------------------------ |
 | **`collections_enabled`**  | Website Settings (`PUT /api/works/:id/website-settings`) | Controls whether collections are displayed on the deployed website |
-| **`generate_collections`** | Standard Pipeline plugin settings                              | Controls whether the AI assigns collections during generation      |
+| **`generate_collections`** | Standard Pipeline plugin settings                        | Controls whether the AI assigns collections during generation      |
 
 Both default to `true`. You can disable AI-generated collections while still managing collections manually, or vice versa.
 
@@ -55,8 +55,8 @@ All collection endpoints require JWT authentication.
 
 ### Create a Collection
 
-| Method | Endpoint                           | Description             |
-| ------ | ---------------------------------- | ----------------------- |
+| Method | Endpoint                     | Description             |
+| ------ | ---------------------------- | ----------------------- |
 | `POST` | `/api/works/:id/collections` | Create a new collection |
 
 ```bash
@@ -72,8 +72,8 @@ curl -X POST http://localhost:3100/api/works/<work-id>/collections \
 
 ### Update a Collection
 
-| Method | Endpoint                                         | Description                   |
-| ------ | ------------------------------------------------ | ----------------------------- |
+| Method | Endpoint                                   | Description                   |
+| ------ | ------------------------------------------ | ----------------------------- |
 | `PUT`  | `/api/works/:id/collections/:collectionId` | Update an existing collection |
 
 ```bash
@@ -88,8 +88,8 @@ curl -X PUT http://localhost:3100/api/works/<work-id>/collections/editors-picks 
 
 ### Delete a Collection
 
-| Method   | Endpoint                                         | Description         |
-| -------- | ------------------------------------------------ | ------------------- |
+| Method   | Endpoint                                   | Description         |
+| -------- | ------------------------------------------ | ------------------- |
 | `DELETE` | `/api/works/:id/collections/:collectionId` | Delete a collection |
 
 ```bash
@@ -105,8 +105,8 @@ Deleting a collection does not remove items — it only removes the grouping. It
 
 Collections are returned as part of the existing categories-tags endpoint:
 
-| Method | Endpoint                               | Description                               |
-| ------ | -------------------------------------- | ----------------------------------------- |
+| Method | Endpoint                         | Description                               |
+| ------ | -------------------------------- | ----------------------------------------- |
 | `GET`  | `/api/works/:id/categories-tags` | Returns categories, tags, and collections |
 
 ```bash

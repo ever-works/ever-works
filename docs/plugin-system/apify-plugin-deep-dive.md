@@ -58,9 +58,9 @@ interface ApifySettings {
 
 ## Capabilities
 
-| Capability             | Description                                              |
-| ---------------------- | -------------------------------------------------------- |
-| `data-source`          | Queries items from Apify datasets and actor runs         |
+| Capability             | Description                                         |
+| ---------------------- | --------------------------------------------------- |
+| `data-source`          | Queries items from Apify datasets and actor runs    |
 | `form-schema-provider` | Contributes form fields to the work generation form |
 
 ## API Reference
@@ -85,12 +85,12 @@ interface ApifySettings {
 
 ### Form Fields
 
-| Field Name                | Type    | Default | Description                               |
-| ------------------------- | ------- | ------- | ----------------------------------------- |
-| `apify_datasetId`         | text    | --      | Apify dataset ID to import from           |
-| `apify_actorRunId`        | text    | --      | Actor run ID (alternative to dataset ID)  |
-| `apify_maxItems`          | number  | 100     | Maximum items to import (0-10000)         |
-| `apify_filterByRelevance` | boolean | true    | Filter items by work topic relevance |
+| Field Name                | Type    | Default | Description                              |
+| ------------------------- | ------- | ------- | ---------------------------------------- |
+| `apify_datasetId`         | text    | --      | Apify dataset ID to import from          |
+| `apify_actorRunId`        | text    | --      | Actor run ID (alternative to dataset ID) |
+| `apify_maxItems`          | number  | 100     | Maximum items to import (0-10000)        |
+| `apify_filterByRelevance` | boolean | true    | Filter items by work topic relevance     |
 
 ## Implementation Details
 

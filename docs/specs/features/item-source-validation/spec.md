@@ -106,14 +106,14 @@ cadence.
 
 ## 5. Key Entities & Domain Concepts
 
-| Entity / concept          | Description                                                       |
-| ------------------------- | ----------------------------------------------------------------- |
-| `ItemSourceValidation`    | Per-item blob with reachability + accuracy + AI metadata          |
-| Reachability check        | Deterministic HTTP-based step                                     |
-| Accuracy check            | AI step that runs only if not clearly broken                      |
-| `sourceValidationCadence` | Per-work schedule field, falls back to main schedule cadence |
-| Manual re-check           | User-initiated single-item re-validation with short-window cache  |
-| `suggested_source_url`    | AI-proposed replacement URL                                       |
+| Entity / concept          | Description                                                      |
+| ------------------------- | ---------------------------------------------------------------- |
+| `ItemSourceValidation`    | Per-item blob with reachability + accuracy + AI metadata         |
+| Reachability check        | Deterministic HTTP-based step                                    |
+| Accuracy check            | AI step that runs only if not clearly broken                     |
+| `sourceValidationCadence` | Per-work schedule field, falls back to main schedule cadence     |
+| Manual re-check           | User-initiated single-item re-validation with short-window cache |
+| `suggested_source_url`    | AI-proposed replacement URL                                      |
 
 ## 6. Out of Scope
 

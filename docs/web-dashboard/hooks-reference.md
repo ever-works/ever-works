@@ -109,11 +109,11 @@ function useKeyboardShortcuts(options?: KeyboardShortcutsOptions): void;
 
 **Registered Shortcuts**:
 
-| Shortcut       | Condition                                 | Action                                           |
-| -------------- | ----------------------------------------- | ------------------------------------------------ |
+| Shortcut       | Condition                                 | Action                                     |
+| -------------- | ----------------------------------------- | ------------------------------------------ |
 | `Ctrl/Cmd + K` | Always                                    | Navigate to works page with search focused |
-| `C`            | Not in input field                        | Navigate to new work page                   |
-| `?`            | Not in input field, `onOpenHelp` provided | Open help drawer                                 |
+| `C`            | Not in input field                        | Navigate to new work page                  |
+| `?`            | Not in input field, `onOpenHelp` provided | Open help drawer                           |
 
 **Internal Behavior**:
 

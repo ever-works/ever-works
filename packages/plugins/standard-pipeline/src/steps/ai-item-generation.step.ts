@@ -269,9 +269,7 @@ export class AiItemGenerationStep extends BasePipelineStep {
 			);
 		}
 
-		logger.log(
-			`[${workSlug}] AI-First Item Generation - Complete. Validated ${allGeneratedItems.length} items.`
-		);
+		logger.log(`[${workSlug}] AI-First Item Generation - Complete. Validated ${allGeneratedItems.length} items.`);
 		return allGeneratedItems;
 	}
 

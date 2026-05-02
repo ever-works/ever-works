@@ -121,35 +121,31 @@ export class ImportExecutorService {
             }
 
             const configWithMeta = configWithWorksState as Record<string, any>;
-            const initResult = await this.dataGenerator.initializeWithImportedData(
-                work,
-                user,
-                {
-                    items,
-                    categories,
-                    tags,
-                    config: {
-                        ...configWithMeta,
-                        metadata: {
-                            ...(configWithMeta.metadata || {}),
-                            imported_from: `${source.owner}/${source.repo}`,
-                            imported_at: new Date().toISOString(),
-                            import_type: 'data_repo',
-                        },
-                    },
-                    worksConfig,
-                    importRequest: {
-                        sourceUrl: this.gitFacade.getWebUrl(
-                            work.gitProvider,
-                            source.owner,
-                            source.repo,
-                        ),
-                        sourceType: 'data_repo' as ImportSourceType,
-                        sourceOwner: source.owner,
-                        sourceRepo: source.repo,
+            const initResult = await this.dataGenerator.initializeWithImportedData(work, user, {
+                items,
+                categories,
+                tags,
+                config: {
+                    ...configWithMeta,
+                    metadata: {
+                        ...(configWithMeta.metadata || {}),
+                        imported_from: `${source.owner}/${source.repo}`,
+                        imported_at: new Date().toISOString(),
+                        import_type: 'data_repo',
                     },
                 },
-            );
+                worksConfig,
+                importRequest: {
+                    sourceUrl: this.gitFacade.getWebUrl(
+                        work.gitProvider,
+                        source.owner,
+                        source.repo,
+                    ),
+                    sourceType: 'data_repo' as ImportSourceType,
+                    sourceOwner: source.owner,
+                    sourceRepo: source.repo,
+                },
+            });
 
             if (initResult.success === false) {
                 return {
@@ -235,9 +231,7 @@ export class ImportExecutorService {
                 itemsImported: genResult.success ? genResult.stats.totalItemsCount : 0,
                 error: genResult.success === false ? genResult.error.message : undefined,
                 errorCode:
-                    genResult.success === false
-                        ? WorkImportErrorCode.ENRICHMENT_FAILED
-                        : undefined,
+                    genResult.success === false ? WorkImportErrorCode.ENRICHMENT_FAILED : undefined,
             };
         } catch (error) {
             this.logger.error('Failed to import from awesome readme', error);
@@ -250,9 +244,7 @@ export class ImportExecutorService {
         }
     }
 
-    async linkExistingDataRepo(
-        options: LinkExistingDataRepoOptions,
-    ): Promise<WorkImportResult> {
+    async linkExistingDataRepo(options: LinkExistingDataRepoOptions): Promise<WorkImportResult> {
         const { work, user, source, token, createMissingRepos = false } = options;
 
         try {
@@ -316,9 +308,7 @@ export class ImportExecutorService {
         }
     }
 
-    async importFromWorksConfig(
-        options: ImportFromWorksConfigOptions,
-    ): Promise<WorkImportResult> {
+    async importFromWorksConfig(options: ImportFromWorksConfigOptions): Promise<WorkImportResult> {
         const { work, user, source, token, providers, worksConfig } = options;
 
         try {
@@ -371,9 +361,7 @@ export class ImportExecutorService {
                 stats: genResult.success ? genResult.stats : undefined,
                 error: genResult.success === false ? genResult.error.message : undefined,
                 errorCode:
-                    genResult.success === false
-                        ? WorkImportErrorCode.GENERATION_FAILED
-                        : undefined,
+                    genResult.success === false ? WorkImportErrorCode.GENERATION_FAILED : undefined,
             };
         } catch (error) {
             this.logger.error('Failed to import from works config', error);

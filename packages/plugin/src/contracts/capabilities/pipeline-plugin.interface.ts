@@ -204,11 +204,7 @@ export interface IPipelinePlugin<TStepId extends string = string> extends IPlugi
 	// When implemented, the engine delegates context creation, snapshotting,
 	// result extraction, and skip/circuit-breaker logic to the plugin.
 
-	createContext?(
-		work: WorkReference,
-		request: GenerationRequest,
-		existing: ExistingItems
-	): IPipelineContext;
+	createContext?(work: WorkReference, request: GenerationRequest, existing: ExistingItems): IPipelineContext;
 	contextToSnapshot?(context: IPipelineContext): unknown;
 	contextFromSnapshot?(snapshot: unknown): IPipelineContext;
 	extractResult?(

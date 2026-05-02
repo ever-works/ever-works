@@ -68,7 +68,7 @@ The **Work Web Template** is a production-ready, full-stack work website that yo
 
 | Aspect                  | Platform                                         | Template                             |
 | ----------------------- | ------------------------------------------------ | ------------------------------------ |
-| **Purpose**             | Backend infrastructure and AI pipeline           | Frontend work website           |
+| **Purpose**             | Backend infrastructure and AI pipeline           | Frontend work website                |
 | **Architecture**        | Monorepo (Turborepo + pnpm workspaces)           | Standalone Next.js application       |
 | **Backend Framework**   | NestJS 11                                        | Next.js API routes                   |
 | **Frontend Framework**  | Next.js 16 (admin dashboard)                     | Next.js 15 (public website + admin)  |
@@ -83,7 +83,7 @@ The **Work Web Template** is a production-ready, full-stack work website that yo
 | **Monitoring**          | Sentry + PostHog                                 | Sentry + PostHog                     |
 | **i18n**                | next-intl (admin dashboard)                      | next-intl (full site, RTL support)   |
 | **Testing**             | Jest + Vitest                                    | Playwright                           |
-| **Primary Audience**    | Platform operators, AI pipeline developers       | Website builders, work creators |
+| **Primary Audience**    | Platform operators, AI pipeline developers       | Website builders, work creators      |
 
 ## How They Connect
 

@@ -288,9 +288,9 @@ overhead.
 Several columns store timestamps as `bigint` Unix-ms instead of
 TypeORM's default `timestamptz`:
 
-| Column                               | Why bigint                                                    |
-| ------------------------------------ | ------------------------------------------------------------- |
-| `cache_entries.expiresAt`            | Comparison hot path; integer compare faster than `now()` cast |
+| Column                          | Why bigint                                                    |
+| ------------------------------- | ------------------------------------------------------------- |
+| `cache_entries.expiresAt`       | Comparison hot path; integer compare faster than `now()` cast |
 | `work_schedules.nextRunAt` (ms) | Race-free CAS comparison without `Date` conversion edge cases |
 
 The pattern surfaced as a recurring source of bugs: comparing
@@ -307,11 +307,11 @@ The bigint pattern is documented as a real lesson learned in the
 
 Entities that need soft-delete (preserve audit trail, allow restore):
 
-| Entity            | Strategy                                                    |
-| ----------------- | ----------------------------------------------------------- |
-| `Notification`    | `deletedAt` column; `where: { deletedAt: IsNull() }` filter |
-| `ActivityLog`     | Hard delete only via cleanup task (90/180-day window)       |
-| `WorkMember` | Hard delete (membership change is the audit trail)          |
+| Entity         | Strategy                                                    |
+| -------------- | ----------------------------------------------------------- |
+| `Notification` | `deletedAt` column; `where: { deletedAt: IsNull() }` filter |
+| `ActivityLog`  | Hard delete only via cleanup task (90/180-day window)       |
+| `WorkMember`   | Hard delete (membership change is the audit trail)          |
 
 Most entities **don't** soft-delete. Notifications + a couple of
 others do because users explicitly recover them from a "Trash"
@@ -322,34 +322,34 @@ view. Domain rule: if there's no UI for "restore", don't soft-delete.
 Index inventory (informational — actual indexes are defined inline
 on entities):
 
-| Entity                         | Indexes                                                            |
-| ------------------------------ | ------------------------------------------------------------------ |
-| `works`                  | `(userId, slug)` unique, `(userId, status)`                        |
+| Entity                    | Indexes                                                       |
+| ------------------------- | ------------------------------------------------------------- |
+| `works`                   | `(userId, slug)` unique, `(userId, status)`                   |
 | `work_schedules`          | `(nextRunAt) WHERE nextRunAt IS NOT NULL` partial, `(workId)` |
 | `work_generation_history` | `(workId, createdAt DESC)` for History tab pagination         |
-| `activity_log`                 | `(userId, createdAt DESC)`, `(workId, createdAt DESC)`        |
-| `cache_entries`                | `(expiresAt)` for sweep                                            |
-| `api_keys`                     | `(hash)` unique                                                    |
-| `notifications`                | `(userId, read, createdAt DESC)` covering for unread query         |
-| `oauth_tokens`                 | `(userId, providerId)` unique                                      |
+| `activity_log`            | `(userId, createdAt DESC)`, `(workId, createdAt DESC)`        |
+| `cache_entries`           | `(expiresAt)` for sweep                                       |
+| `api_keys`                | `(hash)` unique                                               |
+| `notifications`           | `(userId, read, createdAt DESC)` covering for unread query    |
+| `oauth_tokens`            | `(userId, providerId)` unique                                 |
 
 Adding indexes is migration-only — entity-level `@Index` decorators
 work in `synchronize` mode but are discovered late in production.
 
 ## 13. Constitution Reconciliation
 
-| Principle                   | How the database layer respects it                                                   |
-| --------------------------- | ------------------------------------------------------------------------------------ |
-| I — Plugin-first            | Plugins don't touch the DB; they go through services + facades.                      |
-| II — Capability-driven      | Repositories are domain-named; capability resolution happens at facade level.        |
-| III — Source-of-truth repos | The DB stores platform metadata; user content lives in their git repos.              |
-| IV — Trigger.dev            | Worker shares the same DB module; separate connection pool.                          |
-| V — Forward-only migrations | `synchronize: false` in production; two-phase column drops; CI runs migrations.      |
-| VI — Tests                  | Each repository class has a `*.spec.ts` covering query semantics.                    |
-| VII — Secret hygiene        | Encrypted columns (OAuth tokens, plugin secrets) decrypt only at read time.          |
+| Principle                   | How the database layer respects it                                              |
+| --------------------------- | ------------------------------------------------------------------------------- |
+| I — Plugin-first            | Plugins don't touch the DB; they go through services + facades.                 |
+| II — Capability-driven      | Repositories are domain-named; capability resolution happens at facade level.   |
+| III — Source-of-truth repos | The DB stores platform metadata; user content lives in their git repos.         |
+| IV — Trigger.dev            | Worker shares the same DB module; separate connection pool.                     |
+| V — Forward-only migrations | `synchronize: false` in production; two-phase column drops; CI runs migrations. |
+| VI — Tests                  | Each repository class has a `*.spec.ts` covering query semantics.               |
+| VII — Secret hygiene        | Encrypted columns (OAuth tokens, plugin secrets) decrypt only at read time.     |
 | VIII — Plugin counts        | Counts are queries against `plugin_settings` / `user_plugins` / `work_plugins`. |
-| IX — Behaviour-first        | This spec describes observable DB behaviour.                                         |
-| X — Backwards-compat        | Forward-only migrations + driver-agnostic queries keep schema stable.                |
+| IX — Behaviour-first        | This spec describes observable DB behaviour.                                    |
+| X — Backwards-compat        | Forward-only migrations + driver-agnostic queries keep schema stable.           |
 
 ## 14. References
 

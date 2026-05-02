@@ -20,12 +20,7 @@ interface CategoriesTabProps {
     canEdit: boolean;
 }
 
-export function CategoriesTab({
-    workId,
-    initialCategories,
-    items,
-    canEdit,
-}: CategoriesTabProps) {
+export function CategoriesTab({ workId, initialCategories, items, canEdit }: CategoriesTabProps) {
     const t = useTranslations('dashboard.workDetail.items.taxonomy');
     const router = useRouter();
     const [categories, setCategories] = useState<Category[]>(initialCategories);

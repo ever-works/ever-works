@@ -100,27 +100,27 @@ function LoginForm() {
 
 This is the largest action file, covering all work operations:
 
-| Action                            | Description                                                            |
-| --------------------------------- | ---------------------------------------------------------------------- |
+| Action                       | Description                                                       |
+| ---------------------------- | ----------------------------------------------------------------- |
 | `createWork`                 | Create a new work with name, type, and optional repository config |
 | `createWorkWithAI`           | Create a work with AI-assisted content generation                 |
 | `updateWork`                 | Update work metadata (name, description, etc.)                    |
 | `deleteWork`                 | Delete a work and its associated repositories                     |
-| `getWorks`                  | Fetch all works for the current user                             |
-| `syncWorkData`               | Trigger a sync with the source repository                              |
-| `analyzeRepository`               | Analyze a URL to detect format and content structure                   |
-| `analyzeForLinking`               | Check if a repository has existing Ever Works structure                |
+| `getWorks`                   | Fetch all works for the current user                              |
+| `syncWorkData`               | Trigger a sync with the source repository                         |
+| `analyzeRepository`          | Analyze a URL to detect format and content structure              |
+| `analyzeForLinking`          | Check if a repository has existing Ever Works structure           |
 | `importWork`                 | Import a work from an external source                             |
-| `getUserRepositories`             | List repositories from the user's git provider                         |
-| `updateWorkSchedule`         | Configure automated generation schedule                                |
-| `getRepositoryVisibility`         | Check if a repository is public or private                             |
-| `toggleRepositoryVisibility`      | Toggle repository public/private state                                 |
-| `getAdvancedPrompts`              | Fetch custom AI prompts for a work                                |
-| `updateAdvancedPrompts`           | Update custom AI prompts                                               |
-| `getWebsiteSettings`              | Fetch website deployment configuration                                 |
-| `updateWebsiteSettings`           | Update website deployment configuration                                |
-| `updateCommunityPrSettings`       | Update community PR settings for a work                           |
-| `fetchWorkGenerationHistory` | Get the generation history log                                         |
+| `getUserRepositories`        | List repositories from the user's git provider                    |
+| `updateWorkSchedule`         | Configure automated generation schedule                           |
+| `getRepositoryVisibility`    | Check if a repository is public or private                        |
+| `toggleRepositoryVisibility` | Toggle repository public/private state                            |
+| `getAdvancedPrompts`         | Fetch custom AI prompts for a work                                |
+| `updateAdvancedPrompts`      | Update custom AI prompts                                          |
+| `getWebsiteSettings`         | Fetch website deployment configuration                            |
+| `updateWebsiteSettings`      | Update website deployment configuration                           |
+| `updateCommunityPrSettings`  | Update community PR settings for a work                           |
+| `fetchWorkGenerationHistory` | Get the generation history log                                    |
 
 **Example: createWorkWithAI**
 
@@ -151,11 +151,11 @@ export async function createWorkWithAI(params: {
 
 **File:** `apps/web/src/app/actions/dashboard/generator.ts`
 
-| Action               | Description                                                      |
-| -------------------- | ---------------------------------------------------------------- |
+| Action               | Description                                                 |
+| -------------------- | ----------------------------------------------------------- |
 | `generateItems`      | Start AI generation for a work with sanitized plugin config |
-| `updateItems`        | Batch update generated items                                     |
-| `regenerateMarkdown` | Regenerate markdown output from existing items                   |
+| `updateItems`        | Batch update generated items                                |
+| `regenerateMarkdown` | Regenerate markdown output from existing items              |
 
 **generateItems** is notable for its `sanitizePluginConfig` step, which strips sensitive data (like API keys marked with `x-secret`) from the plugin configuration before logging or transmitting it over non-secure channels. The actual secret values are resolved server-side from the stored plugin settings.
 

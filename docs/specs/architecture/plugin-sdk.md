@@ -254,7 +254,7 @@ Works `x-*` keywords:
 | `x-widget`         | UI hint (`password`, `textarea`, `select`, etc.). The Web Dashboard renders the matching widget.   |
 | `x-secret`         | Value is encrypted at rest, never returned by APIs, masked in logs/exports.                        |
 | `x-envVar`         | Environment variable fallback when the setting isn't provided in the DB.                           |
-| `x-scope`          | Setting scope: `global` / `user` / `work`.                                                    |
+| `x-scope`          | Setting scope: `global` / `user` / `work`.                                                         |
 | `x-adminOnly`      | Field is hidden from regular users (used inside `hybrid` plugins).                                 |
 | `x-hidden`         | Field is hidden from the settings UI entirely (used for derived state).                            |
 | `x-showIf`         | Conditional rendering: `{ field, value }` reveals this field only when another matches a value.    |

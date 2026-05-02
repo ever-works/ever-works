@@ -95,7 +95,7 @@ The `Work` entity (`works` table) is the central domain object representing a ge
 | `slug`           | `varchar`            | URL-safe identifier, used for repo names |
 | `userId`         | `uuid` (FK)          | Creator's user ID                        |
 | `owner`          | `varchar` (nullable) | GitHub org/user override for repos       |
-| `description`    | `varchar`            | Work description                    |
+| `description`    | `varchar`            | Work description                         |
 | `gitProvider`    | `varchar`            | Git provider (`github`)                  |
 | `deployProvider` | `varchar` (nullable) | Deploy provider (`vercel`)               |
 | `website`        | `varchar` (nullable) | Published website URL                    |
@@ -116,16 +116,16 @@ The `Work` entity (`works` table) is the central domain object representing a ge
 
 **Helper methods**:
 
-| Method                | Return Type                    | Description                             |
-| --------------------- | ------------------------------ | --------------------------------------- |
-| `getDataRepo()`       | `string`                       | Returns `{slug}-data`                   |
-| `getWebsiteRepo()`    | `string`                       | Returns `{slug}-website`                |
-| `getMainRepo()`       | `string`                       | Returns `slug`                          |
-| `getRepoOwner()`      | `string`                       | Returns `owner` or `user.username`      |
-| `isCreator(userId)`   | `boolean`                      | Checks if user is the work creator |
-| `getMember(userId)`   | `WorkMember \| undefined` | Finds member entry                      |
-| `hasAccess(userId)`   | `boolean`                      | Creator or member check                 |
-| `getUserRole(userId)` | `WorkMemberRole \| null`  | Returns role (owner for creator)        |
+| Method                | Return Type               | Description                        |
+| --------------------- | ------------------------- | ---------------------------------- |
+| `getDataRepo()`       | `string`                  | Returns `{slug}-data`              |
+| `getWebsiteRepo()`    | `string`                  | Returns `{slug}-website`           |
+| `getMainRepo()`       | `string`                  | Returns `slug`                     |
+| `getRepoOwner()`      | `string`                  | Returns `owner` or `user.username` |
+| `isCreator(userId)`   | `boolean`                 | Checks if user is the work creator |
+| `getMember(userId)`   | `WorkMember \| undefined` | Finds member entry                 |
+| `hasAccess(userId)`   | `boolean`                 | Creator or member check            |
+| `getUserRole(userId)` | `WorkMemberRole \| null`  | Returns role (owner for creator)   |
 
 ### WorkMember
 
@@ -134,7 +134,7 @@ Represents a user's membership in a work with role-based access control.
 | Column            | Type              | Description                      |
 | ----------------- | ----------------- | -------------------------------- |
 | `id`              | `uuid` (PK)       | Auto-generated UUID              |
-| `workId`     | `uuid` (FK)       | Work reference              |
+| `workId`          | `uuid` (FK)       | Work reference                   |
 | `userId`          | `uuid` (FK)       | User reference                   |
 | `role`            | `enum`            | `manager`, `editor`, or `viewer` |
 | `invitedByUserId` | `uuid` (nullable) | Who sent the invite              |
@@ -154,7 +154,7 @@ Configures recurring work updates with scheduling, billing, and failure tracking
 
 | Column                | Type                   | Description                              |
 | --------------------- | ---------------------- | ---------------------------------------- |
-| `workId`         | `uuid` (PK, FK)        | One-to-one with Work                |
+| `workId`              | `uuid` (PK, FK)        | One-to-one with Work                     |
 | `cadence`             | `enum`                 | `daily`, `weekly`, `biweekly`, `monthly` |
 | `billingMode`         | `enum`                 | `included` or `usage`                    |
 | `status`              | `enum`                 | `active`, `paused`, `failed`             |
@@ -171,7 +171,7 @@ Tracks each generation run with metrics and status.
 | Column         | Type                   | Description                                         |
 | -------------- | ---------------------- | --------------------------------------------------- |
 | `id`           | `uuid` (PK)            | Auto-generated UUID                                 |
-| `workId`  | `uuid` (FK)            | Work reference                                 |
+| `workId`       | `uuid` (FK)            | Work reference                                      |
 | `userId`       | `uuid` (FK)            | User who triggered it                               |
 | `method`       | `varchar`              | Generation method used                              |
 | `status`       | `varchar`              | `completed`, `failed`, `cancelled`                  |
@@ -199,19 +199,19 @@ interface GenerationMetrics {
 
 ### types.ts
 
-| Export                         | Kind             | Values / Description                                                |
-| ------------------------------ | ---------------- | ------------------------------------------------------------------- |
-| `GenerateStatusType`           | enum (re-export) | From `@ever-works/contracts/api`                                    |
+| Export                    | Kind             | Values / Description                                                |
+| ------------------------- | ---------------- | ------------------------------------------------------------------- |
+| `GenerateStatusType`      | enum (re-export) | From `@ever-works/contracts/api`                                    |
 | `WorkScheduleCadence`     | enum (re-export) | `daily`, `weekly`, `biweekly`, `monthly`                            |
 | `WorkScheduleStatus`      | enum (re-export) | `active`, `paused`, `failed`                                        |
 | `WorkScheduleBillingMode` | enum (re-export) | `included`, `usage`                                                 |
-| `SubscriptionPlanCode`         | enum             | `free`, `standard`, `premium`                                       |
+| `SubscriptionPlanCode`    | enum             | `free`, `standard`, `premium`                                       |
 | `WorkMemberRole`          | enum             | `owner`, `manager`, `editor`, `viewer`                              |
-| `DomainEnvironment`            | enum             | `production`, `staging`, `development`                              |
-| `GenerateStatus`               | type             | Status object with step, progress, errors, warnings                 |
-| `CommunityPrState`             | interface        | PR processing state (`processedPrNumbers`, `lastProcessedAt`, etc.) |
-| `ClassToObject<T>`             | utility type     | Converts class to plain object type                                 |
-| `ASSIGNABLE_MEMBER_ROLES`      | const array      | `[manager, editor, viewer]` (excludes owner)                        |
+| `DomainEnvironment`       | enum             | `production`, `staging`, `development`                              |
+| `GenerateStatus`          | type             | Status object with step, progress, errors, warnings                 |
+| `CommunityPrState`        | interface        | PR processing state (`processedPrNumbers`, `lastProcessedAt`, etc.) |
+| `ClassToObject<T>`        | utility type     | Converts class to plain object type                                 |
+| `ASSIGNABLE_MEMBER_ROLES` | const array      | `[manager, editor, viewer]` (excludes owner)                        |
 
 ### notification.types.ts
 

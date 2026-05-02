@@ -34,44 +34,44 @@ Social login components render provider-specific buttons and handle the OAuth re
 
 Top-level dashboard layout and home page components:
 
-| Component                  | Purpose                                               |
-| -------------------------- | ----------------------------------------------------- |
-| `DashboardHeader.tsx`      | Top navigation bar with user menu                     |
-| `DashboardSidebar.tsx`     | Left sidebar navigation with route links              |
-| `HelpDrawer.tsx`           | Slide-out help panel                                  |
-| `NotificationDropdown.tsx` | Notification bell and dropdown list                   |
-| `RecentActivity.tsx`       | Activity feed on the home page                        |
+| Component                  | Purpose                                         |
+| -------------------------- | ----------------------------------------------- |
+| `DashboardHeader.tsx`      | Top navigation bar with user menu               |
+| `DashboardSidebar.tsx`     | Left sidebar navigation with route links        |
+| `HelpDrawer.tsx`           | Slide-out help panel                            |
+| `NotificationDropdown.tsx` | Notification bell and dropdown list             |
+| `RecentActivity.tsx`       | Activity feed on the home page                  |
 | `StatsOverview.tsx`        | Dashboard statistics cards (works, items, runs) |
 
 ### Work Components (`components/works/`)
 
 Components for listing, creating, and managing works:
 
-| Component                  | Purpose                                           |
-| -------------------------- | ------------------------------------------------- |
-| `WorkList.tsx`        | Paginated work grid/list view                |
-| `WorkCard.tsx`        | Individual work card with status and actions |
-| `WorkAICreator.tsx`   | AI-powered work creation wizard              |
-| `WorkManualForm.tsx`  | Manual work creation form                    |
-| `WorkImportForm.tsx`  | Import work from external source             |
-| `OrganizationSelector.tsx` | GitHub organization picker                        |
-| `RepositorySelector.tsx`   | Repository picker for imports                     |
-| `RepositoryOwnerCard.tsx`  | Display card for repo owner info                  |
+| Component                  | Purpose                                      |
+| -------------------------- | -------------------------------------------- |
+| `WorkList.tsx`             | Paginated work grid/list view                |
+| `WorkCard.tsx`             | Individual work card with status and actions |
+| `WorkAICreator.tsx`        | AI-powered work creation wizard              |
+| `WorkManualForm.tsx`       | Manual work creation form                    |
+| `WorkImportForm.tsx`       | Import work from external source             |
+| `OrganizationSelector.tsx` | GitHub organization picker                   |
+| `RepositorySelector.tsx`   | Repository picker for imports                |
+| `RepositoryOwnerCard.tsx`  | Display card for repo owner info             |
 
 #### Detail Subworks
 
 The `works/detail/` subwork contains components for the work detail view, organized by tab:
 
-| Subwork          | Purpose                            |
+| Subwork               | Purpose                            |
 | --------------------- | ---------------------------------- |
-| `detail/overview/`    | Work overview tab             |
+| `detail/overview/`    | Work overview tab                  |
 | `detail/items/`       | Items browser and editor           |
 | `detail/generator/`   | AI generation controls             |
 | `detail/schedule/`    | Schedule configuration             |
 | `detail/deploy/`      | Deployment settings                |
 | `detail/members/`     | Team member management             |
-| `detail/settings/`    | Work settings form            |
-| `detail/plugins/`     | Per-work plugin toggles       |
+| `detail/settings/`    | Work settings form                 |
+| `detail/plugins/`     | Per-work plugin toggles            |
 | `detail/comparisons/` | Comparison page list               |
 | `detail/history/`     | Generation run history             |
 | `detail/shared/`      | Shared components used across tabs |
@@ -140,7 +140,7 @@ Shared primitive components based on shadcn/ui:
 
 ### Other Components
 
-| Work          | Purpose                                      |
+| Work               | Purpose                                      |
 | ------------------ | -------------------------------------------- |
 | `common/`          | Shared layout helpers and utility components |
 | `footer/`          | Page footer                                  |

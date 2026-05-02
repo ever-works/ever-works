@@ -3,11 +3,7 @@ export { WorkScheduleCadence, WorkScheduleStatus, WorkScheduleBillingMode } from
 export { GenerateStatusType } from './generate-status.enum.js';
 
 // Work DTOs
-export type {
-	WorkScheduleAllowedCadence,
-	WorkScheduleDto,
-	UpdateWorkSchedulePayload
-} from './work-schedule.dto.js';
+export type { WorkScheduleAllowedCadence, WorkScheduleDto, UpdateWorkSchedulePayload } from './work-schedule.dto.js';
 export type {
 	GenerationMetrics,
 	WorkChangelog,

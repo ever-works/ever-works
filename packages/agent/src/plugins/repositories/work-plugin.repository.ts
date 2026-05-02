@@ -30,10 +30,7 @@ export class WorkPluginRepository {
     /**
      * Find a work plugin by work ID and plugin ID
      */
-    async findByWorkAndPlugin(
-        workId: string,
-        pluginId: string,
-    ): Promise<WorkPluginEntity | null> {
+    async findByWorkAndPlugin(workId: string, pluginId: string): Promise<WorkPluginEntity | null> {
         return this.repository.findOne({
             where: { workId, pluginId },
             relations: ['pluginEntity'],
@@ -84,9 +81,7 @@ export class WorkPluginRepository {
             relations: ['pluginEntity'],
         });
         return (
-            workPlugins.find((workPlugin) =>
-                hasActiveCapability(workPlugin, capability),
-            ) ?? null
+            workPlugins.find((workPlugin) => hasActiveCapability(workPlugin, capability)) ?? null
         );
     }
 
@@ -112,10 +107,7 @@ export class WorkPluginRepository {
     /**
      * Update work plugin settings
      */
-    async update(
-        id: string,
-        data: Partial<WorkPluginEntity>,
-    ): Promise<WorkPluginEntity | null> {
+    async update(id: string, data: Partial<WorkPluginEntity>): Promise<WorkPluginEntity | null> {
         await this.repository.update(id, data);
         return this.findById(id);
     }
@@ -185,10 +177,7 @@ export class WorkPluginRepository {
 
         await Promise.all(
             affectedPlugins.map((workPlugin) => {
-                workPlugin.activeCapabilities = removeActiveCapability(
-                    workPlugin,
-                    capability,
-                );
+                workPlugin.activeCapabilities = removeActiveCapability(workPlugin, capability);
                 return this.repository.save(workPlugin);
             }),
         );
@@ -275,10 +264,7 @@ export class WorkPluginRepository {
     ): Promise<WorkPluginEntity> {
         const existing = await this.findByWorkAndPlugin(data.workId, data.pluginId);
         if (existing) {
-            await this.repository.update(
-                { workId: data.workId, pluginId: data.pluginId },
-                data,
-            );
+            await this.repository.update({ workId: data.workId, pluginId: data.pluginId }, data);
             return this.findByWorkAndPlugin(data.workId, data.pluginId);
         }
         return this.create(data);

@@ -149,8 +149,8 @@ A `Switch` controlling whether scheduled generation runs create a git pull reque
 
 ## Action Buttons
 
-| Button  | Action                                           | Disabled When                             |
-| ------- | ------------------------------------------------ | ----------------------------------------- |
+| Button  | Action                                 | Disabled When                             |
+| ------- | -------------------------------------- | ----------------------------------------- |
 | Run Now | `runWorkSchedule(workId)`              | Loading, or schedule status is not ACTIVE |
 | Save    | `updateWorkSchedule(workId, formData)` | Loading                                   |
 | Cancel  | `cancelWorkSchedule(workId)`           | Loading                                   |
@@ -196,8 +196,8 @@ This cron task checks for due schedules and dispatches generation tasks at the c
 
 ## Related API Endpoints
 
-| Action          | Server Action Function                           | HTTP Method |
-| --------------- | ------------------------------------------------ | ----------- |
+| Action          | Server Action Function                 | HTTP Method |
+| --------------- | -------------------------------------- | ----------- |
 | Update schedule | `updateWorkSchedule(workId, formData)` | PATCH       |
 | Run immediately | `runWorkSchedule(workId)`              | POST        |
 | Cancel schedule | `cancelWorkSchedule(workId)`           | POST        |

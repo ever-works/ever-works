@@ -121,8 +121,7 @@ describe('WorkScheduleService', () => {
                 featureEnabled: true,
                 canEnable: false,
                 blockingCode: 'INITIAL_WORK_SETUP_REQUIRED',
-                blockingReason:
-                    'Complete an initial work setup before enabling scheduled updates.',
+                blockingReason: 'Complete an initial work setup before enabling scheduled updates.',
             }),
         );
     });

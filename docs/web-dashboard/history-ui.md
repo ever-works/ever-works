@@ -57,13 +57,13 @@ interface WorkGenerationHistoryResponse {
 
 **State Management**:
 
-| State       | Type                                | Purpose                           |
-| ----------- | ----------------------------------- | --------------------------------- |
+| State       | Type                           | Purpose                           |
+| ----------- | ------------------------------ | --------------------------------- |
 | `entries`   | `WorkGenerationHistoryEntry[]` | Accumulated history entries       |
-| `total`     | `number`                            | Total count from server           |
-| `limit`     | `number`                            | Page size (default: 20)           |
-| `offset`    | `number`                            | Current cursor position           |
-| `isPending` | `boolean`                           | Loading state via `useTransition` |
+| `total`     | `number`                       | Total count from server           |
+| `limit`     | `number`                       | Page size (default: 20)           |
+| `offset`    | `number`                       | Current cursor position           |
+| `isPending` | `boolean`                      | Loading state via `useTransition` |
 
 **Pagination Flow**:
 
@@ -187,8 +187,8 @@ The component uses an append-only pattern for pagination: new entries are concat
 
 ## Related API Endpoints
 
-| Action                    | Server Action Function                                            | HTTP Method |
-| ------------------------- | ----------------------------------------------------------------- | ----------- |
+| Action                    | Server Action Function                                  | HTTP Method |
+| ------------------------- | ------------------------------------------------------- | ----------- |
 | Fetch history (paginated) | `fetchWorkGenerationHistory(workId, { limit, offset })` | GET         |
 
 ## Internationalization

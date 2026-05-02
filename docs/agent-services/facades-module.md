@@ -104,7 +104,7 @@ The `getResolvedSettings()` method merges settings from multiple scopes:
 
 | Priority    | Source                | Description                           |
 | ----------- | --------------------- | ------------------------------------- |
-| 1 (highest) | Work settings    | Per-work plugin configuration    |
+| 1 (highest) | Work settings         | Per-work plugin configuration         |
 | 2           | User settings         | Per-user plugin configuration         |
 | 3           | Admin settings        | Global admin configuration            |
 | 4           | Environment variables | `x-envVar` annotated schema fields    |
@@ -211,12 +211,12 @@ Captures webpage screenshots via screenshot plugins (ScreenshotOne, Urlbox).
 
 **Key methods**:
 
-| Method                                     | Description                                                                 |
-| ------------------------------------------ | --------------------------------------------------------------------------- |
-| `capture(options, facadeOptions)`          | Full screenshot capture with viewport, format, and blocking options         |
+| Method                                     | Description                                                            |
+| ------------------------------------------ | ---------------------------------------------------------------------- |
+| `capture(options, facadeOptions)`          | Full screenshot capture with viewport, format, and blocking options    |
 | `getSmartImage(options, facadeOptions)`    | Simplified screenshot for work item images (1280x800, PNG, ad-blocked) |
-| `getScreenshotUrl(options, facadeOptions)` | Returns a URL to the screenshot without downloading                         |
-| `isAvailable()`                            | Checks if any screenshot plugin is configured                               |
+| `getScreenshotUrl(options, facadeOptions)` | Returns a URL to the screenshot without downloading                    |
+| `isAvailable()`                            | Checks if any screenshot plugin is configured                          |
 
 ### ContentExtractorFacadeService
 

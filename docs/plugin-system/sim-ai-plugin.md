@@ -38,7 +38,7 @@ SIM AI is the right choice when:
 | **Where does AI run?**          | Your AI provider plugin                   | Your AI provider plugin                   | Anthropic API      | SIM's infrastructure              |
 | **What providers do you need?** | AI, Search, Screenshot, Content Extractor | AI, Search, Screenshot, Content Extractor | Screenshot only    | Screenshot only (optional)        |
 | **Setup effort**                | None                                      | None                                      | None               | Requires SIM account + workflow   |
-| **Best for**                    | Broad, structured works             | Exploratory discovery                     | Advanced reasoning | Custom logic, specialized domains |
+| **Best for**                    | Broad, structured works                   | Exploratory discovery                     | Advanced reasoning | Custom logic, specialized domains |
 
 Since SIM AI handles AI and search internally through your workflow, you **do not need** AI provider or search provider plugins configured in Ever Works. The only optional Ever Works provider is screenshot (if you want the platform to capture screenshots after the workflow completes).
 
@@ -230,15 +230,15 @@ Your SIM workflow receives structured data from Ever Works. Here's what each fie
 
 Always present. Contains everything the workflow needs to know about the generation request:
 
-| Field                  | Example                 | How to use it                                                       |
-| ---------------------- | ----------------------- | ------------------------------------------------------------------- |
-| `workName`        | "Best AI Writing Tools" | Use as context for what kind of items to find                       |
-| `workDescription` | "A curated list of..."  | Additional context about the work's purpose                    |
-| `prompt`               | "Find tools that..."    | The user's specific instructions — this is the most important field |
-| `targetItems`          | 50                      | How many new items the user wants — use as a stopping condition     |
-| `generationMethod`     | "create-update"         | Whether to add to existing items or recreate from scratch           |
-| `workId`          | "uuid-123"              | Unique ID (useful for logging/tracking)                             |
-| `workSlug`        | "best-ai-writing-tools" | URL slug (useful if your workflow generates links)                  |
+| Field              | Example                 | How to use it                                                       |
+| ------------------ | ----------------------- | ------------------------------------------------------------------- |
+| `workName`         | "Best AI Writing Tools" | Use as context for what kind of items to find                       |
+| `workDescription`  | "A curated list of..."  | Additional context about the work's purpose                         |
+| `prompt`           | "Find tools that..."    | The user's specific instructions — this is the most important field |
+| `targetItems`      | 50                      | How many new items the user wants — use as a stopping condition     |
+| `generationMethod` | "create-update"         | Whether to add to existing items or recreate from scratch           |
+| `workId`           | "uuid-123"              | Unique ID (useful for logging/tracking)                             |
+| `workSlug`         | "best-ai-writing-tools" | URL slug (useful if your workflow generates links)                  |
 
 ### The `existingSummary` Object
 

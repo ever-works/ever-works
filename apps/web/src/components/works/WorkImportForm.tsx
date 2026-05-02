@@ -10,11 +10,7 @@ import { useTranslations } from 'next-intl';
 import { Button } from '@/components/ui/button';
 import { GitRepo } from './RepositorySelector';
 import { Loader2, ArrowLeft } from 'lucide-react';
-import {
-    analyzeRepository,
-    importWork,
-    analyzeForLinking,
-} from '@/app/actions/dashboard/works';
+import { analyzeRepository, importWork, analyzeForLinking } from '@/app/actions/dashboard/works';
 import {
     ImportModeSelector,
     ImportSourceStep,

@@ -222,7 +222,7 @@ interface PipelineModification {
 | `@ever-works/plugin`         | `IPipelinePlugin`, `IPipelineModifier` interfaces      |
 | `@ever-works/agent/plugins`  | `PluginRegistryService` for pipeline plugin resolution |
 | `@ever-works/agent/facades`  | All facade services for step execution context         |
-| `@ever-works/agent/database` | Work repository for checkpoint persistence        |
+| `@ever-works/agent/database` | Work repository for checkpoint persistence             |
 | `EventEmitter2`              | Pipeline runtime event emission                        |
 
 ## Usage Examples

@@ -66,14 +66,14 @@ The work is the primary isolation boundary in Ever Works. Each work:
 - Has its own member list with role-based permissions
 - Maintains separate pipeline checkpoints
 
-| Aspect                      | Isolation Level | Mechanism                               |
-| --------------------------- | --------------- | --------------------------------------- |
+| Aspect                      | Isolation Level | Mechanism                          |
+| --------------------------- | --------------- | ---------------------------------- |
 | Content (items, categories) | Full            | Foreign key to `workId`            |
 | Plugin settings             | Layered         | `WorkPluginEntity` overrides       |
 | Capability routing          | Independent     | `activeCapability` per work-plugin |
-| Access control              | Per-work   | `WorkOwnershipService` + roles     |
+| Access control              | Per-work        | `WorkOwnershipService` + roles     |
 | Cache / checkpoints         | Scoped          | Cache key includes `workId`        |
-| Generation history          | Per-work   | Scoped to work                     |
+| Generation history          | Per-work        | Scoped to work                     |
 
 ## Role-Based Access Control
 
@@ -90,7 +90,7 @@ graph BT
 
 | Role      | Level | Permissions                                  |
 | --------- | ----- | -------------------------------------------- |
-| `VIEWER`  | 1     | View work content                       |
+| `VIEWER`  | 1     | View work content                            |
 | `EDITOR`  | 2     | View + edit content, trigger generation      |
 | `MANAGER` | 3     | View + edit + manage members                 |
 | `OWNER`   | 4     | Full control including deletion and transfer |
@@ -162,13 +162,13 @@ graph TD
     style E fill:#f3e5f5
 ```
 
-| Priority    | Source      | Storage                      | Scope         |
-| ----------- | ----------- | ---------------------------- | ------------- |
-| 1 (highest) | Work   | `work_plugins.settings` | Per work |
-| 2           | User        | `user_plugins.settings`      | Per user      |
-| 3           | Admin       | `plugins.settings`           | Global        |
-| 4           | Environment | `process.env[x-envVar]`      | Server-wide   |
-| 5 (lowest)  | Default     | JSON Schema `default`        | Built-in      |
+| Priority    | Source      | Storage                 | Scope       |
+| ----------- | ----------- | ----------------------- | ----------- |
+| 1 (highest) | Work        | `work_plugins.settings` | Per work    |
+| 2           | User        | `user_plugins.settings` | Per user    |
+| 3           | Admin       | `plugins.settings`      | Global      |
+| 4           | Environment | `process.env[x-envVar]` | Server-wide |
+| 5 (lowest)  | Default     | JSON Schema `default`   | Built-in    |
 
 ### How Resolution Works
 
@@ -216,10 +216,10 @@ interface ResolvedSetting {
 Plugins declare how their settings can be managed:
 
 | Mode            | Work Settings | User Settings  | Admin Settings | Use Case                            |
-| --------------- | ------------------ | -------------- | -------------- | ----------------------------------- |
-| `hybrid`        | Yes                | Yes            | Yes            | Most plugins (OpenRouter, Scrapfly) |
-| `user-required` | Yes                | Yes (required) | No             | Per-user API keys (Mistral, Google) |
-| `admin-only`    | No                 | No             | Yes            | System-level config                 |
+| --------------- | ------------- | -------------- | -------------- | ----------------------------------- |
+| `hybrid`        | Yes           | Yes            | Yes            | Most plugins (OpenRouter, Scrapfly) |
+| `user-required` | Yes           | Yes (required) | No             | Per-user API keys (Mistral, Google) |
+| `admin-only`    | No            | No             | Yes            | System-level config                 |
 
 When a plugin is `admin-only`, the settings service rejects user and work level updates:
 
@@ -337,10 +337,10 @@ const settings = await this.settingsService.getSettings(pluginId, {
 
 All cache keys include the work ID to prevent cross-work data leakage:
 
-| Cache Type          | Key Format                                       | Example                                        |
-| ------------------- | ------------------------------------------------ | ---------------------------------------------- |
+| Cache Type          | Key Format                                  | Example                                        |
+| ------------------- | ------------------------------------------- | ---------------------------------------------- |
 | Pipeline checkpoint | `pipeline-checkpoint-{workId}-{pipelineId}` | `pipeline-checkpoint-dir123-standard-pipeline` |
-| Plugin cache        | `plugin:{pluginId}:{key}`                        | `plugin:openrouter:models-list`                |
+| Plugin cache        | `plugin:{pluginId}:{key}`                   | `plugin:openrouter:models-list`                |
 
 Pipeline checkpoints are fully scoped to the work, so resuming a failed generation in one work never affects another.
 
@@ -372,12 +372,12 @@ graph LR
     end
 ```
 
-| Boundary  | What Is Isolated           | How                                         |
-| --------- | -------------------------- | ------------------------------------------- |
-| Platform  | Plugin code, registry      | Shared singleton services                   |
-| User      | API keys, user settings    | `UserPluginEntity`, user-scoped resolution  |
-| Work | Content, settings, members | `WorkPluginEntity`, foreign keys, RBAC |
-| Plugin    | Cache, logger, events      | Namespace-prefixed keys, scoped context     |
+| Boundary | What Is Isolated           | How                                        |
+| -------- | -------------------------- | ------------------------------------------ |
+| Platform | Plugin code, registry      | Shared singleton services                  |
+| User     | API keys, user settings    | `UserPluginEntity`, user-scoped resolution |
+| Work     | Content, settings, members | `WorkPluginEntity`, foreign keys, RBAC     |
+| Plugin   | Cache, logger, events      | Namespace-prefixed keys, scoped context    |
 
 ## Best Practices
 

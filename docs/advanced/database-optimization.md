@@ -204,14 +204,14 @@ export class Work {
 
 ### Recommended Indexes by Table
 
-| Table                | Index Columns               | Purpose                         |
-| -------------------- | --------------------------- | ------------------------------- |
-| `works`        | `(userId, status)`          | List user works by status |
-| `work_members`  | `(workId, userId)`     | Membership lookups              |
-| `refresh_tokens`     | `(token)`                   | Token validation                |
-| `refresh_tokens`     | `(userId, revoked)`         | Active token lookup             |
-| `generation_history` | `(workId, createdAt)`  | Generation history timeline     |
-| `notifications`      | `(userId, read, createdAt)` | Unread notification feed        |
+| Table                | Index Columns               | Purpose                     |
+| -------------------- | --------------------------- | --------------------------- |
+| `works`              | `(userId, status)`          | List user works by status   |
+| `work_members`       | `(workId, userId)`          | Membership lookups          |
+| `refresh_tokens`     | `(token)`                   | Token validation            |
+| `refresh_tokens`     | `(userId, revoked)`         | Active token lookup         |
+| `generation_history` | `(workId, createdAt)`       | Generation history timeline |
+| `notifications`      | `(userId, read, createdAt)` | Unread notification feed    |
 
 ## Connection Pooling (PostgreSQL)
 

@@ -118,8 +118,8 @@ export const workScheduleDispatcherTask = schedules.task({
 
 The `TriggerService` runs in the NestJS API and implements both `WorkGenerationDispatcher` and `WorkImportDispatcher` interfaces. It lazily configures the Trigger.dev SDK on first use.
 
-| Method                                 | Description                                       |
-| -------------------------------------- | ------------------------------------------------- |
+| Method                            | Description                                       |
+| --------------------------------- | ------------------------------------------------- |
 | `dispatchWorkGeneration(payload)` | Triggers a generation task with tags for tracking |
 | `dispatchWorkImport(payload)`     | Triggers an import task with source-type tags     |
 
@@ -159,10 +159,10 @@ Orchestrators manage the execution lifecycle of tasks including status tracking,
 
 Abstract base class providing common functionality:
 
-| Method                                            | Description                                            |
-| ------------------------------------------------- | ------------------------------------------------------ |
-| `handleFailure(options)`                          | Records error state, updates history, emits completion |
-| `handleCancellation(options)`                     | Records cancelled state with duration calculation      |
+| Method                                       | Description                                            |
+| -------------------------------------------- | ------------------------------------------------------ |
+| `handleFailure(options)`                     | Records error state, updates history, emits completion |
+| `handleCancellation(options)`                | Records cancelled state with duration calculation      |
 | `handleErrorNotification(error, user, work)` | Classifies errors and sends notifications              |
 
 ### TriggerGenerationOrchestrator
@@ -191,10 +191,10 @@ Coordinates work imports from external sources:
 
 HTTP client for communication between the Trigger.dev worker and the main API. Uses shared secret authentication and SuperJSON serialization.
 
-| Method                                       | Description                                        |
-| -------------------------------------------- | -------------------------------------------------- |
-| `fetchWorkContext(workId, userId)` | Fetches work and user data from the API       |
-| `callRemote(name, method, args)`             | Forwards method calls to API-side services via RPC |
+| Method                             | Description                                        |
+| ---------------------------------- | -------------------------------------------------- |
+| `fetchWorkContext(workId, userId)` | Fetches work and user data from the API            |
+| `callRemote(name, method, args)`   | Forwards method calls to API-side services via RPC |
 
 Features automatic retry with exponential backoff (3 attempts, 500ms base delay) for 5xx errors and network failures.
 

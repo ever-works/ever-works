@@ -82,7 +82,7 @@ Not all context properties can be serialized:
 | ----------------------------- | ------------ | ------------------- |
 | `dto`                         | Yes          | JSON stringify      |
 | `items`, `categories`, `tags` | Yes          | JSON stringify      |
-| `work`                   | No (Entity)  | Re-fetch on resume  |
+| `work`                        | No (Entity)  | Re-fetch on resume  |
 | `contentCache` (Map)          | Yes          | Convert to Object   |
 | `metrics`                     | Yes          | JSON stringify      |
 | `advancedPrompts`             | Yes          | Always reload fresh |

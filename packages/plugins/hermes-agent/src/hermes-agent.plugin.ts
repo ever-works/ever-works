@@ -391,14 +391,7 @@ export class HermesAgentPlugin implements IPlugin, IPipelinePlugin, IFormSchemaP
 				return this.handleCancel(startTime);
 			}
 
-			workspacePath = await this.runPrepareContextStep(
-				work,
-				request,
-				existing,
-				userId,
-				onProgress,
-				onLogEntry
-			);
+			workspacePath = await this.runPrepareContextStep(work, request, existing, userId, onProgress, onLogEntry);
 
 			if (signal.aborted) {
 				if (workspacePath) {

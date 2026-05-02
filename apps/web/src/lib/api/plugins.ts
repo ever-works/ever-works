@@ -193,10 +193,7 @@ export const pluginsAPI = {
     /**
      * Disable a plugin for a work
      */
-    disableForWork: async (
-        workId: string,
-        pluginId: string,
-    ): Promise<WorkPlugin> => {
+    disableForWork: async (workId: string, pluginId: string): Promise<WorkPlugin> => {
         return serverMutation<WorkPlugin>({
             endpoint: `/works/${workId}/plugins/${pluginId}/disable`,
             data: {},

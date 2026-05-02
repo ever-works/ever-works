@@ -96,7 +96,7 @@ and they can be independently toggled on/off.
 | Entity / concept       | Description                                                         |
 | ---------------------- | ------------------------------------------------------------------- |
 | Collection             | `{id, name, description?, icon_url?, priority?}` editorial grouping |
-| `collections.yml`      | Per-work file in the data repo holding the collection list     |
+| `collections.yml`      | Per-work file in the data repo holding the collection list          |
 | `collections_enabled`  | Website-side toggle controlling whether collections render          |
 | `generate_collections` | Pipeline-side toggle controlling AI collection assignment           |
 | Item collection ref    | Slug id stored in the item's YAML                                   |

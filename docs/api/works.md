@@ -13,20 +13,20 @@ All endpoints require JWT authentication.
 
 ## Work CRUD
 
-| Method | Endpoint                      | Description                                           |
-| ------ | ----------------------------- | ----------------------------------------------------- |
+| Method | Endpoint                | Description                                     |
+| ------ | ----------------------- | ----------------------------------------------- |
 | `GET`  | `/api/works`            | List works (supports `?search=` and pagination) |
-| `POST` | `/api/works`            | Create a new work                                |
-| `GET`  | `/api/works/:id`        | Get a work by ID                                 |
-| `PUT`  | `/api/works/:id`        | Update a work                                    |
-| `POST` | `/api/works/:id/delete` | Delete a work and its repositories               |
+| `POST` | `/api/works`            | Create a new work                               |
+| `GET`  | `/api/works/:id`        | Get a work by ID                                |
+| `PUT`  | `/api/works/:id`        | Update a work                                   |
+| `POST` | `/api/works/:id/delete` | Delete a work and its repositories              |
 
 ## Work Data
 
-| Method | Endpoint                                | Description                        |
-| ------ | --------------------------------------- | ---------------------------------- |
-| `GET`  | `/api/works/:id/items`            | Get work items (cached)       |
-| `GET`  | `/api/works/:id/config`           | Get work config (cached)      |
+| Method | Endpoint                          | Description                        |
+| ------ | --------------------------------- | ---------------------------------- |
+| `GET`  | `/api/works/:id/items`            | Get work items (cached)            |
+| `GET`  | `/api/works/:id/config`           | Get work config (cached)           |
 | `GET`  | `/api/works/:id/website-settings` | Get website settings               |
 | `PUT`  | `/api/works/:id/website-settings` | Update website settings            |
 | `GET`  | `/api/works/:id/count`            | Get item count and status (cached) |
@@ -35,9 +35,9 @@ All endpoints require JWT authentication.
 
 ## AI Generation
 
-| Method | Endpoint                            | Description                                 |
-| ------ | ----------------------------------- | ------------------------------------------- |
-| `POST` | `/api/works/generate-details` | Generate work details from a prompt    |
+| Method | Endpoint                      | Description                                 |
+| ------ | ----------------------------- | ------------------------------------------- |
+| `POST` | `/api/works/generate-details` | Generate work details from a prompt         |
 | `POST` | `/api/works/:id/generate`     | Start AI-powered item generation            |
 | `POST` | `/api/works/:id/update`       | Update the generation config and regenerate |
 
@@ -63,20 +63,20 @@ curl -X POST http://localhost:3100/api/works/:id/generate \
 
 ## Item Management
 
-| Method | Endpoint                                   | Description                           |
-| ------ | ------------------------------------------ | ------------------------------------- |
-| `POST` | `/api/works/:id/submit-item`         | Add a new item to the work       |
+| Method | Endpoint                             | Description                           |
+| ------ | ------------------------------------ | ------------------------------------- |
+| `POST` | `/api/works/:id/submit-item`         | Add a new item to the work            |
 | `POST` | `/api/works/:id/remove-item`         | Remove an item                        |
 | `POST` | `/api/works/:id/update-item`         | Update item metadata                  |
-| `POST` | `/api/extract-item-details`                | Extract item details from a URL       |
+| `POST` | `/api/extract-item-details`          | Extract item details from a URL       |
 | `POST` | `/api/works/:id/bulk-capture-images` | Capture screenshots for items in bulk |
 
 ## Repository Operations
 
-| Method | Endpoint                                       | Description                        |
-| ------ | ---------------------------------------------- | ---------------------------------- |
+| Method | Endpoint                                 | Description                        |
+| ------ | ---------------------------------------- | ---------------------------------- |
 | `POST` | `/api/works/:id/regenerate-markdown`     | Regenerate markdown for all items  |
-| `POST` | `/api/works/:id/update-readme`           | Update the work README        |
+| `POST` | `/api/works/:id/update-readme`           | Update the work README             |
 | `POST` | `/api/works/:id/update-website`          | Update the website repository      |
 | `POST` | `/api/works/:id/sync-data`               | Sync data from the data repository |
 | `GET`  | `/api/works/:id/repositories/visibility` | Get repo visibility settings       |
@@ -84,16 +84,16 @@ curl -X POST http://localhost:3100/api/works/:id/generate \
 
 ## Domain Type
 
-| Method | Endpoint                           | Description                                              |
-| ------ | ---------------------------------- | -------------------------------------------------------- |
+| Method | Endpoint                     | Description                                              |
+| ------ | ---------------------------- | -------------------------------------------------------- |
 | `PUT`  | `/api/works/:id/domain-type` | Set domain type (software, ecommerce, services, general) |
 
 The domain type affects image routing and badge generation strategies.
 
 ## Categories, Tags & Collections
 
-| Method   | Endpoint                                         | Description         |
-| -------- | ------------------------------------------------ | ------------------- |
+| Method   | Endpoint                                   | Description         |
+| -------- | ------------------------------------------ | ------------------- |
 | `POST`   | `/api/works/:id/categories`                | Create a category   |
 | `PUT`    | `/api/works/:id/categories/:categoryId`    | Update a category   |
 | `DELETE` | `/api/works/:id/categories/:categoryId`    | Delete a category   |
@@ -110,8 +110,8 @@ The `GET /api/works/:id/categories-tags` endpoint (listed under [Work Data](#wor
 
 ## Advanced Prompts
 
-| Method | Endpoint                                | Description                 |
-| ------ | --------------------------------------- | --------------------------- |
+| Method | Endpoint                          | Description                 |
+| ------ | --------------------------------- | --------------------------- |
 | `GET`  | `/api/works/:id/advanced-prompts` | Get custom prompt overrides |
 | `PUT`  | `/api/works/:id/advanced-prompts` | Set custom prompt overrides |
 
@@ -119,8 +119,8 @@ Advanced prompts let you customize the AI's behavior for specific pipeline steps
 
 ## Scheduled Updates
 
-| Method   | Endpoint                            | Description                        |
-| -------- | ----------------------------------- | ---------------------------------- |
+| Method   | Endpoint                      | Description                        |
+| -------- | ----------------------------- | ---------------------------------- |
 | `GET`    | `/api/works/:id/schedule`     | Get the update schedule            |
 | `PUT`    | `/api/works/:id/schedule`     | Create or update a schedule        |
 | `DELETE` | `/api/works/:id/schedule`     | Cancel scheduled updates           |
@@ -130,8 +130,8 @@ Advanced prompts let you customize the AI's behavior for specific pipeline steps
 
 Manually trigger processing of community-submitted pull requests for a work. See the [Community PR Processing feature doc](/features/community-pr-processing) for details on configuration and workflow.
 
-| Method | Endpoint                                     | Description                     |
-| ------ | -------------------------------------------- | ------------------------------- |
+| Method | Endpoint                               | Description                     |
+| ------ | -------------------------------------- | ------------------------------- |
 | `POST` | `/api/works/:id/process-community-prs` | Process unhandled community PRs |
 
 ```bash
@@ -145,8 +145,8 @@ Returns `{ "itemsAdded": <number> }`. Returns `400` if community PR processing i
 
 Generate and manage A vs B comparison pages. See the [Comparisons feature doc](/features/comparisons) for full details.
 
-| Method   | Endpoint                                           | Description                           |
-| -------- | -------------------------------------------------- | ------------------------------------- |
+| Method   | Endpoint                                     | Description                           |
+| -------- | -------------------------------------------- | ------------------------------------- |
 | `GET`    | `/api/works/:id/comparisons`                 | List all comparisons                  |
 | `GET`    | `/api/works/:id/comparisons/remaining-count` | Count remaining un-generated pairs    |
 | `GET`    | `/api/works/:id/comparisons/:slug`           | Get a comparison with markdown        |
@@ -156,44 +156,44 @@ Generate and manage A vs B comparison pages. See the [Comparisons feature doc](/
 
 ## Import
 
-| Method | Endpoint                                      | Description                                   |
-| ------ | --------------------------------------------- | --------------------------------------------- |
+| Method | Endpoint                                | Description                                   |
+| ------ | --------------------------------------- | --------------------------------------------- |
 | `POST` | `/api/works/import/analyze`             | Analyze a repository for import               |
 | `POST` | `/api/works/import/analyze-for-linking` | Analyze a repo for linking                    |
-| `POST` | `/api/works/import`                     | Import a work from a repository          |
+| `POST` | `/api/works/import`                     | Import a work from a repository               |
 | `GET`  | `/api/works/import/repositories`        | List user's repositories available for import |
 
 ## Deployment
 
 Deploy a work website. See the [Deployment API](/api/deployment) for full details.
 
-| Method | Endpoint                             | Description                       |
-| ------ | ------------------------------------ | --------------------------------- |
-| `POST` | `/api/deploy/works/:id`        | Deploy a work                |
-| `POST` | `/api/deploy/works/:id/check`  | Check deployment capability       |
-| `POST` | `/api/deploy/works/:id/lookup` | Lookup existing deployment        |
-| `POST` | `/api/deploy/validate-token`         | Validate deployment token         |
-| `POST` | `/api/deploy/teams`                  | List deployment teams             |
-| `POST` | `/api/deploy/batch`                  | Batch deploy multiple works |
+| Method | Endpoint                       | Description                 |
+| ------ | ------------------------------ | --------------------------- |
+| `POST` | `/api/deploy/works/:id`        | Deploy a work               |
+| `POST` | `/api/deploy/works/:id/check`  | Check deployment capability |
+| `POST` | `/api/deploy/works/:id/lookup` | Lookup existing deployment  |
+| `POST` | `/api/deploy/validate-token`   | Validate deployment token   |
+| `POST` | `/api/deploy/teams`            | List deployment teams       |
+| `POST` | `/api/deploy/batch`            | Batch deploy multiple works |
 
 ## Members
 
 Manage work collaborators:
 
-| Method   | Endpoint                                 | Description        |
-| -------- | ---------------------------------------- | ------------------ |
+| Method   | Endpoint                           | Description        |
+| -------- | ---------------------------------- | ------------------ |
 | `GET`    | `/api/works/:id/members`           | List all members   |
 | `POST`   | `/api/works/:id/members`           | Invite a member    |
 | `GET`    | `/api/works/:id/members/:memberId` | Get member details |
 | `PUT`    | `/api/works/:id/members/:memberId` | Update member role |
 | `DELETE` | `/api/works/:id/members/:memberId` | Remove a member    |
-| `POST`   | `/api/works/:id/members/leave`     | Leave a work  |
+| `POST`   | `/api/works/:id/members/leave`     | Leave a work       |
 
 ### Member Roles
 
 | Role        | Permissions                                          |
 | ----------- | ---------------------------------------------------- |
-| **Owner**   | Full access (reserved for work creator)         |
+| **Owner**   | Full access (reserved for work creator)              |
 | **Manager** | Can manage members, edit content, trigger generation |
 | **Editor**  | Can edit content and items                           |
 | **Viewer**  | Read-only access                                     |

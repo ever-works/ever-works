@@ -48,11 +48,7 @@ export class PipelineOrchestratorService {
     ): Promise<PipelineResult> {
         const pipelineId = request.providers?.pipeline;
 
-        const plugin = await this.resolvePipelinePlugin(
-            pipelineId,
-            work.id,
-            work.user?.id,
-        );
+        const plugin = await this.resolvePipelinePlugin(pipelineId, work.id, work.user?.id);
 
         const mode: PipelineExecutionMode = isStepOrchestratablePipeline(plugin) ? 'step' : 'full';
 
@@ -61,14 +57,7 @@ export class PipelineOrchestratorService {
         );
 
         if (mode === 'step') {
-            return this.stepExecutor.execute(
-                plugin,
-                work,
-                request,
-                existing,
-                options,
-                onProgress,
-            );
+            return this.stepExecutor.execute(plugin, work, request, existing, options, onProgress);
         }
 
         return this.fullExecutor.execute(plugin, work, request, existing, options, onProgress);
@@ -83,9 +72,7 @@ export class PipelineOrchestratorService {
         options?: PipelineExecutionOptions,
         onProgress?: PipelineProgressCallback,
     ): Promise<PipelineResult> {
-        this.logger.log(
-            `Executing pipeline for work "${work.id}" in forced ${mode} mode`,
-        );
+        this.logger.log(`Executing pipeline for work "${work.id}" in forced ${mode} mode`);
 
         if (mode === 'full') {
             // Find a self-managed (non-step-orchestratable) pipeline plugin
@@ -108,11 +95,7 @@ export class PipelineOrchestratorService {
         }
 
         // Step mode (or fallback from full mode)
-        const plugin = await this.resolvePipelinePlugin(
-            undefined,
-            work.id,
-            work.user?.id,
-        );
+        const plugin = await this.resolvePipelinePlugin(undefined, work.id, work.user?.id);
         return this.stepExecutor.execute(plugin, work, request, existing, options, onProgress);
     }
 

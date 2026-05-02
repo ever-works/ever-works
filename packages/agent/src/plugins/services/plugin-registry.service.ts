@@ -36,11 +36,7 @@ export function resolvePluginEnabled(ctx: PluginEnableContext): boolean {
     if (ctx.systemPlugin) return true;
     if (ctx.userPlugin !== undefined && ctx.userPlugin !== null && !ctx.userPlugin.enabled)
         return false;
-    if (
-        ctx.hasWorkContext &&
-        ctx.workPlugin !== undefined &&
-        ctx.workPlugin !== null
-    )
+    if (ctx.hasWorkContext && ctx.workPlugin !== undefined && ctx.workPlugin !== null)
         return ctx.workPlugin.enabled;
     if (ctx.hasWorkContext && ctx.userPlugin?.autoEnableForWorks) return true;
     if (ctx.userPlugin !== undefined && ctx.userPlugin !== null) {
@@ -410,10 +406,7 @@ export class PluginRegistryService {
         let workPlugin = null;
         if (workId && this.workPluginRepository) {
             try {
-                workPlugin = await this.workPluginRepository.findByWorkAndPlugin(
-                    workId,
-                    pluginId,
-                );
+                workPlugin = await this.workPluginRepository.findByWorkAndPlugin(workId, pluginId);
             } catch {
                 // Continue
             }

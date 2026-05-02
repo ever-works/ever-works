@@ -17,13 +17,13 @@ All endpoints require JWT authentication.
 | ------ | ---------------------------------------------- | ------------------------------------------------------ |
 | `GET`  | `/api/deploy/providers`                        | List available deployment providers                    |
 | `GET`  | `/api/deploy/providers/:providerId/configured` | Check if a provider is configured for the current user |
-| `POST` | `/api/deploy/works/:id`                  | Deploy a work                                     |
-| `POST` | `/api/deploy/works/:id/check`            | Check if a work can be deployed                   |
-| `POST` | `/api/deploy/works/:id/lookup`           | Look up existing deployment status                     |
-| `POST` | `/api/deploy/works/:id/teams`            | List deployment teams for a work                  |
+| `POST` | `/api/deploy/works/:id`                        | Deploy a work                                          |
+| `POST` | `/api/deploy/works/:id/check`                  | Check if a work can be deployed                        |
+| `POST` | `/api/deploy/works/:id/lookup`                 | Look up existing deployment status                     |
+| `POST` | `/api/deploy/works/:id/teams`                  | List deployment teams for a work                       |
 | `POST` | `/api/deploy/validate-token`                   | Validate the current user's deployment token           |
 | `POST` | `/api/deploy/teams`                            | List available deployment teams                        |
-| `POST` | `/api/deploy/batch`                            | Deploy multiple works at once                    |
+| `POST` | `/api/deploy/batch`                            | Deploy multiple works at once                          |
 
 ## Deploy a Work
 

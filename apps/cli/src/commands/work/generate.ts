@@ -51,10 +51,7 @@ export const generateCommand = new Command('generate')
                 console.log(chalk.yellow('\n⚠ Generation already in progress.'));
 
                 if (work.generateStatus.step) {
-                    console.log(
-                        chalk.gray('Current step:'),
-                        chalk.white(work.generateStatus.step),
-                    );
+                    console.log(chalk.gray('Current step:'), chalk.white(work.generateStatus.step));
                 }
 
                 console.log(
@@ -263,10 +260,7 @@ export const generateCommand = new Command('generate')
             const genSpinner = ora('Starting generation process...').start();
 
             try {
-                const response = await apiService.generateContent(
-                    work.id,
-                    createItemsGeneratorDto,
-                );
+                const response = await apiService.generateContent(work.id, createItemsGeneratorDto);
 
                 if (response.status === 'error') {
                     genSpinner.fail('\n✗ Generation failed');

@@ -208,13 +208,13 @@ The `AiOperations` class from `@ever-works/plugin/ai` wraps LangChain and provid
 
 Plugins define their configurable settings using JSON Schema with custom extensions:
 
-| Extension  | Purpose                                         |
-| ---------- | ----------------------------------------------- |
-| `x-secret` | Marks a field as sensitive (encrypted at rest)  |
-| `x-scope`  | Setting scope: `user`, `global`, or `work` |
-| `x-widget` | UI widget hint (e.g., `model-select`)           |
-| `x-hidden` | Hides field from the default settings UI        |
-| `x-envVar` | Maps field to an environment variable           |
+| Extension  | Purpose                                        |
+| ---------- | ---------------------------------------------- |
+| `x-secret` | Marks a field as sensitive (encrypted at rest) |
+| `x-scope`  | Setting scope: `user`, `global`, or `work`     |
+| `x-widget` | UI widget hint (e.g., `model-select`)          |
+| `x-hidden` | Hides field from the default settings UI       |
+| `x-envVar` | Maps field to an environment variable          |
 
 ### Configuration Modes
 
@@ -385,12 +385,12 @@ stateDiagram-v2
 
 Plugin settings are resolved through a multi-layer priority system. Higher-priority sources override lower-priority ones:
 
-| Priority    | Source      | Description                            |
-| ----------- | ----------- | -------------------------------------- |
-| 1 (highest) | `work` | Per-work overrides                |
-| 2           | `user`      | User-level preferences                 |
-| 3           | `admin`     | Platform admin defaults                |
-| 4           | `env`       | Environment variables (via `x-envVar`) |
-| 5 (lowest)  | `default`   | Schema-defined defaults                |
+| Priority    | Source    | Description                            |
+| ----------- | --------- | -------------------------------------- |
+| 1 (highest) | `work`    | Per-work overrides                     |
+| 2           | `user`    | User-level preferences                 |
+| 3           | `admin`   | Platform admin defaults                |
+| 4           | `env`     | Environment variables (via `x-envVar`) |
+| 5 (lowest)  | `default` | Schema-defined defaults                |
 
 This allows flexible configuration where, for example, an admin can set a default AI model but individual users can override it with their own preference, and specific works can further customize the setting.

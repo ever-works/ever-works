@@ -292,10 +292,7 @@ export class PipelineFacadeService {
                     workId: ctx.workId,
                     userId: ctx.userId,
                 }),
-            getEnabledSources: (
-                workId: string,
-                userId: string,
-            ): Promise<EnabledDataSource[]> =>
+            getEnabledSources: (workId: string, userId: string): Promise<EnabledDataSource[]> =>
                 facade.getEnabledSources(workId, userId || ctx.userId),
             isConfigured: () => facade.isConfigured(),
         };

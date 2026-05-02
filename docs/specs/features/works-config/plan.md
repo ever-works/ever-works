@@ -28,12 +28,12 @@ flowchart LR
 
 ## 2. Tech Choices
 
-| Concern        | Choice                                                        | Rationale                                |
-| -------------- | ------------------------------------------------------------- | ---------------------------------------- |
-| YAML parsing   | `yaml` package                                                | Standards-compliant, round-trip-friendly |
-| Git access     | `GitFacadeService` (existing)                                 | Principle II — no direct Octokit usage   |
+| Concern        | Choice                                                  | Rationale                                |
+| -------------- | ------------------------------------------------------- | ---------------------------------------- |
+| YAML parsing   | `yaml` package                                          | Standards-compliant, round-trip-friendly |
+| Git access     | `GitFacadeService` (existing)                           | Principle II — no direct Octokit usage   |
 | Persistence    | Mirror to existing `works` columns; raw blob not stored | Avoid double source-of-truth             |
-| Background job | None                                                          | Sync runs inline with generation         |
+| Background job | None                                                    | Sync runs inline with generation         |
 
 ## 3. Data Model
 

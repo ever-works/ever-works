@@ -58,9 +58,7 @@ export default async function WorkLayout({ params, children }: LayoutParams) {
             // If checkConnection failed but we have provider info from the list,
             // build a minimal connection object so repo links still work
             if (!oauthConnection && providersRes) {
-                const provider = providersRes.providers?.find(
-                    (p) => p.id === work.gitProvider,
-                );
+                const provider = providersRes.providers?.find((p) => p.id === work.gitProvider);
                 if (provider) {
                     oauthConnection = { ...provider, connected: false };
                 }
@@ -72,11 +70,7 @@ export default async function WorkLayout({ params, children }: LayoutParams) {
     }
 
     return (
-        <WorkLayoutClient
-            work={work}
-            oauthConnection={oauthConnection}
-            config={config}
-        >
+        <WorkLayoutClient work={work} oauthConnection={oauthConnection} config={config}>
             {children}
         </WorkLayoutClient>
     );

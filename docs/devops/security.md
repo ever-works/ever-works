@@ -197,12 +197,12 @@ In production, only the web application and API domains are allowed. Development
 
 The `WorkMemberRole` enum defines four access levels:
 
-| Role        | Level | Capabilities                                 |
-| ----------- | ----- | -------------------------------------------- |
+| Role        | Level | Capabilities                            |
+| ----------- | ----- | --------------------------------------- |
 | **OWNER**   | 4     | Full access (implicit for work creator) |
-| **MANAGER** | 3     | Edit content, manage members                 |
-| **EDITOR**  | 2     | Edit content                                 |
-| **VIEWER**  | 1     | Read-only                                    |
+| **MANAGER** | 3     | Edit content, manage members            |
+| **EDITOR**  | 2     | Edit content                            |
+| **VIEWER**  | 1     | Read-only                               |
 
 The OWNER role is never directly assigned to a member. It is inferred from `work.userId`. Only MANAGER, EDITOR, and VIEWER can be assigned to members.
 

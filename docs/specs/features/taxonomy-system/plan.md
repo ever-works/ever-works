@@ -23,13 +23,13 @@ flowchart LR
 
 ## 2. Tech Choices
 
-| Concern            | Choice                              | Rationale                                     |
-| ------------------ | ----------------------------------- | --------------------------------------------- |
-| Storage            | YAML files in the data repo         | Principle III                                 |
-| Slug generation    | `slugifyText()` shared util         | Consistent across categories/tags/collections |
-| Uniqueness check   | Case-insensitive in-memory match    | Cheap; data fits in memory                    |
-| Role enforcement   | `WorkOwnershipService.ensure*` | Single source of truth                        |
-| Mutation atomicity | One git commit per CRUD operation   | Simple recovery model                         |
+| Concern            | Choice                            | Rationale                                     |
+| ------------------ | --------------------------------- | --------------------------------------------- |
+| Storage            | YAML files in the data repo       | Principle III                                 |
+| Slug generation    | `slugifyText()` shared util       | Consistent across categories/tags/collections |
+| Uniqueness check   | Case-insensitive in-memory match  | Cheap; data fits in memory                    |
+| Role enforcement   | `WorkOwnershipService.ensure*`    | Single source of truth                        |
+| Mutation atomicity | One git commit per CRUD operation | Simple recovery model                         |
 
 ## 3. Data Model
 
@@ -45,8 +45,8 @@ No DB schema. Storage:
 
 ## 4. API Surface
 
-| Method   | Endpoint                                         | Description       |
-| -------- | ------------------------------------------------ | ----------------- |
+| Method   | Endpoint                                   | Description       |
+| -------- | ------------------------------------------ | ----------------- |
 | `GET`    | `/api/works/:id/categories-tags`           | List all three    |
 | `POST`   | `/api/works/:id/categories`                | Create category   |
 | `PUT`    | `/api/works/:id/categories/:categoryId`    | Update category   |

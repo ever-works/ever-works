@@ -154,18 +154,18 @@ All routes are centralized in the `ROUTES` constant object.
 
 **Dashboard Routes**:
 
-| Constant                            | Path                          |
-| ----------------------------------- | ----------------------------- |
-| `DASHBOARD`                         | `/`                           |
+| Constant                            | Path                    |
+| ----------------------------------- | ----------------------- |
+| `DASHBOARD`                         | `/`                     |
 | `DASHBOARD_DIRECTORIES`             | `/works`                |
 | `DASHBOARD_DIRECTORIES_NEW`         | `/works/new`            |
 | `DASHBOARD_DIRECTORY(id)`           | `/works/{id}`           |
 | `DASHBOARD_DIRECTORY_ITEMS(id)`     | `/works/{id}/items`     |
 | `DASHBOARD_DIRECTORY_GENERATOR(id)` | `/works/{id}/generator` |
 | `DASHBOARD_DIRECTORY_SETTINGS(id)`  | `/works/{id}/settings`  |
-| `DASHBOARD_PLUGINS`                 | `/plugins`                    |
-| `DASHBOARD_PLUGIN_DETAIL(pluginId)` | `/plugins/{pluginId}`         |
-| `DASHBOARD_SETTINGS`                | `/settings`                   |
+| `DASHBOARD_PLUGINS`                 | `/plugins`              |
+| `DASHBOARD_PLUGIN_DETAIL(pluginId)` | `/plugins/{pluginId}`   |
+| `DASHBOARD_SETTINGS`                | `/settings`             |
 
 **Auth Routes**:
 
@@ -208,11 +208,11 @@ The client-side dashboard shell that wraps all protected pages.
 
 **Keyboard Shortcuts**: Registered via `useKeyboardShortcuts` hook:
 
-| Shortcut       | Action                                      |
-| -------------- | ------------------------------------------- |
+| Shortcut       | Action                                |
+| -------------- | ------------------------------------- |
 | `Ctrl/Cmd + K` | Navigate to works with search focused |
-| `C`            | Navigate to new work page              |
-| `?`            | Open help drawer                            |
+| `C`            | Navigate to new work page             |
+| `?`            | Open help drawer                      |
 
 ## Dashboard Sidebar
 
@@ -222,12 +222,12 @@ The sidebar provides the primary navigation and houses the AI chat interface.
 
 **Navigation Items**:
 
-| Icon       | Label       | Route          |
-| ---------- | ----------- | -------------- |
-| `Home`     | Dashboard   | `/`            |
-| `Folder`   | Works | `/works` |
-| `Plug`     | Plugins     | `/plugins`     |
-| `Settings` | Settings    | `/settings`    |
+| Icon       | Label     | Route       |
+| ---------- | --------- | ----------- |
+| `Home`     | Dashboard | `/`         |
+| `Folder`   | Works     | `/works`    |
+| `Plug`     | Plugins   | `/plugins`  |
+| `Settings` | Settings  | `/settings` |
 
 **Modes**: The sidebar supports two modes toggled by buttons at the bottom:
 
@@ -259,14 +259,14 @@ The top navigation bar provides quick-access controls.
 
 Six server action redirect helpers that use locale-aware navigation:
 
-| Function                  | Redirects To       |
-| ------------------------- | ------------------ |
-| `redirectToWorks`   | `/works`     |
-| `redirectToNewWork`  | `/works/new` |
-| `redirectToDashboard`     | `/`                |
-| `redirectToSettings`      | `/settings`        |
-| `redirectToAnalytics`     | `/analytics`       |
-| `redirectToNotifications` | `/notifications`   |
+| Function                  | Redirects To     |
+| ------------------------- | ---------------- |
+| `redirectToWorks`         | `/works`         |
+| `redirectToNewWork`       | `/works/new`     |
+| `redirectToDashboard`     | `/`              |
+| `redirectToSettings`      | `/settings`      |
+| `redirectToAnalytics`     | `/analytics`     |
+| `redirectToNotifications` | `/notifications` |
 
 Each function calls `getLocale()` to determine the current locale and uses `redirect({ locale, href })` from `@/i18n/navigation`.
 

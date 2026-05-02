@@ -344,9 +344,7 @@ function WebsiteTemplateSettings({
     const [autoUpdate, setAutoUpdate] = useState(work.websiteTemplateAutoUpdate ?? false);
     const [useBeta, setUseBeta] = useState(work.websiteTemplateUseBeta ?? false);
     const [selectedTemplateId, setSelectedTemplateId] = useState(
-        work.websiteTemplateId ||
-            websiteTemplates.find((template) => template.isDefault)?.id ||
-            '',
+        work.websiteTemplateId || websiteTemplates.find((template) => template.isDefault)?.id || '',
     );
     const [confirmSwitchOpen, setConfirmSwitchOpen] = useState(false);
 

@@ -11,15 +11,15 @@ Advanced prompts let you customize the AI's behavior for specific pipeline steps
 
 ## Available Prompt Fields
 
-| Field                 | Pipeline Step      | Description                                                                |
-| --------------------- | ------------------ | -------------------------------------------------------------------------- |
+| Field                 | Pipeline Step      | Description                                                           |
+| --------------------- | ------------------ | --------------------------------------------------------------------- |
 | `relevanceAssessment` | Relevance check    | Custom criteria for deciding if a discovered item belongs in the work |
-| `itemGeneration`      | Content generation | Additional instructions for generating item descriptions and content       |
-| `itemExtraction`      | Content extraction | Guidelines for extracting structured data from web pages                   |
-| `searchQuery`         | Search queries     | Custom instructions for how search queries are constructed                 |
-| `categorization`      | Categorization     | Rules for assigning categories and tags to items                           |
-| `deduplication`       | Deduplication      | Custom logic for identifying and merging duplicate items                   |
-| `sourceValidation`    | Source validation  | Criteria for validating whether a source URL is acceptable                 |
+| `itemGeneration`      | Content generation | Additional instructions for generating item descriptions and content  |
+| `itemExtraction`      | Content extraction | Guidelines for extracting structured data from web pages              |
+| `searchQuery`         | Search queries     | Custom instructions for how search queries are constructed            |
+| `categorization`      | Categorization     | Rules for assigning categories and tags to items                      |
+| `deduplication`       | Deduplication      | Custom logic for identifying and merging duplicate items              |
+| `sourceValidation`    | Source validation  | Criteria for validating whether a source URL is acceptable            |
 
 :::info
 All prompt fields are optional. Set a field to `null` or omit it to use only the system's default prompt for that step. Maximum length: 2,000 characters per field.
@@ -31,8 +31,8 @@ All endpoints require JWT authentication.
 
 ### Get Advanced Prompts
 
-| Method | Endpoint                                | Description                  |
-| ------ | --------------------------------------- | ---------------------------- |
+| Method | Endpoint                          | Description                  |
+| ------ | --------------------------------- | ---------------------------- |
 | `GET`  | `/api/works/:id/advanced-prompts` | Get current prompt overrides |
 
 ```bash
@@ -58,8 +58,8 @@ Response:
 
 ### Update Advanced Prompts
 
-| Method | Endpoint                                | Description          |
-| ------ | --------------------------------------- | -------------------- |
+| Method | Endpoint                          | Description          |
+| ------ | --------------------------------- | -------------------- |
 | `PUT`  | `/api/works/:id/advanced-prompts` | Set prompt overrides |
 
 ```bash
@@ -99,13 +99,13 @@ Every AI operation in the generation pipeline uses a hardcoded base prompt optim
 
 The system is implemented across several layers:
 
-| File                                                             | Purpose                                                   |
-| ---------------------------------------------------------------- | --------------------------------------------------------- |
+| File                                                        | Purpose                                                   |
+| ----------------------------------------------------------- | --------------------------------------------------------- |
 | `entities/work-advanced-prompts.entity.ts`                  | TypeORM entity with nullable text columns per prompt type |
 | `database/repositories/work-advanced-prompts.repository.ts` | CRUD operations for the entity                            |
 | `services/work-advanced-prompts.service.ts`                 | Business logic with access control                        |
 | `dto/work-advanced-prompts.dto.ts`                          | Request/response DTOs                                     |
-| `utils/prompt.util.ts`                                           | Utility for appending custom prompts to base prompts      |
+| `utils/prompt.util.ts`                                      | Utility for appending custom prompts to base prompts      |
 
 ## Prompt Types
 

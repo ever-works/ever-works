@@ -335,7 +335,7 @@ End-to-end import tests live in
 | II — Capability-driven      | Awesome path validates plugin capability availability before dispatch.               |
 | III — Source-of-truth repos | Data-repo `copy` mode creates new user-owned repos; `link` mode reuses the source.   |
 | IV — Trigger.dev            | Awesome generations run as Trigger.dev tasks.                                        |
-| V — Forward-only migrations | No new schema; uses existing `works` + relations.                              |
+| V — Forward-only migrations | No new schema; uses existing `works` + relations.                                    |
 | VI — Tests                  | All three paths covered by unit + e2e suites.                                        |
 | VII — Secret hygiene        | OAuth tokens used to read the source repo are never logged.                          |
 | VIII — Plugin counts        | N/A.                                                                                 |

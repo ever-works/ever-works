@@ -147,8 +147,7 @@ function buildWorkSection(input: NormalizedCliWorkPromptInput): string {
 
 export function buildWorkCliPromptVariables(
 	input: NormalizedCliWorkPromptInput
-): TemplateVariables<typeof DEFAULT_WORK_CLI_SYSTEM_PROMPT> &
-	TemplateVariables<typeof DEFAULT_WORK_CLI_USER_PROMPT> {
+): TemplateVariables<typeof DEFAULT_WORK_CLI_SYSTEM_PROMPT> & TemplateVariables<typeof DEFAULT_WORK_CLI_USER_PROMPT> {
 	let userInstruction: string;
 	if (input.requestPrompt) {
 		userInstruction = input.requestPrompt;

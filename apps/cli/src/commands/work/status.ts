@@ -76,9 +76,7 @@ export const statusCommand = new Command('status')
                         return;
                     }
 
-                    const { work: freshWork } = await apiService.getWork(
-                        work.id,
-                    );
+                    const { work: freshWork } = await apiService.getWork(work.id);
 
                     const status = freshWork.generateStatus?.status;
 
@@ -116,10 +114,7 @@ export const statusCommand = new Command('status')
                         const elapsed = Math.floor((Date.now() - startTime) / 1000);
                         const timeStr = `[${Math.floor(elapsed / 60)}m ${elapsed % 60}s]`;
 
-                        if (
-                            freshWork.generateStatus?.step ||
-                            freshWork.generateStatus?.stepName
-                        ) {
+                        if (freshWork.generateStatus?.step || freshWork.generateStatus?.stepName) {
                             const stepText = getDynamicStepText(freshWork.generateStatus);
                             const progress = getDynamicStepProgress(freshWork.generateStatus);
                             const itemsText = getItemsProcessedText(freshWork.generateStatus);
@@ -183,10 +178,7 @@ function printWorkSummary(work: Work) {
     }
 
     if (work.generateStatus?.step) {
-        console.log(
-            chalk.gray('Last step:'),
-            chalk.white(getDynamicStepText(work.generateStatus)),
-        );
+        console.log(chalk.gray('Last step:'), chalk.white(getDynamicStepText(work.generateStatus)));
     }
 
     if (work.deployProvider) {
@@ -195,9 +187,7 @@ function printWorkSummary(work: Work) {
 
     console.log(
         chalk.gray('Deployment status:'),
-        chalk.white(
-            work.deploymentState ? work.deploymentState.toLowerCase() : 'unknown',
-        ),
+        chalk.white(work.deploymentState ? work.deploymentState.toLowerCase() : 'unknown'),
     );
 
     if (work.deploymentStartedAt) {

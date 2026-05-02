@@ -34,13 +34,13 @@ prompts shipped with each step remain untouched.
 
 | Concern              | Choice                                                          | Rationale                                                                                 |
 | -------------------- | --------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
-| Storage              | New TypeORM entity with `@OneToOne(Work)` + cascade        | One row per work, FK-clean delete                                                    |
+| Storage              | New TypeORM entity with `@OneToOne(Work)` + cascade             | One row per work, FK-clean delete                                                         |
 | Field typing         | All seven prompt fields `text NULL`                             | Optional override per step; null means "use base prompt"                                  |
 | Append vs replace    | **Append** with `## Additional User Instructions:` separator    | Preserves correctness of base prompts; users can't break core extraction logic            |
 | Validation           | class-validator `@MaxLength(2000)` + `sanitizeString` Transform | Bounded length keeps token budget predictable; sanitiser strips `<script>`-style payloads |
-| Loading at run start | Repository lookup once per generation, not per step             | Avoids 7× DB hits per work run; values are immutable for the run's duration          |
+| Loading at run start | Repository lookup once per generation, not per step             | Avoids 7× DB hits per work run; values are immutable for the run's duration               |
 | Checkpoint behaviour | Always reload fresh on resume, **not** restored from checkpoint | Latest user edits take effect on the next attempt without invalidating the checkpoint     |
-| UI shape             | One collapsible section, 7 textareas, single Save               | Matches the rest of the work settings page; no per-field state machine               |
+| UI shape             | One collapsible section, 7 textareas, single Save               | Matches the rest of the work settings page; no per-field state machine                    |
 
 ## 3. Data Model
 
@@ -74,8 +74,8 @@ Migration is additive and forward-only: new table, unique index on
 
 ## 4. API Surface
 
-| Method | Endpoint                                | Auth                  | Description                       |
-| ------ | --------------------------------------- | --------------------- | --------------------------------- |
+| Method | Endpoint                          | Auth                  | Description                       |
+| ------ | --------------------------------- | --------------------- | --------------------------------- |
 | `GET`  | `/api/works/:id/advanced-prompts` | JWT (viewer or above) | Returns the prompts row or `null` |
 | `PUT`  | `/api/works/:id/advanced-prompts` | JWT (editor or above) | Upserts the prompts row           |
 

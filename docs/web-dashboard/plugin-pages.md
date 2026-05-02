@@ -174,15 +174,15 @@ A confirmation dialog shown before disabling a plugin. Displays a warning messag
 
 ## Server Actions Used
 
-| Action                   | Source                       | Description                                         |
-| ------------------------ | ---------------------------- | --------------------------------------------------- |
-| `enablePlugin`           | `src/app/actions/plugins.ts` | Enables a plugin for the user                       |
-| `disablePlugin`          | `src/app/actions/plugins.ts` | Disables a plugin for the user                      |
-| `updatePluginSettings`   | `src/app/actions/plugins.ts` | Updates plugin settings (regular + secret)          |
-| `enableWorkPlugin`  | `src/app/actions/plugins.ts` | Enables a plugin for a specific work           |
-| `disableWorkPlugin` | `src/app/actions/plugins.ts` | Disables a plugin for a specific work          |
-| `fetchModels`            | `src/app/actions/plugins.ts` | Fetches AI models for a plugin                      |
-| `setActiveCapability`    | `src/app/actions/plugins.ts` | Sets active capability for multi-capability plugins |
+| Action                 | Source                       | Description                                         |
+| ---------------------- | ---------------------------- | --------------------------------------------------- |
+| `enablePlugin`         | `src/app/actions/plugins.ts` | Enables a plugin for the user                       |
+| `disablePlugin`        | `src/app/actions/plugins.ts` | Disables a plugin for the user                      |
+| `updatePluginSettings` | `src/app/actions/plugins.ts` | Updates plugin settings (regular + secret)          |
+| `enableWorkPlugin`     | `src/app/actions/plugins.ts` | Enables a plugin for a specific work                |
+| `disableWorkPlugin`    | `src/app/actions/plugins.ts` | Disables a plugin for a specific work               |
+| `fetchModels`          | `src/app/actions/plugins.ts` | Fetches AI models for a plugin                      |
+| `setActiveCapability`  | `src/app/actions/plugins.ts` | Sets active capability for multi-capability plugins |
 
 ## Additional Components
 

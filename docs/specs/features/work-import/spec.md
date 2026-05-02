@@ -80,7 +80,7 @@ metadata pre-filled.
 | Entity / concept           | Description                                           |
 | -------------------------- | ----------------------------------------------------- |
 | `WorksConfigImportPlanner` | Dry-run validator that builds the import preview      |
-| `WorksConfigImportApplier` | Applies the validated plan to the work entity    |
+| `WorksConfigImportApplier` | Applies the validated plan to the work entity         |
 | Source-repo shape          | Detected: `works-config` / `awesome-list` / `unknown` |
 
 ## 6. Out of Scope

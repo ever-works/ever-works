@@ -26,12 +26,12 @@ flowchart TD
 
 ## 2. Tech Choices
 
-| Concern           | Choice                                | Rationale                            |
-| ----------------- | ------------------------------------- | ------------------------------------ |
-| Mutual exclusion  | `DistributedTaskLockService`          | Principle IV; no owning DB row       |
-| GitHub access     | `GitFacadeService`                    | Principle II                         |
-| AI extraction     | `AiFacadeService` with structured out | Principle II                         |
-| State persistence | jsonb column on `works`         | Simple, atomic per-work updates |
+| Concern           | Choice                                | Rationale                       |
+| ----------------- | ------------------------------------- | ------------------------------- |
+| Mutual exclusion  | `DistributedTaskLockService`          | Principle IV; no owning DB row  |
+| GitHub access     | `GitFacadeService`                    | Principle II                    |
+| AI extraction     | `AiFacadeService` with structured out | Principle II                    |
+| State persistence | jsonb column on `works`               | Simple, atomic per-work updates |
 
 ## 3. Data Model
 
@@ -41,8 +41,8 @@ flowchart TD
 
 ## 4. API Surface
 
-| Method | Endpoint                                    | Description                     |
-| ------ | ------------------------------------------- | ------------------------------- |
+| Method | Endpoint                              | Description                     |
+| ------ | ------------------------------------- | ------------------------------- |
 | `POST` | `/api/works/:id/community-pr/process` | Trigger processing now (manual) |
 
 ## 5. Plugin / Web / CLI
@@ -71,7 +71,7 @@ runs (each acquiring its own lock).
 
 | Risk                          | Mitigation                                           |
 | ----------------------------- | ---------------------------------------------------- |
-| Duplicate processing          | Per-work lock                                   |
+| Duplicate processing          | Per-work lock                                        |
 | State loss on mid-batch crash | Persist `communityPrState` per processed PR          |
 | Bad AI extraction merges junk | Schema validation + comment-on-failure path          |
 | GitHub rate limit             | Catch + retry on next cycle; state already persisted |

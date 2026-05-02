@@ -32,9 +32,7 @@ export function handleCliError(error: any, messageHeader: string = 'An error occ
         );
     } else if (status === 404) {
         if (message?.toLowerCase().includes('work')) {
-            console.log(
-                chalk.yellow('\n⚠ Work not found. Please check your input and try again.'),
-            );
+            console.log(chalk.yellow('\n⚠ Work not found. Please check your input and try again.'));
         } else {
             console.log(
                 chalk.yellow('\n⚠ Resource not found. Please check your input and try again.'),

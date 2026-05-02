@@ -43,11 +43,11 @@ const [workRes, configRes] = await Promise.all([
 
 **View Selection**:
 
-| Condition                                  | View                 |
-| ------------------------------------------ | -------------------- |
-| `canGenerate(work.userRole)` is false | `notFound()` (404)   |
-| `generateStatus.status === GENERATING`     | `GenerationProgress` |
-| Otherwise                                  | `GeneratorForm`      |
+| Condition                              | View                 |
+| -------------------------------------- | -------------------- |
+| `canGenerate(work.userRole)` is false  | `notFound()` (404)   |
+| `generateStatus.status === GENERATING` | `GenerationProgress` |
+| Otherwise                              | `GeneratorForm`      |
 
 The `canGenerate` function performs a server-side role check, ensuring only editors and above can access the generator.
 
@@ -59,11 +59,11 @@ The main form component that handles both new work generation and updates to exi
 
 **Props**:
 
-| Prop          | Type               | Description                                                    |
-| ------------- | ------------------ | -------------------------------------------------------------- |
-| `workId` | `string`           | Work identifier                                           |
-| `work`   | `Work`        | Full work object                                          |
-| `config`      | `WorkConfig?` | Work configuration (may be undefined for new works) |
+| Prop     | Type          | Description                                         |
+| -------- | ------------- | --------------------------------------------------- |
+| `workId` | `string`      | Work identifier                                     |
+| `work`   | `Work`        | Full work object                                    |
+| `config` | `WorkConfig?` | Work configuration (may be undefined for new works) |
 
 ### Form State
 
@@ -113,8 +113,8 @@ useEffect(() => {
 
 ### View Modes
 
-| Context                                 | Fields Shown                                                    |
-| --------------------------------------- | --------------------------------------------------------------- |
+| Context                            | Fields Shown                                                    |
+| ---------------------------------- | --------------------------------------------------------------- |
 | New work (never generated)         | RequiredFields + ProviderSelectionSection + DynamicPluginFields |
 | Existing work (simple update)      | UpdateItemsFields only                                          |
 | Existing work (advanced toggle on) | UpdateItemsFields + RequiredFields + providers + plugin fields  |
@@ -162,7 +162,7 @@ Renders the core generation inputs.
 
 | Field             | Component          | Description                                           |
 | ----------------- | ------------------ | ----------------------------------------------------- |
-| Work Name    | `Input` (disabled) | Read-only, pre-filled from work data             |
+| Work Name         | `Input` (disabled) | Read-only, pre-filled from work data                  |
 | Generation Prompt | `Textarea`         | Multi-line prompt for AI generation, with helper text |
 
 ## UpdateItemsFields
@@ -263,9 +263,9 @@ Displays the real-time progress of an active generation run.
 
 ## Server Actions Used
 
-| Action                | Source                        | Description                                            |
-| --------------------- | ----------------------------- | ------------------------------------------------------ |
-| `generateItems`       | `dashboard/generator.ts`      | Starts full item generation                            |
-| `updateItems`         | `dashboard/generator.ts`      | Starts an update-only generation run                   |
+| Action                | Source                        | Description                                       |
+| --------------------- | ----------------------------- | ------------------------------------------------- |
+| `generateItems`       | `dashboard/generator.ts`      | Starts full item generation                       |
+| `updateItems`         | `dashboard/generator.ts`      | Starts an update-only generation run              |
 | `getFormSchema`       | `dashboard/generator-form.ts` | Fetches dynamic form schema for a work + pipeline |
-| `getGlobalFormSchema` | `dashboard/generator-form.ts` | Fetches global form schema (used by AI chat)           |
+| `getGlobalFormSchema` | `dashboard/generator-form.ts` | Fetches global form schema (used by AI chat)      |

@@ -784,11 +784,7 @@ export class GitFacadeService implements IGitFacade {
     private async resolvePluginAndToken(
         options: GitFacadeOptions,
     ): Promise<{ plugin: IGitProviderPlugin; token: string }> {
-        const plugin = await this.resolvePlugin(
-            options.providerId,
-            options.userId,
-            options.workId,
-        );
+        const plugin = await this.resolvePlugin(options.providerId, options.userId, options.workId);
 
         // If token provided directly, use it
         if (options.token) {
@@ -815,11 +811,7 @@ export class GitFacadeService implements IGitFacade {
         }
 
         // 2. Try plugin user settings (for PAT-based plugins like GitLab)
-        const patToken = await this.getPatFromSettings(
-            plugin.id,
-            options.userId,
-            options.workId,
-        );
+        const patToken = await this.getPatFromSettings(plugin.id, options.userId, options.workId);
         if (patToken) {
             return { plugin, token: patToken };
         }
@@ -874,9 +866,7 @@ export class GitFacadeService implements IGitFacade {
         throw new GitProviderNotFoundError(providerId);
     }
 
-    private async getInstallationTokenForWork(
-        options: GitFacadeOptions,
-    ): Promise<string | null> {
+    private async getInstallationTokenForWork(options: GitFacadeOptions): Promise<string | null> {
         if (!options.workId || options.providerId !== 'github') {
             return null;
         }

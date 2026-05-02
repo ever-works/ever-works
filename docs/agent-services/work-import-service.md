@@ -81,7 +81,7 @@ Creates a new work and starts the import process.
 
 | Parameter | Type                                 | Description                                              |
 | --------- | ------------------------------------ | -------------------------------------------------------- |
-| `dto`     | `ImportWorkDto`                 | Import configuration (source URL, type, name, providers) |
+| `dto`     | `ImportWorkDto`                      | Import configuration (source URL, type, name, providers) |
 | `user`    | `User`                               | The requesting user                                      |
 | `context` | `OperationTriggerContext` (optional) | Trigger context (user, schedule, or API)                 |
 
@@ -93,7 +93,7 @@ Re-syncs an existing work from its original source repository.
 
 | Parameter   | Type                | Description                        |
 | ----------- | ------------------- | ---------------------------------- |
-| `work` | `Work`         | The work entity to sync       |
+| `work`      | `Work`              | The work entity to sync            |
 | `user`      | `User`              | The user performing the sync       |
 | `historyId` | `string` (optional) | Generation history entry to update |
 
@@ -132,17 +132,17 @@ For `awesome_readme` imports, the service automatically creates a weekly sync sc
 
 ## Database Interactions
 
-| Repository                             | Methods Used                                                                                                                | Purpose                            |
-| -------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- | ---------------------------------- |
+| Repository                        | Methods Used                                                                                                                | Purpose                       |
+| --------------------------------- | --------------------------------------------------------------------------------------------------------------------------- | ----------------------------- |
 | `WorkRepository`                  | `findByOwnerAndSlug`, `create`, `update`, `updateGenerateStatus`, `recordGenerationStartTime`, `recordGenerationFinishTime` | Work CRUD and status tracking |
-| `WorkGenerationHistoryRepository` | `createEntry`, `updateEntry`, `deleteEntry`                                                                                 | Generation history lifecycle       |
+| `WorkGenerationHistoryRepository` | `createEntry`, `updateEntry`, `deleteEntry`                                                                                 | Generation history lifecycle  |
 
 ## Event System
 
 ### Events Emitted
 
-| Event                               | When                                            |
-| ----------------------------------- | ----------------------------------------------- |
+| Event                          | When                                            |
+| ------------------------------ | ----------------------------------------------- |
 | `WorkGenerationCompletedEvent` | After successful import completion              |
 | `WorkGenerationCompletedEvent` | After import failure (for cleanup/notification) |
 | `WorkGenerationCompletedEvent` | After linking existing repos                    |

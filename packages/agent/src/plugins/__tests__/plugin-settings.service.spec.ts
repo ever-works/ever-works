@@ -132,8 +132,7 @@ describe('PluginSettingsService', () => {
         registry = module.get<PluginRegistryService>(PluginRegistryService);
         pluginRepository = module.get<PluginRepository>(PluginRepository);
         userPluginRepository = module.get<UserPluginRepository>(UserPluginRepository);
-        workPluginRepository =
-            module.get<WorkPluginRepository>(WorkPluginRepository);
+        workPluginRepository = module.get<WorkPluginRepository>(WorkPluginRepository);
         eventEmitter = module.get<EventEmitter2>(EventEmitter2);
     });
 
@@ -640,9 +639,9 @@ describe('PluginSettingsService', () => {
         it('should throw error for non-existent plugin', async () => {
             jest.spyOn(registry, 'get').mockReturnValue(undefined);
 
-            await expect(
-                service.updateWorkSettings('non-existent', 'dir-1', {}),
-            ).rejects.toThrow('Plugin "non-existent" not found');
+            await expect(service.updateWorkSettings('non-existent', 'dir-1', {})).rejects.toThrow(
+                'Plugin "non-existent" not found',
+            );
         });
 
         it('should create work settings if not exists', async () => {
@@ -652,9 +651,7 @@ describe('PluginSettingsService', () => {
                 settings: {},
                 secretSettings: {},
             } as any);
-            jest.spyOn(workPluginRepository, 'findByWorkAndPlugin').mockResolvedValue(
-                null,
-            );
+            jest.spyOn(workPluginRepository, 'findByWorkAndPlugin').mockResolvedValue(null);
 
             await service.updateWorkSettings('test-plugin', 'dir-1', { maxItems: 25 });
 
@@ -699,9 +696,7 @@ describe('PluginSettingsService', () => {
                 settings: {},
                 secretSettings: {},
             } as any);
-            jest.spyOn(workPluginRepository, 'findByWorkAndPlugin').mockResolvedValue(
-                null,
-            );
+            jest.spyOn(workPluginRepository, 'findByWorkAndPlugin').mockResolvedValue(null);
 
             await service.updateWorkSettings('test-plugin', 'dir-1', { maxItems: 25 });
 
@@ -1018,9 +1013,7 @@ describe('PluginSettingsService', () => {
                 settings: {},
                 secretSettings: {},
             } as any);
-            jest.spyOn(workPluginRepository, 'findByWorkAndPlugin').mockResolvedValue(
-                null,
-            );
+            jest.spyOn(workPluginRepository, 'findByWorkAndPlugin').mockResolvedValue(null);
 
             // enabled has no x-scope (defaults to 'global')
             await expect(
@@ -1064,9 +1057,7 @@ describe('PluginSettingsService', () => {
                 settings: {},
                 secretSettings: {},
             } as any);
-            jest.spyOn(workPluginRepository, 'findByWorkAndPlugin').mockResolvedValue(
-                null,
-            );
+            jest.spyOn(workPluginRepository, 'findByWorkAndPlugin').mockResolvedValue(null);
 
             // maxItems has 'x-scope': 'work'
             await expect(
@@ -1555,9 +1546,7 @@ describe('PluginSettingsService', () => {
                     settings: {},
                     secretSettings: {},
                 } as any);
-                jest.spyOn(workPluginRepository, 'findByWorkAndPlugin').mockResolvedValue(
-                    null,
-                );
+                jest.spyOn(workPluginRepository, 'findByWorkAndPlugin').mockResolvedValue(null);
 
                 await service.updateWorkSettings('test-plugin', 'dir-1', {
                     clientId: 'should-be-filtered',
@@ -1583,15 +1572,13 @@ describe('PluginSettingsService', () => {
                     settings: {},
                     secretSettings: {},
                 } as any);
-                jest.spyOn(workPluginRepository, 'findByWorkAndPlugin').mockResolvedValue(
-                    {
-                        id: '1',
-                        workId: 'dir-1',
-                        pluginId: 'test-plugin',
-                        settings: { normalSetting: 'old-value' },
-                        secretSettings: {},
-                    } as any,
-                );
+                jest.spyOn(workPluginRepository, 'findByWorkAndPlugin').mockResolvedValue({
+                    id: '1',
+                    workId: 'dir-1',
+                    pluginId: 'test-plugin',
+                    settings: { normalSetting: 'old-value' },
+                    secretSettings: {},
+                } as any);
 
                 await service.updateWorkSettings('test-plugin', 'dir-1', {
                     clientSecret: 'should-be-filtered',

@@ -55,17 +55,17 @@ flowchart TD
 
 ## Source Files
 
-| File                                                                | Purpose                                                          |
-| ------------------------------------------------------------------- | ---------------------------------------------------------------- |
-| `packages/agent/src/events/base.ts`                                 | Abstract `BaseEvent` class with static `EVENT_NAME`              |
-| `packages/agent/src/events/work-created.event.ts`              | `WorkCreatedEvent` domain event                             |
-| `packages/agent/src/events/work-generation-completed.event.ts` | `WorkGenerationCompletedEvent` domain event                 |
-| `apps/api/src/events/index.ts`                                      | API-layer user lifecycle events (created, forgot password, etc.) |
-| `packages/plugin/src/events/event-types.ts`                         | Typed event names and payload interfaces for the plugin system   |
-| `packages/agent/src/pipeline/step-pipeline-executor.service.ts`     | Pipeline runtime event emission                                  |
-| `packages/agent/src/pipeline/executable-pipeline.class.ts`          | Pipeline runner state change events                              |
-| `apps/api/src/mail/mail.service.ts`                                 | Event listener: sends emails on user events                      |
-| `apps/api/src/works/tasks/work-cleanup.service.ts`       | Event listener: clears cache on generation completion            |
+| File                                                            | Purpose                                                          |
+| --------------------------------------------------------------- | ---------------------------------------------------------------- |
+| `packages/agent/src/events/base.ts`                             | Abstract `BaseEvent` class with static `EVENT_NAME`              |
+| `packages/agent/src/events/work-created.event.ts`               | `WorkCreatedEvent` domain event                                  |
+| `packages/agent/src/events/work-generation-completed.event.ts`  | `WorkGenerationCompletedEvent` domain event                      |
+| `apps/api/src/events/index.ts`                                  | API-layer user lifecycle events (created, forgot password, etc.) |
+| `packages/plugin/src/events/event-types.ts`                     | Typed event names and payload interfaces for the plugin system   |
+| `packages/agent/src/pipeline/step-pipeline-executor.service.ts` | Pipeline runtime event emission                                  |
+| `packages/agent/src/pipeline/executable-pipeline.class.ts`      | Pipeline runner state change events                              |
+| `apps/api/src/mail/mail.service.ts`                             | Event listener: sends emails on user events                      |
+| `apps/api/src/works/tasks/work-cleanup.service.ts`              | Event listener: clears cache on generation completion            |
 
 ## Key Classes
 
@@ -137,15 +137,15 @@ export class MemberInvitedEvent {
 
 Full list of API user events:
 
-| Event Class                | EVENT_NAME                 | Payload                                               |
-| -------------------------- | -------------------------- | ----------------------------------------------------- |
-| `UserCreatedEvent`         | `user.created`             | user, confirmationToken, confirmationUrl              |
-| `UserForgotPasswordEvent`  | `user.forgot_password`     | user, resetToken, resetUrl, expiresIn                 |
-| `UserPasswordChangedEvent` | `user.password_changed`    | user, changedAt, ipAddress, location, device          |
-| `UserConfirmedEvent`       | `user.confirmed`           | user, dashboardUrl                                    |
-| `UserNewDeviceLoginEvent`  | `user.new_device_login`    | user, loginTime, device, browser, location, ipAddress |
-| `UserAccountDeletionEvent` | `user.delete_account`      | user, deleteToken, deleteUrl, expiresIn               |
-| `MemberInvitedEvent`       | `work.member_invited` | invitee, inviter, work, role, workUrl       |
+| Event Class                | EVENT_NAME              | Payload                                               |
+| -------------------------- | ----------------------- | ----------------------------------------------------- |
+| `UserCreatedEvent`         | `user.created`          | user, confirmationToken, confirmationUrl              |
+| `UserForgotPasswordEvent`  | `user.forgot_password`  | user, resetToken, resetUrl, expiresIn                 |
+| `UserPasswordChangedEvent` | `user.password_changed` | user, changedAt, ipAddress, location, device          |
+| `UserConfirmedEvent`       | `user.confirmed`        | user, dashboardUrl                                    |
+| `UserNewDeviceLoginEvent`  | `user.new_device_login` | user, loginTime, device, browser, location, ipAddress |
+| `UserAccountDeletionEvent` | `user.delete_account`   | user, deleteToken, deleteUrl, expiresIn               |
+| `MemberInvitedEvent`       | `work.member_invited`   | invitee, inviter, work, role, workUrl                 |
 
 ### Plugin Event Type System
 

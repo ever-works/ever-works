@@ -87,9 +87,7 @@ export const regenerateMarkdownCommand = new Command('regenerate-markdown')
                         chalk.gray('  • Check your data repository for the updated README.md'),
                     );
                     console.log(chalk.gray('  • Review the changes and commit if satisfied'));
-                    console.log(
-                        chalk.gray('  • Use "work update-website" to update the website'),
-                    );
+                    console.log(chalk.gray('  • Use "work update-website" to update the website'));
                 }
             } catch (error) {
                 spinner.fail('Markdown regeneration failed');

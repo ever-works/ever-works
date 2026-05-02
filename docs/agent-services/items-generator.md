@@ -186,15 +186,15 @@ Supports updating `featured` status and `order` position. Uses the same branch/P
 
 ### CreateItemsGeneratorDto
 
-| Field                                | Type                              | Required | Description                               |
-| ------------------------------------ | --------------------------------- | -------- | ----------------------------------------- |
-| `name`                               | `string`                          | Yes      | Work/generation name (max 200 chars) |
-| `prompt`                             | `string`                          | Yes      | AI generation prompt (max 5000 chars)     |
-| `generation_method`                  | `GenerationMethod`                | No       | `CREATE_UPDATE` (default) or `RECREATE`   |
-| `update_with_pull_request`           | `boolean`                         | No       | Create PRs for updates (default: true)    |
-| `website_repository_creation_method` | `WebsiteRepositoryCreationMethod` | No       | Template-based creation (default)         |
-| `providers`                          | `ProvidersDto`                    | No       | Plugin selection for AI, search, etc.     |
-| `pluginConfig`                       | `Record<string, unknown>`         | No       | Plugin-specific form configuration        |
+| Field                                | Type                              | Required | Description                             |
+| ------------------------------------ | --------------------------------- | -------- | --------------------------------------- |
+| `name`                               | `string`                          | Yes      | Work/generation name (max 200 chars)    |
+| `prompt`                             | `string`                          | Yes      | AI generation prompt (max 5000 chars)   |
+| `generation_method`                  | `GenerationMethod`                | No       | `CREATE_UPDATE` (default) or `RECREATE` |
+| `update_with_pull_request`           | `boolean`                         | No       | Create PRs for updates (default: true)  |
+| `website_repository_creation_method` | `WebsiteRepositoryCreationMethod` | No       | Template-based creation (default)       |
+| `providers`                          | `ProvidersDto`                    | No       | Plugin selection for AI, search, etc.   |
+| `pluginConfig`                       | `Record<string, unknown>`         | No       | Plugin-specific form configuration      |
 
 ## Zod Schemas for AI Extraction
 

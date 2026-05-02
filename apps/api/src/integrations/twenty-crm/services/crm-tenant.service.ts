@@ -16,9 +16,7 @@ export class CrmTenantService {
         userId?: string,
         globalTenantId?: string,
     ): CrmTenantContext {
-        const tenantId = workId
-            ? `work_${workId}`
-            : globalTenantId || 'global_everworks';
+        const tenantId = workId ? `work_${workId}` : globalTenantId || 'global_everworks';
         const context: CrmTenantContext = {
             tenantId,
             workId,

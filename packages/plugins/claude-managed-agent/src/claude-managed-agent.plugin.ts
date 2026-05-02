@@ -273,12 +273,7 @@ export class ClaudeManagedAgentPlugin implements IPipelinePlugin<ClaudeManagedAg
 			);
 			const model = (settings.model as string | undefined) || DEFAULT_MODEL;
 			const systemPrompt = buildSystemPrompt();
-			const workspaceSeedManifest = buildWorkspaceSeedManifest(
-				DEFAULT_WORKSPACE_PATH,
-				work,
-				request,
-				existing
-			);
+			const workspaceSeedManifest = buildWorkspaceSeedManifest(DEFAULT_WORKSPACE_PATH, work, request, existing);
 			const uploadedSeedManifest = await client.uploadTextFile(
 				'ever-works-workspace-seed.json',
 				JSON.stringify(workspaceSeedManifest, null, 2)

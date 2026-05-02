@@ -83,9 +83,7 @@ export function WorkInfo({ work, config }: WorkInfoProps) {
             label: t('gitProvider'),
             value: (
                 <div className="flex items-center gap-2">
-                    <span className="capitalize">
-                        {oauthConnection?.name || work.gitProvider}
-                    </span>
+                    <span className="capitalize">{oauthConnection?.name || work.gitProvider}</span>
                     {oauthConnection?.connected ? (
                         <span className="text-xs text-success">@{oauthConnection.username}</span>
                     ) : (

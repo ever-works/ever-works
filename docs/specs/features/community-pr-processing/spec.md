@@ -82,12 +82,12 @@ processing runs don't fight over the same PRs.
 
 ## 5. Key Entities & Domain Concepts
 
-| Entity / concept              | Description                                                       |
-| ----------------------------- | ----------------------------------------------------------------- |
-| `CommunityPrState`            | Work-level progress: `processedPrNumbers`, `totalItemsAdded` |
-| `CommunityPrProcessorService` | Service that drives processing; uses the lock service             |
-| `CommunityPrTriggerSource`    | Where the run was triggered from (`api` / `cron` / `webhook`)     |
-| Per-work lock key        | `community-pr:<workId>` (Principle IV)                       |
+| Entity / concept              | Description                                                   |
+| ----------------------------- | ------------------------------------------------------------- |
+| `CommunityPrState`            | Work-level progress: `processedPrNumbers`, `totalItemsAdded`  |
+| `CommunityPrProcessorService` | Service that drives processing; uses the lock service         |
+| `CommunityPrTriggerSource`    | Where the run was triggered from (`api` / `cron` / `webhook`) |
+| Per-work lock key             | `community-pr:<workId>` (Principle IV)                        |
 
 ## 6. Out of Scope
 

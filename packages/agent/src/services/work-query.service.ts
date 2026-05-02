@@ -44,10 +44,7 @@ export class WorkQueryService {
         private readonly ownershipService: WorkOwnershipService,
     ) {}
 
-    async getWorks(
-        options: { limit?: number; offset?: number; search?: string } = {},
-        user: User,
-    ) {
+    async getWorks(options: { limit?: number; offset?: number; search?: string } = {}, user: User) {
         const { limit = 20, offset = 0, search } = options;
 
         let sanitizedSearch: string | undefined;
@@ -57,8 +54,7 @@ export class WorkQueryService {
 
         try {
             // Get work IDs where user has membership (not as creator)
-            const memberWorkIds =
-                await this.workMemberRepository.getAccessibleWorkIds(user.id);
+            const memberWorkIds = await this.workMemberRepository.getAccessibleWorkIds(user.id);
 
             // Find all works user has access to (as creator or member)
             let works = await this.workRepository.findAllAccessible({
@@ -145,8 +141,7 @@ export class WorkQueryService {
 
     async getStats(user: User) {
         try {
-            const memberWorkIds =
-                await this.workMemberRepository.getAccessibleWorkIds(user.id);
+            const memberWorkIds = await this.workMemberRepository.getAccessibleWorkIds(user.id);
 
             return await this.workRepository.getAccessibleStats({
                 userId: user.id,
@@ -459,9 +454,7 @@ export class WorkQueryService {
         };
     }
 
-    private toGenerationHistoryDto(
-        record: WorkGenerationHistory,
-    ): WorkGenerationHistoryDto {
+    private toGenerationHistoryDto(record: WorkGenerationHistory): WorkGenerationHistoryDto {
         return {
             id: record.id,
             status: record.status,

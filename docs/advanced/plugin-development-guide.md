@@ -51,7 +51,7 @@ flowchart TD
 | `packages/agent/src/plugins/services/plugin-context-factory.service.ts`    | Creates execution context for plugins                     |
 | `packages/agent/src/plugins/entities/plugin.entity.ts`                     | Database entity for installed plugins                     |
 | `packages/agent/src/plugins/entities/user-plugin.entity.ts`                | Per-user plugin settings entity                           |
-| `packages/agent/src/plugins/entities/work-plugin.entity.ts`           | Per-work plugin settings entity                      |
+| `packages/agent/src/plugins/entities/work-plugin.entity.ts`                | Per-work plugin settings entity                           |
 | `packages/plugins/*/`                                                      | 21 built-in plugin implementations                        |
 
 ## Step-by-Step: Creating a New AI Provider Plugin

@@ -30,10 +30,10 @@ packages/agent/src/subscriptions/
 Plans are seeded automatically on module initialization via `SubscriptionService.onModuleInit()`. Three tiers are defined:
 
 | Plan         | Code       | Max Works | Allowed Cadences                  | Monthly Price | Overage/Run |
-| ------------ | ---------- | --------------- | --------------------------------- | ------------- | ----------- |
-| **Free**     | `free`     | 1               | Monthly, Weekly, Daily, Hourly \* | $0            | $10         |
-| **Standard** | `standard` | 5               | Monthly, Weekly, Daily            | $29           | $8          |
-| **Premium**  | `premium`  | 15              | Monthly, Weekly, Daily, Hourly    | $99           | $0          |
+| ------------ | ---------- | --------- | --------------------------------- | ------------- | ----------- |
+| **Free**     | `free`     | 1         | Monthly, Weekly, Daily, Hourly \* | $0            | $10         |
+| **Standard** | `standard` | 5         | Monthly, Weekly, Daily            | $29           | $8          |
+| **Premium**  | `premium`  | 15        | Monthly, Weekly, Daily, Hourly    | $99           | $0          |
 
 > \* Currently all cadences are enabled for the Free plan during the early-access period.
 

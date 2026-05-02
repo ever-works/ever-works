@@ -41,9 +41,7 @@ describe('WebsiteGeneratorService', () => {
                 name: 'test-work-web',
                 fullName: 'acme/test-work-web',
             } as any),
-            getCloneUrl: jest
-                .fn()
-                .mockReturnValue('https://github.com/acme/test-work-web.git'),
+            getCloneUrl: jest.fn().mockReturnValue('https://github.com/acme/test-work-web.git'),
             getLocalDir: jest.fn().mockReturnValue('/tmp/test-work-web'),
             replaceRemote: jest.fn().mockResolvedValue(undefined),
             push: jest.fn().mockResolvedValue(undefined),
@@ -72,11 +70,7 @@ describe('WebsiteGeneratorService', () => {
         const work = createWork();
         const user = createUser();
 
-        await service.initialize(
-            work,
-            user,
-            WebsiteRepositoryCreationMethod.CREATE_USING_TEMPLATE,
-        );
+        await service.initialize(work, user, WebsiteRepositoryCreationMethod.CREATE_USING_TEMPLATE);
 
         expect(gitFacade.createRepositoryFromTemplate).toHaveBeenCalledTimes(1);
         expect(branchSyncService.syncFromTemplate).toHaveBeenCalledWith(work, user, true);

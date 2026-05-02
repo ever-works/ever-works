@@ -552,11 +552,11 @@ export default YourSourcePlugin;
 
 The `IFormSchemaProvider` interface is what makes your data source configurable per-generation in the UI. Ever Works uses a three-level configuration model:
 
-| Level       | Where              | What                         | Interface                           |
-| ----------- | ------------------ | ---------------------------- | ----------------------------------- |
-| **Level 1** | Settings > Plugins | API tokens, default mappings | `settingsSchema` on `IPlugin`       |
-| **Level 2** | Work > Apps   | Enable/disable per work | `WorkPlugin` entity (platform) |
-| **Level 3** | Generator Form     | Per-generation options       | `IFormSchemaProvider`               |
+| Level       | Where              | What                         | Interface                      |
+| ----------- | ------------------ | ---------------------------- | ------------------------------ |
+| **Level 1** | Settings > Plugins | API tokens, default mappings | `settingsSchema` on `IPlugin`  |
+| **Level 2** | Work > Apps        | Enable/disable per work      | `WorkPlugin` entity (platform) |
+| **Level 3** | Generator Form     | Per-generation options       | `IFormSchemaProvider`          |
 
 Your `getFormFields()` method returns Level 3 fields only. Enable/disable is handled at Level 2 by the platform.
 

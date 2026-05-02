@@ -99,13 +99,13 @@ interface NotificationQueryOptions {
 
 Pre-configured notification creators for common platform events:
 
-| Method                                                     | Category     | Type      | Dedup Key Pattern                 |
-| ---------------------------------------------------------- | ------------ | --------- | --------------------------------- |
-| `notifyAiCreditsDepleted(userId)`                          | `ai_credits` | `warning` | `ai-credits-depleted`             |
-| `notifyAiProviderError(userId, provider, error)`           | `ai_credits` | `error`   | `ai-provider-error-{provider}`    |
-| `notifyGenerationAccountError(userId, workId, error)` | `generation` | `error`   | `gen-account-error-{workId}` |
-| `notifySchedulePaused(userId, workId, reason)`        | `generation` | `warning` | `schedule-paused-{workId}`   |
-| `notifyGitAuthExpired(userId)`                             | `security`   | `warning` | `git-auth-expired`                |
+| Method                                                | Category     | Type      | Dedup Key Pattern              |
+| ----------------------------------------------------- | ------------ | --------- | ------------------------------ |
+| `notifyAiCreditsDepleted(userId)`                     | `ai_credits` | `warning` | `ai-credits-depleted`          |
+| `notifyAiProviderError(userId, provider, error)`      | `ai_credits` | `error`   | `ai-provider-error-{provider}` |
+| `notifyGenerationAccountError(userId, workId, error)` | `generation` | `error`   | `gen-account-error-{workId}`   |
+| `notifySchedulePaused(userId, workId, reason)`        | `generation` | `warning` | `schedule-paused-{workId}`     |
+| `notifyGitAuthExpired(userId)`                        | `security`   | `warning` | `git-auth-expired`             |
 
 All convenience methods use deduplication to prevent notification flooding. For example, if a user's AI credits are depleted and generation runs multiple times, only one `ai-credits-depleted` notification will be active at a time.
 
