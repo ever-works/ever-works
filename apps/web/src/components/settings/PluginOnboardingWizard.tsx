@@ -426,43 +426,31 @@ export function PluginOnboardingWizard({
     const apiKeyField = credentialFields.find(([key]) => key === 'apiKey');
     const additionalCredentialFields = credentialFields.filter(([key]) => key !== 'apiKey');
 
-    const steps = useMemo<StepConfig[]>(() => {
-        const result: StepConfig[] = [];
+    const steps: StepConfig[] = [];
 
-        if (configurationFields.length > 0) {
-            result.push({
-                key: 'configure',
-                title: tWizard('steps.configure.title'),
-                description:
-                    plugin.uiHints?.onboardingDescription ||
-                    tWizard('steps.configure.description', { pluginName: plugin.name }),
-            });
-        }
-
-        if (supportsDeviceAuth || authModeSchema || credentialFields.length > 0) {
-            result.push({
-                key: 'credentials',
-                title: tWizard('steps.credentials.title'),
-                description: tWizard('steps.credentials.description', { pluginName: plugin.name }),
-            });
-        }
-
-        result.push({
-            key: 'verify',
-            title: tWizard('steps.verify.title'),
-            description: tWizard('steps.verify.description'),
+    if (configurationFields.length > 0) {
+        steps.push({
+            key: 'configure',
+            title: tWizard('steps.configure.title'),
+            description:
+                plugin.uiHints?.onboardingDescription ||
+                tWizard('steps.configure.description', { pluginName: plugin.name }),
         });
+    }
 
-        return result;
-    }, [
-        configurationFields.length,
-        authModeSchema,
-        credentialFields.length,
-        plugin.name,
-        plugin.uiHints?.onboardingDescription,
-        supportsDeviceAuth,
-        tWizard,
-    ]);
+    if (supportsDeviceAuth || authModeSchema || credentialFields.length > 0) {
+        steps.push({
+            key: 'credentials',
+            title: tWizard('steps.credentials.title'),
+            description: tWizard('steps.credentials.description', { pluginName: plugin.name }),
+        });
+    }
+
+    steps.push({
+        key: 'verify',
+        title: tWizard('steps.verify.title'),
+        description: tWizard('steps.verify.description'),
+    });
 
     const currentStep = steps[step];
 

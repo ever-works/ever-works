@@ -108,9 +108,6 @@ export function PluginModelSelect({
 
         const cached = modelCache.get(pluginId);
         if (cached) {
-            setModels(cached);
-            setError(null);
-            setLoadedPluginId(pluginId);
             return;
         }
 
@@ -131,20 +128,22 @@ export function PluginModelSelect({
         };
     }, [pluginId, t]);
 
-    const loading = Boolean(pluginId) && loadedPluginId !== pluginId;
-    const activeError = loadedPluginId === pluginId ? error : null;
+    const cachedModels = pluginId ? modelCache.get(pluginId) || null : null;
+    const activeModels = cachedModels || (loadedPluginId === pluginId ? models : []);
+    const loading = Boolean(pluginId) && !cachedModels && loadedPluginId !== pluginId;
+    const activeError = cachedModels ? null : loadedPluginId === pluginId ? error : null;
 
     const filteredModels = useMemo(() => {
-        if (!search) return models;
+        if (!search) return activeModels;
         const searchLower = search.toLowerCase();
-        return models.filter(
+        return activeModels.filter(
             (m) =>
                 m.id.toLowerCase().includes(searchLower) ||
                 m.name.toLowerCase().includes(searchLower),
         );
-    }, [models, search]);
+    }, [activeModels, search]);
 
-    const selectedModel = models.find((m) => m.id === value);
+    const selectedModel = activeModels.find((m) => m.id === value);
     const displayValue = selectedModel?.name || selectedModel?.id || value || t('placeholder');
 
     const formatContext = (tokens: number) => {
