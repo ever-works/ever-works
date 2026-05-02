@@ -364,7 +364,7 @@ export class GitHubSyncService {
             if (fs.existsSync(worksDir)) {
                 const slugs = fs
                     .readdirSync(worksDir, { withFileTypes: true })
-                    .filter((d) => d.isWork())
+                    .filter((d) => d.isDirectory())
                     .map((d) => d.name);
 
                 for (const slug of slugs) {

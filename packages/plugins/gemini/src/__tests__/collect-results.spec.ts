@@ -22,7 +22,7 @@ describe('collect-results', () => {
 	describe('readGeneratedItems - validation', () => {
 		function setupSingleFile(content: string) {
 			vi.mocked(fs.readdir).mockResolvedValue([
-				{ name: 'item.json', isWork: () => false }
+				{ name: 'item.json', isDirectory: () => false }
 			] as unknown as Awaited<ReturnType<typeof fs.readdir>>);
 			vi.mocked(fs.readFile).mockImplementation(((filePath: string) => {
 				if (filePath.includes('seeded.json')) return Promise.reject(new Error('ENOENT'));
@@ -160,8 +160,8 @@ describe('collect-results', () => {
 			const item2 = { name: 'B', description: 'D', source_url: 'https://b.com', category: 'C', tags: [] };
 
 			vi.mocked(fs.readdir).mockResolvedValue([
-				{ name: 'a.json', isWork: () => false },
-				{ name: 'b.json', isWork: () => false }
+				{ name: 'a.json', isDirectory: () => false },
+				{ name: 'b.json', isDirectory: () => false }
 			] as unknown as Awaited<ReturnType<typeof fs.readdir>>);
 
 			vi.mocked(fs.readFile).mockImplementation(async (filePath) => {
@@ -181,8 +181,8 @@ describe('collect-results', () => {
 			const invalid = { name: 'B' }; // Missing required fields
 
 			vi.mocked(fs.readdir).mockResolvedValue([
-				{ name: 'good.json', isWork: () => false },
-				{ name: 'bad.json', isWork: () => false }
+				{ name: 'good.json', isDirectory: () => false },
+				{ name: 'bad.json', isDirectory: () => false }
 			] as unknown as Awaited<ReturnType<typeof fs.readdir>>);
 
 			vi.mocked(fs.readFile).mockImplementation(async (filePath) => {

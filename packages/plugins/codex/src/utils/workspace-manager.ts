@@ -202,7 +202,7 @@ export async function readGeneratedItems(workspacePath: string, logger?: Logger)
 	try {
 		const dirEntries = await fs.readdir(workspacePath, { withFileTypes: true });
 		entries = dirEntries
-			.filter((entry) => !entry.isWork() && entry.name.endsWith('.json'))
+			.filter((entry) => !entry.isDirectory() && entry.name.endsWith('.json'))
 			.map((entry) => entry.name);
 	} catch {
 		logger?.warn('Could not read Codex workspace work');
@@ -258,7 +258,7 @@ export async function describeWorkspaceOutputs(workspacePath: string): Promise<s
 		const dirEntries = await fs.readdir(workspacePath, { withFileTypes: true });
 		return dirEntries
 			.filter((entry) => !entry.name.startsWith('.'))
-			.map((entry) => (entry.isWork() ? `${entry.name}/` : entry.name))
+			.map((entry) => (entry.isDirectory() ? `${entry.name}/` : entry.name))
 			.sort();
 	} catch {
 		return [];
@@ -273,7 +273,7 @@ export async function writeGeneratedItems(workspacePath: string, items: readonly
 	const existingEntries = await fs.readdir(workspacePath, { withFileTypes: true }).catch(() => []);
 	const usedSlugs = new Set(
 		existingEntries
-			.filter((entry) => !entry.isWork() && entry.name.endsWith('.json'))
+			.filter((entry) => !entry.isDirectory() && entry.name.endsWith('.json'))
 			.map((entry) => entry.name.replace(/\.json$/u, ''))
 	);
 

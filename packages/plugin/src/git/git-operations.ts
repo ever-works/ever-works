@@ -388,7 +388,7 @@ export class GitOperations implements IGitOperations {
 	private async workExists(dir: string): Promise<boolean> {
 		try {
 			const stat = await fs.promises.stat(dir);
-			return stat.isWork();
+			return stat.isDirectory();
 		} catch {
 			return false;
 		}

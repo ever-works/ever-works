@@ -18,7 +18,12 @@ type OpenAiHttpResponse = {
     setHeader(name: string, value: string): void;
     json(body: unknown): void;
     write(chunk: string): void;
-    end(): void;
+    end(payload?: string): void;
+    headersSent: boolean;
+    destroyed: boolean;
+    writableEnded: boolean;
+    status(code: number): void;
+    destroy(error?: Error): void;
 };
 
 @ApiTags('AI - OpenAI Compatible')

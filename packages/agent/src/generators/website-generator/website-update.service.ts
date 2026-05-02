@@ -393,7 +393,7 @@ export class WebsiteUpdateService {
             const sourcePath = path.join(sourceDir, entry.name);
             const targetPath = path.join(targetDir, entry.name);
 
-            if (entry.isWork()) {
+            if (entry.isDirectory()) {
                 // Remove existing work if it exists
                 try {
                     await fs.rm(targetPath, { recursive: true, force: true });

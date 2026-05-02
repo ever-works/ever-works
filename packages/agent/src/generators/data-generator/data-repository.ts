@@ -288,7 +288,7 @@ export class DataRepository {
         try {
             const dirpath = path.join(dir, type);
             const stat = await fs.stat(dirpath);
-            return stat.isWork();
+            return stat.isDirectory();
         } catch (err) {
             if ((err as NodeJS.ErrnoException | undefined)?.code === 'ENOENT') {
                 return false;
@@ -409,7 +409,7 @@ export class DataRepository {
     async getItems() {
         const items = await fs.readdir(this.dataDir, { withFileTypes: true });
         const promises = items
-            .filter((item) => item.isWork())
+            .filter((item) => item.isDirectory())
             .map(async (item) => {
                 const slug = item.name;
 
@@ -614,7 +614,7 @@ export class DataRepository {
         try {
             const entries = await fs.readdir(this.comparisonsDir, { withFileTypes: true });
             const promises = entries
-                .filter((entry) => entry.isWork())
+                .filter((entry) => entry.isDirectory())
                 .map((entry) => this.getComparison(entry.name));
             const results = await Promise.all(promises);
             const comparisons = results.filter(Boolean) as ComparisonData[];
@@ -791,7 +791,7 @@ export class DataRepository {
             const entries = await fs.readdir(dir, { withFileTypes: true });
             const counts = await Promise.all(
                 entries
-                    .filter((entry) => entry.isWork())
+                    .filter((entry) => entry.isDirectory())
                     .map(async (entry) => {
                         const childEntries = await fs.readdir(path.join(dir, entry.name));
                         return childEntries.length > 0 ? 1 : 0;

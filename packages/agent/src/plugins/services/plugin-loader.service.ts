@@ -101,7 +101,7 @@ export class PluginLoaderService {
                 }
 
                 const stats = await fs.stat(resolvedPath);
-                if (stats.isWork()) {
+                if (stats.isDirectory()) {
                     const plugins = await this.scanWork(resolvedPath);
                     discovered.push(...plugins);
                 }
@@ -124,7 +124,7 @@ export class PluginLoaderService {
             const entries = await fs.readdir(dirPath, { withFileTypes: true });
 
             for (const entry of entries) {
-                if (!entry.isWork()) continue;
+                if (!entry.isDirectory()) continue;
 
                 const packagePath = path.join(dirPath, entry.name);
                 const plugin = await this.tryLoadPluginManifest(packagePath);

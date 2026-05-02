@@ -17,7 +17,13 @@ import type {
 
 type StreamingResponse = {
     write(chunk: string): void;
-    end(): void;
+    end(payload?: string): void;
+    headersSent: boolean;
+    destroyed: boolean;
+    writableEnded: boolean;
+    status(code: number): void;
+    setHeader(name: string, value: string): void;
+    destroy(error?: Error): void;
 };
 
 @Injectable()

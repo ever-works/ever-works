@@ -126,7 +126,7 @@ export async function readGeneratedItems(
 	let entries: string[];
 	try {
 		const dirEntries = await fs.readdir(workspacePath, { withFileTypes: true });
-		entries = dirEntries.filter((e) => !e.isWork() && e.name.endsWith('.json')).map((e) => e.name);
+		entries = dirEntries.filter((e) => !e.isDirectory() && e.name.endsWith('.json')).map((e) => e.name);
 	} catch {
 		logger?.warn('Could not read workspace work');
 		return [];

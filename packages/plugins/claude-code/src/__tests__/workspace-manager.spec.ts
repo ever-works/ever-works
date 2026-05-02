@@ -131,8 +131,8 @@ describe('workspace-manager', () => {
 
 		it('should read valid JSON files and skip works', async () => {
 			vi.mocked(fs.readdir).mockResolvedValue([
-				{ name: '_meta', isWork: () => true },
-				{ name: 'item.json', isWork: () => false }
+				{ name: '_meta', isDirectory: () => true },
+				{ name: 'item.json', isDirectory: () => false }
 			] as unknown as Awaited<ReturnType<typeof fs.readdir>>);
 
 			vi.mocked(fs.readFile).mockImplementation(((filePath: string) => {
@@ -166,8 +166,8 @@ describe('workspace-manager', () => {
 			const seededHash = createHash('sha256').update(seededContent).digest('hex');
 
 			vi.mocked(fs.readdir).mockResolvedValue([
-				{ name: 'seeded.json', isWork: () => false },
-				{ name: 'new-item.json', isWork: () => false }
+				{ name: 'seeded.json', isDirectory: () => false },
+				{ name: 'new-item.json', isDirectory: () => false }
 			] as unknown as Awaited<ReturnType<typeof fs.readdir>>);
 
 			vi.mocked(fs.readFile).mockImplementation(((filePath: string) => {
@@ -198,7 +198,7 @@ describe('workspace-manager', () => {
 			const originalHash = createHash('sha256').update(originalContent).digest('hex');
 
 			vi.mocked(fs.readdir).mockResolvedValue([
-				{ name: 'cursor.json', isWork: () => false }
+				{ name: 'cursor.json', isDirectory: () => false }
 			] as unknown as Awaited<ReturnType<typeof fs.readdir>>);
 
 			vi.mocked(fs.readFile).mockImplementation(((filePath: string) => {
@@ -224,8 +224,8 @@ describe('workspace-manager', () => {
 
 		it('should skip invalid items and log warnings', async () => {
 			vi.mocked(fs.readdir).mockResolvedValue([
-				{ name: 'bad.json', isWork: () => false },
-				{ name: 'broken.json', isWork: () => false }
+				{ name: 'bad.json', isDirectory: () => false },
+				{ name: 'broken.json', isDirectory: () => false }
 			] as unknown as Awaited<ReturnType<typeof fs.readdir>>);
 
 			vi.mocked(fs.readFile).mockImplementation(((filePath: string) => {

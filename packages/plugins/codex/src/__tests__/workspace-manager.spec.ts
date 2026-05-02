@@ -30,7 +30,7 @@ describe('workspace-manager', () => {
 		expect(path.dirname(workspacePath)).toBe(path.join('/tmp/codex-generator', userId));
 
 		const metaStats = await fs.stat(path.join(workspacePath, '_meta'));
-		expect(metaStats.isWork()).toBe(true);
+		expect(metaStats.isDirectory()).toBe(true);
 	});
 
 	it('writes metadata files when provided', async () => {
