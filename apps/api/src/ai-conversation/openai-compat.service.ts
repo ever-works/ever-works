@@ -8,13 +8,17 @@ import type {
     ChatCompletionChunk,
     ToolDefinition,
 } from '@ever-works/plugin';
-import type { Response } from 'express';
 import type {
     OpenAiChatCompletionRequestDto,
     OpenAiMessageDto,
     OpenAiChatCompletionResponse,
     OpenAiChatCompletionChunkResponse,
 } from './dto/openai-compat.dto';
+
+type StreamingResponse = {
+    write(chunk: string): void;
+    end(): void;
+};
 
 @Injectable()
 export class OpenAiCompatService {
@@ -47,7 +51,7 @@ export class OpenAiCompatService {
     async handleStreamingCompletion(
         dto: OpenAiChatCompletionRequestDto,
         facadeOptions: FacadeOptions,
-        res: Response,
+        res: StreamingResponse,
     ): Promise<void> {
         const resolved = await this.resolveDirectoryContext(facadeOptions);
         const options = this.mapToInternalOptions(dto);

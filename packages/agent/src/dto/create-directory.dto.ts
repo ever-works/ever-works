@@ -116,6 +116,15 @@ export class CreateDirectoryDto {
     deployProvider?: string;
 
     @ApiPropertyOptional({
+        description: 'Website template identifier to use for website repository initialization',
+        default: 'classic',
+    })
+    @IsString()
+    @IsOptional()
+    @Transform(({ value }) => (typeof value === 'string' ? value.trim().toLowerCase() : value))
+    websiteTemplateId?: string;
+
+    @ApiPropertyOptional({
         description: 'Custom README configuration',
         type: MarkdownReadmeConfigDto,
     })

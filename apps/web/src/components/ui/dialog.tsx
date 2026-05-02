@@ -13,6 +13,16 @@ import { useTranslations } from 'next-intl';
 import { cn } from '@/lib/utils/cn';
 import { X } from 'lucide-react';
 
+const DialogPanelCompat = DialogPanel as unknown as React.ComponentType<{
+    children?: React.ReactNode;
+    className?: string;
+}>;
+
+const DescriptionCompat = Description as unknown as React.ComponentType<{
+    children?: React.ReactNode;
+    className?: string;
+}>;
+
 interface DialogProps {
     open: boolean;
     onOpenChange: (open: boolean) => void;
@@ -61,7 +71,7 @@ export function DialogContent({ children, className }: DialogContentProps) {
             leaveFrom="opacity-100 scale-100"
             leaveTo="opacity-0 scale-95"
         >
-            <DialogPanel
+            <DialogPanelCompat
                 className={cn(
                     'relative bg-surface dark:bg-surface-dark',
                     'rounded-lg shadow-xl',
@@ -71,7 +81,7 @@ export function DialogContent({ children, className }: DialogContentProps) {
                 )}
             >
                 {children}
-            </DialogPanel>
+            </DialogPanelCompat>
         </TransitionChild>
     );
 }
@@ -99,14 +109,14 @@ interface DialogDescriptionProps {
 
 export function DialogDescription({ children, className }: DialogDescriptionProps) {
     return (
-        <Description
+        <DescriptionCompat
             className={cn(
                 'text-sm text-text-secondary dark:text-text-secondary-dark mt-1',
                 className,
             )}
         >
             {children}
-        </Description>
+        </DescriptionCompat>
     );
 }
 

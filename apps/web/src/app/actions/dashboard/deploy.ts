@@ -76,6 +76,33 @@ export async function updateWebsiteRepository(directoryId: string) {
     }
 }
 
+export async function switchWebsiteTemplate(directoryId: string, websiteTemplateId: string) {
+    const user = await getAuthFromCookie();
+    if (!user) {
+        redirect(ROUTES.AUTH_LOGIN);
+    }
+
+    const t = await getTranslations('actions.deploy');
+
+    try {
+        const response = await websiteAPI.switchTemplate(directoryId, websiteTemplateId);
+        revalidatePath(ROUTES.DASHBOARD_DIRECTORY_DEPLOY(directoryId));
+
+        return {
+            success: response.status === 'success',
+            data: response,
+            error: response.status === 'error' ? response.message : null,
+        };
+    } catch (error) {
+        console.error('Switch website template error:', error);
+        return {
+            success: false,
+            data: null,
+            error: error instanceof Error ? error.message : t('updateRepositoryFailed'),
+        };
+    }
+}
+
 export async function getDeploymentTeams(directoryId?: string) {
     const user = await getAuthFromCookie();
     if (!user) {

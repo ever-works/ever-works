@@ -9,11 +9,17 @@ import {
     ValidationPipe,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags, ApiOperation } from '@nestjs/swagger';
-import { Response } from 'express';
 import { CurrentUser } from '../auth/decorators/user.decorator';
 import { AuthenticatedUser } from '../auth/types/auth.types';
 import { OpenAiChatCompletionRequestDto } from './dto/openai-compat.dto';
 import { OpenAiCompatService } from './openai-compat.service';
+
+type OpenAiHttpResponse = {
+    setHeader(name: string, value: string): void;
+    json(body: unknown): void;
+    write(chunk: string): void;
+    end(): void;
+};
 
 @ApiTags('AI - OpenAI Compatible')
 @ApiBearerAuth('JWT-auth')
@@ -37,7 +43,7 @@ export class OpenAiCompatController {
         @Headers('x-provider-override') providerOverride: string | undefined,
         @Headers('x-directory-id') directoryId: string | undefined,
         @Body() body: OpenAiChatCompletionRequestDto,
-        @Res() res: Response,
+        @Res() res: OpenAiHttpResponse,
     ): Promise<void> {
         const facadeOptions = {
             userId: auth.userId,

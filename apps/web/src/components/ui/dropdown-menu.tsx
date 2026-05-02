@@ -4,15 +4,35 @@ import * as React from 'react';
 import { Menu, MenuButton, MenuItems, MenuItem } from '@headlessui/react';
 import { cn } from '@/lib/utils/cn';
 
+const MenuCompat = Menu as unknown as React.ComponentType<{
+    children?: React.ReactNode;
+    as?: React.ElementType;
+    className?: string;
+}>;
+
+const MenuButtonCompat = MenuButton as unknown as React.ComponentType<{
+    children?: React.ReactNode;
+    as?: React.ElementType;
+    className?: string;
+}>;
+
+const MenuItemsCompat = MenuItems as unknown as React.ComponentType<{
+    children?: React.ReactNode;
+    className?: string;
+    transition?: boolean;
+    portal?: boolean;
+    anchor?: { to: string; gap: number };
+}>;
+
 interface DropdownMenuProps {
     children: React.ReactNode;
 }
 
 export function DropdownMenu({ children }: DropdownMenuProps) {
     return (
-        <Menu as="div" className="relative inline-block text-left w-full">
+        <MenuCompat as="div" className="relative inline-block text-left w-full">
             {children}
-        </Menu>
+        </MenuCompat>
     );
 }
 
@@ -24,13 +44,13 @@ interface DropdownMenuTriggerProps {
 
 export function DropdownMenuTrigger({ children, asChild, className }: DropdownMenuTriggerProps) {
     if (asChild && React.isValidElement(children)) {
-        return <MenuButton as={React.Fragment}>{children}</MenuButton>;
+        return <MenuButtonCompat as={React.Fragment}>{children}</MenuButtonCompat>;
     }
 
     return (
-        <MenuButton className={cn('inline-flex items-center justify-center', className)}>
+        <MenuButtonCompat className={cn('inline-flex items-center justify-center', className)}>
             {children}
-        </MenuButton>
+        </MenuButtonCompat>
     );
 }
 
@@ -52,7 +72,7 @@ export function DropdownMenuContent({
     const anchorTo = `${anchorSide}${anchorAlign}` as const;
 
     return (
-        <MenuItems
+        <MenuItemsCompat
             transition
             portal
             anchor={{ to: anchorTo, gap: 8 }}
@@ -70,7 +90,7 @@ export function DropdownMenuContent({
             )}
         >
             <div className="p-1">{children}</div>
-        </MenuItems>
+        </MenuItemsCompat>
     );
 }
 

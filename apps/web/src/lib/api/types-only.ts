@@ -18,6 +18,7 @@ export type {
 export type {
     // From directory.ts
     MarkdownReadmeConfig,
+    WebsiteTemplateOption,
     CreateDirectoryDto,
     UpdateDirectoryDto,
     DeleteDirectoryDto,

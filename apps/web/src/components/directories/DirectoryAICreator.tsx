@@ -14,26 +14,35 @@ import { Textarea } from '@/components/ui/textarea';
 import { RepositoryOwnerCard } from './RepositoryOwnerCard';
 import { DynamicPluginFields } from './detail/generator/DynamicPluginFields';
 import { ProviderSelectionSection } from './shared/ProviderSelectionSection';
+import { WebsiteTemplateSelector } from './shared/WebsiteTemplateSelector';
 import { CollapsibleSection } from './detail/shared';
 import { Lightbulb, Check } from 'lucide-react';
 import { useProviderSelection } from '@/lib/hooks/use-provider-selection';
 import type { GeneratorFormSchema } from '@/lib/api/types-only';
+import type { WebsiteTemplateOption } from '@/lib/api/directory';
 
 interface DirectoryAICreatorProps {
     gitProvider?: string;
     gitConnected?: boolean;
     deployProvider?: string;
+    websiteTemplates: WebsiteTemplateOption[];
 }
 
 export function DirectoryAICreator({
     gitProvider,
     gitConnected,
     deployProvider,
+    websiteTemplates,
 }: DirectoryAICreatorProps) {
     const [prompt, setPrompt] = useState('');
     const [directoryName, setDirectoryName] = useState('');
     const [organization, setOrganization] = useState(false);
     const [owner, setOwner] = useState('');
+    const [websiteTemplateId, setWebsiteTemplateId] = useState(
+        websiteTemplates.find((template) => template.isDefault)?.id ||
+            websiteTemplates[0]?.id ||
+            '',
+    );
     const [isPending, startTransition] = useTransition();
     const router = useRouter();
     const t = useTranslations('dashboard.directoryCreation.ai');
@@ -121,6 +130,7 @@ export function DirectoryAICreator({
                 deployProvider,
                 providers: buildSelectedProviders(formSchema),
                 pluginConfig: Object.keys(pluginConfig).length > 0 ? pluginConfig : undefined,
+                websiteTemplateId: websiteTemplateId || undefined,
             });
 
             if (result.success) {
@@ -231,6 +241,14 @@ export function DirectoryAICreator({
                     setOrganization(isOrganization);
                 }}
                 disabled={isPending}
+            />
+
+            <WebsiteTemplateSelector
+                templates={websiteTemplates}
+                value={websiteTemplateId}
+                onChange={setWebsiteTemplateId}
+                disabled={isPending}
+                helperText={t('websiteTemplateHelperText')}
             />
 
             {formSchema && (
