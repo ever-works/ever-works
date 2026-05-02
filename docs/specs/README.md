@@ -28,7 +28,13 @@ docs/specs/
 │   ├── settings-system.md          # 3-tier resolution + secret hygiene
 │   ├── ai-facade.md                # AiFacadeService routing & model catalog
 │   ├── auth.md                     # JWT + OAuth + API keys + device flow
-│   └── activity-log.md             # Audit + changelog infrastructure
+│   ├── activity-log.md             # Audit + changelog infrastructure
+│   ├── subscriptions.md            # Plans, usage ledger, billing-provider
+│   ├── cache.md                    # cache_entries table + 4 consumers
+│   ├── web-dashboard.md            # Next.js 16 App Router internals
+│   ├── monitoring.md               # Sentry + PostHog + structured logging
+│   ├── cli.md                      # Public + internal CLI architectures
+│   └── notifications-mail.md       # In-app + email delivery
 ├── ai/                             # Cross-cutting AI / generation specs
 │   ├── implementation-plan.md
 │   └── tasks-checklist.md
