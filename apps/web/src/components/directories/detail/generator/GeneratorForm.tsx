@@ -33,6 +33,7 @@ import { useProviderSelection } from '@/lib/hooks/use-provider-selection';
 import { ProviderSelectionSection } from '@/components/directories/shared/ProviderSelectionSection';
 import { GenerationProgress } from './GenerationProgress';
 import type { DirectoryPlugin } from '@/lib/api/plugins';
+import { useDirectoryDetail } from '../DirectoryDetailContext';
 
 interface GeneratorFormProps {
     directoryId: string;
@@ -49,6 +50,7 @@ export function GeneratorForm({
 }: GeneratorFormProps) {
     const router = useRouter();
     const t = useTranslations('dashboard.directoryDetail.generator');
+    const { updateGenerateStatus } = useDirectoryDetail();
     const [isPending, startTransition] = useTransition();
     const [optimisticGenerating, setOptimisticGenerating] = useState(false);
     const [showAdvancedOptions, setShowAdvancedOptions] = useState(false);
@@ -172,16 +174,18 @@ export function GeneratorForm({
         setPluginConfig(values);
     }, []);
 
+    const optimisticGenerateStatus: Directory['generateStatus'] =
+        directory.generateStatus?.status === GenerateStatusType.GENERATING
+            ? directory.generateStatus
+            : {
+                  status: GenerateStatusType.GENERATING,
+                  progress: 0,
+                  recentLogs: [],
+              };
+
     const optimisticDirectory: Directory = {
         ...directory,
-        generateStatus:
-            directory.generateStatus?.status === GenerateStatusType.GENERATING
-                ? directory.generateStatus
-                : {
-                      status: GenerateStatusType.GENERATING,
-                      progress: 0,
-                      recentLogs: [],
-                  },
+        generateStatus: optimisticGenerateStatus,
     };
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -249,6 +253,7 @@ export function GeneratorForm({
 
             if (result.success) {
                 setOptimisticGenerating(true);
+                updateGenerateStatus(optimisticGenerateStatus);
                 toast.success(result.message || t('operationStartedSuccessfully'));
                 router.refresh();
             } else {
