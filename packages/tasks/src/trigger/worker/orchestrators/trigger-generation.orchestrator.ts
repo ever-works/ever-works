@@ -14,6 +14,7 @@ import { NotificationService } from '@ever-works/agent/notifications';
 import { normalizeGeneratorError } from '@ever-works/agent/services';
 import {
     calculateDurationSeconds,
+    createGenerationCancelledError,
     isGenerationCancelledError,
     throwIfGenerationCancelled,
 } from '@ever-works/agent/utils';
@@ -53,6 +54,13 @@ export class TriggerGenerationOrchestrator extends BaseOrchestrator {
         signal,
     }: TriggerGenerationOptions): Promise<GenerateStatusType> {
         const startTime = this.resolveStartTime(historyStartedAt);
+
+        if (
+            directory.generateStatus?.status === GenerateStatusType.CANCELLED ||
+            (await this.isDirectoryCancelled(directory.id))
+        ) {
+            return GenerateStatusType.CANCELLED;
+        }
 
         const logCollector = new GenerationLogCollector(
             historyId,
@@ -109,6 +117,7 @@ export class TriggerGenerationOrchestrator extends BaseOrchestrator {
             const newItemsCount = generated.stats?.newItemsCount ?? 0;
             const updatedItemsCount = generated.stats?.updatedItemsCount ?? 0;
 
+            await this.throwIfDirectoryCancelled(directory.id);
             throwIfGenerationCancelled(signal);
 
             if (newItemsCount > 0 || updatedItemsCount > 0) {
@@ -121,6 +130,7 @@ export class TriggerGenerationOrchestrator extends BaseOrchestrator {
                 logCollector.message('Markdown generation completed', 'info', 'orchestrator');
             }
 
+            await this.throwIfDirectoryCancelled(directory.id);
             throwIfGenerationCancelled(signal);
 
             if (newItemsCount > 0 || generated.hasExistingItems) {
@@ -133,6 +143,8 @@ export class TriggerGenerationOrchestrator extends BaseOrchestrator {
                 );
                 logCollector.message('Website generation completed', 'info', 'orchestrator');
             }
+
+            await this.throwIfDirectoryCancelled(directory.id);
 
             const endTime = new Date();
 
@@ -150,6 +162,7 @@ export class TriggerGenerationOrchestrator extends BaseOrchestrator {
                     status: GenerateStatusType.GENERATED,
                     finishedAt: endTime,
                     durationInSeconds: calculateDurationSeconds(startTime, endTime),
+                    warnings: generationWarnings ?? null,
                     ...buildStatsUpdate(generationStats),
                 }),
             ]);
@@ -174,6 +187,7 @@ export class TriggerGenerationOrchestrator extends BaseOrchestrator {
                     finishedAt: endTime,
                     durationInSeconds: calculateDurationSeconds(startTime, endTime),
                     errorMessage: failure.errorMessage,
+                    warnings: generationWarnings ?? null,
                     ...buildStatsUpdate(generationStats),
                 }),
             ]);
@@ -224,5 +238,16 @@ export class TriggerGenerationOrchestrator extends BaseOrchestrator {
             logLevel: 'error',
             wasCancelled: false,
         };
+    }
+
+    private async throwIfDirectoryCancelled(directoryId: string): Promise<void> {
+        if (await this.isDirectoryCancelled(directoryId)) {
+            throw createGenerationCancelledError();
+        }
+    }
+
+    private async isDirectoryCancelled(directoryId: string): Promise<boolean> {
+        const generateStatus = await this.directoryOperations.getGenerateStatus(directoryId);
+        return generateStatus?.status === GenerateStatusType.CANCELLED;
     }
 }

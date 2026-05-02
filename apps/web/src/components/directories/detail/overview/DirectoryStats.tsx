@@ -5,6 +5,7 @@ import { cn } from '@/lib/utils/cn';
 import { getGenerationStatusConfig } from '@/lib/utils/generation-status';
 import { useTranslations } from 'next-intl';
 import { Package, Tag, Clock, Scale } from 'lucide-react';
+import { useDirectoryDetail } from '../DirectoryDetailContext';
 
 interface DirectoryStatsProps {
     directory: Directory;
@@ -88,6 +89,8 @@ export function DirectoryStats({
 }: DirectoryStatsProps) {
     const t = useTranslations('dashboard.directoryDetail.stats');
     const tStatus = useTranslations('dashboard.directoryDetail.status');
+    const { directory: syncedDirectory } = useDirectoryDetail();
+    const statusDirectory = syncedDirectory.id === directory.id ? syncedDirectory : directory;
 
     const stats = [
         {
@@ -108,7 +111,7 @@ export function DirectoryStats({
             icon: <Scale className="w-3 h-3 sm:w-4 sm:h-4" />,
             iconColor: 'text-emerald-500',
         },
-        getGenerationStatusStat(directory, t, tStatus),
+        getGenerationStatusStat(statusDirectory, t, tStatus),
         {
             title: t('daysActive'),
             value: Math.floor(

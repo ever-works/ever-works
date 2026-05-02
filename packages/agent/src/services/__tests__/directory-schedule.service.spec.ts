@@ -144,7 +144,7 @@ describe('DirectoryScheduleService', () => {
         );
     });
 
-    it('does not allow scheduled source sync for linked existing directories', async () => {
+    it('allows linked existing directories to schedule from saved generator config', async () => {
         const linkedDirectory = {
             ...directory,
             sourceRepository: {
@@ -161,15 +161,12 @@ describe('DirectoryScheduleService', () => {
             expect.objectContaining({
                 status: DirectoryScheduleStatus.DISABLED,
                 featureEnabled: true,
-                canEnable: false,
-                blockingCode: 'SOURCE_SYNC_UNSUPPORTED',
-                blockingReason:
-                    'Linked directories use existing repositories directly and cannot be synced from an import source.',
+                canEnable: true,
             }),
         );
     });
 
-    it('rejects enabling scheduled source sync for linked existing directories', async () => {
+    it('enables schedules for linked existing directories with saved generator config', async () => {
         const linkedDirectory = {
             ...directory,
             sourceRepository: {
@@ -179,6 +176,51 @@ describe('DirectoryScheduleService', () => {
 
         ownershipService.ensureCanEdit.mockResolvedValue({ directory: linkedDirectory });
         scheduleRepository.findByDirectoryId.mockResolvedValue(null);
+
+        scheduleRepository.upsert.mockResolvedValue({
+            id: 'schedule-1',
+            directoryId: directory.id,
+            userId: user.id,
+            cadence: DirectoryScheduleCadence.DAILY,
+            billingMode: DirectoryScheduleBillingMode.SUBSCRIPTION,
+            status: DirectoryScheduleStatus.ACTIVE,
+            nextRunAt: new Date('2026-04-08T12:47:00.000Z'),
+            maxFailureBeforePause: 3,
+            alwaysCreatePullRequest: false,
+            providerOverrides: null,
+        });
+
+        await service.updateSchedule(
+            directory.id,
+            {
+                enable: true,
+                cadence: DirectoryScheduleCadence.DAILY,
+            },
+            user,
+        );
+
+        expect(scheduleRepository.upsert).toHaveBeenCalledWith(
+            directory.id,
+            expect.objectContaining({
+                status: DirectoryScheduleStatus.ACTIVE,
+                cadence: DirectoryScheduleCadence.DAILY,
+            }),
+        );
+    });
+
+    it('requires saved generator config before scheduling linked existing directories', async () => {
+        const linkedDirectory = {
+            ...directory,
+            sourceRepository: {
+                type: ImportSourceTypeEnum.LINK_EXISTING,
+            },
+        };
+
+        ownershipService.ensureCanEdit.mockResolvedValue({ directory: linkedDirectory });
+        scheduleRepository.findByDirectoryId.mockResolvedValue(null);
+        dataGeneratorService.getConfig.mockResolvedValue({
+            metadata: {},
+        });
 
         await expect(
             service.updateSchedule(
@@ -191,7 +233,7 @@ describe('DirectoryScheduleService', () => {
             ),
         ).rejects.toMatchObject({
             response: expect.objectContaining({
-                code: 'SOURCE_SYNC_UNSUPPORTED',
+                code: 'INITIAL_DIRECTORY_SETUP_REQUIRED',
             }),
         });
     });

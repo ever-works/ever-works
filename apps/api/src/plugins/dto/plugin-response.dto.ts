@@ -17,6 +17,7 @@ import type {
     PluginVisibility,
     PluginUiHints,
 } from '@ever-works/plugin/api';
+import type { ProviderModelSummary } from '@ever-works/plugin';
 
 // Re-export types for convenience
 export type {
@@ -222,6 +223,9 @@ export class UserPluginResponseDto extends PluginResponseDto implements UserPlug
         description: 'Generic connection/readiness status used by onboarding and settings UI',
     })
     connectionStatus?: UserPluginResponse['connectionStatus'];
+
+    @ApiPropertyOptional({ description: 'Resolved model settings for AI provider plugins' })
+    models?: ProviderModelSummary[];
 }
 
 /**
@@ -234,8 +238,11 @@ export class DirectoryPluginResponseDto
     @ApiProperty({ description: 'Whether plugin is enabled for this directory' })
     directoryEnabled: boolean;
 
-    @ApiPropertyOptional({ description: 'Active capability for this directory' })
-    activeCapability?: string;
+    @ApiPropertyOptional({
+        description: 'Active capabilities for this directory',
+        type: [String],
+    })
+    activeCapabilities?: string[];
 
     @ApiPropertyOptional({ description: 'Directory-specific settings (masked)' })
     directorySettings?: Record<string, unknown>;

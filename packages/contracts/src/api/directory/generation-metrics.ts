@@ -111,6 +111,8 @@ export interface DirectoryGenerationHistoryEntry {
 	changelog?: DirectoryChangelog | null;
 	/** Step-level generation logs */
 	logs?: GenerationStepLog[] | null;
+	/** Warnings captured during generation */
+	warnings?: string[] | null;
 	/** What triggered this run */
 	triggeredBy?: 'user' | 'schedule' | 'api' | null;
 }

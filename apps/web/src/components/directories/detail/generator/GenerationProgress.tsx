@@ -10,6 +10,8 @@ import { TerminalLogViewer } from '../shared/TerminalLogViewer';
 import { ShinyText } from '@/components/ui/ShinyText';
 import { CancelGenerationButton } from './CancelGenerationButton';
 import { useRouter } from '@/i18n/navigation';
+import { useDirectoryDetail } from '../DirectoryDetailContext';
+import { GenerateStatusType } from '@/lib/api/enums';
 
 // ─── Animated orb ────────────────────────────────────────────────────────────
 
@@ -124,6 +126,7 @@ interface GenerationProgressProps {
 export function GenerationProgress({ directory }: GenerationProgressProps) {
     const t = useTranslations('dashboard.directoryDetail.progress');
     const router = useRouter();
+    const { directory: syncedDirectory } = useDirectoryDetail();
     const [dots, setDots] = useState('');
     const [showLogs, setShowLogs] = useState(true);
 
@@ -134,7 +137,11 @@ export function GenerationProgress({ directory }: GenerationProgressProps) {
         return () => clearInterval(interval);
     }, []);
 
-    const generateStatus = directory.generateStatus;
+    const useSyncedDirectory =
+        syncedDirectory.id === directory.id &&
+        syncedDirectory.generateStatus?.status === GenerateStatusType.GENERATING;
+    const currentDirectory = useSyncedDirectory ? syncedDirectory : directory;
+    const generateStatus = currentDirectory.generateStatus;
     const progressPercentage = getStepProgress(generateStatus);
     const stepText = getStepText(generateStatus, t('steps.processing'));
     const itemsText = getItemsProcessedText(generateStatus);
@@ -209,7 +216,7 @@ export function GenerationProgress({ directory }: GenerationProgressProps) {
                         </button>
 
                         <CancelGenerationButton
-                            directoryId={directory.id}
+                            directoryId={currentDirectory.id}
                             labels={{
                                 stop: t('stop'),
                                 stopping: t('stopping'),

@@ -1773,6 +1773,7 @@
                 "default": "Standard",
                 "notConfigured": "Nicht konfiguriert",
                 "notConfiguredTooltip": "Dieser Provider erfordert Konfiguration. Besuchen Sie Einstellungen → Plugins, um ihn einzurichten.",
+                "changeModels": "Ändern",
                 "jsonObjectError": "Wert muss ein JSON-Objekt sein",
                 "invalidJsonError": "Ungültiges JSON-Format"
             },
@@ -2937,6 +2938,7 @@
             "resetSuccess": "Einstellungen auf Standard zurückgesetzt",
             "cancel": "Abbrechen",
             "clickToConfigure": "Zum Konfigurieren klicken",
+            "changeModels": "Ändern",
             "autoEnabledByUser": "Automatisch aktiviert über Benutzereinstellungen",
             "toggleError": "Plugin konnte nicht umgeschaltet werden",
             "system": "System",

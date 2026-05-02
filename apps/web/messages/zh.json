@@ -1773,6 +1773,7 @@
                 "default": "默认",
                 "notConfigured": "未配置",
                 "notConfiguredTooltip": "此提供商需要配置。请访问 设置 → 插件 进行设置。",
+                "changeModels": "更改",
                 "jsonObjectError": "值必须是 JSON 对象",
                 "invalidJsonError": "无效的 JSON 格式"
             },
@@ -2937,6 +2938,7 @@
             "resetSuccess": "设置已重置为默认值",
             "cancel": "取消",
             "clickToConfigure": "点击配置",
+            "changeModels": "更改",
             "autoEnabledByUser": "通过用户设置自动启用",
             "toggleError": "切换插件失败",
             "system": "系统",
