@@ -56,6 +56,16 @@ export function listWebsiteTemplates(): WebsiteTemplateConfig[] {
     return [...WEBSITE_TEMPLATES];
 }
 
+export function findWebsiteTemplateConfig(
+    templateId?: string | null,
+): WebsiteTemplateConfig | null {
+    if (!templateId) {
+        return null;
+    }
+
+    return WEBSITE_TEMPLATES.find((template) => template.id === templateId) || null;
+}
+
 export function getDefaultWebsiteTemplateId(): WebsiteTemplateId {
     const configuredDefaultId = config.websiteTemplate.getDefaultTemplateId();
     const configuredTemplate = WEBSITE_TEMPLATES.find(
@@ -68,10 +78,7 @@ export function getDefaultWebsiteTemplateId(): WebsiteTemplateId {
 export function getWebsiteTemplateConfig(templateId?: string | null): WebsiteTemplateConfig {
     const resolvedTemplateId = templateId || getDefaultWebsiteTemplateId();
 
-    return (
-        WEBSITE_TEMPLATES.find((template) => template.id === resolvedTemplateId) ||
-        CLASSIC_WEBSITE_TEMPLATE
-    );
+    return findWebsiteTemplateConfig(resolvedTemplateId) || CLASSIC_WEBSITE_TEMPLATE;
 }
 
 export function getWebsiteTemplateBranch(template: WebsiteTemplateConfig, useBeta = false): string {

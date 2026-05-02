@@ -80,7 +80,10 @@ import {
     GetUserRepositoriesDto,
     GetUserRepositoriesResponseDto,
 } from '@ever-works/agent/dto';
-import { UpdateWebsiteRepositoryResponseDto } from '@ever-works/agent/generators';
+import {
+    SwitchWebsiteTemplateResponseDto,
+    UpdateWebsiteRepositoryResponseDto,
+} from '@ever-works/agent/generators';
 import { getDefaultWebsiteTemplateId, listWebsiteTemplates } from '@ever-works/agent/generators';
 import { CommunityPrProcessorService } from '@ever-works/agent/community-pr';
 import { DirectoryRepository } from '@ever-works/agent/database';
@@ -991,6 +994,42 @@ export class DirectoriesController {
                 action: 'directory.website_updated',
                 status: ActivityStatus.COMPLETED,
                 summary: `Updated website repository`,
+            })
+            .catch(() => {});
+
+        return result;
+    }
+
+    @Post('directories/:id/switch-website-template')
+    @HttpCode(HttpStatus.OK)
+    @ApiOperation({
+        summary: 'Switch website template',
+        description:
+            'Update the selected website template and recreate the website repository when it already exists',
+    })
+    @ApiParam({ name: 'id', description: 'Directory ID' })
+    @ApiResponse({ status: 200, description: 'Website template switched' })
+    async switchWebsiteTemplate(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id') id: string,
+        @Body() body: { websiteTemplateId: string },
+    ): Promise<SwitchWebsiteTemplateResponseDto> {
+        const user = await this.authService.getUser(auth.userId);
+
+        const result = await this.directoryLifecycleService.switchWebsiteTemplate(
+            id,
+            body.websiteTemplateId,
+            user,
+        );
+
+        this.activityLogService
+            .log({
+                userId: auth.userId,
+                directoryId: id,
+                actionType: ActivityActionType.WEBSITE_SETTINGS_UPDATED,
+                action: 'directory.website_template_switched',
+                status: ActivityStatus.COMPLETED,
+                summary: `Switched website template to ${body.websiteTemplateId}`,
             })
             .catch(() => {});
 

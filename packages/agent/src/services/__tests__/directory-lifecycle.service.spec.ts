@@ -10,6 +10,9 @@ jest.mock('@src/generators/website-generator/website-generator.service', () => (
     WebsiteGeneratorService: class WebsiteGeneratorService {},
 }));
 
+const previousMinimalRepo = process.env.WEBSITE_TEMPLATE_MINIMAL_REPO;
+process.env.WEBSITE_TEMPLATE_MINIMAL_REPO = 'directory-web-template-minimal';
+
 import { DirectoryLifecycleService } from '../directory-lifecycle.service';
 import { GenerateStatusType } from '@src/entities/types';
 
@@ -24,6 +27,14 @@ describe('DirectoryLifecycleService', () => {
     let deployFacade: any;
     let gitFacade: any;
     let service: DirectoryLifecycleService;
+
+    afterAll(() => {
+        if (previousMinimalRepo === undefined) {
+            delete process.env.WEBSITE_TEMPLATE_MINIMAL_REPO;
+        } else {
+            process.env.WEBSITE_TEMPLATE_MINIMAL_REPO = previousMinimalRepo;
+        }
+    });
 
     beforeEach(() => {
         directoryRepository = {
@@ -40,6 +51,7 @@ describe('DirectoryLifecycleService', () => {
         };
         websiteGenerator = {
             removeRepository: jest.fn(),
+            initialize: jest.fn(),
         };
         ownershipService = {
             ensureCanEdit: jest.fn(),
@@ -121,5 +133,50 @@ describe('DirectoryLifecycleService', () => {
         ).rejects.toThrow(
             'Website template cannot be changed after the website repository has been initialized.',
         );
+    });
+
+    it('recreates the website repository when switching templates after initialization', async () => {
+        const directory = {
+            id: 'dir-1',
+            slug: 'test-directory',
+            name: 'Test Directory',
+            description: 'Test description',
+            owner: 'ever-works',
+            organization: false,
+            readmeConfig: {},
+            gitProvider: 'github',
+            userId: user.id,
+            website: 'https://example.com',
+            websiteTemplateId: 'classic',
+            websiteTemplateLastCommit: 'abc123',
+            websiteTemplateLastError: 'old error',
+            websiteTemplateLastUpdatedAt: new Date(),
+            websiteTemplateLastCheckedAt: new Date(),
+            getRepoOwner: jest.fn().mockReturnValue('ever-works'),
+            getWebsiteRepo: jest.fn().mockReturnValue('test-directory-website'),
+        } as any;
+
+        ownershipService.ensureCanEdit.mockResolvedValue({ directory });
+
+        const result = await service.switchWebsiteTemplate(directory.id, 'minimal', user);
+
+        expect(directoryRepository.update).toHaveBeenCalledWith(
+            directory.id,
+            expect.objectContaining({
+                websiteTemplateId: 'minimal',
+                websiteTemplateLastCommit: null,
+                websiteTemplateLastError: null,
+                websiteTemplateLastUpdatedAt: null,
+                websiteTemplateLastCheckedAt: null,
+            }),
+        );
+        expect(websiteGenerator.removeRepository).toHaveBeenCalledWith(directory, user);
+        expect(websiteGenerator.initialize).toHaveBeenCalledWith(
+            directory,
+            user,
+            'create-using-template',
+        );
+        expect(result.repositoryRecreated).toBe(true);
+        expect(result.websiteTemplateId).toBe('minimal');
     });
 });
