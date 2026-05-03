@@ -1,22 +1,17 @@
 import { test, expect } from '@playwright/test';
 
 /**
- * API contract tests for the Directory→Work rename.
+ * API contract tests for the Works surface.
  *
  * Hits the NestJS API (port 3100) directly:
  *   - /api/works/* should respond (typically 401 unauth, but routes exist)
- *   - /api/directories/* should be 404 (routes are gone)
  *   - register + login still work
  *   - health endpoint responds
- *
- * The OLD path is constructed at runtime so the rename script doesn't
- * see a literal string in this file.
  */
 
 const API_BASE = process.env.API_URL || 'http://localhost:3100';
-const OLD_BASE = ['di', 'rec', 'tories'].join(''); // -> "directories"
 
-test.describe('Works rename — API contract', () => {
+test.describe('Works — API contract', () => {
     test('GET /api/health responds 200', async ({ request }) => {
         const res = await request.get(`${API_BASE}/api/health`);
         expect(res.status()).toBe(200);
@@ -38,26 +33,11 @@ test.describe('Works rename — API contract', () => {
     ];
 
     for (const route of newRoutes) {
-        test(`new route ${route} exists (any non-404 status)`, async ({ request }) => {
+        test(`route ${route} exists (any non-404 status)`, async ({ request }) => {
             const res = await request.get(`${API_BASE}${route}`);
             // Without auth, expect 401 / 403 / 400 / 200 — anything BUT 404.
-            // 404 would mean the route doesn't exist.
             expect(res.status(), `${route} status was ${res.status()}`).not.toBe(404);
             expect(res.status(), `${route} should not 5xx`).toBeLessThan(500);
-        });
-    }
-
-    const oldRoutes = [
-        `/api/${OLD_BASE}`,
-        `/api/${OLD_BASE}/stats`,
-        `/api/${OLD_BASE}/some-id`,
-        `/api/${OLD_BASE}/some-id/items`,
-    ];
-
-    for (const route of oldRoutes) {
-        test(`old route ${route} returns 404`, async ({ request }) => {
-            const res = await request.get(`${API_BASE}${route}`);
-            expect(res.status(), `${route} should be 404 (was ${res.status()})`).toBe(404);
         });
     }
 

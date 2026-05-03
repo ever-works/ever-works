@@ -2,9 +2,7 @@ import { Work } from '../work.entity';
 
 /**
  * Pin the contract for Work.getMainRepo / getRepoOwner against the
- * `relatedRepositories.work` persisted JSON key. (The legacy `directory`
- * key from before the full DB rename is migrated to `work` by
- * `runRenameDirectoriesToWorks` at boot, so consumers always see `work`.)
+ * `relatedRepositories.work` persisted JSON key.
  */
 describe('Work.getMainRepo / getRepoOwner — relatedRepositories.work key', () => {
     function makeWork(overrides: Partial<Work> = {}): Work {

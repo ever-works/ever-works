@@ -18,4 +18,3 @@ export * from './repositories/github-app-installation.repository';
 export * from './repositories/github-app-installation-repository.repository';
 export * from './repositories/github-app-user-link.repository';
 export * from './database-init.service';
-export * from './utils/rename-directories-to-works';

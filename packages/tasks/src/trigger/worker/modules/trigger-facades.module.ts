@@ -8,7 +8,11 @@ import {
     GitFacadeService,
     PromptFacadeService,
 } from '@ever-works/agent/facades';
-import { AuthAccountRepository } from '@ever-works/agent/database';
+import {
+    AuthAccountRepository,
+    WorkRepository,
+    GitHubAppInstallationRepository,
+} from '@ever-works/agent/database';
 import { TriggerInternalModule } from './trigger-internal.module';
 import { TriggerInternalApiClient } from '../services/trigger-internal-api.client';
 import { createRemoteProxy } from '../remote-proxy';
@@ -25,7 +29,17 @@ const FACADES = [
 
 /**
  * Facades module for Trigger.dev context.
- * AuthAccountRepository is proxied to the API; `isAccessTokenExpired` runs locally (sync).
+ *
+ * Repositories that the facades depend on are proxied to the API
+ * (`createRemoteProxy`). `AuthAccountRepository.isAccessTokenExpired`
+ * runs locally because it has no DB side and is called in hot paths.
+ *
+ * `WorkRepository` and `GitHubAppInstallationRepository` are required by
+ * `GitFacadeService` (`findById` + `findByInstallationId` for GitHub App
+ * installation token lookups). They must be provided IN THIS module so
+ * the DI container can resolve them when GitFacadeService is instantiated
+ * here — providing them only in the outer `TriggerWorkerModule` doesn't
+ * satisfy the scope.
  */
 @Module({
     imports: [TriggerInternalModule],
@@ -40,6 +54,18 @@ const FACADES = [
                         return new Date() > new Date(account.accessTokenExpiresAt);
                     },
                 }),
+            inject: [TriggerInternalApiClient],
+        },
+        {
+            provide: WorkRepository,
+            useFactory: (apiClient: TriggerInternalApiClient) =>
+                createRemoteProxy(apiClient, 'WorkRepository'),
+            inject: [TriggerInternalApiClient],
+        },
+        {
+            provide: GitHubAppInstallationRepository,
+            useFactory: (apiClient: TriggerInternalApiClient) =>
+                createRemoteProxy(apiClient, 'GitHubAppInstallationRepository'),
             inject: [TriggerInternalApiClient],
         },
     ],

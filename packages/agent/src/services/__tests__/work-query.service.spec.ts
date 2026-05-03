@@ -99,14 +99,12 @@ describe('WorkQueryService', () => {
     });
 
     /**
-     * Regression test for the post-rename incident where production users
-     * suddenly saw an empty Works list despite their data still being in
-     * `works.userId`. The list query passes `user.id` straight through
-     * to `findAllAccessible` — this test pins that handoff so a future
+     * The list query passes `user.id` straight through to
+     * `findAllAccessible` — this test pins that handoff so a future
      * refactor that, say, derives `userId` from a different field can't
      * silently filter out everyone's data.
      */
-    it('passes the authenticated user.id through to findAllAccessible (regression)', async () => {
+    it('passes the authenticated user.id through to findAllAccessible', async () => {
         workMemberRepository.getAccessibleWorkIds.mockResolvedValue([]);
         workRepository.findAllAccessible.mockResolvedValue([]);
         workRepository.countAllAccessible.mockResolvedValue(0);
@@ -127,23 +125,20 @@ describe('WorkQueryService', () => {
         );
     });
 
-    it('returns existing work rows owned by user (regression for empty-list bug)', async () => {
-        // Regression: after the rename, a logged-in user must still see
-        // their pre-rename Work rows surfaced through the listing query
-        // with the OWNER role.
-        const legacyWork = {
-            id: 'legacy-pre-rename-id',
+    it('returns Work rows owned by the user with the OWNER role', async () => {
+        const ownedWork = {
+            id: 'owned-work-1',
             userId: user.id,
-            owner: 'pre-rename-owner',
-            slug: 'my-old-work',
-            name: 'My Old Work',
+            owner: 'work-owner',
+            slug: 'my-work',
+            name: 'My Work',
             itemsCount: 5,
             generateStatus: { status: GenerateStatusType.GENERATED },
-            getRepoOwner: jest.fn().mockReturnValue('pre-rename-owner'),
+            getRepoOwner: jest.fn().mockReturnValue('work-owner'),
         } as any;
 
         workMemberRepository.getAccessibleWorkIds.mockResolvedValue([]);
-        workRepository.findAllAccessible.mockResolvedValue([legacyWork]);
+        workRepository.findAllAccessible.mockResolvedValue([ownedWork]);
         workRepository.countAllAccessible.mockResolvedValue(1);
         workMemberRepository.getMemberRolesForWorks.mockResolvedValue(new Map());
         generationHistoryRepository.findLatestPositiveItemCounts.mockResolvedValue(new Map());
@@ -154,8 +149,8 @@ describe('WorkQueryService', () => {
         expect(result.works).toHaveLength(1);
         expect(result.works[0]).toEqual(
             expect.objectContaining({
-                id: 'legacy-pre-rename-id',
-                slug: 'my-old-work',
+                id: 'owned-work-1',
+                slug: 'my-work',
                 userRole: WorkMemberRole.OWNER,
             }),
         );
