@@ -63,10 +63,13 @@ jobs:
           NODE_ENV: development
 
       - name: Start Web (background)
+        # Both web and Playwright helpers consume API_URL as a bare host —
+        # web's lib/constants.ts auto-appends '/api', and helpers/api.ts
+        # prepends '/api/...' to each request. Keep these aligned.
         run: pnpm dev:web > /tmp/web.log 2>&1 &
         env:
           NODE_ENV: development
-          API_URL: http://localhost:3100/api
+          API_URL: http://localhost:3100
           NEXT_PUBLIC_API_URL: http://localhost:3100/api
 
       - name: Wait for API + Web to be ready
