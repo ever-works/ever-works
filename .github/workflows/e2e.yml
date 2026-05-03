@@ -54,41 +54,57 @@ jobs:
         working-directory: apps/web
         run: pnpm exec playwright install --with-deps chromium
 
-      - name: Start API (background)
-        run: pnpm dev:api > /tmp/api.log 2>&1 &
+      - name: Start dev servers, wait, run Playwright
+        # Background processes started in one `run:` step are killed when the
+        # step ends — so we spawn API + Web AND wait AND run tests inside the
+        # same step. nohup + disown to fully detach from the shell.
+        #
+        # Both web and Playwright helpers consume API_URL as a bare host —
+        # web's lib/constants.ts auto-appends '/api', and helpers/api.ts
+        # prepends '/api/...' to each request. Keep these aligned.
+        working-directory: apps/web
+        run: |
+          set -e
+
+          echo "::group::Starting API on :3100"
+          nohup pnpm --filter ever-works-api dev > /tmp/api.log 2>&1 &
+          API_PID=$!
+          disown $API_PID
+          echo "API pid=$API_PID"
+          echo "::endgroup::"
+
+          echo "::group::Starting Web on :3000"
+          nohup pnpm --filter ever-works-web dev > /tmp/web.log 2>&1 &
+          WEB_PID=$!
+          disown $WEB_PID
+          echo "Web pid=$WEB_PID"
+          echo "::endgroup::"
+
+          echo "Waiting for API on :3100 ..."
+          timeout 180 bash -c 'until curl -sSf http://localhost:3100/api/health > /dev/null; do sleep 3; done' \
+            || { echo "API never came up — last 80 lines:"; tail -n 80 /tmp/api.log || true; exit 1; }
+          echo "API ready."
+
+          echo "Waiting for Web on :3000 ..."
+          timeout 240 bash -c 'until curl -sSf http://localhost:3000/en/login > /dev/null; do sleep 3; done' \
+            || { echo "Web never came up — last 80 lines:"; tail -n 80 /tmp/web.log || true; exit 1; }
+          echo "Web ready."
+
+          echo "::group::Running Playwright e2e suite"
+          pnpm exec playwright test
+          echo "::endgroup::"
         env:
+          # API
           DATABASE_TYPE: sqlite
           DATABASE_IN_MEMORY: 'true'
           AUTH_SECRET: ever-works-e2e-ci-secret
           NODE_ENV: development
-
-      - name: Start Web (background)
-        # Both web and Playwright helpers consume API_URL as a bare host —
-        # web's lib/constants.ts auto-appends '/api', and helpers/api.ts
-        # prepends '/api/...' to each request. Keep these aligned.
-        run: pnpm dev:web > /tmp/web.log 2>&1 &
-        env:
-          NODE_ENV: development
+          # Web
           API_URL: http://localhost:3100
           NEXT_PUBLIC_API_URL: http://localhost:3100/api
-
-      - name: Wait for API + Web to be ready
-        run: |
-          set -e
-          echo "Waiting for API on :3100 ..."
-          timeout 180 bash -c 'until curl -sSf http://localhost:3100/api/health > /dev/null; do sleep 3; done'
-          echo "API ready."
-          echo "Waiting for Web on :3000 ..."
-          timeout 180 bash -c 'until curl -sSf http://localhost:3000/en/login > /dev/null; do sleep 3; done'
-          echo "Web ready."
-
-      - name: Run Playwright e2e suite
-        working-directory: apps/web
-        run: pnpm exec playwright test
-        env:
+          # Playwright
           CI: 'true'
           PLAYWRIGHT_BASE_URL: http://localhost:3000
-          API_URL: http://localhost:3100
 
       - name: Upload Playwright report
         if: always()
