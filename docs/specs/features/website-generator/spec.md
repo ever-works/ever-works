@@ -137,7 +137,7 @@ async createFromTemplate(): Promise<void> {
 
 export const WEBSITE_TEMPLATE_CONFIG = {
 	owner: 'ever-works', // Template owner
-	repo: 'website-template', // Template repository name
+	repo: 'directory-web-template', // Template repository name
 	branch: 'main' // Branch to use
 };
 ```
@@ -289,7 +289,7 @@ class UpdateWebsiteRepositoryDto {
 
 - `GitService`: Git operations
 - `GithubService`: GitHub API operations
-- Template repository: `ever-works/website-template`
+- Default template repository: [`ever-works/directory-web-template`](https://github.com/ever-works/directory-web-template) (also see [Website Templates](../../../features/website-templates.md) for the full template catalogue)
 
 ## Deployment Integration
 

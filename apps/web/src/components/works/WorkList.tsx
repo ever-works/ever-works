@@ -8,6 +8,7 @@ import { Link } from '@/i18n/navigation';
 import { ROUTES } from '@/lib/constants';
 import { WorkCard } from './WorkCard';
 import { useTranslations } from 'next-intl';
+import { Plus } from 'lucide-react';
 
 interface WorkListProps {
     initialWorks?: Work[];
@@ -65,10 +66,11 @@ export function WorkList({
                     <Link
                         href={ROUTES.DASHBOARD_WORKS_NEW}
                         className={cn(
-                            'px-4 py-2 rounded-lg font-medium transition-colors',
+                            'px-4 py-2 rounded-lg font-medium transition-colors inline-flex items-center gap-2',
                             'bg-primary-500 hover:bg-primary-700 text-white',
                         )}
                     >
+                        <Plus className="w-4 h-4" />
                         {t('createButton')}
                     </Link>
                 </div>

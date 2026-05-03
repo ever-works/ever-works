@@ -2161,7 +2161,7 @@
                         "title": "Cấu hình Trước Triển khai",
                         "description": "Xem xét và tùy chỉnh cài đặt trang web trước triển khai",
                         "siteName": "Tên Trang web",
-                        "siteNamePlaceholder": "Thư Mục Của Tôi",
+                        "siteNamePlaceholder": "Công Việc Của Tôi",
                         "siteNameHelper": "Tên hiển thị trên trang web của bạn (mặc định: Acme)",
                         "tabGeneral": "Chung",
                         "tabHeader": "Đầu trang",
@@ -2209,7 +2209,7 @@
             }
         },
         "workCreation": {
-            "title": "Tạo Thư Mục Mới",
+            "title": "Tạo Công Việc Mới",
             "subtitle": "Chọn cách bạn muốn tạo công việc của mình",
             "backToOptions": "Quay lại các tùy chọn",
             "sidebar": {
@@ -2238,12 +2238,12 @@
                 "title": "Tạo Bằng AI",
                 "subtitle": "Mô tả ý tưởng công việc của bạn bằng ngôn ngữ tự nhiên và để AI xử lý việc thiết lập",
                 "getStarted": "Bắt đầu",
-                "formTitle": "Tạo Thư Mục Bằng AI",
+                "formTitle": "Tạo Công Việc Bằng AI",
                 "formSubtitle": "Mô tả ý tưởng công việc của bạn và để AI xử lý việc thiết lập và tạo nội dung ban đầu",
-                "workNameLabel": "Tên Thư Mục",
+                "workNameLabel": "Tên Công Việc",
                 "workNamePlaceholder": "ví dụ: Awesome AI Tools",
                 "workNameHelp": "AI sẽ gợi ý tên nếu bạn để trống",
-                "promptLabel": "Mô Tả Thư Mục Của Bạn",
+                "promptLabel": "Mô Tả Công Việc Của Bạn",
                 "githubRequired": "Vui lòng kết nối tài khoản GitHub của bạn trước.",
                 "promptPlaceholder": "Mô tả loại công việc bạn muốn tạo, các mục nó nên chứa và bất kỳ yêu cầu cụ thể nào...",
                 "inspirationText": "Cần cảm hứng? Thử một trong số này:",
@@ -2273,7 +2273,7 @@
                     "3": "Thiết lập kho GitHub với tài liệu phù hợp"
                 },
                 "generateButton": "Tạo Bằng AI",
-                "generatingButton": "Đang Tạo Thư Mục...",
+                "generatingButton": "Đang Tạo Công Việc...",
                 "cancelButton": "Hủy",
                 "noteTitle": "Lưu Ý:",
                 "noteText": "Việc tạo bằng AI thường mất 2-5 phút tùy thuộc vào độ phức tạp của yêu cầu. Bạn sẽ được thông báo khi công việc sẵn sàng.",
@@ -2302,12 +2302,12 @@
                 "title": "Tạo Thủ Công",
                 "subtitle": "Cấu hình công việc với toàn quyền kiểm soát mọi cài đặt và tùy chọn",
                 "configureNow": "Cấu hình ngay",
-                "formTitle": "Tạo Thư Mục Thủ Công",
+                "formTitle": "Tạo Công Việc Thủ Công",
                 "formSubtitle": "Cấu hình công việc với toàn quyền kiểm soát mọi cài đặt",
                 "basicInfo": "Thông Tin Cơ Bản",
-                "nameLabel": "Tên Thư Mục *",
+                "nameLabel": "Tên Công Việc *",
                 "namePlaceholder": "ví dụ: Awesome AI Tools",
-                "slugLabel": "Slug Thư Mục *",
+                "slugLabel": "Slug Công Việc *",
                 "slugPlaceholder": "awesome-ai-tools",
                 "githubRequired": "Vui lòng kết nối tài khoản GitHub của bạn trước.",
                 "slugHelp": "Định danh thân thiện với URL (chữ cái thường, số và dấu gạch ngang chỉ)",
@@ -2325,8 +2325,8 @@
                 "footerLabel": "Chân Trang README Tùy Chỉnh",
                 "footerPlaceholder": "Thêm nội dung tùy chỉnh vào cuối file README của bạn",
                 "footerOverwrite": "Thay thế hoàn toàn chân trang mặc định",
-                "createButton": "Tạo Thư Mục",
-                "creatingButton": "Đang Tạo Thư Mục...",
+                "createButton": "Tạo Công Việc",
+                "creatingButton": "Đang Tạo Công Việc...",
                 "cancelButton": "Hủy",
                 "nameRequired": "Tên công việc là bắt buộc",
                 "slugRequired": "Slug công việc là bắt buộc",
@@ -2337,12 +2337,12 @@
                 }
             },
             "import": {
-                "title": "Nhập Thư Mục Hiện Có",
+                "title": "Nhập Công Việc Hiện Có",
                 "subtitle": "Nhập công việc từ kho GitHub hiện có",
                 "importNow": "Nhập ngay",
                 "aiProviderSettings": "Nhà Cung Cấp AI",
                 "aiProviderSettingsDescription": "Chọn nhà cung cấp AI để phân tích README",
-                "formTitle": "Nhập Thư Mục Từ GitHub",
+                "formTitle": "Nhập Công Việc Từ GitHub",
                 "formSubtitle": "Nhập các mục từ kho GitHub hiện có để tạo công việc của bạn",
                 "sync": {
                     "title": "Giữ Đồng Bộ",
@@ -2396,8 +2396,8 @@
                     "schedule": "Lịch trình: {cadence}",
                     "providers": "Nhà cung cấp: {providers}"
                 },
-                "nameLabel": "Tên Thư Mục",
-                "namePlaceholder": "ví dụ: Thư Mục Awesome Của Tôi",
+                "nameLabel": "Tên Công Việc",
+                "namePlaceholder": "ví dụ: Công Việc Awesome Của Tôi",
                 "advancedSettings": "Cài Đặt Nâng Cao",
                 "advancedSubtitle": "Cấu hình cài đặt tổ chức và kho lưu trữ",
                 "attribution": {
@@ -2425,12 +2425,12 @@
                     "importingButton": "Đang bắt đầu đường ống nghiên cứu..."
                 },
                 "analyzeButton": "Phân Tích Kho",
-                "importButton": "Nhập Thư Mục",
+                "importButton": "Nhập Công Việc",
                 "importingButton": "Đang Nhập...",
                 "backButton": "Quay Lại",
                 "cancelButton": "Hủy",
                 "importing": {
-                    "title": "Đang Nhập Thư Mục",
+                    "title": "Đang Nhập Công Việc",
                     "subtitle": "Đang thiết lập công việc của bạn từ kho nguồn..."
                 },
                 "repositorySelector": {
