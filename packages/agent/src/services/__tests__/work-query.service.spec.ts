@@ -101,7 +101,7 @@ describe('WorkQueryService', () => {
     /**
      * Regression test for the post-rename incident where production users
      * suddenly saw an empty Works list despite their data still being in
-     * `directories.userId`. The list query passes `user.id` straight through
+     * `works.userId`. The list query passes `user.id` straight through
      * to `findAllAccessible` — this test pins that handoff so a future
      * refactor that, say, derives `userId` from a different field can't
      * silently filter out everyone's data.
@@ -128,15 +128,15 @@ describe('WorkQueryService', () => {
     });
 
     it('returns existing work rows owned by user (regression for empty-list bug)', async () => {
-        // Simulates a row that has been in the `directories` table (= Work entity)
-        // since long before the Directory→Work rename. The query must still
-        // surface it for its owner, with the OWNER role.
+        // Regression: after the rename, a logged-in user must still see
+        // their pre-rename Work rows surfaced through the listing query
+        // with the OWNER role.
         const legacyWork = {
             id: 'legacy-pre-rename-id',
             userId: user.id,
             owner: 'pre-rename-owner',
-            slug: 'my-old-directory',
-            name: 'My Old Directory',
+            slug: 'my-old-work',
+            name: 'My Old Work',
             itemsCount: 5,
             generateStatus: { status: GenerateStatusType.GENERATED },
             getRepoOwner: jest.fn().mockReturnValue('pre-rename-owner'),
@@ -155,7 +155,7 @@ describe('WorkQueryService', () => {
         expect(result.works[0]).toEqual(
             expect.objectContaining({
                 id: 'legacy-pre-rename-id',
-                slug: 'my-old-directory',
+                slug: 'my-old-work',
                 userRole: WorkMemberRole.OWNER,
             }),
         );

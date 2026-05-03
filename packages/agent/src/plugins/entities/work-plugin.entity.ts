@@ -17,7 +17,7 @@ import { PluginEntity } from './plugin.entity';
  * Note: We use string IDs for work reference instead of TypeORM relations to keep
  * the plugin module self-contained and testable without external entity dependencies.
  */
-@Entity({ name: 'directory_plugins' })
+@Entity({ name: 'work_plugins' })
 @Unique(['workId', 'pluginId'])
 export class WorkPluginEntity {
     @PrimaryGeneratedColumn('uuid')
@@ -26,7 +26,7 @@ export class WorkPluginEntity {
     /**
      * Reference to the work (stored as string ID for loose coupling)
      */
-    @Column({ name: 'directoryId' })
+    @Column()
     workId: string;
 
     /**

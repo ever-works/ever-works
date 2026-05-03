@@ -17,16 +17,16 @@ import type { ClassToObject } from './types';
  * Each field is nullable - null/empty values mean the standard prompt is used as-is.
  * Non-empty values are appended as "Additional User Instructions" to the base prompt.
  */
-@Entity({ name: 'directory_advanced_prompts' })
+@Entity({ name: 'work_advanced_prompts' })
 export class WorkAdvancedPrompts {
     @PrimaryGeneratedColumn('uuid')
     id: string;
 
-    @Column({ name: 'directoryId', unique: true })
+    @Column({ unique: true })
     workId: string;
 
     @OneToOne(() => Work, { onDelete: 'CASCADE' })
-    @JoinColumn({ name: 'directoryId' })
+    @JoinColumn({ name: 'workId' })
     work: ClassToObject<Work>;
 
     /**

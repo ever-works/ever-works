@@ -33,7 +33,7 @@ import { WorkSchedule } from './work-schedule.entity';
 import { WorkCustomDomain } from './work-custom-domain.entity';
 import { WorkMember } from './work-member.entity';
 
-@Entity({ name: 'directories' })
+@Entity({ name: 'works' })
 export class Work {
     @PrimaryGeneratedColumn('uuid')
     id: string;
@@ -219,10 +219,7 @@ export class Work {
     }
 
     getMainRepo() {
-        // 'directory' is the legacy key persisted in
-        // `directories.sourceRepository.relatedRepositories` — see
-        // RepositoryRole note in @ever-works/contracts/api.
-        return this.getRelatedRepository('directory').repo;
+        return this.getRelatedRepository('work').repo;
     }
 
     getRepoOwner(type: RepositoryRole = 'data'): string {
@@ -242,7 +239,7 @@ export class Work {
             return `${this.slug}-website`;
         }
 
-        if (type === 'directory') {
+        if (type === 'work') {
             return this.slug;
         }
 

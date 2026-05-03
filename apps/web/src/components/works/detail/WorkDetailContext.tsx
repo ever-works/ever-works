@@ -91,10 +91,7 @@ function repoLink(work: Work, oauthConnection: GitProviderConnectionInfo | null)
     // Strip trailing slash from homepage URL
     const baseUrl = providerUrl.replace(/\/$/, '');
     const relatedRepositories = work.sourceRepository?.relatedRepositories;
-    // 'directory' is the legacy persisted JSON key (see RepositoryRole note
-    // in @ever-works/contracts/api). Renaming would orphan all existing
-    // production works' main-repo links.
-    const mainRepository = relatedRepositories?.directory;
+    const mainRepository = relatedRepositories?.work;
     const dataRepository = relatedRepositories?.data;
     const websiteRepository = relatedRepositories?.website;
 

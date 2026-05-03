@@ -1,15 +1,12 @@
 import { Work } from '../work.entity';
 
 /**
- * Regression tests for the Directory→Work rename.
- *
- * The class is renamed but the persisted JSON column
- * `directories.sourceRepository.relatedRepositories` keeps the legacy key
- * `'directory'`. These tests pin that contract so a future bulk rename
- * cannot silently swap `'directory'` → `'work'` and orphan every existing
- * production work's main-repo lookup.
+ * Pin the contract for Work.getMainRepo / getRepoOwner against the
+ * `relatedRepositories.work` persisted JSON key. (The legacy `directory`
+ * key from before the full DB rename is migrated to `work` by
+ * `runRenameDirectoriesToWorks` at boot, so consumers always see `work`.)
  */
-describe('Work.getMainRepo / getRepoOwner — legacy "directory" key', () => {
+describe('Work.getMainRepo / getRepoOwner — relatedRepositories.work key', () => {
     function makeWork(overrides: Partial<Work> = {}): Work {
         const work = new Work();
         Object.assign(work, {
@@ -24,7 +21,7 @@ describe('Work.getMainRepo / getRepoOwner — legacy "directory" key', () => {
         return work;
     }
 
-    it('reads main repo from relatedRepositories.directory (legacy persisted key)', () => {
+    it('reads main repo from relatedRepositories.work', () => {
         const work = makeWork({
             sourceRepository: {
                 url: 'https://github.com/realorg/realrepo',
@@ -33,16 +30,16 @@ describe('Work.getMainRepo / getRepoOwner — legacy "directory" key', () => {
                 type: 'data_repo',
                 importedAt: new Date(),
                 relatedRepositories: {
-                    directory: { owner: 'realorg', repo: 'main-repo-name' },
+                    work: { owner: 'realorg', repo: 'main-repo-name' },
                 },
             },
         } as any);
 
         expect(work.getMainRepo()).toBe('main-repo-name');
-        expect(work.getRepoOwner('directory')).toBe('realorg');
+        expect(work.getRepoOwner('work')).toBe('realorg');
     });
 
-    it('falls back to slug-based default when relatedRepositories.directory is missing', () => {
+    it('falls back to slug-based default when relatedRepositories.work is missing', () => {
         const work = makeWork();
         expect(work.getMainRepo()).toBe('my-work');
     });

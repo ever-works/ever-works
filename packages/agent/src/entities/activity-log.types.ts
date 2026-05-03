@@ -7,9 +7,9 @@ export enum ActivityActionType {
     DEPLOYMENT = 'deployment',
 
     // Work lifecycle
-    WORK_CREATED = 'directory_created',
-    WORK_UPDATED = 'directory_updated',
-    WORK_DELETED = 'directory_deleted',
+    WORK_CREATED = 'work_created',
+    WORK_UPDATED = 'work_updated',
+    WORK_DELETED = 'work_deleted',
 
     // Items
     ITEM_ADDED = 'item_added',

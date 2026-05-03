@@ -34,12 +34,12 @@ export type GenerationMetrics = {
 @Index(['workId', 'status'])
 @Index(['triggeredBy'])
 @Index(['scheduleId'])
-@Entity({ name: 'directory_generation_history' })
+@Entity({ name: 'work_generation_history' })
 export class WorkGenerationHistory {
     @PrimaryGeneratedColumn('uuid')
     id: string;
 
-    @Column({ name: 'directoryId' })
+    @Column()
     workId: string;
 
     @ManyToOne(() => Work, (work) => work.generationHistory, {
