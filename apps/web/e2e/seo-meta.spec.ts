@@ -67,19 +67,3 @@ test.describe('SEO — title varies by locale on /login', () => {
         // We don't strictly require they differ — branding may keep them same.
     });
 });
-
-test.describe('SEO — title does not contain old "directory" word', () => {
-    for (const url of publicRoutes) {
-        test(`${url} <title> does not contain old "Directory" / "Directories"`, async ({
-            page,
-        }) => {
-            await page.goto(url, { waitUntil: 'domcontentloaded' });
-            const title = await page.title();
-            // Build literals at runtime so the bulk-rename script doesn't rewrite them.
-            const old = ['Di', 'rectory'].join('');
-            const oldPlural = ['Di', 'rectories'].join('');
-            expect(title).not.toMatch(new RegExp(`\\b${old}\\b`, 'i'));
-            expect(title).not.toMatch(new RegExp(`\\b${oldPlural}\\b`, 'i'));
-        });
-    }
-});

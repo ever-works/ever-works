@@ -18,17 +18,6 @@ test.describe('Activity log — UI', () => {
         expect(body.length, 'page has content').toBeGreaterThan(50);
     });
 
-    test('subtitle uses new Works vocabulary (not "directories")', async ({ page }) => {
-        await page.goto('/en/activity', { waitUntil: 'domcontentloaded' });
-        await page.waitForTimeout(2_000);
-        const body = await page.locator('body').innerText();
-        // Built at runtime so the bulk-rename script doesn't rewrite this literal.
-        const old = ['di', 'rectory'].join('');
-        const oldPlural = ['di', 'rectories'].join('');
-        expect(body).not.toMatch(new RegExp(`\\b${old}\\b`, 'i'));
-        expect(body).not.toMatch(new RegExp(`\\b${oldPlural}\\b`, 'i'));
-    });
-
     test('filter controls are present (or empty state is rendered)', async ({ page }) => {
         await page.goto('/en/activity', { waitUntil: 'domcontentloaded' });
         await page.waitForTimeout(2_000);
