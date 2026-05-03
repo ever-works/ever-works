@@ -15,7 +15,10 @@ jest.mock('@src/generators/website-generator/website-update.service', () => ({
 }));
 
 const previousMinimalRepo = process.env.WEBSITE_TEMPLATE_MINIMAL_REPO;
-process.env.WEBSITE_TEMPLATE_MINIMAL_REPO = 'work-web-template-minimal';
+// Concrete GitHub repo name — bulk rename incorrectly produced
+// `work-web-template-minimal`; the real repo is
+// https://github.com/ever-works/directory-web-minimal-template
+process.env.WEBSITE_TEMPLATE_MINIMAL_REPO = 'directory-web-minimal-template';
 
 import { NotFoundException } from '@nestjs/common';
 import { WorkLifecycleService } from '../work-lifecycle.service';

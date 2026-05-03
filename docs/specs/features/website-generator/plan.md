@@ -38,15 +38,15 @@ enabled.
 
 ## 2. Tech Choices
 
-| Concern                 | Choice                                            | Rationale                                                             |
-| ----------------------- | ------------------------------------------------- | --------------------------------------------------------------------- |
-| Default creation method | `DUPLICATE`                                       | Works on personal + org accounts; full control over the process       |
-| Fallback method         | `DUPLICATE` when `CREATE_USING_TEMPLATE` fails    | GitHub's template feature has org-permission edge cases               |
-| Template repo           | `ever-works/website-template` (configurable)      | One canonical Next.js base; user repos diverge by user customizations |
-| Template branch         | `main` (stable) or `stage` (beta)                 | Beta opt-in via `useBetaVersion` work setting                         |
-| Idempotence             | Skip when target repo already exists              | Repeat runs (e.g. weekly schedules) must not clobber the user's repo  |
-| Naming                  | `{work-slug}-web`                                 | Mirrors data (`-data`) and markdown (no suffix) naming convention     |
-| Auto-update             | Opt-in per work; runs through `BranchSyncService` | Avoids surprising users who customised their website repo             |
+| Concern                 | Choice                                             | Rationale                                                             |
+| ----------------------- | -------------------------------------------------- | --------------------------------------------------------------------- |
+| Default creation method | `DUPLICATE`                                        | Works on personal + org accounts; full control over the process       |
+| Fallback method         | `DUPLICATE` when `CREATE_USING_TEMPLATE` fails     | GitHub's template feature has org-permission edge cases               |
+| Template repo           | `ever-works/directory-web-template` (configurable) | One canonical Next.js base; user repos diverge by user customizations |
+| Template branch         | `main` (stable) or `stage` (beta)                  | Beta opt-in via `useBetaVersion` work setting                         |
+| Idempotence             | Skip when target repo already exists               | Repeat runs (e.g. weekly schedules) must not clobber the user's repo  |
+| Naming                  | `{work-slug}-web`                                  | Mirrors data (`-data`) and markdown (no suffix) naming convention     |
+| Auto-update             | Opt-in per work; runs through `BranchSyncService`  | Avoids surprising users who customised their website repo             |
 
 ## 3. Data Model
 
@@ -155,7 +155,7 @@ without the field is "do nothing", which preserves prior semantics.
 | `CREATE_USING_TEMPLATE` fails on org accounts with template-creation policy | Fallback to `DUPLICATE` is automatic and logged; user sees a successful run              |
 | Auto-update overwrites user customizations                                  | `BranchSyncService` performs a per-file merge; conflicts surface as PR for user review   |
 | Repository name collision (slug already used by another repo)               | Creation surfaces a clear error; user can rename the work to retry                       |
-| Template repo (`ever-works/website-template`) is unavailable                | Run fails with a structured `WEBSITE_TEMPLATE_NOT_FOUND` error code                      |
+| Template repo (`ever-works/directory-web-template`) is unavailable          | Run fails with a structured `WEBSITE_TEMPLATE_NOT_FOUND` error code                      |
 | Force-push during DUPLICATE on a repo that already has commits              | Existence check happens **before** creation; force-push only on empty repos created here |
 
 ## 12. Constitution Reconciliation

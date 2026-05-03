@@ -607,7 +607,7 @@
             "recent": "Recent Works",
             "viewAll": "View all ({count})",
             "search": "Search works...",
-            "create": "+ New Work",
+            "create": "New Work",
             "showing": "Showing {current} of {total} works",
             "searchFailed": "Failed to search works. Please try again.",
             "pagination": {
@@ -941,7 +941,7 @@
         },
         "workList": {
             "title": "Your Works",
-            "createButton": "+ New Work"
+            "createButton": "New Work"
         },
         "workDetail": {
             "failedToGenerateItems": "Failed to generate items. Please try again.",
@@ -2364,7 +2364,7 @@
                 "footerLabel": "Custom README Footer",
                 "footerPlaceholder": "Add custom content to the bottom of your README file",
                 "footerOverwrite": "Replace default footer entirely",
-                "createButton": "+ New Work",
+                "createButton": "New Work",
                 "creatingButton": "Creating Work...",
                 "cancelButton": "Cancel",
                 "nameRequired": "Work name is required",
