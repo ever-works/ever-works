@@ -59,7 +59,10 @@ const config: Config = {
 			onBrokenMarkdownLinks: 'warn'
 		}
 	},
-	staticWorks: ['../../docs/assets', 'static'],
+	// Docusaurus built-in field — name is fixed by the framework, do NOT
+	// rename to `staticWorks` (the bulk Directory→Work rename did this and
+	// broke `pnpm --filter ever-works-docs build` with "field not recognized").
+	staticDirectories: ['../../docs/assets', 'static'],
 	// Even if you don't use internationalization, you can use this field to set
 	// useful metadata like html lang. For example, if your site is Chinese, you
 	// may want to replace "en" with "zh-Hans".
