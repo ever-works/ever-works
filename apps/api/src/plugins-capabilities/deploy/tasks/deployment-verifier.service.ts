@@ -1,8 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { DeployFacadeService } from '@ever-works/agent/facades';
-import { DirectoryRepository } from '@ever-works/agent/database';
+import { WorkRepository } from '@ever-works/agent/database';
 import { PluginRegistryService } from '@ever-works/agent/plugins';
-import { Directory } from '@ever-works/agent/entities';
+import { Work } from '@ever-works/agent/entities';
 import type { IDeploymentPlugin } from '@ever-works/plugin';
 
 type CancelVerification = () => void;
@@ -17,7 +17,7 @@ type DeploymentReadyState =
     | 'TIMEOUT';
 
 /**
- * DeploymentVerifierService monitors deployment progress and updates directory status.
+ * DeploymentVerifierService monitors deployment progress and updates work status.
  *
  * It uses the plugin system to check deployment status with the configured provider.
  */
@@ -27,29 +27,29 @@ export class DeploymentVerifierService {
     private queue: Map<string, CancelVerification> = new Map();
 
     constructor(
-        private readonly repository: DirectoryRepository,
+        private readonly repository: WorkRepository,
         private readonly deployFacade: DeployFacadeService,
         private readonly pluginRegistry: PluginRegistryService,
     ) {}
 
     /**
-     * Start verification for a directory deployment
+     * Start verification for a work deployment
      */
-    async startVerification(directory: Directory, userId: string, teamScope?: string) {
-        this.logger.log(`Starting verification for directory ${directory.id}`);
+    async startVerification(work: Work, userId: string, teamScope?: string) {
+        this.logger.log(`Starting verification for work ${work.id}`);
 
-        this.cancelVerification(directory.id);
+        this.cancelVerification(work.id);
 
-        this.queue.set(directory.id, await this.verifyDeployment(directory, userId, teamScope));
+        this.queue.set(work.id, await this.verifyDeployment(work, userId, teamScope));
     }
 
-    private cancelVerification(directoryId: string) {
-        const cancelVerification = this.queue.get(directoryId);
+    private cancelVerification(workId: string) {
+        const cancelVerification = this.queue.get(workId);
         cancelVerification?.();
     }
 
     private async verifyDeployment(
-        directory: Directory,
+        work: Work,
         userId: string,
         teamScope?: string,
     ): Promise<CancelVerification> {
@@ -61,7 +61,7 @@ export class DeploymentVerifierService {
         const intervalId = { value: null as NodeJS.Timeout | null };
 
         // Record start time and update status
-        this.repository.update(directory.id, {
+        this.repository.update(work.id, {
             deploymentStartedAt: new Date(startedAt),
             deploymentState: 'INITIALIZING',
         });
@@ -70,17 +70,15 @@ export class DeploymentVerifierService {
         let inVerification = false;
 
         const cleanup = (state?: DeploymentReadyState) => {
-            this.logger.log(
-                `Cleaning up verification for directory ${directory.id} - ${state || 'UNKNOWN'}`,
-            );
+            this.logger.log(`Cleaning up verification for work ${work.id} - ${state || 'UNKNOWN'}`);
 
             if (intervalId.value) {
                 clearInterval(intervalId.value);
             }
-            this.queue.delete(directory.id);
+            this.queue.delete(work.id);
 
             if (state) {
-                this.repository.update(directory.id, {
+                this.repository.update(work.id, {
                     deploymentState: state,
                 });
             }
@@ -92,15 +90,15 @@ export class DeploymentVerifierService {
             }
 
             inVerification = true;
-            this.logger.log(`Checking deployment status for directory ${directory.id}`);
+            this.logger.log(`Checking deployment status for work ${work.id}`);
 
             try {
                 // Use the plugin to lookup deployment
                 const result = await this.deployFacade.lookupExistingDeployment(
-                    directory.getWebsiteRepo(),
+                    work.getWebsiteRepo(),
                     {
                         userId,
-                        directoryId: directory.id,
+                        workId: work.id,
                     },
                 );
 
@@ -114,7 +112,7 @@ export class DeploymentVerifierService {
 
                 // Update website URL if found
                 if (result.website) {
-                    await this.repository.update(directory.id, {
+                    await this.repository.update(work.id, {
                         website: result.website,
                     });
                 }
@@ -122,21 +120,19 @@ export class DeploymentVerifierService {
                 // Check deployment state
                 const state = result.deploymentState as DeploymentReadyState | undefined;
 
-                this.logger.log(
-                    `Deployment for directory ${directory.id} is ${state || 'UNKNOWN'}`,
-                );
+                this.logger.log(`Deployment for work ${work.id} is ${state || 'UNKNOWN'}`);
 
                 if (state && ['READY', 'ERROR', 'CANCELED'].includes(state)) {
                     cleanup(state);
                 } else if (Date.now() - startedAt > TIMEOUT) {
                     cleanup('TIMEOUT');
                 } else if (state) {
-                    await this.repository.update(directory.id, {
+                    await this.repository.update(work.id, {
                         deploymentState: state,
                     });
                 }
             } catch (error) {
-                this.logger.error(`Failed to get deployment for directory ${directory.id}:`, error);
+                this.logger.error(`Failed to get deployment for work ${work.id}:`, error);
                 cleanup('ERROR');
             } finally {
                 inVerification = false;
@@ -147,10 +143,10 @@ export class DeploymentVerifierService {
     }
 
     /**
-     * Lookup existing deployment for a directory
+     * Lookup existing deployment for a work
      */
     async lookupExistingDeployment(
-        directory: Directory,
+        work: Work,
         userId: string,
     ): Promise<{
         found: boolean;
@@ -158,27 +154,21 @@ export class DeploymentVerifierService {
         deploymentState?: string;
     }> {
         try {
-            const result = await this.deployFacade.lookupExistingDeployment(
-                directory.getWebsiteRepo(),
-                {
-                    userId,
-                    directoryId: directory.id,
-                },
-            );
+            const result = await this.deployFacade.lookupExistingDeployment(work.getWebsiteRepo(), {
+                userId,
+                workId: work.id,
+            });
 
             if (result.found && (result.website || result.deploymentState)) {
-                await this.repository.update(directory.id, {
+                await this.repository.update(work.id, {
                     website: result.website ?? undefined,
-                    deploymentState: result.deploymentState ?? directory.deploymentState,
+                    deploymentState: result.deploymentState ?? work.deploymentState,
                 });
             }
 
             return result;
         } catch (error) {
-            this.logger.error(
-                `Failed to lookup existing deployment for directory ${directory.id}:`,
-                error,
-            );
+            this.logger.error(`Failed to lookup existing deployment for work ${work.id}:`, error);
             return { found: false };
         }
     }

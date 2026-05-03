@@ -12,7 +12,7 @@ import type {
 	PipelineExecutionOptions,
 	PipelineProgressCallback,
 	PipelineResult,
-	DirectoryReference,
+	WorkReference,
 	GenerationRequest,
 	ExistingItems,
 	PluginManifest,
@@ -52,7 +52,7 @@ import { README } from './readme.js';
 /**
  * Make.com Workflows Plugin
  *
- * Pipeline plugin that delegates directory generation to a Make.com scenario
+ * Pipeline plugin that delegates work generation to a Make.com scenario
  * or webhook. The plugin triggers the scenario/webhook at a pipeline stage,
  * polls for completion, and returns structured items ready to be stored.
  */
@@ -192,7 +192,7 @@ export class MakePlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvider
 			id: this.id,
 			name: this.name,
 			version: this.version,
-			description: 'Pipeline plugin that delegates directory generation to Make.com scenarios and webhooks',
+			description: 'Pipeline plugin that delegates work generation to Make.com scenarios and webhooks',
 			category: this.category,
 			capabilities: [...this.capabilities],
 			author: { name: 'Ever Works Team' },
@@ -206,7 +206,7 @@ export class MakePlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvider
 				onboardingPriority: 2,
 				completionFields: ['apiKey'],
 				onboardingDescription:
-					'Connect Make.com to delegate directory generation to visual automation scenarios and webhooks.'
+					'Connect Make.com to delegate work generation to visual automation scenarios and webhooks.'
 			},
 			readme: README,
 			homepage: 'https://developers.make.com/api-documentation',
@@ -245,7 +245,7 @@ export class MakePlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvider
 	private _lastAbortController: AbortController | null = null;
 
 	async execute(
-		directory: DirectoryReference,
+		work: WorkReference,
 		request: GenerationRequest,
 		existing: ExistingItems,
 		options?: PipelineExecutionOptions,
@@ -286,14 +286,14 @@ export class MakePlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvider
 		};
 
 		const logger = this.context?.logger ?? console;
-		const userId = directory.user?.id;
+		const userId = work.user?.id;
 
 		if (!userId) {
 			return handleError(new Error('User ID is required'));
 		}
 
 		try {
-			const pluginSettings = await resolveSettings(this.context, userId, directory.id);
+			const pluginSettings = await resolveSettings(this.context, userId, work.id);
 			const config = (request.config || {}) as Record<string, unknown>;
 
 			const makeSettings = this.resolveMakeSettings(pluginSettings, config);
@@ -349,7 +349,7 @@ export class MakePlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvider
 			setState('prepare-payload', 'running');
 			reportProgress(onProgress, 1, 10, 'Prepare Scenario Payload');
 
-			const payload = buildWorkflowPayload({ directory, request, existing, config });
+			const payload = buildWorkflowPayload({ work, request, existing, config });
 
 			logger.log(
 				`Payload prepared: ${payload.metadata.targetItems} target items, ` +
@@ -479,7 +479,7 @@ export class MakePlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvider
 				request,
 				options?.execContext,
 				items,
-				{ userId, directoryId: directory.id },
+				{ userId, workId: work.id },
 				signal,
 				onProgress,
 				logger

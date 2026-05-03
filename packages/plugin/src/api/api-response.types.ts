@@ -15,11 +15,12 @@ export type { PluginUiHints };
 import type { PluginState } from '../contracts/lifecycle.types.js';
 import type { ConfigurationMode } from '../settings/settings.types.js';
 import type { JsonSchema, JsonSchemaType } from '../settings/json-schema.types.js';
+import type { ProviderModelSummary } from '../contracts/capabilities/form-schema-provider.interface.js';
 
 /**
  * Setting scope determines where the setting value is stored and who can configure it.
  */
-export type SettingScopeApi = 'global' | 'user' | 'directory';
+export type SettingScopeApi = 'global' | 'user' | 'work';
 
 /**
  * Plugin settings schema property for API responses.
@@ -43,7 +44,7 @@ export interface PluginSettingsSchemaProperty {
 	adminOnly?: boolean;
 	/** Environment variable name if field is env-only (from JsonSchema x-envVar) */
 	envVar?: string;
-	/** Setting scope: global, user, or directory (from JsonSchema x-scope) */
+	/** Setting scope: global, user, or work (from JsonSchema x-scope) */
 	scope?: SettingScopeApi;
 	/** Enumerated allowed values */
 	enum?: readonly unknown[];
@@ -200,7 +201,7 @@ export interface PluginConnectionStatus {
 	/** Whether an interactive auth flow is still in progress. */
 	pending?: boolean;
 	/** Scope of the active connection, when known. */
-	scope?: 'user' | 'directory';
+	scope?: 'user' | 'work';
 	/** Human-readable status message. */
 	message?: string;
 }
@@ -222,24 +223,26 @@ export interface UserPluginResponse extends PluginResponse {
 	metadata?: Record<string, unknown>;
 	/** User plugin entity ID */
 	userPluginId?: string;
-	/** Whether this plugin is auto-enabled for all directories */
-	autoEnableForDirectories?: boolean;
+	/** Whether this plugin is auto-enabled for all works */
+	autoEnableForWorks?: boolean;
 	/** Generic connection/readiness status used by onboarding and settings UI. */
 	connectionStatus?: PluginConnectionStatus;
+	/** Effective model settings for AI providers, resolved for the current scope. */
+	models?: ProviderModelSummary[];
 }
 
 /**
- * Plugin response with directory-specific data
+ * Plugin response with work-specific data
  */
-export interface DirectoryPluginResponse extends UserPluginResponse {
-	/** Whether plugin is enabled for this directory */
-	directoryEnabled: boolean;
-	/** Active capability for this directory */
-	activeCapability?: string;
-	/** Directory-specific settings (masked) */
-	directorySettings?: Record<string, unknown>;
-	/** Directory plugin entity ID */
-	directoryPluginId?: string;
+export interface WorkPluginResponse extends UserPluginResponse {
+	/** Whether plugin is enabled for this work */
+	workEnabled: boolean;
+	/** Active capabilities for this work */
+	activeCapabilities?: string[];
+	/** Work-specific settings (masked) */
+	workSettings?: Record<string, unknown>;
+	/** Work plugin entity ID */
+	workPluginId?: string;
 	/** Priority order for this plugin */
 	priority?: number;
 }
@@ -259,11 +262,11 @@ export interface PluginListResponse {
 }
 
 /**
- * Response for directory plugin list endpoint
+ * Response for work plugin list endpoint
  */
-export interface DirectoryPluginListResponse {
+export interface WorkPluginListResponse {
 	/** List of plugins */
-	plugins: DirectoryPluginResponse[];
+	plugins: WorkPluginResponse[];
 	/** Total count of plugins */
 	total: number;
 	/** Capability providers mapping */

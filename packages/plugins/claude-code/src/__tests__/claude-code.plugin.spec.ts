@@ -170,11 +170,11 @@ describe('ClaudeCodePlugin', () => {
 	});
 
 	describe('execute', () => {
-		const directory = {
+		const work = {
 			id: 'dir1',
-			name: 'Test Directory',
-			slug: 'test-directory',
-			description: 'A test directory',
+			name: 'Test Work',
+			slug: 'test-work',
+			description: 'A test work',
 			user: { id: 'user1' }
 		};
 
@@ -193,7 +193,7 @@ describe('ClaudeCodePlugin', () => {
 			const ctx = createMockContext();
 			await plugin.onLoad(ctx);
 
-			const result = await plugin.execute(directory, request, existing);
+			const result = await plugin.execute(work, request, existing);
 
 			expect(result.success).toBe(true);
 			expect(result.outputs.items).toHaveLength(1);
@@ -218,7 +218,7 @@ describe('ClaudeCodePlugin', () => {
 			await plugin.onLoad(ctx);
 
 			const progressUpdates: Array<{ percent: number }> = [];
-			await plugin.execute(directory, request, existing, undefined, (p) => progressUpdates.push(p));
+			await plugin.execute(work, request, existing, undefined, (p) => progressUpdates.push(p));
 
 			expect(progressUpdates.length).toBeGreaterThan(0);
 			expect(progressUpdates[progressUpdates.length - 1].percent).toBe(100);
@@ -244,7 +244,7 @@ describe('ClaudeCodePlugin', () => {
 			await plugin.onLoad(ctx);
 
 			const progressUpdates: Array<{ percent: number; message?: string; itemsProcessed?: number }> = [];
-			await plugin.execute(directory, { ...request, config: { target_items: 10 } }, existing, undefined, (p) =>
+			await plugin.execute(work, { ...request, config: { target_items: 10 } }, existing, undefined, (p) =>
 				progressUpdates.push(p)
 			);
 
@@ -310,7 +310,7 @@ describe('ClaudeCodePlugin', () => {
 				stepName?: string | null;
 			}> = [];
 
-			await plugin.execute(directory, request, existing, {
+			await plugin.execute(work, request, existing, {
 				onLogEntry: (log) => logs.push(log)
 			});
 
@@ -381,7 +381,7 @@ describe('ClaudeCodePlugin', () => {
 			const ctx = createMockContext();
 			await plugin.onLoad(ctx);
 
-			const result = await plugin.execute(directory, request, existing);
+			const result = await plugin.execute(work, request, existing);
 
 			expect(result.success).toBe(true);
 			expect(result.warnings).toHaveLength(1);
@@ -404,7 +404,7 @@ describe('ClaudeCodePlugin', () => {
 			const ctx = createMockContext();
 			await plugin.onLoad(ctx);
 
-			const result = await plugin.execute(directory, request, existing);
+			const result = await plugin.execute(work, request, existing);
 
 			expect(result.warnings).toHaveLength(1);
 			expect(result.warnings![0]).toContain('Max turns reached');
@@ -415,7 +415,7 @@ describe('ClaudeCodePlugin', () => {
 			await plugin.onLoad(ctx);
 
 			// No execContext → screenshots skipped
-			const result1 = await plugin.execute(directory, request, existing);
+			const result1 = await plugin.execute(work, request, existing);
 			expect(result1.success).toBe(true);
 			expect(plugin.getState()?.steps.get('capture-screenshots')?.status).toBe('skipped');
 
@@ -425,7 +425,7 @@ describe('ClaudeCodePlugin', () => {
 			await plugin2.onLoad(createMockContext());
 
 			// Facade throws → pipeline still succeeds
-			const result2 = await plugin2.execute(directory, request, existing, {
+			const result2 = await plugin2.execute(work, request, existing, {
 				execContext: {
 					aiFacade: {} as never,
 					searchFacade: {} as never,
@@ -437,7 +437,7 @@ describe('ClaudeCodePlugin', () => {
 					} as never,
 					contentExtractorFacade: {} as never,
 					logger: { log: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
-					directory,
+					work,
 					user: { id: 'user1' }
 				}
 			});
@@ -461,14 +461,14 @@ describe('ClaudeCodePlugin', () => {
 				getScreenshotUrl: vi.fn()
 			};
 
-			const result = await plugin.execute(directory, request, existing, {
+			const result = await plugin.execute(work, request, existing, {
 				execContext: {
 					aiFacade: {} as never,
 					searchFacade: {} as never,
 					screenshotFacade: mockScreenshotFacade as never,
 					contentExtractorFacade: {} as never,
 					logger: { log: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
-					directory,
+					work,
 					user: { id: 'user1' }
 				}
 			});

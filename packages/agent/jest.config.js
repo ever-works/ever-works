@@ -14,7 +14,7 @@ module.exports = {
         ],
     },
     collectCoverageFrom: ['**/*.(t|j)s'],
-    coverageDirectory: '../coverage',
+    coverageWork: '../coverage',
     testEnvironment: 'node',
     moduleNameMapper: {
         '^@src/(.*)$': '<rootDir>/$1',

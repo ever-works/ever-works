@@ -19,22 +19,22 @@ export class ImageCaptureStep extends BasePipelineStep {
 		context: MutableGenerationContext,
 		execContext: StepExecutionContext
 	): Promise<MutableGenerationContext> {
-		const { directory, request, finalItems, domainAnalysis } = context;
+		const { work, request, finalItems, domainAnalysis } = context;
 		const { logger, screenshotFacade } = execContext;
 		const config = request.config || {};
 
 		const facadeOptions: FacadeOptions = {
 			userId: execContext.user!.id,
-			directoryId: execContext.directory.id
+			workId: execContext.work.id
 		};
 
 		if (!config.capture_screenshots) {
-			logger.debug(`[${directory.slug}] Image capture disabled, skipping`);
+			logger.debug(`[${work.slug}] Image capture disabled, skipping`);
 			return context;
 		}
 
 		if (!screenshotFacade.isAvailable()) {
-			logger.warn(`[${directory.slug}] Screenshot service not configured, skipping image capture`);
+			logger.warn(`[${work.slug}] Screenshot service not configured, skipping image capture`);
 			this.addWarning(
 				context,
 				'Screenshot provider is not configured. Enable a screenshot plugin to capture item images.'
@@ -43,7 +43,7 @@ export class ImageCaptureStep extends BasePipelineStep {
 		}
 
 		if (!domainAnalysis) {
-			logger.warn(`[${directory.slug}] No domain analysis available, skipping image capture`);
+			logger.warn(`[${work.slug}] No domain analysis available, skipping image capture`);
 			return context;
 		}
 
@@ -52,14 +52,12 @@ export class ImageCaptureStep extends BasePipelineStep {
 		);
 
 		if (itemsNeedingImages.length === 0) {
-			logger.debug(`[${directory.slug}] No items need images`);
+			logger.debug(`[${work.slug}] No items need images`);
 			return context;
 		}
 
 		const domainType = domainAnalysis.domain_type as DomainType;
-		logger.log(
-			`[${directory.slug}] Capturing images for ${itemsNeedingImages.length} items (domain: ${domainType})`
-		);
+		logger.log(`[${work.slug}] Capturing images for ${itemsNeedingImages.length} items (domain: ${domainType})`);
 
 		const captureErrors: string[] = [];
 
@@ -76,11 +74,11 @@ export class ImageCaptureStep extends BasePipelineStep {
 
 				if (result.primaryImage) {
 					item.images = [result.primaryImage, ...(item.images || [])];
-					logger.debug(`[${directory.slug}] Captured ${result.source} image for ${item.name}`);
+					logger.debug(`[${work.slug}] Captured ${result.source} image for ${item.name}`);
 				}
 			} catch (error) {
 				const reason = error instanceof Error ? error.message : 'Unknown error';
-				logger.warn(`[${directory.slug}] Failed to capture image for ${item.name}: ${reason}`);
+				logger.warn(`[${work.slug}] Failed to capture image for ${item.name}: ${reason}`);
 				captureErrors.push(reason);
 			}
 
@@ -94,7 +92,7 @@ export class ImageCaptureStep extends BasePipelineStep {
 			this.addWarning(context, `${label} failed for ${captureErrors.length} item(s): ${uniqueErrors.join('; ')}`);
 		}
 
-		logger.log(`[${directory.slug}] Image capture complete for ${itemsNeedingImages.length} items`);
+		logger.log(`[${work.slug}] Image capture complete for ${itemsNeedingImages.length} items`);
 
 		return context;
 	}

@@ -1,22 +1,22 @@
 import { describe, it, expect } from 'vitest';
 import { buildWorkflowPayload } from '../utils/payload-builder.js';
-import type { DirectoryReference, GenerationRequest, ExistingItems } from '@ever-works/plugin';
+import type { WorkReference, GenerationRequest, ExistingItems } from '@ever-works/plugin';
 
 function createOptions(overrides?: {
-	directory?: Partial<DirectoryReference>;
+	work?: Partial<WorkReference>;
 	request?: Partial<GenerationRequest>;
 	existing?: Partial<ExistingItems>;
 	config?: Record<string, unknown>;
 }) {
 	return {
-		directory: {
+		work: {
 			id: 'dir-1',
-			name: 'My Directory',
-			slug: 'my-directory',
-			description: 'A test directory',
+			name: 'My Work',
+			slug: 'my-work',
+			description: 'A test work',
 			user: { id: 'user-1' },
-			...overrides?.directory
-		} as DirectoryReference,
+			...overrides?.work
+		} as WorkReference,
 		request: {
 			prompt: 'Find AI tools',
 			generationMethod: 'create-update',
@@ -36,14 +36,14 @@ function createOptions(overrides?: {
 }
 
 describe('buildWorkflowPayload', () => {
-	it('should build metadata from directory and request', () => {
+	it('should build metadata from work and request', () => {
 		const payload = buildWorkflowPayload(createOptions());
 
 		expect(payload.metadata).toEqual({
-			directoryId: 'dir-1',
-			directoryName: 'My Directory',
-			directorySlug: 'my-directory',
-			directoryDescription: 'A test directory',
+			workId: 'dir-1',
+			workName: 'My Work',
+			workSlug: 'my-work',
+			workDescription: 'A test work',
 			prompt: 'Find AI tools',
 			generationMethod: 'create-update',
 			targetItems: 50

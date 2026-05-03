@@ -140,7 +140,7 @@ With `futureFlags.globalConfiguration`, global settings move under a `global` ke
 }
 ```
 
-## Directory Organization
+## Work Organization
 
 ### Grouping Packages
 

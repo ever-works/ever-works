@@ -150,7 +150,7 @@
         },
         "register": {
             "title": "アカウントを作成",
-            "subtitle": "今日から素晴らしいディレクトリを作成開始",
+            "subtitle": "今日から素晴らしいワークを作成開始",
             "form": {
                 "name": {
                     "label": "フルネーム",
@@ -197,18 +197,18 @@
     "onboarding": {
         "label": "はじめに",
         "title": "Ever Works へようこそ",
-        "subtitle": "数分で最初のディレクトリを作成・公開しましょう。",
+        "subtitle": "数分で最初のワークを作成・公開しましょう。",
         "skipButton": "今はスキップ",
         "nextButton": "次へ",
         "stepIndex": "ステップ {index}",
         "steps": {
             "welcome": {
                 "title": "Ever Works とは？",
-                "description": "Ever Works はオープンソースのディレクトリビルダーです。ツール、求人、リンク、製品などの構造化されたコンテンツディレクトリを作成し、ライブウェブサイトとして公開します。",
-                "detail": "セットアップを始めましょう。以下のプロバイダーを接続し、最初のディレクトリを作成してください。",
+                "description": "Ever Works はオープンソースのワークビルダーです。ツール、求人、リンク、製品などの構造化されたコンテンツワークを作成し、ライブウェブサイトとして公開します。",
+                "detail": "セットアップを始めましょう。以下のプロバイダーを接続し、最初のワークを作成してください。",
                 "feature1": {
                     "title": "AI 駆動のコンテンツ",
-                    "description": "AI プロバイダーを使用してディレクトリ項目を自動生成・充実させます。"
+                    "description": "AI プロバイダーを使用してワーク項目を自動生成・充実させます。"
                 },
                 "feature2": {
                     "title": "即時公開",
@@ -216,18 +216,18 @@
                 },
                 "feature3": {
                     "title": "Git ベース",
-                    "description": "すべてのディレクトリは、あなたが所有・管理する GitHub リポジトリです。"
+                    "description": "すべてのワークは、あなたが所有・管理する GitHub リポジトリです。"
                 }
             },
-            "directory": {
-                "title": "最初のディレクトリを作成",
-                "description": "ディレクトリはコンテンツのハブです。項目を追加し、レイアウトを設定し、1 クリックで公開できます。",
-                "detail": "準備完了です！最初のディレクトリを作成して、コンテンツの構築と公開を始めましょう。",
-                "action": "ディレクトリを作成"
+            "work": {
+                "title": "最初のワークを作成",
+                "description": "ワークはコンテンツのハブです。項目を追加し、レイアウトを設定し、1 クリックで公開できます。",
+                "detail": "準備完了です！最初のワークを作成して、コンテンツの構築と公開を始めましょう。",
+                "action": "ワークを作成"
             },
             "publish": {
                 "title": "公開する",
-                "description": "Vercel または GitHub を接続してディレクトリを公開ウェブサイトとしてデプロイ — ホスティング設定不要です。",
+                "description": "Vercel または GitHub を接続してワークを公開ウェブサイトとしてデプロイ — ホスティング設定不要です。",
                 "action": "公開設定"
             }
         },
@@ -336,7 +336,7 @@
             "steps": {
                 "model": {
                     "title": "モデルを選択",
-                    "description": "エンドツーエンドのディレクトリ生成に使用する Codex モデルを選択してください。"
+                    "description": "エンドツーエンドのワーク生成に使用する Codex モデルを選択してください。"
                 },
                 "credentials": {
                     "title": "認証情報を追加",
@@ -408,7 +408,7 @@
         "simWizard": {
             "label": "SIM AI のセットアップ",
             "title": "2 ステップで SIM AI をセットアップ",
-            "subtitle": "SIM AI API キーを追加し、接続を検証して SIM ワークフローにディレクトリ生成を委任します。",
+            "subtitle": "SIM AI API キーを追加し、接続を検証して SIM ワークフローにワーク生成を委任します。",
             "stepIndex": "ステップ {index}",
             "continueButton": "続ける",
             "steps": {
@@ -431,7 +431,7 @@
         "title": "ダッシュボード",
         "connectGithub": {
             "title": "GitHub アカウントを接続",
-            "description": "ディレクトリリポジトリの作成と管理には GitHub が必要です。アカウントを接続して開始してください。",
+            "description": "ワークリポジトリの作成と管理には GitHub が必要です。アカウントを接続して開始してください。",
             "connect": "GitHub を接続",
             "dismiss": "後でやります"
         },
@@ -465,7 +465,7 @@
         },
         "header": {
             "welcome": "おかえりなさい、{username}！",
-            "subtitle": "AI 駆動のディレクトリを管理し、パフォーマンスを追跡",
+            "subtitle": "AI 駆動のワークを管理し、パフォーマンスを追跡",
             "onboarding": {
                 "badge": "オンボーディング {currentStep}/{totalSteps}",
                 "dismiss": "オンボーディングショートカットを非表示"
@@ -490,14 +490,14 @@
                 },
                 "quickTips": {
                     "title": "クイックヒント",
-                    "tip1": "ダッシュボードの「ディレクトリを作成」ボタンをクリックして最初のディレクトリを作成します。",
-                    "tip2": "AI ジェネレーターを使用して、ディレクトリに関連アイテムを自動的に追加します。",
-                    "tip3": "GitHub アカウントを接続して、ディレクトリをリポジトリとして同期・デプロイします。"
+                    "tip1": "ダッシュボードの「ワークを作成」ボタンをクリックして最初のワークを作成します。",
+                    "tip2": "AI ジェネレーターを使用して、ワークに関連アイテムを自動的に追加します。",
+                    "tip3": "GitHub アカウントを接続して、ワークをリポジトリとして同期・デプロイします。"
                 },
                 "shortcuts": {
                     "title": "キーボードショートカット",
-                    "search": "ディレクトリを検索",
-                    "newDirectory": "新しいディレクトリを作成",
+                    "search": "ワークを検索",
+                    "newWork": "新しいワークを作成",
                     "help": "ヘルプを開く",
                     "hint": "Mac では Cmd、Windows/Linux では Ctrl を使用"
                 },
@@ -513,7 +513,7 @@
         },
         "activity": {
             "title": "アクティビティログ",
-            "subtitle": "ディレクトリ全体のすべての操作を追跡",
+            "subtitle": "ワーク全体のすべての操作を追跡",
             "loading": "読み込み中...",
             "fetchFailed": "アクティビティの読み込みに失敗しました",
             "exportFailed": "アクティビティログのエクスポートに失敗しました",
@@ -521,7 +521,7 @@
             "columns": {
                 "status": "ステータス",
                 "dateTime": "日時",
-                "directory": "ディレクトリ",
+                "work": "ワーク",
                 "type": "タイプ",
                 "summary": "概要"
             },
@@ -532,9 +532,9 @@
                     "generation": "生成",
                     "comparison": "比較",
                     "deployment": "デプロイ",
-                    "directoryCreated": "ディレクトリ作成",
-                    "directoryUpdated": "ディレクトリ更新",
-                    "directoryDeleted": "ディレクトリ削除",
+                    "workCreated": "ワーク作成",
+                    "workUpdated": "ワーク更新",
+                    "workDeleted": "ワーク削除",
                     "pluginEnabled": "プラグイン有効",
                     "pluginDisabled": "プラグイン無効",
                     "pluginConfigured": "プラグイン設定",
@@ -553,7 +553,8 @@
                     "pending": "保留中",
                     "inProgress": "進行中",
                     "completed": "完了",
-                    "failed": "失敗"
+                    "failed": "失敗",
+                    "cancelled": "キャンセル済み"
                 }
             },
             "actions": {
@@ -595,32 +596,32 @@
                 "pageOf": "{total} ページ中 {page} ページ"
             }
         },
-        "directories": {
-            "title": "ディレクトリ",
-            "subtitle": "AI 駆動のディレクトリを管理・整理",
+        "works": {
+            "title": "ワーク",
+            "subtitle": "AI 駆動のワークを管理・整理",
             "summary": {
-                "totalDirectories": "ディレクトリ合計",
+                "totalWorks": "ワーク合計",
                 "generating": "生成中",
                 "totalItems": "アイテム合計"
             },
-            "recent": "最近のディレクトリ",
+            "recent": "最近のワーク",
             "viewAll": "すべて表示 ({count})",
-            "search": "ディレクトリを検索...",
-            "create": "ディレクトリを作成",
-            "showing": "{total} ディレクトリ中 {current} を表示中",
-            "searchFailed": "ディレクトリの検索に失敗しました。もう一度お試しください。",
+            "search": "ワークを検索...",
+            "create": "ワークを作成",
+            "showing": "{total} ワーク中 {current} を表示中",
+            "searchFailed": "ワークの検索に失敗しました。もう一度お試しください。",
             "pagination": {
                 "previous": "前へ",
                 "next": "次へ"
             },
             "empty": {
-                "title": "まだディレクトリはありません",
-                "description": "コンテンツの整理と表示を開始するために、最初の AI 駆動ディレクトリを作成してください。",
-                "action": "最初のディレクトリを作成",
+                "title": "まだワークはありません",
+                "description": "コンテンツの整理と表示を開始するために、最初の AI 駆動ワークを作成してください。",
+                "action": "最初のワークを作成",
                 "notFound": {
-                    "title": "ディレクトリが見つかりません",
+                    "title": "ワークが見つかりません",
                     "withSearch": "検索語を調整してみてください",
-                    "withoutSearch": "開始するために最初の AI 駆動ディレクトリを作成してください"
+                    "withoutSearch": "開始するために最初の AI 駆動ワークを作成してください"
                 }
             }
         },
@@ -637,7 +638,7 @@
             },
             "data": {
                 "exportTitle": "データをエクスポート",
-                "exportDescription": "ディレクトリ、プラグイン設定、プロフィール情報を含むアカウントデータを JSON ファイルとしてダウンロードします。",
+                "exportDescription": "ワーク、プラグイン設定、プロフィール情報を含むアカウントデータを JSON ファイルとしてダウンロードします。",
                 "includeSecrets": "シークレット設定（API キー、トークン）を含める — マスクされた値としてエクスポート",
                 "secretsWarning": "シークレット設定はマスクされた値としてエクスポートされます。インポート前に実際の認証情報に手動で置き換える必要があります。",
                 "exportButton": "データをエクスポート",
@@ -645,7 +646,7 @@
                 "exportSuccess": "データが正常にエクスポートされました",
                 "exportError": "データのエクスポートに失敗しました",
                 "importTitle": "データをインポート",
-                "importDescription": "以前エクスポートした JSON ファイルからデータをインポートします。スラグが一致するディレクトリの競合を解決できます。",
+                "importDescription": "以前エクスポートした JSON ファイルからデータをインポートします。スラグが一致するワークの競合を解決できます。",
                 "importButton": "データをインポート",
                 "syncTitle": "GitHub 同期",
                 "syncDescription": "バックアップとインスタンス間の移行のために、アカウント設定をプライベート GitHub リポジトリに同期します。",
@@ -657,13 +658,13 @@
                     "invalidJson": "無効な JSON ファイルです",
                     "previewError": "インポートファイルの解析に失敗しました",
                     "summary": "インポート要約",
-                    "directories": "ディレクトリ",
+                    "works": "ワーク",
                     "items": "項目",
                     "userPlugins": "ユーザー プラグイン",
                     "version": "フォーマット バージョン",
                     "missingPlugins": "これらのプラグインはインストールされておらず、スキップされます",
                     "conflicts": "スラグ競合",
-                    "existingDirectory": "既存",
+                    "existingWork": "既存",
                     "incoming": "インポート",
                     "strategySkip": "スキップ（既存を保持）",
                     "strategyOverwrite": "既存を上書き",
@@ -680,9 +681,9 @@
                     "validationErrors": "検証エラー",
                     "resultSuccess": "インポートが正常に完了しました",
                     "resultFailed": "インポートに失敗しました",
-                    "directoriesCreated": "ディレクトリが作成されました",
-                    "directoriesUpdated": "ディレクトリが更新されました",
-                    "directoriesSkipped": "ディレクトリがスキップされました",
+                    "worksCreated": "ワークが作成されました",
+                    "worksUpdated": "ワークが更新されました",
+                    "worksSkipped": "ワークがスキップされました",
                     "pluginsImported": "プラグインがインポートされました",
                     "warnings": "警告",
                     "errors": "エラー"
@@ -731,11 +732,11 @@
                 "backToCategory": "{category} に戻る",
                 "pipelineDefault": {
                     "title": "デフォルト パイプライン",
-                    "description": "ディレクトリ項目生成時にデフォルトで使用するパイプラインを選択します。",
+                    "description": "ワーク項目生成時にデフォルトで使用するパイプラインを選択します。",
                     "autoLabel": "自動",
-                    "autoDescription": "各ディレクトリにシステム解決のパイプラインを使用",
+                    "autoDescription": "各ワークにシステム解決のパイプラインを使用",
                     "enforceLabel": "このデフォルトを強制",
-                    "enforceDescription": "ディレクトリに独自のパイプラインが設定されていても、このパイプラインを常に事前選択します。フォームで手動でパイプラインを切り替えることは可能です。",
+                    "enforceDescription": "ワークに独自のパイプラインが設定されていても、このパイプラインを常に事前選択します。フォームで手動でパイプラインを切り替えることは可能です。",
                     "saveFailed": "デフォルト パイプラインの保存に失敗しました"
                 }
             },
@@ -818,8 +819,8 @@
                 "subtitle": "拡張機能のために外部アカウントを接続",
                 "github": {
                     "name": "GitHub",
-                    "connected": "GitHub リポジトリでディレクトリを作成および管理",
-                    "disconnected": "リポジトリからディレクトリを作成するには接続してください",
+                    "connected": "GitHub リポジトリでワークを作成および管理",
+                    "disconnected": "リポジトリからワークを作成するには接続してください",
                     "scopes": "スコープ",
                     "organizations": "接続済み組織",
                     "organizationsHint": "追加の組織へのアクセスを許可するには再接続を使用",
@@ -880,12 +881,12 @@
             }
         },
         "stats": {
-            "totalDirectories": "ディレクトリの合計",
+            "totalWorks": "ワークの合計",
             "totalItems": "項目の合計",
             "activeWebsites": "アクティブなウェブサイト",
             "fromLastMonth": "先月から"
         },
-        "directoryCard": {
+        "workCard": {
             "status": {
                 "active": "アクティブ",
                 "notStarted": "未開始",
@@ -910,14 +911,14 @@
             "views": "{count} ビュー",
             "updated": "{date} に更新",
             "viewAction": "表示 →",
-            "openingTitle": "ディレクトリを開いています",
-            "openingMessage": "ディレクトリを準備中です。詳細がまもなく開きます。このページに留まってください。"
+            "openingTitle": "ワークを開いています",
+            "openingMessage": "ワークを準備中です。詳細がまもなく開きます。このページに留まってください。"
         },
-        "directoryList": {
-            "title": "ディレクトリ",
-            "createButton": "ディレクトリを作成"
+        "workList": {
+            "title": "ワーク",
+            "createButton": "ワークを作成"
         },
-        "directoryDetail": {
+        "workDetail": {
             "failedToGenerateItems": "アイテムの生成に失敗しました。もう一度お試しください。",
             "generationCompleted": "生成が正常に完了しました",
             "generationCancelled": "生成がキャンセルされました",
@@ -952,7 +953,7 @@
             },
             "members": {
                 "title": "チームメンバー",
-                "subtitle": "このディレクトリのアクセス権限とメンバーの権限を管理します。",
+                "subtitle": "このワークのアクセス権限とメンバーの権限を管理します。",
                 "inviteMember": "メンバーを招待",
                 "noMembers": "まだチームメンバーがいません。コラボレーションのために誰かを招待しましょう。",
                 "roles": {
@@ -964,13 +965,13 @@
                 },
                 "roleDescriptions": {
                     "owner": "削除やメンバー管理を含む完全な制御。",
-                    "manager": "ディレクトリの編集とメンバー管理が可能ですが、削除はできません。",
-                    "editor": "ディレクトリの内容を編集し、生成を実行できます。",
-                    "viewer": "ディレクトリを閲覧する読み取り専用アクセス。"
+                    "manager": "ワークの編集とメンバー管理が可能ですが、削除はできません。",
+                    "editor": "ワークの内容を編集し、生成を実行できます。",
+                    "viewer": "ワークを閲覧する読み取り専用アクセス。"
                 },
                 "invite": {
                     "title": "チームメンバーを招待",
-                    "description": "このディレクトリでコラボレーションするための新しいメンバーを追加します。",
+                    "description": "このワークでコラボレーションするための新しいメンバーを追加します。",
                     "emailLabel": "メールアドレス",
                     "emailPlaceholder": "colleague@example.com",
                     "roleLabel": "役割",
@@ -984,7 +985,7 @@
                 },
                 "confirmRemove": {
                     "title": "メンバーを削除",
-                    "description": "このディレクトリから {username} を削除してもよろしいですか？すべてのアクセス権が失われます。",
+                    "description": "このワークから {username} を削除してもよろしいですか？すべてのアクセス権が失われます。",
                     "confirm": "削除",
                     "cancel": "キャンセル"
                 },
@@ -999,7 +1000,7 @@
                 "page": {
                     "title": "スケジュールされた更新",
                     "subtitle": "専用の間隔と障害処理で {name} の更新を自動化します。",
-                    "fallbackName": "このディレクトリ",
+                    "fallbackName": "このワーク",
                     "loadFailed": "スケジュール設定の読み込みに失敗しました。",
                     "providerCategories": {
                         "pipeline": "パイプライン",
@@ -1100,7 +1101,7 @@
                     },
                     "empty": {
                         "title": "最初に手動生成を実行",
-                        "description": "自動スケジュールを解除するために1回成功した手動実行を完了してください。ディレクトリにデータがあると新鮮に保てます。",
+                        "description": "自動スケジュールを解除するために1回成功した手動実行を完了してください。ワークにデータがあると新鮮に保てます。",
                         "refresh": "状態を更新"
                     },
                     "requiresGeneration": "スケジュールを有効にする前に少なくとも1回のアイテム生成を実行してください。"
@@ -1118,7 +1119,7 @@
             "statusCard": {
                 "notStarted": {
                     "title": "生成未開始",
-                    "description": "ディレクトリにコンテンツを格納するためにアイテムの生成を開始してください。",
+                    "description": "ワークにコンテンツを格納するためにアイテムの生成を開始してください。",
                     "action": "生成を開始"
                 },
                 "generating": {
@@ -1132,7 +1133,7 @@
                 },
                 "generated": {
                     "title": "生成完了",
-                    "description": "ディレクトリに正常にアイテムが格納されました。",
+                    "description": "ワークに正常にアイテムが格納されました。",
                     "withWarnings": "警告付きで完了:",
                     "viewItems": "アイテムを表示",
                     "regenerate": "再生成"
@@ -1158,7 +1159,7 @@
             },
             "comparisons": {
                 "title": "比較",
-                "subtitle": "ディレクトリアイテム間の A vs B 比較ページ",
+                "subtitle": "ワークアイテム間の A vs B 比較ページ",
                 "vs": "対",
                 "winner": "勝者: {name}",
                 "tie": "引き分け",
@@ -1306,7 +1307,7 @@
                 }
             },
             "info": {
-                "title": "ディレクトリ情報",
+                "title": "ワーク情報",
                 "yourRole": "あなたの役割",
                 "role": {
                     "owner": "オーナー",
@@ -1356,15 +1357,15 @@
             "activity": {
                 "title": "最近のアクティビティ",
                 "noActivity": "まだアクティビティなし",
-                "created": "ディレクトリ作成",
-                "directoryCreated": "ディレクトリが正常に作成されました",
+                "created": "ワーク作成",
+                "workCreated": "ワークが正常に作成されました",
                 "justNow": "たった今"
             },
             "items": {
-                "title": "ディレクトリ項目",
-                "subtitle": "ディレクトリの項目を管理および整理",
+                "title": "ワーク項目",
+                "subtitle": "ワークの項目を管理および整理",
                 "noItemsTitle": "まだ項目がありません",
-                "noItemsDescription": "ディレクトリにまだ項目がありません。項目を生成してディレクトリにコンテンツを追加してください。",
+                "noItemsDescription": "ワークにまだ項目がありません。項目を生成してワークにコンテンツを追加してください。",
                 "generateItems": "項目を生成",
                 "searchPlaceholder": "項目を検索...",
                 "allCategories": "すべてのカテゴリ",
@@ -1426,14 +1427,14 @@
                     "screenshotFailed": "スクリーンショットのキャプチャに失敗しました",
                     "screenshotError": "スクリーンショットのキャプチャ中にエラーが発生しました",
                     "featured": "注目項目",
-                    "featuredHelp": "ディレクトリでこの項目を注目としてマーク",
+                    "featuredHelp": "ワークでこの項目を注目としてマーク",
                     "updateWithPR": "プルリクエストを作成",
                     "updateWithPRHelp": "直接コミットではなくプルリクエストで変更を送信",
                     "cancel": "キャンセル",
                     "adding": "追加中...",
                     "addItem": "項目を追加",
                     "success": "項目が正常に追加されました",
-                    "successDescription": "項目がディレクトリに追加されました",
+                    "successDescription": "項目がワークに追加されました",
                     "failed": "項目の追加に失敗しました",
                     "error": "項目の追加中にエラーが発生しました",
                     "errors": {
@@ -1652,7 +1653,7 @@
                     "navigationLabel": "ジェネレーター タブ"
                 },
                 "regenerationWarning": "再生成の警告",
-                "regenerationWarningDescription": "このディレクトリはすでに生成されています。新規生成を開始すると、既存のアイテムが置き換えられます。",
+                "regenerationWarningDescription": "このワークはすでに生成されています。新規生成を開始すると、既存のアイテムが置き換えられます。",
                 "requiredInfo": "必須情報",
                 "updateConfiguration": "構成の更新",
                 "promptRequired": "プロンプトが必要です",
@@ -1662,20 +1663,20 @@
                 "loadingFormSchema": "フォーム構成を読み込み中...",
                 "failedToLoadFormSchema": "フォーム構成の読み込みに失敗しました",
                 "selectOption": "オプションを選択",
-                "directoryName": "ディレクトリ名",
+                "workName": "ワーク名",
                 "generationPrompt": "生成プロンプト",
                 "modelOverride": "AI モデル上書き",
                 "modelOverridePlaceholder": "例: openai/gpt-4.1 または openrouter/openai/gpt-4.1",
                 "modelOverrideHelperText": "オプションです。デフォルトではインポートされたモデルまたは以前のモデルを使用しますが、ここで上書きできます。",
                 "recommended": "おすすめ",
-                "promptPlaceholder": "このディレクトリに生成するアイテムを記述してください...",
+                "promptPlaceholder": "このワークに生成するアイテムを記述してください...",
                 "promptHelperText": "生成したいコンテンツの種類について具体的に記述してください",
                 "repositoryDescription": "リポジトリの説明",
                 "repositoryPlaceholder": "リポジトリの簡単な説明（オプション）",
                 "startGeneration": "生成を開始",
                 "regenerateItems": "アイテムを再生成",
                 "updateItems": "生成を実行",
-                "recreateDirectory": "ディレクトリを再作成",
+                "recreateWork": "ワークを再作成",
                 "showAdvancedOptions": "詳細オプションを表示",
                 "hideAdvancedOptions": "詳細オプションを非表示",
                 "cancel": "キャンセル",
@@ -1713,7 +1714,7 @@
                 "websiteRepositoryCreationMethod": "ウェブサイト リポジトリ作成方法",
                 "methodDuplicate": "複製",
                 "methodFork": "フォーク",
-                "directoryNamePlaceholder": "ディレクトリ名を入力",
+                "workNamePlaceholder": "ワーク名を入力",
                 "methodCreateFromTemplate": "テンプレートから作成",
                 "aiProcessingConfiguration": "AI 処理構成",
                 "maxSearchQueries": "最大検索クエリ数",
@@ -1724,7 +1725,7 @@
                 "aiFirstGenerationDescription": "ウェブ検索前に初期アイテムの AI 生成を有効にする。",
                 "contentFiltering": "コンテンツフィルタリング",
                 "contentFilteringDescription": "コンテンツ品質フィルタリングを有効にする",
-                "recreateConfirmTitle": "ディレクトリデータを再作成しますか？",
+                "recreateConfirmTitle": "ワークデータを再作成しますか？",
                 "recreateConfirmDescription": "再作成すると既存のアイテムを削除し、ゼロから再生成します。この操作は元に戻せません。",
                 "confirmRecreate": "はい、再作成",
                 "recreateInlineTitle": "再作成すると既存のアイテムが削除されます",
@@ -1768,10 +1769,11 @@
                 "aiProviderDescription": "コンテンツ生成と抽出のための AI モデルプロバイダ",
                 "contentExtractorProvider": "コンテンツ抽出",
                 "contentExtractorProviderDescription": "ウェブページからコンテンツを抽出するプロバイダ",
-                "useDirectoryDefault": "ディレクトリ既定を使用",
+                "useWorkDefault": "ワーク既定を使用",
                 "default": "既定",
                 "notConfigured": "未設定",
                 "notConfiguredTooltip": "このプロバイダは設定が必要です。Settings → Plugins を訪れて設定してください。",
+                "changeModels": "変更",
                 "jsonObjectError": "値は JSON オブジェクトである必要があります",
                 "invalidJsonError": "無効な JSON 形式"
             },
@@ -1799,7 +1801,11 @@
                 "closeNote": "数分かかる場合があります。このページを閉じて後で戻ることができます。",
                 "showLogs": "ステップ ログを表示",
                 "hideLogs": "ステップ ログを非表示",
-                "waitingForLogs": "ライブログの到着を待機中..."
+                "waitingForLogs": "ライブログの到着を待機中...",
+                "stop": "生成を停止",
+                "stopping": "停止中...",
+                "stopRequested": "生成のキャンセルが要求されました",
+                "stopFailed": "生成のキャンセルに失敗しました"
             },
             "settings": {
                 "sourceSettings": "ソース リポジトリ",
@@ -1831,7 +1837,7 @@
                 },
                 "generalSettings": "一般設定",
                 "generalTitle": "一般設定",
-                "directoryName": "ディレクトリ名",
+                "workName": "ワーク名",
                 "description": "説明",
                 "organizationRepository": "組織リポジトリ",
                 "organizationHelp": "個人アカウントではなく組織の下にリポジトリを作成",
@@ -1843,13 +1849,13 @@
                 "customHeaderPlaceholder": "README ヘッダーにカスタム コンテンツを追加",
                 "overwriteDefaultHeader": "デフォルト ヘッダーを上書き",
                 "customFooter": "カスタム フッター",
-                "cantDeleteWhileGenerating": "アイテムが生成中はディレクトリを削除できません。",
+                "cantDeleteWhileGenerating": "アイテムが生成中はワークを削除できません。",
                 "customFooterPlaceholder": "README フッターにカスタム コンテンツを追加",
                 "overwriteDefaultFooter": "デフォルト フッターを上書き",
                 "dangerZone": "危険領域",
                 "dangerTitle": "危険領域",
-                "deleteWarning": "ディレクトリを削除すると元に戻せません。確実に実行してください。",
-                "dangerDescription": "ディレクトリを削除すると元に戻せません。確実に実行してください。",
+                "deleteWarning": "ワークを削除すると元に戻せません。確実に実行してください。",
+                "dangerDescription": "ワークを削除すると元に戻せません。確実に実行してください。",
                 "deleteOptions": "削除するものを選択：",
                 "deleteDataRepository": "データ リポジトリを削除",
                 "deleteDataRepositoryDescription": "GitHub から JSON データ リポジトリを削除",
@@ -1858,14 +1864,14 @@
                 "deleteWebsiteRepository": "ウェブサイト リポジトリを削除",
                 "deleteWebsiteRepositoryDescription": "デプロイされたウェブサイト リポジトリを削除",
                 "deleteConfirm": "本当に削除しますか？",
-                "deleteConfirmDetail": "この操作は元に戻せません。ディレクトリと選択したリポジトリが永久に削除されます。",
-                "confirmDirectoryName": "削除確認のためディレクトリ名を入力",
-                "confirmDirectoryNameDescription": "削除を確認するには「{name}」と入力してください",
-                "deleteNameMismatch": "ディレクトリ名が一致しません",
-                "deleteButton": "ディレクトリを削除",
+                "deleteConfirmDetail": "この操作は元に戻せません。ワークと選択したリポジトリが永久に削除されます。",
+                "confirmWorkName": "削除確認のためワーク名を入力",
+                "confirmWorkNameDescription": "削除を確認するには「{name}」と入力してください",
+                "deleteNameMismatch": "ワーク名が一致しません",
+                "deleteButton": "ワークを削除",
                 "deleteConfirmButton": "はい、削除",
-                "deleteSuccess": "ディレクトリが正常に削除されました",
-                "deleteFailed": "ディレクトリの削除に失敗しました",
+                "deleteSuccess": "ワークが正常に削除されました",
+                "deleteFailed": "ワークの削除に失敗しました",
                 "yesDelete": "はい、削除",
                 "cancel": "キャンセル",
                 "saveChanges": "変更を保存",
@@ -1874,7 +1880,7 @@
                 "updateFailed": "設定の更新に失敗しました",
                 "deployProvider": {
                     "title": "デプロイ プロバイダー",
-                    "description": "ディレクトリ ウェブサイトをデプロイする場所を選択",
+                    "description": "ワーク ウェブサイトをデプロイする場所を選択",
                     "configure": "設定",
                     "ready": "デプロイの準備完了",
                     "notConfigured": "未設定",
@@ -1911,7 +1917,7 @@
                     "prompts": {
                         "relevanceAssessment": {
                             "title": "関連性評価",
-                            "description": "ディレクトリ トピックとの関連性でウェブページをフィルタリングするための追加指示。",
+                            "description": "ワーク トピックとの関連性でウェブページをフィルタリングするための追加指示。",
                             "placeholder": "例: オープンソース プロジェクトに焦点を当てたページのみを含める..."
                         },
                         "itemGeneration": {
@@ -1962,7 +1968,7 @@
                 "communityPrUpdateFailed": "コミュニティ PR 設定の更新に失敗しました",
                 "websiteConfig": {
                     "title": "ウェブサイト設定",
-                    "subtitle": "ディレクトリ ウェブサイトの外観と動作をカスタマイズ",
+                    "subtitle": "ワーク ウェブサイトの外観と動作をカスタマイズ",
                     "loadFailed": "ウェブサイト設定の読み込みに失敗しました",
                     "saveSuccess": "ウェブサイト設定が正常に保存されました",
                     "saveFailed": "ウェブサイト設定の保存に失敗しました",
@@ -1977,13 +1983,13 @@
                         "siteName": {
                             "title": "サイト ID",
                             "label": "サイト名",
-                            "placeholder": "マイ ディレクトリ",
+                            "placeholder": "マイ ワーク",
                             "helper": "ウェブサイト ヘッダーとブラウザ タブに表示される名前"
                         },
                         "siteUrl": {
                             "label": "サイト URL",
                             "placeholder": "https://example.com",
-                            "helper": "会社またはディレクトリ ウェブサイトの URL"
+                            "helper": "会社またはワーク ウェブサイトの URL"
                         },
                         "global": {
                             "title": "グローバル機能",
@@ -2065,7 +2071,7 @@
                 },
                 "committer": {
                     "title": "Git コミッター",
-                    "description": "このディレクトリの git コミットでコミッター名とメールを上書き。ユーザー設定またはアカウント デフォルトを使用する場合は空のままに。",
+                    "description": "このワークの git コミットでコミッター名とメールを上書き。ユーザー設定またはアカウント デフォルトを使用する場合は空のままに。",
                     "nameLabel": "コミッター名",
                     "emailLabel": "コミッター メール",
                     "save": "コミッターを保存",
@@ -2076,13 +2082,13 @@
             "deploy": {
                 "noProviderAlert": {
                     "title": "デプロイプロバイダーがありません",
-                    "description": "ディレクトリウェブサイトをデプロイするには、デプロイプロバイダーを選択してください。",
+                    "description": "ワークウェブサイトをデプロイするには、デプロイプロバイダーを選択してください。",
                     "selectButton": "選択して続行",
                     "noProviders": "利用可能なデプロイプロバイダーがありません。まずデプロイプラグインをインストールしてください。"
                 },
                 "noTokenAlert": {
                     "title": "{provider} トークンが必要です",
-                    "description": "ディレクトリをデプロイするには、プラグイン設定で {provider} API トークンを設定する必要があります。",
+                    "description": "ワークをデプロイするには、プラグイン設定で {provider} API トークンを設定する必要があります。",
                     "configureButton": "プラグイン設定で設定",
                     "getTokenButton": "API トークンを取得",
                     "howTo": {
@@ -2090,25 +2096,25 @@
                         "step1": "「API トークンを取得」をクリックしてプロバイダーダッシュボードを開きます",
                         "step2": "デプロイ権限を持つ新しいトークンを作成します",
                         "step3": "プラグイン設定 > {provider} で {provider} API トークンを設定します",
-                        "step4": "ここに戻ってディレクトリをデプロイします"
+                        "step4": "ここに戻ってワークをデプロイします"
                     }
                 },
                 "sharedNoTokenAlert": {
                     "title": "デプロイが利用できません",
-                    "description": "ディレクトリオーナーがデプロイを設定していません。ディレクトリオーナーにデプロイの設定を依頼してください。",
+                    "description": "ワークオーナーがデプロイを設定していません。ワークオーナーにデプロイの設定を依頼してください。",
                     "hint": "コラボレーターとして、オーナーがデプロイプロバイダーを設定したら、デプロイをトリガーできます。"
                 },
                 "form": {
                     "deployment": {
                         "title": "ウェブサイトをデプロイ",
-                        "description": "ディレクトリウェブサイトリポジトリをデプロイします。",
+                        "description": "ワークウェブサイトリポジトリをデプロイします。",
                         "deployButton": "{provider} にデプロイ",
                         "deployingButton": "デプロイ中...",
                         "deployingStateButton": "デプロイ中 ({state})...",
                         "successMessage": "ウェブサイトが正常にデプロイされました！",
                         "teamSelection": {
                             "title": "チームを選択",
-                            "description": "このディレクトリをデプロイするチームを選択してください。",
+                            "description": "このワークをデプロイするチームを選択してください。",
                             "label": "チーム",
                             "placeholder": "チームを選択",
                             "confirmButton": "チームにデプロイ",
@@ -2135,7 +2141,7 @@
                     },
                     "info": {
                         "deployInfo": "デプロイには通常1〜3分かかります。完了したらURLが通知されます。",
-                        "updateInfo": "更新により、ディレクトリコンテンツが次のデプロイのためにウェブサイトリポジトリに同期されます。"
+                        "updateInfo": "更新により、ワークコンテンツが次のデプロイのためにウェブサイトリポジトリに同期されます。"
                     },
                     "websiteTemplate": {
                         "title": "自動テンプレート更新",
@@ -2155,7 +2161,7 @@
                         "title": "デプロイ前に設定",
                         "description": "デプロイ前にウェブサイト設定を確認・カスタマイズします",
                         "siteName": "サイト名",
-                        "siteNamePlaceholder": "マイディレクトリ",
+                        "siteNamePlaceholder": "マイワーク",
                         "siteNameHelper": "ウェブサイトに表示される名前（デフォルト: Acme）",
                         "tabGeneral": "全般",
                         "tabHeader": "ヘッダー",
@@ -2202,9 +2208,9 @@
                 }
             }
         },
-        "directoryCreation": {
-            "title": "新しいディレクトリを作成",
-            "subtitle": "ディレクトリを作成する方法を選択してください",
+        "workCreation": {
+            "title": "新しいワークを作成",
+            "subtitle": "ワークを作成する方法を選択してください",
             "backToOptions": "オプションに戻る",
             "sidebar": {
                 "selectedProvider": "Git プロバイダー",
@@ -2212,7 +2218,7 @@
             },
             "deployProvider": {
                 "title": "デプロイ プロバイダー",
-                "description": "ディレクトリウェブサイトをデプロイする場所を選択",
+                "description": "ワークウェブサイトをデプロイする場所を選択",
                 "noProviders": "利用可能なデプロイ プロバイダーがありません",
                 "notConfigured": "未設定",
                 "configured": "デプロイ準備完了",
@@ -2230,21 +2236,21 @@
             },
             "ai": {
                 "title": "AI で作成",
-                "subtitle": "ディレクトリのアイデアを自然言語で記述し、AI にセットアップを任せましょう",
+                "subtitle": "ワークのアイデアを自然言語で記述し、AI にセットアップを任せましょう",
                 "getStarted": "開始",
-                "formTitle": "AI でディレクトリを作成",
-                "formSubtitle": "ディレクトリのアイデアを記述し、AI にセットアップと初期コンテンツ生成を任せましょう",
-                "directoryNameLabel": "ディレクトリ名",
-                "directoryNamePlaceholder": "例: Awesome AI Tools",
-                "directoryNameHelp": "空のままにすると AI が名前を提案します",
-                "promptLabel": "ディレクトリを記述",
+                "formTitle": "AI でワークを作成",
+                "formSubtitle": "ワークのアイデアを記述し、AI にセットアップと初期コンテンツ生成を任せましょう",
+                "workNameLabel": "ワーク名",
+                "workNamePlaceholder": "例: Awesome AI Tools",
+                "workNameHelp": "空のままにすると AI が名前を提案します",
+                "promptLabel": "ワークを記述",
                 "githubRequired": "まず GitHub アカウントを接続してください。",
-                "promptPlaceholder": "作成したいディレクトリの種類、含めるべきアイテム、特定の要件などを記述...",
+                "promptPlaceholder": "作成したいワークの種類、含めるべきアイテム、特定の要件などを記述...",
                 "inspirationText": "インスピレーションが必要ですか？ これらのいずれかを試してみてください：",
                 "examplePrompts": {
                     "0": {
                         "name": "AI 開発者ツール",
-                        "prompt": "開発者向け最高の AI ツールのディレクトリを作成"
+                        "prompt": "開発者向け最高の AI ツールのワークを作成"
                     },
                     "1": {
                         "name": "React コンポーネント ハブ",
@@ -2252,7 +2258,7 @@
                     },
                     "2": {
                         "name": "リモートチームツール",
-                        "prompt": "リモートチーム向け生産性アプリのディレクトリを生成"
+                        "prompt": "リモートチーム向け生産性アプリのワークを生成"
                     },
                     "3": {
                         "name": "サステナブルファッション",
@@ -2267,23 +2273,23 @@
                     "3": "適切なドキュメント付き GitHub リポジトリを設定"
                 },
                 "generateButton": "AI で生成",
-                "generatingButton": "ディレクトリを生成中...",
+                "generatingButton": "ワークを生成中...",
                 "cancelButton": "キャンセル",
                 "noteTitle": "注意：",
-                "noteText": "AI 生成はリクエストの複雑さにより通常 2-5 分かかります。ディレクトリが準備でき次第通知されます。",
+                "noteText": "AI 生成はリクエストの複雑さにより通常 2-5 分かかります。ワークが準備でき次第通知されます。",
                 "errors": {
-                    "promptRequired": "作成したいディレクトリの種類を記述してください",
+                    "promptRequired": "作成したいワークの種類を記述してください",
                     "unconfiguredProviders": "{providers} が未設定です。生成前に設定 → プラグインを訪れて設定してください。",
-                    "nameRequired": "ディレクトリ名が必要です",
-                    "slugRequired": "ディレクトリ スラグが必要です",
-                    "descriptionRequired": "ディレクトリ説明が必要です",
+                    "nameRequired": "ワーク名が必要です",
+                    "slugRequired": "ワーク スラグが必要です",
+                    "descriptionRequired": "ワーク説明が必要です",
                     "githubRequired": "まず GitHub アカウントを接続してください。",
-                    "createFailed": "ディレクトリ作成に失敗しました"
+                    "createFailed": "ワーク作成に失敗しました"
                 },
                 "success": {
-                    "started": "ディレクトリ作成を開始しました！",
+                    "started": "ワーク作成を開始しました！",
                     "generating": "AI がコンテンツを生成中です。数分かかる場合があります...",
-                    "created": "ディレクトリが正常に作成されました！"
+                    "created": "ワークが正常に作成されました！"
                 },
                 "advancedSettings": "詳細設定",
                 "advancedSubtitle": "組織とリポジトリ設定を構成",
@@ -2294,14 +2300,14 @@
             },
             "manual": {
                 "title": "手動で作成",
-                "subtitle": "すべての設定とオプションを完全に制御してディレクトリを設定",
+                "subtitle": "すべての設定とオプションを完全に制御してワークを設定",
                 "configureNow": "今すぐ設定",
-                "formTitle": "手動でディレクトリを作成",
-                "formSubtitle": "すべての設定を完全に制御してディレクトリを設定",
+                "formTitle": "手動でワークを作成",
+                "formSubtitle": "すべての設定を完全に制御してワークを設定",
                 "basicInfo": "基本情報",
-                "nameLabel": "ディレクトリ名 *",
+                "nameLabel": "ワーク名 *",
                 "namePlaceholder": "例: Awesome AI Tools",
-                "slugLabel": "ディレクトリ スラグ *",
+                "slugLabel": "ワーク スラグ *",
                 "slugPlaceholder": "awesome-ai-tools",
                 "githubRequired": "まず GitHub アカウントを接続してください。",
                 "slugHelp": "URL フレンドリーな識別子（小文字、数字、ハイフンのみ）",
@@ -2310,7 +2316,7 @@
                 "advancedSettings": "詳細設定",
                 "advancedSubtitle": "組織、カスタムヘッダーなど",
                 "organizationLabel": "組織の下に作成",
-                "organizationHelp": "このディレクトリを個人アカウントではなく GitHub 組織の下に作成",
+                "organizationHelp": "このワークを個人アカウントではなく GitHub 組織の下に作成",
                 "organizationNameLabel": "組織名",
                 "organizationNamePlaceholder": "my-organization",
                 "headerLabel": "カスタム README ヘッダー",
@@ -2319,25 +2325,25 @@
                 "footerLabel": "カスタム README フッター",
                 "footerPlaceholder": "README ファイルの下部にカスタムコンテンツを追加",
                 "footerOverwrite": "デフォルトフッターを完全に置き換え",
-                "createButton": "ディレクトリを作成",
-                "creatingButton": "ディレクトリを作成中...",
+                "createButton": "ワークを作成",
+                "creatingButton": "ワークを作成中...",
                 "cancelButton": "キャンセル",
-                "nameRequired": "ディレクトリ名が必要です",
-                "slugRequired": "ディレクトリ スラグが必要です",
-                "descriptionRequired": "ディレクトリ説明が必要です",
-                "createFailed": "ディレクトリ作成に失敗しました",
+                "nameRequired": "ワーク名が必要です",
+                "slugRequired": "ワーク スラグが必要です",
+                "descriptionRequired": "ワーク説明が必要です",
+                "createFailed": "ワーク作成に失敗しました",
                 "success": {
-                    "created": "ディレクトリが正常に作成されました！"
+                    "created": "ワークが正常に作成されました！"
                 }
             },
             "import": {
                 "title": "既存をインポート",
-                "subtitle": "既存の GitHub リポジトリからディレクトリをインポート",
+                "subtitle": "既存の GitHub リポジトリからワークをインポート",
                 "importNow": "今すぐインポート",
                 "aiProviderSettings": "AI プロバイダー",
                 "aiProviderSettingsDescription": "README 解析に使用する AI プロバイダーを選択",
-                "formTitle": "GitHub からディレクトリをインポート",
-                "formSubtitle": "既存の GitHub リポジトリからアイテムをインポートしてディレクトリを作成",
+                "formTitle": "GitHub からワークをインポート",
+                "formSubtitle": "既存の GitHub リポジトリからアイテムをインポートしてワークを作成",
                 "sync": {
                     "title": "同期を維持",
                     "description": "ソースリポジトリから自動的に更新を取得。"
@@ -2390,13 +2396,13 @@
                     "schedule": "スケジュール: {cadence}",
                     "providers": "プロバイダー: {providers}"
                 },
-                "nameLabel": "ディレクトリ名",
-                "namePlaceholder": "例: マイ Awesome ディレクトリ",
+                "nameLabel": "ワーク名",
+                "namePlaceholder": "例: マイ Awesome ワーク",
                 "advancedSettings": "詳細設定",
                 "advancedSubtitle": "組織とリポジトリ設定を構成",
                 "attribution": {
                     "title": "ソース帰属：",
-                    "text": "このディレクトリは {url} をソースとして参照します"
+                    "text": "このワークは {url} をソースとして参照します"
                 },
                 "research": {
                     "title": "インポート＆リサーチ モード",
@@ -2419,13 +2425,13 @@
                     "importingButton": "リサーチパイプラインを開始中..."
                 },
                 "analyzeButton": "リポジトリを解析",
-                "importButton": "ディレクトリをインポート",
+                "importButton": "ワークをインポート",
                 "importingButton": "インポート中...",
                 "backButton": "戻る",
                 "cancelButton": "キャンセル",
                 "importing": {
-                    "title": "ディレクトリをインポート中",
-                    "subtitle": "ソースリポジトリからディレクトリを設定中..."
+                    "title": "ワークをインポート中",
+                    "subtitle": "ソースリポジトリからワークを設定中..."
                 },
                 "repositorySelector": {
                     "title": "リポジトリを選択",
@@ -2492,17 +2498,17 @@
                     "unsupportedFormat": "このリポジトリ形式はサポートされていません。データ リポジトリまたは Awesome リスト形式を使用してください。",
                     "analyzeFailed": "リポジトリの解析に失敗しました",
                     "analyzeForLinkingFailed": "リンク用解析に失敗しました",
-                    "nameRequired": "ディレクトリ名が必要です",
+                    "nameRequired": "ワーク名が必要です",
                     "noAnalysis": "まずリポジトリを解析してください",
                     "githubRequired": "まず GitHub アカウントを接続してください",
                     "providerRequired": "まず Git プロバイダーを選択してください",
-                    "importFailed": "ディレクトリインポートに失敗しました",
-                    "linkFailed": "ディレクトリリンクに失敗しました",
+                    "importFailed": "ワークインポートに失敗しました",
+                    "linkFailed": "ワークリンクに失敗しました",
                     "providerNotConfigured": "{provider} が未設定です。インポート前に設定 → プラグインを訪れて設定してください。"
                 },
                 "success": {
-                    "started": "インポートを開始しました！ディレクトリにリダイレクト中...",
-                    "linked": "ディレクトリを正常にリンクしました"
+                    "started": "インポートを開始しました！ワークにリダイレクト中...",
+                    "linked": "ワークを正常にリンクしました"
                 },
                 "slugConflict": {
                     "title": "リポジトリ名競合",
@@ -2515,7 +2521,7 @@
             "connection": {
                 "alert": {
                     "title": "{provider} が接続されていません",
-                    "subtitle": "{provider} アカウントを接続してディレクトリを作成",
+                    "subtitle": "{provider} アカウントを接続してワークを作成",
                     "connectButton": "{provider} を接続",
                     "connectingButton": "接続中..."
                 }
@@ -2531,7 +2537,7 @@
             },
             "settings": {
                 "title": "Git プロバイダー接続",
-                "subtitle": "Git プロバイダーアカウントを接続して、リポジトリをインポート、ディレクトリを作成、プロジェクトを管理します。",
+                "subtitle": "Git プロバイダーアカウントを接続して、リポジトリをインポート、ワークを作成、プロジェクトを管理します。",
                 "connectedCount": "{count, plural, =0 {プロバイダーが接続されていません} =1 {1 つのプロバイダーが接続済み} other {# つのプロバイダーが接続済み}}",
                 "noProvidersConnected": "プロバイダーが接続されていません",
                 "canImport": "リポジトリをインポートおよび管理できます",
@@ -2562,7 +2568,7 @@
                 "subtitle": "プラグイン設定でデプロイプロバイダーを設定",
                 "connected": "接続済み",
                 "notConnected": "未接続",
-                "connectedMessage": "デプロイプロバイダーが設定されました。ディレクトリをデプロイできます。",
+                "connectedMessage": "デプロイプロバイダーが設定されました。ワークをデプロイできます。",
                 "disconnect": "切断",
                 "disconnecting": "削除中...",
                 "apiTokenLabel": "API トークン",
@@ -2598,17 +2604,17 @@
             "subtitle": "重要な更新に関する通知方法を選択",
             "email": {
                 "title": "メール通知",
-                "directoryUpdates": {
-                    "label": "ディレクトリ更新",
-                    "description": "ディレクトリの重要な更新に関する通知を受け取る"
+                "workUpdates": {
+                    "label": "ワーク更新",
+                    "description": "ワークの重要な更新に関する通知を受け取る"
                 },
                 "newItems": {
                     "label": "新規アイテム",
-                    "description": "ディレクトリに新しいアイテムが追加されたときに通知"
+                    "description": "ワークに新しいアイテムが追加されたときに通知"
                 },
                 "weeklyDigest": {
                     "label": "週間ダイジェスト",
-                    "description": "ディレクトリアクティビティの週間サマリーを受信"
+                    "description": "ワークアクティビティの週間サマリーを受信"
                 },
                 "marketing": {
                     "label": "マーケティングとプロモーション",
@@ -2619,11 +2625,11 @@
                 "title": "アプリ内通知",
                 "newItems": {
                     "label": "新規アイテム",
-                    "description": "新しいディレクトリアイテムの通知を表示"
+                    "description": "新しいワークアイテムの通知を表示"
                 },
                 "comments": {
                     "label": "コメント",
-                    "description": "ディレクトリへのコメントに関する通知"
+                    "description": "ワークへのコメントに関する通知"
                 },
                 "mentions": {
                     "label": "@メンション",
@@ -2647,12 +2653,12 @@
         "sidebar": {
             "menu": "メニュー",
             "aiChat": "AI チャット",
-            "newDirectory": "新規ディレクトリ",
-            "activityIndicator": "ディレクトリ生成中",
+            "newWork": "新規ワーク",
+            "activityIndicator": "ワーク生成中",
             "navigation": {
                 "dashboard": "ダッシュボード",
                 "activity": "アクティビティ",
-                "directories": "ディレクトリ",
+                "works": "ワーク",
                 "plugins": "プラグイン",
                 "settings": "設定"
             },
@@ -2674,7 +2680,7 @@
             "subtitle": "元に戻せない破壊的なアクション",
             "export": {
                 "title": "データをエクスポート",
-                "subtitle": "すべてのディレクトリ、アイテム、設定をダウンロード",
+                "subtitle": "すべてのワーク、アイテム、設定をダウンロード",
                 "action": "データエクスポート (近日公開)"
             },
             "delete": {
@@ -2684,8 +2690,8 @@
                 "confirmTitle": "⚠️ 以下のものが永久に削除されます：",
                 "confirmItems": [
                     "アカウントとプロフィール",
-                    "すべてのディレクトリ",
-                    "すべてのディレクトリアイテムとデータ",
+                    "すべてのワーク",
+                    "すべてのワークアイテムとデータ",
                     "API キーと統合",
                     "すべての関連ウェブサイト"
                 ],
@@ -2705,13 +2711,13 @@
         "aiChat": {
             "title": "AI アシスタント",
             "panelTitle": "チャット",
-            "subtitle": "自然言語でディレクトリを作成",
+            "subtitle": "自然言語でワークを作成",
             "welcomeTitle": "AI アシスタントへようこそ 👋",
-            "welcomeSubtitle": "AI 駆動のアシスタントです。ディレクトリの作成、コンテンツ生成、データの整理について何でもお尋ねください。",
-            "welcomeMessage": "こんにちは！自然言語を使ってディレクトリを作成するお手伝いをします。「AI ツールのディレクトリを作成」などのように尋ねたり、必要なものを説明してください。",
+            "welcomeSubtitle": "AI 駆動のアシスタントです。ワークの作成、コンテンツ生成、データの整理について何でもお尋ねください。",
+            "welcomeMessage": "こんにちは！自然言語を使ってワークを作成するお手伝いをします。「AI ツールのワークを作成」などのように尋ねたり、必要なものを説明してください。",
             "capabilities": {
-                "directoryCreation": "ディレクトリ作成",
-                "directoryCreationDesc": "自然言語の説明からディレクトリを構築",
+                "workCreation": "ワーク作成",
+                "workCreationDesc": "自然言語の説明からワークを構築",
                 "webResearch": "ウェブリサーチ",
                 "webResearchDesc": "ウェブ全体からデータを検索・収集",
                 "contentGeneration": "コンテンツ生成",
@@ -2741,11 +2747,11 @@
             "selectProvider": "プロバイダー",
             "notConfigured": "未設定",
             "gitNotConnected": "Git プロバイダーが接続されていません",
-            "gitNotConnectedDesc": "ディレクトリの作成と管理のため、Git プロバイダーを接続してください。",
+            "gitNotConnectedDesc": "ワークの作成と管理のため、Git プロバイダーを接続してください。",
             "connectGithub": "GitHub を接続",
             "gitConnectedAs": "{provider} 経由で {username} として接続済み",
             "deployNotConfigured": "デプロイプロバイダーが設定されていません",
-            "deployNotConfiguredDesc": "ディレクトリウェブサイトを公開するため、デプロイプロバイダーを設定してください。",
+            "deployNotConfiguredDesc": "ワークウェブサイトを公開するため、デプロイプロバイダーを設定してください。",
             "configureDeployProvider": "デプロイプロバイダーを設定",
             "deployConfigured": "デプロイプロバイダー設定済み ({provider})",
             "opened": "開いた",
@@ -2755,12 +2761,12 @@
             "historyYesterday": "昨日",
             "historyDaysAgo": "{days}日前",
             "suggestions": {
-                "s1": "ディレクトリを表示",
-                "s2": "AI ツールのディレクトリを作成",
+                "s1": "ワークを表示",
+                "s2": "AI ツールのワークを作成",
                 "s3": "Git 接続を確認",
                 "s4": "統計を表示"
             },
-            "feelingLucky": "作成するディレクトリを提案",
+            "feelingLucky": "作成するワークを提案",
             "errors": {
                 "unableToSend": "メッセージの送信ができません"
             }
@@ -2773,7 +2779,7 @@
             "enabled": "有効",
             "disabled": "無効",
             "enable": "有効化",
-            "enableDescription": "このプラグインがディレクトリ間でどのように有効化されるかを構成します。",
+            "enableDescription": "このプラグインがワーク間でどのように有効化されるかを構成します。",
             "disable": "無効化",
             "settings": "設定",
             "saveSettings": "設定を保存",
@@ -2805,11 +2811,11 @@
                 "pipeline": "パイプライン"
             },
             "alwaysEnabled": "常に有効",
-            "disableWarning": "このプラグインを無効にすると、すべてのディレクトリで無効になります",
+            "disableWarning": "このプラグインを無効にすると、すべてのワークで無効になります",
             "cannotDisableSystem": "システムプラグインは無効にできません",
             "disableFailed": "プラグインの無効化に失敗しました",
-            "autoEnableForDirectories": "すべてのディレクトリでも有効化",
-            "autoEnableForDirectoriesDescription": "このプラグインはすべてのディレクトリで自動的に有効になります。ディレクトリごとに無効にすることは可能です。",
+            "autoEnableForWorks": "すべてのワークでも有効化",
+            "autoEnableForWorksDescription": "このプラグインはすべてのワークで自動的に有効になります。ワークごとに無効にすることは可能です。",
             "confirmDisable": "無効化の確認",
             "cancel": "キャンセル",
             "missingRequiredFields": "必須フィールドが不足しています: {fields}",
@@ -2884,20 +2890,20 @@
                 "removeLabel": "{login} を削除"
             }
         },
-        "directoryPlugins": {
-            "title": "ディレクトリプラグイン",
-            "subtitle": "このディレクトリのプラグインを設定",
+        "workPlugins": {
+            "title": "ワークプラグイン",
+            "subtitle": "このワークのプラグインを設定",
             "active": "アクティブ",
             "enable": "有効化",
             "disable": "無効化",
-            "enableForDirectory": "このディレクトリで有効化",
-            "disableForDirectory": "このディレクトリで無効化",
+            "enableForWork": "このワークで有効化",
+            "disableForWork": "このワークで無効化",
             "enableAtUserLevelFirst": "まず設定でこのプラグインを有効にしてください",
             "disabledByUser": "ユーザー レベルで無効",
             "systemAlwaysEnabled": "システムプラグイン - 常に有効",
             "showSettings": "設定を表示",
             "hideSettings": "設定を非表示",
-            "directorySettingsInfo": "ここでディレクトリ固有の設定を構成します",
+            "workSettingsInfo": "ここでワーク固有の設定を構成します",
             "save": "保存",
             "saved": "保存済み",
             "showInstalledOnly": "インストール済みのみ表示",
@@ -2905,7 +2911,7 @@
             "noPlugins": "利用可能なプラグインがありません",
             "showAllPlugins": "すべてのプラグインを表示",
             "capabilityProviders": "機能プロバイダー",
-            "capabilityProvidersDescription": "このディレクトリの各機能を提供するプラグインを選択",
+            "capabilityProvidersDescription": "このワークの各機能を提供するプラグインを選択",
             "noProvidersAvailable": "利用可能なプロバイダーがありません",
             "categories": {
                 "git": "Git",
@@ -2923,15 +2929,16 @@
             "errors": {
                 "unableToSend": "メッセージの送信ができません。"
             },
-            "settingsModalTitle": "ディレクトリ設定",
-            "settingsModalDescription": "このディレクトリの設定を上書きします。未設定のフィールドはユーザー設定から継承されます。",
+            "settingsModalTitle": "ワーク設定",
+            "settingsModalDescription": "このワークの設定を上書きします。未設定のフィールドはユーザー設定から継承されます。",
             "inheritedFrom": "継承元: {value}",
             "inheritedSecret": "継承元: ••••••••",
             "resetToDefaults": "既定値にリセット",
-            "resetConfirm": "これにより、すべてのディレクトリ固有の上書きがクリアされます。設定はユーザー レベルの値に戻ります。",
+            "resetConfirm": "これにより、すべてのワーク固有の上書きがクリアされます。設定はユーザー レベルの値に戻ります。",
             "resetSuccess": "設定を既定値にリセットしました",
             "cancel": "キャンセル",
             "clickToConfigure": "構成するためにクリック",
+            "changeModels": "変更",
             "autoEnabledByUser": "ユーザー設定により自動有効",
             "toggleError": "プラグインの切り替えに失敗しました",
             "system": "システム",
@@ -2942,8 +2949,8 @@
         "auth": {
             "backToHome": "ホームに戻る",
             "feature": {
-                "title": "AIでディレクトリを構築",
-                "subtitle": "自然言語を使って数分で美しい検索可能なディレクトリを作成。コーディング不要。",
+                "title": "AIでワークを構築",
+                "subtitle": "自然言語を使って数分で美しい検索可能なワークを作成。コーディング不要。",
                 "badge": "AI搭載",
                 "benefits": {
                     "ai": {
@@ -2995,8 +3002,8 @@
         }
     },
     "metadata": {
-        "title": "{companyName} - ディレクトリビルダー",
-        "description": "ディレクトリを構築・管理するためのSaaSプラットフォーム",
+        "title": "{companyName} - ワークビルダー",
+        "description": "ワークを構築・管理するためのSaaSプラットフォーム",
         "pages": {
             "signIn": "サインイン",
             "createAccount": "アカウント作成",
@@ -3005,9 +3012,9 @@
             "authError": "認証エラー",
             "dashboard": "ダッシュボード",
             "activity": "アクティビティログ",
-            "directories": "ディレクトリ",
-            "newDirectory": "新規ディレクトリ",
-            "directory": "ディレクトリ",
+            "works": "ワーク",
+            "newWork": "新規ワーク",
+            "work": "ワーク",
             "overview": "概要",
             "items": "アイテム",
             "generator": "ジェネレーター",
@@ -3041,7 +3048,7 @@
         }
     },
     "actions": {
-        "directories": {
+        "works": {
             "slug": {
                 "required": "スラッグは必須です",
                 "format": "スラッグは小文字の文字、数字、ハイフンのみを含めてください"
@@ -3060,16 +3067,16 @@
             },
             "oauthRequired": "OAuth接続が必要です。まず{provider}アカウントを接続してください。",
             "githubRequired": "GitHub接続が必要です。まずGitHubアカウントを接続してください。",
-            "createSuccess": "ディレクトリが正常に作成されました！",
-            "createFailed": "ディレクトリの作成に失敗しました",
-            "updateSuccess": "ディレクトリが正常に更新されました！",
-            "updateFailed": "ディレクトリの更新に失敗しました",
-            "invalidGeneratedData": "有効なディレクトリデータを生成できませんでした",
-            "aiGenerationStarted": "ディレクトリの作成が開始されました！AIがコンテンツを生成中です...",
-            "invalidId": "無効なディレクトリIDです",
-            "deleteSuccess": "ディレクトリが正常に削除されました",
-            "deleteFailed": "ディレクトリの削除に失敗しました",
-            "fetchFailed": "ディレクトリの取得に失敗しました",
+            "createSuccess": "ワークが正常に作成されました！",
+            "createFailed": "ワークの作成に失敗しました",
+            "updateSuccess": "ワークが正常に更新されました！",
+            "updateFailed": "ワークの更新に失敗しました",
+            "invalidGeneratedData": "有効なワークデータを生成できませんでした",
+            "aiGenerationStarted": "ワークの作成が開始されました！AIがコンテンツを生成中です...",
+            "invalidId": "無効なワークIDです",
+            "deleteSuccess": "ワークが正常に削除されました",
+            "deleteFailed": "ワークの削除に失敗しました",
+            "fetchFailed": "ワークの取得に失敗しました",
             "organization": {
                 "requiredWhenOwnerProvided": "オーナーが指定されている場合、組織を有効にする必要があります"
             },
@@ -3077,7 +3084,7 @@
                 "invalidUrl": "有効なURLを入力してください",
                 "analyzeFailed": "リポジトリの解析に失敗しました",
                 "started": "インポートが正常に開始されました",
-                "failed": "ディレクトリのインポートに失敗しました",
+                "failed": "ワークのインポートに失敗しました",
                 "fetchReposFailed": "リポジトリの取得に失敗しました"
             }
         },

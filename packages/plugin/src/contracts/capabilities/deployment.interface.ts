@@ -11,11 +11,11 @@ export type DeploymentStatus = 'pending' | 'building' | 'deploying' | 'ready' | 
 export interface DeploymentConfig {
 	/** Project/site name */
 	readonly projectName: string;
-	/** Source directory to deploy */
+	/** Source work to deploy */
 	readonly sourceDir: string;
 	/** Build command */
 	readonly buildCommand?: string;
-	/** Output directory */
+	/** Output work */
 	readonly outputDir?: string;
 	/** Environment variables */
 	readonly env?: Record<string, string>;
@@ -110,7 +110,7 @@ export interface IDeploymentPlugin extends IPlugin {
 	readonly providerName: string;
 
 	/**
-	 * Deploy a directory
+	 * Deploy a work
 	 */
 	deploy(config: DeploymentConfig, token: string): Promise<DeploymentResult>;
 

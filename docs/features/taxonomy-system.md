@@ -7,11 +7,11 @@ sidebar_position: 10
 
 # Taxonomy System
 
-The taxonomy system manages the organizational structure of directory items through three entity types: **categories**, **tags**, and **collections**. These are stored in the data repository as YAML files and managed through the `DirectoryTaxonomyService`.
+The taxonomy system manages the organizational structure of work items through three entity types: **categories**, **tags**, and **collections**. These are stored in the data repository as YAML files and managed through the `WorkTaxonomyService`.
 
 ## Overview
 
-Every directory can organize its items using:
+Every work can organize its items using:
 
 | Entity          | Purpose                        | Example                                  |
 | --------------- | ------------------------------ | ---------------------------------------- |
@@ -23,10 +23,10 @@ Categories and tags are the primary taxonomy mechanisms used during AI generatio
 
 ## Architecture
 
-The taxonomy service is located at `packages/agent/src/services/directory-taxonomy.service.ts` and depends on:
+The taxonomy service is located at `packages/agent/src/services/work-taxonomy.service.ts` and depends on:
 
 - **`DataGeneratorService`** -- reads and writes taxonomy data to the Git data repository.
-- **`DirectoryOwnershipService`** -- enforces access control (viewer for reads, editor for writes).
+- **`WorkOwnershipService`** -- enforces access control (viewer for reads, editor for writes).
 - **`UserRepository`** -- resolves user entities for Git commit authorship.
 
 ## Categories
@@ -50,7 +50,7 @@ interface Category {
 #### List Categories
 
 ```typescript
-async getCategories(directoryId: string, userId: string): Promise<Category[]>
+async getCategories(workId: string, userId: string): Promise<Category[]>
 ```
 
 Reads categories from the data repository. Requires viewer access.
@@ -58,7 +58,7 @@ Reads categories from the data repository. Requires viewer access.
 #### Create Category
 
 ```typescript
-async createCategory(directoryId: string, dto: CreateCategoryDto, userId: string)
+async createCategory(workId: string, dto: CreateCategoryDto, userId: string)
 ```
 
 1. Validates that no duplicate name exists (case-insensitive comparison).
@@ -71,7 +71,7 @@ Requires editor access.
 #### Update Category
 
 ```typescript
-async updateCategory(directoryId: string, categoryId: string, dto: UpdateCategoryDto, userId: string)
+async updateCategory(workId: string, categoryId: string, dto: UpdateCategoryDto, userId: string)
 ```
 
 Updates name, description, icon URL, or priority. Validates uniqueness if the name is being changed. Requires editor access.
@@ -79,7 +79,7 @@ Updates name, description, icon URL, or priority. Validates uniqueness if the na
 #### Delete Category
 
 ```typescript
-async deleteCategory(directoryId: string, categoryId: string, userId: string)
+async deleteCategory(workId: string, categoryId: string, userId: string)
 ```
 
 Removes the category from the list. Note: items referencing this category are not automatically reassigned. Requires editor access.
@@ -102,13 +102,13 @@ interface Tag {
 #### List Tags
 
 ```typescript
-async getTags(directoryId: string, userId: string): Promise<Tag[]>
+async getTags(workId: string, userId: string): Promise<Tag[]>
 ```
 
 #### Create Tag
 
 ```typescript
-async createTag(directoryId: string, dto: CreateTagDto, userId: string)
+async createTag(workId: string, dto: CreateTagDto, userId: string)
 ```
 
 Validates name uniqueness (case-insensitive) and auto-generates the slug ID.
@@ -116,13 +116,13 @@ Validates name uniqueness (case-insensitive) and auto-generates the slug ID.
 #### Update Tag
 
 ```typescript
-async updateTag(directoryId: string, tagId: string, dto: UpdateTagDto, userId: string)
+async updateTag(workId: string, tagId: string, dto: UpdateTagDto, userId: string)
 ```
 
 #### Delete Tag
 
 ```typescript
-async deleteTag(directoryId: string, tagId: string, userId: string)
+async deleteTag(workId: string, tagId: string, userId: string)
 ```
 
 ## Collections
@@ -146,10 +146,10 @@ interface Collection {
 Collections follow the same CRUD pattern as categories:
 
 ```typescript
-async getCollections(directoryId: string, userId: string): Promise<Collection[]>
-async createCollection(directoryId: string, dto: CreateCollectionDto, userId: string)
-async updateCollection(directoryId: string, collectionId: string, dto: UpdateCollectionDto, userId: string)
-async deleteCollection(directoryId: string, collectionId: string, userId: string)
+async getCollections(workId: string, userId: string): Promise<Collection[]>
+async createCollection(workId: string, dto: CreateCollectionDto, userId: string)
+async updateCollection(workId: string, collectionId: string, dto: UpdateCollectionDto, userId: string)
+async deleteCollection(workId: string, collectionId: string, userId: string)
 ```
 
 All operations include duplicate name validation and auto-generated slug IDs.
@@ -159,11 +159,11 @@ All operations include duplicate name validation and auto-generated slug IDs.
 Taxonomy data is stored in the data repository as YAML files:
 
 ```
-{directory-slug}-data/
+{work-slug}-data/
   categories.yml        # Array of category objects
   tags.yml              # Array of tag objects
   collections.yml       # Array of collection objects
-  config.yml            # Directory configuration
+  config.yml            # Work configuration
   data/
     item-slug/
       item.yml          # References category and tags by ID
@@ -220,10 +220,10 @@ This ensures IDs are URL-friendly and consistent with item references.
 | Update                               | Editor        |
 | Delete                               | Editor        |
 
-Access is checked via `DirectoryOwnershipService`:
+Access is checked via `WorkOwnershipService`:
 
-- `ensureAccess(directoryId, userId)` for read operations.
-- `ensureCanEdit(directoryId, userId)` for write operations.
+- `ensureAccess(workId, userId)` for read operations.
+- `ensureCanEdit(workId, userId)` for write operations.
 
 ## AI Integration
 

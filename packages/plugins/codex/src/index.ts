@@ -1,7 +1,7 @@
 /**
  * Codex Generator Plugin
  *
- * Full pipeline plugin that will delegate the entire directory generation
+ * Full pipeline plugin that will delegate the entire work generation
  * to Codex CLI, including managed binary resolution, authentication handling,
  * workspace generation, result collection, and screenshot follow-up support.
  *

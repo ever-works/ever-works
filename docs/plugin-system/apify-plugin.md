@@ -7,7 +7,7 @@ sidebar_position: 26
 
 # Apify Data Source Plugin
 
-The Apify plugin imports items from [Apify](https://apify.com) datasets and actor runs into Ever Works directories. It implements both the data source interface (to query items) and the form schema provider interface (to add configuration fields to the generation form).
+The Apify plugin imports items from [Apify](https://apify.com) datasets and actor runs into Ever Works works. It implements both the data source interface (to query items) and the form schema provider interface (to add configuration fields to the generation form).
 
 **Source:** `packages/plugins/apify/src/apify.plugin.ts`
 
@@ -23,13 +23,13 @@ The Apify plugin imports items from [Apify](https://apify.com) datasets and acto
 | System plugin | No                                    |
 | Auto-enable   | No                                    |
 
-Unlike system plugins, the Apify plugin must be explicitly installed and enabled by users. It implements two interfaces: `IDataSourcePlugin` for querying items and `IFormSchemaProvider` for injecting fields into the directory generation form.
+Unlike system plugins, the Apify plugin must be explicitly installed and enabled by users. It implements two interfaces: `IDataSourcePlugin` for querying items and `IFormSchemaProvider` for injecting fields into the work generation form.
 
 ## Architecture
 
 ```mermaid
 graph TD
-    A[Directory Generation Pipeline] --> B[DataSourceFacade.queryAll]
+    A[Work Generation Pipeline] --> B[DataSourceFacade.queryAll]
     B --> C[ApifyPlugin.query]
     C --> D[Apify REST API]
     D --> E[Dataset Items JSON]
@@ -46,11 +46,11 @@ graph TD
 
 The plugin uses a three-level configuration approach:
 
-| Level   | Where                     | What                                                  |
-| ------- | ------------------------- | ----------------------------------------------------- |
-| Level 1 | Settings > Plugins        | API token (admin or user scope)                       |
-| Level 2 | Directory plugin settings | Enable/disable per directory                          |
-| Level 3 | Generation form           | Dataset ID, actor run ID, max items, relevance filter |
+| Level   | Where                | What                                                  |
+| ------- | -------------------- | ----------------------------------------------------- |
+| Level 1 | Settings > Plugins   | API token (admin or user scope)                       |
+| Level 2 | Work plugin settings | Enable/disable per work                               |
+| Level 3 | Generation form      | Dataset ID, actor run ID, max items, relevance filter |
 
 ## Configuration
 
@@ -77,12 +77,12 @@ The field mapping controls how Apify dataset fields are transformed into Ever Wo
 
 The plugin injects these fields into the generation form via `IFormSchemaProvider`:
 
-| Field Name                | Type      | Default | Description                                        |
-| ------------------------- | --------- | ------- | -------------------------------------------------- |
-| `apify_datasetId`         | `text`    | (empty) | Apify dataset ID to import from                    |
-| `apify_actorRunId`        | `text`    | (empty) | Import from a specific actor run instead           |
-| `apify_maxItems`          | `number`  | `100`   | Maximum items to import (0 = no limit)             |
-| `apify_filterByRelevance` | `boolean` | `true`  | Only import items relevant to the directory prompt |
+| Field Name                | Type      | Default | Description                                   |
+| ------------------------- | --------- | ------- | --------------------------------------------- |
+| `apify_datasetId`         | `text`    | (empty) | Apify dataset ID to import from               |
+| `apify_actorRunId`        | `text`    | (empty) | Import from a specific actor run instead      |
+| `apify_maxItems`          | `number`  | `100`   | Maximum items to import (0 = no limit)        |
+| `apify_filterByRelevance` | `boolean` | `true`  | Only import items relevant to the work prompt |
 
 These fields are grouped under a collapsible "Apify" section:
 
@@ -156,13 +156,13 @@ Slugs are auto-generated from the item name: lowercased, non-alphanumeric charac
 
 When `filterByRelevance` is enabled and a `filterContext` is provided, the plugin filters items by keyword matching:
 
-1. Keywords are extracted from the directory's `prompt`, `subject`, and explicit `keywords` using `extractKeywords()` from `@ever-works/plugin/keywords`.
+1. Keywords are extracted from the work's `prompt`, `subject`, and explicit `keywords` using `extractKeywords()` from `@ever-works/plugin/keywords`.
 2. Each item's `name` and `description` are checked against the keyword set.
 3. Items containing at least one keyword are kept; others are removed.
 
 ```mermaid
 flowchart LR
-    A[Directory Prompt] --> B[extractKeywords]
+    A[Work Prompt] --> B[extractKeywords]
     C[Subject] --> B
     D[Explicit Keywords] --> B
     B --> E[Keyword Set]
@@ -214,8 +214,8 @@ transformFormValues(values) {
 1. Create an Apify account at [apify.com](https://apify.com).
 2. Run an actor or prepare a dataset with the items you want to import.
 3. Enable the Apify plugin in **Settings > Plugins** and enter your API token.
-4. When creating a directory, expand the **Apify** section in the generation form and provide your dataset ID.
-5. Optionally enable relevance filtering to import only items related to your directory topic.
+4. When creating a work, expand the **Apify** section in the generation form and provide your dataset ID.
+5. Optionally enable relevance filtering to import only items related to your work topic.
 
 ## Troubleshooting
 
@@ -224,5 +224,5 @@ transformFormValues(values) {
 | Empty import results             | Invalid dataset ID or empty dataset             | Verify the dataset ID in the Apify console            |
 | "Apify API token not configured" | No API token set                                | Enter your token in plugin settings                   |
 | "Apify API error: 401"           | Invalid API token                               | Regenerate the token in Apify Settings > Integrations |
-| Irrelevant items imported        | Relevance filter disabled or keywords too broad | Enable filtering and refine the directory prompt      |
+| Irrelevant items imported        | Relevance filter disabled or keywords too broad | Enable filtering and refine the work prompt           |
 | Missing fields in imported items | Field mapping does not match dataset structure  | Update the default field mapping in plugin settings   |

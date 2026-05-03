@@ -25,7 +25,7 @@ The Groq plugin provides ultra-fast AI inference through [Groq's](https://groq.c
 | Built-in           | Yes             |
 | Visibility         | `public`        |
 
-Groq runs open-source models such as Llama and Qwen at significantly higher speeds than conventional cloud providers, making it well suited for directories with many items where generation speed is a priority.
+Groq runs open-source models such as Llama and Qwen at significantly higher speeds than conventional cloud providers, making it well suited for works with many items where generation speed is a priority.
 
 ## Architecture
 
@@ -98,7 +98,7 @@ async createEmbedding(_options: EmbeddingOptions): Promise<EmbeddingResponse> {
 }
 ```
 
-If your workflow requires embeddings (e.g., for semantic search within directories), pair Groq with a second provider that supports embeddings, such as OpenAI or Ollama.
+If your workflow requires embeddings (e.g., for semantic search within works), pair Groq with a second provider that supports embeddings, such as OpenAI or Ollama.
 
 ## Tiered Model Assignment
 
@@ -183,7 +183,7 @@ The `apiKey` is intentionally empty at load time. It is merged from the user's s
 2. Enable the Groq plugin in the Ever Works dashboard under **Settings > Plugins**.
 3. Enter your API key in the settings.
 4. Select your preferred models for each task complexity tier.
-5. Groq will be used for content generation during directory builds and AI conversations.
+5. Groq will be used for content generation during work builds and AI conversations.
 
 ## Troubleshooting
 

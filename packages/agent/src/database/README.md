@@ -87,7 +87,7 @@ import { DatabaseConfigurations } from '@ever-works/agent';
             databaseName: 'ever_works',
         }),
 
-        TypeOrmModule.forFeature([Directory, User]),
+        TypeOrmModule.forFeature([Work, User]),
     ],
 })
 export class AppModule {}
@@ -97,22 +97,22 @@ export class AppModule {}
 
 ### Using the Repository
 
-Inject the `DirectoryRepository` in your services:
+Inject the `WorkRepository` in your services:
 
 ```typescript
 import { Injectable } from '@nestjs/common';
-import { DirectoryRepository } from '@ever-works/agent';
+import { WorkRepository } from '@ever-works/agent';
 
 @Injectable()
 export class MyService {
-    constructor(private readonly directoryRepository: DirectoryRepository) {}
+    constructor(private readonly workRepository: WorkRepository) {}
 
-    async createDirectory(data: Partial<Directory>) {
-        return await this.directoryRepository.create(data);
+    async createWork(data: Partial<Work>) {
+        return await this.workRepository.create(data);
     }
 
-    async findDirectory(slug: string) {
-        return await this.directoryRepository.findBySlug(slug);
+    async findWork(slug: string) {
+        return await this.workRepository.findBySlug(slug);
     }
 }
 ```
@@ -123,28 +123,28 @@ The old static mock methods have been replaced:
 
 ```typescript
 // Old way (removed)
-Directory.createMock(directory);
-const directory = await Directory.findMock(slug);
+Work.createMock(work);
+const work = await Work.findMock(slug);
 
 // New way
-const directory = await this.directoryRepository.create(directoryData);
-const directory = await this.directoryRepository.findBySlug(slug);
+const work = await this.workRepository.create(workData);
+const work = await this.workRepository.findBySlug(slug);
 ```
 
 ## Database Schema
 
 The database will be automatically created with the following tables:
 
-- `directory` - Stores directory information with unique constraint on (owner, slug)
+- `work` - Stores work information with unique constraint on (owner, slug)
 - `user` - Stores user information (if using User entity)
 
-### Directory Table Constraints
+### Work Table Constraints
 
-The `directory` table has a unique constraint on the combination of `owner` and `slug`, meaning:
+The `work` table has a unique constraint on the combination of `owner` and `slug`, meaning:
 
 - The same slug can be used by different owners
-- Each owner can only have one directory with a specific slug
-- This allows for proper multi-tenant directory management
+- Each owner can only have one work with a specific slug
+- This allows for proper multi-tenant work management
 
 ### Schema Synchronization
 

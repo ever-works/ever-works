@@ -150,7 +150,7 @@
         },
         "register": {
             "title": "Buat akun Anda",
-            "subtitle": "Mulai bangun direktori luar biasa hari ini",
+            "subtitle": "Mulai bangun karya luar biasa hari ini",
             "form": {
                 "name": {
                     "label": "Nama lengkap",
@@ -197,18 +197,18 @@
     "onboarding": {
         "label": "Mulai",
         "title": "Selamat datang di Ever Works",
-        "subtitle": "Buat dan terbitkan direktori pertama Anda dalam hitungan menit.",
+        "subtitle": "Buat dan terbitkan karya pertama Anda dalam hitungan menit.",
         "skipButton": "Lewati untuk sekarang",
         "nextButton": "Berikutnya",
         "stepIndex": "Langkah {index}",
         "steps": {
             "welcome": {
                 "title": "Apa itu Ever Works?",
-                "description": "Ever Works adalah pembuat direktori open-source. Buat direktori konten terstruktur — alat, pekerjaan, tautan, produk — dan terbitkan sebagai situs web langsung.",
-                "detail": "Mari kita siapkan Anda. Hubungkan penyedia Anda di bawah ini, lalu buat direktori pertama Anda.",
+                "description": "Ever Works adalah pembuat karya open-source. Buat karya konten terstruktur — alat, pekerjaan, tautan, produk — dan terbitkan sebagai situs web langsung.",
+                "detail": "Mari kita siapkan Anda. Hubungkan penyedia Anda di bawah ini, lalu buat karya pertama Anda.",
                 "feature1": {
                     "title": "Konten bertenaga AI",
-                    "description": "Hasilkan dan perkaya item direktori secara otomatis menggunakan penyedia AI Anda."
+                    "description": "Hasilkan dan perkaya item karya secara otomatis menggunakan penyedia AI Anda."
                 },
                 "feature2": {
                     "title": "Penerbitan instan",
@@ -216,18 +216,18 @@
                 },
                 "feature3": {
                     "title": "Didukung Git",
-                    "description": "Setiap direktori adalah repositori GitHub yang Anda miliki dan kendalikan."
+                    "description": "Setiap karya adalah repositori GitHub yang Anda miliki dan kendalikan."
                 }
             },
-            "directory": {
-                "title": "Buat direktori pertama Anda",
-                "description": "Direktori adalah pusat konten Anda. Tambahkan item, konfigurasikan tata letak, dan terbitkan dengan satu klik.",
-                "detail": "Anda sudah siap! Buat direktori pertama Anda untuk mulai membangun dan menerbitkan konten.",
-                "action": "Buat direktori"
+            "work": {
+                "title": "Buat karya pertama Anda",
+                "description": "Karya adalah pusat konten Anda. Tambahkan item, konfigurasikan tata letak, dan terbitkan dengan satu klik.",
+                "detail": "Anda sudah siap! Buat karya pertama Anda untuk mulai membangun dan menerbitkan konten.",
+                "action": "Buat karya"
             },
             "publish": {
                 "title": "Hidupkan",
-                "description": "Hubungkan Vercel atau GitHub untuk menerapkan direktori Anda sebagai situs web publik — tidak perlu konfigurasi hosting.",
+                "description": "Hubungkan Vercel atau GitHub untuk menerapkan karya Anda sebagai situs web publik — tidak perlu konfigurasi hosting.",
                 "action": "Siapkan penerbitan"
             }
         },
@@ -336,7 +336,7 @@
             "steps": {
                 "model": {
                     "title": "Pilih model",
-                    "description": "Pilih model Codex yang ingin Anda jalankan untuk pembuatan direktori end-to-end."
+                    "description": "Pilih model Codex yang ingin Anda jalankan untuk pembuatan karya end-to-end."
                 },
                 "credentials": {
                     "title": "Tambahkan kredensial",
@@ -408,7 +408,7 @@
         "simWizard": {
             "label": "Pengaturan SIM AI",
             "title": "Siapkan SIM AI dalam dua langkah",
-            "subtitle": "Tambahkan kunci API SIM AI Anda dan verifikasi koneksi untuk mulai mendelegasikan pembuatan direktori ke alur kerja SIM.",
+            "subtitle": "Tambahkan kunci API SIM AI Anda dan verifikasi koneksi untuk mulai mendelegasikan pembuatan karya ke alur kerja SIM.",
             "stepIndex": "Langkah {index}",
             "continueButton": "Lanjutkan",
             "steps": {
@@ -431,7 +431,7 @@
         "title": "Dasbor",
         "connectGithub": {
             "title": "Hubungkan akun GitHub Anda",
-            "description": "GitHub diperlukan untuk membuat dan mengelola repositori direktori. Hubungkan akun Anda untuk memulai.",
+            "description": "GitHub diperlukan untuk membuat dan mengelola repositori karya. Hubungkan akun Anda untuk memulai.",
             "connect": "Hubungkan GitHub",
             "dismiss": "Saya akan melakukannya nanti"
         },
@@ -465,7 +465,7 @@
         },
         "header": {
             "welcome": "Selamat datang kembali, {username}!",
-            "subtitle": "Kelola direktori bertenaga AI Anda dan lacak kinerjanya",
+            "subtitle": "Kelola karya bertenaga AI Anda dan lacak kinerjanya",
             "onboarding": {
                 "badge": "Onboarding {currentStep}/{totalSteps}",
                 "dismiss": "Sembunyikan pintasan onboarding"
@@ -490,14 +490,14 @@
                 },
                 "quickTips": {
                     "title": "Tips Cepat",
-                    "tip1": "Buat direktori pertama Anda dengan mengklik tombol 'Buat Direktori' di dasbor.",
-                    "tip2": "Gunakan generator AI untuk mengisi direktori Anda secara otomatis dengan item relevan.",
-                    "tip3": "Hubungkan akun GitHub Anda untuk menyinkronkan dan menerapkan direktori Anda sebagai repositori."
+                    "tip1": "Buat karya pertama Anda dengan mengklik tombol 'Buat Karya' di dasbor.",
+                    "tip2": "Gunakan generator AI untuk mengisi karya Anda secara otomatis dengan item relevan.",
+                    "tip3": "Hubungkan akun GitHub Anda untuk menyinkronkan dan menerapkan karya Anda sebagai repositori."
                 },
                 "shortcuts": {
                     "title": "Pintasan Keyboard",
-                    "search": "Cari direktori",
-                    "newDirectory": "Buat direktori baru",
+                    "search": "Cari karya",
+                    "newWork": "Buat karya baru",
                     "help": "Buka bantuan",
                     "hint": "Gunakan Cmd di Mac atau Ctrl di Windows/Linux"
                 },
@@ -513,7 +513,7 @@
         },
         "activity": {
             "title": "Log Aktivitas",
-            "subtitle": "Lacak semua operasi di seluruh direktori Anda",
+            "subtitle": "Lacak semua operasi di seluruh karya Anda",
             "loading": "Memuat...",
             "fetchFailed": "Gagal memuat aktivitas",
             "exportFailed": "Gagal mengekspor log aktivitas",
@@ -521,7 +521,7 @@
             "columns": {
                 "status": "Status",
                 "dateTime": "Tanggal / Waktu",
-                "directory": "Direktori",
+                "work": "Karya",
                 "type": "Tipe",
                 "summary": "Ringkasan"
             },
@@ -532,9 +532,9 @@
                     "generation": "Generasi",
                     "comparison": "Perbandingan",
                     "deployment": "Penerapan",
-                    "directoryCreated": "Direktori Dibuat",
-                    "directoryUpdated": "Direktori Diperbarui",
-                    "directoryDeleted": "Direktori Dihapus",
+                    "workCreated": "Karya Dibuat",
+                    "workUpdated": "Karya Diperbarui",
+                    "workDeleted": "Karya Dihapus",
                     "pluginEnabled": "Plugin Diaktifkan",
                     "pluginDisabled": "Plugin Dinonaktifkan",
                     "pluginConfigured": "Plugin Dikonfigurasi",
@@ -553,7 +553,8 @@
                     "pending": "Menunggu",
                     "inProgress": "Sedang Berlangsung",
                     "completed": "Selesai",
-                    "failed": "Gagal"
+                    "failed": "Gagal",
+                    "cancelled": "Dibatalkan"
                 }
             },
             "actions": {
@@ -595,32 +596,32 @@
                 "pageOf": "Halaman {page} dari {total}"
             }
         },
-        "directories": {
-            "title": "Direktori",
-            "subtitle": "Kelola dan atur direktori bertenaga AI Anda",
+        "works": {
+            "title": "Karya",
+            "subtitle": "Kelola dan atur karya bertenaga AI Anda",
             "summary": {
-                "totalDirectories": "Total Direktori",
+                "totalWorks": "Total Karya",
                 "generating": "Membuat",
                 "totalItems": "Total Item"
             },
-            "recent": "Direktori Terbaru",
+            "recent": "Karya Terbaru",
             "viewAll": "Lihat semua ({count})",
-            "search": "Cari direktori...",
-            "create": "Buat Direktori",
-            "showing": "Menampilkan {current} dari {total} direktori",
-            "searchFailed": "Gagal mencari direktori. Silakan coba lagi.",
+            "search": "Cari karya...",
+            "create": "Buat Karya",
+            "showing": "Menampilkan {current} dari {total} karya",
+            "searchFailed": "Gagal mencari karya. Silakan coba lagi.",
             "pagination": {
                 "previous": "Sebelumnya",
                 "next": "Berikutnya"
             },
             "empty": {
-                "title": "Belum ada direktori",
-                "description": "Buat direktori bertenaga AI pertama Anda untuk mulai mengatur dan memamerkan konten Anda.",
-                "action": "Buat Direktori Pertama Anda",
+                "title": "Belum ada karya",
+                "description": "Buat karya bertenaga AI pertama Anda untuk mulai mengatur dan memamerkan konten Anda.",
+                "action": "Buat Karya Pertama Anda",
                 "notFound": {
-                    "title": "Tidak ditemukan direktori",
+                    "title": "Tidak ditemukan karya",
                     "withSearch": "Coba sesuaikan istilah pencarian Anda",
-                    "withoutSearch": "Buat direktori bertenaga AI pertama Anda untuk memulai"
+                    "withoutSearch": "Buat karya bertenaga AI pertama Anda untuk memulai"
                 }
             }
         },
@@ -637,7 +638,7 @@
             },
             "data": {
                 "exportTitle": "Ekspor Data",
-                "exportDescription": "Unduh data akun Anda termasuk direktori, pengaturan plugin, dan informasi profil sebagai file JSON.",
+                "exportDescription": "Unduh data akun Anda termasuk karya, pengaturan plugin, dan informasi profil sebagai file JSON.",
                 "includeSecrets": "Sertakan pengaturan rahasia (kunci API, token) — diekspor sebagai nilai tersembunyi",
                 "secretsWarning": "Pengaturan rahasia akan diekspor sebagai nilai tersembunyi. Anda perlu menggantinya secara manual dengan kredensial asli sebelum mengimpor.",
                 "exportButton": "Ekspor Data",
@@ -645,7 +646,7 @@
                 "exportSuccess": "Data berhasil diekspor",
                 "exportError": "Gagal mengekspor data",
                 "importTitle": "Impor Data",
-                "importDescription": "Impor data dari file JSON yang diekspor sebelumnya. Anda dapat menyelesaikan konflik untuk direktori dengan slug yang cocok.",
+                "importDescription": "Impor data dari file JSON yang diekspor sebelumnya. Anda dapat menyelesaikan konflik untuk karya dengan slug yang cocok.",
                 "importButton": "Impor Data",
                 "syncTitle": "Sinkronisasi GitHub",
                 "syncDescription": "Sinkronkan konfigurasi akun Anda ke repositori GitHub pribadi untuk cadangan dan migrasi antar instance.",
@@ -657,13 +658,13 @@
                     "invalidJson": "File JSON tidak valid",
                     "previewError": "Gagal menganalisis file impor",
                     "summary": "Ringkasan Impor",
-                    "directories": "Direktori",
+                    "works": "Karya",
                     "items": "Item",
                     "userPlugins": "Plugin Pengguna",
                     "version": "Versi Format",
                     "missingPlugins": "Plugin ini tidak terinstal dan akan dilewati",
                     "conflicts": "Konflik Slug",
-                    "existingDirectory": "Yang Ada",
+                    "existingWork": "Yang Ada",
                     "incoming": "Masuk",
                     "strategySkip": "Lewati (simpan yang ada)",
                     "strategyOverwrite": "Timpa yang ada",
@@ -680,9 +681,9 @@
                     "validationErrors": "Kesalahan Validasi",
                     "resultSuccess": "Impor Selesai dengan Sukses",
                     "resultFailed": "Impor Gagal",
-                    "directoriesCreated": "Direktori dibuat",
-                    "directoriesUpdated": "Direktori diperbarui",
-                    "directoriesSkipped": "Direktori dilewati",
+                    "worksCreated": "Karya dibuat",
+                    "worksUpdated": "Karya diperbarui",
+                    "worksSkipped": "Karya dilewati",
                     "pluginsImported": "Plugin diimpor",
                     "warnings": "Peringatan",
                     "errors": "Kesalahan"
@@ -731,11 +732,11 @@
                 "backToCategory": "Kembali ke {category}",
                 "pipelineDefault": {
                     "title": "Pipeline Default",
-                    "description": "Pilih pipeline mana yang digunakan secara default saat menghasilkan item direktori.",
+                    "description": "Pilih pipeline mana yang digunakan secara default saat menghasilkan item karya.",
                     "autoLabel": "Otomatis",
-                    "autoDescription": "Gunakan pipeline yang diselesaikan sistem untuk setiap direktori",
+                    "autoDescription": "Gunakan pipeline yang diselesaikan sistem untuk setiap karya",
                     "enforceLabel": "Terapkan default ini",
-                    "enforceDescription": "Selalu pra-pilih pipeline ini, bahkan ketika direktori memiliki pipeline sendiri yang dikonfigurasi. Anda masih dapat mengganti pipeline secara manual di formulir.",
+                    "enforceDescription": "Selalu pra-pilih pipeline ini, bahkan ketika karya memiliki pipeline sendiri yang dikonfigurasi. Anda masih dapat mengganti pipeline secara manual di formulir.",
                     "saveFailed": "Gagal menyimpan pipeline default"
                 }
             },
@@ -818,8 +819,8 @@
                 "subtitle": "Hubungkan akun eksternal Anda untuk fungsionalitas yang ditingkatkan",
                 "github": {
                     "name": "GitHub",
-                    "connected": "Buat dan kelola direktori dengan repositori GitHub",
-                    "disconnected": "Hubungkan untuk membuat direktori dari repositori",
+                    "connected": "Buat dan kelola karya dengan repositori GitHub",
+                    "disconnected": "Hubungkan untuk membuat karya dari repositori",
                     "scopes": "Ruang Lingkup",
                     "organizations": "Organisasi Terhubung",
                     "organizationsHint": "Gunakan Hubungkan Ulang untuk memberikan akses ke organisasi tambahan",
@@ -880,12 +881,12 @@
             }
         },
         "stats": {
-            "totalDirectories": "Total Direktori",
+            "totalWorks": "Total Karya",
             "totalItems": "Total Item",
             "activeWebsites": "Situs Web Aktif",
             "fromLastMonth": "dari bulan lalu"
         },
-        "directoryCard": {
+        "workCard": {
             "status": {
                 "active": "Aktif",
                 "notStarted": "Belum Dimulai",
@@ -910,14 +911,14 @@
             "views": "{count} tampilan",
             "updated": "Diperbarui {date}",
             "viewAction": "Lihat →",
-            "openingTitle": "Membuka direktori",
-            "openingMessage": "Mempersiapkan direktori Anda. Detail akan segera terbuka. Tetap di halaman ini."
+            "openingTitle": "Membuka karya",
+            "openingMessage": "Mempersiapkan karya Anda. Detail akan segera terbuka. Tetap di halaman ini."
         },
-        "directoryList": {
-            "title": "Direktori Anda",
-            "createButton": "Buat Direktori"
+        "workList": {
+            "title": "Karya Anda",
+            "createButton": "Buat Karya"
         },
-        "directoryDetail": {
+        "workDetail": {
             "failedToGenerateItems": "Gagal menghasilkan item. Silakan coba lagi.",
             "generationCompleted": "Generasi selesai dengan sukses",
             "generationCancelled": "Generasi dibatalkan",
@@ -952,7 +953,7 @@
             },
             "members": {
                 "title": "Anggota Tim",
-                "subtitle": "Kelola siapa yang memiliki akses ke direktori ini dan izin mereka.",
+                "subtitle": "Kelola siapa yang memiliki akses ke karya ini dan izin mereka.",
                 "inviteMember": "Undang Anggota",
                 "noMembers": "Belum ada anggota tim. Undang seseorang untuk berkolaborasi.",
                 "roles": {
@@ -964,13 +965,13 @@
                 },
                 "roleDescriptions": {
                     "owner": "Kontrol penuh termasuk penghapusan dan pengelolaan anggota.",
-                    "manager": "Dapat mengedit direktori dan mengelola anggota, tetapi tidak dapat menghapus.",
-                    "editor": "Dapat mengedit konten direktori dan menjalankan generasi.",
-                    "viewer": "Akses baca-saja untuk melihat direktori."
+                    "manager": "Dapat mengedit karya dan mengelola anggota, tetapi tidak dapat menghapus.",
+                    "editor": "Dapat mengedit konten karya dan menjalankan generasi.",
+                    "viewer": "Akses baca-saja untuk melihat karya."
                 },
                 "invite": {
                     "title": "Undang Anggota Tim",
-                    "description": "Tambahkan anggota baru untuk berkolaborasi pada direktori ini.",
+                    "description": "Tambahkan anggota baru untuk berkolaborasi pada karya ini.",
                     "emailLabel": "Alamat email",
                     "emailPlaceholder": "colleague@example.com",
                     "roleLabel": "Peran",
@@ -984,7 +985,7 @@
                 },
                 "confirmRemove": {
                     "title": "Hapus Anggota",
-                    "description": "Apakah Anda yakin ingin menghapus {username} dari direktori ini? Mereka akan kehilangan semua akses.",
+                    "description": "Apakah Anda yakin ingin menghapus {username} dari karya ini? Mereka akan kehilangan semua akses.",
                     "confirm": "Hapus",
                     "cancel": "Batal"
                 },
@@ -999,7 +1000,7 @@
                 "page": {
                     "title": "Pembaruan Terjadwal",
                     "subtitle": "Otomatiskan penyegaran untuk {name} dengan frekuensi khusus dan penanganan kegagalan.",
-                    "fallbackName": "direktori ini",
+                    "fallbackName": "karya ini",
                     "loadFailed": "Gagal memuat pengaturan jadwal.",
                     "providerCategories": {
                         "pipeline": "Pipeline",
@@ -1100,7 +1101,7 @@
                     },
                     "empty": {
                         "title": "Jalankan generasi manual terlebih dahulu",
-                        "description": "Selesaikan satu pelaksanaan manual sukses untuk membuka penjadwalan otomatis. Setelah direktori Anda memiliki data, kami dapat menjaganya tetap segar untuk Anda.",
+                        "description": "Selesaikan satu pelaksanaan manual sukses untuk membuka penjadwalan otomatis. Setelah karya Anda memiliki data, kami dapat menjaganya tetap segar untuk Anda.",
                         "refresh": "Segarkan status"
                     },
                     "requiresGeneration": "Jalankan setidaknya satu generasi item sebelum mengaktifkan jadwal."
@@ -1118,7 +1119,7 @@
             "statusCard": {
                 "notStarted": {
                     "title": "Generasi Belum Dimulai",
-                    "description": "Mulai menghasilkan item untuk direktori Anda agar diisi dengan konten.",
+                    "description": "Mulai menghasilkan item untuk karya Anda agar diisi dengan konten.",
                     "action": "Mulai Generasi"
                 },
                 "generating": {
@@ -1132,7 +1133,7 @@
                 },
                 "generated": {
                     "title": "Generasi Selesai",
-                    "description": "Direktori Anda berhasil diisi dengan item.",
+                    "description": "Karya Anda berhasil diisi dengan item.",
                     "withWarnings": "Selesai dengan peringatan:",
                     "viewItems": "Lihat Item",
                     "regenerate": "Hasilkan Ulang"
@@ -1158,7 +1159,7 @@
             },
             "comparisons": {
                 "title": "Perbandingan",
-                "subtitle": "Halaman perbandingan A vs B antara item direktori",
+                "subtitle": "Halaman perbandingan A vs B antara item karya",
                 "vs": "vs",
                 "winner": "Pemenang: {name}",
                 "tie": "Seri",
@@ -1306,7 +1307,7 @@
                 }
             },
             "info": {
-                "title": "Informasi Direktori",
+                "title": "Informasi Karya",
                 "yourRole": "Peran Anda",
                 "role": {
                     "owner": "Pemilik",
@@ -1356,15 +1357,15 @@
             "activity": {
                 "title": "Aktivitas Terbaru",
                 "noActivity": "Belum ada aktivitas",
-                "created": "Direktori Dibuat",
-                "directoryCreated": "Direktori berhasil dibuat",
+                "created": "Karya Dibuat",
+                "workCreated": "Karya berhasil dibuat",
                 "justNow": "Baru saja"
             },
             "items": {
-                "title": "Item Direktori",
-                "subtitle": "Kelola dan atur item di direktori Anda",
+                "title": "Item Karya",
+                "subtitle": "Kelola dan atur item di karya Anda",
                 "noItemsTitle": "Belum Ada Item",
-                "noItemsDescription": "Direktori Anda belum memiliki item apa pun. Buat item untuk mengisi direktori Anda dengan konten.",
+                "noItemsDescription": "Karya Anda belum memiliki item apa pun. Buat item untuk mengisi karya Anda dengan konten.",
                 "generateItems": "Buat Item",
                 "searchPlaceholder": "Cari item...",
                 "allCategories": "Semua Kategori",
@@ -1426,14 +1427,14 @@
                     "screenshotFailed": "Gagal menangkap screenshot",
                     "screenshotError": "Terjadi kesalahan saat menangkap screenshot",
                     "featured": "Item Unggulan",
-                    "featuredHelp": "Tandai item ini sebagai unggulan di direktori",
+                    "featuredHelp": "Tandai item ini sebagai unggulan di karya",
                     "updateWithPR": "Buat Pull Request",
                     "updateWithPRHelp": "Kirim perubahan sebagai pull request daripada commit langsung",
                     "cancel": "Batal",
                     "adding": "Menambah...",
                     "addItem": "Tambah Item",
                     "success": "Item berhasil ditambahkan",
-                    "successDescription": "Item telah ditambahkan ke direktori Anda",
+                    "successDescription": "Item telah ditambahkan ke karya Anda",
                     "failed": "Gagal menambahkan item",
                     "error": "Terjadi kesalahan saat menambahkan item",
                     "errors": {
@@ -1652,7 +1653,7 @@
                     "navigationLabel": "Tab Generator"
                 },
                 "regenerationWarning": "Peringatan Regenerasi",
-                "regenerationWarningDescription": "Direktori ini sudah dihasilkan. Memulai generasi baru akan mengganti item yang ada.",
+                "regenerationWarningDescription": "Karya ini sudah dihasilkan. Memulai generasi baru akan mengganti item yang ada.",
                 "requiredInfo": "Informasi Wajib",
                 "updateConfiguration": "Perbarui Konfigurasi",
                 "promptRequired": "Prompt wajib diisi",
@@ -1662,20 +1663,20 @@
                 "loadingFormSchema": "Memuat konfigurasi formulir...",
                 "failedToLoadFormSchema": "Gagal memuat konfigurasi formulir",
                 "selectOption": "Pilih opsi",
-                "directoryName": "Nama Direktori",
+                "workName": "Nama Karya",
                 "generationPrompt": "Prompt Generasi",
                 "modelOverride": "Penggantian Model AI",
                 "modelOverridePlaceholder": "misalnya openai/gpt-4.1 atau openrouter/openai/gpt-4.1",
                 "modelOverrideHelperText": "Opsional. Secara default menggunakan model yang diimpor atau model sebelumnya kecuali Anda menimpa di sini.",
                 "recommended": "Direkomendasikan",
-                "promptPlaceholder": "Jelaskan item apa yang harus dihasilkan untuk direktori ini...",
+                "promptPlaceholder": "Jelaskan item apa yang harus dihasilkan untuk karya ini...",
                 "promptHelperText": "Jadilah spesifik tentang jenis konten yang ingin Anda hasilkan",
                 "repositoryDescription": "Deskripsi Repositori",
                 "repositoryPlaceholder": "Deskripsi singkat repositori (opsional)",
                 "startGeneration": "Mulai Generasi",
                 "regenerateItems": "Regenerasi Item",
                 "updateItems": "Jalankan Generasi",
-                "recreateDirectory": "Buat Ulang Direktori",
+                "recreateWork": "Buat Ulang Karya",
                 "showAdvancedOptions": "Tampilkan Opsi Lanjutan",
                 "hideAdvancedOptions": "Sembunyikan Opsi Lanjutan",
                 "cancel": "Batal",
@@ -1713,7 +1714,7 @@
                 "websiteRepositoryCreationMethod": "Metode Pembuatan Repositori Situs Web",
                 "methodDuplicate": "Duplikat",
                 "methodFork": "Fork",
-                "directoryNamePlaceholder": "Masukkan nama direktori",
+                "workNamePlaceholder": "Masukkan nama karya",
                 "methodCreateFromTemplate": "Buat dari Template",
                 "aiProcessingConfiguration": "Konfigurasi Pemrosesan AI",
                 "maxSearchQueries": "Maksimum Kueri Pencarian",
@@ -1724,7 +1725,7 @@
                 "aiFirstGenerationDescription": "Aktifkan generasi AI untuk item awal sebelum pencarian web.",
                 "contentFiltering": "Penyaringan Konten",
                 "contentFilteringDescription": "Aktifkan penyaringan kualitas konten",
-                "recreateConfirmTitle": "Buat ulang data direktori?",
+                "recreateConfirmTitle": "Buat ulang data karya?",
                 "recreateConfirmDescription": "Buat ulang akan menghapus item yang ada dan menghasilkannya dari awal. Tindakan ini tidak dapat dibatalkan.",
                 "confirmRecreate": "Ya, buat ulang",
                 "recreateInlineTitle": "Buat ulang akan menghapus item yang ada",
@@ -1768,10 +1769,11 @@
                 "aiProviderDescription": "Penyedia model AI untuk generasi dan ekstraksi konten",
                 "contentExtractorProvider": "Penyedia Ekstraktor Konten",
                 "contentExtractorProviderDescription": "Penyedia untuk mengekstrak konten dari halaman web",
-                "useDirectoryDefault": "Gunakan Default Direktori",
+                "useWorkDefault": "Gunakan Default Karya",
                 "default": "Default",
                 "notConfigured": "Belum Dikonfigurasi",
                 "notConfiguredTooltip": "Penyedia ini memerlukan konfigurasi. Kunjungi Pengaturan → Plugin untuk menyiapkannya.",
+                "changeModels": "Ubah",
                 "jsonObjectError": "Nilai harus berupa objek JSON",
                 "invalidJsonError": "Format JSON tidak valid"
             },
@@ -1799,7 +1801,11 @@
                 "closeNote": "Ini mungkin memakan waktu beberapa menit. Anda dapat menutup halaman ini dan kembali nanti.",
                 "showLogs": "Tampilkan log langkah",
                 "hideLogs": "Sembunyikan log langkah",
-                "waitingForLogs": "Menunggu log langsung tiba..."
+                "waitingForLogs": "Menunggu log langsung tiba...",
+                "stop": "Berhenti menghasilkan",
+                "stopping": "Menghentikan...",
+                "stopRequested": "Pembatalan pembuatan diminta",
+                "stopFailed": "Gagal membatalkan pembuatan"
             },
             "settings": {
                 "sourceSettings": "Repositori Sumber",
@@ -1831,7 +1837,7 @@
                 },
                 "generalSettings": "Pengaturan Umum",
                 "generalTitle": "Pengaturan Umum",
-                "directoryName": "Nama Direktori",
+                "workName": "Nama Karya",
                 "description": "Deskripsi",
                 "organizationRepository": "Repositori Organisasi",
                 "organizationHelp": "Buat repositori di bawah organisasi daripada akun pribadi Anda",
@@ -1843,13 +1849,13 @@
                 "customHeaderPlaceholder": "Tambahkan konten kustom ke header README",
                 "overwriteDefaultHeader": "Timpa header default",
                 "customFooter": "Footer Kustom",
-                "cantDeleteWhileGenerating": "Tidak dapat menghapus direktori saat item sedang dibuat.",
+                "cantDeleteWhileGenerating": "Tidak dapat menghapus karya saat item sedang dibuat.",
                 "customFooterPlaceholder": "Tambahkan konten kustom ke footer README",
                 "overwriteDefaultFooter": "Timpa footer default",
                 "dangerZone": "Zona Bahaya",
                 "dangerTitle": "Zona Bahaya",
-                "deleteWarning": "Setelah Anda menghapus direktori, tidak ada jalan kembali. Pastikan Anda yakin.",
-                "dangerDescription": "Setelah Anda menghapus direktori, tidak ada jalan kembali. Pastikan Anda yakin.",
+                "deleteWarning": "Setelah Anda menghapus karya, tidak ada jalan kembali. Pastikan Anda yakin.",
+                "dangerDescription": "Setelah Anda menghapus karya, tidak ada jalan kembali. Pastikan Anda yakin.",
                 "deleteOptions": "Pilih apa yang akan dihapus:",
                 "deleteDataRepository": "Hapus repositori data",
                 "deleteDataRepositoryDescription": "Hapus repositori data JSON dari GitHub",
@@ -1858,14 +1864,14 @@
                 "deleteWebsiteRepository": "Hapus repositori situs web",
                 "deleteWebsiteRepositoryDescription": "Hapus repositori situs web yang dideploy",
                 "deleteConfirm": "Apakah Anda benar-benar yakin?",
-                "deleteConfirmDetail": "Tindakan ini tidak dapat dibatalkan. Direktori dan repositori yang dipilih akan dihapus secara permanen.",
-                "confirmDirectoryName": "Ketik nama direktori untuk konfirmasi",
-                "confirmDirectoryNameDescription": "Ketik \"{name}\" untuk mengonfirmasi penghapusan",
-                "deleteNameMismatch": "Nama direktori tidak cocok",
-                "deleteButton": "Hapus Direktori",
+                "deleteConfirmDetail": "Tindakan ini tidak dapat dibatalkan. Karya dan repositori yang dipilih akan dihapus secara permanen.",
+                "confirmWorkName": "Ketik nama karya untuk konfirmasi",
+                "confirmWorkNameDescription": "Ketik \"{name}\" untuk mengonfirmasi penghapusan",
+                "deleteNameMismatch": "Nama karya tidak cocok",
+                "deleteButton": "Hapus Karya",
                 "deleteConfirmButton": "Ya, Hapus",
-                "deleteSuccess": "Direktori berhasil dihapus",
-                "deleteFailed": "Gagal menghapus direktori",
+                "deleteSuccess": "Karya berhasil dihapus",
+                "deleteFailed": "Gagal menghapus karya",
                 "yesDelete": "Ya, Hapus",
                 "cancel": "Batal",
                 "saveChanges": "Simpan Perubahan",
@@ -1874,7 +1880,7 @@
                 "updateFailed": "Gagal memperbarui pengaturan",
                 "deployProvider": {
                     "title": "Penyedia Deploy",
-                    "description": "Pilih tempat untuk deploy situs web direktori Anda",
+                    "description": "Pilih tempat untuk deploy situs web karya Anda",
                     "configure": "Konfigurasi",
                     "ready": "Siap untuk deploy",
                     "notConfigured": "Belum dikonfigurasi",
@@ -1911,7 +1917,7 @@
                     "prompts": {
                         "relevanceAssessment": {
                             "title": "Penilaian Relevansi",
-                            "description": "Instruksi tambahan untuk memfilter halaman web berdasarkan relevansi dengan topik direktori Anda.",
+                            "description": "Instruksi tambahan untuk memfilter halaman web berdasarkan relevansi dengan topik karya Anda.",
                             "placeholder": "mis., Hanya sertakan halaman yang fokus pada proyek open-source..."
                         },
                         "itemGeneration": {
@@ -1962,7 +1968,7 @@
                 "communityPrUpdateFailed": "Gagal memperbarui pengaturan PR komunitas",
                 "websiteConfig": {
                     "title": "Konfigurasi Situs Web",
-                    "subtitle": "Kustomisasi tampilan dan perilaku situs web direktori Anda",
+                    "subtitle": "Kustomisasi tampilan dan perilaku situs web karya Anda",
                     "loadFailed": "Gagal memuat pengaturan situs web",
                     "saveSuccess": "Pengaturan situs web berhasil disimpan",
                     "saveFailed": "Gagal menyimpan pengaturan situs web",
@@ -1977,13 +1983,13 @@
                         "siteName": {
                             "title": "Identitas Situs",
                             "label": "Nama Situs",
-                            "placeholder": "Direktori Saya",
+                            "placeholder": "Karya Saya",
                             "helper": "Nama yang ditampilkan di header situs web dan tab browser Anda"
                         },
                         "siteUrl": {
                             "label": "URL Situs",
                             "placeholder": "https://example.com",
-                            "helper": "URL situs web perusahaan atau direktori Anda"
+                            "helper": "URL situs web perusahaan atau karya Anda"
                         },
                         "global": {
                             "title": "Fitur Global",
@@ -2065,7 +2071,7 @@
                 },
                 "committer": {
                     "title": "Git Committer",
-                    "description": "Timpa nama dan email kommitter untuk commit git di direktori ini. Biarkan kosong untuk menggunakan pengaturan level pengguna atau default akun.",
+                    "description": "Timpa nama dan email kommitter untuk commit git di karya ini. Biarkan kosong untuk menggunakan pengaturan level pengguna atau default akun.",
                     "nameLabel": "Nama Committer",
                     "emailLabel": "Email Committer",
                     "save": "Simpan Committer",
@@ -2076,13 +2082,13 @@
             "deploy": {
                 "noProviderAlert": {
                     "title": "Tidak Ada Penyedia Penyebaran",
-                    "description": "Pilih penyedia penyebaran untuk menyebarkan situs web direktori Anda.",
+                    "description": "Pilih penyedia penyebaran untuk menyebarkan situs web karya Anda.",
                     "selectButton": "Pilih & Lanjutkan",
                     "noProviders": "Tidak ada penyedia penyebaran yang tersedia. Pasang plugin penyebaran terlebih dahulu"
                 },
                 "noTokenAlert": {
                     "title": "{provider} Token Diperlukan",
-                    "description": "Untuk menyebarkan direktori Anda, Anda perlu mengonfigurasi token API {provider} Anda di Pengaturan Plugin.",
+                    "description": "Untuk menyebarkan karya Anda, Anda perlu mengonfigurasi token API {provider} Anda di Pengaturan Plugin.",
                     "configureButton": "Konfigurasi di Pengaturan Plugin",
                     "getTokenButton": "Dapatkan Token API",
                     "howTo": {
@@ -2090,25 +2096,25 @@
                         "step1": "Klik 'Dapatkan Token API' untuk membuka dasbor penyedia Anda",
                         "step2": "Buat token baru dengan izin penyebaran",
                         "step3": "Konfigurasi token API {provider} Anda di Pengaturan Plugin > {provider}",
-                        "step4": "Kembali ke sini untuk menyebarkan direktori Anda"
+                        "step4": "Kembali ke sini untuk menyebarkan karya Anda"
                     }
                 },
                 "sharedNoTokenAlert": {
                     "title": "Penyebaran Tidak Tersedia",
-                    "description": "Pemilik direktori belum mengonfigurasi penyebaran. Harap hubungi pemilik direktori untuk menyiapkan penyebaran.",
+                    "description": "Pemilik karya belum mengonfigurasi penyebaran. Harap hubungi pemilik karya untuk menyiapkan penyebaran.",
                     "hint": "Sebagai kolaborator, Anda dapat memicu penyebaran setelah pemilik mengonfigurasi penyedia penyebarannya"
                 },
                 "form": {
                     "deployment": {
                         "title": "Sebarkan Situs Web",
-                        "description": "Sebarkan repositori situs web direktori Anda.",
+                        "description": "Sebarkan repositori situs web karya Anda.",
                         "deployButton": "Sebarkan ke {provider}",
                         "deployingButton": "Menyusun...",
                         "deployingStateButton": "Menyusun ({state})...",
                         "successMessage": "Situs web Anda telah berhasil disebarkan!",
                         "teamSelection": {
                             "title": "Pilih Tim",
-                            "description": "Pilih tim untuk menyebarkan direktori ini.",
+                            "description": "Pilih tim untuk menyebarkan karya ini.",
                             "label": "Tim",
                             "placeholder": "Pilih tim",
                             "confirmButton": "Sebarkan ke tim",
@@ -2135,7 +2141,7 @@
                     },
                     "info": {
                         "deployInfo": "Penyebaran biasanya memakan waktu 1-3 menit. Anda akan menerima URL setelah selesai.",
-                        "updateInfo": "Pembaruan menyinkronkan konten direktori Anda ke repositori situs web untuk penyebaran berikutnya"
+                        "updateInfo": "Pembaruan menyinkronkan konten karya Anda ke repositori situs web untuk penyebaran berikutnya"
                     },
                     "websiteTemplate": {
                         "title": "Pembaruan Template Otomatis",
@@ -2155,7 +2161,7 @@
                         "title": "Konfigurasi Sebelum Sebarkan",
                         "description": "Tinjau dan sesuaikan pengaturan situs web Anda sebelum penyebaran",
                         "siteName": "Nama Situs",
-                        "siteNamePlaceholder": "Direktori Saya",
+                        "siteNamePlaceholder": "Karya Saya",
                         "siteNameHelper": "Nama yang ditampilkan di situs web Anda (default: Acme)",
                         "tabGeneral": "Umum",
                         "tabHeader": "Header",
@@ -2202,9 +2208,9 @@
                 }
             }
         },
-        "directoryCreation": {
-            "title": "Buat Direktori Baru",
-            "subtitle": "Pilih cara Anda ingin membuat direktori",
+        "workCreation": {
+            "title": "Buat Karya Baru",
+            "subtitle": "Pilih cara Anda ingin membuat karya",
             "backToOptions": "Kembali ke opsi",
             "sidebar": {
                 "selectedProvider": "Penyedia Git",
@@ -2212,7 +2218,7 @@
             },
             "deployProvider": {
                 "title": "Penyedia Deploy",
-                "description": "Pilih tempat untuk menyebarkan situs web direktori Anda",
+                "description": "Pilih tempat untuk menyebarkan situs web karya Anda",
                 "noProviders": "Tidak ada penyedia deploy yang tersedia",
                 "notConfigured": "Belum dikonfigurasi",
                 "configured": "Siap untuk deploy",
@@ -2230,21 +2236,21 @@
             },
             "ai": {
                 "title": "Buat dengan AI",
-                "subtitle": "Jelaskan ide direktori Anda dalam bahasa alami dan biarkan AI menangani pengaturan",
+                "subtitle": "Jelaskan ide karya Anda dalam bahasa alami dan biarkan AI menangani pengaturan",
                 "getStarted": "Mulai",
-                "formTitle": "Buat Direktori dengan AI",
-                "formSubtitle": "Jelaskan ide direktori Anda dan biarkan AI menangani pengaturan dan pembuatan konten awal",
-                "directoryNameLabel": "Nama Direktori",
-                "directoryNamePlaceholder": "misalnya, Awesome AI Tools",
-                "directoryNameHelp": "AI akan menyarankan nama jika Anda biarkan kosong",
-                "promptLabel": "Jelaskan Direktori Anda",
+                "formTitle": "Buat Karya dengan AI",
+                "formSubtitle": "Jelaskan ide karya Anda dan biarkan AI menangani pengaturan dan pembuatan konten awal",
+                "workNameLabel": "Nama Karya",
+                "workNamePlaceholder": "misalnya, Awesome AI Tools",
+                "workNameHelp": "AI akan menyarankan nama jika Anda biarkan kosong",
+                "promptLabel": "Jelaskan Karya Anda",
                 "githubRequired": "Harap hubungkan akun GitHub Anda terlebih dahulu.",
-                "promptPlaceholder": "Jelaskan jenis direktori yang ingin Anda buat, item apa yang harus dikandung, dan persyaratan khusus apa pun...",
+                "promptPlaceholder": "Jelaskan jenis karya yang ingin Anda buat, item apa yang harus dikandung, dan persyaratan khusus apa pun...",
                 "inspirationText": "Butuh inspirasi? Coba salah satu ini:",
                 "examplePrompts": {
                     "0": {
                         "name": "Alat Pengembang AI",
-                        "prompt": "Buat direktori alat AI terbaik untuk pengembang"
+                        "prompt": "Buat karya alat AI terbaik untuk pengembang"
                     },
                     "1": {
                         "name": "Pusat Komponen React",
@@ -2252,7 +2258,7 @@
                     },
                     "2": {
                         "name": "Alat Tim Jarak Jauh",
-                        "prompt": "Hasilkan direktori aplikasi produktivitas untuk tim jarak jauh"
+                        "prompt": "Hasilkan karya aplikasi produktivitas untuk tim jarak jauh"
                     },
                     "3": {
                         "name": "Fashion Berkelanjutan",
@@ -2267,23 +2273,23 @@
                     "3": "Siapkan repositori GitHub dengan dokumentasi yang tepat"
                 },
                 "generateButton": "Hasilkan dengan AI",
-                "generatingButton": "Membuat Direktori...",
+                "generatingButton": "Membuat Karya...",
                 "cancelButton": "Batal",
                 "noteTitle": "Catatan:",
-                "noteText": "Pembuatan AI biasanya memakan waktu 2-5 menit tergantung kompleksitas permintaan Anda. Anda akan diberi tahu saat direktori siap.",
+                "noteText": "Pembuatan AI biasanya memakan waktu 2-5 menit tergantung kompleksitas permintaan Anda. Anda akan diberi tahu saat karya siap.",
                 "errors": {
-                    "promptRequired": "Harap jelaskan jenis direktori yang ingin Anda buat",
+                    "promptRequired": "Harap jelaskan jenis karya yang ingin Anda buat",
                     "unconfiguredProviders": "{providers} belum dikonfigurasi. Kunjungi Pengaturan → Plugin untuk menyiapkan sebelum membuat.",
-                    "nameRequired": "Nama direktori wajib",
-                    "slugRequired": "Slug direktori wajib",
-                    "descriptionRequired": "Deskripsi direktori wajib",
+                    "nameRequired": "Nama karya wajib",
+                    "slugRequired": "Slug karya wajib",
+                    "descriptionRequired": "Deskripsi karya wajib",
                     "githubRequired": "Harap hubungkan akun GitHub Anda terlebih dahulu.",
-                    "createFailed": "Gagal membuat direktori"
+                    "createFailed": "Gagal membuat karya"
                 },
                 "success": {
-                    "started": "Pembuatan direktori dimulai!",
+                    "started": "Pembuatan karya dimulai!",
                     "generating": "AI sedang membuat konten. Ini mungkin memakan waktu beberapa menit...",
-                    "created": "Direktori berhasil dibuat!"
+                    "created": "Karya berhasil dibuat!"
                 },
                 "advancedSettings": "Pengaturan Lanjutan",
                 "advancedSubtitle": "Konfigurasi pengaturan organisasi dan repositori",
@@ -2294,14 +2300,14 @@
             },
             "manual": {
                 "title": "Buat Secara Manual",
-                "subtitle": "Konfigurasi direktori Anda dengan kontrol penuh atas setiap pengaturan dan opsi",
+                "subtitle": "Konfigurasi karya Anda dengan kontrol penuh atas setiap pengaturan dan opsi",
                 "configureNow": "Konfigurasi sekarang",
-                "formTitle": "Buat Direktori Secara Manual",
-                "formSubtitle": "Konfigurasi direktori Anda dengan kontrol penuh atas setiap pengaturan",
+                "formTitle": "Buat Karya Secara Manual",
+                "formSubtitle": "Konfigurasi karya Anda dengan kontrol penuh atas setiap pengaturan",
                 "basicInfo": "Informasi Dasar",
-                "nameLabel": "Nama Direktori *",
+                "nameLabel": "Nama Karya *",
                 "namePlaceholder": "misalnya, Awesome AI Tools",
-                "slugLabel": "Slug Direktori *",
+                "slugLabel": "Slug Karya *",
                 "slugPlaceholder": "awesome-ai-tools",
                 "githubRequired": "Harap hubungkan akun GitHub Anda terlebih dahulu.",
                 "slugHelp": "Pengidentifikasi ramah URL (huruf kecil, angka, dan tanda hubung saja)",
@@ -2310,7 +2316,7 @@
                 "advancedSettings": "Pengaturan Lanjutan",
                 "advancedSubtitle": "Organisasi, header khusus, dan lainnya",
                 "organizationLabel": "Buat di bawah organisasi",
-                "organizationHelp": "Buat direktori ini di bawah organisasi GitHub bukan akun pribadi Anda",
+                "organizationHelp": "Buat karya ini di bawah organisasi GitHub bukan akun pribadi Anda",
                 "organizationNameLabel": "Nama Organisasi",
                 "organizationNamePlaceholder": "my-organization",
                 "headerLabel": "Header README Khusus",
@@ -2319,25 +2325,25 @@
                 "footerLabel": "Footer README Khusus",
                 "footerPlaceholder": "Tambahkan konten khusus di bawah file README Anda",
                 "footerOverwrite": "Ganti footer default sepenuhnya",
-                "createButton": "Buat Direktori",
-                "creatingButton": "Membuat Direktori...",
+                "createButton": "Buat Karya",
+                "creatingButton": "Membuat Karya...",
                 "cancelButton": "Batal",
-                "nameRequired": "Nama direktori wajib",
-                "slugRequired": "Slug direktori wajib",
-                "descriptionRequired": "Deskripsi direktori wajib",
-                "createFailed": "Gagal membuat direktori",
+                "nameRequired": "Nama karya wajib",
+                "slugRequired": "Slug karya wajib",
+                "descriptionRequired": "Deskripsi karya wajib",
+                "createFailed": "Gagal membuat karya",
                 "success": {
-                    "created": "Direktori berhasil dibuat!"
+                    "created": "Karya berhasil dibuat!"
                 }
             },
             "import": {
                 "title": "Impor yang Ada",
-                "subtitle": "Impor direktori dari repositori GitHub yang ada",
+                "subtitle": "Impor karya dari repositori GitHub yang ada",
                 "importNow": "Impor sekarang",
                 "aiProviderSettings": "Penyedia AI",
                 "aiProviderSettingsDescription": "Pilih penyedia AI mana yang digunakan untuk mengurai README",
-                "formTitle": "Impor Direktori dari GitHub",
-                "formSubtitle": "Impor item dari repositori GitHub yang ada untuk membuat direktori Anda",
+                "formTitle": "Impor Karya dari GitHub",
+                "formSubtitle": "Impor item dari repositori GitHub yang ada untuk membuat karya Anda",
                 "sync": {
                     "title": "Tetap disinkronkan",
                     "description": "Tarik pembaruan secara otomatis dari repositori sumber."
@@ -2390,13 +2396,13 @@
                     "schedule": "Jadwal: {cadence}",
                     "providers": "Penyedia: {providers}"
                 },
-                "nameLabel": "Nama Direktori",
-                "namePlaceholder": "misalnya, Direktori Hebat Saya",
+                "nameLabel": "Nama Karya",
+                "namePlaceholder": "misalnya, Karya Hebat Saya",
                 "advancedSettings": "Pengaturan Lanjutan",
                 "advancedSubtitle": "Konfigurasi pengaturan organisasi dan repositori",
                 "attribution": {
                     "title": "Atribusi Sumber:",
-                    "text": "Direktori ini akan mereferensikan {url} sebagai sumbernya"
+                    "text": "Karya ini akan mereferensikan {url} sebagai sumbernya"
                 },
                 "research": {
                     "title": "Mode Impor & Riset",
@@ -2419,13 +2425,13 @@
                     "importingButton": "Memulai pipeline riset..."
                 },
                 "analyzeButton": "Analisis Repositori",
-                "importButton": "Impor Direktori",
+                "importButton": "Impor Karya",
                 "importingButton": "Mengimpor...",
                 "backButton": "Kembali",
                 "cancelButton": "Batal",
                 "importing": {
-                    "title": "Mengimpor Direktori",
-                    "subtitle": "Menyiapkan direktori Anda dari repositori sumber..."
+                    "title": "Mengimpor Karya",
+                    "subtitle": "Menyiapkan karya Anda dari repositori sumber..."
                 },
                 "repositorySelector": {
                     "title": "Pilih Repositori",
@@ -2492,17 +2498,17 @@
                     "unsupportedFormat": "Format repositori ini tidak didukung. Harap gunakan format Repositori Data atau Daftar Hebat.",
                     "analyzeFailed": "Gagal menganalisis repositori",
                     "analyzeForLinkingFailed": "Gagal menganalisis untuk penghubungan",
-                    "nameRequired": "Nama direktori wajib",
+                    "nameRequired": "Nama karya wajib",
                     "noAnalysis": "Harap analisis repositori terlebih dahulu",
                     "githubRequired": "Harap hubungkan akun GitHub Anda terlebih dahulu",
                     "providerRequired": "Silakan pilih penyedia git terlebih dahulu",
-                    "importFailed": "Gagal mengimpor direktori",
-                    "linkFailed": "Gagal menghubungkan direktori",
+                    "importFailed": "Gagal mengimpor karya",
+                    "linkFailed": "Gagal menghubungkan karya",
                     "providerNotConfigured": "{provider} belum dikonfigurasi. Kunjungi Pengaturan → Plugin untuk menyiapkannya sebelum mengimpor."
                 },
                 "success": {
-                    "started": "Impor dimulai! Mengarahkan ke direktori Anda...",
-                    "linked": "Direktori berhasil dihubungkan"
+                    "started": "Impor dimulai! Mengarahkan ke karya Anda...",
+                    "linked": "Karya berhasil dihubungkan"
                 },
                 "slugConflict": {
                     "title": "Konflik nama repositori",
@@ -2515,7 +2521,7 @@
             "connection": {
                 "alert": {
                     "title": "{provider} belum terhubung",
-                    "subtitle": "Hubungkan akun {provider} Anda untuk membuat direktori",
+                    "subtitle": "Hubungkan akun {provider} Anda untuk membuat karya",
                     "connectButton": "Hubungkan {provider}",
                     "connectingButton": "Menghubungkan..."
                 }
@@ -2531,7 +2537,7 @@
             },
             "settings": {
                 "title": "Koneksi Penyedia Git",
-                "subtitle": "Hubungkan akun penyedia git Anda untuk mengimpor repositori, membuat direktori, dan mengelola proyek Anda.",
+                "subtitle": "Hubungkan akun penyedia git Anda untuk mengimpor repositori, membuat karya, dan mengelola proyek Anda.",
                 "connectedCount": "{count, plural, =0 {Tidak ada penyedia yang terhubung} =1 {1 penyedia terhubung} other {# penyedia terhubung}}",
                 "noProvidersConnected": "Tidak ada penyedia yang terhubung",
                 "canImport": "Anda dapat mengimpor dan mengelola repositori",
@@ -2562,7 +2568,7 @@
                 "subtitle": "Konfigurasikan penyedia penyebaran di Pengaturan Plugin",
                 "connected": "Terhubung",
                 "notConnected": "Belum Terhubung",
-                "connectedMessage": "Penyedia penyebaran Anda telah dikonfigurasikan. Anda sekarang dapat menyebarkan direktori.",
+                "connectedMessage": "Penyedia penyebaran Anda telah dikonfigurasikan. Anda sekarang dapat menyebarkan karya.",
                 "disconnect": "Putuskan Koneksi",
                 "disconnecting": "Memutuskan...",
                 "apiTokenLabel": "Token API",
@@ -2598,17 +2604,17 @@
             "subtitle": "Pilih bagaimana Anda ingin diberi tahu tentang pembaruan penting",
             "email": {
                 "title": "Notifikasi Email",
-                "directoryUpdates": {
-                    "label": "Pembaruan Direktori",
-                    "description": "Diberi tahu tentang pembaruan penting pada direktori Anda"
+                "workUpdates": {
+                    "label": "Pembaruan Karya",
+                    "description": "Diberi tahu tentang pembaruan penting pada karya Anda"
                 },
                 "newItems": {
                     "label": "Item Baru",
-                    "description": "Diberi tahu saat item baru ditambahkan ke direktori Anda"
+                    "description": "Diberi tahu saat item baru ditambahkan ke karya Anda"
                 },
                 "weeklyDigest": {
                     "label": "Ringkasan Mingguan",
-                    "description": "Terima ringkasan mingguan aktivitas direktori Anda"
+                    "description": "Terima ringkasan mingguan aktivitas karya Anda"
                 },
                 "marketing": {
                     "label": "Pemasaran & Promosi",
@@ -2619,11 +2625,11 @@
                 "title": "Notifikasi Dalam Aplikasi",
                 "newItems": {
                     "label": "Item Baru",
-                    "description": "Tampilkan notifikasi untuk item direktori baru"
+                    "description": "Tampilkan notifikasi untuk item karya baru"
                 },
                 "comments": {
                     "label": "Komentar",
-                    "description": "Diberi tahu tentang komentar pada direktori Anda"
+                    "description": "Diberi tahu tentang komentar pada karya Anda"
                 },
                 "mentions": {
                     "label": "Mention",
@@ -2647,12 +2653,12 @@
         "sidebar": {
             "menu": "Menu",
             "aiChat": "Obrolan AI",
-            "newDirectory": "Direktori Baru",
-            "activityIndicator": "Direktori sedang dibuat",
+            "newWork": "Karya Baru",
+            "activityIndicator": "Karya sedang dibuat",
             "navigation": {
                 "dashboard": "Dasbor",
                 "activity": "Aktivitas",
-                "directories": "Direktori",
+                "works": "Karya",
                 "plugins": "Plugin",
                 "settings": "Pengaturan"
             },
@@ -2674,7 +2680,7 @@
             "subtitle": "Tindakan tidak dapat dibalik dan destruktif",
             "export": {
                 "title": "Ekspor Data Anda",
-                "subtitle": "Unduh semua direktori, item, dan pengaturan Anda",
+                "subtitle": "Unduh semua karya, item, dan pengaturan Anda",
                 "action": "Ekspor Data (Segera Hadir)"
             },
             "delete": {
@@ -2684,8 +2690,8 @@
                 "confirmTitle": "⚠️ Ini akan menghapus secara permanen:",
                 "confirmItems": [
                     "Akun dan profil Anda",
-                    "Semua direktori Anda",
-                    "Semua item dan data direktori",
+                    "Semua karya Anda",
+                    "Semua item dan data karya",
                     "Kunci API dan integrasi",
                     "Semua situs web terkait"
                 ],
@@ -2705,13 +2711,13 @@
         "aiChat": {
             "title": "Asisten AI",
             "panelTitle": "Obrolan",
-            "subtitle": "Buat direktori dengan bahasa alami",
+            "subtitle": "Buat karya dengan bahasa alami",
             "welcomeTitle": "Selamat datang di Asisten AI 👋",
-            "welcomeSubtitle": "Asisten bertenaga AI Anda. Tanyakan apa saja tentang membuat direktori, menghasilkan konten, atau mengatur data Anda.",
-            "welcomeMessage": "Hai! Saya dapat membantu Anda membuat direktori menggunakan bahasa alami. Tanyakan seperti \"Buat direktori untuk alat AI\" atau jelaskan apa yang Anda butuhkan.",
+            "welcomeSubtitle": "Asisten bertenaga AI Anda. Tanyakan apa saja tentang membuat karya, menghasilkan konten, atau mengatur data Anda.",
+            "welcomeMessage": "Hai! Saya dapat membantu Anda membuat karya menggunakan bahasa alami. Tanyakan seperti \"Buat karya untuk alat AI\" atau jelaskan apa yang Anda butuhkan.",
             "capabilities": {
-                "directoryCreation": "Pembuatan Direktori",
-                "directoryCreationDesc": "Bangun direktori dari deskripsi bahasa alami",
+                "workCreation": "Pembuatan Karya",
+                "workCreationDesc": "Bangun karya dari deskripsi bahasa alami",
                 "webResearch": "Riset Web",
                 "webResearchDesc": "Cari dan kumpulkan data dari seluruh web",
                 "contentGeneration": "Pembangkitan Konten",
@@ -2741,11 +2747,11 @@
             "selectProvider": "Penyedia",
             "notConfigured": "Belum dikonfigurasikan",
             "gitNotConnected": "Penyedia Git belum terhubung",
-            "gitNotConnectedDesc": "Hubungkan penyedia Git Anda untuk membuat dan mengelola direktori.",
+            "gitNotConnectedDesc": "Hubungkan penyedia Git Anda untuk membuat dan mengelola karya.",
             "connectGithub": "Hubungkan GitHub",
             "gitConnectedAs": "Terhubung sebagai {username} melalui {provider}",
             "deployNotConfigured": "Penyedia penyebaran belum dikonfigurasikan",
-            "deployNotConfiguredDesc": "Konfigurasikan penyedia penyebaran untuk mempublikasikan situs web direktori Anda.",
+            "deployNotConfiguredDesc": "Konfigurasikan penyedia penyebaran untuk mempublikasikan situs web karya Anda.",
             "configureDeployProvider": "Konfigurasikan Penyedia Penyebaran",
             "deployConfigured": "Penyedia penyebaran dikonfigurasikan ({provider})",
             "opened": "Dibuka",
@@ -2755,12 +2761,12 @@
             "historyYesterday": "Kemarin",
             "historyDaysAgo": "{days}h lalu",
             "suggestions": {
-                "s1": "Tampilkan direktori saya",
-                "s2": "Buat direktori alat AI",
+                "s1": "Tampilkan karya saya",
+                "s2": "Buat karya alat AI",
                 "s3": "Periksa koneksi git saya",
                 "s4": "Tampilkan statistik saya"
             },
-            "feelingLucky": "Sarankan direktori untuk dibuat",
+            "feelingLucky": "Sarankan karya untuk dibuat",
             "errors": {
                 "unableToSend": "Tidak dapat mengirim pesan"
             }
@@ -2773,7 +2779,7 @@
             "enabled": "Diaktifkan",
             "disabled": "Dinonaktifkan",
             "enable": "Aktifkan",
-            "enableDescription": "Konfigurasikan cara plugin ini diaktifkan di seluruh direktori Anda.",
+            "enableDescription": "Konfigurasikan cara plugin ini diaktifkan di seluruh karya Anda.",
             "disable": "Nonaktifkan",
             "settings": "Pengaturan",
             "saveSettings": "Simpan Pengaturan",
@@ -2805,11 +2811,11 @@
                 "pipeline": "Pipeline"
             },
             "alwaysEnabled": "Selalu diaktifkan",
-            "disableWarning": "Menonaktifkan plugin ini juga akan menonaktifkannya di semua direktori Anda",
+            "disableWarning": "Menonaktifkan plugin ini juga akan menonaktifkannya di semua karya Anda",
             "cannotDisableSystem": "Plugin sistem tidak dapat dinonaktifkan",
             "disableFailed": "Gagal menonaktifkan plugin",
-            "autoEnableForDirectories": "Juga aktifkan untuk semua direktori",
-            "autoEnableForDirectoriesDescription": "Plugin ini akan otomatis aktif di semua direktori Anda. Anda masih bisa menonaktifkannya per direktori.",
+            "autoEnableForWorks": "Juga aktifkan untuk semua karya",
+            "autoEnableForWorksDescription": "Plugin ini akan otomatis aktif di semua karya Anda. Anda masih bisa menonaktifkannya per karya.",
             "confirmDisable": "Konfirmasi Nonaktifkan",
             "cancel": "Batal",
             "missingRequiredFields": "Field yang diperlukan hilang: {fields}",
@@ -2884,20 +2890,20 @@
                 "removeLabel": "Hapus {login}"
             }
         },
-        "directoryPlugins": {
-            "title": "Plugin Direktori",
-            "subtitle": "Konfigurasikan plugin untuk direktori ini",
+        "workPlugins": {
+            "title": "Plugin Karya",
+            "subtitle": "Konfigurasikan plugin untuk karya ini",
             "active": "Aktif",
             "enable": "Aktifkan",
             "disable": "Nonaktifkan",
-            "enableForDirectory": "Aktifkan untuk direktori ini",
-            "disableForDirectory": "Nonaktifkan untuk direktori ini",
+            "enableForWork": "Aktifkan untuk karya ini",
+            "disableForWork": "Nonaktifkan untuk karya ini",
             "enableAtUserLevelFirst": "Aktifkan plugin ini di pengaturan Anda terlebih dahulu",
             "disabledByUser": "Dinonaktifkan di tingkat pengguna",
             "systemAlwaysEnabled": "Plugin sistem - selalu diaktifkan",
             "showSettings": "Tampilkan Pengaturan",
             "hideSettings": "Sembunyikan Pengaturan",
-            "directorySettingsInfo": "Konfigurasikan pengaturan khusus direktori di sini",
+            "workSettingsInfo": "Konfigurasikan pengaturan khusus karya di sini",
             "save": "Simpan",
             "saved": "Tersimpan",
             "showInstalledOnly": "Tampilkan yang terinstal saja",
@@ -2905,7 +2911,7 @@
             "noPlugins": "Tidak ada plugin yang tersedia",
             "showAllPlugins": "Tampilkan semua plugin",
             "capabilityProviders": "Penyedia Kemampuan",
-            "capabilityProvidersDescription": "Pilih plugin mana yang menyediakan setiap kemampuan untuk direktori ini",
+            "capabilityProvidersDescription": "Pilih plugin mana yang menyediakan setiap kemampuan untuk karya ini",
             "noProvidersAvailable": "Tidak ada penyedia yang tersedia",
             "categories": {
                 "git": "Git",
@@ -2923,15 +2929,16 @@
             "errors": {
                 "unableToSend": "Tidak dapat mengirim pesan."
             },
-            "settingsModalTitle": "Pengaturan Direktori",
-            "settingsModalDescription": "Timpa pengaturan untuk direktori ini. Field yang tidak diset akan mewarisi dari pengaturan pengguna Anda.",
+            "settingsModalTitle": "Pengaturan Karya",
+            "settingsModalDescription": "Timpa pengaturan untuk karya ini. Field yang tidak diset akan mewarisi dari pengaturan pengguna Anda.",
             "inheritedFrom": "Diwarisi: {value}",
             "inheritedSecret": "Diwarisi: ••••••••",
             "resetToDefaults": "Atur ulang ke Default",
-            "resetConfirm": "Ini akan menghapus semua timpaan khusus direktori. Pengaturan akan kembali ke nilai tingkat pengguna Anda.",
+            "resetConfirm": "Ini akan menghapus semua timpaan khusus karya. Pengaturan akan kembali ke nilai tingkat pengguna Anda.",
             "resetSuccess": "Pengaturan diatur ulang ke default",
             "cancel": "Batal",
             "clickToConfigure": "Klik untuk mengonfigurasi",
+            "changeModels": "Ubah",
             "autoEnabledByUser": "Diaktifkan otomatis melalui pengaturan pengguna",
             "toggleError": "Gagal mengalihkan plugin",
             "system": "Sistem",
@@ -2942,8 +2949,8 @@
         "auth": {
             "backToHome": "Kembali ke beranda",
             "feature": {
-                "title": "Bangun Direktori dengan AI",
-                "subtitle": "Buat direktori indah dan dapat dicari dalam hitungan menit menggunakan bahasa alami. Tidak diperlukan pengkodean.",
+                "title": "Bangun Karya dengan AI",
+                "subtitle": "Buat karya indah dan dapat dicari dalam hitungan menit menggunakan bahasa alami. Tidak diperlukan pengkodean.",
                 "badge": "Bertenaga AI",
                 "benefits": {
                     "ai": {
@@ -2995,8 +3002,8 @@
         }
     },
     "metadata": {
-        "title": "{companyName} - Pembuat Direktori",
-        "description": "Platform SaaS untuk membangun dan mengelola direktori",
+        "title": "{companyName} - Pembuat Karya",
+        "description": "Platform SaaS untuk membangun dan mengelola karya",
         "pages": {
             "signIn": "Masuk",
             "createAccount": "Buat Akun",
@@ -3005,9 +3012,9 @@
             "authError": "Kesalahan Autentikasi",
             "dashboard": "Dasbor",
             "activity": "Log Aktivitas",
-            "directories": "Direktori",
-            "newDirectory": "Direktori Baru",
-            "directory": "Direktori",
+            "works": "Karya",
+            "newWork": "Karya Baru",
+            "work": "Karya",
             "overview": "Ikhtisar",
             "items": "Item",
             "generator": "Generator",
@@ -3041,7 +3048,7 @@
         }
     },
     "actions": {
-        "directories": {
+        "works": {
             "slug": {
                 "required": "Slug wajib diisi",
                 "format": "Slug harus hanya huruf kecil, angka, dan tanda hubung"
@@ -3060,16 +3067,16 @@
             },
             "oauthRequired": "Koneksi OAuth diperlukan. Silakan hubungkan akun {provider} Anda terlebih dahulu.",
             "githubRequired": "Koneksi GitHub diperlukan. Silakan hubungkan akun GitHub Anda terlebih dahulu.",
-            "createSuccess": "Direktori berhasil dibuat!",
-            "createFailed": "Gagal membuat direktori",
-            "updateSuccess": "Direktori berhasil diperbarui!",
-            "updateFailed": "Gagal memperbarui direktori",
-            "invalidGeneratedData": "Gagal menghasilkan data direktori yang valid",
-            "aiGenerationStarted": "Pembuatan direktori dimulai! AI sedang menghasilkan konten...",
-            "invalidId": "ID direktori tidak valid",
-            "deleteSuccess": "Direktori berhasil dihapus",
-            "deleteFailed": "Gagal menghapus direktori",
-            "fetchFailed": "Gagal mengambil direktori",
+            "createSuccess": "Karya berhasil dibuat!",
+            "createFailed": "Gagal membuat karya",
+            "updateSuccess": "Karya berhasil diperbarui!",
+            "updateFailed": "Gagal memperbarui karya",
+            "invalidGeneratedData": "Gagal menghasilkan data karya yang valid",
+            "aiGenerationStarted": "Pembuatan karya dimulai! AI sedang menghasilkan konten...",
+            "invalidId": "ID karya tidak valid",
+            "deleteSuccess": "Karya berhasil dihapus",
+            "deleteFailed": "Gagal menghapus karya",
+            "fetchFailed": "Gagal mengambil karya",
             "organization": {
                 "requiredWhenOwnerProvided": "Organisasi harus diaktifkan ketika pemilik disediakan"
             },
@@ -3077,7 +3084,7 @@
                 "invalidUrl": "Masukkan URL yang valid",
                 "analyzeFailed": "Gagal menganalisis repositori",
                 "started": "Impor dimulai dengan sukses",
-                "failed": "Gagal mengimpor direktori",
+                "failed": "Gagal mengimpor karya",
                 "fetchReposFailed": "Gagal mengambil repositori"
             }
         },

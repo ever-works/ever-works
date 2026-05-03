@@ -6,6 +6,27 @@ export interface FacadeExtractedContent {
 	readonly rawContent: string;
 	readonly images?: readonly string[];
 	readonly metadata?: Record<string, unknown>;
+	readonly extraction?: FacadeExtractionDiagnostics;
+}
+
+export interface FacadeExtractionAttempt {
+	readonly providerId: string;
+	readonly providerName: string;
+	readonly success: boolean;
+	readonly error?: string;
+	readonly contentLength?: number;
+}
+
+export interface FacadeExtractionDiagnostics {
+	readonly providerId: string;
+	readonly providerName: string;
+	readonly attempts: readonly FacadeExtractionAttempt[];
+}
+
+export interface FacadeContentExtractionResult {
+	readonly content: FacadeExtractedContent | null;
+	readonly attempts: readonly FacadeExtractionAttempt[];
+	readonly error?: string;
 }
 
 export interface FacadeExtractionOptions {
@@ -40,4 +61,10 @@ export interface IContentExtractorFacade extends IBaseFacade {
 		options: FacadeExtractionOptions | undefined,
 		facadeOptions: FacadeOptions
 	): Promise<FacadeExtractedContent | null>;
+
+	extractContentWithDiagnostics?(
+		url: string,
+		options: FacadeExtractionOptions | undefined,
+		facadeOptions: FacadeOptions
+	): Promise<FacadeContentExtractionResult>;
 }

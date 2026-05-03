@@ -203,7 +203,7 @@ Note that the plugin creates a new `Perplexity` client instance for each search 
 
 ## How It Works in Ever Works
 
-When enabled as the active search provider, Perplexity is used during directory generation to find relevant information about each item. The AI-powered search understands query intent rather than just matching keywords, which produces more contextually relevant results for building directory content.
+When enabled as the active search provider, Perplexity is used during work generation to find relevant information about each item. The AI-powered search understands query intent rather than just matching keywords, which produces more contextually relevant results for building work content.
 
 ## Getting Started
 

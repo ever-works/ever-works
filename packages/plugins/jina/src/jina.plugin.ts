@@ -366,7 +366,7 @@ export class JinaReaderPlugin implements IPlugin, ISearchPlugin, IContentExtract
 				'',
 				'## How it works in Ever Works',
 				'',
-				'During directory generation, Jina finds relevant information about each item via search and extracts clean content from web pages for enriching descriptions.',
+				'During work generation, Jina finds relevant information about each item via search and extracts clean content from web pages for enriching descriptions.',
 				'',
 				'## Getting started',
 				'',

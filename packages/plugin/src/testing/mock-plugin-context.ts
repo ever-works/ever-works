@@ -7,7 +7,7 @@ import type {
 	HttpRequestOptions,
 	HttpResponse,
 	CustomCapabilityDefinition,
-	DirectoryInfo,
+	WorkInfo,
 	UserInfo
 } from '../contracts/plugin-context.interface.js';
 import type { EnvironmentVariables } from '../contracts/plugin-environment.interface.js';
@@ -162,17 +162,17 @@ export function createMockHttpClient(responses?: Map<string, HttpResponse<unknow
  * Create mock plugin services for testing
  */
 export function createMockServices(
-	directories?: Map<string, DirectoryInfo>,
+	works?: Map<string, WorkInfo>,
 	users?: Map<string, UserInfo>,
 	currentUser?: UserInfo
 ): PluginServices {
 	return {
-		directory: {
-			async getById(id: string): Promise<DirectoryInfo | null> {
-				return directories?.get(id) ?? null;
+		work: {
+			async getById(id: string): Promise<WorkInfo | null> {
+				return works?.get(id) ?? null;
 			},
-			async getBySlug(slug: string): Promise<DirectoryInfo | null> {
-				for (const dir of directories?.values() ?? []) {
+			async getBySlug(slug: string): Promise<WorkInfo | null> {
+				for (const dir of works?.values() ?? []) {
 					if (dir.slug === slug) return dir;
 				}
 				return null;
@@ -197,7 +197,7 @@ export interface MockPluginContextOptions {
 	settings?: PluginSettings;
 	env?: MockPluginEnvironmentOptions;
 	envVars?: Record<string, string>;
-	directories?: Map<string, DirectoryInfo>;
+	works?: Map<string, WorkInfo>;
 	users?: Map<string, UserInfo>;
 	currentUser?: UserInfo;
 	httpResponses?: Map<string, HttpResponse<unknown>>;
@@ -225,7 +225,7 @@ export function createMockPluginContext(options: MockPluginContextOptions = {}):
 		http: createMockHttpClient(options.httpResponses),
 		env: createMockPluginEnvironment(options.env),
 		envVars: createMockEnvVars({ variables: options.envVars }),
-		services: createMockServices(options.directories, options.users, options.currentUser),
+		services: createMockServices(options.works, options.users, options.currentUser),
 
 		async getSettings(_scope?: SettingScope, _scopeId?: string): Promise<PluginSettings> {
 			return settings;
@@ -245,7 +245,7 @@ export function createMockPluginContext(options: MockPluginContextOptions = {}):
 		},
 
 		async updateSettings(
-			_scope: 'user' | 'directory',
+			_scope: 'user' | 'work',
 			_scopeId: string | undefined,
 			data: PluginSettingsWrite
 		): Promise<void> {

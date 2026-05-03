@@ -5,12 +5,12 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 // Entities
 import { PluginEntity } from './entities/plugin.entity';
 import { UserPluginEntity } from './entities/user-plugin.entity';
-import { DirectoryPluginEntity } from './entities/directory-plugin.entity';
+import { WorkPluginEntity } from './entities/work-plugin.entity';
 
 // Repositories
 import { PluginRepository } from './repositories/plugin.repository';
 import { UserPluginRepository } from './repositories/user-plugin.repository';
-import { DirectoryPluginRepository } from './repositories/directory-plugin.repository';
+import { WorkPluginRepository } from './repositories/work-plugin.repository';
 
 // Services
 import { PluginRegistryService } from './services/plugin-registry.service';
@@ -20,6 +20,7 @@ import { PluginVersionCheckerService } from './services/plugin-version-checker.s
 import { PluginClassValidatorService } from './services/plugin-class-validator.service';
 import { PluginLifecycleManagerService } from './services/plugin-lifecycle-manager.service';
 import { PluginSettingsService } from './services/plugin-settings.service';
+import { SettingsSchemaValidatorService } from './services/settings-schema-validator.service';
 import { PluginContextFactoryService } from './services/plugin-context-factory.service';
 import { CustomCapabilityRegistryService } from './services/custom-capability-registry.service';
 import { PluginBootstrapService } from './services/plugin-bootstrap.service';
@@ -35,7 +36,7 @@ import type {
 /**
  * Plugin entities for TypeORM registration
  */
-export const PLUGIN_ENTITIES = [PluginEntity, UserPluginEntity, DirectoryPluginEntity];
+export const PLUGIN_ENTITIES = [PluginEntity, UserPluginEntity, WorkPluginEntity];
 
 /**
  * All plugin-related providers
@@ -48,11 +49,12 @@ const PROVIDERS = [
     // Repositories
     PluginRepository,
     UserPluginRepository,
-    DirectoryPluginRepository,
+    WorkPluginRepository,
     // Validation services
     PluginManifestValidatorService,
     PluginVersionCheckerService,
     PluginClassValidatorService,
+    SettingsSchemaValidatorService,
     // Core services
     PluginRegistryService,
     PluginLoaderService,
@@ -73,7 +75,7 @@ const EXPORTS = [
     // Repositories
     PluginRepository,
     UserPluginRepository,
-    DirectoryPluginRepository,
+    WorkPluginRepository,
     // Core services
     PluginRegistryService,
     PluginLoaderService,
@@ -85,6 +87,7 @@ const EXPORTS = [
     PluginManifestValidatorService,
     PluginVersionCheckerService,
     PluginClassValidatorService,
+    SettingsSchemaValidatorService,
     // Bootstrap service (for explicit initialization)
     PluginBootstrapService,
 ];

@@ -30,7 +30,7 @@ export function isClaudeCodeStepId(value: string): value is ClaudeCodeStepId {
 }
 
 /**
- * Base temporary directory for all Claude Code operations
+ * Base temporary work for all Claude Code operations
  */
 export const BASE_TEMP_DIR = '/tmp/claude-code-generator';
 

@@ -10,7 +10,7 @@ async function buildCLI() {
     const tempDir = path.join(__dirname, 'temp-build');
     const packageJsonPath = path.join(__dirname, 'package.json');
 
-    // Clean build directories
+    // Clean build works
     await fs.remove(buildDir);
     await fs.remove(tempDir);
     await fs.ensureDir(buildDir);
@@ -115,21 +115,21 @@ async function buildCLI() {
     const publishablePackageJson = {
         name: '@ever-works/cli',
         version: currentPackageJson.version,
-        description: 'Ever Works CLI - Open Directory Builder Platform Command Line Interface',
+        description: 'Ever Works CLI - Open Work Builder Platform Command Line Interface',
         author: AUTHOR,
         license: 'UNLICENSED',
         homepage: 'https://ever.works',
         repository: {
             type: 'git',
             url: 'https://github.com/ever-works/ever-works.git',
-            directory: 'apps/internal-cli',
+            work: 'apps/internal-cli',
         },
         bugs: {
             url: 'https://github.com/ever-works/ever-works/issues',
         },
         keywords: [
             'cli',
-            'directory',
+            'work',
             'builder',
             'ever-works',
             'automation',
@@ -177,11 +177,11 @@ async function buildCLI() {
         await fs.copy(licensePath, path.join(buildDir, 'LICENSE'));
     }
 
-    // Clean up temporary directory
+    // Clean up temporary work
     await fs.remove(tempDir);
 
     console.log('CLI build completed successfully!');
-    console.log(`Output directory: ${buildDir}`);
+    console.log(`Output work: ${buildDir}`);
 }
 
 buildCLI().catch((error) => {

@@ -1,5 +1,5 @@
 /**
- * DTO for removing an item from a directory
+ * DTO for removing an item from a work
  */
 export interface RemoveItemDto {
 	/** Slug of the item to remove */

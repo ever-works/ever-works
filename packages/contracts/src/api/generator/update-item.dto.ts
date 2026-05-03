@@ -1,5 +1,5 @@
 /**
- * DTO for updating item metadata in a directory
+ * DTO for updating item metadata in a work
  */
 export interface UpdateItemDto {
 	/** Slug of the item to update */

@@ -8,7 +8,7 @@ description: Get help with Ever Works - community support, documentation, troubl
 
 # Support & Help
 
-Welcome to the Ever Works support center. We're here to help you get the most out of your directory website building experience.
+Welcome to the Ever Works support center. We're here to help you get the most out of your work website building experience.
 
 ## Getting Help
 
@@ -43,7 +43,7 @@ Welcome to the Ever Works support center. We're here to help you get the most ou
 
 ### Cloud Platform
 
-- **[Ever Works](https://ever.works)** - Build and deploy your directory website
+- **[Ever Works](https://ever.works)** - Build and deploy your work website
 
 ### Self-Hosted Options
 

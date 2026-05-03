@@ -14,9 +14,9 @@ import type {
     ItemHealthStatus,
     ItemSourceValidation,
 } from '@ever-works/contracts';
-import { Directory } from '@src/entities/directory.entity';
+import { Work } from '@src/entities/work.entity';
 import { User } from '@src/entities/user.entity';
-import { DirectoryOwnershipService } from './directory-ownership.service';
+import { WorkOwnershipService } from './work-ownership.service';
 import { GitFacadeService } from '../facades/git.facade';
 import { AiFacadeService } from '../facades/ai.facade';
 import { ContentExtractorFacadeService } from '../facades/content-extractor.facade';
@@ -40,7 +40,7 @@ type CheckLinksFn = (
     },
 ) => Promise<Record<string, CheckLinkResult>>;
 
-type DirectoryHealthCheckResult = {
+type WorkHealthCheckResult = {
     checkedCount: number;
     changedCount: number;
     items: ItemData[];
@@ -57,7 +57,7 @@ const sourceValidationSchema = z.object({
     suggested_source_url: z.string().url().nullable().optional(),
 });
 
-const SOURCE_VALIDATION_PROMPT = `You are validating whether a URL is a good source for a directory item.
+const SOURCE_VALIDATION_PROMPT = `You are validating whether a URL is a good source for a work item.
 
 Return a judgment about the source quality, not just whether the URL opens.
 
@@ -96,11 +96,11 @@ export class ItemHealthService {
         private readonly contentExtractorFacade: ContentExtractorFacadeService,
         @Optional() @Inject(CACHE_MANAGER) private readonly cacheManager?: Cache,
         @Optional()
-        private readonly ownershipService?: DirectoryOwnershipService,
+        private readonly ownershipService?: WorkOwnershipService,
     ) {}
 
     async checkItem(
-        directoryId: string,
+        workId: string,
         itemSlug: string,
         user: User,
     ): Promise<CheckItemHealthResponseDto> {
@@ -110,14 +110,14 @@ export class ItemHealthService {
             );
         }
 
-        const { directory } = await this.ownershipService.ensureCanEdit(directoryId, user.id);
-        const cacheKey = this.buildManualCheckCacheKey(directoryId, itemSlug);
+        const { work } = await this.ownershipService.ensureCanEdit(workId, user.id);
+        const cacheKey = this.buildManualCheckCacheKey(workId, itemSlug);
         const cachedResult = await this.cacheManager?.get<CheckItemHealthResponseDto>(cacheKey);
         if (cachedResult) {
             return cachedResult;
         }
 
-        const result = await this.checkDirectoryItems(directory, user, {
+        const result = await this.checkWorkItems(work, user, {
             trigger: 'manual',
             itemSlugs: [itemSlug],
         });
@@ -145,26 +145,26 @@ export class ItemHealthService {
         return response;
     }
 
-    async runScheduledCheck(directory: Directory, user: User): Promise<DirectoryHealthCheckResult> {
+    async runScheduledCheck(work: Work, user: User): Promise<WorkHealthCheckResult> {
         try {
-            return await this.checkDirectoryItems(directory, user, { trigger: 'schedule' });
+            return await this.checkWorkItems(work, user, { trigger: 'schedule' });
         } catch (error) {
             this.logger.warn(
-                `Failed scheduled item health check for directory ${directory.slug}: ${error instanceof Error ? error.message : String(error)}`,
+                `Failed scheduled item health check for work ${work.slug}: ${error instanceof Error ? error.message : String(error)}`,
             );
             throw error;
         }
     }
 
-    private async checkDirectoryItems(
-        directory: Directory,
+    private async checkWorkItems(
+        work: Work,
         user: User,
         options: { trigger: HealthCheckTrigger; itemSlugs?: string[] },
-    ): Promise<DirectoryHealthCheckResult> {
-        const directoryOwner = directory.user as User;
-        const committer = directory.resolveCommitter(user);
-        const repo = directory.getDataRepo();
-        const owner = directory.getRepoOwner();
+    ): Promise<WorkHealthCheckResult> {
+        const workOwner = work.user as User;
+        const committer = work.resolveCommitter(user);
+        const repo = work.getDataRepo();
+        const owner = work.getRepoOwner();
 
         const dest = await this.gitFacade.cloneOrPull(
             {
@@ -172,7 +172,11 @@ export class ItemHealthService {
                 repo,
                 committer,
             },
-            { userId: directoryOwner.id, providerId: directory.gitProvider },
+            {
+                userId: workOwner.id,
+                providerId: work.gitProvider,
+                workId: work.id,
+            },
         );
 
         const data = await DataRepository.create(dest);
@@ -237,7 +241,7 @@ export class ItemHealthService {
                 item,
                 nextHealth,
                 options.trigger,
-                directory,
+                work,
                 user,
             );
 
@@ -262,16 +266,20 @@ export class ItemHealthService {
         }
 
         if (checkedItems.length > 0) {
-            await this.gitFacade.addAll(directory.gitProvider, data.dir);
+            await this.gitFacade.addAll(work.gitProvider, data.dir);
             await this.gitFacade.commit(
-                directory.gitProvider,
+                work.gitProvider,
                 data.dir,
                 this.buildCommitMessage(options.trigger, checkedItems.length),
                 committer,
             );
             await this.gitFacade.push(
                 { dir: dest },
-                { userId: directoryOwner.id, providerId: directory.gitProvider },
+                {
+                    userId: workOwner.id,
+                    providerId: work.gitProvider,
+                    workId: work.id,
+                },
             );
         }
 
@@ -359,7 +367,7 @@ export class ItemHealthService {
         item: ItemData,
         health: ItemHealth,
         trigger: HealthCheckTrigger,
-        directory: Directory,
+        work: Work,
         user: User,
     ): Promise<ItemSourceValidation> {
         const checkedAt = health.checked_at || format(new Date(), 'yyyy-MM-dd HH:mm');
@@ -410,7 +418,7 @@ export class ItemHealthService {
             undefined,
             {
                 userId: user.id,
-                directoryId: directory.id,
+                workId: work.id,
             },
         );
 
@@ -441,7 +449,7 @@ export class ItemHealthService {
                 },
                 {
                     userId: user.id,
-                    directoryId: directory.id,
+                    workId: work.id,
                 },
             );
 
@@ -662,7 +670,7 @@ export class ItemHealthService {
         }
     }
 
-    private buildManualCheckCacheKey(directoryId: string, itemSlug: string): string {
-        return `item-source-check:${directoryId}:${itemSlug}`;
+    private buildManualCheckCacheKey(workId: string, itemSlug: string): string {
+        return `item-source-check:${workId}:${itemSlug}`;
     }
 }

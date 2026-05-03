@@ -92,20 +92,20 @@ export class PipelineBuilderService {
     constructor(private readonly registry: PluginRegistryService) {}
 
     /**
-     * Build an executable pipeline for a directory.
+     * Build an executable pipeline for a work.
      *
      * @param pipeline - The resolved pipeline plugin instance
-     * @param directoryId - The directory to build the pipeline for
+     * @param workId - The work to build the pipeline for
      * @param userId - Optional user ID for user-level plugin resolution
      * @returns A fully compiled ExecutablePipeline ready for execution
      */
     async build(
         pipeline: IPipelinePlugin,
-        directoryId?: string,
+        workId?: string,
         userId?: string,
     ): Promise<ExecutablePipeline> {
         this.logger.debug(
-            `Building pipeline for directory: ${directoryId || 'global'} using pipeline: ${pipeline.id}`,
+            `Building pipeline for work: ${workId || 'global'} using pipeline: ${pipeline.id}`,
         );
 
         // 1. Start with steps from the resolved pipeline plugin
@@ -120,8 +120,8 @@ export class PipelineBuilderService {
             appendSteps: [],
         };
 
-        // 3. Get enabled modifier plugins (with directory-scoped filtering)
-        const modifiers = await this.getEnabledModifierPlugins(pipeline.id, directoryId, userId);
+        // 3. Get enabled modifier plugins (with work-scoped filtering)
+        const modifiers = await this.getEnabledModifierPlugins(pipeline.id, workId, userId);
         this.logger.debug(`Found ${modifiers.length} enabled modifier plugins`);
 
         // 4. Process each modifier's step contributions
@@ -202,7 +202,7 @@ export class PipelineBuilderService {
      */
     private async getEnabledModifierPlugins(
         pipelineId: string,
-        directoryId?: string,
+        workId?: string,
         userId?: string,
     ): Promise<
         Array<{
@@ -224,7 +224,7 @@ export class PipelineBuilderService {
 
             const isEnabled = await this.registry.isPluginEnabledForScope(
                 registered.plugin.id,
-                directoryId,
+                workId,
                 userId,
             );
             if (!isEnabled) continue;

@@ -19,7 +19,7 @@ export const STEP_DEFINITIONS: readonly PipelineStepDefinition<ZapierStepId>[] =
 	{
 		id: 'prepare-payload',
 		name: 'Prepare Action Payload',
-		description: 'Build input payload from directory context, existing items, and config',
+		description: 'Build input payload from work context, existing items, and config',
 		position: { type: 'after', stepId: 'validate-zapier' },
 		dependencies: [{ stepId: 'validate-zapier', required: true }],
 		optional: false,
@@ -39,7 +39,7 @@ export const STEP_DEFINITIONS: readonly PipelineStepDefinition<ZapierStepId>[] =
 	{
 		id: 'collect-results',
 		name: 'Collect & Validate Results',
-		description: 'Parse the action output into directory items and deduplicate',
+		description: 'Parse the action output into work items and deduplicate',
 		position: { type: 'after', stepId: 'execute-action' },
 		dependencies: [{ stepId: 'execute-action', required: true }],
 		optional: false,

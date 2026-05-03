@@ -9,7 +9,7 @@ sidebar_position: 27
 
 ## Overview
 
-The import flow components implement a multi-step wizard for importing directories from external sources (URLs or git repositories) into Ever Works. The flow supports two modes: "import" (copy data into a new repository) and "link existing" (connect to an already-existing Ever Works repository). All components live in `apps/web/src/components/directories/import/` and are exported through a barrel `index.ts`.
+The import flow components implement a multi-step wizard for importing works from external sources (URLs or git repositories) into Ever Works. The flow supports two modes: "import" (copy data into a new repository) and "link existing" (connect to an already-existing Ever Works repository). All components live in `apps/web/src/components/works/import/` and are exported through a barrel `index.ts`.
 
 ## Architecture
 
@@ -28,17 +28,17 @@ Import Flow (multi-step wizard)
 │
 ├── Step 3 (Import mode): ImportConfigureStep
 │   ├── Detected format display
-│   ├── Directory name input
+│   ├── Work name input
 │   ├── SlugConflictWarning (if slug exists)
 │   ├── Sync toggle (Switch component)
 │   ├── AI provider selection (for awesome_readme type)
 │   ├── Organization selector
-│   └── Import button → importDirectory
+│   └── Import button → importWork
 │
 └── Step 3 (Link mode): LinkExistingConfirm
     ├── Repo status display (data, markdown, website)
     ├── Missing repo warnings
-    └── Confirm link → createDirectory with linked repos
+    └── Confirm link → createWork with linked repos
 ```
 
 The parent page component orchestrates step transitions, holding the current step index and the accumulated form state. Each step component receives its data via props and communicates back through callbacks.
@@ -47,7 +47,7 @@ The parent page component orchestrates step transitions, holding the current ste
 
 ### ImportSourceStep
 
-**File:** `apps/web/src/components/directories/import/ImportSourceStep.tsx`
+**File:** `apps/web/src/components/works/import/ImportSourceStep.tsx`
 
 | Prop          | Type                              | Description                        |
 | ------------- | --------------------------------- | ---------------------------------- |
@@ -75,7 +75,7 @@ When the user clicks "Analyze", the component calls either `analyzeRepository` (
 
 ### ImportModeSelector
 
-**File:** `apps/web/src/components/directories/import/ImportModeSelector.tsx`
+**File:** `apps/web/src/components/works/import/ImportModeSelector.tsx`
 
 | Prop             | Type                         | Description                    |
 | ---------------- | ---------------------------- | ------------------------------ |
@@ -109,7 +109,7 @@ type ImportMode = 'import' | 'link_existing';
 
 ### ImportConfigureStep
 
-**File:** `apps/web/src/components/directories/import/ImportConfigureStep.tsx`
+**File:** `apps/web/src/components/works/import/ImportConfigureStep.tsx`
 
 | Prop             | Type                             | Description                       |
 | ---------------- | -------------------------------- | --------------------------------- |
@@ -122,7 +122,7 @@ The configuration step for the "import" mode. It renders multiple sections:
 
 1. **Detected type display** - Shows the auto-detected format (e.g., "awesome_readme", "json_list", "csv") with an icon and description. If detection failed, a manual format selector is shown as a fallback.
 
-2. **Directory name** - An `Input` field for naming the new directory. Pre-filled from the analysis result.
+2. **Work name** - An `Input` field for naming the new work. Pre-filled from the analysis result.
 
 3. **Slug conflict warning** - If the generated slug conflicts with an existing repository, a `SlugConflictWarning` component is rendered with suggested alternatives.
 
@@ -130,11 +130,11 @@ The configuration step for the "import" mode. It renders multiple sections:
 
 5. **AI provider selection** - Only shown for `awesome_readme` type imports. Lets the user select which AI provider to use for content extraction.
 
-6. **Organization selector** - If the user belongs to organizations, lets them assign the directory to one.
+6. **Organization selector** - If the user belongs to organizations, lets them assign the work to one.
 
 7. **Attribution note** - Informational text about source attribution.
 
-8. **Import button** - Triggers the `importDirectory` server action with the configured options.
+8. **Import button** - Triggers the `importWork` server action with the configured options.
 
 ```tsx
 <ImportConfigureStep analysisResult={analysisResult} mode="import" onImport={handleImport} isPending={isPending} />
@@ -142,7 +142,7 @@ The configuration step for the "import" mode. It renders multiple sections:
 
 ### SlugConflictWarning
 
-**File:** `apps/web/src/components/directories/import/SlugConflictWarning.tsx`
+**File:** `apps/web/src/components/works/import/SlugConflictWarning.tsx`
 
 | Prop             | Type         | Description                                |
 | ---------------- | ------------ | ------------------------------------------ |
@@ -150,7 +150,7 @@ The configuration step for the "import" mode. It renders multiple sections:
 | `suggestedSlug`  | `string`     | Automatically generated alternative slug   |
 | `onUseSuggested` | `() => void` | Callback to apply the suggested slug       |
 
-An amber-colored warning banner displayed when the desired directory slug already exists. It shows:
+An amber-colored warning banner displayed when the desired work slug already exists. It shows:
 
 - A warning icon with explanatory text.
 - The list of conflicting repository names.
@@ -158,15 +158,15 @@ An amber-colored warning banner displayed when the desired directory slug alread
 
 ```tsx
 <SlugConflictWarning
-	conflicts={['my-directory', 'my-directory-data']}
-	suggestedSlug="my-directory-2"
-	onUseSuggested={() => setSlug('my-directory-2')}
+	conflicts={['my-work', 'my-work-data']}
+	suggestedSlug="my-work-2"
+	onUseSuggested={() => setSlug('my-work-2')}
 />
 ```
 
 ### LinkExistingConfirm
 
-**File:** `apps/web/src/components/directories/import/LinkExistingConfirm.tsx`
+**File:** `apps/web/src/components/works/import/LinkExistingConfirm.tsx`
 
 | Prop             | Type                           | Description                     |
 | ---------------- | ------------------------------ | ------------------------------- |
@@ -211,7 +211,7 @@ The analysis result contains:
 ```typescript
 interface AnalyzeResult {
 	type: string; // e.g., 'awesome_readme', 'json_list', 'csv'
-	name: string; // Suggested directory name
+	name: string; // Suggested work name
 	slug: string; // Generated slug
 	itemCount: number; // Detected number of items
 	repoUrl: string; // Source repository URL
@@ -228,12 +228,12 @@ interface AnalyzeResult {
 
 The two modes result in different server action calls:
 
-- **Import** calls `importDirectory` which clones the source, parses the content, creates a new Ever Works directory structure, and optionally sets up sync.
-- **Link** calls `createDirectory` with pre-existing repository references, connecting the directory to already-existing repos without copying data.
+- **Import** calls `importWork` which clones the source, parses the content, creates a new Ever Works work structure, and optionally sets up sync.
+- **Link** calls `createWork` with pre-existing repository references, connecting the work to already-existing repos without copying data.
 
 ### Slug Generation
 
-Directory slugs are auto-generated from the directory name using a kebab-case transformation. If a conflict is detected (the slug or its variants like `slug-data` or `slug-website` already exist), the `SlugConflictWarning` is displayed and a numeric suffix is suggested (e.g., `my-directory-2`).
+Work slugs are auto-generated from the work name using a kebab-case transformation. If a conflict is detected (the slug or its variants like `slug-data` or `slug-website` already exist), the `SlugConflictWarning` is displayed and a numeric suffix is suggested (e.g., `my-work-2`).
 
 ## Styling & Theming
 
@@ -263,8 +263,8 @@ import {
 	ImportModeSelector,
 	ImportConfigureStep,
 	LinkExistingConfirm
-} from '@/components/directories/import';
-import type { ImportMode } from '@/components/directories/import';
+} from '@/components/works/import';
+import type { ImportMode } from '@/components/works/import';
 
 export function ImportPage({ connections }) {
 	const [step, setStep] = useState(1);
@@ -316,7 +316,7 @@ export function ImportPage({ connections }) {
 
 ## Related Components
 
-- [Directory Detail Components](./directory-detail-components.md) - The detail view that displays after import completes
-- [Server Actions Deep Dive](./server-actions-deep-dive.md) - analyzeRepository, importDirectory, createDirectory actions
+- [Work Detail Components](./work-detail-components.md) - The detail view that displays after import completes
+- [Server Actions Deep Dive](./server-actions-deep-dive.md) - analyzeRepository, importWork, createWork actions
 - [Settings Components](./settings-components.md) - GitProviderConnections needed for repository-based imports
 - [UI Component Library](./ui-component-library.md) - Input, Button, Dialog, Switch used throughout the flow

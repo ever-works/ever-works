@@ -7,13 +7,13 @@ sidebar_position: 12
 
 # Generation Workflow UI
 
-The generation interface allows users to create or update directory items using AI. It consists of a server page that determines the current state, a multi-section form for configuring generation parameters, provider selectors, dynamic plugin fields, and a progress display for active generation runs.
+The generation interface allows users to create or update work items using AI. It consists of a server page that determines the current state, a multi-section form for configuring generation parameters, provider selectors, dynamic plugin fields, and a progress display for active generation runs.
 
 ## Architecture Overview
 
 ```
 Generator Page (server)
-  |-- checks directory permissions via canGenerate()
+  |-- checks work permissions via canGenerate()
   |-- checks generateStatus to determine view
   |
   |-- GenerationProgress (if GENERATING)
@@ -22,48 +22,48 @@ Generator Page (server)
   |
   |-- GeneratorForm (otherwise)
         |-- RequiredFields (name, prompt)
-        |-- UpdateItemsFields (for existing directories)
+        |-- UpdateItemsFields (for existing works)
         |-- ProviderSelectionSection
         |-- DynamicPluginFields
 ```
 
 ## Generator Page
 
-**Route**: `/directories/[id]/generator`
-**File**: `src/app/[locale]/(dashboard)/directories/[id]/generator/page.tsx`
+**Route**: `/works/[id]/generator`
+**File**: `src/app/[locale]/(dashboard)/works/[id]/generator/page.tsx`
 
-The server component fetches directory data and configuration in parallel, then determines which view to render.
+The server component fetches work data and configuration in parallel, then determines which view to render.
 
 ```typescript
-const [directoryRes, configRes] = await Promise.all([
-	directoryAPI.get(id),
-	directoryAPI.getConfig(id).catch(() => ({ config: undefined }))
+const [workRes, configRes] = await Promise.all([
+	workAPI.get(id),
+	workAPI.getConfig(id).catch(() => ({ config: undefined }))
 ]);
 ```
 
 **View Selection**:
 
-| Condition                                  | View                 |
-| ------------------------------------------ | -------------------- |
-| `canGenerate(directory.userRole)` is false | `notFound()` (404)   |
-| `generateStatus.status === GENERATING`     | `GenerationProgress` |
-| Otherwise                                  | `GeneratorForm`      |
+| Condition                              | View                 |
+| -------------------------------------- | -------------------- |
+| `canGenerate(work.userRole)` is false  | `notFound()` (404)   |
+| `generateStatus.status === GENERATING` | `GenerationProgress` |
+| Otherwise                              | `GeneratorForm`      |
 
 The `canGenerate` function performs a server-side role check, ensuring only editors and above can access the generator.
 
 ## GeneratorForm
 
-**File**: `src/components/directories/detail/generator/GeneratorForm.tsx`
+**File**: `src/components/works/detail/generator/GeneratorForm.tsx`
 
-The main form component that handles both new directory generation and updates to existing directories.
+The main form component that handles both new work generation and updates to existing works.
 
 **Props**:
 
-| Prop          | Type               | Description                                                    |
-| ------------- | ------------------ | -------------------------------------------------------------- |
-| `directoryId` | `string`           | Directory identifier                                           |
-| `directory`   | `Directory`        | Full directory object                                          |
-| `config`      | `DirectoryConfig?` | Directory configuration (may be undefined for new directories) |
+| Prop     | Type          | Description                                         |
+| -------- | ------------- | --------------------------------------------------- |
+| `workId` | `string`      | Work identifier                                     |
+| `work`   | `Work`        | Full work object                                    |
+| `config` | `WorkConfig?` | Work configuration (may be undefined for new works) |
 
 ### Form State
 
@@ -79,7 +79,7 @@ The form manages three layers of state:
 
 ```typescript
 {
-    name: string;                                  // Directory name (from directory.name)
+    name: string;                                  // Work name (from work.name)
     prompt: string;                                // Generation prompt
     generation_method?: GenerationMethod;           // CREATE_UPDATE or RECREATE
     update_with_pull_request?: boolean;             // Whether to create PRs for changes
@@ -97,14 +97,14 @@ useEffect(() => {
 	if (pipelineId === lastFetchedPipelineRef.current && formSchema) return;
 
 	async function loadFormSchema() {
-		const result = await getFormSchema(directoryId, pipelineId);
+		const result = await getFormSchema(workId, pipelineId);
 		if (result.success && result.data) {
 			setFormSchema(result.data);
 			syncResolvedPipeline(result.data);
 		}
 	}
 	loadFormSchema();
-}, [directoryId, providers.pipeline, syncResolvedPipeline]);
+}, [workId, providers.pipeline, syncResolvedPipeline]);
 ```
 
 **Stale Response Protection**: A `fetchVersionRef` counter ensures that responses from outdated requests (due to rapid pipeline changes) are discarded.
@@ -113,29 +113,29 @@ useEffect(() => {
 
 ### View Modes
 
-| Context                                 | Fields Shown                                                    |
-| --------------------------------------- | --------------------------------------------------------------- |
-| New directory (never generated)         | RequiredFields + ProviderSelectionSection + DynamicPluginFields |
-| Existing directory (simple update)      | UpdateItemsFields only                                          |
-| Existing directory (advanced toggle on) | UpdateItemsFields + RequiredFields + providers + plugin fields  |
+| Context                            | Fields Shown                                                    |
+| ---------------------------------- | --------------------------------------------------------------- |
+| New work (never generated)         | RequiredFields + ProviderSelectionSection + DynamicPluginFields |
+| Existing work (simple update)      | UpdateItemsFields only                                          |
+| Existing work (advanced toggle on) | UpdateItemsFields + RequiredFields + providers + plugin fields  |
 
-The advanced options toggle lets users of existing directories access the full generation form without being overwhelmed by options for a simple update.
+The advanced options toggle lets users of existing works access the full generation form without being overwhelmed by options for a simple update.
 
 ### Submission Flow
 
 The form handles two distinct submission paths:
 
-**Simple Update** (existing directory, no advanced options):
+**Simple Update** (existing work, no advanced options):
 
 ```typescript
 const updateData: UpdateItemsGeneratorDto = {
 	generation_method: coreData.generation_method,
 	update_with_pull_request: coreData.update_with_pull_request
 };
-result = await updateItems(directoryId, updateData);
+result = await updateItems(workId, updateData);
 ```
 
-**Full Generation** (new directory or advanced mode):
+**Full Generation** (new work or advanced mode):
 
 ```typescript
 const generateData: CreateItemsGeneratorDto = {
@@ -147,29 +147,29 @@ const generateData: CreateItemsGeneratorDto = {
 	providers: buildSelectedProviders(formSchema),
 	pluginConfig: Object.keys(pluginConfig).length > 0 ? pluginConfig : undefined
 };
-result = await generateItems(directoryId, generateData);
+result = await generateItems(workId, generateData);
 ```
 
-**Recreate Confirmation**: When the generation method is `RECREATE` and the directory has existing data, a confirmation dialog warns that all items will be deleted and regenerated. The dialog uses the `Dialog` component with a danger-styled confirm button.
+**Recreate Confirmation**: When the generation method is `RECREATE` and the work has existing data, a confirmation dialog warns that all items will be deleted and regenerated. The dialog uses the `Dialog` component with a danger-styled confirm button.
 
 **Unconfigured Provider Check**: Before full generation, `getUnconfiguredProviders(formSchema)` checks that all required providers are configured and shows a toast error if any are missing.
 
 ## RequiredFields
 
-**File**: `src/components/directories/detail/generator/RequiredFields.tsx`
+**File**: `src/components/works/detail/generator/RequiredFields.tsx`
 
 Renders the core generation inputs.
 
 | Field             | Component          | Description                                           |
 | ----------------- | ------------------ | ----------------------------------------------------- |
-| Directory Name    | `Input` (disabled) | Read-only, pre-filled from directory data             |
+| Work Name         | `Input` (disabled) | Read-only, pre-filled from work data                  |
 | Generation Prompt | `Textarea`         | Multi-line prompt for AI generation, with helper text |
 
 ## UpdateItemsFields
 
-**File**: `src/components/directories/detail/generator/UpdateItemsFields.tsx`
+**File**: `src/components/works/detail/generator/UpdateItemsFields.tsx`
 
-Renders update-specific controls for existing directories.
+Renders update-specific controls for existing works.
 
 | Field             | Component      | Description                                          |
 | ----------------- | -------------- | ---------------------------------------------------- |
@@ -177,11 +177,11 @@ Renders update-specific controls for existing directories.
 | Update with PR    | `Switch`       | Toggle for creating pull requests for changes        |
 | PR Update Info    | `PrUpdateInfo` | Shows status of the last main and data PRs           |
 
-When `RECREATE` is selected and the directory has existing configuration, an inline warning banner appears.
+When `RECREATE` is selected and the work has existing configuration, an inline warning banner appears.
 
 ## ProviderSelector
 
-**File**: `src/components/directories/detail/generator/ProviderSelector.tsx`
+**File**: `src/components/works/detail/generator/ProviderSelector.tsx`
 
 Renders a horizontal row of provider buttons for a single category (AI, search, screenshot, etc.).
 
@@ -204,7 +204,7 @@ Also defined in the same file, this component renders pipeline options as radio 
 
 ## DynamicPluginFields
 
-**File**: `src/components/directories/detail/generator/DynamicPluginFields.tsx`
+**File**: `src/components/works/detail/generator/DynamicPluginFields.tsx`
 
 Renders form fields that are dynamically defined by the active pipeline plugin.
 
@@ -238,7 +238,7 @@ Renders form fields that are dynamically defined by the active pipeline plugin.
 
 ## GenerationProgress
 
-**File**: `src/components/directories/detail/generator/GenerationProgress.tsx`
+**File**: `src/components/works/detail/generator/GenerationProgress.tsx`
 
 Displays the real-time progress of an active generation run.
 
@@ -263,9 +263,9 @@ Displays the real-time progress of an active generation run.
 
 ## Server Actions Used
 
-| Action                | Source                        | Description                                            |
-| --------------------- | ----------------------------- | ------------------------------------------------------ |
-| `generateItems`       | `dashboard/generator.ts`      | Starts full item generation                            |
-| `updateItems`         | `dashboard/generator.ts`      | Starts an update-only generation run                   |
-| `getFormSchema`       | `dashboard/generator-form.ts` | Fetches dynamic form schema for a directory + pipeline |
-| `getGlobalFormSchema` | `dashboard/generator-form.ts` | Fetches global form schema (used by AI chat)           |
+| Action                | Source                        | Description                                       |
+| --------------------- | ----------------------------- | ------------------------------------------------- |
+| `generateItems`       | `dashboard/generator.ts`      | Starts full item generation                       |
+| `updateItems`         | `dashboard/generator.ts`      | Starts an update-only generation run              |
+| `getFormSchema`       | `dashboard/generator-form.ts` | Fetches dynamic form schema for a work + pipeline |
+| `getGlobalFormSchema` | `dashboard/generator-form.ts` | Fetches global form schema (used by AI chat)      |

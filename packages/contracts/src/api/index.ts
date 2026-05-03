@@ -8,5 +8,5 @@
 // Generator types
 export * from './generator/index.js';
 
-// Directory types
-export * from './directory/index.js';
+// Work types
+export * from './work/index.js';

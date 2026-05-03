@@ -16,7 +16,7 @@ import {
 type PromptAssessment = z.infer<typeof promptUnderstandingAssessmentSchema>;
 type ExtractedItems = z.infer<typeof extractedItemsSchema>;
 
-const UNDERSTANDING_PROMPT = `You are an AI assistant helping to curate a "Directory website".
+const UNDERSTANDING_PROMPT = `You are an AI assistant helping to curate a "Work website".
 Topic: "{topicName}"
 Description: "{topicDescription}"
 Keywords: "{target_keywords_string}"
@@ -33,8 +33,8 @@ Consider:
 - Are there any ambiguities that would make item generation difficult or likely to produce irrelevant results?` as const;
 
 const GENERATION_PROMPT =
-	`You are an expert curator and technical writer tasked with generating an initial list of items for a "Directory website" about a specific topic.
-The **main topic** of the Directory website is: "{topicName}"
+	`You are an expert curator and technical writer tasked with generating an initial list of items for a "Work website" about a specific topic.
+The **main topic** of the Work website is: "{topicName}"
 Description: "{topicDescription}"
 Optional initial keywords: {target_keywords_string}
 
@@ -66,7 +66,7 @@ Generate the list of items according to the specified schema.` as const;
  * AI Item Generation Step
  *
  * Generates initial items using AI based on the topic description.
- * This step runs before web search to seed the directory with AI-curated items.
+ * This step runs before web search to seed the work with AI-curated items.
  */
 export class AiItemGenerationStep extends BasePipelineStep {
 	readonly name = 'AI Item Generation';
@@ -76,24 +76,24 @@ export class AiItemGenerationStep extends BasePipelineStep {
 		context: MutableGenerationContext,
 		execContext: StepExecutionContext
 	): Promise<MutableGenerationContext> {
-		const { request, directory, featuredItemHints, metrics, advancedPrompts } = context;
+		const { request, work, featuredItemHints, metrics, advancedPrompts } = context;
 		const { logger, aiFacade, promptFacade } = execContext;
 		const config = request.config || {};
 
 		const facadeOptions: FacadeOptions = {
 			userId: execContext.user!.id,
-			directoryId: execContext.directory.id
+			workId: execContext.work.id
 		};
 
 		const aiFirstEnabled = config.ai_first_generation_enabled !== false;
 
 		if (aiFirstEnabled) {
-			logger.log(`[${directory.slug}] AI-First Item Generation - Starting`);
+			logger.log(`[${work.slug}] AI-First Item Generation - Starting`);
 
 			const initialAiItems = await this.generateInitialItemsWithAI(
 				context,
-				directory.slug,
-				request.name || directory.name,
+				work.slug,
+				request.name || work.name,
 				request.prompt || '',
 				(config.target_keywords as string[]) || [],
 				featuredItemHints,
@@ -105,11 +105,11 @@ export class AiItemGenerationStep extends BasePipelineStep {
 				promptFacade
 			);
 
-			logger.log(`[${directory.slug}] AI generated ${initialAiItems.length} initial items.`);
+			logger.log(`[${work.slug}] AI generated ${initialAiItems.length} initial items.`);
 
 			context.initialAiItems = initialAiItems;
 		} else {
-			logger.debug(`[${directory.slug}] AI-First Item Generation - Skipped`);
+			logger.debug(`[${work.slug}] AI-First Item Generation - Skipped`);
 			context.initialAiItems = [];
 		}
 
@@ -121,7 +121,7 @@ export class AiItemGenerationStep extends BasePipelineStep {
 	 */
 	private async generateInitialItemsWithAI(
 		context: MutableGenerationContext,
-		directorySlug: string,
+		workSlug: string,
 		topicName: string,
 		topicDescription: string,
 		targetKeywords: string[],
@@ -133,11 +133,11 @@ export class AiItemGenerationStep extends BasePipelineStep {
 		facadeOptions: FacadeOptions,
 		promptFacade?: StepExecutionContext['promptFacade']
 	): Promise<MutableItemData[]> {
-		logger.debug(`[${directorySlug}] AI-First Item Generation - Starting for topic: ${topicName}`);
+		logger.debug(`[${workSlug}] AI-First Item Generation - Starting for topic: ${topicName}`);
 		const allGeneratedItems: MutableItemData[] = [];
 
 		if (!aiFacade.isConfigured()) {
-			logger.warn(`[${directorySlug}] AI provider not configured. Skipping AI-first item generation.`);
+			logger.warn(`[${workSlug}] AI provider not configured. Skipping AI-first item generation.`);
 			return [];
 		}
 
@@ -179,7 +179,7 @@ export class AiItemGenerationStep extends BasePipelineStep {
 
 			if (!assessment.can_proceed) {
 				logger.warn(
-					`[${directorySlug}] AI cannot confidently proceed with item generation for topic "${topicName}" due to prompt clarity. Reason: ${assessment.reason_if_cannot_proceed || 'No specific reason provided.'}`
+					`[${workSlug}] AI cannot confidently proceed with item generation for topic "${topicName}" due to prompt clarity. Reason: ${assessment.reason_if_cannot_proceed || 'No specific reason provided.'}`
 				);
 				const reason = assessment.reason_if_cannot_proceed || 'unclear prompt';
 				const clarifications = assessment.suggested_clarifications;
@@ -192,11 +192,11 @@ export class AiItemGenerationStep extends BasePipelineStep {
 			}
 
 			logger.debug(
-				`[${directorySlug}] AI assessment: Prompt for topic "${topicName}" is clear. Proceeding with item generation.`
+				`[${workSlug}] AI assessment: Prompt for topic "${topicName}" is clear. Proceeding with item generation.`
 			);
 		} catch (error) {
 			logger.error(
-				`[${directorySlug}] Error during AI prompt understanding assessment for topic "${topicName}": ${this.formatError(error)}. Proceeding with caution (will attempt item generation).`,
+				`[${workSlug}] Error during AI prompt understanding assessment for topic "${topicName}": ${this.formatError(error)}. Proceeding with caution (will attempt item generation).`,
 				getErrorStack(error)
 			);
 		}
@@ -236,7 +236,7 @@ export class AiItemGenerationStep extends BasePipelineStep {
 			}
 
 			if (result && result.items && result.items.length > 0) {
-				logger.debug(`[${directorySlug}] AI initially generated ${result.items.length} items.`);
+				logger.debug(`[${workSlug}] AI initially generated ${result.items.length} items.`);
 				for (const generatedItem of result.items) {
 					try {
 						// Convert nulls to undefined for compatibility
@@ -259,19 +259,17 @@ export class AiItemGenerationStep extends BasePipelineStep {
 					}
 				}
 			} else {
-				logger.log(`[${directorySlug}] No initial items generated by AI for topic: ${topicName}.`);
+				logger.log(`[${workSlug}] No initial items generated by AI for topic: ${topicName}.`);
 				this.addWarning(context, 'AI did not generate any items for this topic.');
 			}
 		} catch (error) {
 			logger.error(
-				`[${directorySlug}] Error generating initial items with AI for topic ${topicName}: ${this.formatError(error)}`,
+				`[${workSlug}] Error generating initial items with AI for topic ${topicName}: ${this.formatError(error)}`,
 				getErrorStack(error)
 			);
 		}
 
-		logger.log(
-			`[${directorySlug}] AI-First Item Generation - Complete. Validated ${allGeneratedItems.length} items.`
-		);
+		logger.log(`[${workSlug}] AI-First Item Generation - Complete. Validated ${allGeneratedItems.length} items.`);
 		return allGeneratedItems;
 	}
 

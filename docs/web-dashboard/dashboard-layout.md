@@ -22,7 +22,7 @@ DashboardLayout
 │   └── HelpCircle button → triggers HelpDrawer
 ├── DashboardSidebar
 │   ├── Mode toggle (menu / AI chat)
-│   ├── Navigation links (Dashboard, Directories, Plugins, Settings)
+│   ├── Navigation links (Dashboard, Works, Plugins, Settings)
 │   ├── ChatInterface (inline, when chat mode active)
 │   ├── Drag-to-resize handle
 │   └── Floating AI chat panel (when sidebar collapsed)
@@ -77,7 +77,7 @@ The header renders a fixed top bar containing:
 
 The sidebar is the most complex layout component. It supports two modes toggled by a button at the top:
 
-- **Menu mode:** Displays navigation links (Dashboard, Directories, Plugins, Settings) with icons from `lucide-react`.
+- **Menu mode:** Displays navigation links (Dashboard, Works, Plugins, Settings) with icons from `lucide-react`.
 - **Chat mode:** Displays an inline `ChatInterface` for AI conversations.
 
 **Resize behavior:** A drag handle on the right edge of the sidebar allows users to resize it. The width is clamped between `SIDEBAR_WIDTH_MIN` (320px) and `SIDEBAR_WIDTH_MAX` (440px) and persisted via `useSidebarPersistence`.
@@ -110,7 +110,7 @@ The sidebar is the most complex layout component. It supports two modes toggled 
 A slide-over panel built on HeadlessUI `Dialog` and `Transition`. It slides in from the right edge and contains three sections:
 
 1. **Quick Tips** - Contextual guidance for using the platform.
-2. **Keyboard Shortcuts** - Displays shortcuts in `<kbd>` elements (Ctrl+K for search, C for new directory, ? for help).
+2. **Keyboard Shortcuts** - Displays shortcuts in `<kbd>` elements (Ctrl+K for search, C for new work, ? for help).
 3. **Documentation Links** - External links to the docs site and GitHub repository.
 
 ```tsx
@@ -135,14 +135,14 @@ Each notification displays an icon based on its type, a title, a message body, a
 
 **File:** `apps/web/src/components/dashboard/StatsOverview.tsx`
 
-| Prop               | Type                | Description                      |
-| ------------------ | ------------------- | -------------------------------- |
-| `totalDirectories` | `number` (optional) | Number of directories to display |
+| Prop         | Type                | Description                |
+| ------------ | ------------------- | -------------------------- |
+| `totalWorks` | `number` (optional) | Number of works to display |
 
-Renders a grid of three stat cards: Total Directories, Total Items, and Active Websites. Each card has a custom SVG icon, a decorative gradient background circle, and displays its count with a muted subtitle. The `totalItems` and `activeWebsites` values are currently computed as multiples of `totalDirectories`.
+Renders a grid of three stat cards: Total Works, Total Items, and Active Websites. Each card has a custom SVG icon, a decorative gradient background circle, and displays its count with a muted subtitle. The `totalItems` and `activeWebsites` values are currently computed as multiples of `totalWorks`.
 
 ```tsx
-<StatsOverview totalDirectories={12} />
+<StatsOverview totalWorks={12} />
 ```
 
 ### RecentActivity
@@ -151,7 +151,7 @@ Renders a grid of three stat cards: Total Directories, Total Items, and Active W
 
 This component takes no props. It renders a feed of recent activity events with:
 
-- Color-coded icons per event type (`directory_created`, `item_added`, `website_deployed`, `api_key_created`).
+- Color-coded icons per event type (`work_created`, `item_added`, `website_deployed`, `api_key_created`).
 - Event title and description text.
 - Relative time formatting (e.g., "2 hours ago").
 

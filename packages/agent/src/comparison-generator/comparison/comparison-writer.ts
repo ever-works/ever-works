@@ -106,7 +106,7 @@ function normalizeComparisonSources(
 /**
  * Default template for the comparison structure prompt.
  * Variables: {itemAName}, {itemADescription}, {itemASourceUrl}, {itemBName},
- *   {itemBDescription}, {itemBSourceUrl}, {category}, {directoryContextSection},
+ *   {itemBDescription}, {itemBSourceUrl}, {category}, {workContextSection},
  *   {researchSection}, {customPromptSection}
  */
 export const DEFAULT_STRUCTURE_PROMPT = `You are an expert technology analyst. Generate a structured comparison between two items.
@@ -120,7 +120,7 @@ export const DEFAULT_STRUCTURE_PROMPT = `You are an expert technology analyst. G
 - Description: {itemBDescription}
 - Source: {itemBSourceUrl}
 - Category: {category}
-{directoryContextSection}{researchSection}{customPromptSection}
+{workContextSection}{researchSection}{customPromptSection}
 Generate a comprehensive, fair, and balanced comparison. Analyze both items across 3-8 relevant dimensions. Score each dimension 1-10. Provide an honest verdict with clear reasoning. The title should be SEO-optimized.`;
 
 /**
@@ -129,15 +129,15 @@ Generate a comprehensive, fair, and balanced comparison. Analyze both items acro
 export function buildStructurePromptVariables(
     pair: ComparisonPair,
     research: ComparisonResearch,
-    directoryContext?: { name?: string; description?: string; customPrompt?: string },
+    workContext?: { name?: string; description?: string; customPrompt?: string },
 ): TemplateVariables<typeof DEFAULT_STRUCTURE_PROMPT> {
-    let directoryContextSection = '';
-    if (directoryContext?.name) {
-        directoryContextSection = `\n\n## Directory Context\nThis comparison is for the "${directoryContext.name}" directory.`;
-        if (directoryContext.description) {
-            directoryContextSection += ` ${directoryContext.description}`;
+    let workContextSection = '';
+    if (workContext?.name) {
+        workContextSection = `\n\n## Work Context\nThis comparison is for the "${workContext.name}" work.`;
+        if (workContext.description) {
+            workContextSection += ` ${workContext.description}`;
         }
-        directoryContextSection += '\n';
+        workContextSection += '\n';
     }
 
     let researchSection = '';
@@ -146,8 +146,8 @@ export function buildStructurePromptVariables(
     }
 
     let customPromptSection = '';
-    if (directoryContext?.customPrompt?.trim()) {
-        customPromptSection = `\n## Additional User Instructions:\n${directoryContext.customPrompt.trim()}\n`;
+    if (workContext?.customPrompt?.trim()) {
+        customPromptSection = `\n## Additional User Instructions:\n${workContext.customPrompt.trim()}\n`;
     }
 
     return {
@@ -158,7 +158,7 @@ export function buildStructurePromptVariables(
         itemBDescription: pair.itemB.description || 'No description available',
         itemBSourceUrl: pair.itemB.source_url || 'N/A',
         category: pair.category,
-        directoryContextSection,
+        workContextSection,
         researchSection,
         customPromptSection,
     };
@@ -167,11 +167,11 @@ export function buildStructurePromptVariables(
 function buildStructurePrompt(
     pair: ComparisonPair,
     research: ComparisonResearch,
-    directoryContext?: { name?: string; description?: string; customPrompt?: string },
+    workContext?: { name?: string; description?: string; customPrompt?: string },
 ): string {
     return substituteVariables(
         DEFAULT_STRUCTURE_PROMPT,
-        buildStructurePromptVariables(pair, research, directoryContext),
+        buildStructurePromptVariables(pair, research, workContext),
     );
 }
 
@@ -355,7 +355,7 @@ export async function generateComparison(
     pair: ComparisonPair,
     research: ComparisonResearch,
     ai: ComparisonAiDependencies,
-    directoryContext?: {
+    workContext?: {
         name?: string;
         description?: string;
         customPrompt?: string;
@@ -378,7 +378,7 @@ export async function generateComparison(
     ) as typeof DEFAULT_STRUCTURE_PROMPT;
     const structurePrompt = substituteVariables(
         structureTemplate,
-        buildStructurePromptVariables(pair, research, directoryContext),
+        buildStructurePromptVariables(pair, research, workContext),
     );
 
     onProgress?.('analyzing');
@@ -402,7 +402,7 @@ export async function generateComparison(
             structure,
             research,
             normalizedSources,
-            directoryContext?.customPrompt,
+            workContext?.customPrompt,
         ),
     );
 
@@ -410,7 +410,7 @@ export async function generateComparison(
     const markdown = await ai.askText(markdownPrompt);
 
     let extendedAnalysisMarkdown: string | undefined;
-    if (directoryContext?.extendedAnalysis) {
+    if (workContext?.extendedAnalysis) {
         // Resolve extended analysis prompt
         const extendedTemplate = (
             promptFacade && facadeOptions
@@ -427,7 +427,7 @@ export async function generateComparison(
                 pair,
                 structure,
                 research,
-                directoryContext?.customPrompt,
+                workContext?.customPrompt,
             ),
         );
         onProgress?.('writing_extended');

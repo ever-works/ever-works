@@ -21,7 +21,7 @@ interface PluginSettingsFormFieldsProps {
 
 /**
  * Shared form body for rendering plugin settings fields + validation errors.
- * Used by both the user-level PluginSettings page and DirectoryPluginSettingsModal.
+ * Used by both the user-level PluginSettings page and WorkPluginSettingsModal.
  */
 export function PluginSettingsFormFields({
     visibleProperties,

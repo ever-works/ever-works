@@ -7,7 +7,7 @@ sidebar_position: 5
 
 # Event & Notification System
 
-Ever Works uses an internal event-driven architecture powered by NestJS `EventEmitter2`. Events flow through the platform to coordinate plugin lifecycle, pipeline execution, directory generation, and system-level notifications. Plugins can subscribe to and emit events through the `PluginContext` interface.
+Ever Works uses an internal event-driven architecture powered by NestJS `EventEmitter2`. Events flow through the platform to coordinate plugin lifecycle, pipeline execution, work generation, and system-level notifications. Plugins can subscribe to and emit events through the `PluginContext` interface.
 
 **Key sources:**
 
@@ -25,7 +25,7 @@ graph TD
         B[Plugin Lifecycle Manager]
         C[Plugin Settings Service]
         D[Pipeline Executor]
-        E[Directory Generation Service]
+        E[Work Generation Service]
     end
 
     subgraph "Event Bus"
@@ -83,33 +83,33 @@ Emitted by the plugin registry and lifecycle manager when plugins change state.
 {
     pluginId: string;
     changedKeys: readonly string[];
-    scope: 'global' | 'directory' | 'user';
+    scope: 'global' | 'work' | 'user';
     requiresRestart?: boolean;
     userId?: string;
-    directoryId?: string;
+    workId?: string;
     timestamp: string;
 }
 ```
 
-### Directory Events
+### Work Events
 
-Emitted during directory lifecycle operations.
+Emitted during work lifecycle operations.
 
-| Event Name                       | Payload                               |
-| -------------------------------- | ------------------------------------- |
-| `directory:created`              | `DirectoryEventPayload`               |
-| `directory:updated`              | `DirectoryEventPayload`               |
-| `directory:deleted`              | `DirectoryEventPayload`               |
-| `directory:deployed`             | `DirectoryEventPayload`               |
-| `directory:generation-started`   | `DirectoryGenerationStartedPayload`   |
-| `directory:generation-completed` | `DirectoryGenerationCompletedPayload` |
-| `directory:generation-failed`    | `DirectoryGenerationFailedPayload`    |
+| Event Name                  | Payload                          |
+| --------------------------- | -------------------------------- |
+| `work:created`              | `WorkEventPayload`               |
+| `work:updated`              | `WorkEventPayload`               |
+| `work:deleted`              | `WorkEventPayload`               |
+| `work:deployed`             | `WorkEventPayload`               |
+| `work:generation-started`   | `WorkGenerationStartedPayload`   |
+| `work:generation-completed` | `WorkGenerationCompletedPayload` |
+| `work:generation-failed`    | `WorkGenerationFailedPayload`    |
 
 ```typescript
-// DirectoryGenerationCompletedPayload
+// WorkGenerationCompletedPayload
 {
-    directoryId: string;
-    directoryName?: string;
+    workId: string;
+    workName?: string;
     itemsGenerated: number;
     categoriesGenerated: number;
     tagsGenerated: number;
@@ -120,7 +120,7 @@ Emitted during directory lifecycle operations.
 
 ### Item Events
 
-Emitted when directory items are created, updated, or validated.
+Emitted when work items are created, updated, or validated.
 
 | Event Name       | Payload                |
 | ---------------- | ---------------------- |
@@ -147,7 +147,7 @@ Emitted by `StepPipelineExecutorService` during pipeline execution. These provid
 ```typescript
 // PipelineStepFailedPayload
 {
-    directoryId: string;
+    workId: string;
     pipelineId?: string;
     stepId: string;
     stepName: string;
@@ -173,8 +173,8 @@ Plugins receive event access through `PluginContext`:
 
 ```typescript
 // Subscribe to events
-const subscription = context.onEvent('directory:generation-completed', (payload) => {
-	context.logger.log(`Generation completed for ${payload.directoryId}: ${payload.itemsGenerated} items`);
+const subscription = context.onEvent('work:generation-completed', (payload) => {
+	context.logger.log(`Generation completed for ${payload.workId}: ${payload.itemsGenerated} items`);
 });
 
 // Unsubscribe later
@@ -182,7 +182,7 @@ subscription.unsubscribe();
 
 // Emit events (for plugin-to-plugin communication)
 context.emitEvent('item:created', {
-	directoryId: 'dir-123',
+	workId: 'dir-123',
 	item: itemData,
 	timestamp: new Date().toISOString()
 });
@@ -263,11 +263,11 @@ The provider is auto-detected from the error message (OpenAI, Anthropic, Google,
 All events are fully typed through the `PluginEventPayloads` mapped type:
 
 ```typescript
-export type PluginEventName = PluginLifecycleEvent | DirectoryEvent | ItemEvent | PipelineEvent | SystemEvent;
+export type PluginEventName = PluginLifecycleEvent | WorkEvent | ItemEvent | PipelineEvent | SystemEvent;
 
 export interface PluginEventPayloads {
 	'plugin:loaded': PluginLoadedPayload;
-	'directory:generation-completed': DirectoryGenerationCompletedPayload;
+	'work:generation-completed': WorkGenerationCompletedPayload;
 	'pipeline:step-failed': PipelineStepFailedPayload;
 	// ... all events mapped to their payload types
 }

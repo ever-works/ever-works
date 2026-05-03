@@ -87,6 +87,7 @@ export function PluginModelSelect({
     const [customModel, setCustomModel] = useState('');
     const [showCustomInput, setShowCustomInput] = useState(false);
     const containerRef = useRef<HTMLDivElement>(null);
+    const cachedModels = pluginId ? (modelCache.get(pluginId) ?? null) : null;
 
     // Click-outside detection via document listener (replaces fragile z-index overlay)
     const handleClickOutside = useCallback((e: MouseEvent) => {
@@ -105,14 +106,7 @@ export function PluginModelSelect({
 
     useEffect(() => {
         if (!pluginId) return;
-
-        const cached = modelCache.get(pluginId);
-        if (cached) {
-            setModels(cached);
-            setError(null);
-            setLoadedPluginId(pluginId);
-            return;
-        }
+        if (cachedModels) return;
 
         let cancelled = false;
 
@@ -129,22 +123,26 @@ export function PluginModelSelect({
         return () => {
             cancelled = true;
         };
-    }, [pluginId, t]);
+    }, [cachedModels, pluginId, t]);
 
-    const loading = Boolean(pluginId) && loadedPluginId !== pluginId;
-    const activeError = loadedPluginId === pluginId ? error : null;
+    const activeModels = useMemo(
+        () => cachedModels ?? (loadedPluginId === pluginId ? models : []),
+        [cachedModels, loadedPluginId, models, pluginId],
+    );
+    const loading = Boolean(pluginId) && !cachedModels && loadedPluginId !== pluginId;
+    const activeError = cachedModels ? null : loadedPluginId === pluginId ? error : null;
 
     const filteredModels = useMemo(() => {
-        if (!search) return models;
+        if (!search) return activeModels;
         const searchLower = search.toLowerCase();
-        return models.filter(
+        return activeModels.filter(
             (m) =>
                 m.id.toLowerCase().includes(searchLower) ||
                 m.name.toLowerCase().includes(searchLower),
         );
-    }, [models, search]);
+    }, [activeModels, search]);
 
-    const selectedModel = models.find((m) => m.id === value);
+    const selectedModel = activeModels.find((m) => m.id === value);
     const displayValue = selectedModel?.name || selectedModel?.id || value || t('placeholder');
 
     const formatContext = (tokens: number) => {

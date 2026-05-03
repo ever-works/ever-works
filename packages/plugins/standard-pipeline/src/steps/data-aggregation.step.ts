@@ -21,18 +21,18 @@ export class DataAggregationStep extends BasePipelineStep {
 		context: MutableGenerationContext,
 		execContext: StepExecutionContext
 	): Promise<MutableGenerationContext> {
-		const { request, directory, existing, initialAiItems, extractedWebItems, webPages, advancedPrompts, metrics } =
+		const { request, work, existing, initialAiItems, extractedWebItems, webPages, advancedPrompts, metrics } =
 			context;
 		const { logger } = execContext;
 
 		const aiWebItems = [...initialAiItems, ...extractedWebItems];
-		logger.debug(`[${directory.slug}] AI + Web items before dedup: ${aiWebItems.length}`);
-		logger.log(`[${directory.slug}] Deduplication and Data Aggregation - Starting`);
+		logger.debug(`[${work.slug}] AI + Web items before dedup: ${aiWebItems.length}`);
+		logger.log(`[${work.slug}] Deduplication and Data Aggregation - Starting`);
 
 		const existingItems = (existing.items as MutableItemData[]) || [];
 
 		const { aggregatedItems: dedupedAiWebItems, updatedMetrics } = await this.aggregateAndDeduplicateData(
-			directory.slug,
+			work.slug,
 			request.prompt || '',
 			existingItems,
 			aiWebItems,
@@ -50,14 +50,14 @@ export class DataAggregationStep extends BasePipelineStep {
 		);
 
 		let finalItems = [...dedupedAiWebItems, ...dataSourceItems];
-		finalItems = this.applyMaxItemsLimit(finalItems, request, directory.slug, logger);
+		finalItems = this.applyMaxItemsLimit(finalItems, request, work.slug, logger);
 
 		context.aggregatedItems = finalItems;
 
 		if (finalItems.length === 0) {
 			context.shouldStop = true;
 			if (existingItems.length > 0) {
-				this.addWarning(context, 'No new items found. The directory already has existing items.');
+				this.addWarning(context, 'No new items found. The work already has existing items.');
 			} else {
 				this.addWarning(context, 'No items were generated or found from any source.');
 			}
@@ -71,7 +71,7 @@ export class DataAggregationStep extends BasePipelineStep {
 	}
 
 	private async aggregateAndDeduplicateData(
-		directorySlug: string,
+		workSlug: string,
 		prompt: string,
 		existingItems: MutableItemData[],
 		newItems: MutableItemData[],
@@ -85,17 +85,17 @@ export class DataAggregationStep extends BasePipelineStep {
 		const aiDeduplicator = new AiDeduplicator(execContext);
 
 		let deduplicated = deduplicateByField(deduplicateByField(newItems, 'slug'), 'source_url');
-		logger.log(`[${directorySlug}] Field-based dedup: ${newItems.length} → ${deduplicated.length}`);
+		logger.log(`[${workSlug}] Field-based dedup: ${newItems.length} → ${deduplicated.length}`);
 
 		if (existingItems.length > 0 && deduplicated.length > 0) {
 			const prev = deduplicated.length;
 			deduplicated = await newItemsExtractor.extractNewItems(existingItems, deduplicated, metrics);
-			logger.log(`[${directorySlug}] New items extraction: ${prev} → ${deduplicated.length}`);
+			logger.log(`[${workSlug}] New items extraction: ${prev} → ${deduplicated.length}`);
 		}
 
 		if (deduplicated.length > 0) {
 			deduplicated = await aiDeduplicator.deduplicateWithAI(prompt, deduplicated, metrics, customPrompt);
-			logger.log(`[${directorySlug}] AI dedup: ${deduplicated.length} items remaining`);
+			logger.log(`[${workSlug}] AI dedup: ${deduplicated.length} items remaining`);
 		}
 
 		return {
@@ -120,7 +120,7 @@ export class DataAggregationStep extends BasePipelineStep {
 
 		const facadeOptions: FacadeOptions = {
 			userId: execContext.user!.id,
-			directoryId: execContext.directory.id
+			workId: execContext.work.id
 		};
 
 		try {
@@ -137,14 +137,14 @@ export class DataAggregationStep extends BasePipelineStep {
 			};
 
 			const result = await dataSourceFacade.queryAll({
-				directoryId: context.directory.id,
+				workId: context.work.id,
 				userId: execContext.user!.id,
 				pluginConfig: context.pluginConfig,
 				filterContext
 			});
 
 			for (const err of result.errors) {
-				logger.warn(`[${context.directory.slug}] Data source ${err.sourceId} failed: ${err.error}`);
+				logger.warn(`[${context.work.slug}] Data source ${err.sourceId} failed: ${err.error}`);
 				this.addWarning(
 					context,
 					`Data source "${err.sourceId}" failed: ${sanitizeErrorForUser(String(err.error))}`
@@ -153,18 +153,18 @@ export class DataAggregationStep extends BasePipelineStep {
 
 			if (result.items.length === 0) return [];
 
-			logger.log(`[${context.directory.slug}] Data sources returned ${result.items.length} items`);
+			logger.log(`[${context.work.slug}] Data sources returned ${result.items.length} items`);
 
 			const baseline = [...existingItems, ...dedupedAiWebItems];
 			const filtered = filterNewItemsManually(baseline, result.items as MutableItemData[]);
 
 			logger.log(
-				`[${context.directory.slug}] Data source field-dedup: ${result.items.length} → ${filtered.length} new`
+				`[${context.work.slug}] Data source field-dedup: ${result.items.length} → ${filtered.length} new`
 			);
 			return filtered;
 		} catch (error) {
 			logger.warn(
-				`[${context.directory.slug}] Data source query failed: ${error instanceof Error ? error.message : String(error)}`
+				`[${context.work.slug}] Data source query failed: ${error instanceof Error ? error.message : String(error)}`
 			);
 			return [];
 		}
@@ -173,12 +173,12 @@ export class DataAggregationStep extends BasePipelineStep {
 	private applyMaxItemsLimit(
 		items: MutableItemData[],
 		request: MutableGenerationContext['request'],
-		directorySlug: string,
+		workSlug: string,
 		logger: StepExecutionContext['logger']
 	): MutableItemData[] {
 		const maxItems = (request.config || {}).max_items as number | undefined;
 		if (maxItems && items.length > maxItems) {
-			logger.log(`[${directorySlug}] Applying max_items limit: ${items.length} → ${maxItems}`);
+			logger.log(`[${workSlug}] Applying max_items limit: ${items.length} → ${maxItems}`);
 			return items.slice(0, maxItems);
 		}
 		return items;

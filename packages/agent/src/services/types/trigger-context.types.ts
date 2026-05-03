@@ -1,4 +1,4 @@
-import { DirectoryScheduleBillingMode } from '@src/entities/types';
+import { WorkScheduleBillingMode } from '@src/entities/types';
 
 export type OperationTriggerContext = {
     triggeredBy: 'user' | 'schedule' | 'api';
@@ -6,7 +6,7 @@ export type OperationTriggerContext = {
 };
 
 export type GenerationTriggerContext = OperationTriggerContext & {
-    billingMode?: DirectoryScheduleBillingMode;
+    billingMode?: WorkScheduleBillingMode;
 };
 
 export const DEFAULT_TRIGGER_CONTEXT: OperationTriggerContext = { triggeredBy: 'user' };

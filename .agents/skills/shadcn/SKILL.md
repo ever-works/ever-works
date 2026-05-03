@@ -166,7 +166,7 @@ npx shadcn@latest docs button dialog select
 ## Workflow
 
 1. **Get project context** — already injected above. Run `npx shadcn@latest info` again if you need to refresh.
-2. **Check installed components first** — before running `add`, always check the `components` list from project context or list the `resolvedPaths.ui` directory. Don't import components that haven't been added, and don't re-add ones already installed.
+2. **Check installed components first** — before running `add`, always check the `components` list from project context or list the `resolvedPaths.ui` work. Don't import components that haven't been added, and don't re-add ones already installed.
 3. **Find components** — `npx shadcn@latest search`.
 4. **Get docs and examples** — run `npx shadcn@latest docs <component>` to get URLs, then fetch them. Use `npx shadcn@latest view` to browse registry items you haven't installed. To preview changes to installed components, use `npx shadcn@latest add --diff`.
 5. **Install or update** — `npx shadcn@latest add`. When updating existing components, use `--dry-run` and `--diff` to preview changes first (see [Updating Components](#updating-components) below).
@@ -177,7 +177,7 @@ npx shadcn@latest docs button dialog select
     - **Overwrite**: `npx shadcn@latest apply --preset <code>`. Overwrites detected components, fonts, and CSS variables.
     - **Merge**: `npx shadcn@latest init --preset <code> --force --no-reinstall`, then run `npx shadcn@latest info` to list installed components, then for each installed component use `--dry-run` and `--diff` to [smart merge](#updating-components) it individually.
     - **Skip**: `npx shadcn@latest init --preset <code> --force --no-reinstall`. Only updates config and CSS, leaves components as-is.
-    - **Important**: Always run preset commands inside the user's project directory. `apply` only works in an existing project with a `components.json` file. The CLI automatically preserves the current base (`base` vs `radix`) from `components.json`. If you must use a scratch/temp directory (e.g. for `--dry-run` comparisons), pass `--base <current-base>` explicitly — preset codes do not encode the base.
+    - **Important**: Always run preset commands inside the user's project work. `apply` only works in an existing project with a `components.json` file. The CLI automatically preserves the current base (`base` vs `radix`) from `components.json`. If you must use a scratch/temp work (e.g. for `--dry-run` comparisons), pass `--base <current-base>` explicitly — preset codes do not encode the base.
 
 ## Updating Components
 

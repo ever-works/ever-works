@@ -47,9 +47,9 @@ function createSettings(overrides?: Partial<SimAiSettings>): SimAiSettings {
 function createInput(): SimWorkflowInput {
 	return {
 		metadata: {
-			directoryId: 'dir-1',
-			directoryName: 'Test',
-			directorySlug: 'test',
+			workId: 'dir-1',
+			workName: 'Test',
+			workSlug: 'test',
 			targetItems: 50
 		}
 	};

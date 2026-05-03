@@ -7,7 +7,7 @@ import {
     type RegisteredPlugin,
 } from '../../plugins/services/plugin-registry.service';
 import { PluginSettingsService } from '../../plugins/services/plugin-settings.service';
-import { DirectoryPluginRepository } from '../../plugins/repositories/directory-plugin.repository';
+import { WorkPluginRepository } from '../../plugins/repositories/work-plugin.repository';
 import type {
     IAiProviderPlugin,
     PluginManifest,
@@ -504,10 +504,10 @@ describe('AiFacadeService', () => {
         });
     });
 
-    describe('provider resolution with active directory provider', () => {
+    describe('provider resolution with active work provider', () => {
         const testSchema = z.object({ name: z.string() });
 
-        it('should use directory active provider when set', async () => {
+        it('should use work active provider when set', async () => {
             const openaiPlugin = createMockAiPlugin('openai-provider', 'OpenAI');
             const anthropicPlugin = createMockAiPlugin('anthropic-provider', 'Anthropic');
 
@@ -521,10 +521,10 @@ describe('AiFacadeService', () => {
             registry.getByCapability.mockReturnValue([openaiRegistered, anthropicRegistered]);
             registry.get.mockReturnValue(anthropicRegistered);
 
-            // Import DirectoryPluginRepository to mock it
+            // Import WorkPluginRepository to mock it
             const {
-                DirectoryPluginRepository,
-            } = require('../../plugins/repositories/directory-plugin.repository');
+                WorkPluginRepository,
+            } = require('../../plugins/repositories/work-plugin.repository');
             const mockDirRepo = {
                 findActiveByCapability: jest.fn().mockResolvedValue({
                     pluginId: 'anthropic-provider',
@@ -532,7 +532,7 @@ describe('AiFacadeService', () => {
                 }),
             };
 
-            // Recreate service with mocked directory repository
+            // Recreate service with mocked work repository
             const module: TestingModule = await Test.createTestingModule({
                 providers: [
                     AiFacadeService,
@@ -545,7 +545,7 @@ describe('AiFacadeService', () => {
                         useValue: settingsService,
                     },
                     {
-                        provide: DirectoryPluginRepository,
+                        provide: WorkPluginRepository,
                         useValue: mockDirRepo,
                     },
                 ],
@@ -557,15 +557,15 @@ describe('AiFacadeService', () => {
                 'Test',
                 testSchema,
                 {},
-                { directoryId: 'dir-123', userId: 'user-456' },
+                { workId: 'dir-123', userId: 'user-456' },
             );
 
-            // Anthropic should be used because it's the active provider for the directory
+            // Anthropic should be used because it's the active provider for the work
             expect(anthropicPlugin.askJson).toHaveBeenCalled();
             expect(openaiPlugin.askJson).not.toHaveBeenCalled();
         });
 
-        it('should fall back to first enabled provider when no directory active provider', async () => {
+        it('should fall back to first enabled provider when no work active provider', async () => {
             const openaiPlugin = createMockAiPlugin('openai-provider', 'OpenAI');
             const anthropicPlugin = createMockAiPlugin('anthropic-provider', 'Anthropic');
 
@@ -583,7 +583,7 @@ describe('AiFacadeService', () => {
                 'Test',
                 testSchema,
                 {},
-                { directoryId: 'dir-123', userId: 'user-456' },
+                { workId: 'dir-123', userId: 'user-456' },
             );
 
             // First provider (OpenAI) should be used when no active provider set
@@ -608,7 +608,7 @@ describe('AiFacadeService', () => {
                 'Test',
                 testSchema,
                 { routing: { providerOverride: 'anthropic-provider' } },
-                { directoryId: 'dir-123', userId: 'user-456' },
+                { workId: 'dir-123', userId: 'user-456' },
             );
 
             // Anthropic should be used because of provider override

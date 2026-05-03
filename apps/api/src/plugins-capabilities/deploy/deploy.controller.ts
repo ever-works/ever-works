@@ -12,12 +12,12 @@ import { ApiTags, ApiBearerAuth, ApiOperation, ApiResponse, ApiParam } from '@ne
 import { AuthSessionGuard, CurrentUser } from '../../auth';
 import { AuthenticatedUser } from '../../auth/types/auth.types';
 import { DeployFacadeService } from '@ever-works/agent/facades';
-import { DirectoryOwnershipService } from '@ever-works/agent/services';
+import { WorkOwnershipService } from '@ever-works/agent/services';
 import { DeployService } from './deploy.service';
 import { DeploymentVerifierService } from './tasks/deployment-verifier.service';
 import { ActivityLogService } from '@ever-works/agent/activity-log';
 import { ActivityActionType, ActivityStatus } from '@ever-works/agent/entities';
-import { DeployDirectoryDto } from './dto/deploy.dto';
+import { DeployWorkDto } from './dto/deploy.dto';
 import { BatchDeployDto, BatchDeployResponseDto } from './dto/batch-deploy.dto';
 import { AddDomainDto } from './dto/domain.dto';
 
@@ -29,7 +29,7 @@ export class DeployController {
     constructor(
         private readonly deployService: DeployService,
         private readonly deployFacade: DeployFacadeService,
-        private readonly ownershipService: DirectoryOwnershipService,
+        private readonly ownershipService: WorkOwnershipService,
         private readonly deploymentVerifier: DeploymentVerifierService,
         private readonly activityLogService: ActivityLogService,
     ) {}
@@ -104,44 +104,44 @@ export class DeployController {
     }
 
     /**
-     * Deploy a directory to its configured provider
+     * Deploy a work to its configured provider
      */
-    @Post('/directories/:id')
+    @Post('/works/:id')
     @ApiOperation({
-        summary: 'Deploy directory',
-        description: 'Deploy a directory website to its configured provider',
+        summary: 'Deploy work',
+        description: 'Deploy a work website to its configured provider',
     })
-    @ApiParam({ name: 'id', description: 'Directory ID' })
+    @ApiParam({ name: 'id', description: 'Work ID' })
     @ApiResponse({ status: 200, description: 'Deployment started' })
     @ApiResponse({ status: 400, description: 'Invalid configuration or missing token' })
     async deploy(
         @CurrentUser() auth: AuthenticatedUser,
-        @Body() deployDto: DeployDirectoryDto,
+        @Body() deployDto: DeployWorkDto,
         @Param('id') id: string,
     ) {
-        const { directory, isCreator } = await this.ownershipService.ensureCanEdit(id, auth.userId);
+        const { work, isCreator } = await this.ownershipService.ensureCanEdit(id, auth.userId);
 
         // Check if user has configured deployment credentials
         const isConfigured = await this.deployFacade.isConfigured({
-            userId: isCreator ? auth.userId : directory.user.id,
-            directoryId: id,
+            userId: isCreator ? auth.userId : work.user.id,
+            workId: id,
         });
 
-        const providerName = this.getProviderName(directory.deployProvider);
+        const providerName = this.getProviderName(work.deployProvider);
 
         if (!isConfigured) {
             throw new BadRequestException({
                 status: 'error',
                 message: isCreator
                     ? `${providerName} token is required. Please configure it in Plugin Settings.`
-                    : `The directory owner has not configured ${providerName} credentials.`,
+                    : `The work owner has not configured ${providerName} credentials.`,
             });
         }
 
         // Validate token
         const isValid = await this.deployFacade.validateToken({
-            userId: isCreator ? auth.userId : directory.user.id,
-            directoryId: id,
+            userId: isCreator ? auth.userId : work.user.id,
+            workId: id,
         });
 
         if (!isValid) {
@@ -154,15 +154,15 @@ export class DeployController {
         // Deploy
         const deploymentInitiated = await this.deployService.deploy(
             id,
-            isCreator ? auth.userId : directory.user.id,
+            isCreator ? auth.userId : work.user.id,
             { teamScope: deployDto.teamScope },
         );
 
         if (deploymentInitiated) {
             // Start verification
             this.deploymentVerifier.startVerification(
-                directory,
-                isCreator ? auth.userId : directory.user.id,
+                work,
+                isCreator ? auth.userId : work.user.id,
                 deployDto.teamScope,
             );
         }
@@ -170,19 +170,19 @@ export class DeployController {
         this.activityLogService
             .log({
                 userId: auth.userId,
-                directoryId: id,
+                workId: id,
                 actionType: ActivityActionType.DEPLOYMENT,
-                action: 'directory.deployed',
+                action: 'work.deployed',
                 status: ActivityStatus.COMPLETED,
-                summary: `Triggered deployment for ${directory.name} via ${providerName}`,
+                summary: `Triggered deployment for ${work.name} via ${providerName}`,
             })
             .catch(() => {});
 
         return {
             status: 'pending',
-            slug: directory.slug,
-            owner: directory.getRepoOwner('website'),
-            repository: `${directory.getRepoOwner('website')}/${directory.getWebsiteRepo()}`,
+            slug: work.slug,
+            owner: work.getRepoOwner('website'),
+            repository: `${work.getRepoOwner('website')}/${work.getWebsiteRepo()}`,
             message: 'Deployment started',
         };
     }
@@ -211,7 +211,7 @@ export class DeployController {
     }
 
     /**
-     * Get deployment teams for the user (requires directory context)
+     * Get deployment teams for the user (requires work context)
      */
     @Post('/teams')
     @ApiOperation({
@@ -225,7 +225,7 @@ export class DeployController {
                 status: 'success',
                 teams: [],
                 message:
-                    'To fetch teams, use the directory-specific endpoint or configure your token in Plugin Settings.',
+                    'To fetch teams, use the work-specific endpoint or configure your token in Plugin Settings.',
             };
         } catch (error) {
             throw new BadRequestException({
@@ -236,23 +236,23 @@ export class DeployController {
     }
 
     /**
-     * Get deployment teams for a specific directory
+     * Get deployment teams for a specific work
      */
-    @Post('/directories/:id/teams')
+    @Post('/works/:id/teams')
     @ApiOperation({
-        summary: 'Get deployment teams for directory',
-        description: 'Get teams from deployment provider for a specific directory',
+        summary: 'Get deployment teams for work',
+        description: 'Get teams from deployment provider for a specific work',
     })
-    @ApiParam({ name: 'id', description: 'Directory ID' })
+    @ApiParam({ name: 'id', description: 'Work ID' })
     @ApiResponse({ status: 200, description: 'List of teams' })
-    async getTeamsForDirectory(@CurrentUser() auth: AuthenticatedUser, @Param('id') id: string) {
-        const { directory, isCreator } = await this.ownershipService.ensureCanView(id, auth.userId);
-        const providerName = this.getProviderName(directory.deployProvider);
+    async getTeamsForWork(@CurrentUser() auth: AuthenticatedUser, @Param('id') id: string) {
+        const { work, isCreator } = await this.ownershipService.ensureCanView(id, auth.userId);
+        const providerName = this.getProviderName(work.deployProvider);
 
         try {
             const teams = await this.deployFacade.getTeams({
-                userId: isCreator ? auth.userId : directory.user.id,
-                directoryId: id,
+                userId: isCreator ? auth.userId : work.user.id,
+                workId: id,
             });
 
             return {
@@ -270,34 +270,34 @@ export class DeployController {
     }
 
     /**
-     * Check if deployment is possible for a directory
+     * Check if deployment is possible for a work
      */
-    @Post('/directories/:id/check')
+    @Post('/works/:id/check')
     @ApiOperation({
         summary: 'Check deployment capability',
-        description: 'Check if deployment is configured for a directory',
+        description: 'Check if deployment is configured for a work',
     })
-    @ApiParam({ name: 'id', description: 'Directory ID' })
+    @ApiParam({ name: 'id', description: 'Work ID' })
     @ApiResponse({ status: 200, description: 'Deployment capability status' })
     async checkDeploymentCapability(
         @CurrentUser() auth: AuthenticatedUser,
         @Param('id') id: string,
     ) {
-        const { directory, isCreator } = await this.ownershipService.ensureCanView(id, auth.userId);
+        const { work, isCreator } = await this.ownershipService.ensureCanView(id, auth.userId);
 
         const canDeploy = await this.deployFacade.isConfigured({
-            userId: isCreator ? auth.userId : directory.user.id,
-            directoryId: id,
+            userId: isCreator ? auth.userId : work.user.id,
+            workId: id,
         });
 
         const ownerCanDeploy = await this.deployFacade.isConfigured({
-            userId: directory.user.id,
-            directoryId: id,
+            userId: work.user.id,
+            workId: id,
         });
 
         const userCanDeploy = await this.deployFacade.isConfigured({
             userId: auth.userId,
-            directoryId: id,
+            workId: id,
         });
 
         return {
@@ -310,49 +310,49 @@ export class DeployController {
     }
 
     /**
-     * Lookup existing deployment for a directory
+     * Lookup existing deployment for a work
      */
-    @Post('/directories/:id/lookup')
+    @Post('/works/:id/lookup')
     @ApiOperation({
         summary: 'Lookup existing deployment',
-        description: 'Check if a directory has an existing deployment',
+        description: 'Check if a work has an existing deployment',
     })
-    @ApiParam({ name: 'id', description: 'Directory ID' })
+    @ApiParam({ name: 'id', description: 'Work ID' })
     @ApiResponse({ status: 200, description: 'Deployment lookup result' })
     async lookupExistingDeployment(
         @CurrentUser() auth: AuthenticatedUser,
         @Param('id') id: string,
     ) {
-        const { directory, isCreator } = await this.ownershipService.ensureCanView(id, auth.userId);
+        const { work, isCreator } = await this.ownershipService.ensureCanView(id, auth.userId);
 
-        if (directory.website) {
+        if (work.website) {
             return {
                 status: 'success',
-                website: directory.website,
-                deploymentState: directory.deploymentState,
+                website: work.website,
+                deploymentState: work.deploymentState,
                 found: true,
             };
         }
 
         const isConfigured = await this.deployFacade.isConfigured({
-            userId: isCreator ? auth.userId : directory.user.id,
-            directoryId: id,
+            userId: isCreator ? auth.userId : work.user.id,
+            workId: id,
         });
 
-        const providerName = this.getProviderName(directory.deployProvider);
+        const providerName = this.getProviderName(work.deployProvider);
 
         if (!isConfigured) {
             throw new BadRequestException({
                 status: 'error',
                 message: isCreator
                     ? `${providerName} token is required to lookup deployments. Configure it in Plugin Settings.`
-                    : `The directory owner has not configured ${providerName} credentials.`,
+                    : `The work owner has not configured ${providerName} credentials.`,
             });
         }
 
         const result = await this.deploymentVerifier.lookupExistingDeployment(
-            directory,
-            isCreator ? auth.userId : directory.user.id,
+            work,
+            isCreator ? auth.userId : work.user.id,
         );
 
         return {
@@ -364,24 +364,24 @@ export class DeployController {
     }
 
     /**
-     * Batch deploy multiple directories
+     * Batch deploy multiple works
      */
     @Post('/batch')
     @ApiOperation({
         summary: 'Batch deploy',
-        description: 'Deploy multiple directories',
+        description: 'Deploy multiple works',
     })
     @ApiResponse({ status: 200, description: 'Batch deployment result' })
     async batchDeploy(
         @CurrentUser() auth: AuthenticatedUser,
         @Body() batchDeployDto: BatchDeployDto,
     ): Promise<BatchDeployResponseDto> {
-        for (const item of batchDeployDto.directories) {
-            await this.ownershipService.ensureCanEdit(item.directoryId, auth.userId);
+        for (const item of batchDeployDto.works) {
+            await this.ownershipService.ensureCanEdit(item.workId, auth.userId);
         }
 
         const result = await this.deployService.deployBatch(
-            batchDeployDto.directories,
+            batchDeployDto.works,
             auth.userId,
             batchDeployDto.teamScope,
         );
@@ -392,21 +392,21 @@ export class DeployController {
                 actionType: ActivityActionType.DEPLOYMENT,
                 action: 'deployment.batch_started',
                 status: ActivityStatus.COMPLETED,
-                summary: `Triggered batch deploy for ${batchDeployDto.directories.length} directories`,
+                summary: `Triggered batch deploy for ${batchDeployDto.works.length} works`,
                 details: {
-                    directoryIds: batchDeployDto.directories.map((item) => item.directoryId),
+                    workIds: batchDeployDto.works.map((item) => item.workId),
                 },
             })
             .catch(() => {});
 
         for (const deployResult of result.results) {
-            if (deployResult.status === 'pending' && deployResult.directoryId) {
-                const { directory } = await this.ownershipService.ensureCanEdit(
-                    deployResult.directoryId,
+            if (deployResult.status === 'pending' && deployResult.workId) {
+                const { work } = await this.ownershipService.ensureCanEdit(
+                    deployResult.workId,
                     auth.userId,
                 );
                 this.deploymentVerifier.startVerification(
-                    directory,
+                    work,
                     auth.userId,
                     batchDeployDto.teamScope,
                 );
@@ -433,30 +433,30 @@ export class DeployController {
     }
 
     /**
-     * List domains for a directory deployment
+     * List domains for a work deployment
      */
-    @Get('/directories/:id/domains')
+    @Get('/works/:id/domains')
     @ApiOperation({
         summary: 'List domains',
-        description: 'Get custom domains for a deployed directory',
+        description: 'Get custom domains for a deployed work',
     })
-    @ApiParam({ name: 'id', description: 'Directory ID' })
+    @ApiParam({ name: 'id', description: 'Work ID' })
     @ApiResponse({ status: 200, description: 'List of domains' })
     async listDomains(@CurrentUser() auth: AuthenticatedUser, @Param('id') id: string) {
-        const { directory, isCreator } = await this.ownershipService.ensureCanView(id, auth.userId);
+        const { work, isCreator } = await this.ownershipService.ensureCanView(id, auth.userId);
 
-        if (!directory.website) {
+        if (!work.website) {
             throw new BadRequestException({
                 status: 'error',
                 message:
-                    'No deployment exists for this directory. Deploy first before managing domains.',
+                    'No deployment exists for this work. Deploy first before managing domains.',
             });
         }
 
         try {
             const domains = await this.deployFacade.getDomains({
-                userId: isCreator ? auth.userId : directory.user.id,
-                directoryId: id,
+                userId: isCreator ? auth.userId : work.user.id,
+                workId: id,
             });
             return { status: 'success', domains };
         } catch (error) {
@@ -468,34 +468,33 @@ export class DeployController {
     }
 
     /**
-     * Add a domain to a directory deployment
+     * Add a domain to a work deployment
      */
-    @Post('/directories/:id/domains')
+    @Post('/works/:id/domains')
     @ApiOperation({
         summary: 'Add domain',
-        description: 'Add a custom domain to a deployed directory',
+        description: 'Add a custom domain to a deployed work',
     })
-    @ApiParam({ name: 'id', description: 'Directory ID' })
+    @ApiParam({ name: 'id', description: 'Work ID' })
     @ApiResponse({ status: 200, description: 'Domain added' })
     async addDomain(
         @CurrentUser() auth: AuthenticatedUser,
         @Param('id') id: string,
         @Body() dto: AddDomainDto,
     ) {
-        const { directory, isCreator } = await this.ownershipService.ensureCanEdit(id, auth.userId);
+        const { work, isCreator } = await this.ownershipService.ensureCanEdit(id, auth.userId);
 
-        if (!directory.website) {
+        if (!work.website) {
             throw new BadRequestException({
                 status: 'error',
-                message:
-                    'No deployment exists for this directory. Deploy first before adding domains.',
+                message: 'No deployment exists for this work. Deploy first before adding domains.',
             });
         }
 
         try {
             const result = await this.deployFacade.addDomain(dto.domain, {
-                userId: isCreator ? auth.userId : directory.user.id,
-                directoryId: id,
+                userId: isCreator ? auth.userId : work.user.id,
+                workId: id,
             });
             return { status: 'success', ...result };
         } catch (error) {
@@ -507,14 +506,14 @@ export class DeployController {
     }
 
     /**
-     * Remove a domain from a directory deployment
+     * Remove a domain from a work deployment
      */
-    @Delete('/directories/:id/domains/:domain')
+    @Delete('/works/:id/domains/:domain')
     @ApiOperation({
         summary: 'Remove domain',
-        description: 'Remove a custom domain from a deployed directory',
+        description: 'Remove a custom domain from a deployed work',
     })
-    @ApiParam({ name: 'id', description: 'Directory ID' })
+    @ApiParam({ name: 'id', description: 'Work ID' })
     @ApiParam({ name: 'domain', description: 'Domain name to remove' })
     @ApiResponse({ status: 200, description: 'Domain removed' })
     async removeDomain(
@@ -522,20 +521,20 @@ export class DeployController {
         @Param('id') id: string,
         @Param('domain') domain: string,
     ) {
-        const { isCreator, directory } = await this.ownershipService.ensureCanEdit(id, auth.userId);
+        const { isCreator, work } = await this.ownershipService.ensureCanEdit(id, auth.userId);
 
-        if (!directory.website) {
+        if (!work.website) {
             throw new BadRequestException({
                 status: 'error',
                 message:
-                    'No deployment exists for this directory. Deploy first before managing domains.',
+                    'No deployment exists for this work. Deploy first before managing domains.',
             });
         }
 
         try {
             const removed = await this.deployFacade.removeDomain(domain, {
-                userId: isCreator ? auth.userId : directory.user.id,
-                directoryId: id,
+                userId: isCreator ? auth.userId : work.user.id,
+                workId: id,
             });
             return { status: 'success', removed };
         } catch (error) {
@@ -547,14 +546,14 @@ export class DeployController {
     }
 
     /**
-     * Verify a domain on a directory deployment
+     * Verify a domain on a work deployment
      */
-    @Post('/directories/:id/domains/:domain/verify')
+    @Post('/works/:id/domains/:domain/verify')
     @ApiOperation({
         summary: 'Verify domain',
-        description: 'Trigger DNS verification for a domain on a deployed directory',
+        description: 'Trigger DNS verification for a domain on a deployed work',
     })
-    @ApiParam({ name: 'id', description: 'Directory ID' })
+    @ApiParam({ name: 'id', description: 'Work ID' })
     @ApiParam({ name: 'domain', description: 'Domain name to verify' })
     @ApiResponse({ status: 200, description: 'Verification result' })
     async verifyDomain(
@@ -562,20 +561,20 @@ export class DeployController {
         @Param('id') id: string,
         @Param('domain') domain: string,
     ) {
-        const { isCreator, directory } = await this.ownershipService.ensureCanEdit(id, auth.userId);
+        const { isCreator, work } = await this.ownershipService.ensureCanEdit(id, auth.userId);
 
-        if (!directory.website) {
+        if (!work.website) {
             throw new BadRequestException({
                 status: 'error',
                 message:
-                    'No deployment exists for this directory. Deploy first before managing domains.',
+                    'No deployment exists for this work. Deploy first before managing domains.',
             });
         }
 
         try {
             const result = await this.deployFacade.verifyDomain(domain, {
-                userId: isCreator ? auth.userId : directory.user.id,
-                directoryId: id,
+                userId: isCreator ? auth.userId : work.user.id,
+                workId: id,
             });
             return { status: 'success', domain: result };
         } catch (error) {

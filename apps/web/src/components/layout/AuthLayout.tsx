@@ -261,7 +261,7 @@ export function AuthLayout({
                     </div>
                 </div>
 
-                {/* ── Right side – animated directory showcase ── */}
+                {/* ── Right side – animated work showcase ── */}
                 <div
                     className={`hidden lg:flex lg:fixed lg:top-0 lg:right-0 lg:h-screen lg:w-1/2 overflow-hidden items-center justify-center px-10`}
                 >

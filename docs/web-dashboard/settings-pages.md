@@ -246,7 +246,7 @@ interface DangerZoneProps {
 **Deletion Flow**:
 
 1. User clicks "Delete Account" button
-2. Warning panel appears listing consequences (directories removed, repositories affected, etc.)
+2. Warning panel appears listing consequences (works removed, repositories affected, etc.)
 3. User must type their email address to confirm
 4. "Confirm Delete" button only becomes active when typed email matches `user.email`
 5. Calls `deleteAccount` server action (currently returns error by design)

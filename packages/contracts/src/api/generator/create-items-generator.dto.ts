@@ -6,7 +6,7 @@ import { GenerationMethod, WebsiteRepositoryCreationMethod } from './generation-
  * All pipeline-specific configuration is passed via pluginConfig.
  */
 export interface CreateItemsGeneratorDto {
-	/** Directory name */
+	/** Work name */
 	name: string;
 	/** Generation prompt */
 	prompt: string;

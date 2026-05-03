@@ -164,9 +164,9 @@ The orchestrator uses `Promise.all` for independent database updates:
 
 ```typescript
 await Promise.all([
-	this.directoryOperations.recordGenerationFinishTime(directoryId, finishedAt),
-	this.directoryOperations.updateGenerateStatus(directoryId, { status, error }),
-	this.directoryOperations.updateGenerationHistory(directoryId, historyId, {
+	this.workOperations.recordGenerationFinishTime(workId, finishedAt),
+	this.workOperations.updateGenerateStatus(workId, { status, error }),
+	this.workOperations.updateGenerationHistory(workId, historyId, {
 		status,
 		finishedAt,
 		durationInSeconds,
@@ -202,12 +202,12 @@ async *createStreamingChatCompletion(
 
 ### Background Task Offloading
 
-Long-running tasks (directory generation, imports) are dispatched to Trigger.dev workers, keeping the API process lean:
+Long-running tasks (work generation, imports) are dispatched to Trigger.dev workers, keeping the API process lean:
 
 ```typescript
-async dispatchDirectoryGeneration(payload): Promise<string | null> {
-    const handle = await directoryGenerationTask.trigger(payload, {
-        tags: ['directory-generation', payload.mode, payload.directoryId],
+async dispatchWorkGeneration(payload): Promise<string | null> {
+    const handle = await workGenerationTask.trigger(payload, {
+        tags: ['work-generation', payload.mode, payload.workId],
         machine: this.machine(),
     });
     return handle.id;

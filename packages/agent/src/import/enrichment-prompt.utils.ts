@@ -4,7 +4,7 @@ import {
     GenerationMethod,
     WebsiteRepositoryCreationMethod,
 } from '@src/items-generator/dto';
-import type { Directory } from '@src/entities/directory.entity';
+import type { Work } from '@src/entities/work.entity';
 
 const DEFAULT_PIPELINE_ID = 'agent-pipeline';
 const DEFAULT_EXPANSION_FACTOR = 2.5;
@@ -19,10 +19,10 @@ const DEFAULT_TARGET_ITEMS = 500;
  * The source is treated as a list of research seeds — links to follow and
  * independently describe — never as content to copy verbatim.
  * The pipeline discovers significantly more items beyond the source so that
- * the source represents at most 30-40% of the final directory.
+ * the source represents at most 30-40% of the final work.
  */
 export function buildImportGenerationDto(options: {
-    directory: Directory;
+    work: Work;
     sourceUrl: string;
     expansionFactor?: number;
     providers?: ProvidersDto;
@@ -30,7 +30,7 @@ export function buildImportGenerationDto(options: {
     updateWithPullRequest?: boolean;
 }): CreateItemsGeneratorDto {
     const {
-        directory,
+        work,
         sourceUrl,
         expansionFactor = DEFAULT_EXPANSION_FACTOR,
         providers,
@@ -42,7 +42,7 @@ export function buildImportGenerationDto(options: {
     const maxSourcePct = Math.round(100 / expansionFactor);
 
     const prompt = [
-        `Build a comprehensive directory using this awesome list as your research starting point: ${sourceUrl}`,
+        `Build a comprehensive work using this awesome list as your research starting point: ${sourceUrl}`,
         ``,
         `## Step 1 — Process source links`,
         `Fetch the source list and pass all item links to \`processUrls\`.`,
@@ -72,7 +72,7 @@ export function buildImportGenerationDto(options: {
     ].join('\n');
 
     const dto = new CreateItemsGeneratorDto();
-    dto.name = directory.name ?? directory.slug;
+    dto.name = work.name ?? work.slug;
     dto.prompt = prompt;
     dto.model = model;
     dto.generation_method = GenerationMethod.CREATE_UPDATE;

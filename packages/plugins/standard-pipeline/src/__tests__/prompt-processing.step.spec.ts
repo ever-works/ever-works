@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { PromptProcessingStep } from '../steps/prompt-processing.step';
-import type { StepExecutionContext, DirectoryReference, GenerationRequest } from '@ever-works/plugin';
+import type { StepExecutionContext, WorkReference, GenerationRequest } from '@ever-works/plugin';
 import type { MutableGenerationContext } from '../context/index.js';
 
 describe('PromptProcessingStep', () => {
@@ -32,15 +32,15 @@ describe('PromptProcessingStep', () => {
 		getDefaultProvider: vi.fn()
 	});
 
-	const createMockDirectory = (): DirectoryReference => ({
+	const createMockWork = (): WorkReference => ({
 		id: 'test-dir-id',
-		slug: 'test-directory',
-		name: 'Test Directory'
+		slug: 'test-work',
+		name: 'Test Work'
 	});
 
 	const createMockRequest = (overrides?: Partial<GenerationRequest>): GenerationRequest =>
 		({
-			prompt: 'Build a directory about vector databases',
+			prompt: 'Build a work about vector databases',
 			config: {
 				source_urls: [],
 				priority_categories: [],
@@ -52,7 +52,7 @@ describe('PromptProcessingStep', () => {
 
 	const createMockContext = (overrides?: Partial<MutableGenerationContext>): MutableGenerationContext =>
 		({
-			directory: createMockDirectory(),
+			work: createMockWork(),
 			request: createMockRequest(),
 			existing: {},
 			metrics: { steps: {} },
@@ -73,7 +73,7 @@ describe('PromptProcessingStep', () => {
 			logger: createMockLogger(),
 			aiFacade: createMockAiFacade(),
 			user: { id: 'test-user-id' },
-			directory: { id: 'test-dir-id' }
+			work: { id: 'test-dir-id' }
 		} as unknown as StepExecutionContext;
 	});
 

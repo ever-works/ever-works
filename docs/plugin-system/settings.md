@@ -7,7 +7,7 @@ sidebar_position: 3
 
 # Plugin Settings
 
-Every plugin defines its configuration through a **JSON Schema** with custom extensions. Settings are resolved at runtime through a cascading hierarchy, allowing admins to set defaults while users and directories can override them.
+Every plugin defines its configuration through a **JSON Schema** with custom extensions. Settings are resolved at runtime through a cascading hierarchy, allowing admins to set defaults while users and works can override them.
 
 ## Settings Schema
 
@@ -54,14 +54,14 @@ readonly settingsSchema: JsonSchema = {
 
 The platform extends JSON Schema with `x-*` properties that control security, scoping, and UI behavior:
 
-| Extension     | Type                                | Description                                                                                  |
-| ------------- | ----------------------------------- | -------------------------------------------------------------------------------------------- |
-| `x-secret`    | `boolean`                           | Field is encrypted at rest and masked in API responses. Use for API keys, tokens, passwords. |
-| `x-envVar`    | `string`                            | Environment variable name to check as a fallback when no setting is stored.                  |
-| `x-scope`     | `'global' \| 'user' \| 'directory'` | Which scope level can set this field.                                                        |
-| `x-widget`    | `string`                            | UI rendering hint (e.g., `model-select` renders a model picker dropdown).                    |
-| `x-hidden`    | `boolean`                           | Hide from the settings UI. Used for advanced/internal settings.                              |
-| `x-adminOnly` | `boolean`                           | Only visible to admin users.                                                                 |
+| Extension     | Type                           | Description                                                                                  |
+| ------------- | ------------------------------ | -------------------------------------------------------------------------------------------- |
+| `x-secret`    | `boolean`                      | Field is encrypted at rest and masked in API responses. Use for API keys, tokens, passwords. |
+| `x-envVar`    | `string`                       | Environment variable name to check as a fallback when no setting is stored.                  |
+| `x-scope`     | `'global' \| 'user' \| 'work'` | Which scope level can set this field.                                                        |
+| `x-widget`    | `string`                       | UI rendering hint (e.g., `model-select` renders a model picker dropdown).                    |
+| `x-hidden`    | `boolean`                      | Hide from the settings UI. Used for advanced/internal settings.                              |
+| `x-adminOnly` | `boolean`                      | Only visible to admin users.                                                                 |
 
 ### x-secret
 
@@ -85,7 +85,7 @@ apiKey: {
 
 With this schema, the API key is resolved as:
 
-1. Directory setting (if in directory context)
+1. Work setting (if in work context)
 2. User setting
 3. Admin setting
 4. `PLUGIN_BRAVE_API_KEY` environment variable
@@ -97,7 +97,7 @@ Controls which scope levels can set the field:
 
 - **`global`** — Typically admin-level settings shared across the platform (e.g., default model names)
 - **`user`** — User-specific settings (e.g., personal API keys)
-- **`directory`** — Can be overridden per directory
+- **`work`** — Can be overridden per work
 
 ## Resolution Hierarchy
 
@@ -105,8 +105,8 @@ When the platform needs a plugin's settings (e.g., to make an API call), it reso
 
 ```
 ┌─────────────────────────────────┐
-│  1. Directory settings          │  ← Highest priority
-│     (per-directory overrides)   │
+│  1. Work settings          │  ← Highest priority
+│     (per-work overrides)   │
 ├─────────────────────────────────┤
 │  2. User settings               │
 │     (personal configuration)    │
@@ -132,7 +132,7 @@ The `getResolvedSettings()` method returns each field with its source:
 interface ResolvedSetting<T = unknown> {
 	readonly key: string;
 	readonly value: T;
-	readonly source: 'default' | 'env' | 'admin' | 'directory' | 'user';
+	readonly source: 'default' | 'env' | 'admin' | 'work' | 'user';
 	readonly isFallback: boolean;
 }
 ```
@@ -195,13 +195,13 @@ interface ValidationError {
 
 Settings are persisted in three tables, one per scope:
 
-| Table                   | Scope         | Settings Column | Secrets Column   |
-| ----------------------- | ------------- | --------------- | ---------------- |
-| `PluginEntity`          | Admin/system  | `settings`      | `secretSettings` |
-| `UserPluginEntity`      | Per user      | `settings`      | `secretSettings` |
-| `DirectoryPluginEntity` | Per directory | `settings`      | `secretSettings` |
+| Table              | Scope        | Settings Column | Secrets Column   |
+| ------------------ | ------------ | --------------- | ---------------- |
+| `PluginEntity`     | Admin/system | `settings`      | `secretSettings` |
+| `UserPluginEntity` | Per user     | `settings`      | `secretSettings` |
+| `WorkPluginEntity` | Per work     | `settings`      | `secretSettings` |
 
-Secret fields (marked with `x-secret`) are stored in a separate `secretSettings` column at every scope level. During resolution, the system checks directory secrets first, then user secrets, then admin secrets, following the same cascading hierarchy as regular settings.
+Secret fields (marked with `x-secret`) are stored in a separate `secretSettings` column at every scope level. During resolution, the system checks work secrets first, then user secrets, then admin secrets, following the same cascading hierarchy as regular settings.
 
 ## Frontend Integration
 
@@ -217,4 +217,4 @@ Settings pages are available at:
 
 - `/settings/plugins/[category]` — User-level settings by category
 - `/plugins/[pluginId]` — Plugin detail page with settings
-- `/directories/[id]/plugins` — Directory-level plugin management
+- `/works/[id]/plugins` — Work-level plugin management

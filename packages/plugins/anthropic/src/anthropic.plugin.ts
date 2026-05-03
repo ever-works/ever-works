@@ -185,7 +185,7 @@ export class AnthropicPlugin extends BaseAiProvider {
 			readme: [
 				'## What is the Anthropic plugin?',
 				'',
-				"This plugin connects Ever Works to Anthropic's Claude models. Claude is recognized for producing well-structured, nuanced content and adhering closely to instructions, making it well-suited for directory descriptions and detailed content generation.",
+				"This plugin connects Ever Works to Anthropic's Claude models. Claude is recognized for producing well-structured, nuanced content and adhering closely to instructions, making it well-suited for work descriptions and detailed content generation.",
 				'',
 				'## Why use it?',
 				'',
@@ -196,7 +196,7 @@ export class AnthropicPlugin extends BaseAiProvider {
 				'',
 				'## How it works in Ever Works',
 				'',
-				'When selected as the AI provider, Claude handles content generation during directory creation, powers the conversational AI assistant, and performs structured data extraction. You can assign different Claude models — Haiku for speed, Sonnet for balance, Opus for quality — to simple, standard, and complex task tiers.',
+				'When selected as the AI provider, Claude handles content generation during work creation, powers the conversational AI assistant, and performs structured data extraction. You can assign different Claude models — Haiku for speed, Sonnet for balance, Opus for quality — to simple, standard, and complex task tiers.',
 				'',
 				'## Getting started',
 				'',

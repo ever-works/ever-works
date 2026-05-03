@@ -6,7 +6,7 @@ import { getErrorStack } from '../utils/error.utils.js';
 import { PROMPT_KEYS } from '../prompt-keys.js';
 
 export const MARKDOWN_PROMPT = `
-You are directory website builder and your task is to generate markdown summary for item:
+You are work website builder and your task is to generate markdown summary for item:
 <item>
 {item}
 </item>
@@ -45,19 +45,19 @@ export class MarkdownGenerationStep extends BasePipelineStep {
 		context: MutableGenerationContext,
 		execContext: StepExecutionContext
 	): Promise<MutableGenerationContext> {
-		const { directory, finalItems, contentCache, metrics } = context;
+		const { work, finalItems, contentCache, metrics } = context;
 		const { logger, aiFacade, contentExtractorFacade, promptFacade } = execContext;
 
 		const facadeOptions: FacadeOptions = {
 			userId: execContext.user!.id,
-			directoryId: execContext.directory.id
+			workId: execContext.work.id
 		};
 
 		if (!finalItems || finalItems.length === 0) {
 			return context;
 		}
 
-		logger.log(`[${directory.slug}] Generating markdown for ${finalItems.length} items`);
+		logger.log(`[${work.slug}] Generating markdown for ${finalItems.length} items`);
 
 		const itemsWithMarkdown = await this.generateMarkdownForItems(
 			finalItems,

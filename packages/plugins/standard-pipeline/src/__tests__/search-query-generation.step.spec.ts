@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { SearchQueryGenerationStep } from '../steps/search-query-generation.step';
-import type { StepExecutionContext, DirectoryReference, GenerationRequest } from '@ever-works/plugin';
+import type { StepExecutionContext, WorkReference, GenerationRequest } from '@ever-works/plugin';
 import type { MutableGenerationContext } from '../context/index.js';
 
 describe('SearchQueryGenerationStep', () => {
@@ -25,16 +25,16 @@ describe('SearchQueryGenerationStep', () => {
 		getDefaultProvider: vi.fn()
 	});
 
-	const createMockDirectory = (): DirectoryReference => ({
+	const createMockWork = (): WorkReference => ({
 		id: 'test-dir-id',
-		slug: 'test-directory',
-		name: 'Test Directory'
+		slug: 'test-work',
+		name: 'Test Work'
 	});
 
 	const createMockRequest = (overrides?: Partial<GenerationRequest>): GenerationRequest =>
 		({
 			prompt: 'Test prompt',
-			name: 'Test Directory',
+			name: 'Test Work',
 			config: {
 				max_search_queries: 10,
 				target_keywords: [],
@@ -45,7 +45,7 @@ describe('SearchQueryGenerationStep', () => {
 
 	const createMockContext = (overrides?: Partial<MutableGenerationContext>): MutableGenerationContext =>
 		({
-			directory: createMockDirectory(),
+			work: createMockWork(),
 			request: createMockRequest(),
 			metrics: { steps: {} },
 			advancedPrompts: {},
@@ -62,7 +62,7 @@ describe('SearchQueryGenerationStep', () => {
 			logger: createMockLogger(),
 			aiFacade: createMockAiFacade(),
 			user: { id: 'test-user-id' },
-			directory: { id: 'test-dir-id' }
+			work: { id: 'test-dir-id' }
 		} as unknown as StepExecutionContext;
 	});
 

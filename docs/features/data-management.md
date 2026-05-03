@@ -7,10 +7,10 @@ sidebar_position: 11
 
 # Data Management
 
-Data Management lets you export your entire account configuration, import it into another instance, and optionally keep a live backup synced to a private GitHub repository. This covers directories (including items, comparisons, site config, schedules, and advanced prompts), user plugins, and profile data.
+Data Management lets you export your entire account configuration, import it into another instance, and optionally keep a live backup synced to a private GitHub repository. This covers works (including items, comparisons, site config, schedules, and advanced prompts), user plugins, and profile data.
 
 :::tip When to use this
-Use data management to migrate between Ever Works instances, create backups of your configuration, or share directory setups across environments (staging, production).
+Use data management to migrate between Ever Works instances, create backups of your configuration, or share work setups across environments (staging, production).
 :::
 
 ## Prerequisites
@@ -39,18 +39,18 @@ The export produces a versioned JSON file (currently v1) containing:
 | Data                              | Details                                                            |
 | --------------------------------- | ------------------------------------------------------------------ |
 | **Profile**                       | Username, email, avatar                                            |
-| **Directories**                   | Name, slug, description, git/deploy provider, settings             |
-| **Directory Items**               | Full item data from the data repository (YAML), including markdown |
+| **Works**                         | Name, slug, description, git/deploy provider, settings             |
+| **Work Items**                    | Full item data from the data repository (YAML), including markdown |
 | **Categories, Tags, Collections** | Taxonomy data from the data repository                             |
 | **Comparisons**                   | Comparison data with dimensions, scores, and markdown content      |
-| **Site Config**                   | Per-directory website configuration                                |
+| **Site Config**                   | Per-work website configuration                                     |
 | **Markdown Templates**            | Header and footer markdown templates                               |
 | **Schedules**                     | Update cadence, status, billing mode, failure thresholds           |
 | **Advanced Prompts**              | Custom AI prompt overrides for each pipeline step                  |
-| **Members**                       | Directory member user IDs and roles                                |
+| **Members**                       | Work member user IDs and roles                                     |
 | **Custom Domains**                | Domain name, environment, verification status                      |
 | **User Plugins**                  | Plugin ID, enabled state, settings                                 |
-| **Directory Plugins**             | Per-directory plugin configuration, capability, priority           |
+| **Work Plugins**                  | Per-work plugin configuration, capability, priority                |
 
 ### Secret Handling
 
@@ -73,10 +73,10 @@ The masked format shows the first 3 and last 4 characters of the original value 
 			"username": "myuser",
 			"email": "user@example.com"
 		},
-		"directories": [
+		"works": [
 			{
-				"name": "My Directory",
-				"slug": "my-directory",
+				"name": "My Work",
+				"slug": "my-work",
 				"description": "...",
 				"gitProvider": "github",
 				"items": [],
@@ -90,7 +90,7 @@ The masked format shows the first 3 and last 4 characters of the original value 
 				"advancedPrompts": { "itemGeneration": "..." },
 				"members": [],
 				"customDomains": [],
-				"directoryPlugins": [
+				"workPlugins": [
 					{
 						"pluginId": "openai",
 						"enabled": true,
@@ -135,10 +135,10 @@ Upload a JSON file to analyze its contents before making any changes. The previe
 | `version`          | Export format version                                           |
 | `includesSecrets`  | Whether the file contains secret settings                       |
 | `hasMaskedSecrets` | Whether secret values are masked (need replacing before import) |
-| `directoryCount`   | Number of directories in the file                               |
-| `totalItemCount`   | Total items across all directories                              |
+| `workCount`        | Number of works in the file                                     |
+| `totalItemCount`   | Total items across all works                                    |
 | `userPluginCount`  | Number of user plugins                                          |
-| `conflicts`        | Directories whose slugs match existing directories              |
+| `conflicts`        | Works whose slugs match existing works                          |
 | `missingPlugins`   | Plugin IDs not installed on this instance                       |
 
 ### Masked Secrets Detection
@@ -151,20 +151,20 @@ During import, any secret settings that still contain masked values are **skippe
 
 ### Step 2: Conflict Resolution
 
-When a directory slug in the import file matches an existing directory, you choose a resolution strategy:
+When a work slug in the import file matches an existing work, you choose a resolution strategy:
 
-| Strategy      | Behavior                                                    |
-| ------------- | ----------------------------------------------------------- |
-| **Skip**      | Keep the existing directory, do not import the incoming one |
-| **Overwrite** | Update the existing directory with the imported data        |
-| **Rename**    | Import with a new slug (e.g., `my-dir-imported`)            |
+| Strategy      | Behavior                                               |
+| ------------- | ------------------------------------------------------ |
+| **Skip**      | Keep the existing work, do not import the incoming one |
+| **Overwrite** | Update the existing work with the imported data        |
+| **Rename**    | Import with a new slug (e.g., `my-dir-imported`)       |
 
 ### Step 3: Apply
 
 Once conflicts are resolved, the import creates/updates:
 
-1. **Directories** — creates new or updates existing based on resolution
-2. **Directory relations** — members, custom domains, plugins, advanced prompts, schedules
+1. **Works** — creates new or updates existing based on resolution
+2. **Work relations** — members, custom domains, plugins, advanced prompts, schedules
 3. **Repository data** — clones the data repo, writes items, categories, tags, collections, comparisons, site config, and markdown templates, then commits and pushes
 4. **User plugins** — upserts plugin configurations
 
@@ -188,7 +188,7 @@ POST /api/account/import/apply
 }
 ```
 
-**Response**: `ImportResult` with counts of created/updated/skipped directories, imported plugins, and any warnings or errors.
+**Response**: `ImportResult` with counts of created/updated/skipped works, imported plugins, and any warnings or errors.
 
 ## GitHub Sync
 
@@ -209,17 +209,17 @@ manifest.json                    # Version and timestamp
 profile.json                     # Username, email, avatar
 plugins/
   user-plugins.json              # User plugin configurations
-directories/
-  my-directory/
-    config.json                  # Directory settings
-    members.json                 # Directory members
+works/
+  my-work/
+    config.json                  # Work settings
+    members.json                 # Work members
     domains.json                 # Custom domains
-    plugins.json                 # Directory plugin configurations
+    plugins.json                 # Work plugin configurations
     prompts.json                 # Advanced prompt overrides
     schedule.json                # Update schedule settings
     site-config.json             # Website configuration
     markdown-template.json       # Header/footer markdown
-    items.json                   # Directory items
+    items.json                   # Work items
     categories.json              # Categories
     tags.json                    # Tags
     collections.json             # Collections
@@ -255,13 +255,13 @@ DELETE /api/account/sync
 
 ## Security Considerations
 
-| Concern                        | Mitigation                                                                             |
-| ------------------------------ | -------------------------------------------------------------------------------------- |
-| Secret leakage via export      | Secrets are always masked with `MASKED:` prefix; real values never leave the API       |
-| Secret leakage via GitHub      | Push always writes masked values; pull always ignores secret values                    |
-| Masked values imported as real | Import detects `MASKED:` prefix and skips those values with a warning                  |
-| Path traversal in sync         | Directory slugs are validated with `path.basename()` on both write and read operations |
-| Repository tampering           | Pull operations use the same preview/conflict flow as file import                      |
+| Concern                        | Mitigation                                                                        |
+| ------------------------------ | --------------------------------------------------------------------------------- |
+| Secret leakage via export      | Secrets are always masked with `MASKED:` prefix; real values never leave the API  |
+| Secret leakage via GitHub      | Push always writes masked values; pull always ignores secret values               |
+| Masked values imported as real | Import detects `MASKED:` prefix and skips those values with a warning             |
+| Path traversal in sync         | Work slugs are validated with `path.basename()` on both write and read operations |
+| Repository tampering           | Pull operations use the same preview/conflict flow as file import                 |
 
 ## Dashboard UI
 

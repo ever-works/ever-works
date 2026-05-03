@@ -148,7 +148,7 @@ function createExecContext(overrides?: Record<string, unknown>) {
 		contentExtractorFacade: {} as never,
 		promptFacade: undefined,
 		logger: { log: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
-		directory: {
+		work: {
 			id: 'dir1'
 		},
 		user: { id: 'user1' },
@@ -208,11 +208,11 @@ describe('OpenCodePlugin', () => {
 	});
 
 	describe('execute', () => {
-		const directory = {
+		const work = {
 			id: 'dir1',
-			name: 'Test Directory',
-			slug: 'test-directory',
-			description: 'A test directory',
+			name: 'Test Work',
+			slug: 'test-work',
+			description: 'A test work',
 			user: { id: 'user1' }
 		};
 
@@ -231,7 +231,7 @@ describe('OpenCodePlugin', () => {
 			const ctx = createMockContext();
 			await plugin.onLoad(ctx);
 
-			const result = await plugin.execute(directory, request, existing, {
+			const result = await plugin.execute(work, request, existing, {
 				execContext: createExecContext()
 			});
 
@@ -250,7 +250,7 @@ describe('OpenCodePlugin', () => {
 
 			const { executeOpenCode } = await import('../utils/process-runner');
 
-			await plugin.execute(directory, request, existing, {
+			await plugin.execute(work, request, existing, {
 				execContext: createExecContext()
 			});
 
@@ -267,7 +267,7 @@ describe('OpenCodePlugin', () => {
 
 			const progressUpdates: Array<{ percent: number }> = [];
 			await plugin.execute(
-				directory,
+				work,
 				request,
 				existing,
 				{
@@ -301,7 +301,7 @@ describe('OpenCodePlugin', () => {
 
 			const progressUpdates: Array<{ percent: number; message?: string; itemsProcessed?: number }> = [];
 			await plugin.execute(
-				directory,
+				work,
 				{ ...request, config: { target_items: 10 } },
 				existing,
 				{
@@ -372,7 +372,7 @@ describe('OpenCodePlugin', () => {
 				stepName?: string | null;
 			}> = [];
 
-			await plugin.execute(directory, request, existing, {
+			await plugin.execute(work, request, existing, {
 				execContext: createExecContext(),
 				onLogEntry: (log) => logs.push(log)
 			});
@@ -444,7 +444,7 @@ describe('OpenCodePlugin', () => {
 			const ctx = createMockContext();
 			await plugin.onLoad(ctx);
 
-			const result = await plugin.execute(directory, request, existing, {
+			const result = await plugin.execute(work, request, existing, {
 				execContext: createExecContext()
 			});
 
@@ -469,7 +469,7 @@ describe('OpenCodePlugin', () => {
 			const ctx = createMockContext();
 			await plugin.onLoad(ctx);
 
-			const result = await plugin.execute(directory, request, existing, {
+			const result = await plugin.execute(work, request, existing, {
 				execContext: createExecContext()
 			});
 
@@ -482,7 +482,7 @@ describe('OpenCodePlugin', () => {
 			await plugin.onLoad(ctx);
 
 			// No execContext → hard failure because AI provider resolution needs facade context
-			const result1 = await plugin.execute(directory, request, existing);
+			const result1 = await plugin.execute(work, request, existing);
 			expect(result1.success).toBe(false);
 
 			// Reset
@@ -491,7 +491,7 @@ describe('OpenCodePlugin', () => {
 			await plugin2.onLoad(createMockContext());
 
 			// Facade throws → pipeline still succeeds
-			const result2 = await plugin2.execute(directory, request, existing, {
+			const result2 = await plugin2.execute(work, request, existing, {
 				execContext: {
 					...createExecContext(),
 					searchFacade: {} as never,
@@ -503,7 +503,7 @@ describe('OpenCodePlugin', () => {
 					} as never,
 					contentExtractorFacade: {} as never,
 					logger: { log: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
-					directory,
+					work,
 					user: { id: 'user1' }
 				}
 			});
@@ -528,7 +528,7 @@ describe('OpenCodePlugin', () => {
 			};
 
 			const result = await plugin.execute(
-				directory,
+				work,
 				{
 					...request,
 					config: {
@@ -544,7 +544,7 @@ describe('OpenCodePlugin', () => {
 						screenshotFacade: mockScreenshotFacade as never,
 						contentExtractorFacade: {} as never,
 						logger: { log: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
-						directory,
+						work,
 						user: { id: 'user1' }
 					}
 				}

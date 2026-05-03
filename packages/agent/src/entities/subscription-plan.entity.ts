@@ -7,7 +7,7 @@ import {
     OneToMany,
     Index,
 } from 'typeorm';
-import type { ClassToObject, DirectoryScheduleCadence, SubscriptionPlanCode } from './types';
+import type { ClassToObject, WorkScheduleCadence, SubscriptionPlanCode } from './types';
 import { UserSubscription } from './user-subscription.entity';
 
 @Index(['code'], { unique: true })
@@ -24,10 +24,10 @@ export class SubscriptionPlan {
     displayName: string;
 
     @Column({ type: 'int', default: 1 })
-    maxDirectories: number;
+    maxWorks: number;
 
     @Column({ type: 'simple-json', nullable: false })
-    allowedCadences: DirectoryScheduleCadence[];
+    allowedCadences: WorkScheduleCadence[];
 
     @Column({ type: 'decimal', precision: 10, scale: 2, default: 0 })
     monthlyPrice: string;

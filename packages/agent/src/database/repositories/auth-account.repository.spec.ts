@@ -225,4 +225,63 @@ describe('AuthAccountRepository', () => {
             ]),
         ).toBe(false);
     });
+
+    it('prefers plugin integration accounts over social sign-in accounts', async () => {
+        const pluginAccount = {
+            id: 'account-plugin',
+            userId: 'user-1',
+            providerId: 'plugin:github',
+            accountId: '35149259',
+            accessToken: 'plugin-token',
+            accessTokenExpiresAt: null,
+            scope: 'repo read:user',
+        };
+
+        repository.findOne.mockResolvedValueOnce(pluginAccount);
+
+        const result = await authAccountRepository.findConnectedProviderAccount(
+            'user-1',
+            'github',
+            {
+                usePluginProviderId: true,
+                requiredScopes: ['repo'],
+            },
+        );
+
+        expect(result).toBe(pluginAccount);
+        expect(repository.findOne).toHaveBeenCalledWith({
+            where: { userId: 'user-1', providerId: 'plugin:github' },
+        });
+    });
+
+    it('falls back to the social sign-in account when plugin integration is absent', async () => {
+        const socialAccount = {
+            id: 'account-social',
+            userId: 'user-1',
+            providerId: 'github',
+            accountId: '35149259',
+            accessToken: 'social-token',
+            accessTokenExpiresAt: null,
+            scope: 'repo read:user',
+        };
+
+        repository.findOne.mockResolvedValueOnce(null).mockResolvedValueOnce(socialAccount);
+
+        const result = await authAccountRepository.findConnectedProviderAccount(
+            'user-1',
+            'github',
+            {
+                usePluginProviderId: true,
+                requiredScopes: ['repo'],
+            },
+        );
+
+        expect(result).toBe(socialAccount);
+        expect(repository.findOne).toHaveBeenNthCalledWith(1, {
+            where: { userId: 'user-1', providerId: 'plugin:github' },
+        });
+        expect(repository.findOne).toHaveBeenNthCalledWith(2, {
+            where: { userId: 'user-1', providerId: 'github' },
+        });
+    });
 });

@@ -32,8 +32,11 @@ COPY --from=pruner /app/out/full/ .
 COPY packages/plugins/ packages/plugins/
 COPY scripts/prepare-docker-plugins.js scripts/prepare-docker-plugins.js
 
-RUN pnpm build --filter=ever-works-api...
-RUN pnpm build --filter="./packages/plugins/*"
+# Use turbo directly to bypass the root `pnpm build` script's
+# `--filter=!./apps/docs` which fails in the pruned workspace where
+# apps/docs is not present.
+RUN pnpm exec turbo build --filter=ever-works-api...
+RUN pnpm exec turbo build --filter="./packages/plugins/*"
 RUN pnpm deploy --filter=ever-works-api --prod --legacy /app/deploy
 RUN node scripts/prepare-docker-plugins.js
 

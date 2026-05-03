@@ -7,7 +7,7 @@ sidebar_position: 10
 
 # Content Extraction Plugins
 
-Content extraction plugins retrieve and clean web page content for use during directory generation. They implement the `IContentExtractorPlugin` interface and transform raw HTML into structured text, markdown, images, links, and metadata.
+Content extraction plugins retrieve and clean web page content for use during work generation. They implement the `IContentExtractorPlugin` interface and transform raw HTML into structured text, markdown, images, links, and metadata.
 
 ## IContentExtractorPlugin Interface
 
@@ -198,7 +198,7 @@ The content extraction facade uses the `canExtract()` method to automatically ro
 2. If no supplementary plugin matches, use the user-selected content extractor
 3. Fall back to the local content extractor if nothing else is configured
 
-This means the Notion and PDF extractors work transparently -- when a directory item has a Notion page or PDF as its source URL, the correct extractor is used automatically without user intervention.
+This means the Notion and PDF extractors work transparently -- when a work item has a Notion page or PDF as its source URL, the correct extractor is used automatically without user intervention.
 
 ## Metadata Extraction
 
@@ -226,4 +226,4 @@ interface PageMetadata {
 }
 ```
 
-This metadata enriches directory items with SEO-relevant information, Open Graph data, and publication dates.
+This metadata enriches work items with SEO-relevant information, Open Graph data, and publication dates.

@@ -94,7 +94,7 @@ models/gemini-2.5-pro
 | Vision             | Yes                  | Image analysis and understanding             |
 | Max Context Length | **1,048,576 tokens** | 1M token context window                      |
 
-The 1 million token context window is the largest among all AI provider plugins, making Gemini ideal for processing large volumes of source material during directory generation.
+The 1 million token context window is the largest among all AI provider plugins, making Gemini ideal for processing large volumes of source material during work generation.
 
 ### Context Window Comparison
 

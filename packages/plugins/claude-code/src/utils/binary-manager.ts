@@ -92,7 +92,7 @@ export async function ensureBinary(version: string = DEFAULT_CLI_VERSION, logger
 		// Binary doesn't exist or isn't executable, proceed with download
 	}
 
-	// Ensure bin directory exists
+	// Ensure bin work exists
 	const binDir = path.dirname(binaryPath);
 	await fs.mkdir(binDir, { recursive: true });
 

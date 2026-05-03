@@ -6,7 +6,7 @@ import {
     DEFAULT_PLATFORM_VERSION,
     PluginRepository,
     UserPluginRepository,
-    DirectoryPluginRepository,
+    WorkPluginRepository,
     PluginRegistryService,
     PluginLoaderService,
     PluginManifestValidatorService,
@@ -68,9 +68,9 @@ export class TriggerPluginsModule {
                     inject: [TriggerInternalApiClient],
                 },
                 {
-                    provide: DirectoryPluginRepository,
+                    provide: WorkPluginRepository,
                     useFactory: (apiClient: TriggerInternalApiClient) =>
-                        createRemoteProxy(apiClient, 'DirectoryPluginRepository'),
+                        createRemoteProxy(apiClient, 'WorkPluginRepository'),
                     inject: [TriggerInternalApiClient],
                 },
                 PluginManifestValidatorService,
@@ -88,7 +88,7 @@ export class TriggerPluginsModule {
             exports: [
                 PluginRepository,
                 UserPluginRepository,
-                DirectoryPluginRepository,
+                WorkPluginRepository,
                 PluginRegistryService,
                 PluginLoaderService,
                 PluginLifecycleManagerService,

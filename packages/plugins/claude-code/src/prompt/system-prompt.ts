@@ -1,9 +1,9 @@
-import type { DirectoryReference, GenerationRequest, ExistingItems } from '@ever-works/plugin';
-import { createDirectoryCliPromptHelpers } from '@ever-works/plugin/cli-pipeline';
+import type { WorkReference, GenerationRequest, ExistingItems } from '@ever-works/plugin';
+import { createWorkCliPromptHelpers } from '@ever-works/plugin/cli-pipeline';
 import { DEFAULT_TARGET_ITEMS } from '../form-schema.js';
 
 export interface SystemPromptOptions {
-	readonly directory: DirectoryReference;
+	readonly work: WorkReference;
 	readonly request: GenerationRequest;
 	readonly existing: ExistingItems;
 	readonly workspacePath: string;
@@ -14,7 +14,7 @@ const EXISTING_ITEMS_LOOKUP_INSTRUCTIONS =
 	'- Search for URLs: `grep "example.com" _meta/existing-items.jsonl`\n' +
 	'- Search for names: `grep -i "keyword" _meta/existing-items.jsonl`';
 
-const promptHelpers = createDirectoryCliPromptHelpers<SystemPromptOptions>({
+const promptHelpers = createWorkCliPromptHelpers<SystemPromptOptions>({
 	resolveTargetItems: ({ request }) => ((request.config || {}).target_items as number) || DEFAULT_TARGET_ITEMS,
 	existingItemsLookupInstructions: EXISTING_ITEMS_LOOKUP_INSTRUCTIONS
 });

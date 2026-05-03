@@ -5,7 +5,7 @@ import { gitProvidersAPI } from '@/lib/api/plugins-capabilities/git-providers';
 
 export const checkGitConnection = tool({
     description: [
-        'Check if user has a connected git provider. MUST call before directory creation, import, or generation.',
+        'Check if user has a connected git provider. MUST call before Work creation, import, or generation.',
         'If not connected, tell user to connect — the result includes a setupUrl.',
     ].join(' '),
     inputSchema: z.object({

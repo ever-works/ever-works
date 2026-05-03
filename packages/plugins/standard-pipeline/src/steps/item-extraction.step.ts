@@ -18,11 +18,11 @@ import {
 type ExtractedItems = z.infer<typeof extractedItemsSchema>;
 type ExtractedItemsWithTags = z.infer<typeof extractedItemsSchemaWithTags>;
 
-const ITEMS_EXTRACTION_PROMPT = `You are an expert data extractor and technical writer for directory websites.
+const ITEMS_EXTRACTION_PROMPT = `You are an expert data extractor and technical writer for work websites.
 Your task is to identify and extract information for one or more distinct items (tools, resources, libraries, articles, etc.)
 that are **directly and highly relevant to the main topic and research context** and should match extraction criteria.
 
-The **main topic** of this directory is:
+The **main topic** of this work is:
 - topic name: "{topicName}"
 - topic task: "{topicDescription}".
 
@@ -80,19 +80,19 @@ export class ItemExtractionStep extends BasePipelineStep {
 		context: MutableGenerationContext,
 		execContext: StepExecutionContext
 	): Promise<MutableGenerationContext> {
-		const { request, directory, webPages, featuredItemHints, metrics, advancedPrompts } = context;
+		const { request, work, webPages, featuredItemHints, metrics, advancedPrompts } = context;
 		const { logger, aiFacade, promptFacade } = execContext;
 
 		const facadeOptions: FacadeOptions = {
 			userId: execContext.user!.id,
-			directoryId: execContext.directory.id
+			workId: execContext.work.id
 		};
 
-		logger.log(`[${directory.slug}] AI-Driven Structured Data Extraction for Items from Web - Starting`);
+		logger.log(`[${work.slug}] AI-Driven Structured Data Extraction for Items from Web - Starting`);
 
 		const extractedWebItems = await this.extractItemsFromPages(
-			directory.slug,
-			request.name || directory.name,
+			work.slug,
+			request.name || work.name,
 			request.prompt || '',
 			request.config || {},
 			webPages,
@@ -106,7 +106,7 @@ export class ItemExtractionStep extends BasePipelineStep {
 			promptFacade
 		);
 
-		logger.log(`[${directory.slug}] Extracted ${extractedWebItems.length} potential items from web pages.`);
+		logger.log(`[${work.slug}] Extracted ${extractedWebItems.length} potential items from web pages.`);
 
 		context.extractedWebItems = extractedWebItems;
 
@@ -121,7 +121,7 @@ export class ItemExtractionStep extends BasePipelineStep {
 	 * Extract items from pages
 	 */
 	private async extractItemsFromPages(
-		directorySlug: string,
+		workSlug: string,
 		topicName: string,
 		topicDescription: string,
 		config: Record<string, unknown>,
@@ -136,7 +136,7 @@ export class ItemExtractionStep extends BasePipelineStep {
 		promptFacade?: StepExecutionContext['promptFacade']
 	): Promise<MutableItemData[]> {
 		if (!aiFacade.isConfigured()) {
-			logger.warn(`[${directorySlug}] AI provider not configured. Skipping AI-driven item extraction.`);
+			logger.warn(`[${workSlug}] AI provider not configured. Skipping AI-driven item extraction.`);
 			return [];
 		}
 
@@ -148,7 +148,7 @@ export class ItemExtractionStep extends BasePipelineStep {
 
 			if (!hasSufficientContent) {
 				logger.debug(
-					`[${directorySlug}] Skipping item extraction for page (insufficient content): ${page.source_url}`
+					`[${workSlug}] Skipping item extraction for page (insufficient content): ${page.source_url}`
 				);
 			}
 
@@ -211,7 +211,7 @@ export class ItemExtractionStep extends BasePipelineStep {
 								return result?.items || [];
 							} catch (chunkError) {
 								logger.error(
-									`[${directorySlug}] Error processing chunk ${index + 1} from ${page.source_url}: ${this.formatError(chunkError)}`
+									`[${workSlug}] Error processing chunk ${index + 1} from ${page.source_url}: ${this.formatError(chunkError)}`
 								);
 								return [];
 							}
@@ -241,9 +241,7 @@ export class ItemExtractionStep extends BasePipelineStep {
 						const uniqueItems = this.deduplicateItems(validatedItems);
 						extractedItems.push(...uniqueItems);
 					} else {
-						logger.debug(
-							`[${directorySlug}] No items extracted by LLM from any chunks in ${page.source_url}`
-						);
+						logger.debug(`[${workSlug}] No items extracted by LLM from any chunks in ${page.source_url}`);
 					}
 				} else {
 					// Process the entire content at once for smaller pages
@@ -292,12 +290,12 @@ export class ItemExtractionStep extends BasePipelineStep {
 
 						extractedItems.push(...validatedItems);
 					} else {
-						logger.debug(`[${directorySlug}] No items extracted by LLM from ${page.source_url}`);
+						logger.debug(`[${workSlug}] No items extracted by LLM from ${page.source_url}`);
 					}
 				}
 			} catch (error) {
 				logger.error(
-					`[${directorySlug}] Error extracting items from ${page.source_url}: ${this.formatError(error)}`,
+					`[${workSlug}] Error extracting items from ${page.source_url}: ${this.formatError(error)}`,
 					getErrorStack(error)
 				);
 			}
@@ -327,12 +325,12 @@ export class ItemExtractionStep extends BasePipelineStep {
 
 		if (uniqueExtractedItems.length < allExtractedItems.length) {
 			logger.log(
-				`[${directorySlug}] Deduplicated ${allExtractedItems.length - uniqueExtractedItems.length} duplicate items across all pages.`
+				`[${workSlug}] Deduplicated ${allExtractedItems.length - uniqueExtractedItems.length} duplicate items across all pages.`
 			);
 		}
 
 		logger.log(
-			`[${directorySlug}] Item extraction complete. Extracted ${uniqueExtractedItems.length} unique items from ${pagesWithSufficientContent.length} pages.`
+			`[${workSlug}] Item extraction complete. Extracted ${uniqueExtractedItems.length} unique items from ${pagesWithSufficientContent.length} pages.`
 		);
 		return uniqueExtractedItems;
 	}

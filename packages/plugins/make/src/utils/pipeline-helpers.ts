@@ -18,12 +18,12 @@ export const buildErrorResult = runtime.buildErrorResult;
 export const buildCancelledResult = runtime.buildCancelledResult;
 
 /**
- * Merges user and directory-level settings (directory overrides user).
+ * Merges user and work-level settings (work overrides user).
  *
  * Returns a fresh object rather than mutating either input, so the plugin
  * context is free to cache the original settings objects without risk of
- * cross-directory contamination on subsequent calls. Only own, non-nullish
- * directory properties override user values.
+ * cross-work contamination on subsequent calls. Only own, non-nullish
+ * work properties override user values.
  */
 export function buildMetrics(
 	startTime: number,

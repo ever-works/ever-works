@@ -19,9 +19,13 @@ import {
 import { CurrentUser } from '../auth/decorators/user.decorator';
 import type { AuthenticatedUser } from '../auth/types/auth.types';
 import { ActivityLogService } from '@ever-works/agent/activity-log';
-import { DirectoryRepository } from '@ever-works/agent/database';
+import { WorkRepository } from '@ever-works/agent/database';
 import type { ActivityActionType, ActivityStatus } from '@ever-works/agent/entities';
-import type { Response } from 'express';
+
+type CsvResponse = {
+    setHeader(name: string, value: string): void;
+    send(body: string): void;
+};
 
 const ACTIVITY_RECONCILE_TTL_MS = 5000;
 
@@ -34,7 +38,7 @@ export class ActivityLogController {
 
     constructor(
         private readonly activityLogService: ActivityLogService,
-        private readonly directoryRepository: DirectoryRepository,
+        private readonly workRepository: WorkRepository,
     ) {}
 
     private async reconcileActivities(userId: string) {
@@ -76,18 +80,18 @@ export class ActivityLogController {
         description: 'Get paginated, filtered activity log for the current user',
     })
     @ApiQuery({ name: 'actionType', required: false, description: 'Filter by action type' })
-    @ApiQuery({ name: 'directoryId', required: false, description: 'Filter by directory' })
+    @ApiQuery({ name: 'workId', required: false, description: 'Filter by work' })
     @ApiQuery({ name: 'status', required: false, description: 'Filter by status' })
     @ApiQuery({ name: 'dateFrom', required: false, description: 'Start of date range (ISO)' })
     @ApiQuery({ name: 'dateTo', required: false, description: 'End of date range (ISO)' })
-    @ApiQuery({ name: 'search', required: false, description: 'Search summary and directory name' })
+    @ApiQuery({ name: 'search', required: false, description: 'Search summary and work name' })
     @ApiQuery({ name: 'limit', required: false, description: 'Page size (default 25, max 100)' })
     @ApiQuery({ name: 'offset', required: false, description: 'Pagination offset' })
     @ApiResponse({ status: 200, description: 'Activity log entries with total count' })
     async getActivities(
         @CurrentUser() auth: AuthenticatedUser,
         @Query('actionType') actionType?: string,
-        @Query('directoryId') directoryId?: string,
+        @Query('workId') workId?: string,
         @Query('status') status?: string,
         @Query('dateFrom') dateFrom?: string,
         @Query('dateTo') dateTo?: string,
@@ -100,7 +104,7 @@ export class ActivityLogController {
         const result = await this.activityLogService.findAll({
             userId: auth.userId,
             actionType: actionType as ActivityActionType,
-            directoryId,
+            workId,
             status: status as ActivityStatus,
             dateFrom: dateFrom ? new Date(dateFrom) : undefined,
             dateTo: dateTo ? new Date(dateTo) : undefined,
@@ -147,16 +151,16 @@ export class ActivityLogController {
         description: 'Download activity log entries as a CSV file',
     })
     @ApiQuery({ name: 'actionType', required: false })
-    @ApiQuery({ name: 'directoryId', required: false })
+    @ApiQuery({ name: 'workId', required: false })
     @ApiQuery({ name: 'status', required: false })
     @ApiQuery({ name: 'dateFrom', required: false })
     @ApiQuery({ name: 'dateTo', required: false })
     @ApiResponse({ status: 200, description: 'CSV file download' })
     async exportCsv(
         @CurrentUser() auth: AuthenticatedUser,
-        @Res() res: Response,
+        @Res() res: CsvResponse,
         @Query('actionType') actionType?: string,
-        @Query('directoryId') directoryId?: string,
+        @Query('workId') workId?: string,
         @Query('status') status?: string,
         @Query('dateFrom') dateFrom?: string,
         @Query('dateTo') dateTo?: string,
@@ -166,7 +170,7 @@ export class ActivityLogController {
         const csv = await this.activityLogService.exportCsv({
             userId: auth.userId,
             actionType: actionType as ActivityActionType,
-            directoryId,
+            workId,
             status: status as ActivityStatus,
             dateFrom: dateFrom ? new Date(dateFrom) : undefined,
             dateTo: dateTo ? new Date(dateTo) : undefined,
@@ -195,10 +199,10 @@ export class ActivityLogController {
 
         let liveLogs = activity.details?.liveLogs;
 
-        if (activity.status === 'in_progress' && activity.directoryId) {
-            const directory = await this.directoryRepository.findById(activity.directoryId);
-            if (directory?.generateStatus?.recentLogs?.length) {
-                liveLogs = directory.generateStatus.recentLogs;
+        if (activity.status === 'in_progress' && activity.workId) {
+            const work = await this.workRepository.findById(activity.workId);
+            if (work?.generateStatus?.recentLogs?.length) {
+                liveLogs = work.generateStatus.recentLogs;
             }
         }
 

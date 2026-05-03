@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { ContentFilteringStep } from '../steps/content-filtering.step';
-import type { StepExecutionContext, DirectoryReference, GenerationRequest, WebPageData } from '@ever-works/plugin';
+import type { StepExecutionContext, WorkReference, GenerationRequest, WebPageData } from '@ever-works/plugin';
 import type { MutableGenerationContext } from '../context/index.js';
 
 describe('ContentFilteringStep', () => {
@@ -29,16 +29,16 @@ describe('ContentFilteringStep', () => {
 		getDefaultProvider: vi.fn()
 	});
 
-	const createMockDirectory = (): DirectoryReference => ({
+	const createMockWork = (): WorkReference => ({
 		id: 'test-dir-id',
-		slug: 'test-directory',
-		name: 'Test Directory'
+		slug: 'test-work',
+		name: 'Test Work'
 	});
 
 	const createMockRequest = (overrides?: Partial<GenerationRequest>): GenerationRequest =>
 		({
 			prompt: 'Test prompt',
-			name: 'Test Directory',
+			name: 'Test Work',
 			config: {
 				content_filtering_enabled: true,
 				min_content_length_for_extraction: 100,
@@ -56,7 +56,7 @@ describe('ContentFilteringStep', () => {
 
 	const createMockContext = (overrides?: Partial<MutableGenerationContext>): MutableGenerationContext =>
 		({
-			directory: createMockDirectory(),
+			work: createMockWork(),
 			request: createMockRequest(),
 			webPages: [createMockWebPage('A'.repeat(200))],
 			metrics: { steps: {} },
@@ -73,7 +73,7 @@ describe('ContentFilteringStep', () => {
 			logger: createMockLogger(),
 			aiFacade: createMockAiFacade(),
 			user: { id: 'test-user-id' },
-			directory: { id: 'test-dir-id' }
+			work: { id: 'test-dir-id' }
 		} as unknown as StepExecutionContext;
 	});
 

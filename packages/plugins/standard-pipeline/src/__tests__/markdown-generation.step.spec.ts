@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { MarkdownGenerationStep } from '../steps/markdown-generation.step';
-import type { StepExecutionContext, DirectoryReference, GenerationRequest, MutableItemData } from '@ever-works/plugin';
+import type { StepExecutionContext, WorkReference, GenerationRequest, MutableItemData } from '@ever-works/plugin';
 import type { MutableGenerationContext } from '../context/index.js';
 
 describe('MarkdownGenerationStep', () => {
@@ -30,10 +30,10 @@ describe('MarkdownGenerationStep', () => {
 		isConfigured: vi.fn().mockReturnValue(true)
 	});
 
-	const createMockDirectory = (): DirectoryReference => ({
+	const createMockWork = (): WorkReference => ({
 		id: 'test-dir-id',
-		slug: 'test-directory',
-		name: 'Test Directory'
+		slug: 'test-work',
+		name: 'Test Work'
 	});
 
 	const createMockRequest = (overrides?: Partial<GenerationRequest>): GenerationRequest =>
@@ -55,7 +55,7 @@ describe('MarkdownGenerationStep', () => {
 
 	const createMockContext = (overrides?: Partial<MutableGenerationContext>): MutableGenerationContext =>
 		({
-			directory: createMockDirectory(),
+			work: createMockWork(),
 			request: createMockRequest(),
 			finalItems: [createMockItem('Test Item', 'https://example.com')],
 			contentCache: new Map<string, string>(),
@@ -73,7 +73,7 @@ describe('MarkdownGenerationStep', () => {
 			aiFacade: createMockAiFacade(),
 			contentExtractorFacade: createMockContentExtractorFacade(),
 			user: { id: 'test-user-id' },
-			directory: { id: 'test-dir-id' }
+			work: { id: 'test-dir-id' }
 		} as unknown as StepExecutionContext;
 	});
 
@@ -113,7 +113,7 @@ describe('MarkdownGenerationStep', () => {
 			expect(mockExecContext.contentExtractorFacade.extractContent).toHaveBeenCalledWith(
 				'https://example.com',
 				undefined,
-				{ userId: 'test-user-id', directoryId: 'test-dir-id' }
+				{ userId: 'test-user-id', workId: 'test-dir-id' }
 			);
 		});
 

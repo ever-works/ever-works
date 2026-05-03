@@ -32,7 +32,7 @@ Initializes shadcn/ui in an existing project or creates a new project (when `--n
 | `--yes`                 | `-y`  | Skip confirmation prompt                                  | `true`  |
 | `--defaults`            | `-d`  | Use defaults (`--template=next --preset=base-nova`)       | `false` |
 | `--force`               | `-f`  | Force overwrite existing configuration                    | `false` |
-| `--cwd <cwd>`           | `-c`  | Working directory                                         | current |
+| `--cwd <cwd>`           | `-c`  | Working work                                              | current |
 | `--name <name>`         | `-n`  | Name for new project                                      | —       |
 | `--silent`              | `-s`  | Mute output                                               | `false` |
 | `--rtl`                 |       | Enable RTL support                                        | —       |
@@ -54,7 +54,7 @@ Applies a preset to an existing project, overwriting preset-driven config, fonts
 | ------------------- | ----- | ------------------------------------------ | ------- |
 | `--preset <preset>` | —     | Preset configuration (named, code, or URL) | —       |
 | `--yes`             | `-y`  | Skip confirmation prompt                   | `false` |
-| `--cwd <cwd>`       | `-c`  | Working directory                          | current |
+| `--cwd <cwd>`       | `-c`  | Working work                               | current |
 | `--silent`          | `-s`  | Mute output                                | `false` |
 
 `[preset]` is a shorthand for `--preset <preset>`. If both are provided, they must match.
@@ -74,7 +74,7 @@ Accepts component names, registry-prefixed names (`@magicui/shimmer-button`), UR
 | --------------- | ----- | -------------------------------------------------------------------------------------------------------------------- | ------- |
 | `--yes`         | `-y`  | Skip confirmation prompt                                                                                             | `false` |
 | `--overwrite`   | `-o`  | Overwrite existing files                                                                                             | `false` |
-| `--cwd <cwd>`   | `-c`  | Working directory                                                                                                    | current |
+| `--cwd <cwd>`   | `-c`  | Working work                                                                                                         | current |
 | `--all`         | `-a`  | Add all available components                                                                                         | `false` |
 | `--path <path>` | `-p`  | Target path for the component                                                                                        | —       |
 | `--silent`      | `-s`  | Mute output                                                                                                          | `false` |
@@ -136,7 +136,7 @@ Fuzzy search across registries. Also aliased as `npx shadcn@latest list`. Withou
 | `--query <query>`   | `-q`  | Search query           | —       |
 | `--limit <number>`  | `-l`  | Max items per registry | `100`   |
 | `--offset <number>` | `-o`  | Items to skip          | `0`     |
-| `--cwd <cwd>`       | `-c`  | Working directory      | current |
+| `--cwd <cwd>`       | `-c`  | Working work           | current |
 
 ### `view` — View item details
 
@@ -182,9 +182,9 @@ npx shadcn@latest info [options]
 
 Displays project info and `components.json` configuration. Run this first to discover the project's framework, aliases, Tailwind version, and resolved paths.
 
-| Flag          | Short | Description       | Default |
-| ------------- | ----- | ----------------- | ------- |
-| `--cwd <cwd>` | `-c`  | Working directory | current |
+| Flag          | Short | Description  | Default |
+| ------------- | ----- | ------------ | ------- |
+| `--cwd <cwd>` | `-c`  | Working work | current |
 
 **Project Info fields:**
 
@@ -192,7 +192,7 @@ Displays project info and `components.json` configuration. Run this first to dis
 | -------------------- | --------- | ------------------------------------------------------------------ |
 | `framework`          | `string`  | Detected framework (`next`, `vite`, `react-router`, `start`, etc.) |
 | `frameworkVersion`   | `string`  | Framework version (e.g. `15.2.4`)                                  |
-| `isSrcDir`           | `boolean` | Whether the project uses a `src/` directory                        |
+| `isSrcDir`           | `boolean` | Whether the project uses a `src/` work                             |
 | `isRSC`              | `boolean` | Whether React Server Components are enabled                        |
 | `isTsx`              | `boolean` | Whether the project uses TypeScript                                |
 | `tailwindVersion`    | `string`  | `"v3"` or `"v4"`                                                   |
@@ -232,10 +232,10 @@ npx shadcn@latest build [registry] [options]
 
 Builds `registry.json` into individual JSON files for distribution. Default input: `./registry.json`, default output: `./public/r`.
 
-| Flag              | Short | Description       | Default      |
-| ----------------- | ----- | ----------------- | ------------ |
-| `--output <path>` | `-o`  | Output directory  | `./public/r` |
-| `--cwd <cwd>`     | `-c`  | Working directory | current      |
+| Flag              | Short | Description  | Default      |
+| ----------------- | ----- | ------------ | ------------ |
+| `--output <path>` | `-o`  | Output work  | `./public/r` |
+| `--cwd <cwd>`     | `-c`  | Working work | current      |
 
 ---
 
@@ -250,7 +250,7 @@ Builds `registry.json` into individual JSON files for distribution. Default inpu
 | `astro`        | Astro          | Yes              |
 | `laravel`      | Laravel        | No               |
 
-All templates support monorepo scaffolding via the `--monorepo` flag. When passed, the CLI uses a monorepo-specific template directory (e.g. `next-monorepo`, `vite-monorepo`). When neither `--monorepo` nor `--no-monorepo` is passed, the CLI prompts interactively. Laravel does not support monorepo scaffolding.
+All templates support monorepo scaffolding via the `--monorepo` flag. When passed, the CLI uses a monorepo-specific template work (e.g. `next-monorepo`, `vite-monorepo`). When neither `--monorepo` nor `--no-monorepo` is passed, the CLI prompts interactively. Laravel does not support monorepo scaffolding.
 
 ---
 
@@ -273,4 +273,4 @@ Ask the user first: **overwrite**, **merge**, or **skip** existing components?
 - **Merge** → `npx shadcn@latest init --preset <code> --force --no-reinstall`, then run `npx shadcn@latest info` to get the list of installed components and use the [smart merge workflow](./SKILL.md#updating-components) to update them one by one, preserving local changes. Use when the user has customized components.
 - **Skip** → `npx shadcn@latest init --preset <code> --force --no-reinstall`. Only updates config and CSS variables, leaves existing components as-is.
 
-Always run preset commands inside the user's project directory. `apply` only works in an existing project with a `components.json` file. The CLI automatically preserves the current base (`base` vs `radix`) from `components.json`. If you must use a scratch/temp directory (e.g. for `--dry-run` comparisons), pass `--base <current-base>` explicitly — preset codes do not encode the base.
+Always run preset commands inside the user's project work. `apply` only works in an existing project with a `components.json` file. The CLI automatically preserves the current base (`base` vs `radix`) from `components.json`. If you must use a scratch/temp work (e.g. for `--dry-run` comparisons), pass `--base <current-base>` explicitly — preset codes do not encode the base.

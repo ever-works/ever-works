@@ -116,7 +116,7 @@ Each extraction result includes a `readingTime` estimate calculated as `ceil(wor
 
 ## Usage in Pipelines
 
-When a source URL in a directory item points to a PDF file, the content extractor facade automatically delegates to the PDF Extractor plugin instead of the default HTML extractor. This enables:
+When a source URL in a work item points to a PDF file, the content extractor facade automatically delegates to the PDF Extractor plugin instead of the default HTML extractor. This enables:
 
 - Using research papers as source material
 - Extracting content from PDF reports and documentation
@@ -174,7 +174,7 @@ class PdfExtractorPlugin implements IPlugin, IContentExtractorPlugin {
 3. For scanned/image-based PDFs:
     - Get a Mistral AI API key from [console.mistral.ai](https://console.mistral.ai)
     - Enter the key in the plugin settings
-4. Add PDF URLs as source material when generating your directory
+4. Add PDF URLs as source material when generating your work
 
 ## Error Handling
 

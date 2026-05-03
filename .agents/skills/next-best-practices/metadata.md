@@ -82,7 +82,7 @@ export const metadata: Metadata = {
 
 Reference: https://nextjs.org/docs/app/getting-started/project-structure#metadata-file-conventions
 
-Place these files in `app/` directory (or route segments):
+Place these files in `app/` work (or route segments):
 
 | File                            | Purpose                                       |
 | ------------------------------- | --------------------------------------------- |

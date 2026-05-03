@@ -1,7 +1,7 @@
 import { IsOptional, IsString } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
-export class DeployDirectoryDto {
+export class DeployWorkDto {
     @ApiPropertyOptional({ description: 'Team scope for deployment' })
     @IsString()
     @IsOptional()

@@ -1,10 +1,14 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { randomBytes } from 'crypto';
 import { DeployFacadeService, GitFacadeService } from '@ever-works/agent/facades';
-import { DirectoryRepository } from '@ever-works/agent/database';
+import { WorkRepository } from '@ever-works/agent/database';
 import { PluginRegistryService } from '@ever-works/agent/plugins';
-import { Directory, User } from '@ever-works/agent/entities';
-import { WebsiteUpdateService, WEBSITE_TEMPLATE_CONFIG } from '@ever-works/agent/generators';
+import { Work, User } from '@ever-works/agent/entities';
+import {
+    WebsiteUpdateService,
+    getWebsiteTemplateBranch,
+    getWebsiteTemplateConfig,
+} from '@ever-works/agent/generators';
 import type { BatchDeployItemDto, BatchDeployItemResultDto } from './dto/batch-deploy.dto';
 
 interface RepoContext {
@@ -30,36 +34,37 @@ export class DeployService {
     constructor(
         private readonly deployFacade: DeployFacadeService,
         private readonly gitFacade: GitFacadeService,
-        private readonly directoryRepository: DirectoryRepository,
+        private readonly workRepository: WorkRepository,
         private readonly pluginRegistry: PluginRegistryService,
         private readonly websiteUpdateService: WebsiteUpdateService,
     ) {}
 
     /**
-     * Deploy a directory using its configured deployment provider
+     * Deploy a work using its configured deployment provider
      */
     async deploy(
-        directoryId: string,
+        workId: string,
         userId: string,
         options: { teamScope?: string },
     ): Promise<boolean> {
-        const { plugin, token, directory } = await this.deployFacade.getPluginAndToken({
+        const { plugin, token, work } = await this.deployFacade.getPluginAndToken({
             userId,
-            directoryId,
+            workId,
         });
 
-        const user = directory.user as User;
+        const user = work.user as User;
         const gitToken = await this.gitFacade.getAccessToken({
             userId: user.id,
-            providerId: directory.gitProvider,
+            providerId: work.gitProvider,
+            workId: work.id,
         });
 
         if (!gitToken) {
             throw new Error('Git provider token not available');
         }
 
-        const websiteOwner = directory.getRepoOwner('website');
-        const websiteRepo = directory.getWebsiteRepo();
+        const websiteOwner = work.getRepoOwner('website');
+        const websiteRepo = work.getWebsiteRepo();
         const ctx = await this.createRepoContext(websiteOwner, websiteRepo, gitToken);
 
         await this.enableWorkflows({
@@ -69,18 +74,18 @@ export class DeployService {
             withDelay: false,
         });
 
-        await this.setRequiredSecrets(ctx, token, directory);
+        await this.setRequiredSecrets(ctx, token, work);
         await this.setOptionalSecrets(ctx, options.teamScope, gitToken);
         await this.ensureCronSecret(ctx);
 
-        return this.dispatchWithRetry(directory, user, gitToken);
+        return this.dispatchWithRetry(work, user, gitToken);
     }
 
     /**
-     * Batch deploy multiple directories
+     * Batch deploy multiple works
      */
     async deployBatch(
-        directories: BatchDeployItemDto[],
+        works: BatchDeployItemDto[],
         userId: string,
         defaultTeamScope?: string,
     ): Promise<{
@@ -95,12 +100,12 @@ export class DeployService {
 
         const MAX_CONCURRENT = 5;
 
-        for (let i = 0; i < directories.length; i += MAX_CONCURRENT) {
-            const batch = directories.slice(i, i + MAX_CONCURRENT);
+        for (let i = 0; i < works.length; i += MAX_CONCURRENT) {
+            const batch = works.slice(i, i + MAX_CONCURRENT);
 
             const batchResults = await Promise.allSettled(
                 batch.map((item) =>
-                    this.deploySingle(item.directoryId, userId, item.teamScope || defaultTeamScope),
+                    this.deploySingle(item.workId, userId, item.teamScope || defaultTeamScope),
                 ),
             );
 
@@ -118,7 +123,7 @@ export class DeployService {
                 } else {
                     failCount++;
                     results.push({
-                        directoryId: item.directoryId,
+                        workId: item.workId,
                         slug: 'unknown',
                         status: 'error',
                         message: result.reason?.message || 'Unknown error',
@@ -126,13 +131,13 @@ export class DeployService {
                 }
             }
 
-            if (i + MAX_CONCURRENT < directories.length) {
+            if (i + MAX_CONCURRENT < works.length) {
                 await new Promise((r) => setTimeout(r, 2000));
             }
         }
 
         return {
-            totalRequested: directories.length,
+            totalRequested: works.length,
             successfullyStarted: successCount,
             failed: failCount,
             results,
@@ -140,34 +145,34 @@ export class DeployService {
     }
 
     private async deploySingle(
-        directoryId: string,
+        workId: string,
         userId: string,
         teamScope?: string,
     ): Promise<BatchDeployItemResultDto> {
         try {
-            const directory = await this.directoryRepository.findById(directoryId);
-            if (!directory) {
+            const work = await this.workRepository.findById(workId);
+            if (!work) {
                 return {
-                    directoryId,
+                    workId,
                     slug: 'unknown',
                     status: 'error',
-                    message: 'Directory not found',
+                    message: 'Work not found',
                 };
             }
 
-            const success = await this.deploy(directoryId, userId, { teamScope });
+            const success = await this.deploy(workId, userId, { teamScope });
 
             return {
-                directoryId,
-                slug: directory.slug,
+                workId,
+                slug: work.slug,
                 status: success ? 'pending' : 'error',
                 message: success ? 'Deployment started' : 'Failed to initiate deployment',
-                owner: directory.getRepoOwner('website'),
-                repository: `${directory.getRepoOwner('website')}/${directory.getWebsiteRepo()}`,
+                owner: work.getRepoOwner('website'),
+                repository: `${work.getRepoOwner('website')}/${work.getWebsiteRepo()}`,
             };
         } catch (error) {
             return {
-                directoryId,
+                workId,
                 slug: 'unknown',
                 status: 'error',
                 message: error instanceof Error ? error.message : 'Unknown error',
@@ -196,8 +201,8 @@ export class DeployService {
         return this.setActionVariable({ key, value, owner: ctx.owner, repo: ctx.repo }, ctx.token);
     }
 
-    private async setRequiredSecrets(ctx: RepoContext, deployToken: string, directory: Directory) {
-        const provider = directory.deployProvider || 'vercel';
+    private async setRequiredSecrets(ctx: RepoContext, deployToken: string, work: Work) {
+        const provider = work.deployProvider || 'vercel';
         try {
             await this.setVariable(ctx, 'DEPLOY_PROVIDER', provider);
         } catch (error) {
@@ -207,8 +212,8 @@ export class DeployService {
         }
 
         await Promise.all([
-            this.setSecret(ctx, 'TENANT_ID', directory.id),
-            this.setSecret(ctx, 'DATA_REPOSITORY', directory.getDataRepo()),
+            this.setSecret(ctx, 'TENANT_ID', work.id),
+            this.setSecret(ctx, 'DATA_REPOSITORY', work.getDataRepo()),
             this.setSecret(ctx, `${provider.toUpperCase()}_TOKEN`, deployToken),
             this.setSecret(ctx, 'DEPLOY_TOKEN', deployToken),
         ]);
@@ -240,14 +245,11 @@ export class DeployService {
         return randomBytes(this.CRON_SECRET_LENGTH).toString('hex');
     }
 
-    private async dispatchWithRetry(
-        directory: Directory,
-        user: User,
-        gitToken: string,
-    ): Promise<boolean> {
+    private async dispatchWithRetry(work: Work, user: User, gitToken: string): Promise<boolean> {
         const workflowFilesToTry = ['deploy_vercel.yaml', 'deploy_prod.yaml'];
-        const owner = directory.getRepoOwner('website');
-        const repo = directory.getWebsiteRepo();
+        const owner = work.getRepoOwner('website');
+        const repo = work.getWebsiteRepo();
+        const template = getWebsiteTemplateConfig(work.websiteTemplateId);
 
         const tryDispatch = async (): Promise<boolean> => {
             for (const workflowFile of workflowFilesToTry) {
@@ -260,7 +262,7 @@ export class DeployService {
                         {
                             workflow: workflowFile,
                             inputs: { environment: 'production' },
-                            branch: WEBSITE_TEMPLATE_CONFIG.branch,
+                            branch: template.branch,
                             owner,
                             repo,
                         },
@@ -289,8 +291,8 @@ export class DeployService {
         // If dispatch fails, update the repository
         try {
             this.logger.log(`Workflow dispatch failed. Updating repository for ${owner}/${repo}`);
-            await this.websiteUpdateService.updateRepository(directory, user);
-            await this.createTriggerCommit(directory, user);
+            await this.websiteUpdateService.updateRepository(work, user);
+            await this.createTriggerCommit(work, user);
             await this.delay(3000);
 
             const retrySuccess = await tryDispatch();
@@ -312,20 +314,25 @@ export class DeployService {
         return new Promise((resolve) => setTimeout(resolve, ms));
     }
 
-    private async createTriggerCommit(directory: Directory, user: User): Promise<void> {
-        const directoryOwner = directory.user as User;
-        const websiteOwner = directory.getRepoOwner('website');
-        const websiteRepo = directory.getWebsiteRepo();
+    private async createTriggerCommit(work: Work, user: User): Promise<void> {
+        const workOwner = work.user as User;
+        const websiteOwner = work.getRepoOwner('website');
+        const websiteRepo = work.getWebsiteRepo();
+        const template = getWebsiteTemplateConfig(work.websiteTemplateId);
 
         try {
             const repoDir = await this.gitFacade.cloneOrPull(
                 {
                     owner: websiteOwner,
                     repo: websiteRepo,
-                    branch: WEBSITE_TEMPLATE_CONFIG.branch,
-                    committer: directory.resolveCommitter(user),
+                    branch: getWebsiteTemplateBranch(template, work.websiteTemplateUseBeta),
+                    committer: work.resolveCommitter(user),
                 },
-                { userId: directoryOwner.id, providerId: directory.gitProvider },
+                {
+                    userId: workOwner.id,
+                    providerId: work.gitProvider,
+                    workId: work.id,
+                },
             );
 
             const triggerFile = `${repoDir}/.deployment-trigger`;
@@ -335,16 +342,20 @@ export class DeployService {
                 `Deployment triggered at ${new Date().toISOString()}\n`,
             );
 
-            await this.gitFacade.add(directory.gitProvider, repoDir, '.deployment-trigger');
+            await this.gitFacade.add(work.gitProvider, repoDir, '.deployment-trigger');
             await this.gitFacade.commit(
-                directory.gitProvider,
+                work.gitProvider,
                 repoDir,
                 `chore: trigger deployment\n\nTriggered by Ever Works platform`,
-                directory.resolveCommitter(user),
+                work.resolveCommitter(user),
             );
             await this.gitFacade.push(
                 { dir: repoDir },
-                { userId: directoryOwner.id, providerId: directory.gitProvider },
+                {
+                    userId: workOwner.id,
+                    providerId: work.gitProvider,
+                    workId: work.id,
+                },
             );
 
             this.logger.log(`Created trigger commit for ${websiteOwner}/${websiteRepo}`);

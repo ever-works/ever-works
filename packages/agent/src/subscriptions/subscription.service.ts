@@ -9,38 +9,34 @@ import { SubscriptionPlanRepository } from '@src/database/repositories/subscript
 import { UserSubscriptionRepository } from '@src/database/repositories/user-subscription.repository';
 import { SubscriptionPlan } from '@src/entities/subscription-plan.entity';
 import { config } from '@src/config';
-import { DirectoryScheduleAllowedCadence } from '@src/dto';
+import { WorkScheduleAllowedCadence } from '@src/dto';
 import { User } from '@src/entities/user.entity';
 import { UserRepository } from '@src/database/repositories/user.repository';
-import {
-    DirectoryScheduleBillingMode,
-    DirectoryScheduleCadence,
-    SubscriptionPlanCode,
-} from '@src/entities';
+import { WorkScheduleBillingMode, WorkScheduleCadence, SubscriptionPlanCode } from '@src/entities';
 
-const ALL_CADENCES: DirectoryScheduleCadence[] = [
-    DirectoryScheduleCadence.MONTHLY,
-    DirectoryScheduleCadence.WEEKLY,
-    DirectoryScheduleCadence.DAILY,
-    DirectoryScheduleCadence.EVERY_12_HOURS,
-    DirectoryScheduleCadence.EVERY_8_HOURS,
-    DirectoryScheduleCadence.EVERY_3_HOURS,
-    DirectoryScheduleCadence.HOURLY,
+const ALL_CADENCES: WorkScheduleCadence[] = [
+    WorkScheduleCadence.MONTHLY,
+    WorkScheduleCadence.WEEKLY,
+    WorkScheduleCadence.DAILY,
+    WorkScheduleCadence.EVERY_12_HOURS,
+    WorkScheduleCadence.EVERY_8_HOURS,
+    WorkScheduleCadence.EVERY_3_HOURS,
+    WorkScheduleCadence.HOURLY,
 ];
 
 const PLAN_SEED_DATA: Array<{
     code: SubscriptionPlanCode;
     displayName: string;
-    maxDirectories: number;
-    allowedCadences: DirectoryScheduleCadence[];
+    maxWorks: number;
+    allowedCadences: WorkScheduleCadence[];
     monthlyPrice: string;
     overagePricePerRun: string;
 }> = [
     {
         code: SubscriptionPlanCode.FREE,
         displayName: 'Free',
-        maxDirectories: 1,
-        // allowedCadences: [DirectoryScheduleCadence.MONTHLY],
+        maxWorks: 1,
+        // allowedCadences: [WorkScheduleCadence.MONTHLY],
         allowedCadences: ALL_CADENCES, // for now everything is free
         monthlyPrice: '0',
         overagePricePerRun: '10',
@@ -48,12 +44,12 @@ const PLAN_SEED_DATA: Array<{
     {
         code: SubscriptionPlanCode.STANDARD,
         displayName: 'Standard',
-        maxDirectories: 5,
+        maxWorks: 5,
         allowedCadences: [
-            DirectoryScheduleCadence.MONTHLY,
-            DirectoryScheduleCadence.WEEKLY,
-            DirectoryScheduleCadence.DAILY,
-            DirectoryScheduleCadence.EVERY_12_HOURS,
+            WorkScheduleCadence.MONTHLY,
+            WorkScheduleCadence.WEEKLY,
+            WorkScheduleCadence.DAILY,
+            WorkScheduleCadence.EVERY_12_HOURS,
         ],
         monthlyPrice: '29',
         overagePricePerRun: '8',
@@ -61,15 +57,15 @@ const PLAN_SEED_DATA: Array<{
     {
         code: SubscriptionPlanCode.PREMIUM,
         displayName: 'Premium',
-        maxDirectories: 15,
+        maxWorks: 15,
         allowedCadences: [
-            DirectoryScheduleCadence.MONTHLY,
-            DirectoryScheduleCadence.WEEKLY,
-            DirectoryScheduleCadence.DAILY,
-            DirectoryScheduleCadence.EVERY_12_HOURS,
-            DirectoryScheduleCadence.EVERY_8_HOURS,
-            DirectoryScheduleCadence.EVERY_3_HOURS,
-            DirectoryScheduleCadence.HOURLY,
+            WorkScheduleCadence.MONTHLY,
+            WorkScheduleCadence.WEEKLY,
+            WorkScheduleCadence.DAILY,
+            WorkScheduleCadence.EVERY_12_HOURS,
+            WorkScheduleCadence.EVERY_8_HOURS,
+            WorkScheduleCadence.EVERY_3_HOURS,
+            WorkScheduleCadence.HOURLY,
         ],
         monthlyPrice: '99',
         overagePricePerRun: '0',
@@ -127,7 +123,7 @@ export class SubscriptionService implements OnModuleInit {
         return this.resolveDefaultPlan();
     }
 
-    async getCadenceAllowances(user: User): Promise<DirectoryScheduleAllowedCadence[]> {
+    async getCadenceAllowances(user: User): Promise<WorkScheduleAllowedCadence[]> {
         if (!this.isEnabled()) {
             return ALL_CADENCES.map((cadence) => ({
                 cadence,
@@ -149,19 +145,19 @@ export class SubscriptionService implements OnModuleInit {
         }));
     }
 
-    getDefaultCadence(plan: SubscriptionPlan): DirectoryScheduleCadence {
-        const allowed = (plan.allowedCadences || []) as DirectoryScheduleCadence[];
+    getDefaultCadence(plan: SubscriptionPlan): WorkScheduleCadence {
+        const allowed = (plan.allowedCadences || []) as WorkScheduleCadence[];
         if (allowed.length > 0) {
             return allowed[allowed.length - 1];
         }
 
-        return DirectoryScheduleCadence.MONTHLY;
+        return WorkScheduleCadence.MONTHLY;
     }
 
     requiresUsageBilling(
-        cadence: DirectoryScheduleCadence,
+        cadence: WorkScheduleCadence,
         plan: SubscriptionPlan,
-        billingMode: DirectoryScheduleBillingMode,
+        billingMode: WorkScheduleBillingMode,
     ): boolean {
         if (!this.isEnabled()) {
             return false;
@@ -172,18 +168,18 @@ export class SubscriptionService implements OnModuleInit {
             return false;
         }
 
-        return billingMode !== DirectoryScheduleBillingMode.USAGE;
+        return billingMode !== WorkScheduleBillingMode.USAGE;
     }
 
-    private recommendationForCadence(cadence: DirectoryScheduleCadence): string {
+    private recommendationForCadence(cadence: WorkScheduleCadence): string {
         switch (cadence) {
-            case DirectoryScheduleCadence.HOURLY:
-            case DirectoryScheduleCadence.EVERY_3_HOURS:
-            case DirectoryScheduleCadence.EVERY_8_HOURS:
+            case WorkScheduleCadence.HOURLY:
+            case WorkScheduleCadence.EVERY_3_HOURS:
+            case WorkScheduleCadence.EVERY_8_HOURS:
                 return 'Premium';
-            case DirectoryScheduleCadence.EVERY_12_HOURS:
-            case DirectoryScheduleCadence.DAILY:
-            case DirectoryScheduleCadence.WEEKLY:
+            case WorkScheduleCadence.EVERY_12_HOURS:
+            case WorkScheduleCadence.DAILY:
+            case WorkScheduleCadence.WEEKLY:
                 return 'Standard';
             default:
                 return 'Free';

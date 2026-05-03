@@ -46,7 +46,7 @@ describe('DataRepository', () => {
         await fs.rm(repoDir, { recursive: true, force: true });
     });
 
-    it('counts item directories without parsing malformed item YAML', async () => {
+    it('counts item works without parsing malformed item YAML', async () => {
         const repoDir = await fs.mkdtemp(path.join(os.tmpdir(), 'data-repository-spec-'));
         const itemDir = path.join(repoDir, 'data', 'broken-item');
 
@@ -102,6 +102,23 @@ describe('DataRepository', () => {
         );
         await expect(fs.readFile(path.join(repoDir, 'config.yml'), 'utf-8')).resolves.toContain(
             'name: Generated Config',
+        );
+
+        await fs.rm(repoDir, { recursive: true, force: true });
+    });
+
+    it('uses provided default config overrides when creating config.yml', async () => {
+        const repoDir = await fs.mkdtemp(path.join(os.tmpdir(), 'data-repository-spec-'));
+
+        const repository = await DataRepository.create(repoDir, {
+            company_name: 'Compare Cloud Pricing',
+        });
+
+        await expect(repository.getConfig()).resolves.toMatchObject({
+            company_name: 'Compare Cloud Pricing',
+        });
+        await expect(fs.readFile(path.join(repoDir, 'config.yml'), 'utf-8')).resolves.toContain(
+            'company_name: Compare Cloud Pricing',
         );
 
         await fs.rm(repoDir, { recursive: true, force: true });

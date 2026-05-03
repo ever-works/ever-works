@@ -14,7 +14,7 @@ import type {
 	PipelineExecutionOptions,
 	PipelineProgressCallback,
 	PipelineResult,
-	DirectoryReference,
+	WorkReference,
 	GenerationRequest,
 	ExistingItems,
 	PluginManifest,
@@ -74,6 +74,7 @@ interface ProcessUrlExecutionResult {
 	files: string[];
 	count: number;
 	error?: string;
+	errorKind?: 'extraction' | 'empty' | 'worker' | 'aborted';
 }
 
 export class AgentPipelinePlugin implements IPlugin, IPipelinePlugin<AgentPipelineStepId>, IFormSchemaProvider {
@@ -125,8 +126,7 @@ export class AgentPipelinePlugin implements IPlugin, IPipelinePlugin<AgentPipeli
 			id: this.id,
 			name: this.name,
 			version: this.version,
-			description:
-				'Autonomous tool-based pipeline that researches and generates directory items using an AI agent',
+			description: 'Autonomous tool-based pipeline that researches and generates work items using an AI agent',
 			category: this.category,
 			capabilities: [...this.capabilities],
 			author: { name: 'Ever Works Team' },
@@ -140,7 +140,7 @@ export class AgentPipelinePlugin implements IPlugin, IPipelinePlugin<AgentPipeli
 			readme: [
 				'# Agent Pipeline Plugin',
 				'',
-				'Autonomous tool-based pipeline that researches and generates directory items.',
+				'Autonomous tool-based pipeline that researches and generates work items.',
 				'',
 				'## How it works',
 				'',
@@ -182,7 +182,7 @@ export class AgentPipelinePlugin implements IPlugin, IPipelinePlugin<AgentPipeli
 	}
 
 	async execute(
-		directory: DirectoryReference,
+		work: WorkReference,
 		request: GenerationRequest,
 		existing: ExistingItems,
 		options?: PipelineExecutionOptions,
@@ -197,7 +197,7 @@ export class AgentPipelinePlugin implements IPlugin, IPipelinePlugin<AgentPipeli
 			);
 		}
 
-		const userId = execContext.user?.id ?? directory.user?.id;
+		const userId = execContext.user?.id ?? work.user?.id;
 		if (!userId) {
 			return this.handleError(new Error('User ID is required'), startTime);
 		}
@@ -218,7 +218,7 @@ export class AgentPipelinePlugin implements IPlugin, IPipelinePlugin<AgentPipeli
 		const logger = this.context?.logger ?? console;
 		const onLogEntry = options?.onLogEntry;
 
-		const facadeOptions: FacadeOptions = { userId, directoryId: directory.id };
+		const facadeOptions: FacadeOptions = { userId, workId: work.id };
 
 		const tokenAccumulator = new TokenUsageAccumulator();
 		let workspacePath: string | null = null;
@@ -242,10 +242,10 @@ export class AgentPipelinePlugin implements IPlugin, IPipelinePlugin<AgentPipeli
 				);
 			}
 
-			workspacePath = await createWorkspace(userId, directory.id, existing, directory, request);
+			workspacePath = await createWorkspace(userId, work.id, existing, work, request);
 			const dataSourceItems = await this.queryDataSources(
 				execContext,
-				directory,
+				work,
 				userId,
 				request,
 				existing,
@@ -267,7 +267,7 @@ export class AgentPipelinePlugin implements IPlugin, IPipelinePlugin<AgentPipeli
 				workspacePath,
 				execContext,
 				facadeOptions,
-				directory,
+				work,
 				request,
 				existing,
 				onProgress,
@@ -408,7 +408,7 @@ export class AgentPipelinePlugin implements IPlugin, IPipelinePlugin<AgentPipeli
 
 	private async queryDataSources(
 		execContext: NonNullable<PipelineExecutionOptions['execContext']>,
-		directory: DirectoryReference,
+		work: WorkReference,
 		userId: string,
 		request: GenerationRequest,
 		existing: ExistingItems,
@@ -418,12 +418,12 @@ export class AgentPipelinePlugin implements IPlugin, IPipelinePlugin<AgentPipeli
 		if (!execContext.dataSourceFacade?.isConfigured()) return [];
 
 		try {
-			const keywords = extractSimpleKeywords(request.prompt, directory.name);
+			const keywords = extractSimpleKeywords(request.prompt, work.name);
 			const result = await execContext.dataSourceFacade.queryAll({
-				directoryId: directory.id,
+				workId: work.id,
 				userId,
 				pluginConfig: request.config as Record<string, Record<string, unknown>> | undefined,
-				filterContext: { prompt: request.prompt, subject: directory.name, keywords }
+				filterContext: { prompt: request.prompt, subject: work.name, keywords }
 			});
 
 			for (const err of result.errors) {
@@ -450,7 +450,7 @@ export class AgentPipelinePlugin implements IPlugin, IPipelinePlugin<AgentPipeli
 		workspacePath: string,
 		execContext: NonNullable<PipelineExecutionOptions['execContext']>,
 		facadeOptions: FacadeOptions,
-		directory: DirectoryReference,
+		work: WorkReference,
 		request: GenerationRequest,
 		existing: ExistingItems,
 		onProgress: PipelineProgressCallback | undefined,
@@ -504,9 +504,9 @@ export class AgentPipelinePlugin implements IPlugin, IPipelinePlugin<AgentPipeli
 			`Context windows — parent: ${parentMaxContextTokens} tokens, worker: ${workerMaxContextTokens} tokens`
 		);
 
-		const directoryContext = {
-			directoryName: directory.name,
-			directoryDescription: directory.description,
+		const workContext = {
+			workName: work.name,
+			workDescription: work.description,
 			requestPrompt: request.prompt
 		};
 
@@ -524,7 +524,7 @@ export class AgentPipelinePlugin implements IPlugin, IPipelinePlugin<AgentPipeli
 			workerMaxContextTokens,
 			parentModel,
 			parentMaxContextTokens,
-			directoryContext,
+			workContext,
 			existing,
 			onProgress,
 			totalSteps: AGENT_PIPELINE_STEP_IDS.length,
@@ -536,7 +536,7 @@ export class AgentPipelinePlugin implements IPlugin, IPipelinePlugin<AgentPipeli
 			onLogEntry
 		});
 
-		const promptOptions = { directory, request, existing };
+		const promptOptions = { work, request, existing };
 		const promptFacade = execContext.promptFacade;
 
 		const sysTemplate = (
@@ -557,7 +557,7 @@ export class AgentPipelinePlugin implements IPlugin, IPipelinePlugin<AgentPipeli
 
 		this.context?.logger.log('[User Prompt] ' + userPrompt);
 
-		const settings = await resolveSettings(this.context, facadeOptions.userId, directory.id);
+		const settings = await resolveSettings(this.context, facadeOptions.userId, work.id);
 		const maxSteps = (settings.maxSteps as number) || DEFAULT_MAX_STEPS;
 
 		const repairToolCall = createToolCallRepairFn(parentModel, logger);
@@ -652,11 +652,16 @@ export class AgentPipelinePlugin implements IPlugin, IPipelinePlugin<AgentPipeli
 				processUrlFailures.sampleErrors.length > 0
 					? ` Errors: ${processUrlFailures.sampleErrors.join('; ')}`
 					: '';
+			const causes =
+				processUrlFailures.failureCauses.length > 0
+					? ` Causes: ${processUrlFailures.failureCauses.join(', ')}.`
+					: '';
 
 			if (processUrlFailures.failedUrls === processUrlFailures.totalUrls) {
 				warnings.push(
 					`URL processing had failures (${processUrlFailures.failedUrls}/${processUrlFailures.totalUrls} URLs failed). ` +
 						'Some relevant items may be missing.' +
+						causes +
 						samples
 				);
 			}
@@ -789,10 +794,12 @@ export class AgentPipelinePlugin implements IPlugin, IPipelinePlugin<AgentPipeli
 		totalUrls: number;
 		failedUrls: number;
 		sampleErrors: string[];
+		failureCauses: string[];
 	} {
 		let totalUrls = 0;
 		let failedUrls = 0;
 		const uniqueErrors = new Set<string>();
+		const failuresByKind = new Map<string, number>();
 
 		for (const step of steps) {
 			const toolResults = (step as { toolResults?: unknown[] }).toolResults;
@@ -808,6 +815,8 @@ export class AgentPipelinePlugin implements IPlugin, IPipelinePlugin<AgentPipeli
 				if (typeof result.error === 'string' && result.error.trim()) {
 					failedUrls++;
 					uniqueErrors.add(result.error.trim());
+					const kind = result.errorKind ?? this.classifyProcessUrlError(result.error);
+					failuresByKind.set(kind, (failuresByKind.get(kind) ?? 0) + 1);
 				}
 			}
 		}
@@ -815,8 +824,32 @@ export class AgentPipelinePlugin implements IPlugin, IPipelinePlugin<AgentPipeli
 		return {
 			totalUrls,
 			failedUrls,
-			sampleErrors: [...uniqueErrors].slice(0, 3)
+			sampleErrors: [...uniqueErrors].slice(0, 3),
+			failureCauses: [...failuresByKind.entries()].map(([kind, count]) => this.formatFailureCause(kind, count))
 		};
+	}
+
+	private classifyProcessUrlError(error: string): string {
+		const normalized = error.toLowerCase();
+		if (normalized.includes('content extraction')) return 'extraction';
+		if (normalized.includes('no items extracted') || normalized.includes('empty content')) return 'empty';
+		if (normalized.includes('aborted')) return 'aborted';
+		return 'worker';
+	}
+
+	private formatFailureCause(kind: string, count: number): string {
+		const plural = count === 1 ? '' : 's';
+
+		switch (kind) {
+			case 'extraction':
+				return `${count} extraction failure${plural}`;
+			case 'empty':
+				return `${count} extracted page${plural} with no items`;
+			case 'aborted':
+				return `${count} aborted URL${plural}`;
+			default:
+				return `${count} worker failure${plural}`;
+		}
 	}
 
 	private async runScreenshotCapture(

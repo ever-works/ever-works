@@ -9,9 +9,9 @@ sidebar_position: 30
 
 ## Overview
 
-The Integration module in `@ever-works/agent` encompasses the systems that connect a directory to external sources and community contributions. It includes three major sub-systems: the **Import system** for bootstrapping directories from external repositories, the **Community PR processor** for handling community-submitted pull requests, and the **OAuth facade** for managing third-party authentication flows.
+The Integration module in `@ever-works/agent` encompasses the systems that connect a work to external sources and community contributions. It includes three major sub-systems: the **Import system** for bootstrapping works from external repositories, the **Community PR processor** for handling community-submitted pull requests, and the **OAuth facade** for managing third-party authentication flows.
 
-Together, these systems allow directories to be populated from existing data, accept community contributions via Git pull requests, and authenticate with external services like GitHub for API access.
+Together, these systems allow works to be populated from existing data, accept community contributions via Git pull requests, and authenticate with external services like GitHub for API access.
 
 ## Module Structure
 
@@ -30,8 +30,8 @@ packages/agent/src/
   facades/
     oauth.facade.ts                   # OAuth provider facade
   tasks/
-    directory-import-dispatcher.ts    # Import dispatcher interface
-    directory-import.types.ts         # Import payload and result types
+    work-import-dispatcher.ts    # Import dispatcher interface
+    work-import.types.ts         # Import payload and result types
 ```
 
 ## Key Classes and Services
@@ -48,7 +48,7 @@ Imports from an existing Ever Works data repository:
 
 1. Clones the source repository via `GitFacadeService`
 2. Reads items, categories, tags, and config from the source using `DataRepository`
-3. Initializes the target directory's data repository with the imported data
+3. Initializes the target work's data repository with the imported data
 4. Initializes markdown and website repositories from templates
 5. Tracks import metadata (source URL, import timestamp, source type)
 
@@ -64,13 +64,13 @@ Imports from an "awesome list" style README repository:
 
 **`linkExistingDataRepo(options)`**
 
-Links a directory to an existing data repository without copying:
+Links a work to an existing data repository without copying:
 
 1. Analyzes the repository structure via `SourceRepoAnalyzerService`
 2. Verifies write access to the repository
 3. Clones and reads the existing data to count items and categories
 4. Optionally creates missing markdown and website repositories
-5. Links the directory to the existing data repo as-is
+5. Links the work to the existing data repo as-is
 
 **`executeBySourceType(options)`**
 
@@ -87,7 +87,7 @@ Dispatcher method that routes to the appropriate import method based on `sourceT
 Analyzes external repositories to determine their type and structure:
 
 - **`parseGitUrl(url)`** -- parse a repository URL into `{ owner, repo, provider }`. Supports GitHub, GitLab, and Bitbucket URL patterns.
-- **`analyzeRepository(sourceUrl, token?)`** -- analyze a repository's structure and detect its type. Checks for `config.yml` + `data/` directory (data repo), or README with list patterns (awesome list).
+- **`analyzeRepository(sourceUrl, token?)`** -- analyze a repository's structure and detect its type. Checks for `config.yml` + `data/` work (data repo), or README with list patterns (awesome list).
 - **`analyzeForLinking(sourceUrl, token)`** -- extended analysis for the link-existing workflow. Checks write access, counts items/categories, and detects related repos (markdown, website).
 - **`checkSlugConflicts(owner, slug, token)`** -- check if repository names would conflict with existing repos. Suggests alternative slugs if conflicts are found.
 - **`getReadmeContent(sourceUrl, token?)`** -- fetch README content with multiple fallback strategies.
@@ -96,13 +96,13 @@ Analyzes external repositories to determine their type and structure:
 
 The analyzer classifies repositories by examining their contents:
 
-- `data_repo` -- has `config.yml` (or `.yaml`) AND a `data/` directory
+- `data_repo` -- has `config.yml` (or `.yaml`) AND a `data/` work
 - `awesome_readme` -- has a README with section headers and 5+ list-formatted links
 - `null` -- structure not recognized
 
 **Multi-file awesome list detection:**
 
-The analyzer also detects "multi-file" awesome lists where categories are split into subdirectories, each with their own README. These are identified by 3+ directory links in the main README.
+The analyzer also detects "multi-file" awesome lists where categories are split into subworks, each with their own README. These are identified by 3+ work links in the main README.
 
 #### `AwesomeReadmeParserService`
 
@@ -117,29 +117,29 @@ Parses markdown README files from "awesome list" repositories using AI to extrac
 
 #### `CommunityPrProcessorService`
 
-Processes community-submitted pull requests to the directory's main repository, extracting new items via AI and adding them to the data repository:
+Processes community-submitted pull requests to the work's main repository, extracting new items via AI and adding them to the data repository:
 
-**`processAllDirectories()`**
+**`processAllWorks()`**
 
-Batch processor that finds all directories with `communityPrEnabled === true` and processes their open PRs:
+Batch processor that finds all works with `communityPrEnabled === true` and processes their open PRs:
 
-1. Queries all directories with community PR processing enabled
-2. For each directory, loads the PR processing state (processed PR numbers, total items added)
-3. Calls `processDirectory()` for each
+1. Queries all works with community PR processing enabled
+2. For each work, loads the PR processing state (processed PR numbers, total items added)
+3. Calls `processWork()` for each
 4. Returns aggregate results with processed count and any errors
 
-**`processDirectory(directory, state?, autoClose?)`**
+**`processWork(work, state?, autoClose?)`**
 
-Processes unprocessed PRs for a single directory:
+Processes unprocessed PRs for a single work:
 
-1. Lists open PRs on the directory's main repository
+1. Lists open PRs on the work's main repository
 2. Filters out already-processed PRs using the `communityPrState.processedPrNumbers` set
 3. For each unprocessed PR, calls `processSinglePr()`
-4. Updates the directory's community PR state with new processed numbers
+4. Updates the work's community PR state with new processed numbers
 5. Caps `processedPrNumbers` at 500 entries to prevent unbounded growth
-6. Atomically increments the directory's `itemsCount`
+6. Atomically increments the work's `itemsCount`
 
-**`processSinglePr(directory, pr, gitOptions, autoClose)` (private)**
+**`processSinglePr(work, pr, gitOptions, autoClose)` (private)**
 
 Processes a single PR:
 
@@ -148,7 +148,7 @@ Processes a single PR:
 3. Clones the data repository to read existing categories
 4. Sends the PR context to the AI facade with a structured extraction prompt
 5. Validates extracted items against a Zod schema
-6. Writes extracted items to the data repository (creates item directories, writes data.json and content.md)
+6. Writes extracted items to the data repository (creates item works, writes data.json and content.md)
 7. Commits and pushes changes to the data repository
 8. Comments on the PR with the list of added items
 9. Optionally closes the PR if `autoClose` is enabled
@@ -203,23 +203,23 @@ OAuth tokens are stored in the `OAuthToken` entity via `OAuthTokenRepository`. T
 ### ImportExecutorService
 
 ```typescript
-executeBySourceType(options: ExecuteBySourceTypeOptions): Promise<DirectoryImportResult>
-importFromDataRepo(options: ImportFromDataRepoOptions): Promise<DirectoryImportResult>
-importFromAwesomeReadme(options: ImportFromAwesomeReadmeOptions): Promise<DirectoryImportResult>
-linkExistingDataRepo(options: LinkExistingDataRepoOptions): Promise<DirectoryImportResult>
+executeBySourceType(options: ExecuteBySourceTypeOptions): Promise<WorkImportResult>
+importFromDataRepo(options: ImportFromDataRepoOptions): Promise<WorkImportResult>
+importFromAwesomeReadme(options: ImportFromAwesomeReadmeOptions): Promise<WorkImportResult>
+linkExistingDataRepo(options: LinkExistingDataRepoOptions): Promise<WorkImportResult>
 ```
 
-### DirectoryImportResult
+### WorkImportResult
 
 ```typescript
-interface DirectoryImportResult {
+interface WorkImportResult {
 	success: boolean;
-	directoryId: string;
+	workId: string;
 	itemsImported?: number;
 	categoriesImported?: number;
 	tagsImported?: number;
 	error?: string;
-	errorCode?: DirectoryImportErrorCode;
+	errorCode?: WorkImportErrorCode;
 	metrics?: ImportMetrics;
 }
 ```
@@ -237,8 +237,8 @@ getReadmeContent(sourceUrl: string, token?: string): Promise<{ content: string; 
 ### CommunityPrProcessorService
 
 ```typescript
-processAllDirectories(): Promise<CommunityPrProcessingResult>
-processDirectory(directory: Directory, state?: CommunityPrState, autoClose?: boolean): Promise<number>
+processAllWorks(): Promise<CommunityPrProcessingResult>
+processWork(work: Work, state?: CommunityPrState, autoClose?: boolean): Promise<number>
 ```
 
 ### OAuthFacadeService
@@ -258,17 +258,17 @@ revokeToken(userId: string, providerId: string): Promise<void>
 
 ### Import Dispatch
 
-Imports can be dispatched to background workers via the `DIRECTORY_IMPORT_DISPATCHER` Symbol token:
+Imports can be dispatched to background workers via the `WORK_IMPORT_DISPATCHER` Symbol token:
 
 ```typescript
-interface DirectoryImportDispatcher {
-	dispatchDirectoryImport(payload: DirectoryImportPayload): Promise<string | null>;
+interface WorkImportDispatcher {
+	dispatchWorkImport(payload: WorkImportPayload): Promise<string | null>;
 }
 ```
 
 ### Community PR State
 
-The `communityPrState` JSON field on the Directory entity tracks processing progress:
+The `communityPrState` JSON field on the Work entity tracks processing progress:
 
 ```typescript
 interface CommunityPrState {
@@ -279,10 +279,10 @@ interface CommunityPrState {
 }
 ```
 
-### Directory Import Error Codes
+### Work Import Error Codes
 
 ```typescript
-enum DirectoryImportErrorCode {
+enum WorkImportErrorCode {
 	CLONE_FAILED = 'CLONE_FAILED',
 	PARSE_FAILED = 'PARSE_FAILED',
 	CREATE_REPO_FAILED = 'CREATE_REPO_FAILED',
@@ -309,7 +309,7 @@ URLs with `.git` suffix or trailing slashes are automatically cleaned.
 | ------------------------------ | ----------------------------------------------------------------------------- |
 | `@ever-works/agent/facades`    | `GitFacadeService`, `AiFacadeService`, `OAuthFacadeService`                   |
 | `@ever-works/agent/generators` | `DataGeneratorService`, `MarkdownGeneratorService`, `WebsiteGeneratorService` |
-| `@ever-works/agent/database`   | `DirectoryRepository`, `OAuthTokenRepository`                                 |
+| `@ever-works/agent/database`   | `WorkRepository`, `OAuthTokenRepository`                                      |
 | `@ever-works/plugin`           | `IOAuthPlugin`, `PLUGIN_CAPABILITIES`, plugin interfaces                      |
 | `@ever-works/contracts`        | `Category`, `Tag` type definitions                                            |
 | `zod`                          | Schema validation for AI extraction output                                    |
@@ -322,7 +322,7 @@ URLs with `.git` suffix or trailing slashes are automatically cleaned.
 import { ImportExecutorService } from '@ever-works/agent/import';
 
 const result = await importExecutor.importFromDataRepo({
-	directory,
+	work,
 	user,
 	source: { owner: 'example-org', repo: 'tools-data' },
 	token: gitAccessToken
@@ -337,7 +337,7 @@ if (result.success) {
 
 ```typescript
 const result = await importExecutor.importFromAwesomeReadme({
-	directory,
+	work,
 	user,
 	sourceUrl: 'https://github.com/sindresorhus/awesome-nodejs',
 	token: gitAccessToken,
@@ -362,11 +362,11 @@ console.log(`Public: ${analysis.isPublic}`);
 ```typescript
 import { CommunityPrProcessorService } from '@ever-works/agent/community-pr';
 
-// Process all enabled directories (typically called by a cron job)
-const result = await processor.processAllDirectories();
+// Process all enabled works (typically called by a cron job)
+const result = await processor.processAllWorks();
 console.log(`Processed ${result.processed} items from community PRs`);
 result.errors.forEach((e) => {
-	console.error(`Directory ${e.directoryId}: ${e.error}`);
+	console.error(`Work ${e.workId}: ${e.error}`);
 });
 ```
 

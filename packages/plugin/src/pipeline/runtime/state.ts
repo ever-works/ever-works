@@ -151,20 +151,20 @@ export function reportPipelineItemProgress(
 export async function resolveScopedSettings(
 	context: PluginContext | null,
 	userId: string,
-	directoryId: string
+	workId: string
 ): Promise<PluginSettings> {
 	if (!context) return {};
 
 	try {
-		const [userSettings, directorySettings] = await Promise.all([
+		const [userSettings, workSettings] = await Promise.all([
 			context.getSettings('user', userId),
-			context.getSettings('directory', directoryId)
+			context.getSettings('work', workId)
 		]);
 
 		const merged: PluginSettings = { ...userSettings };
-		for (const key in directorySettings) {
-			if (directorySettings[key] !== undefined && directorySettings[key] !== null) {
-				merged[key] = directorySettings[key];
+		for (const key in workSettings) {
+			if (workSettings[key] !== undefined && workSettings[key] !== null) {
+				merged[key] = workSettings[key];
 			}
 		}
 

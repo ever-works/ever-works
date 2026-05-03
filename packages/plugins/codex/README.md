@@ -1,6 +1,6 @@
 # @ever-works/codex-plugin
 
-Full pipeline plugin that delegates directory generation to the [Codex CLI](https://github.com/openai/codex). A single Codex session researches, creates, and updates directory item JSON files inside a temporary workspace.
+Full pipeline plugin that delegates work generation to the [Codex CLI](https://github.com/openai/codex). A single Codex session researches, creates, and updates work item JSON files inside a temporary workspace.
 
 ## Pipeline Steps
 
@@ -35,7 +35,7 @@ If no API key is configured, the plugin can use local Codex CLI auth stored in a
 codex login
 ```
 
-The plugin materializes an isolated `CODEX_HOME` for each Ever Works user under its managed temp directory, so local Codex auth does not rely on a shared `~/.codex/auth.json`.
+The plugin materializes an isolated `CODEX_HOME` for each Ever Works user under its managed temp work, so local Codex auth does not rely on a shared `~/.codex/auth.json`.
 
 The onboarding UI provides a 3-step flow: choose auth mode, configure credentials, and verify the connection.
 
@@ -72,7 +72,7 @@ Prompt keys:
 - `codex.system` - System prompt template
 - `codex.user` - User prompt template
 
-Both support variable substitution for directory context, existing items, categories, tags, and brands.
+Both support variable substitution for work context, existing items, categories, tags, and brands.
 
 ## Binary Management
 

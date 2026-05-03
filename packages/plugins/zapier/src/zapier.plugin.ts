@@ -12,7 +12,7 @@ import type {
 	PipelineExecutionOptions,
 	PipelineProgressCallback,
 	PipelineResult,
-	DirectoryReference,
+	WorkReference,
 	GenerationRequest,
 	ExistingItems,
 	PluginManifest,
@@ -59,10 +59,10 @@ import { README } from './readme.js';
 /**
  * Zapier Automation Plugin
  *
- * Pipeline plugin that triggers a Zapier action during directory generation.
+ * Pipeline plugin that triggers a Zapier action during work generation.
  * Supports two result shapes: a structured `{ items: [...] }` contract for
  * custom Zaps, and a native-record mode where raw Zapier action output is
- * projected onto directory items via a field mapping.
+ * projected onto work items via a field mapping.
  */
 export class ZapierPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvider {
 	readonly id = 'zapier';
@@ -203,7 +203,7 @@ export class ZapierPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvid
 			id: this.id,
 			name: this.name,
 			version: this.version,
-			description: 'Pipeline plugin that triggers Zapier actions during directory generation',
+			description: 'Pipeline plugin that triggers Zapier actions during work generation',
 			category: this.category,
 			capabilities: [...this.capabilities],
 			author: { name: 'Ever Works Team' },
@@ -216,8 +216,7 @@ export class ZapierPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvid
 				includeInOnboarding: true,
 				onboardingPriority: 2,
 				completionFields: ['clientId', 'clientSecret'],
-				onboardingDescription:
-					'Connect Zapier to trigger actions across 9,000+ apps during directory generation.'
+				onboardingDescription: 'Connect Zapier to trigger actions across 9,000+ apps during work generation.'
 			},
 			readme: README,
 			homepage: 'https://docs.zapier.com/sdk',
@@ -256,7 +255,7 @@ export class ZapierPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvid
 	private _lastAbortController: AbortController | null = null;
 
 	async execute(
-		directory: DirectoryReference,
+		work: WorkReference,
 		request: GenerationRequest,
 		existing: ExistingItems,
 		options?: PipelineExecutionOptions,
@@ -297,7 +296,7 @@ export class ZapierPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvid
 		};
 
 		const logger = this.context?.logger ?? console;
-		const userId = directory.user?.id;
+		const userId = work.user?.id;
 
 		if (!userId) {
 			return handleError(new Error('User ID is required'));
@@ -306,7 +305,7 @@ export class ZapierPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvid
 		let timeoutHandle: ReturnType<typeof setTimeout> | undefined;
 
 		try {
-			const pluginSettings = await resolveSettings(this.context, userId, directory.id);
+			const pluginSettings = await resolveSettings(this.context, userId, work.id);
 			const config = (request.config || {}) as Record<string, unknown>;
 
 			const zapierSettings = this.resolveZapierSettings(pluginSettings, config);
@@ -353,7 +352,7 @@ export class ZapierPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvid
 			setState('prepare-payload', 'running');
 			reportProgress(onProgress, 1, 10, 'Prepare Action Payload');
 
-			const payload = buildWorkflowPayload({ directory, request, existing, config });
+			const payload = buildWorkflowPayload({ work, request, existing, config });
 
 			logger.log(
 				`Payload prepared: ${payload.metadata.targetItems} target items, ` +
@@ -396,7 +395,7 @@ export class ZapierPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvid
 
 			if (zapierSettings.resultShape === 'side-effect') {
 				// Fire-and-forget action (send email, post message, create task, …). The action
-				// executed successfully but produces no directory items — treat as success with 0 items.
+				// executed successfully but produces no work items — treat as success with 0 items.
 				logger.log(
 					`Side-effect action completed — no items parsed. Response: ${safeStringify(execResult.data)}`
 				);
@@ -420,7 +419,7 @@ export class ZapierPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvid
 				request,
 				options?.execContext,
 				items,
-				{ userId, directoryId: directory.id },
+				{ userId, workId: work.id },
 				signal,
 				onProgress,
 				logger

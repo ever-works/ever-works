@@ -10,9 +10,9 @@ interface ChatWelcomeProps {
 
 const suggestionKeys = ['s1', 's2', 's3', 's4'] as const;
 
-type CapabilityKey = 'directoryCreation' | 'webResearch' | 'contentGeneration' | 'smartSuggestions';
+type CapabilityKey = 'workCreation' | 'webResearch' | 'contentGeneration' | 'smartSuggestions';
 type CapabilityDescKey =
-    | 'directoryCreationDesc'
+    | 'workCreationDesc'
     | 'webResearchDesc'
     | 'contentGenerationDesc'
     | 'smartSuggestionsDesc';
@@ -22,7 +22,7 @@ const capabilities: Array<{
     title: CapabilityKey;
     description: CapabilityDescKey;
 }> = [
-    { icon: FolderSearch, title: 'directoryCreation', description: 'directoryCreationDesc' },
+    { icon: FolderSearch, title: 'workCreation', description: 'workCreationDesc' },
     { icon: Globe, title: 'webResearch', description: 'webResearchDesc' },
     { icon: Sparkles, title: 'contentGeneration', description: 'contentGenerationDesc' },
     { icon: Lightbulb, title: 'smartSuggestions', description: 'smartSuggestionsDesc' },

@@ -19,8 +19,8 @@ export interface PluginSchemaExtensions {
 	readonly 'x-secret'?: boolean;
 	/** Environment variable fallback (checked when no other setting is found) */
 	readonly 'x-envVar'?: string;
-	/** Setting scope: global, user, or directory */
-	readonly 'x-scope'?: 'global' | 'user' | 'directory';
+	/** Setting scope: global, user, or work */
+	readonly 'x-scope'?: 'global' | 'user' | 'work';
 	/** Whether field is admin-only (not visible to regular users) */
 	readonly 'x-adminOnly'?: boolean;
 	/** Whether field should be hidden from the settings UI entirely */

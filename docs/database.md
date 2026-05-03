@@ -73,24 +73,24 @@ DATABASE_NAME=ever_works
 
 The platform defines 16 TypeORM entities:
 
-| Entity                         | Table                          | Description                                                                                                                |
-| ------------------------------ | ------------------------------ | -------------------------------------------------------------------------------------------------------------------------- |
-| **Directory**                  | `directories`                  | Core directory with name, slug, description, generation status, deployment state, repository config, community PR settings |
-| **User**                       | `users`                        | User account with email, password, subscription info                                                                       |
-| **DirectoryMember**            | `directory_members`            | Many-to-many relationship between users and directories with roles (owner, manager, editor, viewer)                        |
-| **DirectoryGenerationHistory** | `directory_generation_history` | Tracks each generation run: method, status, metrics, item counts, duration                                                 |
-| **DirectorySchedule**          | `directory_schedules`          | Scheduled update configuration: cadence, status, billing mode, failure tracking                                            |
-| **DirectoryAdvancedPrompts**   | `directory_advanced_prompts`   | Per-directory custom prompts for pipeline steps                                                                            |
-| **OAuthToken**                 | `oauth_tokens`                 | OAuth provider tokens with access/refresh tokens and metadata                                                              |
-| **RefreshToken**               | `refresh_tokens`               | JWT refresh tokens with family-based rotation, revocation tracking, and device info                                        |
-| **Notification**               | `notifications`                | User notifications with type, category, read/dismissed state, expiration                                                   |
-| **SubscriptionPlan**           | `subscription_plans`           | Plan definitions: max directories, allowed cadences, pricing                                                               |
-| **UserSubscription**           | `user_subscriptions`           | Active subscriptions: plan, status, billing provider (Stripe/manual), period info                                          |
-| **UsageLedgerEntry**           | `usage_ledger_entries`         | Usage tracking: trigger type, billing mode, units, amount, settlement status                                               |
-| **CacheEntry**                 | `cache_entries`                | Key-value cache entries with TTL expiration                                                                                |
-| **PluginEntity**               | `plugins`                      | Plugin registry: metadata, status, global settings                                                                         |
-| **UserPluginEntity**           | `user_plugins`                 | Per-user plugin settings and API keys                                                                                      |
-| **DirectoryPluginEntity**      | `directory_plugins`            | Per-directory plugin configuration and overrides                                                                           |
+| Entity                    | Table                     | Description                                                                                                           |
+| ------------------------- | ------------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| **Work**                  | `works`                   | Core work with name, slug, description, generation status, deployment state, repository config, community PR settings |
+| **User**                  | `users`                   | User account with email, password, subscription info                                                                  |
+| **WorkMember**            | `work_members`            | Many-to-many relationship between users and works with roles (owner, manager, editor, viewer)                         |
+| **WorkGenerationHistory** | `work_generation_history` | Tracks each generation run: method, status, metrics, item counts, duration                                            |
+| **WorkSchedule**          | `work_schedules`          | Scheduled update configuration: cadence, status, billing mode, failure tracking                                       |
+| **WorkAdvancedPrompts**   | `work_advanced_prompts`   | Per-work custom prompts for pipeline steps                                                                            |
+| **OAuthToken**            | `oauth_tokens`            | OAuth provider tokens with access/refresh tokens and metadata                                                         |
+| **RefreshToken**          | `refresh_tokens`          | JWT refresh tokens with family-based rotation, revocation tracking, and device info                                   |
+| **Notification**          | `notifications`           | User notifications with type, category, read/dismissed state, expiration                                              |
+| **SubscriptionPlan**      | `subscription_plans`      | Plan definitions: max works, allowed cadences, pricing                                                                |
+| **UserSubscription**      | `user_subscriptions`      | Active subscriptions: plan, status, billing provider (Stripe/manual), period info                                     |
+| **UsageLedgerEntry**      | `usage_ledger_entries`    | Usage tracking: trigger type, billing mode, units, amount, settlement status                                          |
+| **CacheEntry**            | `cache_entries`           | Key-value cache entries with TTL expiration                                                                           |
+| **PluginEntity**          | `plugins`                 | Plugin registry: metadata, status, global settings                                                                    |
+| **UserPluginEntity**      | `user_plugins`            | Per-user plugin settings and API keys                                                                                 |
+| **WorkPluginEntity**      | `work_plugins`            | Per-work plugin configuration and overrides                                                                           |
 
 ## Auto-Sync
 

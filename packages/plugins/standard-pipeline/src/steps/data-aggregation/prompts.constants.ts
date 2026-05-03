@@ -1,7 +1,7 @@
 // Prompts for deduplication and extraction
 export const DEDUPLICATOR_PROMPT = `
-You are directory website builder and your task is to deduplicate items.
-Directory topic: {task}
+You are work website builder and your task is to deduplicate items.
+Work topic: {task}
 
 Our crawlers found some items, but some of them MIGHT be duplicated.
 Every item has name, description, and optionally URL of item's official website/repository.
@@ -35,7 +35,7 @@ Here is the list of items to deduplicate:
 ` as const;
 
 export const EXTRACT_NEW_ITEMS_PROMPT = `
-You are directory website builder and your task is to extract new items from the list.
+You are work website builder and your task is to extract new items from the list.
 We don't want to show duplicates to our users, so return only new items that don't exist in existing items list.
 
 <rules>

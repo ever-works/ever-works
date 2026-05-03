@@ -7,11 +7,11 @@ sidebar_position: 6
 
 # Creating a Search Plugin
 
-This guide covers everything you need to build a search plugin for the Ever Works platform. Search plugins provide web search capabilities that the generation pipeline uses to discover information about directory items. By the end, you will have a fully working search plugin with settings, filtering, pagination, optional content extraction, and tests.
+This guide covers everything you need to build a search plugin for the Ever Works platform. Search plugins provide web search capabilities that the generation pipeline uses to discover information about work items. By the end, you will have a fully working search plugin with settings, filtering, pagination, optional content extraction, and tests.
 
 ## What Search Plugins Do
 
-During directory generation, the **standard pipeline** runs a "web-search" step that queries the active search plugin for each item in the directory. The search facade (`ISearchFacade`) routes these queries to whichever search plugin the user has selected. Your plugin receives a `SearchOptions` object, calls an external search API, and returns normalized `SearchResponse` data that the pipeline consumes downstream for content enrichment, source validation, and AI-powered description generation.
+During work generation, the **standard pipeline** runs a "web-search" step that queries the active search plugin for each item in the work. The search facade (`ISearchFacade`) routes these queries to whichever search plugin the user has selected. Your plugin receives a `SearchOptions` object, calls an external search API, and returns normalized `SearchResponse` data that the pipeline consumes downstream for content enrichment, source validation, and AI-powered description generation.
 
 ```mermaid
 sequenceDiagram
@@ -41,7 +41,7 @@ Some search plugins also implement `IContentExtractorPlugin` to provide URL cont
 
 ## Project Scaffolding
 
-Create a new directory under `packages/plugins/`:
+Create a new work under `packages/plugins/`:
 
 ```
 packages/plugins/my-search/
@@ -550,15 +550,15 @@ The `settingsSchema` property uses JSON Schema extended with Ever Works custom p
 
 ### Custom schema extensions
 
-| Extension     | Type                                | Purpose                                                                                         |
-| ------------- | ----------------------------------- | ----------------------------------------------------------------------------------------------- |
-| `x-secret`    | `boolean`                           | Field value is encrypted at rest, never returned in API responses, rendered as a password input |
-| `x-envVar`    | `string`                            | Environment variable fallback checked when no user or admin value is saved                      |
-| `x-scope`     | `'global' \| 'user' \| 'directory'` | Which settings scope this field belongs to                                                      |
-| `x-widget`    | `string`                            | UI widget hint (e.g., `textarea`, `select`, `toggle`)                                           |
-| `x-adminOnly` | `boolean`                           | Only visible to admins                                                                          |
-| `x-hidden`    | `boolean`                           | Never shown in the UI                                                                           |
-| `x-showIf`    | `{ field, value }`                  | Conditional visibility based on another field                                                   |
+| Extension     | Type                           | Purpose                                                                                         |
+| ------------- | ------------------------------ | ----------------------------------------------------------------------------------------------- |
+| `x-secret`    | `boolean`                      | Field value is encrypted at rest, never returned in API responses, rendered as a password input |
+| `x-envVar`    | `string`                       | Environment variable fallback checked when no user or admin value is saved                      |
+| `x-scope`     | `'global' \| 'user' \| 'work'` | Which settings scope this field belongs to                                                      |
+| `x-widget`    | `string`                       | UI widget hint (e.g., `textarea`, `select`, `toggle`)                                           |
+| `x-adminOnly` | `boolean`                      | Only visible to admins                                                                          |
+| `x-hidden`    | `boolean`                      | Never shown in the UI                                                                           |
+| `x-showIf`    | `{ field, value }`             | Conditional visibility based on another field                                                   |
 
 ### Example: advanced settings schema
 
@@ -619,7 +619,7 @@ All search plugins use `configurationMode: 'hybrid'`:
 Settings are **not** stored on the plugin instance. They arrive via `options.settings` on every `search()` call, already resolved by the platform through this priority chain:
 
 ```
-User override > Directory override > Admin default > Environment variable > Schema default
+User override > Work override > Admin default > Environment variable > Schema default
 ```
 
 Always read settings from `options.settings`, never from `this.context.getSettings()` inside `search()`. The context method is for `isAvailable()` checks where no call-time options exist.
@@ -1195,7 +1195,7 @@ describe('MySearchPlugin', () => {
 ### Running tests
 
 ```bash
-# From the plugin directory
+# From the plugin work
 cd packages/plugins/my-search
 pnpm test
 

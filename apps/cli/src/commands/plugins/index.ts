@@ -224,7 +224,7 @@ async function handleEnable(plugin: UserPluginResponse): Promise<void> {
     let enableData: {
         settings?: Record<string, unknown>;
         secretSettings?: Record<string, unknown>;
-        autoEnableForDirectories?: boolean;
+        autoEnableForWorks?: boolean;
     } = {};
 
     // Check if plugin has required settings that need configuration
@@ -280,12 +280,12 @@ async function handleEnable(plugin: UserPluginResponse): Promise<void> {
         {
             type: 'confirm',
             name: 'autoEnable',
-            message: 'Auto-enable for all directories?',
+            message: 'Auto-enable for all works?',
             default: false,
         },
     ]);
     if (autoEnable) {
-        enableData.autoEnableForDirectories = true;
+        enableData.autoEnableForWorks = true;
     }
 
     const spinner = ora('Enabling plugin...').start();

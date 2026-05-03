@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { DomainDetectionStep } from '../steps/domain-detection.step';
-import type { StepExecutionContext, DirectoryReference, GenerationRequest } from '@ever-works/plugin';
+import type { StepExecutionContext, WorkReference, GenerationRequest } from '@ever-works/plugin';
 import type { MutableGenerationContext } from '../context/index.js';
 
 describe('DomainDetectionStep', () => {
@@ -32,15 +32,15 @@ describe('DomainDetectionStep', () => {
 		getDefaultProvider: vi.fn()
 	});
 
-	const createMockDirectory = (): DirectoryReference => ({
+	const createMockWork = (): WorkReference => ({
 		id: 'test-dir-id',
-		slug: 'test-directory',
-		name: 'Test Directory'
+		slug: 'test-work',
+		name: 'Test Work'
 	});
 
 	const createMockRequest = (overrides?: Partial<GenerationRequest>): GenerationRequest =>
 		({
-			prompt: 'Build a directory about vector databases',
+			prompt: 'Build a work about vector databases',
 			name: 'Vector Databases',
 			config: {
 				...((overrides?.config as Record<string, unknown>) || {})
@@ -50,7 +50,7 @@ describe('DomainDetectionStep', () => {
 
 	const createMockContext = (overrides?: Partial<MutableGenerationContext>): MutableGenerationContext =>
 		({
-			directory: createMockDirectory(),
+			work: createMockWork(),
 			request: createMockRequest(),
 			metrics: { steps: {} },
 			domainAnalysis: undefined,
@@ -66,7 +66,7 @@ describe('DomainDetectionStep', () => {
 			logger: createMockLogger(),
 			aiFacade: createMockAiFacade(),
 			user: { id: 'test-user-id' },
-			directory: { id: 'test-dir-id' }
+			work: { id: 'test-dir-id' }
 		} as unknown as StepExecutionContext;
 	});
 
@@ -172,7 +172,7 @@ describe('DomainDetectionStep', () => {
 
 			const call = mockExecContext.aiFacade.askJson.mock.calls[0];
 			expect(call[2].variables.name).toBe('Vector Databases');
-			expect(call[2].variables.description).toBe('Build a directory about vector databases');
+			expect(call[2].variables.description).toBe('Build a work about vector databases');
 		});
 
 		it('should accumulate metrics correctly', async () => {

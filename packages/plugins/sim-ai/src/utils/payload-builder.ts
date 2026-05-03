@@ -1,9 +1,9 @@
-import type { DirectoryReference, GenerationRequest, ExistingItems } from '@ever-works/plugin';
+import type { WorkReference, GenerationRequest, ExistingItems } from '@ever-works/plugin';
 import type { SimWorkflowInput } from '../types.js';
 import { DEFAULT_TARGET_ITEMS } from '../types.js';
 
 interface PayloadOptions {
-	directory: DirectoryReference;
+	work: WorkReference;
 	request: GenerationRequest;
 	existing: ExistingItems;
 	config: Record<string, unknown>;
@@ -14,14 +14,14 @@ interface PayloadOptions {
  * Uses inline data by default, with optional GitHub repo reference.
  */
 export function buildWorkflowPayload(options: PayloadOptions): SimWorkflowInput {
-	const { directory, request, existing, config } = options;
+	const { work, request, existing, config } = options;
 
 	const payload: SimWorkflowInput = {
 		metadata: {
-			directoryId: directory.id,
-			directoryName: directory.name,
-			directorySlug: directory.slug,
-			directoryDescription: directory.description,
+			workId: work.id,
+			workName: work.name,
+			workSlug: work.slug,
+			workDescription: work.description,
 			prompt: request.prompt,
 			generationMethod: request.generationMethod,
 			targetItems: (config.target_items as number) ?? DEFAULT_TARGET_ITEMS

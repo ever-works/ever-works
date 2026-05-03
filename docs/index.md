@@ -8,19 +8,19 @@ slug: /
 
 # Ever Works Platform
 
-The Ever Works Platform is the backend infrastructure that powers AI-generated directory websites. It provides REST APIs, an AI generation pipeline, database management, and deployment tooling — all organized as a **Turborepo + pnpm workspaces** monorepo.
+The Ever Works Platform is the backend infrastructure that powers AI-generated work websites. It provides REST APIs, an AI generation pipeline, database management, and deployment tooling — all organized as a **Turborepo + pnpm workspaces** monorepo.
 
 ## Components
 
-| Component                | Technology             | Description                                                                |
-| ------------------------ | ---------------------- | -------------------------------------------------------------------------- |
-| **API**                  | NestJS 11              | REST API with JWT auth, directory management, AI conversations, deployment |
-| **Web Dashboard**        | Next.js 16             | Admin interface for managing directories and content                       |
-| **CLI**                  | Commander.js + esbuild | Standalone command-line tool for directory operations                      |
-| **Internal CLI**         | nest-commander         | Internal tooling for maintenance tasks                                     |
-| **@packages/agent**      | LangChain, TypeORM     | AI agents, data generation, database, git operations, deployment           |
-| **@packages/monitoring** | Sentry, PostHog        | Error tracking and product analytics                                       |
-| **@packages/tasks**      | Trigger.dev            | Background job processing                                                  |
+| Component                | Technology             | Description                                                           |
+| ------------------------ | ---------------------- | --------------------------------------------------------------------- |
+| **API**                  | NestJS 11              | REST API with JWT auth, work management, AI conversations, deployment |
+| **Web Dashboard**        | Next.js 16             | Admin interface for managing works and content                        |
+| **CLI**                  | Commander.js + esbuild | Standalone command-line tool for work operations                      |
+| **Internal CLI**         | nest-commander         | Internal tooling for maintenance tasks                                |
+| **@packages/agent**      | LangChain, TypeORM     | AI agents, data generation, database, git operations, deployment      |
+| **@packages/monitoring** | Sentry, PostHog        | Error tracking and product analytics                                  |
+| **@packages/tasks**      | Trigger.dev            | Background job processing                                             |
 
 ## Documentation
 

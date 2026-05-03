@@ -1,13 +1,13 @@
 ---
 id: import-system
-title: Directory Import System
+title: Work Import System
 sidebar_label: Import System
 sidebar_position: 1
 ---
 
-# Directory Import System
+# Work Import System
 
-The import system allows users to populate directories from external sources rather than starting from scratch. It supports three import modes: importing from an existing data repository, parsing an Awesome List README, and linking to an existing data repository.
+The import system allows users to populate works from external sources rather than starting from scratch. It supports three import modes: importing from an existing data repository, parsing an Awesome List README, and linking to an existing data repository.
 
 ## Architecture
 
@@ -28,20 +28,20 @@ Imports from a structured Ever Works data repository that already contains items
 **Flow:**
 
 1. Clone the source repository via `GitFacadeService.cloneOrPull()`.
-2. Create a `DataRepository` instance from the cloned directory.
+2. Create a `DataRepository` instance from the cloned work.
 3. Read items, categories, tags, and config from the repository.
 4. Validate that items exist (return error if zero items found).
-5. Initialize the target directory with `DataGeneratorService.initializeWithImportedData()`.
+5. Initialize the target work with `DataGeneratorService.initializeWithImportedData()`.
 6. Initialize markdown and website generators.
 7. Return success with import counts.
 
 **Required structure in source repo:**
 
 ```
-config.yml          # Directory configuration
+config.yml          # Work configuration
 categories.yml      # Category definitions
 data/
-  item-slug-1/      # One directory per item
+  item-slug-1/      # One work per item
     item.yml         # Item metadata
     README.md        # Item description
   item-slug-2/
@@ -60,7 +60,7 @@ Imports from any GitHub "Awesome List" -- a curated README with categorized link
     - **Phase 1**: Extract category structure from headings.
     - **Phase 2**: Extract items from each category section.
     - **Phase 3**: Deduplicate items and extract unique tags.
-4. Initialize the target directory with the parsed data.
+4. Initialize the target work with the parsed data.
 5. Initialize markdown and website generators.
 
 ### Link Existing Repository (`link_existing`)
@@ -122,9 +122,9 @@ Supports multiple Git providers:
 
 ### Repository Type Detection
 
-Analyzes the root directory contents to classify repositories:
+Analyzes the root work contents to classify repositories:
 
-1. **Data repo**: Has `config.yml` + `data/` directory.
+1. **Data repo**: Has `config.yml` + `data/` work.
 2. **Awesome README**: Has `README.md` that passes the "awesome list" heuristic (section headers + multiple categorized links).
 3. **Unknown**: Neither pattern matches.
 
@@ -134,7 +134,7 @@ For non-data repos, the analyzer checks if companion repositories exist followin
 
 ## Error Handling
 
-The import system defines typed error codes in `DirectoryImportErrorCode`:
+The import system defines typed error codes in `WorkImportErrorCode`:
 
 | Error Code             | When                                       |
 | ---------------------- | ------------------------------------------ |
@@ -144,4 +144,4 @@ The import system defines typed error codes in `DirectoryImportErrorCode`:
 | `REPO_ACCESS_DENIED`   | User lacks access to the source repository |
 | `AI_EXTRACTION_FAILED` | AI-powered extraction encountered an error |
 
-Each import method returns a `DirectoryImportResult` with `success`, `directoryId`, item/category/tag counts on success, or `error` and `errorCode` on failure.
+Each import method returns a `WorkImportResult` with `success`, `workId`, item/category/tag counts on success, or `error` and `errorCode` on failure.

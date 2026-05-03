@@ -15,7 +15,7 @@ The Ever Works platform uses TypeORM with support for multiple database backends
                      Application Layer
                            |
                   +--------v---------+
-                  |  Repository Layer |   (e.g., DirectoryRepository)
+                  |  Repository Layer |   (e.g., WorkRepository)
                   +--------+---------+
                            |
                   +--------v---------+
@@ -80,15 +80,15 @@ DatabaseConfigurations.test();
 All database access goes through injectable repository services that wrap TypeORM:
 
 ```typescript
-// packages/agent/src/database/repositories/directory.repository.ts
+// packages/agent/src/database/repositories/work.repository.ts
 @Injectable()
-export class DirectoryRepository {
+export class WorkRepository {
 	constructor(
-		@InjectRepository(Directory)
-		private readonly repo: Repository<Directory>
+		@InjectRepository(Work)
+		private readonly repo: Repository<Work>
 	) {}
 
-	async findByIdWithRelations(id: string): Promise<Directory | null> {
+	async findByIdWithRelations(id: string): Promise<Work | null> {
 		return this.repo.findOne({
 			where: { id },
 			relations: ['members', 'advancedPrompts']
@@ -113,13 +113,13 @@ The `DatabaseModule` registers all repositories and exports them for use across 
 		TypeOrmModule.forFeature(ENTITIES)
 	],
 	providers: [
-		DirectoryRepository,
+		WorkRepository,
 		UserRepository
 		// ... all repositories
 	],
 	exports: [
 		TypeOrmModule,
-		DirectoryRepository,
+		WorkRepository,
 		UserRepository
 		// ... all repositories
 	]
@@ -135,13 +135,13 @@ Always load related entities in a single query rather than lazy-loading:
 
 ```typescript
 // BAD: N+1 problem
-const directories = await repo.find();
-for (const dir of directories) {
-	dir.members = await memberRepo.findByDirectoryId(dir.id); // N extra queries
+const works = await repo.find();
+for (const dir of works) {
+	dir.members = await memberRepo.findByWorkId(dir.id); // N extra queries
 }
 
 // GOOD: Single query with join
-const directories = await repo.find({
+const works = await repo.find({
 	relations: ['members']
 });
 ```
@@ -151,13 +151,13 @@ const directories = await repo.find({
 When you need selective fields or conditions on joined tables:
 
 ```typescript
-const directories = await this.repo
-	.createQueryBuilder('directory')
-	.leftJoinAndSelect('directory.members', 'member')
-	.leftJoinAndSelect('directory.advancedPrompts', 'prompts')
-	.where('directory.userId = :userId', { userId })
+const works = await this.repo
+	.createQueryBuilder('work')
+	.leftJoinAndSelect('work.members', 'member')
+	.leftJoinAndSelect('work.advancedPrompts', 'prompts')
+	.where('work.userId = :userId', { userId })
 	.andWhere('member.role = :role', { role: 'admin' })
-	.orderBy('directory.createdAt', 'DESC')
+	.orderBy('work.createdAt', 'DESC')
 	.take(20)
 	.getMany();
 ```
@@ -169,9 +169,9 @@ Avoid loading full entities when only specific fields are required:
 ```typescript
 // Select specific columns to reduce payload size
 const summary = await this.repo
-	.createQueryBuilder('directory')
-	.select(['directory.id', 'directory.name', 'directory.status'])
-	.where('directory.userId = :userId', { userId })
+	.createQueryBuilder('work')
+	.select(['work.id', 'work.name', 'work.status'])
+	.where('work.userId = :userId', { userId })
 	.getMany();
 ```
 
@@ -182,11 +182,11 @@ const summary = await this.repo
 Define indexes directly on entities using TypeORM decorators:
 
 ```typescript
-@Entity('directories')
+@Entity('works')
 @Index(['userId', 'status']) // Composite index
 @Index(['createdAt']) // Sort index
 @Index(['name'], { unique: false }) // Search index
-export class Directory {
+export class Work {
 	@PrimaryGeneratedColumn('uuid')
 	id: string;
 
@@ -204,14 +204,14 @@ export class Directory {
 
 ### Recommended Indexes by Table
 
-| Table                | Index Columns               | Purpose                         |
-| -------------------- | --------------------------- | ------------------------------- |
-| `directories`        | `(userId, status)`          | List user directories by status |
-| `directory_members`  | `(directoryId, userId)`     | Membership lookups              |
-| `refresh_tokens`     | `(token)`                   | Token validation                |
-| `refresh_tokens`     | `(userId, revoked)`         | Active token lookup             |
-| `generation_history` | `(directoryId, createdAt)`  | Generation history timeline     |
-| `notifications`      | `(userId, read, createdAt)` | Unread notification feed        |
+| Table                | Index Columns               | Purpose                     |
+| -------------------- | --------------------------- | --------------------------- |
+| `works`              | `(userId, status)`          | List user works by status   |
+| `work_members`       | `(workId, userId)`          | Membership lookups          |
+| `refresh_tokens`     | `(token)`                   | Token validation            |
+| `refresh_tokens`     | `(userId, revoked)`         | Active token lookup         |
+| `generation_history` | `(workId, createdAt)`       | Generation history timeline |
+| `notifications`      | `(userId, read, createdAt)` | Unread notification feed    |
 
 ## Connection Pooling (PostgreSQL)
 

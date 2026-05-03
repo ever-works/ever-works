@@ -1,5 +1,5 @@
 export interface FacadeOptions {
 	readonly userId: string;
-	readonly directoryId?: string;
+	readonly workId?: string;
 	readonly providerOverride?: string;
 }

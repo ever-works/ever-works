@@ -7,7 +7,7 @@ sidebar_position: 27
 
 # Notion Page Extractor Plugin
 
-The Notion Extractor plugin extracts content from Notion pages and converts it to clean markdown for use as source material during directory generation. It supports both public pages (via the free Splitbee API) and private pages (via the official Notion API).
+The Notion Extractor plugin extracts content from Notion pages and converts it to clean markdown for use as source material during work generation. It supports both public pages (via the free Splitbee API) and private pages (via the official Notion API).
 
 **Source:** `packages/plugins/notion-extractor/src/notion-extractor.plugin.ts`
 
@@ -177,7 +177,7 @@ Settings are resolved through the standard 4-level plugin settings hierarchy:
 
 ```mermaid
 flowchart TB
-    D["Directory-level settings<br/>(per-directory override)"] --> U["User-level settings<br/>(user's API key)"]
+    D["Work-level settings<br/>(per-work override)"] --> U["User-level settings<br/>(user's API key)"]
     U --> A["Admin-level settings<br/>(platform default key)"]
     A --> E["Environment variables"]
 
@@ -187,11 +187,11 @@ flowchart TB
     style E fill:#f87171,color:#000
 ```
 
-A user might set their own Notion API key at the user level, while the admin provides a default key at the admin level. Directory-level overrides allow per-directory API keys if needed.
+A user might set their own Notion API key at the user level, while the admin provides a default key at the admin level. Work-level overrides allow per-work API keys if needed.
 
 ## How It Works in the Pipeline
 
-When a directory's source URLs include Notion pages, the content extraction facade delegates to this plugin:
+When a work's source URLs include Notion pages, the content extraction facade delegates to this plugin:
 
 1. The facade calls `canExtract(url)` for each source URL.
 2. For Notion URLs, the facade calls `extract({ url, settings })`.
@@ -206,7 +206,7 @@ When a directory's source URLs include Notion pages, the content extraction faca
    a. Create a Notion integration at [notion.so/my-integrations](https://www.notion.so/my-integrations).
    b. Share the target Notion pages with your integration.
    c. Enter the integration API key in the plugin settings.
-4. Add Notion page URLs as source material when generating your directory.
+4. Add Notion page URLs as source material when generating your work.
 
 ## Troubleshooting
 

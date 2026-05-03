@@ -212,9 +212,9 @@ The controller method runs with validated, transformed parameters and the authen
 
 ```typescript
 @Post()
-async createDirectory(
+async createWork(
     @CurrentUser() user: JwtPayload,
-    @Body() createDto: CreateDirectoryDto,
+    @Body() createDto: CreateWorkDto,
 ) {
     return this.service.create(user.sub, createDto);
 }
@@ -260,9 +260,9 @@ If an error escapes all interceptors, NestJS built-in exception filters convert 
 @Module({
 	/* ... */
 })
-export class DirectoriesModule implements NestModule {
+export class WorksModule implements NestModule {
 	configure(consumer: MiddlewareConsumer) {
-		consumer.apply(RequestLoggerMiddleware).forRoutes('directories');
+		consumer.apply(RequestLoggerMiddleware).forRoutes('works');
 	}
 }
 ```
@@ -282,7 +282,7 @@ export class AdminController {
 ```typescript
 @UseInterceptors(CacheInterceptor)
 @Get('popular')
-async getPopularDirectories() {
+async getPopularWorks() {
     // Response will be cached
 }
 ```

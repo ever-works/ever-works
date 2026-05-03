@@ -21,12 +21,12 @@ interface Logger {
 	debug?(message: string, ...args: unknown[]): void;
 }
 
-export function getWorkspacePath(userId: string, directoryId: string): string {
-	return getCliWorkspacePath(BASE_TEMP_DIR, userId, directoryId);
+export function getWorkspacePath(userId: string, workId: string): string {
+	return getCliWorkspacePath(BASE_TEMP_DIR, userId, workId);
 }
 
-export function createWorkspace(userId: string, directoryId: string): Promise<string> {
-	return createCliWorkspace(BASE_TEMP_DIR, userId, directoryId);
+export function createWorkspace(userId: string, workId: string): Promise<string> {
+	return createCliWorkspace(BASE_TEMP_DIR, userId, workId);
 }
 
 export const seedExistingItems = seedCliExistingItems;

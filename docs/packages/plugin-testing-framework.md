@@ -150,7 +150,7 @@ const context = createMockPluginContext({
 		apiKey: 'test-key',
 		model: 'gpt-4'
 	},
-	directorySettings: {
+	workSettings: {
 		model: 'gpt-3.5-turbo'
 	},
 	envVars: {
@@ -356,7 +356,7 @@ describe('GitHubPlugin', () => {
 		await harness.load(context);
 		const plugin = harness.getPlugin();
 		const dir = await plugin.cloneRepository('owner', 'repo');
-		harness.assert(dir !== null, 'Should return directory path');
+		harness.assert(dir !== null, 'Should return work path');
 	});
 });
 ```

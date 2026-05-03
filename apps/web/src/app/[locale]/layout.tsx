@@ -12,12 +12,12 @@ import { APP_NAME } from '@/lib/constants';
 export const metadata: Metadata = {
     title: {
         template: `%s | ${APP_NAME}`,
-        default: `${APP_NAME} - Directory Builder`,
+        default: `${APP_NAME} — Workshop for AI`,
     },
     description:
         process.env.NEXT_PUBLIC_SITE_DESCRIPTION ||
         process.env.APP_DESCRIPTION ||
-        'A SaaS platform for building and managing directories',
+        'An agentic runtime that autonomously builds and maintains content-rich web apps and Git repositories',
 };
 
 export default async function RootLayout({

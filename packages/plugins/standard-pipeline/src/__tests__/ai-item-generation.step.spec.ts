@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { AiItemGenerationStep } from '../steps/ai-item-generation.step';
-import type { StepExecutionContext, DirectoryReference, GenerationRequest } from '@ever-works/plugin';
+import type { StepExecutionContext, WorkReference, GenerationRequest } from '@ever-works/plugin';
 import type { MutableGenerationContext } from '../context/index.js';
 
 describe('AiItemGenerationStep', () => {
@@ -25,16 +25,16 @@ describe('AiItemGenerationStep', () => {
 		getDefaultProvider: vi.fn()
 	});
 
-	const createMockDirectory = (): DirectoryReference => ({
+	const createMockWork = (): WorkReference => ({
 		id: 'test-dir-id',
-		slug: 'test-directory',
-		name: 'Test Directory'
+		slug: 'test-work',
+		name: 'Test Work'
 	});
 
 	const createMockRequest = (overrides?: Partial<GenerationRequest>): GenerationRequest =>
 		({
 			prompt: 'Test prompt',
-			name: 'Test Directory',
+			name: 'Test Work',
 			config: {
 				ai_first_generation_enabled: true,
 				target_keywords: [],
@@ -45,7 +45,7 @@ describe('AiItemGenerationStep', () => {
 
 	const createMockContext = (overrides?: Partial<MutableGenerationContext>): MutableGenerationContext =>
 		({
-			directory: createMockDirectory(),
+			work: createMockWork(),
 			request: createMockRequest(),
 			featuredItemHints: [],
 			metrics: { steps: {} },
@@ -63,7 +63,7 @@ describe('AiItemGenerationStep', () => {
 			logger: createMockLogger(),
 			aiFacade: createMockAiFacade(),
 			user: { id: 'test-user-id' },
-			directory: { id: 'test-dir-id' }
+			work: { id: 'test-dir-id' }
 		} as unknown as StepExecutionContext;
 	});
 

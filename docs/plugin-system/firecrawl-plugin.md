@@ -199,9 +199,9 @@ Rate limit tracking is not performed client-side (`getRateLimitInfo()` returns `
 
 ## Usage in the Platform
 
-Firecrawl is particularly valuable for directories that reference JavaScript-heavy websites. During generation:
+Firecrawl is particularly valuable for works that reference JavaScript-heavy websites. During generation:
 
-1. **Search** finds relevant pages about each directory item.
+1. **Search** finds relevant pages about each work item.
 2. **Content extraction** scrapes those pages -- including SPAs and dynamically-rendered content -- into clean markdown for enriching item descriptions.
 
 ```mermaid

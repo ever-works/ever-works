@@ -270,7 +270,7 @@ export class SerpApiSearchPlugin implements IPlugin, ISearchPlugin {
 				'',
 				'## How it works in Ever Works',
 				'',
-				'When enabled and set as the active search provider, SerpAPI is used during directory generation to find information about each item. It can search across multiple engines to gather diverse source material.',
+				'When enabled and set as the active search provider, SerpAPI is used during work generation to find information about each item. It can search across multiple engines to gather diverse source material.',
 				'',
 				'## Getting started',
 				'',
@@ -278,7 +278,7 @@ export class SerpApiSearchPlugin implements IPlugin, ISearchPlugin {
 				'2. Copy your API key from the SerpAPI dashboard',
 				'3. Enter the key in the **API Key** field below',
 				'4. Select your preferred search engine',
-				'5. Enable this plugin to use it for directory generation'
+				'5. Enable this plugin to use it for work generation'
 			].join('\n')
 		};
 	}

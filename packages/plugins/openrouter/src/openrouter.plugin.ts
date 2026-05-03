@@ -238,7 +238,7 @@ export class OpenRouterPlugin extends BaseAiProvider {
 				'',
 				'## How it works in Ever Works',
 				'',
-				'OpenRouter is the default AI provider. During directory generation, it handles content creation, item descriptions, categorization, and summarization. It also powers the conversational AI assistant and structured data extraction. You can configure three model tiers — simple, standard, and complex — to balance cost and output quality across different pipeline steps.',
+				'OpenRouter is the default AI provider. During work generation, it handles content creation, item descriptions, categorization, and summarization. It also powers the conversational AI assistant and structured data extraction. You can configure three model tiers — simple, standard, and complex — to balance cost and output quality across different pipeline steps.',
 				'',
 				'## Getting started',
 				'',

@@ -23,15 +23,15 @@ All templates share a consistent design system with a branded header, main conte
 
 ## Template Inventory
 
-| Template File             | Event Class                | Event Name                 | Trigger                            |
-| ------------------------- | -------------------------- | -------------------------- | ---------------------------------- |
-| `signup-confirmation.hbs` | `UserCreatedEvent`         | `user.created`             | User registers a new account       |
-| `forgot-password.hbs`     | `UserForgotPasswordEvent`  | `user.forgot_password`     | User requests password reset       |
-| `password-changed.hbs`    | `UserPasswordChangedEvent` | `user.password_changed`    | User successfully changes password |
-| `welcome.hbs`             | `UserConfirmedEvent`       | `user.confirmed`           | User confirms email address        |
-| `new-device-login.hbs`    | `UserNewDeviceLoginEvent`  | `user.new_device_login`    | Login detected from new device     |
-| `account-deletion.hbs`    | `UserAccountDeletionEvent` | `user.delete_account`      | User requests account deletion     |
-| `member-invitation.hbs`   | `MemberInvitedEvent`       | `directory.member_invited` | User is invited to a directory     |
+| Template File             | Event Class                | Event Name              | Trigger                            |
+| ------------------------- | -------------------------- | ----------------------- | ---------------------------------- |
+| `signup-confirmation.hbs` | `UserCreatedEvent`         | `user.created`          | User registers a new account       |
+| `forgot-password.hbs`     | `UserForgotPasswordEvent`  | `user.forgot_password`  | User requests password reset       |
+| `password-changed.hbs`    | `UserPasswordChangedEvent` | `user.password_changed` | User successfully changes password |
+| `welcome.hbs`             | `UserConfirmedEvent`       | `user.confirmed`        | User confirms email address        |
+| `new-device-login.hbs`    | `UserNewDeviceLoginEvent`  | `user.new_device_login` | Login detected from new device     |
+| `account-deletion.hbs`    | `UserAccountDeletionEvent` | `user.delete_account`   | User requests account deletion     |
+| `member-invitation.hbs`   | `MemberInvitedEvent`       | `work.member_invited`   | User is invited to a work          |
 
 ## Global Context Variables
 
@@ -125,16 +125,16 @@ Sent after a user confirms their email. Includes onboarding steps and a CTA to t
 
 **Context Variables:**
 
-| Variable       | Type     | Description                    |
-| -------------- | -------- | ------------------------------ |
-| `firstName`    | `string` | User's display name            |
-| `dashboardUrl` | `string` | Link to create first directory |
+| Variable       | Type     | Description               |
+| -------------- | -------- | ------------------------- |
+| `firstName`    | `string` | User's display name       |
+| `dashboardUrl` | `string` | Link to create first work |
 
 The template displays a three-step getting-started guide:
 
-1. Create your first directory
+1. Create your first work
 2. Generate with AI
-3. Deploy your directory
+3. Deploy your work
 
 ### 5. New Device Login (`new-device-login.hbs`)
 
@@ -178,19 +178,19 @@ The template includes a prominent warning box listing what will be permanently d
 
 ### 7. Member Invitation (`member-invitation.hbs`)
 
-Sent when a user is invited to collaborate on a directory.
+Sent when a user is invited to collaborate on a work.
 
 **Context Variables:**
 
-| Variable        | Type     | Description                 |
-| --------------- | -------- | --------------------------- |
-| `inviteeName`   | `string` | Invited user's name         |
-| `inviterName`   | `string` | Name of the person inviting |
-| `directoryName` | `string` | Name of the directory       |
-| `roleName`      | `string` | Assigned role (formatted)   |
-| `directoryUrl`  | `string` | Link to the directory       |
+| Variable      | Type     | Description                 |
+| ------------- | -------- | --------------------------- |
+| `inviteeName` | `string` | Invited user's name         |
+| `inviterName` | `string` | Name of the person inviting |
+| `workName`    | `string` | Name of the work            |
+| `roleName`    | `string` | Assigned role (formatted)   |
+| `workUrl`     | `string` | Link to the work            |
 
-The template displays an info box with a table layout showing directory name, assigned role (with a styled badge), and inviter name.
+The template displays an info box with a table layout showing work name, assigned role (with a styled badge), and inviter name.
 
 ## Handlebars Patterns Used
 
@@ -222,7 +222,7 @@ To customize email templates:
 
 ### Adding a New Template
 
-1. Create a new `.hbs` file in the templates directory
+1. Create a new `.hbs` file in the templates work
 2. Define a new event class in `apps/api/src/events/index.ts`
 3. Add an `@OnEvent` handler in `MailService`
 4. Emit the event from the relevant service using `EventEmitter2`

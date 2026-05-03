@@ -17,9 +17,9 @@ sidebar_position: 60
 
 ## Overview
 
-The SIM AI Workflows plugin lets you delegate the entire directory generation process to a [SIM AI](https://www.sim.ai) workflow. SIM AI is an open-source visual workflow builder — you design AI agent workflows by connecting blocks in a visual editor rather than writing code.
+The SIM AI Workflows plugin lets you delegate the entire work generation process to a [SIM AI](https://www.sim.ai) workflow. SIM AI is an open-source visual workflow builder — you design AI agent workflows by connecting blocks in a visual editor rather than writing code.
 
-When you select SIM AI as the pipeline, the platform sends your directory context (name, prompt, existing items) to a SIM workflow that you've designed, the workflow runs on SIM's infrastructure, and the results are collected back into your directory as structured items with categories, tags, and brands.
+When you select SIM AI as the pipeline, the platform sends your work context (name, prompt, existing items) to a SIM workflow that you've designed, the workflow runs on SIM's infrastructure, and the results are collected back into your work as structured items with categories, tags, and brands.
 
 ### When to Use SIM AI
 
@@ -38,7 +38,7 @@ SIM AI is the right choice when:
 | **Where does AI run?**          | Your AI provider plugin                   | Your AI provider plugin                   | Anthropic API      | SIM's infrastructure              |
 | **What providers do you need?** | AI, Search, Screenshot, Content Extractor | AI, Search, Screenshot, Content Extractor | Screenshot only    | Screenshot only (optional)        |
 | **Setup effort**                | None                                      | None                                      | None               | Requires SIM account + workflow   |
-| **Best for**                    | Broad, structured directories             | Exploratory discovery                     | Advanced reasoning | Custom logic, specialized domains |
+| **Best for**                    | Broad, structured works                   | Exploratory discovery                     | Advanced reasoning | Custom logic, specialized domains |
 
 Since SIM AI handles AI and search internally through your workflow, you **do not need** AI provider or search provider plugins configured in Ever Works. The only optional Ever Works provider is screenshot (if you want the platform to capture screenshots after the workflow completes).
 
@@ -50,21 +50,21 @@ Go to [sim.ai](https://www.sim.ai) and sign up for an account. SIM offers a free
 
 ### 2. Build Your Workflow in SIM Studio
 
-Open SIM Studio and create a new workflow. Your workflow needs to do three things: receive input from Ever Works, generate directory items, and return them in the expected format.
+Open SIM Studio and create a new workflow. Your workflow needs to do three things: receive input from Ever Works, generate work items, and return them in the expected format.
 
 **Configure the Start block:**
 
 The Start block is where your workflow receives input from the plugin. Add three fields of type `object`:
 
-1. **`metadata`** — contains the directory name, description, prompt, and target item count.
-2. **`existingSummary`** — contains a summary of items already in the directory (for deduplication). This is optional and may not be present if the directory is empty.
+1. **`metadata`** — contains the work name, description, prompt, and target item count.
+2. **`existingSummary`** — contains a summary of items already in the work (for deduplication). This is optional and may not be present if the work is empty.
 3. **`workflowParams`** — contains any custom key-value pairs you pass from the generator form.
 
 You access these in subsequent blocks using SIM's variable syntax: `<start.metadata>`, `<start.existingSummary>`, `<start.workflowParams>`.
 
 **Design the workflow logic:**
 
-How you build the middle of your workflow is entirely up to you. A typical directory generation workflow might look like this:
+How you build the middle of your workflow is entirely up to you. A typical work generation workflow might look like this:
 
 ```mermaid
 flowchart TD
@@ -79,7 +79,7 @@ flowchart TD
 
 Common blocks you might use:
 
-- **Agent block** — an AI agent that can reason, use tools (web search, URL reader), and produce structured output. This is the most powerful option for directory generation.
+- **Agent block** — an AI agent that can reason, use tools (web search, URL reader), and produce structured output. This is the most powerful option for work generation.
 - **Search block** — performs web searches and returns results.
 - **HTTP block** — calls external APIs (your own services, databases, etc.).
 - **LLM block** — calls a language model for text generation or classification.
@@ -124,7 +124,7 @@ If you don't return these optional arrays, the plugin derives categories, tags, 
 :::tip Using SIM Studio's AI Chat
 SIM Studio has a built-in AI chat that can generate workflow templates from a description. Paste this prompt to get a starter workflow:
 
-> Build a workflow that generates directory listing items. The Start block has three object fields: metadata (accessed via `<start.metadata>`, contains prompt, directoryName, directoryDescription, targetItems), existingSummary (optional, accessed via `<start.existingSummary>`, contains existing items to avoid duplicates), and workflowParams (optional, accessed via `<start.workflowParams>`, custom key-value pairs). Use web search to find real items with valid URLs. Generate up to targetItems new items. Return a JSON object with an "items" array where each item has: name, description, url, category, tags.
+> Build a workflow that generates work listing items. The Start block has three object fields: metadata (accessed via `<start.metadata>`, contains prompt, workName, workDescription, targetItems), existingSummary (optional, accessed via `<start.existingSummary>`, contains existing items to avoid duplicates), and workflowParams (optional, accessed via `<start.workflowParams>`, custom key-value pairs). Use web search to find real items with valid URLs. Generate up to targetItems new items. Return a JSON object with an "items" array where each item has: name, description, url, category, tags.
 > :::
 
 ### 3. Deploy Your Workflow
@@ -144,22 +144,22 @@ The workflow must be deployed before the plugin can use it. If you edit the work
 
 1. Go to **Settings > Plugins > SIM AI Workflows** in the Ever Works dashboard.
 2. Enter your **SIM API key**.
-3. Enter the **Default Workflow ID** — this is the workflow that will run when you generate a directory with the SIM AI pipeline.
+3. Enter the **Default Workflow ID** — this is the workflow that will run when you generate a work with the SIM AI pipeline.
 4. Optionally change the **Base URL** if you self-host SIM (defaults to `https://www.sim.ai`).
 5. Click **Save**. The plugin will validate your API key and check that the workflow is deployed.
 
 You can also set the API key via the `SIM_API_KEY` environment variable in `apps/api/.env`.
 
-### 5. Generate a Directory with SIM AI
+### 5. Generate a Work with SIM AI
 
-1. Go to **Directories > New Directory** and choose **AI Creation**.
-2. Enter a directory name and prompt as usual.
+1. Go to **Works > New Work** and choose **AI Creation**.
+2. Enter a work name and prompt as usual.
 3. Expand **Advanced Settings** and select **SIM AI Workflows** as the pipeline.
 4. The form will show SIM-specific options (see [Generator Form Options](#generator-form-options) below).
 5. Optionally override the Workflow ID, set a target item count, or enable screenshot capture.
 6. Click **Generate**. The platform dispatches the request to your SIM workflow and shows progress in real time.
 
-You can also use SIM AI when **regenerating** an existing directory — go to the directory's detail page, open the generator, and select SIM AI as the pipeline.
+You can also use SIM AI when **regenerating** an existing work — go to the work's detail page, open the generator, and select SIM AI as the pipeline.
 
 ## Generator Form Options
 
@@ -175,10 +175,10 @@ When SIM AI is selected as the pipeline, the generation form shows these options
 
 These options control what context your SIM workflow receives:
 
-- **Pass Existing Items Summary** (default: on) — includes a summary of items already in the directory: total count, category and tag names, and the first 20 items with their names and URLs. This helps your workflow avoid generating duplicate items.
+- **Pass Existing Items Summary** (default: on) — includes a summary of items already in the work: total count, category and tag names, and the first 20 items with their names and URLs. This helps your workflow avoid generating duplicate items.
 
-- **Pass Data Repository Access** (default: off) — grants your workflow direct read access to the directory's data repository on GitHub. When enabled, three additional fields appear:
-    - **Data Repository URL** — the GitHub URL of the directory's data repo.
+- **Pass Data Repository Access** (default: off) — grants your workflow direct read access to the work's data repository on GitHub. When enabled, three additional fields appear:
+    - **Data Repository URL** — the GitHub URL of the work's data repo.
     - **Repository Access Token** — a read-only GitHub token for the repo.
     - **Repository Branch** — the branch to read from (defaults to `data`).
 
@@ -201,26 +201,26 @@ When you trigger a generation with SIM AI, here's what happens step by step:
 ```mermaid
 flowchart TD
     A[Validate Connection] -->|"Check API key, workflow deployment, rate limits"| B[Prepare Payload]
-    B -->|"Build input from directory context"| C[Execute Workflow]
+    B -->|"Build input from work context"| C[Execute Workflow]
     C -->|"Call SIM API, wait for completion"| D[Collect Results]
     D -->|"Parse output, deduplicate items"| E{Screenshots enabled?}
     E -->|Yes| F[Capture Screenshots]
     E -->|No| G[Cleanup]
     F --> G
-    G --> H[Directory Updated]
+    G --> H[Work Updated]
 ```
 
 1. **Validate** — the plugin checks that your API key is valid, the workflow is deployed and reachable, and your SIM account hasn't hit its rate limit. If anything is wrong, you get a clear error message before any generation runs.
 
-2. **Prepare** — the plugin builds a structured input payload from your directory's metadata, the user's prompt, existing items summary (if enabled), and any custom workflow parameters.
+2. **Prepare** — the plugin builds a structured input payload from your work's metadata, the user's prompt, existing items summary (if enabled), and any custom workflow parameters.
 
-3. **Execute** — the plugin calls the SIM API to run your workflow. Since the generation already runs as a background job, the plugin waits synchronously for the workflow to complete. You can see progress updates on the directory detail page.
+3. **Execute** — the plugin calls the SIM API to run your workflow. Since the generation already runs as a background job, the plugin waits synchronously for the workflow to complete. You can see progress updates on the work detail page.
 
-4. **Collect** — when the workflow finishes, the plugin parses the output. It's flexible about the format: it handles a direct `{ items: [...] }` object, a plain array of items, and various nested structures. Items are validated (must have at least a name) and deduplicated against existing directory items by name.
+4. **Collect** — when the workflow finishes, the plugin parses the output. It's flexible about the format: it handles a direct `{ items: [...] }` object, a plain array of items, and various nested structures. Items are validated (must have at least a name) and deduplicated against existing work items by name.
 
 5. **Screenshots** (optional) — if enabled, the platform captures website screenshots for items that have a URL but no images, using the configured screenshot provider.
 
-6. **Cleanup** — resources are released and the directory is marked as generated.
+6. **Cleanup** — resources are released and the work is marked as generated.
 
 ## Understanding Workflow Input
 
@@ -230,19 +230,19 @@ Your SIM workflow receives structured data from Ever Works. Here's what each fie
 
 Always present. Contains everything the workflow needs to know about the generation request:
 
-| Field                  | Example                 | How to use it                                                       |
-| ---------------------- | ----------------------- | ------------------------------------------------------------------- |
-| `directoryName`        | "Best AI Writing Tools" | Use as context for what kind of items to find                       |
-| `directoryDescription` | "A curated list of..."  | Additional context about the directory's purpose                    |
-| `prompt`               | "Find tools that..."    | The user's specific instructions — this is the most important field |
-| `targetItems`          | 50                      | How many new items the user wants — use as a stopping condition     |
-| `generationMethod`     | "create-update"         | Whether to add to existing items or recreate from scratch           |
-| `directoryId`          | "uuid-123"              | Unique ID (useful for logging/tracking)                             |
-| `directorySlug`        | "best-ai-writing-tools" | URL slug (useful if your workflow generates links)                  |
+| Field              | Example                 | How to use it                                                       |
+| ------------------ | ----------------------- | ------------------------------------------------------------------- |
+| `workName`         | "Best AI Writing Tools" | Use as context for what kind of items to find                       |
+| `workDescription`  | "A curated list of..."  | Additional context about the work's purpose                         |
+| `prompt`           | "Find tools that..."    | The user's specific instructions — this is the most important field |
+| `targetItems`      | 50                      | How many new items the user wants — use as a stopping condition     |
+| `generationMethod` | "create-update"         | Whether to add to existing items or recreate from scratch           |
+| `workId`           | "uuid-123"              | Unique ID (useful for logging/tracking)                             |
+| `workSlug`         | "best-ai-writing-tools" | URL slug (useful if your workflow generates links)                  |
 
 ### The `existingSummary` Object
 
-Present when the directory has existing items and "Pass Existing Items Summary" is enabled. Use it to avoid duplicates:
+Present when the work has existing items and "Pass Existing Items Summary" is enabled. Use it to avoid duplicates:
 
 | Field         | Example                             | How to use it                              |
 | ------------- | ----------------------------------- | ------------------------------------------ |
@@ -279,15 +279,15 @@ Contains any custom parameters the user entered in the Advanced section of the g
 
 ## Example: Building a Simple Workflow
 
-Here's a walkthrough of creating a basic directory generation workflow:
+Here's a walkthrough of creating a basic work generation workflow:
 
-**Goal:** A workflow that takes a directory prompt, uses web search to find items, and returns structured results.
+**Goal:** A workflow that takes a work prompt, uses web search to find items, and returns structured results.
 
 **Step 1 — Start block:** Add three `object` fields: `metadata`, `existingSummary`, `workflowParams`.
 
 **Step 2 — Agent block:** Connect an Agent block to the Start block. Configure it with:
 
-- A system prompt that explains the task: "You are a directory curator. Given a topic and prompt, find real tools/products/services and return them as structured JSON."
+- A system prompt that explains the task: "You are a work curator. Given a topic and prompt, find real tools/products/services and return them as structured JSON."
 - Tools: Enable web search and URL reader.
 - Response format: JSON with an `items` array schema.
 - Input: Reference `<start.metadata.prompt>` for the user's instructions and `<start.metadata.targetItems>` for how many items to find. Reference `<start.existingSummary.sampleItems>` to list items to avoid.
@@ -299,7 +299,7 @@ Here's a walkthrough of creating a basic directory generation workflow:
 ```json
 {
 	"metadata": {
-		"directoryName": "Best Project Management Tools",
+		"workName": "Best Project Management Tools",
 		"prompt": "Find the best project management tools for small teams",
 		"targetItems": 10
 	}
@@ -310,7 +310,7 @@ Here's a walkthrough of creating a basic directory generation workflow:
 
 ## Related
 
-- [Creating a Directory](../features/creating-a-directory) — How to select SIM AI as the pipeline during directory creation
+- [Creating a Work](../features/creating-a-work) — How to select SIM AI as the pipeline during work creation
 - [Pipeline Plugins](./pipeline-plugins) — Overview of all pipeline plugin types
 - [Creating a Pipeline Plugin](./creating-pipeline-plugin) — How to build custom pipeline plugins
 - [SIM AI Documentation](https://docs.sim.ai) — Official SIM AI docs

@@ -7,15 +7,15 @@ sidebar_position: 7
 
 # Comparisons
 
-Comparisons auto-generate SEO-optimized "A vs B" comparison pages between items in a directory. Each comparison includes structured dimension-by-dimension scoring, a verdict, a full markdown article, and optional extended deep-dive analysis.
+Comparisons auto-generate SEO-optimized "A vs B" comparison pages between items in a work. Each comparison includes structured dimension-by-dimension scoring, a verdict, a full markdown article, and optional extended deep-dive analysis.
 
 :::tip When to use this
-Enable comparisons on directories where users naturally compare alternatives — e.g., "Best CI/CD Tools" or "Top Design Platforms".
+Enable comparisons on works where users naturally compare alternatives — e.g., "Best CI/CD Tools" or "Top Design Platforms".
 :::
 
 ## Prerequisites
 
-- Directory must have completed at least one generation (items must exist)
+- Work must have completed at least one generation (items must exist)
 - At least one **AI provider** plugin must be active
 - At least one **search** plugin must be active (for web research)
 - Minimum of 3 items (configurable) in a category before pairs are generated
@@ -76,52 +76,52 @@ Each entry in `dimensions` follows this shape:
 
 Comparisons are configured at two levels:
 
-### 1. Directory Form Fields
+### 1. Work Form Fields
 
-These fields appear on the directory generator settings form (provided by the Comparison Generator plugin's form schema):
+These fields appear on the work generator settings form (provided by the Comparison Generator plugin's form schema):
 
-| Field                 | Type    | Default         | Description                                             |
-| --------------------- | ------- | --------------- | ------------------------------------------------------- |
-| `comparison_enabled`  | boolean | `false`         | Master switch for comparisons                           |
-| `comparison_cadence`  | select  | `use_directory` | Cadence: Use Directory Schedule, Daily, Weekly, Monthly |
-| `comparison_max_mode` | select  | `custom`        | Custom Limit or All Pairs                               |
-| `comparison_max`      | number  | `50`            | Max comparisons (1–500, only shown in Custom mode)      |
+| Field                 | Type    | Default    | Description                                        |
+| --------------------- | ------- | ---------- | -------------------------------------------------- |
+| `comparison_enabled`  | boolean | `false`    | Master switch for comparisons                      |
+| `comparison_cadence`  | select  | `use_work` | Cadence: Use Work Schedule, Daily, Weekly, Monthly |
+| `comparison_max_mode` | select  | `custom`   | Custom Limit or All Pairs                          |
+| `comparison_max`      | number  | `50`       | Max comparisons (1–500, only shown in Custom mode) |
 
 ### 2. Plugin Settings
 
 The **Comparison Generator** plugin (`comparison-generator`) provides additional configuration. See [Built-in Plugins](/plugin-system/built-in-plugins#comparison-generator) for the full settings table.
 
-| Setting                    | Type    | Default         | Description                                            |
-| -------------------------- | ------- | --------------- | ------------------------------------------------------ |
-| `cadence_override`         | string  | `use_directory` | `use_directory`, `daily`, `weekly`, `monthly`          |
-| `max_comparisons_mode`     | string  | `custom`        | `custom` or `unlimited`                                |
-| `max_comparisons`          | number  | `50`            | Max total comparisons (1–500)                          |
-| `min_items_for_comparison` | number  | `3`             | Min items in category before generating (2–20)         |
-| `ai_provider`              | string  | —               | Override AI provider for comparison generation         |
-| `ai_model`                 | string  | —               | Override AI model for comparison generation            |
-| `custom_prompt`            | string  | —               | Additional instructions appended to comparison prompts |
-| `extended_analysis`        | boolean | `false`         | Enable 7-section deep-dive extended analysis           |
+| Setting                    | Type    | Default    | Description                                            |
+| -------------------------- | ------- | ---------- | ------------------------------------------------------ |
+| `cadence_override`         | string  | `use_work` | `use_work`, `daily`, `weekly`, `monthly`               |
+| `max_comparisons_mode`     | string  | `custom`   | `custom` or `unlimited`                                |
+| `max_comparisons`          | number  | `50`       | Max total comparisons (1–500)                          |
+| `min_items_for_comparison` | number  | `3`        | Min items in category before generating (2–20)         |
+| `ai_provider`              | string  | —          | Override AI provider for comparison generation         |
+| `ai_model`                 | string  | —          | Override AI model for comparison generation            |
+| `custom_prompt`            | string  | —          | Additional instructions appended to comparison prompts |
+| `extended_analysis`        | boolean | `false`    | Enable 7-section deep-dive extended analysis           |
 
 ## Scheduling
 
-A cron job runs every 6 hours for all directories with comparisons enabled. Each run generates one comparison per directory (the next best un-generated pair). Comparisons can also be triggered manually via the API or the dashboard.
+A cron job runs every 6 hours for all works with comparisons enabled. Each run generates one comparison per work (the next best un-generated pair). Comparisons can also be triggered manually via the API or the dashboard.
 
 ## Generate All
 
-The dashboard provides a **Generate All** button that batch-generates every remaining comparison pair for a directory. Under the hood, it calls the single-generation endpoint (`POST /api/directories/:id/comparisons/generate`) in a loop, generating one comparison at a time.
+The dashboard provides a **Generate All** button that batch-generates every remaining comparison pair for a work. Under the hood, it calls the single-generation endpoint (`POST /api/works/:id/comparisons/generate`) in a loop, generating one comparison at a time.
 
 The UI shows a real-time progress bar with the number of completed comparisons out of the total remaining. You can stop generation at any time — the process also stops automatically if there are no more pairs or after 3 consecutive errors.
 
-Before starting, a confirmation dialog shows the number of remaining pairs and warns that the process may take several minutes for directories with many items.
+Before starting, a confirmation dialog shows the number of remaining pairs and warns that the process may take several minutes for works with many items.
 
 ## Model Selection
 
-By default, comparisons use the directory's configured AI provider and model. You can override both on the Comparisons page using the **AI Model** settings panel:
+By default, comparisons use the work's configured AI provider and model. You can override both on the Comparisons page using the **AI Model** settings panel:
 
 - **Provider** — select any active AI provider plugin (OpenAI, Anthropic, Google, Groq, etc.)
 - **Model** — the model dropdown updates dynamically based on the selected provider's available models
 
-These overrides are stored as `ai_provider` and `ai_model` in the Comparison Generator plugin settings and apply only to comparison generation — they do not affect the main directory generation pipeline.
+These overrides are stored as `ai_provider` and `ai_model` in the Comparison Generator plugin settings and apply only to comparison generation — they do not affect the main work generation pipeline.
 
 ## Extended Analysis
 
@@ -155,21 +155,21 @@ This is separate from the [Advanced Prompts](./advanced-prompts) that customize 
 
 ## API
 
-All endpoints require JWT authentication. Base path: `/api/directories/:id/comparisons`.
+All endpoints require JWT authentication. Base path: `/api/works/:id/comparisons`.
 
-| Method   | Endpoint                                           | Description                             |
-| -------- | -------------------------------------------------- | --------------------------------------- |
-| `GET`    | `/api/directories/:id/comparisons`                 | List all comparisons                    |
-| `GET`    | `/api/directories/:id/comparisons/remaining-count` | Count remaining un-generated pairs      |
-| `GET`    | `/api/directories/:id/comparisons/:slug`           | Get a comparison with markdown          |
-| `POST`   | `/api/directories/:id/comparisons/generate`        | Auto-generate next comparison           |
-| `POST`   | `/api/directories/:id/comparisons/generate-manual` | Generate comparison for a specific pair |
-| `DELETE` | `/api/directories/:id/comparisons/:slug`           | Delete a comparison                     |
+| Method   | Endpoint                                     | Description                             |
+| -------- | -------------------------------------------- | --------------------------------------- |
+| `GET`    | `/api/works/:id/comparisons`                 | List all comparisons                    |
+| `GET`    | `/api/works/:id/comparisons/remaining-count` | Count remaining un-generated pairs      |
+| `GET`    | `/api/works/:id/comparisons/:slug`           | Get a comparison with markdown          |
+| `POST`   | `/api/works/:id/comparisons/generate`        | Auto-generate next comparison           |
+| `POST`   | `/api/works/:id/comparisons/generate-manual` | Generate comparison for a specific pair |
+| `DELETE` | `/api/works/:id/comparisons/:slug`           | Delete a comparison                     |
 
 ### List All Comparisons
 
 ```bash
-curl http://localhost:3100/api/directories/:id/comparisons \
+curl http://localhost:3100/api/works/:id/comparisons \
   -H "Authorization: Bearer <token>"
 ```
 
@@ -178,7 +178,7 @@ Returns an array of `ComparisonData` objects, sorted by `generated_at` descendin
 ### Get a Single Comparison
 
 ```bash
-curl http://localhost:3100/api/directories/:id/comparisons/netlify--vercel \
+curl http://localhost:3100/api/works/:id/comparisons/netlify--vercel \
   -H "Authorization: Bearer <token>"
 ```
 
@@ -195,7 +195,7 @@ Response:
 ### Get Remaining Count
 
 ```bash
-curl http://localhost:3100/api/directories/:id/comparisons/remaining-count \
+curl http://localhost:3100/api/works/:id/comparisons/remaining-count \
   -H "Authorization: Bearer <token>"
 ```
 
@@ -210,7 +210,7 @@ Response:
 Automatically picks the best un-generated pair and generates a comparison.
 
 ```bash
-curl -X POST http://localhost:3100/api/directories/:id/comparisons/generate \
+curl -X POST http://localhost:3100/api/works/:id/comparisons/generate \
   -H "Authorization: Bearer <token>"
 ```
 
@@ -227,7 +227,7 @@ Possible `status` values: `success`, `skipped` (no pairs remaining or max reache
 Compare two specific items by slug.
 
 ```bash
-curl -X POST http://localhost:3100/api/directories/:id/comparisons/generate-manual \
+curl -X POST http://localhost:3100/api/works/:id/comparisons/generate-manual \
   -H "Authorization: Bearer <token>" \
   -H "Content-Type: application/json" \
   -d '{"itemASlug": "netlify", "itemBSlug": "vercel"}'
@@ -238,7 +238,7 @@ Returns `400` if the slugs are the same, if either slug is missing, or if the co
 ### Delete a Comparison
 
 ```bash
-curl -X DELETE http://localhost:3100/api/directories/:id/comparisons/netlify--vercel \
+curl -X DELETE http://localhost:3100/api/works/:id/comparisons/netlify--vercel \
   -H "Authorization: Bearer <token>"
 ```
 
@@ -248,7 +248,7 @@ Deleting a comparison removes its YAML, markdown, and extended markdown files fr
 
 ## Data Storage
 
-Comparisons are stored in the data repository under the `comparisons/` directory:
+Comparisons are stored in the data repository under the `comparisons/` work:
 
 ```
 comparisons/
@@ -272,7 +272,7 @@ metadata:
 
 ## Related
 
-- [Scheduled Updates](./scheduled-updates) — comparisons can follow the directory schedule
+- [Scheduled Updates](./scheduled-updates) — comparisons can follow the work schedule
 - [Advanced Prompts](./advanced-prompts) — customize AI behavior for pipeline steps
 - [Built-in Plugins](/plugin-system/built-in-plugins#comparison-generator) — Comparison Generator plugin settings
 - [AI & Generation](/ai-agents/) — pipeline overview

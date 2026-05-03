@@ -36,12 +36,12 @@ function createMockContext(overrides?: Partial<ParentToolContext>): ParentToolCo
 				isConfigured: () => true
 			} as unknown as IContentExtractorFacade
 		},
-		facadeOptions: { userId: 'u1', directoryId: 'd1' },
+		facadeOptions: { userId: 'u1', workId: 'd1' },
 		workerModel: {} as never,
 		workerMaxContextTokens: 128000,
 		parentModel: {} as never,
 		parentMaxContextTokens: 128000,
-		directoryContext: { directoryName: 'Test Dir' },
+		workContext: { workName: 'Test Dir' },
 		existing: { items: [], categories: [], tags: [], brands: [] },
 		onProgress: vi.fn(),
 		totalSteps: 5,

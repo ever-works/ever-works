@@ -64,21 +64,21 @@
 ### 3.2 Create Service
 
 - [x] Create `apps/api/src/ai-conversation/openai-compat.service.ts`
-    - [x] Constructor: inject `AiFacadeService`, `DirectoryRepository`
+    - [x] Constructor: inject `AiFacadeService`, `WorkRepository`
     - [x] `handleCompletion(dto, facadeOptions)` - non-streaming path
     - [x] `handleStreamingCompletion(dto, facadeOptions, res)` - SSE streaming path
     - [x] `mapToInternalMessages(messages)` - OpenAI -> internal ChatMessage format (with tool_calls + tool_call_id)
     - [x] `mapToInternalOptions(dto)` - Full request mapping (snake_case -> camelCase)
     - [x] `mapToOpenAiResponse(response)` - Internal -> OpenAI response format (camelCase -> snake_case)
     - [x] `mapToOpenAiStreamChunk(chunk, toolCallBaseIndex)` - Internal -> OpenAI SSE chunk format with indexed tool_calls
-    - [x] `resolveDirectoryContext(options)` - Reuses same logic as old service
+    - [x] `resolveWorkContext(options)` - Reuses same logic as old service
 
 ### 3.3 Create Controller
 
 - [x] Create `apps/api/src/ai-conversation/openai-compat.controller.ts`
     - [x] `POST /api/v1/chat/completions`
     - [x] JWT auth via `@CurrentUser()`
-    - [x] Read `X-Provider-Override` and `X-Directory-Id` headers
+    - [x] Read `X-Provider-Override` and `X-Work-Id` headers
     - [x] Route to streaming (SSE) vs non-streaming (JSON) based on `body.stream`
     - [x] Proper SSE headers: `text/event-stream`, `no-cache`, `keep-alive`, `X-Accel-Buffering: no`
 
@@ -119,7 +119,7 @@
 - [x] Create `apps/web/src/app/api/chat/route.ts`
     - [x] `POST` handler with `maxDuration = 60`
     - [x] Auth: `getAuthAccessCookie()` + `refreshAccessToken()` fallback (same as `serverFetch`)
-    - [x] Parse body: extract `messages` (UIMessage[]), `providerOverride` (required), `directoryId`
+    - [x] Parse body: extract `messages` (UIMessage[]), `providerOverride` (required), `workId`
     - [x] Returns 400 if `providerOverride` missing
     - [x] Returns 401 if no auth token after refresh attempt
     - [x] Creates provider with `createBackendProvider()` pointing to `${API_URL}/v1`
@@ -182,7 +182,7 @@
 - [x] Deleted `apps/web/src/lib/hooks/use-ai-stream.ts`
 - [x] Deleted `apps/web/src/lib/hooks/use-chat-history.ts`
 - [x] Deleted `apps/web/src/lib/api/ai-conversation.ts`
-- [x] Deleted `apps/web/src/app/api/ai-conversations/` (entire directory tree)
+- [x] Deleted `apps/web/src/app/api/ai-conversations/` (entire work tree)
 - [x] Deleted `apps/web/src/lib/utils/next-api.ts`
 - [x] Deleted `apps/api/src/ai-conversation/ai-conversation.controller.ts` (old NDJSON controller)
 - [x] Deleted `apps/api/src/ai-conversation/ai-conversation.service.ts` (old streaming service)
@@ -207,4 +207,4 @@
 - [x] `npx turbo build --filter=ever-works-api` passes
 - [x] `cd packages/agent && pnpm test` — 892 tests pass
 - [ ] Manual E2E test of chat feature (requires running servers)
-- [ ] Manual test of directory generation (verify pipelines still work)
+- [ ] Manual test of work generation (verify pipelines still work)

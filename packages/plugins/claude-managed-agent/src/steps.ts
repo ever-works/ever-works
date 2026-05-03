@@ -13,14 +13,14 @@ export const STEP_DEFINITIONS: readonly PipelineStepDefinition<ClaudeManagedAgen
 	{
 		id: 'run-managed-session',
 		name: 'Run Managed Session',
-		description: 'Start a Claude Managed Agents session and let it research the directory topic.',
+		description: 'Start a Claude Managed Agents session and let it research the work topic.',
 		position: { type: 'after', stepId: 'configure-managed-agent' },
 		estimatedDuration: 120
 	},
 	{
 		id: 'parse-agent-output',
 		name: 'Parse Agent Output',
-		description: 'Extract normalized directory items, taxonomy, and warnings from the session transcript.',
+		description: 'Extract normalized work items, taxonomy, and warnings from the session transcript.',
 		position: { type: 'after', stepId: 'run-managed-session' },
 		estimatedDuration: 5
 	},

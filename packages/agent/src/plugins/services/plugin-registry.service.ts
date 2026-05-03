@@ -9,15 +9,16 @@ import type {
     PluginStateTransition,
 } from '@ever-works/plugin';
 import { PluginEvents } from '../plugins.constants';
-import { DirectoryPluginRepository } from '../repositories/directory-plugin.repository';
+import { WorkPluginRepository } from '../repositories/work-plugin.repository';
 import { UserPluginRepository } from '../repositories/user-plugin.repository';
+import { hasActiveCapability } from '../utils/active-capabilities.util';
 
 export interface PluginEnableContext {
     systemPlugin?: boolean;
     autoEnable?: boolean;
-    userPlugin?: { enabled: boolean; autoEnableForDirectories?: boolean } | null;
-    directoryPlugin?: { enabled: boolean } | null;
-    hasDirectoryContext: boolean;
+    userPlugin?: { enabled: boolean; autoEnableForWorks?: boolean } | null;
+    workPlugin?: { enabled: boolean } | null;
+    hasWorkContext: boolean;
 }
 
 /**
@@ -26,26 +27,22 @@ export interface PluginEnableContext {
  * Priority:
  * 1. System plugins → always enabled
  * 2. User-level DISABLE → cascades globally
- * 3. Directory explicit record → use its enabled value
- * 4. User autoEnableForDirectories (directory context) → true
- * 5. User record exists → enabled outside directory, false inside directory
+ * 3. Work explicit record → use its enabled value
+ * 4. User autoEnableForWorks (work context) → true
+ * 5. User record exists → enabled outside work, false inside work
  * 6. Fallback to manifest autoEnable (default false)
  */
 export function resolvePluginEnabled(ctx: PluginEnableContext): boolean {
     if (ctx.systemPlugin) return true;
     if (ctx.userPlugin !== undefined && ctx.userPlugin !== null && !ctx.userPlugin.enabled)
         return false;
-    if (
-        ctx.hasDirectoryContext &&
-        ctx.directoryPlugin !== undefined &&
-        ctx.directoryPlugin !== null
-    )
-        return ctx.directoryPlugin.enabled;
-    if (ctx.hasDirectoryContext && ctx.userPlugin?.autoEnableForDirectories) return true;
+    if (ctx.hasWorkContext && ctx.workPlugin !== undefined && ctx.workPlugin !== null)
+        return ctx.workPlugin.enabled;
+    if (ctx.hasWorkContext && ctx.userPlugin?.autoEnableForWorks) return true;
     if (ctx.userPlugin !== undefined && ctx.userPlugin !== null) {
-        // In directory context, user-level enabled does NOT cascade to directories
-        // unless autoEnableForDirectories is true (already checked above).
-        if (ctx.hasDirectoryContext) return false;
+        // In work context, user-level enabled does NOT cascade to works
+        // unless autoEnableForWorks is true (already checked above).
+        if (ctx.hasWorkContext) return false;
         return ctx.userPlugin.enabled;
     }
     return ctx.autoEnable ?? false;
@@ -75,7 +72,7 @@ export class PluginRegistryService {
 
     constructor(
         private readonly eventEmitter: EventEmitter2,
-        @Optional() private readonly directoryPluginRepository?: DirectoryPluginRepository,
+        @Optional() private readonly workPluginRepository?: WorkPluginRepository,
         @Optional() private readonly userPluginRepository?: UserPluginRepository,
     ) {}
 
@@ -312,23 +309,23 @@ export class PluginRegistryService {
         this.logger.warn('Registry cleared');
     }
 
-    /** Get default plugin for capability with scope resolution (directory > user > manifest) */
+    /** Get default plugin for capability with scope resolution (work > user > manifest) */
     async getDefaultForCapabilityScoped(
         capability: string,
-        directoryId?: string,
+        workId?: string,
         userId?: string,
     ): Promise<RegisteredPlugin | undefined> {
         const plugins = this.getByCapability(capability);
         const enabledPlugins = plugins.filter((p) => p.state === 'loaded');
 
-        if (directoryId && this.directoryPluginRepository) {
+        if (workId && this.workPluginRepository) {
             for (const registered of enabledPlugins) {
                 try {
-                    const dp = await this.directoryPluginRepository.findByDirectoryAndPlugin(
-                        directoryId,
+                    const dp = await this.workPluginRepository.findByWorkAndPlugin(
+                        workId,
                         registered.plugin.id,
                     );
-                    if (dp?.activeCapability === capability && dp.enabled) {
+                    if (dp?.enabled && hasActiveCapability(dp, capability)) {
                         return registered;
                     }
                 } catch {
@@ -340,7 +337,7 @@ export class PluginRegistryService {
         for (const registered of enabledPlugins) {
             const isEnabled = await this.isPluginEnabledForScope(
                 registered.plugin.id,
-                directoryId,
+                workId,
                 userId,
             );
             if (isEnabled && registered.manifest.defaultForCapabilities?.includes(capability)) {
@@ -351,7 +348,7 @@ export class PluginRegistryService {
         for (const registered of enabledPlugins) {
             const isEnabled = await this.isPluginEnabledForScope(
                 registered.plugin.id,
-                directoryId,
+                workId,
                 userId,
             );
             if (isEnabled) {
@@ -364,7 +361,7 @@ export class PluginRegistryService {
 
     async getEnabledPluginsScoped(
         capability?: string,
-        directoryId?: string,
+        workId?: string,
         userId?: string,
     ): Promise<RegisteredPlugin[]> {
         const plugins = capability ? this.getByCapability(capability) : this.getReady();
@@ -375,7 +372,7 @@ export class PluginRegistryService {
 
             const isEnabled = await this.isPluginEnabledForScope(
                 registered.plugin.id,
-                directoryId,
+                workId,
                 userId,
             );
             if (isEnabled) {
@@ -392,7 +389,7 @@ export class PluginRegistryService {
      */
     async isPluginEnabledForScope(
         pluginId: string,
-        directoryId?: string,
+        workId?: string,
         userId?: string,
     ): Promise<boolean> {
         const registered = this.plugins.get(pluginId);
@@ -406,13 +403,10 @@ export class PluginRegistryService {
             }
         }
 
-        let directoryPlugin = null;
-        if (directoryId && this.directoryPluginRepository) {
+        let workPlugin = null;
+        if (workId && this.workPluginRepository) {
             try {
-                directoryPlugin = await this.directoryPluginRepository.findByDirectoryAndPlugin(
-                    directoryId,
-                    pluginId,
-                );
+                workPlugin = await this.workPluginRepository.findByWorkAndPlugin(workId, pluginId);
             } catch {
                 // Continue
             }
@@ -422,8 +416,8 @@ export class PluginRegistryService {
             systemPlugin: registered?.manifest?.systemPlugin,
             autoEnable: registered?.manifest?.autoEnable,
             userPlugin,
-            directoryPlugin,
-            hasDirectoryContext: !!directoryId,
+            workPlugin,
+            hasWorkContext: !!workId,
         });
     }
 }

@@ -198,7 +198,7 @@ export class GitHubSyncService {
                     includesSecrets: false,
                     hasMaskedSecrets: false,
                     profile: { username: '', email: '' },
-                    directoryCount: 0,
+                    workCount: 0,
                     totalItemCount: 0,
                     userPluginCount: 0,
                     conflicts: [],
@@ -238,9 +238,9 @@ export class GitHubSyncService {
             if (!payload) {
                 return {
                     success: false,
-                    directoriesCreated: 0,
-                    directoriesUpdated: 0,
-                    directoriesSkipped: 0,
+                    worksCreated: 0,
+                    worksUpdated: 0,
+                    worksSkipped: 0,
                     userPluginsImported: 0,
                     errors: ['No valid configuration found in repository'],
                     warnings: [],
@@ -271,7 +271,7 @@ export class GitHubSyncService {
         const manifest = {
             version: payload.version,
             syncedAt: new Date().toISOString(),
-            directoryCount: payload.data.directories.length,
+            workCount: payload.data.works.length,
             includesSecrets: payload.includesSecrets,
         };
         this.writeJsonFile(path.join(dir, 'manifest.json'), manifest);
@@ -284,23 +284,23 @@ export class GitHubSyncService {
         fs.mkdirSync(pluginsDir, { recursive: true });
         this.writeJsonFile(path.join(pluginsDir, 'user-plugins.json'), payload.data.userPlugins);
 
-        // Write directories
-        const directoriesDir = path.join(dir, 'directories');
-        fs.mkdirSync(directoriesDir, { recursive: true });
+        // Write works
+        const worksDir = path.join(dir, 'works');
+        fs.mkdirSync(worksDir, { recursive: true });
 
-        for (const directory of payload.data.directories) {
-            const safeName = path.basename(directory.slug);
-            if (safeName !== directory.slug) {
-                this.logger.warn(`Skipping directory with invalid slug: ${directory.slug}`);
+        for (const work of payload.data.works) {
+            const safeName = path.basename(work.slug);
+            if (safeName !== work.slug) {
+                this.logger.warn(`Skipping work with invalid slug: ${work.slug}`);
                 continue;
             }
-            const dirPath = path.join(directoriesDir, safeName);
+            const dirPath = path.join(worksDir, safeName);
             fs.mkdirSync(dirPath, { recursive: true });
 
             const {
                 members,
                 customDomains,
-                directoryPlugins,
+                workPlugins,
                 advancedPrompts,
                 schedule,
                 siteConfig,
@@ -311,11 +311,11 @@ export class GitHubSyncService {
                 collections,
                 comparisons,
                 ...config
-            } = directory;
+            } = work;
             this.writeJsonFile(path.join(dirPath, 'config.json'), config);
             this.writeJsonFile(path.join(dirPath, 'members.json'), members);
             this.writeJsonFile(path.join(dirPath, 'domains.json'), customDomains);
-            this.writeJsonFile(path.join(dirPath, 'plugins.json'), directoryPlugins);
+            this.writeJsonFile(path.join(dirPath, 'plugins.json'), workPlugins);
             if (advancedPrompts && Object.keys(advancedPrompts).length > 0) {
                 this.writeJsonFile(path.join(dirPath, 'prompts.json'), advancedPrompts);
             }
@@ -358,25 +358,24 @@ export class GitHubSyncService {
             const userPlugins =
                 this.readJsonFile(path.join(dir, 'plugins', 'user-plugins.json')) || [];
 
-            const directories: any[] = [];
-            const directoriesDir = path.join(dir, 'directories');
+            const works: any[] = [];
+            const worksDir = path.join(dir, 'works');
 
-            if (fs.existsSync(directoriesDir)) {
+            if (fs.existsSync(worksDir)) {
                 const slugs = fs
-                    .readdirSync(directoriesDir, { withFileTypes: true })
+                    .readdirSync(worksDir, { withFileTypes: true })
                     .filter((d) => d.isDirectory())
                     .map((d) => d.name);
 
                 for (const slug of slugs) {
                     const safeName = path.basename(slug);
                     if (safeName !== slug) continue;
-                    const dirPath = path.join(directoriesDir, safeName);
+                    const dirPath = path.join(worksDir, safeName);
                     const config = this.readJsonFile(path.join(dirPath, 'config.json')) || {};
                     const members = this.readJsonFile(path.join(dirPath, 'members.json')) || [];
                     const customDomains =
                         this.readJsonFile(path.join(dirPath, 'domains.json')) || [];
-                    const directoryPlugins =
-                        this.readJsonFile(path.join(dirPath, 'plugins.json')) || [];
+                    const workPlugins = this.readJsonFile(path.join(dirPath, 'plugins.json')) || [];
 
                     const advancedPrompts =
                         this.readJsonFile(path.join(dirPath, 'prompts.json')) || undefined;
@@ -396,12 +395,12 @@ export class GitHubSyncService {
                     const comparisons =
                         this.readJsonFile(path.join(dirPath, 'comparisons.json')) || [];
 
-                    directories.push({
+                    works.push({
                         ...config,
                         slug,
                         members,
                         customDomains,
-                        directoryPlugins,
+                        workPlugins,
                         advancedPrompts,
                         schedule,
                         siteConfig,
@@ -421,7 +420,7 @@ export class GitHubSyncService {
                 includesSecrets: manifest.includesSecrets || false,
                 data: {
                     profile,
-                    directories,
+                    works,
                     userPlugins,
                 },
             };

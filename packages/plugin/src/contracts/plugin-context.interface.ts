@@ -69,24 +69,24 @@ export interface HttpResponse<T> {
  * Service references available to plugins
  */
 export interface PluginServices {
-	/** Directory service (limited interface) */
-	readonly directory?: DirectoryServiceRef;
+	/** Work service (limited interface) */
+	readonly work?: WorkServiceRef;
 	/** User service (limited interface) */
 	readonly user?: UserServiceRef;
 }
 
 /**
- * Limited directory service interface for plugins
+ * Limited work service interface for plugins
  */
-export interface DirectoryServiceRef {
-	getById(id: string): Promise<DirectoryInfo | null>;
-	getBySlug(slug: string): Promise<DirectoryInfo | null>;
+export interface WorkServiceRef {
+	getById(id: string): Promise<WorkInfo | null>;
+	getBySlug(slug: string): Promise<WorkInfo | null>;
 }
 
 /**
- * Basic directory information
+ * Basic work information
  */
-export interface DirectoryInfo {
+export interface WorkInfo {
 	readonly id: string;
 	readonly name: string;
 	readonly slug: string;
@@ -153,7 +153,7 @@ export interface PluginContext {
 	/**
 	 * Get resolved settings for this plugin
 	 * @param scope - Optional scope to get settings from
-	 * @param scopeId - Directory or user ID if scope is 'directory' or 'user'
+	 * @param scopeId - Work or user ID if scope is 'work' or 'user'
 	 */
 	getSettings(scope?: SettingScope, scopeId?: string): Promise<PluginSettings>;
 
@@ -166,7 +166,7 @@ export interface PluginContext {
 	 * Persist settings for this plugin at the requested scope.
 	 * Secret settings are stored through the platform secret-settings layer.
 	 */
-	updateSettings(scope: 'user' | 'directory', scopeId: string | undefined, data: PluginSettingsWrite): Promise<void>;
+	updateSettings(scope: 'user' | 'work', scopeId: string | undefined, data: PluginSettingsWrite): Promise<void>;
 
 	/**
 	 * Subscribe to a platform event

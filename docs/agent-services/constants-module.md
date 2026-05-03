@@ -24,7 +24,7 @@ packages/agent/src/constants/
 export const GENERATION_CANCELLED = 'Generation cancelled by user';
 ```
 
-Used when a user explicitly cancels an in-progress directory generation. This message is set on the directory's `generateStatus.error` field and surfaced in the UI.
+Used when a user explicitly cancels an in-progress work generation. This message is set on the work's `generateStatus.error` field and surfaced in the UI.
 
 **Used by**: Generation orchestrator, pipeline executor, cancellation handlers.
 
@@ -34,9 +34,9 @@ Used when a user explicitly cancels an in-progress directory generation. This me
 export const IMPORT_CANCELLED = 'Import cancelled by user';
 ```
 
-Used when a user cancels an in-progress directory import operation (e.g., importing from an Awesome List or existing data repository).
+Used when a user cancels an in-progress work import operation (e.g., importing from an Awesome List or existing data repository).
 
-**Used by**: Import services, directory import handlers.
+**Used by**: Import services, work import handlers.
 
 ### GIT_TOKEN_NOT_AVAILABLE
 
@@ -58,12 +58,12 @@ Used when a git operation fails because no authentication token could be resolve
 import { GENERATION_CANCELLED, IMPORT_CANCELLED, GIT_TOKEN_NOT_AVAILABLE } from '@ever-works/agent/constants';
 
 // Example: checking if generation was user-cancelled
-if (directory.generateStatus?.error === GENERATION_CANCELLED) {
+if (work.generateStatus?.error === GENERATION_CANCELLED) {
 	// Handle user cancellation differently from errors
 }
 
 // Example: setting cancellation status
-directory.generateStatus = {
+work.generateStatus = {
 	status: GenerateStatusType.CANCELLED,
 	error: GENERATION_CANCELLED
 };

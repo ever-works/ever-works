@@ -116,7 +116,7 @@ Validation helpers (`validateContactData`, `validateOrganizationData`, `validate
 
 ## Multi-Tenant Support
 
-`CrmTenantService` resolves tenant context (`tenantId`, `directoryId`, `userId`) for operations that need workspace isolation.
+`CrmTenantService` resolves tenant context (`tenantId`, `workId`, `userId`) for operations that need workspace isolation.
 
 ## Retry Utilities
 

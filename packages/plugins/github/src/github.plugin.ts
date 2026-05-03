@@ -384,14 +384,14 @@ export class GitHubPlugin implements IPlugin, IGitProviderPlugin, IOAuthPlugin {
 		return this.apiService.getRawFileUrl(owner, repo, branch, path);
 	}
 
-	async getDirectoryContents(
+	async getWorkContents(
 		owner: string,
 		repo: string,
 		path: string,
 		token: string
 	): Promise<Array<{ name: string; type: 'file' | 'dir' | 'submodule' | 'symlink'; path: string }> | null> {
 		const settings = await this.getSettings();
-		return this.apiService.getDirectoryContents(owner, repo, path, token, settings.apiBaseUrl);
+		return this.apiService.getWorkContents(owner, repo, path, token, settings.apiBaseUrl);
 	}
 
 	// GitHub Actions specific operations
@@ -560,13 +560,13 @@ export class GitHubPlugin implements IPlugin, IGitProviderPlugin, IOAuthPlugin {
 				'## Key features',
 				'',
 				'- **OAuth authentication** — sign in to Ever Works using a GitHub account',
-				'- **Repository management** — automatically creates and manages repositories for deployed directories',
+				'- **Repository management** — automatically creates and manages repositories for deployed works',
 				'- **Git operations** — handles cloning, committing, pushing, and branch management',
 				'- **Pull request workflow** — creates and merges pull requests as part of the deployment process',
 				'',
 				'## How it works in Ever Works',
 				'',
-				'GitHub is a core component of the deployment pipeline. When a directory is deployed, Ever Works creates or updates a GitHub repository with the generated site, commits the changes, and triggers a GitHub Actions workflow that builds and deploys to the hosting provider. The OAuth facade also uses this plugin to handle GitHub-based sign-in.',
+				'GitHub is a core component of the deployment pipeline. When a work is deployed, Ever Works creates or updates a GitHub repository with the generated site, commits the changes, and triggers a GitHub Actions workflow that builds and deploys to the hosting provider. The OAuth facade also uses this plugin to handle GitHub-based sign-in.',
 				'',
 				'## Getting started',
 				'',

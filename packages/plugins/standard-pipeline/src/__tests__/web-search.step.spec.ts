@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { WebSearchStep } from '../steps/web-search.step';
-import type { StepExecutionContext, DirectoryReference, GenerationRequest } from '@ever-works/plugin';
+import type { StepExecutionContext, WorkReference, GenerationRequest } from '@ever-works/plugin';
 import type { MutableGenerationContext } from '../context/index.js';
 
 describe('WebSearchStep', () => {
@@ -28,10 +28,10 @@ describe('WebSearchStep', () => {
 		isConfigured: vi.fn().mockReturnValue(true)
 	});
 
-	const createMockDirectory = (): DirectoryReference => ({
+	const createMockWork = (): WorkReference => ({
 		id: 'test-dir-id',
-		slug: 'test-directory',
-		name: 'Test Directory'
+		slug: 'test-work',
+		name: 'Test Work'
 	});
 
 	const createMockRequest = (overrides?: Partial<GenerationRequest>): GenerationRequest =>
@@ -48,7 +48,7 @@ describe('WebSearchStep', () => {
 
 	const createMockContext = (overrides?: Partial<MutableGenerationContext>): MutableGenerationContext =>
 		({
-			directory: createMockDirectory(),
+			work: createMockWork(),
 			request: createMockRequest(),
 			searchQueries: ['test query 1', 'test query 2'],
 			extractedUrls: [],
@@ -60,7 +60,7 @@ describe('WebSearchStep', () => {
 			...overrides
 		}) as MutableGenerationContext;
 
-	const expectedFacadeOptions = { userId: 'test-user-id', directoryId: 'test-dir-id' };
+	const expectedFacadeOptions = { userId: 'test-user-id', workId: 'test-dir-id' };
 
 	beforeEach(() => {
 		step = new WebSearchStep();
@@ -70,7 +70,7 @@ describe('WebSearchStep', () => {
 			searchFacade: createMockSearchFacade(),
 			contentExtractorFacade: createMockContentExtractorFacade(),
 			user: { id: 'test-user-id' },
-			directory: { id: 'test-dir-id' }
+			work: { id: 'test-dir-id' }
 		} as unknown as StepExecutionContext;
 	});
 

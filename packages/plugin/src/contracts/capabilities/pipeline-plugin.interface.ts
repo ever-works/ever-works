@@ -5,7 +5,7 @@ import type {
 	IPipelineContext,
 	GenerationRequest,
 	ExistingItems,
-	DirectoryReference
+	WorkReference
 } from '../../pipeline/generation-context.interface.js';
 import type { IBuiltInStepExecutor } from '../../pipeline/built-in-step-executor.interface.js';
 import type { StepExecutionContext } from '../../pipeline/step-execution-context.interface.js';
@@ -156,7 +156,7 @@ export interface StepProgress {
  * Unified pipeline plugin interface.
  * Capability: 'pipeline'
  *
- * All pipelines implement this interface. A pipeline generates directory content
+ * All pipelines implement this interface. A pipeline generates work content
  * (items, categories, tags, brands) through a series of steps.
  *
  * Pipelines come in two flavors:
@@ -176,7 +176,7 @@ export interface IPipelinePlugin<TStepId extends string = string> extends IPlugi
 
 	/** All pipelines must be executable */
 	execute(
-		directory: DirectoryReference,
+		work: WorkReference,
 		request: GenerationRequest,
 		existing: ExistingItems,
 		options?: PipelineExecutionOptions,
@@ -204,11 +204,7 @@ export interface IPipelinePlugin<TStepId extends string = string> extends IPlugi
 	// When implemented, the engine delegates context creation, snapshotting,
 	// result extraction, and skip/circuit-breaker logic to the plugin.
 
-	createContext?(
-		directory: DirectoryReference,
-		request: GenerationRequest,
-		existing: ExistingItems
-	): IPipelineContext;
+	createContext?(work: WorkReference, request: GenerationRequest, existing: ExistingItems): IPipelineContext;
 	contextToSnapshot?(context: IPipelineContext): unknown;
 	contextFromSnapshot?(snapshot: unknown): IPipelineContext;
 	extractResult?(

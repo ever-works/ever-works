@@ -10,13 +10,14 @@ import type {
     PluginSettingsSchema,
     PluginResponse,
     UserPluginResponse,
-    DirectoryPluginResponse,
+    WorkPluginResponse,
     PluginListResponse,
-    DirectoryPluginListResponse,
+    WorkPluginListResponse,
     SettingScopeApi,
     PluginVisibility,
     PluginUiHints,
 } from '@ever-works/plugin/api';
+import type { ProviderModelSummary } from '@ever-works/plugin';
 
 // Re-export types for convenience
 export type {
@@ -89,8 +90,8 @@ export class PluginSettingsSchemaPropertyDto implements PluginSettingsSchemaProp
     envVar?: string;
 
     @ApiPropertyOptional({
-        description: 'Setting scope: global, user, or directory',
-        enum: ['global', 'user', 'directory'],
+        description: 'Setting scope: global, user, or work',
+        enum: ['global', 'user', 'work'],
         default: 'global',
     })
     scope?: SettingScopeApi;
@@ -222,31 +223,34 @@ export class UserPluginResponseDto extends PluginResponseDto implements UserPlug
         description: 'Generic connection/readiness status used by onboarding and settings UI',
     })
     connectionStatus?: UserPluginResponse['connectionStatus'];
+
+    @ApiPropertyOptional({ description: 'Resolved model settings for AI provider plugins' })
+    models?: ProviderModelSummary[];
 }
 
 /**
- * Response DTO for a plugin in directory context
+ * Response DTO for a plugin in work context
  */
-export class DirectoryPluginResponseDto
-    extends UserPluginResponseDto
-    implements DirectoryPluginResponse
-{
-    @ApiProperty({ description: 'Whether plugin is enabled for this directory' })
-    directoryEnabled: boolean;
+export class WorkPluginResponseDto extends UserPluginResponseDto implements WorkPluginResponse {
+    @ApiProperty({ description: 'Whether plugin is enabled for this work' })
+    workEnabled: boolean;
 
-    @ApiPropertyOptional({ description: 'Active capability for this directory' })
-    activeCapability?: string;
+    @ApiPropertyOptional({
+        description: 'Active capabilities for this work',
+        type: [String],
+    })
+    activeCapabilities?: string[];
 
-    @ApiPropertyOptional({ description: 'Directory-specific settings (masked)' })
-    directorySettings?: Record<string, unknown>;
+    @ApiPropertyOptional({ description: 'Work-specific settings (masked)' })
+    workSettings?: Record<string, unknown>;
 
-    @ApiPropertyOptional({ description: 'Directory plugin entity ID' })
-    directoryPluginId?: string;
+    @ApiPropertyOptional({ description: 'Work plugin entity ID' })
+    workPluginId?: string;
 
     @ApiPropertyOptional({ description: 'Priority order for this plugin' })
     priority?: number;
 
-    @ApiPropertyOptional({ description: 'Directory-specific plugin metadata (read-only state)' })
+    @ApiPropertyOptional({ description: 'Work-specific plugin metadata (read-only state)' })
     metadata?: Record<string, unknown>;
 }
 
@@ -268,11 +272,11 @@ export class PluginListResponseDto implements PluginListResponse {
 }
 
 /**
- * Response for directory plugin list
+ * Response for work plugin list
  */
-export class DirectoryPluginListResponseDto implements DirectoryPluginListResponse {
-    @ApiProperty({ description: 'List of plugins', type: [DirectoryPluginResponseDto] })
-    plugins: DirectoryPluginResponseDto[];
+export class WorkPluginListResponseDto implements WorkPluginListResponse {
+    @ApiProperty({ description: 'List of plugins', type: [WorkPluginResponseDto] })
+    plugins: WorkPluginResponseDto[];
 
     @ApiProperty({ description: 'Total count of plugins' })
     total: number;

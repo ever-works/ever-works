@@ -43,9 +43,9 @@ function createSettings(overrides?: Partial<MakeSettings>): MakeSettings {
 function createInput(): MakeWorkflowInput {
 	return {
 		metadata: {
-			directoryId: 'dir-1',
-			directoryName: 'Test',
-			directorySlug: 'test',
+			workId: 'dir-1',
+			workName: 'Test',
+			workSlug: 'test',
 			targetItems: 50
 		}
 	};
@@ -207,7 +207,7 @@ describe('MakeClient', () => {
 			expect(String(url)).toBe('https://us2.make.com/api/v2/scenarios/42/run');
 			expect((init as RequestInit).method).toBe('POST');
 			const body = JSON.parse((init as RequestInit).body as string);
-			expect(body.data.metadata.directoryId).toBe('dir-1');
+			expect(body.data.metadata.workId).toBe('dir-1');
 			expect(body.responsive).toBe(true);
 		});
 	});

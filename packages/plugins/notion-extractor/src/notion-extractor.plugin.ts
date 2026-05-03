@@ -25,11 +25,11 @@ import { NotionService } from './notion.js';
  * - Supports public pages via Splitbee API (no API key required)
  * - Supports private pages via official Notion API (requires API key)
  *
- * Per-directory enable:
+ * Per-work enable:
  * - Plugin must be installed at user level first
- * - Then enabled per-directory via GeneratorForm or directory settings
+ * - Then enabled per-work via GeneratorForm or work settings
  * - Settings are resolved through the plugin system's 4-level hierarchy:
- *   Directory > User > Admin > Environment variable
+ *   Work > User > Admin > Environment variable
  */
 export class NotionExtractorPlugin implements IPlugin, IContentExtractorPlugin {
 	// ============================================================================
@@ -53,9 +53,9 @@ export class NotionExtractorPlugin implements IPlugin, IContentExtractorPlugin {
 	 * Settings can be configured at:
 	 * - Admin level: Default API key for all users
 	 * - User level: User's personal Notion API key
-	 * - Directory level: Per-directory overrides
+	 * - Work level: Per-work overrides
 	 *
-	 * The plugin system resolves settings with directory > user > admin > env priority.
+	 * The plugin system resolves settings with work > user > admin > env priority.
 	 */
 	readonly settingsSchema: JsonSchema = {
 		type: 'object',
@@ -306,7 +306,7 @@ export class NotionExtractorPlugin implements IPlugin, IContentExtractorPlugin {
 			id: this.id,
 			name: this.name,
 			version: this.version,
-			description: 'Extract content from Notion pages to use as source material for your directory',
+			description: 'Extract content from Notion pages to use as source material for your work',
 			category: this.category,
 			capabilities: [...this.capabilities],
 			author: { name: 'Ever Works Team' },
@@ -322,7 +322,7 @@ export class NotionExtractorPlugin implements IPlugin, IContentExtractorPlugin {
 			readme: [
 				'## What does the Notion Extractor do?',
 				'',
-				'This plugin extracts content from Notion pages and converts it to clean markdown for use as source material during directory generation. It supports both public and private Notion pages.',
+				'This plugin extracts content from Notion pages and converts it to clean markdown for use as source material during work generation. It supports both public and private Notion pages.',
 				'',
 				'## Why use it?',
 				'',
@@ -333,14 +333,14 @@ export class NotionExtractorPlugin implements IPlugin, IContentExtractorPlugin {
 				'',
 				'## How it works in Ever Works',
 				'',
-				'When a source URL points to a Notion page (notion.so or notion.site), the content extractor facade delegates to this plugin instead of the default extractor. It retrieves the page content as structured markdown, which the AI then uses to generate directory items during the pipeline.',
+				'When a source URL points to a Notion page (notion.so or notion.site), the content extractor facade delegates to this plugin instead of the default extractor. It retrieves the page content as structured markdown, which the AI then uses to generate work items during the pipeline.',
 				'',
 				'## Getting started',
 				'',
 				'1. Enable the Notion Extractor plugin on this page',
 				'2. For public pages, no additional configuration is required',
 				'3. For private pages, create a Notion integration at [notion.so/my-integrations](https://www.notion.so/my-integrations) and enter the API key in the settings below',
-				'4. Add Notion page URLs as source material when generating your directory'
+				'4. Add Notion page URLs as source material when generating your work'
 			].join('\n')
 		};
 	}

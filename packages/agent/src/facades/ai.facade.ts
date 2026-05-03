@@ -20,7 +20,7 @@ import { PLUGIN_CAPABILITIES, substituteVariables } from '@ever-works/plugin';
 import { jsonrepair } from '@ever-works/plugin/ai';
 import { PluginRegistryService } from '../plugins/services/plugin-registry.service';
 import { PluginSettingsService } from '../plugins/services/plugin-settings.service';
-import { DirectoryPluginRepository } from '../plugins/repositories/directory-plugin.repository';
+import { WorkPluginRepository } from '../plugins/repositories/work-plugin.repository';
 import { BaseFacadeService, FacadeError } from './base.facade';
 import { fetchModelCatalog, matchModelCatalogEntry } from './model-catalog';
 import type { ModelCatalogEntry } from './model-catalog';
@@ -45,9 +45,9 @@ export class AiFacadeService extends BaseFacadeService implements IAiFacade {
     constructor(
         registry: PluginRegistryService,
         settingsService: PluginSettingsService,
-        @Optional() directoryPluginRepository?: DirectoryPluginRepository,
+        @Optional() workPluginRepository?: WorkPluginRepository,
     ) {
-        super(registry, settingsService, directoryPluginRepository);
+        super(registry, settingsService, workPluginRepository);
     }
 
     async askJson<T, Template extends string = string>(
@@ -59,12 +59,12 @@ export class AiFacadeService extends BaseFacadeService implements IAiFacade {
         const plugin = await this.resolvePlugin<IAiProviderPlugin>(
             options?.routing?.providerOverride ?? facadeOptions.providerOverride,
             facadeOptions.userId,
-            facadeOptions.directoryId,
+            facadeOptions.workId,
         );
 
         const settings = await this.getResolvedSettings(plugin.id, {
             userId: facadeOptions.userId,
-            directoryId: facadeOptions.directoryId,
+            workId: facadeOptions.workId,
         });
 
         const model = this.resolveModel(plugin, settings, options?.routing);
@@ -228,12 +228,12 @@ export class AiFacadeService extends BaseFacadeService implements IAiFacade {
         const plugin = await this.resolvePlugin<IAiProviderPlugin>(
             facadeOptions.providerOverride,
             facadeOptions.userId,
-            facadeOptions.directoryId,
+            facadeOptions.workId,
         );
 
         const settings = await this.getResolvedSettings(plugin.id, {
             userId: facadeOptions.userId,
-            directoryId: facadeOptions.directoryId,
+            workId: facadeOptions.workId,
         });
 
         const model = this.resolveModel(plugin, settings, options as unknown as AiRoutingOptions);
@@ -253,12 +253,12 @@ export class AiFacadeService extends BaseFacadeService implements IAiFacade {
         const plugin = await this.resolvePlugin<IAiProviderPlugin>(
             facadeOptions.providerOverride,
             facadeOptions.userId,
-            facadeOptions.directoryId,
+            facadeOptions.workId,
         );
 
         const settings = await this.getResolvedSettings(plugin.id, {
             userId: facadeOptions.userId,
-            directoryId: facadeOptions.directoryId,
+            workId: facadeOptions.workId,
         });
 
         const model = this.resolveModel(plugin, settings, options as unknown as AiRoutingOptions);
@@ -285,7 +285,7 @@ export class AiFacadeService extends BaseFacadeService implements IAiFacade {
             const plugin = await this.resolvePlugin<IAiProviderPlugin>(
                 facadeOptions.providerOverride,
                 facadeOptions.userId,
-                facadeOptions.directoryId,
+                facadeOptions.workId,
             );
 
             const settings = await this.getResolvedSettings(plugin.id, facadeOptions);
@@ -314,7 +314,7 @@ export class AiFacadeService extends BaseFacadeService implements IAiFacade {
             const plugin = await this.resolvePlugin<IAiProviderPlugin>(
                 facadeOptions.providerOverride,
                 facadeOptions.userId,
-                facadeOptions.directoryId,
+                facadeOptions.workId,
             );
             const settings = await this.getResolvedSettings(plugin.id, facadeOptions);
             return await plugin.listModels(settings);
@@ -328,12 +328,12 @@ export class AiFacadeService extends BaseFacadeService implements IAiFacade {
         const plugin = await this.resolvePlugin<IAiProviderPlugin>(
             facadeOptions.providerOverride,
             facadeOptions.userId,
-            facadeOptions.directoryId,
+            facadeOptions.workId,
         );
 
         const settings = await this.getResolvedSettings(plugin.id, {
             userId: facadeOptions.userId,
-            directoryId: facadeOptions.directoryId,
+            workId: facadeOptions.workId,
         });
 
         const apiKey = this.getSettingTyped<string>(settings, 'apiKey', 'string');
@@ -360,12 +360,12 @@ export class AiFacadeService extends BaseFacadeService implements IAiFacade {
             const plugin = await this.resolvePlugin<IAiProviderPlugin>(
                 facadeOptions.providerOverride,
                 facadeOptions.userId,
-                facadeOptions.directoryId,
+                facadeOptions.workId,
             );
 
             const settings = await this.getResolvedSettings(plugin.id, {
                 userId: facadeOptions.userId,
-                directoryId: facadeOptions.directoryId,
+                workId: facadeOptions.workId,
             });
 
             return this.resolveModelMetadataForPlugin(plugin, modelId, settings);

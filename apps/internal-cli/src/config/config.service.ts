@@ -14,13 +14,13 @@ export class ConfigService {
     private readonly configPath = path.join(this.configDir, 'config.json');
 
     /**
-     * Ensures the configuration directory exists
+     * Ensures the configuration work exists
      */
     private async ensureConfigDir(): Promise<void> {
         try {
             await fs.ensureDir(this.configDir);
         } catch (error) {
-            throw new Error(`Failed to create config directory: ${error.message}`);
+            throw new Error(`Failed to create config work: ${error.message}`);
         }
     }
 
@@ -75,7 +75,7 @@ export class ConfigService {
     }
 
     /**
-     * Gets the configuration directory path
+     * Gets the configuration work path
      */
     getConfigDir(): string {
         return this.configDir;

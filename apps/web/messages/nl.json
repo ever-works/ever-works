@@ -150,7 +150,7 @@
         },
         "register": {
             "title": "Maak uw account aan",
-            "subtitle": "Begin vandaag met het bouwen van geweldige directories",
+            "subtitle": "Begin vandaag met het bouwen van geweldige werken",
             "form": {
                 "name": {
                     "label": "Volledige naam",
@@ -197,18 +197,18 @@
     "onboarding": {
         "label": "Aan de slag",
         "title": "Welkom bij Ever Works",
-        "subtitle": "Bouw en publiceer je eerste directory in minuten.",
+        "subtitle": "Bouw en publiceer je eerste werk in minuten.",
         "skipButton": "Overslaan voor nu",
         "nextButton": "Volgende",
         "stepIndex": "Stap {index}",
         "steps": {
             "welcome": {
                 "title": "Wat is Ever Works?",
-                "description": "Ever Works is een open-source directory-builder. Maak gestructureerde contentdirectories — tools, banen, links, producten — en publiceer ze als live websites.",
-                "detail": "Laten we je instellen. Verbind je providers hieronder, en maak dan je eerste directory.",
+                "description": "Ever Works is een open-source werk-builder. Maak gestructureerde contentwerken — tools, banen, links, producten — en publiceer ze als live websites.",
+                "detail": "Laten we je instellen. Verbind je providers hieronder, en maak dan je eerste werk.",
                 "feature1": {
                     "title": "AI-aangedreven content",
-                    "description": "Genereer en verrijk directory-items automatisch met je AI-provider."
+                    "description": "Genereer en verrijk werk-items automatisch met je AI-provider."
                 },
                 "feature2": {
                     "title": "Direct publiceren",
@@ -216,18 +216,18 @@
                 },
                 "feature3": {
                     "title": "Git-ondersteund",
-                    "description": "Elke directory is een GitHub-repository die jij bezit en beheert."
+                    "description": "Elke werk is een GitHub-repository die jij bezit en beheert."
                 }
             },
-            "directory": {
-                "title": "Maak je eerste directory",
-                "description": "Een directory is je contenthub. Voeg items toe, configureer de lay-out en publiceer met één klik.",
-                "detail": "Je bent klaar! Maak je eerste directory om te beginnen met bouwen en publiceren van content.",
-                "action": "Directory maken"
+            "work": {
+                "title": "Maak je eerste werk",
+                "description": "Een werk is je contenthub. Voeg items toe, configureer de lay-out en publiceer met één klik.",
+                "detail": "Je bent klaar! Maak je eerste werk om te beginnen met bouwen en publiceren van content.",
+                "action": "Werk maken"
             },
             "publish": {
                 "title": "Live gaan",
-                "description": "Verbind Vercel of GitHub om je directory als publieke website te deployen — geen hostingconfiguratie nodig.",
+                "description": "Verbind Vercel of GitHub om je werk als publieke website te deployen — geen hostingconfiguratie nodig.",
                 "action": "Publiceren instellen"
             }
         },
@@ -336,7 +336,7 @@
             "steps": {
                 "model": {
                     "title": "Kies een model",
-                    "description": "Kies het Codex-model dat je wilt draaien voor end-to-end directory-generatie."
+                    "description": "Kies het Codex-model dat je wilt draaien voor end-to-end werk-generatie."
                 },
                 "credentials": {
                     "title": "Voeg referenties toe",
@@ -408,7 +408,7 @@
         "simWizard": {
             "label": "SIM AI installatie",
             "title": "Stel SIM AI in twee stappen in",
-            "subtitle": "Voeg je SIM AI API-sleutel toe en verifieer de verbinding om directory-generatie te delegeren aan SIM-workflows.",
+            "subtitle": "Voeg je SIM AI API-sleutel toe en verifieer de verbinding om werk-generatie te delegeren aan SIM-workflows.",
             "stepIndex": "Stap {index}",
             "continueButton": "Doorgaan",
             "steps": {
@@ -431,7 +431,7 @@
         "title": "Dashboard",
         "connectGithub": {
             "title": "Verbind je GitHub-account",
-            "description": "GitHub is vereist voor het maken en beheren van directory-repositories. Verbind je account om te beginnen.",
+            "description": "GitHub is vereist voor het maken en beheren van werk-repositories. Verbind je account om te beginnen.",
             "connect": "GitHub verbinden",
             "dismiss": "Dit doe ik later"
         },
@@ -465,7 +465,7 @@
         },
         "header": {
             "welcome": "Welkom terug, {username}!",
-            "subtitle": "Beheer je AI-aangedreven directories en volg hun prestaties",
+            "subtitle": "Beheer je AI-aangedreven werken en volg hun prestaties",
             "onboarding": {
                 "badge": "Ingebruikname {currentStep}/{totalSteps}",
                 "dismiss": "Ingebruikname-snelkoppeling verbergen"
@@ -490,14 +490,14 @@
                 },
                 "quickTips": {
                     "title": "Snelle tips",
-                    "tip1": "Maak je eerste directory door op de knop 'Directory maken' op het dashboard te klikken.",
-                    "tip2": "Gebruik de AI-generator om je directory automatisch te vullen met relevante items.",
-                    "tip3": "Verbind je GitHub-account om je directories te synchroniseren en als repositories te implementeren."
+                    "tip1": "Maak je eerste werk door op de knop 'Werk maken' op het dashboard te klikken.",
+                    "tip2": "Gebruik de AI-generator om je werk automatisch te vullen met relevante items.",
+                    "tip3": "Verbind je GitHub-account om je werken te synchroniseren en als repositories te implementeren."
                 },
                 "shortcuts": {
                     "title": "Toetsenbord-snelkoppelingen",
-                    "search": "Directories doorzoeken",
-                    "newDirectory": "Nieuwe directory maken",
+                    "search": "Werken doorzoeken",
+                    "newWork": "Nieuwe werk maken",
                     "help": "Help openen",
                     "hint": "Gebruik Cmd op Mac of Ctrl op Windows/Linux"
                 },
@@ -513,7 +513,7 @@
         },
         "activity": {
             "title": "Activiteitenlogboek",
-            "subtitle": "Volg alle bewerkingen in je directories",
+            "subtitle": "Volg alle bewerkingen in je werken",
             "loading": "Laden...",
             "fetchFailed": "Kon activiteiten niet laden",
             "exportFailed": "Kon activiteitenlogboek niet exporteren",
@@ -521,7 +521,7 @@
             "columns": {
                 "status": "Status",
                 "dateTime": "Datum / tijd",
-                "directory": "Directory",
+                "work": "Werk",
                 "type": "Type",
                 "summary": "Samenvatting"
             },
@@ -532,9 +532,9 @@
                     "generation": "Generatie",
                     "comparison": "Vergelijking",
                     "deployment": "Implementatie",
-                    "directoryCreated": "Directory gemaakt",
-                    "directoryUpdated": "Directory bijgewerkt",
-                    "directoryDeleted": "Directory verwijderd",
+                    "workCreated": "Werk gemaakt",
+                    "workUpdated": "Werk bijgewerkt",
+                    "workDeleted": "Werk verwijderd",
                     "pluginEnabled": "Plugin ingeschakeld",
                     "pluginDisabled": "Plugin uitgeschakeld",
                     "pluginConfigured": "Plugin geconfigureerd",
@@ -553,7 +553,8 @@
                     "pending": "In afwachting",
                     "inProgress": "Uitvoeren",
                     "completed": "Voltooid",
-                    "failed": "Mislukt"
+                    "failed": "Mislukt",
+                    "cancelled": "Geannuleerd"
                 }
             },
             "actions": {
@@ -595,32 +596,32 @@
                 "pageOf": "Pagina {page} van {total}"
             }
         },
-        "directories": {
-            "title": "Directories",
-            "subtitle": "Beheer en organiseer je AI-aangedreven directories",
+        "works": {
+            "title": "Werken",
+            "subtitle": "Beheer en organiseer je AI-aangedreven werken",
             "summary": {
-                "totalDirectories": "Totaal directories",
+                "totalWorks": "Totaal werken",
                 "generating": "Genereren",
                 "totalItems": "Totaal items"
             },
-            "recent": "Recente directories",
+            "recent": "Recente werken",
             "viewAll": "Alle bekijken ({count})",
-            "search": "Directories doorzoeken...",
-            "create": "Directory maken",
-            "showing": "Weergeven van {current} van {total} directories",
-            "searchFailed": "Kon directories niet doorzoeken. Probeer het opnieuw.",
+            "search": "Werken doorzoeken...",
+            "create": "Werk maken",
+            "showing": "Weergeven van {current} van {total} werken",
+            "searchFailed": "Kon werken niet doorzoeken. Probeer het opnieuw.",
             "pagination": {
                 "previous": "Vorige",
                 "next": "Volgende"
             },
             "empty": {
-                "title": "Nog geen directories",
-                "description": "Maak je eerste AI-aangedreven directory om te beginnen met organiseren en tonen van je inhoud.",
-                "action": "Maak je eerste directory",
+                "title": "Nog geen werken",
+                "description": "Maak je eerste AI-aangedreven werk om te beginnen met organiseren en tonen van je inhoud.",
+                "action": "Maak je eerste werk",
                 "notFound": {
-                    "title": "Geen directories gevonden",
+                    "title": "Geen werken gevonden",
                     "withSearch": "Pas je zoektermen aan",
-                    "withoutSearch": "Maak je eerste AI-aangedreven directory om te beginnen"
+                    "withoutSearch": "Maak je eerste AI-aangedreven werk om te beginnen"
                 }
             }
         },
@@ -637,7 +638,7 @@
             },
             "data": {
                 "exportTitle": "Gegevens exporteren",
-                "exportDescription": "Download je accountgegevens inclusief directories, plugin-instellingen en profielinformatie als een JSON-bestand.",
+                "exportDescription": "Download je accountgegevens inclusief werken, plugin-instellingen en profielinformatie als een JSON-bestand.",
                 "includeSecrets": "Geheime instellingen opnemen (API-sleutels, tokens) — geëxporteerd als gemaskeerde waarden",
                 "secretsWarning": "Geheime instellingen worden geëxporteerd als gemaskeerde waarden. Je moet ze handmatig vervangen door echte credentials voordat je importeert.",
                 "exportButton": "Gegevens exporteren",
@@ -645,7 +646,7 @@
                 "exportSuccess": "Gegevens succesvol geëxporteerd",
                 "exportError": "Kon gegevens niet exporteren",
                 "importTitle": "Gegevens importeren",
-                "importDescription": "Importeer gegevens uit een eerder geëxporteerd JSON-bestand. Je kunt conflicten oplossen voor directories met overeenkomende slugs.",
+                "importDescription": "Importeer gegevens uit een eerder geëxporteerd JSON-bestand. Je kunt conflicten oplossen voor werken met overeenkomende slugs.",
                 "importButton": "Gegevens importeren",
                 "syncTitle": "GitHub-synchronisatie",
                 "syncDescription": "Synchroniseer je accountconfiguratie naar een privé GitHub-repository voor back-up en migratie tussen instanties.",
@@ -657,13 +658,13 @@
                     "invalidJson": "Ongeldig JSON-bestand",
                     "previewError": "Kon importbestand niet analyseren",
                     "summary": "Importoverzicht",
-                    "directories": "Directories",
+                    "works": "Werken",
                     "items": "Items",
                     "userPlugins": "Gebruikersplugins",
                     "version": "Formaatversie",
                     "missingPlugins": "Deze plugins zijn niet geïnstalleerd en worden overgeslagen",
                     "conflicts": "Slug-conflicten",
-                    "existingDirectory": "Bestaand",
+                    "existingWork": "Bestaand",
                     "incoming": "Binnenkomend",
                     "strategySkip": "Overslaan (bestaande behouden)",
                     "strategyOverwrite": "Bestaande overschrijven",
@@ -680,9 +681,9 @@
                     "validationErrors": "Validatiefouten",
                     "resultSuccess": "Import succesvol voltooid",
                     "resultFailed": "Import mislukt",
-                    "directoriesCreated": "Directories aangemaakt",
-                    "directoriesUpdated": "Directories bijgewerkt",
-                    "directoriesSkipped": "Directories overgeslagen",
+                    "worksCreated": "Werken aangemaakt",
+                    "worksUpdated": "Werken bijgewerkt",
+                    "worksSkipped": "Werken overgeslagen",
                     "pluginsImported": "Plugins geïmporteerd",
                     "warnings": "Waarschuwingen",
                     "errors": "Fouten"
@@ -731,11 +732,11 @@
                 "backToCategory": "Terug naar {category}",
                 "pipelineDefault": {
                     "title": "Standaardpipeline",
-                    "description": "Kies welke pipeline standaard wordt gebruikt bij het genereren van directory-items.",
+                    "description": "Kies welke pipeline standaard wordt gebruikt bij het genereren van werk-items.",
                     "autoLabel": "Automatisch",
-                    "autoDescription": "Gebruik de door het systeem opgeloste pipeline voor elke directory",
+                    "autoDescription": "Gebruik de door het systeem opgeloste pipeline voor elke werk",
                     "enforceLabel": "Deze standaard afdwingen",
-                    "enforceDescription": "Selecteer altijd deze pipeline vooraf, zelfs als een directory zijn eigen pipeline heeft geconfigureerd. Je kunt pipelines nog steeds handmatig wisselen in het formulier.",
+                    "enforceDescription": "Selecteer altijd deze pipeline vooraf, zelfs als een werk zijn eigen pipeline heeft geconfigureerd. Je kunt pipelines nog steeds handmatig wisselen in het formulier.",
                     "saveFailed": "Kon standaardpipeline niet opslaan"
                 }
             },
@@ -818,8 +819,8 @@
                 "subtitle": "Koppel je externe accounts voor uitgebreide functionaliteit",
                 "github": {
                     "name": "GitHub",
-                    "connected": "Maak en beheer directories met GitHub-repositories",
-                    "disconnected": "Verbind om directories te maken vanuit repositories",
+                    "connected": "Maak en beheer werken met GitHub-repositories",
+                    "disconnected": "Verbind om werken te maken vanuit repositories",
                     "scopes": "Bereiken",
                     "organizations": "Gekoppelde organisaties",
                     "organizationsHint": "Gebruik Opnieuw verbinden om toegang te verlenen tot extra organisaties",
@@ -880,12 +881,12 @@
             }
         },
         "stats": {
-            "totalDirectories": "Totaal directories",
+            "totalWorks": "Totaal werken",
             "totalItems": "Totaal items",
             "activeWebsites": "Actieve websites",
             "fromLastMonth": "van afgelopen maand"
         },
-        "directoryCard": {
+        "workCard": {
             "status": {
                 "active": "Actief",
                 "notStarted": "Nog niet gestart",
@@ -910,14 +911,14 @@
             "views": "{count} weergaven",
             "updated": "Bijgewerkt {date}",
             "viewAction": "Bekijken →",
-            "openingTitle": "Directory openen",
-            "openingMessage": "Je directory wordt voorbereid. Details openen binnenkort. Blijf op deze pagina."
+            "openingTitle": "Werk openen",
+            "openingMessage": "Je werk wordt voorbereid. Details openen binnenkort. Blijf op deze pagina."
         },
-        "directoryList": {
-            "title": "Jouw directories",
-            "createButton": "Directory aanmaken"
+        "workList": {
+            "title": "Jouw werken",
+            "createButton": "Werk aanmaken"
         },
-        "directoryDetail": {
+        "workDetail": {
             "failedToGenerateItems": "Kon items niet genereren. Probeer het opnieuw.",
             "generationCompleted": "Generatie succesvol voltooid",
             "generationCancelled": "Generatie is geannuleerd",
@@ -1357,14 +1358,14 @@
                 "title": "Recente activiteit",
                 "noActivity": "Nog geen activiteit",
                 "created": "Map aangemaakt",
-                "directoryCreated": "Map is succesvol aangemaakt",
+                "workCreated": "Map is succesvol aangemaakt",
                 "justNow": "Zojuist"
             },
             "items": {
-                "title": "Directory-items",
-                "subtitle": "Beheer en organiseer de items in je directory",
+                "title": "Werk-items",
+                "subtitle": "Beheer en organiseer de items in je werk",
                 "noItemsTitle": "Nog geen items",
-                "noItemsDescription": "Je directory heeft nog geen items. Genereer items om je directory met inhoud te vullen.",
+                "noItemsDescription": "Je werk heeft nog geen items. Genereer items om je werk met inhoud te vullen.",
                 "generateItems": "Items genereren",
                 "searchPlaceholder": "Zoek items…",
                 "allCategories": "Alle categorieën",
@@ -1426,14 +1427,14 @@
                     "screenshotFailed": "Kon screenshot niet vastleggen",
                     "screenshotError": "Er is een fout opgetreden bij het vastleggen van de screenshot",
                     "featured": "Uitgelicht item",
-                    "featuredHelp": "Markeer dit item als uitgelicht in de directory",
+                    "featuredHelp": "Markeer dit item als uitgelicht in de werk",
                     "updateWithPR": "Pull request maken",
                     "updateWithPRHelp": "Dien wijzigingen in als pull request in plaats van directe vastlegging",
                     "cancel": "Annuleren",
                     "adding": "Toevoegen…",
                     "addItem": "Item toevoegen",
                     "success": "Item succesvol toegevoegd",
-                    "successDescription": "Het item is toegevoegd aan je directory",
+                    "successDescription": "Het item is toegevoegd aan je werk",
                     "failed": "Kon item niet toevoegen",
                     "error": "Er is een fout opgetreden bij het toevoegen van het item",
                     "errors": {
@@ -1662,7 +1663,7 @@
                 "loadingFormSchema": "Laden formulierconfiguratie...",
                 "failedToLoadFormSchema": "Kon formulierconfiguratie niet laden",
                 "selectOption": "Selecteer een optie",
-                "directoryName": "Mapnaam",
+                "workName": "Mapnaam",
                 "generationPrompt": "Generatieprompt",
                 "modelOverride": "AI-model overschrijven",
                 "modelOverridePlaceholder": "bijv. openai/gpt-4.1 of openrouter/openai/gpt-4.1",
@@ -1675,7 +1676,7 @@
                 "startGeneration": "Generatie starten",
                 "regenerateItems": "Items opnieuw genereren",
                 "updateItems": "Generatie uitvoeren",
-                "recreateDirectory": "Map opnieuw aanmaken",
+                "recreateWork": "Map opnieuw aanmaken",
                 "showAdvancedOptions": "Geavanceerde opties tonen",
                 "hideAdvancedOptions": "Geavanceerde opties verbergen",
                 "cancel": "Annuleren",
@@ -1713,7 +1714,7 @@
                 "websiteRepositoryCreationMethod": "Website-repository aanmaakmethode",
                 "methodDuplicate": "Dupliceren",
                 "methodFork": "Fork",
-                "directoryNamePlaceholder": "Voer mapnaam in",
+                "workNamePlaceholder": "Voer mapnaam in",
                 "methodCreateFromTemplate": "Aanmaken vanuit sjabloon",
                 "aiProcessingConfiguration": "AI-verwerkingsconfiguratie",
                 "maxSearchQueries": "Max zoekopdrachten",
@@ -1768,10 +1769,11 @@
                 "aiProviderDescription": "AI-modelprovider voor contentgeneratie en -extractie",
                 "contentExtractorProvider": "Content Extractor",
                 "contentExtractorProviderDescription": "Provider voor het extraheren van content uit webpagina's",
-                "useDirectoryDefault": "Gebruik map-standaard",
+                "useWorkDefault": "Gebruik map-standaard",
                 "default": "Standaard",
                 "notConfigured": "Niet geconfigureerd",
                 "notConfiguredTooltip": "Deze provider vereist configuratie. Ga naar Instellingen → Plugins om in te stellen.",
+                "changeModels": "Wijzigen",
                 "jsonObjectError": "Waarde moet een JSON-object zijn",
                 "invalidJsonError": "Ongeldig JSON-formaat"
             },
@@ -1799,7 +1801,11 @@
                 "closeNote": "Dit kan enkele minuten duren. Je kunt deze pagina sluiten en later terugkomen.",
                 "showLogs": "Staplogs tonen",
                 "hideLogs": "Staplogs verbergen",
-                "waitingForLogs": "Wachten op live logs..."
+                "waitingForLogs": "Wachten op live logs...",
+                "stop": "Generatie stoppen",
+                "stopping": "Stopt...",
+                "stopRequested": "Annulering van generatie aangevraagd",
+                "stopFailed": "Annulering van generatie mislukt"
             },
             "settings": {
                 "sourceSettings": "Bronrepository",
@@ -1831,7 +1837,7 @@
                 },
                 "generalSettings": "Algemene instellingen",
                 "generalTitle": "Algemene instellingen",
-                "directoryName": "Mapnaam",
+                "workName": "Mapnaam",
                 "description": "Beschrijving",
                 "organizationRepository": "Organisatie-repository",
                 "organizationHelp": "Maak repositories onder een organisatie in plaats van je persoonlijke account",
@@ -1859,8 +1865,8 @@
                 "deleteWebsiteRepositoryDescription": "Verwijder de gedeployde website-repository",
                 "deleteConfirm": "Weet je het absoluut zeker?",
                 "deleteConfirmDetail": "Deze actie kan niet ongedaan worden gemaakt. De map en geselecteerde repositories worden permanent verwijderd.",
-                "confirmDirectoryName": "Typ mapnaam om te bevestigen",
-                "confirmDirectoryNameDescription": "Typ \"{name}\" om verwijdering te bevestigen",
+                "confirmWorkName": "Typ mapnaam om te bevestigen",
+                "confirmWorkNameDescription": "Typ \"{name}\" om verwijdering te bevestigen",
                 "deleteNameMismatch": "Mapnaam komt niet overeen",
                 "deleteButton": "Map verwijderen",
                 "deleteConfirmButton": "Ja, verwijderen",
@@ -1874,7 +1880,7 @@
                 "updateFailed": "Kon instellingen niet bijwerken",
                 "deployProvider": {
                     "title": "Deploy-provider",
-                    "description": "Selecteer waar je directory-website wordt gedeployed",
+                    "description": "Selecteer waar je werk-website wordt gedeployed",
                     "configure": "Configureren",
                     "ready": "Klaar om te deployen",
                     "notConfigured": "Niet geconfigureerd",
@@ -1911,7 +1917,7 @@
                     "prompts": {
                         "relevanceAssessment": {
                             "title": "Relevantiebeoordeling",
-                            "description": "Aanvullende instructies voor het filteren van webpagina's op relevantie voor je directory-onderwerp.",
+                            "description": "Aanvullende instructies voor het filteren van webpagina's op relevantie voor je werk-onderwerp.",
                             "placeholder": "bijv. Alleen pagina's opnemen die zich richten op open-sourceprojecten..."
                         },
                         "itemGeneration": {
@@ -1962,7 +1968,7 @@
                 "communityPrUpdateFailed": "Kon community PR-instellingen niet bijwerken",
                 "websiteConfig": {
                     "title": "Websiteconfiguratie",
-                    "subtitle": "Pas aan hoe je directory-website eruitziet en zich gedraagt",
+                    "subtitle": "Pas aan hoe je werk-website eruitziet en zich gedraagt",
                     "loadFailed": "Kon website-instellingen niet laden",
                     "saveSuccess": "Website-instellingen succesvol opgeslagen",
                     "saveFailed": "Kon website-instellingen niet opslaan",
@@ -1977,13 +1983,13 @@
                         "siteName": {
                             "title": "Site-identiteit",
                             "label": "Sitenaam",
-                            "placeholder": "Mijn Directory",
+                            "placeholder": "Mijn Werk",
                             "helper": "De naam die wordt weergegeven in de websitekop en het browservenster"
                         },
                         "siteUrl": {
                             "label": "Site-URL",
                             "placeholder": "https://example.com",
-                            "helper": "De URL van je bedrijf of directory-website"
+                            "helper": "De URL van je bedrijf of werk-website"
                         },
                         "global": {
                             "title": "Globale functies",
@@ -2065,7 +2071,7 @@
                 },
                 "committer": {
                     "title": "Git-committer",
-                    "description": "Overschrijf de naam en e-mail van de committer voor git-commits in deze directory. Laat leeg om je gebruikersniveau-instellingen of accountstandaarden te gebruiken.",
+                    "description": "Overschrijf de naam en e-mail van de committer voor git-commits in deze werk. Laat leeg om je gebruikersniveau-instellingen of accountstandaarden te gebruiken.",
                     "nameLabel": "Committer-naam",
                     "emailLabel": "Committer-e-mail",
                     "save": "Committer opslaan",
@@ -2076,13 +2082,13 @@
             "deploy": {
                 "noProviderAlert": {
                     "title": "Geen uitrolprovider",
-                    "description": "Selecteer een uitrolprovider om uw directory-website uit te rollen.",
+                    "description": "Selecteer een uitrolprovider om uw werk-website uit te rollen.",
                     "selectButton": "Selecteren & Doorgaan",
                     "noProviders": "Geen uitrolproviders beschikbaar. Installeer eerst een uitrolplug-in."
                 },
                 "noTokenAlert": {
                     "title": "{provider} Token vereist",
-                    "description": "Om uw directory uit te rollen, moet u uw {provider} API-token configureren in de plug-ininstellingen.",
+                    "description": "Om uw werk uit te rollen, moet u uw {provider} API-token configureren in de plug-ininstellingen.",
                     "configureButton": "Configureren in plug-ininstellingen",
                     "getTokenButton": "API-token ophalen",
                     "howTo": {
@@ -2090,25 +2096,25 @@
                         "step1": "Klik op 'API-token ophalen' om het dashboard van uw provider te openen",
                         "step2": "Maak een nieuw token aan met uitrolmachtigingen",
                         "step3": "Configureer uw {provider} API-token in Plug-ininstellingen > {provider}",
-                        "step4": "Keer hier terug om uw directory uit te rollen"
+                        "step4": "Keer hier terug om uw werk uit te rollen"
                     }
                 },
                 "sharedNoTokenAlert": {
                     "title": "Uitrol niet beschikbaar",
-                    "description": "De directory-eigenaar heeft uitrol niet geconfigureerd. Neem contact op met de directory-eigenaar om uitrol in te stellen.",
+                    "description": "De werk-eigenaar heeft uitrol niet geconfigureerd. Neem contact op met de werk-eigenaar om uitrol in te stellen.",
                     "hint": "Als medewerker kunt u uitrollen starten zodra de eigenaar de uitrolprovider heeft geconfigureerd."
                 },
                 "form": {
                     "deployment": {
                         "title": "Website uitrollen",
-                        "description": "Rol uw directory-website-repository uit.",
+                        "description": "Rol uw werk-website-repository uit.",
                         "deployButton": "Uitrollen naar {provider}",
                         "deployingButton": "Uitrollen...",
                         "deployingStateButton": "Uitrollen ({state})...",
                         "successMessage": "Uw website is succesvol uitgerold!",
                         "teamSelection": {
                             "title": "Team selecteren",
-                            "description": "Kies het team om deze directory naar uit te rollen.",
+                            "description": "Kies het team om deze werk naar uit te rollen.",
                             "label": "Team",
                             "placeholder": "Selecteer een team",
                             "confirmButton": "Uitrollen naar team",
@@ -2135,7 +2141,7 @@
                     },
                     "info": {
                         "deployInfo": "Uitrol duurt doorgaans 1-3 minuten. U ontvangt een URL zodra het voltooid is.",
-                        "updateInfo": "Updates synchroniseren uw directory-inhoud met de website-repository voor de volgende uitrol."
+                        "updateInfo": "Updates synchroniseren uw werk-inhoud met de website-repository voor de volgende uitrol."
                     },
                     "websiteTemplate": {
                         "title": "Automatische sjabloonupdates",
@@ -2155,7 +2161,7 @@
                         "title": "Configureren voor uitrol",
                         "description": "Bekijk en pas uw website-instellingen aan voor uitrol",
                         "siteName": "Sitenaam",
-                        "siteNamePlaceholder": "Mijn directory",
+                        "siteNamePlaceholder": "Mijn werk",
                         "siteNameHelper": "De naam die op uw website wordt weergegeven (standaard: Acme)",
                         "tabGeneral": "Algemeen",
                         "tabHeader": "Kop",
@@ -2202,9 +2208,9 @@
                 }
             }
         },
-        "directoryCreation": {
-            "title": "Nieuwe directory aanmaken",
-            "subtitle": "Kies hoe je je directory wilt aanmaken",
+        "workCreation": {
+            "title": "Nieuwe werk aanmaken",
+            "subtitle": "Kies hoe je je werk wilt aanmaken",
             "backToOptions": "Terug naar opties",
             "sidebar": {
                 "selectedProvider": "Git-provider",
@@ -2212,7 +2218,7 @@
             },
             "deployProvider": {
                 "title": "Deploy-provider",
-                "description": "Selecteer waar je je directory-website wilt deployen",
+                "description": "Selecteer waar je je werk-website wilt deployen",
                 "noProviders": "Geen deploy-providers beschikbaar",
                 "notConfigured": "Niet geconfigureerd",
                 "configured": "Klaar om te deployen",
@@ -2230,21 +2236,21 @@
             },
             "ai": {
                 "title": "Aanmaken met AI",
-                "subtitle": "Beschrijf je directory-idee in natuurlijke taal en laat AI de setup regelen",
+                "subtitle": "Beschrijf je werk-idee in natuurlijke taal en laat AI de setup regelen",
                 "getStarted": "Aan de slag",
-                "formTitle": "Directory aanmaken met AI",
-                "formSubtitle": "Beschrijf je directory-idee en laat AI de setup en initiële content-generatie regelen",
-                "directoryNameLabel": "Directory-naam",
-                "directoryNamePlaceholder": "bijv. Awesome AI Tools",
-                "directoryNameHelp": "AI stelt een naam voor als je dit leeg laat",
-                "promptLabel": "Beschrijf je directory",
+                "formTitle": "Werk aanmaken met AI",
+                "formSubtitle": "Beschrijf je werk-idee en laat AI de setup en initiële content-generatie regelen",
+                "workNameLabel": "Werk-naam",
+                "workNamePlaceholder": "bijv. Awesome AI Tools",
+                "workNameHelp": "AI stelt een naam voor als je dit leeg laat",
+                "promptLabel": "Beschrijf je werk",
                 "githubRequired": "Verbind eerst je GitHub-account.",
-                "promptPlaceholder": "Beschrijf welk soort directory je wilt aanmaken, welke items het moet bevatten en eventuele specifieke eisen...",
+                "promptPlaceholder": "Beschrijf welk soort werk je wilt aanmaken, welke items het moet bevatten en eventuele specifieke eisen...",
                 "inspirationText": "Inspiratie nodig? Probeer een van deze:",
                 "examplePrompts": {
                     "0": {
                         "name": "AI Developer Tools",
-                        "prompt": "Maak een directory van de beste AI-tools voor ontwikkelaars"
+                        "prompt": "Maak een werk van de beste AI-tools voor ontwikkelaars"
                     },
                     "1": {
                         "name": "React Components Hub",
@@ -2252,7 +2258,7 @@
                     },
                     "2": {
                         "name": "Remote Team Tools",
-                        "prompt": "Genereer een directory van productiviteitsapps voor remote teams"
+                        "prompt": "Genereer een werk van productiviteitsapps voor remote teams"
                     },
                     "3": {
                         "name": "Sustainable Fashion",
@@ -2267,23 +2273,23 @@
                     "3": "Richt GitHub-repository in met juiste documentatie"
                 },
                 "generateButton": "Genereren met AI",
-                "generatingButton": "Directory genereren...",
+                "generatingButton": "Werk genereren...",
                 "cancelButton": "Annuleren",
                 "noteTitle": "Opmerking:",
-                "noteText": "AI-generatie duurt meestal 2-5 minuten afhankelijk van de complexiteit van je verzoek. Je krijgt een melding als je directory klaar is.",
+                "noteText": "AI-generatie duurt meestal 2-5 minuten afhankelijk van de complexiteit van je verzoek. Je krijgt een melding als je werk klaar is.",
                 "errors": {
-                    "promptRequired": "Beschrijf alsjeblieft welk soort directory je wilt aanmaken",
+                    "promptRequired": "Beschrijf alsjeblieft welk soort werk je wilt aanmaken",
                     "unconfiguredProviders": "{providers} niet geconfigureerd. Ga naar Instellingen → Plugins om in te stellen voor genereren.",
-                    "nameRequired": "Directory-naam is verplicht",
-                    "slugRequired": "Directory-slug is verplicht",
-                    "descriptionRequired": "Directory-beschrijving is verplicht",
+                    "nameRequired": "Werk-naam is verplicht",
+                    "slugRequired": "Werk-slug is verplicht",
+                    "descriptionRequired": "Werk-beschrijving is verplicht",
                     "githubRequired": "Verbind eerst je GitHub-account.",
-                    "createFailed": "Fout bij aanmaken directory"
+                    "createFailed": "Fout bij aanmaken werk"
                 },
                 "success": {
-                    "started": "Directory-aanmaken gestart!",
+                    "started": "Werk-aanmaken gestart!",
                     "generating": "AI genereert content. Dit kan enkele minuten duren...",
-                    "created": "Directory succesvol aangemaakt!"
+                    "created": "Werk succesvol aangemaakt!"
                 },
                 "advancedSettings": "Geavanceerde instellingen",
                 "advancedSubtitle": "Configureer organisatie- en repository-instellingen",
@@ -2294,14 +2300,14 @@
             },
             "manual": {
                 "title": "Handmatig aanmaken",
-                "subtitle": "Configureer je directory met volledige controle over elke instelling en optie",
+                "subtitle": "Configureer je werk met volledige controle over elke instelling en optie",
                 "configureNow": "Nu configureren",
-                "formTitle": "Directory handmatig aanmaken",
-                "formSubtitle": "Configureer je directory met volledige controle over elke instelling",
+                "formTitle": "Werk handmatig aanmaken",
+                "formSubtitle": "Configureer je werk met volledige controle over elke instelling",
                 "basicInfo": "Basisinformatie",
-                "nameLabel": "Directory-naam *",
+                "nameLabel": "Werk-naam *",
                 "namePlaceholder": "bijv. Awesome AI Tools",
-                "slugLabel": "Directory-slug *",
+                "slugLabel": "Werk-slug *",
                 "slugPlaceholder": "awesome-ai-tools",
                 "githubRequired": "Verbind eerst je GitHub-account.",
                 "slugHelp": "URL-vriendelijke identifier (alleen kleine letters, cijfers en koppeltekens)",
@@ -2310,7 +2316,7 @@
                 "advancedSettings": "Geavanceerde instellingen",
                 "advancedSubtitle": "Organisatie, aangepaste headers en meer",
                 "organizationLabel": "Aanmaken onder organisatie",
-                "organizationHelp": "Maak deze directory aan onder een GitHub-organisatie in plaats van je persoonlijke account",
+                "organizationHelp": "Maak deze werk aan onder een GitHub-organisatie in plaats van je persoonlijke account",
                 "organizationNameLabel": "Organisatienaam",
                 "organizationNamePlaceholder": "mijn-organisatie",
                 "headerLabel": "Aangepaste README-header",
@@ -2319,25 +2325,25 @@
                 "footerLabel": "Aangepaste README-footer",
                 "footerPlaceholder": "Voeg aangepaste content toe onderaan je README-bestand",
                 "footerOverwrite": "Standaard footer volledig vervangen",
-                "createButton": "Directory aanmaken",
-                "creatingButton": "Directory aanmaken...",
+                "createButton": "Werk aanmaken",
+                "creatingButton": "Werk aanmaken...",
                 "cancelButton": "Annuleren",
-                "nameRequired": "Directory-naam is verplicht",
-                "slugRequired": "Directory-slug is verplicht",
-                "descriptionRequired": "Directory-beschrijving is verplicht",
-                "createFailed": "Fout bij aanmaken directory",
+                "nameRequired": "Werk-naam is verplicht",
+                "slugRequired": "Werk-slug is verplicht",
+                "descriptionRequired": "Werk-beschrijving is verplicht",
+                "createFailed": "Fout bij aanmaken werk",
                 "success": {
-                    "created": "Directory succesvol aangemaakt!"
+                    "created": "Werk succesvol aangemaakt!"
                 }
             },
             "import": {
                 "title": "Bestaande importeren",
-                "subtitle": "Importeer een directory vanuit een bestaande GitHub-repository",
+                "subtitle": "Importeer een werk vanuit een bestaande GitHub-repository",
                 "importNow": "Nu importeren",
                 "aiProviderSettings": "AI-provider",
                 "aiProviderSettingsDescription": "Kies welke AI-provider te gebruiken voor het parsen van de README",
-                "formTitle": "Directory importeren vanuit GitHub",
-                "formSubtitle": "Importeer items vanuit een bestaande GitHub-repository om je directory te maken",
+                "formTitle": "Werk importeren vanuit GitHub",
+                "formSubtitle": "Importeer items vanuit een bestaande GitHub-repository om je werk te maken",
                 "sync": {
                     "title": "Gesynchroniseerd houden",
                     "description": "Updates automatisch ophalen uit de bronrepository."
@@ -2390,13 +2396,13 @@
                     "schedule": "Schema: {cadence}",
                     "providers": "Providers: {providers}"
                 },
-                "nameLabel": "Directory-naam",
-                "namePlaceholder": "bijv. Mijn Awesome Directory",
+                "nameLabel": "Werk-naam",
+                "namePlaceholder": "bijv. Mijn Awesome Werk",
                 "advancedSettings": "Geavanceerde instellingen",
                 "advancedSubtitle": "Configureer organisatie- en repository-instellingen",
                 "attribution": {
                     "title": "Bronvermelding:",
-                    "text": "Deze directory verwijst naar {url} als bron"
+                    "text": "Deze werk verwijst naar {url} als bron"
                 },
                 "research": {
                     "title": "Import- en onderzoeksmodus",
@@ -2419,13 +2425,13 @@
                     "importingButton": "Onderzoeks-pipeline starten..."
                 },
                 "analyzeButton": "Repository analyseren",
-                "importButton": "Directory importeren",
+                "importButton": "Werk importeren",
                 "importingButton": "Importeren...",
                 "backButton": "Terug",
                 "cancelButton": "Annuleren",
                 "importing": {
-                    "title": "Directory importeren",
-                    "subtitle": "Je directory instellen vanuit de bronrepository..."
+                    "title": "Werk importeren",
+                    "subtitle": "Je werk instellen vanuit de bronrepository..."
                 },
                 "repositorySelector": {
                     "title": "Repository selecteren",
@@ -2492,17 +2498,17 @@
                     "unsupportedFormat": "Dit repository-format wordt niet ondersteund. Gebruik een Data-repository of Awesome List-format.",
                     "analyzeFailed": "Fout bij analyseren repository",
                     "analyzeForLinkingFailed": "Fout bij analyseren voor koppelen",
-                    "nameRequired": "Directory-naam is verplicht",
+                    "nameRequired": "Werk-naam is verplicht",
                     "noAnalysis": "Analyseer eerst een repository",
                     "githubRequired": "Verbind eerst je GitHub-account",
                     "providerRequired": "Selecteer eerst een git-provider",
-                    "importFailed": "Fout bij importeren directory",
-                    "linkFailed": "Fout bij koppelen directory",
+                    "importFailed": "Fout bij importeren werk",
+                    "linkFailed": "Fout bij koppelen werk",
                     "providerNotConfigured": "{provider} is niet geconfigureerd. Ga naar Instellingen → Plugins om in te stellen voor importeren."
                 },
                 "success": {
-                    "started": "Import gestart! Doorsturen naar je directory...",
-                    "linked": "Directory succesvol gekoppeld"
+                    "started": "Import gestart! Doorsturen naar je werk...",
+                    "linked": "Werk succesvol gekoppeld"
                 },
                 "slugConflict": {
                     "title": "Repository-naamconflict",
@@ -2515,7 +2521,7 @@
             "connection": {
                 "alert": {
                     "title": "{provider} niet verbonden",
-                    "subtitle": "Verbind je {provider}-account om directories te maken",
+                    "subtitle": "Verbind je {provider}-account om werken te maken",
                     "connectButton": "{provider} verbinden",
                     "connectingButton": "Verbinden..."
                 }
@@ -2531,7 +2537,7 @@
             },
             "settings": {
                 "title": "Git-providerverbindingen",
-                "subtitle": "Verbind je git-provideraccounts om repositories te importeren, directories te maken en je projecten te beheren.",
+                "subtitle": "Verbind je git-provideraccounts om repositories te importeren, werken te maken en je projecten te beheren.",
                 "connectedCount": "{count, plural, =0 {Geen providers verbonden} =1 {1 provider verbonden} other {# providers verbonden}}",
                 "noProvidersConnected": "Geen providers verbonden",
                 "canImport": "Je kunt repositories importeren en beheren",
@@ -2562,7 +2568,7 @@
                 "subtitle": "Configureer implementatie-providers in de plugin-instellingen",
                 "connected": "Verbonden",
                 "notConnected": "Niet verbonden",
-                "connectedMessage": "Je implementatie-provider is geconfigureerd. Je kunt nu directories implementeren.",
+                "connectedMessage": "Je implementatie-provider is geconfigureerd. Je kunt nu werken implementeren.",
                 "disconnect": "Ontkoppelen",
                 "disconnecting": "Verwijderen...",
                 "apiTokenLabel": "API-token",
@@ -2598,17 +2604,17 @@
             "subtitle": "Kies hoe je wilt worden geïnformeerd over belangrijke updates",
             "email": {
                 "title": "E-mailmeldingen",
-                "directoryUpdates": {
-                    "label": "Directory-updates",
-                    "description": "Ontvang meldingen over belangrijke updates van je directories"
+                "workUpdates": {
+                    "label": "Werk-updates",
+                    "description": "Ontvang meldingen over belangrijke updates van je werken"
                 },
                 "newItems": {
                     "label": "Nieuwe items",
-                    "description": "Ontvang meldingen wanneer nieuwe items aan je directories worden toegevoegd"
+                    "description": "Ontvang meldingen wanneer nieuwe items aan je werken worden toegevoegd"
                 },
                 "weeklyDigest": {
                     "label": "Wekelijkse samenvatting",
-                    "description": "Ontvang een wekelijkse samenvatting van je directory-activiteit"
+                    "description": "Ontvang een wekelijkse samenvatting van je werk-activiteit"
                 },
                 "marketing": {
                     "label": "Marketing en promoties",
@@ -2619,11 +2625,11 @@
                 "title": "In-app meldingen",
                 "newItems": {
                     "label": "Nieuwe items",
-                    "description": "Toon meldingen voor nieuwe directory-items"
+                    "description": "Toon meldingen voor nieuwe werk-items"
                 },
                 "comments": {
                     "label": "Opmerkingen",
-                    "description": "Ontvang meldingen over opmerkingen bij je directories"
+                    "description": "Ontvang meldingen over opmerkingen bij je werken"
                 },
                 "mentions": {
                     "label": "Vermeldingen",
@@ -2647,12 +2653,12 @@
         "sidebar": {
             "menu": "Menu",
             "aiChat": "AI-chat",
-            "newDirectory": "Nieuwe directory",
-            "activityIndicator": "Directory genereren",
+            "newWork": "Nieuwe werk",
+            "activityIndicator": "Werk genereren",
             "navigation": {
                 "dashboard": "Dashboard",
                 "activity": "Activiteit",
-                "directories": "Directories",
+                "works": "Werken",
                 "plugins": "Plugins",
                 "settings": "Instellingen"
             },
@@ -2674,7 +2680,7 @@
             "subtitle": "Onomkeerbare en destructieve acties",
             "export": {
                 "title": "Je gegevens exporteren",
-                "subtitle": "Download al je directories, items en instellingen",
+                "subtitle": "Download al je werken, items en instellingen",
                 "action": "Gegevens exporteren (Binnenkort beschikbaar)"
             },
             "delete": {
@@ -2684,8 +2690,8 @@
                 "confirmTitle": "⚠️ Dit verwijdert permanent:",
                 "confirmItems": [
                     "Je account en profiel",
-                    "Al je directories",
-                    "Alle directory-items en gegevens",
+                    "Al je werken",
+                    "Alle werk-items en gegevens",
                     "API-sleutels en integraties",
                     "Alle gekoppelde websites"
                 ],
@@ -2705,13 +2711,13 @@
         "aiChat": {
             "title": "AI-assistent",
             "panelTitle": "Chat",
-            "subtitle": "Maak directories met natuurlijke taal",
+            "subtitle": "Maak werken met natuurlijke taal",
             "welcomeTitle": "Welkom bij AI-assistent 👋",
-            "welcomeSubtitle": "Je AI-aangedreven assistent. Vraag me alles over het maken van directories, genereren van inhoud of organiseren van je gegevens.",
-            "welcomeMessage": "Hoi! Ik kan je helpen directories te maken met natuurlijke taal. Vraag iets als \"Maak een directory voor AI-tools\" of beschrijf wat je nodig hebt.",
+            "welcomeSubtitle": "Je AI-aangedreven assistent. Vraag me alles over het maken van werken, genereren van inhoud of organiseren van je gegevens.",
+            "welcomeMessage": "Hoi! Ik kan je helpen werken te maken met natuurlijke taal. Vraag iets als \"Maak een werk voor AI-tools\" of beschrijf wat je nodig hebt.",
             "capabilities": {
-                "directoryCreation": "Directory-aanmaak",
-                "directoryCreationDesc": "Bouw directories op uit natuurlijke taalbeschrijvingen",
+                "workCreation": "Werk-aanmaak",
+                "workCreationDesc": "Bouw werken op uit natuurlijke taalbeschrijvingen",
                 "webResearch": "Webonderzoek",
                 "webResearchDesc": "Zoek en verzamel gegevens van over het web",
                 "contentGeneration": "Inhoudgeneratie",
@@ -2741,11 +2747,11 @@
             "selectProvider": "Provider",
             "notConfigured": "Niet geconfigureerd",
             "gitNotConnected": "Git-provider niet verbonden",
-            "gitNotConnectedDesc": "Verbind je git-provider om directories te maken en te beheren.",
+            "gitNotConnectedDesc": "Verbind je git-provider om werken te maken en te beheren.",
             "connectGithub": "GitHub verbinden",
             "gitConnectedAs": "Verbonden als {username} via {provider}",
             "deployNotConfigured": "Implementatie-provider niet geconfigureerd",
-            "deployNotConfiguredDesc": "Configureer een implementatie-provider om je directory-websites te publiceren.",
+            "deployNotConfiguredDesc": "Configureer een implementatie-provider om je werk-websites te publiceren.",
             "configureDeployProvider": "Implementatie-provider configureren",
             "deployConfigured": "Implementatie-provider geconfigureerd ({provider})",
             "opened": "Geopend",
@@ -2755,12 +2761,12 @@
             "historyYesterday": "Gisteren",
             "historyDaysAgo": "{days}d geleden",
             "suggestions": {
-                "s1": "Toon mijn directories",
-                "s2": "Maak een directory van AI-tools",
+                "s1": "Toon mijn werken",
+                "s2": "Maak een werk van AI-tools",
                 "s3": "Controleer mijn git-verbinding",
                 "s4": "Toon mijn statistieken"
             },
-            "feelingLucky": "Stel een directory voor om te maken",
+            "feelingLucky": "Stel een werk voor om te maken",
             "errors": {
                 "unableToSend": "Bericht niet kunnen verzenden"
             }
@@ -2808,8 +2814,8 @@
             "disableWarning": "Het uitschakelen van deze plug-in schakelt deze ook uit in al uw mappen",
             "cannotDisableSystem": "Systeemplug-ins kunnen niet worden uitgeschakeld",
             "disableFailed": "Kon plug-in niet uitschakelen",
-            "autoEnableForDirectories": "Ook inschakelen voor alle mappen",
-            "autoEnableForDirectoriesDescription": "Deze plug-in is automatisch actief in al uw mappen. U kunt deze nog steeds per map uitschakelen.",
+            "autoEnableForWorks": "Ook inschakelen voor alle mappen",
+            "autoEnableForWorksDescription": "Deze plug-in is automatisch actief in al uw mappen. U kunt deze nog steeds per map uitschakelen.",
             "confirmDisable": "Bevestig uitschakelen",
             "cancel": "Annuleren",
             "missingRequiredFields": "Ontbrekende vereiste velden: {fields}",
@@ -2884,20 +2890,20 @@
                 "removeLabel": "Verwijder {login}"
             }
         },
-        "directoryPlugins": {
+        "workPlugins": {
             "title": "Mapplug-ins",
             "subtitle": "Configureer plug-ins voor deze map",
             "active": "Actief",
             "enable": "Inschakelen",
             "disable": "Uitschakelen",
-            "enableForDirectory": "Inschakelen voor deze map",
-            "disableForDirectory": "Uitschakelen voor deze map",
+            "enableForWork": "Inschakelen voor deze map",
+            "disableForWork": "Uitschakelen voor deze map",
             "enableAtUserLevelFirst": "Schakel deze plug-in eerst in uw instellingen in",
             "disabledByUser": "Uitgeschakeld op gebruikersniveau",
             "systemAlwaysEnabled": "Systeemplug-in - altijd ingeschakeld",
             "showSettings": "Instellingen tonen",
             "hideSettings": "Instellingen verbergen",
-            "directorySettingsInfo": "Configureer hier mappen-specifieke instellingen",
+            "workSettingsInfo": "Configureer hier mappen-specifieke instellingen",
             "save": "Opslaan",
             "saved": "Opgeslagen",
             "showInstalledOnly": "Alleen geïnstalleerde tonen",
@@ -2932,6 +2938,7 @@
             "resetSuccess": "Instellingen hersteld naar standaardwaarden",
             "cancel": "Annuleren",
             "clickToConfigure": "Klik om te configureren",
+            "changeModels": "Wijzigen",
             "autoEnabledByUser": "Automatisch ingeschakeld via gebruikersinstellingen",
             "toggleError": "Kon plug-in niet schakelen",
             "system": "Systeem",
@@ -2942,8 +2949,8 @@
         "auth": {
             "backToHome": "Terug naar home",
             "feature": {
-                "title": "Directories bouwen met AI",
-                "subtitle": "Creëer prachtige, doorzoekbare directories in een paar minuten met natuurlijke taal. Geen codering vereist.",
+                "title": "Werken bouwen met AI",
+                "subtitle": "Creëer prachtige, doorzoekbare werken in een paar minuten met natuurlijke taal. Geen codering vereist.",
                 "badge": "AI-aangedreven",
                 "benefits": {
                     "ai": {
@@ -2995,8 +3002,8 @@
         }
     },
     "metadata": {
-        "title": "{companyName} - Directory Builder",
-        "description": "Een SaaS-platform voor het bouwen en beheren van directories",
+        "title": "{companyName} - Werk Builder",
+        "description": "Een SaaS-platform voor het bouwen en beheren van werken",
         "pages": {
             "signIn": "Inloggen",
             "createAccount": "Account aanmaken",
@@ -3005,9 +3012,9 @@
             "authError": "Authenticatiefout",
             "dashboard": "Dashboard",
             "activity": "Activiteitenlogboek",
-            "directories": "Directories",
-            "newDirectory": "Nieuwe directory",
-            "directory": "Directory",
+            "works": "Werken",
+            "newWork": "Nieuwe werk",
+            "work": "Werk",
             "overview": "Overzicht",
             "items": "Items",
             "generator": "Generator",
@@ -3041,7 +3048,7 @@
         }
     },
     "actions": {
-        "directories": {
+        "works": {
             "slug": {
                 "required": "Slug is vereist",
                 "format": "Slug mag alleen kleine letters, cijfers en koppeltekens bevatten"
@@ -3060,16 +3067,16 @@
             },
             "oauthRequired": "OAuth-verbinding vereist. Verbind eerst je {provider}-account.",
             "githubRequired": "GitHub-verbinding vereist. Verbind eerst je GitHub-account.",
-            "createSuccess": "Directory succesvol aangemaakt!",
-            "createFailed": "Directory aanmaken mislukt",
-            "updateSuccess": "Directory succesvol bijgewerkt!",
-            "updateFailed": "Directory bijwerken mislukt",
-            "invalidGeneratedData": "Genereren van geldige directorygegevens mislukt",
-            "aiGenerationStarted": "Directory-aanmaken gestart! AI genereert inhoud...",
-            "invalidId": "Ongeldige directory-ID",
-            "deleteSuccess": "Directory succesvol verwijderd",
-            "deleteFailed": "Directory verwijderen mislukt",
-            "fetchFailed": "Directories ophalen mislukt",
+            "createSuccess": "Werk succesvol aangemaakt!",
+            "createFailed": "Werk aanmaken mislukt",
+            "updateSuccess": "Werk succesvol bijgewerkt!",
+            "updateFailed": "Werk bijwerken mislukt",
+            "invalidGeneratedData": "Genereren van geldige werkgegevens mislukt",
+            "aiGenerationStarted": "Werk-aanmaken gestart! AI genereert inhoud...",
+            "invalidId": "Ongeldige werk-ID",
+            "deleteSuccess": "Werk succesvol verwijderd",
+            "deleteFailed": "Werk verwijderen mislukt",
+            "fetchFailed": "Werken ophalen mislukt",
             "organization": {
                 "requiredWhenOwnerProvided": "Organisatie moet ingeschakeld zijn wanneer eigenaar is opgegeven"
             },
@@ -3077,7 +3084,7 @@
                 "invalidUrl": "Voer een geldige URL in",
                 "analyzeFailed": "Repository analyseren mislukt",
                 "started": "Importeren succesvol gestart",
-                "failed": "Directory importeren mislukt",
+                "failed": "Werk importeren mislukt",
                 "fetchReposFailed": "Repositories ophalen mislukt"
             }
         },

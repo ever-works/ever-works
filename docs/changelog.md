@@ -60,11 +60,11 @@ pnpm typeorm migration:generate -d typeorm.config.ts
 pnpm typeorm migration:run -d typeorm.config.ts
 ```
 
-Migrations are stored in the `apps/api/src/migrations/` directory and are tracked in version control. Each migration has a timestamp-based name and includes both `up` and `down` methods for forward and rollback operations.
+Migrations are stored in the `apps/api/src/migrations/` work and are tracked in version control. Each migration has a timestamp-based name and includes both `up` and `down` methods for forward and rollback operations.
 
 ## Template Versioning
 
-The Directory Web Template is a **standalone Next.js application** with a single version in its root `package.json`.
+The Work Web Template is a **standalone Next.js application** with a single version in its root `package.json`.
 
 ### Database Migrations (Template)
 
@@ -81,7 +81,7 @@ pnpm db:migrate
 pnpm db:studio
 ```
 
-Migration files are stored in the `lib/db/migrations/` directory. Each migration is a SQL file generated from changes to the Drizzle schema definitions in `lib/db/schema/`.
+Migration files are stored in the `lib/db/migrations/` work. Each migration is a SQL file generated from changes to the Drizzle schema definitions in `lib/db/schema/`.
 
 ### Migration-Based Upgrades
 
@@ -217,7 +217,7 @@ Release notes follow this structure:
 ### Added
 
 - New plugin system for AI provider integration
-- Category-based directory filtering
+- Category-based work filtering
 
 ### Changed
 
@@ -226,7 +226,7 @@ Release notes follow this structure:
 
 ### Fixed
 
-- Resolved race condition in concurrent directory updates
+- Resolved race condition in concurrent work updates
 - Fixed pagination offset calculation for search results
 
 ### Deprecated
@@ -236,7 +236,7 @@ Release notes follow this structure:
 ### Breaking Changes
 
 - Removed `LEGACY_AUTH_MODE` environment variable
-- Renamed `DirectoryItem` type to `Item` across all APIs
+- Renamed `WorkItem` type to `Item` across all APIs
 ```
 
 This format follows [Keep a Changelog](https://keepachangelog.com/) conventions, making it easy to scan for the information you need.

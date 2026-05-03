@@ -33,7 +33,7 @@ export function isOpenCodeStepId(value: string): value is OpenCodeStepId {
 }
 
 /**
- * Base temporary directory for all OpenCode operations
+ * Base temporary work for all OpenCode operations
  */
 export const BASE_TEMP_DIR = path.join(os.tmpdir(), 'opencode-generator');
 

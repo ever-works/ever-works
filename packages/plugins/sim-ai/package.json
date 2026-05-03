@@ -1,7 +1,7 @@
 {
 	"name": "@ever-works/sim-ai-plugin",
 	"version": "1.0.0",
-	"description": "SIM AI Workflow Pipeline Plugin - Delegates directory generation to SIM AI workflows",
+	"description": "SIM AI Workflow Pipeline Plugin - Delegates Work generation to SIM AI workflows",
 	"private": true,
 	"type": "module",
 	"main": "./dist/index.cjs",
@@ -49,7 +49,7 @@
 				"pipeline",
 				"form-schema-provider"
 			],
-			"description": "Pipeline plugin that delegates directory generation to SIM AI workflows",
+			"description": "Pipeline plugin that delegates Work generation to SIM AI workflows",
 			"author": {
 				"name": "Ever Works Team"
 			},

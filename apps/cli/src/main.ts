@@ -3,7 +3,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import dotenv from 'dotenv';
 import { authCommand } from './commands/auth';
-import { directoryCommand } from './commands/directory';
+import { workCommand } from './commands/work';
 import { pluginsCommand } from './commands/plugins';
 
 // Load environment variables
@@ -15,12 +15,12 @@ const packageJson = JSON.parse(
 
 program
     .name('ever-works')
-    .description('Ever Works CLI - Open Directory Builder Platform')
+    .description('Ever Works CLI - Open Work Builder Platform')
     .version(packageJson.version);
 
 // commands
 program.addCommand(authCommand);
-program.addCommand(directoryCommand);
+program.addCommand(workCommand);
 program.addCommand(pluginsCommand);
 
 // Parse arguments

@@ -7,7 +7,7 @@ sidebar_position: 8
 
 # Creating a Content Extractor Plugin
 
-Content extractor plugins retrieve text, HTML, and Markdown from web pages so the AI pipeline can use that content as source material during directory generation. They integrate into the pipeline at the **content-retrieval** step and are consumed through the `IContentExtractorFacade`.
+Content extractor plugins retrieve text, HTML, and Markdown from web pages so the AI pipeline can use that content as source material during work generation. They integrate into the pipeline at the **content-retrieval** step and are consumed through the `IContentExtractorFacade`.
 
 This guide covers everything you need to build one from scratch, register it with the platform, and test it thoroughly.
 
@@ -940,7 +940,7 @@ timeout: {
 
 ### Settings resolution
 
-Settings are resolved at call time through a 4-level hierarchy: **Directory > User > Admin > Environment variable**. Always read settings from `options.settings`, never from cached instance state:
+Settings are resolved at call time through a 4-level hierarchy: **Work > User > Admin > Environment variable**. Always read settings from `options.settings`, never from cached instance state:
 
 ```typescript
 async extract(options: ContentExtractionOptions): Promise<ContentExtractionResult> {

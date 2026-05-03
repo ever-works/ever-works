@@ -1,4 +1,4 @@
-import { DirectoryScheduleCadence } from '@ever-works/contracts/api';
+import { WorkScheduleCadence } from '@ever-works/contracts/api';
 import { WorksConfigService } from '../services/works-config.service';
 
 describe('WorksConfigService', () => {
@@ -22,7 +22,7 @@ providers:
         );
         expect(result.model).toBe('openai/gpt-4.1');
         expect(result.websiteRepo).toBe('ever-works/compare-cloud-pricing');
-        expect(result.scheduleCadence).toBe(DirectoryScheduleCadence.WEEKLY);
+        expect(result.scheduleCadence).toBe(WorkScheduleCadence.WEEKLY);
         expect(result.providers).toEqual({
             ai: 'openrouter',
             pipeline: 'agent-pipeline',
@@ -38,7 +38,7 @@ schedule:
 `);
 
         expect(result.initialPrompt).toBe('Keep this repo up to date');
-        expect(result.scheduleCadence).toBe(DirectoryScheduleCadence.EVERY_12_HOURS);
+        expect(result.scheduleCadence).toBe(WorkScheduleCadence.EVERY_12_HOURS);
     });
 
     it('loads works config from works_config/works.yaml when root file is absent', async () => {

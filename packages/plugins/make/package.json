@@ -1,7 +1,7 @@
 {
 	"name": "@ever-works/make-plugin",
 	"version": "1.0.0",
-	"description": "Make.com Workflow Pipeline Plugin - Delegates directory generation to Make.com scenarios and webhooks",
+	"description": "Make.com Workflow Pipeline Plugin - Delegates Work generation to Make.com scenarios and webhooks",
 	"private": true,
 	"type": "module",
 	"main": "./dist/index.cjs",
@@ -47,7 +47,7 @@
 				"pipeline",
 				"form-schema-provider"
 			],
-			"description": "Pipeline plugin that delegates directory generation to Make.com scenarios and webhooks",
+			"description": "Pipeline plugin that delegates Work generation to Make.com scenarios and webhooks",
 			"author": {
 				"name": "Ever Works Team"
 			},

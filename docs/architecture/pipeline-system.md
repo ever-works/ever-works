@@ -7,7 +7,7 @@ sidebar_position: 2
 
 # Pipeline System
 
-The pipeline system is the execution engine for directory generation in Ever Works. It is a plugin-driven architecture that compiles step definitions from pipeline and modifier plugins into an executable pipeline, then orchestrates step-by-step or full execution with checkpointing, parallel groups, and cancellation support.
+The pipeline system is the execution engine for work generation in Ever Works. It is a plugin-driven architecture that compiles step definitions from pipeline and modifier plugins into an executable pipeline, then orchestrates step-by-step or full execution with checkpointing, parallel groups, and cancellation support.
 
 ## Architecture Overview
 
@@ -77,7 +77,7 @@ Compiles an `ExecutablePipeline` from a pipeline plugin's step definitions and m
 
 1. **Collect base steps** from the pipeline plugin via `getStepDefinitions()`
 2. **Initialize build context** with empty replacement, injection, and disable maps
-3. **Discover modifier plugins** that target this pipeline (filtered by directory scope and enable status)
+3. **Discover modifier plugins** that target this pipeline (filtered by work scope and enable status)
 4. **Process modifier contributions** (replacements, injections, disables, prepend/append)
 5. **Apply modifications** in order: replacements, disabling, injections, prepend/append
 6. **Check for duplicate step IDs** to ensure uniqueness
@@ -147,11 +147,11 @@ The executor for self-managed pipeline plugins that own their entire execution f
 
 ### PipelineFacadeService
 
-Creates bound facade instances for pipeline step execution. This service bridges the gap between the pipeline system and the facade layer by pre-binding directory and user context:
+Creates bound facade instances for pipeline step execution. This service bridges the gap between the pipeline system and the facade layer by pre-binding work and user context:
 
 ```typescript
 createStepExecutionContext(
-    directory: DirectoryReference,
+    work: WorkReference,
     providerOverrides?: GenerationRequest['providers'],
     signal?: AbortSignal,
 ): StepExecutionContext
@@ -164,8 +164,8 @@ The returned `StepExecutionContext` includes:
 - `screenshotFacade` -- Bound screenshot capture facade
 - `contentExtractorFacade` -- Bound content extraction facade
 - `dataSourceFacade` -- Bound data source facade
-- `logger` -- Scoped step logger with directory context
-- `directory` -- The directory reference
+- `logger` -- Scoped step logger with work context
+- `work` -- The work reference
 - `signal` -- Optional AbortSignal for cancellation
 
 ## Checkpointing
@@ -188,7 +188,7 @@ interface CheckpointData {
 
 - **TTL:** 24 hours
 - **Serialization:** superjson (preserves Maps, Sets, Dates)
-- **Cache key:** `pipeline-checkpoint-{directoryId}-{pipelineId}`
+- **Cache key:** `pipeline-checkpoint-{workId}-{pipelineId}`
 - **Version checking:** Checkpoints with mismatched `schemaVersion` are discarded
 - **Viability check:** `plugin.isCheckpointViable()` validates whether a checkpoint can be resumed
 
@@ -262,11 +262,11 @@ sequenceDiagram
     participant Step as StepExecutor
     participant Cache as CacheManager
 
-    API->>Orch: execute(directory, request, existing)
+    API->>Orch: execute(work, request, existing)
     Orch->>Registry: resolvePipelinePlugin()
     Registry-->>Orch: IPipelinePlugin
     Orch->>Orch: detect mode (step vs full)
-    Orch->>Builder: build(plugin, directoryId)
+    Orch->>Builder: build(plugin, workId)
     Builder->>Registry: getModifierPlugins()
     Builder->>Builder: compile (sort, group, map)
     Builder-->>Orch: ExecutablePipeline

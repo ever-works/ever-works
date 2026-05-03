@@ -285,7 +285,7 @@ export interface IGitProviderPlugin extends IPlugin, IGitOperations {
 		token?: string
 	): Promise<{ content: string; path: string } | null>;
 	getRawFileUrl?(owner: string, repo: string, branch: string, path: string): string;
-	getDirectoryContents?(
+	getWorkContents?(
 		owner: string,
 		repo: string,
 		path: string,

@@ -4,14 +4,14 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { randomUUID } from 'node:crypto';
 import { createWorkspace, collectItemsFromWorkspace, cleanupWorkspace } from '../utils/sandbox-workspace';
-import type { DirectoryReference, GenerationRequest, ExistingItems } from '@ever-works/plugin';
+import type { WorkReference, GenerationRequest, ExistingItems } from '@ever-works/plugin';
 
 describe('sandbox-workspace', () => {
-	const baseDirectory: DirectoryReference = {
+	const baseWork: WorkReference = {
 		id: 'dir1',
 		name: 'AI Tools',
 		slug: 'ai-tools',
-		description: 'A curated directory of AI tools and services'
+		description: 'A curated work of AI tools and services'
 	};
 
 	const baseRequest: GenerationRequest = {
@@ -51,10 +51,10 @@ describe('sandbox-workspace', () => {
 				brands: [{ id: 'brand1', name: 'Brand 1' }]
 			};
 
-			const workspacePath = await createWorkspace(userId, 'dir1', existing, baseDirectory, baseRequest);
+			const workspacePath = await createWorkspace(userId, 'dir1', existing, baseWork, baseRequest);
 			createdWorkspacePaths.push(workspacePath);
 
-			const dirMeta = JSON.parse(await readFile(join(workspacePath, '_meta', 'directory.json'), 'utf-8'));
+			const dirMeta = JSON.parse(await readFile(join(workspacePath, '_meta', 'work.json'), 'utf-8'));
 			expect(dirMeta.name).toBe('AI Tools');
 
 			const item = JSON.parse(await readFile(join(workspacePath, 'cursor.json'), 'utf-8'));
@@ -91,7 +91,7 @@ describe('sandbox-workspace', () => {
 				tags: []
 			};
 
-			const workspacePath = await createWorkspace(userId, 'dir1', existing, baseDirectory, baseRequest);
+			const workspacePath = await createWorkspace(userId, 'dir1', existing, baseWork, baseRequest);
 			createdWorkspacePaths.push(workspacePath);
 
 			const entries = await readdir(workspacePath);
@@ -116,7 +116,7 @@ describe('sandbox-workspace', () => {
 				tags: []
 			};
 
-			const workspacePath = await createWorkspace(userId, 'dir1', existing, baseDirectory, baseRequest);
+			const workspacePath = await createWorkspace(userId, 'dir1', existing, baseWork, baseRequest);
 			createdWorkspacePaths.push(workspacePath);
 
 			const jsonl = await readFile(join(workspacePath, '_meta', 'existing-items.jsonl'), 'utf-8');
@@ -144,7 +144,7 @@ describe('sandbox-workspace', () => {
 				tags: []
 			};
 
-			const workspacePath = await createWorkspace(userId, 'dir1', existing, baseDirectory, baseRequest);
+			const workspacePath = await createWorkspace(userId, 'dir1', existing, baseWork, baseRequest);
 			createdWorkspacePaths.push(workspacePath);
 
 			const seeded = JSON.parse(await readFile(join(workspacePath, '_meta', 'seeded.json'), 'utf-8'));
@@ -157,7 +157,7 @@ describe('sandbox-workspace', () => {
 			const userId = uniqueUserId();
 			const existing: ExistingItems = { items: [], categories: [], tags: [] };
 
-			const workspacePath = await createWorkspace(userId, 'dir1', existing, baseDirectory, baseRequest);
+			const workspacePath = await createWorkspace(userId, 'dir1', existing, baseWork, baseRequest);
 			createdWorkspacePaths.push(workspacePath);
 
 			const metaEntries = await readdir(join(workspacePath, '_meta'));
@@ -205,7 +205,7 @@ describe('sandbox-workspace', () => {
 				tags: []
 			};
 
-			const workspacePath = await createWorkspace(userId, 'dir1', existing, baseDirectory, baseRequest);
+			const workspacePath = await createWorkspace(userId, 'dir1', existing, baseWork, baseRequest);
 			createdWorkspacePaths.push(workspacePath);
 
 			await writeFile(
@@ -242,7 +242,7 @@ describe('sandbox-workspace', () => {
 				tags: []
 			};
 
-			const workspacePath = await createWorkspace(userId, 'dir1', existing, baseDirectory, baseRequest);
+			const workspacePath = await createWorkspace(userId, 'dir1', existing, baseWork, baseRequest);
 			createdWorkspacePaths.push(workspacePath);
 
 			// Overwrite with different content — hash will differ
@@ -320,7 +320,7 @@ describe('sandbox-workspace', () => {
 			await rm(dir, { recursive: true, force: true });
 		});
 
-		it('should return empty array when directory does not exist', async () => {
+		it('should return empty array when work does not exist', async () => {
 			const logger = { log: vi.fn(), warn: vi.fn() };
 			const dir = join(tmpdir(), `test-collect-nonexistent-${randomUUID()}`);
 
@@ -330,11 +330,11 @@ describe('sandbox-workspace', () => {
 	});
 
 	describe('cleanupWorkspace', () => {
-		it('should remove the workspace directory', async () => {
+		it('should remove the workspace work', async () => {
 			const userId = uniqueUserId();
 			const existing: ExistingItems = { items: [], categories: [], tags: [] };
 
-			const workspacePath = await createWorkspace(userId, 'dir1', existing, baseDirectory, baseRequest);
+			const workspacePath = await createWorkspace(userId, 'dir1', existing, baseWork, baseRequest);
 
 			await cleanupWorkspace(workspacePath);
 			await expect(readdir(workspacePath)).rejects.toThrow();

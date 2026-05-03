@@ -9,8 +9,8 @@ export class WorksConfigSyncListener {
 
     @OnEvent(WorksConfigSyncRequestedEvent.EVENT_NAME, { async: true })
     async handleSyncRequested(event: WorksConfigSyncRequestedEvent): Promise<void> {
-        await this.syncService.syncDirectory({
-            directoryId: event.directoryId,
+        await this.syncService.syncWork({
+            workId: event.workId,
             userId: event.userId,
             reason: event.reason,
         });

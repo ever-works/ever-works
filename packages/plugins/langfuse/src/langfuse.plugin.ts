@@ -25,29 +25,29 @@ Each prompt uses \`{variable}\` placeholders that are substituted at runtime.
 
 | Key | Description | Variables |
 |-----|-------------|-----------|
-| \`standard-pipeline.domain-detection\` | Classifies directory topic domain | \`{name}\`, \`{description}\` |
+| \`standard-pipeline.domain-detection\` | Classifies work topic domain | \`{name}\`, \`{description}\` |
 | \`standard-pipeline.prompt-processing\` | Extracts/rewrites user prompt | \`{user_prompt}\` |
 | \`standard-pipeline.search-query-generation\` | Generates search queries | \`{name}\`, \`{description}\`, \`{keywords}\`, \`{date}\`, \`{query_count}\` |
 | \`standard-pipeline.content-filtering\` | Assesses page relevance | \`{topic_name}\`, \`{topic_description}\`, \`{snippet_length}\`, \`{snippet}\` |
 | \`standard-pipeline.item-extraction\` | Extracts items from page content | \`{topicName}\`, \`{topicDescription}\`, \`{page_content_snippet}\`, \`{featured_hints_section}\` |
 | \`standard-pipeline.understanding\` | Assesses topic for AI generation | \`{topicName}\`, \`{topicDescription}\`, \`{target_keywords_string}\` |
-| \`standard-pipeline.generation\` | Generates directory items via AI | \`{topicName}\`, \`{topicDescription}\`, \`{target_keywords_string}\`, \`{featured_hints_section}\` |
+| \`standard-pipeline.generation\` | Generates work items via AI | \`{topicName}\`, \`{topicDescription}\`, \`{target_keywords_string}\`, \`{featured_hints_section}\` |
 | \`standard-pipeline.markdown-generation\` | Generates item markdown summaries | \`{item}\`, \`{content}\` |
 | \`standard-pipeline.category-processing\` | Categorizes items (base) | \`{task}\`, \`{items}\` |
 | \`standard-pipeline.enhanced-category-processing\` | Categorizes with existing context | \`{task}\`, \`{items}\`, \`{existing_categories}\`, \`{existing_tags}\`, \`{category_metrics}\` |
 | \`standard-pipeline.badge-processing\` | Assigns badges to items | \`{name}\`, \`{description}\`, \`{source_url}\`, \`{domain_type}\`, \`{badge_criteria}\` |
 | \`standard-pipeline.source-validation\` | Validates item source URLs | \`{itemName}\`, \`{itemDescription}\`, \`{candidateUrl}\`, \`{pageContent}\` |
 | \`standard-pipeline.prompt-comparison\` | Compares two prompts for similarity | \`{existing_prompt}\`, \`{new_prompt}\` |
-| \`standard-pipeline.deduplication\` | Deduplicates directory items | \`{task}\`, \`{items}\` |
+| \`standard-pipeline.deduplication\` | Deduplicates work items | \`{task}\`, \`{items}\` |
 | \`standard-pipeline.extract-new-items\` | Extracts genuinely new items | \`{existing}\`, \`{new}\` |
 
 ### Agent Pipeline
 
 | Key | Description | Variables |
 |-----|-------------|-----------|
-| \`agent-pipeline.parent-system\` | Parent orchestrator system prompt | \`{date}\`, \`{existingCount}\`, \`{existingItemsSection}\`, \`{maxPages}\`, \`{modificationSection}\`, \`{targetItems}\`, \`{targetSuffix}\`, \`{directorySection}\` |
-| \`agent-pipeline.parent-user\` | Parent orchestrator user prompt | \`{userInstruction}\`, \`{directoryDescription}\`, \`{workflowInstructions}\`, \`{targetItems}\` |
-| \`agent-pipeline.worker-system\` | Content extraction worker prompt | \`{date}\`, \`{itemSchemaText}\`, \`{directoryName}\`, \`{directoryDescription}\`, \`{requestPrompt}\` |
+| \`agent-pipeline.parent-system\` | Parent orchestrator system prompt | \`{date}\`, \`{existingCount}\`, \`{existingItemsSection}\`, \`{maxPages}\`, \`{modificationSection}\`, \`{targetItems}\`, \`{targetSuffix}\`, \`{workSection}\` |
+| \`agent-pipeline.parent-user\` | Parent orchestrator user prompt | \`{userInstruction}\`, \`{workDescription}\`, \`{workflowInstructions}\`, \`{targetItems}\` |
+| \`agent-pipeline.worker-system\` | Content extraction worker prompt | \`{date}\`, \`{itemSchemaText}\`, \`{workName}\`, \`{workDescription}\`, \`{requestPrompt}\` |
 | \`agent-pipeline.chunk-user\` | Per-chunk extraction prompt | \`{sourceUrl}\`, \`{chunkInfo}\`, \`{previouslyExtractedList}\`, \`{chunkText}\` |
 | \`agent-pipeline.modification-system\` | Item modification worker prompt | \`{date}\`, \`{itemSchemaText}\` |
 
@@ -55,35 +55,35 @@ Each prompt uses \`{variable}\` placeholders that are substituted at runtime.
 
 | Key | Description | Variables |
 |-----|-------------|-----------|
-| \`claude-code.system\` | Claude Code system prompt | \`{workspacePath}\`, \`{date}\`, \`{itemSchemaText}\`, \`{existingItemsSection}\`, \`{modificationSection}\`, \`{targetItems}\`, \`{directorySection}\` |
-| \`claude-code.user\` | Claude Code user prompt | \`{userInstruction}\`, \`{directoryDescription}\`, \`{workflowInstructions}\`, \`{targetItems}\` |
+| \`claude-code.system\` | Claude Code system prompt | \`{workspacePath}\`, \`{date}\`, \`{itemSchemaText}\`, \`{existingItemsSection}\`, \`{modificationSection}\`, \`{targetItems}\`, \`{workSection}\` |
+| \`claude-code.user\` | Claude Code user prompt | \`{userInstruction}\`, \`{workDescription}\`, \`{workflowInstructions}\`, \`{targetItems}\` |
 
 ### Gemini
 
 | Key | Description | Variables |
 |-----|-------------|-----------|
-| \`gemini.system\` | Gemini CLI system prompt | \`{workspacePath}\`, \`{date}\`, \`{itemSchemaText}\`, \`{existingItemsSection}\`, \`{modificationSection}\`, \`{targetItems}\`, \`{directorySection}\` |
-| \`gemini.user\` | Gemini CLI user prompt | \`{userInstruction}\`, \`{directoryDescription}\`, \`{workflowInstructions}\`, \`{targetItems}\` |
+| \`gemini.system\` | Gemini CLI system prompt | \`{workspacePath}\`, \`{date}\`, \`{itemSchemaText}\`, \`{existingItemsSection}\`, \`{modificationSection}\`, \`{targetItems}\`, \`{workSection}\` |
+| \`gemini.user\` | Gemini CLI user prompt | \`{userInstruction}\`, \`{workDescription}\`, \`{workflowInstructions}\`, \`{targetItems}\` |
 
 ### OpenCode
 
 | Key | Description | Variables |
 |-----|-------------|-----------|
-| \`opencode.system\` | OpenCode system prompt | \`{workspacePath}\`, \`{date}\`, \`{itemSchemaText}\`, \`{existingItemsSection}\`, \`{modificationSection}\`, \`{targetItems}\`, \`{directorySection}\` |
-| \`opencode.user\` | OpenCode user prompt | \`{userInstruction}\`, \`{directoryDescription}\`, \`{workflowInstructions}\`, \`{targetItems}\` |
+| \`opencode.system\` | OpenCode system prompt | \`{workspacePath}\`, \`{date}\`, \`{itemSchemaText}\`, \`{existingItemsSection}\`, \`{modificationSection}\`, \`{targetItems}\`, \`{workSection}\` |
+| \`opencode.user\` | OpenCode user prompt | \`{userInstruction}\`, \`{workDescription}\`, \`{workflowInstructions}\`, \`{targetItems}\` |
 
 ### Codex
 
 | Key | Description | Variables |
 |-----|-------------|-----------|
-| \`codex.system\` | Codex system prompt | \`{workspacePath}\`, \`{date}\`, \`{itemSchemaText}\`, \`{existingItemsSection}\`, \`{directorySection}\`, \`{targetItems}\` |
-| \`codex.user\` | Codex user prompt | \`{userInstruction}\`, \`{directoryDescription}\`, \`{workflowInstructions}\`, \`{targetItems}\` |
+| \`codex.system\` | Codex system prompt | \`{workspacePath}\`, \`{date}\`, \`{itemSchemaText}\`, \`{existingItemsSection}\`, \`{workSection}\`, \`{targetItems}\` |
+| \`codex.user\` | Codex user prompt | \`{userInstruction}\`, \`{workDescription}\`, \`{workflowInstructions}\`, \`{targetItems}\` |
 
 ### Comparison Generator
 
 | Key | Description | Variables |
 |-----|-------------|-----------|
-| \`comparison.structure\` | Structured comparison generation | \`{itemAName}\`, \`{itemADescription}\`, \`{itemASourceUrl}\`, \`{itemBName}\`, \`{itemBDescription}\`, \`{itemBSourceUrl}\`, \`{category}\`, \`{directoryContextSection}\`, \`{researchSection}\`, \`{customPromptSection}\` |
+| \`comparison.structure\` | Structured comparison generation | \`{itemAName}\`, \`{itemADescription}\`, \`{itemASourceUrl}\`, \`{itemBName}\`, \`{itemBDescription}\`, \`{itemBSourceUrl}\`, \`{category}\`, \`{workContextSection}\`, \`{researchSection}\`, \`{customPromptSection}\` |
 | \`comparison.markdown\` | Comparison markdown article | \`{itemAName}\`, \`{itemBName}\`, \`{category}\`, \`{summary}\`, \`{dimensionsText}\`, \`{verdict}\`, \`{sourcesText}\`, \`{customPromptSection}\` |
 | \`comparison.extended-analysis\` | Extended deep-dive analysis | \`{itemAName}\`, \`{itemBName}\`, \`{title}\`, \`{verdict}\`, \`{category}\`, \`{researchContent}\`, \`{customPromptSection}\` |
 

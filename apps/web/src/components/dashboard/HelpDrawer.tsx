@@ -1,6 +1,5 @@
 'use client';
 
-import { Fragment } from 'react';
 import { Dialog, DialogPanel, DialogTitle, Transition, TransitionChild } from '@headlessui/react';
 import { cn } from '@/lib/utils/cn';
 import { useTranslations } from 'next-intl';
@@ -30,7 +29,7 @@ export function HelpDrawer({ open, onClose, onboarding }: HelpDrawerProps) {
 
     const keyboardShortcuts = [
         { keys: ['Ctrl', 'K'], label: t('shortcuts.search') },
-        { keys: ['C'], label: t('shortcuts.newDirectory') },
+        { keys: ['C'], label: t('shortcuts.newWork') },
     ];
 
     const links = [
@@ -43,11 +42,10 @@ export function HelpDrawer({ open, onClose, onboarding }: HelpDrawerProps) {
     ];
 
     return (
-        <Transition show={open} as={Fragment}>
+        <Transition show={open}>
             <Dialog onClose={onClose} className="relative z-50">
                 {/* Backdrop */}
                 <TransitionChild
-                    as={Fragment}
                     enter="ease-out duration-300"
                     enterFrom="opacity-0"
                     enterTo="opacity-100"
@@ -63,7 +61,6 @@ export function HelpDrawer({ open, onClose, onboarding }: HelpDrawerProps) {
                     <div className="absolute inset-0 overflow-hidden">
                         <div className="pointer-events-none fixed inset-y-0 right-0 flex max-w-full pl-10">
                             <TransitionChild
-                                as={Fragment}
                                 enter="transform transition ease-in-out duration-300"
                                 enterFrom="translate-x-full"
                                 enterTo="translate-x-0"
@@ -221,8 +218,9 @@ export function HelpDrawer({ open, onClose, onboarding }: HelpDrawerProps) {
                                                             <div className="flex items-center gap-1">
                                                                 {shortcut.keys.map(
                                                                     (key, keyIndex) => (
-                                                                        <Fragment key={keyIndex}>
+                                                                        <>
                                                                             <kbd
+                                                                                key={`key-${keyIndex}`}
                                                                                 className={cn(
                                                                                     'px-2 py-1 text-xs font-medium rounded',
                                                                                     'bg-white dark:bg-surface-dark',
@@ -236,11 +234,14 @@ export function HelpDrawer({ open, onClose, onboarding }: HelpDrawerProps) {
                                                                                 shortcut.keys
                                                                                     .length -
                                                                                     1 && (
-                                                                                <span className="text-text-muted dark:text-text-muted-dark">
+                                                                                <span
+                                                                                    key={`sep-${keyIndex}`}
+                                                                                    className="text-text-muted dark:text-text-muted-dark"
+                                                                                >
                                                                                     +
                                                                                 </span>
                                                                             )}
-                                                                        </Fragment>
+                                                                        </>
                                                                     ),
                                                                 )}
                                                             </div>

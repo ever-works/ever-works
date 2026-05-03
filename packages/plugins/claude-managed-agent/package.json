@@ -47,7 +47,7 @@
 				"pipeline",
 				"form-schema-provider"
 			],
-			"description": "Hosted Claude Managed Agent pipeline for directory generation in Ever Works",
+			"description": "Hosted Claude Managed Agent pipeline for Work generation in Ever Works",
 			"author": {
 				"name": "Ever Works Team"
 			},

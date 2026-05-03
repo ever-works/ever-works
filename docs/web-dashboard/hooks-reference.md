@@ -109,11 +109,11 @@ function useKeyboardShortcuts(options?: KeyboardShortcutsOptions): void;
 
 **Registered Shortcuts**:
 
-| Shortcut       | Condition                                 | Action                                           |
-| -------------- | ----------------------------------------- | ------------------------------------------------ |
-| `Ctrl/Cmd + K` | Always                                    | Navigate to directories page with search focused |
-| `C`            | Not in input field                        | Navigate to new directory page                   |
-| `?`            | Not in input field, `onOpenHelp` provided | Open help drawer                                 |
+| Shortcut       | Condition                                 | Action                                     |
+| -------------- | ----------------------------------------- | ------------------------------------------ |
+| `Ctrl/Cmd + K` | Always                                    | Navigate to works page with search focused |
+| `C`            | Not in input field                        | Navigate to new work page                  |
+| `?`            | Not in input field, `onOpenHelp` provided | Open help drawer                           |
 
 **Internal Behavior**:
 
@@ -166,7 +166,7 @@ interface UsePluginSettingsOptions {
 	scopes: SettingScopeApi[];
 	onSave: (data: { settings?: Record<string, unknown>; secretSettings?: Record<string, unknown> }) => Promise<void>;
 	fallbackSettings?: Record<string, unknown>;
-	scope: 'user' | 'directory';
+	scope: 'user' | 'work';
 }
 
 function usePluginSettings(options: UsePluginSettingsOptions): {
@@ -188,7 +188,7 @@ function usePluginSettings(options: UsePluginSettingsOptions): {
 
 - **Secret Splitting**: Separates settings into regular and secret buckets using `splitSettingsBySecret` from `@ever-works/plugin/api`
 - **Visible Properties**: Filters schema properties based on scopes to determine which fields to render
-- **Required Validation**: Uses `validateRequiredSettings` to check all required fields before saving; directory scope allows inheritance from `fallbackSettings`
+- **Required Validation**: Uses `validateRequiredSettings` to check all required fields before saving; work scope allows inheritance from `fallbackSettings`
 - **Constraint Validation**: Uses `validateSettingsConstraints` for value range and pattern checks
 - **Fallback Display**: `getFieldValue` shows inherited values from `fallbackSettings` when no local value exists, but respects user modifications (even empty values)
 - **Sync on Refresh**: Detects when `initialSettings` changes (e.g., after `router.refresh()`) and resets local state
@@ -220,7 +220,7 @@ function usePluginToggle(options: UsePluginToggleOptions): {
 
 **Toggle Flow**:
 
-- **Enable**: If the plugin supports directory scope, shows an enable panel with an auto-enable checkbox first. On confirm, optimistically sets enabled state and calls `enablePlugin` server action via `useTransition`.
+- **Enable**: If the plugin supports work scope, shows an enable panel with an auto-enable checkbox first. On confirm, optimistically sets enabled state and calls `enablePlugin` server action via `useTransition`.
 - **Disable**: Shows a cascade warning dialog first. On confirm, optimistically disables and calls `disablePlugin`.
 - **Rollback**: If the server action fails, the optimistic state is reverted.
 
