@@ -35,12 +35,12 @@ configurability story.
 ## II. Capability-Driven Resolution (NON-NEGOTIABLE)
 
 The platform asks "give me a plugin that can do X for this scope" and a facade
-resolves the answer based on a **three-tier settings cascade**: directory →
+resolves the answer based on a **three-tier settings cascade**: work →
 user → admin. UI and API code MUST request capabilities through facades; they
 MUST NOT hard-code a specific plugin id.
 
-**Why**: Per-directory plugin overrides are the foundation of the platform's
-flexibility (Directory A uses OpenAI + Brave, Directory B uses Anthropic +
+**Why**: Per-work plugin overrides are the foundation of the platform's
+flexibility (Work A uses OpenAI + Brave, Work B uses Anthropic +
 Tavily). Hardcoding plugin ids in core code defeats this and forces every
 deployment to use the same providers.
 
@@ -53,19 +53,19 @@ deployment to use the same providers.
 
 ## III. Source-of-Truth Repositories (NON-NEGOTIABLE)
 
-Every directory's content lives in **GitHub repositories owned by the
+Every work's content lives in **GitHub repositories owned by the
 end-user** — never inside our database. The platform's database stores
 metadata, schedules, history, and audit logs; the items, categories,
 configuration, and the website itself live in user-owned repos.
 
 **Why**: Users own their content. They can leave the platform at any time and
-keep their directory running. They can edit content via PRs. Governance
+keep their work running. They can edit content via PRs. Governance
 (branch protection, code review) flows through their own GitHub setup.
 
 **Implications**:
 
-- The data repo (`<directory-slug>-data`) holds YAML config + JSON items.
-- The website repo (`<directory-slug>-site`) holds the deployed site.
+- The data repo (`<work-slug>-data`) holds YAML config + JSON items.
+- The website repo (`<work-slug>-site`) holds the deployed site.
 - `works.yml` in the data repo is the source-controlled config, kept in sync
   by the platform on every successful generation.
 - Database rows for items/categories/tags are derived state, not the source
@@ -87,7 +87,7 @@ Re-implementing those primitives in the API process is busywork.
 **Implications**:
 
 - New "I need to run X every N minutes" → Trigger.dev cron task.
-- New "I need to fan out work for each directory in a batch" → Trigger.dev
+- New "I need to fan out work for each work in a batch" → Trigger.dev
   task triggered by a parent.
 - Mutual exclusion across overlapping ticks → atomic SQL `UPDATE … WHERE` if
   you have an owning row, else `DistributedTaskLockService`.
@@ -121,7 +121,7 @@ the API uses **Jest**; the web app uses **Playwright** for E2E. Failing CI
 blocks merges.
 
 **Why**: The plugin system means a regression in one plugin can break
-unrelated directories. Test isolation per plugin (vitest in each package)
+unrelated works. Test isolation per plugin (vitest in each package)
 catches breakages locally before they ship.
 
 **Implications**:
@@ -135,7 +135,7 @@ catches breakages locally before they ship.
 ## VII. User Privacy & Secret Hygiene (NON-NEGOTIABLE)
 
 Secrets (API keys, OAuth tokens, webhooks) are stored encrypted, scoped to
-user/directory, and never logged or returned in API responses. Plugin
+user/work, and never logged or returned in API responses. Plugin
 settings declare secrets via the `x-secret: true` JSON Schema extension; the
 settings UI hides them; the API serialiser strips them.
 

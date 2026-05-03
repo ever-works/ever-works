@@ -163,12 +163,12 @@ describe('SchemaConverterService', () => {
 					name: 'id',
 					required: true,
 					schema: { type: 'string' } as JsonSchema,
-					description: 'Directory ID (UUID)'
+					description: 'Work ID (UUID)'
 				}
 			];
 			const result = converter.buildToolParameters(params, [], undefined);
 			const shape = result.shape;
-			expect(shape.id.description).toBe('Directory ID (UUID)');
+			expect(shape.id.description).toBe('Work ID (UUID)');
 		});
 	});
 });

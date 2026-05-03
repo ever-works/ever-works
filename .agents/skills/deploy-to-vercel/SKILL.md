@@ -42,14 +42,14 @@ vercel deploy [path] -y --no-wait --scope <team-slug>
 
 If the project is already linked (`.vercel/project.json` or `.vercel/repo.json` exists), the `orgId` in those files determines the team — no need to ask again. If there is only one team (or just a personal account), skip the prompt and use it directly.
 
-**About the `.vercel/` directory:** A linked project has either:
+**About the `.vercel/` work:** A linked project has either:
 
 - `.vercel/project.json` — created by `vercel link` (single project linking). Contains `projectId` and `orgId`.
-- `.vercel/repo.json` — created by `vercel link --repo` (repo-based linking). Contains `orgId`, `remoteName`, and a `projects` array mapping directories to Vercel project IDs.
+- `.vercel/repo.json` — created by `vercel link --repo` (repo-based linking). Contains `orgId`, `remoteName`, and a `projects` array mapping works to Vercel project IDs.
 
 Either file means the project is linked. Check for both.
 
-**Do NOT** use `vercel project inspect`, `vercel ls`, or `vercel link` to detect state in an unlinked directory — without a `.vercel/` config, they will interactively prompt (or with `--yes`, silently link as a side-effect). Only `vercel whoami` is safe to run anywhere.
+**Do NOT** use `vercel project inspect`, `vercel ls`, or `vercel link` to detect state in an unlinked work — without a `.vercel/` config, they will interactively prompt (or with `--yes`, silently link as a side-effect). Only `vercel whoami` is safe to run anywhere.
 
 ## Step 2: Choose a Deploy Method
 
@@ -128,7 +128,7 @@ The CLI is working but the project isn't linked yet. This is the opportunity to 
     vercel link --repo --scope <team-slug>
     ```
 
-    This reads the git remote URL and matches it to existing Vercel projects that deploy from that repo. It creates `.vercel/repo.json`. This is much more reliable than `vercel link` (without `--repo`), which tries to match by directory name and often fails when the local folder and Vercel project are named differently.
+    This reads the git remote URL and matches it to existing Vercel projects that deploy from that repo. It creates `.vercel/repo.json`. This is much more reliable than `vercel link` (without `--repo`), which tries to match by work name and often fails when the local folder and Vercel project are named differently.
 
     **If there is no git remote**, fall back to standard linking:
 
@@ -185,7 +185,7 @@ bash /mnt/skills/user/deploy-to-vercel/resources/deploy.sh [path]
 
 **Arguments:**
 
-- `path` - Directory to deploy, or a `.tgz` file (defaults to current directory)
+- `path` - Work to deploy, or a `.tgz` file (defaults to current work)
 
 **Examples:**
 

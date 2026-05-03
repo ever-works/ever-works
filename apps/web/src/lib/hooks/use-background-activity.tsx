@@ -19,8 +19,7 @@ export function BackgroundActivityProvider({ children }: { children: React.React
     const pathname = usePathname();
     const [isGeneratingWork, setIsGeneratingWork] = useState(false);
     const isOnWorksPage =
-        pathname === ROUTES.DASHBOARD_DIRECTORIES ||
-        pathname?.startsWith(ROUTES.DASHBOARD_DIRECTORIES + '/');
+        pathname === ROUTES.DASHBOARD_WORKS || pathname?.startsWith(ROUTES.DASHBOARD_WORKS + '/');
 
     const markGenerating = useCallback(() => {
         setIsGeneratingWork(true);

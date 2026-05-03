@@ -163,7 +163,7 @@ website-template/
 ├── tailwind.config.js
 └── .env.example
     DATA_REPO_URL=              # Set to user's data repository
-    DIRECTORY_SLUG=             # Work identifier
+    WORK_SLUG=             # Work identifier
 ```
 
 ## Website Update Service

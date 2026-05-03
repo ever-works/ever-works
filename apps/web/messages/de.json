@@ -2397,7 +2397,7 @@
                     "providers": "Anbieter: {providers}"
                 },
                 "nameLabel": "Werkname",
-                "namePlaceholder": "z. B. Mein Awesome Directory",
+                "namePlaceholder": "z. B. Mein Awesome Work",
                 "advancedSettings": "Erweiterte Einstellungen",
                 "advancedSubtitle": "Organisation und Repository-Einstellungen konfigurieren",
                 "attribution": {

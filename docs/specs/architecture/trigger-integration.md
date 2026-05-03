@@ -37,7 +37,7 @@ package layout and bootstrap pattern**, see the companion
 │  │ WorkGenerationService.startGeneration()               │  │
 │  │   ├── Create WorkGenerationHistory row                │  │
 │  │   ├── Build WorkGenerationPayload                     │  │
-│  │   └── Call DIRECTORY_GENERATION_DISPATCHER.dispatch(...)   │  │
+│  │   └── Call WORK_GENERATION_DISPATCHER.dispatch(...)   │  │
 │  └────────────────────────────────────────────────────────────┘  │
 │                          │                                       │
 │                          ▼                                       │
@@ -133,7 +133,7 @@ export interface WorkGenerationDispatcher {
 	cancelWorkGeneration(runId: string): Promise<boolean>;
 }
 
-export const DIRECTORY_GENERATION_DISPATCHER = Symbol('DIRECTORY_GENERATION_DISPATCHER');
+export const WORK_GENERATION_DISPATCHER = Symbol('WORK_GENERATION_DISPATCHER');
 ```
 
 `packages/tasks/src/trigger/trigger.module.ts` provides the binding:
@@ -143,10 +143,10 @@ export const DIRECTORY_GENERATION_DISPATCHER = Symbol('DIRECTORY_GENERATION_DISP
 @Module({
 	providers: [
 		TriggerService,
-		{ provide: DIRECTORY_GENERATION_DISPATCHER, useExisting: TriggerService },
-		{ provide: DIRECTORY_IMPORT_DISPATCHER, useExisting: TriggerService }
+		{ provide: WORK_GENERATION_DISPATCHER, useExisting: TriggerService },
+		{ provide: WORK_IMPORT_DISPATCHER, useExisting: TriggerService }
 	],
-	exports: [TriggerService, DIRECTORY_GENERATION_DISPATCHER, DIRECTORY_IMPORT_DISPATCHER]
+	exports: [TriggerService, WORK_GENERATION_DISPATCHER, WORK_IMPORT_DISPATCHER]
 })
 export class TriggerModule {}
 ```

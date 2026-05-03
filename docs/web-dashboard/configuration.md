@@ -63,11 +63,11 @@ The dashboard has built-in support for 21 locales: en, ar, bg, de, es, fr, he, h
 
 ### Application Behavior
 
-| Variable                           | Default               | Description                              |
-| ---------------------------------- | --------------------- | ---------------------------------------- |
-| `NEXT_PUBLIC_DIRECTORY_LIST_LIMIT` | `6`                   | Works per page (pagination)              |
-| `REDIRECT_SEARCH_PARAM`            | `redirect_uri`        | URL param for post-login redirect        |
-| `ALLOWED_REDIRECT_URLS`            | `localhost,127.0.0.1` | Allowed redirect hosts (comma-separated) |
+| Variable                      | Default               | Description                              |
+| ----------------------------- | --------------------- | ---------------------------------------- |
+| `NEXT_PUBLIC_WORK_LIST_LIMIT` | `6`                   | Works per page (pagination)              |
+| `REDIRECT_SEARCH_PARAM`       | `redirect_uri`        | URL param for post-login redirect        |
+| `ALLOWED_REDIRECT_URLS`       | `localhost,127.0.0.1` | Allowed redirect hosts (comma-separated) |
 
 ### Authentication
 
@@ -136,8 +136,8 @@ All dashboard routes are defined as constants in `lib/constants.ts`:
 ```typescript
 export const ROUTES = {
 	DASHBOARD: '/',
-	DASHBOARD_DIRECTORIES: '/works',
-	DASHBOARD_DIRECTORY: (id: string) => `/works/${id}`
+	DASHBOARD_WORKS: '/works',
+	DASHBOARD_WORK: (id: string) => `/works/${id}`
 	// ... all other routes
 };
 ```

@@ -47,7 +47,7 @@ Every mutation that needs to be audited goes through
 await activityLogService.recordActivity({
 	userId,
 	workId,
-	actionType: ActivityActionType.DIRECTORY_GENERATED,
+	actionType: ActivityActionType.WORK_GENERATED,
 	action: 'generation_completed',
 	status: ActivityStatus.COMPLETED,
 	summary: `Generated 27 items for "${work.name}"`,
@@ -77,7 +77,7 @@ History tab:
 
 | Filter group   | `ActivityActionType` values                                                                                 |
 | -------------- | ----------------------------------------------------------------------------------------------------------- |
-| `generation`   | `DIRECTORY_GENERATED`, `DIRECTORY_REGENERATED`, `DIRECTORY_GENERATION_FAILED`                               |
+| `generation`   | `WORK_GENERATED`, `WORK_REGENERATED`, `WORK_GENERATION_FAILED`                                              |
 | `items`        | `ITEM_ADDED`, `ITEM_UPDATED`, `ITEM_REMOVED`                                                                |
 | `comparisons`  | `COMPARISON_ADDED`, `COMPARISON_REMOVED`                                                                    |
 | `taxonomy`     | `CATEGORY_CHANGE`, `TAG_CHANGE`, `COLLECTION_CHANGE`                                                        |
@@ -170,7 +170,7 @@ the snake-case `actionType`:
 
 | `actionType`          | PostHog event name    |
 | --------------------- | --------------------- |
-| `DIRECTORY_GENERATED` | `work_generated`      |
+| `WORK_GENERATED`      | `work_generated`      |
 | `ITEM_ADDED`          | `item_added`          |
 | `COMMUNITY_PR_MERGED` | `community_pr_merged` |
 

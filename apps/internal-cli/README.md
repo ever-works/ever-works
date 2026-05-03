@@ -1,6 +1,6 @@
 # Ever Works CLI
 
-The command-line interface for Ever Works - Open Directory Builder Platform.
+The command-line interface for Ever Works - Open Work Builder Platform.
 
 ## Installation
 
@@ -17,7 +17,7 @@ ew --help
 ## Commands
 
 - `ew config` - Configure the CLI
-- `ew directory` - Manage directories
+- `ew work` - Manage works
 - `ew serve` - Start local development server
 
 For more information, visit: https://ever.works

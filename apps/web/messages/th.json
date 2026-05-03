@@ -2397,7 +2397,7 @@
                     "providers": "ผู้ให้บริการ: {providers}"
                 },
                 "nameLabel": "ชื่องาน",
-                "namePlaceholder": "เช่น My Awesome Directory",
+                "namePlaceholder": "เช่น My Awesome Work",
                 "advancedSettings": "การตั้งค่าขั้นสูง",
                 "advancedSubtitle": "ตั้งค่าองค์กรและการตั้งค่า repository",
                 "attribution": {

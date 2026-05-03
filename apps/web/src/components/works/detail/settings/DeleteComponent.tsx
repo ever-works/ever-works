@@ -60,7 +60,7 @@ export function DeleteComponent({ work }: { work: Work }) {
 
             if (result.success) {
                 toast.success(result.message || t('deleteSuccess'));
-                router.push(ROUTES.DASHBOARD_DIRECTORIES);
+                router.push(ROUTES.DASHBOARD_WORKS);
             } else {
                 toast.error(result.error || t('deleteFailed'));
             }

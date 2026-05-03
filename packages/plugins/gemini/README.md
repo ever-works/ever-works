@@ -1,6 +1,6 @@
 # @ever-works/gemini-plugin
 
-Full pipeline plugin that delegates directory generation to the [Gemini CLI](https://github.com/google-gemini/gemini-cli). A single Gemini CLI session autonomously handles web search, content creation, and file generation inside a temporary workspace.
+Full pipeline plugin that delegates work generation to the [Gemini CLI](https://github.com/google-gemini/gemini-cli). A single Gemini CLI session autonomously handles web search, content creation, and file generation inside a temporary workspace.
 
 ## Pipeline Steps
 
@@ -23,7 +23,7 @@ Provide a Gemini API key from [Google AI Studio](https://aistudio.google.com/api
 
 This plugin does not reuse host machine Gemini CLI login state from `~/.gemini/`.
 Credentials must come from Ever Works user settings so each user keeps isolated auth.
-The runtime also uses an isolated per-user Gemini home/config directory instead of the machine user's home.
+The runtime also uses an isolated per-user Gemini home/config work instead of the machine user's home.
 
 ## Settings
 
@@ -57,7 +57,7 @@ Prompt keys:
 - `gemini.system` - System prompt template
 - `gemini.user` - User prompt template
 
-Both support variable substitution for directory context, existing items, categories, tags, and brands.
+Both support variable substitution for work context, existing items, categories, tags, and brands.
 
 ## Binary Management
 

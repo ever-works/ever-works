@@ -67,7 +67,7 @@ Or use the shortcut:
 turbo run build test --affected
 ```
 
-## Directory-Based
+## Work-Based
 
 Run in all apps:
 
@@ -75,7 +75,7 @@ Run in all apps:
 turbo run build --filter=./apps/*
 ```
 
-Run in specific directories:
+Run in specific works:
 
 ```bash
 turbo run build --filter=./apps/web --filter=./apps/api

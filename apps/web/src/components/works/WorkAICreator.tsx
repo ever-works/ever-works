@@ -142,11 +142,11 @@ export function WorkAICreator({
                 if (result.work) {
                     router.push(ROUTES.DASHBOARD_WORK(result.work.id));
                 } else {
-                    router.push(ROUTES.DASHBOARD_DIRECTORIES);
+                    router.push(ROUTES.DASHBOARD_WORKS);
                 }
             } else if (result.requiresGitProvider) {
                 toast.error(result.error || t('errors.githubRequired'));
-                router.push(ROUTES.DASHBOARD_DIRECTORIES_NEW);
+                router.push(ROUTES.DASHBOARD_WORKS_NEW);
             } else {
                 toast.error(result.error || t('errors.createFailed'));
             }

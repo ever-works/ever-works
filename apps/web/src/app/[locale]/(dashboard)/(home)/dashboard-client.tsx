@@ -55,7 +55,7 @@ export default function DashboardClient({
                                 </h2>
                                 {totalWorks > 5 && (
                                     <Link
-                                        href={ROUTES.DASHBOARD_DIRECTORIES}
+                                        href={ROUTES.DASHBOARD_WORKS}
                                         className="text-sm text-primary hover:text-primary-hover transition-colors"
                                     >
                                         {t('works.viewAll', { count: totalWorks })}
@@ -71,7 +71,7 @@ export default function DashboardClient({
                             action={{
                                 label: t('works.empty.action'),
                                 onClick: () => {
-                                    router.push(ROUTES.DASHBOARD_DIRECTORIES_NEW);
+                                    router.push(ROUTES.DASHBOARD_WORKS_NEW);
                                 },
                             }}
                         />

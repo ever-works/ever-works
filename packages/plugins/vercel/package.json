@@ -1,7 +1,7 @@
 {
 	"name": "@ever-works/vercel-plugin",
 	"version": "1.0.0",
-	"description": "Vercel deployment plugin for Ever Works - deploy directories to Vercel",
+	"description": "Vercel deployment plugin for Ever Works - deploy works to Vercel",
 	"type": "module",
 	"main": "./dist/index.cjs",
 	"module": "./dist/index.js",
@@ -44,7 +44,7 @@
 			"capabilities": [
 				"deployment"
 			],
-			"description": "Deploy directories to Vercel",
+			"description": "Deploy works to Vercel",
 			"author": {
 				"name": "Ever Works Team"
 			},

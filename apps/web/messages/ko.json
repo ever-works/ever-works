@@ -2397,7 +2397,7 @@
                     "providers": "제공자: {providers}"
                 },
                 "nameLabel": "워크 이름",
-                "namePlaceholder": "e.g., My Awesome Directory",
+                "namePlaceholder": "e.g., My Awesome Work",
                 "advancedSettings": "고급 설정",
                 "advancedSubtitle": "조직 및 저장소 설정 구성",
                 "attribution": {

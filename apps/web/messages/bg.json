@@ -2397,7 +2397,7 @@
                     "providers": "Доставчици: {providers}"
                 },
                 "nameLabel": "Име на работа",
-                "namePlaceholder": "нпр. My Awesome Directory",
+                "namePlaceholder": "нпр. My Awesome Work",
                 "advancedSettings": "Разширени настройки",
                 "advancedSubtitle": "Конфигурирайте организация и настройки на хранилището",
                 "attribution": {

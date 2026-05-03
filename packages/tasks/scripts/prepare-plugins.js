@@ -35,7 +35,7 @@ function main() {
     fs.mkdirSync(PLUGINS_DEST, { recursive: true });
 
     if (!fs.existsSync(PLUGINS_SRC)) {
-        console.error('==> ❌ Plugin source directory not found!');
+        console.error('==> ❌ Plugin source work not found!');
         process.exit(1);
     }
 

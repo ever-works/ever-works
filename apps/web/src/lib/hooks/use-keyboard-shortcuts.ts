@@ -35,7 +35,7 @@ export function useKeyboardShortcuts(options: KeyboardShortcutsOptions = {}) {
             if (modifier && event.key.toLowerCase() === 'k') {
                 event.preventDefault();
                 // Navigate to works page with focus param
-                router.push(`${ROUTES.DASHBOARD_DIRECTORIES}?focus=search`);
+                router.push(`${ROUTES.DASHBOARD_WORKS}?focus=search`);
                 return;
             }
 
@@ -47,7 +47,7 @@ export function useKeyboardShortcuts(options: KeyboardShortcutsOptions = {}) {
             // C: Create new work
             if (event.key.toLowerCase() === 'c' && !modifier) {
                 event.preventDefault();
-                router.push(ROUTES.DASHBOARD_DIRECTORIES_NEW);
+                router.push(ROUTES.DASHBOARD_WORKS_NEW);
                 return;
             }
 

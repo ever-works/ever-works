@@ -29,7 +29,7 @@ export class ActivityLog {
     @JoinColumn({ name: 'userId' })
     user: User;
 
-    @Column({ nullable: true })
+    @Column({ name: 'directoryId', nullable: true })
     workId?: string;
 
     @ManyToOne(() => Work, { onDelete: 'SET NULL', nullable: true })
