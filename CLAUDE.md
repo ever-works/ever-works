@@ -55,7 +55,7 @@ pnpm typeorm migration:run -d typeorm.config.ts
 pnpm deploy:trigger
 ```
 
-**Package manager**: pnpm only (never npm/yarn). Node.js >=20. Run `pnpm install` after adding dependencies.
+**Package manager**: pnpm only (never npm/yarn). Node.js >=22 (matches the Docker `node:22-alpine` base image). Run `pnpm install` after adding dependencies.
 
 ## Architecture
 

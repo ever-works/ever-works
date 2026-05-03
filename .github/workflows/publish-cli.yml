@@ -57,10 +57,10 @@ jobs:
         with:
           version: 10.13.1
 
-      - name: Setup Node.js 20.x
+      - name: Setup Node.js 22.x
         uses: actions/setup-node@v4
         with:
-          node-version: 20.x
+          node-version: 22.x
           cache: "pnpm"
 
       - name: Install dependencies
@@ -117,7 +117,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20.x
+          node-version: 22.x
           registry-url: "https://registry.npmjs.org"
 
       - name: Download Internal CLI artifact
@@ -167,7 +167,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20.x
+          node-version: 22.x
           registry-url: "https://registry.npmjs.org"
 
       - name: Download External CLI artifact
@@ -213,7 +213,7 @@ jobs:
       - name: Setup Node.js for version extraction
         uses: actions/setup-node@v4
         with:
-          node-version: 20.x
+          node-version: 22.x
       - name: Extract internal CLI version
         id: version
         run: |
@@ -254,7 +254,7 @@ jobs:
       - name: Setup Node.js for version extraction
         uses: actions/setup-node@v4
         with:
-          node-version: 20.x
+          node-version: 22.x
       - name: Extract external CLI version
         id: version
         run: |
@@ -295,7 +295,7 @@ jobs:
       - name: Setup Node.js for version extraction
         uses: actions/setup-node@v4
         with:
-          node-version: 20.x
+          node-version: 22.x
       - name: Extract versions
         id: version
         run: |
