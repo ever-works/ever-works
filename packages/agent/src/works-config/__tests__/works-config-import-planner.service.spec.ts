@@ -61,7 +61,9 @@ describe('WorksConfigImportPlannerService', () => {
                 repo: 'Compare-Cloud-Pricing-Website',
             },
         });
-        expect(sourceRepository.relatedRepositories?.work).toBeUndefined();
+        // Persisted JSON key stays as 'directory' for back-compat with rows
+        // imported before the Directory→Work rename.
+        expect(sourceRepository.relatedRepositories?.directory).toBeUndefined();
     });
 
     it('can snapshot works config metadata without assigning the source repo a work role', () => {

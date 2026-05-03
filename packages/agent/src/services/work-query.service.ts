@@ -114,6 +114,16 @@ export class WorkQueryService {
                 search: sanitizedSearch,
             });
 
+            // Diagnostic: explicit log when listing returns empty.
+            // After the Directory→Work rename incident this lets us see in
+            // server logs why a user might suddenly see "0 works" — including
+            // their userId so we can cross-check with the DB row's userId.
+            if (worksWithRoles.length === 0) {
+                this.logger.log(
+                    `getWorks: 0 works for user ${user.id} (memberWorkIds=${memberWorkIds.length}, total=${total}, search=${sanitizedSearch ?? 'none'})`,
+                );
+            }
+
             return {
                 status: 'success',
                 works: worksWithRoles,
