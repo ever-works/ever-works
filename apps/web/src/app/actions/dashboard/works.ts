@@ -859,7 +859,9 @@ export async function getRepositoryVisibility(workId: string) {
 
 export async function toggleRepositoryVisibility(
     workId: string,
-    repoType: 'data' | 'work' | 'website',
+    // 'directory' is the legacy persisted role key — see RepositoryRole
+    // note in @ever-works/contracts/api.
+    repoType: 'data' | 'directory' | 'website',
     isPrivate: boolean,
 ) {
     const user = await getAuthFromCookie();
