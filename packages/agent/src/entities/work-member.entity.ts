@@ -22,17 +22,17 @@ import { ClassToObject, WorkMemberRole } from './types';
  * Note: Members can only have roles: MANAGER, EDITOR, or VIEWER.
  * OWNER role is reserved for the work creator (identified by work.userId).
  */
-@Entity({ name: 'directory_members' })
+@Entity({ name: 'work_members' })
 @Unique(['workId', 'userId']) // A user can only have one membership per work
 export class WorkMember {
     @PrimaryGeneratedColumn('uuid')
     id: string;
 
-    @Column({ name: 'directoryId' })
+    @Column()
     workId: string;
 
     @ManyToOne(() => Work, (work) => work.members, { onDelete: 'CASCADE' })
-    @JoinColumn({ name: 'directoryId' })
+    @JoinColumn({ name: 'workId' })
     work: ClassToObject<Work>;
 
     @Column()

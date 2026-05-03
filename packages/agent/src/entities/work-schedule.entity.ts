@@ -20,16 +20,16 @@ import { UsageLedgerEntry } from './usage-ledger-entry.entity';
 @Index(['status', 'nextRunAt'])
 @Index(['userId', 'status'])
 @Index(['workId'], { unique: true })
-@Entity({ name: 'directory_schedules' })
+@Entity({ name: 'work_schedules' })
 export class WorkSchedule {
     @PrimaryGeneratedColumn('uuid')
     id: string;
 
-    @Column({ name: 'directoryId', unique: true })
+    @Column({ unique: true })
     workId: string;
 
     @OneToOne(() => Work, (work) => work.schedule, { onDelete: 'CASCADE' })
-    @JoinColumn({ name: 'directoryId' })
+    @JoinColumn({ name: 'workId' })
     work: ClassToObject<Work>;
 
     @Column()

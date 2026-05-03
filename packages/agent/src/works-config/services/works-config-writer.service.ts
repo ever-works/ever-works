@@ -93,21 +93,19 @@ export class WorksConfigWriterService {
         return undefined;
     }
 
-    // 'directory' role string preserved for compatibility with legacy
-    // persisted JSON keys (see RepositoryRole note in @ever-works/contracts).
-    private formatRepositoryTarget(work: Work, role: 'data' | 'directory' | 'website'): string {
+    private formatRepositoryTarget(work: Work, role: 'data' | 'work' | 'website'): string {
         const target = this.getRepositoryTarget(work, role);
         return `${target.owner}/${target.repo}`;
     }
 
     private getRepositoryTarget(
         work: Work,
-        role: 'data' | 'directory' | 'website',
+        role: 'data' | 'work' | 'website',
     ): Required<RepositoryTarget> {
         switch (role) {
-            case 'directory':
+            case 'work':
                 return {
-                    owner: work.getRepoOwner('directory'),
+                    owner: work.getRepoOwner('work'),
                     repo: work.getMainRepo(),
                 };
             case 'website':
