@@ -5,7 +5,15 @@ export const IMPORT_SOURCE_TYPES = ['data_repo', 'awesome_readme', 'link_existin
 
 export type ImportSourceType = (typeof IMPORT_SOURCE_TYPES)[number];
 
-export type RepositoryRole = 'data' | 'work' | 'website';
+/**
+ * NOTE: the 'directory' role name is preserved (not renamed to 'work')
+ * because this string is also the KEY used in the persisted JSON column
+ * `directories.sourceRepository.relatedRepositories` for every existing
+ * production work. Renaming this string makes `relatedRepositories['work']`
+ * miss the persisted `relatedRepositories['directory']` value, falling back
+ * to a synthesized owner that no longer matches the real GitHub repo.
+ */
+export type RepositoryRole = 'data' | 'directory' | 'website';
 
 export interface RepositoryTarget {
 	owner?: string;
@@ -14,7 +22,12 @@ export interface RepositoryTarget {
 
 export interface RelatedRepositories {
 	data?: RepositoryTarget;
-	work?: RepositoryTarget;
+	/**
+	 * Persisted in DB as the 'directory' key — see RepositoryRole note.
+	 * Despite the new product naming, this property name stays as `directory`
+	 * because it's the JSON key in already-stored `directories.sourceRepository`.
+	 */
+	directory?: RepositoryTarget;
 	website?: RepositoryTarget;
 }
 
@@ -37,10 +50,16 @@ export interface SourceRepository<TImportedAt = string> {
 	worksConfig?: WorksConfigSnapshot;
 }
 
+/**
+ * Persisted in `directories.repoVisibility` (JSON column). The `directory`
+ * key (formerly the entity's main repo) is preserved so existing rows
+ * continue to round-trip correctly. Renaming to `work` would silently
+ * drop the saved value on read.
+ */
 export interface RepoVisibility {
 	data: boolean;
 	website: boolean;
-	work: boolean;
+	directory: boolean;
 }
 
 export interface ImportEnrichmentConfig {

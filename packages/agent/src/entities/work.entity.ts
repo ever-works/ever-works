@@ -219,7 +219,10 @@ export class Work {
     }
 
     getMainRepo() {
-        return this.getRelatedRepository('work').repo;
+        // 'directory' is the legacy key persisted in
+        // `directories.sourceRepository.relatedRepositories` — see
+        // RepositoryRole note in @ever-works/contracts/api.
+        return this.getRelatedRepository('directory').repo;
     }
 
     getRepoOwner(type: RepositoryRole = 'data'): string {
@@ -239,7 +242,7 @@ export class Work {
             return `${this.slug}-website`;
         }
 
-        if (type === 'work') {
+        if (type === 'directory') {
             return this.slug;
         }
 

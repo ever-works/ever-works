@@ -425,7 +425,10 @@ export interface AnalyzeForLinkingResponseDto {
     error?: string;
 }
 
-export type RepositoryType = 'data' | 'work' | 'website';
+// 'directory' is the legacy persisted role key — preserved for round-trip
+// with `directories.sourceRepository.relatedRepositories` and
+// `directories.repoVisibility`. See RepositoryRole in @ever-works/contracts/api.
+export type RepositoryType = 'data' | 'directory' | 'website';
 
 export interface RepositoryStatus {
     type: RepositoryType;

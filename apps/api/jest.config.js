@@ -16,7 +16,7 @@ module.exports = {
         ],
     },
     collectCoverageFrom: ['**/*.(t|j)s'],
-    coverageWork: '../coverage',
+    coverageDirectory: '../coverage',
     testEnvironment: 'node',
     moduleNameMapper: {
         '^@src/generators/(.*)$': '<rootDir>/../../../packages/agent/src/generators/$1/index.ts',

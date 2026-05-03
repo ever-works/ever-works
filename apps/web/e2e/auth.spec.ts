@@ -15,14 +15,16 @@ test.describe('Registration', () => {
     };
 
     test('should register a new user and redirect to dashboard', async ({ page }) => {
-        test.setTimeout(180_000);
+        test.setTimeout(240_000);
 
-        // Warm up the dashboard route so the post-register redirect resolves quickly.
+        // Warm up the dashboard route + register page so the post-register redirect resolves quickly.
+        await page.goto('/en/register', { waitUntil: 'domcontentloaded' });
+        await page.waitForTimeout(1_500);
         await page.goto('/en', { waitUntil: 'domcontentloaded' });
-        await page.waitForTimeout(500);
+        await page.waitForTimeout(1_500);
 
         await page.goto('/en/register', { waitUntil: 'networkidle' });
-        await page.waitForTimeout(1_000);
+        await page.waitForTimeout(2_000);
 
         // Verify form is visible
         await expect(page.locator('input[name="name"]')).toBeVisible();
@@ -43,7 +45,7 @@ test.describe('Registration', () => {
 
         // Should redirect to dashboard (any /en path that isn't an auth page)
         await page.waitForURL(/\/en(\/(?!login|register|forgot|reset|email|auth)|$|\?)/, {
-            timeout: 60_000,
+            timeout: 120_000,
         });
         await expect(page).not.toHaveURL(/\/register/);
     });

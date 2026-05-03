@@ -12,7 +12,7 @@ const authFile = 'e2e/.auth/user.json';
 setup('authenticate', async ({ page, baseURL }) => {
     // Dev-mode compilation of the dashboard route on first hit can take a
     // long time, so the whole setup needs a generous budget.
-    setup.setTimeout(180_000);
+    setup.setTimeout(300_000);
 
     // 1. Register the user via API (fast)
     try {
@@ -21,18 +21,21 @@ setup('authenticate', async ({ page, baseURL }) => {
         // User may already exist from a previous run — try logging in instead
     }
 
-    // 2. Warm up: hit the dashboard root once so Next.js compiles `/en` before
-    //    we redirect to it from the login form. Without this, the post-login
-    //    redirect arrives faster than the dev server can compile the target.
+    // 2. Thorough warmup: hit /en/login AND /en so both routes are compiled
+    //    by the dev server before we attempt the login flow. The post-login
+    //    server-action redirect needs the destination to be ready, otherwise
+    //    the browser sits on /en/login while the dev server compiles /en.
+    await page.goto('/en/login', { waitUntil: 'domcontentloaded' });
+    await page.waitForTimeout(1_500);
     await page.goto('/en', { waitUntil: 'domcontentloaded' });
-    await page.waitForTimeout(500);
+    await page.waitForTimeout(1_500);
 
     // 3. Log in via the UI so cookies are properly set by the Next.js server.
     //    Wait for the page (and any Fast Refresh rebuilds) to settle before
     //    interacting with the form, otherwise the submit button can get
     //    re-rendered out from under us in dev mode.
     await page.goto('/en/login', { waitUntil: 'networkidle' });
-    await page.waitForTimeout(1_000);
+    await page.waitForTimeout(2_000);
 
     await page.locator('input[name="email"]').fill(TEST_USER.email);
     await page.locator('input[name="password"]').fill(TEST_USER.password);
@@ -42,7 +45,7 @@ setup('authenticate', async ({ page, baseURL }) => {
     // `/en?...`, or `/en/<dashboard-path>` — but NOT `/en/login` or other auth pages
     // (so we don't accidentally consider the still-on-login state as success).
     await page.waitForURL(/\/en(\/(?!login|register|forgot|reset|email|auth)|$|\?)/, {
-        timeout: 60_000,
+        timeout: 120_000,
     });
 
     // Verify we're authenticated

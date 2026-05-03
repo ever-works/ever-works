@@ -150,7 +150,7 @@
         },
         "register": {
             "title": "Tạo tài khoản của bạn",
-            "subtitle": "Bắt đầu xây dựng các danh bạ tuyệt vời ngay hôm nay",
+            "subtitle": "Bắt đầu xây dựng các công việc tuyệt vời ngay hôm nay",
             "form": {
                 "name": {
                     "label": "Họ và tên",
@@ -2949,8 +2949,8 @@
         "auth": {
             "backToHome": "Quay về trang chủ",
             "feature": {
-                "title": "Xây dựng Danh bạ với AI",
-                "subtitle": "Tạo danh bạ đẹp, có thể tìm kiếm trong vài phút bằng ngôn ngữ tự nhiên. Không cần mã hóa.",
+                "title": "Xây dựng Công việc với AI",
+                "subtitle": "Tạo công việc đẹp, có thể tìm kiếm trong vài phút bằng ngôn ngữ tự nhiên. Không cần mã hóa.",
                 "badge": "Được hỗ trợ bởi AI",
                 "benefits": {
                     "ai": {
@@ -3002,8 +3002,8 @@
         }
     },
     "metadata": {
-        "title": "{companyName} - Trình xây dựng Danh bạ",
-        "description": "Nền tảng SaaS để xây dựng và quản lý danh bạ",
+        "title": "{companyName} - Trình xây dựng Công việc",
+        "description": "Nền tảng SaaS để xây dựng và quản lý công việc",
         "pages": {
             "signIn": "Đăng nhập",
             "createAccount": "Tạo Tài khoản",
@@ -3012,9 +3012,9 @@
             "authError": "Lỗi Xác thực",
             "dashboard": "Bảng điều khiển",
             "activity": "Nhật ký Hoạt động",
-            "works": "Danh bạ",
-            "newWork": "Danh bạ Mới",
-            "work": "Danh bạ",
+            "works": "Công việc",
+            "newWork": "Công việc Mới",
+            "work": "Công việc",
             "overview": "Tổng quan",
             "items": "Mục",
             "generator": "Trình tạo",
@@ -3067,16 +3067,16 @@
             },
             "oauthRequired": "Yêu cầu kết nối OAuth. Vui lòng kết nối tài khoản {provider} trước.",
             "githubRequired": "Yêu cầu kết nối GitHub. Vui lòng kết nối tài khoản GitHub trước.",
-            "createSuccess": "Tạo danh bạ thành công!",
-            "createFailed": "Tạo danh bạ thất bại",
-            "updateSuccess": "Cập nhật danh bạ thành công!",
-            "updateFailed": "Cập nhật danh bạ thất bại",
-            "invalidGeneratedData": "Tạo dữ liệu danh bạ hợp lệ thất bại",
-            "aiGenerationStarted": "Tạo danh bạ đã bắt đầu! AI đang tạo nội dung...",
-            "invalidId": "ID danh bạ không hợp lệ",
-            "deleteSuccess": "Xóa danh bạ thành công",
-            "deleteFailed": "Xóa danh bạ thất bại",
-            "fetchFailed": "Lấy danh bạ thất bại",
+            "createSuccess": "Tạo công việc thành công!",
+            "createFailed": "Tạo công việc thất bại",
+            "updateSuccess": "Cập nhật công việc thành công!",
+            "updateFailed": "Cập nhật công việc thất bại",
+            "invalidGeneratedData": "Tạo dữ liệu công việc hợp lệ thất bại",
+            "aiGenerationStarted": "Tạo công việc đã bắt đầu! AI đang tạo nội dung...",
+            "invalidId": "ID công việc không hợp lệ",
+            "deleteSuccess": "Xóa công việc thành công",
+            "deleteFailed": "Xóa công việc thất bại",
+            "fetchFailed": "Lấy công việc thất bại",
             "organization": {
                 "requiredWhenOwnerProvided": "Tổ chức phải được kích hoạt khi chủ sở hữu được cung cấp"
             },
@@ -3084,7 +3084,7 @@
                 "invalidUrl": "Vui lòng nhập URL hợp lệ",
                 "analyzeFailed": "Phân tích kho lưu trữ thất bại",
                 "started": "Nhập đã bắt đầu thành công",
-                "failed": "Nhập danh bạ thất bại",
+                "failed": "Nhập công việc thất bại",
                 "fetchReposFailed": "Lấy kho lưu trữ thất bại"
             }
         },
