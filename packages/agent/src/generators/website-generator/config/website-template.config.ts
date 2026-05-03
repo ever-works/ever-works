@@ -16,13 +16,10 @@ export interface WebsiteTemplateConfig {
 const CLASSIC_WEBSITE_TEMPLATE: WebsiteTemplateConfig = {
     id: 'classic',
     name: 'Classic',
-    description: 'The original Ever Works directory-style website template.',
+    description: 'The original Ever Works website template.',
     owner: 'ever-works',
-    // Concrete GitHub repository name — must NOT be renamed to
-    // `work-web-template`. The bulk Directory→Work rename incorrectly
-    // changed this; the repo is and will remain
-    // https://github.com/ever-works/directory-web-template (template
-    // for directory-style sites). See docs/specs/features/website-templates.
+    // Concrete GitHub repository name. See
+    // docs/features/website-templates.md for the full template catalogue.
     repo: 'directory-web-template',
     branch: 'main',
     syncBranches: ['main', 'stage', 'develop'],

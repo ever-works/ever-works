@@ -100,17 +100,6 @@ Anyone can author and contribute one; the only contract is that the repo's
 branch layout matches `WebsiteTemplateConfig` (i.e. `main` and a sensible
 default branch).
 
-## Naming notes
-
-The repos `directory-web-template` and `directory-web-minimal-template`
-keep their `directory-…` naming because they are **specifically built for
-directory-style websites** (listing of items with categories, tags,
-comparisons, etc.). The `directory` here is a domain concept (the type of
-website being generated), independent of the platform's internal product
-rename from "Directory" to "Work" — that rename only affected the platform
-itself; the template repos remain authoritative for the directory site
-shape they generate.
-
 ## Related
 
 - [Website Generation](../ai-agents/website-generation.md) — runtime
