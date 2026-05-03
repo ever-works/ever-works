@@ -1292,7 +1292,7 @@ export class DataGeneratorService {
 
     private getDefaultReadme(work: Work) {
         // Construct URL based on work's repo provider
-        const owner = work.getRepoOwner('work');
+        const owner = work.getRepoOwner('directory');
         const repo = work.getMainRepo();
         const markdownURL = this.gitFacade.getWebUrl(work.gitProvider, owner, repo);
         return (

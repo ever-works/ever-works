@@ -100,7 +100,7 @@ export function RepoVisibilitySettings({ initialRepositories }: RepoVisibilitySe
                         <div className="space-y-1">
                             <div className="flex items-center gap-2">
                                 <span className="text-xs font-medium text-text dark:text-text-dark capitalize">
-                                    {repo.type === 'work'
+                                    {repo.type === 'directory'
                                         ? t('repositoryTypes.main')
                                         : repo.type === 'data'
                                           ? t('repositoryTypes.data')

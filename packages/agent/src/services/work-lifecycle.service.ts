@@ -475,7 +475,9 @@ export class WorkLifecycleService {
             if (deleteWorkDto.delete_markdown_repository !== false) {
                 try {
                     await this.markdownGenerator.removeRepository(work, user);
-                    deletedRepositories.push(`${work.getRepoOwner('work')}/${work.getMainRepo()}`);
+                    deletedRepositories.push(
+                        `${work.getRepoOwner('directory')}/${work.getMainRepo()}`,
+                    );
                 } catch (error) {
                     if (error instanceof HttpException) {
                         throw error;
