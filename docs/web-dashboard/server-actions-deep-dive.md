@@ -25,13 +25,13 @@ apps/web/src/app/actions/
 │
 └── dashboard/
     ├── index.ts               # Barrel re-exports
-    ├── directories.ts         # Directory CRUD + advanced operations
+    ├── works.ts         # Work CRUD + advanced operations
     ├── generator.ts           # AI generation actions
     ├── generator-form.ts      # Generator form schema
     ├── items.ts               # Item CRUD
     ├── comparisons.ts         # Comparison management
     ├── deploy.ts              # Deployment actions
-    ├── directory-schedule.ts  # Schedule management
+    ├── work-schedule.ts  # Schedule management
     ├── members.ts             # Team member management
     ├── navigation.ts          # Navigation data
     ├── oauth.ts               # OAuth connection management
@@ -94,40 +94,40 @@ function LoginForm() {
 }
 ```
 
-### Directory Actions
+### Work Actions
 
-**File:** `apps/web/src/app/actions/dashboard/directories.ts`
+**File:** `apps/web/src/app/actions/dashboard/works.ts`
 
-This is the largest action file, covering all directory operations:
+This is the largest action file, covering all work operations:
 
-| Action                            | Description                                                            |
-| --------------------------------- | ---------------------------------------------------------------------- |
-| `createDirectory`                 | Create a new directory with name, type, and optional repository config |
-| `createDirectoryWithAI`           | Create a directory with AI-assisted content generation                 |
-| `updateDirectory`                 | Update directory metadata (name, description, etc.)                    |
-| `deleteDirectory`                 | Delete a directory and its associated repositories                     |
-| `getDirectories`                  | Fetch all directories for the current user                             |
-| `syncDirectoryData`               | Trigger a sync with the source repository                              |
-| `analyzeRepository`               | Analyze a URL to detect format and content structure                   |
-| `analyzeForLinking`               | Check if a repository has existing Ever Works structure                |
-| `importDirectory`                 | Import a directory from an external source                             |
-| `getUserRepositories`             | List repositories from the user's git provider                         |
-| `updateDirectorySchedule`         | Configure automated generation schedule                                |
-| `getRepositoryVisibility`         | Check if a repository is public or private                             |
-| `toggleRepositoryVisibility`      | Toggle repository public/private state                                 |
-| `getAdvancedPrompts`              | Fetch custom AI prompts for a directory                                |
-| `updateAdvancedPrompts`           | Update custom AI prompts                                               |
-| `getWebsiteSettings`              | Fetch website deployment configuration                                 |
-| `updateWebsiteSettings`           | Update website deployment configuration                                |
-| `updateCommunityPrSettings`       | Update community PR settings for a directory                           |
-| `fetchDirectoryGenerationHistory` | Get the generation history log                                         |
+| Action                       | Description                                                       |
+| ---------------------------- | ----------------------------------------------------------------- |
+| `createWork`                 | Create a new work with name, type, and optional repository config |
+| `createWorkWithAI`           | Create a work with AI-assisted content generation                 |
+| `updateWork`                 | Update work metadata (name, description, etc.)                    |
+| `deleteWork`                 | Delete a work and its associated repositories                     |
+| `getWorks`                   | Fetch all works for the current user                              |
+| `syncWorkData`               | Trigger a sync with the source repository                         |
+| `analyzeRepository`          | Analyze a URL to detect format and content structure              |
+| `analyzeForLinking`          | Check if a repository has existing Ever Works structure           |
+| `importWork`                 | Import a work from an external source                             |
+| `getUserRepositories`        | List repositories from the user's git provider                    |
+| `updateWorkSchedule`         | Configure automated generation schedule                           |
+| `getRepositoryVisibility`    | Check if a repository is public or private                        |
+| `toggleRepositoryVisibility` | Toggle repository public/private state                            |
+| `getAdvancedPrompts`         | Fetch custom AI prompts for a work                                |
+| `updateAdvancedPrompts`      | Update custom AI prompts                                          |
+| `getWebsiteSettings`         | Fetch website deployment configuration                            |
+| `updateWebsiteSettings`      | Update website deployment configuration                           |
+| `updateCommunityPrSettings`  | Update community PR settings for a work                           |
+| `fetchWorkGenerationHistory` | Get the generation history log                                    |
 
-**Example: createDirectoryWithAI**
+**Example: createWorkWithAI**
 
 ```typescript
 'use server';
 
-export async function createDirectoryWithAI(params: {
+export async function createWorkWithAI(params: {
 	name: string;
 	description: string;
 	aiProvider: string;
@@ -136,7 +136,7 @@ export async function createDirectoryWithAI(params: {
 	const session = await getSession();
 	if (!session) return { success: false, error: 'Unauthorized' };
 
-	const result = await directoryAPI.createWithAI(params, session.token);
+	const result = await workAPI.createWithAI(params, session.token);
 
 	if (!result.success) {
 		return { success: false, error: result.error };
@@ -151,11 +151,11 @@ export async function createDirectoryWithAI(params: {
 
 **File:** `apps/web/src/app/actions/dashboard/generator.ts`
 
-| Action               | Description                                                      |
-| -------------------- | ---------------------------------------------------------------- |
-| `generateItems`      | Start AI generation for a directory with sanitized plugin config |
-| `updateItems`        | Batch update generated items                                     |
-| `regenerateMarkdown` | Regenerate markdown output from existing items                   |
+| Action               | Description                                                 |
+| -------------------- | ----------------------------------------------------------- |
+| `generateItems`      | Start AI generation for a work with sanitized plugin config |
+| `updateItems`        | Batch update generated items                                |
+| `regenerateMarkdown` | Regenerate markdown output from existing items              |
 
 **generateItems** is notable for its `sanitizePluginConfig` step, which strips sensitive data (like API keys marked with `x-secret`) from the plugin configuration before logging or transmitting it over non-secure channels. The actual secret values are resolved server-side from the stored plugin settings.
 
@@ -163,7 +163,7 @@ export async function createDirectoryWithAI(params: {
 // Client component usage
 startTransition(async () => {
 	const result = await generateItems({
-		directoryId: directory.id,
+		workId: work.id,
 		providers: selectedProviders,
 		options: generatorOptions
 	});
@@ -354,17 +354,17 @@ export function RegisterForm() {
 'use client';
 
 import { useTransition } from 'react';
-import { deleteDirectory } from '@/app/actions/dashboard/directories';
+import { deleteWork } from '@/app/actions/dashboard/works';
 import { toast } from 'sonner';
 
-export function DeleteDirectoryButton({ directoryId }) {
+export function DeleteWorkButton({ workId }) {
 	const [isPending, startTransition] = useTransition();
 
 	const handleDelete = () => {
 		startTransition(async () => {
-			const result = await deleteDirectory(directoryId);
+			const result = await deleteWork(workId);
 			if (result.success) {
-				toast.success('Directory deleted');
+				toast.success('Work deleted');
 			} else {
 				toast.error(result.error || 'Failed to delete');
 			}
@@ -373,7 +373,7 @@ export function DeleteDirectoryButton({ directoryId }) {
 
 	return (
 		<Button variant="danger" onClick={handleDelete} loading={isPending}>
-			Delete Directory
+			Delete Work
 		</Button>
 	);
 }
@@ -383,6 +383,6 @@ export function DeleteDirectoryButton({ directoryId }) {
 
 - [Auth Components](./auth-components.md) - Consumes auth actions (login, register, connectProvider)
 - [Settings Components](./settings-components.md) - Consumes settings, plugin, API key, and OAuth actions
-- [Directory Detail Components](./directory-detail-components.md) - Consumes directory and generator actions
-- [Import Flow Components](./import-flow-components.md) - Consumes analyzeRepository, importDirectory actions
+- [Work Detail Components](./work-detail-components.md) - Consumes work and generator actions
+- [Import Flow Components](./import-flow-components.md) - Consumes analyzeRepository, importWork actions
 - [Web API Routes](./web-api-routes.md) - API routes that complement server actions for streaming and OAuth callbacks

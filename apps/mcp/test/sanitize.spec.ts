@@ -19,7 +19,7 @@ describe('sanitizeResponse', () => {
 
 	it('strips sensitive fields from nested objects', () => {
 		const input = {
-			directory: {
+			work: {
 				id: '1',
 				user: {
 					id: 'u1',
@@ -31,7 +31,7 @@ describe('sanitizeResponse', () => {
 		};
 		const result = sanitizeResponse(input);
 		expect(result).toEqual({
-			directory: {
+			work: {
 				id: '1',
 				user: {
 					id: 'u1',
@@ -94,9 +94,9 @@ describe('sanitizeResponse', () => {
 	it('preserves non-sensitive fields', () => {
 		const input = {
 			id: '123',
-			name: 'Test Directory',
+			name: 'Test Work',
 			slug: 'test-dir',
-			description: 'A test directory',
+			description: 'A test work',
 			createdAt: '2025-01-01',
 			updatedAt: '2025-01-02'
 		};

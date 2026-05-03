@@ -11,19 +11,19 @@ The Ever Works dashboard uses several patterns for displaying collections of dat
 
 ## Component Overview
 
-| Component              | Pattern                                  | Virtualized | Source                                                           |
-| ---------------------- | ---------------------------------------- | ----------- | ---------------------------------------------------------------- |
-| `ItemsList`            | Card grid / list with search and filters | Yes         | `components/directories/detail/items/ItemsList.tsx`              |
-| `HistoryTable`         | HTML table with status badges            | No          | `components/directories/detail/history/HistoryTable.tsx`         |
-| `PluginGrid`           | Card grid with category grouping         | No          | `components/plugins/PluginGrid.tsx`                              |
-| `DirectoryPluginsList` | Card list with capability selectors      | No          | `components/directories/detail/plugins/DirectoryPluginsList.tsx` |
-| `MembersList`          | Divided list with role badges            | No          | `components/directories/detail/members/MembersList.tsx`          |
+| Component         | Pattern                                  | Virtualized | Source                                                |
+| ----------------- | ---------------------------------------- | ----------- | ----------------------------------------------------- |
+| `ItemsList`       | Card grid / list with search and filters | Yes         | `components/works/detail/items/ItemsList.tsx`         |
+| `HistoryTable`    | HTML table with status badges            | No          | `components/works/detail/history/HistoryTable.tsx`    |
+| `PluginGrid`      | Card grid with category grouping         | No          | `components/plugins/PluginGrid.tsx`                   |
+| `WorkPluginsList` | Card list with capability selectors      | No          | `components/works/detail/plugins/WorkPluginsList.tsx` |
+| `MembersList`     | Divided list with role badges            | No          | `components/works/detail/members/MembersList.tsx`     |
 
 ## ItemsList -- Virtualized Item Grid
 
-**Source:** `apps/web/src/components/directories/detail/items/ItemsList.tsx`
+**Source:** `apps/web/src/components/works/detail/items/ItemsList.tsx`
 
-The `ItemsList` component displays directory items in a searchable, filterable, virtualized grid. It uses `@tanstack/react-virtual` to efficiently render hundreds or thousands of items without performance degradation.
+The `ItemsList` component displays work items in a searchable, filterable, virtualized grid. It uses `@tanstack/react-virtual` to efficiently render hundreds or thousands of items without performance degradation.
 
 ### Architecture
 
@@ -118,9 +118,9 @@ function sortItems(items: ItemData[]): ItemData[] {
 
 ## HistoryTable -- Generation History
 
-**Source:** `apps/web/src/components/directories/detail/history/HistoryTable.tsx`
+**Source:** `apps/web/src/components/works/detail/history/HistoryTable.tsx`
 
-The `HistoryTable` displays directory generation run history as an HTML table with status badges, duration formatting, and token usage.
+The `HistoryTable` displays work generation run history as an HTML table with status badges, duration formatting, and token usage.
 
 ### Columns
 
@@ -217,11 +217,11 @@ The grid shows contextual empty states:
 - **With search query**: Search icon, "No results" message, and "Clear search" button.
 - **Without search**: Simple "No plugins" message.
 
-## MembersList -- Directory Members
+## MembersList -- Work Members
 
-**Source:** `apps/web/src/components/directories/detail/members/MembersList.tsx`
+**Source:** `apps/web/src/components/works/detail/members/MembersList.tsx`
 
-The `MembersList` displays directory collaborators in a divided list format with role badges and permission-based management controls.
+The `MembersList` displays work collaborators in a divided list format with role badges and permission-based management controls.
 
 ### Layout
 
@@ -245,17 +245,17 @@ The owner is always displayed first with:
 
 ### Member Management
 
-Each `MemberRow` component receives a `canManage` prop determined by `canManageMembers(directory.userRole)`. When `true`, the row shows management controls (role change, remove member).
+Each `MemberRow` component receives a `canManage` prop determined by `canManageMembers(work.userRole)`. When `true`, the row shows management controls (role change, remove member).
 
 ### Props
 
 ```typescript
 interface MembersListProps {
-	directory: Directory;
-	members: DirectoryMember[];
-	owner: DirectoryOwner;
+	work: Work;
+	members: WorkMember[];
+	owner: WorkOwner;
 	onMemberRemoved: (memberId: string) => void;
-	onMemberUpdated: (member: DirectoryMember) => void;
+	onMemberUpdated: (member: WorkMember) => void;
 }
 ```
 

@@ -263,7 +263,7 @@ The platform uses these capabilities to decide which models are suitable for spe
 
 The `AiFacadeService` in the agent package consumes AI provider plugins. When a generation request specifies an AI provider, the facade:
 
-1. Resolves user/directory-scoped settings for the selected provider
+1. Resolves user/work-scoped settings for the selected provider
 2. Passes `settings` in every operation call (e.g., `ChatCompletionOptions.settings`)
 3. The plugin uses `resolveConfig(settings)` to build the final `AiOperationsConfig`
 

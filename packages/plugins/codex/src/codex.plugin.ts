@@ -2,7 +2,7 @@ import type {
 	AiModel,
 	ConnectionValidationResult,
 	FacadeOptions,
-	DirectoryReference,
+	WorkReference,
 	ExistingItems,
 	IDeviceAuthProvider,
 	FormFieldDefinition,
@@ -147,7 +147,7 @@ const MANIFEST: PluginManifest = {
 		includeInOnboarding: true,
 		onboardingPriority: 2,
 		onboardingDescription:
-			'Connect Codex with an OpenAI API key or a user-scoped device authentication flow for end-to-end directory generation.',
+			'Connect Codex with an OpenAI API key or a user-scoped device authentication flow for end-to-end work generation.',
 		deviceAuth: {
 			authModeField: 'authMode'
 		},
@@ -161,17 +161,17 @@ const MANIFEST: PluginManifest = {
 	readme: [
 		'# Codex Generator Plugin',
 		'',
-		'Use Codex as the pipeline engine for directory generation inside Ever Works.',
+		'Use Codex as the pipeline engine for work generation inside Ever Works.',
 		'',
-		'Codex researches sources, generates structured directory items, and returns the finished results to Ever Works as a complete pipeline run.',
+		'Codex researches sources, generates structured work items, and returns the finished results to Ever Works as a complete pipeline run.',
 		'',
 		'Choose this plugin when you want Codex to handle the full research and generation workflow instead of combining separate search and AI providers manually.',
 		'',
 		'## What It Does',
 		'',
-		'- Researches sources for the current directory topic.',
+		'- Researches sources for the current work topic.',
 		'- Generates structured item data for Ever Works.',
-		'- Reuses your directory context and existing items during generation.',
+		'- Reuses your work context and existing items during generation.',
 		'- Can work with screenshot providers for item imagery.',
 		'',
 		'## Authentication',
@@ -184,7 +184,7 @@ const MANIFEST: PluginManifest = {
 		'## Usage',
 		'',
 		'1. Connect Codex with API key or device auth.',
-		'2. Enable the plugin for a directory.',
+		'2. Enable the plugin for a work.',
 		'3. Select `codex` as the pipeline provider for generation.'
 	].join('\n'),
 	homepage: 'https://github.com/openai/codex'
@@ -526,7 +526,7 @@ export class CodexPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvide
 	}
 
 	async execute(
-		directory: DirectoryReference,
+		work: WorkReference,
 		request: GenerationRequest,
 		existing: ExistingItems,
 		options?: PipelineExecutionOptions,
@@ -557,7 +557,7 @@ export class CodexPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvide
 		const signal = abortController.signal;
 		const onLogEntry = options?.onLogEntry;
 		const logger = this.context?.logger ?? console;
-		const userId = directory.user?.id ?? 'system';
+		const userId = work.user?.id ?? 'system';
 
 		let workspaceCreated = false;
 		let workspacePath: string | null = null;
@@ -567,7 +567,7 @@ export class CodexPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvide
 			const setupStartedAt = this.startStep('setup-codex', onLogEntry);
 			reportProgress(onProgress, 0, 5, 'Setup Codex');
 
-			const settings = await resolveSettings(this.context, userId, directory.id);
+			const settings = await resolveSettings(this.context, userId, work.id);
 			const executionAuth = await resolveExecutionAuth(settings);
 			if (!executionAuth) {
 				throw new Error(
@@ -589,11 +589,11 @@ export class CodexPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvide
 			const prepareStartedAt = this.startStep('prepare-context', onLogEntry);
 			reportProgress(onProgress, 1, 15, 'Prepare Context');
 
-			workspacePath = await createWorkspace(userId, directory.id);
+			workspacePath = await createWorkspace(userId, work.id);
 			workspaceCreated = true;
 			await seedExistingItems(workspacePath, existing.items);
 			await seedMetadata(workspacePath, {
-				directory: { name: directory.name, description: directory.description },
+				work: { name: work.name, description: work.description },
 				request: { prompt: request.prompt, name: request.name },
 				categories: existing.categories,
 				tags: existing.tags,
@@ -616,10 +616,10 @@ export class CodexPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvide
 
 			const execContext = options?.execContext;
 			const promptFacade = execContext?.promptFacade;
-			const facadeOptions = { userId, directoryId: directory.id };
+			const facadeOptions = { userId, workId: work.id };
 
 			const prompt = await this.buildExecutionPrompt(
-				directory,
+				work,
 				request,
 				existing,
 				workspacePath,
@@ -718,7 +718,7 @@ export class CodexPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvide
 
 				if (items.length === 0) {
 					const recoveredItems = await this.recoverItemsFromStructuredOutput({
-						directory,
+						work,
 						request,
 						existing,
 						workspacePath,
@@ -770,7 +770,7 @@ export class CodexPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvide
 				options?.execContext,
 				items as never[],
 				userId,
-				directory.id,
+				work.id,
 				signal,
 				onProgress,
 				logger,
@@ -833,7 +833,7 @@ export class CodexPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvide
 	}
 
 	private async buildExecutionPrompt(
-		directory: DirectoryReference,
+		work: WorkReference,
 		request: GenerationRequest,
 		existing: ExistingItems,
 		workspacePath: string,
@@ -841,7 +841,7 @@ export class CodexPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvide
 		facadeOptions?: FacadeOptions
 	): Promise<string> {
 		const promptOptions = {
-			directory,
+			work,
 			request: {
 				...request,
 				config: {
@@ -926,7 +926,7 @@ export class CodexPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvide
 	}
 
 	private async recoverItemsFromStructuredOutput({
-		directory,
+		work,
 		request,
 		existing,
 		workspacePath,
@@ -936,7 +936,7 @@ export class CodexPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvide
 		onLogEntry,
 		signal
 	}: {
-		readonly directory: DirectoryReference;
+		readonly work: WorkReference;
 		readonly request: GenerationRequest;
 		readonly existing: ExistingItems;
 		readonly workspacePath: string;
@@ -960,7 +960,7 @@ export class CodexPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvide
 			message: 'Codex produced no item files; attempting structured JSON recovery'
 		});
 
-		const recoveryPrompt = this.buildStructuredRecoveryPrompt(directory, request, existing);
+		const recoveryPrompt = this.buildStructuredRecoveryPrompt(work, request, existing);
 		const { promise, kill } = executeCodex({
 			command: this.codexCommandPath ?? 'codex',
 			cwd: workspacePath,
@@ -1030,7 +1030,7 @@ export class CodexPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvide
 	}
 
 	private buildStructuredRecoveryPrompt(
-		directory: DirectoryReference,
+		work: WorkReference,
 		request: GenerationRequest,
 		existing: ExistingItems
 	): string {
@@ -1039,8 +1039,8 @@ export class CodexPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvide
 			'The previous Codex run completed research but failed to persist item files in the workspace.',
 			'This recovery run must return the final items directly as structured JSON matching the provided schema.',
 			'Do not explain your work. Do not ask for another message. Do not mention sandbox limitations.',
-			`Directory: ${directory.name}`,
-			directory.description ? `Directory description: ${directory.description}` : '',
+			`Work: ${work.name}`,
+			work.description ? `Work description: ${work.description}` : '',
 			request.prompt ? `Requested topic: ${request.prompt}` : '',
 			request.name ? `Requested name: ${request.name}` : '',
 			existing.items.length > 0
@@ -1306,7 +1306,7 @@ export class CodexPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvide
 		execContext: PipelineExecutionOptions['execContext'],
 		items: { name: string; source_url?: string; images?: string[] }[],
 		userId: string,
-		directoryId: string,
+		workId: string,
 		signal: AbortSignal,
 		onProgress: PipelineProgressCallback | undefined,
 		logger: { warn(...args: unknown[]): void },
@@ -1334,7 +1334,7 @@ export class CodexPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvide
 
 		const facadeOptions: FacadeOptions = {
 			userId,
-			directoryId
+			workId
 		};
 
 		const result = await captureScreenshots(items as never[], {

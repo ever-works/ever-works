@@ -4,14 +4,14 @@ import { redirect } from '@/i18n/navigation';
 import { getLocale } from 'next-intl/server';
 import { ROUTES } from '@/lib/constants';
 
-export async function redirectToDirectories() {
+export async function redirectToWorks() {
     const locale = await getLocale();
-    redirect({ locale, href: ROUTES.DASHBOARD_DIRECTORIES });
+    redirect({ locale, href: ROUTES.DASHBOARD_WORKS });
 }
 
-export async function redirectToNewDirectory() {
+export async function redirectToNewWork() {
     const locale = await getLocale();
-    redirect({ locale, href: ROUTES.DASHBOARD_DIRECTORIES_NEW });
+    redirect({ locale, href: ROUTES.DASHBOARD_WORKS_NEW });
 }
 
 export async function redirectToDashboard() {

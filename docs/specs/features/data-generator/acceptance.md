@@ -12,7 +12,7 @@
 ### AC-2: Configuration File
 
 - [ ] Reads existing `config.yml`
-- [ ] Creates `config.yml` for new directories
+- [ ] Creates `config.yml` for new works
 - [ ] Increments version on each update
 - [ ] Preserves metadata (initial_prompt, timestamps)
 - [ ] Updates `last_request_data` with current DTO
@@ -97,7 +97,7 @@
 ### AC-12: Repository Structure
 
 - [ ] `config.yml` at root
-- [ ] `items/` directory with JSON files
+- [ ] `items/` work with JSON files
 - [ ] `categories.yml` at root
 - [ ] `tags.yml` at root
 - [ ] `brands.yml` at root

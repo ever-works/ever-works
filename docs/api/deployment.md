@@ -7,7 +7,7 @@ sidebar_position: 5
 
 # Deployment API
 
-The Deployment API handles deploying directory websites to hosting providers. The API is provider-agnostic — it uses the active deployment plugin (e.g., Vercel) configured through the [plugin system](/plugin-system).
+The Deployment API handles deploying work websites to hosting providers. The API is provider-agnostic — it uses the active deployment plugin (e.g., Vercel) configured through the [plugin system](/plugin-system).
 
 All endpoints require JWT authentication.
 
@@ -17,20 +17,20 @@ All endpoints require JWT authentication.
 | ------ | ---------------------------------------------- | ------------------------------------------------------ |
 | `GET`  | `/api/deploy/providers`                        | List available deployment providers                    |
 | `GET`  | `/api/deploy/providers/:providerId/configured` | Check if a provider is configured for the current user |
-| `POST` | `/api/deploy/directories/:id`                  | Deploy a directory                                     |
-| `POST` | `/api/deploy/directories/:id/check`            | Check if a directory can be deployed                   |
-| `POST` | `/api/deploy/directories/:id/lookup`           | Look up existing deployment status                     |
-| `POST` | `/api/deploy/directories/:id/teams`            | List deployment teams for a directory                  |
+| `POST` | `/api/deploy/works/:id`                        | Deploy a work                                          |
+| `POST` | `/api/deploy/works/:id/check`                  | Check if a work can be deployed                        |
+| `POST` | `/api/deploy/works/:id/lookup`                 | Look up existing deployment status                     |
+| `POST` | `/api/deploy/works/:id/teams`                  | List deployment teams for a work                       |
 | `POST` | `/api/deploy/validate-token`                   | Validate the current user's deployment token           |
 | `POST` | `/api/deploy/teams`                            | List available deployment teams                        |
-| `POST` | `/api/deploy/batch`                            | Deploy multiple directories at once                    |
+| `POST` | `/api/deploy/batch`                            | Deploy multiple works at once                          |
 
-## Deploy a Directory
+## Deploy a Work
 
-Trigger a deployment for a specific directory:
+Trigger a deployment for a specific work:
 
 ```bash
-curl -X POST http://localhost:3100/api/deploy/directories/:id \
+curl -X POST http://localhost:3100/api/deploy/works/:id \
   -H "Authorization: Bearer <token>" \
   -H "Content-Type: application/json" \
   -d '{"teamScope": "optional-team-id"}'
@@ -44,10 +44,10 @@ curl -X POST http://localhost:3100/api/deploy/directories/:id \
 
 ## Check Deployment Capability
 
-Check if the current user has the necessary provider configuration to deploy a directory:
+Check if the current user has the necessary provider configuration to deploy a work:
 
 ```bash
-curl -X POST http://localhost:3100/api/deploy/directories/:id/check \
+curl -X POST http://localhost:3100/api/deploy/works/:id/check \
   -H "Authorization: Bearer <token>"
 ```
 
@@ -62,16 +62,16 @@ curl -X POST http://localhost:3100/api/deploy/validate-token \
 
 ## Batch Deployment
 
-Deploy multiple directories at once:
+Deploy multiple works at once:
 
 ```bash
 curl -X POST http://localhost:3100/api/deploy/batch \
   -H "Authorization: Bearer <token>" \
   -H "Content-Type: application/json" \
   -d '{
-    "directories": [
-      { "directoryId": "id-1", "teamScope": "optional-team" },
-      { "directoryId": "id-2" }
+    "works": [
+      { "workId": "id-1", "teamScope": "optional-team" },
+      { "workId": "id-2" }
     ],
     "teamScope": "optional-default-team"
   }'

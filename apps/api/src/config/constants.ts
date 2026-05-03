@@ -38,7 +38,7 @@ export const config = {
         appDescription: () =>
             process.env.APP_DESCRIPTION ||
             process.env.NEXT_PUBLIC_SITE_DESCRIPTION ||
-            'A SaaS platform for building and managing directories',
+            'A SaaS platform for building and managing works',
     },
 
     mail: {
@@ -92,6 +92,22 @@ export const config = {
             return process.env.GH_CALLBACK_URL || `${webUrl}/api/oauth/github/callback`;
         },
     },
+    githubApp: {
+        appId: () => process.env.GITHUB_APP_ID,
+        clientId: () => process.env.GITHUB_APP_CLIENT_ID,
+        clientSecret: () => process.env.GITHUB_APP_CLIENT_SECRET,
+        privateKey: () => process.env.GITHUB_APP_PRIVATE_KEY?.replace(/\\n/g, '\n'),
+        webhookSecret: () => process.env.GITHUB_APP_WEBHOOK_SECRET,
+        slug: () => process.env.GITHUB_APP_SLUG || 'ever-works',
+        setupUrl: () => {
+            const webUrl = config.webAppUrl();
+            return process.env.GITHUB_APP_SETUP_URL || `${webUrl}/api/github-app/setup`;
+        },
+        callbackUrl: () => {
+            const webUrl = config.webAppUrl();
+            return process.env.GITHUB_APP_CALLBACK_URL || `${webUrl}/api/github-app/callback`;
+        },
+    },
     facebook: {
         clientId: () => process.env.FACEBOOK_CLIENT_ID,
         clientSecret: () => process.env.FACEBOOK_CLIENT_SECRET,
@@ -109,7 +125,7 @@ export const config = {
         },
     },
 
-    directory: {
-        staleTimeoutHours: () => parseInt(process.env.DIRECTORY_STALE_TIMEOUT_HOURS || '2', 10),
+    work: {
+        staleTimeoutHours: () => parseInt(process.env.WORK_STALE_TIMEOUT_HOURS || '2', 10),
     },
 };

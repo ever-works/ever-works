@@ -2,16 +2,16 @@
 
 import { cn } from '@/lib/utils/cn';
 import { useTranslations } from 'next-intl';
-import { FolderClosed, ListTodo, Globe } from 'lucide-react';
+import { FolderClosed, ListTodo, Globe, type LucideIcon } from 'lucide-react';
 
 interface StatsOverviewProps {
-    totalDirectories?: number;
+    totalWorks?: number;
     totalItems?: number;
     activeWebsites?: number;
 }
 
 export function StatsOverview({
-    totalDirectories = 0,
+    totalWorks = 0,
     totalItems = 0,
     activeWebsites = 0,
 }: StatsOverviewProps) {
@@ -20,15 +20,15 @@ export function StatsOverview({
     const statCards: Array<{
         title: string;
         value: string | number;
-        icon: React.ComponentType<{ className?: string; strokeWidth?: number }>;
+        icon: LucideIcon;
         change: string;
         changeType: 'positive' | 'negative' | 'neutral';
         iconColor?: string;
         dotColor?: string;
     }> = [
         {
-            title: t('totalDirectories'),
-            value: totalDirectories,
+            title: t('totalWorks'),
+            value: totalWorks,
             icon: FolderClosed,
             iconColor: 'text-blue-500',
             dotColor: 'bg-blue-500',

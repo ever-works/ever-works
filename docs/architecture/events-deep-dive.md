@@ -16,7 +16,7 @@ flowchart LR
     subgraph Producers
         A[AuthService]
         B[MembersController]
-        C[DirectoryGenerationService]
+        C[WorkGenerationService]
     end
 
     subgraph EventBus["NestJS EventEmitter2"]
@@ -25,12 +25,12 @@ flowchart LR
 
     subgraph Consumers
         M[MailService]
-        D[DirectoryCleanupService]
+        D[WorkCleanupService]
     end
 
     A -- "user.created\nuser.confirmed\nuser.forgot_password" --> E
-    B -- "directory.member_invited" --> E
-    C -- "directory.generation.completed" --> E
+    B -- "work.member_invited" --> E
+    C -- "work.generation.completed" --> E
     E --> M
     E --> D
 ```
@@ -61,7 +61,7 @@ Events are defined in two locations based on their scope:
 | Location                     | Scope                              | Events                                                                                                                                                                       |
 | ---------------------------- | ---------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `apps/api/src/events/`       | API-level (user and member events) | `UserCreatedEvent`, `UserForgotPasswordEvent`, `UserPasswordChangedEvent`, `UserConfirmedEvent`, `UserNewDeviceLoginEvent`, `UserAccountDeletionEvent`, `MemberInvitedEvent` |
-| `packages/agent/src/events/` | Agent-level (directory lifecycle)  | `DirectoryCreatedEvent`, `DirectoryGenerationCompletedEvent`                                                                                                                 |
+| `packages/agent/src/events/` | Agent-level (work lifecycle)       | `WorkCreatedEvent`, `WorkGenerationCompletedEvent`                                                                                                                           |
 
 ### Base Event Classes
 
@@ -96,8 +96,8 @@ Examples:
 
 - `user.created`
 - `user.forgot_password`
-- `directory.member_invited`
-- `directory.generation.completed`
+- `work.member_invited`
+- `work.generation.completed`
 
 ## Complete Event Reference
 
@@ -112,13 +112,13 @@ Examples:
 | `UserNewDeviceLoginEvent`  | `user.new_device_login` | `user`, `loginTime`, `device`, `browser`, `location`, `ipAddress`, `verifyToken`, `verifyUrl`, `secureAccountUrl` |
 | `UserAccountDeletionEvent` | `user.delete_account`   | `user`, `deleteToken`, `deleteUrl`, `keepAccountUrl`, `expiresIn`                                                 |
 
-### Directory Events
+### Work Events
 
-| Event Class                         | `EVENT_NAME`                     | Payload Properties                                        | Source |
-| ----------------------------------- | -------------------------------- | --------------------------------------------------------- | ------ |
-| `MemberInvitedEvent`                | `directory.member_invited`       | `invitee`, `inviter`, `directory`, `role`, `directoryUrl` | API    |
-| `DirectoryCreatedEvent`             | `directory.created`              | `directory`                                               | Agent  |
-| `DirectoryGenerationCompletedEvent` | `directory.generation.completed` | `directory`                                               | Agent  |
+| Event Class                    | `EVENT_NAME`                | Payload Properties                              | Source |
+| ------------------------------ | --------------------------- | ----------------------------------------------- | ------ |
+| `MemberInvitedEvent`           | `work.member_invited`       | `invitee`, `inviter`, `work`, `role`, `workUrl` | API    |
+| `WorkCreatedEvent`             | `work.created`              | `work`                                          | Agent  |
+| `WorkGenerationCompletedEvent` | `work.generation.completed` | `work`                                          | Agent  |
 
 ## Emitting Events
 
@@ -148,19 +148,19 @@ export class AuthService {
 ### Example: Member Invitation
 
 ```typescript
-// apps/api/src/directories/members.controller.ts
+// apps/api/src/works/members.controller.ts
 @Post()
-async inviteMember(@CurrentUser() auth, @Param('directoryId') directoryId, @Body() dto) {
-    const result = await this.memberService.inviteMember(directoryId, user.id, dto);
+async inviteMember(@CurrentUser() auth, @Param('workId') workId, @Body() dto) {
+    const result = await this.memberService.inviteMember(workId, user.id, dto);
 
     this.eventEmitter.emit(
         MemberInvitedEvent.EVENT_NAME,
         new MemberInvitedEvent(
             result.invitee,
             result.inviter,
-            result.directory,
+            result.work,
             dto.role,
-            directoryUrl,
+            workUrl,
         ),
     );
 }
@@ -224,17 +224,17 @@ export class MailService {
 }
 ```
 
-### DirectoryCleanupService -- Cache Invalidation
+### WorkCleanupService -- Cache Invalidation
 
 The cleanup service listens for generation completion to clear stale cache entries:
 
 ```typescript
-// apps/api/src/directories/tasks/directory-cleanup.service.ts
+// apps/api/src/works/tasks/work-cleanup.service.ts
 @Injectable()
-export class DirectoryCleanupService {
-	@OnEvent(DirectoryGenerationCompletedEvent.EVENT_NAME)
-	clearDirectoryCache(data: DirectoryGenerationCompletedEvent) {
-		this.cacheRepository.typeormAdapter.deleteUnscopedEntriesLike(data.directory.id);
+export class WorkCleanupService {
+	@OnEvent(WorkGenerationCompletedEvent.EVENT_NAME)
+	clearWorkCache(data: WorkGenerationCompletedEvent) {
+		this.cacheRepository.typeormAdapter.deleteUnscopedEntriesLike(data.work.id);
 	}
 }
 ```
@@ -259,7 +259,7 @@ sequenceDiagram
     AuthService-->>Client: Return JWT tokens
 ```
 
-### Directory Generation Completed Flow
+### Work Generation Completed Flow
 
 ```mermaid
 sequenceDiagram
@@ -267,10 +267,10 @@ sequenceDiagram
     participant EventBus
     participant CleanupService
 
-    Pipeline->>Pipeline: Finish generating directory items
-    Pipeline->>EventBus: emit("directory.generation.completed")
-    EventBus->>CleanupService: @OnEvent("directory.generation.completed")
-    CleanupService->>CleanupService: Delete stale cache entries for directory
+    Pipeline->>Pipeline: Finish generating work items
+    Pipeline->>EventBus: emit("work.generation.completed")
+    EventBus->>CleanupService: @OnEvent("work.generation.completed")
+    CleanupService->>CleanupService: Delete stale cache entries for work
 ```
 
 ## Error Handling
@@ -297,7 +297,7 @@ To add a new event to the system:
 
 1. **Define the event class** in the appropriate location:
     - User/API scope: `apps/api/src/events/index.ts`
-    - Directory/agent scope: `packages/agent/src/events/`
+    - Work/agent scope: `packages/agent/src/events/`
 
 2. **Follow the naming convention**: `<domain>.<action>`
 
@@ -309,11 +309,11 @@ To add a new event to the system:
 
 ```typescript
 // 1. Define the event
-export class DirectoryPublishedEvent extends BaseEvent {
-    static EVENT_NAME = 'directory.published';
+export class WorkPublishedEvent extends BaseEvent {
+    static EVENT_NAME = 'work.published';
 
     constructor(
-        public readonly directory: Directory,
+        public readonly work: Work,
         public readonly publishedUrl: string,
     ) {
         super();
@@ -322,13 +322,13 @@ export class DirectoryPublishedEvent extends BaseEvent {
 
 // 2. Emit it
 this.eventEmitter.emit(
-    DirectoryPublishedEvent.EVENT_NAME,
-    new DirectoryPublishedEvent(directory, url),
+    WorkPublishedEvent.EVENT_NAME,
+    new WorkPublishedEvent(work, url),
 );
 
 // 3. Subscribe to it
-@OnEvent(DirectoryPublishedEvent.EVENT_NAME)
-async handleDirectoryPublished(data: DirectoryPublishedEvent) {
+@OnEvent(WorkPublishedEvent.EVENT_NAME)
+async handleWorkPublished(data: WorkPublishedEvent) {
     // React to the event
 }
 ```

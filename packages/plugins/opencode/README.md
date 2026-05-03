@@ -1,6 +1,6 @@
 # @ever-works/opencode-plugin
 
-Full pipeline plugin that delegates directory generation to the [OpenCode CLI](https://github.com/sst/opencode). A single OpenCode CLI session autonomously handles web search, content creation, and file generation inside a temporary workspace while using the active Ever Works AI provider for model access.
+Full pipeline plugin that delegates work generation to the [OpenCode CLI](https://github.com/sst/opencode). A single OpenCode CLI session autonomously handles web search, content creation, and file generation inside a temporary workspace while using the active Ever Works AI provider for model access.
 
 ## Pipeline Steps
 
@@ -21,11 +21,11 @@ During step 3, a **taxonomy watcher** monitors the workspace for new item files 
 
 OpenCode does not ask the user to configure a separate provider, auth mode, or model inside this plugin.
 
-Instead, it resolves the active Ever Works `ai-provider` for the current `{ userId, directoryId }` context and generates an isolated OpenCode config for the run:
+Instead, it resolves the active Ever Works `ai-provider` for the current `{ userId, workId }` context and generates an isolated OpenCode config for the run:
 
 - Provider base URL and API key come from `execContext.aiFacade.getProviderConfig(...)`
 - Model selection comes from the AI provider routing config (`complexModel` first, then `defaultModel`)
-- OpenCode runs with a user-scoped, isolated config directory rather than machine-global auth state
+- OpenCode runs with a user-scoped, isolated config work rather than machine-global auth state
 - Web tools are explicitly enabled, including `websearch`
 
 ## Settings
@@ -52,7 +52,7 @@ Prompt keys:
 - `opencode.system` — System prompt template
 - `opencode.user` — User prompt template
 
-Both support variable substitution for directory context, existing items, categories, tags, and brands.
+Both support variable substitution for work context, existing items, categories, tags, and brands.
 
 ## Binary Management
 

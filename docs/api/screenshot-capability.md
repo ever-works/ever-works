@@ -248,8 +248,8 @@ Both cases return a structured error response:
 
 Screenshots are used for:
 
-- **Directory item previews**: Generating preview images for URLs added to directories
-- **Smart image generation**: Creating visual thumbnails for directory websites
+- **Work item previews**: Generating preview images for URLs added to works
+- **Smart image generation**: Creating visual thumbnails for work websites
 - **OG image creation**: Generating Open Graph images for social media sharing
 
 ## Source Files

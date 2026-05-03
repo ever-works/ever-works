@@ -53,7 +53,7 @@ export class GitOperations implements IGitOperations {
 			await this.switchToMainBranch(dir).catch(() => null);
 		}
 
-		if (await this.directoryExists(dir)) {
+		if (await this.workExists(dir)) {
 			try {
 				await this.pull(dir, token, committer);
 				return dir;
@@ -385,7 +385,7 @@ export class GitOperations implements IGitOperations {
 		};
 	}
 
-	private async directoryExists(dir: string): Promise<boolean> {
+	private async workExists(dir: string): Promise<boolean> {
 		try {
 			const stat = await fs.promises.stat(dir);
 			return stat.isDirectory();

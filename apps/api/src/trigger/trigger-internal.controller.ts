@@ -14,16 +14,16 @@ import {
 import superjson from 'superjson';
 import { Public } from '../auth/decorators/public.decorator';
 import { config } from '@ever-works/agent/config';
-import { DirectoryRepository, AuthAccountRepository } from '@ever-works/agent/database';
-import { Directory, User } from '@ever-works/agent/entities';
+import { WorkRepository, AuthAccountRepository } from '@ever-works/agent/database';
+import { Work, User } from '@ever-works/agent/entities';
 import { CACHE_MANAGER, Cache } from '@ever-works/agent/cache';
-import { DirectoryOperationsService } from '@ever-works/agent/directory-operations';
-import { DirectoryContextResponse } from '@ever-works/agent/tasks';
+import { WorkOperationsService } from '@ever-works/agent/work-operations';
+import { WorkContextResponse } from '@ever-works/agent/tasks';
 import { SkipThrottle } from '@nestjs/throttler';
 import {
-    DirectoryOwnershipService,
-    DirectoryScheduleDispatcherService,
-    DirectoryScheduleService,
+    WorkOwnershipService,
+    WorkScheduleDispatcherService,
+    WorkScheduleService,
 } from '@ever-works/agent/services';
 import { NotificationService } from '@ever-works/agent/notifications';
 import { GitFacadeService } from '@ever-works/agent/facades';
@@ -31,7 +31,7 @@ import { RemoteCallDto } from './dto/remote-call.dto';
 import {
     PluginRepository,
     UserPluginRepository,
-    DirectoryPluginRepository,
+    WorkPluginRepository,
 } from '@ever-works/agent/plugins';
 
 @SkipThrottle({ short: true, medium: true, long: true })
@@ -40,17 +40,17 @@ export class TriggerInternalController implements OnModuleInit {
     private remoteMap: Record<string, object> = {};
 
     constructor(
-        private readonly directoryRepository: DirectoryRepository,
-        private readonly ownershipService: DirectoryOwnershipService,
-        private readonly directoryOperationsService: DirectoryOperationsService,
+        private readonly workRepository: WorkRepository,
+        private readonly ownershipService: WorkOwnershipService,
+        private readonly workOperationsService: WorkOperationsService,
         @Inject(CACHE_MANAGER) private cacheManager: Cache,
-        private readonly scheduleDispatcher: DirectoryScheduleDispatcherService,
-        private readonly directoryScheduleService: DirectoryScheduleService,
+        private readonly scheduleDispatcher: WorkScheduleDispatcherService,
+        private readonly workScheduleService: WorkScheduleService,
         private readonly notificationService: NotificationService,
         private readonly gitFacade: GitFacadeService,
         private readonly pluginRepository: PluginRepository,
         private readonly userPluginRepository: UserPluginRepository,
-        private readonly directoryPluginRepository: DirectoryPluginRepository,
+        private readonly workPluginRepository: WorkPluginRepository,
         private readonly authAccountRepository: AuthAccountRepository,
     ) {}
 
@@ -59,39 +59,40 @@ export class TriggerInternalController implements OnModuleInit {
             AuthAccountRepository: this.authAccountRepository,
             PluginRepository: this.pluginRepository,
             UserPluginRepository: this.userPluginRepository,
-            DirectoryPluginRepository: this.directoryPluginRepository,
-            DirectoryOperationsService: this.directoryOperationsService,
+            WorkPluginRepository: this.workPluginRepository,
+            WorkOperationsService: this.workOperationsService,
             NotificationService: this.notificationService,
-            DirectoryRepository: this.directoryRepository,
+            WorkRepository: this.workRepository,
             CacheManager: this.cacheManager,
-            DirectoryScheduleDispatcherService: this.scheduleDispatcher,
-            DirectoryScheduleService: this.directoryScheduleService,
+            WorkScheduleDispatcherService: this.scheduleDispatcher,
+            WorkScheduleService: this.workScheduleService,
         };
     }
 
-    @Get('directories/:id/context')
+    @Get('works/:id/context')
     @Public()
-    async getDirectoryContext(
+    async getWorkContext(
         @Headers('x-trigger-secret') secret: string,
-        @Param('id') directoryId: string,
+        @Param('id') workId: string,
         @Query('userId') userId: string,
-    ): Promise<DirectoryContextResponse> {
+    ): Promise<WorkContextResponse> {
         this.ensureSecret(secret);
 
         if (!userId) {
             throw new BadRequestException('Missing userId');
         }
 
-        const { directory } = await this.ownershipService.ensureAccess(directoryId, userId);
+        const { work } = await this.ownershipService.ensureAccess(workId, userId);
 
         const gitToken = await this.gitFacade.getAccessToken({
             userId,
-            providerId: directory.gitProvider,
+            providerId: work.gitProvider,
+            workId: work.id,
         });
 
         return {
-            directory: this.stripRelations(directory),
-            user: this.stripSensitiveUserData(directory.user),
+            work: this.stripRelations(work),
+            user: this.stripSensitiveUserData(work.user),
             gitToken: gitToken ?? undefined,
         };
     }
@@ -134,13 +135,13 @@ export class TriggerInternalController implements OnModuleInit {
         }
     }
 
-    private stripSensitiveUserData(user: User): DirectoryContextResponse['user'] {
+    private stripSensitiveUserData(user: User): WorkContextResponse['user'] {
         const { password, ...rest } = user;
         return JSON.parse(JSON.stringify(rest));
     }
 
-    private stripRelations(directory: Directory) {
-        const { user, ...rest } = directory;
+    private stripRelations(work: Work) {
+        const { user, ...rest } = work;
         return JSON.parse(JSON.stringify(rest));
     }
 }

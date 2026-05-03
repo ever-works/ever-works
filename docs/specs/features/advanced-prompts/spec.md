@@ -1,8 +1,8 @@
-# Advanced Prompts (Per-Directory Customization)
+# Advanced Prompts (Per-Work Customization)
 
 ## Overview
 
-Advanced Prompts allow users to customize AI behavior during directory generation by appending additional instructions to the 7 most impactful pipeline steps. Custom prompts are **appended** to existing prompts, not replacements, ensuring core functionality is preserved while allowing fine-tuning.
+Advanced Prompts allow users to customize AI behavior during work generation by appending additional instructions to the 7 most impactful pipeline steps. Custom prompts are **appended** to existing prompts, not replacements, ensuring core functionality is preserved while allowing fine-tuning.
 
 ## Architecture
 
@@ -31,17 +31,17 @@ Advanced Prompts allow users to customize AI behavior during directory generatio
 ┌─────────────────────────────────────────────────────────────────┐
 │                         API Layer                                │
 │                                                                  │
-│  PUT /directories/:id/advanced-prompts                          │
-│  GET /directories/:id/advanced-prompts                          │
+│  PUT /works/:id/advanced-prompts                          │
+│  GET /works/:id/advanced-prompts                          │
 └─────────────────────────────────────────────────────────────────┘
                               │
                               ▼
 ┌─────────────────────────────────────────────────────────────────┐
-│                   DirectoryAdvancedPrompts                       │
+│                   WorkAdvancedPrompts                       │
 │                       (Database Entity)                          │
 │                                                                  │
 │  id: UUID                                                        │
-│  directoryId: UUID (one-to-one with Directory)                  │
+│  workId: UUID (one-to-one with Work)                  │
 │  relevanceAssessment: text (nullable)                           │
 │  itemGeneration: text (nullable)                                │
 │  itemExtraction: text (nullable)                                │
@@ -72,26 +72,26 @@ Advanced Prompts allow users to customize AI behavior during directory generatio
 Frontend Form
     │
     ▼
-updateAdvancedPrompts(directoryId, data)  [Server Action]
+updateAdvancedPrompts(workId, data)  [Server Action]
     │
     ├── Validate (Zod: max 2000 chars each)
     │
     ▼
-directoryAPI.updateAdvancedPrompts(id, data)  [API Client]
+workAPI.updateAdvancedPrompts(id, data)  [API Client]
     │
     ▼
-PUT /directories/:id/advanced-prompts  [Controller]
+PUT /works/:id/advanced-prompts  [Controller]
     │
     ▼
-DirectoryAdvancedPromptsService.updateAdvancedPrompts()
+WorkAdvancedPromptsService.updateAdvancedPrompts()
     │
     ├── Check user has editor role
     │
     ▼
-DirectoryAdvancedPromptsRepository.createOrUpdate()
+WorkAdvancedPromptsRepository.createOrUpdate()
     │
     ▼
-Database (DirectoryAdvancedPrompts table)
+Database (WorkAdvancedPrompts table)
 ```
 
 ### Load Flow (During Generation)
@@ -100,7 +100,7 @@ Database (DirectoryAdvancedPrompts table)
 ItemsGeneratorService.generateItems()
     │
     ▼
-DirectoryAdvancedPromptsRepository.findByDirectoryId(directoryId)
+WorkAdvancedPromptsRepository.findByWorkId(workId)
     │
     ▼
 context.advancedPrompts = {
@@ -121,19 +121,19 @@ Each step calls appendCustomPrompt(basePrompt, context.advancedPrompts?.fieldNam
 ### Entity
 
 ```typescript
-// /packages/agent/src/entities/directory-advanced-prompts.entity.ts
+// /packages/agent/src/entities/work-advanced-prompts.entity.ts
 
-@Entity({ name: 'directory_advanced_prompts' })
-export class DirectoryAdvancedPrompts {
+@Entity({ name: 'work_advanced_prompts' })
+export class WorkAdvancedPrompts {
 	@PrimaryGeneratedColumn('uuid')
 	id: string;
 
 	@Column({ unique: true })
-	directoryId: string;
+	workId: string;
 
-	@OneToOne(() => Directory, { onDelete: 'CASCADE' })
-	@JoinColumn({ name: 'directoryId' })
-	directory: Directory;
+	@OneToOne(() => Work, { onDelete: 'CASCADE' })
+	@JoinColumn({ name: 'workId' })
+	work: Work;
 
 	@Column({ type: 'text', nullable: true })
 	relevanceAssessment?: string | null;
@@ -167,9 +167,9 @@ export class DirectoryAdvancedPrompts {
 ### DTO
 
 ```typescript
-// /packages/agent/src/dto/directory-advanced-prompts.dto.ts
+// /packages/agent/src/dto/work-advanced-prompts.dto.ts
 
-export class UpdateDirectoryAdvancedPromptsDto {
+export class UpdateWorkAdvancedPromptsDto {
 	@IsOptional()
 	@IsString()
 	@MaxLength(2000)
@@ -179,9 +179,9 @@ export class UpdateDirectoryAdvancedPromptsDto {
 	// ... same for all 7 fields
 }
 
-export interface DirectoryAdvancedPromptsResponseDto {
+export interface WorkAdvancedPromptsResponseDto {
 	id: string;
-	directoryId: string;
+	workId: string;
 	relevanceAssessment?: string | null;
 	itemGeneration?: string | null;
 	itemExtraction?: string | null;
@@ -254,9 +254,9 @@ Prioritize tools with documentation in English.
 
 ## API Endpoints
 
-### GET /directories/:id/advanced-prompts
+### GET /works/:id/advanced-prompts
 
-Returns the advanced prompts for a directory.
+Returns the advanced prompts for a work.
 
 **Response**:
 
@@ -264,7 +264,7 @@ Returns the advanced prompts for a directory.
 {
     "advancedPrompts": {
         "id": "uuid",
-        "directoryId": "uuid",
+        "workId": "uuid",
         "relevanceAssessment": "...",
         "itemGeneration": null,
         ...
@@ -272,9 +272,9 @@ Returns the advanced prompts for a directory.
 }
 ```
 
-### PUT /directories/:id/advanced-prompts
+### PUT /works/:id/advanced-prompts
 
-Updates advanced prompts for a directory.
+Updates advanced prompts for a work.
 
 **Request Body**:
 
@@ -286,14 +286,14 @@ Updates advanced prompts for a directory.
 }
 ```
 
-**Authorization**: Requires editor role on directory
+**Authorization**: Requires editor role on work
 
 ## Frontend Component
 
 ```typescript
-// /apps/web/src/components/directories/detail/settings/AdvancedPromptsSettings.tsx
+// /apps/web/src/components/works/detail/settings/AdvancedPromptsSettings.tsx
 
-export function AdvancedPromptsSettings({ directoryId }: Props) {
+export function AdvancedPromptsSettings({ workId }: Props) {
 	// Collapsible section (collapsed by default)
 	// 7 textareas with labels and descriptions
 	// Save button
@@ -303,10 +303,10 @@ export function AdvancedPromptsSettings({ directoryId }: Props) {
 
 ## Translations
 
-Located in `apps/web/messages/en.json` under `dashboard.directoryDetail.settings.advancedPrompts`:
+Located in `apps/web/messages/en.json` under `dashboard.workDetail.settings.advancedPrompts`:
 
 - Title: "Advanced Prompts"
-- Subtitle: "Customize AI prompts for directory generation..."
+- Subtitle: "Customize AI prompts for work generation..."
 - Per-prompt: title, description, placeholder
 
 ## File Locations
@@ -316,13 +316,13 @@ Located in `apps/web/messages/en.json` under `dashboard.directoryDetail.settings
 ```
 /packages/agent/src/
 ├── entities/
-│   └── directory-advanced-prompts.entity.ts
+│   └── work-advanced-prompts.entity.ts
 ├── database/repositories/
-│   └── directory-advanced-prompts.repository.ts
+│   └── work-advanced-prompts.repository.ts
 ├── dto/
-│   └── directory-advanced-prompts.dto.ts
+│   └── work-advanced-prompts.dto.ts
 ├── services/
-│   └── directory-advanced-prompts.service.ts
+│   └── work-advanced-prompts.service.ts
 └── items-generator/
     ├── utils/prompt.util.ts
     └── interfaces/pipeline.interface.ts
@@ -331,17 +331,17 @@ Located in `apps/web/messages/en.json` under `dashboard.directoryDetail.settings
 ### API
 
 ```
-/apps/api/src/directories/
-└── directories.controller.ts   # GET/PUT endpoints
+/apps/api/src/works/
+└── works.controller.ts   # GET/PUT endpoints
 ```
 
 ### Frontend
 
 ```
 /apps/web/src/
-├── lib/api/directory.ts                          # API types & functions
-├── app/actions/dashboard/directories.ts          # Server actions
-├── components/directories/detail/settings/
+├── lib/api/work.ts                          # API types & functions
+├── app/actions/dashboard/works.ts          # Server actions
+├── components/works/detail/settings/
 │   ├── AdvancedPromptsSettings.tsx              # Main component
 │   └── SettingsForm.tsx                          # Parent form
 └── messages/en.json                              # Translations

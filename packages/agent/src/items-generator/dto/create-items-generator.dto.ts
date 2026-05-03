@@ -50,7 +50,7 @@ export class ProvidersDto implements IProvidersDto {
 
 /** DTO for creating/triggering item generation. */
 export class CreateItemsGeneratorDto implements ICreateItemsGeneratorDto {
-    @ApiProperty({ description: 'Directory name', maxLength: 200 })
+    @ApiProperty({ description: 'Work name', maxLength: 200 })
     @IsString()
     @IsNotEmpty()
     @MaxLength(200)

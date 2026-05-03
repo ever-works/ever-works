@@ -7,7 +7,7 @@ sidebar_position: 4
 
 # Server Actions Reference
 
-The web dashboard uses Next.js Server Actions for all server-side mutations. Every action file is marked with `'use server'` and runs exclusively on the server. Actions are organized into two layers: top-level actions for authentication and global concerns, and dashboard-scoped actions under `actions/dashboard/` for directory, generation, and plugin operations.
+The web dashboard uses Next.js Server Actions for all server-side mutations. Every action file is marked with `'use server'` and runs exclusively on the server. Actions are organized into two layers: top-level actions for authentication and global concerns, and dashboard-scoped actions under `actions/dashboard/` for work, generation, and plugin operations.
 
 ## File Organization
 
@@ -20,15 +20,15 @@ src/app/actions/
   settings.ts              # Profile, password, notification preferences, danger zone
   validation.ts            # Shared validation constants
   dashboard/
-    index.ts               # Re-exports oauth, directories, navigation, generator
+    index.ts               # Re-exports oauth, works, navigation, generator
     comparisons.ts         # Comparison CRUD and AI config
     deploy.ts              # Deployment and website repository actions
-    directories.ts         # Directory CRUD, import, schedule, advanced prompts
-    directory-schedule.ts  # Schedule-specific update/run/cancel
+    works.ts         # Work CRUD, import, schedule, advanced prompts
+    work-schedule.ts  # Schedule-specific update/run/cancel
     generator.ts           # Item generation, update, markdown regeneration
     generator-form.ts      # Generator form schema fetching
     items.ts               # Item add/remove/update, screenshot, extraction
-    members.ts             # Directory member invite/update/remove/leave
+    members.ts             # Work member invite/update/remove/leave
     navigation.ts          # Programmatic redirect helpers
     oauth.ts               # Git provider and OAuth connection management
     organizations.ts       # Git provider organization fetching
@@ -103,52 +103,52 @@ interface ActionResult<T = unknown> {
 
 **File**: `src/app/actions/plugins.ts`
 
-| Action                          | Parameters                                                            | Return                | Description                                            |
-| ------------------------------- | --------------------------------------------------------------------- | --------------------- | ------------------------------------------------------ |
-| `enablePlugin`                  | `pluginId, { settings?, secretSettings?, autoEnableForDirectories? }` | `ActionResult`        | Enables a plugin for the current user                  |
-| `disablePlugin`                 | `pluginId`                                                            | `ActionResult`        | Disables a plugin for the current user                 |
-| `updatePluginSettings`          | `pluginId, { settings?, secretSettings?, metadata? }`                 | `ActionResult`        | Updates user-level plugin configuration                |
-| `enableDirectoryPlugin`         | `directoryId, pluginId, { settings?, activeCapability?, priority? }`  | `ActionResult`        | Enables a plugin for a specific directory              |
-| `disableDirectoryPlugin`        | `directoryId, pluginId`                                               | `ActionResult`        | Disables a directory plugin                            |
-| `updateDirectoryPluginSettings` | `directoryId, pluginId, { settings?, secretSettings?, metadata? }`    | `ActionResult`        | Updates directory-level plugin settings                |
-| `fetchModels`                   | `pluginId`                                                            | `ActionResult<any[]>` | Lists available AI models for a provider plugin        |
-| `setActiveCapability`           | `directoryId, pluginId, capability`                                   | `ActionResult`        | Sets which capability is active for a directory plugin |
+| Action                     | Parameters                                                      | Return                | Description                                       |
+| -------------------------- | --------------------------------------------------------------- | --------------------- | ------------------------------------------------- |
+| `enablePlugin`             | `pluginId, { settings?, secretSettings?, autoEnableForWorks? }` | `ActionResult`        | Enables a plugin for the current user             |
+| `disablePlugin`            | `pluginId`                                                      | `ActionResult`        | Disables a plugin for the current user            |
+| `updatePluginSettings`     | `pluginId, { settings?, secretSettings?, metadata? }`           | `ActionResult`        | Updates user-level plugin configuration           |
+| `enableWorkPlugin`         | `workId, pluginId, { settings?, activeCapability?, priority? }` | `ActionResult`        | Enables a plugin for a specific work              |
+| `disableWorkPlugin`        | `workId, pluginId`                                              | `ActionResult`        | Disables a work plugin                            |
+| `updateWorkPluginSettings` | `workId, pluginId, { settings?, secretSettings?, metadata? }`   | `ActionResult`        | Updates work-level plugin settings                |
+| `fetchModels`              | `pluginId`                                                      | `ActionResult<any[]>` | Lists available AI models for a provider plugin   |
+| `setActiveCapability`      | `workId, pluginId, capability`                                  | `ActionResult`        | Sets which capability is active for a work plugin |
 
-## Directory Actions
+## Work Actions
 
-**File**: `src/app/actions/dashboard/directories.ts`
+**File**: `src/app/actions/dashboard/works.ts`
 
-This is the largest action file with 20+ exported functions covering the full directory lifecycle.
+This is the largest action file with 20+ exported functions covering the full work lifecycle.
 
-| Action                       | Key Parameters                                   | Description                                                                     |
-| ---------------------------- | ------------------------------------------------ | ------------------------------------------------------------------------------- |
-| `createDirectory`            | `CreateDirectoryDto`                             | Creates a directory with slug, name, description, git/deploy providers          |
-| `createDirectoryWithAI`      | `AIDirectoryOptions`                             | AI-generated directory: generates details, creates directory, starts generation |
-| `updateDirectory`            | `directoryId, UpdateDirectoryDto`                | Updates name, description, owner, readme config                                 |
-| `deleteDirectory`            | `directoryId, DeleteDirectoryDto?`               | Validates UUID, deletes directory                                               |
-| `getDirectories`             | `{ search?, limit?, offset? }`                   | Paginated directory list                                                        |
-| `syncDirectoryData`          | `directoryId`                                    | Syncs directory data from git repository                                        |
-| `analyzeRepository`          | `sourceUrl, providerId?`                         | Analyzes a repository URL for import                                            |
-| `importDirectory`            | `ImportDirectoryRequest`                         | Imports a directory from an external source                                     |
-| `getUserRepositories`        | `{ gitProvider, page?, search?, owner?, type? }` | Lists user's git repositories                                                   |
-| `updateDirectorySchedule`    | `directoryId, UpdateDirectorySchedulePayload`    | Updates auto-generation schedule                                                |
-| `getAdvancedPrompts`         | `directoryId`                                    | Fetches custom prompt overrides                                                 |
-| `updateAdvancedPrompts`      | `directoryId, UpdateDirectoryAdvancedPromptsDto` | Updates 7 prompt types (max 2000 chars each)                                    |
-| `getWebsiteSettings`         | `directoryId`                                    | Fetches website configuration                                                   |
-| `updateWebsiteSettings`      | `directoryId, data`                              | Updates header, homepage, footer, custom menu settings                          |
-| `updateCommunityPrSettings`  | `directoryId, settings`                          | Toggles community PR and auto-close settings                                    |
-| `getRepositoryVisibility`    | `directoryId`                                    | Gets visibility status of data/directory/website repos                          |
-| `toggleRepositoryVisibility` | `directoryId, repoType, isPrivate`               | Toggles public/private for a specific repo                                      |
+| Action                       | Key Parameters                                   | Description                                                           |
+| ---------------------------- | ------------------------------------------------ | --------------------------------------------------------------------- |
+| `createWork`                 | `CreateWorkDto`                                  | Creates a work with slug, name, description, git/deploy providers     |
+| `createWorkWithAI`           | `AIWorkOptions`                                  | AI-generated work: generates details, creates work, starts generation |
+| `updateWork`                 | `workId, UpdateWorkDto`                          | Updates name, description, owner, readme config                       |
+| `deleteWork`                 | `workId, DeleteWorkDto?`                         | Validates UUID, deletes work                                          |
+| `getWorks`                   | `{ search?, limit?, offset? }`                   | Paginated work list                                                   |
+| `syncWorkData`               | `workId`                                         | Syncs work data from git repository                                   |
+| `analyzeRepository`          | `sourceUrl, providerId?`                         | Analyzes a repository URL for import                                  |
+| `importWork`                 | `ImportWorkRequest`                              | Imports a work from an external source                                |
+| `getUserRepositories`        | `{ gitProvider, page?, search?, owner?, type? }` | Lists user's git repositories                                         |
+| `updateWorkSchedule`         | `workId, UpdateWorkSchedulePayload`              | Updates auto-generation schedule                                      |
+| `getAdvancedPrompts`         | `workId`                                         | Fetches custom prompt overrides                                       |
+| `updateAdvancedPrompts`      | `workId, UpdateWorkAdvancedPromptsDto`           | Updates 7 prompt types (max 2000 chars each)                          |
+| `getWebsiteSettings`         | `workId`                                         | Fetches website configuration                                         |
+| `updateWebsiteSettings`      | `workId, data`                                   | Updates header, homepage, footer, custom menu settings                |
+| `updateCommunityPrSettings`  | `workId, settings`                               | Toggles community PR and auto-close settings                          |
+| `getRepositoryVisibility`    | `workId`                                         | Gets visibility status of data/work/website repos                     |
+| `toggleRepositoryVisibility` | `workId, repoType, isPrivate`                    | Toggles public/private for a specific repo                            |
 
 ## Generator Actions
 
 **File**: `src/app/actions/dashboard/generator.ts`
 
-| Action               | Parameters                             | Description                                                                    |
-| -------------------- | -------------------------------------- | ------------------------------------------------------------------------------ |
-| `generateItems`      | `directoryId, CreateItemsGeneratorDto` | Sanitizes inputs, validates git connection and org access, triggers generation |
-| `updateItems`        | `directoryId, UpdateItemsGeneratorDto` | Triggers item update generation                                                |
-| `regenerateMarkdown` | `directoryId`                          | Regenerates markdown for all directory items                                   |
+| Action               | Parameters                        | Description                                                                    |
+| -------------------- | --------------------------------- | ------------------------------------------------------------------------------ |
+| `generateItems`      | `workId, CreateItemsGeneratorDto` | Sanitizes inputs, validates git connection and org access, triggers generation |
+| `updateItems`        | `workId, UpdateItemsGeneratorDto` | Triggers item update generation                                                |
+| `regenerateMarkdown` | `workId`                          | Regenerates markdown for all work items                                        |
 
 The `sanitizePluginConfig` helper processes plugin config values, sanitizing string arrays and URL arrays before sending them to the API.
 
@@ -156,14 +156,14 @@ The `sanitizePluginConfig` helper processes plugin config values, sanitizing str
 
 **File**: `src/app/actions/dashboard/items.ts`
 
-| Action                        | Parameters                                                 | Description                                         |
-| ----------------------------- | ---------------------------------------------------------- | --------------------------------------------------- |
-| `addItem`                     | `directoryId, SubmitItemDto`                               | Adds item, returns PR info and merge status         |
-| `removeItem`                  | `directoryId, itemSlug, { reason?, create_pull_request? }` | Removes item with optional PR creation              |
-| `updateItem`                  | `directoryId, UpdateItemDto`                               | Updates item metadata                               |
-| `extractItemDetails`          | `sourceUrl, existingCategories?`                           | AI-extracts item details from a URL                 |
-| `captureScreenshot`           | `sourceUrl`                                                | Captures a website screenshot via screenshot plugin |
-| `checkScreenshotAvailability` | none                                                       | Checks if screenshot plugin is configured           |
+| Action                        | Parameters                                            | Description                                         |
+| ----------------------------- | ----------------------------------------------------- | --------------------------------------------------- |
+| `addItem`                     | `workId, SubmitItemDto`                               | Adds item, returns PR info and merge status         |
+| `removeItem`                  | `workId, itemSlug, { reason?, create_pull_request? }` | Removes item with optional PR creation              |
+| `updateItem`                  | `workId, UpdateItemDto`                               | Updates item metadata                               |
+| `extractItemDetails`          | `sourceUrl, existingCategories?`                      | AI-extracts item details from a URL                 |
+| `captureScreenshot`           | `sourceUrl`                                           | Captures a website screenshot via screenshot plugin |
+| `checkScreenshotAvailability` | none                                                  | Checks if screenshot plugin is configured           |
 
 ## Taxonomy Actions
 
@@ -181,29 +181,29 @@ Full CRUD for three taxonomy types, all following the same pattern with auth che
 
 **File**: `src/app/actions/dashboard/comparisons.ts`
 
-| Action                        | Parameters                                            | Description                                       |
-| ----------------------------- | ----------------------------------------------------- | ------------------------------------------------- |
-| `listComparisons`             | `directoryId`                                         | Lists all comparisons for a directory             |
-| `getRemainingComparisonCount` | `directoryId`                                         | Gets count of remaining comparisons to generate   |
-| `generateNextComparison`      | `directoryId`                                         | Auto-generates the next comparison pair           |
-| `generateManualComparison`    | `directoryId, itemASlug, itemBSlug`                   | Generates comparison for specific item pair       |
-| `deleteComparison`            | `directoryId, slug`                                   | Deletes a comparison                              |
-| `getComparisonAiConfig`       | `directoryId`                                         | Gets AI provider and model config for comparisons |
-| `saveComparisonAiConfig`      | `directoryId, { provider, model, extendedAnalysis? }` | Saves AI config, auto-enables plugin if needed    |
-| `saveComparisonCustomPrompt`  | `directoryId, customPrompt`                           | Saves custom comparison prompt                    |
-| `getAiProviderModels`         | `pluginId`                                            | Lists models for an AI provider                   |
+| Action                        | Parameters                                       | Description                                       |
+| ----------------------------- | ------------------------------------------------ | ------------------------------------------------- |
+| `listComparisons`             | `workId`                                         | Lists all comparisons for a work                  |
+| `getRemainingComparisonCount` | `workId`                                         | Gets count of remaining comparisons to generate   |
+| `generateNextComparison`      | `workId`                                         | Auto-generates the next comparison pair           |
+| `generateManualComparison`    | `workId, itemASlug, itemBSlug`                   | Generates comparison for specific item pair       |
+| `deleteComparison`            | `workId, slug`                                   | Deletes a comparison                              |
+| `getComparisonAiConfig`       | `workId`                                         | Gets AI provider and model config for comparisons |
+| `saveComparisonAiConfig`      | `workId, { provider, model, extendedAnalysis? }` | Saves AI config, auto-enables plugin if needed    |
+| `saveComparisonCustomPrompt`  | `workId, customPrompt`                           | Saves custom comparison prompt                    |
+| `getAiProviderModels`         | `pluginId`                                       | Lists models for an AI provider                   |
 
 ## Deploy Actions
 
 **File**: `src/app/actions/dashboard/deploy.ts`
 
-| Action                          | Parameters                                                             | Description                                           |
-| ------------------------------- | ---------------------------------------------------------------------- | ----------------------------------------------------- |
-| `deploy`                        | `directoryId, teamScope?`                                              | Triggers deployment, verifies git provider connection |
-| `updateWebsiteRepository`       | `directoryId`                                                          | Updates the website repository                        |
-| `getDeploymentTeams`            | `directoryId?`                                                         | Lists available deployment teams                      |
-| `lookupExistingDeployment`      | `directoryId`                                                          | Checks for existing deployment and returns state      |
-| `updateWebsiteTemplateSettings` | `directoryId, { websiteTemplateAutoUpdate?, websiteTemplateUseBeta? }` | Updates template auto-update settings                 |
+| Action                          | Parameters                                                        | Description                                           |
+| ------------------------------- | ----------------------------------------------------------------- | ----------------------------------------------------- |
+| `deploy`                        | `workId, teamScope?`                                              | Triggers deployment, verifies git provider connection |
+| `updateWebsiteRepository`       | `workId`                                                          | Updates the website repository                        |
+| `getDeploymentTeams`            | `workId?`                                                         | Lists available deployment teams                      |
+| `lookupExistingDeployment`      | `workId`                                                          | Checks for existing deployment and returns state      |
+| `updateWebsiteTemplateSettings` | `workId, { websiteTemplateAutoUpdate?, websiteTemplateUseBeta? }` | Updates template auto-update settings                 |
 
 ## Navigation Actions
 
@@ -212,8 +212,8 @@ Full CRUD for three taxonomy types, all following the same pattern with auth che
 Simple redirect helpers using `next-intl` locale-aware routing:
 
 ```typescript
-redirectToDirectories(); // -> /directories
-redirectToNewDirectory(); // -> /directories/new
+redirectToWorks(); // -> /works
+redirectToNewWork(); // -> /works/new
 redirectToDashboard(); // -> /dashboard
 redirectToSettings(); // -> /settings
 redirectToAnalytics(); // -> /analytics

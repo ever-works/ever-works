@@ -2,7 +2,7 @@
  * Agent Pipeline Plugin
  *
  * AI agent pipeline that uses Vercel AI SDK (generateText + tools) to
- * generate directory items via an autonomous agent loop. The agent has
+ * generate work items via an autonomous agent loop. The agent has
  * tools for web search, content extraction, file management, and
  * progress reporting, all running in an in-memory sandbox.
  *

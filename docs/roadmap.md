@@ -11,12 +11,12 @@ This page outlines the current direction of Ever Works, areas of active developm
 
 ## Product Vision
 
-Ever Works aims to be the most comprehensive open-source solution for building professional directory websites. The long-term vision encompasses:
+Ever Works aims to be the most comprehensive open-source solution for building professional work websites. The long-term vision encompasses:
 
-- **AI-first content generation** that makes it possible to build and maintain large directories with minimal manual effort
+- **AI-first content generation** that makes it possible to build and maintain large works with minimal manual effort
 - **A thriving plugin ecosystem** that allows developers to extend the Platform with custom AI providers, data sources, and integrations
 - **Production-grade website templates** that are beautiful, performant, and fully customizable
-- **Multi-directory management** that scales from a single directory to hundreds, all managed from a unified backend
+- **Multi-work management** that scales from a single work to hundreds, all managed from a unified backend
 
 ## Areas of Active Development
 
@@ -40,7 +40,7 @@ The following areas are actively being worked on in the Platform repository:
 
 #### API and Dashboard
 
-- Expanding the REST API with more granular endpoints for directory management
+- Expanding the REST API with more granular endpoints for work management
 - Adding real-time pipeline status monitoring in the Web Dashboard
 - Improving the dashboard UI with better data visualization and analytics
 - Implementing role-based access control for multi-user environments
@@ -60,7 +60,7 @@ The following areas are actively being worked on in the Template repository:
 
 - Optimizing Largest Contentful Paint (LCP) for item listing and detail pages
 - Reducing JavaScript bundle size through better code splitting and tree shaking
-- Improving image optimization pipeline for directory item screenshots and logos
+- Improving image optimization pipeline for work item screenshots and logos
 - Implementing partial prerendering for faster initial page loads
 
 #### Feature Enhancements
@@ -74,14 +74,14 @@ The following areas are actively being worked on in the Template repository:
 
 - Improving local development setup with better documentation and error messages
 - Adding more comprehensive E2E test coverage with Playwright
-- Creating starter templates for common directory types (SaaS, local business, resources)
+- Creating starter templates for common work types (SaaS, local business, resources)
 - Improving TypeScript type safety across the codebase
 
 #### Internationalization
 
 - Adding more built-in language translations
 - Improving RTL layout support for Arabic and Hebrew
-- Supporting per-directory language configuration
+- Supporting per-work language configuration
 - Adding automated translation workflows
 
 ### Documentation
@@ -107,7 +107,7 @@ When creating a feature request:
 1. **Check existing issues** first to avoid duplicates. If a similar request exists, add your use case as a comment.
 2. **Use the feature request template** if one is provided.
 3. **Describe the problem** you are trying to solve, not just the solution you want.
-4. **Provide context** about your use case, directory type, and scale.
+4. **Provide context** about your use case, work type, and scale.
 5. **Include examples** of how the feature would work (mockups, API schemas, configuration examples).
 
 ### GitHub Discussions

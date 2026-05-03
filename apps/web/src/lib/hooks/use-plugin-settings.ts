@@ -28,8 +28,8 @@ interface UsePluginSettingsOptions {
      *  These are NOT saved — only used by getFieldValue for display purposes. */
     fallbackSettings?: Record<string, unknown>;
     /** Identifies validation context: 'user' scope requires all required fields,
-     *  'directory' scope allows inheritance from fallbackSettings */
-    scope: 'user' | 'directory';
+     *  'work' scope allows inheritance from fallbackSettings */
+    scope: 'user' | 'work';
 }
 
 /** Stable empty object to avoid re-renders when initialSettings is undefined */
@@ -161,13 +161,19 @@ export function usePluginSettings({
         setIsSaving(true);
         setValidationError(null);
         try {
+            const modifiedRegularSettings = Object.fromEntries(
+                Object.entries(settings).filter(([key]) => modifiedFields.has(key)),
+            );
+            const modifiedSecretSettings = Object.fromEntries(
+                Object.entries(secretSettings).filter(([key]) => modifiedFields.has(key)),
+            );
             const sanitizedSettings =
-                Object.keys(settings).length > 0
-                    ? sanitizeSettingsForSave(settings, scope)
+                Object.keys(modifiedRegularSettings).length > 0
+                    ? sanitizeSettingsForSave(modifiedRegularSettings, scope)
                     : undefined;
             const sanitizedSecretSettings =
-                Object.keys(secretSettings).length > 0
-                    ? sanitizeSettingsForSave(secretSettings, scope)
+                Object.keys(modifiedSecretSettings).length > 0
+                    ? sanitizeSettingsForSave(modifiedSecretSettings, scope)
                     : undefined;
 
             const result = await onSave({
@@ -244,6 +250,7 @@ export function usePluginSettings({
         validateConstraints,
         settings,
         secretSettings,
+        modifiedFields,
         onSave,
         router,
         t,

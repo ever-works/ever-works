@@ -98,7 +98,7 @@ In this example, changing `tsconfig.json` invalidates `build` (it's in the task'
 
 ## What Gets Cached
 
-1. **File outputs** - files/directories specified in `outputs`
+1. **File outputs** - files/works specified in `outputs`
 2. **Task logs** - stdout/stderr for replay on cache hit
 
 ```json

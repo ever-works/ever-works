@@ -111,7 +111,7 @@ Returns an async iterable of `ChatCompletionChunk` objects for real-time token s
 async createEmbedding(options: EmbeddingOptions): Promise<EmbeddingResponse>
 ```
 
-Generates vector embeddings using OpenAI's embedding models (e.g., `text-embedding-3-small`). Used for semantic search within directories.
+Generates vector embeddings using OpenAI's embedding models (e.g., `text-embedding-3-small`). Used for semantic search within works.
 
 ### Model Listing
 
@@ -182,7 +182,7 @@ The actual API key and model selection come from user settings at call time thro
 
 When OpenAI is selected as the AI provider:
 
-1. **Content generation** -- Produces directory item descriptions, summaries, and metadata during generation.
+1. **Content generation** -- Produces work item descriptions, summaries, and metadata during generation.
 2. **Conversational AI** -- Powers the chat assistant in the web dashboard.
 3. **Embeddings** -- Creates vector representations for semantic search.
 4. **Structured extraction** -- Uses function calling to extract structured data from web content.

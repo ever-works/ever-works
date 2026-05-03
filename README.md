@@ -20,7 +20,20 @@ An open-source, extensible, agentic runtime for building content-rich web apps a
 
 ## 💪 Thanks to our Contributors
 
-See our contributors list in [CONTRIBUTORS.md](https://github.com/ever-works/ever-works/blob/develop/.github/CONTRIBUTORS.md).
+This project was initially developed in a private repository before its public release.
+We are grateful to the current and former team members who contributed to the project during that phase.
+
+Private-development contributors:
+
+- Paradoxe Ng (492,726++ 246,474--)
+- Ruslan Konviser (250,892++ 51,505--)
+- Gabriel Nt (111,946++ 36,898--)
+- Akilimaili Cizungu Innocent (43,132++ 700--)
+- Michał Dziuba (18,944++ 6,930--)
+- Roland MN (14,063++ 155--)
+- Joel Kalema (12,720++ 6,039--)
+
+Public contributions are tracked in the repository history from the initial public release onward in [CONTRIBUTORS.md](https://github.com/ever-works/ever-works/blob/develop/.github/CONTRIBUTORS.md).
 You can also view a full list of our [contributors tracked by GitHub](https://github.com/ever-works/ever-works/graphs/contributors).
 
 <img src="https://contributors-img.web.app/image?repo=ever-works/ever-works" />

@@ -18,23 +18,23 @@ export class ContentRetrievalStep extends BasePipelineStep {
 		context: MutableGenerationContext,
 		execContext: StepExecutionContext
 	): Promise<MutableGenerationContext> {
-		const { request, directory, extractedUrls, processedSourceUrls } = context;
+		const { request, work, extractedUrls, processedSourceUrls } = context;
 		const { logger, contentExtractorFacade } = execContext;
 		const config = request.config || {};
 
 		const facadeOptions: FacadeOptions = {
 			userId: execContext.user!.id,
-			directoryId: execContext.directory.id
+			workId: execContext.work.id
 		};
 
-		logger.log(`[${directory.slug}] Content Retrieval - Starting`);
+		logger.log(`[${work.slug}] Content Retrieval - Starting`);
 
 		// Combine extractedUrls from previous steps with sourceUrls from config
 		const sourceUrls = (config.source_urls as string[]) || [];
 		const allUrls = [...new Set([...extractedUrls, ...sourceUrls])];
 
 		if (allUrls.length === 0) {
-			logger.log(`[${directory.slug}] No URLs to retrieve content from`);
+			logger.log(`[${work.slug}] No URLs to retrieve content from`);
 			return context;
 		}
 
@@ -42,12 +42,12 @@ export class ContentRetrievalStep extends BasePipelineStep {
 		const urlsToProcess = allUrls.filter((url) => !processedSourceUrls.has(url));
 
 		if (urlsToProcess.length === 0) {
-			logger.log(`[${directory.slug}] All URLs have already been processed`);
+			logger.log(`[${work.slug}] All URLs have already been processed`);
 			return context;
 		}
 
 		logger.log(
-			`[${directory.slug}] Processing ${urlsToProcess.length} URLs (${allUrls.length - urlsToProcess.length} already processed)`
+			`[${work.slug}] Processing ${urlsToProcess.length} URLs (${allUrls.length - urlsToProcess.length} already processed)`
 		);
 
 		// Resolve provider name for user-facing warnings
@@ -57,7 +57,7 @@ export class ContentRetrievalStep extends BasePipelineStep {
 
 		// Process all URLs using ContentExtractorFacade (unified content extraction)
 		const retrievedPages = await this.processUrls(
-			directory.slug,
+			work.slug,
 			urlsToProcess,
 			processedSourceUrls,
 			contentExtractorFacade,
@@ -76,7 +76,7 @@ export class ContentRetrievalStep extends BasePipelineStep {
 		}
 
 		logger.log(
-			`[${directory.slug}] Content Retrieval complete. Retrieved ${retrievedPages.length} pages (total: ${context.webPages.length})`
+			`[${work.slug}] Content Retrieval complete. Retrieved ${retrievedPages.length} pages (total: ${context.webPages.length})`
 		);
 
 		if (retrievedPages.length === 0 && urlsToProcess.length > 0) {

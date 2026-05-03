@@ -16,6 +16,7 @@ import { PluginDeviceAuthConnection } from '@/components/settings/PluginDeviceAu
 import { PluginOAuthConnection } from '@/components/settings/PluginOAuthConnection';
 import { getCapabilityLabel } from '@/lib/utils/plugin-category-icons';
 import { usePluginSettings } from '@/lib/hooks/use-plugin-settings';
+import { usePluginToggle } from '@/lib/hooks/use-plugin-toggle';
 
 interface PluginSettingsInlineProps {
     plugin: UserPlugin;
@@ -42,6 +43,12 @@ export function PluginSettingsInline({
     const hasDeviceAuth =
         plugin.capabilities.includes('device-auth') && deviceAuthStatus !== undefined;
     const deviceAuthModeField = plugin.uiHints?.deviceAuth?.authModeField ?? 'authMode';
+    const { isPending, optimisticEnabled } = usePluginToggle({
+        pluginId: plugin.pluginId,
+        enabled: plugin.enabled,
+        visibility: plugin.visibility,
+    });
+    const saveBlockedByEnableState = !optimisticEnabled || isPending;
 
     const onSave = useCallback(
         async (data: {
@@ -235,12 +242,18 @@ export function PluginSettingsInline({
                                 variant="primary"
                                 size="sm"
                                 onClick={handleSave}
-                                disabled={!hasChanges || isSaving}
+                                disabled={!hasChanges || isSaving || saveBlockedByEnableState}
                                 loading={isSaving}
                             >
                                 <Save className="w-3.5 h-3.5 mr-1.5" />
                                 {t('saveSettings')}
                             </Button>
+
+                            {saveBlockedByEnableState && (
+                                <span className="text-sm text-text-muted dark:text-text-muted-dark">
+                                    {t('enableFirstToSave')}
+                                </span>
+                            )}
 
                             {saveSuccess && (
                                 <span className="inline-flex items-center gap-1 text-sm text-success">

@@ -43,7 +43,7 @@ RUN cd apps/web && pnpm install --frozen-lockfile
 # Build the project
 COPY --from=builder /app/out/full/ .
 # Build the apps
-RUN pnpm build --filter=ever-works-web...
+RUN turbo build --filter=ever-works-web...
 # Prune dev deps
 RUN sed -i '/"prepare.*husky/d' package.json
 RUN cd apps/web && pnpm prune --prod

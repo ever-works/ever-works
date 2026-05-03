@@ -1,9 +1,9 @@
-import type { DirectoryReference, GenerationRequest, ExistingItems } from '@ever-works/plugin';
+import type { WorkReference, GenerationRequest, ExistingItems } from '@ever-works/plugin';
 import type { ZapierWorkflowInput } from '../types.js';
 import { DEFAULT_TARGET_ITEMS } from '../types.js';
 
 interface PayloadOptions {
-	directory: DirectoryReference;
+	work: WorkReference;
 	request: GenerationRequest;
 	existing: ExistingItems;
 	config: Record<string, unknown>;
@@ -14,7 +14,7 @@ interface PayloadOptions {
  *
  * The returned object merges two layers:
  *  - **Envelope** — `metadata`, `existingSummary`, `dataSource`, `actionParams`.
- *    Custom Zaps can destructure these for directory context.
+ *    Custom Zaps can destructure these for work context.
  *  - **Flattened `action_params`** — each key is also spread at the top level so
  *    catalog actions (Gmail, Slack, Sheets, …) see their required input fields
  *    where Zapier expects them (e.g. `{ to, subject, body }` for Gmail send).
@@ -23,14 +23,14 @@ interface PayloadOptions {
  * with an envelope key (e.g. `metadata`), the user's value wins via spread order.
  */
 export function buildWorkflowPayload(options: PayloadOptions): ZapierWorkflowInput & Record<string, unknown> {
-	const { directory, request, existing, config } = options;
+	const { work, request, existing, config } = options;
 
 	const envelope: ZapierWorkflowInput = {
 		metadata: {
-			directoryId: directory.id,
-			directoryName: directory.name,
-			directorySlug: directory.slug,
-			directoryDescription: directory.description,
+			workId: work.id,
+			workName: work.name,
+			workSlug: work.slug,
+			workDescription: work.description,
 			prompt: request.prompt,
 			generationMethod: request.generationMethod,
 			targetItems: (config.target_items as number) ?? DEFAULT_TARGET_ITEMS

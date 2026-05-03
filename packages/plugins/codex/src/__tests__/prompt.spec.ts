@@ -9,11 +9,11 @@ import {
 
 describe('codex prompts', () => {
 	const baseOptions = {
-		directory: {
+		work: {
 			id: 'dir1',
 			name: 'AI Tools',
 			slug: 'ai-tools',
-			description: 'A curated directory of AI tools'
+			description: 'A curated work of AI tools'
 		},
 		request: {
 			prompt: 'Generate tools for AI engineering teams',
@@ -41,8 +41,8 @@ describe('codex prompts', () => {
 
 		expect(vars.workspacePath).toBe('/tmp/codex-generator/user1/dir1');
 		expect(vars.targetItems).toBe('25');
-		expect(vars.directorySection).toContain('Directory name: AI Tools');
-		expect(vars.directorySection).toContain('Requested topic: Generate tools for AI engineering teams');
+		expect(vars.workSection).toContain('Work name: AI Tools');
+		expect(vars.workSection).toContain('Requested topic: Generate tools for AI engineering teams');
 		expect(vars.existingItemsSection).toContain('already contains 1 existing items');
 	});
 
@@ -62,7 +62,7 @@ describe('codex prompts', () => {
 		const prompt = buildUserPrompt(baseOptions);
 
 		expect(vars.userInstruction).toBe('Generate tools for AI engineering teams');
-		expect(vars.directoryDescription).toBe('Directory description: A curated directory of AI tools');
+		expect(vars.workDescription).toBe('Work description: A curated work of AI tools');
 		expect(vars.targetItems).toBe('25');
 		expect(prompt).toContain('Generate tools for AI engineering teams');
 		expect(prompt).toContain('Target: generate approximately 25 new items.');

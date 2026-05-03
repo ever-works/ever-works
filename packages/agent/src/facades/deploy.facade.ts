@@ -12,12 +12,12 @@ import type {
 import { PLUGIN_CAPABILITIES } from '@ever-works/plugin';
 import { PluginRegistryService } from '../plugins/services/plugin-registry.service';
 import { PluginSettingsService } from '../plugins/services/plugin-settings.service';
-import { DirectoryPluginRepository } from '../plugins/repositories/directory-plugin.repository';
-import { DirectoryRepository } from '../database/repositories/directory.repository';
+import { WorkPluginRepository } from '../plugins/repositories/work-plugin.repository';
+import { WorkRepository } from '../database/repositories/work.repository';
 import { GitFacadeService } from './git.facade';
-import { DirectoryCustomDomainRepository } from '../database/repositories/directory-custom-domain.repository';
+import { WorkCustomDomainRepository } from '../database/repositories/work-custom-domain.repository';
 import { FacadeError, NoProviderError, ProviderNotFoundError } from './base.facade';
-import type { Directory } from '../entities/directory.entity';
+import type { Work } from '../entities/work.entity';
 import type { User } from '../entities/user.entity';
 
 export class DeployFacadeError extends FacadeError {
@@ -55,19 +55,19 @@ export class NoDeployCredentialsError extends DeployFacadeError {
 }
 
 export interface DeployFacadeFullOptions extends DeployFacadeOptions {
-    /** Override the provider (instead of using directory.deployProvider) */
+    /** Override the provider (instead of using work.deployProvider) */
     providerOverride?: string;
 }
 
 /**
  * DeployFacadeService provides a unified interface for deployment operations.
  *
- * It resolves the deployment provider from directory.deployProvider and retrieves
+ * It resolves the deployment provider from work.deployProvider and retrieves
  * credentials from plugin settings (user-scoped). This facade implements the
  * IDeployFacade interface from the plugin package.
  *
  * Key differences from other facades:
- * - Uses directory.deployProvider instead of capability-based resolution
+ * - Uses work.deployProvider instead of capability-based resolution
  * - Tokens are always from plugin settings (user-required configuration mode)
  * - Coordinates with GitFacade for git operations during deployment
  */
@@ -79,32 +79,32 @@ export class DeployFacadeService implements IDeployFacade {
     constructor(
         private readonly registry: PluginRegistryService,
         private readonly settingsService: PluginSettingsService,
-        private readonly directoryRepository: DirectoryRepository,
+        private readonly workRepository: WorkRepository,
         private readonly gitFacade: GitFacadeService,
-        private readonly domainRepository: DirectoryCustomDomainRepository,
-        private readonly directoryPluginRepository?: DirectoryPluginRepository,
+        private readonly domainRepository: WorkCustomDomainRepository,
+        private readonly workPluginRepository?: WorkPluginRepository,
     ) {}
 
     /**
-     * Check if deployment is configured for a directory
+     * Check if deployment is configured for a work
      */
     async isConfigured(options: DeployFacadeOptions): Promise<boolean> {
         try {
-            const directory = await this.directoryRepository.findById(options.directoryId);
-            if (!directory?.deployProvider) {
+            const work = await this.workRepository.findById(options.workId);
+            if (!work?.deployProvider) {
                 return false;
             }
 
-            const registered = this.registry.get(directory.deployProvider);
+            const registered = this.registry.get(work.deployProvider);
             if (!registered || registered.state !== 'loaded') {
                 return false;
             }
 
             // Check if user has configured their token
             const token = await this.getTokenFromSettings(
-                directory.deployProvider,
+                work.deployProvider,
                 options.userId,
-                options.directoryId,
+                options.workId,
             );
             return !!token;
         } catch {
@@ -164,13 +164,14 @@ export class DeployFacadeService implements IDeployFacade {
         config: { projectName: string; teamScope?: string },
         options: DeployFacadeOptions,
     ): Promise<boolean> {
-        const { plugin, token, directory } = await this.resolvePluginAndTokenWithDirectory(options);
-        const user = directory.user as User;
+        const { plugin, token, work } = await this.resolvePluginAndTokenWithWork(options);
+        const user = work.user as User;
 
         // Get git token for repository operations
         const gitToken = await this.gitFacade.getAccessToken({
             userId: user.id,
-            providerId: directory.gitProvider,
+            providerId: work.gitProvider,
+            workId: work.id,
         });
 
         if (!gitToken) {
@@ -206,20 +207,19 @@ export class DeployFacadeService implements IDeployFacade {
     }
 
     /**
-     * Lookup existing deployment for a directory
+     * Lookup existing deployment for a work
      */
     async lookupExistingDeployment(
         projectName: string,
         options: DeployFacadeOptions,
     ): Promise<DeploymentLookupResult> {
         try {
-            const { plugin, token, directory } =
-                await this.resolvePluginAndTokenWithDirectory(options);
+            const { plugin, token, work } = await this.resolvePluginAndTokenWithWork(options);
 
             // Get team scope from settings
             const settings = await this.settingsService.getSettings(plugin.id, {
                 userId: options.userId,
-                directoryId: options.directoryId,
+                workId: options.workId,
                 includeSecrets: false,
             });
             const teamScope = settings.defaultTeamScope as string | undefined;
@@ -227,11 +227,11 @@ export class DeployFacadeService implements IDeployFacade {
             if (plugin.lookupExistingDeployment) {
                 const result = await plugin.lookupExistingDeployment(projectName, token, teamScope);
 
-                // Update directory with deployment info if found
+                // Update work with deployment info if found
                 if (result.found && (result.website || result.deploymentState)) {
-                    await this.directoryRepository.update(directory.id, {
+                    await this.workRepository.update(work.id, {
                         website: result.website ?? undefined,
-                        deploymentState: result.deploymentState ?? directory.deploymentState,
+                        deploymentState: result.deploymentState ?? work.deploymentState,
                     });
                 }
 
@@ -245,38 +245,34 @@ export class DeployFacadeService implements IDeployFacade {
     }
 
     /**
-     * Get deployment token for a user/directory
+     * Get deployment token for a user/work
      * (Used by the deploy service for setting repository secrets)
      */
     async getDeployToken(options: DeployFacadeOptions): Promise<string | null> {
         try {
-            const directory = await this.directoryRepository.findById(options.directoryId);
-            if (!directory?.deployProvider) {
+            const work = await this.workRepository.findById(options.workId);
+            if (!work?.deployProvider) {
                 return null;
             }
-            return this.getTokenFromSettings(
-                directory.deployProvider,
-                options.userId,
-                options.directoryId,
-            );
+            return this.getTokenFromSettings(work.deployProvider, options.userId, options.workId);
         } catch {
             return null;
         }
     }
 
     /**
-     * Get the deployment provider for a directory
+     * Get the deployment provider for a work
      */
-    async getDirectoryProvider(directoryId: string): Promise<string | null> {
-        const directory = await this.directoryRepository.findById(directoryId);
-        return directory?.deployProvider ?? null;
+    async getWorkProvider(workId: string): Promise<string | null> {
+        const work = await this.workRepository.findById(workId);
+        return work?.deployProvider ?? null;
     }
 
     /**
-     * Set deployment provider for a directory
+     * Set deployment provider for a work
      */
-    async setDirectoryProvider(directoryId: string, providerId: string): Promise<void> {
-        await this.directoryRepository.update(directoryId, {
+    async setWorkProvider(workId: string, providerId: string): Promise<void> {
+        await this.workRepository.update(workId, {
             deployProvider: providerId,
         });
     }
@@ -288,30 +284,39 @@ export class DeployFacadeService implements IDeployFacade {
     async getPluginAndToken(options: DeployFacadeOptions): Promise<{
         plugin: IDeploymentPlugin;
         token: string;
-        directory: Directory;
+        work: Work;
     }> {
-        return this.resolvePluginAndTokenWithDirectory(options);
+        return this.resolvePluginAndTokenWithWork(options);
     }
 
     // Domain management methods
     // DB is the primary source of truth; provider APIs are used for sync and verification.
 
     /**
-     * Get domains for a deployed directory.
+     * Get domains for a deployed work.
      * Reads from DB, enriches with provider verification data when available.
      */
     async getDomains(options: DeployFacadeOptions): Promise<DeploymentDomain[]> {
-        const dbDomains = await this.domainRepository.findByDirectory(options.directoryId);
+        const dbDomains = await this.domainRepository.findByWork(options.workId);
+        const hasCustomDomain = dbDomains.some(
+            (domain) => !this.isAutoAssignedDomain(domain.domain),
+        );
+        const shouldAutoImportProviderDomains = !hasCustomDomain;
 
         // Try to enrich with provider verification data
         let providerDomains: DeploymentDomain[] = [];
+        let providerId: string | undefined;
+
         try {
-            const { plugin, token, directory } =
-                await this.resolvePluginAndTokenWithDirectory(options);
+            const { plugin, token, work } = await this.resolvePluginAndTokenWithWork(options);
+            providerId = plugin.id;
             if (plugin.getDomains) {
-                const projectId = await this.resolveProjectId(plugin, token, directory, options);
+                const projectId = await this.resolveProjectId(plugin, token, work, options);
                 const teamScope = await this.getTeamScope(plugin.id, options);
                 providerDomains = await plugin.getDomains(projectId, token, teamScope);
+                if (shouldAutoImportProviderDomains) {
+                    await this.reconcileProviderDomains(options.workId, plugin.id, providerDomains);
+                }
             }
         } catch (error) {
             this.logger.warn(`Failed to fetch provider domains for enrichment: ${error}`);
@@ -323,8 +328,7 @@ export class DeployFacadeService implements IDeployFacade {
             providerMap.set(pd.name, pd);
         }
 
-        // Merge: DB domains with provider verification details
-        return dbDomains.map((dbDomain) => {
+        const merged = dbDomains.map((dbDomain) => {
             const providerData = providerMap.get(dbDomain.domain);
             return {
                 name: dbDomain.domain,
@@ -332,14 +336,66 @@ export class DeployFacadeService implements IDeployFacade {
                 verification: providerData?.verification,
             };
         });
+
+        if (shouldAutoImportProviderDomains) {
+            const dbDomainNames = new Set(dbDomains.map((domain) => domain.domain));
+            for (const providerDomain of providerDomains) {
+                if (dbDomainNames.has(providerDomain.name)) continue;
+
+                merged.push({
+                    name: providerDomain.name,
+                    verified: providerDomain.verified,
+                    verification: providerDomain.verification,
+                });
+            }
+        }
+
+        if (providerId && providerDomains.length > 0) {
+            this.logger.debug(
+                `Resolved ${providerDomains.length} domain(s) from provider ${providerId} for work ${options.workId}`,
+            );
+        }
+
+        return this.sortDomainsForDisplay(merged);
+    }
+
+    private async reconcileProviderDomains(
+        workId: string,
+        providerId: string,
+        providerDomains: DeploymentDomain[],
+    ): Promise<void> {
+        for (const providerDomain of providerDomains) {
+            try {
+                const existing = await this.domainRepository.findOne(workId, providerDomain.name);
+                if (!existing) {
+                    await this.domainRepository.addDomain(workId, providerDomain.name, providerId);
+                } else if (existing.provider !== providerId) {
+                    await this.domainRepository.updateProvider(
+                        workId,
+                        providerDomain.name,
+                        providerId,
+                    );
+                }
+
+                await this.domainRepository.updateVerified(
+                    workId,
+                    providerDomain.name,
+                    providerDomain.verified,
+                );
+            } catch (error) {
+                this.logger.warn(
+                    `Failed to reconcile provider domain "${providerDomain.name}" for work ${workId}: ${error}`,
+                );
+            }
+        }
     }
 
     /**
-     * Add a domain to a deployed directory.
-     * Saves to DB first, then pushes to provider.
+     * Add a domain to a deployed work.
+     * Provider state is checked first so domains already attached outside Ever Works are imported.
      */
     async addDomain(domain: string, options: DeployFacadeOptions): Promise<AddDomainResult> {
-        const { plugin, token, directory } = await this.resolvePluginAndTokenWithDirectory(options);
+        const { plugin, token, work } = await this.resolvePluginAndTokenWithWork(options);
         if (!plugin.addDomain) {
             throw new DeployFacadeError(
                 'Domain management is not supported by this provider',
@@ -348,58 +404,120 @@ export class DeployFacadeService implements IDeployFacade {
             );
         }
 
-        // Check for duplicate before inserting
-        const existing = await this.domainRepository.findOne(options.directoryId, domain);
-        if (existing) {
-            throw new DeployFacadeError(
-                `Domain "${domain}" is already added to this directory`,
-                'addDomain',
-                plugin.id,
+        const projectId = await this.resolveProjectId(plugin, token, work, options);
+        const teamScope = await this.getTeamScope(plugin.id, options);
+        const existing = await this.domainRepository.findOne(options.workId, domain);
+
+        if (plugin.getDomains) {
+            const providerDomain = await this.findProviderDomain(
+                plugin,
+                projectId,
+                token,
+                teamScope,
+                domain,
             );
+
+            if (providerDomain) {
+                await this.reconcileProviderDomains(options.workId, plugin.id, [providerDomain]);
+                await this.promoteVerifiedDomainWebsite(work, providerDomain);
+                return {
+                    domain: providerDomain,
+                    verified: providerDomain.verified,
+                };
+            }
         }
 
-        // Save to DB first (unverified, no provider yet)
-        await this.domainRepository.addDomain(options.directoryId, domain);
+        if (existing) {
+            return {
+                domain: {
+                    name: existing.domain,
+                    verified: existing.verified,
+                },
+                verified: existing.verified,
+            };
+        }
 
         // Push to provider
-        const projectId = await this.resolveProjectId(plugin, token, directory, options);
-        const teamScope = await this.getTeamScope(plugin.id, options);
         let result: AddDomainResult;
         try {
             result = await plugin.addDomain(projectId, domain, token, teamScope);
         } catch (error) {
-            // Provider failed — keep DB record so user can retry, but rethrow
             throw error;
         }
 
-        // Update DB with provider and verified status
-        await this.domainRepository.updateProvider(options.directoryId, domain, plugin.id);
+        await this.domainRepository.addDomain(options.workId, domain, plugin.id);
         if (result.verified) {
-            await this.domainRepository.updateVerified(options.directoryId, domain, true);
-            // Only promote to primary URL if current website is auto-assigned or unset
-            const isAutoAssigned = !directory.website || directory.website.endsWith('.vercel.app');
-            if (isAutoAssigned) {
-                await this.directoryRepository.update(directory.id, {
-                    website: `https://${result.domain.name}`,
-                });
-            }
+            await this.domainRepository.updateVerified(options.workId, domain, true);
+            await this.promoteVerifiedDomainWebsite(work, result.domain);
         }
 
         return result;
     }
 
+    private async findProviderDomain(
+        plugin: IDeploymentPlugin,
+        projectId: string,
+        token: string,
+        teamScope: string | undefined,
+        domain: string,
+    ): Promise<DeploymentDomain | undefined> {
+        if (!plugin.getDomains) return undefined;
+
+        try {
+            const providerDomains = await plugin.getDomains(projectId, token, teamScope);
+            return providerDomains.find((item) => item.name === domain);
+        } catch (error) {
+            this.logger.warn(
+                `Failed to check provider domains before adding "${domain}": ${error}`,
+            );
+            return undefined;
+        }
+    }
+
+    private async promoteVerifiedDomainWebsite(
+        work: Work,
+        domain: DeploymentDomain,
+    ): Promise<void> {
+        if (!domain.verified) return;
+
+        // Only promote to primary URL if current website is auto-assigned or unset
+        const isAutoAssigned = !work.website || work.website.endsWith('.vercel.app');
+        if (!isAutoAssigned) return;
+
+        await this.workRepository.update(work.id, {
+            website: `https://${domain.name}`,
+        });
+    }
+
+    private isAutoAssignedDomain(domain: string): boolean {
+        return domain.endsWith('.vercel.app');
+    }
+
+    private sortDomainsForDisplay(domains: DeploymentDomain[]): DeploymentDomain[] {
+        return [...domains].sort((left, right) => {
+            const leftAutoAssigned = this.isAutoAssignedDomain(left.name);
+            const rightAutoAssigned = this.isAutoAssignedDomain(right.name);
+
+            if (leftAutoAssigned === rightAutoAssigned) {
+                return left.name.localeCompare(right.name);
+            }
+
+            return leftAutoAssigned ? 1 : -1;
+        });
+    }
+
     /**
-     * Remove a domain from a deployed directory.
+     * Remove a domain from a deployed work.
      * Removes from provider first, then from DB.
      */
     async removeDomain(domain: string, options: DeployFacadeOptions): Promise<boolean> {
-        const { plugin, token, directory } = await this.resolvePluginAndTokenWithDirectory(options);
+        const { plugin, token, work } = await this.resolvePluginAndTokenWithWork(options);
 
         // If provider supports removal and domain is synced, remove from provider
-        const dbRecord = await this.domainRepository.findOne(options.directoryId, domain);
+        const dbRecord = await this.domainRepository.findOne(options.workId, domain);
         if (dbRecord?.provider && plugin.removeDomain) {
             try {
-                const projectId = await this.resolveProjectId(plugin, token, directory, options);
+                const projectId = await this.resolveProjectId(plugin, token, work, options);
                 const teamScope = await this.getTeamScope(plugin.id, options);
                 await plugin.removeDomain(projectId, domain, token, teamScope);
             } catch (error) {
@@ -410,19 +528,19 @@ export class DeployFacadeService implements IDeployFacade {
         }
 
         // Remove from DB
-        const removed = await this.domainRepository.removeDomain(options.directoryId, domain);
+        const removed = await this.domainRepository.removeDomain(options.workId, domain);
 
         // If the removed domain was the current website URL, re-lookup to update
-        if (removed && directory.website === `https://${domain}`) {
+        if (removed && work.website === `https://${domain}`) {
             try {
                 const teamScope = await this.getTeamScope(plugin.id, options);
                 if (plugin.lookupExistingDeployment) {
                     const lookup = await plugin.lookupExistingDeployment(
-                        directory.slug,
+                        work.slug,
                         token,
                         teamScope,
                     );
-                    await this.directoryRepository.update(directory.id, {
+                    await this.workRepository.update(work.id, {
                         website: lookup.website ?? undefined,
                     });
                 }
@@ -435,11 +553,11 @@ export class DeployFacadeService implements IDeployFacade {
     }
 
     /**
-     * Verify a domain on a deployed directory.
+     * Verify a domain on a deployed work.
      * Verifies at provider, updates DB with result.
      */
     async verifyDomain(domain: string, options: DeployFacadeOptions): Promise<DeploymentDomain> {
-        const { plugin, token, directory } = await this.resolvePluginAndTokenWithDirectory(options);
+        const { plugin, token, work } = await this.resolvePluginAndTokenWithWork(options);
         if (!plugin.verifyDomain) {
             throw new DeployFacadeError(
                 'Domain management is not supported by this provider',
@@ -447,18 +565,18 @@ export class DeployFacadeService implements IDeployFacade {
                 plugin.id,
             );
         }
-        const projectId = await this.resolveProjectId(plugin, token, directory, options);
+        const projectId = await this.resolveProjectId(plugin, token, work, options);
         const teamScope = await this.getTeamScope(plugin.id, options);
         const result = await plugin.verifyDomain(projectId, domain, token, teamScope);
 
         // Update DB with verification result
-        await this.domainRepository.updateVerified(options.directoryId, domain, result.verified);
+        await this.domainRepository.updateVerified(options.workId, domain, result.verified);
 
         // Only promote to primary URL if current website is auto-assigned or unset
         if (result.verified) {
-            const isAutoAssigned = !directory.website || directory.website.endsWith('.vercel.app');
+            const isAutoAssigned = !work.website || work.website.endsWith('.vercel.app');
             if (isAutoAssigned) {
-                await this.directoryRepository.update(directory.id, {
+                await this.workRepository.update(work.id, {
                     website: `https://${result.name}`,
                 });
             }
@@ -473,24 +591,21 @@ export class DeployFacadeService implements IDeployFacade {
         plugin: IDeploymentPlugin;
         token: string;
     }> {
-        const { plugin, token } = await this.resolvePluginAndTokenWithDirectory(options);
+        const { plugin, token } = await this.resolvePluginAndTokenWithWork(options);
         return { plugin, token };
     }
 
-    private async resolvePluginAndTokenWithDirectory(options: DeployFacadeOptions): Promise<{
+    private async resolvePluginAndTokenWithWork(options: DeployFacadeOptions): Promise<{
         plugin: IDeploymentPlugin;
         token: string;
-        directory: Directory;
+        work: Work;
     }> {
-        const directory = await this.directoryRepository.findById(options.directoryId);
-        if (!directory) {
-            throw new DeployFacadeError(
-                `Directory not found: ${options.directoryId}`,
-                'resolvePlugin',
-            );
+        const work = await this.workRepository.findById(options.workId);
+        if (!work) {
+            throw new DeployFacadeError(`Work not found: ${options.workId}`, 'resolvePlugin');
         }
 
-        const providerId = directory.deployProvider;
+        const providerId = work.deployProvider;
         if (!providerId) {
             throw new NoDeployProviderError();
         }
@@ -505,11 +620,7 @@ export class DeployFacadeService implements IDeployFacade {
         }
 
         // Get token from plugin settings (user-required mode)
-        const token = await this.getTokenFromSettings(
-            providerId,
-            options.userId,
-            options.directoryId,
-        );
+        const token = await this.getTokenFromSettings(providerId, options.userId, options.workId);
 
         if (!token) {
             const providerName =
@@ -520,35 +631,35 @@ export class DeployFacadeService implements IDeployFacade {
         return {
             plugin: registered.plugin as IDeploymentPlugin,
             token,
-            directory,
+            work,
         };
     }
 
     /**
-     * Resolve the deployment projectId for a directory.
+     * Resolve the deployment projectId for a work.
      * Uses the cached deployProjectId when available to avoid redundant API calls.
      */
     private async resolveProjectId(
         plugin: IDeploymentPlugin,
         token: string,
-        directory: Directory,
+        work: Work,
         options: DeployFacadeOptions,
     ): Promise<string> {
         // Use cached value if available
-        if (directory.deployProjectId) {
-            return directory.deployProjectId;
+        if (work.deployProjectId) {
+            return work.deployProjectId;
         }
 
         const teamScope = await this.getTeamScope(plugin.id, options);
         if (plugin.lookupExistingDeployment) {
             const result = await plugin.lookupExistingDeployment(
-                directory.getWebsiteRepo(),
+                work.getWebsiteRepo(),
                 token,
                 teamScope,
             );
             if (result.found && result.projectId) {
                 // Cache the projectId for future calls
-                await this.directoryRepository.update(directory.id, {
+                await this.workRepository.update(work.id, {
                     deployProjectId: result.projectId,
                 });
                 return result.projectId;
@@ -570,7 +681,7 @@ export class DeployFacadeService implements IDeployFacade {
     ): Promise<string | undefined> {
         const settings = await this.settingsService.getSettings(pluginId, {
             userId: options.userId,
-            directoryId: options.directoryId,
+            workId: options.workId,
             includeSecrets: false,
         });
         return settings.defaultTeamScope as string | undefined;
@@ -583,12 +694,12 @@ export class DeployFacadeService implements IDeployFacade {
     private async getTokenFromSettings(
         pluginId: string,
         userId: string,
-        directoryId?: string,
+        workId?: string,
     ): Promise<string | null> {
         try {
             const settings = await this.settingsService.getResolvedSettings(pluginId, {
                 userId,
-                directoryId,
+                workId,
                 includeSecrets: true,
             });
 

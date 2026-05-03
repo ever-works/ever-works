@@ -1,6 +1,6 @@
 /**
  * Account transfer types for import/export and GitHub sync.
- * Supports versioned JSON export (v1) with full directory data including
+ * Supports versioned JSON export (v1) with full work data including
  * items, comparisons, site config, schedules, and advanced prompts.
  */
 
@@ -12,7 +12,7 @@ export interface ExportedProfile {
     avatar?: string;
 }
 
-export interface ExportedDirectoryMember {
+export interface ExportedWorkMember {
     userId: string;
     role: string;
 }
@@ -24,16 +24,18 @@ export interface ExportedCustomDomain {
     provider?: string;
 }
 
-export interface ExportedDirectoryPlugin {
+export interface ExportedWorkPlugin {
     pluginId: string;
     enabled: boolean;
+    /** Legacy export shape accepted for backwards-compatible imports. */
     activeCapability?: string;
+    activeCapabilities?: string[];
     settings: Record<string, unknown>;
     secretSettings?: Record<string, unknown>;
     priority: number;
 }
 
-export interface ExportedDirectoryItem {
+export interface ExportedWorkItem {
     name: string;
     description: string;
     featured?: boolean;
@@ -50,7 +52,7 @@ export interface ExportedDirectoryItem {
     images?: readonly string[];
 }
 
-export interface ExportedDirectoryCategory {
+export interface ExportedWorkCategory {
     id: string;
     name: string;
     description?: string;
@@ -58,12 +60,12 @@ export interface ExportedDirectoryCategory {
     priority?: number;
 }
 
-export interface ExportedDirectoryTag {
+export interface ExportedWorkTag {
     id: string;
     name: string;
 }
 
-export interface ExportedDirectoryCollection {
+export interface ExportedWorkCollection {
     id: string;
     name: string;
     description?: string;
@@ -126,7 +128,7 @@ export interface ExportedMarkdownTemplate {
     footer: string;
 }
 
-export interface ExportedDirectory {
+export interface ExportedWork {
     name: string;
     slug: string;
     description: string;
@@ -141,24 +143,24 @@ export interface ExportedDirectory {
     communityPrEnabled: boolean;
     communityPrAutoClose: boolean;
     comparisonsEnabled: boolean;
-    members: ExportedDirectoryMember[];
+    members: ExportedWorkMember[];
     customDomains: ExportedCustomDomain[];
-    directoryPlugins: ExportedDirectoryPlugin[];
+    workPlugins: ExportedWorkPlugin[];
     advancedPrompts?: ExportedAdvancedPrompts;
     schedule?: ExportedSchedule;
     siteConfig?: Record<string, any>;
     markdownTemplate?: ExportedMarkdownTemplate;
-    items?: ExportedDirectoryItem[];
-    categories?: ExportedDirectoryCategory[];
-    tags?: ExportedDirectoryTag[];
-    collections?: ExportedDirectoryCollection[];
+    items?: ExportedWorkItem[];
+    categories?: ExportedWorkCategory[];
+    tags?: ExportedWorkTag[];
+    collections?: ExportedWorkCollection[];
     comparisons?: ExportedComparison[];
 }
 
 export interface ExportedUserPlugin {
     pluginId: string;
     enabled: boolean;
-    autoEnableForDirectories: boolean;
+    autoEnableForWorks: boolean;
     settings: Record<string, unknown>;
     secretSettings?: Record<string, unknown>;
 }
@@ -169,7 +171,7 @@ export interface AccountExportPayload {
     includesSecrets: boolean;
     data: {
         profile: ExportedProfile;
-        directories: ExportedDirectory[];
+        works: ExportedWork[];
         userPlugins: ExportedUserPlugin[];
     };
 }
@@ -191,7 +193,7 @@ export interface ImportPreview {
     includesSecrets: boolean;
     hasMaskedSecrets: boolean;
     profile: ExportedProfile;
-    directoryCount: number;
+    workCount: number;
     totalItemCount: number;
     userPluginCount: number;
     conflicts: ImportConflict[];
@@ -206,9 +208,9 @@ export interface ConflictResolution {
 
 export interface ImportResult {
     success: boolean;
-    directoriesCreated: number;
-    directoriesUpdated: number;
-    directoriesSkipped: number;
+    worksCreated: number;
+    worksUpdated: number;
+    worksSkipped: number;
     userPluginsImported: number;
     errors: string[];
     warnings: string[];

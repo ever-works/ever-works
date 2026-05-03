@@ -15,32 +15,32 @@ The platform registers 15 entities across core domain, authentication, billing, 
 
 ```typescript
 export const ENTITIES = [
-	Directory,
-	DirectoryAdvancedPrompts,
-	DirectoryMember,
+	Work,
+	WorkAdvancedPrompts,
+	WorkMember,
 	User,
 	RefreshToken,
 	OAuthToken,
 	CacheEntry,
-	DirectoryGenerationHistory,
+	WorkGenerationHistory,
 	SubscriptionPlan,
 	UserSubscription,
-	DirectorySchedule,
+	WorkSchedule,
 	UsageLedgerEntry,
 	Notification,
 	PluginEntity,
 	UserPluginEntity,
-	DirectoryPluginEntity
+	WorkPluginEntity
 ];
 ```
 
 ## Core Entities
 
-### Directory
+### Work
 
-**Table**: `directories` | **Primary Key**: UUID
+**Table**: `works` | **Primary Key**: UUID
 
-The central domain entity representing a directory project. Contains 40+ columns spanning generation state, deployment, scheduling, community PRs, comparisons, and website template tracking.
+The central domain entity representing a work project. Contains 40+ columns spanning generation state, deployment, scheduling, community PRs, comparisons, and website template tracking.
 
 | Column Group         | Key Fields                                                                                                     | Notes                           |
 | -------------------- | -------------------------------------------------------------------------------------------------------------- | ------------------------------- |
@@ -57,10 +57,10 @@ The central domain entity representing a directory project. Contains 40+ columns
 **Relations**:
 
 ```
-Directory --> User           (ManyToOne, eager, CASCADE delete)
-Directory --> GenerationHistory  (OneToMany)
-Directory --> DirectorySchedule  (OneToOne)
-Directory --> DirectoryMember    (OneToMany)
+Work --> User           (ManyToOne, eager, CASCADE delete)
+Work --> GenerationHistory  (OneToMany)
+Work --> WorkSchedule  (OneToOne)
+Work --> WorkMember    (OneToMany)
 ```
 
 **Helper Methods**:
@@ -71,7 +71,7 @@ Directory --> DirectoryMember    (OneToMany)
 - `getRepoOwner()` -- Returns owner or user's username
 - `isCreator(userId)` -- Checks if user is the original creator
 - `hasAccess(userId)` -- Checks creator or member status
-- `getUserRole(userId)` -- Returns the user's role in this directory
+- `getUserRole(userId)` -- Returns the user's role in this work
 
 ### User
 
@@ -93,13 +93,13 @@ Directory --> DirectoryMember    (OneToMany)
 
 All `OneToMany` relations on User use `lazy: true` (return Promises) to avoid loading large collections eagerly.
 
-### DirectoryGenerationHistory
+### WorkGenerationHistory
 
-**Table**: `directory_generation_history` | **Primary Key**: UUID
+**Table**: `work_generation_history` | **Primary Key**: UUID
 
 Tracks every generation run with metrics, timing, and error state.
 
-**Indexes**: `[directoryId, status]`, `[triggeredBy]`, `[scheduleId]`
+**Indexes**: `[workId, status]`, `[triggeredBy]`, `[scheduleId]`
 
 | Column                                                  | Type                            | Purpose                                     |
 | ------------------------------------------------------- | ------------------------------- | ------------------------------------------- |
@@ -112,20 +112,20 @@ Tracks every generation run with metrics, timing, and error state.
 | `startedAt`, `finishedAt`, `durationInSeconds`          | timestamp/int                   | Timing                                      |
 | `errorMessage`                                          | `text`                          | Error details if failed                     |
 
-### DirectoryMember
+### WorkMember
 
-**Table**: `directory_members` | **Primary Key**: UUID
+**Table**: `work_members` | **Primary Key**: UUID
 
-Implements role-based access control for directory collaboration.
+Implements role-based access control for work collaboration.
 
-**Unique Constraint**: `[directoryId, userId]` -- A user can only have one membership per directory.
+**Unique Constraint**: `[workId, userId]` -- A user can only have one membership per work.
 
-| Role      | Level | Capabilities                                              |
-| --------- | ----- | --------------------------------------------------------- |
-| `OWNER`   | 4     | Reserved for directory creator (implicit, not assignable) |
-| `MANAGER` | 3     | Edit content, manage members                              |
-| `EDITOR`  | 2     | Edit content only                                         |
-| `VIEWER`  | 1     | Read-only access                                          |
+| Role      | Level | Capabilities                                         |
+| --------- | ----- | ---------------------------------------------------- |
+| `OWNER`   | 4     | Reserved for work creator (implicit, not assignable) |
+| `MANAGER` | 3     | Edit content, manage members                         |
+| `EDITOR`  | 2     | Edit content only                                    |
+| `VIEWER`  | 1     | Read-only access                                     |
 
 Helper methods: `hasRoleOrHigher(role)`, `canManageMembers()`, `canEdit()`.
 
@@ -173,7 +173,7 @@ Defines available subscription tiers with pricing and feature limits.
 | -------------------- | ---------------------- | ------------------------------------- |
 | `code`               | `SubscriptionPlanCode` | `free`, `standard`, `premium`         |
 | `displayName`        | `string`               | Human-readable name                   |
-| `maxDirectories`     | `int`                  | Directory limit for the plan          |
+| `maxWorks`           | `int`                  | Work limit for the plan               |
 | `allowedCadences`    | `simple-json`          | Array of allowed schedule frequencies |
 | `monthlyPrice`       | `decimal(10,2)`        | Plan price                            |
 | `overagePricePerRun` | `decimal(10,2)`        | Cost per extra generation run         |
@@ -199,47 +199,47 @@ Defines available subscription tiers with pricing and feature limits.
 
 **Table**: `usage_ledger_entries`
 
-**Indexes**: `[userId, status]`, `[directoryId]`, `[createdAt]`, `[scheduleId]`
+**Indexes**: `[userId, status]`, `[workId]`, `[createdAt]`, `[scheduleId]`
 
 Tracks individual generation runs for usage-based billing.
 
-| Column                | Type                           | Purpose                                                |
-| --------------------- | ------------------------------ | ------------------------------------------------------ |
-| `triggerType`         | `UsageLedgerTriggerType`       | `manual` or `scheduled`                                |
-| `billingMode`         | `DirectoryScheduleBillingMode` | `subscription` or `usage`                              |
-| `units`               | `int`                          | Number of generation units consumed                    |
-| `amountCents`         | `int`                          | Charge in cents                                        |
-| `status`              | `UsageLedgerStatus`            | `pending`, `queued_for_settlement`, `paid`, `canceled` |
-| `generationHistoryId` | `string`                       | Links to the specific generation run                   |
+| Column                | Type                      | Purpose                                                |
+| --------------------- | ------------------------- | ------------------------------------------------------ |
+| `triggerType`         | `UsageLedgerTriggerType`  | `manual` or `scheduled`                                |
+| `billingMode`         | `WorkScheduleBillingMode` | `subscription` or `usage`                              |
+| `units`               | `int`                     | Number of generation units consumed                    |
+| `amountCents`         | `int`                     | Charge in cents                                        |
+| `status`              | `UsageLedgerStatus`       | `pending`, `queued_for_settlement`, `paid`, `canceled` |
+| `generationHistoryId` | `string`                  | Links to the specific generation run                   |
 
 ## Scheduling Entity
 
-### DirectorySchedule
+### WorkSchedule
 
-**Table**: `directory_schedules`
+**Table**: `work_schedules`
 
-**Indexes**: `[status, nextRunAt]`, `[userId, status]`, `[directoryId]` (unique)
+**Indexes**: `[status, nextRunAt]`, `[userId, status]`, `[workId]` (unique)
 
-One-to-one with Directory. Manages recurring generation runs.
+One-to-one with Work. Manages recurring generation runs.
 
-| Column                    | Type                           | Purpose                                          |
-| ------------------------- | ------------------------------ | ------------------------------------------------ |
-| `cadence`                 | `DirectoryScheduleCadence`     | Frequency (daily, weekly, monthly, etc.)         |
-| `status`                  | `DirectoryScheduleStatus`      | `disabled`, `active`, `paused`                   |
-| `billingMode`             | `DirectoryScheduleBillingMode` | `subscription` or `usage`                        |
-| `nextRunAt`, `lastRunAt`  | `Date`                         | Schedule timing                                  |
-| `failureCount`            | `int`                          | Consecutive failures                             |
-| `maxFailureBeforePause`   | `int`                          | Default: 3, auto-pauses after this many failures |
-| `alwaysCreatePullRequest` | `boolean`                      | Force PR mode for scheduled runs                 |
-| `providerOverrides`       | `simple-json`                  | Override AI/search providers per schedule        |
+| Column                    | Type                      | Purpose                                          |
+| ------------------------- | ------------------------- | ------------------------------------------------ |
+| `cadence`                 | `WorkScheduleCadence`     | Frequency (daily, weekly, monthly, etc.)         |
+| `status`                  | `WorkScheduleStatus`      | `disabled`, `active`, `paused`                   |
+| `billingMode`             | `WorkScheduleBillingMode` | `subscription` or `usage`                        |
+| `nextRunAt`, `lastRunAt`  | `Date`                    | Schedule timing                                  |
+| `failureCount`            | `int`                     | Consecutive failures                             |
+| `maxFailureBeforePause`   | `int`                     | Default: 3, auto-pauses after this many failures |
+| `alwaysCreatePullRequest` | `boolean`                 | Force PR mode for scheduled runs                 |
+| `providerOverrides`       | `simple-json`             | Override AI/search providers per schedule        |
 
 ## Support Entities
 
-### DirectoryAdvancedPrompts
+### WorkAdvancedPrompts
 
-**Table**: `directory_advanced_prompts`
+**Table**: `work_advanced_prompts`
 
-One-to-one with Directory. Stores per-directory custom prompt overrides for each pipeline stage.
+One-to-one with Work. Stores per-work custom prompt overrides for each pipeline stage.
 
 | Field                 | Pipeline Stage                  |
 | --------------------- | ------------------------------- |
@@ -295,7 +295,7 @@ enum GenerateStatusType {
 	IDLE
 }
 
-enum DirectoryMemberRole {
+enum WorkMemberRole {
 	OWNER = 'owner', // Reserved for creator
 	MANAGER = 'manager', // Assignable
 	EDITOR = 'editor', // Assignable

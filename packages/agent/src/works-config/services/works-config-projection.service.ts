@@ -1,68 +1,67 @@
 import { Injectable, Optional } from '@nestjs/common';
 import type { ProvidersDto } from '@ever-works/contracts/api';
 import { getUIKeyFromCapability } from '@ever-works/plugin';
-import { DirectoryScheduleRepository } from '@src/database/repositories/directory-schedule.repository';
-import { DirectoryPluginRepository } from '@src/plugins/repositories/directory-plugin.repository';
-import { Directory } from '@src/entities/directory.entity';
+import { WorkScheduleRepository } from '@src/database/repositories/work-schedule.repository';
+import { WorkPluginRepository } from '@src/plugins/repositories/work-plugin.repository';
+import { getActiveCapabilities } from '@src/plugins/utils/active-capabilities.util';
+import { Work } from '@src/entities/work.entity';
 import type { WorksConfigWriteRequest } from './works-config-writer.service';
 
 @Injectable()
 export class WorksConfigProjectionService {
     constructor(
-        private readonly scheduleRepository: DirectoryScheduleRepository,
+        private readonly scheduleRepository: WorkScheduleRepository,
         @Optional()
-        private readonly directoryPluginRepository?: DirectoryPluginRepository,
+        private readonly workPluginRepository?: WorkPluginRepository,
     ) {}
 
-    async buildWriteRequest(directory: Directory): Promise<WorksConfigWriteRequest> {
+    async buildWriteRequest(work: Work): Promise<WorksConfigWriteRequest> {
         const [scheduleProviders, activeProviders, pipelineModel] = await Promise.all([
-            this.getScheduleProviderOverrides(directory.id),
-            this.getActiveCapabilityProviders(directory.id),
-            this.getPipelineModel(directory.id),
+            this.getScheduleProviderOverrides(work.id),
+            this.getActiveCapabilityProviders(work.id),
+            this.getPipelineModel(work.id),
         ]);
 
         return {
-            name: directory.name,
+            name: work.name,
             model: pipelineModel ?? null,
             providers: this.mergeProviders(activeProviders, scheduleProviders) ?? null,
         };
     }
 
-    private async getScheduleProviderOverrides(
-        directoryId: string,
-    ): Promise<ProvidersDto | undefined> {
-        const schedule = await this.scheduleRepository.findByDirectoryId(directoryId);
+    private async getScheduleProviderOverrides(workId: string): Promise<ProvidersDto | undefined> {
+        const schedule = await this.scheduleRepository.findByWorkId(workId);
         const providers = schedule?.providerOverrides ?? undefined;
 
         return this.hasProviders(providers) ? providers : undefined;
     }
 
-    private async getActiveCapabilityProviders(
-        directoryId: string,
-    ): Promise<ProvidersDto | undefined> {
-        if (!this.directoryPluginRepository) {
+    private async getActiveCapabilityProviders(workId: string): Promise<ProvidersDto | undefined> {
+        if (!this.workPluginRepository) {
             return undefined;
         }
 
-        const directoryPlugins =
-            await this.directoryPluginRepository.findEnabledByDirectory(directoryId);
+        const workPlugins = await this.workPluginRepository.findEnabledByWork(workId);
         const providers: ProvidersDto = {};
 
-        for (const plugin of directoryPlugins) {
-            const providerKey = this.getProviderKey(plugin.activeCapability);
-            if (!providerKey || this.isSupplementaryPlugin(plugin.pluginEntity?.manifest)) {
+        for (const plugin of workPlugins) {
+            if (this.isSupplementaryPlugin(plugin.pluginEntity?.manifest)) {
                 continue;
             }
 
-            providers[providerKey] = plugin.pluginId;
+            for (const capability of getActiveCapabilities(plugin)) {
+                const providerKey = this.getProviderKey(capability);
+                if (!providerKey) continue;
+                providers[providerKey] = plugin.pluginId;
+            }
         }
 
         return this.hasProviders(providers) ? providers : undefined;
     }
 
-    private async getPipelineModel(directoryId: string): Promise<string | undefined> {
-        const pipelinePlugin = await this.directoryPluginRepository?.findActiveByCapability(
-            directoryId,
+    private async getPipelineModel(workId: string): Promise<string | undefined> {
+        const pipelinePlugin = await this.workPluginRepository?.findActiveByCapability(
+            workId,
             'pipeline',
         );
 

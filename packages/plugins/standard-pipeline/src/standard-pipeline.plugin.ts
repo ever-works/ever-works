@@ -18,7 +18,7 @@ import type {
 	StepExecutionContext,
 	FormFieldDefinition,
 	FormFieldGroup,
-	DirectoryReference,
+	WorkReference,
 	GenerationRequest,
 	ExistingItems,
 	IFormSchemaProvider
@@ -323,7 +323,7 @@ export class StandardPipelinePlugin implements IPipelinePlugin<BuiltInStepId>, I
 	}
 
 	async execute(
-		_directory: DirectoryReference,
+		_work: WorkReference,
 		_request: GenerationRequest,
 		_existing: ExistingItems,
 		_options?: PipelineExecutionOptions,
@@ -372,12 +372,8 @@ export class StandardPipelinePlugin implements IPipelinePlugin<BuiltInStepId>, I
 
 	// --- Context lifecycle hooks ---
 
-	createContext(
-		directory: DirectoryReference,
-		request: GenerationRequest,
-		existing: ExistingItems
-	): IPipelineContext {
-		return new TypedGenerationContext(directory, request, existing);
+	createContext(work: WorkReference, request: GenerationRequest, existing: ExistingItems): IPipelineContext {
+		return new TypedGenerationContext(work, request, existing);
 	}
 
 	contextToSnapshot(context: IPipelineContext): unknown {
@@ -479,7 +475,7 @@ export class StandardPipelinePlugin implements IPipelinePlugin<BuiltInStepId>, I
 				name: 'initial_categories',
 				type: 'tags',
 				label: 'Initial Categories',
-				description: 'Suggested categories for the directory',
+				description: 'Suggested categories for the work',
 				group: 'categories'
 			},
 			{
@@ -855,7 +851,7 @@ export class StandardPipelinePlugin implements IPipelinePlugin<BuiltInStepId>, I
 			readme: [
 				'## What is the Standard Pipeline?',
 				'',
-				'The default engine-orchestrated generation pipeline. It runs 15 sequential steps that combine AI generation, web search, content extraction, and post-processing to build a complete directory from a single prompt.',
+				'The default engine-orchestrated generation pipeline. It runs 15 sequential steps that combine AI generation, web search, content extraction, and post-processing to build a complete work from a single prompt.',
 				'',
 				'## How it works',
 				'',

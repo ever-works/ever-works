@@ -7,15 +7,15 @@ sidebar_position: 2
 
 # Platform Overview
 
-The Ever Works Platform provides the backend infrastructure for building, generating, and deploying AI-powered directory websites.
+The Ever Works Platform provides the backend infrastructure for building, generating, and deploying AI-powered work websites.
 
 ## How It Works
 
-1. **Create a Directory** — A user creates a directory project through the web dashboard or API, providing a topic and description.
-2. **AI Generation Pipeline** — The platform's AI agents generate directory items by researching the web, extracting relevant listings, validating sources, and organizing content into categories.
+1. **Create a Work** — A user creates a work project through the web dashboard or API, providing a topic and description.
+2. **AI Generation Pipeline** — The platform's AI agents generate work items by researching the web, extracting relevant listings, validating sources, and organizing content into categories.
 3. **Repository Management** — Generated content is committed to GitHub repositories (a data repo and a website repo) that the user owns.
-4. **Website Deployment** — The website repository is deployed to Vercel, producing a live directory website.
-5. **Ongoing Updates** — Directories can be regenerated, updated on a schedule, or enriched through AI conversations.
+4. **Website Deployment** — The website repository is deployed to Vercel, producing a live work website.
+5. **Ongoing Updates** — Works can be regenerated, updated on a schedule, or enriched through AI conversations.
 
 ## Technology Stack
 
@@ -38,7 +38,7 @@ The Ever Works Platform provides the backend infrastructure for building, genera
 | Repository                    | Description                                                             |
 | ----------------------------- | ----------------------------------------------------------------------- |
 | `ever-works`                  | Platform monorepo — API, web dashboard, CLI, AI agents, shared packages |
-| `ever-works-website-template` | Next.js template used by generated directory websites                   |
+| `ever-works-website-template` | Next.js template used by generated work websites                        |
 | `ever-works-docs`             | This documentation site                                                 |
 
 ## AI Providers

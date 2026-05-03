@@ -63,7 +63,7 @@ app.listen(PORT, () => {
 
 ## Reference Guides
 
-Detailed implementations in the `references/` directory:
+Detailed implementations in the `references/` work:
 
 | Guide                                                                                                            | Contents                                         |
 | ---------------------------------------------------------------------------------------------------------------- | ------------------------------------------------ |

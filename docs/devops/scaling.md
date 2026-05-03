@@ -20,7 +20,7 @@ kubectl scale deployment/ever-works-api --replicas=3
 kubectl scale deployment/ever-works-web --replicas=3
 ```
 
-The stateless architecture of both applications enables horizontal scaling without code changes. The API stores all persistent state in the database, and Git operations use per-request temporary directories.
+The stateless architecture of both applications enables horizontal scaling without code changes. The API stores all persistent state in the database, and Git operations use per-request temporary works.
 
 ### Trigger.dev Worker Scaling
 
@@ -109,9 +109,9 @@ This is used for caching API responses, computed results, and configuration data
 Cloned repositories are cached on the local filesystem to avoid re-cloning on every operation:
 
 - **API Docker volume**: `/tmp/ever-works-repos` -- persists across container restarts.
-- **Clone-or-pull strategy**: The Git facade first attempts a `pull` on an existing clone, falling back to a fresh `clone` if the directory does not exist.
+- **Clone-or-pull strategy**: The Git facade first attempts a `pull` on an existing clone, falling back to a fresh `clone` if the work does not exist.
 
-This significantly reduces I/O for frequent operations on the same directory's repositories.
+This significantly reduces I/O for frequent operations on the same work's repositories.
 
 ## Concurrency Controls
 
@@ -128,13 +128,13 @@ await pMap(items, (item) => dataRepo.writeItem(item), {
 
 ### Branch Synchronization
 
-Website template branch syncing runs sequentially (concurrency = 1) because the clone-or-pull mechanism uses a deterministic directory path based on `owner+repo`:
+Website template branch syncing runs sequentially (concurrency = 1) because the clone-or-pull mechanism uses a deterministic work path based on `owner+repo`:
 
 ```typescript
 private readonly MAX_CONCURRENT_SYNCS = 1;
 ```
 
-Parallel syncs to the same template repository would corrupt the local working directory.
+Parallel syncs to the same template repository would corrupt the local working work.
 
 ### Rate Limiting
 
@@ -216,10 +216,10 @@ Generation tasks call external AI APIs (OpenAI, Anthropic, etc.) which have thei
 
 Key indexes are defined on entities to optimize common queries:
 
-| Entity                       | Index                   | Query Pattern                   |
-| ---------------------------- | ----------------------- | ------------------------------- |
-| `DirectoryGenerationHistory` | `[directoryId, status]` | History by directory and status |
-| `DirectorySchedule`          | `[status, nextRunAt]`   | Finding due schedules           |
-| `UserSubscription`           | `[userId, status]`      | Active subscription lookup      |
-| `Notification`               | `[userId, isRead]`      | Unread notification count       |
-| `UsageLedgerEntry`           | `[userId, status]`      | Billing aggregation             |
+| Entity                  | Index                 | Query Pattern              |
+| ----------------------- | --------------------- | -------------------------- |
+| `WorkGenerationHistory` | `[workId, status]`    | History by work and status |
+| `WorkSchedule`          | `[status, nextRunAt]` | Finding due schedules      |
+| `UserSubscription`      | `[userId, status]`    | Active subscription lookup |
+| `Notification`          | `[userId, isRead]`    | Unread notification count  |
+| `UsageLedgerEntry`      | `[userId, status]`    | Billing aggregation        |

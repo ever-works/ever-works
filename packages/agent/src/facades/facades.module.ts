@@ -32,12 +32,12 @@ const FACADES = [
  *
  * Resolution priority:
  * 1. Provider override (explicit request)
- * 2. Directory default provider
+ * 2. Work default provider
  * 3. User default provider
  * 4. First enabled provider
  *
  * Settings are resolved using the 4-level hierarchy:
- * 1. Directory settings
+ * 1. Work settings
  * 2. User settings
  * 3. Admin settings
  * 4. Plugin defaults

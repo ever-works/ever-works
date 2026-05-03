@@ -7,16 +7,16 @@ import { SearchFacadeService } from '../facades/search.facade';
 import { ContentExtractorFacadeService } from '../facades/content-extractor.facade';
 import { GitFacadeService, type GitFacadeOptions } from '../facades/git.facade';
 import { PromptFacadeService } from '../facades/prompt.facade';
-import { DirectoryRepository } from '../database/repositories/directory.repository';
-import { DirectoryGenerationHistoryRepository } from '../database/repositories/directory-generation-history.repository';
-import { DirectoryPluginRepository } from '../plugins/repositories/directory-plugin.repository';
+import { WorkRepository } from '../database/repositories/work.repository';
+import { WorkGenerationHistoryRepository } from '../database/repositories/work-generation-history.repository';
+import { WorkPluginRepository } from '../plugins/repositories/work-plugin.repository';
 import { CacheEntry } from '../entities/cache.entity';
-import type { Directory } from '../entities/directory.entity';
+import type { Work } from '../entities/work.entity';
 import type { ComparisonData } from '@ever-works/contracts';
 import type { FacadeOptions } from '@ever-works/plugin';
 import { DataRepository, type IDataConfig } from '../generators/data-generator/data-repository';
 import { CACHE_MANAGER, type Cache } from '../cache';
-import { DirectoryScheduleCadence, GenerateStatusType } from '../entities/types';
+import { WorkScheduleCadence, GenerateStatusType } from '../entities/types';
 import {
     DEFAULT_COMPARISON_SETTINGS,
     selectNextPair,
@@ -33,11 +33,8 @@ import {
     type ComparisonProgressInfo,
     type ComparisonProgressCallback,
 } from './comparison';
-import {
-    DirectoryHistoryActivityType,
-    type DirectoryHistoryChangeEntry,
-} from '@ever-works/contracts/api';
-import { buildDirectoryChangelog } from '../utils/directory-changelog.utils';
+import { WorkHistoryActivityType, type WorkHistoryChangeEntry } from '@ever-works/contracts/api';
+import { buildWorkChangelog } from '../utils/work-changelog.utils';
 import { normalizeGeneratorError } from '../services/utils/error.utils';
 
 const comparisonStructureSchema = z.object({
@@ -74,9 +71,9 @@ export class ComparisonGenerationService {
         private readonly contentExtractorFacade: ContentExtractorFacadeService,
         private readonly gitFacade: GitFacadeService,
         private readonly promptFacade: PromptFacadeService,
-        private readonly directoryRepository: DirectoryRepository,
-        private readonly generationHistoryRepository: DirectoryGenerationHistoryRepository,
-        private readonly directoryPluginRepository: DirectoryPluginRepository,
+        private readonly workRepository: WorkRepository,
+        private readonly generationHistoryRepository: WorkGenerationHistoryRepository,
+        private readonly workPluginRepository: WorkPluginRepository,
         @Optional() @Inject(CACHE_MANAGER) private readonly cacheManager?: Cache,
         @Optional()
         @InjectRepository(CacheEntry)
@@ -86,16 +83,16 @@ export class ComparisonGenerationService {
     private static readonly PROGRESS_CACHE_TTL = 120_000; // 2 minutes
     private static readonly GENERATION_LOCK_TTL = 2 * 60 * 60 * 1000; // 2 hours
 
-    private progressCacheKey(directoryId: string): string {
-        return `comparison-progress-${directoryId}`;
+    private progressCacheKey(workId: string): string {
+        return `comparison-progress-${workId}`;
     }
 
-    private generationLockKey(directoryId: string): string {
-        return `comparison-generation-lock:${directoryId}`;
+    private generationLockKey(workId: string): string {
+        return `comparison-generation-lock:${workId}`;
     }
 
     private async setProgress(
-        directoryId: string,
+        workId: string,
         stage: ComparisonProgressStage,
         itemAName: string,
         itemBName: string,
@@ -104,39 +101,39 @@ export class ComparisonGenerationService {
         if (!this.cacheManager) return;
         const info: ComparisonProgressInfo = { stage, itemAName, itemBName, startedAt };
         await this.cacheManager.set(
-            this.progressCacheKey(directoryId),
+            this.progressCacheKey(workId),
             info,
             ComparisonGenerationService.PROGRESS_CACHE_TTL,
         );
     }
 
-    private async clearProgress(directoryId: string): Promise<void> {
+    private async clearProgress(workId: string): Promise<void> {
         if (!this.cacheManager) return;
-        await this.cacheManager.del(this.progressCacheKey(directoryId));
+        await this.cacheManager.del(this.progressCacheKey(workId));
     }
 
     async getGenerationStatus(
-        directoryId: string,
+        workId: string,
     ): Promise<{ generating: boolean } & Partial<ComparisonProgressInfo>> {
         if (!this.cacheManager) return { generating: false };
         const info = await this.cacheManager.get<ComparisonProgressInfo>(
-            this.progressCacheKey(directoryId),
+            this.progressCacheKey(workId),
         );
         if (!info) return { generating: false };
         return { generating: true, ...info };
     }
 
     private async recordComparisonHistory(params: {
-        directoryId: string;
+        workId: string;
         userId: string;
-        activityType: DirectoryHistoryActivityType;
-        entries: DirectoryHistoryChangeEntry[];
+        activityType: WorkHistoryActivityType;
+        entries: WorkHistoryChangeEntry[];
         summary: string;
     }): Promise<void> {
         const now = new Date();
 
         await this.generationHistoryRepository.createEntry({
-            directoryId: params.directoryId,
+            workId: params.workId,
             userId: params.userId,
             status: GenerateStatusType.GENERATED,
             startedAt: now,
@@ -144,21 +141,21 @@ export class ComparisonGenerationService {
             durationInSeconds: 0,
             triggeredBy: 'user',
             activityType: params.activityType,
-            changelog: buildDirectoryChangelog(params.entries, params.summary),
+            changelog: buildWorkChangelog(params.entries, params.summary),
         });
     }
 
-    private async findDirectoryOrFail(directoryId: string): Promise<Directory> {
-        const directory = await this.directoryRepository.findById(directoryId);
-        if (!directory) {
-            throw new NotFoundException(`Directory not found: ${directoryId}`);
+    private async findWorkOrFail(workId: string): Promise<Work> {
+        const work = await this.workRepository.findById(workId);
+        if (!work) {
+            throw new NotFoundException(`Work not found: ${workId}`);
         }
-        return directory;
+        return work;
     }
 
-    private async getComparisonPluginSettings(directoryId: string) {
-        const dirPlugin = await this.directoryPluginRepository.findByDirectoryAndPlugin(
-            directoryId,
+    private async getComparisonPluginSettings(workId: string) {
+        const dirPlugin = await this.workPluginRepository.findByWorkAndPlugin(
+            workId,
             'comparison-generator',
         );
         const settings = dirPlugin?.settings ?? {};
@@ -182,53 +179,50 @@ export class ComparisonGenerationService {
     }
 
     private resolveComparisonCadence(
-        directory: Directory,
+        work: Work,
         cadenceOverride: string,
-    ): DirectoryScheduleCadence | null {
+    ): WorkScheduleCadence | null {
         switch (cadenceOverride) {
             case 'daily':
-                return DirectoryScheduleCadence.DAILY;
+                return WorkScheduleCadence.DAILY;
             case 'weekly':
-                return DirectoryScheduleCadence.WEEKLY;
+                return WorkScheduleCadence.WEEKLY;
             case 'monthly':
-                return DirectoryScheduleCadence.MONTHLY;
-            case 'use_directory':
-                return directory.scheduledCadence ?? null;
+                return WorkScheduleCadence.MONTHLY;
+            case 'use_work':
+                return work.scheduledCadence ?? null;
             default:
                 return null;
         }
     }
 
-    private calculateNextComparisonRun(
-        cadence: DirectoryScheduleCadence,
-        fromDate = new Date(),
-    ): Date {
+    private calculateNextComparisonRun(cadence: WorkScheduleCadence, fromDate = new Date()): Date {
         const next = new Date(fromDate);
 
         switch (cadence) {
-            case DirectoryScheduleCadence.HOURLY:
+            case WorkScheduleCadence.HOURLY:
                 next.setMinutes(0, 0, 0);
                 next.setHours(next.getHours() + 1);
                 break;
-            case DirectoryScheduleCadence.EVERY_3_HOURS:
+            case WorkScheduleCadence.EVERY_3_HOURS:
                 next.setMinutes(0, 0, 0);
                 next.setHours(next.getHours() + 3);
                 break;
-            case DirectoryScheduleCadence.EVERY_8_HOURS:
+            case WorkScheduleCadence.EVERY_8_HOURS:
                 next.setMinutes(0, 0, 0);
                 next.setHours(next.getHours() + 8);
                 break;
-            case DirectoryScheduleCadence.EVERY_12_HOURS:
+            case WorkScheduleCadence.EVERY_12_HOURS:
                 next.setMinutes(0, 0, 0);
                 next.setHours(next.getHours() + 12);
                 break;
-            case DirectoryScheduleCadence.DAILY:
+            case WorkScheduleCadence.DAILY:
                 next.setDate(next.getDate() + 1);
                 break;
-            case DirectoryScheduleCadence.WEEKLY:
+            case WorkScheduleCadence.WEEKLY:
                 next.setDate(next.getDate() + 7);
                 break;
-            case DirectoryScheduleCadence.MONTHLY:
+            case WorkScheduleCadence.MONTHLY:
                 next.setMonth(next.getMonth() + 1);
                 break;
         }
@@ -237,11 +231,11 @@ export class ComparisonGenerationService {
     }
 
     private isComparisonDue(
-        directory: Directory,
+        work: Work,
         cadenceOverride: string,
         lastGeneratedAt?: string,
     ): boolean {
-        const cadence = this.resolveComparisonCadence(directory, cadenceOverride);
+        const cadence = this.resolveComparisonCadence(work, cadenceOverride);
         if (!cadence || !lastGeneratedAt) {
             return true;
         }
@@ -254,15 +248,15 @@ export class ComparisonGenerationService {
         return this.calculateNextComparisonRun(cadence, lastGeneratedDate) <= new Date();
     }
 
-    private async tryAcquireGenerationLock(directoryId: string): Promise<string | null> {
-        if (this.activeGenerationLocks.has(directoryId)) {
+    private async tryAcquireGenerationLock(workId: string): Promise<string | null> {
+        if (this.activeGenerationLocks.has(workId)) {
             return null;
         }
 
         const lockToken = `${process.pid}-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 
         if (this.cacheEntryRepository) {
-            const lockKey = this.generationLockKey(directoryId);
+            const lockKey = this.generationLockKey(workId);
             const now = Date.now();
 
             await this.cacheEntryRepository.delete({
@@ -290,15 +284,12 @@ export class ComparisonGenerationService {
             }
         }
 
-        this.activeGenerationLocks.add(directoryId);
+        this.activeGenerationLocks.add(workId);
         return lockToken;
     }
 
-    private async releaseGenerationLock(
-        directoryId: string,
-        lockToken: string | null,
-    ): Promise<void> {
-        this.activeGenerationLocks.delete(directoryId);
+    private async releaseGenerationLock(workId: string, lockToken: string | null): Promise<void> {
+        this.activeGenerationLocks.delete(workId);
 
         if (!lockToken || !this.cacheEntryRepository) {
             return;
@@ -308,15 +299,16 @@ export class ComparisonGenerationService {
             .createQueryBuilder()
             .delete()
             .from(CacheEntry)
-            .where('key = :key', { key: this.generationLockKey(directoryId) })
+            .where('key = :key', { key: this.generationLockKey(workId) })
             .andWhere('value = :value', { value: lockToken })
             .execute();
     }
 
-    private getDirectoryGitOptions(directory: Directory): GitFacadeOptions {
+    private getWorkGitOptions(work: Work): GitFacadeOptions {
         return {
-            userId: directory.userId,
-            providerId: directory.gitProvider,
+            userId: work.userId,
+            providerId: work.gitProvider,
+            workId: work.id,
         };
     }
 
@@ -379,29 +371,29 @@ export class ComparisonGenerationService {
     }
 
     /**
-     * Generate the next automatic comparison for a directory.
+     * Generate the next automatic comparison for a work.
      * Picks the best un-compared pair and generates a full comparison page.
      */
     async generateNextComparison(
-        directoryId: string,
+        workId: string,
         userId: string,
         options: { respectCadence?: boolean } = {},
     ): Promise<ComparisonResult> {
-        const directory = await this.findDirectoryOrFail(directoryId);
-        const lockToken = await this.tryAcquireGenerationLock(directoryId);
+        const work = await this.findWorkOrFail(workId);
+        const lockToken = await this.tryAcquireGenerationLock(workId);
 
         if (!lockToken) {
             return {
                 status: 'skipped',
-                message: 'Comparison generation is already in progress for this directory',
+                message: 'Comparison generation is already in progress for this work',
             };
         }
 
         try {
-            const gitOptions = this.getDirectoryGitOptions(directory);
+            const gitOptions = this.getWorkGitOptions(work);
 
             const dest = await this.gitFacade.cloneOrPull(
-                { owner: directory.getRepoOwner(), repo: directory.getDataRepo() },
+                { owner: work.getRepoOwner(), repo: work.getDataRepo() },
                 gitOptions,
             );
             const dataRepo = await DataRepository.create(dest);
@@ -413,11 +405,11 @@ export class ComparisonGenerationService {
                 total_generated: 0,
             };
 
-            const pluginSettings = await this.getComparisonPluginSettings(directoryId);
+            const pluginSettings = await this.getComparisonPluginSettings(workId);
             if (
                 options.respectCadence &&
                 !this.isComparisonDue(
-                    directory,
+                    work,
                     pluginSettings.cadence_override,
                     comparisonState.last_generated_at,
                 )
@@ -444,27 +436,27 @@ export class ComparisonGenerationService {
 
             return this.generateComparisonForPair(
                 pair,
-                directory,
+                work,
                 dataRepo,
                 config,
                 comparisonState,
                 gitOptions,
             );
         } finally {
-            await this.releaseGenerationLock(directoryId, lockToken);
+            await this.releaseGenerationLock(workId, lockToken);
         }
     }
 
     /**
      * Count how many un-generated comparison pairs remain.
      */
-    async getRemainingCount(directoryId: string, userId: string): Promise<number> {
-        const directory = await this.findDirectoryOrFail(directoryId);
+    async getRemainingCount(workId: string, userId: string): Promise<number> {
+        const work = await this.findWorkOrFail(workId);
 
-        const gitOptions = this.getDirectoryGitOptions(directory);
+        const gitOptions = this.getWorkGitOptions(work);
 
         const dest = await this.gitFacade.cloneOrPull(
-            { owner: directory.getRepoOwner(), repo: directory.getDataRepo() },
+            { owner: work.getRepoOwner(), repo: work.getDataRepo() },
             gitOptions,
         );
         const dataRepo = await DataRepository.create(dest);
@@ -476,7 +468,7 @@ export class ComparisonGenerationService {
             total_generated: 0,
         };
 
-        const pluginSettings = await this.getComparisonPluginSettings(directoryId);
+        const pluginSettings = await this.getComparisonPluginSettings(workId);
         const maxComparisons =
             pluginSettings.max_comparisons_mode === 'unlimited'
                 ? Number.MAX_SAFE_INTEGER
@@ -494,26 +486,26 @@ export class ComparisonGenerationService {
      * Generate a comparison for two specific items (manual trigger).
      */
     async generateManualComparison(
-        directoryId: string,
+        workId: string,
         userId: string,
         itemASlug: string,
         itemBSlug: string,
     ): Promise<ComparisonResult> {
-        const directory = await this.findDirectoryOrFail(directoryId);
-        const lockToken = await this.tryAcquireGenerationLock(directoryId);
+        const work = await this.findWorkOrFail(workId);
+        const lockToken = await this.tryAcquireGenerationLock(workId);
 
         if (!lockToken) {
             return {
                 status: 'skipped',
-                message: 'Comparison generation is already in progress for this directory',
+                message: 'Comparison generation is already in progress for this work',
             };
         }
 
         try {
-            const gitOptions = this.getDirectoryGitOptions(directory);
+            const gitOptions = this.getWorkGitOptions(work);
 
             const dest = await this.gitFacade.cloneOrPull(
-                { owner: directory.getRepoOwner(), repo: directory.getDataRepo() },
+                { owner: work.getRepoOwner(), repo: work.getDataRepo() },
                 gitOptions,
             );
             const dataRepo = await DataRepository.create(dest);
@@ -547,28 +539,28 @@ export class ComparisonGenerationService {
 
             return this.generateComparisonForPair(
                 pair,
-                directory,
+                work,
                 dataRepo,
                 config,
                 comparisonState,
                 gitOptions,
             );
         } finally {
-            await this.releaseGenerationLock(directoryId, lockToken);
+            await this.releaseGenerationLock(workId, lockToken);
         }
     }
 
     /**
-     * List all comparisons for a directory.
+     * List all comparisons for a work.
      */
-    async listComparisons(directoryId: string, userId: string): Promise<ComparisonData[]> {
-        const directory = await this.findDirectoryOrFail(directoryId);
+    async listComparisons(workId: string, userId: string): Promise<ComparisonData[]> {
+        const work = await this.findWorkOrFail(workId);
 
-        const gitOptions = this.getDirectoryGitOptions(directory);
+        const gitOptions = this.getWorkGitOptions(work);
 
         try {
             const dest = await this.gitFacade.cloneOrPull(
-                { owner: directory.getRepoOwner(), repo: directory.getDataRepo() },
+                { owner: work.getRepoOwner(), repo: work.getDataRepo() },
                 gitOptions,
             );
             const dataRepo = await DataRepository.create(dest);
@@ -587,7 +579,7 @@ export class ComparisonGenerationService {
      * Get a single comparison by slug.
      */
     async getComparison(
-        directoryId: string,
+        workId: string,
         userId: string,
         slug: string,
     ): Promise<{
@@ -595,13 +587,13 @@ export class ComparisonGenerationService {
         markdown?: string;
         extendedAnalysisMarkdown?: string;
     }> {
-        const directory = await this.findDirectoryOrFail(directoryId);
+        const work = await this.findWorkOrFail(workId);
 
-        const gitOptions = this.getDirectoryGitOptions(directory);
+        const gitOptions = this.getWorkGitOptions(work);
 
         try {
             const dest = await this.gitFacade.cloneOrPull(
-                { owner: directory.getRepoOwner(), repo: directory.getDataRepo() },
+                { owner: work.getRepoOwner(), repo: work.getDataRepo() },
                 gitOptions,
             );
             const dataRepo = await DataRepository.create(dest);
@@ -626,16 +618,16 @@ export class ComparisonGenerationService {
      * Delete a comparison by slug.
      */
     async deleteComparison(
-        directoryId: string,
+        workId: string,
         userId: string,
         slug: string,
     ): Promise<ComparisonResult> {
-        const directory = await this.findDirectoryOrFail(directoryId);
+        const work = await this.findWorkOrFail(workId);
 
-        const gitOptions = this.getDirectoryGitOptions(directory);
+        const gitOptions = this.getWorkGitOptions(work);
 
         const dest = await this.gitFacade.cloneOrPull(
-            { owner: directory.getRepoOwner(), repo: directory.getDataRepo() },
+            { owner: work.getRepoOwner(), repo: work.getDataRepo() },
             gitOptions,
         );
         const dataRepo = await DataRepository.create(dest);
@@ -660,18 +652,14 @@ export class ComparisonGenerationService {
         });
 
         // Commit and push
-        await this.gitFacade.add(directory.gitProvider, dest, '.');
-        await this.gitFacade.commit(
-            directory.gitProvider,
-            dest,
-            `chore: remove comparison - ${slug}`,
-        );
+        await this.gitFacade.add(work.gitProvider, dest, '.');
+        await this.gitFacade.commit(work.gitProvider, dest, `chore: remove comparison - ${slug}`);
         await this.gitFacade.push({ dir: dest }, gitOptions);
 
         await this.recordComparisonHistory({
-            directoryId,
+            workId,
             userId,
-            activityType: DirectoryHistoryActivityType.COMPARISON_REMOVED,
+            activityType: WorkHistoryActivityType.COMPARISON_REMOVED,
             entries: [
                 {
                     entityType: 'comparison',
@@ -688,7 +676,7 @@ export class ComparisonGenerationService {
 
     private async generateComparisonForPair(
         pair: ComparisonPair,
-        directory: Directory,
+        work: Work,
         dataRepo: DataRepository,
         config: IDataConfig,
         comparisonState: {
@@ -700,20 +688,16 @@ export class ComparisonGenerationService {
     ): Promise<ComparisonResult> {
         const startedAt = new Date().toISOString();
         const onProgress: ComparisonProgressCallback = (stage) => {
-            this.setProgress(
-                directory.id,
-                stage,
-                pair.itemA.name,
-                pair.itemB.name,
-                startedAt,
-            ).catch(() => {});
+            this.setProgress(work.id, stage, pair.itemA.name, pair.itemB.name, startedAt).catch(
+                () => {},
+            );
         };
 
         try {
-            const pluginSettings = await this.getComparisonPluginSettings(directory.id);
+            const pluginSettings = await this.getComparisonPluginSettings(work.id);
             const facadeOptions: FacadeOptions = {
                 userId: gitOptions.userId!,
-                directoryId: directory.id,
+                workId: work.id,
                 providerOverride: pluginSettings.ai_provider,
             };
 
@@ -782,8 +766,8 @@ export class ComparisonGenerationService {
                 research,
                 aiDeps,
                 {
-                    name: directory.name,
-                    description: directory.description,
+                    name: work.name,
+                    description: work.description,
                     customPrompt: pluginSettings.custom_prompt,
                     extendedAnalysis: pluginSettings.extended_analysis,
                 },
@@ -813,9 +797,9 @@ export class ComparisonGenerationService {
             });
 
             // 5. Commit and push
-            await this.gitFacade.add(directory.gitProvider, dataRepo.dir, '.');
+            await this.gitFacade.add(work.gitProvider, dataRepo.dir, '.');
             await this.gitFacade.commit(
-                directory.gitProvider,
+                work.gitProvider,
                 dataRepo.dir,
                 `chore: add comparison - ${pair.itemA.name} vs ${pair.itemB.name}`,
             );
@@ -824,9 +808,9 @@ export class ComparisonGenerationService {
             this.logger.log(`Comparison generated: ${result.comparison.slug}`);
 
             await this.recordComparisonHistory({
-                directoryId: directory.id,
+                workId: work.id,
                 userId: gitOptions.userId!,
-                activityType: DirectoryHistoryActivityType.COMPARISON_ADDED,
+                activityType: WorkHistoryActivityType.COMPARISON_ADDED,
                 entries: [
                     {
                         entityType: 'comparison',
@@ -844,7 +828,7 @@ export class ComparisonGenerationService {
                 message: `Generated comparison: ${pair.itemA.name} vs ${pair.itemB.name}`,
             };
         } finally {
-            await this.clearProgress(directory.id);
+            await this.clearProgress(work.id);
         }
     }
 }

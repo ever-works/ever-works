@@ -157,7 +157,7 @@ describe('DataSourceFacadeService', () => {
     });
 
     describe('queryAll', () => {
-        it('should skip plugins not enabled for directory', async () => {
+        it('should skip plugins not enabled for work', async () => {
             const apify = createMockDataSourcePlugin('apify', 'Apify');
             const registered = createRegisteredPlugin(apify, { capabilities: ['data-source'] });
             registry.getByCapability.mockReturnValue([registered]);
@@ -165,7 +165,7 @@ describe('DataSourceFacadeService', () => {
 
             const result = await service.queryAll({
                 userId: 'test-user',
-                directoryId: 'dir-123',
+                workId: 'dir-123',
                 pluginConfig: {
                     apify: { datasetId: 'abc123' },
                 },
@@ -191,7 +191,7 @@ describe('DataSourceFacadeService', () => {
 
             const result = await service.queryAll({
                 userId: 'test-user',
-                directoryId: 'dir-123',
+                workId: 'dir-123',
                 pluginConfig: {
                     apify: { datasetId: 'abc123' },
                 },
@@ -431,7 +431,7 @@ describe('DataSourceFacadeService', () => {
             expect(enabledSources).toHaveLength(0);
         });
 
-        it('should return empty array when directoryId is empty', async () => {
+        it('should return empty array when workId is empty', async () => {
             const apify = createMockDataSourcePlugin('apify', 'Apify');
             const registered = createRegisteredPlugin(apify, { capabilities: ['data-source'] });
             registry.getByCapability.mockReturnValue([registered]);
@@ -456,7 +456,7 @@ describe('DataSourceFacadeService', () => {
 
             const result = await service.queryAll({
                 userId: 'test-user',
-                directoryId: 'dir-123',
+                workId: 'dir-123',
             });
 
             expect(result.items).toHaveLength(1);
@@ -477,7 +477,7 @@ describe('DataSourceFacadeService', () => {
 
             const result = await service.queryAll({
                 userId: 'test-user',
-                directoryId: 'dir-123',
+                workId: 'dir-123',
             });
 
             expect(result.items).toHaveLength(0);
@@ -497,7 +497,7 @@ describe('DataSourceFacadeService', () => {
 
             const result = await service.queryAll({
                 userId: 'test-user',
-                directoryId: 'dir-123',
+                workId: 'dir-123',
                 pluginConfig: {
                     apify: { enabled: true },
                 },
@@ -516,7 +516,7 @@ describe('DataSourceFacadeService', () => {
 
             const result = await service.queryAll({
                 userId: 'test-user',
-                directoryId: 'dir-123',
+                workId: 'dir-123',
                 pluginConfig: {
                     apify: { enabled: false },
                 },
@@ -526,7 +526,7 @@ describe('DataSourceFacadeService', () => {
             expect(apify.query).not.toHaveBeenCalled();
         });
 
-        it('should pass directoryId and userId to registry scope check', async () => {
+        it('should pass workId and userId to registry scope check', async () => {
             const apify = createMockDataSourcePlugin('apify', 'Apify');
             (apify.query as jest.Mock).mockResolvedValue({
                 items: [{ name: 'Item', slug: 'item', source_url: '' }],
@@ -538,7 +538,7 @@ describe('DataSourceFacadeService', () => {
             registry.isPluginEnabledForScope.mockResolvedValue(true);
 
             await service.queryAll({
-                directoryId: 'dir-123',
+                workId: 'dir-123',
                 userId: 'user-456',
             });
 
@@ -576,7 +576,7 @@ describe('DataSourceFacadeService', () => {
 
             const result = await service.queryAll({
                 userId: 'test-user',
-                directoryId: 'dir-123',
+                workId: 'dir-123',
             });
 
             expect(result.items).toHaveLength(2);

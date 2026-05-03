@@ -1,8 +1,9 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { GitFacadeService } from '../../facades/git.facade';
-import { Directory } from '../../entities/directory.entity';
+import { Work } from '../../entities/work.entity';
 import { User } from '../../entities/user.entity';
-import { DataRepository, PRUpdate } from './data-repository';
+import { DataRepository } from './data-repository';
+import type { IDataConfig, PRUpdate } from './data-repository';
 import { slugifyText } from '../../utils/text.utils';
 import type { Identifiable, ItemData, Category, Collection, Tag } from '@ever-works/contracts';
 import {
@@ -13,23 +14,23 @@ import {
 import { format } from 'date-fns';
 import { GenerateStatusType } from '../../entities/types';
 import { LEGAL_NOTICE, LICENSE_TEXT } from './texts';
-import { DirectoryOperationsService } from '@src/directory-operations';
-import { getDirectoryOwner } from '../../utils/directory.utils';
+import { WorkOperationsService } from '@src/work-operations';
+import { getWorkOwner } from '../../utils/work.utils';
 import pMap from 'p-map';
 import { config } from '../../config';
 import { PipelineOrchestratorService } from '../../pipeline';
-import { buildDirectoryChangelog } from '../../utils/directory-changelog.utils';
+import { buildWorkChangelog } from '../../utils/work-changelog.utils';
 import { cloneFreshRepository } from '../../utils/fresh-repository-clone.utils';
 import { assertCreatedRepositoryTarget } from '../../utils/git-repository.utils';
 import { extractPipelineUsageMetrics } from '../../utils/metrics.util';
 import type {
-    DirectoryReference,
+    WorkReference,
     GenerationRequest,
     ExistingItems as PluginExistingItems,
     PipelineResult,
     PipelineProgress,
 } from '@ever-works/plugin';
-import type { DirectoryHistoryChangeEntry } from '@ever-works/contracts/api';
+import type { WorkHistoryChangeEntry } from '@ever-works/contracts/api';
 import type { GenerationLogCollector } from './generation-log-collector';
 import { throwIfGenerationCancelled } from '@src/utils';
 import { WorksConfigWriterService } from '@src/works-config/services/works-config-writer.service';
@@ -58,8 +59,12 @@ export type GenerationStats = {
     updatedItemsCount: number;
     totalItemsCount: number;
     metrics?: ItemsGeneratorMetrics;
-    changelog?: ReturnType<typeof buildDirectoryChangelog>;
+    changelog?: ReturnType<typeof buildWorkChangelog>;
 };
+
+const getWorkDefaultDataConfig = (work: Work): Partial<IDataConfig> => ({
+    company_name: work.name || work.slug,
+});
 
 export type InitializeResult =
     | {
@@ -89,16 +94,16 @@ export class DataGeneratorService {
     constructor(
         private readonly gitFacade: GitFacadeService,
         private readonly pipelineOrchestrator: PipelineOrchestratorService,
-        private readonly directoryOperations: DirectoryOperationsService,
+        private readonly workOperations: WorkOperationsService,
         private readonly worksConfigWriter: WorksConfigWriterService,
     ) {}
 
-    private getDirectoryOwner(directory: Directory): User {
-        return getDirectoryOwner(directory);
+    private getWorkOwner(work: Work): User {
+        return getWorkOwner(work);
     }
 
     async initialize(
-        directory: Directory,
+        work: Work,
         user: User,
         createItemsGeneratorDto: CreateItemsGeneratorDto,
         options?: {
@@ -109,7 +114,7 @@ export class DataGeneratorService {
         },
     ): Promise<InitializeResult> {
         this.logger.debug(
-            `Initializing data repository for directory: ${JSON.stringify(createItemsGeneratorDto)}`,
+            `Initializing data repository for work: ${JSON.stringify(createItemsGeneratorDto)}`,
         );
 
         const throwIfCancelled = () => throwIfGenerationCancelled(options?.signal);
@@ -126,11 +131,10 @@ export class DataGeneratorService {
         // Get existing data if available
         // get existing data only if we are in update mode
         if (createItemsGeneratorDto.generation_method === GenerationMethod.CREATE_UPDATE) {
-            existingData = await this.getExistingData(directory, user);
+            existingData = await this.getExistingData(work, user);
             existingItemsBeforeGeneration = existingData.existingItems;
         } else if (createItemsGeneratorDto.generation_method === GenerationMethod.RECREATE) {
-            existingItemsBeforeGeneration = (await this.getExistingData(directory, user))
-                .existingItems;
+            existingItemsBeforeGeneration = (await this.getExistingData(work, user)).existingItems;
         }
 
         throwIfCancelled();
@@ -141,12 +145,12 @@ export class DataGeneratorService {
 
         // Execute pipeline to generate items
         const pipelineResult = await this.executePipeline(
-            directory,
+            work,
             user,
             createItemsGeneratorDto,
             existingData,
             (progress) => {
-                this.onGenerationProgress(progress, directory, logCollector);
+                this.onGenerationProgress(progress, work, logCollector);
             },
             options?.tryResume,
             logCollector ? (entry) => logCollector.log(entry) : undefined,
@@ -197,14 +201,14 @@ export class DataGeneratorService {
             `Generated ${newCategories.length} categories, ${newItems.length} items, ${newTags.length} tags, ${newCollections.length} collections.`,
         );
 
-        const description = `machine-readable data for ${directory.slug}`;
+        const description = `machine-readable data for ${work.slug}`;
 
-        // Use directory owner's credentials (they set up the repos)
+        // Use work owner's credentials (they set up the repos)
         // but use current user as committer for attribution
-        const directoryOwner = this.getDirectoryOwner(directory);
-        const committer = directory.resolveCommitter(user);
-        const owner = directory.getRepoOwner();
-        const repo = directory.getDataRepo();
+        const workOwner = this.getWorkOwner(work);
+        const committer = work.resolveCommitter(user);
+        const owner = work.getRepoOwner();
+        const repo = work.getDataRepo();
 
         throwIfCancelled();
 
@@ -214,10 +218,14 @@ export class DataGeneratorService {
                 {
                     name: repo,
                     description,
-                    organization: directory.organization ? owner : undefined,
+                    organization: work.organization ? owner : undefined,
                     isPrivate: true,
                 },
-                { userId: directoryOwner.id, providerId: directory.gitProvider },
+                {
+                    userId: workOwner.id,
+                    providerId: work.gitProvider,
+                    workId: work.id,
+                },
             ),
             owner,
             repo,
@@ -236,8 +244,9 @@ export class DataGeneratorService {
                     owner: createdRepository.owner,
                     repo: createdRepository.name,
                     committer,
-                    userId: directoryOwner.id,
-                    providerId: directory.gitProvider,
+                    userId: workOwner.id,
+                    providerId: work.gitProvider,
+                    workId: work.id,
                 },
                 this.logger,
             );
@@ -256,14 +265,14 @@ export class DataGeneratorService {
 
         let data: DataRepository;
         try {
-            data = await DataRepository.create(dest);
+            data = await DataRepository.create(dest, getWorkDefaultDataConfig(work));
         } catch (err) {
             this.logger.error('Failed to create data repository', err);
             return {
                 success: false,
                 error: {
                     code: 'DATA_REPO_FAILED' as const,
-                    message: 'Failed to create data repository from cloned directory',
+                    message: 'Failed to create data repository from cloned work',
                     cause: err instanceof Error ? err : new Error(String(err)),
                 },
                 warnings,
@@ -274,8 +283,8 @@ export class DataGeneratorService {
         throwIfCancelled();
 
         try {
-            // Ensure directories exist
-            await data.ensureDirectoriesExist();
+            // Ensure works exist
+            await data.ensureWorksExist();
             await data.ensureDefaultConfig();
 
             // Name of the new branch if we are in update mode
@@ -288,7 +297,7 @@ export class DataGeneratorService {
                 createItemsGeneratorDto.generation_method === GenerationMethod.CREATE_UPDATE;
             const shouldCreatePR = createItemsGeneratorDto.update_with_pull_request;
 
-            const provider = directory.gitProvider;
+            const provider = work.gitProvider;
             const defaultBranch = await this.gitFacade
                 .getMainBranch(provider, dest)
                 .catch((err) => {
@@ -334,7 +343,7 @@ export class DataGeneratorService {
                 data.writeCollections(this.merge(existingCollections, [...newCollections])),
             ];
 
-            const { title: prTitle, body: prBody } = this.getPRDetails(directory);
+            const { title: prTitle, body: prBody } = this.getPRDetails(work);
 
             const isNewOrRecreate =
                 !existed || createItemsGeneratorDto.generation_method === GenerationMethod.RECREATE;
@@ -344,7 +353,7 @@ export class DataGeneratorService {
              */
             if (isNewOrRecreate) {
                 promises.push(
-                    data.writeReadme(this.getDefaultReadme(directory)),
+                    data.writeReadme(this.getDefaultReadme(work)),
                     data.writeLicense(LICENSE_TEXT),
                 );
             }
@@ -352,10 +361,7 @@ export class DataGeneratorService {
             // Write markdown template if new/recreate OR if creating a PR branch
             if (isNewOrRecreate || newBranchName) {
                 promises.push(
-                    data.writeMarkdownTemplate(
-                        this.getHeader(directory),
-                        this.getFooter(directory),
-                    ),
+                    data.writeMarkdownTemplate(this.getHeader(work), this.getFooter(work)),
                 );
             }
 
@@ -388,7 +394,7 @@ export class DataGeneratorService {
             // write categories, tags, readme, license, config, markdown template
             await Promise.all(promises);
             await this.worksConfigWriter.writeToDataRepository({
-                directory,
+                work,
                 dataRepository: data,
                 request: createItemsGeneratorDto,
                 importedWorksConfig: options?.worksConfig,
@@ -405,7 +411,7 @@ export class DataGeneratorService {
                 provider,
                 data.dir,
                 existed ? 'update items' : 'init repository',
-                directory.resolveCommitter(user),
+                work.resolveCommitter(user),
             );
 
             this.logger.debug('files written and committed.');
@@ -466,7 +472,7 @@ export class DataGeneratorService {
             ).length;
 
             const updatedItemsCount = itemsWithSlugs.length - newItemsCount;
-            const changelogEntries: DirectoryHistoryChangeEntry[] = itemsWithSlugs.map((item) => ({
+            const changelogEntries: WorkHistoryChangeEntry[] = itemsWithSlugs.map((item) => ({
                 entityType: 'item',
                 action: existingSlugSet.has(item.slug!) ? 'updated' : 'added',
                 name: item.name,
@@ -481,7 +487,7 @@ export class DataGeneratorService {
                         return !generatedSlugSet.has(slug);
                     })
                     .map(
-                        (item): DirectoryHistoryChangeEntry => ({
+                        (item): WorkHistoryChangeEntry => ({
                             entityType: 'item',
                             action: 'removed',
                             name: item.name,
@@ -515,7 +521,7 @@ export class DataGeneratorService {
                     provider,
                     data.dir,
                     commitMessage,
-                    directory.resolveCommitter(user),
+                    work.resolveCommitter(user),
                 );
 
                 this.logger.debug(`Batch committed ${newItems.length} items`);
@@ -524,18 +530,22 @@ export class DataGeneratorService {
             // Push changes
             await this.gitFacade.push(
                 { dir: dest },
-                { userId: directoryOwner.id, providerId: directory.gitProvider },
+                {
+                    userId: workOwner.id,
+                    providerId: work.gitProvider,
+                    workId: work.id,
+                },
             );
-            this.logger.log(`All processed and pushed to ${directory.getRepoOwner()}/${repo}`);
+            this.logger.log(`All processed and pushed to ${work.getRepoOwner()}/${repo}`);
 
-            // Update directory items count
-            await this.directoryOperations.updateDirectory(directory.id, {
+            // Update work items count
+            await this.workOperations.updateWork(work.id, {
                 itemsCount: pipelineResult.outputs.items.length + existingData.existingItems.length,
             });
 
             // Persist domain type if detected and not manually set
-            if (pipelineResult.outputs.domainAnalysis && !directory.domainTypeManuallySet) {
-                await this.directoryOperations.updateDirectory(directory.id, {
+            if (pipelineResult.outputs.domainAnalysis && !work.domainTypeManuallySet) {
+                await this.workOperations.updateWork(work.id, {
                     domainType: pipelineResult.outputs.domainAnalysis.domain_type,
                     domainTypeConfidence: pipelineResult.outputs.domainAnalysis.confidence,
                 });
@@ -546,7 +556,7 @@ export class DataGeneratorService {
                 updatedItemsCount,
                 totalItemsCount: newItems.length,
                 metrics: this.convertPipelineMetrics(pipelineResult),
-                changelog: buildDirectoryChangelog(changelogEntries),
+                changelog: buildWorkChangelog(changelogEntries),
             };
 
             let prUpdate: PRUpdate | null = null;
@@ -555,14 +565,18 @@ export class DataGeneratorService {
             if (newBranchName && defaultBranch) {
                 const pr = await this.gitFacade.createPullRequest(
                     {
-                        owner: directory.getRepoOwner(),
+                        owner: work.getRepoOwner(),
                         repo: repo,
                         head: newBranchName,
                         base: defaultBranch,
                         title: prTitle,
                         body: prBody,
                     },
-                    { userId: directoryOwner.id, providerId: directory.gitProvider },
+                    {
+                        userId: workOwner.id,
+                        providerId: work.gitProvider,
+                        workId: work.id,
+                    },
                 );
 
                 prUpdate = {
@@ -573,8 +587,8 @@ export class DataGeneratorService {
                     url: pr.url,
                 };
 
-                // Save PR details to the directory
-                await this.directoryOperations.updateLastPullRequest(directory.id, {
+                // Save PR details to the work
+                await this.workOperations.updateLastPullRequest(work.id, {
                     data: {
                         branch: newBranchName,
                         title: prTitle,
@@ -614,20 +628,18 @@ export class DataGeneratorService {
         }
     }
 
-    async updateMarkdownTemplate(
-        directory: Directory,
-        user: User,
-    ): Promise<UpdateMarkdownTemplateResult> {
-        // Use directory owner's credentials (they set up the repos)
-        const directoryOwner = this.getDirectoryOwner(directory);
-        const committer = directory.resolveCommitter(user);
-        const owner = directory.getRepoOwner();
-        const repo = directory.getDataRepo();
+    async updateMarkdownTemplate(work: Work, user: User): Promise<UpdateMarkdownTemplateResult> {
+        // Use work owner's credentials (they set up the repos)
+        const workOwner = this.getWorkOwner(work);
+        const committer = work.resolveCommitter(user);
+        const owner = work.getRepoOwner();
+        const repo = work.getDataRepo();
 
         const repoExists = await this.gitFacade
             .repositoryExists(owner, repo, {
-                userId: directoryOwner.id,
-                providerId: directory.gitProvider,
+                userId: workOwner.id,
+                providerId: work.gitProvider,
+                workId: work.id,
             })
             .catch((error) => {
                 this.logger.error(
@@ -650,20 +662,24 @@ export class DataGeneratorService {
 
         const dest = await this.gitFacade.cloneOrPull(
             { owner, repo, committer },
-            { userId: directoryOwner.id, providerId: directory.gitProvider },
+            {
+                userId: workOwner.id,
+                providerId: work.gitProvider,
+                workId: work.id,
+            },
         );
 
-        const dataRepo = await DataRepository.create(dest);
+        const dataRepo = await DataRepository.create(dest, getWorkDefaultDataConfig(work));
 
-        await dataRepo.ensureDirectoriesExist();
+        await dataRepo.ensureWorksExist();
 
-        await dataRepo.writeMarkdownTemplate(this.getHeader(directory), this.getFooter(directory));
+        await dataRepo.writeMarkdownTemplate(this.getHeader(work), this.getFooter(work));
 
-        const changes = await this.gitFacade.getStatus(directory.gitProvider, dataRepo.dir);
+        const changes = await this.gitFacade.getStatus(work.gitProvider, dataRepo.dir);
         const hasChanges = changes.length > 0;
 
         if (!hasChanges) {
-            this.logger.log(`No README template changes detected for ${directory.slug}`);
+            this.logger.log(`No README template changes detected for ${work.slug}`);
             return {
                 updated: false,
                 reason: 'no_changes',
@@ -671,9 +687,9 @@ export class DataGeneratorService {
             };
         }
 
-        await this.gitFacade.addAll(directory.gitProvider, dataRepo.dir);
+        await this.gitFacade.addAll(work.gitProvider, dataRepo.dir);
         await this.gitFacade.commit(
-            directory.gitProvider,
+            work.gitProvider,
             dataRepo.dir,
             'update README template',
             committer,
@@ -681,7 +697,11 @@ export class DataGeneratorService {
 
         await this.gitFacade.push(
             { dir: dest },
-            { userId: directoryOwner.id, providerId: directory.gitProvider },
+            {
+                userId: workOwner.id,
+                providerId: work.gitProvider,
+                workId: work.id,
+            },
         );
 
         return {
@@ -691,53 +711,54 @@ export class DataGeneratorService {
     }
 
     /**
-     * Remove repository for a directory
+     * Remove repository for a work
      * @param _user - Unused, kept for API consistency with other generator services
      */
-    async removeRepository(directory: Directory, _user: User): Promise<void> {
-        // Use directory owner's credentials (they set up the repos)
-        const directoryOwner = this.getDirectoryOwner(directory);
-        const repo = directory.getDataRepo();
+    async removeRepository(work: Work, _user: User): Promise<void> {
+        // Use work owner's credentials (they set up the repos)
+        const workOwner = this.getWorkOwner(work);
+        const repo = work.getDataRepo();
 
         try {
             // Delete the repository
-            await this.gitFacade.deleteRepository(directory.getRepoOwner(), repo, {
-                userId: directoryOwner.id,
-                providerId: directory.gitProvider,
+            await this.gitFacade.deleteRepository(work.getRepoOwner(), repo, {
+                userId: workOwner.id,
+                providerId: work.gitProvider,
+                workId: work.id,
             });
 
-            this.logger.log(
-                `Successfully deleted data repository: ${directory.getRepoOwner()}/${repo}`,
-            );
+            this.logger.log(`Successfully deleted data repository: ${work.getRepoOwner()}/${repo}`);
         } catch (error) {
             this.logger.error(
-                `Failed to delete data repository ${directory.getRepoOwner()}/${repo}:`,
+                `Failed to delete data repository ${work.getRepoOwner()}/${repo}:`,
                 error,
             );
             throw error;
         }
     }
 
-    public cleanup(directory: Directory) {
+    public cleanup(work: Work) {
         const dataDir = this.gitFacade.getLocalDir(
-            directory.gitProvider,
-            directory.getRepoOwner(),
-            directory.getDataRepo(),
+            work.gitProvider,
+            work.getRepoOwner(),
+            work.getDataRepo(),
         );
 
-        return DataRepository.create(dataDir).then((data) => data.cleanup());
+        return DataRepository.create(dataDir, getWorkDefaultDataConfig(work)).then((data) =>
+            data.cleanup(),
+        );
     }
 
     /**
      * Get existing items from the repository
      */
 
-    async getItems(directory: Directory, user: User) {
-        return (await this.getExistingData(directory, user)).existingItems;
+    async getItems(work: Work, user: User) {
+        return (await this.getExistingData(work, user)).existingItems;
     }
 
-    async getCategoriesTags(directory: Directory, user: User) {
-        const data = await this.repositoryData(directory, user);
+    async getCategoriesTags(work: Work, user: User) {
+        const data = await this.repositoryData(work, user);
 
         const [categories, tags, collections] = await Promise.all([
             data.getCategories(),
@@ -755,90 +776,104 @@ export class DataGeneratorService {
     /**
      * Save categories to the data repository and push changes
      */
-    async saveCategories(directory: Directory, user: User, categories: Category[]) {
-        const directoryOwner = this.getDirectoryOwner(directory);
-        const committer = directory.resolveCommitter(user);
-        const repo = directory.getDataRepo();
+    async saveCategories(work: Work, user: User, categories: Category[]) {
+        const workOwner = this.getWorkOwner(work);
+        const committer = work.resolveCommitter(user);
+        const repo = work.getDataRepo();
 
         const dest = await this.gitFacade.cloneOrPull(
-            { owner: directory.getRepoOwner(), repo, committer },
-            { userId: directoryOwner.id, providerId: directory.gitProvider },
+            { owner: work.getRepoOwner(), repo, committer },
+            {
+                userId: workOwner.id,
+                providerId: work.gitProvider,
+                workId: work.id,
+            },
         );
 
-        const data = await DataRepository.create(dest);
+        const data = await DataRepository.create(dest, getWorkDefaultDataConfig(work));
 
         await data.writeCategories(categories);
 
-        await this.gitFacade.addAll(directory.gitProvider, data.dir);
-        await this.gitFacade.commit(
-            directory.gitProvider,
-            data.dir,
-            'update categories',
-            committer,
-        );
+        await this.gitFacade.addAll(work.gitProvider, data.dir);
+        await this.gitFacade.commit(work.gitProvider, data.dir, 'update categories', committer);
         await this.gitFacade.push(
             { dir: dest },
-            { userId: directoryOwner.id, providerId: directory.gitProvider },
+            {
+                userId: workOwner.id,
+                providerId: work.gitProvider,
+                workId: work.id,
+            },
         );
     }
 
     /**
      * Save tags to the data repository and push changes
      */
-    async saveTags(directory: Directory, user: User, tags: Tag[]) {
-        const directoryOwner = this.getDirectoryOwner(directory);
-        const committer = directory.resolveCommitter(user);
-        const repo = directory.getDataRepo();
+    async saveTags(work: Work, user: User, tags: Tag[]) {
+        const workOwner = this.getWorkOwner(work);
+        const committer = work.resolveCommitter(user);
+        const repo = work.getDataRepo();
 
         const dest = await this.gitFacade.cloneOrPull(
-            { owner: directory.getRepoOwner(), repo, committer },
-            { userId: directoryOwner.id, providerId: directory.gitProvider },
+            { owner: work.getRepoOwner(), repo, committer },
+            {
+                userId: workOwner.id,
+                providerId: work.gitProvider,
+                workId: work.id,
+            },
         );
 
-        const data = await DataRepository.create(dest);
+        const data = await DataRepository.create(dest, getWorkDefaultDataConfig(work));
 
         await data.writeTags(tags);
 
-        await this.gitFacade.addAll(directory.gitProvider, data.dir);
-        await this.gitFacade.commit(directory.gitProvider, data.dir, 'update tags', committer);
+        await this.gitFacade.addAll(work.gitProvider, data.dir);
+        await this.gitFacade.commit(work.gitProvider, data.dir, 'update tags', committer);
         await this.gitFacade.push(
             { dir: dest },
-            { userId: directoryOwner.id, providerId: directory.gitProvider },
+            {
+                userId: workOwner.id,
+                providerId: work.gitProvider,
+                workId: work.id,
+            },
         );
     }
 
     /**
      * Save collections to the data repository and push changes
      */
-    async saveCollections(directory: Directory, user: User, collections: Collection[]) {
-        const directoryOwner = this.getDirectoryOwner(directory);
-        const committer = directory.resolveCommitter(user);
-        const repo = directory.getDataRepo();
+    async saveCollections(work: Work, user: User, collections: Collection[]) {
+        const workOwner = this.getWorkOwner(work);
+        const committer = work.resolveCommitter(user);
+        const repo = work.getDataRepo();
 
         const dest = await this.gitFacade.cloneOrPull(
-            { owner: directory.getRepoOwner(), repo, committer },
-            { userId: directoryOwner.id, providerId: directory.gitProvider },
+            { owner: work.getRepoOwner(), repo, committer },
+            {
+                userId: workOwner.id,
+                providerId: work.gitProvider,
+                workId: work.id,
+            },
         );
 
-        const data = await DataRepository.create(dest);
+        const data = await DataRepository.create(dest, getWorkDefaultDataConfig(work));
 
         await data.writeCollections(collections);
 
-        await this.gitFacade.addAll(directory.gitProvider, data.dir);
-        await this.gitFacade.commit(
-            directory.gitProvider,
-            data.dir,
-            'update collections',
-            committer,
-        );
+        await this.gitFacade.addAll(work.gitProvider, data.dir);
+        await this.gitFacade.commit(work.gitProvider, data.dir, 'update collections', committer);
         await this.gitFacade.push(
             { dir: dest },
-            { userId: directoryOwner.id, providerId: directory.gitProvider },
+            {
+                userId: workOwner.id,
+                providerId: work.gitProvider,
+                workId: work.id,
+            },
         );
     }
 
-    async count(directory: Directory, user: User) {
-        const data = await this.repositoryData(directory, user);
+    async count(work: Work, user: User) {
+        const data = await this.repositoryData(work, user);
 
         const [categories, tags, items, comparisons] = await Promise.allSettled([
             data.getCategories(),
@@ -856,7 +891,7 @@ export class DataGeneratorService {
             }
 
             this.logger.warn(
-                `Failed to count ${label} for directory ${directory.id}; defaulting to 0.`,
+                `Failed to count ${label} for work ${work.id}; defaulting to 0.`,
                 result.reason instanceof Error ? result.reason.stack : undefined,
             );
             return 0;
@@ -871,7 +906,7 @@ export class DataGeneratorService {
             }
 
             this.logger.warn(
-                `Failed to count ${label} for directory ${directory.id}; defaulting to 0.`,
+                `Failed to count ${label} for work ${work.id}; defaulting to 0.`,
                 result.reason instanceof Error ? result.reason.stack : undefined,
             );
             return 0;
@@ -885,8 +920,8 @@ export class DataGeneratorService {
         };
     }
 
-    async getConfig(directory: Directory, user: User) {
-        const data = await this.repositoryData(directory, user);
+    async getConfig(work: Work, user: User) {
+        const data = await this.repositoryData(work, user);
         return data.getConfig();
     }
 
@@ -894,8 +929,8 @@ export class DataGeneratorService {
      * Returns a lightweight snapshot of the data repository for sync purposes.
      * Uses the shared repositoryData() helper to respect cloning/pulling patterns.
      */
-    async getDataSyncSnapshot(directory: Directory, user: User) {
-        const data = await this.repositoryData(directory, user);
+    async getDataSyncSnapshot(work: Work, user: User) {
+        const data = await this.repositoryData(work, user);
 
         const [items, config, markdownTemplate] = await Promise.all([
             data.getItems().catch(() => []),
@@ -914,7 +949,7 @@ export class DataGeneratorService {
      * Update website settings in config.yml and push to git repository
      */
     async updateWebsiteSettings(
-        directory: Directory,
+        work: Work,
         user: User,
         settings: {
             categories_enabled?: boolean;
@@ -961,10 +996,10 @@ export class DataGeneratorService {
         companyName?: string,
         companyWebsite?: string,
     ): Promise<void> {
-        const directoryOwner = this.getDirectoryOwner(directory);
-        const committer = directory.resolveCommitter(user);
+        const workOwner = this.getWorkOwner(work);
+        const committer = work.resolveCommitter(user);
 
-        const data = await this.repositoryData(directory, user);
+        const data = await this.repositoryData(work, user);
         const currentConfig = await data.getConfig();
 
         // Deep merge settings
@@ -994,38 +1029,46 @@ export class DataGeneratorService {
 
         await data.writeConfig(newConfig);
 
-        await this.gitFacade.addAll(directory.gitProvider, data.dir);
+        await this.gitFacade.addAll(work.gitProvider, data.dir);
         await this.gitFacade.commit(
-            directory.gitProvider,
+            work.gitProvider,
             data.dir,
             'update website settings',
             committer,
         );
         await this.gitFacade.push(
             { dir: data.dir },
-            { userId: directoryOwner.id, providerId: directory.gitProvider },
+            {
+                userId: workOwner.id,
+                providerId: work.gitProvider,
+                workId: work.id,
+            },
         );
 
-        this.logger.log(`Successfully updated website settings for directory ${directory.slug}`);
+        this.logger.log(`Successfully updated website settings for work ${work.slug}`);
     }
 
-    private async repositoryData(directory: Directory, user: User) {
-        // Use directory owner's credentials (they set up the repos)
-        const directoryOwner = this.getDirectoryOwner(directory);
-        const committer = directory.resolveCommitter(user);
+    private async repositoryData(work: Work, user: User) {
+        // Use work owner's credentials (they set up the repos)
+        const workOwner = this.getWorkOwner(work);
+        const committer = work.resolveCommitter(user);
 
-        const repo = directory.getDataRepo();
+        const repo = work.getDataRepo();
 
         const dest = await this.gitFacade.cloneOrPull(
             {
-                owner: directory.getRepoOwner(),
+                owner: work.getRepoOwner(),
                 repo,
                 committer,
             },
-            { userId: directoryOwner.id, providerId: directory.gitProvider },
+            {
+                userId: workOwner.id,
+                providerId: work.gitProvider,
+                workId: work.id,
+            },
         );
 
-        const data = await DataRepository.create(dest);
+        const data = await DataRepository.create(dest, getWorkDefaultDataConfig(work));
 
         return data;
     }
@@ -1034,7 +1077,7 @@ export class DataGeneratorService {
      * Execute the pipeline to generate items.
      * This method converts DTOs to plugin types and calls the pipeline orchestrator.
      *
-     * @param directory - The directory entity
+     * @param work - The work entity
      * @param user - The user executing the generation (for multi-tenant context)
      * @param dto - The generation request DTO
      * @param existingData - Existing items for deduplication
@@ -1042,7 +1085,7 @@ export class DataGeneratorService {
      * @returns Pipeline execution result
      */
     private async executePipeline(
-        directory: Directory,
+        work: Work,
         user: User,
         dto: CreateItemsGeneratorDto,
         existingData: {
@@ -1069,13 +1112,13 @@ export class DataGeneratorService {
             };
         }
 
-        // Convert Directory entity to DirectoryReference (plugin type)
+        // Convert Work entity to WorkReference (plugin type)
         // This includes user context for multi-tenant resolution
-        const directoryRef: DirectoryReference = {
-            id: directory.id,
-            name: directory.name ?? directory.slug,
-            slug: directory.slug,
-            description: directory.description,
+        const workRef: WorkReference = {
+            id: work.id,
+            name: work.name ?? work.slug,
+            slug: work.slug,
+            description: work.description,
             user: { id: user.id }, // User context for multi-tenant plugin resolution
         };
 
@@ -1107,7 +1150,7 @@ export class DataGeneratorService {
             existingConfig: existing.existingConfig,
         };
 
-        this.logger.log(`Executing pipeline for directory "${directory.slug}" (user: ${user.id})`);
+        this.logger.log(`Executing pipeline for work "${work.slug}" (user: ${user.id})`);
 
         const pipelineOptions =
             onLogEntry || signal
@@ -1120,14 +1163,14 @@ export class DataGeneratorService {
         // Execute the pipeline - the orchestrator handles plugin resolution
         return tryResume
             ? this.pipelineOrchestrator.resumeOrExecute(
-                  directoryRef,
+                  workRef,
                   request,
                   pluginExisting,
                   pipelineOptions,
                   onProgress,
               )
             : this.pipelineOrchestrator.execute(
-                  directoryRef,
+                  workRef,
                   request,
                   pluginExisting,
                   pipelineOptions,
@@ -1160,12 +1203,12 @@ export class DataGeneratorService {
      */
     private async onGenerationProgress(
         progress: PipelineProgress,
-        directory: Directory,
+        work: Work,
         logCollector?: GenerationLogCollector,
     ) {
         // Note: step_started/completed events are now emitted by pipeline executors
         // via onLogEntry → logCollector.log(), so we only update the generate status here.
-        await this.directoryOperations.updateGenerateStatus(directory.id, {
+        await this.workOperations.updateGenerateStatus(work.id, {
             status: GenerateStatusType.GENERATING,
             step: progress.message ?? progress.currentStepName,
             stepName: progress.currentStepName,
@@ -1180,17 +1223,21 @@ export class DataGeneratorService {
     /**
      * Gets existing data from the repository if it exists, otherwise returns empty data
      */
-    private async getExistingData(directory: Directory, user: User) {
-        const directoryOwner = this.getDirectoryOwner(directory);
-        const committer = directory.resolveCommitter(user);
-        const repo = directory.getDataRepo();
+    private async getExistingData(work: Work, user: User) {
+        const workOwner = this.getWorkOwner(work);
+        const committer = work.resolveCommitter(user);
+        const repo = work.getDataRepo();
 
         try {
             const dest = await this.gitFacade.cloneOrPull(
-                { owner: directory.getRepoOwner(), repo, committer },
-                { userId: directoryOwner.id, providerId: directory.gitProvider },
+                { owner: work.getRepoOwner(), repo, committer },
+                {
+                    userId: workOwner.id,
+                    providerId: work.gitProvider,
+                    workId: work.id,
+                },
             );
-            const data = await DataRepository.create(dest);
+            const data = await DataRepository.create(dest, getWorkDefaultDataConfig(work));
 
             const [categories, tags, collections, existingItems, config] = await Promise.all([
                 data.getCategories().catch(() => []),
@@ -1224,11 +1271,11 @@ export class DataGeneratorService {
         await Promise.all([data.writeItem(item), data.writeItemMarkdown(item, md)]);
     }
 
-    private getPRDetails(directory: Directory) {
+    private getPRDetails(work: Work) {
         const title = `Update data - ${format(new Date(), 'MM/dd/yyyy HH:mm')}`;
         const appName = config.branding.getAppName();
         const platformWebsite = config.branding.getPlatformWebsite();
-        const body = `Update data for ${directory.slug}\n\nGenerated by [${appName}](${platformWebsite})`;
+        const body = `Update data for ${work.slug}\n\nGenerated by [${appName}](${platformWebsite})`;
         return { title, body };
     }
 
@@ -1243,19 +1290,19 @@ export class DataGeneratorService {
         return Array.from(map.values());
     }
 
-    private getDefaultReadme(directory: Directory) {
-        // Construct URL based on directory's repo provider
-        const owner = directory.getRepoOwner('directory');
-        const repo = directory.getMainRepo();
-        const markdownURL = this.gitFacade.getWebUrl(directory.gitProvider, owner, repo);
+    private getDefaultReadme(work: Work) {
+        // Construct URL based on work's repo provider
+        const owner = work.getRepoOwner('work');
+        const repo = work.getMainRepo();
+        const markdownURL = this.gitFacade.getWebUrl(work.gitProvider, owner, repo);
         return (
-            `# ${directory.getDataRepo()}\n\n` +
+            `# ${work.getDataRepo()}\n\n` +
             `This repository holds data used to generate [${repo}](${markdownURL})\n\n`
         );
     }
 
-    private getHeader(directory: Directory) {
-        const readmeConfig = directory.readmeConfig;
+    private getHeader(work: Work) {
+        const readmeConfig = work.readmeConfig;
         if (readmeConfig?.header && readmeConfig.overwriteDefaultHeader) {
             return readmeConfig.header;
         }
@@ -1265,11 +1312,11 @@ export class DataGeneratorService {
             additionalHeader = additionalHeader + '\n\n';
         }
 
-        return `# ${directory.name}\n\n` + `${directory.description}\n\n` + additionalHeader;
+        return `# ${work.name}\n\n` + `${work.description}\n\n` + additionalHeader;
     }
 
-    private getFooter(directory: Directory) {
-        const readmeConfig = directory.readmeConfig;
+    private getFooter(work: Work) {
+        const readmeConfig = work.readmeConfig;
         if (readmeConfig?.footer && readmeConfig.overwriteDefaultFooter) {
             return readmeConfig.footer;
         }
@@ -1283,7 +1330,7 @@ export class DataGeneratorService {
     }
 
     async initializeWithImportedData(
-        directory: Directory,
+        work: Work,
         user: User,
         importedData: {
             items: ItemData[];
@@ -1300,12 +1347,12 @@ export class DataGeneratorService {
             };
         },
     ): Promise<InitializeResult> {
-        const committer = directory.resolveCommitter(user);
+        const committer = work.resolveCommitter(user);
 
         try {
             // Create the data repository
-            const repoName = directory.getDataRepo();
-            const repoOwner = directory.getRepoOwner();
+            const repoName = work.getDataRepo();
+            const repoOwner = work.getRepoOwner();
 
             this.logger.log(`Creating data repo: ${repoOwner}/${repoName}`);
 
@@ -1313,11 +1360,15 @@ export class DataGeneratorService {
                 await this.gitFacade.createRepository(
                     {
                         name: repoName,
-                        description: directory.description,
-                        organization: directory.organization ? repoOwner : undefined,
+                        description: work.description,
+                        organization: work.organization ? repoOwner : undefined,
                         isPrivate: true,
                     },
-                    { userId: user.id, providerId: directory.gitProvider },
+                    {
+                        userId: user.id,
+                        providerId: work.gitProvider,
+                        workId: work.id,
+                    },
                 ),
                 repoOwner,
                 repoName,
@@ -1332,13 +1383,14 @@ export class DataGeneratorService {
                     repo: createdRepository.name,
                     committer,
                     userId: user.id,
-                    providerId: directory.gitProvider,
+                    providerId: work.gitProvider,
+                    workId: work.id,
                 },
                 this.logger,
             );
 
-            const data = await DataRepository.create(dest);
-            await data.ensureDirectoriesExist();
+            const data = await DataRepository.create(dest, getWorkDefaultDataConfig(work));
+            await data.ensureWorksExist();
 
             // Write categories, tags, and collections
             if (importedData.categories.length > 0) {
@@ -1352,7 +1404,7 @@ export class DataGeneratorService {
             }
 
             const initialCategories = importedData.categories.map((c) => c.id);
-            const initialPrompt = `Directory imported from ${importedData.importRequest?.sourceOwner || 'external'}/${importedData.importRequest?.sourceRepo || 'source'}. Contains ${importedData.items.length} items across ${importedData.categories.length} categories.`;
+            const initialPrompt = `Work imported from ${importedData.importRequest?.sourceOwner || 'external'}/${importedData.importRequest?.sourceRepo || 'source'}. Contains ${importedData.items.length} items across ${importedData.categories.length} categories.`;
 
             // Preserve existing metadata from imported config (data_repo/link_existing already have config)
             const existingMetadata = importedData.config?.metadata || {};
@@ -1370,7 +1422,7 @@ export class DataGeneratorService {
             if (!existingMetadata.last_request_data) {
                 // Store minimal request data - plugin-specific defaults come from plugins
                 const initialRequestData: Partial<CreateItemsGeneratorDto> = {
-                    name: directory.name,
+                    name: work.name,
                     prompt: configData.metadata.initial_prompt,
                     // pluginConfig is intentionally empty - plugins provide defaults
                     pluginConfig: {},
@@ -1380,7 +1432,7 @@ export class DataGeneratorService {
 
             await data.mergeConfig(configData);
             await this.worksConfigWriter.writeToDataRepository({
-                directory,
+                work,
                 dataRepository: data,
                 request: configData.metadata.last_request_data,
                 importedWorksConfig: importedData.worksConfig,
@@ -1388,16 +1440,16 @@ export class DataGeneratorService {
             });
 
             // Write README and LICENSE
-            await data.writeReadme(this.getDefaultReadme(directory));
+            await data.writeReadme(this.getDefaultReadme(work));
             await data.writeLicense(LICENSE_TEXT);
 
             // Write markdown templates
-            await data.writeMarkdownTemplate(this.getHeader(directory), this.getFooter(directory));
+            await data.writeMarkdownTemplate(this.getHeader(work), this.getFooter(work));
 
             // Commit metadata files
-            await this.gitFacade.addAll(directory.gitProvider, data.dir);
+            await this.gitFacade.addAll(work.gitProvider, data.dir);
             await this.gitFacade.commit(
-                directory.gitProvider,
+                work.gitProvider,
                 data.dir,
                 'init repository with imported data',
                 committer,
@@ -1414,9 +1466,9 @@ export class DataGeneratorService {
             });
 
             // Commit items
-            await this.gitFacade.addAll(directory.gitProvider, data.dir);
+            await this.gitFacade.addAll(work.gitProvider, data.dir);
             await this.gitFacade.commit(
-                directory.gitProvider,
+                work.gitProvider,
                 data.dir,
                 `add ${itemsWithSlugs.length} imported items`,
                 committer,
@@ -1425,7 +1477,7 @@ export class DataGeneratorService {
             // Push to remote
             await this.gitFacade.push(
                 { dir: dest },
-                { userId: user.id, providerId: directory.gitProvider },
+                { userId: user.id, providerId: work.gitProvider, workId: work.id },
             );
 
             this.logger.log(
@@ -1456,7 +1508,7 @@ export class DataGeneratorService {
     }
 
     async updateWithImportedData(
-        directory: Directory,
+        work: Work,
         user: User,
         importedData: {
             items: ItemData[];
@@ -1471,9 +1523,9 @@ export class DataGeneratorService {
             commitMessage?: string;
         } = { updateWithPullRequest: true },
     ): Promise<InitializeResult> {
-        const committer = directory.resolveCommitter(user);
-        const repoName = directory.getDataRepo();
-        const repoOwner = directory.getRepoOwner();
+        const committer = work.resolveCommitter(user);
+        const repoName = work.getDataRepo();
+        const repoOwner = work.getRepoOwner();
 
         try {
             this.logger.log(`Syncing imported data for: ${repoOwner}/${repoName}`);
@@ -1481,11 +1533,11 @@ export class DataGeneratorService {
             // Clone/Pull the repository
             const dest = await this.gitFacade.cloneOrPull(
                 { owner: repoOwner, repo: repoName, committer },
-                { userId: user.id, providerId: directory.gitProvider },
+                { userId: user.id, providerId: work.gitProvider, workId: work.id },
             );
 
-            const data = await DataRepository.create(dest);
-            await data.ensureDirectoriesExist();
+            const data = await DataRepository.create(dest, getWorkDefaultDataConfig(work));
+            await data.ensureWorksExist();
             await data.ensureDefaultConfig();
 
             // Get existing data to compare
@@ -1495,7 +1547,7 @@ export class DataGeneratorService {
             );
 
             // Handle branching
-            const provider = directory.gitProvider;
+            const provider = work.gitProvider;
             let newBranchName: string | null = null;
             const defaultBranch = await this.gitFacade
                 .getMainBranch(provider, dest)
@@ -1574,7 +1626,7 @@ export class DataGeneratorService {
                 concurrency: PARALLEL_WRITE_CONCURRENCY,
             });
             await this.worksConfigWriter.writeToDataRepository({
-                directory,
+                work,
                 dataRepository: data,
                 request: importedData.config?.metadata?.last_request_data,
                 importedWorksConfig: importedData.worksConfig,
@@ -1608,11 +1660,11 @@ export class DataGeneratorService {
             // Push
             await this.gitFacade.push(
                 { dir: dest },
-                { userId: user.id, providerId: directory.gitProvider },
+                { userId: user.id, providerId: work.gitProvider, workId: work.id },
             );
 
             // Update DB stats
-            await this.directoryOperations.updateDirectory(directory.id, {
+            await this.workOperations.updateWork(work.id, {
                 itemsCount: existingItems.length + newItemsCount,
             });
 
@@ -1634,7 +1686,11 @@ export class DataGeneratorService {
                         title: `Sync with source - ${format(new Date(), 'MM/dd/yyyy')}`,
                         body: `Automated sync from source repository.\n\nNew items: ${newItemsCount}\nUpdated items: ${updatedItemsCount}`,
                     },
-                    { userId: user.id, providerId: directory.gitProvider },
+                    {
+                        userId: user.id,
+                        providerId: work.gitProvider,
+                        workId: work.id,
+                    },
                 );
 
                 prUpdate = {
@@ -1645,7 +1701,7 @@ export class DataGeneratorService {
                     url: pr.url,
                 };
 
-                await this.directoryOperations.updateLastPullRequest(directory.id, {
+                await this.workOperations.updateLastPullRequest(work.id, {
                     data: prUpdate,
                 });
             }

@@ -9,7 +9,7 @@ sidebar_position: 60
 
 ## Overview
 
-The Exa plugin provides AI-native search and content extraction capabilities using the Exa API. Unlike traditional search engines that match keywords, Exa uses neural embeddings to find results based on semantic meaning. The plugin supports three search modes (auto, neural, keyword), category filtering, domain filtering, time range filtering, and clean text extraction from web pages. It implements both `ISearchPlugin` and `IContentExtractorPlugin`, making it a dual-purpose tool for directory generation pipelines.
+The Exa plugin provides AI-native search and content extraction capabilities using the Exa API. Unlike traditional search engines that match keywords, Exa uses neural embeddings to find results based on semantic meaning. The plugin supports three search modes (auto, neural, keyword), category filtering, domain filtering, time range filtering, and clean text extraction from web pages. It implements both `ISearchPlugin` and `IContentExtractorPlugin`, making it a dual-purpose tool for work generation pipelines.
 
 ## Architecture
 
@@ -78,7 +78,7 @@ interface ExaSettings {
 Exa supports three search types, configured via the `searchType` setting:
 
 - **`auto`** (default): Exa automatically selects the best approach for the query -- neural for conceptual queries, keyword for specific terms.
-- **`neural`**: Semantic search that finds results based on meaning. Particularly useful for conceptual queries like "tools for building web directories" where keyword matching would miss relevant results.
+- **`neural`**: Semantic search that finds results based on meaning. Particularly useful for conceptual queries like "tools for building web works" where keyword matching would miss relevant results.
 - **`keyword`**: Traditional keyword-based search for precise term matching.
 
 The search type is passed directly to the Exa SDK as the `type` parameter.
@@ -169,7 +169,7 @@ A new `Exa` client is created for each operation via the `getClient(settings)` h
 ```typescript
 // Basic search
 const results = await exaPlugin.search({
-	query: 'open source directory builders',
+	query: 'open source work builders',
 	limit: 10,
 	settings: { apiKey: exaApiKey }
 });
@@ -187,7 +187,7 @@ const companyResults = await exaPlugin.search({
 
 // Search with domain and time filters
 const filteredResults = await exaPlugin.search({
-	query: 'directory software',
+	query: 'work software',
 	limit: 15,
 	includeDomains: ['github.com', 'producthunt.com'],
 	timeRange: 'month',

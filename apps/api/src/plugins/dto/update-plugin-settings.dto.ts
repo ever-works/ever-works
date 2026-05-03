@@ -44,37 +44,37 @@ export class EnableUserPluginDto {
     @IsOptional()
     secretSettings?: Record<string, unknown>;
 
-    @ApiPropertyOptional({ description: 'Auto-enable this plugin for all directories' })
+    @ApiPropertyOptional({ description: 'Auto-enable this plugin for all works' })
     @IsBoolean()
     @IsOptional()
-    autoEnableForDirectories?: boolean;
+    autoEnableForWorks?: boolean;
 }
 
 /**
- * DTO for updating directory plugin settings
+ * DTO for updating work plugin settings
  */
-export class UpdateDirectoryPluginSettingsDto {
-    @ApiPropertyOptional({ description: 'Directory-specific settings' })
+export class UpdateWorkPluginSettingsDto {
+    @ApiPropertyOptional({ description: 'Work-specific settings' })
     @IsObject()
     @IsOptional()
     settings?: Record<string, unknown>;
 
-    @ApiPropertyOptional({ description: 'Directory-specific secret settings' })
+    @ApiPropertyOptional({ description: 'Work-specific secret settings' })
     @IsObject()
     @IsOptional()
     secretSettings?: Record<string, unknown>;
 
-    @ApiPropertyOptional({ description: 'Directory-specific metadata' })
+    @ApiPropertyOptional({ description: 'Work-specific metadata' })
     @IsObject()
     @IsOptional()
     metadata?: Record<string, unknown>;
 }
 
 /**
- * DTO for enabling a plugin for a directory
+ * DTO for enabling a plugin for a work
  */
-export class EnableDirectoryPluginDto {
-    @ApiPropertyOptional({ description: 'Initial directory-specific settings' })
+export class EnableWorkPluginDto {
+    @ApiPropertyOptional({ description: 'Initial work-specific settings' })
     @IsObject()
     @IsOptional()
     settings?: Record<string, unknown>;
@@ -96,7 +96,7 @@ export class EnableDirectoryPluginDto {
 }
 
 /**
- * DTO for setting active capability for a directory
+ * DTO for setting active capability for a work
  */
 export class SetActiveCapabilityDto {
     @ApiProperty({
@@ -109,9 +109,9 @@ export class SetActiveCapabilityDto {
 }
 
 /**
- * DTO for updating directory plugin priority
+ * DTO for updating work plugin priority
  */
-export class UpdateDirectoryPluginPriorityDto {
+export class UpdateWorkPluginPriorityDto {
     @ApiProperty({ description: 'New priority value (lower = higher priority)' })
     @IsNumber()
     @Min(0)
@@ -133,7 +133,7 @@ export class SetGlobalPipelineDefaultDto {
 
     @ApiProperty({
         description:
-            'When true, this pipeline is pre-selected in the generator form across all directories, overriding directory-level defaults. The user can still change the selection manually.',
+            'When true, this pipeline is pre-selected in the generator form across all works, overriding work-level defaults. The user can still change the selection manually.',
         example: false,
     })
     @IsBoolean()

@@ -19,7 +19,7 @@ ApiModule (Root)
   |     +-- JwtModule.registerAsync()
   |     +-- DatabaseModule
   |
-  +-- DirectoriesModule             Feature module
+  +-- WorksModule             Feature module
   |     +-- DatabaseModule
   |     +-- FacadesModule
   |     +-- MailModule
@@ -102,14 +102,14 @@ Shared modules provide reusable services with no controllers. They are imported 
 		TypeOrmModule.forFeature(ENTITIES)
 	],
 	providers: [
-		DirectoryRepository,
+		WorkRepository,
 		UserRepository,
 		RefreshTokenRepository
 		// ... all repositories
 	],
 	exports: [
 		TypeOrmModule,
-		DirectoryRepository,
+		WorkRepository,
 		UserRepository,
 		RefreshTokenRepository
 		// ... all repositories
@@ -118,7 +118,7 @@ Shared modules provide reusable services with no controllers. They are imported 
 export class DatabaseModule {}
 ```
 
-`DatabaseModule` is imported by `AuthModule`, `DirectoriesModule`, `FacadesModule`, and others. TypeORM handles deduplication so the database connection is created only once.
+`DatabaseModule` is imported by `AuthModule`, `WorksModule`, `FacadesModule`, and others. TypeORM handles deduplication so the database connection is created only once.
 
 ### Global Modules
 
@@ -262,11 +262,11 @@ export class ModuleA {}
 
 ```typescript
 // ModuleA emits an event
-this.eventEmitter.emit('directory.created', new DirectoryCreatedEvent(directory));
+this.eventEmitter.emit('work.created', new WorkCreatedEvent(work));
 
 // ModuleB listens for the event (no import of ModuleA needed)
-@OnEvent('directory.created')
-handleDirectoryCreated(event: DirectoryCreatedEvent) { /* ... */ }
+@OnEvent('work.created')
+handleWorkCreated(event: WorkCreatedEvent) { /* ... */ }
 ```
 
 The platform uses `EventEmitterModule` extensively to decouple modules.

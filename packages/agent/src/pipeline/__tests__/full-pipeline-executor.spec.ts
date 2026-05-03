@@ -13,7 +13,7 @@ jest.spyOn(Logger.prototype, 'log').mockImplementation(() => {});
 jest.spyOn(Logger.prototype, 'debug').mockImplementation(() => {});
 
 import type {
-    DirectoryReference,
+    WorkReference,
     GenerationRequest,
     ExistingItems,
     IPipelinePlugin,
@@ -29,10 +29,10 @@ describe('FullPipelineExecutorService', () => {
     let service: FullPipelineExecutorService;
     let eventEmitter: EventEmitter2;
 
-    const mockDirectory: DirectoryReference = {
+    const mockWork: WorkReference = {
         id: 'dir-123',
-        name: 'Test Directory',
-        slug: 'test-directory',
+        name: 'Test Work',
+        slug: 'test-work',
     };
 
     const mockRequest: GenerationRequest = {
@@ -209,10 +209,10 @@ describe('FullPipelineExecutorService', () => {
         it('should execute full pipeline plugin', async () => {
             const plugin = createMockFullPipelinePlugin('exa-websets');
 
-            const result = await service.execute(plugin, mockDirectory, mockRequest, mockExisting);
+            const result = await service.execute(plugin, mockWork, mockRequest, mockExisting);
 
             expect(plugin.execute).toHaveBeenCalledWith(
-                mockDirectory,
+                mockWork,
                 mockRequest,
                 mockExisting,
                 expect.objectContaining({ execContext: expect.any(Object) }),
@@ -225,12 +225,12 @@ describe('FullPipelineExecutorService', () => {
         it('should emit pipeline:started event', async () => {
             const plugin = createMockFullPipelinePlugin('exa-websets');
 
-            await service.execute(plugin, mockDirectory, mockRequest, mockExisting);
+            await service.execute(plugin, mockWork, mockRequest, mockExisting);
 
             expect(eventEmitter.emit).toHaveBeenCalledWith(
                 PipelineEvents.STARTED,
                 expect.objectContaining({
-                    directoryId: mockDirectory.id,
+                    workId: mockWork.id,
                     pipelineId: plugin.id,
                 }),
             );
@@ -239,12 +239,12 @@ describe('FullPipelineExecutorService', () => {
         it('should emit pipeline:completed event on success', async () => {
             const plugin = createMockFullPipelinePlugin('exa-websets');
 
-            await service.execute(plugin, mockDirectory, mockRequest, mockExisting);
+            await service.execute(plugin, mockWork, mockRequest, mockExisting);
 
             expect(eventEmitter.emit).toHaveBeenCalledWith(
                 PipelineEvents.COMPLETED,
                 expect.objectContaining({
-                    directoryId: mockDirectory.id,
+                    workId: mockWork.id,
                     pipelineId: plugin.id,
                     stepsCompleted: 5,
                     outputs: expect.objectContaining({
@@ -262,14 +262,14 @@ describe('FullPipelineExecutorService', () => {
             const error = new Error('Plugin execution failed');
             const plugin = createMockFullPipelinePlugin('exa-websets', { executeError: error });
 
-            const result = await service.execute(plugin, mockDirectory, mockRequest, mockExisting);
+            const result = await service.execute(plugin, mockWork, mockRequest, mockExisting);
 
             expect(result.success).toBe(false);
             expect(result.error).toBe(error);
             expect(eventEmitter.emit).toHaveBeenCalledWith(
                 PipelineEvents.FAILED,
                 expect.objectContaining({
-                    directoryId: mockDirectory.id,
+                    workId: mockWork.id,
                     pipelineId: plugin.id,
                     error: 'Plugin execution failed',
                 }),
@@ -280,7 +280,7 @@ describe('FullPipelineExecutorService', () => {
             const error = new Error('Plugin execution failed');
             const plugin = createMockFullPipelinePlugin('exa-websets', { executeError: error });
 
-            const result = await service.execute(plugin, mockDirectory, mockRequest, mockExisting);
+            const result = await service.execute(plugin, mockWork, mockRequest, mockExisting);
 
             expect(result.success).toBe(false);
             expect(result.outputs.items).toEqual([]);
@@ -298,10 +298,10 @@ describe('FullPipelineExecutorService', () => {
                 skipSteps: ['optional-step'],
             };
 
-            await service.execute(plugin, mockDirectory, mockRequest, mockExisting, options);
+            await service.execute(plugin, mockWork, mockRequest, mockExisting, options);
 
             expect(plugin.execute).toHaveBeenCalledWith(
-                mockDirectory,
+                mockWork,
                 mockRequest,
                 mockExisting,
                 expect.objectContaining({ ...options, execContext: expect.any(Object) }),
@@ -315,7 +315,7 @@ describe('FullPipelineExecutorService', () => {
 
             await service.execute(
                 plugin,
-                mockDirectory,
+                mockWork,
                 mockRequest,
                 mockExisting,
                 undefined,
@@ -323,7 +323,7 @@ describe('FullPipelineExecutorService', () => {
             );
 
             expect(plugin.execute).toHaveBeenCalledWith(
-                mockDirectory,
+                mockWork,
                 mockRequest,
                 mockExisting,
                 expect.objectContaining({ execContext: expect.any(Object) }),
@@ -334,7 +334,7 @@ describe('FullPipelineExecutorService', () => {
         it('should include duration in result', async () => {
             const plugin = createMockFullPipelinePlugin('exa-websets');
 
-            const result = await service.execute(plugin, mockDirectory, mockRequest, mockExisting);
+            const result = await service.execute(plugin, mockWork, mockRequest, mockExisting);
 
             expect(result.duration).toBeGreaterThanOrEqual(0);
         });
@@ -342,7 +342,7 @@ describe('FullPipelineExecutorService', () => {
         it('should include timestamp in events', async () => {
             const plugin = createMockFullPipelinePlugin('exa-websets');
 
-            await service.execute(plugin, mockDirectory, mockRequest, mockExisting);
+            await service.execute(plugin, mockWork, mockRequest, mockExisting);
 
             expect(eventEmitter.emit).toHaveBeenCalledWith(
                 PipelineEvents.STARTED,
@@ -363,7 +363,7 @@ describe('FullPipelineExecutorService', () => {
 
             const result = await service.executeWithCancellation(
                 plugin,
-                mockDirectory,
+                mockWork,
                 mockRequest,
                 mockExisting,
                 options,
@@ -391,7 +391,7 @@ describe('FullPipelineExecutorService', () => {
             // Start execution
             const executePromise = service.executeWithCancellation(
                 plugin,
-                mockDirectory,
+                mockWork,
                 mockRequest,
                 mockExisting,
                 options,
@@ -414,7 +414,7 @@ describe('FullPipelineExecutorService', () => {
 
             const result = await service.executeWithCancellation(
                 plugin,
-                mockDirectory,
+                mockWork,
                 mockRequest,
                 mockExisting,
                 options,
@@ -433,7 +433,7 @@ describe('FullPipelineExecutorService', () => {
 
             await service.executeWithCancellation(
                 plugin,
-                mockDirectory,
+                mockWork,
                 mockRequest,
                 mockExisting,
                 options,
@@ -459,7 +459,7 @@ describe('FullPipelineExecutorService', () => {
 
             const executePromise = service.executeWithCancellation(
                 plugin,
-                mockDirectory,
+                mockWork,
                 mockRequest,
                 mockExisting,
                 options,
@@ -498,7 +498,7 @@ describe('FullPipelineExecutorService', () => {
         it('should emit events with correct timestamp format', async () => {
             const plugin = createMockFullPipelinePlugin('exa-websets');
 
-            await service.execute(plugin, mockDirectory, mockRequest, mockExisting);
+            await service.execute(plugin, mockWork, mockRequest, mockExisting);
 
             const startedCall = (eventEmitter.emit as jest.Mock).mock.calls.find(
                 (call) => call[0] === PipelineEvents.STARTED,
@@ -512,13 +512,13 @@ describe('FullPipelineExecutorService', () => {
         it('should include all required fields in completed event', async () => {
             const plugin = createMockFullPipelinePlugin('exa-websets');
 
-            await service.execute(plugin, mockDirectory, mockRequest, mockExisting);
+            await service.execute(plugin, mockWork, mockRequest, mockExisting);
 
             expect(eventEmitter.emit).toHaveBeenCalledWith(
                 PipelineEvents.COMPLETED,
                 expect.objectContaining({
                     timestamp: expect.any(String),
-                    directoryId: mockDirectory.id,
+                    workId: mockWork.id,
                     pipelineId: plugin.id,
                     duration: expect.any(Number),
                     stepsCompleted: expect.any(Number),
@@ -537,13 +537,13 @@ describe('FullPipelineExecutorService', () => {
             const error = new Error('Test error');
             const plugin = createMockFullPipelinePlugin('exa-websets', { executeError: error });
 
-            await service.execute(plugin, mockDirectory, mockRequest, mockExisting);
+            await service.execute(plugin, mockWork, mockRequest, mockExisting);
 
             expect(eventEmitter.emit).toHaveBeenCalledWith(
                 PipelineEvents.FAILED,
                 expect.objectContaining({
                     timestamp: expect.any(String),
-                    directoryId: mockDirectory.id,
+                    workId: mockWork.id,
                     pipelineId: plugin.id,
                     error: 'Test error',
                     completedSteps: 0,
@@ -575,7 +575,7 @@ describe('FullPipelineExecutorService', () => {
                 executeResult: partialResult,
             });
 
-            const result = await service.execute(plugin, mockDirectory, mockRequest, mockExisting);
+            const result = await service.execute(plugin, mockWork, mockRequest, mockExisting);
 
             expect(result.success).toBe(true);
             expect(result.stepsCompleted).toBe(3);
@@ -604,7 +604,7 @@ describe('FullPipelineExecutorService', () => {
                 executeResult: cancelledResult,
             });
 
-            const result = await service.execute(plugin, mockDirectory, mockRequest, mockExisting);
+            const result = await service.execute(plugin, mockWork, mockRequest, mockExisting);
 
             expect(result.success).toBe(false);
             expect(result.state.isCancelled).toBe(true);

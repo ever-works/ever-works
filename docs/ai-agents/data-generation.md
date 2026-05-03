@@ -7,7 +7,7 @@ sidebar_position: 3
 
 # Data Generation
 
-The Data Generation system is the core engine behind Ever Works' AI-powered directory content creation. It orchestrates the full lifecycle of collecting, validating, deduplicating, and persisting structured item data into Git-backed YAML repositories.
+The Data Generation system is the core engine behind Ever Works' AI-powered work content creation. It orchestrates the full lifecycle of collecting, validating, deduplicating, and persisting structured item data into Git-backed YAML repositories.
 
 ## Architecture Overview
 
@@ -21,17 +21,17 @@ The data generation pipeline lives in `packages/agent/src/generators/data-genera
 
 ```
 DataGeneratorModule
-  imports: [FacadesModule, PipelineModule, DatabaseModule, DirectoryOperationsModule]
+  imports: [FacadesModule, PipelineModule, DatabaseModule, WorkOperationsModule]
   provides: [DataGeneratorService]
 ```
 
 ## Data Repository File Structure
 
-Every directory in Ever Works maps to a Git repository with a standardized YAML layout:
+Every work in Ever Works maps to a Git repository with a standardized YAML layout:
 
 ```
 <repo-root>/
-  config.yml            # Directory configuration (name, settings, pagination, etc.)
+  config.yml            # Work configuration (name, settings, pagination, etc.)
   categories.yml        # Category definitions
   tags.yml              # Tag definitions
   collections.yml       # Collection definitions
@@ -105,13 +105,13 @@ const mergeDataConfig = (base: IDataConfig, incoming: Partial<IDataConfig>): IDa
 
 ### Initialization Flow
 
-The `DataGeneratorService.initialize()` method handles first-time directory creation:
+The `DataGeneratorService.initialize()` method handles first-time work creation:
 
 1. **Repository Creation** -- Creates a new Git repository via the `GitFacadeService`.
 2. **Clone & Setup** -- Clones the repository locally and creates a `DataRepository` instance.
-3. **Config Initialization** -- Writes default `config.yml` with directory metadata.
+3. **Config Initialization** -- Writes default `config.yml` with work metadata.
 4. **Pipeline Execution** -- Delegates to the `PipelineOrchestratorService` to run the AI generation pipeline.
-5. **Item Writing** -- Writes generated items to YAML files in the `data/` directory.
+5. **Item Writing** -- Writes generated items to YAML files in the `data/` work.
 6. **Deduplication** -- Skips writing items whose content matches existing files (no spurious Git diffs).
 7. **Commit & Push** -- Stages all changes, commits, and pushes to the remote.
 
@@ -201,5 +201,5 @@ DataGeneratorModule
   +-- FacadesModule (GitFacadeService for Git operations)
   +-- PipelineModule (PipelineOrchestratorService for AI pipeline)
   +-- DatabaseModule (TypeORM repositories for entity persistence)
-  +-- DirectoryOperationsModule (Directory CRUD operations)
+  +-- WorkOperationsModule (Work CRUD operations)
 ```

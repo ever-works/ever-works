@@ -1,7 +1,7 @@
 /**
  * Zapier Automation Plugin
  *
- * Pipeline plugin that triggers Zapier actions during directory generation.
+ * Pipeline plugin that triggers Zapier actions during work generation.
  * Supports both the structured `{ items: [...] }` contract and native Zapier
  * action records via user-provided field mapping.
  *

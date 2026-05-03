@@ -259,7 +259,7 @@ await loginPage.login('user@example.com', 'password');
 - **Don't make page objects too large** - Split into components
 - **Don't share state** between page object instances
 
-### Directory Structure
+### Work Structure
 
 ```
 tests/

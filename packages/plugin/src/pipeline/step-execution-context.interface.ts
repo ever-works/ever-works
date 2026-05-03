@@ -4,7 +4,7 @@ import type { IScreenshotFacade } from '../facades/screenshot-facade.interface.j
 import type { IContentExtractorFacade } from '../facades/content-extractor-facade.interface.js';
 import type { IDataSourceFacade } from '../facades/data-source-facade.interface.js';
 import type { IPromptFacade } from '../facades/prompt-facade.interface.js';
-import type { DirectoryReference, UserReference } from './generation-context.interface.js';
+import type { WorkReference, UserReference } from './generation-context.interface.js';
 
 /**
  * Logger interface for step execution.
@@ -70,9 +70,9 @@ export interface StepExecutionContext {
 	readonly logger: StepLogger;
 
 	/**
-	 * Directory being processed.
+	 * Work being processed.
 	 */
-	readonly directory: DirectoryReference;
+	readonly work: WorkReference;
 
 	/**
 	 * User context for settings resolution.

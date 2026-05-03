@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { SourceValidationStep } from '../steps/source-validation.step';
-import type { StepExecutionContext, DirectoryReference, GenerationRequest, MutableItemData } from '@ever-works/plugin';
+import type { StepExecutionContext, WorkReference, GenerationRequest, MutableItemData } from '@ever-works/plugin';
 import type { MutableGenerationContext } from '../context/index.js';
 
 describe('SourceValidationStep', () => {
@@ -41,10 +41,10 @@ describe('SourceValidationStep', () => {
 		isConfigured: vi.fn().mockReturnValue(true)
 	});
 
-	const createMockDirectory = (): DirectoryReference => ({
+	const createMockWork = (): WorkReference => ({
 		id: 'test-dir-id',
-		slug: 'test-directory',
-		name: 'Test Directory'
+		slug: 'test-work',
+		name: 'Test Work'
 	});
 
 	const createMockRequest = (overrides?: Partial<GenerationRequest>): GenerationRequest =>
@@ -66,7 +66,7 @@ describe('SourceValidationStep', () => {
 
 	const createMockContext = (overrides?: Partial<MutableGenerationContext>): MutableGenerationContext =>
 		({
-			directory: createMockDirectory(),
+			work: createMockWork(),
 			request: createMockRequest(),
 			finalItems: [createMockItem('Test Item', 'https://example.com')],
 			metrics: { steps: {} },
@@ -93,7 +93,7 @@ describe('SourceValidationStep', () => {
 			searchFacade: createMockSearchFacade(),
 			contentExtractorFacade: createMockContentExtractorFacade(),
 			user: { id: 'test-user-id' },
-			directory: { id: 'test-dir-id' }
+			work: { id: 'test-dir-id' }
 		} as unknown as StepExecutionContext;
 	});
 

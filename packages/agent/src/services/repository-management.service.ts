@@ -1,10 +1,10 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { GitFacadeService } from '../facades/git.facade';
-import { Directory, RepoVisibility } from '../entities/directory.entity';
+import { Work, RepoVisibility } from '../entities/work.entity';
 import { User } from '../entities/user.entity';
-import { DirectoryRepository } from '../database/repositories/directory.repository';
+import { WorkRepository } from '../database/repositories/work.repository';
 
-export type RepositoryType = 'data' | 'directory' | 'website';
+export type RepositoryType = 'data' | 'work' | 'website';
 
 export interface RepositoryStatus {
     type: RepositoryType;
@@ -20,23 +20,24 @@ export class RepositoryManagementService {
 
     constructor(
         private readonly gitFacade: GitFacadeService,
-        private readonly directoryRepository: DirectoryRepository,
+        private readonly workRepository: WorkRepository,
     ) {}
 
-    async getRepositoriesStatus(directory: Directory, user: User): Promise<RepositoryStatus[]> {
+    async getRepositoriesStatus(work: Work, user: User): Promise<RepositoryStatus[]> {
         const repos: { type: RepositoryType; name: string }[] = [
-            { type: 'data', name: directory.getDataRepo() },
-            { type: 'directory', name: directory.getMainRepo() },
-            { type: 'website', name: directory.getWebsiteRepo() },
+            { type: 'data', name: work.getDataRepo() },
+            { type: 'work', name: work.getMainRepo() },
+            { type: 'website', name: work.getWebsiteRepo() },
         ];
 
         const results = await Promise.all(
             repos.map(async (repo) => {
-                const owner = directory.getRepoOwner(repo.type);
+                const owner = work.getRepoOwner(repo.type);
                 try {
                     const data = await this.gitFacade.getRepository(owner, repo.name, {
                         userId: user.id,
-                        providerId: directory.gitProvider,
+                        providerId: work.gitProvider,
+                        workId: work.id,
                     });
                     if (data) {
                         return {
@@ -63,19 +64,19 @@ export class RepositoryManagementService {
         // Update DB cache
         const newVisibility: RepoVisibility = {
             data: results.find((r) => r.type === 'data')?.isPrivate ?? true,
-            directory: results.find((r) => r.type === 'directory')?.isPrivate ?? true,
+            work: results.find((r) => r.type === 'work')?.isPrivate ?? true,
             website: results.find((r) => r.type === 'website')?.isPrivate ?? true,
         };
 
         // Only update if changed
-        const currentVisibility = directory.repoVisibility;
+        const currentVisibility = work.repoVisibility;
         if (
             !currentVisibility ||
             currentVisibility.data !== newVisibility.data ||
-            currentVisibility.directory !== newVisibility.directory ||
+            currentVisibility.work !== newVisibility.work ||
             currentVisibility.website !== newVisibility.website
         ) {
-            await this.directoryRepository.update(directory.id, {
+            await this.workRepository.update(work.id, {
                 repoVisibility: newVisibility,
             });
         }
@@ -84,23 +85,23 @@ export class RepositoryManagementService {
     }
 
     async updateRepositoryVisibility(
-        directory: Directory,
+        work: Work,
         user: User,
         repoType: RepositoryType,
         isPrivate: boolean,
     ): Promise<RepositoryStatus> {
-        const owner = directory.getRepoOwner(repoType);
+        const owner = work.getRepoOwner(repoType);
         let repoName: string;
 
         switch (repoType) {
             case 'data':
-                repoName = directory.getDataRepo();
+                repoName = work.getDataRepo();
                 break;
-            case 'directory':
-                repoName = directory.getMainRepo();
+            case 'work':
+                repoName = work.getMainRepo();
                 break;
             case 'website':
-                repoName = directory.getWebsiteRepo();
+                repoName = work.getWebsiteRepo();
                 break;
             default:
                 throw new Error('Invalid repository type');
@@ -110,19 +111,19 @@ export class RepositoryManagementService {
             owner,
             repoName,
             { isPrivate },
-            { userId: user.id, providerId: directory.gitProvider },
+            { userId: user.id, providerId: work.gitProvider, workId: work.id },
         );
 
         // Update DB cache
-        const currentVisibility = directory.repoVisibility || {
+        const currentVisibility = work.repoVisibility || {
             data: true,
-            directory: true,
+            work: true,
             website: true,
         };
         const newVisibility = { ...currentVisibility };
         newVisibility[repoType] = updated.isPrivate;
 
-        await this.directoryRepository.update(directory.id, {
+        await this.workRepository.update(work.id, {
             repoVisibility: newVisibility,
         });
 

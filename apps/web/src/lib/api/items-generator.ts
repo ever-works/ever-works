@@ -18,6 +18,7 @@ import type {
 export type {
     PluginIcon,
     ProviderOption,
+    ProviderModelSummary,
     GeneratorFormSchema,
     FormSchemaProvidersType,
     ProviderSelectionState,
@@ -84,9 +85,9 @@ export interface CancelGenerationResponse {
 
 export const itemsGeneratorAPI = {
     // Generate items
-    generate: async (directoryId: string, data: CreateItemsGeneratorDto) => {
+    generate: async (workId: string, data: CreateItemsGeneratorDto) => {
         return serverMutation<ItemsGeneratorResponse>({
-            endpoint: `/directories/${directoryId}/generate`,
+            endpoint: `/works/${workId}/generate`,
             data,
             method: 'POST',
             wrapInData: false,
@@ -94,18 +95,18 @@ export const itemsGeneratorAPI = {
     },
 
     // Update items generator
-    update: async (directoryId: string, data: UpdateItemsGeneratorDto) => {
+    update: async (workId: string, data: UpdateItemsGeneratorDto) => {
         return serverMutation<ItemsGeneratorResponse>({
-            endpoint: `/directories/${directoryId}/update`,
+            endpoint: `/works/${workId}/update`,
             data,
             method: 'POST',
             wrapInData: false,
         });
     },
 
-    cancel: async (directoryId: string) => {
+    cancel: async (workId: string) => {
         return serverMutation<CancelGenerationResponse>({
-            endpoint: `/directories/${directoryId}/cancel-generation`,
+            endpoint: `/works/${workId}/cancel-generation`,
             data: {},
             method: 'POST',
             wrapInData: false,
@@ -113,9 +114,9 @@ export const itemsGeneratorAPI = {
     },
 
     // Submit new item
-    submitItem: async (directoryId: string, data: SubmitItemDto) => {
+    submitItem: async (workId: string, data: SubmitItemDto) => {
         return serverMutation<ItemResponse>({
-            endpoint: `/directories/${directoryId}/submit-item`,
+            endpoint: `/works/${workId}/submit-item`,
             data,
             method: 'POST',
             wrapInData: false,
@@ -123,9 +124,9 @@ export const itemsGeneratorAPI = {
     },
 
     // Remove item
-    removeItem: async (directoryId: string, data: RemoveItemDto) => {
+    removeItem: async (workId: string, data: RemoveItemDto) => {
         return serverMutation<ItemResponse>({
-            endpoint: `/directories/${directoryId}/remove-item`,
+            endpoint: `/works/${workId}/remove-item`,
             data,
             method: 'POST',
             wrapInData: false,
@@ -133,18 +134,18 @@ export const itemsGeneratorAPI = {
     },
 
     // Update item metadata
-    updateItem: async (directoryId: string, data: UpdateItemDto) => {
+    updateItem: async (workId: string, data: UpdateItemDto) => {
         return serverMutation<ItemResponse>({
-            endpoint: `/directories/${directoryId}/update-item`,
+            endpoint: `/works/${workId}/update-item`,
             data,
             method: 'POST',
             wrapInData: false,
         });
     },
 
-    checkItemHealth: async (directoryId: string, data: CheckItemHealthDto) => {
+    checkItemHealth: async (workId: string, data: CheckItemHealthDto) => {
         return serverMutation<CheckItemHealthResponseDto>({
-            endpoint: `/directories/${directoryId}/check-item-health`,
+            endpoint: `/works/${workId}/check-item-health`,
             data,
             method: 'POST',
             wrapInData: false,
@@ -162,9 +163,9 @@ export const itemsGeneratorAPI = {
     },
 
     // Regenerate markdown
-    regenerateMarkdown: async (directoryId: string) => {
+    regenerateMarkdown: async (workId: string) => {
         return serverMutation<APIResponse<{ message?: string }>>({
-            endpoint: `/directories/${directoryId}/regenerate-markdown`,
+            endpoint: `/works/${workId}/regenerate-markdown`,
             data: {},
             method: 'POST',
             wrapInData: false,
@@ -172,14 +173,12 @@ export const itemsGeneratorAPI = {
     },
 
     // Get generator form schema
-    getFormSchema: async (directoryId: string, pipelineId?: string) => {
+    getFormSchema: async (workId: string, pipelineId?: string) => {
         const queryParams = pipelineId ? `?pipelineId=${encodeURIComponent(pipelineId)}` : '';
-        return serverFetch<GeneratorFormSchema>(
-            `/directories/${directoryId}/generator-form${queryParams}`,
-        );
+        return serverFetch<GeneratorFormSchema>(`/works/${workId}/generator-form${queryParams}`);
     },
 
-    // Get global generator form schema (no directory context)
+    // Get global generator form schema (no work context)
     getFormSchemaGlobal: async (pipelineId?: string) => {
         const queryParams = pipelineId ? `?pipelineId=${encodeURIComponent(pipelineId)}` : '';
         return serverFetch<GeneratorFormSchema>(`/generator-form${queryParams}`);

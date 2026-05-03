@@ -18,17 +18,17 @@ sidebar_position: 66
 
 ## Overview
 
-The Codex plugin is a **full pipeline plugin** that delegates the entire directory generation flow to OpenAI's Codex agent. It is one of several CLI-driven generators (alongside `claude-code`, `gemini`, and `opencode`) that run an autonomous coding agent locally to produce directory data.
+The Codex plugin is a **full pipeline plugin** that delegates the entire work generation flow to OpenAI's Codex agent. It is one of several CLI-driven generators (alongside `claude-code`, `gemini`, and `opencode`) that run an autonomous coding agent locally to produce work data.
 
 The plugin packages the Codex CLI binary so users do not need to install it separately; the binary is fetched and unpacked at runtime.
 
 ## Selecting It
 
-In the directory edit screen, set **Generation Pipeline** to `Codex Generator`. The plugin appears in the dropdown once it has been configured with an API key.
+In the work edit screen, set **Generation Pipeline** to `Codex Generator`. The plugin appears in the dropdown once it has been configured with an API key.
 
 ## Configuration
 
-Configuration is provided through the directory settings UI. The settings schema is defined in `packages/plugins/codex/src/` — see that source for the current set of fields and defaults.
+Configuration is provided through the work settings UI. The settings schema is defined in `packages/plugins/codex/src/` — see that source for the current set of fields and defaults.
 
 You will typically need:
 

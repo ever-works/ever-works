@@ -4,7 +4,7 @@ import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { Cache } from 'cache-manager';
 import * as superjson from 'superjson';
 import type {
-    DirectoryReference,
+    WorkReference,
     GenerationRequest,
     ExistingItems,
     IPipelineContext,
@@ -104,7 +104,7 @@ export class StepPipelineExecutorService {
 
     async execute(
         plugin: IPipelinePlugin,
-        directory: DirectoryReference,
+        work: WorkReference,
         request: GenerationRequest,
         existing: ExistingItems,
         options?: PipelineExecutionOptions,
@@ -115,7 +115,7 @@ export class StepPipelineExecutorService {
                 `Pipeline plugin "${plugin.id}" must implement createContext() for engine-orchestrated execution.`,
             );
         }
-        const context = plugin.createContext(directory, request, existing);
+        const context = plugin.createContext(work, request, existing);
 
         // Attach log interceptor to capture ALL plugin logger output
         const onLogEntry = options?.onLogEntry;
@@ -149,17 +149,17 @@ export class StepPipelineExecutorService {
         onProgress?: PipelineProgressCallback,
     ): Promise<PipelineResult> {
         const startTime = Date.now();
-        const directory = context.directory;
+        const work = context.work;
 
         this.logger.log(
-            `Starting step-based pipeline execution for directory: ${directory.id} via plugin: ${plugin.id}`,
+            `Starting step-based pipeline execution for work: ${work.id} via plugin: ${plugin.id}`,
         );
 
-        const pipeline = await this.pipelineBuilder.build(plugin, directory.id, directory.user?.id);
+        const pipeline = await this.pipelineBuilder.build(plugin, work.id, work.user?.id);
         const runner = new ExecutablePipelineRunner(pipeline, this.eventEmitter);
 
         this.emitPipelineEvent(PipelineEvents.STARTED, {
-            directoryId: directory.id,
+            workId: work.id,
             pipelineId: plugin.id,
         });
 
@@ -174,7 +174,7 @@ export class StepPipelineExecutorService {
                     this.logger.log(`Pipeline cancelled before group ${group.id}`);
                     runner.cancelExecution();
                     this.emitPipelineEvent(PipelineEvents.CANCELLED, {
-                        directoryId: directory.id,
+                        workId: work.id,
                     });
                     return this.buildResult(plugin, context, runner, startTime, {
                         error: `Pipeline cancelled at step: ${group.stepIds[0]}`,
@@ -188,7 +188,7 @@ export class StepPipelineExecutorService {
 
                 if (groupSteps.length === 0) continue;
 
-                const concurrency = group.maxConcurrent;
+                const concurrency = this.resolveGroupConcurrency(group.maxConcurrent, options);
                 if (!concurrency || concurrency >= groupSteps.length) {
                     await Promise.all(
                         groupSteps.map((step, idx) =>
@@ -238,7 +238,7 @@ export class StepPipelineExecutorService {
             const result = this.buildResult(plugin, context, runner, startTime);
 
             this.emitPipelineCompleted(
-                directory.id,
+                work.id,
                 Date.now() - startTime,
                 runner.getState().completedSteps.length,
                 result,
@@ -249,7 +249,7 @@ export class StepPipelineExecutorService {
                 `Pipeline completed: ${runner.getState().completedSteps.length}/${pipeline.steps.length} steps`,
             );
 
-            await this.clearCheckpoint(directory.id, plugin.id);
+            await this.clearCheckpoint(work.id, plugin.id);
 
             return result;
         } catch (error) {
@@ -257,7 +257,7 @@ export class StepPipelineExecutorService {
             const failedStep = pipeline.steps[currentStepIndex]?.id;
 
             this.emitPipelineFailed(
-                directory.id,
+                work.id,
                 error as Error,
                 failedStep,
                 lastCompletedStepIndex + 1,
@@ -363,7 +363,7 @@ export class StepPipelineExecutorService {
 
             await this.saveCheckpoint(
                 plugin,
-                context.directory,
+                context.work,
                 pipelineId,
                 context,
                 stepIndex,
@@ -417,14 +417,14 @@ export class StepPipelineExecutorService {
 
     async resumeFromCheckpoint(
         plugin: IPipelinePlugin,
-        directoryId: string,
+        workId: string,
         pipelineId: string,
         options?: PipelineExecutionOptions,
         onProgress?: PipelineProgressCallback,
     ): Promise<PipelineResult | null> {
-        const checkpoint = await this.loadCheckpoint(directoryId, pipelineId);
+        const checkpoint = await this.loadCheckpoint(workId, pipelineId);
         if (!checkpoint) {
-            this.logger.warn(`No checkpoint found for directory: ${directoryId}`);
+            this.logger.warn(`No checkpoint found for work: ${workId}`);
             return null;
         }
 
@@ -432,8 +432,8 @@ export class StepPipelineExecutorService {
             plugin.isCheckpointViable?.(checkpoint.context, checkpoint.completedSteps) ?? true;
 
         if (!viable) {
-            this.logger.warn(`Checkpoint for directory ${directoryId} is not viable. Discarding.`);
-            await this.clearCheckpoint(directoryId, pipelineId);
+            this.logger.warn(`Checkpoint for work ${workId} is not viable. Discarding.`);
+            await this.clearCheckpoint(workId, pipelineId);
             return null;
         }
 
@@ -441,7 +441,7 @@ export class StepPipelineExecutorService {
             this.logger.warn(
                 `Pipeline plugin "${plugin.id}" does not implement contextFromSnapshot(). Cannot resume.`,
             );
-            await this.clearCheckpoint(directoryId, pipelineId);
+            await this.clearCheckpoint(workId, pipelineId);
             return null;
         }
 
@@ -469,7 +469,7 @@ export class StepPipelineExecutorService {
         options?: PipelineExecutionOptions,
     ): Promise<void> {
         const execContext = this.facadeService.createStepExecutionContext(
-            context.directory,
+            context.work,
             context.request.providers,
             context.request.aiModel,
             options?.signal,
@@ -539,13 +539,23 @@ export class StepPipelineExecutorService {
         await Promise.all(executing);
     }
 
+    private resolveGroupConcurrency(
+        groupConcurrency: number | undefined,
+        options?: PipelineExecutionOptions,
+    ): number | undefined {
+        if (options?.maxConcurrent !== undefined) {
+            return Math.max(1, Math.floor(options.maxConcurrent));
+        }
+        return groupConcurrency;
+    }
+
     // ============================================================================
     // Checkpoint Management
     // ============================================================================
 
     private async saveCheckpoint(
         plugin: IPipelinePlugin,
-        directory: DirectoryReference,
+        work: WorkReference,
         pipelineId: string,
         context: IPipelineContext,
         stepIndex: number,
@@ -556,7 +566,7 @@ export class StepPipelineExecutorService {
             return;
         }
 
-        const checkpointKey = `pipeline-checkpoint-${directory.id}-${pipelineId}`;
+        const checkpointKey = `pipeline-checkpoint-${work.id}-${pipelineId}`;
         const snapshot = plugin.contextToSnapshot(context);
 
         const checkpointData: CheckpointData = {
@@ -579,12 +589,12 @@ export class StepPipelineExecutorService {
         }
     }
 
-    async loadCheckpoint(directoryId: string, pipelineId: string): Promise<CheckpointData | null> {
+    async loadCheckpoint(workId: string, pipelineId: string): Promise<CheckpointData | null> {
         if (!this.cacheManager) {
             return null;
         }
 
-        const checkpointKey = `pipeline-checkpoint-${directoryId}-${pipelineId}`;
+        const checkpointKey = `pipeline-checkpoint-${workId}-${pipelineId}`;
         try {
             const serialized = await this.cacheManager.get<string>(checkpointKey);
             if (!serialized) {
@@ -595,7 +605,7 @@ export class StepPipelineExecutorService {
             const schemaVersion = data.schemaVersion ?? 0;
             if (schemaVersion !== CURRENT_CHECKPOINT_VERSION) {
                 this.logger.warn(
-                    `Checkpoint schema version mismatch for directory ${directoryId}: ` +
+                    `Checkpoint schema version mismatch for work ${workId}: ` +
                         `expected ${CURRENT_CHECKPOINT_VERSION}, got ${schemaVersion}. ` +
                         `Clearing incompatible checkpoint.`,
                 );
@@ -609,11 +619,11 @@ export class StepPipelineExecutorService {
         }
     }
 
-    async clearCheckpoint(directoryId: string, pipelineId: string): Promise<void> {
+    async clearCheckpoint(workId: string, pipelineId: string): Promise<void> {
         if (!this.cacheManager) {
             return;
         }
-        await this.cacheManager.del(`pipeline-checkpoint-${directoryId}-${pipelineId}`);
+        await this.cacheManager.del(`pipeline-checkpoint-${workId}-${pipelineId}`);
     }
 
     // ============================================================================
@@ -768,7 +778,7 @@ export class StepPipelineExecutorService {
     }
 
     private emitPipelineCompleted(
-        directoryId: string,
+        workId: string,
         duration: number,
         stepsCompleted: number,
         result: PipelineResult,
@@ -776,7 +786,7 @@ export class StepPipelineExecutorService {
     ): void {
         this.eventEmitter.emit(PipelineEvents.COMPLETED, {
             timestamp: new Date().toISOString(),
-            directoryId,
+            workId,
             pipelineId: source,
             duration,
             stepsCompleted,
@@ -785,7 +795,7 @@ export class StepPipelineExecutorService {
     }
 
     private emitPipelineFailed(
-        directoryId: string,
+        workId: string,
         error: Error,
         failedStep: string | undefined,
         completedSteps: number,
@@ -793,7 +803,7 @@ export class StepPipelineExecutorService {
     ): void {
         this.eventEmitter.emit(PipelineEvents.FAILED, {
             timestamp: new Date().toISOString(),
-            directoryId,
+            workId,
             pipelineId: source,
             error: error.message,
             failedStep,

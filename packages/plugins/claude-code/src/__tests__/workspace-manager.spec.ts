@@ -18,7 +18,7 @@ describe('workspace-manager', () => {
 	});
 
 	describe('createWorkspace', () => {
-		it('should create a per-run workspace and create _meta directory', async () => {
+		it('should create a per-run workspace and create _meta work', async () => {
 			vi.mocked(fs.mkdir).mockResolvedValue(undefined as unknown as string);
 			vi.mocked(fs.mkdtemp).mockResolvedValue('/tmp/claude-code-generator/user1/dir1/run-123');
 
@@ -110,12 +110,12 @@ describe('workspace-manager', () => {
 
 			const categories: Category[] = [{ id: '1', name: 'Cat1' }];
 			await seedMetadata('/workspace', {
-				directory: { name: 'Dir', description: 'Desc' },
+				work: { name: 'Dir', description: 'Desc' },
 				categories
 			});
 
 			const writePaths = vi.mocked(fs.writeFile).mock.calls.map((c) => c[0]);
-			expect(writePaths).toContain('/workspace/_meta/directory.json');
+			expect(writePaths).toContain('/workspace/_meta/work.json');
 			expect(writePaths).toContain('/workspace/_meta/categories.json');
 		});
 
@@ -129,7 +129,7 @@ describe('workspace-manager', () => {
 	describe('readGeneratedItems', () => {
 		const mockLogger = { log: vi.fn(), warn: vi.fn(), debug: vi.fn() };
 
-		it('should read valid JSON files and skip directories', async () => {
+		it('should read valid JSON files and skip works', async () => {
 			vi.mocked(fs.readdir).mockResolvedValue([
 				{ name: '_meta', isDirectory: () => true },
 				{ name: 'item.json', isDirectory: () => false }
@@ -284,7 +284,7 @@ describe('workspace-manager', () => {
 	});
 
 	describe('cleanupWorkspace', () => {
-		it('should remove workspace directory', async () => {
+		it('should remove workspace work', async () => {
 			vi.mocked(fs.rm).mockResolvedValue(undefined);
 			await cleanupWorkspace('/tmp/claude-code-generator/user1/dir1/run-123');
 			expect(fs.rm).toHaveBeenCalledWith('/tmp/claude-code-generator/user1/dir1/run-123', {

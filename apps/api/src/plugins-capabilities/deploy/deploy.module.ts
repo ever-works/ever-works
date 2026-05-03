@@ -3,7 +3,7 @@ import { FacadesModule } from '@ever-works/agent/facades';
 import { DatabaseModule } from '@ever-works/agent/database';
 import { PluginsModule } from '@ever-works/agent/plugins';
 import { WebsiteGeneratorModule } from '@ever-works/agent/generators';
-import { DirectoryModule } from '@ever-works/agent/services';
+import { WorkModule } from '@ever-works/agent/services';
 import { AuthModule } from '../../auth/auth.module';
 import { ActivityLogModule } from '@ever-works/agent/activity-log';
 import { DeployController } from './deploy.controller';
@@ -16,7 +16,7 @@ import { DeploymentVerifierService } from './tasks/deployment-verifier.service';
         DatabaseModule,
         PluginsModule,
         WebsiteGeneratorModule,
-        DirectoryModule,
+        WorkModule,
         ActivityLogModule,
         forwardRef(() => AuthModule),
     ],

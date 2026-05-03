@@ -8,7 +8,7 @@ import { appendCustomPrompt } from '../utils/prompt.utils.js';
 import { PROMPT_KEYS } from '../prompt-keys.js';
 
 const SEARCH_QUERY_PROMPT =
-	`You are a directory builder generating search queries to find the most relevant, official sources.
+	`You are a work builder generating search queries to find the most relevant, official sources.
 
 Topic: "{name}"
 Description: "{description}"
@@ -39,20 +39,20 @@ export class SearchQueryGenerationStep extends BasePipelineStep {
 		context: MutableGenerationContext,
 		execContext: StepExecutionContext
 	): Promise<MutableGenerationContext> {
-		const { request, directory, metrics, advancedPrompts } = context;
+		const { request, work, metrics, advancedPrompts } = context;
 		const { logger, aiFacade, promptFacade } = execContext;
 		const config = request.config || {};
 
 		const facadeOptions: FacadeOptions = {
 			userId: execContext.user!.id,
-			directoryId: execContext.directory.id
+			workId: execContext.work.id
 		};
 
-		logger.log(`[${directory.slug}] AI-Powered Search Query Generation - Starting`);
+		logger.log(`[${work.slug}] AI-Powered Search Query Generation - Starting`);
 
 		const searchQueries = await this.generateSearchQueries(
 			context,
-			request.name || directory.name,
+			request.name || work.name,
 			request.prompt || '',
 			(config.target_keywords as string[]) || [],
 			(config.max_search_queries as number) || 10,
@@ -64,7 +64,7 @@ export class SearchQueryGenerationStep extends BasePipelineStep {
 			promptFacade
 		);
 
-		logger.log(`[${directory.slug}] Generated ${searchQueries.length} search queries.`);
+		logger.log(`[${work.slug}] Generated ${searchQueries.length} search queries.`);
 
 		context.searchQueries = searchQueries;
 

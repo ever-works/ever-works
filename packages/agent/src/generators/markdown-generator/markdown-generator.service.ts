@@ -2,14 +2,14 @@ import { Injectable, Logger } from '@nestjs/common';
 import * as fs from 'node:fs/promises';
 import { GitFacadeService } from '../../facades/git.facade';
 import type { Category, Identifiable, ItemData, Tag } from '@ever-works/contracts';
-import { Directory } from '../../entities/directory.entity';
+import { Work } from '../../entities/work.entity';
 import { User } from '../../entities/user.entity';
 import { DataRepository, PRUpdate } from '../data-generator/data-repository';
 import { ReadmeBuilder } from './readme-builder';
 import { MarkdownRepository } from './markdown-repository';
 import { GenerationMethod } from '../../items-generator/dto';
-import { DirectoryOperationsService } from '@src/directory-operations';
-import { getDirectoryOwner } from '../../utils/directory.utils';
+import { WorkOperationsService } from '@src/work-operations';
+import { getWorkOwner } from '../../utils/work.utils';
 import { cloneFreshRepository } from '../../utils/fresh-repository-clone.utils';
 import { assertCreatedRepositoryTarget } from '../../utils/git-repository.utils';
 import { throwIfGenerationCancelled } from '../../utils/generation-cancellation.utils';
@@ -27,17 +27,17 @@ export class MarkdownGeneratorService {
 
     constructor(
         private readonly gitFacade: GitFacadeService,
-        private readonly directoryOperations: DirectoryOperationsService,
+        private readonly workOperations: WorkOperationsService,
     ) {}
 
-    async initialize(directory: Directory, user: User, options: InitializeOptions = {}) {
+    async initialize(work: Work, user: User, options: InitializeOptions = {}) {
         throwIfGenerationCancelled(options.signal);
 
-        const directoryOwner = getDirectoryOwner(directory);
-        const committer = directory.resolveCommitter(user);
-        const description = directory.description;
-        const mainRepoOwner = directory.getRepoOwner('directory');
-        const mainRepo = directory.getMainRepo();
+        const workOwner = getWorkOwner(work);
+        const committer = work.resolveCommitter(user);
+        const description = work.description;
+        const mainRepoOwner = work.getRepoOwner('work');
+        const mainRepo = work.getMainRepo();
 
         // Create repository through facade
         const markdownRepository = assertCreatedRepositoryTarget(
@@ -45,10 +45,14 @@ export class MarkdownGeneratorService {
                 {
                     name: mainRepo,
                     description,
-                    organization: directory.organization ? mainRepoOwner : undefined,
+                    organization: work.organization ? mainRepoOwner : undefined,
                     isPrivate: true,
                 },
-                { userId: directoryOwner.id, providerId: directory.gitProvider },
+                {
+                    userId: workOwner.id,
+                    providerId: work.gitProvider,
+                    workId: work.id,
+                },
             ),
             mainRepoOwner,
             mainRepo,
@@ -63,8 +67,9 @@ export class MarkdownGeneratorService {
                 owner: markdownRepository.owner,
                 repo: markdownRepository.name,
                 committer,
-                userId: directoryOwner.id,
-                providerId: directory.gitProvider,
+                userId: workOwner.id,
+                providerId: work.gitProvider,
+                workId: work.id,
             },
             this.logger,
         );
@@ -73,11 +78,15 @@ export class MarkdownGeneratorService {
         // Clone data repo
         const dataPath = await this.gitFacade.cloneOrPull(
             {
-                owner: directory.getRepoOwner(),
-                repo: directory.getDataRepo(),
+                owner: work.getRepoOwner(),
+                repo: work.getDataRepo(),
                 committer,
             },
-            { userId: directoryOwner.id, providerId: directory.gitProvider },
+            {
+                userId: workOwner.id,
+                providerId: work.gitProvider,
+                workId: work.id,
+            },
         );
         throwIfGenerationCancelled(options.signal);
 
@@ -86,9 +95,9 @@ export class MarkdownGeneratorService {
 
         try {
             const slugs = await fs.readdir(dataRepo.dataDir);
-            await markdownRepo.ensureDirectoriesExist();
+            await markdownRepo.ensureWorksExist();
 
-            const provider = directory.gitProvider;
+            const provider = work.gitProvider;
             const defaultBranch = await this.gitFacade
                 .getMainBranch(provider, markdownRepo.dir)
                 .catch((err) => {
@@ -220,18 +229,22 @@ export class MarkdownGeneratorService {
                 provider,
                 markdownPath,
                 'sync README.md',
-                directory.resolveCommitter(user),
+                work.resolveCommitter(user),
             );
             throwIfGenerationCancelled(options.signal);
             await this.gitFacade.push(
                 { dir: markdownPath },
-                { userId: directoryOwner.id, providerId: directory.gitProvider },
+                {
+                    userId: workOwner.id,
+                    providerId: work.gitProvider,
+                    workId: work.id,
+                },
             );
 
             throwIfGenerationCancelled(options.signal);
             if (canCreatePR && defaultBranch) {
                 this.logger.log(
-                    `Creating PR from ${pr_update.branch} to ${defaultBranch} for ${directory.slug}`,
+                    `Creating PR from ${pr_update.branch} to ${defaultBranch} for ${work.slug}`,
                 );
 
                 const pr = await this.gitFacade
@@ -244,7 +257,11 @@ export class MarkdownGeneratorService {
                             title: pr_update.title,
                             body: pr_update.body,
                         },
-                        { userId: directoryOwner.id, providerId: directory.gitProvider },
+                        {
+                            userId: workOwner.id,
+                            providerId: work.gitProvider,
+                            workId: work.id,
+                        },
                     )
                     .catch((err) => {
                         this.logger.error('Failed to create PR', err);
@@ -252,7 +269,7 @@ export class MarkdownGeneratorService {
                     });
 
                 if (pr) {
-                    await this.directoryOperations.updateLastPullRequest(directory.id, {
+                    await this.workOperations.updateLastPullRequest(work.id, {
                         main: {
                             branch: pr_update.branch,
                             title: pr_update.title,
@@ -263,7 +280,7 @@ export class MarkdownGeneratorService {
                     });
                 }
             } else {
-                this.logger.log(`Pushed changes to main branch for ${directory.slug}`);
+                this.logger.log(`Pushed changes to main branch for ${work.slug}`);
             }
         } catch (err) {
             this.logger.error('Error during markdown generation', err);
@@ -271,11 +288,11 @@ export class MarkdownGeneratorService {
         }
     }
 
-    async removeItemDetail(directory: Directory, user: User, slug: string, branch?: string) {
-        const directoryOwner = getDirectoryOwner(directory);
-        const committer = directory.resolveCommitter(user);
-        const mainRepoOwner = directory.getRepoOwner('directory');
-        const mainRepo = directory.getMainRepo();
+    async removeItemDetail(work: Work, user: User, slug: string, branch?: string) {
+        const workOwner = getWorkOwner(work);
+        const committer = work.resolveCommitter(user);
+        const mainRepoOwner = work.getRepoOwner('work');
+        const mainRepo = work.getMainRepo();
 
         const markdownPath = await this.gitFacade.cloneOrPull(
             {
@@ -283,14 +300,18 @@ export class MarkdownGeneratorService {
                 repo: mainRepo,
                 committer,
             },
-            { userId: directoryOwner.id, providerId: directory.gitProvider },
+            {
+                userId: workOwner.id,
+                providerId: work.gitProvider,
+                workId: work.id,
+            },
         );
 
         const markdownRepo = new MarkdownRepository(markdownPath);
 
         if (branch) {
             await this.gitFacade
-                .switchBranch(directory.gitProvider, markdownRepo.dir, branch, true)
+                .switchBranch(work.gitProvider, markdownRepo.dir, branch, true)
                 .catch((err) => {
                     this.logger.error('Failed to switch to PR branch', err);
                 });
@@ -300,24 +321,25 @@ export class MarkdownGeneratorService {
     }
 
     /**
-     * Remove repository for a directory
+     * Remove repository for a work
      */
-    async removeRepository(directory: Directory, user: User): Promise<void> {
-        const directoryOwner = getDirectoryOwner(directory);
-        const mainRepoOwner = directory.getRepoOwner('directory');
-        const mainRepo = directory.getMainRepo();
+    async removeRepository(work: Work, user: User): Promise<void> {
+        const workOwner = getWorkOwner(work);
+        const mainRepoOwner = work.getRepoOwner('work');
+        const mainRepo = work.getMainRepo();
 
         try {
             // Delete the repository
             await this.gitFacade.deleteRepository(mainRepoOwner, mainRepo, {
-                userId: directoryOwner.id,
-                providerId: directory.gitProvider,
+                userId: workOwner.id,
+                providerId: work.gitProvider,
+                workId: work.id,
             });
 
             const dataDir = this.gitFacade.getLocalDir(
-                directory.gitProvider,
-                directory.getRepoOwner(),
-                directory.getMainRepo(),
+                work.gitProvider,
+                work.getRepoOwner(),
+                work.getMainRepo(),
             );
 
             new MarkdownRepository(dataDir).cleanup();
@@ -334,11 +356,11 @@ export class MarkdownGeneratorService {
         }
     }
 
-    async cleanup(directory: Directory) {
+    async cleanup(work: Work) {
         const dataDir = this.gitFacade.getLocalDir(
-            directory.gitProvider,
-            directory.getRepoOwner(),
-            directory.getMainRepo(),
+            work.gitProvider,
+            work.getRepoOwner(),
+            work.getMainRepo(),
         );
 
         return new MarkdownRepository(dataDir).cleanup();

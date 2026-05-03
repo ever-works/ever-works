@@ -10,7 +10,7 @@ sidebar_position: 11
 API keys provide a long-lived, non-interactive way to authenticate with the Ever Works API. They are ideal for CI/CD pipelines, CLI tools, MCP server connections, and any integration that cannot go through the browser-based JWT login flow.
 
 :::tip When to use this
-Use API keys whenever you need programmatic access to the API without user interaction — for example, connecting the MCP server, automating directory updates from a CI pipeline, or building custom integrations.
+Use API keys whenever you need programmatic access to the API without user interaction — for example, connecting the MCP server, automating work updates from a CI pipeline, or building custom integrations.
 :::
 
 ## Prerequisites
@@ -41,11 +41,11 @@ API keys are accepted in two ways:
 
 ```bash
 # Option 1: x-api-key header
-curl http://localhost:3100/api/directories \
+curl http://localhost:3100/api/works \
   -H "x-api-key: ew_live_your_key_here"
 
 # Option 2: Authorization header
-curl http://localhost:3100/api/directories \
+curl http://localhost:3100/api/works \
   -H "Authorization: Bearer ew_live_your_key_here"
 ```
 

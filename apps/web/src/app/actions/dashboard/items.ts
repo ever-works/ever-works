@@ -2,28 +2,28 @@
 
 import { itemsGeneratorAPI, SubmitItemDto, UpdateItemDto } from '@/lib/api';
 import { screenshotAPI } from '@/lib/api';
-import { directoryAPI } from '@/lib/api';
+import { workAPI } from '@/lib/api';
 import { getAuthFromCookie } from '@/lib/auth';
 import { redirect } from 'next/navigation';
 import { ROUTES } from '@/lib/constants';
 import { revalidatePath } from 'next/cache';
 import { getTranslations } from 'next-intl/server';
-import { DirectoryScheduleCadence } from '@/lib/api/enums';
+import { WorkScheduleCadence } from '@/lib/api/enums';
 
-export async function addItem(directoryId: string, data: SubmitItemDto) {
+export async function addItem(workId: string, data: SubmitItemDto) {
     const user = await getAuthFromCookie();
     if (!user) {
         redirect(ROUTES.AUTH_LOGIN);
     }
 
-    const t = await getTranslations('dashboard.directoryDetail.items.addModal');
+    const t = await getTranslations('dashboard.workDetail.items.addModal');
 
     try {
-        const response = await itemsGeneratorAPI.submitItem(directoryId, data);
+        const response = await itemsGeneratorAPI.submitItem(workId, data);
 
         if (response.status === 'success') {
-            revalidatePath(`/directories/${directoryId}/items`);
-            revalidatePath(`/directories/${directoryId}`);
+            revalidatePath(`/works/${workId}/items`);
+            revalidatePath(`/works/${workId}`);
         }
 
         return {
@@ -46,7 +46,7 @@ export async function addItem(directoryId: string, data: SubmitItemDto) {
 }
 
 export async function removeItem(
-    directoryId: string,
+    workId: string,
     itemSlug: string,
     options?: { reason?: string; create_pull_request?: boolean },
 ) {
@@ -55,18 +55,18 @@ export async function removeItem(
         redirect(ROUTES.AUTH_LOGIN);
     }
 
-    const t = await getTranslations('dashboard.directoryDetail.items');
+    const t = await getTranslations('dashboard.workDetail.items');
 
     try {
-        const response = await itemsGeneratorAPI.removeItem(directoryId, {
+        const response = await itemsGeneratorAPI.removeItem(workId, {
             item_slug: itemSlug,
             reason: options?.reason,
             create_pull_request: options?.create_pull_request,
         });
 
         if (response.status) {
-            revalidatePath(`/directories/${directoryId}/items`);
-            revalidatePath(`/directories/${directoryId}`);
+            revalidatePath(`/works/${workId}/items`);
+            revalidatePath(`/works/${workId}`);
         }
 
         return {
@@ -90,7 +90,7 @@ export async function extractItemDetails(sourceUrl: string, existingCategories?:
         redirect(ROUTES.AUTH_LOGIN);
     }
 
-    const t = await getTranslations('dashboard.directoryDetail.items.addModal');
+    const t = await getTranslations('dashboard.workDetail.items.addModal');
 
     try {
         const response = await itemsGeneratorAPI.extractItemDetails({
@@ -143,20 +143,20 @@ export async function extractItemDetails(sourceUrl: string, existingCategories?:
     }
 }
 
-export async function updateItem(directoryId: string, data: UpdateItemDto) {
+export async function updateItem(workId: string, data: UpdateItemDto) {
     const user = await getAuthFromCookie();
     if (!user) {
         redirect(ROUTES.AUTH_LOGIN);
     }
 
-    const t = await getTranslations('dashboard.directoryDetail.items');
+    const t = await getTranslations('dashboard.workDetail.items');
 
     try {
-        const response = await itemsGeneratorAPI.updateItem(directoryId, data);
+        const response = await itemsGeneratorAPI.updateItem(workId, data);
 
         if (response.status === 'success') {
-            revalidatePath(`/directories/${directoryId}/items`);
-            revalidatePath(`/directories/${directoryId}`);
+            revalidatePath(`/works/${workId}/items`);
+            revalidatePath(`/works/${workId}`);
         }
 
         return {
@@ -175,22 +175,22 @@ export async function updateItem(directoryId: string, data: UpdateItemDto) {
     }
 }
 
-export async function checkItemHealth(directoryId: string, itemSlug: string) {
+export async function checkItemHealth(workId: string, itemSlug: string) {
     const user = await getAuthFromCookie();
     if (!user) {
         redirect(ROUTES.AUTH_LOGIN);
     }
 
-    const t = await getTranslations('dashboard.directoryDetail.items');
+    const t = await getTranslations('dashboard.workDetail.items');
 
     try {
-        const response = await itemsGeneratorAPI.checkItemHealth(directoryId, {
+        const response = await itemsGeneratorAPI.checkItemHealth(workId, {
             item_slug: itemSlug,
         });
 
         if (response.status === 'success') {
-            revalidatePath(`/directories/${directoryId}/items`);
-            revalidatePath(`/directories/${directoryId}`);
+            revalidatePath(`/works/${workId}/items`);
+            revalidatePath(`/works/${workId}`);
         }
 
         return {
@@ -214,17 +214,17 @@ export async function checkItemHealth(directoryId: string, itemSlug: string) {
 
 export async function captureScreenshot(
     sourceUrl: string,
-    options?: { directoryId?: string; providerOverride?: string },
+    options?: { workId?: string; providerOverride?: string },
 ) {
     const user = await getAuthFromCookie();
     if (!user) {
         redirect(ROUTES.AUTH_LOGIN);
     }
 
-    const t = await getTranslations('dashboard.directoryDetail.items.screenshot');
+    const t = await getTranslations('dashboard.workDetail.items.screenshot');
 
     try {
-        const availability = await screenshotAPI.checkAvailability(options?.directoryId);
+        const availability = await screenshotAPI.checkAvailability(options?.workId);
 
         if (!availability.available) {
             return {
@@ -253,7 +253,7 @@ export async function captureScreenshot(
         const response = await screenshotAPI.getScreenshotUrl({
             url: sourceUrl,
             providerOverride,
-            directoryId: options?.directoryId,
+            workId: options?.workId,
             blockAds: true,
             blockTrackers: true,
             blockCookieBanners: true,
@@ -280,14 +280,14 @@ export async function captureScreenshot(
     }
 }
 
-export async function checkScreenshotAvailability(directoryId?: string) {
+export async function checkScreenshotAvailability(workId?: string) {
     const user = await getAuthFromCookie();
     if (!user) {
         return { available: false, providers: [], activeProvider: null };
     }
 
     try {
-        const availability = await screenshotAPI.checkAvailability(directoryId);
+        const availability = await screenshotAPI.checkAvailability(workId);
         return {
             available: availability.available,
             providers: availability.providers,
@@ -299,8 +299,8 @@ export async function checkScreenshotAvailability(directoryId?: string) {
 }
 
 export async function updateSourceValidationSettings(
-    directoryId: string,
-    payload: { enabled: boolean; cadence?: DirectoryScheduleCadence },
+    workId: string,
+    payload: { enabled: boolean; cadence?: WorkScheduleCadence },
 ) {
     const user = await getAuthFromCookie();
     if (!user) {
@@ -308,8 +308,8 @@ export async function updateSourceValidationSettings(
     }
 
     try {
-        await directoryAPI.updateSourceValidationSettings(directoryId, payload);
-        revalidatePath(ROUTES.DASHBOARD_DIRECTORY_ITEMS(directoryId));
+        await workAPI.updateSourceValidationSettings(workId, payload);
+        revalidatePath(ROUTES.DASHBOARD_WORK_ITEMS(workId));
         return { status: 'success' as const };
     } catch (error) {
         return {

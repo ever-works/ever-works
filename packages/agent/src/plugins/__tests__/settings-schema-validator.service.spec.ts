@@ -94,7 +94,7 @@ describe('SettingsSchemaValidatorService', () => {
                 properties: {
                     globalSetting: { type: 'string', 'x-scope': 'global' },
                     userSetting: { type: 'string', 'x-scope': 'user' },
-                    directorySetting: { type: 'string', 'x-scope': 'directory' },
+                    workSetting: { type: 'string', 'x-scope': 'work' },
                 },
             };
 
@@ -120,29 +120,29 @@ describe('SettingsSchemaValidatorService', () => {
             );
             expect(userResult.valid).toBe(false);
 
-            // At directory scope, only global and directory settings should be validated
-            const directoryResult = service.validateSettings(
+            // At work scope, only global and work settings should be validated
+            const workResult = service.validateSettings(
                 {
                     globalSetting: 'value',
-                    userSetting: 123, // Wrong type but should be ignored at directory scope
-                    directorySetting: 123, // Wrong type - should be caught
+                    userSetting: 123, // Wrong type but should be ignored at work scope
+                    workSetting: 123, // Wrong type - should be caught
                 },
                 schema,
-                'directory',
+                'work',
             );
-            expect(directoryResult.valid).toBe(false);
+            expect(workResult.valid).toBe(false);
 
-            // At directory scope, user-scoped wrong types are ignored
-            const directoryValidResult = service.validateSettings(
+            // At work scope, user-scoped wrong types are ignored
+            const workValidResult = service.validateSettings(
                 {
                     globalSetting: 'value',
-                    userSetting: 123, // Wrong type but ignored at directory scope
-                    directorySetting: 'value',
+                    userSetting: 123, // Wrong type but ignored at work scope
+                    workSetting: 'value',
                 },
                 schema,
-                'directory',
+                'work',
             );
-            expect(directoryValidResult.valid).toBe(true);
+            expect(workValidResult.valid).toBe(true);
         });
     });
 
@@ -187,7 +187,7 @@ describe('SettingsSchemaValidatorService', () => {
             expect(result.valid).toBe(false);
         });
 
-        it('should not require user-scoped fields when validating at directory scope', () => {
+        it('should not require user-scoped fields when validating at work scope', () => {
             const schema: JsonSchema = {
                 type: 'object',
                 required: ['apiKey', 'defaultModel'],
@@ -197,11 +197,11 @@ describe('SettingsSchemaValidatorService', () => {
                 },
             };
 
-            // At directory scope, only global+directory fields required — apiKey is user-scoped
+            // At work scope, only global+work fields required — apiKey is user-scoped
             const result = service.validateRequiredFields(
                 { defaultModel: 'gemini-2.5-flash' },
                 schema,
-                'directory',
+                'work',
             );
             expect(result.valid).toBe(true);
         });
@@ -222,10 +222,10 @@ describe('SettingsSchemaValidatorService', () => {
         it('should only check required fields for the given scope', () => {
             const schema: JsonSchema = {
                 type: 'object',
-                required: ['globalField', 'directoryField'],
+                required: ['globalField', 'workField'],
                 properties: {
                     globalField: { type: 'string', 'x-scope': 'global' },
-                    directoryField: { type: 'string', 'x-scope': 'directory' },
+                    workField: { type: 'string', 'x-scope': 'work' },
                 },
             };
 
@@ -237,13 +237,13 @@ describe('SettingsSchemaValidatorService', () => {
             );
             expect(result.valid).toBe(true);
 
-            // At directory scope, both should be required
-            const directoryResult = service.validateRequiredFields(
+            // At work scope, both should be required
+            const workResult = service.validateRequiredFields(
                 { globalField: 'value' },
                 schema,
-                'directory',
+                'work',
             );
-            expect(directoryResult.valid).toBe(false);
+            expect(workResult.valid).toBe(false);
         });
     });
 
@@ -325,7 +325,7 @@ describe('SettingsSchemaValidatorService', () => {
             expect(result.errors).not.toContain('Need auth');
         });
 
-        it('should include user-scoped group fields at directory scope (inherited values)', () => {
+        it('should include user-scoped group fields at work scope (inherited values)', () => {
             const schema: JsonSchema = {
                 type: 'object',
                 properties: {
@@ -337,15 +337,15 @@ describe('SettingsSchemaValidatorService', () => {
                 ],
             };
 
-            // At directory scope with empty settings, user-scoped fields are now
+            // At work scope with empty settings, user-scoped fields are now
             // included (merged settings would carry inherited user values).
             // Empty settings → group fails.
-            const result = service.validateRequiredFields({}, schema, 'directory');
+            const result = service.validateRequiredFields({}, schema, 'work');
             expect(result.valid).toBe(false);
             expect(result.errors).toContain('Need credential');
         });
 
-        it('should pass group at directory scope when user-scoped field has inherited value', () => {
+        it('should pass group at work scope when user-scoped field has inherited value', () => {
             const schema: JsonSchema = {
                 type: 'object',
                 properties: {
@@ -357,16 +357,16 @@ describe('SettingsSchemaValidatorService', () => {
                 ],
             };
 
-            // At directory scope, merged settings include inherited user oauthToken
+            // At work scope, merged settings include inherited user oauthToken
             const result = service.validateRequiredFields(
                 { oauthToken: 'inherited-token' },
                 schema,
-                'directory',
+                'work',
             );
             expect(result.valid).toBe(true);
         });
 
-        it('should fail group at directory scope when user-scoped and global fields are both empty', () => {
+        it('should fail group at work scope when user-scoped and global fields are both empty', () => {
             const schema: JsonSchema = {
                 type: 'object',
                 properties: {
@@ -378,7 +378,7 @@ describe('SettingsSchemaValidatorService', () => {
                 ],
             };
 
-            const result = service.validateRequiredFields({}, schema, 'directory');
+            const result = service.validateRequiredFields({}, schema, 'work');
             expect(result.valid).toBe(false);
             expect(result.errors).toContain('Need credential');
         });

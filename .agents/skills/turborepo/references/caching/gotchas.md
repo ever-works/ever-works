@@ -187,4 +187,4 @@ Cache hit when expected miss:
 
 1. Verify env var is in `env` array
 2. Verify file is in `inputs` array
-3. Check if file is outside package directory
+3. Check if file is outside package work

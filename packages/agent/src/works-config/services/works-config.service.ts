@@ -1,8 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { DirectoryScheduleCadence, type ProvidersDto } from '@ever-works/contracts/api';
+import { WorkScheduleCadence, type ProvidersDto } from '@ever-works/contracts/api';
 import * as yaml from 'yaml';
 import { GitFacadeService } from '@src/facades/git.facade';
-import type { RepositoryTarget } from '@src/entities/directory.entity';
+import type { RepositoryTarget } from '@src/entities/work.entity';
 
 const WORKS_CONFIG_FILEPATHS = [
     'works.yml',
@@ -16,7 +16,7 @@ export interface WorksConfigSummary {
     initialPrompt?: string;
     model?: string;
     websiteRepo?: string;
-    scheduleCadence?: DirectoryScheduleCadence | null;
+    scheduleCadence?: WorkScheduleCadence | null;
     providers?: ProvidersDto;
 }
 
@@ -163,7 +163,7 @@ export class WorksConfigService {
         return Object.keys(normalized).length > 0 ? normalized : undefined;
     }
 
-    private readScheduleCadence(raw: Record<string, unknown>): DirectoryScheduleCadence | null {
+    private readScheduleCadence(raw: Record<string, unknown>): WorkScheduleCadence | null {
         const schedule = raw.schedule;
 
         if (typeof schedule === 'string') {
@@ -187,7 +187,7 @@ export class WorksConfigService {
         );
     }
 
-    private normalizeCadence(value?: string | null): DirectoryScheduleCadence | null {
+    private normalizeCadence(value?: string | null): WorkScheduleCadence | null {
         if (!value) {
             return null;
         }
@@ -195,23 +195,23 @@ export class WorksConfigService {
         const normalized = value.trim().toLowerCase();
 
         switch (normalized) {
-            case DirectoryScheduleCadence.HOURLY:
-                return DirectoryScheduleCadence.HOURLY;
-            case DirectoryScheduleCadence.EVERY_3_HOURS:
+            case WorkScheduleCadence.HOURLY:
+                return WorkScheduleCadence.HOURLY;
+            case WorkScheduleCadence.EVERY_3_HOURS:
             case 'every-3-hours':
-                return DirectoryScheduleCadence.EVERY_3_HOURS;
-            case DirectoryScheduleCadence.EVERY_8_HOURS:
+                return WorkScheduleCadence.EVERY_3_HOURS;
+            case WorkScheduleCadence.EVERY_8_HOURS:
             case 'every-8-hours':
-                return DirectoryScheduleCadence.EVERY_8_HOURS;
-            case DirectoryScheduleCadence.EVERY_12_HOURS:
+                return WorkScheduleCadence.EVERY_8_HOURS;
+            case WorkScheduleCadence.EVERY_12_HOURS:
             case 'every-12-hours':
-                return DirectoryScheduleCadence.EVERY_12_HOURS;
-            case DirectoryScheduleCadence.DAILY:
-                return DirectoryScheduleCadence.DAILY;
-            case DirectoryScheduleCadence.WEEKLY:
-                return DirectoryScheduleCadence.WEEKLY;
-            case DirectoryScheduleCadence.MONTHLY:
-                return DirectoryScheduleCadence.MONTHLY;
+                return WorkScheduleCadence.EVERY_12_HOURS;
+            case WorkScheduleCadence.DAILY:
+                return WorkScheduleCadence.DAILY;
+            case WorkScheduleCadence.WEEKLY:
+                return WorkScheduleCadence.WEEKLY;
+            case WorkScheduleCadence.MONTHLY:
+                return WorkScheduleCadence.MONTHLY;
             default:
                 return null;
         }

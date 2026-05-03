@@ -39,20 +39,20 @@ Implement **checkpoint-based resumption** in the `PipelineExecutor`:
 
 ```typescript
 // Save checkpoint after each step
-async saveCheckpoint(directoryId: string, data: CheckpointData): Promise<void> {
-    const key = `checkpoint:${directoryId}`;
+async saveCheckpoint(workId: string, data: CheckpointData): Promise<void> {
+    const key = `checkpoint:${workId}`;
     await this.cacheManager.set(key, data, 3600); // 1 hour TTL
 }
 
 // Load checkpoint on resume
-async loadCheckpoint(directoryId: string): Promise<CheckpointData | null> {
-    const key = `checkpoint:${directoryId}`;
+async loadCheckpoint(workId: string): Promise<CheckpointData | null> {
+    const key = `checkpoint:${workId}`;
     return this.cacheManager.get(key);
 }
 
 // Execution with checkpointing
 async execute(context: GenerationContext): Promise<GenerationContext> {
-    const checkpoint = await this.loadCheckpoint(context.directory.id);
+    const checkpoint = await this.loadCheckpoint(context.work.id);
 
     let startIndex = 0;
     if (checkpoint && this.isRecent(checkpoint)) {
@@ -62,14 +62,14 @@ async execute(context: GenerationContext): Promise<GenerationContext> {
 
     for (let i = startIndex; i < this.steps.length; i++) {
         context = await this.steps[i].run(context);
-        await this.saveCheckpoint(context.directory.id, {
+        await this.saveCheckpoint(context.work.id, {
             completedSteps: this.steps.slice(0, i + 1).map(s => s.name),
             context: this.serializeContext(context),
             timestamp: Date.now(),
         });
     }
 
-    await this.clearCheckpoint(context.directory.id);
+    await this.clearCheckpoint(context.work.id);
     return context;
 }
 ```
@@ -82,7 +82,7 @@ Not all context properties can be serialized:
 | ----------------------------- | ------------ | ------------------- |
 | `dto`                         | Yes          | JSON stringify      |
 | `items`, `categories`, `tags` | Yes          | JSON stringify      |
-| `directory`                   | No (Entity)  | Re-fetch on resume  |
+| `work`                        | No (Entity)  | Re-fetch on resume  |
 | `contentCache` (Map)          | Yes          | Convert to Object   |
 | `metrics`                     | Yes          | JSON stringify      |
 | `advancedPrompts`             | Yes          | Always reload fresh |

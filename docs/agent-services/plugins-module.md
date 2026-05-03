@@ -21,11 +21,11 @@ packages/agent/src/plugins/
 ├── entities/
 │   ├── plugin.entity.ts                        # PluginEntity (admin-level)
 │   ├── user-plugin.entity.ts                   # UserPluginEntity (user-level)
-│   └── directory-plugin.entity.ts              # DirectoryPluginEntity (directory-level)
+│   └── work-plugin.entity.ts              # WorkPluginEntity (work-level)
 ├── repositories/
 │   ├── plugin.repository.ts                    # PluginRepository
 │   ├── user-plugin.repository.ts               # UserPluginRepository
-│   └── directory-plugin.repository.ts          # DirectoryPluginRepository
+│   └── work-plugin.repository.ts          # WorkPluginRepository
 └── services/
     ├── plugin-registry.service.ts              # In-memory registry with fast lookups
     ├── plugin-loader.service.ts                # Discovery and loading from filesystem
@@ -61,7 +61,7 @@ graph TD
 
         SETTINGS[PluginSettingsService] -->|resolves| P_REPO[PluginRepository]
         SETTINGS -->|resolves| UP_REPO[UserPluginRepository]
-        SETTINGS -->|resolves| DP_REPO[DirectoryPluginRepository]
+        SETTINGS -->|resolves| DP_REPO[WorkPluginRepository]
     end
 
     FACADES[Facade Services] --> REG
@@ -133,7 +133,7 @@ PluginsModule.forRootAsync({
 | `enableWatcher`       | `boolean`        | Watch for plugin file changes         |
 | `secretEncryptionKey` | `string`         | Key for encrypting secret settings    |
 
-**PLUGIN_ENTITIES**: The module exports `[PluginEntity, UserPluginEntity, DirectoryPluginEntity]` for TypeORM registration.
+**PLUGIN_ENTITIES**: The module exports `[PluginEntity, UserPluginEntity, WorkPluginEntity]` for TypeORM registration.
 
 ### PluginRegistryService
 
@@ -187,12 +187,12 @@ flowchart TD
     B -->|Yes| C[ENABLED - always]
     B -->|No| D{User disabled?}
     D -->|Yes| E[DISABLED - cascades globally]
-    D -->|No| F{Directory context?}
-    F -->|Yes| G{Directory record exists?}
-    G -->|Yes| H[Use directory.enabled]
-    G -->|No| I{User autoEnableForDirectories?}
+    D -->|No| F{Work context?}
+    F -->|Yes| G{Work record exists?}
+    G -->|Yes| H[Use work.enabled]
+    G -->|No| I{User autoEnableForWorks?}
     I -->|Yes| J[ENABLED]
-    I -->|No| K[DISABLED in directory context]
+    I -->|No| K[DISABLED in work context]
     F -->|No| L{User record exists?}
     L -->|Yes| M[Use user.enabled]
     L -->|No| N[Use manifest.autoEnable - default false]
@@ -204,8 +204,8 @@ Discovers plugins on the filesystem and loads them into the registry.
 
 **Discovery flow**:
 
-1. Scans configured `pluginPaths` directories
-2. Reads `package.json` from each subdirectory
+1. Scans configured `pluginPaths` works
+2. Reads `package.json` from each subwork
 3. Validates `everworks.plugin` manifest section
 4. Returns `DiscoveredPlugin[]`
 
@@ -251,20 +251,20 @@ The 4-level settings resolution engine. See [Facades Module](./facades-module.md
 
 **Resolution hierarchy** (highest to lowest priority):
 
-| Level | Source                | When Used                                             |
-| ----- | --------------------- | ----------------------------------------------------- |
-| 1     | Directory settings    | `directoryId` provided, `configMode !== 'admin-only'` |
-| 2     | User settings         | `userId` provided, `configMode !== 'admin-only'`      |
-| 3     | Admin settings        | Always checked                                        |
-| 4     | Environment variables | `x-envVar` schema annotation maps to `process.env`    |
-| 5     | Plugin defaults       | `default` values from JSON Schema                     |
+| Level | Source                | When Used                                          |
+| ----- | --------------------- | -------------------------------------------------- |
+| 1     | Work settings         | `workId` provided, `configMode !== 'admin-only'`   |
+| 2     | User settings         | `userId` provided, `configMode !== 'admin-only'`   |
+| 3     | Admin settings        | Always checked                                     |
+| 4     | Environment variables | `x-envVar` schema annotation maps to `process.env` |
+| 5     | Plugin defaults       | `default` values from JSON Schema                  |
 
 **Configuration modes**:
 
-| Mode               | Description                                                             |
-| ------------------ | ----------------------------------------------------------------------- |
-| `hybrid` (default) | Users and directories can override admin settings                       |
-| `admin-only`       | Only admin-level settings are used; user/directory settings are ignored |
+| Mode               | Description                                                        |
+| ------------------ | ------------------------------------------------------------------ |
+| `hybrid` (default) | Users and works can override admin settings                        |
+| `admin-only`       | Only admin-level settings are used; user/work settings are ignored |
 
 **Security features**:
 
@@ -272,20 +272,20 @@ The 4-level settings resolution engine. See [Facades Module](./facades-module.md
 - `x-secret` fields are stored in separate `secretSettings` columns
 - Masked placeholder values (`********`) are stripped during updates to prevent accidental overwrite
 
-**Scope validation**: Settings with `x-scope: 'directory'` can only be updated at the directory level. Settings with `x-scope: 'user'` cannot be updated at the global level.
+**Scope validation**: Settings with `x-scope: 'work'` can only be updated at the work level. Settings with `x-scope: 'user'` cannot be updated at the global level.
 
 **Key methods**:
 
-| Method                                               | Description                               |
-| ---------------------------------------------------- | ----------------------------------------- |
-| `getResolvedSettings(pluginId, options)`             | Full resolution with source tracking      |
-| `getSettings(pluginId, options)`                     | Plain key-value settings (no source info) |
-| `updateAdminSettings(pluginId, settings)`            | Update global settings                    |
-| `updateUserSettings(pluginId, userId, settings)`     | Update user-level settings                |
-| `updateDirectorySettings(pluginId, dirId, settings)` | Update directory-level settings           |
-| `getSettingsSchema(pluginId)`                        | Raw JSON Schema                           |
-| `getSettingsSchemaForContext(pluginId, context)`     | Schema filtered by scope context          |
-| `validateSettings(pluginId, settings, options)`      | Validate against schema and scope         |
+| Method                                           | Description                               |
+| ------------------------------------------------ | ----------------------------------------- |
+| `getResolvedSettings(pluginId, options)`         | Full resolution with source tracking      |
+| `getSettings(pluginId, options)`                 | Plain key-value settings (no source info) |
+| `updateAdminSettings(pluginId, settings)`        | Update global settings                    |
+| `updateUserSettings(pluginId, userId, settings)` | Update user-level settings                |
+| `updateWorkSettings(pluginId, dirId, settings)`  | Update work-level settings                |
+| `getSettingsSchema(pluginId)`                    | Raw JSON Schema                           |
+| `getSettingsSchemaForContext(pluginId, context)` | Schema filtered by scope context          |
+| `validateSettings(pluginId, settings, options)`  | Validate against schema and scope         |
 
 ## Plugin Entities
 
@@ -308,31 +308,31 @@ The 4-level settings resolution engine. See [Facades Module](./facades-module.md
 
 ### UserPluginEntity (User Level)
 
-| Column                     | Type        | Description                    |
-| -------------------------- | ----------- | ------------------------------ |
-| `id`                       | `uuid` (PK) | Auto-generated                 |
-| `userId`                   | `varchar`   | Loose coupling (no FK)         |
-| `pluginId`                 | `varchar`   | Plugin identifier              |
-| `pluginEntityId`           | `uuid` (FK) | References PluginEntity        |
-| `enabled`                  | `boolean`   | User-level enable toggle       |
-| `autoEnableForDirectories` | `boolean`   | Auto-enable in new directories |
-| `settings`                 | `json`      | User-level settings            |
-| `secretSettings`           | `json`      | User-level secrets             |
-| `metadata`                 | `json`      | User-specific metadata         |
+| Column               | Type        | Description              |
+| -------------------- | ----------- | ------------------------ |
+| `id`                 | `uuid` (PK) | Auto-generated           |
+| `userId`             | `varchar`   | Loose coupling (no FK)   |
+| `pluginId`           | `varchar`   | Plugin identifier        |
+| `pluginEntityId`     | `uuid` (FK) | References PluginEntity  |
+| `enabled`            | `boolean`   | User-level enable toggle |
+| `autoEnableForWorks` | `boolean`   | Auto-enable in new works |
+| `settings`           | `json`      | User-level settings      |
+| `secretSettings`     | `json`      | User-level secrets       |
+| `metadata`           | `json`      | User-specific metadata   |
 
-### DirectoryPluginEntity (Directory Level)
+### WorkPluginEntity (Work Level)
 
 | Column             | Type                 | Description                                  |
 | ------------------ | -------------------- | -------------------------------------------- |
 | `id`               | `uuid` (PK)          | Auto-generated                               |
-| `directoryId`      | `varchar`            | Loose coupling (no FK)                       |
+| `workId`           | `varchar`            | Loose coupling (no FK)                       |
 | `pluginId`         | `varchar`            | Plugin identifier                            |
 | `pluginEntityId`   | `uuid` (FK)          | References PluginEntity                      |
-| `enabled`          | `boolean`            | Directory-level enable toggle                |
+| `enabled`          | `boolean`            | Work-level enable toggle                     |
 | `activeCapability` | `varchar` (nullable) | Marks this plugin as active for a capability |
-| `settings`         | `json`               | Directory-level settings                     |
-| `secretSettings`   | `json`               | Directory-level secrets                      |
-| `metadata`         | `json`               | Directory-specific metadata                  |
+| `settings`         | `json`               | Work-level settings                          |
+| `secretSettings`   | `json`               | Work-level secrets                           |
+| `metadata`         | `json`               | Work-specific metadata                       |
 | `priority`         | `int`                | Ordering priority                            |
 
 ## Plugin Events
@@ -353,7 +353,7 @@ Constants defined in `plugins.constants.ts`:
 
 ```typescript
 const SETTING_SOURCE_PRIORITY: Record<SettingSource, number> = {
-	directory: 1, // Highest
+	work: 1, // Highest
 	user: 2,
 	admin: 3,
 	env: 4,
@@ -407,9 +407,9 @@ export class SettingsController {
 		);
 	}
 
-	async getDirectorySettings(pluginId: string, directoryId: string, userId: string) {
+	async getWorkSettings(pluginId: string, workId: string, userId: string) {
 		return this.settings.getResolvedSettings(pluginId, {
-			directoryId,
+			workId,
 			userId,
 			includeSecrets: false
 		});

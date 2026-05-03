@@ -61,7 +61,7 @@ ChatInterface -> useChat() -> POST /api/chat (Next.js route handler)
 
 4. **Extend existing `AiConversationModule`** (not a new module)
     - Add `OpenAiCompatController` + `OpenAiCompatService` alongside existing controller
-    - Share `DirectoryRepository` and `AiFacadeService` imports
+    - Share `WorkRepository` and `AiFacadeService` imports
 
 ---
 
@@ -298,7 +298,7 @@ export interface OpenAiToolDefinition {
 - `mapToInternalOptions(dto)` - Convert OpenAI format to internal format
 - `mapToOpenAiResponse(response)` - Convert internal response to OpenAI format
 - `mapToOpenAiChunk(chunk, index)` - Convert internal chunk to OpenAI SSE chunk
-- `resolveDirectoryContext(options)` - Reused from existing service
+- `resolveWorkContext(options)` - Reused from existing service
 
 **Message mapping (OpenAI -> Internal):**
 
@@ -329,13 +329,13 @@ export class OpenAiCompatController {
 	async chatCompletions(
 		@CurrentUser() auth: AuthenticatedUser,
 		@Headers('x-provider-override') providerOverride: string | undefined,
-		@Headers('x-directory-id') directoryId: string | undefined,
+		@Headers('x-work-id') workId: string | undefined,
 		@Body() body: OpenAiChatCompletionRequestDto,
 		@Res() res: Response
 	): Promise<void> {
 		const facadeOptions = {
 			userId: auth.userId,
-			directoryId,
+			workId,
 			providerOverride
 		};
 
@@ -433,7 +433,7 @@ export interface BackendProviderOptions {
 	baseURL: string;
 	authToken: string;
 	providerOverride: string; // Always required — user always has an active AI provider
-	directoryId?: string;
+	workId?: string;
 }
 
 export function createBackendProvider(options: BackendProviderOptions) {
@@ -443,7 +443,7 @@ export function createBackendProvider(options: BackendProviderOptions) {
 		apiKey: options.authToken,
 		headers: {
 			'X-Provider-Override': options.providerOverride,
-			...(options.directoryId && { 'X-Directory-Id': options.directoryId })
+			...(options.workId && { 'X-Work-Id': options.workId })
 		}
 	});
 }
@@ -488,7 +488,7 @@ export async function POST(request: Request) {
 	const { messages, ...rest } = body as {
 		messages: UIMessage[];
 		providerOverride?: string;
-		directoryId?: string;
+		workId?: string;
 	};
 
 	// 3. Create provider (API_URL already includes /api suffix)
@@ -496,7 +496,7 @@ export async function POST(request: Request) {
 		baseURL: `${API_URL}/v1`,
 		authToken: token,
 		providerOverride: rest.providerOverride ?? 'openrouter',
-		directoryId: rest.directoryId
+		workId: rest.workId
 	});
 
 	// 4. Stream with Vercel AI SDK
@@ -513,7 +513,7 @@ export async function POST(request: Request) {
 
 - `maxDuration = 60` allows long streaming responses (Vercel default is 10s)
 - Auth follows the same `getAuthAccessCookie` + refresh pattern as `serverFetch`
-- Provider/directory selection passed from the client as body fields
+- Provider/work selection passed from the client as body fields
 - `convertToModelMessages()` converts `UIMessage[]` to model-compatible format
 - `toUIMessageStreamResponse()` returns the proper streaming response for `useChat`
 
@@ -693,7 +693,7 @@ const handleSaveEdit = async () => {
 | `apps/web/src/lib/api/index.ts`                              | Remove `export * from './ai-conversation'`                             |
 | `apps/web/src/lib/constants.ts`                              | Remove `API_AI_CONVERSATIONS_CHAT_STREAM`, add `API_CHAT: '/api/chat'` |
 | `apps/api/src/ai-conversation/ai-conversation.controller.ts` | Mark `@Deprecated()`, keep for now                                     |
-| `apps/api/src/ai-conversation/ai-conversation.service.ts`    | Keep (shared `resolveDirectoryContext` logic)                          |
+| `apps/api/src/ai-conversation/ai-conversation.service.ts`    | Keep (shared `resolveWorkContext` logic)                               |
 
 ### Verification Checklist
 

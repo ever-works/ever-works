@@ -8,7 +8,7 @@ import type {
 	DomainAnalysis,
 	WebPageData,
 	IPipelineContext,
-	DirectoryReference,
+	WorkReference,
 	GenerationRequest,
 	ExistingItems
 } from '@ever-works/plugin';
@@ -25,7 +25,7 @@ export interface AdvancedPromptsContext {
 }
 
 export interface MutableGenerationContext extends IPipelineContext {
-	directory: DirectoryReference;
+	work: WorkReference;
 	request: GenerationRequest;
 	existing: ExistingItems;
 
@@ -59,7 +59,7 @@ export interface MutableGenerationContext extends IPipelineContext {
 }
 
 export interface GenerationContextSnapshot {
-	readonly directory: DirectoryReference;
+	readonly work: WorkReference;
 	readonly request: GenerationRequest;
 	readonly existing: ExistingItems;
 	readonly extractedUrls: readonly string[];

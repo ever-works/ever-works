@@ -2,7 +2,7 @@
  * Deploy Facade Interface
  *
  * Provides a unified interface for deployment operations through the plugin system.
- * The facade resolves the appropriate deployment provider based on directory configuration
+ * The facade resolves the appropriate deployment provider based on work configuration
  * and retrieves credentials from plugin settings.
  */
 
@@ -15,8 +15,8 @@ import type { DeploymentDomain, AddDomainResult } from '../contracts/capabilitie
 export interface DeployFacadeOptions {
 	/** User ID for token retrieval */
 	readonly userId: string;
-	/** Directory ID for provider resolution */
-	readonly directoryId: string;
+	/** Work ID for provider resolution */
+	readonly workId: string;
 }
 
 /**
@@ -71,8 +71,8 @@ export interface DeploymentLookupResult {
  */
 export interface IDeployFacade {
 	/**
-	 * Check if deployment is configured for a directory
-	 * @param options Facade options with user and directory IDs
+	 * Check if deployment is configured for a work
+	 * @param options Facade options with user and work IDs
 	 * @returns True if a deployment provider is configured with valid credentials
 	 */
 	isConfigured(options: DeployFacadeOptions): Promise<boolean>;
@@ -85,14 +85,14 @@ export interface IDeployFacade {
 
 	/**
 	 * Validate the user's deployment token
-	 * @param options Facade options with user and directory IDs
+	 * @param options Facade options with user and work IDs
 	 * @returns True if the token is valid
 	 */
 	validateToken(options: DeployFacadeOptions): Promise<boolean>;
 
 	/**
 	 * Get teams/organizations available to the user
-	 * @param options Facade options with user and directory IDs
+	 * @param options Facade options with user and work IDs
 	 * @returns Array of team information
 	 */
 	getTeams(options: DeployFacadeOptions): Promise<DeployFacadeTeam[]>;
@@ -100,7 +100,7 @@ export interface IDeployFacade {
 	/**
 	 * Initiate a deployment
 	 * @param config Deployment configuration
-	 * @param options Facade options with user and directory IDs
+	 * @param options Facade options with user and work IDs
 	 * @returns True if deployment was initiated successfully
 	 */
 	deploy(
@@ -114,7 +114,7 @@ export interface IDeployFacade {
 	/**
 	 * Get status of a deployment
 	 * @param deploymentId Deployment ID
-	 * @param options Facade options with user and directory IDs
+	 * @param options Facade options with user and work IDs
 	 * @returns Deployment status information
 	 */
 	getDeploymentStatus(
@@ -127,40 +127,40 @@ export interface IDeployFacade {
 	}>;
 
 	/**
-	 * Lookup existing deployment for a directory
+	 * Lookup existing deployment for a work
 	 * @param projectName Project name to look up
-	 * @param options Facade options with user and directory IDs
+	 * @param options Facade options with user and work IDs
 	 * @returns Deployment lookup result
 	 */
 	lookupExistingDeployment(projectName: string, options: DeployFacadeOptions): Promise<DeploymentLookupResult>;
 
 	/**
-	 * Get domains for a deployed directory
-	 * @param options Facade options with user and directory IDs
+	 * Get domains for a deployed work
+	 * @param options Facade options with user and work IDs
 	 * @returns Array of domain information
 	 */
 	getDomains(options: DeployFacadeOptions): Promise<DeploymentDomain[]>;
 
 	/**
-	 * Add a domain to a deployed directory
+	 * Add a domain to a deployed work
 	 * @param domain Domain name to add
-	 * @param options Facade options with user and directory IDs
+	 * @param options Facade options with user and work IDs
 	 * @returns Result of domain addition
 	 */
 	addDomain(domain: string, options: DeployFacadeOptions): Promise<AddDomainResult>;
 
 	/**
-	 * Remove a domain from a deployed directory
+	 * Remove a domain from a deployed work
 	 * @param domain Domain name to remove
-	 * @param options Facade options with user and directory IDs
+	 * @param options Facade options with user and work IDs
 	 * @returns True if domain was removed
 	 */
 	removeDomain(domain: string, options: DeployFacadeOptions): Promise<boolean>;
 
 	/**
-	 * Verify a domain on a deployed directory
+	 * Verify a domain on a deployed work
 	 * @param domain Domain name to verify
-	 * @param options Facade options with user and directory IDs
+	 * @param options Facade options with user and work IDs
 	 * @returns Updated domain information
 	 */
 	verifyDomain(domain: string, options: DeployFacadeOptions): Promise<DeploymentDomain>;

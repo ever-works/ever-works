@@ -1,7 +1,7 @@
 {
 	"name": "@ever-works/apify-plugin",
 	"version": "1.0.0",
-	"description": "Apify - Import items from Apify datasets into your directory",
+	"description": "Apify - Import items from Apify datasets into your Work",
 	"private": true,
 	"type": "module",
 	"main": "./dist/index.cjs",
@@ -47,7 +47,7 @@
 				"data-source",
 				"form-schema-provider"
 			],
-			"description": "Import items from Apify datasets. Supports field mapping and filtering to import relevant items into your directories.",
+			"description": "Import items from Apify datasets. Supports field mapping and filtering to import relevant items into your works.",
 			"author": {
 				"name": "Ever Works Team"
 			},

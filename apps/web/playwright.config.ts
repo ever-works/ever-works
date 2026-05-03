@@ -33,6 +33,10 @@ export default defineConfig({
         },
         {
             name: 'chromium',
+            // The unauth-specific tests must NOT run with stored auth state —
+            // they assert things like "/works redirects to login" which is
+            // only true when the user is signed out.
+            testIgnore: /\/(auth|navigation|password-reset|user-journey|works-rename)\.spec\.ts$/,
             use: {
                 ...devices['Desktop Chrome'],
                 storageState: './e2e/.auth/user.json',
@@ -42,7 +46,7 @@ export default defineConfig({
         // Unauthenticated tests (no storageState dependency)
         {
             name: 'chromium-no-auth',
-            testMatch: /\/(auth|navigation|password-reset|user-journey)\.spec\.ts$/,
+            testMatch: /\/(auth|navigation|password-reset|user-journey|works-rename)\.spec\.ts$/,
             use: {
                 ...devices['Desktop Chrome'],
             },

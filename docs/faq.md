@@ -11,7 +11,7 @@ sidebar_position: 12
 
 ### What is the difference between the Platform and the Template?
 
-The **Template** is a standalone, production-ready Next.js website you can clone, customize, and deploy. The **Platform** is the backend infrastructure (APIs, AI agents, plugin system) that can power one or many directory websites at scale.
+The **Template** is a standalone, production-ready Next.js website you can clone, customize, and deploy. The **Platform** is the backend infrastructure (APIs, AI agents, plugin system) that can power one or many work websites at scale.
 
 ### Can I use the Template without the Platform?
 
@@ -19,7 +19,7 @@ Yes. The Template works independently as a self-contained Next.js application wi
 
 ### What is Pinler.com?
 
-[Pinler.com](https://pinler.com) is a SaaS directory service built on top of the Ever Works Platform and Template. It demonstrates a production deployment of the full Ever Works stack.
+[Pinler.com](https://pinler.com) is a SaaS work service built on top of the Ever Works Platform and Template. It demonstrates a production deployment of the full Ever Works stack.
 
 ## Template
 

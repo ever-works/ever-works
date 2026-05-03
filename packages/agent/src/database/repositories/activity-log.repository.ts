@@ -30,32 +30,32 @@ export class ActivityLogRepository {
     async findById(id: string): Promise<ActivityLog | null> {
         return this.repository.findOne({
             where: { id },
-            relations: ['directory'],
+            relations: ['work'],
         });
     }
 
     async findByIdAndUserId(id: string, userId: string): Promise<ActivityLog | null> {
         return this.repository.findOne({
             where: { id, userId },
-            relations: ['directory'],
+            relations: ['work'],
         });
     }
 
-    async findLatestByUserDirectoryActionStatus(params: {
+    async findLatestByUserWorkActionStatus(params: {
         userId: string;
-        directoryId: string;
+        workId: string;
         actionType: ActivityActionType;
         status: ActivityStatus;
     }): Promise<ActivityLog | null> {
         return this.repository.findOne({
             where: {
                 userId: params.userId,
-                directoryId: params.directoryId,
+                workId: params.workId,
                 actionType: params.actionType,
                 status: params.status,
             },
             order: { createdAt: 'DESC' },
-            relations: ['directory'],
+            relations: ['work'],
         });
     }
 
@@ -87,7 +87,7 @@ export class ActivityLogRepository {
     ): Promise<{ activities: ActivityLog[]; total: number }> {
         const qb = this.repository
             .createQueryBuilder('activity')
-            .leftJoinAndSelect('activity.directory', 'directory')
+            .leftJoinAndSelect('activity.work', 'work')
             .where('activity.userId = :userId', { userId: options.userId })
             .orderBy('activity.createdAt', 'DESC');
 
@@ -95,9 +95,9 @@ export class ActivityLogRepository {
             qb.andWhere('activity.actionType = :actionType', { actionType: options.actionType });
         }
 
-        if (options.directoryId) {
-            qb.andWhere('activity.directoryId = :directoryId', {
-                directoryId: options.directoryId,
+        if (options.workId) {
+            qb.andWhere('activity.workId = :workId', {
+                workId: options.workId,
             });
         }
 
@@ -122,7 +122,7 @@ export class ActivityLogRepository {
                             .where(buildCaseInsensitiveLikeClause('activity.summary'), {
                                 search: searchPattern,
                             })
-                            .orWhere(buildCaseInsensitiveLikeClause('directory.name'), {
+                            .orWhere(buildCaseInsensitiveLikeClause('work.name'), {
                                 search: searchPattern,
                             });
                     }),

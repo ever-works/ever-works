@@ -11,7 +11,7 @@ sidebar_position: 64
 
 The PDF Extractor plugin (`@ever-works/plugins/pdf-extractor`) is a content extraction plugin that extracts text content from PDF files. It uses a hybrid approach: first attempting text-layer extraction via the `unpdf` library, then falling back to OCR via the Mistral AI API when the text layer is insufficient.
 
-This plugin is marked as `supplementary: true`, meaning it extends the content extraction capabilities of the platform rather than serving as a primary content source. It integrates with the `ContentExtractorFacade` to handle PDF URLs encountered during directory generation.
+This plugin is marked as `supplementary: true`, meaning it extends the content extraction capabilities of the platform rather than serving as a primary content source. It integrates with the `ContentExtractorFacade` to handle PDF URLs encountered during work generation.
 
 - **Plugin ID**: `pdf-extractor`
 - **Category**: `content-extraction`
@@ -225,7 +225,7 @@ async extract(url: string, options?: ContentExtractionOptions) {
 
 ### Automatic Content Extraction
 
-The PDF Extractor is typically invoked automatically by the `ContentExtractorFacade` when a PDF URL is encountered during directory generation:
+The PDF Extractor is typically invoked automatically by the `ContentExtractorFacade` when a PDF URL is encountered during work generation:
 
 ```typescript
 // ContentExtractorFacade routes to PDF Extractor when URL ends in .pdf

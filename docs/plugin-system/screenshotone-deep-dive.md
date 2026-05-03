@@ -9,7 +9,7 @@ sidebar_position: 69
 
 ## Overview
 
-The ScreenshotOne plugin (`@ever-works/plugins/screenshotone`) is a screenshot capture plugin that uses the ScreenshotOne API to generate website screenshots for directory items. When directory items include source URLs, this plugin automatically captures preview images that serve as item thumbnails.
+The ScreenshotOne plugin (`@ever-works/plugins/screenshotone`) is a screenshot capture plugin that uses the ScreenshotOne API to generate website screenshots for work items. When work items include source URLs, this plugin automatically captures preview images that serve as item thumbnails.
 
 The plugin implements the `IScreenshotPlugin` interface, providing screenshot capture, URL generation, credential validation, and format/dimension queries. It uses the official `screenshotone-api-sdk` for API communication and supports signed URLs for secure access.
 

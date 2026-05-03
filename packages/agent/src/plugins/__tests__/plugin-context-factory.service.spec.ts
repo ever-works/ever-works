@@ -141,7 +141,7 @@ describe('PluginContextFactoryService', () => {
         it('should include scope options', () => {
             const context = service.createContext('test-plugin', {
                 userId: 'user-1',
-                directoryId: 'dir-1',
+                workId: 'dir-1',
             });
 
             expect(context).toBeDefined();
@@ -403,7 +403,7 @@ describe('PluginContextFactoryService', () => {
             expect(context.env.apiBaseUrl).toBe('http://localhost:3100');
         });
 
-        it('should provide directories', () => {
+        it('should provide works', () => {
             const context = service.createContext('test-plugin');
 
             expect(context.env.tempDir).toBe('/tmp/test');
@@ -592,46 +592,46 @@ describe('PluginContextFactoryService', () => {
             const context = service.createContext('test-plugin');
 
             expect(context.services).toBeDefined();
-            expect(context.services.directory).toBeUndefined();
+            expect(context.services.work).toBeUndefined();
             expect(context.services.user).toBeUndefined();
         });
 
         it('should inject services via injectServices', () => {
-            const mockDirectoryService = { getDirectory: jest.fn() };
+            const mockWorkService = { getWork: jest.fn() };
             const mockUserService = { getUser: jest.fn() };
 
             service.injectServices({
-                directory: mockDirectoryService as any,
+                work: mockWorkService as any,
                 user: mockUserService as any,
             });
 
             const context = service.createContext('test-plugin');
 
-            expect(context.services.directory).toBe(mockDirectoryService);
+            expect(context.services.work).toBe(mockWorkService);
             expect(context.services.user).toBe(mockUserService);
         });
 
         it('should merge services when injecting multiple times', () => {
-            const mockDirectoryService = { getDirectory: jest.fn() };
+            const mockWorkService = { getWork: jest.fn() };
             const mockUserService = { getUser: jest.fn() };
 
-            service.injectServices({ directory: mockDirectoryService as any });
+            service.injectServices({ work: mockWorkService as any });
             service.injectServices({ user: mockUserService as any });
 
             const context = service.createContext('test-plugin');
 
-            expect(context.services.directory).toBe(mockDirectoryService);
+            expect(context.services.work).toBe(mockWorkService);
             expect(context.services.user).toBe(mockUserService);
         });
 
         it('should allow partial service injection', () => {
-            const mockDirectoryService = { getDirectory: jest.fn() };
+            const mockWorkService = { getWork: jest.fn() };
 
-            service.injectServices({ directory: mockDirectoryService as any });
+            service.injectServices({ work: mockWorkService as any });
 
             const context = service.createContext('test-plugin');
 
-            expect(context.services.directory).toBe(mockDirectoryService);
+            expect(context.services.work).toBe(mockWorkService);
             expect(context.services.user).toBeUndefined();
         });
     });

@@ -1,6 +1,6 @@
 export * from './api-keys';
 export * from './auth';
-export * from './directory';
+export * from './work';
 export * from './items-generator';
 export * from './website';
 export * from './server-api';
@@ -14,4 +14,5 @@ export * from './plugins-capabilities/git-providers';
 export * from './plugins-capabilities/device-auth';
 export * from './plugins-capabilities/oauth';
 export * from './account-transfer.types';
+export * from './github-app';
 export * from './types';

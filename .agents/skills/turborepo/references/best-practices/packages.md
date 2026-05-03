@@ -4,7 +4,7 @@ How to create and structure internal packages in your monorepo.
 
 ## Package Creation Checklist
 
-1. Create directory in `packages/`
+1. Create work in `packages/`
 2. Add `package.json` with name and exports
 3. Add source code in `src/`
 4. Add `tsconfig.json` if using TypeScript

@@ -4,29 +4,29 @@
 
 ### AC-1: Database Entity
 
-- [ ] `DirectoryAdvancedPrompts` entity exists with all 7 prompt fields
-- [ ] One-to-one relationship with Directory
-- [ ] Cascade delete when directory is deleted
+- [ ] `WorkAdvancedPrompts` entity exists with all 7 prompt fields
+- [ ] One-to-one relationship with Work
+- [ ] Cascade delete when work is deleted
 - [ ] Timestamps (createdAt, updatedAt) are tracked
 
 ### AC-2: Repository
 
-- [ ] `findByDirectoryId` returns prompts or null
+- [ ] `findByWorkId` returns prompts or null
 - [ ] `createOrUpdate` creates new record if none exists
 - [ ] `createOrUpdate` updates existing record if found
-- [ ] `delete` removes record for directory
+- [ ] `delete` removes record for work
 
 ### AC-3: Service
 
-- [ ] `getAdvancedPrompts` returns prompts for directory
+- [ ] `getAdvancedPrompts` returns prompts for work
 - [ ] `updateAdvancedPrompts` requires editor role
 - [ ] `updateAdvancedPrompts` sanitizes input
 - [ ] `getPromptsForGeneration` returns prompts as context object
 
 ### AC-4: API Endpoints
 
-- [ ] `GET /directories/:id/advanced-prompts` returns current prompts
-- [ ] `PUT /directories/:id/advanced-prompts` updates prompts
+- [ ] `GET /works/:id/advanced-prompts` returns current prompts
+- [ ] `PUT /works/:id/advanced-prompts` updates prompts
 - [ ] Proper error responses for not found, unauthorized
 - [ ] Input validation (max 2000 chars per field)
 

@@ -59,7 +59,7 @@ export class AuthService {
             if (isTrustedEmail) {
                 this.eventEmitter.emit(
                     UserConfirmedEvent.EVENT_NAME,
-                    new UserConfirmedEvent(user, `${this.webAppUrl}/directories/new`),
+                    new UserConfirmedEvent(user, `${this.webAppUrl}/works/new`),
                 );
             }
         } else {
@@ -171,7 +171,7 @@ export class AuthService {
         // Send welcome email after email verification
         this.eventEmitter.emit(
             UserConfirmedEvent.EVENT_NAME,
-            new UserConfirmedEvent(updatedUser, `${this.webAppUrl}/directories/new`),
+            new UserConfirmedEvent(updatedUser, `${this.webAppUrl}/works/new`),
         );
 
         return updatedUser;

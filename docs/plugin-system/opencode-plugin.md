@@ -18,13 +18,13 @@ sidebar_position: 68
 
 ## Overview
 
-The OpenCode plugin is a **full pipeline plugin** that delegates the entire directory generation flow to [OpenCode](https://github.com/opencode-ai/opencode), an open-source coding agent. Like the other CLI-driven generators (Claude Code, Codex, Gemini), it packages the agent binary so users do not need to install it separately.
+The OpenCode plugin is a **full pipeline plugin** that delegates the entire work generation flow to [OpenCode](https://github.com/opencode-ai/opencode), an open-source coding agent. Like the other CLI-driven generators (Claude Code, Codex, Gemini), it packages the agent binary so users do not need to install it separately.
 
 OpenCode is a good choice when you want to keep generation costs down by running against a self-hosted or open-weight model, while still getting an autonomous agent's tool-using behaviour.
 
 ## Selecting It
 
-In the directory edit screen, set **Generation Pipeline** to `OpenCode Generator`. The plugin appears in the dropdown once configured.
+In the work edit screen, set **Generation Pipeline** to `OpenCode Generator`. The plugin appears in the dropdown once configured.
 
 ## Configuration
 

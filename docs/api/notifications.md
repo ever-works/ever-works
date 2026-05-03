@@ -28,13 +28,13 @@ packages/agent/src/notifications/
 
 **Categories:**
 
-| Category       | Use Case                                    |
-| -------------- | ------------------------------------------- |
-| `ai_credits`   | AI provider credit depletion and errors     |
-| `subscription` | Subscription and billing notifications      |
-| `generation`   | Directory generation successes and failures |
-| `system`       | Platform-level system notifications         |
-| `security`     | Authentication and access-related alerts    |
+| Category       | Use Case                                 |
+| -------------- | ---------------------------------------- |
+| `ai_credits`   | AI provider credit depletion and errors  |
+| `subscription` | Subscription and billing notifications   |
+| `generation`   | Work generation successes and failures   |
+| `system`       | Platform-level system notifications      |
+| `security`     | Authentication and access-related alerts |
 
 ## REST Endpoints
 
@@ -105,7 +105,7 @@ Notifications support a `deduplicationKey` field. When set, the service checks f
 | -------------------------------- | ------------ | ---------- | --------------------------------------- |
 | `notifyAiCreditsDepleted()`      | `ai_credits` | Yes        | AI provider credits exhausted           |
 | `notifyAiProviderError()`        | `ai_credits` | No         | AI provider returned an error           |
-| `notifyGenerationAccountError()` | `generation` | No         | Directory generation failed             |
+| `notifyGenerationAccountError()` | `generation` | No         | Work generation failed                  |
 | `notifySchedulePaused()`         | `generation` | No         | Scheduled updates paused                |
 | `notifyGitAuthExpired()`         | `security`   | Yes        | Git provider token expired              |
 | `clearByDeduplicationKey()`      | --           | --         | Remove notification when issue resolves |

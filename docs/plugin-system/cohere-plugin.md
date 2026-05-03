@@ -7,7 +7,7 @@ sidebar_position: 38
 
 # Cohere Models via OpenRouter
 
-Ever Works does not ship a standalone Cohere plugin. Cohere models, including the Command R family, are available through the **OpenRouter** plugin. This page describes how to configure and use Cohere models for directory generation, content creation, and AI conversations.
+Ever Works does not ship a standalone Cohere plugin. Cohere models, including the Command R family, are available through the **OpenRouter** plugin. This page describes how to configure and use Cohere models for work generation, content creation, and AI conversations.
 
 **Related source files:**
 
@@ -18,7 +18,7 @@ Ever Works does not ship a standalone Cohere plugin. Cohere models, including th
 
 ## What is Cohere?
 
-Cohere is an enterprise AI platform that offers models optimized for business applications. Their Command R models are designed for retrieval-augmented generation (RAG), multilingual content, and structured data extraction -- all capabilities that align well with directory generation workflows.
+Cohere is an enterprise AI platform that offers models optimized for business applications. Their Command R models are designed for retrieval-augmented generation (RAG), multilingual content, and structured data extraction -- all capabilities that align well with work generation workflows.
 
 ## Available Cohere Models
 
@@ -35,9 +35,9 @@ Cohere models are available on OpenRouter with the `cohere/` prefix:
 Model availability on OpenRouter changes over time. Check [openrouter.ai/models](https://openrouter.ai/models) for the current list of available Cohere models and pricing.
 :::
 
-## Why Consider Cohere for Directories?
+## Why Consider Cohere for Works?
 
-Cohere models have specific strengths relevant to directory generation:
+Cohere models have specific strengths relevant to work generation:
 
 | Strength                 | Benefit for Ever Works                            |
 | ------------------------ | ------------------------------------------------- |
@@ -142,19 +142,19 @@ Cohere offers embedding models (e.g., `embed-english-v3.0`), but these are not c
 | Embeddings        | Not via OpenRouter      | Yes             | No                 |
 | Cost              | Moderate                | Varies by model | Varies by model    |
 
-## Use Cases for Cohere in Directories
+## Use Cases for Cohere in Works
 
-### Multilingual Directories
+### Multilingual Works
 
-Cohere's multilingual capabilities make it well-suited for directories that serve content in multiple languages. Command R models handle cross-language content generation without significant quality degradation.
+Cohere's multilingual capabilities make it well-suited for works that serve content in multiple languages. Command R models handle cross-language content generation without significant quality degradation.
 
-### Source-Heavy Directories
+### Source-Heavy Works
 
-When directories are built from extensive source material (web scraping, PDFs, Notion pages), Cohere's RAG optimization helps the model ground its output in the provided sources rather than hallucinating information.
+When works are built from extensive source material (web scraping, PDFs, Notion pages), Cohere's RAG optimization helps the model ground its output in the provided sources rather than hallucinating information.
 
 ### Structured Data Extraction
 
-Cohere models reliably produce structured JSON output, which is critical for generating directory item data (names, descriptions, categories, tags, metadata).
+Cohere models reliably produce structured JSON output, which is critical for generating work item data (names, descriptions, categories, tags, metadata).
 
 ## Troubleshooting
 

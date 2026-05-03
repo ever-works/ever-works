@@ -260,13 +260,13 @@ export class BraveSearchPlugin implements IPlugin, ISearchPlugin {
 				'',
 				'## How it works in Ever Works',
 				'',
-				'When enabled and set as the active search provider, Brave Search is used during directory generation to find information about each item. Its independent index can surface results that other engines may miss.',
+				'When enabled and set as the active search provider, Brave Search is used during work generation to find information about each item. Its independent index can surface results that other engines may miss.',
 				'',
 				'## Getting started',
 				'',
 				'1. Get an API key at [brave.com/search/api](https://brave.com/search/api/)',
 				'2. Enter the key in the **API Key** field below',
-				'3. Enable this plugin to use it for directory generation'
+				'3. Enable this plugin to use it for work generation'
 			].join('\n')
 		};
 	}

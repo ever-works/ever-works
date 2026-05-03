@@ -14,7 +14,7 @@ import { PipelineFacadeService } from '../pipeline-facade.service';
 import { PluginSettingsService } from '../../plugins/services/plugin-settings.service';
 import { PluginContextFactoryService } from '../../plugins/services/plugin-context-factory.service';
 import type {
-    DirectoryReference,
+    WorkReference,
     GenerationRequest,
     ExistingItems,
     IPipelinePlugin,
@@ -36,10 +36,10 @@ describe('PipelineOrchestratorService', () => {
     let registry: PluginRegistryService;
     let standardPlugin: MockPipelinePlugin;
 
-    const mockDirectory: DirectoryReference = {
+    const mockWork: WorkReference = {
         id: 'dir-123',
-        name: 'Test Directory',
-        slug: 'test-directory',
+        name: 'Test Work',
+        slug: 'test-work',
         user: { id: 'user-123' },
     };
 
@@ -138,7 +138,7 @@ describe('PipelineOrchestratorService', () => {
                                 warn: jest.fn(),
                                 error: jest.fn(),
                             },
-                            directory: {
+                            work: {
                                 id: 'dir-123',
                                 name: 'Test',
                                 slug: 'test',
@@ -206,7 +206,7 @@ describe('PipelineOrchestratorService', () => {
         it('should use step executor when no full pipeline plugin', async () => {
             const executeSpy = jest.spyOn(stepExecutor, 'execute');
 
-            await service.execute(mockDirectory, mockRequest, mockExisting);
+            await service.execute(mockWork, mockRequest, mockExisting);
 
             expect(executeSpy).toHaveBeenCalled();
         });
@@ -228,11 +228,11 @@ describe('PipelineOrchestratorService', () => {
                 providers: { pipeline: 'full-pipeline-plugin' },
             };
 
-            await service.execute(mockDirectory, requestWithPipeline, mockExisting);
+            await service.execute(mockWork, requestWithPipeline, mockExisting);
 
             expect(fullExecuteSpy).toHaveBeenCalledWith(
                 plugin,
-                mockDirectory,
+                mockWork,
                 requestWithPipeline,
                 mockExisting,
                 undefined,
@@ -248,7 +248,7 @@ describe('PipelineOrchestratorService', () => {
 
             const stepExecuteSpy = jest.spyOn(stepExecutor, 'execute');
 
-            await service.execute(mockDirectory, mockRequest, mockExisting);
+            await service.execute(mockWork, mockRequest, mockExisting);
 
             expect(stepExecuteSpy).toHaveBeenCalled();
         });
@@ -271,7 +271,7 @@ describe('PipelineOrchestratorService', () => {
                 providers: { pipeline: null },
             };
 
-            await service.execute(mockDirectory, requestWithNullPipeline, mockExisting);
+            await service.execute(mockWork, requestWithNullPipeline, mockExisting);
 
             expect(stepExecuteSpy).toHaveBeenCalled();
             expect(fullExecuteSpy).not.toHaveBeenCalled();
@@ -294,11 +294,45 @@ describe('PipelineOrchestratorService', () => {
                 providers: { pipeline: 'my-custom-pipeline' },
             };
 
-            await service.execute(mockDirectory, requestWithPipelineId, mockExisting);
+            await service.execute(mockWork, requestWithPipelineId, mockExisting);
 
             expect(fullExecuteSpy).toHaveBeenCalledWith(
                 plugin,
-                mockDirectory,
+                mockWork,
+                requestWithPipelineId,
+                mockExisting,
+                undefined,
+                undefined,
+            );
+        });
+
+        it('should fall back when explicit pipeline plugin is not enabled for scope', async () => {
+            const plugin = createMockFullPipelinePlugin('scoped-off-pipeline');
+            registry.register(
+                plugin as unknown as IPlugin,
+                {
+                    ...createMockManifest('scoped-off-pipeline'),
+                    autoEnable: false,
+                },
+                {
+                    state: 'loaded',
+                },
+            );
+
+            const stepExecuteSpy = jest.spyOn(stepExecutor, 'execute');
+            const fullExecuteSpy = jest.spyOn(fullExecutor, 'execute');
+
+            const requestWithPipelineId: GenerationRequest = {
+                ...mockRequest,
+                providers: { pipeline: 'scoped-off-pipeline' },
+            };
+
+            await service.execute(mockWork, requestWithPipelineId, mockExisting);
+
+            expect(fullExecuteSpy).not.toHaveBeenCalled();
+            expect(stepExecuteSpy).toHaveBeenCalledWith(
+                standardPlugin,
+                mockWork,
                 requestWithPipelineId,
                 mockExisting,
                 undefined,
@@ -314,7 +348,7 @@ describe('PipelineOrchestratorService', () => {
                 providers: { pipeline: 'non-existent-plugin' },
             };
 
-            await service.execute(mockDirectory, requestWithBadId, mockExisting);
+            await service.execute(mockWork, requestWithBadId, mockExisting);
 
             expect(stepExecuteSpy).toHaveBeenCalled();
         });
@@ -336,7 +370,7 @@ describe('PipelineOrchestratorService', () => {
                 providers: { pipeline: 'disabled-pipeline' },
             };
 
-            await service.execute(mockDirectory, requestWithDisabledId, mockExisting);
+            await service.execute(mockWork, requestWithDisabledId, mockExisting);
 
             expect(stepExecuteSpy).toHaveBeenCalled();
         });
@@ -350,13 +384,13 @@ describe('PipelineOrchestratorService', () => {
             const stepExecuteSpy = jest.spyOn(stepExecutor, 'execute');
 
             // No providers at all → auto-detect → standard-pipeline wins via defaultForCapabilities
-            await service.execute(mockDirectory, mockRequest, mockExisting);
+            await service.execute(mockWork, mockRequest, mockExisting);
 
             expect(stepExecuteSpy).toHaveBeenCalled();
             // Verify it resolved to standard-pipeline (step-orchestratable), not other-pipeline
             expect(stepExecuteSpy).toHaveBeenCalledWith(
                 standardPlugin,
-                mockDirectory,
+                mockWork,
                 mockRequest,
                 mockExisting,
                 undefined,
@@ -367,7 +401,7 @@ describe('PipelineOrchestratorService', () => {
         it('should throw when no pipeline plugin is available', async () => {
             registry.clear();
 
-            await expect(service.execute(mockDirectory, mockRequest, mockExisting)).rejects.toThrow(
+            await expect(service.execute(mockWork, mockRequest, mockExisting)).rejects.toThrow(
                 'No pipeline plugin available',
             );
         });
@@ -376,11 +410,11 @@ describe('PipelineOrchestratorService', () => {
             const executeSpy = jest.spyOn(stepExecutor, 'execute');
             const options = { timeout: 5000, continueOnError: true };
 
-            await service.execute(mockDirectory, mockRequest, mockExisting, options);
+            await service.execute(mockWork, mockRequest, mockExisting, options);
 
             expect(executeSpy).toHaveBeenCalledWith(
                 expect.anything(),
-                mockDirectory,
+                mockWork,
                 mockRequest,
                 mockExisting,
                 options,
@@ -398,7 +432,7 @@ describe('PipelineOrchestratorService', () => {
 
             const stepExecuteSpy = jest.spyOn(stepExecutor, 'execute');
 
-            await service.executeWithMode('step', mockDirectory, mockRequest, mockExisting);
+            await service.executeWithMode('step', mockWork, mockRequest, mockExisting);
 
             expect(stepExecuteSpy).toHaveBeenCalled();
         });
@@ -411,7 +445,7 @@ describe('PipelineOrchestratorService', () => {
 
             const fullExecuteSpy = jest.spyOn(fullExecutor, 'execute');
 
-            await service.executeWithMode('full', mockDirectory, mockRequest, mockExisting);
+            await service.executeWithMode('full', mockWork, mockRequest, mockExisting);
 
             expect(fullExecuteSpy).toHaveBeenCalled();
         });
@@ -419,7 +453,7 @@ describe('PipelineOrchestratorService', () => {
         it('should fall back to step mode when full mode requested but no plugin', async () => {
             const stepExecuteSpy = jest.spyOn(stepExecutor, 'execute');
 
-            await service.executeWithMode('full', mockDirectory, mockRequest, mockExisting);
+            await service.executeWithMode('full', mockWork, mockRequest, mockExisting);
 
             expect(stepExecuteSpy).toHaveBeenCalled();
         });
@@ -521,12 +555,12 @@ describe('PipelineOrchestratorService', () => {
 
             const executeSpy = jest.spyOn(stepExecutor, 'execute');
 
-            await service.resumeOrExecute(mockDirectory, mockRequest, mockExisting);
+            await service.resumeOrExecute(mockWork, mockRequest, mockExisting);
 
             // Should have tried to resume first
             expect(resumeSpy).toHaveBeenCalledWith(
                 standardPlugin,
-                mockDirectory.id,
+                mockWork.id,
                 standardPlugin.id,
                 undefined,
                 undefined,
@@ -559,7 +593,7 @@ describe('PipelineOrchestratorService', () => {
 
             const executeSpy = jest.spyOn(stepExecutor, 'execute');
 
-            const result = await service.resumeOrExecute(mockDirectory, mockRequest, mockExisting);
+            const result = await service.resumeOrExecute(mockWork, mockRequest, mockExisting);
 
             expect(result.success).toBe(true);
             // Should NOT have called fresh execute
@@ -582,7 +616,7 @@ describe('PipelineOrchestratorService', () => {
                 providers: { pipeline: 'full-pipeline-plugin' },
             };
 
-            await service.resumeOrExecute(mockDirectory, requestWithPipeline, mockExisting);
+            await service.resumeOrExecute(mockWork, requestWithPipeline, mockExisting);
 
             // Should NOT have tried to resume (full pipeline is not step-orchestratable)
             expect(resumeSpy).not.toHaveBeenCalled();

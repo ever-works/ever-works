@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { GitFacadeService } from '../facades/git.facade';
-import { Directory } from '../entities/directory.entity';
+import { Work } from '../entities/work.entity';
 import { User } from '../entities/user.entity';
 import { DataRepository, IDataConfig } from '../generators/data-generator/data-repository';
 import { slugifyText } from '../utils/text.utils';
@@ -26,22 +26,20 @@ export class ItemSubmissionService {
     ) {}
 
     async submitItem(
-        directory: Directory,
+        work: Work,
         user: User,
         submitItemDto: SubmitItemDto,
     ): Promise<SubmitItemResponseDto> {
-        this.logger.debug(
-            `Submitting item for directory: ${directory.slug}, item: ${submitItemDto.name}`,
-        );
+        this.logger.debug(`Submitting item for work: ${work.slug}, item: ${submitItemDto.name}`);
 
         try {
-            // Use directory owner's credentials (they set up the repos)
+            // Use work owner's credentials (they set up the repos)
             // but use current user as committer for attribution
-            const directoryOwner = directory.user as User;
-            const committer = directory.resolveCommitter(user);
+            const workOwner = work.user as User;
+            const committer = work.resolveCommitter(user);
 
-            const repo = directory.getDataRepo();
-            const owner = directory.getRepoOwner();
+            const repo = work.getDataRepo();
+            const owner = work.getRepoOwner();
 
             // Clone or pull the data repository
             const dest = await this.gitFacade.cloneOrPull(
@@ -50,7 +48,11 @@ export class ItemSubmissionService {
                     repo,
                     committer,
                 },
-                { userId: directoryOwner.id, providerId: directory.gitProvider },
+                {
+                    userId: workOwner.id,
+                    providerId: work.gitProvider,
+                    workId: work.id,
+                },
             );
 
             const data = await DataRepository.create(dest);
@@ -75,7 +77,7 @@ export class ItemSubmissionService {
             );
 
             // Get main branch
-            const provider = directory.gitProvider;
+            const provider = work.gitProvider;
             const defaultBranch = await this.gitFacade.getMainBranch(provider, dest);
 
             let branchName: string | null = null;
@@ -133,8 +135,8 @@ export class ItemSubmissionService {
                             cache: true,
                         },
                         {
-                            userId: directoryOwner.id,
-                            directoryId: directory.id,
+                            userId: workOwner.id,
+                            workId: work.id,
                         },
                     );
 
@@ -160,7 +162,7 @@ export class ItemSubmissionService {
             // Ensure slug is set
             itemWithMarkdown.slug = slugifyText(itemWithMarkdown.slug || itemWithMarkdown.name);
 
-            // Create item directory and write files
+            // Create item work and write files
             await data.createItemDir(itemWithMarkdown);
             await data.writeItem(itemWithMarkdown);
 
@@ -176,13 +178,17 @@ export class ItemSubmissionService {
                 provider,
                 dest,
                 `Add ${itemWithMarkdown.name}`,
-                directory.resolveCommitter(user),
+                work.resolveCommitter(user),
             );
 
             // Push changes
             await this.gitFacade.push(
                 { dir: dest },
-                { userId: directoryOwner.id, providerId: directory.gitProvider },
+                {
+                    userId: workOwner.id,
+                    providerId: work.gitProvider,
+                    workId: work.id,
+                },
             );
 
             // If direct commit, return success without PR
@@ -192,7 +198,7 @@ export class ItemSubmissionService {
                 );
                 return {
                     status: 'success',
-                    slug: directory.slug,
+                    slug: work.slug,
                     item_name: itemWithMarkdown.name,
                     item_slug: itemWithMarkdown.slug,
                     message: `Item "${itemWithMarkdown.name}" has been successfully added and published (committed directly to ${defaultBranch}).`,
@@ -240,14 +246,18 @@ export class ItemSubmissionService {
                     title: prTitle,
                     body: prBody,
                 },
-                { userId: directoryOwner.id, providerId: directory.gitProvider },
+                {
+                    userId: workOwner.id,
+                    providerId: work.gitProvider,
+                    workId: work.id,
+                },
             );
 
             this.logger.log(`PR #${pr.number} created for item "${itemWithMarkdown.name}"`);
 
             return {
                 status: 'success',
-                slug: directory.slug,
+                slug: work.slug,
                 item_name: itemWithMarkdown.name,
                 item_slug: itemWithMarkdown.slug,
                 message: `Item "${itemWithMarkdown.name}" has been submitted for review. PR #${pr.number} created.`,
@@ -263,7 +273,7 @@ export class ItemSubmissionService {
             this.logger.error('Failed to submit item', error);
             return {
                 status: 'error',
-                slug: directory.slug,
+                slug: work.slug,
                 item_name: submitItemDto.name,
                 message: error.message,
             };
@@ -271,22 +281,22 @@ export class ItemSubmissionService {
     }
 
     async removeItem(
-        directory: Directory,
+        work: Work,
         user: User,
         removeItemDto: RemoveItemDto,
     ): Promise<RemoveItemResponseDto> {
         this.logger.debug(
-            `Removing item for directory: ${directory.slug}, item slug: ${removeItemDto.item_slug}`,
+            `Removing item for work: ${work.slug}, item slug: ${removeItemDto.item_slug}`,
         );
 
         try {
-            // Use directory owner's credentials (they set up the repos)
+            // Use work owner's credentials (they set up the repos)
             // but use current user as committer for attribution
-            const directoryOwner = directory.user as User;
-            const committer = directory.resolveCommitter(user);
+            const workOwner = work.user as User;
+            const committer = work.resolveCommitter(user);
 
-            const repo = directory.getDataRepo();
-            const owner = directory.getRepoOwner();
+            const repo = work.getDataRepo();
+            const owner = work.getRepoOwner();
 
             // Clone or pull the data repository
             const dest = await this.gitFacade.cloneOrPull(
@@ -295,7 +305,11 @@ export class ItemSubmissionService {
                     repo,
                     committer,
                 },
-                { userId: directoryOwner.id, providerId: directory.gitProvider },
+                {
+                    userId: workOwner.id,
+                    providerId: work.gitProvider,
+                    workId: work.id,
+                },
             );
 
             const data = await DataRepository.create(dest);
@@ -305,7 +319,7 @@ export class ItemSubmissionService {
             if (!itemExists) {
                 return {
                     status: 'error',
-                    slug: directory.slug,
+                    slug: work.slug,
                     item_name: 'Unknown',
                     item_slug: removeItemDto.item_slug,
                     message: `Item with slug '${removeItemDto.item_slug}' not found`,
@@ -318,7 +332,7 @@ export class ItemSubmissionService {
             if (!itemData) {
                 return {
                     status: 'error',
-                    slug: directory.slug,
+                    slug: work.slug,
                     item_name: 'Unknown',
                     item_slug: removeItemDto.item_slug,
                     message: `Failed to retrieve item details for '${removeItemDto.item_slug}'`,
@@ -326,7 +340,7 @@ export class ItemSubmissionService {
             }
 
             const shouldCreatePR = removeItemDto.create_pull_request === true;
-            const provider = directory.gitProvider;
+            const provider = work.gitProvider;
             const defaultBranch = await this.gitFacade.getMainBranch(provider, dest);
 
             let branchName: string | null = null;
@@ -350,7 +364,7 @@ export class ItemSubmissionService {
             if (!removed) {
                 return {
                     status: 'error',
-                    slug: directory.slug,
+                    slug: work.slug,
                     item_name: itemData.name,
                     item_slug: removeItemDto.item_slug,
                     message: `Failed to remove item '${removeItemDto.item_slug}'`,
@@ -362,17 +376,16 @@ export class ItemSubmissionService {
             const commitMessage = removeItemDto.reason
                 ? `Remove ${itemData.name} - ${removeItemDto.reason}`
                 : `Remove ${itemData.name}`;
-            await this.gitFacade.commit(
-                provider,
-                dest,
-                commitMessage,
-                directory.resolveCommitter(user),
-            );
+            await this.gitFacade.commit(provider, dest, commitMessage, work.resolveCommitter(user));
 
             // Push changes
             await this.gitFacade.push(
                 { dir: dest },
-                { userId: directoryOwner.id, providerId: directory.gitProvider },
+                {
+                    userId: workOwner.id,
+                    providerId: work.gitProvider,
+                    workId: work.id,
+                },
             );
 
             if (shouldCreatePR && branchName && defaultBranch) {
@@ -394,12 +407,16 @@ export class ItemSubmissionService {
                         title: prTitle,
                         body: prBody,
                     },
-                    { userId: directoryOwner.id, providerId: directory.gitProvider },
+                    {
+                        userId: workOwner.id,
+                        providerId: work.gitProvider,
+                        workId: work.id,
+                    },
                 );
 
                 return {
                     status: 'success',
-                    slug: directory.slug,
+                    slug: work.slug,
                     item_name: itemData.name,
                     item_slug: removeItemDto.item_slug,
                     message: `Item "${itemData.name}" removal has been submitted for review. PR #${pr.number} created.`,
@@ -413,7 +430,7 @@ export class ItemSubmissionService {
 
             return {
                 status: 'success',
-                slug: directory.slug,
+                slug: work.slug,
                 item_name: itemData.name,
                 item_slug: removeItemDto.item_slug,
                 message: `Item "${itemData.name}" removed successfully.`,
@@ -422,7 +439,7 @@ export class ItemSubmissionService {
             this.logger.error('Failed to remove item', error);
             return {
                 status: 'error',
-                slug: directory.slug,
+                slug: work.slug,
                 item_name: 'Unknown',
                 item_slug: removeItemDto.item_slug,
                 message: error.message,
@@ -431,22 +448,22 @@ export class ItemSubmissionService {
     }
 
     async updateItem(
-        directory: Directory,
+        work: Work,
         user: User,
         updateItemDto: UpdateItemDto,
     ): Promise<SubmitItemResponseDto> {
         this.logger.debug(
-            `Updating item metadata for directory: ${directory.slug}, item slug: ${updateItemDto.item_slug}`,
+            `Updating item metadata for work: ${work.slug}, item slug: ${updateItemDto.item_slug}`,
         );
 
         try {
-            // Use directory owner's credentials (they set up the repos)
+            // Use work owner's credentials (they set up the repos)
             // but use current user as committer for attribution
-            const directoryOwner = directory.user as User;
-            const committer = directory.resolveCommitter(user);
+            const workOwner = work.user as User;
+            const committer = work.resolveCommitter(user);
 
-            const repo = directory.getDataRepo();
-            const owner = directory.getRepoOwner();
+            const repo = work.getDataRepo();
+            const owner = work.getRepoOwner();
 
             const dest = await this.gitFacade.cloneOrPull(
                 {
@@ -454,7 +471,11 @@ export class ItemSubmissionService {
                     repo,
                     committer,
                 },
-                { userId: directoryOwner.id, providerId: directory.gitProvider },
+                {
+                    userId: workOwner.id,
+                    providerId: work.gitProvider,
+                    workId: work.id,
+                },
             );
 
             const data = await DataRepository.create(dest);
@@ -463,14 +484,14 @@ export class ItemSubmissionService {
             if (!existingItem) {
                 return {
                     status: 'error',
-                    slug: directory.slug,
+                    slug: work.slug,
                     item_name: 'Unknown',
                     item_slug: updateItemDto.item_slug,
                     message: `Item with slug '${updateItemDto.item_slug}' not found`,
                 };
             }
 
-            const provider = directory.gitProvider;
+            const provider = work.gitProvider;
             const defaultBranch = await this.gitFacade.getMainBranch(provider, dest);
             const shouldCreatePR = updateItemDto.create_pull_request === true;
 
@@ -524,7 +545,7 @@ export class ItemSubmissionService {
             if (!updatedItem) {
                 return {
                     status: 'error',
-                    slug: directory.slug,
+                    slug: work.slug,
                     item_name: 'Unknown',
                     item_slug: updateItemDto.item_slug,
                     message: `Failed to update item '${updateItemDto.item_slug}'`,
@@ -535,15 +556,14 @@ export class ItemSubmissionService {
             const commitMessage = sourceUrlChanged
                 ? `Update ${updatedItem.name} source`
                 : `Update ${updatedItem.name} metadata`;
-            await this.gitFacade.commit(
-                provider,
-                dest,
-                commitMessage,
-                directory.resolveCommitter(user),
-            );
+            await this.gitFacade.commit(provider, dest, commitMessage, work.resolveCommitter(user));
             await this.gitFacade.push(
                 { dir: dest },
-                { userId: directoryOwner.id, providerId: directory.gitProvider },
+                {
+                    userId: workOwner.id,
+                    providerId: work.gitProvider,
+                    workId: work.id,
+                },
             );
 
             if (shouldCreatePR && branchName && defaultBranch) {
@@ -565,12 +585,16 @@ export class ItemSubmissionService {
                         title: prTitle,
                         body: prBody,
                     },
-                    { userId: directoryOwner.id, providerId: directory.gitProvider },
+                    {
+                        userId: workOwner.id,
+                        providerId: work.gitProvider,
+                        workId: work.id,
+                    },
                 );
 
                 return {
                     status: 'success',
-                    slug: directory.slug,
+                    slug: work.slug,
                     item_name: updatedItem.name,
                     item_slug: updateItemDto.item_slug,
                     message: sourceUrlChanged
@@ -586,7 +610,7 @@ export class ItemSubmissionService {
 
             return {
                 status: 'success',
-                slug: directory.slug,
+                slug: work.slug,
                 item_name: updatedItem.name,
                 item_slug: updateItemDto.item_slug,
                 message: sourceUrlChanged
@@ -597,7 +621,7 @@ export class ItemSubmissionService {
             this.logger.error('Failed to update item metadata', error);
             return {
                 status: 'error',
-                slug: directory.slug,
+                slug: work.slug,
                 item_name: 'Unknown',
                 item_slug: updateItemDto.item_slug,
                 message: error.message,

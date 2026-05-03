@@ -90,18 +90,18 @@ The `AnalyticsService` wraps PostHog client operations with typed method signatu
 
 ```typescript
 @Injectable()
-export class DirectoryService {
+export class WorkService {
 	constructor(private readonly analytics: AnalyticsService) {}
 
-	async createDirectory(userId: string, data: CreateDirectoryDto) {
-		const directory = await this.directoryRepo.create(data);
+	async createWork(userId: string, data: CreateWorkDto) {
+		const work = await this.workRepo.create(data);
 
-		this.analytics.trackBusinessEvent(userId, 'directory_created', {
-			directoryId: directory.id,
-			slug: directory.slug
+		this.analytics.trackBusinessEvent(userId, 'work_created', {
+			workId: work.id,
+			slug: work.slug
 		});
 
-		return directory;
+		return work;
 	}
 }
 ```
@@ -157,7 +157,7 @@ Automatically tracks API requests as PostHog events. Attaches to the NestJS requ
 | `ip`         | Client IP address      |
 | `timestamp`  | ISO timestamp          |
 
-The interceptor also generates a normalized endpoint event name by replacing numeric IDs with `:id` placeholders (e.g., `api_get_directories_:id`).
+The interceptor also generates a normalized endpoint event name by replacing numeric IDs with `:id` placeholders (e.g., `api_get_works_:id`).
 
 ### SentryInterceptor
 

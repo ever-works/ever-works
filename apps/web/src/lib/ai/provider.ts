@@ -5,7 +5,7 @@ export interface BackendProviderOptions {
     baseURL: string;
     authToken: string;
     providerOverride: string;
-    directoryId?: string;
+    workId?: string;
     conversationId?: string;
 }
 
@@ -16,7 +16,7 @@ export function createBackendProvider(options: BackendProviderOptions) {
         apiKey: options.authToken,
         headers: {
             'X-Provider-Override': options.providerOverride,
-            ...(options.directoryId && { 'X-Directory-Id': options.directoryId }),
+            ...(options.workId && { 'X-Work-Id': options.workId }),
             ...(options.conversationId && { 'X-Conversation-Id': options.conversationId }),
         },
     });

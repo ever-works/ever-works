@@ -9,9 +9,9 @@ export interface UserReference {
 }
 
 /**
- * Directory reference for generation context
+ * Work reference for generation context
  */
-export interface DirectoryReference {
+export interface WorkReference {
 	readonly id: string;
 	readonly name: string;
 	readonly slug: string;
@@ -77,7 +77,7 @@ export interface GenerationRequest {
 
 	/**
 	 * Provider overrides selected by the user in the generator form.
-	 * When set, these override the default/directory-level provider for each facade.
+	 * When set, these override the default/work-level provider for each facade.
 	 */
 	readonly providers?: {
 		readonly ai?: string;
@@ -100,7 +100,7 @@ export interface ExistingConfig {
 }
 
 /**
- * Existing items in the directory (for deduplication)
+ * Existing items in the work (for deduplication)
  */
 export interface ExistingItems {
 	readonly items: readonly ItemData[];
@@ -118,7 +118,7 @@ export interface ExistingItems {
  * The engine works with this interface only — it never accesses pipeline-specific fields.
  */
 export interface IPipelineContext {
-	readonly directory: DirectoryReference;
+	readonly work: WorkReference;
 	readonly request: GenerationRequest;
 	shouldStop?: boolean;
 	warnings: string[];

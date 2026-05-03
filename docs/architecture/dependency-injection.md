@@ -16,9 +16,9 @@ The Ever Works platform relies heavily on NestJS dependency injection (DI) to ma
                           |
          +----------------+------------------+
          |                |                  |
-    AuthModule      DirectoriesModule    MonitoringModule
+    AuthModule      WorksModule    MonitoringModule
          |                |                  |
-    AuthService      DirectoryRepo      AnalyticsService
+    AuthService      WorkRepo      AnalyticsService
     JwtStrategy      MemberRepo         SentryService
     OAuthService     ...                 ...
          |
@@ -190,9 +190,9 @@ export class AiFacadeService extends BaseFacadeService implements IAiFacade {
 	constructor(
 		registry: PluginRegistryService, // From PluginsModule (global)
 		settingsService: PluginSettingsService, // From PluginsModule (global)
-		@Optional() directoryPluginRepository?: DirectoryPluginRepository
+		@Optional() workPluginRepository?: WorkPluginRepository
 	) {
-		super(registry, settingsService, directoryPluginRepository);
+		super(registry, settingsService, workPluginRepository);
 	}
 }
 ```

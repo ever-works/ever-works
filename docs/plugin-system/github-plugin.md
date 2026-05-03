@@ -7,7 +7,7 @@ sidebar_position: 19
 
 # GitHub Plugin
 
-The GitHub plugin is a core system plugin that provides Git operations, repository management, pull request workflows, and OAuth authentication through the GitHub API. It is the backbone of the deployment pipeline, managing the repositories that store generated directory content.
+The GitHub plugin is a core system plugin that provides Git operations, repository management, pull request workflows, and OAuth authentication through the GitHub API. It is the backbone of the deployment pipeline, managing the repositories that store generated work content.
 
 **Source:** `packages/plugins/github/src/`
 
@@ -156,12 +156,12 @@ interface ListRepositoriesOptions {
 
 ## Content Access
 
-| Method                                           | Description                                                    |
-| ------------------------------------------------ | -------------------------------------------------------------- |
-| `getFileContent(owner, repo, path, ref, token)`  | Read a file from a repo. Base64-decoded to UTF-8.              |
-| `getReadme(owner, repo, ref, token)`             | Get README using the dedicated API, with fallback file lookup. |
-| `getRawFileUrl(owner, repo, branch, path)`       | Build `raw.githubusercontent.com` URL.                         |
-| `getDirectoryContents(owner, repo, path, token)` | List files and directories at a path.                          |
+| Method                                          | Description                                                    |
+| ----------------------------------------------- | -------------------------------------------------------------- |
+| `getFileContent(owner, repo, path, ref, token)` | Read a file from a repo. Base64-decoded to UTF-8.              |
+| `getReadme(owner, repo, ref, token)`            | Get README using the dedicated API, with fallback file lookup. |
+| `getRawFileUrl(owner, repo, branch, path)`      | Build `raw.githubusercontent.com` URL.                         |
+| `getWorkContents(owner, repo, path, token)`     | List files and works at a path.                                |
 
 ## GitHub Actions Service
 
@@ -211,7 +211,7 @@ Local git operations are provided by `GitOperations` from `@ever-works/plugin/gi
 | `getCurrentBranch(dir)`             | Get current branch name.                           |
 | `switchBranch(dir, branch, create)` | Switch branches, optionally creating a new one.    |
 | `getStatus(dir)`                    | List file changes.                                 |
-| `getLocalDir(owner, repo)`          | Get the local directory path for a repo.           |
+| `getLocalDir(owner, repo)`          | Get the local work path for a repo.                |
 
 ## Error Handling
 

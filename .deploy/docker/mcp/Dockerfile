@@ -20,7 +20,10 @@ RUN echo "shamefully-hoist=true" > .npmrc
 RUN pnpm install --frozen-lockfile
 
 COPY --from=pruner /app/out/full/ .
-RUN pnpm build --filter=ever-works-mcp...
+# Use turbo directly to bypass the root `pnpm build` script's
+# `--filter=!./apps/docs` which fails in the pruned workspace where
+# apps/docs is not present.
+RUN pnpm exec turbo build --filter=ever-works-mcp...
 RUN pnpm deploy --filter=ever-works-mcp --prod --legacy /app/deploy
 
 #-- Production

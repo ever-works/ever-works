@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { AgentPipelinePlugin } from '../agent-pipeline.plugin';
 import type {
 	PluginContext,
-	DirectoryReference,
+	WorkReference,
 	GenerationRequest,
 	ExistingItems,
 	MutableItemData
@@ -187,7 +187,7 @@ describe('AgentPipelinePlugin', () => {
 	});
 
 	describe('execute', () => {
-		const directory: DirectoryReference = {
+		const work: WorkReference = {
 			id: 'dir1',
 			name: 'AI Tools',
 			slug: 'ai-tools',
@@ -212,7 +212,7 @@ describe('AgentPipelinePlugin', () => {
 			} as unknown as PluginContext;
 			await plugin.onLoad(context);
 
-			const result = await plugin.execute(directory, request, existing, {});
+			const result = await plugin.execute(work, request, existing, {});
 
 			expect(result.success).toBe(false);
 			expect(result.error).toBeDefined();
@@ -227,7 +227,7 @@ describe('AgentPipelinePlugin', () => {
 			} as unknown as PluginContext;
 			await plugin.onLoad(context);
 
-			const dirNoUser: DirectoryReference = {
+			const dirNoUser: WorkReference = {
 				id: 'dir1',
 				name: 'AI Tools',
 				slug: 'ai-tools'
@@ -240,7 +240,7 @@ describe('AgentPipelinePlugin', () => {
 					screenshotFacade: {} as never,
 					contentExtractorFacade: {} as never,
 					logger: { log: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
-					directory: dirNoUser
+					work: dirNoUser
 				}
 			});
 
@@ -289,7 +289,7 @@ describe('AgentPipelinePlugin', () => {
 					toolResults: [
 						{
 							toolName: 'processUrl',
-							output: { url: 'https://b.com', files: [], count: 0, error: 'timeout' }
+							output: { url: 'https://b.com', files: [], count: 0, error: 'timeout', errorKind: 'worker' }
 						}
 					]
 				}
@@ -299,6 +299,41 @@ describe('AgentPipelinePlugin', () => {
 			expect(summary.totalUrls).toBe(1);
 			expect(summary.failedUrls).toBe(1);
 			expect(summary.sampleErrors).toContain('timeout');
+			expect(summary.failureCauses).toEqual(['1 worker failure']);
+		});
+
+		it('groups processUrl failures by structured error kind', () => {
+			const steps = [
+				{
+					toolResults: [
+						{
+							toolName: 'processUrl',
+							output: {
+								url: 'https://a.com',
+								files: [],
+								count: 0,
+								error: 'Content extraction failed for URL: https://a.com',
+								errorKind: 'extraction'
+							}
+						},
+						{
+							toolName: 'processUrl',
+							output: {
+								url: 'https://b.com',
+								files: [],
+								count: 0,
+								error: 'No items extracted',
+								errorKind: 'empty'
+							}
+						}
+					]
+				}
+			];
+
+			const summary = (plugin as any).collectProcessUrlFailures(steps);
+			expect(summary.totalUrls).toBe(2);
+			expect(summary.failedUrls).toBe(2);
+			expect(summary.failureCauses).toEqual(['1 extraction failure', '1 extracted page with no items']);
 		});
 	});
 

@@ -1,6 +1,6 @@
 'use server';
 
-import { directoryAPI, Category, Tag, Collection } from '@/lib/api';
+import { workAPI, Category, Tag, Collection } from '@/lib/api';
 import { getAuthFromCookie } from '@/lib/auth';
 import { redirect } from 'next/navigation';
 import { ROUTES } from '@/lib/constants';
@@ -8,18 +8,18 @@ import { revalidatePath } from 'next/cache';
 
 // Category CRUD operations
 
-export async function createCategory(directoryId: string, data: Partial<Category>) {
+export async function createCategory(workId: string, data: Partial<Category>) {
     const user = await getAuthFromCookie();
     if (!user) {
         redirect(ROUTES.AUTH_LOGIN);
     }
 
     try {
-        const response = await directoryAPI.createCategory(directoryId, data);
+        const response = await workAPI.createCategory(workId, data);
 
         if (response.status === 'success' && response.category) {
-            revalidatePath(`/directories/${directoryId}/items`);
-            revalidatePath(`/directories/${directoryId}`);
+            revalidatePath(`/works/${workId}/items`);
+            revalidatePath(`/works/${workId}`);
             return {
                 success: true,
                 category: response.category,
@@ -39,22 +39,18 @@ export async function createCategory(directoryId: string, data: Partial<Category
     }
 }
 
-export async function updateCategory(
-    directoryId: string,
-    categoryId: string,
-    data: Partial<Category>,
-) {
+export async function updateCategory(workId: string, categoryId: string, data: Partial<Category>) {
     const user = await getAuthFromCookie();
     if (!user) {
         redirect(ROUTES.AUTH_LOGIN);
     }
 
     try {
-        const response = await directoryAPI.updateCategory(directoryId, categoryId, data);
+        const response = await workAPI.updateCategory(workId, categoryId, data);
 
         if (response.status === 'success' && response.category) {
-            revalidatePath(`/directories/${directoryId}/items`);
-            revalidatePath(`/directories/${directoryId}`);
+            revalidatePath(`/works/${workId}/items`);
+            revalidatePath(`/works/${workId}`);
             return {
                 success: true,
                 category: response.category,
@@ -74,18 +70,18 @@ export async function updateCategory(
     }
 }
 
-export async function deleteCategory(directoryId: string, categoryId: string) {
+export async function deleteCategory(workId: string, categoryId: string) {
     const user = await getAuthFromCookie();
     if (!user) {
         redirect(ROUTES.AUTH_LOGIN);
     }
 
     try {
-        const response = await directoryAPI.deleteCategory(directoryId, categoryId);
+        const response = await workAPI.deleteCategory(workId, categoryId);
 
         if (response.status === 'success') {
-            revalidatePath(`/directories/${directoryId}/items`);
-            revalidatePath(`/directories/${directoryId}`);
+            revalidatePath(`/works/${workId}/items`);
+            revalidatePath(`/works/${workId}`);
             return {
                 success: true,
             };
@@ -106,18 +102,18 @@ export async function deleteCategory(directoryId: string, categoryId: string) {
 
 // Tag CRUD operations
 
-export async function createTag(directoryId: string, data: Partial<Tag>) {
+export async function createTag(workId: string, data: Partial<Tag>) {
     const user = await getAuthFromCookie();
     if (!user) {
         redirect(ROUTES.AUTH_LOGIN);
     }
 
     try {
-        const response = await directoryAPI.createTag(directoryId, data);
+        const response = await workAPI.createTag(workId, data);
 
         if (response.status === 'success' && response.tag) {
-            revalidatePath(`/directories/${directoryId}/items`);
-            revalidatePath(`/directories/${directoryId}`);
+            revalidatePath(`/works/${workId}/items`);
+            revalidatePath(`/works/${workId}`);
             return {
                 success: true,
                 tag: response.tag,
@@ -137,18 +133,18 @@ export async function createTag(directoryId: string, data: Partial<Tag>) {
     }
 }
 
-export async function updateTag(directoryId: string, tagId: string, data: Partial<Tag>) {
+export async function updateTag(workId: string, tagId: string, data: Partial<Tag>) {
     const user = await getAuthFromCookie();
     if (!user) {
         redirect(ROUTES.AUTH_LOGIN);
     }
 
     try {
-        const response = await directoryAPI.updateTag(directoryId, tagId, data);
+        const response = await workAPI.updateTag(workId, tagId, data);
 
         if (response.status === 'success' && response.tag) {
-            revalidatePath(`/directories/${directoryId}/items`);
-            revalidatePath(`/directories/${directoryId}`);
+            revalidatePath(`/works/${workId}/items`);
+            revalidatePath(`/works/${workId}`);
             return {
                 success: true,
                 tag: response.tag,
@@ -168,18 +164,18 @@ export async function updateTag(directoryId: string, tagId: string, data: Partia
     }
 }
 
-export async function deleteTag(directoryId: string, tagId: string) {
+export async function deleteTag(workId: string, tagId: string) {
     const user = await getAuthFromCookie();
     if (!user) {
         redirect(ROUTES.AUTH_LOGIN);
     }
 
     try {
-        const response = await directoryAPI.deleteTag(directoryId, tagId);
+        const response = await workAPI.deleteTag(workId, tagId);
 
         if (response.status === 'success') {
-            revalidatePath(`/directories/${directoryId}/items`);
-            revalidatePath(`/directories/${directoryId}`);
+            revalidatePath(`/works/${workId}/items`);
+            revalidatePath(`/works/${workId}`);
             return {
                 success: true,
             };
@@ -200,18 +196,18 @@ export async function deleteTag(directoryId: string, tagId: string) {
 
 // Collection CRUD operations
 
-export async function createCollection(directoryId: string, data: Partial<Collection>) {
+export async function createCollection(workId: string, data: Partial<Collection>) {
     const user = await getAuthFromCookie();
     if (!user) {
         redirect(ROUTES.AUTH_LOGIN);
     }
 
     try {
-        const response = await directoryAPI.createCollection(directoryId, data);
+        const response = await workAPI.createCollection(workId, data);
 
         if (response.status === 'success' && response.collection) {
-            revalidatePath(`/directories/${directoryId}/items`);
-            revalidatePath(`/directories/${directoryId}`);
+            revalidatePath(`/works/${workId}/items`);
+            revalidatePath(`/works/${workId}`);
             return {
                 success: true,
                 collection: response.collection,
@@ -232,7 +228,7 @@ export async function createCollection(directoryId: string, data: Partial<Collec
 }
 
 export async function updateCollection(
-    directoryId: string,
+    workId: string,
     collectionId: string,
     data: Partial<Collection>,
 ) {
@@ -242,11 +238,11 @@ export async function updateCollection(
     }
 
     try {
-        const response = await directoryAPI.updateCollection(directoryId, collectionId, data);
+        const response = await workAPI.updateCollection(workId, collectionId, data);
 
         if (response.status === 'success' && response.collection) {
-            revalidatePath(`/directories/${directoryId}/items`);
-            revalidatePath(`/directories/${directoryId}`);
+            revalidatePath(`/works/${workId}/items`);
+            revalidatePath(`/works/${workId}`);
             return {
                 success: true,
                 collection: response.collection,
@@ -266,18 +262,18 @@ export async function updateCollection(
     }
 }
 
-export async function deleteCollection(directoryId: string, collectionId: string) {
+export async function deleteCollection(workId: string, collectionId: string) {
     const user = await getAuthFromCookie();
     if (!user) {
         redirect(ROUTES.AUTH_LOGIN);
     }
 
     try {
-        const response = await directoryAPI.deleteCollection(directoryId, collectionId);
+        const response = await workAPI.deleteCollection(workId, collectionId);
 
         if (response.status === 'success') {
-            revalidatePath(`/directories/${directoryId}/items`);
-            revalidatePath(`/directories/${directoryId}`);
+            revalidatePath(`/works/${workId}/items`);
+            revalidatePath(`/works/${workId}`);
             return {
                 success: true,
             };

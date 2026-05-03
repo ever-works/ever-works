@@ -15,6 +15,7 @@ export interface OAuthConnectionInfo extends OAuthProviderInfo {
     username?: string;
     email?: string;
     avatarUrl?: string;
+    connectionSource?: 'plugin' | 'social';
 }
 
 export const oauthAPI = {

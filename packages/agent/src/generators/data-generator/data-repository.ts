@@ -219,9 +219,13 @@ export class DataRepository {
         private readonly collectionsPath: string,
         private readonly markdownTemplatePath: string,
         public readonly dataDir: string,
+        private readonly defaultConfigOverrides: Partial<IDataConfig>,
     ) {}
 
-    static async create(dir: string): Promise<DataRepository> {
+    static async create(
+        dir: string,
+        defaultConfigOverrides: Partial<IDataConfig> = {},
+    ): Promise<DataRepository> {
         /*
          *   File structure:
          *      - config.yml
@@ -252,6 +256,7 @@ export class DataRepository {
             collectionsPath,
             path.join(dir, 'markdown'),
             path.join(dir, 'data'),
+            defaultConfigOverrides,
         );
 
         return repo;
@@ -314,7 +319,7 @@ export class DataRepository {
 
     /**
      * Remove all files except allowlisted ones
-     * and ensure all needed directories exist
+     * and ensure all needed works exist
      */
     async resetFiles() {
         const files = await fs.readdir(this.dir);
@@ -328,10 +333,10 @@ export class DataRepository {
             await fs.rm(path.join(this.dir, file), { recursive: true, force: true });
         }
 
-        await this.ensureDirectoriesExist();
+        await this.ensureWorksExist();
     }
 
-    async ensureDirectoriesExist() {
+    async ensureWorksExist() {
         await Promise.all([
             fs.mkdir(this.markdownTemplatePath, { recursive: true }),
             fs.mkdir(this.dataDir, { recursive: true }),
@@ -355,7 +360,7 @@ export class DataRepository {
                     return fallbackConfig;
                 }
 
-                const defaultConfig = createDefaultConfig();
+                const defaultConfig = createDefaultConfig(this.defaultConfigOverrides);
                 await this.writeConfig(defaultConfig);
                 return defaultConfig;
             }
@@ -420,7 +425,7 @@ export class DataRepository {
     }
 
     async countItems(): Promise<number> {
-        return this.countNonEmptyDirectories(this.dataDir);
+        return this.countNonEmptyWorks(this.dataDir);
     }
 
     async getItem(slug: string): Promise<ItemData | null> {
@@ -517,7 +522,10 @@ export class DataRepository {
         const exists = await this.fileExists(this.configPath);
 
         if (!exists) {
-            const defaultConfig = createDefaultConfig(overrides);
+            const defaultConfig = createDefaultConfig({
+                ...this.defaultConfigOverrides,
+                ...overrides,
+            });
             await this.writeConfig(defaultConfig);
             return defaultConfig;
         }
@@ -623,7 +631,7 @@ export class DataRepository {
     }
 
     async countComparisons(): Promise<number> {
-        return this.countNonEmptyDirectories(this.comparisonsDir);
+        return this.countNonEmptyWorks(this.comparisonsDir);
     }
 
     async getComparison(slug: string): Promise<ComparisonData | null> {
@@ -778,7 +786,7 @@ export class DataRepository {
         return error instanceof Error && error.message.includes('Map keys must be unique');
     }
 
-    private async countNonEmptyDirectories(dir: string): Promise<number> {
+    private async countNonEmptyWorks(dir: string): Promise<number> {
         try {
             const entries = await fs.readdir(dir, { withFileTypes: true });
             const counts = await Promise.all(
@@ -842,10 +850,10 @@ export class DataRepository {
         const itemPath = this.getItemPath(slug);
 
         try {
-            // Check if item directory exists
+            // Check if item work exists
             await fs.access(itemPath);
 
-            // Remove the entire item directory
+            // Remove the entire item work
             await fs.rm(itemPath, { recursive: true, force: true });
 
             return true;

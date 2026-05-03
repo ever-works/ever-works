@@ -22,7 +22,7 @@ export class SearchController {
     /**
      * Check if all required settings fields are configured for a plugin.
      * Mirrors PluginOperationsService.checkHasUnconfiguredRequiredSettings logic,
-     * but uses fully resolved settings (4-level: directory > user > admin > env > defaults).
+     * but uses fully resolved settings (4-level: work > user > admin > env > defaults).
      */
     private hasAllRequiredSettings(
         schema: JsonSchema | undefined,

@@ -83,7 +83,7 @@ Source validation can also run automatically.
 
 - It still runs after scheduled generation completes successfully.
 - It now also has its own standalone periodic scheduler.
-- Each directory schedule can define a separate `sourceValidationCadence`.
+- Each work schedule can define a separate `sourceValidationCadence`.
 - If no separate cadence is set, it defaults to the main schedule cadence.
 
 This keeps source quality fresh even between generation runs.
@@ -100,14 +100,14 @@ The Items UI shows compact validation status without turning every ambiguous cas
 
 ### Check a Single Item Source
 
-| Method | Endpoint                                 | Description                                               |
-| ------ | ---------------------------------------- | --------------------------------------------------------- |
-| `POST` | `/api/directories/:id/check-item-health` | Run source validation for one item and persist the result |
+| Method | Endpoint                           | Description                                               |
+| ------ | ---------------------------------- | --------------------------------------------------------- |
+| `POST` | `/api/works/:id/check-item-health` | Run source validation for one item and persist the result |
 
 **Example:**
 
 ```bash
-curl -X POST http://localhost:3100/api/directories/<directory-id>/check-item-health \
+curl -X POST http://localhost:3100/api/works/<work-id>/check-item-health \
   -H "Authorization: Bearer <token>" \
   -H "Content-Type: application/json" \
   -d '{
@@ -117,7 +117,7 @@ curl -X POST http://localhost:3100/api/directories/<directory-id>/check-item-hea
 
 ## Why It Matters
 
-Item Source Validation helps directory owners keep links useful, not just alive:
+Item Source Validation helps work owners keep links useful, not just alive:
 
 - detect clearly broken sources
 - identify generic or weak supporting pages
@@ -129,4 +129,4 @@ Item Source Validation helps directory owners keep links useful, not just alive:
 - [Items Management](../web-dashboard/items-ui.md) — where validation status and actions appear
 - [Scheduled Updates](./scheduled-updates.md) — source validation cadence can be configured alongside generation cadence
 - [Scheduling Interface](../web-dashboard/schedule-ui.md) — dashboard controls for validation cadence
-- [Directories API](../api/directories.md) — schedule fields and manual validation endpoint
+- [Works API](../api/works.md) — schedule fields and manual validation endpoint

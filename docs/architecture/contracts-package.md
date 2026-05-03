@@ -29,7 +29,7 @@ The package exposes four entry points:
 | `@ever-works/contracts/item`   | `src/item/`    | Item data structures, categories, tags, collections, brands, badges |
 | `@ever-works/contracts/domain` | `src/domain/`  | Domain analysis types, web page data, relevance assessment          |
 | `@ever-works/contracts/form`   | `src/form/`    | Form field definitions, validation rules, field groups              |
-| `@ever-works/contracts/api`    | `src/api/`     | API request/response DTOs for generators and directories            |
+| `@ever-works/contracts/api`    | `src/api/`     | API request/response DTOs for generators and works                  |
 
 ## Item Types (`@ever-works/contracts/item`)
 
@@ -48,7 +48,7 @@ interface Identifiable {
 
 #### ItemData
 
-The central data structure representing a directory entry:
+The central data structure representing a work entry:
 
 ```typescript
 interface ItemData {
@@ -173,7 +173,7 @@ interface ComparisonData {
 
 ### DomainType Enum
 
-Classifies directory content for domain-specific behavior:
+Classifies work content for domain-specific behavior:
 
 ```typescript
 enum DomainType {
@@ -311,18 +311,18 @@ interface FormFieldCondition {
 | `UpdateItemDto`                   | DTO for updating an item                       |
 | `ExtractItemDetailsDto`           | DTO for extracting item details                |
 
-### Directory API Types
+### Work API Types
 
-| Type                                 | Description                                                |
-| ------------------------------------ | ---------------------------------------------------------- |
-| `GenerateStatusType`                 | Enum: generation status (idle, running, completed, failed) |
-| `DirectoryScheduleCadence`           | Enum: schedule frequency (daily, weekly, monthly)          |
-| `DirectoryScheduleStatus`            | Enum: schedule status (active, paused, disabled)           |
-| `DirectoryScheduleBillingMode`       | Enum: billing mode for scheduled generations               |
-| `DirectoryScheduleDto`               | DTO for directory schedule configuration                   |
-| `GenerationMetrics`                  | Metrics from a generation run                              |
-| `DirectoryGenerationHistoryEntry`    | Single generation history entry                            |
-| `DirectoryGenerationHistoryResponse` | Paginated generation history                               |
+| Type                            | Description                                                |
+| ------------------------------- | ---------------------------------------------------------- |
+| `GenerateStatusType`            | Enum: generation status (idle, running, completed, failed) |
+| `WorkScheduleCadence`           | Enum: schedule frequency (daily, weekly, monthly)          |
+| `WorkScheduleStatus`            | Enum: schedule status (active, paused, disabled)           |
+| `WorkScheduleBillingMode`       | Enum: billing mode for scheduled generations               |
+| `WorkScheduleDto`               | DTO for work schedule configuration                        |
+| `GenerationMetrics`             | Metrics from a generation run                              |
+| `WorkGenerationHistoryEntry`    | Single generation history entry                            |
+| `WorkGenerationHistoryResponse` | Paginated generation history                               |
 
 ## Usage Across the Monorepo
 

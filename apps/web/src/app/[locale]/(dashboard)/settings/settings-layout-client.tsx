@@ -2,7 +2,7 @@
 
 import { usePathname } from '@/i18n/navigation';
 import { cn } from '@/lib/utils/cn';
-import { User, Lock, Key, AlertTriangle, HardDrive } from 'lucide-react';
+import { User, Lock, Key, AlertTriangle, HardDrive, Github } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import Link from 'next/link';
 import { useMemo } from 'react';
@@ -48,6 +48,12 @@ export function SettingsLayoutClient({ children, settingsMenu }: SettingsLayoutC
                 label: t('tabs.data'),
                 icon: HardDrive,
                 href: `${baseSettingsPath}/data`,
+            },
+            {
+                id: 'github-app',
+                label: t('tabs.githubApp'),
+                icon: Github,
+                href: `${baseSettingsPath}/github-app`,
             },
         ],
         [t],

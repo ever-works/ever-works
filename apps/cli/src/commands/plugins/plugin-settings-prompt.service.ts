@@ -21,7 +21,7 @@ interface PromptSettingsOptions {
     schema: PluginSettingsSchema;
     currentSettings?: Record<string, unknown>;
     currentSecretSettings?: Record<string, unknown>;
-    scope: 'user' | 'directory';
+    scope: 'user' | 'work';
     scopes: SettingScopeApi[];
     fallbackSettings?: Record<string, unknown>;
 }
@@ -130,13 +130,13 @@ export class PluginSettingsPromptService extends BasePromptService {
 
     private printFieldHint(
         prop: PluginSettingsSchemaProperty,
-        scope: 'user' | 'directory',
+        scope: 'user' | 'work',
         inheritedValue: unknown,
     ): void {
         if (prop.description) {
             console.log(chalk.gray(`  ${prop.description}`));
         }
-        if (scope === 'directory' && inheritedValue !== undefined && inheritedValue !== null) {
+        if (scope === 'work' && inheritedValue !== undefined && inheritedValue !== null) {
             const preview =
                 typeof inheritedValue === 'string' && prop.secret ? '••••' : String(inheritedValue);
             console.log(chalk.blue(`  Inherited: ${preview}`));

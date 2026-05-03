@@ -222,14 +222,14 @@ describe('ContentExtractorFacadeService', () => {
 
             registry.getByCapability.mockReturnValue([pdfRegistered, tavilyRegistered]);
             registry.get.mockReturnValue(tavilyRegistered);
-            // PDF extractor disabled for this directory
+            // PDF extractor disabled for this work
             registry.isPluginEnabledForScope.mockImplementation((id) =>
                 Promise.resolve(id !== 'pdf-extractor'),
             );
 
             await service.extractContent('https://example.com/doc.pdf', undefined, {
                 userId: 'test-user',
-                directoryId: 'dir-1',
+                workId: 'dir-1',
                 providerOverride: 'tavily',
             });
 
@@ -254,6 +254,53 @@ describe('ContentExtractorFacadeService', () => {
             expect(registry.get).toHaveBeenCalledWith('notion-extractor');
             expect(notionExtractor.extract).toHaveBeenCalled();
             expect(result?.rawContent).toBe('Content from Notion');
+        });
+
+        it('should support provider override from facade extraction options', async () => {
+            const jinaExtractor = createMockExtractorPlugin('jina', 'Jina');
+            const registered = createRegisteredPlugin(jinaExtractor, {
+                capabilities: ['content-extractor'],
+            });
+            registry.get.mockReturnValue(registered);
+
+            const result = await service.extractContent(
+                'https://example.com',
+                { providerOverride: 'jina' },
+                defaultFacadeOptions,
+            );
+
+            expect(registry.get).toHaveBeenCalledWith('jina');
+            expect(jinaExtractor.extract).toHaveBeenCalled();
+            expect(result?.rawContent).toBe('Content from Jina');
+        });
+
+        it('should prefer facade provider override over extraction option override', async () => {
+            const jinaExtractor = createMockExtractorPlugin('jina', 'Jina');
+            const firecrawlExtractor = createMockExtractorPlugin('firecrawl', 'Firecrawl');
+
+            registry.get.mockImplementation((id) => {
+                if (id === 'jina') {
+                    return createRegisteredPlugin(jinaExtractor, {
+                        capabilities: ['content-extractor'],
+                    });
+                }
+                if (id === 'firecrawl') {
+                    return createRegisteredPlugin(firecrawlExtractor, {
+                        capabilities: ['content-extractor'],
+                    });
+                }
+                return undefined;
+            });
+
+            const result = await service.extractContent(
+                'https://example.com',
+                { providerOverride: 'jina' },
+                { ...defaultFacadeOptions, providerOverride: 'firecrawl' },
+            );
+
+            expect(firecrawlExtractor.extract).toHaveBeenCalled();
+            expect(jinaExtractor.extract).not.toHaveBeenCalled();
+            expect(result?.rawContent).toBe('Content from Firecrawl');
         });
 
         it('should throw error when override plugin cannot extract URL', async () => {
@@ -374,6 +421,132 @@ describe('ContentExtractorFacadeService', () => {
             expect(githubExtractor.extract).not.toHaveBeenCalled();
             expect(notionExtractor.canExtract).toHaveBeenCalled();
             expect(notionExtractor.extract).toHaveBeenCalled();
+        });
+
+        it('should fall back when the preferred extractor returns a failure result', async () => {
+            const jinaExtractor = createMockExtractorPlugin('jina', 'Jina');
+            const firecrawlExtractor = createMockExtractorPlugin('firecrawl', 'Firecrawl');
+
+            (jinaExtractor.extract as jest.Mock).mockResolvedValue({
+                success: false,
+                url: 'https://example.com',
+                error: 'blocked',
+            } as ContentExtractionResult);
+
+            const jinaRegistered = createRegisteredPlugin(jinaExtractor, {
+                capabilities: ['content-extractor'],
+                systemPlugin: false,
+            });
+            const firecrawlRegistered = createRegisteredPlugin(firecrawlExtractor, {
+                capabilities: ['content-extractor'],
+                systemPlugin: false,
+            });
+
+            registry.getByCapability.mockReturnValue([jinaRegistered, firecrawlRegistered]);
+
+            const result = await service.extractContent(
+                'https://example.com',
+                undefined,
+                defaultFacadeOptions,
+            );
+
+            expect(jinaExtractor.extract).toHaveBeenCalled();
+            expect(firecrawlExtractor.extract).toHaveBeenCalled();
+            expect(result?.rawContent).toBe('Content from Firecrawl');
+            expect(result?.extraction?.providerId).toBe('firecrawl');
+            expect(result?.extraction?.attempts).toEqual([
+                expect.objectContaining({ providerId: 'jina', success: false, error: 'blocked' }),
+                expect.objectContaining({ providerId: 'firecrawl', success: true }),
+            ]);
+        });
+
+        it('should fall back when the preferred extractor returns empty content', async () => {
+            const localExtractor = createMockExtractorPlugin('local-content-extractor', 'Local', {
+                systemPlugin: true,
+                defaultForCapabilities: ['content-extractor'],
+            });
+            const scrapflyExtractor = createMockExtractorPlugin('scrapfly', 'Scrapfly');
+
+            (scrapflyExtractor.extract as jest.Mock).mockResolvedValue({
+                success: true,
+                url: 'https://example.com',
+                content: '',
+                markdown: '',
+            } as ContentExtractionResult);
+
+            const scrapflyRegistered = createRegisteredPlugin(scrapflyExtractor, {
+                capabilities: ['content-extractor'],
+                systemPlugin: false,
+            });
+            const localRegistered = createRegisteredPlugin(localExtractor, {
+                capabilities: ['content-extractor'],
+                systemPlugin: true,
+                defaultForCapabilities: ['content-extractor'],
+            });
+
+            registry.getByCapability.mockReturnValue([scrapflyRegistered, localRegistered]);
+            registry.getDefaultForCapability.mockReturnValue(localRegistered);
+
+            const result = await service.extractContent(
+                'https://example.com',
+                undefined,
+                defaultFacadeOptions,
+            );
+
+            expect(scrapflyExtractor.extract).toHaveBeenCalled();
+            expect(localExtractor.extract).toHaveBeenCalled();
+            expect(result?.rawContent).toBe('Content from Local');
+            expect(result?.extraction?.attempts[0]).toEqual(
+                expect.objectContaining({
+                    providerId: 'scrapfly',
+                    success: false,
+                    error: 'empty content',
+                }),
+            );
+        });
+
+        it('should return diagnostics when all extractors fail', async () => {
+            const jinaExtractor = createMockExtractorPlugin('jina', 'Jina');
+            const firecrawlExtractor = createMockExtractorPlugin('firecrawl', 'Firecrawl');
+
+            (jinaExtractor.extract as jest.Mock).mockResolvedValue({
+                success: false,
+                url: 'https://example.com',
+                error: 'blocked',
+            } as ContentExtractionResult);
+            (firecrawlExtractor.extract as jest.Mock).mockResolvedValue({
+                success: false,
+                url: 'https://example.com',
+                error: 'timeout',
+            } as ContentExtractionResult);
+
+            registry.getByCapability.mockReturnValue([
+                createRegisteredPlugin(jinaExtractor, {
+                    capabilities: ['content-extractor'],
+                    systemPlugin: false,
+                }),
+                createRegisteredPlugin(firecrawlExtractor, {
+                    capabilities: ['content-extractor'],
+                    systemPlugin: false,
+                }),
+            ]);
+
+            const result = await service.extractContentWithDiagnostics(
+                'https://example.com',
+                undefined,
+                defaultFacadeOptions,
+            );
+
+            expect(result.content).toBeNull();
+            expect(result.error).toBe('Content extraction failed for URL: https://example.com');
+            expect(result.attempts).toEqual([
+                expect.objectContaining({ providerId: 'jina', success: false, error: 'blocked' }),
+                expect.objectContaining({
+                    providerId: 'firecrawl',
+                    success: false,
+                    error: 'timeout',
+                }),
+            ]);
         });
     });
 

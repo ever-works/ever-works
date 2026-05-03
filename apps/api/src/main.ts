@@ -6,6 +6,7 @@ import { apiReference } from '@scalar/nestjs-api-reference';
 import { ApiModule } from './api.module';
 import helmet from 'helmet';
 import { initSentry, initPostHog } from '@ever-works/monitoring';
+import { IncomingMessage, ServerResponse } from 'http';
 import * as path from 'path';
 import { json, urlencoded } from 'express';
 
@@ -19,9 +20,19 @@ async function bootstrap() {
 
     const app = await NestFactory.create(ApiModule);
 
+    const captureRawBody = (
+        req: IncomingMessage & { rawBody?: string },
+        _res: ServerResponse,
+        buffer: Buffer,
+    ) => {
+        if (buffer.length > 0) {
+            req.rawBody = buffer.toString('utf8');
+        }
+    };
+
     // Increase body-parser limit for large payloads
-    app.use(json({ limit: '10mb' }));
-    app.use(urlencoded({ limit: '10mb', extended: true }));
+    app.use(json({ limit: '10mb', verify: captureRawBody }));
+    app.use(urlencoded({ limit: '10mb', extended: true, verify: captureRawBody }));
 
     // Security configurations
     // Use relaxed CSP for API docs to allow Scalar's inline scripts
@@ -61,7 +72,7 @@ async function bootstrap() {
     const config = new DocumentBuilder()
         .setTitle('Ever Works API')
         .setDescription(
-            'The Ever Works Platform API - Build and manage AI-powered directories with automated content generation, deployment, and integrations.',
+            'The Ever Works Platform API - Build and manage AI-powered works with automated content generation, deployment, and integrations.',
         )
         .setVersion('1.0')
         .addBearerAuth(
@@ -77,13 +88,13 @@ async function bootstrap() {
         )
         .addTag('Health', 'API health check endpoints')
         .addTag('Auth', 'Authentication and authorization endpoints')
-        .addTag('Directories', 'Directory management endpoints')
+        .addTag('Works', 'Work management endpoints')
         .addTag('Deploy', 'Deployment endpoints')
         .addTag('AI Conversation', 'AI-powered conversation and content generation')
         .addTag('Screenshot', 'Screenshot capture and smart image preview')
         .addTag('Subscriptions', 'Subscription and billing management')
         .addTag('Notifications', 'User notifications')
-        .addTag('Members', 'Directory member management')
+        .addTag('Members', 'Work member management')
         .build();
 
     const document = SwaggerModule.createDocument(app, config);

@@ -39,8 +39,8 @@ export function classifyGenerationError(error: unknown): ErrorClassification {
 export async function notifyForClassifiedError(
     notificationService: NotificationService,
     userId: string,
-    directoryId: string,
-    directoryName: string,
+    workId: string,
+    workName: string,
     classification: ErrorClassification,
 ): Promise<void> {
     switch (classification.type) {
@@ -67,8 +67,8 @@ export async function notifyForClassifiedError(
         case 'account_level':
             await notificationService.notifyGenerationAccountError(
                 userId,
-                directoryId,
-                directoryName,
+                workId,
+                workName,
                 classification.message,
             );
             break;

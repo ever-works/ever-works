@@ -7,7 +7,7 @@ sidebar_position: 13
 
 # Pipeline Plugins
 
-Pipeline plugins define the content generation workflow -- the sequence of steps that transform a user's prompt into a fully populated directory with items, categories, tags, and collections. The platform ships with two built-in pipelines and supports custom pipeline creation.
+Pipeline plugins define the content generation workflow -- the sequence of steps that transform a user's prompt into a fully populated work with items, categories, tags, and collections. The platform ships with two built-in pipelines and supports custom pipeline creation.
 
 ## IPipelinePlugin Interface
 
@@ -18,7 +18,7 @@ interface IPipelinePlugin<TStepId extends string = string> extends IPlugin {
 
 	/** Execute the full pipeline */
 	execute(
-		directory: DirectoryReference,
+		work: WorkReference,
 		request: GenerationRequest,
 		existing: ExistingItems,
 		options?: PipelineExecutionOptions,
@@ -31,7 +31,7 @@ interface IPipelinePlugin<TStepId extends string = string> extends IPlugin {
 	executeStep?(stepId, context, execContext, options?, onProgress?): Promise<IPipelineContext>;
 
 	// Optional: Context lifecycle hooks
-	createContext?(directory, request, existing): IPipelineContext;
+	createContext?(work, request, existing): IPipelineContext;
 	contextToSnapshot?(context): unknown;
 	contextFromSnapshot?(snapshot): IPipelineContext;
 	extractResult?(context, meta): PipelineResult;
@@ -155,7 +155,7 @@ The pipeline uses a typed context object that accumulates data as steps execute.
 
 ## Agent Pipeline (5 Steps)
 
-The agent pipeline is a self-managed pipeline that uses an AI agent with tool-calling to autonomously research and generate directory items.
+The agent pipeline is a self-managed pipeline that uses an AI agent with tool-calling to autonomously research and generate work items.
 
 | Property       | Value                               |
 | -------------- | ----------------------------------- |

@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { MakePlugin } from '../make.plugin.js';
-import type { DirectoryReference, GenerationRequest, ExistingItems, PluginContext } from '@ever-works/plugin';
+import type { WorkReference, GenerationRequest, ExistingItems, PluginContext } from '@ever-works/plugin';
 
 interface MockResponseInit {
 	status?: number;
@@ -59,15 +59,15 @@ function createMockContext(): PluginContext {
 	} as unknown as PluginContext;
 }
 
-function createDirectory(overrides?: Partial<DirectoryReference>): DirectoryReference {
+function createWork(overrides?: Partial<WorkReference>): WorkReference {
 	return {
 		id: 'dir-123',
-		name: 'Test Directory',
-		slug: 'test-directory',
-		description: 'A test directory',
+		name: 'Test Work',
+		slug: 'test-work',
+		description: 'A test work',
 		user: { id: 'user-456' },
 		...overrides
-	} as DirectoryReference;
+	} as WorkReference;
 }
 
 function createRequest(overrides?: Partial<GenerationRequest>): GenerationRequest {
@@ -311,17 +311,13 @@ describe('MakePlugin', () => {
 		});
 
 		it('should fail without user ID', async () => {
-			const result = await plugin.execute(
-				createDirectory({ user: undefined }),
-				createRequest(),
-				createExisting()
-			);
+			const result = await plugin.execute(createWork({ user: undefined }), createRequest(), createExisting());
 			expect(result.success).toBe(false);
 		});
 
 		it('should fail without scenario ID in scenario mode', async () => {
 			const result = await plugin.execute(
-				createDirectory(),
+				createWork(),
 				createRequest({ config: { execution_mode: 'scenario' } }),
 				createExisting()
 			);
@@ -331,7 +327,7 @@ describe('MakePlugin', () => {
 
 		it('should fail without webhook URL in webhook mode', async () => {
 			const result = await plugin.execute(
-				createDirectory(),
+				createWork(),
 				createRequest({ config: { execution_mode: 'webhook' } }),
 				createExisting()
 			);
@@ -342,7 +338,7 @@ describe('MakePlugin', () => {
 		it('should execute a scenario run successfully', async () => {
 			mockSuccessfulScenarioRun(fetchMock);
 
-			const result = await plugin.execute(createDirectory(), createRequest(), createExisting());
+			const result = await plugin.execute(createWork(), createRequest(), createExisting());
 
 			expect(result.success).toBe(true);
 			expect(result.outputs.items.length).toBeGreaterThan(0);
@@ -352,7 +348,7 @@ describe('MakePlugin', () => {
 		it('should return categories and tags from Make.com output', async () => {
 			mockSuccessfulScenarioRun(fetchMock);
 
-			const result = await plugin.execute(createDirectory(), createRequest(), createExisting());
+			const result = await plugin.execute(createWork(), createRequest(), createExisting());
 
 			expect(result.success).toBe(true);
 			expect(result.outputs.categories.length).toBeGreaterThan(0);
@@ -364,7 +360,7 @@ describe('MakePlugin', () => {
 				items: [{ name: 'Test Item 1', description: 'Existing item' } as never]
 			});
 
-			const result = await plugin.execute(createDirectory(), createRequest(), existing);
+			const result = await plugin.execute(createWork(), createRequest(), existing);
 
 			expect(result.success).toBe(true);
 			const hasExisting = result.outputs.items.some((i) => i.name === 'Test Item 1');
@@ -391,7 +387,7 @@ describe('MakePlugin', () => {
 			);
 
 			const result = await plugin.execute(
-				createDirectory(),
+				createWork(),
 				createRequest({
 					config: {
 						execution_mode: 'webhook',
@@ -430,7 +426,7 @@ describe('MakePlugin', () => {
 				})
 			);
 
-			const result = await plugin.execute(createDirectory(), createRequest(), createExisting());
+			const result = await plugin.execute(createWork(), createRequest(), createExisting());
 
 			expect(result.success).toBe(true);
 			expect(result.outputs.items[0].name).toBe('Inline Item');
@@ -461,7 +457,7 @@ describe('MakePlugin', () => {
 				})
 			);
 
-			const result = await plugin.execute(createDirectory(), createRequest(), createExisting());
+			const result = await plugin.execute(createWork(), createRequest(), createExisting());
 
 			expect(result.success).toBe(true);
 			expect(result.outputs.items[0].name).toBe('Stringified Inline Item');
@@ -498,7 +494,7 @@ describe('MakePlugin', () => {
 			);
 
 			const result = await plugin.execute(
-				createDirectory(),
+				createWork(),
 				createRequest({
 					config: {
 						execution_mode: 'scenario',
@@ -526,7 +522,7 @@ describe('MakePlugin', () => {
 			fetchMock.mockResolvedValueOnce(mockResponse({ body: { hook: { id: 99, name: 'Broken Hook' } } }));
 
 			const result = await plugin.execute(
-				createDirectory(),
+				createWork(),
 				createRequest({
 					config: {
 						execution_mode: 'scenario',
@@ -546,7 +542,7 @@ describe('MakePlugin', () => {
 			const abortController = new AbortController();
 			abortController.abort();
 
-			const result = await plugin.execute(createDirectory(), createRequest(), createExisting(), {
+			const result = await plugin.execute(createWork(), createRequest(), createExisting(), {
 				signal: abortController.signal
 			});
 
@@ -556,7 +552,7 @@ describe('MakePlugin', () => {
 		it('should track state during execution', async () => {
 			mockSuccessfulScenarioRun(fetchMock);
 
-			await plugin.execute(createDirectory(), createRequest(), createExisting());
+			await plugin.execute(createWork(), createRequest(), createExisting());
 
 			const state = plugin.getState();
 			expect(state).toBeDefined();
@@ -570,7 +566,7 @@ describe('MakePlugin', () => {
 				})
 			);
 
-			const result = await plugin.execute(createDirectory(), createRequest(), createExisting());
+			const result = await plugin.execute(createWork(), createRequest(), createExisting());
 
 			expect(result.success).toBe(false);
 			const errorMessage = result.error instanceof Error ? result.error.message : String(result.error);

@@ -29,8 +29,12 @@ import {
     AuthAccountRepository,
     buildPluginProviderId,
 } from '../database/repositories/auth-account.repository';
+import { WorkRepository } from '../database/repositories/work.repository';
+import { GitHubAppInstallationRepository } from '../database/repositories/github-app-installation.repository';
 import type { AuthAccount } from '../entities';
 import { FacadeError } from './base.facade';
+import { config } from '@src/config';
+import { requestGitHubAppInstallationAccessTokenDetails } from '@src/utils';
 
 // Facade-specific types that don't require token (facade resolves token internally)
 export interface FacadeCloneOptions {
@@ -82,7 +86,7 @@ export class NoGitCredentialsError extends GitFacadeError {
 /** Base options shared by all Git facade calls */
 interface GitFacadeBaseOptions {
     readonly providerId: string;
-    readonly directoryId?: string;
+    readonly workId?: string;
 }
 
 /** Token-based auth — used when caller already has a token (e.g., public repo analysis) */
@@ -105,11 +109,21 @@ export type { GitProviderInfo };
 @Injectable()
 export class GitFacadeService implements IGitFacade {
     private readonly CAPABILITY = PLUGIN_CAPABILITIES.GIT_PROVIDER;
+    private readonly installationTokenCache = new Map<
+        string,
+        {
+            token: string;
+            expiresAtMs: number;
+        }
+    >();
+    private readonly installationTokenRequests = new Map<string, Promise<string | null>>();
 
     constructor(
         private readonly registry: PluginRegistryService,
         private readonly authAccountRepository: AuthAccountRepository,
         private readonly settingsService: PluginSettingsService,
+        private readonly workRepository: WorkRepository,
+        private readonly gitHubAppInstallationRepository: GitHubAppInstallationRepository,
     ) {}
 
     private getRequiredOAuthScopes(providerId: string): readonly string[] {
@@ -119,24 +133,6 @@ export class GitFacadeService implements IGitFacade {
             default:
                 return [];
         }
-    }
-
-    private canUseOAuthAccountForGit(
-        providerId: string,
-        account: {
-            accessToken?: string | null;
-            scope?: string | null;
-            accessTokenExpiresAt?: Date | null;
-        },
-    ): boolean {
-        return (
-            !!account.accessToken &&
-            !this.authAccountRepository.isAccessTokenExpired(account) &&
-            this.authAccountRepository.hasRequiredScopes(
-                account,
-                this.getRequiredOAuthScopes(providerId),
-            )
-        );
     }
 
     isConfigured(): boolean {
@@ -164,29 +160,11 @@ export class GitFacadeService implements IGitFacade {
         return this.authAccountRepository.findProviderAccount(userId, pluginId);
     }
 
-    private async findUsableGitProviderAccount(
-        userId: string,
-        pluginId: string,
-    ): Promise<AuthAccount | null> {
-        const pluginAccount = await this.authAccountRepository.findProviderAccount(
-            userId,
-            buildPluginProviderId(pluginId),
-        );
-
-        if (pluginAccount && this.canUseOAuthAccountForGit(pluginId, pluginAccount)) {
-            return pluginAccount;
-        }
-
-        const providerAccount = await this.authAccountRepository.findProviderAccount(
-            userId,
-            pluginId,
-        );
-
-        if (providerAccount && this.canUseOAuthAccountForGit(pluginId, providerAccount)) {
-            return providerAccount;
-        }
-
-        return null;
+    private async findUsableGitProviderAccount(userId: string, pluginId: string) {
+        return this.authAccountRepository.findConnectedProviderAccount(userId, pluginId, {
+            usePluginProviderId: true,
+            requiredScopes: this.getRequiredOAuthScopes(pluginId),
+        });
     }
 
     getAvailableProviders(): GitProviderInfo[] {
@@ -206,10 +184,15 @@ export class GitFacadeService implements IGitFacade {
         if (!options.userId || !options.providerId) return false;
 
         try {
+            const linkedToken = await this.getInstallationTokenForWork(options);
+            if (linkedToken) {
+                return true;
+            }
+
             const plugin = await this.resolvePlugin(
                 options.providerId,
                 options.userId,
-                options.directoryId,
+                options.workId,
             );
 
             // Check connected provider account first
@@ -222,7 +205,7 @@ export class GitFacadeService implements IGitFacade {
             const patToken = await this.getPatFromSettings(
                 plugin.id,
                 options.userId,
-                options.directoryId,
+                options.workId,
             );
             return !!patToken;
         } catch {
@@ -235,10 +218,15 @@ export class GitFacadeService implements IGitFacade {
         if (!options.userId || !options.providerId) return null;
 
         try {
+            const linkedToken = await this.getInstallationTokenForWork(options);
+            if (linkedToken) {
+                return linkedToken;
+            }
+
             const plugin = await this.resolvePlugin(
                 options.providerId,
                 options.userId,
-                options.directoryId,
+                options.workId,
             );
 
             // Try connected provider account first
@@ -248,7 +236,7 @@ export class GitFacadeService implements IGitFacade {
             }
 
             // Try plugin settings for PAT
-            return this.getPatFromSettings(plugin.id, options.userId, options.directoryId);
+            return this.getPatFromSettings(plugin.id, options.userId, options.workId);
         } catch {
             return null;
         }
@@ -261,7 +249,7 @@ export class GitFacadeService implements IGitFacade {
             const plugin = await this.resolvePlugin(
                 options.providerId,
                 options.userId,
-                options.directoryId,
+                options.workId,
             );
 
             // Try to get committer info from the connected provider account first
@@ -282,7 +270,7 @@ export class GitFacadeService implements IGitFacade {
             // For PAT-based auth, try to get committer info from plugin settings
             const settings = await this.settingsService.getResolvedSettings(plugin.id, {
                 userId: options.userId,
-                directoryId: options.directoryId,
+                workId: options.workId,
                 includeSecrets: false, // We don't need secrets, just user info
             });
 
@@ -297,7 +285,7 @@ export class GitFacadeService implements IGitFacade {
             const patToken = await this.getPatFromSettings(
                 plugin.id,
                 options.userId,
-                options.directoryId,
+                options.workId,
             );
             if (patToken) {
                 try {
@@ -559,7 +547,7 @@ export class GitFacadeService implements IGitFacade {
         );
     }
 
-    async getDirectoryContents(
+    async getWorkContents(
         owner: string,
         repo: string,
         path: string,
@@ -570,8 +558,8 @@ export class GitFacadeService implements IGitFacade {
         path: string;
     }> | null> {
         const { plugin, token } = await this.resolvePluginAndToken(options);
-        if (plugin.getDirectoryContents) {
-            return plugin.getDirectoryContents(owner, repo, path, token);
+        if (plugin.getWorkContents) {
+            return plugin.getWorkContents(owner, repo, path, token);
         }
         return null;
     }
@@ -796,11 +784,7 @@ export class GitFacadeService implements IGitFacade {
     private async resolvePluginAndToken(
         options: GitFacadeOptions,
     ): Promise<{ plugin: IGitProviderPlugin; token: string }> {
-        const plugin = await this.resolvePlugin(
-            options.providerId,
-            options.userId,
-            options.directoryId,
-        );
+        const plugin = await this.resolvePlugin(options.providerId, options.userId, options.workId);
 
         // If token provided directly, use it
         if (options.token) {
@@ -815,6 +799,11 @@ export class GitFacadeService implements IGitFacade {
             );
         }
 
+        const linkedToken = await this.getInstallationTokenForWork(options);
+        if (linkedToken) {
+            return { plugin, token: linkedToken };
+        }
+
         // 1. Try the connected provider account first (for OAuth-based plugins like GitHub)
         const account = await this.findUsableGitProviderAccount(options.userId, plugin.id);
         if (account?.accessToken) {
@@ -822,11 +811,7 @@ export class GitFacadeService implements IGitFacade {
         }
 
         // 2. Try plugin user settings (for PAT-based plugins like GitLab)
-        const patToken = await this.getPatFromSettings(
-            plugin.id,
-            options.userId,
-            options.directoryId,
-        );
+        const patToken = await this.getPatFromSettings(plugin.id, options.userId, options.workId);
         if (patToken) {
             return { plugin, token: patToken };
         }
@@ -840,12 +825,12 @@ export class GitFacadeService implements IGitFacade {
     private async getPatFromSettings(
         pluginId: string,
         userId: string,
-        directoryId?: string,
+        workId?: string,
     ): Promise<string | null> {
         try {
             const settings = await this.settingsService.getResolvedSettings(pluginId, {
                 userId,
-                directoryId,
+                workId,
                 includeSecrets: true,
             });
             return (settings.accessToken?.value as string) || null;
@@ -857,7 +842,7 @@ export class GitFacadeService implements IGitFacade {
     private async resolvePlugin(
         providerId: string,
         userId?: string,
-        directoryId?: string,
+        workId?: string,
     ): Promise<IGitProviderPlugin> {
         if (!providerId) {
             throw new GitFacadeError('providerId is required', 'resolvePlugin');
@@ -871,7 +856,7 @@ export class GitFacadeService implements IGitFacade {
         ) {
             const isEnabled = await this.registry.isPluginEnabledForScope(
                 providerId,
-                directoryId,
+                workId,
                 userId,
             );
             if (isEnabled) {
@@ -879,5 +864,105 @@ export class GitFacadeService implements IGitFacade {
             }
         }
         throw new GitProviderNotFoundError(providerId);
+    }
+
+    private async getInstallationTokenForWork(options: GitFacadeOptions): Promise<string | null> {
+        if (!options.workId || options.providerId !== 'github') {
+            return null;
+        }
+
+        const work = await this.workRepository.findById(options.workId);
+        const auth = work?.sourceRepository?.auth;
+
+        if (!auth || auth.mode !== 'github_app_installation' || !auth.installationId) {
+            return null;
+        }
+
+        const installation = await this.gitHubAppInstallationRepository.findByInstallationId(
+            auth.installationId,
+        );
+        if (!installation || installation.deletedAt || installation.suspendedAt) {
+            this.installationTokenCache.delete(auth.installationId);
+            this.installationTokenRequests.delete(auth.installationId);
+            return null;
+        }
+
+        return this.createGitHubAppInstallationToken(auth.installationId);
+    }
+
+    private async createGitHubAppInstallationToken(installationId: string): Promise<string | null> {
+        const cachedToken = this.getCachedInstallationToken(installationId);
+        if (cachedToken) {
+            return cachedToken;
+        }
+
+        const inflightRequest = this.installationTokenRequests.get(installationId);
+        if (inflightRequest) {
+            return inflightRequest;
+        }
+
+        const appId = config.githubApp.getAppId();
+        const privateKey = config.githubApp.getPrivateKey();
+
+        if (!appId || !privateKey) {
+            return null;
+        }
+
+        const request = (async () => {
+            try {
+                const tokenData = await requestGitHubAppInstallationAccessTokenDetails(
+                    installationId,
+                    {
+                        appId,
+                        privateKey,
+                    },
+                );
+                this.cacheInstallationToken(installationId, tokenData);
+                return tokenData.token;
+            } catch (error) {
+                throw new GitFacadeError(
+                    error instanceof Error
+                        ? error.message
+                        : 'Failed to create GitHub App installation token',
+                    'createInstallationToken',
+                    'github',
+                );
+            } finally {
+                this.installationTokenRequests.delete(installationId);
+            }
+        })();
+
+        this.installationTokenRequests.set(installationId, request);
+        return request;
+    }
+
+    private getCachedInstallationToken(installationId: string): string | null {
+        const cachedToken = this.installationTokenCache.get(installationId);
+        if (!cachedToken) {
+            return null;
+        }
+
+        const refreshBufferMs = 60_000;
+        if (cachedToken.expiresAtMs <= Date.now() + refreshBufferMs) {
+            this.installationTokenCache.delete(installationId);
+            return null;
+        }
+
+        return cachedToken.token;
+    }
+
+    private cacheInstallationToken(
+        installationId: string,
+        tokenData: { token: string; expiresAt: string | null },
+    ): void {
+        const fallbackTtlMs = 55 * 60 * 1000;
+        const expiresAtMs = tokenData.expiresAt
+            ? Date.parse(tokenData.expiresAt)
+            : Date.now() + fallbackTtlMs;
+
+        this.installationTokenCache.set(installationId, {
+            token: tokenData.token,
+            expiresAtMs: Number.isFinite(expiresAtMs) ? expiresAtMs : Date.now() + fallbackTtlMs,
+        });
     }
 }

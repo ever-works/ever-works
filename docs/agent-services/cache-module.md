@@ -131,7 +131,7 @@ logger.log(`Cleaned ${deletedCount} expired cache entries`);
 
 ```typescript
 // Delete all cache entries matching a pattern
-const deleted = await adapter.deleteUnscopedEntriesLike('directory:%');
+const deleted = await adapter.deleteUnscopedEntriesLike('work:%');
 ```
 
 ## Exports

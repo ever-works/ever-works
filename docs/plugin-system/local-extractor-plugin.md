@@ -126,7 +126,7 @@ The default user agent mimics a modern Chrome browser to maximize compatibility 
 
 ## Usage in Pipelines
 
-The Local Content Extractor is the default content extraction plugin. It is used automatically during directory generation whenever the pipeline needs to retrieve and parse web page content. Since it requires no API key, it works out of the box.
+The Local Content Extractor is the default content extraction plugin. It is used automatically during work generation whenever the pipeline needs to retrieve and parse web page content. Since it requires no API key, it works out of the box.
 
 Other content extraction plugins (Firecrawl, Scrapfly, Jina) can be enabled as alternatives when you need JavaScript rendering, anti-bot bypass, or other advanced features that the local extractor does not support.
 

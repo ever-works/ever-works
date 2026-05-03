@@ -12,7 +12,7 @@ export interface CheckAvailabilityResponse {
 export interface CaptureScreenshotDto {
     url: string;
     providerOverride?: string;
-    directoryId?: string;
+    workId?: string;
     viewportWidth?: number;
     viewportHeight?: number;
     format?: 'png' | 'jpg' | 'webp';
@@ -38,8 +38,8 @@ export interface GetScreenshotUrlResponse {
 }
 
 export const screenshotAPI = {
-    checkAvailability: async (directoryId?: string) => {
-        const query = directoryId ? `?directoryId=${encodeURIComponent(directoryId)}` : '';
+    checkAvailability: async (workId?: string) => {
+        const query = workId ? `?workId=${encodeURIComponent(workId)}` : '';
         return serverFetch<CheckAvailabilityResponse>(`/screenshot/check-availability${query}`);
     },
 

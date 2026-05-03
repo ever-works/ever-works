@@ -9,7 +9,7 @@ export const PLUGINS_MODULE_OPTIONS = Symbol('PLUGINS_MODULE_OPTIONS');
 
 /**
  * Default plugin paths to scan for plugins.
- * These paths are scanned for directories containing package.json with everworks.plugin manifest.
+ * These paths are scanned for works containing package.json with everworks.plugin manifest.
  */
 export const DEFAULT_PLUGIN_PATHS = [
     './plugins',
@@ -63,4 +63,4 @@ export const PluginEvents = {
 /**
  * Setting sources in priority order (highest to lowest)
  */
-export const SETTING_SOURCE_PRIORITY = ['directory', 'user', 'admin', 'env', 'default'] as const;
+export const SETTING_SOURCE_PRIORITY = ['work', 'user', 'admin', 'env', 'default'] as const;

@@ -100,7 +100,7 @@ export async function delayWithSignal(ms: number, signal?: AbortSignal): Promise
 export async function resolveManagedAgentSettings(
 	context: PluginContext | null,
 	userId: string,
-	directoryId: string
+	workId: string
 ): Promise<PluginSettings> {
-	return resolveSettings(context, userId, directoryId);
+	return resolveSettings(context, userId, workId);
 }

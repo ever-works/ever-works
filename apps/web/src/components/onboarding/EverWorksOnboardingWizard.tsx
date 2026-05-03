@@ -36,10 +36,7 @@ interface EverWorksOnboardingWizardProps {
     onClose: () => void;
 }
 
-type WizardStep =
-    | { kind: 'welcome' }
-    | { kind: 'plugin'; plugin: UserPlugin }
-    | { kind: 'directory' };
+type WizardStep = { kind: 'welcome' } | { kind: 'plugin'; plugin: UserPlugin } | { kind: 'work' };
 
 function isPluginConnected(
     plugin: UserPlugin,
@@ -78,7 +75,7 @@ export function EverWorksOnboardingWizard({
         () => [
             { kind: 'welcome' },
             ...plugins.map((p) => ({ kind: 'plugin' as const, plugin: p })),
-            { kind: 'directory' },
+            { kind: 'work' },
         ],
         [plugins],
     );
@@ -137,8 +134,7 @@ export function EverWorksOnboardingWizard({
 
                                 const label = (() => {
                                     if (step.kind === 'welcome') return t('steps.welcome.title');
-                                    if (step.kind === 'directory')
-                                        return t('steps.directory.title');
+                                    if (step.kind === 'work') return t('steps.work.title');
                                     return step.plugin.name;
                                 })();
 
@@ -302,8 +298,8 @@ export function EverWorksOnboardingWizard({
                                 </div>
                             )}
 
-                            {/* Directory */}
-                            {currentStep.kind === 'directory' && (
+                            {/* Work */}
+                            {currentStep.kind === 'work' && (
                                 <div className="space-y-5 max-w-lg">
                                     <div className="flex items-start gap-4">
                                         <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-surface-secondary dark:bg-white/5">
@@ -311,23 +307,23 @@ export function EverWorksOnboardingWizard({
                                         </div>
                                         <div>
                                             <h3 className="text-lg font-semibold text-text dark:text-text-dark">
-                                                {t('steps.directory.title')}
+                                                {t('steps.work.title')}
                                             </h3>
                                             <p className="mt-1 text-sm text-text-muted dark:text-text-muted-dark">
-                                                {t('steps.directory.description')}
+                                                {t('steps.work.description')}
                                             </p>
                                         </div>
                                     </div>
                                     <div className="rounded-xl border border-dashed border-border dark:border-border-dark bg-surface-secondary/40 dark:bg-surface-secondary-dark/30 p-5 space-y-4">
                                         <p className="text-sm text-text-secondary dark:text-text-secondary-dark leading-relaxed">
-                                            {t('steps.directory.detail')}
+                                            {t('steps.work.detail')}
                                         </p>
                                         <Link
-                                            href={ROUTES.DASHBOARD_DIRECTORIES_NEW}
+                                            href={ROUTES.DASHBOARD_WORKS_NEW}
                                             className="inline-flex items-center gap-2 rounded-lg bg-black dark:bg-button-primary-dark px-4 py-2.5 text-sm font-medium text-white dark:text-black transition-colors hover:bg-button-primary-hover dark:hover:bg-button-primary-hover-dark"
                                             onClick={onClose}
                                         >
-                                            {t('steps.directory.action')}
+                                            {t('steps.work.action')}
                                             <ArrowRight className="w-4 h-4" />
                                         </Link>
                                     </div>

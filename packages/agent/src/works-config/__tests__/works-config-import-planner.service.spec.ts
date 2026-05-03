@@ -32,7 +32,7 @@ describe('WorksConfigImportPlannerService', () => {
         ).toThrow(BadRequestException);
     });
 
-    it('builds data repo source metadata without treating the data repo as the directory repo', () => {
+    it('builds data repo source metadata without treating the data repo as the work repo', () => {
         const service = createService();
 
         const sourceRepository = service.buildSourceRepository({
@@ -61,10 +61,10 @@ describe('WorksConfigImportPlannerService', () => {
                 repo: 'Compare-Cloud-Pricing-Website',
             },
         });
-        expect(sourceRepository.relatedRepositories?.directory).toBeUndefined();
+        expect(sourceRepository.relatedRepositories?.work).toBeUndefined();
     });
 
-    it('can snapshot works config metadata without assigning the source repo a directory role', () => {
+    it('can snapshot works config metadata without assigning the source repo a work role', () => {
         const service = createService();
 
         const sourceRepository = service.buildSourceRepository({

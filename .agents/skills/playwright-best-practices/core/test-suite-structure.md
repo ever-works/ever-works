@@ -7,7 +7,7 @@
 3. [Component Tests](#component-tests)
 4. [API Tests](#api-tests)
 5. [Visual Regression Tests](#visual-regression-tests)
-6. [Directory Structure](#directory-structure)
+6. [Work Structure](#work-structure)
 7. [Tagging & Filtering](#tagging--filtering)
 
 ### Project Setup
@@ -282,7 +282,7 @@ npx playwright test --update-snapshots
 npx playwright test homepage.spec.ts --update-snapshots
 ```
 
-## Directory Structure
+## Work Structure
 
 ```
 tests/

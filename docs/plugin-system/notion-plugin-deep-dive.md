@@ -9,7 +9,7 @@ sidebar_position: 57
 
 ## Overview
 
-The Notion Extractor plugin extracts content from Notion pages and converts it to clean markdown for use as source material during directory generation. It supports both public pages (via the free Splitbee API) and private pages (via the official Notion API with an integration key). The plugin is additive -- it only handles Notion URLs (`notion.so`, `notion.site`) and delegates all other URLs to the default content extractor.
+The Notion Extractor plugin extracts content from Notion pages and converts it to clean markdown for use as source material during work generation. It supports both public pages (via the free Splitbee API) and private pages (via the official Notion API with an integration key). The plugin is additive -- it only handles Notion URLs (`notion.so`, `notion.site`) and delegates all other URLs to the default content extractor.
 
 ## Architecture
 
@@ -46,7 +46,7 @@ interface NotionExtractorSettings {
 
 - `configurationMode`: defaults to standard plugin settings resolution.
 - `apiKey` is optional -- public pages can be extracted without any key.
-- The 4-level settings hierarchy applies: directory > user > admin > environment.
+- The 4-level settings hierarchy applies: work > user > admin > environment.
 
 ## Capabilities
 

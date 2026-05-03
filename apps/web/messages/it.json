@@ -150,7 +150,7 @@
         },
         "register": {
             "title": "Crea il tuo account",
-            "subtitle": "Inizia a creare directory incredibili oggi",
+            "subtitle": "Inizia a creare lavori incredibili oggi",
             "form": {
                 "name": {
                     "label": "Nome completo",
@@ -197,18 +197,18 @@
     "onboarding": {
         "label": "Per iniziare",
         "title": "Benvenuti in Ever Works",
-        "subtitle": "Crea e pubblica la tua prima directory in pochi minuti.",
+        "subtitle": "Crea e pubblica la tua prima lavori in pochi minuti.",
         "skipButton": "Salta per ora",
         "nextButton": "Avanti",
         "stepIndex": "Passo {index}",
         "steps": {
             "welcome": {
                 "title": "Cos'è Ever Works?",
-                "description": "Ever Works è un builder di directory open-source. Crea directory di contenuti strutturati — tool, lavori, link, prodotti — e pubblicali come siti web live.",
-                "detail": "Configuriamoci. Connetti i tuoi provider qui sotto, poi crea la tua prima directory.",
+                "description": "Ever Works è un builder di lavori open-source. Crea lavori di contenuti strutturati — tool, lavori, link, prodotti — e pubblicali come siti web live.",
+                "detail": "Configuriamoci. Connetti i tuoi provider qui sotto, poi crea la tua prima lavori.",
                 "feature1": {
                     "title": "Contenuti potenziati dall'IA",
-                    "description": "Genera e arricchisci gli elementi della directory automaticamente usando il tuo provider IA."
+                    "description": "Genera e arricchisci gli elementi della lavori automaticamente usando il tuo provider IA."
                 },
                 "feature2": {
                     "title": "Pubblicazione istantanea",
@@ -216,18 +216,18 @@
                 },
                 "feature3": {
                     "title": "Basato su Git",
-                    "description": "Ogni directory è un repository GitHub di tua proprietà e controllo."
+                    "description": "Ogni lavori è un repository GitHub di tua proprietà e controllo."
                 }
             },
-            "directory": {
-                "title": "Crea la tua prima directory",
-                "description": "Una directory è il tuo hub di contenuti. Aggiungi elementi, configura il layout e pubblicala con un clic.",
-                "detail": "Sei pronto! Crea la tua prima directory per iniziare a creare e pubblicare contenuti.",
-                "action": "Crea una directory"
+            "work": {
+                "title": "Crea la tua prima lavori",
+                "description": "Una lavori è il tuo hub di contenuti. Aggiungi elementi, configura il layout e pubblicala con un clic.",
+                "detail": "Sei pronto! Crea la tua prima lavori per iniziare a creare e pubblicare contenuti.",
+                "action": "Crea una lavori"
             },
             "publish": {
                 "title": "Vai online",
-                "description": "Connetti Vercel o GitHub per distribuire la tua directory come sito web pubblico — nessuna configurazione hosting necessaria.",
+                "description": "Connetti Vercel o GitHub per distribuire la tua lavori come sito web pubblico — nessuna configurazione hosting necessaria.",
                 "action": "Configura la pubblicazione"
             }
         },
@@ -336,7 +336,7 @@
             "steps": {
                 "model": {
                     "title": "Scegli un modello",
-                    "description": "Scegli il modello Codex che vuoi eseguire per la generazione directory end-to-end."
+                    "description": "Scegli il modello Codex che vuoi eseguire per la generazione lavori end-to-end."
                 },
                 "credentials": {
                     "title": "Aggiungi credenziali",
@@ -408,7 +408,7 @@
         "simWizard": {
             "label": "Configurazione SIM AI",
             "title": "Configura SIM AI in due passaggi",
-            "subtitle": "Aggiungi la tua chiave API SIM AI e verifica la connessione per iniziare a delegare la generazione directory ai workflow SIM.",
+            "subtitle": "Aggiungi la tua chiave API SIM AI e verifica la connessione per iniziare a delegare la generazione lavori ai workflow SIM.",
             "stepIndex": "Passo {index}",
             "continueButton": "Continua",
             "steps": {
@@ -431,7 +431,7 @@
         "title": "Cruscotto",
         "connectGithub": {
             "title": "Collega il tuo account GitHub",
-            "description": "GitHub è necessario per creare e gestire i repository delle directory. Collega il tuo account per iniziare.",
+            "description": "GitHub è necessario per creare e gestire i repository delle lavori. Collega il tuo account per iniziare.",
             "connect": "Collega GitHub",
             "dismiss": "Lo farò più tardi"
         },
@@ -465,7 +465,7 @@
         },
         "header": {
             "welcome": "Bentornato, {username}!",
-            "subtitle": "Gestisci le tue directory con IA e monitora le loro performance",
+            "subtitle": "Gestisci le tue lavori con IA e monitora le loro performance",
             "onboarding": {
                 "badge": "Procedura guidata {currentStep}/{totalSteps}",
                 "dismiss": "Nascondi collegamento procedura guidata"
@@ -490,14 +490,14 @@
                 },
                 "quickTips": {
                     "title": "Suggerimenti Rapidi",
-                    "tip1": "Crea la tua prima directory cliccando sul pulsante 'Crea Directory' nel cruscotto.",
-                    "tip2": "Usa il generatore IA per popolare automaticamente la tua directory con elementi rilevanti.",
-                    "tip3": "Collega il tuo account GitHub per sincronizzare e distribuire le tue directory come repository."
+                    "tip1": "Crea la tua prima lavori cliccando sul pulsante 'Crea Lavori' nel cruscotto.",
+                    "tip2": "Usa il generatore IA per popolare automaticamente la tua lavori con elementi rilevanti.",
+                    "tip3": "Collega il tuo account GitHub per sincronizzare e distribuire le tue lavori come repository."
                 },
                 "shortcuts": {
                     "title": "Scorciatoie da Tastiera",
-                    "search": "Cerca directory",
-                    "newDirectory": "Crea nuova directory",
+                    "search": "Cerca lavori",
+                    "newWork": "Crea nuova lavori",
                     "help": "Apri aiuto",
                     "hint": "Usa Cmd su Mac o Ctrl su Windows/Linux"
                 },
@@ -513,7 +513,7 @@
         },
         "activity": {
             "title": "Registro Attività",
-            "subtitle": "Monitora tutte le operazioni nelle tue directory",
+            "subtitle": "Monitora tutte le operazioni nelle tue lavori",
             "loading": "Caricamento...",
             "fetchFailed": "Impossibile caricare le attività",
             "exportFailed": "Impossibile esportare il registro attività",
@@ -521,7 +521,7 @@
             "columns": {
                 "status": "Stato",
                 "dateTime": "Data / Ora",
-                "directory": "Directory",
+                "work": "Lavori",
                 "type": "Tipo",
                 "summary": "Riepilogo"
             },
@@ -532,9 +532,9 @@
                     "generation": "Generazione",
                     "comparison": "Confronto",
                     "deployment": "Distribuzione",
-                    "directoryCreated": "Directory Creata",
-                    "directoryUpdated": "Directory Aggiornata",
-                    "directoryDeleted": "Directory Eliminata",
+                    "workCreated": "Lavori Creata",
+                    "workUpdated": "Lavori Aggiornata",
+                    "workDeleted": "Lavori Eliminata",
                     "pluginEnabled": "Plugin Abilitato",
                     "pluginDisabled": "Plugin Disabilitato",
                     "pluginConfigured": "Plugin Configurato",
@@ -553,7 +553,8 @@
                     "pending": "In Attesa",
                     "inProgress": "In Corso",
                     "completed": "Completato",
-                    "failed": "Fallito"
+                    "failed": "Fallito",
+                    "cancelled": "Annullato"
                 }
             },
             "actions": {
@@ -595,32 +596,32 @@
                 "pageOf": "Pagina {page} di {total}"
             }
         },
-        "directories": {
-            "title": "Directory",
-            "subtitle": "Gestisci e organizza le tue directory con IA",
+        "works": {
+            "title": "Lavori",
+            "subtitle": "Gestisci e organizza le tue lavori con IA",
             "summary": {
-                "totalDirectories": "Totale Directory",
+                "totalWorks": "Totale Lavori",
                 "generating": "In Generazione",
                 "totalItems": "Totale Elementi"
             },
-            "recent": "Directory Recenti",
+            "recent": "Lavori Recenti",
             "viewAll": "Visualizza tutte ({count})",
-            "search": "Cerca directory...",
-            "create": "Crea Directory",
-            "showing": "Visualizzazione di {current} su {total} directory",
-            "searchFailed": "Impossibile cercare directory. Riprova.",
+            "search": "Cerca lavori...",
+            "create": "Crea Lavori",
+            "showing": "Visualizzazione di {current} su {total} lavori",
+            "searchFailed": "Impossibile cercare lavori. Riprova.",
             "pagination": {
                 "previous": "Precedente",
                 "next": "Successivo"
             },
             "empty": {
-                "title": "Nessuna directory ancora",
-                "description": "Crea la tua prima directory con IA per iniziare a organizzare e mostrare i tuoi contenuti.",
-                "action": "Crea la Tua Prima Directory",
+                "title": "Nessuna lavori ancora",
+                "description": "Crea la tua prima lavori con IA per iniziare a organizzare e mostrare i tuoi contenuti.",
+                "action": "Crea la Tua Prima Lavori",
                 "notFound": {
-                    "title": "Nessuna directory trovata",
+                    "title": "Nessuna lavori trovata",
                     "withSearch": "Prova a modificare i termini di ricerca",
-                    "withoutSearch": "Crea la tua prima directory con IA per iniziare"
+                    "withoutSearch": "Crea la tua prima lavori con IA per iniziare"
                 }
             }
         },
@@ -637,7 +638,7 @@
             },
             "data": {
                 "exportTitle": "Esporta dati",
-                "exportDescription": "Scarica i dati del tuo account incluse directory, impostazioni dei plugin e informazioni del profilo come file JSON.",
+                "exportDescription": "Scarica i dati del tuo account incluse lavori, impostazioni dei plugin e informazioni del profilo come file JSON.",
                 "includeSecrets": "Includi impostazioni segrete (chiavi API, token) — esportate come valori mascherati",
                 "secretsWarning": "Le impostazioni segrete verranno esportate come valori mascherati. Dovrai sostituirle manualmente con credenziali reali prima dell'importazione.",
                 "exportButton": "Esporta dati",
@@ -645,7 +646,7 @@
                 "exportSuccess": "Dati esportati con successo",
                 "exportError": "Errore nell'esportazione dei dati",
                 "importTitle": "Importa dati",
-                "importDescription": "Importa dati da un file JSON esportato precedentemente. Puoi risolvere i conflitti per le directory con slug corrispondenti.",
+                "importDescription": "Importa dati da un file JSON esportato precedentemente. Puoi risolvere i conflitti per le lavori con slug corrispondenti.",
                 "importButton": "Importa dati",
                 "syncTitle": "Sincronizzazione GitHub",
                 "syncDescription": "Sincronizza la configurazione del tuo account con un repository GitHub privato per backup e migrazione tra istanze.",
@@ -657,13 +658,13 @@
                     "invalidJson": "File JSON non valido",
                     "previewError": "Errore nell'analisi del file di importazione",
                     "summary": "Riepilogo importazione",
-                    "directories": "Directory",
+                    "works": "Lavori",
                     "items": "Elementi",
                     "userPlugins": "Plugin utente",
                     "version": "Versione formato",
                     "missingPlugins": "Questi plugin non sono installati e verranno ignorati",
                     "conflicts": "Conflitti slug",
-                    "existingDirectory": "Esistente",
+                    "existingWork": "Esistente",
                     "incoming": "In arrivo",
                     "strategySkip": "Ignora (mantieni esistente)",
                     "strategyOverwrite": "Sovrascrivi esistente",
@@ -680,9 +681,9 @@
                     "validationErrors": "Errori di validazione",
                     "resultSuccess": "Importazione completata con successo",
                     "resultFailed": "Importazione fallita",
-                    "directoriesCreated": "Directory create",
-                    "directoriesUpdated": "Directory aggiornate",
-                    "directoriesSkipped": "Directory ignorate",
+                    "worksCreated": "Lavori create",
+                    "worksUpdated": "Lavori aggiornate",
+                    "worksSkipped": "Lavori ignorate",
                     "pluginsImported": "Plugin importati",
                     "warnings": "Avvisi",
                     "errors": "Errori"
@@ -731,11 +732,11 @@
                 "backToCategory": "Torna a {category}",
                 "pipelineDefault": {
                     "title": "Pipeline predefinita",
-                    "description": "Scegli quale pipeline usare di default durante la generazione degli elementi della directory.",
+                    "description": "Scegli quale pipeline usare di default durante la generazione degli elementi della lavori.",
                     "autoLabel": "Auto",
-                    "autoDescription": "Usa la pipeline risolta dal sistema per ogni directory",
+                    "autoDescription": "Usa la pipeline risolta dal sistema per ogni lavori",
                     "enforceLabel": "Impone questa predefinita",
-                    "enforceDescription": "Seleziona sempre questa pipeline in anticipo, anche quando una directory ha la sua pipeline configurata. Puoi comunque cambiare pipeline manualmente nel form.",
+                    "enforceDescription": "Seleziona sempre questa pipeline in anticipo, anche quando una lavori ha la sua pipeline configurata. Puoi comunque cambiare pipeline manualmente nel form.",
                     "saveFailed": "Errore nel salvataggio della pipeline predefinita"
                 }
             },
@@ -818,8 +819,8 @@
                 "subtitle": "Collega i tuoi account esterni per funzionalità avanzate",
                 "github": {
                     "name": "GitHub",
-                    "connected": "Crea e gestisci directory con repository GitHub",
-                    "disconnected": "Connettiti per creare directory da repository",
+                    "connected": "Crea e gestisci lavori con repository GitHub",
+                    "disconnected": "Connettiti per creare lavori da repository",
                     "scopes": "Ambiti",
                     "organizations": "Organizzazioni collegate",
                     "organizationsHint": "Usa Riconnetti per concedere accesso a organizzazioni aggiuntive",
@@ -880,12 +881,12 @@
             }
         },
         "stats": {
-            "totalDirectories": "Totale directory",
+            "totalWorks": "Totale lavori",
             "totalItems": "Totale elementi",
             "activeWebsites": "Siti web attivi",
             "fromLastMonth": "rispetto al mese scorso"
         },
-        "directoryCard": {
+        "workCard": {
             "status": {
                 "active": "Attiva",
                 "notStarted": "Non avviata",
@@ -910,14 +911,14 @@
             "views": "{count} visualizzazioni",
             "updated": "Aggiornato {date}",
             "viewAction": "Visualizza →",
-            "openingTitle": "Apertura directory",
-            "openingMessage": "Preparazione della tua directory. I dettagli si apriranno a breve. Rimani su questa pagina."
+            "openingTitle": "Apertura lavori",
+            "openingMessage": "Preparazione della tua lavori. I dettagli si apriranno a breve. Rimani su questa pagina."
         },
-        "directoryList": {
-            "title": "Le tue directory",
-            "createButton": "Crea directory"
+        "workList": {
+            "title": "Le tue lavori",
+            "createButton": "Crea lavori"
         },
-        "directoryDetail": {
+        "workDetail": {
             "failedToGenerateItems": "Impossibile generare gli elementi. Riprova.",
             "generationCompleted": "Generazione completata con successo",
             "generationCancelled": "Generazione annullata",
@@ -952,7 +953,7 @@
             },
             "members": {
                 "title": "Membri del team",
-                "subtitle": "Gestisci chi ha accesso a questa directory e i relativi permessi.",
+                "subtitle": "Gestisci chi ha accesso a questa lavori e i relativi permessi.",
                 "inviteMember": "Invita membro",
                 "noMembers": "Nessun membro del team. Invita qualcuno per collaborare.",
                 "roles": {
@@ -964,13 +965,13 @@
                 },
                 "roleDescriptions": {
                     "owner": "Controllo completo inclusa eliminazione e gestione membri.",
-                    "manager": "Può modificare la directory e gestire i membri, ma non eliminare.",
-                    "editor": "Può modificare il contenuto della directory e avviare generazioni.",
-                    "viewer": "Accesso in sola lettura per visualizzare la directory."
+                    "manager": "Può modificare la lavori e gestire i membri, ma non eliminare.",
+                    "editor": "Può modificare il contenuto della lavori e avviare generazioni.",
+                    "viewer": "Accesso in sola lettura per visualizzare la lavori."
                 },
                 "invite": {
                     "title": "Invita membro del team",
-                    "description": "Aggiungi un nuovo membro per collaborare su questa directory.",
+                    "description": "Aggiungi un nuovo membro per collaborare su questa lavori.",
                     "emailLabel": "Indirizzo email",
                     "emailPlaceholder": "colleague@example.com",
                     "roleLabel": "Ruolo",
@@ -984,7 +985,7 @@
                 },
                 "confirmRemove": {
                     "title": "Rimuovi membro",
-                    "description": "Sei sicuro di voler rimuovere {username} da questa directory? Perderà tutto l'accesso.",
+                    "description": "Sei sicuro di voler rimuovere {username} da questa lavori? Perderà tutto l'accesso.",
                     "confirm": "Rimuovi",
                     "cancel": "Annulla"
                 },
@@ -999,7 +1000,7 @@
                 "page": {
                     "title": "Aggiornamenti programmati",
                     "subtitle": "Automatizza i refresh per {name} con cadenza dedicata e gestione errori.",
-                    "fallbackName": "questa directory",
+                    "fallbackName": "questa lavori",
                     "loadFailed": "Impossibile caricare le impostazioni di programmazione.",
                     "providerCategories": {
                         "pipeline": "Pipeline",
@@ -1100,7 +1101,7 @@
                     },
                     "empty": {
                         "title": "Esegui prima una generazione manuale",
-                        "description": "Completa una esecuzione manuale riuscita per sbloccare la programmazione automatica. Una volta che la directory ha dati, possiamo mantenerla aggiornata per te.",
+                        "description": "Completa una esecuzione manuale riuscita per sbloccare la programmazione automatica. Una volta che la lavori ha dati, possiamo mantenerla aggiornata per te.",
                         "refresh": "Aggiorna stato"
                     },
                     "requiresGeneration": "Esegui almeno una generazione di elementi prima di abilitare le programmazioni."
@@ -1118,7 +1119,7 @@
             "statusCard": {
                 "notStarted": {
                     "title": "Generazione non avviata",
-                    "description": "Avvia la generazione degli elementi per popolare la directory con contenuti.",
+                    "description": "Avvia la generazione degli elementi per popolare la lavori con contenuti.",
                     "action": "Avvia generazione"
                 },
                 "generating": {
@@ -1132,7 +1133,7 @@
                 },
                 "generated": {
                     "title": "Generazione completata",
-                    "description": "La directory è stata popolata con successo con elementi.",
+                    "description": "La lavori è stata popolata con successo con elementi.",
                     "withWarnings": "Completata con avvisi:",
                     "viewItems": "Visualizza elementi",
                     "regenerate": "Rigenera"
@@ -1158,7 +1159,7 @@
             },
             "comparisons": {
                 "title": "Confronti",
-                "subtitle": "Pagine di confronto A vs B tra elementi della directory",
+                "subtitle": "Pagine di confronto A vs B tra elementi della lavori",
                 "vs": "vs",
                 "winner": "Vincitore: {name}",
                 "tie": "Pareggio",
@@ -1306,7 +1307,7 @@
                 }
             },
             "info": {
-                "title": "Informazioni directory",
+                "title": "Informazioni lavori",
                 "yourRole": "Il tuo ruolo",
                 "role": {
                     "owner": "Proprietario",
@@ -1356,15 +1357,15 @@
             "activity": {
                 "title": "Attività recente",
                 "noActivity": "Nessuna attività ancora",
-                "created": "Directory creata",
-                "directoryCreated": "Directory creata con successo",
+                "created": "Lavori creata",
+                "workCreated": "Lavori creata con successo",
                 "justNow": "Proprio ora"
             },
             "items": {
-                "title": "Elementi Directory",
-                "subtitle": "Gestisci e organizza gli elementi nella tua directory",
+                "title": "Elementi Lavori",
+                "subtitle": "Gestisci e organizza gli elementi nella tua lavori",
                 "noItemsTitle": "Nessun Elemento Ancora",
-                "noItemsDescription": "La tua directory non ha ancora elementi. Genera elementi per popolare la tua directory con contenuti.",
+                "noItemsDescription": "La tua lavori non ha ancora elementi. Genera elementi per popolare la tua lavori con contenuti.",
                 "generateItems": "Genera Elementi",
                 "searchPlaceholder": "Cerca elementi...",
                 "allCategories": "Tutte le Categorie",
@@ -1426,14 +1427,14 @@
                     "screenshotFailed": "Impossibile catturare screenshot",
                     "screenshotError": "Si è verificato un errore durante la cattura dello screenshot",
                     "featured": "Elemento in Evidenza",
-                    "featuredHelp": "Contrassegna questo elemento come in evidenza nella directory",
+                    "featuredHelp": "Contrassegna questo elemento come in evidenza nella lavori",
                     "updateWithPR": "Crea Pull Request",
                     "updateWithPRHelp": "Invia modifiche come pull request invece di commit diretto",
                     "cancel": "Annulla",
                     "adding": "Aggiungendo...",
                     "addItem": "Aggiungi Elemento",
                     "success": "Elemento aggiunto con successo",
-                    "successDescription": "L'elemento è stato aggiunto alla tua directory",
+                    "successDescription": "L'elemento è stato aggiunto alla tua lavori",
                     "failed": "Impossibile aggiungere elemento",
                     "error": "Si è verificato un errore durante l'aggiunta dell'elemento",
                     "errors": {
@@ -1652,7 +1653,7 @@
                     "navigationLabel": "Schede Generatore"
                 },
                 "regenerationWarning": "Avviso di Rigenerazione",
-                "regenerationWarningDescription": "Questa directory è già stata generata. Avviare una nuova generazione sostituirà gli elementi esistenti.",
+                "regenerationWarningDescription": "Questa lavori è già stata generata. Avviare una nuova generazione sostituirà gli elementi esistenti.",
                 "requiredInfo": "Informazioni Richieste",
                 "updateConfiguration": "Aggiorna Configurazione",
                 "promptRequired": "Il prompt è obbligatorio",
@@ -1662,20 +1663,20 @@
                 "loadingFormSchema": "Caricamento configurazione modulo...",
                 "failedToLoadFormSchema": "Impossibile caricare la configurazione del modulo",
                 "selectOption": "Seleziona un'opzione",
-                "directoryName": "Nome Directory",
+                "workName": "Nome Lavori",
                 "generationPrompt": "Prompt di Generazione",
                 "modelOverride": "Sovrascrittura modello AI",
                 "modelOverridePlaceholder": "es. openai/gpt-4.1 o openrouter/openai/gpt-4.1",
                 "modelOverrideHelperText": "Opzionale. Usa il modello importato o precedente per impostazione predefinita a meno che non lo sovrascriva qui.",
                 "recommended": "Consigliato",
-                "promptPlaceholder": "Descrivi quali elementi devono essere generati per questa directory...",
+                "promptPlaceholder": "Descrivi quali elementi devono essere generati per questa lavori...",
                 "promptHelperText": "Sii specifico sul tipo di contenuto che vuoi generare",
                 "repositoryDescription": "Descrizione Repository",
                 "repositoryPlaceholder": "Breve descrizione del repository (opzionale)",
                 "startGeneration": "Avvia Generazione",
                 "regenerateItems": "Rigenera Elementi",
                 "updateItems": "Esegui Generazione",
-                "recreateDirectory": "Ricarica Directory",
+                "recreateWork": "Ricarica Lavori",
                 "showAdvancedOptions": "Mostra Opzioni Avanzate",
                 "hideAdvancedOptions": "Nascondi Opzioni Avanzate",
                 "cancel": "Annulla",
@@ -1713,7 +1714,7 @@
                 "websiteRepositoryCreationMethod": "Metodo Creazione Repository Sito Web",
                 "methodDuplicate": "Duplica",
                 "methodFork": "Fork",
-                "directoryNamePlaceholder": "Inserisci nome directory",
+                "workNamePlaceholder": "Inserisci nome lavori",
                 "methodCreateFromTemplate": "Crea da Template",
                 "aiProcessingConfiguration": "Configurazione Elaborazione AI",
                 "maxSearchQueries": "Max Ricerche",
@@ -1724,7 +1725,7 @@
                 "aiFirstGenerationDescription": "Abilita generazione AI di elementi iniziali prima della ricerca web.",
                 "contentFiltering": "Filtro Contenuti",
                 "contentFilteringDescription": "Abilita filtro qualità contenuti",
-                "recreateConfirmTitle": "Ricaricare dati directory?",
+                "recreateConfirmTitle": "Ricaricare dati lavori?",
                 "recreateConfirmDescription": "Ricaricare eliminerà gli elementi esistenti e li rigenererà da zero. Questa azione non può essere annullata.",
                 "confirmRecreate": "Sì, ricarica",
                 "recreateInlineTitle": "Ricaricare rimuoverà gli elementi esistenti",
@@ -1768,10 +1769,11 @@
                 "aiProviderDescription": "Provider modello AI per generazione ed estrazione contenuti",
                 "contentExtractorProvider": "Estrai Contenuti",
                 "contentExtractorProviderDescription": "Provider per estrazione contenuti dalle pagine web",
-                "useDirectoryDefault": "Usa Predefinito Directory",
+                "useWorkDefault": "Usa Predefinito Lavori",
                 "default": "Predefinito",
                 "notConfigured": "Non configurato",
                 "notConfiguredTooltip": "Questo provider richiede configurazione. Visita Impostazioni → Plugin per configurarlo.",
+                "changeModels": "Cambia",
                 "jsonObjectError": "Il valore deve essere un oggetto JSON",
                 "invalidJsonError": "Formato JSON non valido"
             },
@@ -1799,7 +1801,11 @@
                 "closeNote": "Potrebbe richiedere alcuni minuti. Puoi chiudere questa pagina e tornare dopo.",
                 "showLogs": "Mostra log passi",
                 "hideLogs": "Nascondi log passi",
-                "waitingForLogs": "In attesa di log live..."
+                "waitingForLogs": "In attesa di log live...",
+                "stop": "Arresta la generazione",
+                "stopping": "Interruzione in corso...",
+                "stopRequested": "Richiesta di annullamento della generazione",
+                "stopFailed": "Impossibile annullare la generazione"
             },
             "settings": {
                 "sourceSettings": "Repository di origine",
@@ -1831,7 +1837,7 @@
                 },
                 "generalSettings": "Impostazioni generali",
                 "generalTitle": "Impostazioni generali",
-                "directoryName": "Nome directory",
+                "workName": "Nome lavori",
                 "description": "Descrizione",
                 "organizationRepository": "Repository organizzazione",
                 "organizationHelp": "Crea repository sotto un'organizzazione invece del tuo account personale",
@@ -1843,13 +1849,13 @@
                 "customHeaderPlaceholder": "Aggiungi contenuto personalizzato all'intestazione del README",
                 "overwriteDefaultHeader": "Sovrascrivi intestazione predefinita",
                 "customFooter": "Piè di pagina personalizzato",
-                "cantDeleteWhileGenerating": "Impossibile eliminare la directory mentre gli elementi vengono generati.",
+                "cantDeleteWhileGenerating": "Impossibile eliminare la lavori mentre gli elementi vengono generati.",
                 "customFooterPlaceholder": "Aggiungi contenuto personalizzato al piè di pagina del README",
                 "overwriteDefaultFooter": "Sovrascrivi piè di pagina predefinito",
                 "dangerZone": "Zona di pericolo",
                 "dangerTitle": "Zona di pericolo",
-                "deleteWarning": "Una volta eliminata una directory, non si può tornare indietro. Sii certo.",
-                "dangerDescription": "Una volta eliminata una directory, non si può tornare indietro. Sii certo.",
+                "deleteWarning": "Una volta eliminata una lavori, non si può tornare indietro. Sii certo.",
+                "dangerDescription": "Una volta eliminata una lavori, non si può tornare indietro. Sii certo.",
                 "deleteOptions": "Seleziona cosa eliminare:",
                 "deleteDataRepository": "Elimina repository dati",
                 "deleteDataRepositoryDescription": "Rimuovi il repository dati JSON da GitHub",
@@ -1858,14 +1864,14 @@
                 "deleteWebsiteRepository": "Elimina repository sito web",
                 "deleteWebsiteRepositoryDescription": "Rimuovi il repository del sito web deployato",
                 "deleteConfirm": "Sei assolutamente sicuro?",
-                "deleteConfirmDetail": "Questa azione non può essere annullata. La directory e i repository selezionati verranno eliminati permanentemente.",
-                "confirmDirectoryName": "Digita il nome della directory per confermare",
-                "confirmDirectoryNameDescription": "Digita \"{name}\" per confermare l'eliminazione",
-                "deleteNameMismatch": "Il nome della directory non corrisponde",
-                "deleteButton": "Elimina Directory",
+                "deleteConfirmDetail": "Questa azione non può essere annullata. La lavori e i repository selezionati verranno eliminati permanentemente.",
+                "confirmWorkName": "Digita il nome della lavori per confermare",
+                "confirmWorkNameDescription": "Digita \"{name}\" per confermare l'eliminazione",
+                "deleteNameMismatch": "Il nome della lavori non corrisponde",
+                "deleteButton": "Elimina Lavori",
                 "deleteConfirmButton": "Sì, Elimina",
-                "deleteSuccess": "Directory eliminata con successo",
-                "deleteFailed": "Impossibile eliminare la directory",
+                "deleteSuccess": "Lavori eliminata con successo",
+                "deleteFailed": "Impossibile eliminare la lavori",
                 "yesDelete": "Sì, Elimina",
                 "cancel": "Annulla",
                 "saveChanges": "Salva modifiche",
@@ -1874,7 +1880,7 @@
                 "updateFailed": "Impossibile aggiornare le impostazioni",
                 "deployProvider": {
                     "title": "Fornitore di deploy",
-                    "description": "Seleziona dove deployare il sito web della tua directory",
+                    "description": "Seleziona dove deployare il sito web della tua lavori",
                     "configure": "Configura",
                     "ready": "Pronto per il deploy",
                     "notConfigured": "Non configurato",
@@ -1911,7 +1917,7 @@
                     "prompts": {
                         "relevanceAssessment": {
                             "title": "Valutazione di Rilevanza",
-                            "description": "Istruzioni aggiuntive per filtrare le pagine web in base alla rilevanza per il topic della tua directory.",
+                            "description": "Istruzioni aggiuntive per filtrare le pagine web in base alla rilevanza per il topic della tua lavori.",
                             "placeholder": "ad es., Includi solo pagine che si concentrano su progetti open-source..."
                         },
                         "itemGeneration": {
@@ -1962,7 +1968,7 @@
                 "communityPrUpdateFailed": "Impossibile aggiornare le impostazioni PR Community",
                 "websiteConfig": {
                     "title": "Configurazione Sito Web",
-                    "subtitle": "Personalizza l'aspetto e il comportamento del tuo sito web directory",
+                    "subtitle": "Personalizza l'aspetto e il comportamento del tuo sito web lavori",
                     "loadFailed": "Impossibile caricare le impostazioni del sito web",
                     "saveSuccess": "Impostazioni sito web salvate con successo",
                     "saveFailed": "Impossibile salvare le impostazioni del sito web",
@@ -1977,13 +1983,13 @@
                         "siteName": {
                             "title": "Identità Sito",
                             "label": "Nome Sito",
-                            "placeholder": "La Mia Directory",
+                            "placeholder": "La Mia Lavori",
                             "helper": "Il nome visualizzato nell'intestazione del sito e nella scheda del browser"
                         },
                         "siteUrl": {
                             "label": "URL Sito",
                             "placeholder": "https://example.com",
-                            "helper": "L'URL del tuo sito web aziendale o directory"
+                            "helper": "L'URL del tuo sito web aziendale o lavori"
                         },
                         "global": {
                             "title": "Funzionalità Globali",
@@ -2034,7 +2040,7 @@
                             "defaultView": "Visualizzazione Predefinita",
                             "viewClassic": "Classico",
                             "viewGrid": "Griglia",
-                            "viewList": "Elenco",
+                            "viewList": "Lavoro",
                             "defaultSort": "Ordinamento Predefinito",
                             "sortPopularity": "Popolarità",
                             "sortNewest": "Più Nuovi",
@@ -2065,7 +2071,7 @@
                 },
                 "committer": {
                     "title": "Commit Git",
-                    "description": "Sovrascrivi nome e email del committer per i commit git in questa directory. Lascia vuoto per usare le impostazioni a livello utente o predefinite dell'account.",
+                    "description": "Sovrascrivi nome e email del committer per i commit git in questa lavori. Lascia vuoto per usare le impostazioni a livello utente o predefinite dell'account.",
                     "nameLabel": "Nome Committer",
                     "emailLabel": "Email Committer",
                     "save": "Salva Committer",
@@ -2076,13 +2082,13 @@
             "deploy": {
                 "noProviderAlert": {
                     "title": "Nessun Provider di Distribuzione",
-                    "description": "Seleziona un provider di distribuzione per distribuire il tuo sito web directory.",
+                    "description": "Seleziona un provider di distribuzione per distribuire il tuo sito web lavori.",
                     "selectButton": "Seleziona e Continua",
                     "noProviders": "Nessun provider di distribuzione disponibile. Installa prima un plugin di distribuzione"
                 },
                 "noTokenAlert": {
                     "title": "Token {provider} Richiesto",
-                    "description": "Per distribuire la tua directory, devi configurare il tuo token API {provider} in Impostazioni Plugin.",
+                    "description": "Per distribuire la tua lavori, devi configurare il tuo token API {provider} in Impostazioni Plugin.",
                     "configureButton": "Configura in Impostazioni Plugin",
                     "getTokenButton": "Ottieni Token API",
                     "howTo": {
@@ -2090,25 +2096,25 @@
                         "step1": "Clicca 'Ottieni Token API' per aprire il dashboard del tuo provider",
                         "step2": "Crea un nuovo token con permessi di distribuzione",
                         "step3": "Configura il tuo token API {provider} in Impostazioni Plugin > {provider}",
-                        "step4": "Torna qui per distribuire la tua directory"
+                        "step4": "Torna qui per distribuire la tua lavori"
                     }
                 },
                 "sharedNoTokenAlert": {
                     "title": "Distribuzione Non Disponibile",
-                    "description": "Il proprietario della directory non ha configurato la distribuzione. Contatta il proprietario della directory per impostare la distribuzione.",
+                    "description": "Il proprietario della lavori non ha configurato la distribuzione. Contatta il proprietario della lavori per impostare la distribuzione.",
                     "hint": "Come collaboratore, puoi attivare distribuzioni una volta che il proprietario configura il suo provider di distribuzione"
                 },
                 "form": {
                     "deployment": {
                         "title": "Distribuisci Sito Web",
-                        "description": "Distribuisci il repository del tuo sito web directory.",
+                        "description": "Distribuisci il repository del tuo sito web lavori.",
                         "deployButton": "Distribuisci su {provider}",
                         "deployingButton": "Distribuzione in corso...",
                         "deployingStateButton": "Distribuzione ({state}) in corso...",
                         "successMessage": "Il tuo sito web è stato distribuito con successo!",
                         "teamSelection": {
                             "title": "Seleziona Team",
-                            "description": "Scegli il team su cui distribuire questa directory.",
+                            "description": "Scegli il team su cui distribuire questa lavori.",
                             "label": "Team",
                             "placeholder": "Seleziona un team",
                             "confirmButton": "Distribuisci sul team",
@@ -2135,7 +2141,7 @@
                     },
                     "info": {
                         "deployInfo": "La distribuzione richiede tipicamente 1-3 minuti. Riceverai un URL una volta completata.",
-                        "updateInfo": "Gli aggiornamenti sincronizzano il contenuto della tua directory con il repository del sito web per la prossima distribuzione"
+                        "updateInfo": "Gli aggiornamenti sincronizzano il contenuto della tua lavori con il repository del sito web per la prossima distribuzione"
                     },
                     "websiteTemplate": {
                         "title": "Aggiornamenti Automatici del Template",
@@ -2155,7 +2161,7 @@
                         "title": "Configura Prima di Distribuzione",
                         "description": "Rivedi e personalizza le impostazioni del tuo sito web prima della distribuzione",
                         "siteName": "Nome Sito",
-                        "siteNamePlaceholder": "La Mia Directory",
+                        "siteNamePlaceholder": "La Mia Lavori",
                         "siteNameHelper": "Il nome visualizzato sul tuo sito web (predefinito: Acme)",
                         "tabGeneral": "Generale",
                         "tabHeader": "Intestazione",
@@ -2202,9 +2208,9 @@
                 }
             }
         },
-        "directoryCreation": {
-            "title": "Crea Nuova Directory",
-            "subtitle": "Scegli come desideri creare la tua directory",
+        "workCreation": {
+            "title": "Crea Nuova Lavori",
+            "subtitle": "Scegli come desideri creare la tua lavori",
             "backToOptions": "Torna alle opzioni",
             "sidebar": {
                 "selectedProvider": "Fornitore Git",
@@ -2212,7 +2218,7 @@
             },
             "deployProvider": {
                 "title": "Fornitore di Deploy",
-                "description": "Seleziona dove distribuire il sito web della tua directory",
+                "description": "Seleziona dove distribuire il sito web della tua lavori",
                 "noProviders": "Nessun fornitore di deploy disponibile",
                 "notConfigured": "Non configurato",
                 "configured": "Pronto per il deploy",
@@ -2230,29 +2236,29 @@
             },
             "ai": {
                 "title": "Crea con AI",
-                "subtitle": "Descrivi la tua idea di directory in linguaggio naturale e lascia che l'AI gestisca la configurazione",
+                "subtitle": "Descrivi la tua idea di lavori in linguaggio naturale e lascia che l'AI gestisca la configurazione",
                 "getStarted": "Inizia",
-                "formTitle": "Crea Directory con AI",
-                "formSubtitle": "Descrivi la tua idea di directory e lascia che l'AI gestisca la configurazione e la generazione del contenuto iniziale",
-                "directoryNameLabel": "Nome Directory",
-                "directoryNamePlaceholder": "es., Awesome AI Tools",
-                "directoryNameHelp": "L'AI suggerirà un nome se lasci questo campo vuoto",
-                "promptLabel": "Descrivi la Tua Directory",
+                "formTitle": "Crea Lavori con AI",
+                "formSubtitle": "Descrivi la tua idea di lavori e lascia che l'AI gestisca la configurazione e la generazione del contenuto iniziale",
+                "workNameLabel": "Nome Lavori",
+                "workNamePlaceholder": "es., Awesome AI Tools",
+                "workNameHelp": "L'AI suggerirà un nome se lasci questo campo vuoto",
+                "promptLabel": "Descrivi la Tua Lavori",
                 "githubRequired": "Collega prima il tuo account GitHub.",
-                "promptPlaceholder": "Descrivi che tipo di directory vuoi creare, quali elementi deve contenere e eventuali requisiti specifici...",
+                "promptPlaceholder": "Descrivi che tipo di lavori vuoi creare, quali elementi deve contenere e eventuali requisiti specifici...",
                 "inspirationText": "Hai bisogno di ispirazione? Prova uno di questi:",
                 "examplePrompts": {
                     "0": {
                         "name": "Strumenti AI per Sviluppatori",
-                        "prompt": "Crea una directory dei migliori strumenti AI per sviluppatori"
+                        "prompt": "Crea una lavori dei migliori strumenti AI per sviluppatori"
                     },
                     "1": {
                         "name": "Hub Componenti React",
-                        "prompt": "Crea un elenco curato di componenti React open-source"
+                        "prompt": "Crea un lavoro curato di componenti React open-source"
                     },
                     "2": {
                         "name": "Strumenti per Team Remoti",
-                        "prompt": "Genera una directory di app di produttività per team remoti"
+                        "prompt": "Genera una lavori di app di produttività per team remoti"
                     },
                     "3": {
                         "name": "Moda Sostenibile",
@@ -2267,23 +2273,23 @@
                     "3": "Configura il repository GitHub con documentazione adeguata"
                 },
                 "generateButton": "Genera con AI",
-                "generatingButton": "Generazione Directory...",
+                "generatingButton": "Generazione Lavori...",
                 "cancelButton": "Annulla",
                 "noteTitle": "Nota:",
-                "noteText": "La generazione AI richiede tipicamente 2-5 minuti a seconda della complessità della tua richiesta. Verrai notificato quando la tua directory sarà pronta.",
+                "noteText": "La generazione AI richiede tipicamente 2-5 minuti a seconda della complessità della tua richiesta. Verrai notificato quando la tua lavori sarà pronta.",
                 "errors": {
-                    "promptRequired": "Descrivi che tipo di directory vuoi creare",
+                    "promptRequired": "Descrivi che tipo di lavori vuoi creare",
                     "unconfiguredProviders": "{providers} non configurato. Vai su Impostazioni → Plugin per configurarlo prima di generare.",
-                    "nameRequired": "Il nome della directory è obbligatorio",
-                    "slugRequired": "Lo slug della directory è obbligatorio",
-                    "descriptionRequired": "La descrizione della directory è obbligatoria",
+                    "nameRequired": "Il nome della lavori è obbligatorio",
+                    "slugRequired": "Lo slug della lavori è obbligatorio",
+                    "descriptionRequired": "La descrizione della lavori è obbligatoria",
                     "githubRequired": "Collega prima il tuo account GitHub.",
-                    "createFailed": "Impossibile creare la directory"
+                    "createFailed": "Impossibile creare la lavori"
                 },
                 "success": {
-                    "started": "Creazione directory avviata!",
+                    "started": "Creazione lavori avviata!",
                     "generating": "L'AI sta generando il contenuto. Potrebbero volerci alcuni minuti...",
-                    "created": "Directory creata con successo!"
+                    "created": "Lavori creata con successo!"
                 },
                 "advancedSettings": "Impostazioni Avanzate",
                 "advancedSubtitle": "Configura impostazioni organizzazione e repository",
@@ -2294,23 +2300,23 @@
             },
             "manual": {
                 "title": "Crea Manualmente",
-                "subtitle": "Configura la tua directory con pieno controllo su ogni impostazione e opzione",
+                "subtitle": "Configura la tua lavori con pieno controllo su ogni impostazione e opzione",
                 "configureNow": "Configura ora",
-                "formTitle": "Crea Directory Manualmente",
-                "formSubtitle": "Configura la tua directory con pieno controllo su ogni impostazione",
+                "formTitle": "Crea Lavori Manualmente",
+                "formSubtitle": "Configura la tua lavori con pieno controllo su ogni impostazione",
                 "basicInfo": "Informazioni Base",
-                "nameLabel": "Nome Directory *",
+                "nameLabel": "Nome Lavori *",
                 "namePlaceholder": "es., Awesome AI Tools",
-                "slugLabel": "Slug Directory *",
+                "slugLabel": "Slug Lavori *",
                 "slugPlaceholder": "awesome-ai-tools",
                 "githubRequired": "Collega prima il tuo account GitHub.",
                 "slugHelp": "Identificatore adatto all'URL (solo lettere minuscole, numeri e trattini)",
                 "descriptionLabel": "Descrizione *",
-                "descriptionPlaceholder": "Un elenco curato dei migliori strumenti e risorse AI per sviluppatori",
+                "descriptionPlaceholder": "Un lavoro curato dei migliori strumenti e risorse AI per sviluppatori",
                 "advancedSettings": "Impostazioni Avanzate",
                 "advancedSubtitle": "Organizzazione, intestazioni personalizzate e altro",
                 "organizationLabel": "Crea sotto organizzazione",
-                "organizationHelp": "Crea questa directory sotto un'organizzazione GitHub invece del tuo account personale",
+                "organizationHelp": "Crea questa lavori sotto un'organizzazione GitHub invece del tuo account personale",
                 "organizationNameLabel": "Nome Organizzazione",
                 "organizationNamePlaceholder": "my-organization",
                 "headerLabel": "Intestazione README Personalizzata",
@@ -2319,25 +2325,25 @@
                 "footerLabel": "Piè README Personalizzato",
                 "footerPlaceholder": "Aggiungi contenuto personalizzato in fondo al file README",
                 "footerOverwrite": "Sostituisci completamente il piè predefinito",
-                "createButton": "Crea Directory",
-                "creatingButton": "Creazione Directory...",
+                "createButton": "Crea Lavori",
+                "creatingButton": "Creazione Lavori...",
                 "cancelButton": "Annulla",
-                "nameRequired": "Il nome della directory è obbligatorio",
-                "slugRequired": "Lo slug della directory è obbligatorio",
-                "descriptionRequired": "La descrizione della directory è obbligatoria",
-                "createFailed": "Impossibile creare la directory",
+                "nameRequired": "Il nome della lavori è obbligatorio",
+                "slugRequired": "Lo slug della lavori è obbligatorio",
+                "descriptionRequired": "La descrizione della lavori è obbligatoria",
+                "createFailed": "Impossibile creare la lavori",
                 "success": {
-                    "created": "Directory creata con successo!"
+                    "created": "Lavori creata con successo!"
                 }
             },
             "import": {
                 "title": "Importa Esistente",
-                "subtitle": "Importa una directory da un repository GitHub esistente",
+                "subtitle": "Importa una lavori da un repository GitHub esistente",
                 "importNow": "Importa ora",
                 "aiProviderSettings": "Fornitore AI",
                 "aiProviderSettingsDescription": "Scegli quale fornitore AI usare per l'analisi del README",
-                "formTitle": "Importa Directory da GitHub",
-                "formSubtitle": "Importa elementi da un repository GitHub esistente per creare la tua directory",
+                "formTitle": "Importa Lavori da GitHub",
+                "formSubtitle": "Importa elementi da un repository GitHub esistente per creare la tua lavori",
                 "sync": {
                     "title": "Mantieni sincronizzato",
                     "description": "Estrai automaticamente gli aggiornamenti dal repository sorgente."
@@ -2367,7 +2373,7 @@
                     },
                     "awesomeReadme": {
                         "title": "Lista Awesome",
-                        "description": "Repository di elenchi curati con README in markdown"
+                        "description": "Repository di lavori curati con README in markdown"
                     }
                 },
                 "analyzing": {
@@ -2390,13 +2396,13 @@
                     "schedule": "Pianificazione: {cadence}",
                     "providers": "Fornitori: {providers}"
                 },
-                "nameLabel": "Nome Directory",
-                "namePlaceholder": "es., La Mia Directory Awesome",
+                "nameLabel": "Nome Lavori",
+                "namePlaceholder": "es., La Mia Lavori Awesome",
                 "advancedSettings": "Impostazioni Avanzate",
                 "advancedSubtitle": "Configura impostazioni organizzazione e repository",
                 "attribution": {
                     "title": "Attribuzione Sorgente:",
-                    "text": "Questa directory farà riferimento a {url} come sorgente"
+                    "text": "Questa lavori farà riferimento a {url} come sorgente"
                 },
                 "research": {
                     "title": "Modalità Importa e Ricerca",
@@ -2419,13 +2425,13 @@
                     "importingButton": "Avvio pipeline di ricerca..."
                 },
                 "analyzeButton": "Analizza Repository",
-                "importButton": "Importa Directory",
+                "importButton": "Importa Lavori",
                 "importingButton": "Importazione...",
                 "backButton": "Indietro",
                 "cancelButton": "Annulla",
                 "importing": {
-                    "title": "Importazione Directory",
-                    "subtitle": "Configurazione della tua directory dal repository sorgente..."
+                    "title": "Importazione Lavori",
+                    "subtitle": "Configurazione della tua lavori dal repository sorgente..."
                 },
                 "repositorySelector": {
                     "title": "Seleziona Repository",
@@ -2492,17 +2498,17 @@
                     "unsupportedFormat": "Questo formato di repository non è supportato. Usa un formato Repository Dati o Lista Awesome.",
                     "analyzeFailed": "Impossibile analizzare il repository",
                     "analyzeForLinkingFailed": "Impossibile analizzare per il collegamento",
-                    "nameRequired": "Il nome della directory è obbligatorio",
+                    "nameRequired": "Il nome della lavori è obbligatorio",
                     "noAnalysis": "Analizza prima un repository",
                     "githubRequired": "Collega prima il tuo account GitHub",
                     "providerRequired": "Seleziona prima un provider git",
-                    "importFailed": "Impossibile importare la directory",
-                    "linkFailed": "Impossibile collegare la directory",
+                    "importFailed": "Impossibile importare la lavori",
+                    "linkFailed": "Impossibile collegare la lavori",
                     "providerNotConfigured": "{provider} non è configurato. Vai su Impostazioni → Plugin per configurarlo prima di importare."
                 },
                 "success": {
-                    "started": "Importazione avviata! Reindirizzamento alla tua directory...",
-                    "linked": "Directory collegata con successo"
+                    "started": "Importazione avviata! Reindirizzamento alla tua lavori...",
+                    "linked": "Lavori collegata con successo"
                 },
                 "slugConflict": {
                     "title": "Conflitto nome repository",
@@ -2515,7 +2521,7 @@
             "connection": {
                 "alert": {
                     "title": "{provider} non connesso",
-                    "subtitle": "Collega il tuo account {provider} per creare directory",
+                    "subtitle": "Collega il tuo account {provider} per creare lavori",
                     "connectButton": "Collega {provider}",
                     "connectingButton": "Connessione in corso..."
                 }
@@ -2531,7 +2537,7 @@
             },
             "settings": {
                 "title": "Connessioni Provider Git",
-                "subtitle": "Collega i tuoi account provider git per importare repository, creare directory e gestire i tuoi progetti.",
+                "subtitle": "Collega i tuoi account provider git per importare repository, creare lavori e gestire i tuoi progetti.",
                 "connectedCount": "{count, plural, =0 {Nessun provider connesso} =1 {1 provider connesso} other {# provider connessi}}",
                 "noProvidersConnected": "Nessun provider connesso",
                 "canImport": "Puoi importare e gestire repository",
@@ -2562,7 +2568,7 @@
                 "subtitle": "Configura i provider di deployment nelle Impostazioni Plugin",
                 "connected": "Connesso",
                 "notConnected": "Non Connesso",
-                "connectedMessage": "Il tuo provider di deployment è configurato. Ora puoi distribuire le directory.",
+                "connectedMessage": "Il tuo provider di deployment è configurato. Ora puoi distribuire le lavori.",
                 "disconnect": "Disconnetti",
                 "disconnecting": "Rimozione in corso...",
                 "apiTokenLabel": "Token API",
@@ -2598,17 +2604,17 @@
             "subtitle": "Scegli come vuoi essere notificato sugli aggiornamenti importanti",
             "email": {
                 "title": "Notifiche Email",
-                "directoryUpdates": {
-                    "label": "Aggiornamenti Directory",
-                    "description": "Ricevi notifiche sugli aggiornamenti importanti delle tue directory"
+                "workUpdates": {
+                    "label": "Aggiornamenti Lavori",
+                    "description": "Ricevi notifiche sugli aggiornamenti importanti delle tue lavori"
                 },
                 "newItems": {
                     "label": "Nuovi Elementi",
-                    "description": "Ricevi notifiche quando nuovi elementi vengono aggiunti alle tue directory"
+                    "description": "Ricevi notifiche quando nuovi elementi vengono aggiunti alle tue lavori"
                 },
                 "weeklyDigest": {
                     "label": "Riepilogo Settimanale",
-                    "description": "Ricevi un riepilogo settimanale dell'attività della tua directory"
+                    "description": "Ricevi un riepilogo settimanale dell'attività della tua lavori"
                 },
                 "marketing": {
                     "label": "Marketing & Promozioni",
@@ -2619,11 +2625,11 @@
                 "title": "Notifiche In-App",
                 "newItems": {
                     "label": "Nuovi Elementi",
-                    "description": "Mostra notifiche per i nuovi elementi della directory"
+                    "description": "Mostra notifiche per i nuovi elementi della lavori"
                 },
                 "comments": {
                     "label": "Commenti",
-                    "description": "Ricevi notifiche sui commenti alle tue directory"
+                    "description": "Ricevi notifiche sui commenti alle tue lavori"
                 },
                 "mentions": {
                     "label": "Menzioni",
@@ -2647,12 +2653,12 @@
         "sidebar": {
             "menu": "Menu",
             "aiChat": "Chat AI",
-            "newDirectory": "Nuova Directory",
-            "activityIndicator": "Generazione directory",
+            "newWork": "Nuova Lavori",
+            "activityIndicator": "Generazione lavori",
             "navigation": {
                 "dashboard": "Dashboard",
                 "activity": "Attività",
-                "directories": "Directory",
+                "works": "Lavori",
                 "plugins": "Plugin",
                 "settings": "Impostazioni"
             },
@@ -2674,7 +2680,7 @@
             "subtitle": "Azioni irreversibili e distruttive",
             "export": {
                 "title": "Esporta i Tuoi Dati",
-                "subtitle": "Scarica tutte le tue directory, elementi e impostazioni",
+                "subtitle": "Scarica tutte le tue lavori, elementi e impostazioni",
                 "action": "Esporta Dati (Prossimamente)"
             },
             "delete": {
@@ -2684,8 +2690,8 @@
                 "confirmTitle": "⚠️ Questo eliminerà permanentemente:",
                 "confirmItems": [
                     "Il tuo account e profilo",
-                    "Tutte le tue directory",
-                    "Tutti gli elementi e dati delle directory",
+                    "Tutte le tue lavori",
+                    "Tutti gli elementi e dati delle lavori",
                     "Chiavi API e integrazioni",
                     "Tutti i siti web associati"
                 ],
@@ -2705,13 +2711,13 @@
         "aiChat": {
             "title": "Assistente AI",
             "panelTitle": "Chat",
-            "subtitle": "Crea directory con linguaggio naturale",
+            "subtitle": "Crea lavori con linguaggio naturale",
             "welcomeTitle": "Benvenuto nell'Assistente AI 👋",
-            "welcomeSubtitle": "Il tuo assistente alimentato da AI. Chiedimi qualsiasi cosa sulla creazione di directory, generazione di contenuti o organizzazione dei tuoi dati.",
-            "welcomeMessage": "Ciao! Posso aiutarti a creare directory usando linguaggio naturale. Chiedi qualcosa come \"Crea una directory per tool AI\" o descrivi ciò di cui hai bisogno.",
+            "welcomeSubtitle": "Il tuo assistente alimentato da AI. Chiedimi qualsiasi cosa sulla creazione di lavori, generazione di contenuti o organizzazione dei tuoi dati.",
+            "welcomeMessage": "Ciao! Posso aiutarti a creare lavori usando linguaggio naturale. Chiedi qualcosa come \"Crea una lavori per tool AI\" o descrivi ciò di cui hai bisogno.",
             "capabilities": {
-                "directoryCreation": "Creazione Directory",
-                "directoryCreationDesc": "Costruisci directory da descrizioni in linguaggio naturale",
+                "workCreation": "Creazione Lavori",
+                "workCreationDesc": "Costruisci lavori da descrizioni in linguaggio naturale",
                 "webResearch": "Ricerca Web",
                 "webResearchDesc": "Cerca e raccogli dati da tutto il web",
                 "contentGeneration": "Generazione Contenuti",
@@ -2741,11 +2747,11 @@
             "selectProvider": "Provider",
             "notConfigured": "Non configurato",
             "gitNotConnected": "Provider Git non connesso",
-            "gitNotConnectedDesc": "Collega il tuo provider git per creare e gestire directory.",
+            "gitNotConnectedDesc": "Collega il tuo provider git per creare e gestire lavori.",
             "connectGithub": "Collega GitHub",
             "gitConnectedAs": "Connesso come {username} tramite {provider}",
             "deployNotConfigured": "Provider Deploy non configurato",
-            "deployNotConfiguredDesc": "Configura un provider di deployment per pubblicare i siti web delle tue directory.",
+            "deployNotConfiguredDesc": "Configura un provider di deployment per pubblicare i siti web delle tue lavori.",
             "configureDeployProvider": "Configura Provider Deploy",
             "deployConfigured": "Provider Deploy configurato ({provider})",
             "opened": "Aperto",
@@ -2755,12 +2761,12 @@
             "historyYesterday": "Ieri",
             "historyDaysAgo": "{days}g fa",
             "suggestions": {
-                "s1": "Mostra le mie directory",
-                "s2": "Crea una directory di tool AI",
+                "s1": "Mostra le mie lavori",
+                "s2": "Crea una lavori di tool AI",
                 "s3": "Controlla la mia connessione git",
                 "s4": "Mostra le mie statistiche"
             },
-            "feelingLucky": "Suggerisci una directory da creare",
+            "feelingLucky": "Suggerisci una lavori da creare",
             "errors": {
                 "unableToSend": "Impossibile inviare messaggio"
             }
@@ -2773,7 +2779,7 @@
             "enabled": "Abilitato",
             "disabled": "Disabilitato",
             "enable": "Abilita",
-            "enableDescription": "Configura come questo plugin è abilitato nelle tue directory.",
+            "enableDescription": "Configura come questo plugin è abilitato nelle tue lavori.",
             "disable": "Disabilita",
             "settings": "Impostazioni",
             "saveSettings": "Salva impostazioni",
@@ -2805,11 +2811,11 @@
                 "pipeline": "Pipeline"
             },
             "alwaysEnabled": "Sempre abilitato",
-            "disableWarning": "Disabilitare questo plugin lo disabiliterà anche in tutte le tue directory",
+            "disableWarning": "Disabilitare questo plugin lo disabiliterà anche in tutte le tue lavori",
             "cannotDisableSystem": "I plugin di sistema non possono essere disabilitati",
             "disableFailed": "Impossibile disabilitare il plugin",
-            "autoEnableForDirectories": "Abilita anche per tutte le directory",
-            "autoEnableForDirectoriesDescription": "Questo plugin sarà automaticamente attivo in tutte le tue directory. Puoi comunque disabilitarlo per directory.",
+            "autoEnableForWorks": "Abilita anche per tutte le lavori",
+            "autoEnableForWorksDescription": "Questo plugin sarà automaticamente attivo in tutte le tue lavori. Puoi comunque disabilitarlo per lavori.",
             "confirmDisable": "Conferma disabilitazione",
             "cancel": "Annulla",
             "missingRequiredFields": "Campi obbligatori mancanti: {fields}",
@@ -2884,20 +2890,20 @@
                 "removeLabel": "Rimuovi {login}"
             }
         },
-        "directoryPlugins": {
-            "title": "Plugin directory",
-            "subtitle": "Configura plugin per questa directory",
+        "workPlugins": {
+            "title": "Plugin lavori",
+            "subtitle": "Configura plugin per questa lavori",
             "active": "Attivo",
             "enable": "Abilita",
             "disable": "Disabilita",
-            "enableForDirectory": "Abilita per questa directory",
-            "disableForDirectory": "Disabilita per questa directory",
+            "enableForWork": "Abilita per questa lavori",
+            "disableForWork": "Disabilita per questa lavori",
             "enableAtUserLevelFirst": "Abilita questo plugin nelle tue impostazioni prima",
             "disabledByUser": "Disabilitato a livello utente",
             "systemAlwaysEnabled": "Plugin di sistema - sempre abilitato",
             "showSettings": "Mostra impostazioni",
             "hideSettings": "Nascondi impostazioni",
-            "directorySettingsInfo": "Configura impostazioni specifiche della directory qui",
+            "workSettingsInfo": "Configura impostazioni specifiche della lavori qui",
             "save": "Salva",
             "saved": "Salvato",
             "showInstalledOnly": "Mostra solo installati",
@@ -2905,7 +2911,7 @@
             "noPlugins": "Nessun plugin disponibile",
             "showAllPlugins": "Mostra tutti i plugin",
             "capabilityProviders": "Fornitori di capacità",
-            "capabilityProvidersDescription": "Seleziona quale plugin fornisce ogni capacità per questa directory",
+            "capabilityProvidersDescription": "Seleziona quale plugin fornisce ogni capacità per questa lavori",
             "noProvidersAvailable": "Nessun fornitore disponibile",
             "categories": {
                 "git": "Git",
@@ -2923,15 +2929,16 @@
             "errors": {
                 "unableToSend": "Impossibile inviare messaggio."
             },
-            "settingsModalTitle": "Impostazioni directory",
-            "settingsModalDescription": "Sovrascrivi le impostazioni per questa directory. I campi non impostati ereditano dalle tue impostazioni utente.",
+            "settingsModalTitle": "Impostazioni lavori",
+            "settingsModalDescription": "Sovrascrivi le impostazioni per questa lavori. I campi non impostati ereditano dalle tue impostazioni utente.",
             "inheritedFrom": "Ereditato: {value}",
             "inheritedSecret": "Ereditato: ••••••••",
             "resetToDefaults": "Reimposta sui valori predefiniti",
-            "resetConfirm": "Questo cancellerà tutte le sovrascritture specifiche della directory. Le impostazioni torneranno ai valori a livello utente.",
+            "resetConfirm": "Questo cancellerà tutte le sovrascritture specifiche della lavori. Le impostazioni torneranno ai valori a livello utente.",
             "resetSuccess": "Impostazioni reimpostate sui valori predefiniti",
             "cancel": "Annulla",
             "clickToConfigure": "Clicca per configurare",
+            "changeModels": "Cambia",
             "autoEnabledByUser": "Auto-abilitato tramite impostazioni utente",
             "toggleError": "Impossibile attivare/disattivare il plugin",
             "system": "Sistema",
@@ -2942,8 +2949,8 @@
         "auth": {
             "backToHome": "Torna alla home",
             "feature": {
-                "title": "Crea Directory con l'IA",
-                "subtitle": "Crea directory belle e ricercabili in pochi minuti usando linguaggio naturale. Nessuna programmazione richiesta.",
+                "title": "Crea Lavori con l'IA",
+                "subtitle": "Crea lavori belle e ricercabili in pochi minuti usando linguaggio naturale. Nessuna programmazione richiesta.",
                 "badge": "Potenziato dall'IA",
                 "benefits": {
                     "ai": {
@@ -2995,8 +3002,8 @@
         }
     },
     "metadata": {
-        "title": "{companyName} - Generatore di Directory",
-        "description": "Piattaforma SaaS per creare e gestire directory",
+        "title": "{companyName} - Generatore di Lavori",
+        "description": "Piattaforma SaaS per creare e gestire lavori",
         "pages": {
             "signIn": "Accedi",
             "createAccount": "Crea account",
@@ -3005,9 +3012,9 @@
             "authError": "Errore di autenticazione",
             "dashboard": "Dashboard",
             "activity": "Registro attività",
-            "directories": "Directory",
-            "newDirectory": "Nuova directory",
-            "directory": "Directory",
+            "works": "Lavori",
+            "newWork": "Nuova lavori",
+            "work": "Lavori",
             "overview": "Panoramica",
             "items": "Elementi",
             "generator": "Generatore",
@@ -3041,7 +3048,7 @@
         }
     },
     "actions": {
-        "directories": {
+        "works": {
             "slug": {
                 "required": "Lo slug è obbligatorio",
                 "format": "Lo slug deve contenere solo lettere minuscole, numeri e trattini"
@@ -3060,16 +3067,16 @@
             },
             "oauthRequired": "Connessione OAuth richiesta. Collega prima il tuo account {provider}.",
             "githubRequired": "Connessione GitHub richiesta. Collega prima il tuo account GitHub.",
-            "createSuccess": "Directory creata con successo!",
-            "createFailed": "Impossibile creare directory",
-            "updateSuccess": "Directory aggiornata con successo!",
-            "updateFailed": "Impossibile aggiornare directory",
-            "invalidGeneratedData": "Impossibile generare dati directory validi",
-            "aiGenerationStarted": "Creazione directory iniziata! L'IA sta generando contenuto...",
-            "invalidId": "ID directory non valido",
-            "deleteSuccess": "Directory eliminata con successo",
-            "deleteFailed": "Impossibile eliminare directory",
-            "fetchFailed": "Impossibile recuperare directory",
+            "createSuccess": "Lavori creata con successo!",
+            "createFailed": "Impossibile creare lavori",
+            "updateSuccess": "Lavori aggiornata con successo!",
+            "updateFailed": "Impossibile aggiornare lavori",
+            "invalidGeneratedData": "Impossibile generare dati lavori validi",
+            "aiGenerationStarted": "Creazione lavori iniziata! L'IA sta generando contenuto...",
+            "invalidId": "ID lavori non valido",
+            "deleteSuccess": "Lavori eliminata con successo",
+            "deleteFailed": "Impossibile eliminare lavori",
+            "fetchFailed": "Impossibile recuperare lavori",
             "organization": {
                 "requiredWhenOwnerProvided": "L'organizzazione deve essere abilitata quando è fornito il proprietario"
             },
@@ -3077,7 +3084,7 @@
                 "invalidUrl": "Inserisci un URL valido",
                 "analyzeFailed": "Impossibile analizzare il repository",
                 "started": "Import avviato con successo",
-                "failed": "Impossibile importare directory",
+                "failed": "Impossibile importare lavori",
                 "fetchReposFailed": "Impossibile recuperare repository"
             }
         },

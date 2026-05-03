@@ -74,16 +74,16 @@ interface SentryService {
 
 ```typescript
 @Injectable()
-export class DirectoryService {
+export class WorkService {
 	constructor(private readonly sentryService: SentryService) {}
 
-	async generate(directoryId: string) {
-		this.sentryService.info('Generation started', { directoryId });
+	async generate(workId: string) {
+		this.sentryService.info('Generation started', { workId });
 		try {
 			// ... generation logic
-			this.sentryService.info('Generation completed', { directoryId, itemCount: 42 });
+			this.sentryService.info('Generation completed', { workId, itemCount: 42 });
 		} catch (error) {
-			this.sentryService.error('Generation failed', { directoryId, error: error.message });
+			this.sentryService.error('Generation failed', { workId, error: error.message });
 			this.sentryService.captureException(error);
 			throw error;
 		}
@@ -155,7 +155,7 @@ Key behaviors:
 Use Sentry's Logs view to search structured log entries:
 
 - Filter by level: `level:error` or `level:warn`
-- Filter by context fields: `directoryId:abc-123`
+- Filter by context fields: `workId:abc-123`
 - Filter by service: `logger.name:ScheduleDispatcher`
 
 ### Trigger.dev Dashboard
