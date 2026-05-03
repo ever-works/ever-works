@@ -38,7 +38,7 @@ spec:
           imagePullPolicy: Always
           env:
             - name: EVER_WORKS_API_URL
-              value: "http://ever-works-api:3100"
+              value: "https://api.ever.works"
             - name: EVER_WORKS_API_KEY
               value: "$EVER_WORKS_MCP_API_KEY"
             - name: EVER_WORKS_MCP_PORT
