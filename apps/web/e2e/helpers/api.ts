@@ -114,13 +114,7 @@ export async function createWorkViaAPI(
         throw new Error(`createWorkViaAPI failed (${res.status()}): ${body}`);
     }
     const json = await res.json();
-    const id =
-        json?.work?.id ??
-        json?.directory?.id ??
-        json?.id ??
-        json?.data?.id ??
-        json?.work?.work_id ??
-        '';
+    const id = json?.work?.id ?? json?.id ?? json?.data?.id ?? json?.work?.work_id ?? '';
     return { id, raw: json };
 }
 

@@ -118,11 +118,7 @@ test.describe('Works rename — API contract', () => {
         expect(res.status(), 'authenticated /api/works').toBe(200);
 
         const body = await res.json();
-        // The response should have either { works: [...] } or { directories: [...] }
-        // (DB column still uses old name internally — TS-side property may
-        // reflect the old name temporarily). Either is acceptable; what we
-        // care about is that the endpoint works.
-        const list = body.works ?? body.directories ?? body;
+        const list = body.works ?? body;
         expect(Array.isArray(list) || typeof list === 'object', 'response is list-shaped').toBe(
             true,
         );

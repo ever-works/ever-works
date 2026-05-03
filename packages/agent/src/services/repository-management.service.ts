@@ -4,13 +4,7 @@ import { Work, RepoVisibility } from '../entities/work.entity';
 import { User } from '../entities/user.entity';
 import { WorkRepository } from '../database/repositories/work.repository';
 
-/**
- * Internal repository type. The 'directory' value matches the legacy
- * key persisted in `directories.sourceRepository.relatedRepositories`
- * and `directories.repoVisibility`. Do NOT rename to 'work' — see notes
- * on RepositoryRole / RepoVisibility in @ever-works/contracts/api.
- */
-export type RepositoryType = 'data' | 'directory' | 'website';
+export type RepositoryType = 'data' | 'work' | 'website';
 
 export interface RepositoryStatus {
     type: RepositoryType;
@@ -32,7 +26,7 @@ export class RepositoryManagementService {
     async getRepositoriesStatus(work: Work, user: User): Promise<RepositoryStatus[]> {
         const repos: { type: RepositoryType; name: string }[] = [
             { type: 'data', name: work.getDataRepo() },
-            { type: 'directory', name: work.getMainRepo() },
+            { type: 'work', name: work.getMainRepo() },
             { type: 'website', name: work.getWebsiteRepo() },
         ];
 
@@ -70,7 +64,7 @@ export class RepositoryManagementService {
         // Update DB cache
         const newVisibility: RepoVisibility = {
             data: results.find((r) => r.type === 'data')?.isPrivate ?? true,
-            directory: results.find((r) => r.type === 'directory')?.isPrivate ?? true,
+            work: results.find((r) => r.type === 'work')?.isPrivate ?? true,
             website: results.find((r) => r.type === 'website')?.isPrivate ?? true,
         };
 
@@ -79,7 +73,7 @@ export class RepositoryManagementService {
         if (
             !currentVisibility ||
             currentVisibility.data !== newVisibility.data ||
-            currentVisibility.directory !== newVisibility.directory ||
+            currentVisibility.work !== newVisibility.work ||
             currentVisibility.website !== newVisibility.website
         ) {
             await this.workRepository.update(work.id, {
@@ -103,7 +97,7 @@ export class RepositoryManagementService {
             case 'data':
                 repoName = work.getDataRepo();
                 break;
-            case 'directory':
+            case 'work':
                 repoName = work.getMainRepo();
                 break;
             case 'website':
@@ -123,7 +117,7 @@ export class RepositoryManagementService {
         // Update DB cache
         const currentVisibility = work.repoVisibility || {
             data: true,
-            directory: true,
+            work: true,
             website: true,
         };
         const newVisibility = { ...currentVisibility };

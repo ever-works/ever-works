@@ -42,11 +42,11 @@ export class UsageLedgerEntry {
     @JoinColumn({ name: 'userId' })
     user: ClassToObject<User>;
 
-    @Column({ name: 'directoryId' })
+    @Column()
     workId: string;
 
     @ManyToOne(() => Work, { onDelete: 'CASCADE' })
-    @JoinColumn({ name: 'directoryId' })
+    @JoinColumn({ name: 'workId' })
     work: ClassToObject<Work>;
 
     @Column({ nullable: true })

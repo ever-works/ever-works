@@ -60,9 +60,7 @@ export class DeleteSubCommand extends CommandRunner {
                 repositoriesToDelete.push(`${work.getRepoOwner()}/${work.getDataRepo()}`);
             }
             if (deleteOptions.delete_markdown_repository) {
-                repositoriesToDelete.push(
-                    `${work.getRepoOwner('directory')}/${work.getMainRepo()}`,
-                );
+                repositoriesToDelete.push(`${work.getRepoOwner('work')}/${work.getMainRepo()}`);
             }
             if (deleteOptions.delete_website_repository) {
                 repositoriesToDelete.push(
