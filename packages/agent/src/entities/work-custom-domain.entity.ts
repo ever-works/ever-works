@@ -21,17 +21,17 @@ import { ClassToObject, DomainEnvironment } from './types';
  * If a user switches deployment providers, domain records persist in the DB
  * and can be re-attached to the new provider.
  */
-@Entity({ name: 'directory_custom_domains' })
+@Entity({ name: 'work_custom_domains' })
 @Unique(['workId', 'domain'])
 export class WorkCustomDomain {
     @PrimaryGeneratedColumn('uuid')
     id: string;
 
-    @Column({ name: 'directoryId' })
+    @Column()
     workId: string;
 
     @ManyToOne(() => Work, (work) => work.customDomains, { onDelete: 'CASCADE' })
-    @JoinColumn({ name: 'directoryId' })
+    @JoinColumn({ name: 'workId' })
     work: ClassToObject<Work>;
 
     @Column()

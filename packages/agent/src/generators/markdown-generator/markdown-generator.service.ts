@@ -36,7 +36,7 @@ export class MarkdownGeneratorService {
         const workOwner = getWorkOwner(work);
         const committer = work.resolveCommitter(user);
         const description = work.description;
-        const mainRepoOwner = work.getRepoOwner('directory');
+        const mainRepoOwner = work.getRepoOwner('work');
         const mainRepo = work.getMainRepo();
 
         // Create repository through facade
@@ -291,7 +291,7 @@ export class MarkdownGeneratorService {
     async removeItemDetail(work: Work, user: User, slug: string, branch?: string) {
         const workOwner = getWorkOwner(work);
         const committer = work.resolveCommitter(user);
-        const mainRepoOwner = work.getRepoOwner('directory');
+        const mainRepoOwner = work.getRepoOwner('work');
         const mainRepo = work.getMainRepo();
 
         const markdownPath = await this.gitFacade.cloneOrPull(
@@ -325,7 +325,7 @@ export class MarkdownGeneratorService {
      */
     async removeRepository(work: Work, user: User): Promise<void> {
         const workOwner = getWorkOwner(work);
-        const mainRepoOwner = work.getRepoOwner('directory');
+        const mainRepoOwner = work.getRepoOwner('work');
         const mainRepo = work.getMainRepo();
 
         try {

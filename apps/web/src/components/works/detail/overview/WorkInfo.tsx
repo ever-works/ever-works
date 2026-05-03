@@ -166,7 +166,7 @@ export function WorkInfo({ work, config }: WorkInfoProps) {
                     <li className="flex gap-1">
                         {work.repoVisibility && (
                             <RepoVisibilityIcon
-                                isPrivate={work.repoVisibility.directory}
+                                isPrivate={work.repoVisibility.work}
                                 label={t('mainRepo')}
                             />
                         )}
