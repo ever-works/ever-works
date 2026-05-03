@@ -22,18 +22,33 @@ Located in `packages/agent/src/generators/website-generator/`, the system includ
 
 ## Template Configuration
 
-The website template source is defined in a static config:
+The website template source is defined in a static registry:
 
 ```typescript
-export const WEBSITE_TEMPLATE_CONFIG = {
+const CLASSIC_WEBSITE_TEMPLATE: WebsiteTemplateConfig = {
+	id: 'classic',
+	name: 'Classic',
+	description: 'The original Ever Works directory-style website template.',
 	owner: 'ever-works',
-	repo: 'ever-works-website-template',
+	repo: 'directory-web-template',
 	branch: 'main',
 	syncBranches: ['main', 'stage', 'develop']
-} as const;
+};
 ```
 
-This means every generated website is based on the `ever-works-website-template` repository, and three branches (`main`, `stage`, `develop`) are kept in sync.
+By default every generated website is based on the
+[`directory-web-template`](https://github.com/ever-works/directory-web-template)
+repository (Next.js, full-featured directory site), and three branches
+(`main`, `stage`, `develop`) are kept in sync.
+
+A second template, [`directory-web-minimal-template`](https://github.com/ever-works/directory-web-minimal-template)
+(Astro, static, plugin-driven), can be enabled by setting
+`WEBSITE_TEMPLATE_MINIMAL_REPO=directory-web-minimal-template` and chosen
+per-Work via the website-template selector.
+
+For the full template catalogue (including the planned generic
+`web-template` and `web-minimal-template`), see
+[**Website Templates**](../features/website-templates.md).
 
 ## Repository Naming Convention
 
@@ -53,7 +68,7 @@ The `duplicate` method performs a full copy of the template:
 
 ```
 1. Cleanup any existing local files
-2. Clone the template repository (ever-works-website-template)
+2. Clone the template repository (directory-web-template)
 3. Create a new repository for the work's website
 4. Replace the Git remote origin with the new repository URL
 5. Force push the template content to the new repository
