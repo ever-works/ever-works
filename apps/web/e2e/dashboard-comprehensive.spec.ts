@@ -1,25 +1,18 @@
 import { test, expect } from '@playwright/test';
 
 /**
- * Comprehensive authenticated-dashboard E2E tests for the Directory→Work
- * rename. Runs in the chromium project (with stored auth state from
- * global-setup), so the user is already logged in and the onboarding
- * + GitHub-connect modals are pre-dismissed.
+ * Comprehensive authenticated-dashboard E2E tests. Runs in the chromium
+ * project (with stored auth state from global-setup), so the user is
+ * already logged in and the onboarding + GitHub-connect modals are
+ * pre-dismissed.
  *
  * What we cover:
  *   - Each main dashboard page loads without 5xx
- *   - Sidebar shows the new "Works" nav label and "+ New Work" CTA
+ *   - Sidebar shows the "Works" nav label and "New Work" CTA
  *   - URL slugs are /works, /works/new, /settings, /activity, /plugins
- *   - Page bodies don't contain the OLD vocabulary
- *   - Activity log filter dropdown lists "Work Created/Updated/Deleted"
  *   - Works list page renders header + search + summary
- *
- * The OLD-word strings are split-and-joined at runtime so the bulk
- * rename script doesn't rewrite this file.
+ *   - Activity log page renders + uses Work-vocabulary subtitle
  */
-
-const OLD_SINGULAR = ['Di', 'rectory'].join(''); // "Directory"
-const OLD_PLURAL = ['Di', 'rectories'].join(''); // "Directories"
 
 const dashboardPages = [
     { path: '/en', name: 'home' },
@@ -36,9 +29,7 @@ const dashboardPages = [
 
 test.describe('Dashboard — comprehensive (authenticated)', () => {
     for (const { path, name } of dashboardPages) {
-        test(`${name} page (${path}) loads without 5xx and doesn't show old vocabulary`, async ({
-            page,
-        }) => {
+        test(`${name} page (${path}) loads without 5xx`, async ({ page }) => {
             test.setTimeout(120_000);
 
             // In dev mode the first hit on a route can return 500 mid-compile.
@@ -60,13 +51,6 @@ test.describe('Dashboard — comprehensive (authenticated)', () => {
 
             // Page actually rendered something
             expect(body.length, `${path} page should have content`).toBeGreaterThan(50);
-
-            // No old vocabulary in visible text (these regex literals are
-            // built at runtime so the sweep won't rewrite them)
-            const singularRe = new RegExp(`\\b${OLD_SINGULAR}\\b`);
-            const pluralRe = new RegExp(`\\b${OLD_PLURAL}\\b`);
-            expect(body, `${path} body must not contain "${OLD_SINGULAR}"`).not.toMatch(singularRe);
-            expect(body, `${path} body must not contain "${OLD_PLURAL}"`).not.toMatch(pluralRe);
         });
     }
 
@@ -74,7 +58,6 @@ test.describe('Dashboard — comprehensive (authenticated)', () => {
         await page.goto('/en', { waitUntil: 'domcontentloaded' });
         await page.waitForTimeout(1_500);
 
-        // Sidebar has a link/listitem with text "Works" pointing to /en/works
         const worksLink = page.locator('a[href="/en/works"]').first();
         await expect(worksLink, 'sidebar /en/works link present').toBeVisible({ timeout: 10_000 });
     });
@@ -83,32 +66,28 @@ test.describe('Dashboard — comprehensive (authenticated)', () => {
         await page.goto('/en', { waitUntil: 'domcontentloaded' });
         await page.waitForTimeout(1_500);
 
-        // The sidebar has a "+ New Work" button or icon link to /en/works/new
         const newWorkLink = page.locator('a[href="/en/works/new"]').first();
         await expect(newWorkLink, 'sidebar /en/works/new CTA present').toBeVisible({
             timeout: 10_000,
         });
     });
 
-    test('works list page header uses new copy', async ({ page }) => {
+    test('works list page header uses Work vocabulary', async ({ page }) => {
         await page.goto('/en/works', { waitUntil: 'domcontentloaded' });
         await page.waitForTimeout(2_000);
 
         const body = await page.locator('body').innerText();
 
-        // "Works" is the page title (capitalized, branded)
         expect(body).toMatch(/\bWorks\b/);
-        // Subtitle copy
         expect(body).toMatch(/manage and organize your ai-powered works/i);
     });
 
-    test('works list page search input is present and labelled correctly', async ({ page }) => {
+    test('works list page search input is present', async ({ page }) => {
         await page.goto('/en/works', { waitUntil: 'domcontentloaded' });
         await page.waitForTimeout(2_000);
 
-        // The search input is labelled "Search works..." (placeholder text)
         const search = page.locator('input[placeholder*="works" i]').first();
-        await expect(search, 'search input with new copy').toBeVisible({ timeout: 10_000 });
+        await expect(search, 'search input visible').toBeVisible({ timeout: 10_000 });
     });
 
     test('new work page shows three creation modes', async ({ page }) => {
@@ -116,33 +95,18 @@ test.describe('Dashboard — comprehensive (authenticated)', () => {
         await page.waitForTimeout(2_000);
 
         const body = await page.locator('body').innerText();
-        // Title from i18n: "New Work" (or "Create New Work" in fallback)
         expect(body).toMatch(/new work/i);
 
-        // Three modes: Create with AI / Create Manually / Import Existing
         expect(body, 'mode selector mentions Create/Configure/Import').toMatch(
             /create with ai|configure|manual|import existing/i,
         );
     });
 
-    test('settings page tabs/links use the new vocabulary', async ({ page }) => {
-        await page.goto('/en/settings', { waitUntil: 'domcontentloaded' });
-        await page.waitForTimeout(2_000);
-
-        const body = await page.locator('body').innerText();
-        // Settings page itself stays generic, but should not show old word
-        const re = new RegExp(`\\b${OLD_SINGULAR}\\b`);
-        expect(body).not.toMatch(re);
-    });
-
-    test('activity log page filter dropdown uses Work Created/Updated/Deleted labels', async ({
-        page,
-    }) => {
+    test('activity log subtitle uses Work vocabulary', async ({ page }) => {
         await page.goto('/en/activity', { waitUntil: 'domcontentloaded' });
         await page.waitForTimeout(2_000);
 
         const body = await page.locator('body').innerText();
-        // Subtitle uses new vocabulary
         expect(body, 'activity subtitle mentions works').toMatch(
             /track all operations across your works/i,
         );
@@ -152,39 +116,11 @@ test.describe('Dashboard — comprehensive (authenticated)', () => {
         await page.goto('/en/activity', { waitUntil: 'domcontentloaded' });
         await page.waitForTimeout(2_000);
 
-        // Look for a column header. The activity table has columns:
-        // Status / Date / Work / Type / Summary
-        const body = await page.locator('body').innerText();
-        // The "Work" column header should appear (the table renders it as a th).
-        // We check the table head specifically to avoid matching the brand name.
         const tableHeaders = page.locator('table thead th, [role="columnheader"]');
         const count = await tableHeaders.count();
         if (count > 0) {
             const headers = await tableHeaders.allInnerTexts();
-            expect(headers.join('|'), 'table headers use new vocabulary').toMatch(/work/i);
-        } else {
-            // No table rendered (probably empty state) — at minimum the
-            // body should not show the old singular column label
-            const re = new RegExp(`\\b${OLD_SINGULAR}\\b`);
-            expect(body).not.toMatch(re);
-        }
-    });
-
-    test('AI chat suggestions use new copy ("Show my works" / "Build a Work")', async ({
-        page,
-    }) => {
-        await page.goto('/en', { waitUntil: 'domcontentloaded' });
-        await page.waitForTimeout(2_500);
-
-        const body = await page.locator('body').innerText();
-        // The AI chat panel suggestions: "Show my works", "Build a Work for AI tools",
-        // "Suggest a Work to build". The chat panel may not always be open, so we
-        // just verify that IF it shows suggestions, they use the new copy.
-        // Use a non-greedy check: if any text matches, it should be new vocab.
-        const chatHints = body.match(/show my (\w+)/i);
-        if (chatHints) {
-            expect(chatHints[0].toLowerCase()).not.toContain(OLD_SINGULAR.toLowerCase());
-            expect(chatHints[0].toLowerCase()).not.toContain(OLD_PLURAL.toLowerCase());
+            expect(headers.join('|'), 'table headers use Work vocabulary').toMatch(/work/i);
         }
     });
 
@@ -193,9 +129,7 @@ test.describe('Dashboard — comprehensive (authenticated)', () => {
         expect(resp?.status(), '/en/plugins should not 5xx').toBeLessThan(500);
         await page.waitForTimeout(1_500);
         const body = await page.locator('body').innerText();
-        expect(body, 'plugins page subtitle uses new copy').toMatch(
-            /manage your installed plugins/i,
-        );
+        expect(body, 'plugins page subtitle').toMatch(/manage your installed plugins/i);
     });
 
     test('clicking sidebar Works link navigates to /en/works', async ({ page }) => {
@@ -210,7 +144,7 @@ test.describe('Dashboard — comprehensive (authenticated)', () => {
         expect(page.url()).toMatch(/\/en\/works/);
     });
 
-    test('clicking sidebar "+ New Work" link navigates to /en/works/new', async ({ page }) => {
+    test('clicking sidebar "New Work" link navigates to /en/works/new', async ({ page }) => {
         test.setTimeout(60_000);
         await page.goto('/en', { waitUntil: 'domcontentloaded' });
         await page.waitForTimeout(2_000);

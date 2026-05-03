@@ -1,11 +1,7 @@
 /**
- * Regression tests for the website-templates registry.
- *
- * Background: the bulk Directory→Work rename briefly changed the concrete
- * GitHub repo name `directory-web-template` to `work-web-template` (which
- * does not exist). Result: every newly-generated Work cloned a missing
- * repo and the website-init flow broke. This test pins the repo names so
- * a future blanket rename can't re-introduce the same outage.
+ * Tests for the website-templates registry — pins the published repo
+ * names so a careless rename can't replace them with non-existent values
+ * (which would make every newly-generated Work clone a missing repo).
  */
 
 import {
@@ -17,15 +13,11 @@ import {
 
 describe('Website templates registry', () => {
     describe('classic template', () => {
-        it('is registered and points at the real ever-works/directory-web-template repo', () => {
+        it('is registered and points at the published ever-works/directory-web-template repo', () => {
             const classic = findWebsiteTemplateConfig('classic');
             expect(classic).not.toBeNull();
             expect(classic!.id).toBe('classic');
             expect(classic!.owner).toBe('ever-works');
-            // The bulk Directory→Work rename mistakenly changed this to
-            // `work-web-template`. The real published repo on GitHub is
-            // `directory-web-template` — the template for directory-style
-            // websites (independent of the platform's own product naming).
             expect(classic!.repo).toBe('directory-web-template');
             expect(classic!.branch).toBe('main');
             expect(classic!.syncBranches).toEqual(
@@ -78,9 +70,7 @@ describe('Website templates registry', () => {
 
         it('appears with the correct GitHub repo when env opts in', () => {
             jest.resetModules();
-            // The real published repo on GitHub:
-            //   https://github.com/ever-works/directory-web-minimal-template
-            // Bulk renames must NOT change this string to a `work-…` form.
+            // Published repo: https://github.com/ever-works/directory-web-minimal-template
             process.env.WEBSITE_TEMPLATE_MINIMAL_REPO = 'directory-web-minimal-template';
             process.env.WEBSITE_TEMPLATE_MINIMAL_OWNER = 'ever-works';
             const reloaded =
