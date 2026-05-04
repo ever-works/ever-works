@@ -12,6 +12,7 @@ import { WorksConfigService, type ResolvedWorksConfig } from './works-config.ser
 const WORKS_CONFIG_FILENAME = 'works.yaml';
 const WORKS_CONFIG_FALLBACK_FILENAMES = ['works.yaml', 'works.yml'] as const;
 const LEGACY_DATA_CONFIG_FILENAMES = ['config.yaml', 'config.yml'] as const;
+const OBSOLETE_DATA_CONFIG_FILENAMES = ['config.yaml', 'config.yml', 'works.yml'] as const;
 
 export type WorksConfigWriteRequest = Partial<Pick<CreateItemsGeneratorDto, 'name' | 'prompt'>> & {
     model?: string | null;
@@ -32,7 +33,7 @@ export class WorksConfigWriterService {
 
     async writeToDataRepository(options: WriteWorksConfigOptions): Promise<void> {
         const filePath = await this.resolveWorksConfigPath(options.dataRepository.dir);
-        const existingRaw = await this.readExistingRaw(options.dataRepository.dir, filePath);
+        const existingRaw = await this.readExistingRaw(options.dataRepository.dir);
         const nextConfig = this.buildConfig(existingRaw, options);
 
         await fs.writeFile(filePath, yaml.stringify(nextConfig), 'utf-8');
@@ -129,10 +130,7 @@ export class WorksConfigWriterService {
         return path.join(repoDir, WORKS_CONFIG_FILENAME);
     }
 
-    private async readExistingRaw(
-        repoDir: string,
-        _filePath: string,
-    ): Promise<Record<string, unknown>> {
+    private async readExistingRaw(repoDir: string): Promise<Record<string, unknown>> {
         let existingRaw: Record<string, unknown> = {};
 
         for (const filename of LEGACY_DATA_CONFIG_FILENAMES) {
@@ -174,7 +172,7 @@ export class WorksConfigWriterService {
 
     private async removeLegacyDataConfigFiles(repoDir: string): Promise<void> {
         await Promise.all(
-            LEGACY_DATA_CONFIG_FILENAMES.map((filename) =>
+            OBSOLETE_DATA_CONFIG_FILENAMES.map((filename) =>
                 fs.rm(path.join(repoDir, filename), { force: true }),
             ),
         );

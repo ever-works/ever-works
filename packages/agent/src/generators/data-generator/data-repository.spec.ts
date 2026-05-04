@@ -104,6 +104,33 @@ describe('DataRepository', () => {
         await fs.rm(repoDir, { recursive: true, force: true });
     });
 
+    it('removes stale works.yml after writing canonical works.yaml', async () => {
+        const repoDir = await fs.mkdtemp(path.join(os.tmpdir(), 'data-repository-spec-'));
+
+        await Promise.all([
+            fs.writeFile(path.join(repoDir, 'works.yml'), 'providers:\n  ai: openai\n', 'utf-8'),
+            fs.writeFile(path.join(repoDir, 'config.yaml'), 'company_name: Legacy\n', 'utf-8'),
+        ]);
+
+        const repository = await DataRepository.create(repoDir);
+
+        await repository.writeConfig({
+            company_name: 'Generated Config',
+        } as any);
+
+        await expect(fs.readFile(path.join(repoDir, 'works.yaml'), 'utf-8')).resolves.toContain(
+            'company_name: Generated Config',
+        );
+        await expect(fs.access(path.join(repoDir, 'works.yml'))).rejects.toMatchObject({
+            code: 'ENOENT',
+        });
+        await expect(fs.access(path.join(repoDir, 'config.yaml'))).rejects.toMatchObject({
+            code: 'ENOENT',
+        });
+
+        await fs.rm(repoDir, { recursive: true, force: true });
+    });
+
     it('overlays works.yaml values on top of legacy config.yaml values when reading', async () => {
         const repoDir = await fs.mkdtemp(path.join(os.tmpdir(), 'data-repository-spec-'));
 

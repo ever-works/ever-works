@@ -495,7 +495,10 @@ export class DataRepository {
         await fs.writeFile(this.configPath, str, 'utf-8');
         await Promise.all(
             this.configFallbackPaths
-                .filter((filePath) => path.basename(filePath).startsWith('config.'))
+                .filter((filePath) => {
+                    const filename = path.basename(filePath);
+                    return filename.startsWith('config.') || filename === 'works.yml';
+                })
                 .map((filePath) => fs.rm(filePath, { force: true })),
         );
     }

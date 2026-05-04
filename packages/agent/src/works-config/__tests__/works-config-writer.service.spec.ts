@@ -96,7 +96,7 @@ describe('WorksConfigWriterService', () => {
         const service = new WorksConfigWriterService(new WorksConfigService({} as any));
 
         await service.writeToDataRepository({
-            directory: createDirectory(),
+            work: createWork(),
             dataRepository: { dir: repoDir } as any,
             request: {
                 prompt: 'New prompt',
@@ -144,7 +144,7 @@ describe('WorksConfigWriterService', () => {
         const service = new WorksConfigWriterService(new WorksConfigService({} as any));
 
         await service.writeToDataRepository({
-            directory: createDirectory(),
+            work: createWork(),
             dataRepository: { dir: repoDir } as any,
         });
 
@@ -158,6 +158,9 @@ describe('WorksConfigWriterService', () => {
             },
         });
         await expect(fs.access(path.join(repoDir, 'config.yaml'))).rejects.toMatchObject({
+            code: 'ENOENT',
+        });
+        await expect(fs.access(path.join(repoDir, 'works.yml'))).rejects.toMatchObject({
             code: 'ENOENT',
         });
 
