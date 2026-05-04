@@ -502,7 +502,7 @@ describe('DirectoryScheduleService', () => {
         expect(scheduleRepository.updateById.mock.calls[0][1]).not.toHaveProperty('failureCount');
     });
 
-    it('defaults provider overrides from imported works.yml config when enabling schedule', async () => {
+    it('defaults provider overrides from imported works.yaml config when enabling schedule', async () => {
         const worksConfigDirectory = {
             ...directory,
             sourceRepository: {

@@ -31,7 +31,7 @@ export class WorksConfigRepositorySyncService {
         const directory = await this.directoryRepository.findById(options.directoryId);
         if (!directory?.user) {
             this.logger.warn(
-                `Skipping works.yml sync for ${options.directoryId}: directory or owner was not found`,
+                `Skipping works.yaml sync for ${options.directoryId}: directory or owner was not found`,
             );
             return;
         }
@@ -58,7 +58,7 @@ export class WorksConfigRepositorySyncService {
                 dataRepository.dir,
             );
             if (changes.length === 0) {
-                this.logger.debug(`works.yml already up to date for ${owner}/${repo}`);
+                this.logger.debug(`works.yaml already up to date for ${owner}/${repo}`);
                 return;
             }
 
@@ -66,7 +66,7 @@ export class WorksConfigRepositorySyncService {
             await this.gitFacade.commit(
                 directory.gitProvider,
                 dataRepository.dir,
-                `sync works.yml after ${options.reason}`,
+                `sync works.yaml after ${options.reason}`,
                 committer,
             );
             await this.gitFacade.push(
@@ -76,7 +76,7 @@ export class WorksConfigRepositorySyncService {
         } catch (error) {
             const errorMessage = error instanceof Error ? error.message : String(error);
 
-            this.logger.warn(`Failed to sync works.yml for ${owner}/${repo}: ${errorMessage}`);
+            this.logger.warn(`Failed to sync works.yaml for ${owner}/${repo}: ${errorMessage}`);
             this.eventEmitter?.emit(
                 WorksConfigSyncFailedEvent.EVENT_NAME,
                 new WorksConfigSyncFailedEvent(

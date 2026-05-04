@@ -60,7 +60,7 @@ export class WorksConfigImportApplierService {
             );
         } catch (error) {
             this.logger.warn(
-                `Failed to restore schedule from works.yml for directory ${directoryId}: ${
+                `Failed to restore schedule from works.yaml for directory ${directoryId}: ${
                     error instanceof Error ? error.message : String(error)
                 }`,
             );
@@ -91,7 +91,7 @@ export class WorksConfigImportApplierService {
             );
         } catch (error) {
             this.logger.warn(
-                `Failed to restore schedule overrides from works.yml for directory ${directory.id}: ${
+                `Failed to restore schedule overrides from works.yaml for directory ${directory.id}: ${
                     error instanceof Error ? error.message : String(error)
                 }`,
             );

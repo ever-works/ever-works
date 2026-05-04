@@ -51,7 +51,7 @@ describe('WorksConfigRepositorySyncService', () => {
         };
     };
 
-    it('writes projected works.yml and skips commit when the repo is unchanged', async () => {
+    it('writes projected works.yaml and skips commit when the repo is unchanged', async () => {
         const { service, gitFacade, projection, writer } = createService();
 
         await service.syncDirectory({
@@ -74,8 +74,8 @@ describe('WorksConfigRepositorySyncService', () => {
         expect(gitFacade.push).not.toHaveBeenCalled();
     });
 
-    it('commits and pushes when projected works.yml changes the data repo', async () => {
-        const { service, gitFacade } = createService([{ path: 'works.yml', status: 'modified' }]);
+    it('commits and pushes when projected works.yaml changes the data repo', async () => {
+        const { service, gitFacade } = createService([{ path: 'works.yaml', status: 'modified' }]);
 
         await service.syncDirectory({
             directoryId: 'dir-1',
@@ -87,7 +87,7 @@ describe('WorksConfigRepositorySyncService', () => {
         expect(gitFacade.commit).toHaveBeenCalledWith(
             'github',
             '/tmp/data-repo',
-            'sync works.yml after provider_changed',
+            'sync works.yaml after provider_changed',
             { name: 'User One', email: 'user@example.com' },
         );
         expect(gitFacade.push).toHaveBeenCalledWith(
@@ -98,7 +98,7 @@ describe('WorksConfigRepositorySyncService', () => {
 
     it('emits a failure event when the non-blocking sync fails', async () => {
         const { service, gitFacade, eventEmitter } = createService([
-            { path: 'works.yml', status: 'modified' },
+            { path: 'works.yaml', status: 'modified' },
         ]);
         gitFacade.push.mockRejectedValue(new Error('permission denied'));
 
