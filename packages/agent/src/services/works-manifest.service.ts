@@ -1,10 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { z } from 'zod';
 import * as yaml from 'yaml';
-import type {
-    ManifestValidationError,
-    WorksManifestV1,
-} from '@ever-works/contracts/api';
+import type { ManifestValidationError, WorksManifestV1 } from '@ever-works/contracts/api';
 
 const SLUG_RE = /^[a-z0-9]([a-z0-9-]*[a-z0-9])?$/;
 const SUBDOMAIN_RE = SLUG_RE;

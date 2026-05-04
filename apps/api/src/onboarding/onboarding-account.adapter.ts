@@ -55,7 +55,9 @@ export class OnboardingAccountAdapter implements OnboardingAccountUpsert {
         }
 
         if (!user) {
-            const username = await this.resolveUniqueUsername(input.login || `agent-${input.githubUserId}`);
+            const username = await this.resolveUniqueUsername(
+                input.login || `agent-${input.githubUserId}`,
+            );
             const email = input.email || `agent-${input.githubUserId}@users.noreply.ever.works`;
             user = await this.users.create({
                 username,

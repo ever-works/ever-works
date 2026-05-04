@@ -41,7 +41,7 @@ export class WellKnownController {
                 {
                     id: 'register_work',
                     summary:
-                        "Register an Ever Works account on demand and create a Work from a GitHub repo manifest.",
+                        'Register an Ever Works account on demand and create a Work from a GitHub repo manifest.',
                     rest: {
                         method: 'POST',
                         url: `${apiBase}/api/register-work`,

@@ -136,8 +136,7 @@ describe('OnboardingController (HTTP)', () => {
 
     describe('GET /.well-known/agent.json', () => {
         it('serves the Agent Card', async () => {
-            const res = await request(app.getHttpServer())
-                .get('/.well-known/agent.json');
+            const res = await request(app.getHttpServer()).get('/.well-known/agent.json');
 
             expect(res.status).toBe(200);
             expect(res.body.name).toBe('Ever Works');

@@ -113,14 +113,16 @@ spec:
         createFromManifest: jest.fn().mockResolvedValue({ workId: 'work-1' }),
     });
 
-    const createService = (overrides: {
-        repo?: ReturnType<typeof fakeRepository>;
-        manifest?: ReturnType<typeof fakeManifestService>;
-        git?: ReturnType<typeof fakeGitFacade>;
-        rowRepo?: ReturnType<typeof fakeOnboardingRowRepo>;
-        account?: ReturnType<typeof fakeAccountUpsert>;
-        workCreator?: ReturnType<typeof fakeWorkCreator>;
-    } = {}) => {
+    const createService = (
+        overrides: {
+            repo?: ReturnType<typeof fakeRepository>;
+            manifest?: ReturnType<typeof fakeManifestService>;
+            git?: ReturnType<typeof fakeGitFacade>;
+            rowRepo?: ReturnType<typeof fakeOnboardingRowRepo>;
+            account?: ReturnType<typeof fakeAccountUpsert>;
+            workCreator?: ReturnType<typeof fakeWorkCreator>;
+        } = {},
+    ) => {
         const repo = overrides.repo ?? fakeRepository();
         const manifest = overrides.manifest ?? fakeManifestService();
         const git = overrides.git ?? fakeGitFacade();
@@ -162,13 +164,11 @@ spec:
 
     it('rejects with repo_already_owned when a different identity owns the repo', async () => {
         const repo = fakeRepository();
-        repo.findOne
-            .mockResolvedValueOnce(null)
-            .mockResolvedValueOnce({
-                id: 'other-id',
-                githubIdentityHash: 'different-hash',
-                repoUrlCanonical: 'https://github.com/octocat/awesome-mcp',
-            });
+        repo.findOne.mockResolvedValueOnce(null).mockResolvedValueOnce({
+            id: 'other-id',
+            githubIdentityHash: 'different-hash',
+            repoUrlCanonical: 'https://github.com/octocat/awesome-mcp',
+        });
 
         const { service } = createService({ repo });
         await expect(
@@ -196,12 +196,25 @@ spec:
         expect(saved.idempotencyKey).toBe('idem-1');
 
         expect(git.getUser).toHaveBeenCalledWith({ providerId: 'github', token: 'token-aaaa' });
-        expect(git.getRepository).toHaveBeenCalledWith('octocat', 'awesome-mcp', expect.objectContaining({ token: 'token-aaaa' }));
-        expect(git.getFileContent).toHaveBeenCalledWith('octocat', 'awesome-mcp', 'works.yml', expect.objectContaining({ token: 'token-aaaa' }));
+        expect(git.getRepository).toHaveBeenCalledWith(
+            'octocat',
+            'awesome-mcp',
+            expect.objectContaining({ token: 'token-aaaa' }),
+        );
+        expect(git.getFileContent).toHaveBeenCalledWith(
+            'octocat',
+            'awesome-mcp',
+            'works.yml',
+            expect.objectContaining({ token: 'token-aaaa' }),
+        );
         expect(manifest.parseAndValidate).toHaveBeenCalled();
 
         expect(account.upsertFromGithub).toHaveBeenCalledWith(
-            expect.objectContaining({ login: 'octocat', email: 'owner@example.com', accessToken: 'token-aaaa' }),
+            expect.objectContaining({
+                login: 'octocat',
+                email: 'owner@example.com',
+                accessToken: 'token-aaaa',
+            }),
         );
         expect(rowRepo.setAccountId).toHaveBeenCalledWith('onboard-1', 'acc-1');
 
@@ -215,7 +228,9 @@ spec:
             }),
         );
         expect(rowRepo.setWorkId).toHaveBeenCalledWith('onboard-1', 'work-1');
-        expect(rowRepo.tryTransition).toHaveBeenCalledWith('onboard-1', 'validated', 'queued', { workId: 'work-1' });
+        expect(rowRepo.tryTransition).toHaveBeenCalledWith('onboard-1', 'validated', 'queued', {
+            workId: 'work-1',
+        });
 
         expect(result.status).toBe('queued');
         expect(result.workId).toBe('work-1');
@@ -324,7 +339,13 @@ spec:
             kind: 'failure',
             ok: false,
             code: 'manifest_invalid',
-            errors: [{ path: 'spec.domain', message: 'Invalid enum value', subcode: 'manifest.spec.domain_invalid' }],
+            errors: [
+                {
+                    path: 'spec.domain',
+                    message: 'Invalid enum value',
+                    subcode: 'manifest.spec.domain_invalid',
+                },
+            ],
         });
 
         const { service } = createService({ repo, manifest });
@@ -342,18 +363,28 @@ spec:
         const repo = fakeRepository();
         repo.findOne.mockResolvedValueOnce(null).mockResolvedValueOnce(null);
         const git = fakeGitFacade();
-        git.getFileContent
-            .mockResolvedValueOnce(null)
-            .mockResolvedValueOnce({
-                content: Buffer.from(validManifestYaml).toString('base64'),
-                encoding: 'base64',
-            });
+        git.getFileContent.mockResolvedValueOnce(null).mockResolvedValueOnce({
+            content: Buffer.from(validManifestYaml).toString('base64'),
+            encoding: 'base64',
+        });
 
         const { service } = createService({ repo, git });
         await service.handle({ body: validBody as any, githubToken: 'token-aaaa' });
 
-        expect(git.getFileContent).toHaveBeenNthCalledWith(1, 'octocat', 'awesome-mcp', 'works.yml', expect.anything());
-        expect(git.getFileContent).toHaveBeenNthCalledWith(2, 'octocat', 'awesome-mcp', 'works.yaml', expect.anything());
+        expect(git.getFileContent).toHaveBeenNthCalledWith(
+            1,
+            'octocat',
+            'awesome-mcp',
+            'works.yml',
+            expect.anything(),
+        );
+        expect(git.getFileContent).toHaveBeenNthCalledWith(
+            2,
+            'octocat',
+            'awesome-mcp',
+            'works.yaml',
+            expect.anything(),
+        );
     });
 
     it('rejects when token is empty', async () => {
@@ -383,7 +414,10 @@ spec:
     it('getStatus returns the row when token matches', async () => {
         const repo = fakeRepository();
         const git = fakeGitFacade();
-        const expectedHash = require('node:crypto').createHash('sha256').update('github:12345').digest('hex');
+        const expectedHash = require('node:crypto')
+            .createHash('sha256')
+            .update('github:12345')
+            .digest('hex');
         repo.findOne.mockResolvedValueOnce({
             id: 'r1',
             githubIdentityHash: expectedHash,

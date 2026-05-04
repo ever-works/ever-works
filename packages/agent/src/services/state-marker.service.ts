@@ -54,9 +54,7 @@ export class StateMarkerService {
     async write(input: StateMarkerInput): Promise<void> {
         const path = input.markerPath ?? DEFAULT_MARKER_PATH;
         if (!path.startsWith('.works/')) {
-            throw new Error(
-                `state marker path must live under .works/ — got ${path} (FR-26a)`,
-            );
+            throw new Error(`state marker path must live under .works/ — got ${path} (FR-26a)`);
         }
 
         const contents = JSON.stringify(input.state, null, 2) + '\n';

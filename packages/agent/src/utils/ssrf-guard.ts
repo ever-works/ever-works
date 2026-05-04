@@ -39,10 +39,7 @@ export function isSafeWebhookUrl(rawUrl: string): boolean {
     return true;
 }
 
-const CLOUD_METADATA_HOSTNAMES = new Set([
-    'metadata.google.internal',
-    'metadata.goog',
-]);
+const CLOUD_METADATA_HOSTNAMES = new Set(['metadata.google.internal', 'metadata.goog']);
 
 function isPrivateIPv4(ip: string): boolean {
     const parts = ip.split('.').map((p) => Number(p));

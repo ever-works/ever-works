@@ -32,9 +32,7 @@ export const registerCommand = new Command('register')
         const githubToken = options.githubToken || process.env.GITHUB_TOKEN;
         if (!githubToken) {
             console.error(
-                chalk.red(
-                    'A GitHub token is required. Pass --github-token or set $GITHUB_TOKEN.',
-                ),
+                chalk.red('A GitHub token is required. Pass --github-token or set $GITHUB_TOKEN.'),
             );
             process.exit(2);
         }
@@ -74,9 +72,7 @@ export const registerCommand = new Command('register')
             if (response.status >= 200 && response.status < 300) {
                 spinner.succeed(chalk.green('Onboarding accepted'));
                 console.log();
-                console.log(
-                    `  ${chalk.bold('Onboarding ID')}  ${parsed.onboardingId ?? '—'}`,
-                );
+                console.log(`  ${chalk.bold('Onboarding ID')}  ${parsed.onboardingId ?? '—'}`);
                 console.log(`  ${chalk.bold('Work ID')}        ${parsed.workId ?? '—'}`);
                 console.log(`  ${chalk.bold('Status')}         ${parsed.status ?? '—'}`);
                 console.log(`  ${chalk.bold('Subdomain')}      ${parsed.subdomain ?? '—'}`);

@@ -15,17 +15,25 @@ describe('OnboardingTerminalService', () => {
         deploymentUrl: 'https://mydir.ever.works',
     };
 
-    const create = (overrides: {
-        onboardingRow?: Partial<{ id: string; webhookUrl: string | null; accountId: string | null }>;
-        deliveryResult?: { ok: boolean; status?: number };
-        subscriptions?: Array<{ id: string; url: string; secretEncrypted: string }>;
-    } = {}) => {
+    const create = (
+        overrides: {
+            onboardingRow?: Partial<{
+                id: string;
+                webhookUrl: string | null;
+                accountId: string | null;
+            }>;
+            deliveryResult?: { ok: boolean; status?: number };
+            subscriptions?: Array<{ id: string; url: string; secretEncrypted: string }>;
+        } = {},
+    ) => {
         const onboardingRepo = {
-            findById: jest.fn().mockResolvedValue(
-                overrides.onboardingRow === undefined
-                    ? { id: 'ob-1', webhookUrl: 'https://hooks.example.com/p', accountId: null }
-                    : overrides.onboardingRow,
-            ),
+            findById: jest
+                .fn()
+                .mockResolvedValue(
+                    overrides.onboardingRow === undefined
+                        ? { id: 'ob-1', webhookUrl: 'https://hooks.example.com/p', accountId: null }
+                        : overrides.onboardingRow,
+                ),
         };
         const webhookSubs = {
             listActiveForWork: jest.fn().mockResolvedValue(overrides.subscriptions ?? []),
@@ -36,7 +44,9 @@ describe('OnboardingTerminalService', () => {
         const delivery = {
             deliver: jest
                 .fn()
-                .mockResolvedValue(overrides.deliveryResult ?? { ok: true, status: 202, deliveryId: 'd-1' }),
+                .mockResolvedValue(
+                    overrides.deliveryResult ?? { ok: true, status: 202, deliveryId: 'd-1' },
+                ),
         };
         const svc = new OnboardingTerminalService(
             onboardingRepo as any,

@@ -40,24 +40,24 @@ GET https://api.ever.works/.well-known/agent.json
 
 ```json
 {
-  "name": "Ever Works",
-  "description": "Build, host, and grow directory websites end-to-end.",
-  "capabilities": [
-    {
-      "id": "register_work",
-      "summary": "Register an Ever Works account on demand and create a Work from a GitHub repo manifest.",
-      "rest": {
-        "method": "POST",
-        "url": "https://api.ever.works/api/register-work"
-      },
-      "mcp": {
-        "server": "https://mcp.ever.works",
-        "tool": "register_work"
-      },
-      "manifestSchema": "https://docs.ever.works/agent-services/works-yml-schema"
-    }
-  ],
-  "contact": "ever@ever.co"
+	"name": "Ever Works",
+	"description": "Build, host, and grow directory websites end-to-end.",
+	"capabilities": [
+		{
+			"id": "register_work",
+			"summary": "Register an Ever Works account on demand and create a Work from a GitHub repo manifest.",
+			"rest": {
+				"method": "POST",
+				"url": "https://api.ever.works/api/register-work"
+			},
+			"mcp": {
+				"server": "https://mcp.ever.works",
+				"tool": "register_work"
+			},
+			"manifestSchema": "https://docs.ever.works/agent-services/works-yml-schema"
+		}
+	],
+	"contact": "ever@ever.co"
 }
 ```
 
@@ -65,43 +65,43 @@ GET https://api.ever.works/.well-known/agent.json
 
 ### Headers
 
-| Header             | Required | Description                                                |
-| ------------------ | -------- | ---------------------------------------------------------- |
-| `X-GitHub-Token`   | yes      | Fine-grained PAT, classic PAT, or GitHub App installation token. Never put this in the URL. |
-| `Content-Type`     | yes      | `application/json`                                         |
-| `Idempotency-Key`  | no       | UUID for safe retry. Stripe-style.                         |
+| Header            | Required | Description                                                                                 |
+| ----------------- | -------- | ------------------------------------------------------------------------------------------- |
+| `X-GitHub-Token`  | yes      | Fine-grained PAT, classic PAT, or GitHub App installation token. Never put this in the URL. |
+| `Content-Type`    | yes      | `application/json`                                                                          |
+| `Idempotency-Key` | no       | UUID for safe retry. Stripe-style.                                                          |
 
 ### Body
 
 ```json
 {
-  "repo": "https://github.com/<owner>/<repo>",
-  "email": "agent@example.com",
-  "agentId": "my-agent-id",
-  "webhookUrl": "https://my-agent.example.com/webhooks/ever-works",
-  "subdomain": "my-directory"
+	"repo": "https://github.com/<owner>/<repo>",
+	"email": "agent@example.com",
+	"agentId": "my-agent-id",
+	"webhookUrl": "https://my-agent.example.com/webhooks/ever-works",
+	"subdomain": "my-directory"
 }
 ```
 
-| Field         | Type   | Required | Description                                                                |
-| ------------- | ------ | -------- | -------------------------------------------------------------------------- |
-| `repo`        | string | yes      | HTTPS URL to the manifest repo. Must contain `works.yml` at root.          |
-| `email`       | string | no       | Contact channel. Optional but recommended for human reachability.          |
-| `agentId`     | string | no       | Opaque identifier for the agent's own bookkeeping. Up to 256 chars.        |
-| `webhookUrl`  | string | no       | HTTPS URL for signed terminal-status callbacks.                            |
-| `subdomain`   | string | no       | DNS-safe slug; if taken, the platform allocates an alternative.            |
-| `agentPayment`| object | no       | Reserved for v2 paid plane. Ignored at v1.                                 |
+| Field          | Type   | Required | Description                                                         |
+| -------------- | ------ | -------- | ------------------------------------------------------------------- |
+| `repo`         | string | yes      | HTTPS URL to the manifest repo. Must contain `works.yml` at root.   |
+| `email`        | string | no       | Contact channel. Optional but recommended for human reachability.   |
+| `agentId`      | string | no       | Opaque identifier for the agent's own bookkeeping. Up to 256 chars. |
+| `webhookUrl`   | string | no       | HTTPS URL for signed terminal-status callbacks.                     |
+| `subdomain`    | string | no       | DNS-safe slug; if taken, the platform allocates an alternative.     |
+| `agentPayment` | object | no       | Reserved for v2 paid plane. Ignored at v1.                          |
 
 ### Response — `202 Accepted`
 
 ```json
 {
-  "onboardingId": "0c4e8f3e-…",
-  "workId": "fdb1a02b-…",
-  "status": "queued",
-  "statusUrl": "https://api.ever.works/api/register-work/0c4e8f3e-…",
-  "subdomain": "my-directory.ever.works",
-  "warnings": []
+	"onboardingId": "0c4e8f3e-…",
+	"workId": "fdb1a02b-…",
+	"status": "queued",
+	"statusUrl": "https://api.ever.works/api/register-work/0c4e8f3e-…",
+	"subdomain": "my-directory.ever.works",
+	"warnings": []
 }
 ```
 
@@ -109,17 +109,17 @@ GET https://api.ever.works/.well-known/agent.json
 
 Every error carries a `code` slug you can branch on:
 
-| Status | Code                                       | When                                                              |
-| ------ | ------------------------------------------ | ----------------------------------------------------------------- |
-| 400    | `validation_error`                         | Body or header failed validation                                  |
-| 403    | `gh_repo_access_denied`                    | Token cannot read or write the named repo                         |
-| 409    | `repo_already_owned`                       | Repo previously onboarded by a different GitHub identity          |
-| 422    | `manifest_missing`                         | No `works.yml` at repo root                                       |
-| 422    | `manifest_invalid`                         | Schema validation failed (per-field errors in body)               |
-| 422    | `unsupported_capability`                   | Pipeline / plugin in manifest is not registered                   |
-| 422    | `gh_insufficient_scope_for_repo_creation`  | Manifest opts in to platform-managed repos, scope is insufficient |
-| 429    | `rate_limited`                             | Throttle hit; honour `Retry-After`                                 |
-| 500    | `internal_error`                           | Catch-all                                                          |
+| Status | Code                                      | When                                                              |
+| ------ | ----------------------------------------- | ----------------------------------------------------------------- |
+| 400    | `validation_error`                        | Body or header failed validation                                  |
+| 403    | `gh_repo_access_denied`                   | Token cannot read or write the named repo                         |
+| 409    | `repo_already_owned`                      | Repo previously onboarded by a different GitHub identity          |
+| 422    | `manifest_missing`                        | No `works.yml` at repo root                                       |
+| 422    | `manifest_invalid`                        | Schema validation failed (per-field errors in body)               |
+| 422    | `unsupported_capability`                  | Pipeline / plugin in manifest is not registered                   |
+| 422    | `gh_insufficient_scope_for_repo_creation` | Manifest opts in to platform-managed repos, scope is insufficient |
+| 429    | `rate_limited`                            | Throttle hit; honour `Retry-After`                                |
+| 500    | `internal_error`                          | Catch-all                                                         |
 
 ### Idempotency
 
@@ -147,12 +147,12 @@ REST body; the response shape is identical.
 If you supply `webhookUrl`, the platform delivers POSTs with the
 following headers on every terminal status transition:
 
-| Header                    | Value                                                                     |
-| ------------------------- | ------------------------------------------------------------------------- |
-| `Content-Type`            | `application/json; charset=utf-8`                                         |
-| `X-Hub-Signature-256`     | `sha256=<hmac>` over the raw body using a per-account secret.            |
-| `X-Ever-Works-Event`      | One of `onboarding.terminal`, `work.regenerated`, `work.deploy_failed`.  |
-| `X-Ever-Works-Delivery`   | UUID for idempotent consumption on your side.                            |
+| Header                  | Value                                                                   |
+| ----------------------- | ----------------------------------------------------------------------- |
+| `Content-Type`          | `application/json; charset=utf-8`                                       |
+| `X-Hub-Signature-256`   | `sha256=<hmac>` over the raw body using a per-account secret.           |
+| `X-Ever-Works-Event`    | One of `onboarding.terminal`, `work.regenerated`, `work.deploy_failed`. |
+| `X-Ever-Works-Delivery` | UUID for idempotent consumption on your side.                           |
 
 Verification example (Node.js):
 
@@ -160,8 +160,8 @@ Verification example (Node.js):
 import { createHmac, timingSafeEqual } from 'node:crypto';
 
 function verify(rawBody: Buffer, header: string, secret: string) {
-    const expected = 'sha256=' + createHmac('sha256', secret).update(rawBody).digest('hex');
-    return timingSafeEqual(Buffer.from(header), Buffer.from(expected));
+	const expected = 'sha256=' + createHmac('sha256', secret).update(rawBody).digest('hex');
+	return timingSafeEqual(Buffer.from(header), Buffer.from(expected));
 }
 ```
 
@@ -176,12 +176,12 @@ also commits `.works/state.json` to your manifest repo:
 
 ```json
 {
-  "status": "deployed",
-  "workId": "fdb1a02b-…",
-  "subdomain": "my-directory.ever.works",
-  "deploymentUrl": "https://my-directory.ever.works",
-  "updatedAt": "2026-05-04T12:34:56Z",
-  "deliveryId": "…uuid…"
+	"status": "deployed",
+	"workId": "fdb1a02b-…",
+	"subdomain": "my-directory.ever.works",
+	"deploymentUrl": "https://my-directory.ever.works",
+	"updatedAt": "2026-05-04T12:34:56Z",
+	"deliveryId": "…uuid…"
 }
 ```
 
@@ -199,9 +199,9 @@ regenerates. No new API call required.
 You can authenticate with any of:
 
 1. **Fine-grained PAT** (recommended). Minimum scopes:
-   - `Contents: Read and write`
-   - `Metadata: Read`
-   - `Pull Requests: Read and write` (only when `output.repos.awesomeList` or `output.repos.website` is `managed` and you want PR-based updates)
+    - `Contents: Read and write`
+    - `Metadata: Read`
+    - `Pull Requests: Read and write` (only when `output.repos.awesomeList` or `output.repos.website` is `managed` and you want PR-based updates)
 2. **Classic PAT**. Works at v1 but the platform returns a deprecation
    warning. Prefer fine-grained.
 3. **Ever Works GitHub App** (optional). Install on your user/org via

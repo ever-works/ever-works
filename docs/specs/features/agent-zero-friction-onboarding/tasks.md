@@ -23,7 +23,7 @@
 - [x] **T2**. ✅ `WebhookSubscription` entity at [`packages/agent/src/entities/webhook-subscription.entity.ts`](../../../../packages/agent/src/entities/webhook-subscription.entity.ts) with `secretEncrypted` doc-marked as `x-secret: true`.
 - [x] **T3**. ✅ Hand-written migration at [`apps/api/src/migrations/1746360000000-AddOnboardingAndWebhookSubscriptions.ts`](../../../../apps/api/src/migrations/1746360000000-AddOnboardingAndWebhookSubscriptions.ts). Forward-only, additive. **Verify** with a `pnpm typeorm migration:generate` run after pulling — should be a no-op or small diff.
 - [x] **T4**. ✅ Onboarding contract types under [`packages/contracts/src/api/onboarding/`](../../../../packages/contracts/src/api/onboarding/) with re-exports from the API barrel:
-  - `register-work.request.ts`, `register-work.response.ts`, `onboarding-status.ts`, `webhook-event.ts`, `manifest.types.ts`.
+    - `register-work.request.ts`, `register-work.response.ts`, `onboarding-status.ts`, `webhook-event.ts`, `manifest.types.ts`.
 - [x] **T5**. ✅ Zod manifest schema at [`packages/agent/src/services/works-manifest.service.ts`](../../../../packages/agent/src/services/works-manifest.service.ts) (placed in the agent package because contracts has no zod dep). Test at [`packages/agent/src/services/__tests__/works-manifest.service.spec.ts`](../../../../packages/agent/src/services/__tests__/works-manifest.service.spec.ts) covers the happy path, every documented subcode, and the 64 KiB cap.
 
 ## Phase 2 — Service layer
@@ -39,11 +39,11 @@
 - [x] **T7**. ✅ `WebhookSubscriptionRepository` at [`packages/agent/src/database/repositories/webhook-subscription.repository.ts`](../../../../packages/agent/src/database/repositories/webhook-subscription.repository.ts) with `createForAccount`, `listActiveForWork`, `listActiveForAccount`, `markSuccess`, `incrementFailure`, `markFailed`, `pause`, `findById`. Wired the same way.
 - [x] **T8**. (already done as T5 in slice 1) — `WorksManifestService` ships with the lean barrel.
 - [ ] **T9**. Add `OnboardingService` at `packages/agent/src/services/onboarding.service.ts`
-  - Public methods:
-    - `handle(request: RegisterWorkInput, token: string): Promise<RegisterWorkResponseDto>`
-    - `getStatus(id: string, proof: string): Promise<RegisterWorkStatusDto>`
-  - Internals: identity-hash, idempotency lookup, GitHub validation via `GitFacade`, manifest fetch, account upsert via Better Auth, Work create via `WorksService`, status transitions via repo CAS, Trigger.dev enqueue.
-  - **Test**: `…onboarding.service.spec.ts` — mock all collaborators; cover happy path + every typed error code in [`plan.md` §4](./plan.md#4-api-surface)
+    - Public methods:
+        - `handle(request: RegisterWorkInput, token: string): Promise<RegisterWorkResponseDto>`
+        - `getStatus(id: string, proof: string): Promise<RegisterWorkStatusDto>`
+    - Internals: identity-hash, idempotency lookup, GitHub validation via `GitFacade`, manifest fetch, account upsert via Better Auth, Work create via `WorksService`, status transitions via repo CAS, Trigger.dev enqueue.
+    - **Test**: `…onboarding.service.spec.ts` — mock all collaborators; cover happy path + every typed error code in [`plan.md` §4](./plan.md#4-api-surface)
 - [x] **T10**. ✅ `WebhookDeliveryService` at [`packages/agent/src/services/webhook-delivery.service.ts`](../../../../packages/agent/src/services/webhook-delivery.service.ts) signs `X-Hub-Signature-256` HMAC-SHA256 over the raw body, emits `X-Ever-Works-Event` and `X-Ever-Works-Delivery` headers, applies the SSRF guard, exposes a static `verify()` for receivers, and uses `fetch` (Node 22+) as the default HTTP client (mockable via `WebhookHttpClient`). Companion spec at [`webhook-delivery.service.spec.ts`](../../../../packages/agent/src/services/__tests__/webhook-delivery.service.spec.ts) — 12 cases (signature determinism, secret variance, header shape, success/failure paths, SSRF block, network error). The retry policy is provided by the Trigger.dev task that wraps deliver().
 - [x] **T11**. ✅ `StateMarkerService` at [`packages/agent/src/services/state-marker.service.ts`](../../../../packages/agent/src/services/state-marker.service.ts) writes `.works/state.json` (default) via a `MarkerFileWriter` interface so the heavy git-write transitively imports stay out of the unit-test path. Enforces the `.works/` namespace per FR-26a. Companion spec — 5 cases.
 - [x] **T12**. ✅ Lean barrel at [`packages/agent/src/onboarding/index.ts`](../../../../packages/agent/src/onboarding/index.ts) re-exports `WorksManifestService`, `WebhookDeliveryService`, `StateMarkerService`, both repositories, the SSRF/redaction utilities, and the three injection-token interfaces (`OnboardingGitProvider`, `OnboardingAccountUpsert`, `OnboardingWorkCreator`). Registered in agent `package.json` exports as `./onboarding` so api-side code can import without pulling the heavy services chain.
@@ -56,19 +56,19 @@
 - [x] **T18 (controller half)**. ✅ Jest spec at [`apps/api/src/onboarding/onboarding.controller.spec.ts`](../../../../apps/api/src/onboarding/onboarding.controller.spec.ts) — supertest-driven, runs the full Nest pipeline (validation, `whitelist`, header parsing, idempotency-key forwarding, missing-token rejection, Agent Card route).
 
 - [ ] **T15 (alternate)**. Add `apps/api/src/onboarding/onboarding.controller.ts` exposing:
-  - `POST /api/register-work` (`@Public()`, `@Throttle({ default: { limit: 30, ttl: 60_000 } })`)
-  - `GET /api/register-work/:id` (`@Public()`)
-  - Carry `@ApiOperation`, `@ApiHeader('X-GitHub-Token')`, `@ApiBody`, `@ApiResponse` for every documented status / code so Swagger + Scalar surface the contract automatically.
+    - `POST /api/register-work` (`@Public()`, `@Throttle({ default: { limit: 30, ttl: 60_000 } })`)
+    - `GET /api/register-work/:id` (`@Public()`)
+    - Carry `@ApiOperation`, `@ApiHeader('X-GitHub-Token')`, `@ApiBody`, `@ApiResponse` for every documented status / code so Swagger + Scalar surface the contract automatically.
 - [ ] **T16**. Add `apps/api/src/onboarding/onboarding.module.ts`; import into `apps/api/src/api.module.ts`.
 - [x] **T17**. ✅ Project-wide redaction utility at [`packages/agent/src/utils/redaction.ts`](../../../../packages/agent/src/utils/redaction.ts) with `redactHeaders`, `redactBody`, `redactString`, `REDACTED_HEADERS` (incl. `x-github-token`, `x-hub-signature-256`, `x-ever-works-signature`, `idempotency-key`), and `REDACTED_BODY_FIELDS` (incl. `agentPayment`). The current `LoggingInterceptor` does not log bodies/headers (so it's already secret-safe); the helper is the single point of policy for any future log site. Companion spec covers headers, nested-body, arrays, and the short-secret guard.
 - [ ] **T18**. Add e2e test at `apps/api/test/onboarding.e2e-spec.ts`:
-  - 202 on happy path (mocked GitHub + mocked WorksService)
-  - 403 with `gh_repo_access_denied`
-  - 422 with `manifest_missing` and `manifest_invalid`
-  - 409 with `repo_already_owned`
-  - Idempotent re-call returns same `onboardingId`
-  - 429 when rate-limited
-  - `X-GitHub-Token` is never echoed in logs (assert via test logger)
+    - 202 on happy path (mocked GitHub + mocked WorksService)
+    - 403 with `gh_repo_access_denied`
+    - 422 with `manifest_missing` and `manifest_invalid`
+    - 409 with `repo_already_owned`
+    - Idempotent re-call returns same `onboardingId`
+    - 429 when rate-limited
+    - `X-GitHub-Token` is never echoed in logs (assert via test logger)
 
 ## Phase 4 — Background pipeline
 
@@ -88,10 +88,10 @@
 - [x] **T26**. ✅ MCP `register_work` tool at [`apps/mcp/src/register-work.tool.ts`](../../../../apps/mcp/src/register-work.tool.ts) using `@rekog/mcp-nest`'s `@Tool` decorator with a Zod parameter schema. Registered in [`apps/mcp/src/app.module.ts`](../../../../apps/mcp/src/app.module.ts). The tool POSTs to `${EVER_WORKS_API_URL}/api/register-work` with `X-GitHub-Token` (and optional `Idempotency-Key`) and proxies the response. Public — no Ever Works credential required.
 - [x] **T27**. ✅ Agent Card route at [`apps/api/src/onboarding/well-known.controller.ts`](../../../../apps/api/src/onboarding/well-known.controller.ts), serving `GET /.well-known/agent.json` with `Cache-Control: public, max-age=300`. URLs are env-driven (`PUBLIC_API_URL`, `PUBLIC_MCP_URL`, `PUBLIC_DOCS_URL`, `PUBLIC_CONTACT_EMAIL`). HTTP test included in the controller spec asserts shape + cache header.
 - [ ] **T28 (deferred — separate repo PR)**. The directory website template lives in its own git repo (`ever-works/directory-web-template`) and ships independently. The required additions are:
-  - `apps/web/app/llms.txt/route.ts` returning the public llms.txt convention (or `public/llms.txt` static).
-  - `apps/web/app/items.json/route.ts` returning the canonical item dump.
-  - Snapshot test on a sample work in the template's existing harness.
-  These changes are tracked as a sibling PR to the template repo and don't block the platform-side feature shipping. The `OnboardingService` already passes through `manifest.spec.output.{llmsTxt,itemsJson}` flags so the template can read them when implemented.
+    - `apps/web/app/llms.txt/route.ts` returning the public llms.txt convention (or `public/llms.txt` static).
+    - `apps/web/app/items.json/route.ts` returning the canonical item dump.
+    - Snapshot test on a sample work in the template's existing harness.
+      These changes are tracked as a sibling PR to the template repo and don't block the platform-side feature shipping. The `OnboardingService` already passes through `manifest.spec.output.{llmsTxt,itemsJson}` flags so the template can read them when implemented.
 
 ## Phase 7 — CLI surface
 

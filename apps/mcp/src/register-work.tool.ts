@@ -7,16 +7,11 @@ const PRINTABLE_ASCII = /^[\x21-\x7E]+$/;
 const GITHUB_HTTPS_REPO = /^https:\/\/github\.com\/[^/]+\/[^/]+\/?$/i;
 
 const RegisterWorkSchema = z.object({
-	repo: z
-		.string()
-		.regex(GITHUB_HTTPS_REPO)
-		.describe('HTTPS GitHub repo URL containing works.yml at root'),
+	repo: z.string().regex(GITHUB_HTTPS_REPO).describe('HTTPS GitHub repo URL containing works.yml at root'),
 	githubToken: z
 		.string()
 		.min(4)
-		.describe(
-			'Fine-grained PAT, classic PAT, or GitHub App installation token. Never logged, never echoed.'
-		),
+		.describe('Fine-grained PAT, classic PAT, or GitHub App installation token. Never logged, never echoed.'),
 	email: z.string().email().optional().describe('Optional contact email.'),
 	agentId: z
 		.string()
@@ -25,11 +20,7 @@ const RegisterWorkSchema = z.object({
 		.regex(PRINTABLE_ASCII)
 		.optional()
 		.describe('Opaque agent identifier (printable ASCII, ≤256 chars).'),
-	webhookUrl: z
-		.string()
-		.url()
-		.optional()
-		.describe('Optional HTTPS URL for signed terminal-status webhooks.'),
+	webhookUrl: z.string().url().optional().describe('Optional HTTPS URL for signed terminal-status webhooks.'),
 	subdomain: z
 		.string()
 		.min(3)
@@ -37,12 +28,7 @@ const RegisterWorkSchema = z.object({
 		.regex(SUBDOMAIN_RE)
 		.optional()
 		.describe('Optional DNS-safe slug for the assigned subdomain.'),
-	idempotencyKey: z
-		.string()
-		.min(1)
-		.max(64)
-		.optional()
-		.describe('Optional idempotency key (Stripe convention).')
+	idempotencyKey: z.string().min(1).max(64).optional().describe('Optional idempotency key (Stripe convention).')
 });
 
 /**

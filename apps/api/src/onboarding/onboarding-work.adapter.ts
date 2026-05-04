@@ -90,7 +90,10 @@ export class OnboardingWorkAdapter implements OnboardingWorkCreator {
 function parseRepoOwner(url: string): string {
     try {
         const u = new URL(url);
-        const segments = u.pathname.replace(/\.git$/, '').split('/').filter(Boolean);
+        const segments = u.pathname
+            .replace(/\.git$/, '')
+            .split('/')
+            .filter(Boolean);
         return segments[0] ?? '';
     } catch {
         return '';

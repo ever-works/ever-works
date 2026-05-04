@@ -52,11 +52,7 @@ export class OnboardingRequestRepository {
         return (result.affected ?? 0) > 0;
     }
 
-    async markFailure(
-        id: string,
-        failureCode: string,
-        failureDetail?: unknown,
-    ): Promise<void> {
+    async markFailure(id: string, failureCode: string, failureDetail?: unknown): Promise<void> {
         await this.repository.update(id, {
             status: 'failed',
             failureCode,

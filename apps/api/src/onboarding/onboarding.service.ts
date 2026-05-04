@@ -178,18 +178,18 @@ export class OnboardingService {
                     onboardingId: persisted.id,
                 });
                 await this.onboardingRowRepo.setWorkId(persisted.id, workId);
-                await this.onboardingRowRepo.tryTransition(persisted.id, 'validated', 'queued', { workId });
+                await this.onboardingRowRepo.tryTransition(persisted.id, 'validated', 'queued', {
+                    workId,
+                });
                 persisted.workId = workId;
                 persisted.status = 'queued';
             } catch (workErr) {
                 this.logger.warn(
                     `onboarding.work_creation_failed id=${persisted.id} reason=${describeError(workErr)}`,
                 );
-                await this.onboardingRowRepo.markFailure(
-                    persisted.id,
-                    'work_creation_failed',
-                    { message: describeError(workErr) },
-                );
+                await this.onboardingRowRepo.markFailure(persisted.id, 'work_creation_failed', {
+                    message: describeError(workErr),
+                });
                 persisted.status = 'failed';
                 persisted.failureCode = 'work_creation_failed';
             }
@@ -300,12 +300,10 @@ export class OnboardingService {
     private async fetchManifest(coords: ParsedRepoCoords, token: string): Promise<string> {
         for (const path of MANIFEST_PATHS) {
             try {
-                const file = await this.gitFacade.getFileContent(
-                    coords.owner,
-                    coords.repo,
-                    path,
-                    { providerId: 'github', token },
-                );
+                const file = await this.gitFacade.getFileContent(coords.owner, coords.repo, path, {
+                    providerId: 'github',
+                    token,
+                });
                 if (file) {
                     return decodeFileContent(file.content, file.encoding);
                 }
@@ -366,7 +364,10 @@ export function parseRepoCoords(input: string): ParsedRepoCoords | null {
         const url = new URL(input);
         if (url.protocol !== 'https:' && url.protocol !== 'http:') return null;
         if (url.hostname.toLowerCase() !== 'github.com') return null;
-        const segments = url.pathname.replace(/\.git$/, '').split('/').filter(Boolean);
+        const segments = url.pathname
+            .replace(/\.git$/, '')
+            .split('/')
+            .filter(Boolean);
         if (segments.length < 2) return null;
         const owner = segments[0].toLowerCase();
         const repo = segments[1].toLowerCase();
@@ -381,12 +382,14 @@ export function parseRepoCoords(input: string): ParsedRepoCoords | null {
 }
 
 function slugify(name: string): string {
-    return name
-        .toLowerCase()
-        .trim()
-        .replace(/[^a-z0-9]+/g, '-')
-        .replace(/^-+|-+$/g, '')
-        .slice(0, 63) || 'work';
+    return (
+        name
+            .toLowerCase()
+            .trim()
+            .replace(/[^a-z0-9]+/g, '-')
+            .replace(/^-+|-+$/g, '')
+            .slice(0, 63) || 'work'
+    );
 }
 
 function decodeFileContent(content: string, encoding: string): string {

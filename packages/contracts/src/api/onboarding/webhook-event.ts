@@ -1,9 +1,6 @@
 import type { OnboardingStatus } from './onboarding-status.js';
 
-export type WebhookEvent =
-	| WebhookEventTerminal
-	| WebhookEventManifestChanged
-	| WebhookEventDeployFailed;
+export type WebhookEvent = WebhookEventTerminal | WebhookEventManifestChanged | WebhookEventDeployFailed;
 
 export interface WebhookEventTerminal {
 	event: 'onboarding.terminal';

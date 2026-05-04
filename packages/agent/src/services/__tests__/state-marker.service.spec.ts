@@ -1,4 +1,8 @@
-import { StateMarkerService, type MarkerFileWriter, STATE_MARKER_DEFAULT_PATH } from '../state-marker.service';
+import {
+    StateMarkerService,
+    type MarkerFileWriter,
+    STATE_MARKER_DEFAULT_PATH,
+} from '../state-marker.service';
 
 describe('StateMarkerService', () => {
     const baseInput = {
@@ -49,9 +53,9 @@ describe('StateMarkerService', () => {
         const writer: MarkerFileWriter = { writeFile: jest.fn() };
         const svc = new StateMarkerService(writer);
 
-        await expect(
-            svc.write({ ...baseInput, markerPath: 'state.json' }),
-        ).rejects.toThrow(/under \.works\//);
+        await expect(svc.write({ ...baseInput, markerPath: 'state.json' })).rejects.toThrow(
+            /under \.works\//,
+        );
         expect(writer.writeFile).not.toHaveBeenCalled();
     });
 

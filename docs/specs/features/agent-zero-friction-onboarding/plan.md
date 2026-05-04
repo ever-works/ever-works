@@ -36,6 +36,7 @@ flowchart LR
 ```
 
 **Reuses without change**:
+
 - `git-provider` plugin (GitHub OAuth + PAT + GitHub App auth flows)
 - `deployment` plugin (Vercel)
 - `pipeline` plugin family (existing work generation)
@@ -45,6 +46,7 @@ flowchart LR
 - Existing `github-app` integration ([`apps/api/src/integrations/github-app/`](../../../apps/api/src/integrations/github-app/)) for App-mode credentials and webhook signature verification helpers
 
 **Net-new**:
+
 - `apps/api/src/onboarding/` module (controller, service, DTOs)
 - `OnboardingRequest` and `WebhookSubscription` entities
 - `WorksManifestService` — parse and validate `works.yml`
@@ -55,21 +57,21 @@ flowchart LR
 
 ## 2. Tech Choices
 
-| Concern                    | Choice                                                                  | Rationale                                                                                                  |
-| -------------------------- | ----------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
-| Persistence                | TypeORM entities + repositories                                         | Existing pattern in `packages/agent`                                                                       |
-| Background generation      | Trigger.dev task (`work-onboarding.task.ts`) calling existing tasks     | Principle IV; survives restarts; consistent with `work-generation.task` and `work-import.task`             |
-| Webhook delivery           | New `WebhookDeliveryService` using BullMQ queue with exponential retry  | BullMQ already in deps; built-in retry; out-of-band from the Trigger.dev pipeline                          |
-| GitHub credential validate | Existing `git-provider` capability via `GitFacade`                      | No new direct integration; Principle I                                                                     |
-| Manifest schema            | Zod schema in `@ever-works/contracts`                                   | Already used by some DTOs; lets us share the schema between API (validation) and CLI (lint)                |
-| Manifest format            | YAML 1.2, parsed with `js-yaml` (already a transitive dep)              | Human-readable; agents and humans both edit it; matches existing `config.yml` ergonomics                   |
-| Webhook signing            | HMAC-SHA256 over raw body, GitHub-style `X-Hub-Signature-256` header    | Matches FR-12; reuses helper from `github-app-webhook.controller.ts` if exposed, else new shared util      |
-| Public endpoint protection | `@Public()` + `@Throttle()` (existing decorators)                       | The endpoint is the bootstrap; no JWT possible; throttling guards against abuse                            |
-| MCP tool placement         | Inside `apps/mcp/`, no per-tool authentication for `register_work`      | Matches FR-15 (per-tool auth, not per-server); avoids a second MCP server                                  |
-| Discovery doc              | Static JSON served from `apps/api` (or `apps/web` if root domain hosts) | Single canonical URL `/.well-known/agent.json` accessible from `api.ever.works`                            |
-| llms.txt / items.json      | Emitted by website template under `directory-web-template`              | Generated at build time, not runtime; downstream agents fetch the static file                              |
-| Tests                      | Jest (unit) in `packages/agent`, Jest e2e in `apps/api/test`            | Matches existing project conventions; Vitest is for plugin packages only                                   |
-| Naming                     | No `agent_` prefix on tables, endpoints, or column names                | Per owner decision: humans may also use these primitives                                                   |
+| Concern                    | Choice                                                                  | Rationale                                                                                             |
+| -------------------------- | ----------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
+| Persistence                | TypeORM entities + repositories                                         | Existing pattern in `packages/agent`                                                                  |
+| Background generation      | Trigger.dev task (`work-onboarding.task.ts`) calling existing tasks     | Principle IV; survives restarts; consistent with `work-generation.task` and `work-import.task`        |
+| Webhook delivery           | New `WebhookDeliveryService` using BullMQ queue with exponential retry  | BullMQ already in deps; built-in retry; out-of-band from the Trigger.dev pipeline                     |
+| GitHub credential validate | Existing `git-provider` capability via `GitFacade`                      | No new direct integration; Principle I                                                                |
+| Manifest schema            | Zod schema in `@ever-works/contracts`                                   | Already used by some DTOs; lets us share the schema between API (validation) and CLI (lint)           |
+| Manifest format            | YAML 1.2, parsed with `js-yaml` (already a transitive dep)              | Human-readable; agents and humans both edit it; matches existing `config.yml` ergonomics              |
+| Webhook signing            | HMAC-SHA256 over raw body, GitHub-style `X-Hub-Signature-256` header    | Matches FR-12; reuses helper from `github-app-webhook.controller.ts` if exposed, else new shared util |
+| Public endpoint protection | `@Public()` + `@Throttle()` (existing decorators)                       | The endpoint is the bootstrap; no JWT possible; throttling guards against abuse                       |
+| MCP tool placement         | Inside `apps/mcp/`, no per-tool authentication for `register_work`      | Matches FR-15 (per-tool auth, not per-server); avoids a second MCP server                             |
+| Discovery doc              | Static JSON served from `apps/api` (or `apps/web` if root domain hosts) | Single canonical URL `/.well-known/agent.json` accessible from `api.ever.works`                       |
+| llms.txt / items.json      | Emitted by website template under `directory-web-template`              | Generated at build time, not runtime; downstream agents fetch the static file                         |
+| Tests                      | Jest (unit) in `packages/agent`, Jest e2e in `apps/api/test`            | Matches existing project conventions; Vitest is for plugin packages only                              |
+| Naming                     | No `agent_` prefix on tables, endpoints, or column names                | Per owner decision: humans may also use these primitives                                              |
 
 ## 3. Data Model
 
@@ -83,41 +85,41 @@ Both live in `packages/agent/src/entities/`. No `agent_` prefix per owner naming
 @Index(['githubIdentityHash', 'repoUrlCanonical'], { unique: true })
 @Index(['repoUrlCanonical'])
 export class OnboardingRequestEntity {
-    @PrimaryGeneratedColumn('uuid')
-    id!: string;
+	@PrimaryGeneratedColumn('uuid')
+	id!: string;
 
-    @Column({ type: 'varchar', length: 64 })
-    githubIdentityHash!: string; // sha256(github_user_id) — canonical identity
+	@Column({ type: 'varchar', length: 64 })
+	githubIdentityHash!: string; // sha256(github_user_id) — canonical identity
 
-    @Column({ type: 'varchar', length: 512 })
-    repoUrlCanonical!: string; // lowercased https URL without `.git`, no auth
+	@Column({ type: 'varchar', length: 512 })
+	repoUrlCanonical!: string; // lowercased https URL without `.git`, no auth
 
-    @Column({ type: 'varchar', length: 320, nullable: true })
-    contactEmail?: string | null;
+	@Column({ type: 'varchar', length: 320, nullable: true })
+	contactEmail?: string | null;
 
-    @Column({ type: 'varchar', length: 256, nullable: true })
-    agentId?: string | null;
+	@Column({ type: 'varchar', length: 256, nullable: true })
+	agentId?: string | null;
 
-    @Column({ type: 'uuid', nullable: true })
-    accountId?: string | null;
+	@Column({ type: 'uuid', nullable: true })
+	accountId?: string | null;
 
-    @Column({ type: 'uuid', nullable: true })
-    workId?: string | null;
+	@Column({ type: 'uuid', nullable: true })
+	workId?: string | null;
 
-    @Column({ type: 'varchar', length: 64 })
-    status!: OnboardingStatus; // 'received' | 'validating' | 'validated' | 'queued' | 'generating' | 'deployed' | 'failed' | 'rejected'
+	@Column({ type: 'varchar', length: 64 })
+	status!: OnboardingStatus; // 'received' | 'validating' | 'validated' | 'queued' | 'generating' | 'deployed' | 'failed' | 'rejected'
 
-    @Column({ type: 'varchar', length: 128, nullable: true })
-    failureCode?: string | null; // typed error slug
+	@Column({ type: 'varchar', length: 128, nullable: true })
+	failureCode?: string | null; // typed error slug
 
-    @Column({ type: 'jsonb', nullable: true })
-    failureDetail?: unknown;
+	@Column({ type: 'jsonb', nullable: true })
+	failureDetail?: unknown;
 
-    @Column({ type: 'varchar', length: 64, nullable: true })
-    idempotencyKey?: string | null;
+	@Column({ type: 'varchar', length: 64, nullable: true })
+	idempotencyKey?: string | null;
 
-    @CreateDateColumn() createdAt!: Date;
-    @UpdateDateColumn() updatedAt!: Date;
+	@CreateDateColumn() createdAt!: Date;
+	@UpdateDateColumn() updatedAt!: Date;
 }
 ```
 
@@ -126,33 +128,33 @@ export class OnboardingRequestEntity {
 @Entity('webhook_subscriptions')
 @Index(['accountId'])
 export class WebhookSubscriptionEntity {
-    @PrimaryGeneratedColumn('uuid')
-    id!: string;
+	@PrimaryGeneratedColumn('uuid')
+	id!: string;
 
-    @Column({ type: 'uuid' })
-    accountId!: string;
+	@Column({ type: 'uuid' })
+	accountId!: string;
 
-    @Column({ type: 'uuid', nullable: true })
-    workId?: string | null; // null = account-scoped
+	@Column({ type: 'uuid', nullable: true })
+	workId?: string | null; // null = account-scoped
 
-    @Column({ type: 'varchar', length: 2048 })
-    url!: string;
+	@Column({ type: 'varchar', length: 2048 })
+	url!: string;
 
-    /** x-secret: true — HMAC-SHA256 signing secret, encrypted at rest */
-    @Column({ type: 'text' })
-    secretEncrypted!: string;
+	/** x-secret: true — HMAC-SHA256 signing secret, encrypted at rest */
+	@Column({ type: 'text' })
+	secretEncrypted!: string;
 
-    @Column({ type: 'varchar', length: 32, default: 'active' })
-    status!: 'active' | 'paused' | 'failed';
+	@Column({ type: 'varchar', length: 32, default: 'active' })
+	status!: 'active' | 'paused' | 'failed';
 
-    @Column({ type: 'int', default: 0 })
-    consecutiveFailures!: number;
+	@Column({ type: 'int', default: 0 })
+	consecutiveFailures!: number;
 
-    @Column({ type: 'timestamp with time zone', nullable: true })
-    lastDeliveryAt?: Date | null;
+	@Column({ type: 'timestamp with time zone', nullable: true })
+	lastDeliveryAt?: Date | null;
 
-    @CreateDateColumn() createdAt!: Date;
-    @UpdateDateColumn() updatedAt!: Date;
+	@CreateDateColumn() createdAt!: Date;
+	@UpdateDateColumn() updatedAt!: Date;
 }
 ```
 
@@ -189,27 +191,34 @@ New in `packages/contracts/src/api/onboarding/`:
 
 ```ts
 export class RegisterWorkRequestDto {
-    @IsString()
-    @Matches(/^https?:\/\/github\.com\/[^/]+\/[^/]+\/?$/i)
-    repo!: string;
+	@IsString()
+	@Matches(/^https?:\/\/github\.com\/[^/]+\/[^/]+\/?$/i)
+	repo!: string;
 
-    @IsOptional() @IsEmail()
-    email?: string;
+	@IsOptional()
+	@IsEmail()
+	email?: string;
 
-    @IsOptional() @IsString() @Length(1, 256)
-    @Matches(/^[\x21-\x7E]+$/)
-    agentId?: string;
+	@IsOptional()
+	@IsString()
+	@Length(1, 256)
+	@Matches(/^[\x21-\x7E]+$/)
+	agentId?: string;
 
-    @IsOptional() @IsString() @IsUrl({ require_tld: false })
-    webhookUrl?: string;
+	@IsOptional()
+	@IsString()
+	@IsUrl({ require_tld: false })
+	webhookUrl?: string;
 
-    @IsOptional() @IsString() @Length(3, 63)
-    @Matches(/^[a-z0-9]([a-z0-9-]*[a-z0-9])?$/)
-    subdomain?: string;
+	@IsOptional()
+	@IsString()
+	@Length(3, 63)
+	@Matches(/^[a-z0-9]([a-z0-9-]*[a-z0-9])?$/)
+	subdomain?: string;
 
-    /** Reserved for v2 paid plane (x402 / Skyfire / Crossmint / Stripe Agent) */
-    @IsOptional()
-    agentPayment?: Record<string, unknown>;
+	/** Reserved for v2 paid plane (x402 / Skyfire / Crossmint / Stripe Agent) */
+	@IsOptional()
+	agentPayment?: Record<string, unknown>;
 }
 ```
 
@@ -222,13 +231,13 @@ export class RegisterWorkRequestDto {
 
 ```ts
 export interface RegisterWorkResponseDto {
-    onboardingId: string;
-    workId: string;
-    status: OnboardingStatus;
-    statusUrl: string;          // absolute
-    subdomain: string;          // <slug>.ever.works
-    deploymentUrl?: string;     // populated on terminal success
-    warnings?: string[];        // e.g., "classic PAT detected, prefer fine-grained"
+	onboardingId: string;
+	workId: string;
+	status: OnboardingStatus;
+	statusUrl: string; // absolute
+	subdomain: string; // <slug>.ever.works
+	deploymentUrl?: string; // populated on terminal success
+	warnings?: string[]; // e.g., "classic PAT detected, prefer fine-grained"
 }
 ```
 
@@ -238,17 +247,17 @@ export interface RegisterWorkResponseDto {
 
 **Error responses** (typed `code` slug accompanies every error):
 
-| Status | Code                                       | When                                                |
-| ------ | ------------------------------------------ | --------------------------------------------------- |
-| 400    | `validation_error`                         | DTO validation failure                              |
-| 403    | `gh_repo_access_denied`                    | Token cannot read or write the repo                 |
-| 409    | `repo_already_owned`                       | Repo previously onboarded by a different identity   |
-| 422    | `manifest_missing`                         | No `works.yml` at repo root                         |
-| 422    | `manifest_invalid`                         | Schema validation failure (per-field errors)        |
-| 422    | `unsupported_capability`                   | Pipeline / plugin in manifest unsupported           |
-| 422    | `gh_insufficient_scope_for_repo_creation`  | Manifest opts in to platform-managed repos, scope short |
-| 429    | `rate_limited`                             | Throttle hit                                        |
-| 500    | `internal_error`                           | Catch-all — never leaks token/PII                   |
+| Status | Code                                      | When                                                    |
+| ------ | ----------------------------------------- | ------------------------------------------------------- |
+| 400    | `validation_error`                        | DTO validation failure                                  |
+| 403    | `gh_repo_access_denied`                   | Token cannot read or write the repo                     |
+| 409    | `repo_already_owned`                      | Repo previously onboarded by a different identity       |
+| 422    | `manifest_missing`                        | No `works.yml` at repo root                             |
+| 422    | `manifest_invalid`                        | Schema validation failure (per-field errors)            |
+| 422    | `unsupported_capability`                  | Pipeline / plugin in manifest unsupported               |
+| 422    | `gh_insufficient_scope_for_repo_creation` | Manifest opts in to platform-managed repos, scope short |
+| 429    | `rate_limited`                            | Throttle hit                                            |
+| 500    | `internal_error`                          | Catch-all — never leaks token/PII                       |
 
 ### `GET /api/register-work/:id`
 
@@ -280,12 +289,12 @@ If the manifest names a pipeline / plugin not present in the registry, we return
 
 ## 7. Background Jobs
 
-| Trigger                           | When                                          | What it does                                                                          | Idempotency strategy                                                |
-| --------------------------------- | --------------------------------------------- | ------------------------------------------------------------------------------------- | ------------------------------------------------------------------- |
-| `work-onboarding.task` (Trigger.dev) | Enqueued by `OnboardingService.handle()`     | Validates manifest → calls `WorksService.createFromManifest` → triggers existing import flow | DB row in `onboarding_requests` is the lock; CAS update on `status` |
-| `webhook-delivery.queue` (BullMQ) | On every terminal status transition          | Loads `WebhookSubscription`, signs payload, POSTs with retry                          | `X-Ever-Works-Delivery` UUID; consumer-side de-dup is recommended    |
-| `state-marker.task` (Trigger.dev) | On every terminal status transition          | Commits `.works/state.json` to manifest repo if opted in                              | Path is fixed; commit message includes delivery UUID                 |
-| GitHub repo webhook → reconciler  | On push to manifest repo touching `works.yml` | Re-runs validation, triggers regeneration via existing `work-generation.task`         | DB-level CAS on `works.last_manifest_sha`                            |
+| Trigger                              | When                                          | What it does                                                                                 | Idempotency strategy                                                |
+| ------------------------------------ | --------------------------------------------- | -------------------------------------------------------------------------------------------- | ------------------------------------------------------------------- |
+| `work-onboarding.task` (Trigger.dev) | Enqueued by `OnboardingService.handle()`      | Validates manifest → calls `WorksService.createFromManifest` → triggers existing import flow | DB row in `onboarding_requests` is the lock; CAS update on `status` |
+| `webhook-delivery.queue` (BullMQ)    | On every terminal status transition           | Loads `WebhookSubscription`, signs payload, POSTs with retry                                 | `X-Ever-Works-Delivery` UUID; consumer-side de-dup is recommended   |
+| `state-marker.task` (Trigger.dev)    | On every terminal status transition           | Commits `.works/state.json` to manifest repo if opted in                                     | Path is fixed; commit message includes delivery UUID                |
+| GitHub repo webhook → reconciler     | On push to manifest repo touching `works.yml` | Re-runs validation, triggers regeneration via existing `work-generation.task`                | DB-level CAS on `works.last_manifest_sha`                           |
 
 ## 8. Security & Permissions
 
@@ -303,17 +312,17 @@ If the manifest names a pipeline / plugin not present in the registry, we return
 
 Activity log events emitted via the existing `ActivityLogService`:
 
-| Event                         | When                                                                       |
-| ----------------------------- | -------------------------------------------------------------------------- |
-| `onboarding.received`         | Request accepted by controller (post-DTO-validation)                       |
-| `onboarding.token_validated`  | GitHub token resolves and grants required access                           |
-| `onboarding.token_rejected`   | GitHub token validation failed (with typed code)                           |
-| `onboarding.manifest_invalid` | `works.yml` missing or fails schema                                        |
-| `onboarding.account_linked`   | New or existing account linked to GitHub identity                          |
-| `onboarding.work_created`     | Work row + repos created, generation enqueued                              |
+| Event                         | When                                                                        |
+| ----------------------------- | --------------------------------------------------------------------------- |
+| `onboarding.received`         | Request accepted by controller (post-DTO-validation)                        |
+| `onboarding.token_validated`  | GitHub token resolves and grants required access                            |
+| `onboarding.token_rejected`   | GitHub token validation failed (with typed code)                            |
+| `onboarding.manifest_invalid` | `works.yml` missing or fails schema                                         |
+| `onboarding.account_linked`   | New or existing account linked to GitHub identity                           |
+| `onboarding.work_created`     | Work row + repos created, generation enqueued                               |
 | `onboarding.terminal`         | Generation finished (success / failure) — payload used for webhook + marker |
-| `webhook.delivered`           | 2xx from agent webhook                                                     |
-| `webhook.failed`              | Non-2xx after retry budget                                                 |
+| `webhook.delivered`           | 2xx from agent webhook                                                      |
+| `webhook.failed`              | Non-2xx after retry budget                                                  |
 
 Sentry tags: `onboarding.id`, `onboarding.status`, `repo.canonical`. **Never** tag the GitHub token.
 
@@ -339,16 +348,16 @@ A feature flag (`features.zeroFrictionOnboarding`) gates the public endpoint and
 
 ## 11. Risks & Mitigations
 
-| Risk                                                       | Likelihood | Impact | Mitigation                                                                                              |
-| ---------------------------------------------------------- | ---------- | ------ | ------------------------------------------------------------------------------------------------------- |
+| Risk                                                       | Likelihood | Impact | Mitigation                                                                                               |
+| ---------------------------------------------------------- | ---------- | ------ | -------------------------------------------------------------------------------------------------------- |
 | Public endpoint abused for spam Work creation              | Medium     | Medium | Throttle + 1-Work-per-repo + GitHub repo write-access proof gate the call                                |
 | Token leak via logs                                        | Low        | High   | Redact `X-GitHub-Token` + `agentPayment.*` in `LoggingInterceptor`; never persist on `OnboardingRequest` |
-| Manifest schema drift across CLI / API                     | Low        | Medium | Zod schema lives in `@ever-works/contracts`, imported by both                                           |
+| Manifest schema drift across CLI / API                     | Low        | Medium | Zod schema lives in `@ever-works/contracts`, imported by both                                            |
 | Webhook deliveries to malicious agent URLs (SSRF)          | Medium     | High   | Block private/loopback ranges + cloud metadata IPs at the HTTP client layer                              |
 | Ownership race when two agents register same repo          | Low        | Medium | Unique index on `(githubIdentityHash, repoUrlCanonical)`; `repo_already_owned` returned on conflict      |
 | Webhook retries hammer flaky agent endpoint                | Medium     | Low    | Exponential backoff up to 6 attempts over 24h then mark `failed`; surface in status endpoint             |
-| Long-running generation outlives the request               | High       | Low    | Async by design; 202 + status endpoint + webhook + state marker — three completion signals              |
-| Classic PAT with overly broad scope persisted accidentally | Low        | High   | Validate-then-discard during onboarding; only persist via account-level token store, encrypted          |
+| Long-running generation outlives the request               | High       | Low    | Async by design; 202 + status endpoint + webhook + state marker — three completion signals               |
+| Classic PAT with overly broad scope persisted accidentally | Low        | High   | Validate-then-discard during onboarding; only persist via account-level token store, encrypted           |
 
 ## 12. Constitution Reconciliation
 
@@ -369,16 +378,16 @@ A feature flag (`features.zeroFrictionOnboarding`) gates the public endpoint and
 - Tasks: [`./tasks.md`](./tasks.md)
 - Manifest schema spec: [`./manifest-schema.md`](./manifest-schema.md)
 - Related architecture:
-  - [`docs/api/works.md`](../../../api/works.md)
-  - [`docs/api/git-provider-capability.md`](../../../api/git-provider-capability.md)
-  - [`docs/api/deploy-capability.md`](../../../api/deploy-capability.md)
+    - [`docs/api/works.md`](../../../api/works.md)
+    - [`docs/api/git-provider-capability.md`](../../../api/git-provider-capability.md)
+    - [`docs/api/deploy-capability.md`](../../../api/deploy-capability.md)
 - Related features:
-  - [`creating-a-work`](../creating-a-work/spec.md)
-  - [`work-import`](../work-import/spec.md)
-  - [`mcp-server`](../mcp-server/spec.md)
+    - [`creating-a-work`](../creating-a-work/spec.md)
+    - [`work-import`](../work-import/spec.md)
+    - [`mcp-server`](../mcp-server/spec.md)
 - Industry references (informational):
-  - Model Context Protocol — agent tool exposure
-  - Agent2Agent / Agent Card — discovery at `/.well-known/agent.json`
-  - llms.txt — site-level convention for downstream agents
-  - GitHub webhook signature scheme — `X-Hub-Signature-256`
-  - x402 / Skyfire / Crossmint / Stripe Agent — future paid plane
+    - Model Context Protocol — agent tool exposure
+    - Agent2Agent / Agent Card — discovery at `/.well-known/agent.json`
+    - llms.txt — site-level convention for downstream agents
+    - GitHub webhook signature scheme — `X-Hub-Signature-256`
+    - x402 / Skyfire / Crossmint / Stripe Agent — future paid plane

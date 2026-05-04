@@ -26,10 +26,11 @@ describe('redactHeaders', () => {
 
 describe('redactBody', () => {
     it('replaces sensitive top-level fields', () => {
-        const out = redactBody({ token: 'xxx', repo: 'foo', agentPayment: { wallet: 'abc' } }) as Record<
-            string,
-            unknown
-        >;
+        const out = redactBody({
+            token: 'xxx',
+            repo: 'foo',
+            agentPayment: { wallet: 'abc' },
+        }) as Record<string, unknown>;
         expect(out.token).toBe('[REDACTED]');
         expect(out.agentPayment).toBe('[REDACTED]');
         expect(out.repo).toBe('foo');

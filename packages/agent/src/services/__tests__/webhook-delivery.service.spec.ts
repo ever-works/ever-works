@@ -73,7 +73,11 @@ describe('WebhookDeliveryService.verify', () => {
             payload: { hello: 'world' },
             deliveryId: 'd-1',
         });
-        const ok = WebhookDeliveryService.verify(signed.body, signed.headers['X-Hub-Signature-256'], 'shh');
+        const ok = WebhookDeliveryService.verify(
+            signed.body,
+            signed.headers['X-Hub-Signature-256'],
+            'shh',
+        );
         expect(ok).toBe(true);
     });
 
@@ -86,7 +90,11 @@ describe('WebhookDeliveryService.verify', () => {
             payload: {},
             deliveryId: 'd-1',
         });
-        const ok = WebhookDeliveryService.verify(signed.body, signed.headers['X-Hub-Signature-256'], 'bad');
+        const ok = WebhookDeliveryService.verify(
+            signed.body,
+            signed.headers['X-Hub-Signature-256'],
+            'bad',
+        );
         expect(ok).toBe(false);
     });
 
@@ -99,7 +107,11 @@ describe('WebhookDeliveryService.verify', () => {
             payload: {},
             deliveryId: 'd-1',
         });
-        const ok = WebhookDeliveryService.verify('{"tampered":true}', signed.headers['X-Hub-Signature-256'], 's');
+        const ok = WebhookDeliveryService.verify(
+            '{"tampered":true}',
+            signed.headers['X-Hub-Signature-256'],
+            's',
+        );
         expect(ok).toBe(false);
     });
 });

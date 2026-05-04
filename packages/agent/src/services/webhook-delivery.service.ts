@@ -39,7 +39,12 @@ export interface WebhookDeliveryRequest {
  * which is available in Node 22+ (the project's required runtime).
  */
 export interface WebhookHttpClient {
-    post(args: { url: string; body: string; headers: Record<string, string>; timeoutMs: number }): Promise<{
+    post(args: {
+        url: string;
+        body: string;
+        headers: Record<string, string>;
+        timeoutMs: number;
+    }): Promise<{
         status: number;
     }>;
 }
@@ -106,7 +111,11 @@ export class WebhookDeliveryService {
     async deliver(request: WebhookDeliveryRequest): Promise<DeliveryResult> {
         if (!isSafeWebhookUrl(request.url)) {
             this.logger.warn(`webhook.ssrf_blocked url=${redactUrl(request.url)}`);
-            return { ok: false, error: 'ssrf_blocked', deliveryId: request.deliveryId ?? randomUUID() };
+            return {
+                ok: false,
+                error: 'ssrf_blocked',
+                deliveryId: request.deliveryId ?? randomUUID(),
+            };
         }
 
         const signed = this.sign(request);

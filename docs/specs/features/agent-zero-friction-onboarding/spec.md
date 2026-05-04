@@ -96,7 +96,7 @@ A human is not in the loop for any happy-path scenario.
 
 - **Given** the repo has no `works.yml` at root, **when** the agent
   calls the endpoint, **then** the platform returns `422
-  Unprocessable Entity` with `manifest_missing` and a pointer to the
+Unprocessable Entity` with `manifest_missing` and a pointer to the
   manifest schema docs.
 
 - **Given** `works.yml` is malformed or fails schema validation,
@@ -109,7 +109,7 @@ A human is not in the loop for any happy-path scenario.
   the agent to switch to a fine-grained PAT or the Ever Works
   GitHub App, and links to the docs.
 
-- **Given** the same repo URL was already onboarded by a *different*
+- **Given** the same repo URL was already onboarded by a _different_
   GitHub identity, **when** a new identity tries to onboard it,
   **then** the platform returns `409 Conflict` with
   `repo_already_owned` and does not transfer ownership.
@@ -170,7 +170,7 @@ A human is not in the loop for any happy-path scenario.
   of the supplied repository and validate it against the published
   manifest schema.
 - **FR-8** The system MUST be idempotent for the same `(github_identity,
-  repo_url)` pair: a second call returns the existing `work_id`
+repo_url)` pair: a second call returns the existing `work_id`
   without creating a duplicate.
 - **FR-9** The system MUST honour an optional `Idempotency-Key`
   request header per the Stripe-style convention for client-driven
@@ -305,13 +305,13 @@ A human is not in the loop for any happy-path scenario.
   MUST NOT block generation or status reporting through other
   channels.
 - **Security & privacy**:
-  - GitHub credentials are sensitive (`x-secret`) — encrypted at
-    rest, redacted in logs and activity records, transported only
-    over TLS.
-  - The signed webhook secret is per-account; rotation is supported
-    without changing the registered URL.
-  - Token validation against GitHub MUST happen before any
-    persistent write tied to the request.
+    - GitHub credentials are sensitive (`x-secret`) — encrypted at
+      rest, redacted in logs and activity records, transported only
+      over TLS.
+    - The signed webhook secret is per-account; rotation is supported
+      without changing the registered URL.
+    - Token validation against GitHub MUST happen before any
+      persistent write tied to the request.
 - **Observability**: Every onboarding attempt — successful or not —
   emits an entry to the activity log capturing the GitHub identity,
   repo URL (canonicalised), terminal status, and the typed error
@@ -324,17 +324,17 @@ A human is not in the loop for any happy-path scenario.
 
 ## 5. Key Entities & Domain Concepts
 
-| Entity / concept       | Description |
-| ---------------------- | ----------- |
-| `Agent`                | A non-human caller of the registration capability. Identified by its GitHub identity (user or installation). |
-| `OnboardingRequest`    | A single registration attempt. Carries repo URL, credential, contact identifier, optional webhook URL and subdomain hint. |
+| Entity / concept       | Description                                                                                                                                                                                                   |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Agent`                | A non-human caller of the registration capability. Identified by its GitHub identity (user or installation).                                                                                                  |
+| `OnboardingRequest`    | A single registration attempt. Carries repo URL, credential, contact identifier, optional webhook URL and subdomain hint.                                                                                     |
 | `works.yml`            | A YAML manifest at the root of the agent's repo describing the desired Work: name, description, pipeline, plugins, taxonomy, item sources, deployment options. The source of truth for GitOps reconciliation. |
-| `Manifest Repo`        | The agent's repository containing `works.yml`. Distinct from the data, website, and Awesome-list repos that the platform may create. |
-| `Account Linking`      | The pairing of an Ever Works account with a GitHub identity, established or reused at registration time. |
-| `Subdomain Allocation` | The free `<slug>.ever.works` host assigned at registration before generation completes, so an agent can return a URL to its caller immediately. |
-| `Webhook Subscription` | The optional callback URL plus a per-account HMAC secret used to sign deliveries. |
-| `State Marker`         | An optional file (e.g. `.works/state.json`) committed by the platform to the manifest repo to surface terminal status to agents that watch the repo. |
-| `Agent Card`           | The A2A-style discovery document at `/.well-known/agent.json` advertising the registration capability and its endpoint. |
+| `Manifest Repo`        | The agent's repository containing `works.yml`. Distinct from the data, website, and Awesome-list repos that the platform may create.                                                                          |
+| `Account Linking`      | The pairing of an Ever Works account with a GitHub identity, established or reused at registration time.                                                                                                      |
+| `Subdomain Allocation` | The free `<slug>.ever.works` host assigned at registration before generation completes, so an agent can return a URL to its caller immediately.                                                               |
+| `Webhook Subscription` | The optional callback URL plus a per-account HMAC secret used to sign deliveries.                                                                                                                             |
+| `State Marker`         | An optional file (e.g. `.works/state.json`) committed by the platform to the manifest repo to surface terminal status to agents that watch the repo.                                                          |
+| `Agent Card`           | The A2A-style discovery document at `/.well-known/agent.json` advertising the registration capability and its endpoint.                                                                                       |
 
 ## 6. Out of Scope
 
@@ -379,7 +379,7 @@ A human is not in the loop for any happy-path scenario.
 - [ ] The endpoint accepts the GitHub credential in body or header
       and rejects it in the URL query string.
 - [ ] Calling the endpoint twice with the same `(github_identity,
-      repo_url)` returns the same `work_id` and does not create a
+repo_url)` returns the same `work_id` and does not create a
       duplicate.
 - [ ] An invalid GitHub credential or one without repo write access
       causes a typed `403` with `gh_repo_access_denied` and creates
@@ -493,28 +493,28 @@ pending owner status flip from `Draft` to `In Review`.
 ## 10. References
 
 - Related features:
-  - [`creating-a-work`](../creating-a-work/spec.md) — the existing
-    human-facing creation flow this builds on.
-  - [`work-import`](../work-import/spec.md) — the existing import
-    pipeline for data repos and Awesome lists.
-  - [`mcp-server`](../mcp-server/spec.md) — the MCP surface this
-    feature extends with `register_work`.
-  - [`api-keys`](../api-keys/spec.md) — relates to post-onboarding
-    auth; not used during the initial zero-friction call.
-  - [`custom-domains`](../custom-domains/spec.md) — the upgrade path
-    from the auto-allocated subdomain.
+    - [`creating-a-work`](../creating-a-work/spec.md) — the existing
+      human-facing creation flow this builds on.
+    - [`work-import`](../work-import/spec.md) — the existing import
+      pipeline for data repos and Awesome lists.
+    - [`mcp-server`](../mcp-server/spec.md) — the MCP surface this
+      feature extends with `register_work`.
+    - [`api-keys`](../api-keys/spec.md) — relates to post-onboarding
+      auth; not used during the initial zero-friction call.
+    - [`custom-domains`](../custom-domains/spec.md) — the upgrade path
+      from the auto-allocated subdomain.
 - Related architecture:
-  - [`docs/api/works.md`](../../../api/works.md)
-  - [`docs/api/git-provider-capability.md`](../../../api/git-provider-capability.md)
-  - [`docs/api/deploy-capability.md`](../../../api/deploy-capability.md)
+    - [`docs/api/works.md`](../../../api/works.md)
+    - [`docs/api/git-provider-capability.md`](../../../api/git-provider-capability.md)
+    - [`docs/api/deploy-capability.md`](../../../api/deploy-capability.md)
 - Industry references (informational, not standards we're forced to
   adopt):
-  - Model Context Protocol (Anthropic) — MCP tool exposure.
-  - Agent2Agent / Agent Card (Google) — `/.well-known/agent.json`
-    discovery.
-  - llms.txt — site-level convention for downstream agents.
-  - Stripe Agent Toolkit — agent-friendly API ergonomics
-    (idempotency, typed errors, programmatic onboarding).
-  - GitHub Apps & fine-grained PATs — recommended credential modes.
-  - x402 (Coinbase) / Skyfire / Crossmint — agent-payment standards
-    for the future billing plane.
+    - Model Context Protocol (Anthropic) — MCP tool exposure.
+    - Agent2Agent / Agent Card (Google) — `/.well-known/agent.json`
+      discovery.
+    - llms.txt — site-level convention for downstream agents.
+    - Stripe Agent Toolkit — agent-friendly API ergonomics
+      (idempotency, typed errors, programmatic onboarding).
+    - GitHub Apps & fine-grained PATs — recommended credential modes.
+    - x402 (Coinbase) / Skyfire / Crossmint — agent-payment standards
+      for the future billing plane.

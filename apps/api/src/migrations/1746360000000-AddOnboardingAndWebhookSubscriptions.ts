@@ -99,7 +99,11 @@ export class AddOnboardingAndWebhookSubscriptions1746360000000 implements Migrat
                     { name: 'secret_encrypted', type: 'text' },
                     { name: 'status', type: 'varchar', length: '32', default: "'active'" },
                     { name: 'consecutive_failures', type: 'integer', default: 0 },
-                    { name: 'last_delivery_at', type: 'timestamp with time zone', isNullable: true },
+                    {
+                        name: 'last_delivery_at',
+                        type: 'timestamp with time zone',
+                        isNullable: true,
+                    },
                     {
                         name: 'created_at',
                         type: 'timestamp with time zone',

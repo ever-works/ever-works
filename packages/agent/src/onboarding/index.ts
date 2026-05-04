@@ -18,10 +18,7 @@ export {
     PRINTABLE_ASCII_PATTERN,
     SUBDOMAIN_PATTERN,
 } from '../services/works-manifest.service';
-export type {
-    ParsedManifest,
-    ManifestParseResult,
-} from '../services/works-manifest.service';
+export type { ParsedManifest, ManifestParseResult } from '../services/works-manifest.service';
 
 export { isSafeWebhookUrl } from '../utils/ssrf-guard';
 export {
