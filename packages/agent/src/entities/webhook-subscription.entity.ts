@@ -6,6 +6,7 @@ import {
     CreateDateColumn,
     UpdateDateColumn,
 } from 'typeorm';
+import { TimestampColumn } from './_types';
 
 export type WebhookSubscriptionStatus = 'active' | 'paused' | 'failed';
 
@@ -38,7 +39,7 @@ export class WebhookSubscription {
     @Column({ type: 'int', default: 0 })
     consecutiveFailures: number;
 
-    @Column({ type: 'timestamp with time zone', nullable: true })
+    @TimestampColumn({ nullable: true })
     lastDeliveryAt: Date | null;
 
     @CreateDateColumn()
