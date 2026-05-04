@@ -237,7 +237,6 @@ export class WebSearchStep extends BasePipelineStep {
 							url,
 							status: 'success',
 							pipeline: 'standard-pipeline',
-							itemsCreated: 0,
 							previous
 						})
 					);
@@ -358,7 +357,6 @@ export class WebSearchStep extends BasePipelineStep {
 							url,
 							status: 'success',
 							pipeline: 'standard-pipeline',
-							itemsCreated: 0,
 							previous
 						})
 					);

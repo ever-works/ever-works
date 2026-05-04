@@ -172,7 +172,6 @@ export class ContentRetrievalStep extends BasePipelineStep {
 							status: 'success',
 							pipeline: 'standard-pipeline',
 							provider: providerName,
-							itemsCreated: 0,
 							previous
 						})
 					);

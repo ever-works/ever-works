@@ -160,6 +160,18 @@ export class DataGeneratorService {
             options?.signal,
         );
 
+        if (!pipelineResult) {
+            return {
+                success: false,
+                error: {
+                    code: 'GENERATION_FAILED' as const,
+                    message: 'Pipeline execution returned no result',
+                    cause: new Error('Pipeline execution returned no result'),
+                },
+                warnings: [],
+            };
+        }
+
         const warnings = pipelineResult.warnings?.slice();
 
         // If pipeline failed or no items were generated, handle appropriately
@@ -181,7 +193,7 @@ export class DataGeneratorService {
         throwIfCancelled();
 
         // If no items were generated, we don't need to do anything else
-        if (!pipelineResult || pipelineResult.outputs.items.length === 0) {
+        if (pipelineResult.outputs.items.length === 0) {
             const generatedReferences = this.extractPipelineReferences(pipelineResult);
             if (generatedReferences.length > 0) {
                 await this.persistReferencesToExistingDataRepository(
