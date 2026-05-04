@@ -27,10 +27,10 @@ import { task, logger } from '@trigger.dev/sdk';
  * `failed`.
  */
 
-export interface WorkOnboardingPayload {
+export type WorkOnboardingPayload = {
     onboardingId: string;
     workId: string;
-}
+};
 
 export const workOnboardingTask = task({
     id: 'work-onboarding',
@@ -43,7 +43,7 @@ export const workOnboardingTask = task({
         randomize: true,
     },
     run: async (payload: WorkOnboardingPayload) => {
-        logger.info('work-onboarding.start', payload);
+        logger.info('work-onboarding.start', { ...payload });
 
         // The integration handoff into the existing work-import orchestrator
         // happens here. Because the orchestrator boot is heavyweight and
@@ -59,7 +59,9 @@ export const workOnboardingTask = task({
 
         logger.warn(
             'work-onboarding.handoff_pending — final pipeline integration deferred to T9d completion',
-            { workId: payload.workId },
+            {
+                workId: payload.workId,
+            },
         );
 
         return { onboardingId: payload.onboardingId, workId: payload.workId, status: 'queued' };
