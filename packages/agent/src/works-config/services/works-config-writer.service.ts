@@ -136,7 +136,10 @@ export class WorksConfigWriterService {
         for (const filename of LEGACY_DATA_CONFIG_FILENAMES) {
             try {
                 const content = await fs.readFile(path.join(repoDir, filename), 'utf-8');
-                existingRaw = this.mergeRaw(existingRaw, this.worksConfigService.parse(content).raw);
+                existingRaw = this.mergeRaw(
+                    existingRaw,
+                    this.worksConfigService.parse(content).raw,
+                );
             } catch (error) {
                 if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
                     throw error;
@@ -147,7 +150,10 @@ export class WorksConfigWriterService {
         for (const filename of [...WORKS_CONFIG_FALLBACK_FILENAMES].reverse()) {
             try {
                 const content = await fs.readFile(path.join(repoDir, filename), 'utf-8');
-                existingRaw = this.mergeRaw(existingRaw, this.worksConfigService.parse(content).raw);
+                existingRaw = this.mergeRaw(
+                    existingRaw,
+                    this.worksConfigService.parse(content).raw,
+                );
             } catch (error) {
                 if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
                     throw error;
