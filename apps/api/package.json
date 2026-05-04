@@ -26,6 +26,7 @@
     },
     "dependencies": {
         "@ever-works/agent": "workspace:*",
+        "@ever-works/contracts": "workspace:*",
         "@ever-works/monitoring": "workspace:*",
         "@ever-works/plugin": "workspace:*",
         "@ever-works/trigger-tasks": "workspace:*",

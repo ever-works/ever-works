@@ -117,8 +117,12 @@ export class OnboardingService {
         const manifestText = await this.fetchManifest(coords, ctx.githubToken);
         const parseResult = this.manifestService.parseAndValidate(manifestText);
         if (parseResult.kind === 'failure') {
+            // Both `manifest_invalid_yaml` (parse error) and `manifest_invalid` (schema)
+            // surface as the public `manifest_invalid` typed error code with an
+            // explanatory message — agents can still distinguish via the per-field
+            // `subcode` on the returned error array.
             this.fail({
-                code: parseResult.code,
+                code: 'manifest_invalid',
                 message:
                     parseResult.code === 'manifest_invalid_yaml'
                         ? 'works.yml could not be parsed'
