@@ -25,6 +25,7 @@ describe('WorksConfigRepositorySyncService', () => {
             getStatus: jest.fn().mockResolvedValue(changes),
             addAll: jest.fn().mockResolvedValue(undefined),
             commit: jest.fn().mockResolvedValue('commit-sha'),
+            pull: jest.fn().mockResolvedValue(undefined),
             push: jest.fn().mockResolvedValue(undefined),
         };
         const projection = {
@@ -90,8 +91,45 @@ describe('WorksConfigRepositorySyncService', () => {
             'sync works.yaml after provider_changed',
             { name: 'User One', email: 'user@example.com' },
         );
+        expect(gitFacade.pull).toHaveBeenCalledWith(
+            '/tmp/data-repo',
+            { name: 'User One', email: 'user@example.com' },
+            { userId: 'user-1', providerId: 'github' },
+        );
         expect(gitFacade.push).toHaveBeenCalledWith(
             { dir: '/tmp/data-repo' },
+            { userId: 'user-1', providerId: 'github' },
+        );
+        expect(gitFacade.pull.mock.invocationCallOrder[0]).toBeLessThan(
+            gitFacade.push.mock.invocationCallOrder[0],
+        );
+    });
+
+    it('force pushes when the synced config push is rejected as non-fast-forward', async () => {
+        const { service, gitFacade } = createService([{ path: 'works.yaml', status: 'modified' }]);
+        gitFacade.push
+            .mockRejectedValueOnce(
+                new Error(
+                    'Push rejected because it was not a simple fast-forward. Use "force: true" to override.',
+                ),
+            )
+            .mockResolvedValueOnce(undefined);
+
+        await service.syncWork({
+            workId: 'dir-1',
+            userId: 'user-1',
+            reason: 'provider_changed',
+        });
+
+        expect(gitFacade.push).toHaveBeenCalledTimes(2);
+        expect(gitFacade.push).toHaveBeenNthCalledWith(
+            1,
+            { dir: '/tmp/data-repo' },
+            { userId: 'user-1', providerId: 'github' },
+        );
+        expect(gitFacade.push).toHaveBeenNthCalledWith(
+            2,
+            { dir: '/tmp/data-repo', force: true },
             { userId: 'user-1', providerId: 'github' },
         );
     });

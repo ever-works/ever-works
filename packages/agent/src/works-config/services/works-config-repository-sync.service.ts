@@ -66,10 +66,11 @@ export class WorksConfigRepositorySyncService {
                 `sync works.yaml after ${options.reason}`,
                 committer,
             );
-            await this.gitFacade.push(
-                { dir: dest },
-                { userId: options.userId, providerId: work.gitProvider },
-            );
+            await this.gitFacade.pull(dest, committer, {
+                userId: options.userId,
+                providerId: work.gitProvider,
+            });
+            await this.pushSyncedConfig(dest, options.userId, work.gitProvider);
         } catch (error) {
             const errorMessage = error instanceof Error ? error.message : String(error);
 
@@ -85,5 +86,29 @@ export class WorksConfigRepositorySyncService {
                 ),
             );
         }
+    }
+
+    private async pushSyncedConfig(dir: string, userId: string, providerId: string): Promise<void> {
+        try {
+            await this.gitFacade.push({ dir }, { userId, providerId });
+        } catch (error) {
+            if (!this.isNonFastForwardPushError(error)) {
+                throw error;
+            }
+
+            this.logger.warn(
+                'works.yaml sync push was rejected as non-fast-forward; force pushing',
+            );
+            await this.gitFacade.push({ dir, force: true }, { userId, providerId });
+        }
+    }
+
+    private isNonFastForwardPushError(error: unknown): boolean {
+        const message = error instanceof Error ? error.message : String(error);
+        return (
+            message.includes('not a simple fast-forward') ||
+            message.includes('non-fast-forward') ||
+            message.includes('fetch first')
+        );
     }
 }
