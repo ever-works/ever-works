@@ -1,9 +1,9 @@
 import { Injectable, Logger } from '@nestjs/common';
 import type { ParsedWorksConfig, ResolvedWorksConfig } from './works-config.service';
-import { Directory } from '@src/entities/directory.entity';
+import { Work } from '@src/entities/work.entity';
 import { User } from '@src/entities/user.entity';
 import { PluginOperationsService } from '@src/plugins/services/plugin-operations.service';
-import { DirectoryScheduleService } from '@src/services/directory-schedule.service';
+import { WorkScheduleService } from '@src/services/work-schedule.service';
 
 @Injectable()
 export class WorksConfigImportApplierService {
@@ -11,11 +11,11 @@ export class WorksConfigImportApplierService {
 
     constructor(
         private readonly pluginOperationsService: PluginOperationsService,
-        private readonly directoryScheduleService: DirectoryScheduleService,
+        private readonly workScheduleService: WorkScheduleService,
     ) {}
 
     async applyPipelineSettings(
-        directoryId: string,
+        workId: string,
         userId: string,
         worksConfig?: ParsedWorksConfig | ResolvedWorksConfig | null,
     ): Promise<void> {
@@ -24,8 +24,8 @@ export class WorksConfigImportApplierService {
             return;
         }
 
-        await this.pluginOperationsService.enablePluginForDirectory(
-            directoryId,
+        await this.pluginOperationsService.enablePluginForWork(
+            workId,
             pipelineSettings.pluginId,
             userId,
             {
@@ -36,7 +36,7 @@ export class WorksConfigImportApplierService {
     }
 
     async applyInitialSchedule(
-        directoryId: string,
+        workId: string,
         user: User,
         worksConfig?: ParsedWorksConfig | ResolvedWorksConfig | null,
     ): Promise<void> {
@@ -45,8 +45,8 @@ export class WorksConfigImportApplierService {
         }
 
         try {
-            await this.directoryScheduleService.updateSchedule(
-                directoryId,
+            await this.workScheduleService.updateSchedule(
+                workId,
                 {
                     enable: true,
                     cadence: worksConfig.scheduleCadence,
@@ -60,7 +60,7 @@ export class WorksConfigImportApplierService {
             );
         } catch (error) {
             this.logger.warn(
-                `Failed to restore schedule from works.yaml for directory ${directoryId}: ${
+                `Failed to restore schedule from works.yml for work ${workId}: ${
                     error instanceof Error ? error.message : String(error)
                 }`,
             );
@@ -68,20 +68,20 @@ export class WorksConfigImportApplierService {
     }
 
     async applyScheduleOverrides(
-        directory: Directory,
+        work: Work,
         user: User,
         worksConfig?: ParsedWorksConfig | ResolvedWorksConfig | null,
     ): Promise<void> {
         if (
-            !directory.scheduledUpdatesEnabled ||
+            !work.scheduledUpdatesEnabled ||
             (!worksConfig?.scheduleCadence && !worksConfig?.providers)
         ) {
             return;
         }
 
         try {
-            await this.directoryScheduleService.updateSchedule(
-                directory.id,
+            await this.workScheduleService.updateSchedule(
+                work.id,
                 {
                     cadence: worksConfig?.scheduleCadence ?? undefined,
                     providerOverrides:
@@ -91,7 +91,7 @@ export class WorksConfigImportApplierService {
             );
         } catch (error) {
             this.logger.warn(
-                `Failed to restore schedule overrides from works.yaml for directory ${directory.id}: ${
+                `Failed to restore schedule overrides from works.yml for work ${work.id}: ${
                     error instanceof Error ? error.message : String(error)
                 }`,
             );

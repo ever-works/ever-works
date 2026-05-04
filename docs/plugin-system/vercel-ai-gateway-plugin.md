@@ -179,7 +179,7 @@ This ensures that only valid, typed values are forwarded to the underlying LangC
 3. Enable the Vercel AI Gateway plugin.
 4. Enter the API key in the plugin settings.
 5. Select models for each complexity tier using the `provider/model` format.
-6. Set this plugin as the active AI provider for your directory.
+6. Set this plugin as the active AI provider for your work.
 
 ## Troubleshooting
 

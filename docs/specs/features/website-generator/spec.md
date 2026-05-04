@@ -2,7 +2,7 @@
 
 ## Overview
 
-The Website Generator creates and manages the **website repository** for each directory - a Next.js application that displays the directory content. It duplicates or creates from a template repository, providing users with a deployable website.
+The Website Generator creates and manages the **website repository** for each work - a Next.js application that displays the work content. It duplicates or creates from a template repository, providing users with a deployable website.
 
 ## Architecture
 
@@ -26,7 +26,7 @@ The Website Generator creates and manages the **website repository** for each di
 ┌─────────────────────────────────────────────────────────────────┐
 │                  GitHub Website Repository                       │
 │                                                                  │
-│  {owner}/{directory-slug}-web/                                  │
+│  {owner}/{work-slug}-web/                                  │
 │  ├── src/                 # Next.js source code                 │
 │  ├── public/              # Static assets                       │
 │  ├── package.json         # Dependencies                        │
@@ -79,7 +79,7 @@ async duplicateRepository(): Promise<void> {
 
     // 2. Create empty repo in user's account
     await this.githubService.createRepository(targetRepoName, {
-        description: `Website for ${directory.name}`,
+        description: `Website for ${work.name}`,
         private: false,
     });
 
@@ -113,7 +113,7 @@ async createFromTemplate(): Promise<void> {
         templateRepo: TEMPLATE_CONFIG.repo,
         owner: targetOwner,
         name: targetRepoName,
-        description: `Website for ${directory.name}`,
+        description: `Website for ${work.name}`,
         private: false,
     });
 }
@@ -137,7 +137,7 @@ async createFromTemplate(): Promise<void> {
 
 export const WEBSITE_TEMPLATE_CONFIG = {
 	owner: 'ever-works', // Template owner
-	repo: 'website-template', // Template repository name
+	repo: 'directory-web-template', // Template repository name
 	branch: 'main' // Branch to use
 };
 ```
@@ -150,7 +150,7 @@ The template repository contains a pre-configured Next.js application:
 website-template/
 ├── src/
 │   ├── app/                    # Next.js App Router
-│   │   ├── page.tsx            # Homepage (directory listing)
+│   │   ├── page.tsx            # Homepage (work listing)
 │   │   ├── [category]/         # Category pages
 │   │   └── item/[slug]/        # Item detail pages
 │   ├── components/             # React components
@@ -163,7 +163,7 @@ website-template/
 ├── tailwind.config.js
 └── .env.example
     DATA_REPO_URL=              # Set to user's data repository
-    DIRECTORY_SLUG=             # Directory identifier
+    WORK_SLUG=             # Work identifier
 ```
 
 ## Website Update Service
@@ -174,7 +174,7 @@ For existing websites, the `WebsiteUpdateService` handles template updates:
 // /packages/agent/src/website-generator/website-update.service.ts
 
 class WebsiteUpdateService {
-	async updateFromTemplate(directory: Directory): Promise<UpdateResult> {
+	async updateFromTemplate(work: Work): Promise<UpdateResult> {
 		// 1. Fetch latest template
 		// 2. Merge with existing website repo
 		// 3. Preserve user customizations
@@ -185,7 +185,7 @@ class WebsiteUpdateService {
 
 ### Auto-Update Feature
 
-Directories can opt-in to automatic template updates:
+Works can opt-in to automatic template updates:
 
 ```typescript
 interface WebsiteAutoUpdateConfig {
@@ -222,7 +222,7 @@ enum WebsiteRepositoryCreationMethod {
 
 ```typescript
 class UpdateWebsiteRepositoryDto {
-	directoryId: string;
+	workId: string;
 	autoUpdate?: boolean;
 	useBetaVersion?: boolean;
 }
@@ -230,13 +230,13 @@ class UpdateWebsiteRepositoryDto {
 
 ## Repository Naming Convention
 
-| Repository Type     | Naming Pattern          |
-| ------------------- | ----------------------- |
-| Data Repository     | `{directory-slug}-data` |
-| Markdown Repository | `{directory-slug}`      |
-| Website Repository  | `{directory-slug}-web`  |
+| Repository Type     | Naming Pattern     |
+| ------------------- | ------------------ |
+| Data Repository     | `{work-slug}-data` |
+| Markdown Repository | `{work-slug}`      |
+| Website Repository  | `{work-slug}-web`  |
 
-**Example**: For directory `awesome-tools`:
+**Example**: For work `awesome-tools`:
 
 - Data: `awesome-tools-data`
 - Markdown: `awesome-tools`
@@ -269,14 +269,14 @@ class UpdateWebsiteRepositoryDto {
 | Option                               | Source                    | Description                        |
 | ------------------------------------ | ------------------------- | ---------------------------------- |
 | `website_repository_creation_method` | `CreateItemsGeneratorDto` | DUPLICATE or CREATE_USING_TEMPLATE |
-| `autoUpdate`                         | Directory settings        | Enable auto-updates                |
-| `useBetaVersion`                     | Directory settings        | Use beta template branch           |
+| `autoUpdate`                         | Work settings             | Enable auto-updates                |
+| `useBetaVersion`                     | Work settings             | Use beta template branch           |
 
 ## Integration Points
 
 ### Input
 
-- Directory metadata (name, slug, description)
+- Work metadata (name, slug, description)
 - Creation method preference
 - Owner/organization info
 
@@ -289,7 +289,7 @@ class UpdateWebsiteRepositoryDto {
 
 - `GitService`: Git operations
 - `GithubService`: GitHub API operations
-- Template repository: `ever-works/website-template`
+- Default template repository: [`ever-works/directory-web-template`](https://github.com/ever-works/directory-web-template) (also see [Website Templates](../../../features/website-templates.md) for the full template catalogue)
 
 ## Deployment Integration
 

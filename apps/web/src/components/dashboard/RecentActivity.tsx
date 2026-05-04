@@ -5,7 +5,7 @@ import { cn } from '@/lib/utils/cn';
 
 interface Activity {
     id: string;
-    type: 'directory_created' | 'item_added' | 'website_deployed' | 'api_key_created';
+    type: 'work_created' | 'item_added' | 'website_deployed' | 'api_key_created';
     title: string;
     description: string;
     timestamp: Date;
@@ -14,9 +14,9 @@ interface Activity {
 const activities: Activity[] = [
     {
         id: '1',
-        type: 'directory_created',
-        title: 'New Directory Created',
-        description: 'Created "Awesome AI Tools" directory',
+        type: 'work_created',
+        title: 'New Work Created',
+        description: 'Created "Awesome AI Tools" Work',
         timestamp: new Date(Date.now() - 1000 * 60 * 30),
     },
     {
@@ -37,7 +37,7 @@ const activities: Activity[] = [
 
 const getActivityIcon = (type: Activity['type']) => {
     switch (type) {
-        case 'directory_created':
+        case 'work_created':
             return <FolderPlusIcon className="w-5 h-5 text-primary" />;
         case 'item_added':
             return <PlusCircleIcon className="w-5 h-5 text-success" />;

@@ -24,7 +24,7 @@ src/app/[locale]/
     layout.tsx                    # Dashboard layout (auth check + sidebar/header shell)
     layout-client.tsx             # Client layout (sidebar, header, footer, help drawer)
     page.tsx                      # Dashboard home
-    directories/...               # Directory management pages
+    works/...               # Work management pages
     plugins/...                   # Plugin management pages
     settings/...                  # User settings pages
     notifications/page.tsx        # Notifications page
@@ -73,7 +73,7 @@ Creates locale-aware navigation utilities from `next-intl/navigation`:
 export const { Link, redirect, usePathname, useRouter, getPathname } = createNavigation(routing);
 ```
 
-All internal navigation uses these exports instead of the raw `next/link` or `next/navigation` equivalents. This ensures links and redirects automatically include the current locale prefix (e.g., `/en/directories` or `/fr/directories`).
+All internal navigation uses these exports instead of the raw `next/link` or `next/navigation` equivalents. This ensures links and redirects automatically include the current locale prefix (e.g., `/en/works` or `/fr/works`).
 
 ### Message Loading
 
@@ -154,18 +154,18 @@ All routes are centralized in the `ROUTES` constant object.
 
 **Dashboard Routes**:
 
-| Constant                            | Path                          |
-| ----------------------------------- | ----------------------------- |
-| `DASHBOARD`                         | `/`                           |
-| `DASHBOARD_DIRECTORIES`             | `/directories`                |
-| `DASHBOARD_DIRECTORIES_NEW`         | `/directories/new`            |
-| `DASHBOARD_DIRECTORY(id)`           | `/directories/{id}`           |
-| `DASHBOARD_DIRECTORY_ITEMS(id)`     | `/directories/{id}/items`     |
-| `DASHBOARD_DIRECTORY_GENERATOR(id)` | `/directories/{id}/generator` |
-| `DASHBOARD_DIRECTORY_SETTINGS(id)`  | `/directories/{id}/settings`  |
-| `DASHBOARD_PLUGINS`                 | `/plugins`                    |
-| `DASHBOARD_PLUGIN_DETAIL(pluginId)` | `/plugins/{pluginId}`         |
-| `DASHBOARD_SETTINGS`                | `/settings`                   |
+| Constant                            | Path                    |
+| ----------------------------------- | ----------------------- |
+| `DASHBOARD`                         | `/`                     |
+| `DASHBOARD_WORKS`                   | `/works`                |
+| `DASHBOARD_WORKS_NEW`               | `/works/new`            |
+| `DASHBOARD_WORK(id)`                | `/works/{id}`           |
+| `DASHBOARD_WORK_ITEMS(id)`          | `/works/{id}/items`     |
+| `DASHBOARD_WORK_GENERATOR(id)`      | `/works/{id}/generator` |
+| `DASHBOARD_WORK_SETTINGS(id)`       | `/works/{id}/settings`  |
+| `DASHBOARD_PLUGINS`                 | `/plugins`              |
+| `DASHBOARD_PLUGIN_DETAIL(pluginId)` | `/plugins/{pluginId}`   |
+| `DASHBOARD_SETTINGS`                | `/settings`             |
 
 **Auth Routes**:
 
@@ -208,11 +208,11 @@ The client-side dashboard shell that wraps all protected pages.
 
 **Keyboard Shortcuts**: Registered via `useKeyboardShortcuts` hook:
 
-| Shortcut       | Action                                      |
-| -------------- | ------------------------------------------- |
-| `Ctrl/Cmd + K` | Navigate to directories with search focused |
-| `C`            | Navigate to new directory page              |
-| `?`            | Open help drawer                            |
+| Shortcut       | Action                                |
+| -------------- | ------------------------------------- |
+| `Ctrl/Cmd + K` | Navigate to works with search focused |
+| `C`            | Navigate to new work page             |
+| `?`            | Open help drawer                      |
 
 ## Dashboard Sidebar
 
@@ -222,16 +222,16 @@ The sidebar provides the primary navigation and houses the AI chat interface.
 
 **Navigation Items**:
 
-| Icon       | Label       | Route          |
-| ---------- | ----------- | -------------- |
-| `Home`     | Dashboard   | `/`            |
-| `Folder`   | Directories | `/directories` |
-| `Plug`     | Plugins     | `/plugins`     |
-| `Settings` | Settings    | `/settings`    |
+| Icon       | Label     | Route       |
+| ---------- | --------- | ----------- |
+| `Home`     | Dashboard | `/`         |
+| `Folder`   | Works     | `/works`    |
+| `Plug`     | Plugins   | `/plugins`  |
+| `Settings` | Settings  | `/settings` |
 
 **Modes**: The sidebar supports two modes toggled by buttons at the bottom:
 
-- **Menu mode**: Shows navigation links and directory list
+- **Menu mode**: Shows navigation links and work list
 - **Chat mode**: Shows the AI chat interface (`ChatProvider` + `ChatInterface`)
 
 **Resizable**: The sidebar is draggable between `SIDEBAR_WIDTH_MIN` (320px) and `SIDEBAR_WIDTH_MAX` (440px). A drag handle on the right edge enables mouse-based resizing.
@@ -259,14 +259,14 @@ The top navigation bar provides quick-access controls.
 
 Six server action redirect helpers that use locale-aware navigation:
 
-| Function                  | Redirects To       |
-| ------------------------- | ------------------ |
-| `redirectToDirectories`   | `/directories`     |
-| `redirectToNewDirectory`  | `/directories/new` |
-| `redirectToDashboard`     | `/`                |
-| `redirectToSettings`      | `/settings`        |
-| `redirectToAnalytics`     | `/analytics`       |
-| `redirectToNotifications` | `/notifications`   |
+| Function                  | Redirects To     |
+| ------------------------- | ---------------- |
+| `redirectToWorks`         | `/works`         |
+| `redirectToNewWork`       | `/works/new`     |
+| `redirectToDashboard`     | `/`              |
+| `redirectToSettings`      | `/settings`      |
+| `redirectToAnalytics`     | `/analytics`     |
+| `redirectToNotifications` | `/notifications` |
 
 Each function calls `getLocale()` to determine the current locale and uses `redirect({ locale, href })` from `@/i18n/navigation`.
 

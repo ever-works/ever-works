@@ -3,12 +3,12 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import {
     PluginEntity,
     UserPluginEntity,
-    DirectoryPluginEntity,
+    WorkPluginEntity,
     PluginOperationsService,
     SettingsSchemaValidatorService,
 } from '@ever-works/agent/plugins';
 import { FacadesModule } from '@ever-works/agent/facades';
-import { DirectoryModule } from '@ever-works/agent/services';
+import { WorkModule } from '@ever-works/agent/services';
 import { AuthModule } from '../auth';
 import { ActivityLogModule } from '@ever-works/agent/activity-log';
 
@@ -22,9 +22,9 @@ import { PluginValidationService } from './plugin-validation.service';
  */
 @Module({
     imports: [
-        TypeOrmModule.forFeature([PluginEntity, UserPluginEntity, DirectoryPluginEntity]),
+        TypeOrmModule.forFeature([PluginEntity, UserPluginEntity, WorkPluginEntity]),
         FacadesModule,
-        DirectoryModule,
+        WorkModule,
         AuthModule,
         ActivityLogModule,
     ],

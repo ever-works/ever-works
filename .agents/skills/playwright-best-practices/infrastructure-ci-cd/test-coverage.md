@@ -309,7 +309,7 @@ test.afterAll(async () => {
 });
 ```
 
-### Per-Directory Thresholds
+### Per-Work Thresholds
 
 ```typescript
 // coverage-check.ts

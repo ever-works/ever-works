@@ -7,7 +7,7 @@ sidebar_position: 9
 
 # Search Provider Plugins
 
-Search plugins enable the platform to discover items during directory generation. They implement the `ISearchPlugin` interface and provide a unified way to query multiple search engines with consistent parameters and result formatting.
+Search plugins enable the platform to discover items during work generation. They implement the `ISearchPlugin` interface and provide a unified way to query multiple search engines with consistent parameters and result formatting.
 
 ## ISearchPlugin Interface
 
@@ -199,14 +199,14 @@ Brave Search is a privacy-focused search engine with its own independent index (
 
 ## How Search Plugins Are Used
 
-During directory generation, the active search plugin is invoked by the pipeline's Web Search step:
+During work generation, the active search plugin is invoked by the pipeline's Web Search step:
 
-1. The **Search Query Generation** step produces optimized queries based on the directory prompt
+1. The **Search Query Generation** step produces optimized queries based on the work prompt
 2. The **Web Search** step calls `search()` on the active search plugin for each query
 3. Results are passed to the **Content Retrieval** step for full-page extraction
-4. The **Item Extraction** step processes the extracted content into directory items
+4. The **Item Extraction** step processes the extracted content into work items
 
-The search plugin is selected per-directory in the generator form. If no search plugin is explicitly selected, the platform uses the default provider (determined by `defaultForCapabilities` in the manifest or the first configured provider).
+The search plugin is selected per-work in the generator form. If no search plugin is explicitly selected, the platform uses the default provider (determined by `defaultForCapabilities` in the manifest or the first configured provider).
 
 ## Rate Limiting
 

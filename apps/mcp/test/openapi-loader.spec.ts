@@ -17,10 +17,10 @@ describe('OpenApiLoaderService', () => {
 		openapi: '3.0.0',
 		info: { title: 'Test', version: '1.0' },
 		paths: {
-			'/api/directories': {
+			'/api/works': {
 				get: {
-					operationId: 'DirectoriesController_findAll',
-					summary: 'List directories',
+					operationId: 'WorksController_findAll',
+					summary: 'List works',
 					parameters: [
 						{
 							name: 'limit',
@@ -32,8 +32,8 @@ describe('OpenApiLoaderService', () => {
 					]
 				},
 				post: {
-					operationId: 'DirectoriesController_create',
-					summary: 'Create directory',
+					operationId: 'WorksController_create',
+					summary: 'Create work',
 					requestBody: {
 						content: {
 							'application/json': {
@@ -50,11 +50,11 @@ describe('OpenApiLoaderService', () => {
 					}
 				}
 			},
-			'/api/directories/{id}': {
+			'/api/works/{id}': {
 				parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
 				get: {
-					operationId: 'DirectoriesController_findOne',
-					summary: 'Get directory'
+					operationId: 'WorksController_findOne',
+					summary: 'Get work'
 				}
 			}
 		}
@@ -97,9 +97,9 @@ describe('OpenApiLoaderService', () => {
 		await service.onModuleInit();
 		const ops = service.getOperations();
 
-		const getAll = ops.find((op) => op.method === 'GET' && op.path === '/api/directories');
+		const getAll = ops.find((op) => op.method === 'GET' && op.path === '/api/works');
 		expect(getAll).toBeDefined();
-		expect(getAll!.summary).toBe('List directories');
+		expect(getAll!.summary).toBe('List works');
 		expect(getAll!.queryParams).toHaveLength(1);
 		expect(getAll!.queryParams[0].name).toBe('limit');
 	});
@@ -109,7 +109,7 @@ describe('OpenApiLoaderService', () => {
 		await service.onModuleInit();
 		const ops = service.getOperations();
 
-		const getOne = ops.find((op) => op.method === 'GET' && op.path === '/api/directories/{id}');
+		const getOne = ops.find((op) => op.method === 'GET' && op.path === '/api/works/{id}');
 		expect(getOne).toBeDefined();
 		expect(getOne!.pathParams).toHaveLength(1);
 		expect(getOne!.pathParams[0].name).toBe('id');
@@ -121,7 +121,7 @@ describe('OpenApiLoaderService', () => {
 		await service.onModuleInit();
 		const ops = service.getOperations();
 
-		const create = ops.find((op) => op.method === 'POST' && op.path === '/api/directories');
+		const create = ops.find((op) => op.method === 'POST' && op.path === '/api/works');
 		expect(create).toBeDefined();
 		expect(create!.requestBody).toBeDefined();
 		expect(create!.requestBody!.properties).toHaveProperty('name');

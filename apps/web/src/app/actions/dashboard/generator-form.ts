@@ -4,11 +4,11 @@ import { itemsGeneratorAPI, GeneratorFormSchema } from '@/lib/api';
 import { getTranslations } from 'next-intl/server';
 
 /**
- * Fetch the generator form schema for a directory.
+ * Fetch the generator form schema for a work.
  * The schema includes provider options and dynamic plugin fields.
  */
 export async function getFormSchema(
-    directoryId: string,
+    workId: string,
     pipelineId?: string,
 ): Promise<{
     success: boolean;
@@ -18,7 +18,7 @@ export async function getFormSchema(
     const t = await getTranslations('actions.generator');
 
     try {
-        const schema = await itemsGeneratorAPI.getFormSchema(directoryId, pipelineId);
+        const schema = await itemsGeneratorAPI.getFormSchema(workId, pipelineId);
 
         return {
             success: true,
@@ -34,7 +34,7 @@ export async function getFormSchema(
 }
 
 /**
- * Fetch the global generator form schema (no directory context).
+ * Fetch the global generator form schema (no work context).
  * Used by the "Create with AI" flow to show provider/pipeline selection.
  */
 export async function getGlobalFormSchema(pipelineId?: string): Promise<{

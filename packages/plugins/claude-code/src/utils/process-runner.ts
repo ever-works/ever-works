@@ -8,7 +8,7 @@ export interface ExecuteOptions {
 	readonly prompt: string;
 	/** System prompt (passed as --append-system-prompt) */
 	readonly systemPrompt: string;
-	/** Working directory (workspace path) */
+	/** Working work (workspace path) */
 	readonly cwd: string;
 	/** Environment variables to set */
 	readonly env: Record<string, string>;

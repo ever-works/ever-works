@@ -14,9 +14,9 @@ The Ever Works API uses the NestJS `EventEmitterModule` for internal event-drive
 ```
 Event Producers (Services)
   ├── AuthService                  -- User lifecycle events
-  ├── DirectoryOperationsService   -- Directory generation events
-  ├── DirectoryImportService       -- Import completion events
-  ├── DirectoryGenerationService   -- Generation completion events
+  ├── WorkOperationsService   -- Work generation events
+  ├── WorkImportService       -- Import completion events
+  ├── WorkGenerationService   -- Generation completion events
   ├── PluginRegistryService        -- Plugin lifecycle events
   ├── PluginLifecycleManager       -- Plugin load/unload events
   └── PluginSettingsService        -- Plugin settings change events
@@ -25,7 +25,7 @@ EventEmitterModule (in-process event bus)
 
 Event Consumers (Listeners)
   ├── MailService                  -- Sends transactional emails
-  ├── DirectoryCleanupService      -- Clears cache on generation complete
+  ├── WorkCleanupService      -- Clears cache on generation complete
   └── NotificationService          -- Creates persistent notifications
 
 Notification Delivery
@@ -76,24 +76,24 @@ export abstract class BaseEvent {
 
 All user events extend `BaseUserEvent` and are defined in `apps/api/src/events/index.ts`. They are emitted by `AuthService` and consumed by `MailService`.
 
-| Event Class                | Event Name                 | Trigger                            | Consumer                          |
-| -------------------------- | -------------------------- | ---------------------------------- | --------------------------------- |
-| `UserCreatedEvent`         | `user.created`             | User registration                  | Sends signup confirmation email   |
-| `UserConfirmedEvent`       | `user.confirmed`           | Email verification or OAuth signup | Sends welcome email               |
-| `UserForgotPasswordEvent`  | `user.forgot_password`     | Password reset request             | Sends forgot-password email       |
-| `UserPasswordChangedEvent` | `user.password_changed`    | Password change                    | Sends password-changed alert      |
-| `UserNewDeviceLoginEvent`  | `user.new_device_login`    | Login from unrecognized device     | Sends new-device alert            |
-| `UserAccountDeletionEvent` | `user.delete_account`      | Account deletion request           | Sends deletion confirmation email |
-| `MemberInvitedEvent`       | `directory.member_invited` | User invited to a directory        | Sends invitation email            |
+| Event Class                | Event Name              | Trigger                            | Consumer                          |
+| -------------------------- | ----------------------- | ---------------------------------- | --------------------------------- |
+| `UserCreatedEvent`         | `user.created`          | User registration                  | Sends signup confirmation email   |
+| `UserConfirmedEvent`       | `user.confirmed`        | Email verification or OAuth signup | Sends welcome email               |
+| `UserForgotPasswordEvent`  | `user.forgot_password`  | Password reset request             | Sends forgot-password email       |
+| `UserPasswordChangedEvent` | `user.password_changed` | Password change                    | Sends password-changed alert      |
+| `UserNewDeviceLoginEvent`  | `user.new_device_login` | Login from unrecognized device     | Sends new-device alert            |
+| `UserAccountDeletionEvent` | `user.delete_account`   | Account deletion request           | Sends deletion confirmation email |
+| `MemberInvitedEvent`       | `work.member_invited`   | User invited to a work             | Sends invitation email            |
 
-### Directory Events
+### Work Events
 
-Directory events extend `BaseEvent` and are defined in `packages/agent/src/events/`.
+Work events extend `BaseEvent` and are defined in `packages/agent/src/events/`.
 
-| Event Class                         | Event Name                       | Trigger                | Consumer            |
-| ----------------------------------- | -------------------------------- | ---------------------- | ------------------- |
-| `DirectoryCreatedEvent`             | `directory.created`              | New directory created  | Internal processing |
-| `DirectoryGenerationCompletedEvent` | `directory.generation.completed` | AI generation finishes | Cache cleanup       |
+| Event Class                    | Event Name                  | Trigger                | Consumer            |
+| ------------------------------ | --------------------------- | ---------------------- | ------------------- |
+| `WorkCreatedEvent`             | `work.created`              | New work created       | Internal processing |
+| `WorkGenerationCompletedEvent` | `work.generation.completed` | AI generation finishes | Cache cleanup       |
 
 ### Plugin Lifecycle Events
 
@@ -134,7 +134,7 @@ this.eventEmitter.emit(UserCreatedEvent.EVENT_NAME, new UserCreatedEvent(user, v
 // Email verification
 this.eventEmitter.emit(
 	UserConfirmedEvent.EVENT_NAME,
-	new UserConfirmedEvent(updatedUser, `${this.webAppUrl}/directories/new`)
+	new UserConfirmedEvent(updatedUser, `${this.webAppUrl}/works/new`)
 );
 
 // Password reset request
@@ -146,13 +146,13 @@ this.eventEmitter.emit(
 
 OAuth sign-ups (GitHub, Google) also emit `UserConfirmedEvent` after creating a new user, bypassing the email verification step.
 
-### DirectoryOperationsService
+### WorkOperationsService
 
-Emits `DirectoryGenerationCompletedEvent` when AI content generation finishes for a directory. This triggers cache invalidation in `DirectoryCleanupService`.
+Emits `WorkGenerationCompletedEvent` when AI content generation finishes for a work. This triggers cache invalidation in `WorkCleanupService`.
 
-### DirectoryImportService
+### WorkImportService
 
-Emits `DirectoryGenerationCompletedEvent` after importing directory content from external sources. Also emits `DirectoryCreatedEvent` when a new directory is created during import.
+Emits `WorkGenerationCompletedEvent` after importing work content from external sources. Also emits `WorkCreatedEvent` when a new work is created during import.
 
 ## Event Consumers
 
@@ -187,18 +187,18 @@ async sendMemberInvitation(data: MemberInvitedEvent): Promise<void> { ... }
 
 Each handler wraps the email send in a try-catch and logs failures without throwing, ensuring a failed email does not disrupt the originating operation.
 
-### DirectoryCleanupService (Cache Invalidation)
+### WorkCleanupService (Cache Invalidation)
 
-**Source:** `apps/api/src/directories/tasks/directory-cleanup.service.ts`
+**Source:** `apps/api/src/works/tasks/work-cleanup.service.ts`
 
 Listens for generation completion to clear cached data:
 
 ```typescript
-@OnEvent(DirectoryGenerationCompletedEvent.EVENT_NAME)
-clearDirectoryCache(data: DirectoryGenerationCompletedEvent) {
+@OnEvent(WorkGenerationCompletedEvent.EVENT_NAME)
+clearWorkCache(data: WorkGenerationCompletedEvent) {
     this.cacheRepository.typeormAdapter
-        .deleteUnscopedEntriesLike(data.directory.id)
-        .then(() => this.logger.log(`Cache cleared for directory ${data.directory.id}`))
+        .deleteUnscopedEntriesLike(data.work.id)
+        .then(() => this.logger.log(`Cache cleared for work ${data.work.id}`))
         .catch((err) => this.logger.error('Failed to clear cache:', err));
 }
 ```
@@ -249,7 +249,7 @@ export class Notification {
 | -------------- | --------------------------------------- |
 | `ai_credits`   | AI credit depletion and provider errors |
 | `subscription` | Subscription-related notifications      |
-| `generation`   | Directory generation status             |
+| `generation`   | Work generation status                  |
 | `system`       | System-level messages                   |
 | `security`     | Security alerts (auth expiration)       |
 
@@ -273,13 +273,13 @@ Provides CRUD operations with deduplication and lifecycle management:
 
 **Convenience methods** for common notification scenarios:
 
-| Method                                                             | Category     | Persistent |
-| ------------------------------------------------------------------ | ------------ | ---------- |
-| `notifyAiCreditsDepleted(userId, provider)`                        | `ai_credits` | Yes        |
-| `notifyAiProviderError(userId, provider, message)`                 | `ai_credits` | No         |
-| `notifyGenerationAccountError(userId, directoryId, name, message)` | `generation` | No         |
-| `notifySchedulePaused(userId, directoryId, name, reason)`          | `generation` | No         |
-| `notifyGitAuthExpired(userId, provider)`                           | `security`   | Yes        |
+| Method                                                        | Category     | Persistent |
+| ------------------------------------------------------------- | ------------ | ---------- |
+| `notifyAiCreditsDepleted(userId, provider)`                   | `ai_credits` | Yes        |
+| `notifyAiProviderError(userId, provider, message)`            | `ai_credits` | No         |
+| `notifyGenerationAccountError(userId, workId, name, message)` | `generation` | No         |
+| `notifySchedulePaused(userId, workId, name, reason)`          | `generation` | No         |
+| `notifyGitAuthExpired(userId, provider)`                      | `security`   | Yes        |
 
 ### Deduplication
 
@@ -337,17 +337,17 @@ AuthService.verifyEmail()
   --> Sends "welcome" email with dashboard link
 ```
 
-### Directory Generation Flow
+### Work Generation Flow
 
 ```
-DirectoryGenerationService.generate()
+WorkGenerationService.generate()
   --> AI content generation completes
-  --> emit(DirectoryGenerationCompletedEvent)
-  --> DirectoryCleanupService.clearDirectoryCache()
-  --> Clears all cache entries for the directory
+  --> emit(WorkGenerationCompletedEvent)
+  --> WorkCleanupService.clearWorkCache()
+  --> Clears all cache entries for the work
 
-DirectoryCleanupService.handleStalledGenerations() [every 10 min]
-  --> Finds directories stuck in GENERATING for too long
+WorkCleanupService.handleStalledGenerations() [every 10 min]
+  --> Finds works stuck in GENERATING for too long
   --> Marks them as ERROR status
 ```
 
@@ -362,18 +362,18 @@ PluginSettingsService.upsertSettings()
 
 ## Source Files
 
-| File                                                                | Purpose                          |
-| ------------------------------------------------------------------- | -------------------------------- |
-| `apps/api/src/events/index.ts`                                      | User lifecycle event definitions |
-| `apps/api/src/mail/mail.service.ts`                                 | Email event consumers            |
-| `apps/api/src/directories/tasks/directory-cleanup.service.ts`       | Generation event consumer        |
-| `apps/api/src/notifications/notifications.controller.ts`            | Notification REST API            |
-| `apps/api/src/auth/services/auth.service.ts`                        | User event emitter               |
-| `apps/api/src/api.module.ts`                                        | EventEmitterModule registration  |
-| `packages/agent/src/events/base.ts`                                 | Base event class                 |
-| `packages/agent/src/events/directory-generation-completed.event.ts` | Generation completed event       |
-| `packages/agent/src/events/directory-created.event.ts`              | Directory created event          |
-| `packages/agent/src/plugins/plugins.constants.ts`                   | Plugin event constants           |
-| `packages/agent/src/notifications/notification.service.ts`          | Notification business logic      |
-| `packages/agent/src/entities/notification.entity.ts`                | Notification database entity     |
-| `packages/agent/src/entities/notification.types.ts`                 | Notification types and enums     |
+| File                                                           | Purpose                          |
+| -------------------------------------------------------------- | -------------------------------- |
+| `apps/api/src/events/index.ts`                                 | User lifecycle event definitions |
+| `apps/api/src/mail/mail.service.ts`                            | Email event consumers            |
+| `apps/api/src/works/tasks/work-cleanup.service.ts`             | Generation event consumer        |
+| `apps/api/src/notifications/notifications.controller.ts`       | Notification REST API            |
+| `apps/api/src/auth/services/auth.service.ts`                   | User event emitter               |
+| `apps/api/src/api.module.ts`                                   | EventEmitterModule registration  |
+| `packages/agent/src/events/base.ts`                            | Base event class                 |
+| `packages/agent/src/events/work-generation-completed.event.ts` | Generation completed event       |
+| `packages/agent/src/events/work-created.event.ts`              | Work created event               |
+| `packages/agent/src/plugins/plugins.constants.ts`              | Plugin event constants           |
+| `packages/agent/src/notifications/notification.service.ts`     | Notification business logic      |
+| `packages/agent/src/entities/notification.entity.ts`           | Notification database entity     |
+| `packages/agent/src/entities/notification.types.ts`            | Notification types and enums     |

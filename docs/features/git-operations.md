@@ -7,7 +7,7 @@ sidebar_position: 9
 
 # Git Operations
 
-The Ever Works platform uses Git as its primary storage layer for directory data, markdown content, and generated websites. All Git operations are abstracted behind the `GitFacadeService`, which delegates to provider-specific plugins (currently GitHub via Octokit and isomorphic-git).
+The Ever Works platform uses Git as its primary storage layer for work data, markdown content, and generated websites. All Git operations are abstracted behind the `GitFacadeService`, which delegates to provider-specific plugins (currently GitHub via Octokit and isomorphic-git).
 
 ## Architecture
 
@@ -35,15 +35,15 @@ GitFacadeService
 
 ### Repository Management
 
-| Method                                             | Description                  |
-| -------------------------------------------------- | ---------------------------- |
-| `getRepository(owner, repo, options)`              | Get repository metadata      |
-| `repositoryExists(owner, repo, options)`           | Check if a repository exists |
-| `createRepository(owner, repo, options)`           | Create a new repository      |
-| `hasRepositoryAccess(owner, repo, options)`        | Verify write access          |
-| `getDirectoryContents(owner, repo, path, options)` | List files in a directory    |
-| `getFileContent(owner, repo, path, options)`       | Read a file's content        |
-| `getReadme(owner, repo, options)`                  | Fetch the README file        |
+| Method                                        | Description                  |
+| --------------------------------------------- | ---------------------------- |
+| `getRepository(owner, repo, options)`         | Get repository metadata      |
+| `repositoryExists(owner, repo, options)`      | Check if a repository exists |
+| `createRepository(owner, repo, options)`      | Create a new repository      |
+| `hasRepositoryAccess(owner, repo, options)`   | Verify write access          |
+| `getWorkContents(owner, repo, path, options)` | List files in a work         |
+| `getFileContent(owner, repo, path, options)`  | Read a file's content        |
+| `getReadme(owner, repo, options)`             | Fetch the README file        |
 
 ### Local Git Operations
 
@@ -90,7 +90,7 @@ The facade resolves Git credentials automatically from the user's OAuth tokens:
 interface GitFacadeOptions {
 	readonly userId: string;
 	readonly providerId: string;
-	readonly directoryId?: string;
+	readonly workId?: string;
 	readonly token?: string; // Optional explicit token
 }
 ```
@@ -110,7 +110,7 @@ The facade defines a typed error hierarchy for clear error handling:
 
 The `cloneOrPull()` method implements an efficient local caching strategy:
 
-1. **First call**: Clone the repository to a local directory (managed per user/repo).
+1. **First call**: Clone the repository to a local work (managed per user/repo).
 2. **Subsequent calls**: Pull latest changes instead of re-cloning.
 3. **Branch handling**: Optionally auto-switch to the main branch.
 
@@ -120,7 +120,7 @@ The committer information is embedded in clone options:
 await gitFacade.cloneOrPull(
 	{
 		owner: 'ever-works',
-		repo: 'my-directory-data',
+		repo: 'my-work-data',
 		committer: user.asCommitter() // { name, email }
 	},
 	{ userId: user.id, providerId: 'github' }
@@ -129,7 +129,7 @@ await gitFacade.cloneOrPull(
 
 ## Repository Ecosystem
 
-Each directory typically operates with three repositories following a naming convention:
+Each work typically operates with three repositories following a naming convention:
 
 | Repository    | Naming           | Content                              |
 | ------------- | ---------------- | ------------------------------------ |

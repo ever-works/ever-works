@@ -13,8 +13,8 @@ export interface OpenCodeSessionConfig {
 	readonly model: string;
 }
 
-function getSessionRoot(userId: string, directoryId: string): string {
-	return path.join(BASE_TEMP_DIR, userId, 'opencode', directoryId);
+function getSessionRoot(userId: string, workId: string): string {
+	return path.join(BASE_TEMP_DIR, userId, 'opencode', workId);
 }
 
 function buildConfig(providerConfig: AiProviderConfig, model: string) {
@@ -62,12 +62,12 @@ function buildQualifiedModel(model: string): string {
 
 export async function prepareOpenCodeSessionConfig(options: {
 	userId: string;
-	directoryId: string;
+	workId: string;
 	providerConfig: AiProviderConfig;
 	model: string;
 }): Promise<OpenCodeSessionConfig> {
-	const { userId, directoryId, providerConfig, model } = options;
-	const sessionRoot = getSessionRoot(userId, directoryId);
+	const { userId, workId, providerConfig, model } = options;
+	const sessionRoot = getSessionRoot(userId, workId);
 	await fs.mkdir(sessionRoot, { recursive: true });
 	const sessionDir = path.join(sessionRoot, `run-${randomUUID()}`);
 	const configDir = path.join(sessionDir, 'config');

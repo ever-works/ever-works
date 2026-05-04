@@ -50,24 +50,24 @@ export class ContentFilteringStep extends BasePipelineStep {
 		context: MutableGenerationContext,
 		execContext: StepExecutionContext
 	): Promise<MutableGenerationContext> {
-		const { request, directory, webPages, metrics, advancedPrompts } = context;
+		const { request, work, webPages, metrics, advancedPrompts } = context;
 		const { logger, aiFacade, promptFacade } = execContext;
 		const config = request.config || {};
 
 		const facadeOptions: FacadeOptions = {
 			userId: execContext.user!.id,
-			directoryId: execContext.directory.id
+			workId: execContext.work.id
 		};
 
 		const contentFilteringEnabled = config.content_filtering_enabled !== false;
 
 		if (contentFilteringEnabled) {
-			logger.log(`[${directory.slug}] Content Filtering - Starting`);
+			logger.log(`[${work.slug}] Content Filtering - Starting`);
 
 			const filteredWebPages = await this.filterAndAssessPages(
-				directory.slug,
+				work.slug,
 				webPages,
-				request.name || directory.name,
+				request.name || work.name,
 				request.prompt || '',
 				config,
 				metrics,
@@ -78,7 +78,7 @@ export class ContentFilteringStep extends BasePipelineStep {
 				promptFacade
 			);
 
-			logger.log(`[${directory.slug}] Filtered down to ${filteredWebPages.length} relevant pages.`);
+			logger.log(`[${work.slug}] Filtered down to ${filteredWebPages.length} relevant pages.`);
 
 			if (filteredWebPages.length === 0 && webPages.length > 0) {
 				this.addWarning(
@@ -89,14 +89,14 @@ export class ContentFilteringStep extends BasePipelineStep {
 
 			context.webPages = filteredWebPages;
 		} else {
-			logger.debug(`[${directory.slug}] Content Filtering - Skipped`);
+			logger.debug(`[${work.slug}] Content Filtering - Skipped`);
 		}
 
 		return context;
 	}
 
 	private async filterAndAssessPages(
-		directorySlug: string,
+		workSlug: string,
 		webPages: WebPageData[],
 		topicName: string,
 		topicDescription: string,
@@ -108,7 +108,7 @@ export class ContentFilteringStep extends BasePipelineStep {
 		facadeOptions: FacadeOptions,
 		promptFacade?: StepExecutionContext['promptFacade']
 	): Promise<WebPageData[]> {
-		logger.log(`[${directorySlug}] Starting content filtering for ${webPages.length} pages`);
+		logger.log(`[${workSlug}] Starting content filtering for ${webPages.length} pages`);
 
 		const minContentLength = (config.min_content_length_for_extraction as number) || 100;
 		const relevanceThreshold = (config.relevance_threshold_content as number) || 0.5;
@@ -126,7 +126,7 @@ export class ContentFilteringStep extends BasePipelineStep {
 			return filteredPages;
 		}
 
-		logger.log(`[${directorySlug}] ${filteredPages.length} pages passed initial length filter`);
+		logger.log(`[${workSlug}] ${filteredPages.length} pages passed initial length filter`);
 
 		if (filteredPages.length === 0) {
 			return [];
@@ -190,11 +190,11 @@ export class ContentFilteringStep extends BasePipelineStep {
 				};
 			} catch (error) {
 				logger.error(
-					`[${directorySlug}] Error assessing relevance for ${page.source_url}: ${this.formatError(error)}`,
+					`[${workSlug}] Error assessing relevance for ${page.source_url}: ${this.formatError(error)}`,
 					getErrorStack(error)
 				);
 				logger.warn(
-					`[${directorySlug}] Keeping page due to relevance assessment error (will rely on later extraction quality): ${page.source_url}`
+					`[${workSlug}] Keeping page due to relevance assessment error (will rely on later extraction quality): ${page.source_url}`
 				);
 				return { page, isRelevant: true, error };
 			}
@@ -202,7 +202,7 @@ export class ContentFilteringStep extends BasePipelineStep {
 
 		const relevantPages: WebPageData[] = [];
 
-		logger.log(`[${directorySlug}] Processing relevance assessment in batches of ${this.BATCH_SIZE}`);
+		logger.log(`[${workSlug}] Processing relevance assessment in batches of ${this.BATCH_SIZE}`);
 
 		for (let i = 0; i < filteredPages.length; i += this.BATCH_SIZE) {
 			const batch = filteredPages.slice(i, i + this.BATCH_SIZE);
@@ -221,7 +221,7 @@ export class ContentFilteringStep extends BasePipelineStep {
 		}
 
 		logger.log(
-			`[${directorySlug}] Content filtering complete. ${relevantPages.length} relevant pages found out of ${webPages.length} total pages.`
+			`[${workSlug}] Content filtering complete. ${relevantPages.length} relevant pages found out of ${webPages.length} total pages.`
 		);
 		return relevantPages;
 	}

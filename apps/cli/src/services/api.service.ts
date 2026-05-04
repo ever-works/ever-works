@@ -1,4 +1,4 @@
-import { Directory } from '@ever-works/cli-shared';
+import { Work } from '@ever-works/cli-shared';
 import { getHttpClient } from './http-client';
 import type {
     CreateItemsGeneratorDto,
@@ -18,7 +18,7 @@ import type {
 import type {
     PluginListResponse,
     UserPluginResponse,
-    DirectoryPluginListResponse,
+    WorkPluginListResponse,
 } from '@ever-works/plugin/api';
 
 // Re-export types used by other CLI modules
@@ -35,13 +35,13 @@ export type {
     AiModel,
     PluginListResponse,
     UserPluginResponse,
-    DirectoryPluginListResponse,
+    WorkPluginListResponse,
 };
 export { GenerationMethod, WebsiteRepositoryCreationMethod };
 
 // Types for API responses
 
-export interface DirectoryConfig {
+export interface WorkConfig {
     metadata?: {
         initial_prompt?: string;
         last_request_data?: CreateItemsGeneratorDto;
@@ -57,7 +57,7 @@ export interface MarkdownReadmeConfigDto {
     overwriteDefaultFooter?: boolean;
 }
 
-export interface CreateDirectoryDto {
+export interface CreateWorkDto {
     slug: string;
     name: string;
     description: string;
@@ -116,7 +116,7 @@ export interface DeployDto {
     teamScope?: string;
 }
 
-export interface PatchDirectoryDto {
+export interface PatchWorkDto {
     deployProvider?: string;
 }
 
@@ -128,7 +128,7 @@ export interface LookupDeploymentResponse {
     message?: string;
 }
 
-export interface DeleteDirectoryDto {
+export interface DeleteWorkDto {
     reason?: string;
     force_delete?: boolean;
     delete_data_repository?: boolean;
@@ -143,15 +143,15 @@ export interface UserProfile {
     avatar?: string;
 }
 
-export interface DirectoriesResponse {
+export interface WorksResponse {
     status: string;
-    directories: Directory[];
+    works: Work[];
     total: number;
     limit: number;
     offset: number;
 }
 
-export interface DeleteDirectoryResponse {
+export interface DeleteWorkResponse {
     status: 'success' | 'error' | 'pending';
     slug: string;
     message: string;
@@ -216,53 +216,45 @@ export interface DeployCapabilityResponse {
 }
 
 /**
- * Centralized API service for all directory-related operations
+ * Centralized API service for all work-related operations
  */
 export class ApiService {
     private httpClient = getHttpClient();
 
-    // Directory operations
-    async getDirectories(options?: {
-        limit?: number;
-        offset?: number;
-    }): Promise<DirectoriesResponse> {
+    // Work operations
+    async getWorks(options?: { limit?: number; offset?: number }): Promise<WorksResponse> {
         const queryParams = new URLSearchParams();
         if (options?.limit) queryParams.append('limit', options.limit.toString());
         if (options?.offset) queryParams.append('offset', options.offset.toString());
 
-        const response = await this.httpClient.get<DirectoriesResponse>(
-            `/directories?${queryParams.toString()}`,
+        const response = await this.httpClient.get<WorksResponse>(
+            `/works?${queryParams.toString()}`,
         );
         return response.data;
     }
 
-    async createDirectory(data: CreateDirectoryDto) {
-        const response = await this.httpClient.post<ApiResponse<{ directory: Directory }>>(
-            '/directories',
+    async createWork(data: CreateWorkDto) {
+        const response = await this.httpClient.post<ApiResponse<{ work: Work }>>('/works', data);
+        return response.data;
+    }
+
+    async getWork(id: string) {
+        const response = await this.httpClient.get<ApiResponse<{ work: Work }>>(`/works/${id}`);
+        return response.data;
+    }
+
+    async patchWork(workId: string, data: PatchWorkDto) {
+        const response = await this.httpClient.put<ApiResponse<{ work: Work }>>(
+            `/works/${workId}`,
             data,
         );
         return response.data;
     }
 
-    async getDirectory(id: string) {
-        const response = await this.httpClient.get<ApiResponse<{ directory: Directory }>>(
-            `/directories/${id}`,
-        );
-        return response.data;
-    }
-
-    async patchDirectory(directoryId: string, data: PatchDirectoryDto) {
-        const response = await this.httpClient.put<ApiResponse<{ directory: Directory }>>(
-            `/directories/${directoryId}`,
-            data,
-        );
-        return response.data;
-    }
-
-    async getDirectoryConfig(directoryId: string): Promise<DirectoryConfig | null> {
+    async getWorkConfig(workId: string): Promise<WorkConfig | null> {
         try {
-            const response = await this.httpClient.get<ApiResponse<{ config: DirectoryConfig }>>(
-                `/directories/${directoryId}/config`,
+            const response = await this.httpClient.get<ApiResponse<{ config: WorkConfig }>>(
+                `/works/${workId}/config`,
             );
             return response.data.config;
         } catch {
@@ -270,66 +262,66 @@ export class ApiService {
         }
     }
 
-    async generateContent(directoryId: string, data: CreateItemsGeneratorDto) {
+    async generateContent(workId: string, data: CreateItemsGeneratorDto) {
         const response = await this.httpClient.post<ApiResponse<{ slug: string; message: string }>>(
-            `/directories/${directoryId}/generate`,
+            `/works/${workId}/generate`,
             data,
         );
         return response.data;
     }
 
-    async updateDirectory(directoryId: string, data: UpdateItemsGeneratorDto) {
+    async updateWork(workId: string, data: UpdateItemsGeneratorDto) {
         const response = await this.httpClient.post<ApiResponse<{ slug: string; message: string }>>(
-            `/directories/${directoryId}/update`,
+            `/works/${workId}/update`,
             data,
         );
         return response.data;
     }
 
-    async submitItem(directoryId: string, data: SubmitItemDto) {
+    async submitItem(workId: string, data: SubmitItemDto) {
         const response = await this.httpClient.post<ApiResponse<ItemResponse>>(
-            `/directories/${directoryId}/submit-item`,
+            `/works/${workId}/submit-item`,
             data,
         );
 
         return response.data;
     }
 
-    async removeItem(directoryId: string, data: RemoveItemDto) {
+    async removeItem(workId: string, data: RemoveItemDto) {
         const response = await this.httpClient.post<ApiResponse<ItemResponse>>(
-            `/directories/${directoryId}/remove-item`,
+            `/works/${workId}/remove-item`,
             data,
         );
 
         return response.data;
     }
 
-    async regenerateMarkdown(directoryId: string) {
+    async regenerateMarkdown(workId: string) {
         const response = await this.httpClient.post<ApiResponse<{ message?: string }>>(
-            `/directories/${directoryId}/regenerate-markdown`,
+            `/works/${workId}/regenerate-markdown`,
         );
 
         return response.data;
     }
 
-    async updateWebsite(directoryId: string) {
+    async updateWebsite(workId: string) {
         const response = await this.httpClient.post<ApiResponse<UpdateWebsiteRepositoryResponse>>(
-            `/directories/${directoryId}/update-website`,
+            `/works/${workId}/update-website`,
         );
         return response.data;
     }
 
-    async deployWebsite(directoryId: string, data: DeployDto = {}) {
+    async deployWebsite(workId: string, data: DeployDto = {}) {
         const response = await this.httpClient.post<ApiResponse<DeployWebsiteResponse>>(
-            `/deploy/directories/${directoryId}`,
+            `/deploy/works/${workId}`,
             data,
         );
         return response.data;
     }
 
-    async deleteDirectory(id: string, data?: DeleteDirectoryDto) {
-        const response = await this.httpClient.post<ApiResponse<DeleteDirectoryResponse>>(
-            `/directories/${id}/delete`,
+    async deleteWork(id: string, data?: DeleteWorkDto) {
+        const response = await this.httpClient.post<ApiResponse<DeleteWorkResponse>>(
+            `/works/${id}/delete`,
             data,
         );
         return response.data;
@@ -370,26 +362,26 @@ export class ApiService {
         return response.data;
     }
 
-    // Deploy operations (directory-scoped)
+    // Deploy operations (work-scoped)
 
-    async lookupExistingDeployment(directoryId: string): Promise<LookupDeploymentResponse> {
+    async lookupExistingDeployment(workId: string): Promise<LookupDeploymentResponse> {
         const response = await this.httpClient.post<LookupDeploymentResponse>(
-            `/deploy/directories/${directoryId}/lookup`,
+            `/deploy/works/${workId}/lookup`,
             {},
         );
         return response.data;
     }
 
-    async checkDeployCapability(directoryId: string): Promise<DeployCapabilityResponse> {
+    async checkDeployCapability(workId: string): Promise<DeployCapabilityResponse> {
         const response = await this.httpClient.post<DeployCapabilityResponse>(
-            `/deploy/directories/${directoryId}/check`,
+            `/deploy/works/${workId}/check`,
         );
         return response.data;
     }
 
-    async getDeployTeamsForDirectory(directoryId: string): Promise<DeploymentTeamResponse> {
+    async getDeployTeamsForWork(workId: string): Promise<DeploymentTeamResponse> {
         const response = await this.httpClient.post<DeploymentTeamResponse>(
-            `/deploy/directories/${directoryId}/teams`,
+            `/deploy/works/${workId}/teams`,
             {},
         );
         return response.data;
@@ -398,14 +390,14 @@ export class ApiService {
     // Generator form schema
 
     async getGeneratorFormSchema(
-        directoryId: string,
+        workId: string,
         pipelineId?: string,
     ): Promise<GeneratorFormSchema> {
         const queryParams = new URLSearchParams();
         if (pipelineId) queryParams.append('pipelineId', pipelineId);
 
         const query = queryParams.toString();
-        const url = `/directories/${directoryId}/generator-form${query ? `?${query}` : ''}`;
+        const url = `/works/${workId}/generator-form${query ? `?${query}` : ''}`;
 
         const response = await this.httpClient.get<GeneratorFormSchema>(url);
         return response.data;
@@ -444,7 +436,7 @@ export class ApiService {
         data?: {
             settings?: Record<string, unknown>;
             secretSettings?: Record<string, unknown>;
-            autoEnableForDirectories?: boolean;
+            autoEnableForWorks?: boolean;
         },
     ): Promise<UserPluginResponse> {
         const response = await this.httpClient.post<UserPluginResponse>(
@@ -476,17 +468,17 @@ export class ApiService {
         return response.data;
     }
 
-    // Plugin operations (directory-level)
+    // Plugin operations (work-level)
 
-    async getDirectoryPlugins(directoryId: string): Promise<DirectoryPluginListResponse> {
-        const response = await this.httpClient.get<DirectoryPluginListResponse>(
-            `/directories/${directoryId}/plugins`,
+    async getWorkPlugins(workId: string): Promise<WorkPluginListResponse> {
+        const response = await this.httpClient.get<WorkPluginListResponse>(
+            `/works/${workId}/plugins`,
         );
         return response.data;
     }
 
-    async enableDirectoryPlugin(
-        directoryId: string,
+    async enableWorkPlugin(
+        workId: string,
         pluginId: string,
         data?: {
             settings?: Record<string, unknown>;
@@ -494,36 +486,30 @@ export class ApiService {
             priority?: number;
         },
     ): Promise<void> {
-        await this.httpClient.post(
-            `/directories/${directoryId}/plugins/${pluginId}/enable`,
-            data || {},
-        );
+        await this.httpClient.post(`/works/${workId}/plugins/${pluginId}/enable`, data || {});
     }
 
-    async disableDirectoryPlugin(directoryId: string, pluginId: string): Promise<void> {
-        await this.httpClient.post(`/directories/${directoryId}/plugins/${pluginId}/disable`, {});
+    async disableWorkPlugin(workId: string, pluginId: string): Promise<void> {
+        await this.httpClient.post(`/works/${workId}/plugins/${pluginId}/disable`, {});
     }
 
-    async updateDirectoryPluginSettings(
-        directoryId: string,
+    async updateWorkPluginSettings(
+        workId: string,
         pluginId: string,
         data: {
             settings?: Record<string, unknown>;
             secretSettings?: Record<string, unknown>;
         },
     ): Promise<void> {
-        await this.httpClient.patch(
-            `/directories/${directoryId}/plugins/${pluginId}/settings`,
-            data,
-        );
+        await this.httpClient.patch(`/works/${workId}/plugins/${pluginId}/settings`, data);
     }
 
-    async setDirectoryPluginCapability(
-        directoryId: string,
+    async setWorkPluginCapability(
+        workId: string,
         pluginId: string,
         capability: string,
     ): Promise<void> {
-        await this.httpClient.post(`/directories/${directoryId}/plugins/${pluginId}/capability`, {
+        await this.httpClient.post(`/works/${workId}/plugins/${pluginId}/capability`, {
             capability,
         });
     }

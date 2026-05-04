@@ -203,8 +203,8 @@ export class LoggingInterceptor implements NestInterceptor {
 **Output Examples:**
 
 ```
-[HTTP] Incoming Request: POST /api/deploy/directories/abc123
-[HTTP] Outgoing Response: POST /api/deploy/directories/abc123 200 - 342ms
+[HTTP] Incoming Request: POST /api/deploy/works/abc123
+[HTTP] Outgoing Response: POST /api/deploy/works/abc123 200 - 342ms
 [HTTP] Error Response: POST /api/screenshot/capture 400 - 15ms
 ```
 

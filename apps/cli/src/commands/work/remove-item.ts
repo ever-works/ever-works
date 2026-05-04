@@ -1,0 +1,118 @@
+import { Command } from 'commander';
+import chalk from 'chalk';
+import ora from 'ora';
+import inquirer from 'inquirer';
+import { requireAuth } from '../auth';
+import { getApiService } from '../../services/api.service';
+import { WorkPromptService, canEdit } from './work-prompt.service';
+import { handleCliError } from '../../utils/error';
+
+export const removeItemCommand = new Command('remove-item')
+    .description('Remove an item from a work')
+    .action(async () => {
+        try {
+            console.log(chalk.cyan.bold('\nRemove Item from Work\n'));
+
+            // Ensure user is authenticated
+            await requireAuth();
+
+            const apiService = getApiService();
+            const workPrompt = new WorkPromptService();
+
+            // Select work
+            const selection = await workPrompt.promptWorkSelection();
+            if (selection.cancelled || !selection.work) {
+                console.log(chalk.yellow('\nOperation cancelled.'));
+                return;
+            }
+
+            const work = selection.work;
+            const role = selection.role!;
+            const isShared = selection.isShared!;
+
+            console.log(
+                chalk.green(
+                    `\n✓ Selected work: ${workPrompt.formatSelectedWork(work, role, isShared)}`,
+                ),
+            );
+
+            if (!canEdit(role)) {
+                console.log(chalk.yellow('\n⚠ You do not have permission to perform this action.'));
+                console.log(chalk.gray(`  Your role: ${role}. Required: editor or higher.`));
+                return;
+            }
+
+            // Collect item information
+            const answers = await inquirer.prompt([
+                {
+                    type: 'input',
+                    name: 'item_slug',
+                    message: 'Item slug to remove:',
+                    validate: (input) => {
+                        if (!input.trim()) return 'Item slug is required';
+                        if (!/^[a-z0-9-]+$/.test(input)) {
+                            return 'Item slug must contain only lowercase letters, numbers, and hyphens';
+                        }
+                        return true;
+                    },
+                },
+                {
+                    type: 'input',
+                    name: 'reason',
+                    message: 'Reason for removal (optional):',
+                },
+            ]);
+
+            // Show summary and confirm
+            console.log('');
+            console.log(chalk.gray('Work:'), chalk.white(work.slug));
+            console.log(chalk.gray('Item slug to remove:'), chalk.white(answers.item_slug));
+            if (answers.reason) {
+                console.log(chalk.gray('Reason:'), chalk.white(answers.reason));
+            }
+
+            const confirmed = await inquirer.prompt([
+                {
+                    type: 'confirm',
+                    name: 'proceed',
+                    message: chalk.red('Are you sure you want to remove this item?'),
+                    default: false,
+                },
+            ]);
+
+            if (!confirmed.proceed) {
+                console.log(chalk.yellow('\nOperation cancelled.'));
+                return;
+            }
+
+            // Remove item
+            const spinner = ora('Removing item...').start();
+
+            try {
+                const removeDto = {
+                    item_slug: answers.item_slug,
+                    reason: answers.reason || undefined,
+                };
+
+                const response = await apiService.removeItem(work.id, removeDto);
+
+                if (response.status === 'error') {
+                    spinner.fail('Item removal failed');
+                } else {
+                    spinner.succeed('Item removed successfully!');
+                }
+
+                console.log(chalk.gray('Status:'), chalk.white(response.status));
+                if (response.message) {
+                    console.log(chalk.gray('Message:'), chalk.white(response.message));
+                }
+            } catch (error) {
+                spinner.fail('Item removal failed');
+                throw error;
+            }
+        } catch (error) {
+            handleCliError(error);
+
+            process.exit(1);
+        }
+    });

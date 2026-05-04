@@ -7,7 +7,7 @@ sidebar_position: 5
 
 # Items Generator Module
 
-The Items Generator module handles individual item operations within a directory -- submitting new items, removing existing items, and updating item metadata. It operates directly on the data Git repository using branch-based workflows with optional pull request creation.
+The Items Generator module handles individual item operations within a work -- submitting new items, removing existing items, and updating item metadata. It operates directly on the data Git repository using branch-based workflows with optional pull request creation.
 
 **Sources:**
 
@@ -30,7 +30,7 @@ items-generator/
         extract-item-details.dto.ts      # Detail extraction request
         extract-item-details-response.dto.ts
         items-generator-response.dto.ts  # Generation response
-        delete-items-generator.dto.ts    # Directory deletion
+        delete-items-generator.dto.ts    # Work deletion
         index.ts                         # Barrel export
     schemas/
         item-extraction.schemas.ts       # Zod schemas for AI extraction
@@ -56,10 +56,10 @@ The module is intentionally lightweight. Bulk generation is handled by the `Pipe
 
 ### Submit Item
 
-The `submitItem` method adds a new item to a directory's data repository:
+The `submitItem` method adds a new item to a work's data repository:
 
 ```typescript
-const result = await submissionService.submitItem(directory, user, {
+const result = await submissionService.submitItem(work, user, {
 	name: 'VS Code',
 	description: 'A popular code editor by Microsoft',
 	source_url: 'https://code.visualstudio.com',
@@ -70,7 +70,7 @@ const result = await submissionService.submitItem(directory, user, {
 
 #### Workflow
 
-1. **Clone/pull** the data repository using the directory owner's credentials.
+1. **Clone/pull** the data repository using the work owner's credentials.
 2. **Read config** to check autoapproval settings.
 3. **Determine commit strategy:**
 
@@ -97,7 +97,7 @@ const result = await submissionService.submitItem(directory, user, {
 // Direct commit response
 {
     status: 'success',
-    slug: 'my-directory',
+    slug: 'my-work',
     item_name: 'VS Code',
     item_slug: 'vs-code',
     direct_commit: true,
@@ -107,7 +107,7 @@ const result = await submissionService.submitItem(directory, user, {
 // PR creation response
 {
     status: 'success',
-    slug: 'my-directory',
+    slug: 'my-work',
     item_name: 'VS Code',
     item_slug: 'vs-code',
     pr_number: 42,
@@ -123,7 +123,7 @@ const result = await submissionService.submitItem(directory, user, {
 The `removeItem` method removes an item from the data repository:
 
 ```typescript
-const result = await submissionService.removeItem(directory, user, {
+const result = await submissionService.removeItem(work, user, {
 	item_slug: 'vs-code',
 	reason: 'No longer maintained',
 	create_pull_request: true
@@ -136,7 +136,7 @@ const result = await submissionService.removeItem(directory, user, {
 2. Verify the item exists via `data.itemExists()`.
 3. Read item details for the response.
 4. Create a branch (if PR requested) or switch to main.
-5. Remove the item directory via `data.removeItem()`.
+5. Remove the item work via `data.removeItem()`.
 6. Commit with an optional reason in the message.
 7. Push and optionally create a PR.
 
@@ -145,7 +145,7 @@ const result = await submissionService.removeItem(directory, user, {
 The `updateItem` method modifies metadata fields on an existing item:
 
 ```typescript
-const result = await submissionService.updateItem(directory, user, {
+const result = await submissionService.updateItem(work, user, {
 	item_slug: 'vs-code',
 	featured: true,
 	order: 1,
@@ -186,15 +186,15 @@ Supports updating `featured` status and `order` position. Uses the same branch/P
 
 ### CreateItemsGeneratorDto
 
-| Field                                | Type                              | Required | Description                               |
-| ------------------------------------ | --------------------------------- | -------- | ----------------------------------------- |
-| `name`                               | `string`                          | Yes      | Directory/generation name (max 200 chars) |
-| `prompt`                             | `string`                          | Yes      | AI generation prompt (max 5000 chars)     |
-| `generation_method`                  | `GenerationMethod`                | No       | `CREATE_UPDATE` (default) or `RECREATE`   |
-| `update_with_pull_request`           | `boolean`                         | No       | Create PRs for updates (default: true)    |
-| `website_repository_creation_method` | `WebsiteRepositoryCreationMethod` | No       | Template-based creation (default)         |
-| `providers`                          | `ProvidersDto`                    | No       | Plugin selection for AI, search, etc.     |
-| `pluginConfig`                       | `Record<string, unknown>`         | No       | Plugin-specific form configuration        |
+| Field                                | Type                              | Required | Description                             |
+| ------------------------------------ | --------------------------------- | -------- | --------------------------------------- |
+| `name`                               | `string`                          | Yes      | Work/generation name (max 200 chars)    |
+| `prompt`                             | `string`                          | Yes      | AI generation prompt (max 5000 chars)   |
+| `generation_method`                  | `GenerationMethod`                | No       | `CREATE_UPDATE` (default) or `RECREATE` |
+| `update_with_pull_request`           | `boolean`                         | No       | Create PRs for updates (default: true)  |
+| `website_repository_creation_method` | `WebsiteRepositoryCreationMethod` | No       | Template-based creation (default)       |
+| `providers`                          | `ProvidersDto`                    | No       | Plugin selection for AI, search, etc.   |
+| `pluginConfig`                       | `Record<string, unknown>`         | No       | Plugin-specific form configuration      |
 
 ## Zod Schemas for AI Extraction
 

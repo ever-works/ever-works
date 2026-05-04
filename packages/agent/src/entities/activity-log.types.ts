@@ -6,10 +6,10 @@ export enum ActivityActionType {
     // Deployment
     DEPLOYMENT = 'deployment',
 
-    // Directory lifecycle
-    DIRECTORY_CREATED = 'directory_created',
-    DIRECTORY_UPDATED = 'directory_updated',
-    DIRECTORY_DELETED = 'directory_deleted',
+    // Work lifecycle
+    WORK_CREATED = 'work_created',
+    WORK_UPDATED = 'work_updated',
+    WORK_DELETED = 'work_deleted',
 
     // Items
     ITEM_ADDED = 'item_added',
@@ -65,7 +65,7 @@ export enum ActivityStatus {
 
 export interface CreateActivityLogDto {
     userId: string;
-    directoryId?: string;
+    workId?: string;
     actionType: ActivityActionType;
     action: string;
     status: ActivityStatus;
@@ -79,7 +79,7 @@ export interface CreateActivityLogDto {
 export interface ActivityLogQueryOptions {
     userId: string;
     actionType?: ActivityActionType;
-    directoryId?: string;
+    workId?: string;
     status?: ActivityStatus;
     dateFrom?: Date;
     dateTo?: Date;

@@ -2,8 +2,8 @@ import type { Metadata } from 'next';
 import { getTranslations } from 'next-intl/server';
 import { getAuthFromCookie } from '@/lib/auth';
 import DashboardClient from './dashboard-client';
-import { getDirectories, getDirectoryStats } from '@/app/actions/dashboard/directories';
-import { GET_DIRECTORY_LIST_LIMIT } from '@/lib/constants';
+import { getWorks, getWorkStats } from '@/app/actions/dashboard/works';
+import { GET_WORK_LIST_LIMIT } from '@/lib/constants';
 
 export async function generateMetadata(): Promise<Metadata> {
     const t = await getTranslations('metadata.pages');
@@ -11,30 +11,28 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export default async function Dashboard() {
-    const [user, directoriesResponse, statsResponse] = await Promise.all([
+    const [user, worksResponse, statsResponse] = await Promise.all([
         getAuthFromCookie(),
-        getDirectories({ limit: GET_DIRECTORY_LIST_LIMIT }).catch(() => ({
+        getWorks({ limit: GET_WORK_LIST_LIMIT }).catch(() => ({
             success: false,
-            directories: [],
+            works: [],
             total: 0,
         })),
-        getDirectoryStats().catch(() => ({
+        getWorkStats().catch(() => ({
             success: false,
-            totalDirectories: 0,
+            totalWorks: 0,
             totalItems: 0,
             activeWebsites: 0,
         })),
     ]);
 
-    const totalDirectories = statsResponse.success
-        ? statsResponse.totalDirectories
-        : directoriesResponse.total;
+    const totalWorks = statsResponse.success ? statsResponse.totalWorks : worksResponse.total;
 
     return (
         <DashboardClient
             user={user!}
-            initialDirectories={directoriesResponse.directories}
-            totalDirectories={totalDirectories}
+            initialWorks={worksResponse.works}
+            totalWorks={totalWorks}
             totalItems={statsResponse.totalItems}
             activeWebsites={statsResponse.activeWebsites}
         />

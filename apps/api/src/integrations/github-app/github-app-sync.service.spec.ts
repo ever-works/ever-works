@@ -25,7 +25,7 @@ describe('GitHubAppSyncService', () => {
         const sourceRepoAnalyzerService = {
             analyzeRepository: jest.fn(),
         };
-        const directoryImportService = {
+        const workImportService = {
             onboardLinkedRepository: jest.fn(),
         };
 
@@ -34,7 +34,7 @@ describe('GitHubAppSyncService', () => {
             gitHubAppInstallationRepository as any,
             gitHubAppInstallationRepoRepository as any,
             sourceRepoAnalyzerService as any,
-            directoryImportService as any,
+            workImportService as any,
         );
 
         return {

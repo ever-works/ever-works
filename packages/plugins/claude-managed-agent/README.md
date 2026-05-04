@@ -1,6 +1,6 @@
 # Claude Managed Agent Plugin
 
-Full pipeline plugin that delegates directory generation to Anthropic Claude Managed Agents.
+Full pipeline plugin that delegates work generation to Anthropic Claude Managed Agents.
 
 This package is scaffolded for the Ever Works plugin runtime and uses the Managed Agents REST API directly.
 

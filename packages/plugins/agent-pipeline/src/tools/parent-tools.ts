@@ -33,7 +33,7 @@ export interface ParentToolContext {
 	workerMaxContextTokens: number;
 	parentModel: LanguageModelV3;
 	parentMaxContextTokens: number;
-	directoryContext: WorkerPromptOptions;
+	workContext: WorkerPromptOptions;
 	existing: ExistingItems;
 	onProgress: PipelineProgressCallback | undefined;
 	totalSteps: number;
@@ -137,7 +137,7 @@ export function createParentTools(ctx: ParentToolContext): ParentToolsResult {
 				maxContextTokens: ctx.workerMaxContextTokens,
 				contentExtractorFacade: ctx.facades.contentExtractorFacade,
 				facadeOptions: ctx.facadeOptions,
-				directoryContext: ctx.directoryContext,
+				workContext: ctx.workContext,
 				workspacePath: ctx.workspacePath,
 				breaker,
 				logger: ctx.logger,

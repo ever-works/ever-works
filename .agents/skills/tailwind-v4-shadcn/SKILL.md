@@ -381,7 +381,7 @@ See `reference/common-gotchas.md` for complete troubleshooting guide.
 
 ## File Templates
 
-All templates are available in the `templates/` directory:
+All templates are available in the `templates/` work:
 
 - **index.css** - Complete CSS setup with all color variables
 - **components.json** - shadcn/ui v4 configuration

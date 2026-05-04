@@ -36,26 +36,26 @@ describe('ActivityLogService', () => {
         it('formats cancelled generation summaries separately from failures', () => {
             expect(
                 service.formatGenerationCompletionSummary({
-                    name: 'Example Directory',
+                    name: 'Example Work',
                     generateStatus: { status: GenerateStatusType.CANCELLED },
                 }),
-            ).toBe('Generation cancelled for Example Directory');
+            ).toBe('Generation cancelled for Example Work');
         });
 
         it('formats failed generation summaries', () => {
             expect(
                 service.formatGenerationCompletionSummary({
-                    name: 'Example Directory',
+                    name: 'Example Work',
                     generateStatus: { status: GenerateStatusType.ERROR },
                 }),
-            ).toBe('Generation failed for Example Directory');
+            ).toBe('Generation failed for Example Work');
         });
 
         it('formats successful generation counts', () => {
             expect(
                 service.formatGenerationCompletionSummary(
                     {
-                        name: 'Example Directory',
+                        name: 'Example Work',
                         generateStatus: { status: GenerateStatusType.GENERATED },
                     },
                     {

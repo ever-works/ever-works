@@ -7,7 +7,7 @@ sidebar_position: 47
 
 # Standard Pipeline Plugin
 
-The Standard Pipeline is the default generation pipeline for Ever Works. It runs a fixed sequence of 15 steps that combine AI generation, web search, content extraction, and post-processing to build a complete directory from a single prompt. The pipeline is engine-orchestrated, meaning the pipeline engine runs each step individually, enabling checkpoint resume and step-level customization.
+The Standard Pipeline is the default generation pipeline for Ever Works. It runs a fixed sequence of 15 steps that combine AI generation, web search, content extraction, and post-processing to build a complete work from a single prompt. The pipeline is engine-orchestrated, meaning the pipeline engine runs each step individually, enabling checkpoint resume and step-level customization.
 
 **Source:** `packages/plugins/standard-pipeline/src/standard-pipeline.plugin.ts`
 
@@ -136,7 +136,7 @@ The Standard Pipeline exposes a rich set of configuration options through `IForm
 
 | Field                 | Type   | Default | Description                             |
 | --------------------- | ------ | ------- | --------------------------------------- |
-| `initial_categories`  | `tags` | --      | Suggested categories for the directory  |
+| `initial_categories`  | `tags` | --      | Suggested categories for the work       |
 | `priority_categories` | `tags` | --      | Categories to prioritize and show first |
 | `target_keywords`     | `tags` | --      | Keywords to guide search and extraction |
 
@@ -205,7 +205,7 @@ Steps declare their data dependencies via `provides` and `requires` arrays in th
 
 The Standard Pipeline is enabled by default and requires no additional configuration. To customize it:
 
-1. Go to the directory Generator settings
+1. Go to the work Generator settings
 2. Adjust search, generation, and extraction options
 3. Enable optional features like badge evaluation or screenshot capture
 4. Trigger generation -- the pipeline engine handles step orchestration automatically
@@ -222,7 +222,7 @@ class StandardPipelinePlugin implements IPipelinePlugin<BuiltInStepId>, IFormSch
 	executeStep(stepId, context, execContext, options?, onProgress?): Promise<IPipelineContext>;
 	getStepDefinitions(): PipelineStepDefinition<BuiltInStepId>[];
 	registerStepExecutor(stepId, executor): void;
-	createContext(directory, request, existing): IPipelineContext;
+	createContext(work, request, existing): IPipelineContext;
 	extractResult(context, meta): PipelineResult;
 	isCheckpointViable(snapshot, completedSteps): boolean;
 	canSkipStep(stepId, context): boolean;

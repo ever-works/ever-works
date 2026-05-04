@@ -5,7 +5,7 @@ import { ScheduleModule } from '@nestjs/schedule';
 import { AuthModule } from './auth/auth.module';
 import { AuthSessionGuard } from './auth/guards/auth-session.guard';
 import { throttlerConfig } from './config/throttler.config';
-import { DirectoriesModule } from './directories/directories.module';
+import { WorksModule } from './works/works.module';
 import { EventEmitterModule } from '@nestjs/event-emitter';
 import { MailModule } from './mail/mail.module';
 import { LoggingInterceptor } from './logging.interceptor';
@@ -52,7 +52,7 @@ import { CacheFactory } from '@ever-works/agent/cache';
             },
         }),
         AuthModule,
-        DirectoriesModule,
+        WorksModule,
         MailModule,
         TriggerInternalModule,
         SubscriptionsModule,

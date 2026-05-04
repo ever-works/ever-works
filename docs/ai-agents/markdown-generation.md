@@ -7,7 +7,7 @@ sidebar_position: 4
 
 # Markdown Content Generation
 
-The Markdown Generation system transforms structured directory data into human-readable README files and detail pages. It creates a separate Git repository that serves as the public-facing markdown representation of a directory.
+The Markdown Generation system transforms structured work data into human-readable README files and detail pages. It creates a separate Git repository that serves as the public-facing markdown representation of a work.
 
 ## Architecture Overview
 
@@ -22,10 +22,10 @@ Located in `packages/agent/src/generators/markdown-generator/`, the system compr
 
 ## Markdown Repository Structure
 
-Each directory gets a dedicated markdown repository with this layout:
+Each work gets a dedicated markdown repository with this layout:
 
 ```
-<directory-slug>/
+<work-slug>/
   README.md            # Auto-generated README with categorized item listings
   LICENSE.md           # License file (copied from data repo)
   details/
@@ -157,8 +157,8 @@ When using `APPEND` or `UPDATE` modes with a PR configuration:
 
 ```typescript
 const pr = await this.gitFacade.createPullRequest({
-	owner: directory.getRepoOwner(),
-	repo: directory.slug,
+	owner: work.getRepoOwner(),
+	repo: work.slug,
 	base: defaultBranch,
 	head: pr_update.branch,
 	title: pr_update.title,
@@ -166,15 +166,15 @@ const pr = await this.gitFacade.createPullRequest({
 });
 ```
 
-The PR metadata (number, URL, branch) is stored in the directory entity for tracking.
+The PR metadata (number, URL, branch) is stored in the work entity for tracking.
 
 ## Repository Cleanup
 
 The service provides lifecycle management methods:
 
-- `removeItemDetail(directory, user, slug)` -- Removes a single item's detail file.
-- `removeRepository(directory, user)` -- Deletes the entire markdown repository from the Git provider.
-- `cleanup(directory)` -- Removes local cloned files.
+- `removeItemDetail(work, user, slug)` -- Removes a single item's detail file.
+- `removeRepository(work, user)` -- Deletes the entire markdown repository from the Git provider.
+- `cleanup(work)` -- Removes local cloned files.
 
 ## Module Dependencies
 
@@ -183,5 +183,5 @@ MarkdownGeneratorModule
   +-- DataGeneratorModule (access to DataRepository for reading item data)
   +-- FacadesModule (GitFacadeService for all Git operations)
   +-- DatabaseModule (TypeORM repositories)
-  +-- DirectoryOperationsModule (directory entity operations)
+  +-- WorkOperationsModule (work entity operations)
 ```

@@ -1,7 +1,7 @@
 /**
  * Hermes Agent pipeline plugin.
  *
- * Delegates full directory generation to a Hermes Agent CLI session running
+ * Delegates full work generation to a Hermes Agent CLI session running
  * against a user-selected Hermes profile on the backend machine.
  */
 

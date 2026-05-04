@@ -1,17 +1,17 @@
 import { Injectable } from '@nestjs/common';
 import { UsageLedgerRepository } from '@src/database/repositories/usage-ledger.repository';
-import { DirectorySchedule } from '@src/entities/directory-schedule.entity';
+import { WorkSchedule } from '@src/entities/work-schedule.entity';
 import { UsageLedgerEntry, UsageLedgerTriggerType } from '@src/entities/usage-ledger-entry.entity';
 import { config } from '@src/config';
-import { DirectoryScheduleBillingMode } from '@src/entities';
+import { WorkScheduleBillingMode } from '@src/entities';
 import { BillingProvider } from './billing/billing.provider';
 
 type RecordUsageOptions = {
     userId: string;
-    directoryId: string;
-    schedule?: DirectorySchedule | null;
+    workId: string;
+    schedule?: WorkSchedule | null;
     triggerType: UsageLedgerTriggerType;
-    billingMode: DirectoryScheduleBillingMode;
+    billingMode: WorkScheduleBillingMode;
     generationHistoryId?: string;
 };
 
@@ -25,7 +25,7 @@ export class UsageLedgerService {
     async recordUsage(options: RecordUsageOptions): Promise<UsageLedgerEntry | null> {
         if (
             !config.subscriptions.isEnabled() ||
-            options.billingMode !== DirectoryScheduleBillingMode.USAGE
+            options.billingMode !== WorkScheduleBillingMode.USAGE
         ) {
             return null;
         }
@@ -34,7 +34,7 @@ export class UsageLedgerService {
 
         const entry = await this.ledgerRepository.record({
             userId: options.userId,
-            directoryId: options.directoryId,
+            workId: options.workId,
             scheduleId: options.schedule?.id,
             triggerType: options.triggerType,
             billingMode: options.billingMode,

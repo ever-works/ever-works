@@ -13,7 +13,7 @@ This page covers the shared testing infrastructure, fixture patterns, CI test ex
 
 ### Entity Factories
 
-Tests frequently need mock entities (directories, users, plugins). The convention is to define factory functions at the top of test files or in shared helper modules:
+Tests frequently need mock entities (works, users, plugins). The convention is to define factory functions at the top of test files or in shared helper modules:
 
 ```typescript
 // Factory for mock items
@@ -29,20 +29,20 @@ function makeItem(slug: string, category: string, opts: Partial<ItemData> = {}):
 	};
 }
 
-// Factory for mock directories
-function makeDirectory(overrides: Partial<Directory> = {}): Directory {
+// Factory for mock works
+function makeWork(overrides: Partial<Work> = {}): Work {
 	return {
 		id: 'dir-123',
-		name: 'Test Directory',
-		slug: 'test-directory',
-		description: 'A test directory',
+		name: 'Test Work',
+		slug: 'test-work',
+		description: 'A test work',
 		userId: 'user-123',
 		gitProvider: 'github',
 		getRepoOwner: () => 'test-owner',
-		getDataRepo: () => 'test-directory-data',
-		getMainRepo: () => 'test-directory',
+		getDataRepo: () => 'test-work-data',
+		getMainRepo: () => 'test-work',
 		...overrides
-	} as Directory;
+	} as Work;
 }
 ```
 
@@ -168,7 +168,7 @@ pnpm test:cov
 Output:
 
 - **Console** -- summary table showing statement, branch, function, and line coverage.
-- **`coverage/`** -- directory containing JSON data and an HTML report.
+- **`coverage/`** -- work containing JSON data and an HTML report.
 
 ### Plugin Coverage
 

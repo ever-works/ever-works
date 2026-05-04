@@ -9,7 +9,7 @@ sidebar_position: 55
 
 ## Overview
 
-The Firecrawl plugin provides web search and content extraction capabilities using the Firecrawl API. It can search the web for structured results and scrape any web page into clean markdown, handling JavaScript rendering and anti-bot protections automatically. The plugin implements both `ISearchPlugin` and `IContentExtractorPlugin`, making it a dual-purpose tool for directory generation pipelines.
+The Firecrawl plugin provides web search and content extraction capabilities using the Firecrawl API. It can search the web for structured results and scrape any web page into clean markdown, handling JavaScript rendering and anti-bot protections automatically. The plugin implements both `ISearchPlugin` and `IContentExtractorPlugin`, making it a dual-purpose tool for work generation pipelines.
 
 ## Architecture
 

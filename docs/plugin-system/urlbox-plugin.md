@@ -7,7 +7,7 @@ sidebar_position: 40
 
 # Urlbox Plugin
 
-The Urlbox plugin captures website screenshots using the [Urlbox API](https://urlbox.com). It generates preview images for directory items during the generation pipeline, with support for retina rendering, image quality control, and automatic cookie banner removal.
+The Urlbox plugin captures website screenshots using the [Urlbox API](https://urlbox.com). It generates preview images for work items during the generation pipeline, with support for retina rendering, image quality control, and automatic cookie banner removal.
 
 **Source:** `packages/plugins/urlbox/src/urlbox.plugin.ts`
 
@@ -80,7 +80,7 @@ Urlbox uses a two-step approach:
 
 API keys are resolved through the standard 4-level hierarchy:
 
-1. Directory settings (highest priority)
+1. Work settings (highest priority)
 2. User settings
 3. Admin settings
 4. Environment variables (lowest priority)
@@ -156,7 +156,7 @@ The plugin maps `ScreenshotOptions` to Urlbox `RenderOptions`:
 
 ## Usage in Pipelines
 
-During directory generation, the screenshot facade sends capture requests to Urlbox for items that have a source URL. The resulting images are stored as item preview thumbnails.
+During work generation, the screenshot facade sends capture requests to Urlbox for items that have a source URL. The resulting images are stored as item preview thumbnails.
 
 ## Comparison with ScreenshotOne
 
@@ -211,7 +211,7 @@ class UrlboxPlugin implements IPlugin, IScreenshotPlugin {
 2. Copy your API key and API secret
 3. Enable the Urlbox plugin on the Plugins page
 4. Enter your credentials in the plugin settings
-5. Select Urlbox as the screenshot provider for your directory
+5. Select Urlbox as the screenshot provider for your work
 
 ## Troubleshooting
 

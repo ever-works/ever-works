@@ -1,5 +1,5 @@
 /**
- * Domain type classification for directory content
+ * Domain type classification for work content
  */
 export enum DomainType {
 	SOFTWARE = 'software',
@@ -9,7 +9,7 @@ export enum DomainType {
 }
 
 /**
- * Result of domain analysis for a directory
+ * Result of domain analysis for a work
  */
 export interface DomainAnalysis {
 	/** The detected domain type */

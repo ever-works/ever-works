@@ -7,7 +7,7 @@
 3. [Custom Reporter](#custom-reporter)
 4. [Trace Configuration](#trace-configuration)
 5. [Screenshot & Video Settings](#screenshot--video-settings)
-6. [Artifact Directory Structure](#artifact-directory-structure)
+6. [Artifact Work Structure](#artifact-work-structure)
 7. [CI Artifact Upload](#ci-artifact-upload)
 8. [Decision Guide](#decision-guide)
 9. [Anti-Patterns](#anti-patterns)
@@ -251,7 +251,7 @@ use: {
 | `'on-first-retry'`    | On retry   | Retried | Low       |
 | `'retain-on-failure'` | Every test | Failed  | Medium    |
 
-## Artifact Directory Structure
+## Artifact Work Structure
 
 ```text
 test-results/
@@ -395,7 +395,7 @@ export default defineConfig({
 
 ### Missing Screenshots in Report
 
-Enable screenshots and keep both directories:
+Enable screenshots and keep both works:
 
 ```typescript
 use: {
@@ -403,4 +403,4 @@ use: {
 },
 ```
 
-The HTML report embeds screenshots from `test-results/`. Deleting that directory removes screenshots from the report.
+The HTML report embeds screenshots from `test-results/`. Deleting that work removes screenshots from the report.

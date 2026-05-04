@@ -7,7 +7,7 @@ sidebar_position: 16
 
 # Deploy Capability
 
-The Deploy capability manages website deployments for directories through the plugin system. It coordinates between deployment providers (Vercel, etc.), Git repositories, and the internal directory model. The module handles single deployments, batch deployments, deployment verification, and status tracking.
+The Deploy capability manages website deployments for works through the plugin system. It coordinates between deployment providers (Vercel, etc.), Git repositories, and the internal work model. The module handles single deployments, batch deployments, deployment verification, and status tracking.
 
 Source: `apps/api/src/plugins-capabilities/deploy/`
 
@@ -20,7 +20,7 @@ DeployModule
   ├── DeploymentVerifierService     -- Async status polling
   ├── DeployFacadeService           -- Plugin provider resolution
   ├── GitFacadeService              -- Git operations
-  ├── DirectoryOwnershipService     -- Authorization checks
+  ├── WorkOwnershipService     -- Authorization checks
   └── WebsiteUpdateService          -- Repository content updates
 ```
 
@@ -30,10 +30,10 @@ The module imports several dependencies:
 @Module({
     imports: [
         FacadesModule,           // Deploy and Git facades
-        DatabaseModule,          // DirectoryRepository
+        DatabaseModule,          // WorkRepository
         PluginsModule,           // Plugin registry
         WebsiteGeneratorModule,  // Website update service
-        DirectoryModule,         // Ownership service
+        WorkModule,         // Ownership service
         AuthModule,              // JWT authentication
     ],
     controllers: [DeployController],
@@ -71,15 +71,15 @@ GET /api/deploy/providers/:providerId/configured
 
 Checks if a specific provider is available and enabled.
 
-### Deploy Directory
+### Deploy Work
 
 ```
-POST /api/deploy/directories/:id
+POST /api/deploy/works/:id
 ```
 
-Deploys a directory to its configured deployment provider. This is the primary deployment endpoint.
+Deploys a work to its configured deployment provider. This is the primary deployment endpoint.
 
-**Request Body (DeployDirectoryDto):**
+**Request Body (DeployWorkDto):**
 
 | Field       | Type     | Required | Description                       |
 | ----------- | -------- | -------- | --------------------------------- |
@@ -87,7 +87,7 @@ Deploys a directory to its configured deployment provider. This is the primary d
 
 **Deployment Flow:**
 
-1. Verify user owns (or has edit access to) the directory
+1. Verify user owns (or has edit access to) the work
 2. Check if deployment credentials are configured via `DeployFacadeService`
 3. Validate the deployment token
 4. Execute deployment via `DeployService`
@@ -98,9 +98,9 @@ Deploys a directory to its configured deployment provider. This is the primary d
 ```json
 {
 	"status": "pending",
-	"slug": "my-directory",
+	"slug": "my-work",
 	"owner": "username",
-	"repository": "username/my-directory-website",
+	"repository": "username/my-work-website",
 	"message": "Deployment started"
 }
 ```
@@ -113,18 +113,18 @@ POST /api/deploy/validate-token
 
 Checks if the user has a valid deployment provider available.
 
-### Get Teams for Directory
+### Get Teams for Work
 
 ```
-POST /api/deploy/directories/:id/teams
+POST /api/deploy/works/:id/teams
 ```
 
-Fetches available teams/organizations from the deployment provider for a specific directory.
+Fetches available teams/organizations from the deployment provider for a specific work.
 
 ### Check Deployment Capability
 
 ```
-POST /api/deploy/directories/:id/check
+POST /api/deploy/works/:id/check
 ```
 
 Returns detailed deployment capability status:
@@ -142,10 +142,10 @@ Returns detailed deployment capability status:
 ### Lookup Existing Deployment
 
 ```
-POST /api/deploy/directories/:id/lookup
+POST /api/deploy/works/:id/lookup
 ```
 
-Checks if a directory has an existing deployment and returns its status.
+Checks if a work has an existing deployment and returns its status.
 
 ### Batch Deploy
 
@@ -153,13 +153,13 @@ Checks if a directory has an existing deployment and returns its status.
 POST /api/deploy/batch
 ```
 
-Deploy multiple directories in a single request.
+Deploy multiple works in a single request.
 
 **Request Body (BatchDeployDto):**
 
 ```json
 {
-	"directories": [{ "directoryId": "uuid-1", "teamScope": "team-slug" }, { "directoryId": "uuid-2" }],
+	"works": [{ "workId": "uuid-1", "teamScope": "team-slug" }, { "workId": "uuid-2" }],
 	"teamScope": "default-team"
 }
 ```
@@ -174,14 +174,14 @@ Deploy multiple directories in a single request.
 	"successfullyStarted": 2,
 	"failed": 1,
 	"results": [
-		{ "directoryId": "uuid-1", "slug": "dir-1", "status": "pending", "message": "Deployment started" },
-		{ "directoryId": "uuid-2", "slug": "dir-2", "status": "pending", "message": "Deployment started" },
-		{ "directoryId": "uuid-3", "slug": "unknown", "status": "error", "message": "Directory not found" }
+		{ "workId": "uuid-1", "slug": "dir-1", "status": "pending", "message": "Deployment started" },
+		{ "workId": "uuid-2", "slug": "dir-2", "status": "pending", "message": "Deployment started" },
+		{ "workId": "uuid-3", "slug": "unknown", "status": "error", "message": "Work not found" }
 	]
 }
 ```
 
-Batch status is `success` (0 failures), `partial` (some succeeded), or `error` (all failed). Batches process up to 5 directories concurrently with a 2-second delay between batches.
+Batch status is `success` (0 failures), `partial` (some succeeded), or `error` (all failed). Batches process up to 5 works concurrently with a 2-second delay between batches.
 
 ## DeployService Internals
 
@@ -237,7 +237,7 @@ flowchart TD
     Start["Start"] --> Poll["Poll every 10s"]
     Poll --> Check["Check deployment via<br/>DeployFacadeService"]
     Check --> Found{"Deployment found with<br/>READY / ERROR / CANCELED?"}
-    Found -- Yes --> Stop["Stop, update directory"]
+    Found -- Yes --> Stop["Stop, update work"]
     Found -- "No, < 3 min" --> Poll
     Found -- "No, > 3 min" --> Timeout["TIMEOUT"]
     Check --> TotalCheck{"Total time > 13 min?"}
@@ -266,19 +266,19 @@ flowchart TD
 
 ### Queue Management
 
-The verifier maintains an in-memory map of active verifications. Starting a new verification for a directory automatically cancels any existing one:
+The verifier maintains an in-memory map of active verifications. Starting a new verification for a work automatically cancels any existing one:
 
 ```typescript
-// Only one verification per directory at a time
-startVerification(directory, userId, teamScope);
+// Only one verification per work at a time
+startVerification(work, userId, teamScope);
 ```
 
 ## DTOs
 
-### DeployDirectoryDto
+### DeployWorkDto
 
 ```typescript
-class DeployDirectoryDto {
+class DeployWorkDto {
 	@IsString()
 	@IsOptional()
 	teamScope?: string;
@@ -291,7 +291,7 @@ class DeployDirectoryDto {
 class BatchDeployDto {
 	@IsArray()
 	@ValidateNested({ each: true })
-	directories: BatchDeployItemDto[];
+	works: BatchDeployItemDto[];
 
 	@IsString()
 	@IsOptional()
@@ -300,7 +300,7 @@ class BatchDeployDto {
 
 class BatchDeployItemDto {
 	@IsString()
-	directoryId: string;
+	workId: string;
 
 	@IsString()
 	@IsOptional()
@@ -321,12 +321,12 @@ class BatchDeployResponseDto {
 }
 ```
 
-## Shared Directory Handling
+## Shared Work Handling
 
-The deploy capability supports shared directories. When a non-owner collaborator triggers deployment:
+The deploy capability supports shared works. When a non-owner collaborator triggers deployment:
 
 - The **owner's** deployment credentials are used (not the collaborator's)
-- The `DirectoryOwnershipService` determines the `isCreator` flag
+- The `WorkOwnershipService` determines the `isCreator` flag
 - Token validation runs against the owner's configuration
 
 ## Source Files

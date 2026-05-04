@@ -235,7 +235,7 @@ The `everworks.plugin` block in a plugin's `package.json`:
 
 - `public` — shown to all users (default).
 - `hidden` — never shown in the plugin UI (internal infrastructure).
-- `user-only` — shown in the user plugins list, hidden from per-directory
+- `user-only` — shown in the user plugins list, hidden from per-work
   plugin pickers.
 
 `configurationMode` decides who provides settings:
@@ -254,7 +254,7 @@ Works `x-*` keywords:
 | `x-widget`         | UI hint (`password`, `textarea`, `select`, etc.). The Web Dashboard renders the matching widget.   |
 | `x-secret`         | Value is encrypted at rest, never returned by APIs, masked in logs/exports.                        |
 | `x-envVar`         | Environment variable fallback when the setting isn't provided in the DB.                           |
-| `x-scope`          | Setting scope: `global` / `user` / `directory`.                                                    |
+| `x-scope`          | Setting scope: `global` / `user` / `work`.                                                         |
 | `x-adminOnly`      | Field is hidden from regular users (used inside `hybrid` plugins).                                 |
 | `x-hidden`         | Field is hidden from the settings UI entirely (used for derived state).                            |
 | `x-showIf`         | Conditional rendering: `{ field, value }` reveals this field only when another matches a value.    |
@@ -302,7 +302,7 @@ interface PluginContext {
 	readonly events: IEventEmitter; // emit + subscribe to pipeline events
 	readonly settings: ISettingsAccessor; // resolve current effective settings
 	readonly env: PluginEnvironment; // read-only env-var window
-	readonly directoryId?: string; // present in directory-scoped invocations
+	readonly workId?: string; // present in work-scoped invocations
 	readonly userId?: string; // present in user-scoped invocations
 }
 ```
@@ -339,10 +339,10 @@ package version changes, the worker restarts.
 For capability resolution, the platform follows this cascade:
 
 1. **Per-call override** — caller passes a specific plugin id.
-2. **Directory-scoped binding** — `directory_plugins` row picks a plugin
-   for the capability for this directory.
+2. **Work-scoped binding** — `work_plugins` row picks a plugin
+   for the capability for this work.
 3. **User-scoped binding** — `user_plugins` row picks a plugin for the
-   user (used outside any directory context).
+   user (used outside any work context).
 4. **`defaultFor` registration** — plugin manifest declares
    `defaultFor: 'search'` and `autoEnable: true`. The first such plugin
    found wins.

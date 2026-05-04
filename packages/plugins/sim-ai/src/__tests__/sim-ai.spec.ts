@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { SimAiPlugin } from '../sim-ai.plugin.js';
-import type { DirectoryReference, GenerationRequest, ExistingItems, PluginContext } from '@ever-works/plugin';
+import type { WorkReference, GenerationRequest, ExistingItems, PluginContext } from '@ever-works/plugin';
 
 // Mock the simstudio-ts-sdk
 vi.mock('simstudio-ts-sdk', () => ({
@@ -80,12 +80,12 @@ function createMockContext(): PluginContext {
 	} as unknown as PluginContext;
 }
 
-function createDirectory(overrides?: Partial<DirectoryReference>): DirectoryReference {
+function createWork(overrides?: Partial<WorkReference>): WorkReference {
 	return {
 		id: 'dir-123',
-		name: 'Test Directory',
-		slug: 'test-directory',
-		description: 'A test directory',
+		name: 'Test Work',
+		slug: 'test-work',
+		description: 'A test work',
 		user: { id: 'user-456' },
 		...overrides
 	};
@@ -267,22 +267,18 @@ describe('SimAiPlugin', () => {
 		});
 
 		it('should fail without user ID', async () => {
-			const result = await plugin.execute(
-				createDirectory({ user: undefined }),
-				createRequest(),
-				createExisting()
-			);
+			const result = await plugin.execute(createWork({ user: undefined }), createRequest(), createExisting());
 			expect(result.success).toBe(false);
 		});
 
 		it('should fail without workflow ID', async () => {
-			const result = await plugin.execute(createDirectory(), createRequest({ config: {} }), createExisting());
+			const result = await plugin.execute(createWork(), createRequest({ config: {} }), createExisting());
 			expect(result.success).toBe(false);
 			expect(result.error).toBeDefined();
 		});
 
 		it('should execute sync workflow successfully', async () => {
-			const result = await plugin.execute(createDirectory(), createRequest(), createExisting());
+			const result = await plugin.execute(createWork(), createRequest(), createExisting());
 
 			expect(result.success).toBe(true);
 			expect(result.outputs.items.length).toBeGreaterThan(0);
@@ -290,7 +286,7 @@ describe('SimAiPlugin', () => {
 		});
 
 		it('should return categories and tags from SIM output', async () => {
-			const result = await plugin.execute(createDirectory(), createRequest(), createExisting());
+			const result = await plugin.execute(createWork(), createRequest(), createExisting());
 
 			expect(result.success).toBe(true);
 			expect(result.outputs.categories.length).toBeGreaterThan(0);
@@ -301,7 +297,7 @@ describe('SimAiPlugin', () => {
 				items: [{ name: 'Test Item 1', description: 'Existing item' } as never]
 			});
 
-			const result = await plugin.execute(createDirectory(), createRequest(), existing);
+			const result = await plugin.execute(createWork(), createRequest(), existing);
 
 			expect(result.success).toBe(true);
 			const hasExisting = result.outputs.items.some((i) => i.name === 'Test Item 1');
@@ -312,7 +308,7 @@ describe('SimAiPlugin', () => {
 			const abortController = new AbortController();
 			abortController.abort();
 
-			const result = await plugin.execute(createDirectory(), createRequest(), createExisting(), {
+			const result = await plugin.execute(createWork(), createRequest(), createExisting(), {
 				signal: abortController.signal
 			});
 
@@ -320,7 +316,7 @@ describe('SimAiPlugin', () => {
 		});
 
 		it('should track state during execution', async () => {
-			await plugin.execute(createDirectory(), createRequest(), createExisting());
+			await plugin.execute(createWork(), createRequest(), createExisting());
 
 			const state = plugin.getState();
 			expect(state).toBeDefined();

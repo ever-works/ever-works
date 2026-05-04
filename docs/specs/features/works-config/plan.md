@@ -1,4 +1,4 @@
-# Implementation Plan: `works.yml` Source-Controlled Directory Configuration
+# Implementation Plan: `works.yml` Source-Controlled Work Configuration
 
 **Feature ID**: `works-config`
 **Spec**: `./spec.md`
@@ -28,23 +28,23 @@ flowchart LR
 
 ## 2. Tech Choices
 
-| Concern        | Choice                                                        | Rationale                                |
-| -------------- | ------------------------------------------------------------- | ---------------------------------------- |
-| YAML parsing   | `yaml` package                                                | Standards-compliant, round-trip-friendly |
-| Git access     | `GitFacadeService` (existing)                                 | Principle II — no direct Octokit usage   |
-| Persistence    | Mirror to existing `directories` columns; raw blob not stored | Avoid double source-of-truth             |
-| Background job | None                                                          | Sync runs inline with generation         |
+| Concern        | Choice                                                  | Rationale                                |
+| -------------- | ------------------------------------------------------- | ---------------------------------------- |
+| YAML parsing   | `yaml` package                                          | Standards-compliant, round-trip-friendly |
+| Git access     | `GitFacadeService` (existing)                           | Principle II — no direct Octokit usage   |
+| Persistence    | Mirror to existing `works` columns; raw blob not stored | Avoid double source-of-truth             |
+| Background job | None                                                    | Sync runs inline with generation         |
 
 ## 3. Data Model
 
-No schema changes — the writer mirrors existing `directories` columns
+No schema changes — the writer mirrors existing `works` columns
 (`name`, `initialPrompt`, `model`, `providers`, `scheduledCadence`,
 `scheduledUpdatesEnabled`, `websiteRepositoryTarget`) into the YAML file.
 
 ## 4. API Surface
 
 No new endpoints. `works.yml` is read during the existing
-`POST /api/directories/import` flow and written by the directory generation
+`POST /api/works/import` flow and written by the work generation
 flow.
 
 ## 5. Plugin Surface
@@ -73,9 +73,9 @@ generation, both in-process.
 
 ## 9. Observability
 
-- Parse failures: activity-log action `directory_import` with status `failed`
+- Parse failures: activity-log action `work_import` with status `failed`
   and `details.reason = 'works_config_parse_error'`.
-- Plugin-id validation failures: activity-log action `directory_import` with
+- Plugin-id validation failures: activity-log action `work_import` with
   status `failed` and `details.reason = 'unknown_plugin_id'`.
 - Sync failures: activity-log action `works_config_sync_failure` with the
   error message.

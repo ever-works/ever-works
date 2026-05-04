@@ -7,7 +7,7 @@ sidebar_position: 11
 
 # Deployment & Git Plugins
 
-Deployment and git plugins handle the full lifecycle of publishing a generated directory: creating repositories, managing branches, committing code, creating pull requests, and deploying to hosting platforms.
+Deployment and git plugins handle the full lifecycle of publishing a generated work: creating repositories, managing branches, committing code, creating pull requests, and deploying to hosting platforms.
 
 ## GitHub Plugin
 
@@ -70,7 +70,7 @@ interface IGitProviderPlugin extends IPlugin, IGitOperations {
 	// Content access
 	getFileContent?(owner, repo, path, ref?, token?): Promise<{ content; encoding } | null>;
 	getReadme?(owner, repo, ref?, token?): Promise<{ content; path } | null>;
-	getDirectoryContents?(owner, repo, path, token): Promise<Array<{ name; type; path }> | null>;
+	getWorkContents?(owner, repo, path, token): Promise<Array<{ name; type; path }> | null>;
 }
 ```
 
@@ -90,7 +90,7 @@ These operations use `isomorphic-git` and are the same for all git providers -- 
 | `getMainBranch(dir)`                 | Detect the main/master branch          |
 | `switchBranch(dir, branch, create?)` | Switch or create a branch              |
 | `getStatus(dir)`                     | Get file change status                 |
-| `getLocalDir(owner, repo)`           | Get local clone directory path         |
+| `getLocalDir(owner, repo)`           | Get local clone work path              |
 | `removeLocalDir(owner, repo)`        | Clean up local clone                   |
 
 ### OAuth Integration
@@ -132,7 +132,7 @@ The `GitHubActionsService` handles:
 
 ## Vercel Plugin
 
-The Vercel plugin handles deployment of generated directories to the Vercel hosting platform.
+The Vercel plugin handles deployment of generated works to the Vercel hosting platform.
 
 | Property           | Value                       |
 | ------------------ | --------------------------- |
@@ -175,9 +175,9 @@ The Vercel plugin works with the GitHub plugin for a git-based deployment workfl
 ```typescript
 interface DeploymentConfig {
 	projectName: string; // Vercel project name
-	sourceDir: string; // Directory containing the code
+	sourceDir: string; // Work containing the code
 	buildCommand?: string; // Custom build command
-	outputDir?: string; // Build output directory
+	outputDir?: string; // Build output work
 	env?: Record<string, string>; // Environment variables
 	domain?: string; // Custom domain
 	options?: Record<string, unknown>;

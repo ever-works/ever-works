@@ -5,7 +5,7 @@ import { Repository } from 'typeorm';
 import { PluginOperationsService } from '../services/plugin-operations.service';
 import { PluginEntity } from '../entities/plugin.entity';
 import { UserPluginEntity } from '../entities/user-plugin.entity';
-import { DirectoryPluginEntity } from '../entities/directory-plugin.entity';
+import { WorkPluginEntity } from '../entities/work-plugin.entity';
 import { PluginRegistryService } from '../services/plugin-registry.service';
 import { SettingsSchemaValidatorService } from '../services/settings-schema-validator.service';
 import { PluginSettingsService } from '../services/plugin-settings.service';
@@ -35,7 +35,7 @@ describe('PluginOperationsService', () => {
     let service: PluginOperationsService;
     let pluginRepository: Repository<PluginEntity>;
     let userPluginRepository: Repository<UserPluginEntity>;
-    let directoryPluginRepository: Repository<DirectoryPluginEntity>;
+    let workPluginRepository: Repository<WorkPluginEntity>;
     let pluginRegistryService: PluginRegistryService;
     let settingsService: PluginSettingsService;
 
@@ -121,7 +121,7 @@ describe('PluginOperationsService', () => {
                     },
                 },
                 {
-                    provide: getRepositoryToken(DirectoryPluginEntity),
+                    provide: getRepositoryToken(WorkPluginEntity),
                     useValue: {
                         findOne: jest.fn().mockResolvedValue(null),
                         find: jest.fn().mockResolvedValue([]),
@@ -173,8 +173,8 @@ describe('PluginOperationsService', () => {
         userPluginRepository = module.get<Repository<UserPluginEntity>>(
             getRepositoryToken(UserPluginEntity),
         );
-        directoryPluginRepository = module.get<Repository<DirectoryPluginEntity>>(
-            getRepositoryToken(DirectoryPluginEntity),
+        workPluginRepository = module.get<Repository<WorkPluginEntity>>(
+            getRepositoryToken(WorkPluginEntity),
         );
         pluginRegistryService = module.get<PluginRegistryService>(PluginRegistryService);
         settingsService = module.get<PluginSettingsService>(PluginSettingsService);
@@ -207,7 +207,7 @@ describe('PluginOperationsService', () => {
                 expect(result.settings!.normalSetting).toBe('should-appear');
             });
 
-            it('should return masked secret values in directory plugin response', async () => {
+            it('should return masked secret values in work plugin response', async () => {
                 const registered = createRegisteredPlugin();
                 jest.spyOn(pluginRegistryService, 'get').mockReturnValue(registered);
                 jest.spyOn(pluginRegistryService, 'getAll').mockReturnValue([registered]);
@@ -224,10 +224,10 @@ describe('PluginOperationsService', () => {
                     } as any,
                 ]);
 
-                jest.spyOn(directoryPluginRepository, 'find').mockResolvedValue([
+                jest.spyOn(workPluginRepository, 'find').mockResolvedValue([
                     {
                         id: '1',
-                        directoryId: 'dir-1',
+                        workId: 'dir-1',
                         pluginId: 'test-plugin',
                         enabled: true,
                         settings: {
@@ -243,25 +243,25 @@ describe('PluginOperationsService', () => {
                     normalSetting: {
                         key: 'normalSetting',
                         value: 'should-appear',
-                        source: 'directory',
+                        source: 'work',
                         isFallback: false,
                     },
                     secretField: {
                         key: 'secretField',
                         value: 'real-dir-secret',
-                        source: 'directory',
+                        source: 'work',
                         isFallback: false,
                     },
                 });
 
-                const result = await service.listDirectoryPlugins('dir-1', 'user-1');
+                const result = await service.listWorkPlugins('dir-1', 'user-1');
 
                 const plugin = result.plugins.find((p) => p.pluginId === 'test-plugin');
                 expect(plugin).toBeDefined();
-                expect(plugin!.directorySettings).toBeDefined();
+                expect(plugin!.workSettings).toBeDefined();
                 // Secret field should be masked (first 4 + •••• + last 4)
-                expect(plugin!.directorySettings!.secretField).toBe('real••••cret');
-                expect(plugin!.directorySettings!.normalSetting).toBe('should-appear');
+                expect(plugin!.workSettings!.secretField).toBe('real••••cret');
+                expect(plugin!.workSettings!.normalSetting).toBe('should-appear');
             });
         });
 
@@ -616,8 +616,8 @@ describe('PluginOperationsService', () => {
         });
     });
 
-    describe('disablePluginForDirectory', () => {
-        it('should throw BadRequestException when disabling a systemPlugin at directory level', async () => {
+    describe('disablePluginForWork', () => {
+        it('should throw BadRequestException when disabling a systemPlugin at work level', async () => {
             const systemPlugin = createRegisteredPlugin();
             systemPlugin.manifest = {
                 ...systemPlugin.manifest,
@@ -627,11 +627,11 @@ describe('PluginOperationsService', () => {
             jest.spyOn(pluginRegistryService, 'get').mockReturnValue(systemPlugin);
 
             await expect(
-                service.disablePluginForDirectory('dir-1', 'test-plugin', 'user-1'),
+                service.disablePluginForWork('dir-1', 'test-plugin', 'user-1'),
             ).rejects.toThrow(BadRequestException);
         });
 
-        it('should allow disabling an autoEnable plugin at directory level', async () => {
+        it('should allow disabling an autoEnable plugin at work level', async () => {
             const autoEnablePlugin = createRegisteredPlugin();
             autoEnablePlugin.manifest = {
                 ...autoEnablePlugin.manifest,
@@ -648,9 +648,9 @@ describe('PluginOperationsService', () => {
                 secretSettings: {},
                 metadata: {},
             } as any);
-            jest.spyOn(directoryPluginRepository, 'findOne').mockResolvedValue({
+            jest.spyOn(workPluginRepository, 'findOne').mockResolvedValue({
                 id: '1',
-                directoryId: 'dir-1',
+                workId: 'dir-1',
                 pluginId: 'test-plugin',
                 enabled: true,
                 settings: {},
@@ -658,17 +658,13 @@ describe('PluginOperationsService', () => {
                 metadata: {},
             } as any);
 
-            const result = await service.disablePluginForDirectory(
-                'dir-1',
-                'test-plugin',
-                'user-1',
-            );
+            const result = await service.disablePluginForWork('dir-1', 'test-plugin', 'user-1');
 
-            expect(result.directoryEnabled).toBe(false);
-            expect(directoryPluginRepository.save).toHaveBeenCalled();
+            expect(result.workEnabled).toBe(false);
+            expect(workPluginRepository.save).toHaveBeenCalled();
         });
 
-        it('should successfully disable a normal plugin for directory', async () => {
+        it('should successfully disable a normal plugin for work', async () => {
             const registered = createRegisteredPlugin();
             jest.spyOn(pluginRegistryService, 'get').mockReturnValue(registered);
             jest.spyOn(userPluginRepository, 'findOne').mockResolvedValue({
@@ -680,9 +676,9 @@ describe('PluginOperationsService', () => {
                 secretSettings: {},
                 metadata: {},
             } as any);
-            jest.spyOn(directoryPluginRepository, 'findOne').mockResolvedValue({
+            jest.spyOn(workPluginRepository, 'findOne').mockResolvedValue({
                 id: '1',
-                directoryId: 'dir-1',
+                workId: 'dir-1',
                 pluginId: 'test-plugin',
                 enabled: true,
                 settings: {},
@@ -690,14 +686,10 @@ describe('PluginOperationsService', () => {
                 metadata: {},
             } as any);
 
-            const result = await service.disablePluginForDirectory(
-                'dir-1',
-                'test-plugin',
-                'user-1',
-            );
+            const result = await service.disablePluginForWork('dir-1', 'test-plugin', 'user-1');
 
-            expect(result.directoryEnabled).toBe(false);
-            expect(directoryPluginRepository.save).toHaveBeenCalled();
+            expect(result.workEnabled).toBe(false);
+            expect(workPluginRepository.save).toHaveBeenCalled();
         });
     });
 
@@ -782,7 +774,7 @@ describe('PluginOperationsService', () => {
     });
 
     describe('visibility filtering', () => {
-        it('should filter out user-only plugins from listDirectoryPlugins', async () => {
+        it('should filter out user-only plugins from listWorkPlugins', async () => {
             const userOnlyPlugin = createRegisteredPlugin();
             userOnlyPlugin.manifest = {
                 ...userOnlyPlugin.manifest,
@@ -794,31 +786,31 @@ describe('PluginOperationsService', () => {
                 id: 'user-only-plugin',
             } as IPlugin;
 
-            const directoryPlugin = createRegisteredPlugin();
-            directoryPlugin.manifest = {
-                ...directoryPlugin.manifest,
-                id: 'directory-plugin',
+            const workPlugin = createRegisteredPlugin();
+            workPlugin.manifest = {
+                ...workPlugin.manifest,
+                id: 'work-plugin',
                 visibility: 'public',
             } as PluginManifest;
-            directoryPlugin.plugin = {
-                ...directoryPlugin.plugin,
-                id: 'directory-plugin',
+            workPlugin.plugin = {
+                ...workPlugin.plugin,
+                id: 'work-plugin',
             } as IPlugin;
 
             jest.spyOn(pluginRegistryService, 'getAll').mockReturnValue([
                 userOnlyPlugin,
-                directoryPlugin,
+                workPlugin,
             ]);
             jest.spyOn(userPluginRepository, 'find').mockResolvedValue([]);
-            jest.spyOn(directoryPluginRepository, 'find').mockResolvedValue([]);
+            jest.spyOn(workPluginRepository, 'find').mockResolvedValue([]);
 
-            const result = await service.listDirectoryPlugins('dir-1', 'user-1');
+            const result = await service.listWorkPlugins('dir-1', 'user-1');
 
             expect(result.plugins.length).toBe(1);
-            expect(result.plugins[0].pluginId).toBe('directory-plugin');
+            expect(result.plugins[0].pluginId).toBe('work-plugin');
         });
 
-        it('should filter out hidden plugins from listDirectoryPlugins', async () => {
+        it('should filter out hidden plugins from listWorkPlugins', async () => {
             const hiddenPlugin = createRegisteredPlugin();
             hiddenPlugin.manifest = {
                 ...hiddenPlugin.manifest,
@@ -846,22 +838,22 @@ describe('PluginOperationsService', () => {
                 publicPlugin,
             ]);
             jest.spyOn(userPluginRepository, 'find').mockResolvedValue([]);
-            jest.spyOn(directoryPluginRepository, 'find').mockResolvedValue([]);
+            jest.spyOn(workPluginRepository, 'find').mockResolvedValue([]);
 
-            const result = await service.listDirectoryPlugins('dir-1', 'user-1');
+            const result = await service.listWorkPlugins('dir-1', 'user-1');
 
             expect(result.plugins.length).toBe(1);
             expect(result.plugins[0].pluginId).toBe('public-plugin');
         });
 
-        it('should include plugins with default visibility in listDirectoryPlugins', async () => {
+        it('should include plugins with default visibility in listWorkPlugins', async () => {
             const defaultVisibilityPlugin = createRegisteredPlugin();
             // No visibility set - should default to 'public'
             jest.spyOn(pluginRegistryService, 'getAll').mockReturnValue([defaultVisibilityPlugin]);
             jest.spyOn(userPluginRepository, 'find').mockResolvedValue([]);
-            jest.spyOn(directoryPluginRepository, 'find').mockResolvedValue([]);
+            jest.spyOn(workPluginRepository, 'find').mockResolvedValue([]);
 
-            const result = await service.listDirectoryPlugins('dir-1', 'user-1');
+            const result = await service.listWorkPlugins('dir-1', 'user-1');
 
             expect(result.plugins.length).toBe(1);
         });
@@ -912,7 +904,7 @@ describe('PluginOperationsService', () => {
             );
         });
 
-        it('should save secret settings on updateDirectoryPluginSettings', async () => {
+        it('should save secret settings on updateWorkPluginSettings', async () => {
             const registered = createRegisteredPlugin();
             jest.spyOn(pluginRegistryService, 'get').mockReturnValue(registered);
             jest.spyOn(userPluginRepository, 'findOne').mockResolvedValue({
@@ -924,9 +916,9 @@ describe('PluginOperationsService', () => {
                 secretSettings: {},
                 metadata: {},
             } as any);
-            jest.spyOn(directoryPluginRepository, 'findOne').mockResolvedValue({
+            jest.spyOn(workPluginRepository, 'findOne').mockResolvedValue({
                 id: '1',
-                directoryId: 'dir-1',
+                workId: 'dir-1',
                 pluginId: 'test-plugin',
                 enabled: true,
                 settings: {},
@@ -934,15 +926,11 @@ describe('PluginOperationsService', () => {
                 metadata: {},
             } as any);
 
-            await service.updateDirectoryPluginSettings(
-                'dir-1',
-                'test-plugin',
-                'user-1',
-                undefined,
-                { secretField: 'new-secret' },
-            );
+            await service.updateWorkPluginSettings('dir-1', 'test-plugin', 'user-1', undefined, {
+                secretField: 'new-secret',
+            });
 
-            expect(directoryPluginRepository.save).toHaveBeenCalledWith(
+            expect(workPluginRepository.save).toHaveBeenCalledWith(
                 expect.objectContaining({
                     secretSettings: { secretField: 'new-secret' },
                 }),
@@ -1664,8 +1652,8 @@ describe('PluginOperationsService', () => {
         });
     });
 
-    describe('autoEnableForDirectories', () => {
-        it('should store autoEnableForDirectories when creating new user plugin', async () => {
+    describe('autoEnableForWorks', () => {
+        it('should store autoEnableForWorks when creating new user plugin', async () => {
             const registered = createRegisteredPlugin();
             jest.spyOn(pluginRegistryService, 'get').mockReturnValue(registered);
             jest.spyOn(pluginRepository, 'findOne').mockResolvedValue({
@@ -1677,12 +1665,12 @@ describe('PluginOperationsService', () => {
             await service.enablePluginForUser('test-plugin', 'user-1', undefined, undefined, true);
 
             expect(userPluginRepository.create).toHaveBeenCalledWith(
-                expect.objectContaining({ autoEnableForDirectories: true }),
+                expect.objectContaining({ autoEnableForWorks: true }),
             );
             expect(userPluginRepository.save).toHaveBeenCalled();
         });
 
-        it('should default autoEnableForDirectories to false', async () => {
+        it('should default autoEnableForWorks to false', async () => {
             const registered = createRegisteredPlugin();
             jest.spyOn(pluginRegistryService, 'get').mockReturnValue(registered);
             jest.spyOn(pluginRepository, 'findOne').mockResolvedValue({
@@ -1694,11 +1682,11 @@ describe('PluginOperationsService', () => {
             await service.enablePluginForUser('test-plugin', 'user-1');
 
             expect(userPluginRepository.create).toHaveBeenCalledWith(
-                expect.objectContaining({ autoEnableForDirectories: false }),
+                expect.objectContaining({ autoEnableForWorks: false }),
             );
         });
 
-        it('should update autoEnableForDirectories on existing user plugin', async () => {
+        it('should update autoEnableForWorks on existing user plugin', async () => {
             const registered = createRegisteredPlugin();
             jest.spyOn(pluginRegistryService, 'get').mockReturnValue(registered);
             jest.spyOn(pluginRepository, 'findOne').mockResolvedValue({
@@ -1710,7 +1698,7 @@ describe('PluginOperationsService', () => {
                 userId: 'user-1',
                 pluginId: 'test-plugin',
                 enabled: false,
-                autoEnableForDirectories: false,
+                autoEnableForWorks: false,
                 settings: {},
                 secretSettings: {},
                 metadata: {},
@@ -1720,11 +1708,11 @@ describe('PluginOperationsService', () => {
             await service.enablePluginForUser('test-plugin', 'user-1', undefined, undefined, true);
 
             expect(userPluginRepository.save).toHaveBeenCalledWith(
-                expect.objectContaining({ autoEnableForDirectories: true }),
+                expect.objectContaining({ autoEnableForWorks: true }),
             );
         });
 
-        it('should include autoEnableForDirectories in user plugin response', async () => {
+        it('should include autoEnableForWorks in user plugin response', async () => {
             const registered = createRegisteredPlugin();
             jest.spyOn(pluginRegistryService, 'get').mockReturnValue(registered);
             jest.spyOn(userPluginRepository, 'findOne').mockResolvedValue({
@@ -1732,7 +1720,7 @@ describe('PluginOperationsService', () => {
                 userId: 'user-1',
                 pluginId: 'test-plugin',
                 enabled: true,
-                autoEnableForDirectories: true,
+                autoEnableForWorks: true,
                 settings: {},
                 secretSettings: {},
                 metadata: {},
@@ -1740,10 +1728,10 @@ describe('PluginOperationsService', () => {
 
             const result = await service.getPlugin('test-plugin', 'user-1');
 
-            expect(result.autoEnableForDirectories).toBe(true);
+            expect(result.autoEnableForWorks).toBe(true);
         });
 
-        it('should use autoEnableForDirectories in directory plugin response', async () => {
+        it('should use autoEnableForWorks in work plugin response', async () => {
             const plugin = createRegisteredPlugin();
             plugin.manifest = { ...plugin.manifest, autoEnable: false } as PluginManifest;
             jest.spyOn(pluginRegistryService, 'getAll').mockReturnValue([plugin]);
@@ -1753,20 +1741,20 @@ describe('PluginOperationsService', () => {
                     userId: 'user-1',
                     pluginId: 'test-plugin',
                     enabled: true,
-                    autoEnableForDirectories: true,
+                    autoEnableForWorks: true,
                     settings: {},
                     secretSettings: {},
                     metadata: {},
                 } as any,
             ]);
-            jest.spyOn(directoryPluginRepository, 'find').mockResolvedValue([]);
+            jest.spyOn(workPluginRepository, 'find').mockResolvedValue([]);
 
-            const result = await service.listDirectoryPlugins('dir-1', 'user-1');
+            const result = await service.listWorkPlugins('dir-1', 'user-1');
 
-            expect(result.plugins[0].directoryEnabled).toBe(true);
+            expect(result.plugins[0].workEnabled).toBe(true);
         });
 
-        it('should respect autoEnableForDirectories=false even when manifest autoEnable=true', async () => {
+        it('should respect autoEnableForWorks=false even when manifest autoEnable=true', async () => {
             const plugin = createRegisteredPlugin();
             plugin.manifest = { ...plugin.manifest, autoEnable: true } as PluginManifest;
             jest.spyOn(pluginRegistryService, 'getAll').mockReturnValue([plugin]);
@@ -1776,22 +1764,22 @@ describe('PluginOperationsService', () => {
                     userId: 'user-1',
                     pluginId: 'test-plugin',
                     enabled: true,
-                    autoEnableForDirectories: false,
+                    autoEnableForWorks: false,
                     settings: {},
                     secretSettings: {},
                     metadata: {},
                 } as any,
             ]);
-            jest.spyOn(directoryPluginRepository, 'find').mockResolvedValue([]);
+            jest.spyOn(workPluginRepository, 'find').mockResolvedValue([]);
 
-            const result = await service.listDirectoryPlugins('dir-1', 'user-1');
+            const result = await service.listWorkPlugins('dir-1', 'user-1');
 
-            // User explicitly chose autoEnableForDirectories=false, so plugin is NOT
-            // enabled at directory level despite manifest autoEnable=true
-            expect(result.plugins[0].directoryEnabled).toBe(false);
+            // User explicitly chose autoEnableForWorks=false, so plugin is NOT
+            // enabled at work level despite manifest autoEnable=true
+            expect(result.plugins[0].workEnabled).toBe(false);
         });
 
-        it('should auto-create directory record in updateDirectoryPluginSettings when user has autoEnableForDirectories', async () => {
+        it('should auto-create work record in updateWorkPluginSettings when user has autoEnableForWorks', async () => {
             const registered = createRegisteredPlugin();
             registered.manifest = { ...registered.manifest, autoEnable: false } as PluginManifest;
             jest.spyOn(pluginRegistryService, 'get').mockReturnValue(registered);
@@ -1800,28 +1788,28 @@ describe('PluginOperationsService', () => {
                 userId: 'user-1',
                 pluginId: 'test-plugin',
                 enabled: true,
-                autoEnableForDirectories: true,
+                autoEnableForWorks: true,
                 settings: {},
                 secretSettings: {},
                 metadata: {},
             } as any);
-            jest.spyOn(directoryPluginRepository, 'findOne').mockResolvedValue(null);
+            jest.spyOn(workPluginRepository, 'findOne').mockResolvedValue(null);
             jest.spyOn(pluginRepository, 'findOne').mockResolvedValue({
                 id: '1',
                 pluginId: 'test-plugin',
             } as any);
 
-            await service.updateDirectoryPluginSettings('dir-1', 'test-plugin', 'user-1', {
+            await service.updateWorkPluginSettings('dir-1', 'test-plugin', 'user-1', {
                 normalSetting: 'val',
             });
 
-            expect(directoryPluginRepository.create).toHaveBeenCalledWith(
+            expect(workPluginRepository.create).toHaveBeenCalledWith(
                 expect.objectContaining({ enabled: true }),
             );
-            expect(directoryPluginRepository.save).toHaveBeenCalled();
+            expect(workPluginRepository.save).toHaveBeenCalled();
         });
 
-        it('should auto-create directory record in setActiveCapability when user has autoEnableForDirectories', async () => {
+        it('should auto-create work record in setActiveCapability when user has autoEnableForWorks', async () => {
             const registered = createRegisteredPlugin();
             registered.manifest = { ...registered.manifest, autoEnable: false } as PluginManifest;
             jest.spyOn(pluginRegistryService, 'get').mockReturnValue(registered);
@@ -1830,12 +1818,12 @@ describe('PluginOperationsService', () => {
                 userId: 'user-1',
                 pluginId: 'test-plugin',
                 enabled: true,
-                autoEnableForDirectories: true,
+                autoEnableForWorks: true,
                 settings: {},
                 secretSettings: {},
                 metadata: {},
             } as any);
-            jest.spyOn(directoryPluginRepository, 'findOne').mockResolvedValue(null);
+            jest.spyOn(workPluginRepository, 'findOne').mockResolvedValue(null);
             jest.spyOn(pluginRepository, 'findOne').mockResolvedValue({
                 id: '1',
                 pluginId: 'test-plugin',
@@ -1843,10 +1831,10 @@ describe('PluginOperationsService', () => {
 
             await service.setActiveCapability('dir-1', 'test-plugin', 'user-1', 'test');
 
-            expect(directoryPluginRepository.save).toHaveBeenCalled();
+            expect(workPluginRepository.save).toHaveBeenCalled();
         });
 
-        it('should enable an existing directory plugin when selected as capability provider', async () => {
+        it('should enable an existing work plugin when selected as capability provider', async () => {
             const registered = createRegisteredPlugin();
             jest.spyOn(pluginRegistryService, 'get').mockReturnValue(registered);
             jest.spyOn(userPluginRepository, 'findOne').mockResolvedValue({
@@ -1859,9 +1847,9 @@ describe('PluginOperationsService', () => {
                 metadata: {},
             } as any);
 
-            const directoryPlugin = {
+            const workPlugin = {
                 id: '1',
-                directoryId: 'dir-1',
+                workId: 'dir-1',
                 pluginId: 'test-plugin',
                 enabled: false,
                 activeCapabilities: [],
@@ -1869,12 +1857,12 @@ describe('PluginOperationsService', () => {
                 secretSettings: {},
                 metadata: {},
             } as any;
-            jest.spyOn(directoryPluginRepository, 'findOne').mockResolvedValue(directoryPlugin);
-            jest.spyOn(directoryPluginRepository, 'find').mockResolvedValue([directoryPlugin]);
+            jest.spyOn(workPluginRepository, 'findOne').mockResolvedValue(workPlugin);
+            jest.spyOn(workPluginRepository, 'find').mockResolvedValue([workPlugin]);
 
             await service.setActiveCapability('dir-1', 'test-plugin', 'user-1', 'test');
 
-            expect(directoryPluginRepository.save).toHaveBeenCalledWith(
+            expect(workPluginRepository.save).toHaveBeenCalledWith(
                 expect.objectContaining({
                     enabled: true,
                     activeCapabilities: ['test'],
@@ -1911,10 +1899,10 @@ describe('PluginOperationsService', () => {
                     metadata: {},
                 } as any,
             ]);
-            jest.spyOn(directoryPluginRepository, 'find').mockResolvedValue([
+            jest.spyOn(workPluginRepository, 'find').mockResolvedValue([
                 {
                     id: '1',
-                    directoryId: 'dir-1',
+                    workId: 'dir-1',
                     pluginId: 'tavily',
                     enabled: true,
                     activeCapabilities: ['search', 'content-extractor'],
@@ -1924,7 +1912,7 @@ describe('PluginOperationsService', () => {
                 } as any,
             ]);
 
-            const result = await service.listDirectoryPlugins('dir-1', 'user-1');
+            const result = await service.listWorkPlugins('dir-1', 'user-1');
 
             expect(result.capabilityProviders).toEqual({
                 search: 'tavily',
@@ -1933,7 +1921,7 @@ describe('PluginOperationsService', () => {
             expect(result.plugins[0].activeCapabilities).toEqual(['search', 'content-extractor']);
         });
 
-        it('should throw in updateDirectoryPluginSettings when user has plugin disabled', async () => {
+        it('should throw in updateWorkPluginSettings when user has plugin disabled', async () => {
             const registered = createRegisteredPlugin();
             registered.manifest = { ...registered.manifest, autoEnable: false } as PluginManifest;
             jest.spyOn(pluginRegistryService, 'get').mockReturnValue(registered);
@@ -1942,21 +1930,21 @@ describe('PluginOperationsService', () => {
                 userId: 'user-1',
                 pluginId: 'test-plugin',
                 enabled: false,
-                autoEnableForDirectories: false,
+                autoEnableForWorks: false,
                 settings: {},
                 secretSettings: {},
                 metadata: {},
             } as any);
-            jest.spyOn(directoryPluginRepository, 'findOne').mockResolvedValue(null);
+            jest.spyOn(workPluginRepository, 'findOne').mockResolvedValue(null);
 
             await expect(
-                service.updateDirectoryPluginSettings('dir-1', 'test-plugin', 'user-1', {
+                service.updateWorkPluginSettings('dir-1', 'test-plugin', 'user-1', {
                     normalSetting: 'val',
                 }),
             ).rejects.toThrow(BadRequestException);
         });
 
-        it('should create opt-out record when disabling auto-enabled plugin for directory', async () => {
+        it('should create opt-out record when disabling auto-enabled plugin for work', async () => {
             const registered = createRegisteredPlugin();
             registered.manifest = { ...registered.manifest, autoEnable: false } as PluginManifest;
             jest.spyOn(pluginRegistryService, 'get').mockReturnValue(registered);
@@ -1965,23 +1953,23 @@ describe('PluginOperationsService', () => {
                 userId: 'user-1',
                 pluginId: 'test-plugin',
                 enabled: true,
-                autoEnableForDirectories: true,
+                autoEnableForWorks: true,
                 settings: {},
                 secretSettings: {},
                 metadata: {},
             } as any);
-            jest.spyOn(directoryPluginRepository, 'findOne').mockResolvedValue(null);
+            jest.spyOn(workPluginRepository, 'findOne').mockResolvedValue(null);
             jest.spyOn(pluginRepository, 'findOne').mockResolvedValue({
                 id: '1',
                 pluginId: 'test-plugin',
             } as any);
 
-            await service.disablePluginForDirectory('dir-1', 'test-plugin', 'user-1');
+            await service.disablePluginForWork('dir-1', 'test-plugin', 'user-1');
 
-            expect(directoryPluginRepository.create).toHaveBeenCalledWith(
+            expect(workPluginRepository.create).toHaveBeenCalledWith(
                 expect.objectContaining({ enabled: false }),
             );
-            expect(directoryPluginRepository.save).toHaveBeenCalled();
+            expect(workPluginRepository.save).toHaveBeenCalled();
         });
     });
 
@@ -2040,11 +2028,11 @@ describe('PluginOperationsService', () => {
         });
     });
 
-    describe('x-requiredGroups in directory settings', () => {
+    describe('x-requiredGroups in work settings', () => {
         let realService: PluginOperationsService;
         let realRegistry: PluginRegistryService;
         let realUserPluginRepo: Repository<UserPluginEntity>;
-        let realDirectoryPluginRepo: Repository<DirectoryPluginEntity>;
+        let realWorkPluginRepo: Repository<WorkPluginEntity>;
 
         beforeEach(async () => {
             const mod: TestingModule = await Test.createTestingModule({
@@ -2068,7 +2056,7 @@ describe('PluginOperationsService', () => {
                         },
                     },
                     {
-                        provide: getRepositoryToken(DirectoryPluginEntity),
+                        provide: getRepositoryToken(WorkPluginEntity),
                         useValue: {
                             findOne: jest.fn().mockResolvedValue(null),
                             save: jest.fn().mockImplementation((e) => e),
@@ -2106,7 +2094,7 @@ describe('PluginOperationsService', () => {
             realService = mod.get(PluginOperationsService);
             realRegistry = mod.get(PluginRegistryService);
             realUserPluginRepo = mod.get(getRepositoryToken(UserPluginEntity));
-            realDirectoryPluginRepo = mod.get(getRepositoryToken(DirectoryPluginEntity));
+            realWorkPluginRepo = mod.get(getRepositoryToken(WorkPluginEntity));
         });
 
         const makeSchema = (overrides: Partial<JsonSchema> = {}): JsonSchema =>
@@ -2124,7 +2112,7 @@ describe('PluginOperationsService', () => {
             return createRegisteredPlugin(plugin);
         };
 
-        const setupDirectoryPlugin = (
+        const setupWorkPlugin = (
             userSettings: Record<string, unknown>,
             dirSettings: Record<string, unknown>,
         ) => {
@@ -2137,9 +2125,9 @@ describe('PluginOperationsService', () => {
                 secretSettings: userSettings,
                 metadata: {},
             } as any);
-            jest.spyOn(realDirectoryPluginRepo, 'findOne').mockResolvedValue({
+            jest.spyOn(realWorkPluginRepo, 'findOne').mockResolvedValue({
                 id: '2',
-                directoryId: 'dir-1',
+                workId: 'dir-1',
                 pluginId: 'test-plugin',
                 enabled: true,
                 settings: {},
@@ -2148,26 +2136,22 @@ describe('PluginOperationsService', () => {
             } as any);
         };
 
-        it('should allow directory save when group has mixed scopes and user set nothing', async () => {
+        it('should allow work save when group has mixed scopes and user set nothing', async () => {
             const schema = makeSchema({
                 'x-requiredGroups': [{ fields: ['oauthToken', 'apiKey'], message: 'Need auth' }],
             });
             jest.spyOn(realRegistry, 'get').mockReturnValue(makePlugin(schema));
-            setupDirectoryPlugin({}, {});
+            setupWorkPlugin({}, {});
 
-            // Directory provides apiKey (global scope) — should pass
+            // Work provides apiKey (global scope) — should pass
             await expect(
-                realService.updateDirectoryPluginSettings(
-                    'dir-1',
-                    'test-plugin',
-                    'user-1',
-                    undefined,
-                    { apiKey: 'sk-123' },
-                ),
+                realService.updateWorkPluginSettings('dir-1', 'test-plugin', 'user-1', undefined, {
+                    apiKey: 'sk-123',
+                }),
             ).resolves.toBeDefined();
         });
 
-        it('should block directory save when all group fields are user-scoped and user set nothing', async () => {
+        it('should block work save when all group fields are user-scoped and user set nothing', async () => {
             const schema: JsonSchema = {
                 type: 'object',
                 properties: {
@@ -2178,10 +2162,10 @@ describe('PluginOperationsService', () => {
             } as unknown as JsonSchema;
 
             jest.spyOn(realRegistry, 'get').mockReturnValue(makePlugin(schema));
-            setupDirectoryPlugin({}, {});
+            setupWorkPlugin({}, {});
 
             await expect(
-                realService.updateDirectoryPluginSettings('dir-1', 'test-plugin', 'user-1', {
+                realService.updateWorkPluginSettings('dir-1', 'test-plugin', 'user-1', {
                     some: 'value',
                 }),
             ).rejects.toThrow('User-level required settings must be configured first');
@@ -2198,10 +2182,10 @@ describe('PluginOperationsService', () => {
             } as unknown as JsonSchema;
 
             jest.spyOn(realRegistry, 'get').mockReturnValue(makePlugin(schema));
-            setupDirectoryPlugin({ tokenA: 'my-token' }, {});
+            setupWorkPlugin({ tokenA: 'my-token' }, {});
 
             await expect(
-                realService.updateDirectoryPluginSettings('dir-1', 'test-plugin', 'user-1', {
+                realService.updateWorkPluginSettings('dir-1', 'test-plugin', 'user-1', {
                     some: 'value',
                 }),
             ).resolves.toBeDefined();
@@ -2229,9 +2213,9 @@ describe('PluginOperationsService', () => {
                 secretSettings: { apiKey: 'sk-user' },
                 metadata: {},
             } as any);
-            jest.spyOn(realDirectoryPluginRepo, 'findOne').mockResolvedValue({
+            jest.spyOn(realWorkPluginRepo, 'findOne').mockResolvedValue({
                 id: '2',
-                directoryId: 'dir-1',
+                workId: 'dir-1',
                 pluginId: 'test-plugin',
                 enabled: true,
                 settings: {},
@@ -2239,9 +2223,9 @@ describe('PluginOperationsService', () => {
                 metadata: {},
             } as any);
 
-            // Global-scoped model not enforced at user pre-check; directory provides it
+            // Global-scoped model not enforced at user pre-check; work provides it
             await expect(
-                realService.updateDirectoryPluginSettings('dir-1', 'test-plugin', 'user-1', {
+                realService.updateWorkPluginSettings('dir-1', 'test-plugin', 'user-1', {
                     model: 'gpt-4',
                 }),
             ).resolves.toBeDefined();
@@ -2269,9 +2253,9 @@ describe('PluginOperationsService', () => {
                 secretSettings: {},
                 metadata: {},
             } as any);
-            jest.spyOn(realDirectoryPluginRepo, 'findOne').mockResolvedValue({
+            jest.spyOn(realWorkPluginRepo, 'findOne').mockResolvedValue({
                 id: '2',
-                directoryId: 'dir-1',
+                workId: 'dir-1',
                 pluginId: 'test-plugin',
                 enabled: true,
                 settings: {},
@@ -2280,13 +2264,13 @@ describe('PluginOperationsService', () => {
             } as any);
 
             await expect(
-                realService.updateDirectoryPluginSettings('dir-1', 'test-plugin', 'user-1', {
+                realService.updateWorkPluginSettings('dir-1', 'test-plugin', 'user-1', {
                     model: 'gpt-4o',
                 }),
             ).rejects.toThrow('User-level required settings must be configured first');
         });
 
-        it('should inherit user settings for required field validation at directory level', async () => {
+        it('should inherit user settings for required field validation at work level', async () => {
             const schema: JsonSchema = {
                 type: 'object',
                 properties: {
@@ -2298,7 +2282,7 @@ describe('PluginOperationsService', () => {
 
             jest.spyOn(realRegistry, 'get').mockReturnValue(makePlugin(schema));
 
-            // User has apiKey (user-scoped required); directory overrides model
+            // User has apiKey (user-scoped required); work overrides model
             jest.spyOn(realUserPluginRepo, 'findOne').mockResolvedValue({
                 id: '1',
                 userId: 'user-1',
@@ -2308,9 +2292,9 @@ describe('PluginOperationsService', () => {
                 secretSettings: { apiKey: 'sk-user' },
                 metadata: {},
             } as any);
-            jest.spyOn(realDirectoryPluginRepo, 'findOne').mockResolvedValue({
+            jest.spyOn(realWorkPluginRepo, 'findOne').mockResolvedValue({
                 id: '2',
-                directoryId: 'dir-1',
+                workId: 'dir-1',
                 pluginId: 'test-plugin',
                 enabled: true,
                 settings: {},
@@ -2318,15 +2302,15 @@ describe('PluginOperationsService', () => {
                 metadata: {},
             } as any);
 
-            // Directory overrides model — apiKey+model inherited from user
+            // Work overrides model — apiKey+model inherited from user
             await expect(
-                realService.updateDirectoryPluginSettings('dir-1', 'test-plugin', 'user-1', {
+                realService.updateWorkPluginSettings('dir-1', 'test-plugin', 'user-1', {
                     model: 'gpt-4',
                 }),
             ).resolves.toBeDefined();
         });
 
-        it('should fail directory validation when required field is missing from both levels', async () => {
+        it('should fail work validation when required field is missing from both levels', async () => {
             const schema: JsonSchema = {
                 type: 'object',
                 properties: {
@@ -2338,7 +2322,7 @@ describe('PluginOperationsService', () => {
 
             jest.spyOn(realRegistry, 'get').mockReturnValue(makePlugin(schema));
 
-            // User has apiKey but not model; directory sends unrelated
+            // User has apiKey but not model; work sends unrelated
             jest.spyOn(realUserPluginRepo, 'findOne').mockResolvedValue({
                 id: '1',
                 userId: 'user-1',
@@ -2348,9 +2332,9 @@ describe('PluginOperationsService', () => {
                 secretSettings: { apiKey: 'sk-user' },
                 metadata: {},
             } as any);
-            jest.spyOn(realDirectoryPluginRepo, 'findOne').mockResolvedValue({
+            jest.spyOn(realWorkPluginRepo, 'findOne').mockResolvedValue({
                 id: '2',
-                directoryId: 'dir-1',
+                workId: 'dir-1',
                 pluginId: 'test-plugin',
                 enabled: true,
                 settings: {},
@@ -2359,21 +2343,21 @@ describe('PluginOperationsService', () => {
             } as any);
 
             // model is global-scoped required — passes user pre-check (only user-scoped
-            // fields enforced), fails directory-level validation
+            // fields enforced), fails work-level validation
             await expect(
-                realService.updateDirectoryPluginSettings('dir-1', 'test-plugin', 'user-1', {
+                realService.updateWorkPluginSettings('dir-1', 'test-plugin', 'user-1', {
                     unrelated: 'value',
                 }),
             ).rejects.toThrow('Invalid plugin settings');
         });
 
-        it('should satisfy requiredGroup at directory level via inherited global-scoped value', async () => {
+        it('should satisfy requiredGroup at work level via inherited global-scoped value', async () => {
             const schema = makeSchema({
                 'x-requiredGroups': [{ fields: ['oauthToken', 'apiKey'], message: 'Need auth' }],
             });
             jest.spyOn(realRegistry, 'get').mockReturnValue(makePlugin(schema));
 
-            // User set apiKey (global scope) — it's inherited at directory level
+            // User set apiKey (global scope) — it's inherited at work level
             jest.spyOn(realUserPluginRepo, 'findOne').mockResolvedValue({
                 id: '1',
                 userId: 'user-1',
@@ -2383,9 +2367,9 @@ describe('PluginOperationsService', () => {
                 secretSettings: { apiKey: 'sk-from-user' },
                 metadata: {},
             } as any);
-            jest.spyOn(realDirectoryPluginRepo, 'findOne').mockResolvedValue({
+            jest.spyOn(realWorkPluginRepo, 'findOne').mockResolvedValue({
                 id: '2',
-                directoryId: 'dir-1',
+                workId: 'dir-1',
                 pluginId: 'test-plugin',
                 enabled: true,
                 settings: {},
@@ -2393,21 +2377,21 @@ describe('PluginOperationsService', () => {
                 metadata: {},
             } as any);
 
-            // apiKey inherited from user → group satisfied at directory scope
+            // apiKey inherited from user → group satisfied at work scope
             await expect(
-                realService.updateDirectoryPluginSettings('dir-1', 'test-plugin', 'user-1', {
+                realService.updateWorkPluginSettings('dir-1', 'test-plugin', 'user-1', {
                     some: 'value',
                 }),
             ).resolves.toBeDefined();
         });
 
-        it('should pass requiredGroup at directory level when user-scoped field is inherited', async () => {
+        it('should pass requiredGroup at work level when user-scoped field is inherited', async () => {
             const schema = makeSchema({
                 'x-requiredGroups': [{ fields: ['oauthToken', 'apiKey'], message: 'Need auth' }],
             });
             jest.spyOn(realRegistry, 'get').mockReturnValue(makePlugin(schema));
 
-            // User set oauthToken (user-scoped) — inherited in merged settings at directory scope
+            // User set oauthToken (user-scoped) — inherited in merged settings at work scope
             jest.spyOn(realUserPluginRepo, 'findOne').mockResolvedValue({
                 id: '1',
                 userId: 'user-1',
@@ -2417,9 +2401,9 @@ describe('PluginOperationsService', () => {
                 secretSettings: { oauthToken: 'oauth-val' },
                 metadata: {},
             } as any);
-            jest.spyOn(realDirectoryPluginRepo, 'findOne').mockResolvedValue({
+            jest.spyOn(realWorkPluginRepo, 'findOne').mockResolvedValue({
                 id: '2',
-                directoryId: 'dir-1',
+                workId: 'dir-1',
                 pluginId: 'test-plugin',
                 enabled: true,
                 settings: {},
@@ -2427,16 +2411,16 @@ describe('PluginOperationsService', () => {
                 metadata: {},
             } as any);
 
-            // oauthToken is user-scoped but inherited → visible at directory scope
+            // oauthToken is user-scoped but inherited → visible at work scope
             // group satisfied via inherited user value
             await expect(
-                realService.updateDirectoryPluginSettings('dir-1', 'test-plugin', 'user-1', {
+                realService.updateWorkPluginSettings('dir-1', 'test-plugin', 'user-1', {
                     some: 'value',
                 }),
             ).resolves.toBeDefined();
         });
 
-        it('should fail requiredGroup at directory level when neither user nor global fields are set', async () => {
+        it('should fail requiredGroup at work level when neither user nor global fields are set', async () => {
             const schema = makeSchema({
                 'x-requiredGroups': [{ fields: ['oauthToken', 'apiKey'], message: 'Need auth' }],
             });
@@ -2452,9 +2436,9 @@ describe('PluginOperationsService', () => {
                 secretSettings: {},
                 metadata: {},
             } as any);
-            jest.spyOn(realDirectoryPluginRepo, 'findOne').mockResolvedValue({
+            jest.spyOn(realWorkPluginRepo, 'findOne').mockResolvedValue({
                 id: '2',
-                directoryId: 'dir-1',
+                workId: 'dir-1',
                 pluginId: 'test-plugin',
                 enabled: true,
                 settings: {},
@@ -2463,7 +2447,7 @@ describe('PluginOperationsService', () => {
             } as any);
 
             await expect(
-                realService.updateDirectoryPluginSettings('dir-1', 'test-plugin', 'user-1', {
+                realService.updateWorkPluginSettings('dir-1', 'test-plugin', 'user-1', {
                     some: 'value',
                 }),
             ).rejects.toThrow('Invalid plugin settings');
@@ -2529,8 +2513,8 @@ describe('PluginOperationsService', () => {
             });
         });
 
-        describe('toDirectoryPluginResponse with autoEnable', () => {
-            it('should show autoEnabled plugin as directoryEnabled without DirectoryPluginEntity', async () => {
+        describe('toWorkPluginResponse with autoEnable', () => {
+            it('should show autoEnabled plugin as workEnabled without WorkPluginEntity', async () => {
                 const autoEnabledPlugin = createRegisteredPlugin();
                 autoEnabledPlugin.manifest = {
                     ...autoEnabledPlugin.manifest,
@@ -2539,14 +2523,14 @@ describe('PluginOperationsService', () => {
 
                 jest.spyOn(pluginRegistryService, 'getAll').mockReturnValue([autoEnabledPlugin]);
                 jest.spyOn(userPluginRepository, 'find').mockResolvedValue([]);
-                jest.spyOn(directoryPluginRepository, 'find').mockResolvedValue([]);
+                jest.spyOn(workPluginRepository, 'find').mockResolvedValue([]);
 
-                const result = await service.listDirectoryPlugins('dir-1', 'user-1');
+                const result = await service.listWorkPlugins('dir-1', 'user-1');
 
-                expect(result.plugins[0].directoryEnabled).toBe(true);
+                expect(result.plugins[0].workEnabled).toBe(true);
             });
 
-            it('should respect explicit disabled status for autoEnabled plugin at directory level', async () => {
+            it('should respect explicit disabled status for autoEnabled plugin at work level', async () => {
                 const autoEnabledPlugin = createRegisteredPlugin();
                 autoEnabledPlugin.manifest = {
                     ...autoEnabledPlugin.manifest,
@@ -2555,10 +2539,10 @@ describe('PluginOperationsService', () => {
 
                 jest.spyOn(pluginRegistryService, 'getAll').mockReturnValue([autoEnabledPlugin]);
                 jest.spyOn(userPluginRepository, 'find').mockResolvedValue([]);
-                jest.spyOn(directoryPluginRepository, 'find').mockResolvedValue([
+                jest.spyOn(workPluginRepository, 'find').mockResolvedValue([
                     {
                         id: '1',
-                        directoryId: 'dir-1',
+                        workId: 'dir-1',
                         pluginId: 'test-plugin',
                         enabled: false, // Explicitly disabled
                         settings: {},
@@ -2567,12 +2551,12 @@ describe('PluginOperationsService', () => {
                     } as any,
                 ]);
 
-                const result = await service.listDirectoryPlugins('dir-1', 'user-1');
+                const result = await service.listWorkPlugins('dir-1', 'user-1');
 
-                expect(result.plugins[0].directoryEnabled).toBe(false);
+                expect(result.plugins[0].workEnabled).toBe(false);
             });
 
-            it('should show non-autoEnabled plugin as not directoryEnabled without DirectoryPluginEntity', async () => {
+            it('should show non-autoEnabled plugin as not workEnabled without WorkPluginEntity', async () => {
                 const normalPlugin = createRegisteredPlugin();
                 normalPlugin.manifest = {
                     ...normalPlugin.manifest,
@@ -2581,16 +2565,16 @@ describe('PluginOperationsService', () => {
 
                 jest.spyOn(pluginRegistryService, 'getAll').mockReturnValue([normalPlugin]);
                 jest.spyOn(userPluginRepository, 'find').mockResolvedValue([]);
-                jest.spyOn(directoryPluginRepository, 'find').mockResolvedValue([]);
+                jest.spyOn(workPluginRepository, 'find').mockResolvedValue([]);
 
-                const result = await service.listDirectoryPlugins('dir-1', 'user-1');
+                const result = await service.listWorkPlugins('dir-1', 'user-1');
 
-                expect(result.plugins[0].directoryEnabled).toBe(false);
+                expect(result.plugins[0].workEnabled).toBe(false);
             });
         });
 
-        describe('enablePluginForDirectory with autoEnable', () => {
-            it('should allow enabling autoEnabled plugin for directory without UserPluginEntity', async () => {
+        describe('enablePluginForWork with autoEnable', () => {
+            it('should allow enabling autoEnabled plugin for work without UserPluginEntity', async () => {
                 const autoEnabledPlugin = createRegisteredPlugin();
                 autoEnabledPlugin.manifest = {
                     ...autoEnabledPlugin.manifest,
@@ -2603,16 +2587,12 @@ describe('PluginOperationsService', () => {
                     pluginId: 'test-plugin',
                 } as any);
                 jest.spyOn(userPluginRepository, 'findOne').mockResolvedValue(null);
-                jest.spyOn(directoryPluginRepository, 'findOne').mockResolvedValue(null);
+                jest.spyOn(workPluginRepository, 'findOne').mockResolvedValue(null);
 
-                const result = await service.enablePluginForDirectory(
-                    'dir-1',
-                    'test-plugin',
-                    'user-1',
-                );
+                const result = await service.enablePluginForWork('dir-1', 'test-plugin', 'user-1');
 
-                expect(result.directoryEnabled).toBe(true);
-                expect(directoryPluginRepository.save).toHaveBeenCalled();
+                expect(result.workEnabled).toBe(true);
+                expect(workPluginRepository.save).toHaveBeenCalled();
             });
 
             it('should reject non-autoEnabled plugin without UserPluginEntity', async () => {
@@ -2626,7 +2606,7 @@ describe('PluginOperationsService', () => {
                 jest.spyOn(userPluginRepository, 'findOne').mockResolvedValue(null);
 
                 await expect(
-                    service.enablePluginForDirectory('dir-1', 'test-plugin', 'user-1'),
+                    service.enablePluginForWork('dir-1', 'test-plugin', 'user-1'),
                 ).rejects.toThrow(BadRequestException);
             });
 
@@ -2649,7 +2629,7 @@ describe('PluginOperationsService', () => {
                 } as any);
 
                 await expect(
-                    service.enablePluginForDirectory('dir-1', 'test-plugin', 'user-1'),
+                    service.enablePluginForWork('dir-1', 'test-plugin', 'user-1'),
                 ).rejects.toThrow(BadRequestException);
             });
         });

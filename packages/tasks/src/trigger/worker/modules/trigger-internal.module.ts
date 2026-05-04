@@ -1,8 +1,5 @@
 import { Module } from '@nestjs/common';
-import {
-    DirectoryScheduleDispatcherService,
-    DirectoryScheduleService,
-} from '@ever-works/agent/services';
+import { WorkScheduleDispatcherService, WorkScheduleService } from '@ever-works/agent/services';
 import { TriggerInternalApiClient } from '../services/trigger-internal-api.client';
 import { createRemoteProxy } from '../remote-proxy';
 
@@ -10,22 +7,18 @@ import { createRemoteProxy } from '../remote-proxy';
     providers: [
         TriggerInternalApiClient,
         {
-            provide: DirectoryScheduleDispatcherService,
+            provide: WorkScheduleDispatcherService,
             useFactory: (apiClient: TriggerInternalApiClient) =>
-                createRemoteProxy(apiClient, 'DirectoryScheduleDispatcherService'),
+                createRemoteProxy(apiClient, 'WorkScheduleDispatcherService'),
             inject: [TriggerInternalApiClient],
         },
         {
-            provide: DirectoryScheduleService,
+            provide: WorkScheduleService,
             useFactory: (apiClient: TriggerInternalApiClient) =>
-                createRemoteProxy(apiClient, 'DirectoryScheduleService'),
+                createRemoteProxy(apiClient, 'WorkScheduleService'),
             inject: [TriggerInternalApiClient],
         },
     ],
-    exports: [
-        TriggerInternalApiClient,
-        DirectoryScheduleDispatcherService,
-        DirectoryScheduleService,
-    ],
+    exports: [TriggerInternalApiClient, WorkScheduleDispatcherService, WorkScheduleService],
 })
 export class TriggerInternalModule {}

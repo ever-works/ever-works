@@ -106,7 +106,7 @@ The interceptor sets these on every event automatically:
 | -------------- | -------------------------------------------------------- |
 | `app`          | `ever-works-api` / `ever-works-mcp` / `trigger-worker`   |
 | `userId`       | `req.user.userId` if authenticated                       |
-| `directoryId`  | Route param when present                                 |
+| `workId`       | Route param when present                                 |
 | `pluginId`     | Set by facade interceptors when routing through a plugin |
 | `pipelineStep` | Set by the pipeline executor on step events              |
 | `triggerRunId` | Set by the Trigger.dev task wrapper                      |
@@ -148,17 +148,17 @@ PostHog is **product analytics**, not error tracking. It receives:
 - **Page views** (from the dashboard, with locale + page name).
 - **Feature usage** (custom events emitted by domain code).
 - **Plan changes** — upgrade, downgrade, cancellation.
-- **Generation cost / outcome** — aggregated per directory per period.
+- **Generation cost / outcome** — aggregated per work per period.
 
 ### 5.2 Event naming convention
 
 snake_case, derived from `ActivityActionType`:
 
-| `ActivityActionType`  | PostHog event name    |
-| --------------------- | --------------------- |
-| `DIRECTORY_GENERATED` | `directory_generated` |
-| `ITEM_ADDED`          | `item_added`          |
-| `OAUTH_LINKED`        | `oauth_linked`        |
+| `ActivityActionType` | PostHog event name |
+| -------------------- | ------------------ |
+| `WORK_GENERATED`     | `work_generated`   |
+| `ITEM_ADDED`         | `item_added`       |
+| `OAUTH_LINKED`       | `oauth_linked`     |
 
 Event properties mirror the row's `details` block but **with PII
 stripped** (no email, no IP, no user-agent — only `userId`, opaque
@@ -189,7 +189,7 @@ parallel logging library. Conventions:
 - **Context** — every service constructor sets a `Logger` with the
   class name (`new Logger(MyService.name)`).
 - **Levels** — `verbose` < `debug` < `log` < `warn` < `error`.
-- **Structured payloads** — `logger.log('directory generated', { directoryId, durationMs })`.
+- **Structured payloads** — `logger.log('work generated', { workId, durationMs })`.
 - **No sensitive values** — never log API keys, OAuth tokens, JWT
   payloads, or user emails.
 - **JSON output in production** — `LOGGER_FORMAT=json` flips the log
@@ -203,7 +203,7 @@ Both run on every controller via `APP_INTERCEPTOR`:
 ### 7.1 `SentryInterceptor`
 
 - Starts a Sentry span named after the route.
-- Attaches the user / directory / plugin tags described in §4.2.
+- Attaches the user / work / plugin tags described in §4.2.
 - On error, captures the exception with the active span.
 - On success, finishes the span with the response status.
 
@@ -250,7 +250,7 @@ The Trigger.dev worker is its own NestJS app context (see
 - Closes the application context in `finally` so resources free up.
 
 A failed Trigger.dev run shows up in Sentry as a transaction tagged
-with the task id, the directory id (when applicable), and the failing
+with the task id, the work id (when applicable), and the failing
 step — clickable straight to the offending pipeline step.
 
 ## 10. Health Checks

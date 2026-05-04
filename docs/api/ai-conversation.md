@@ -7,7 +7,7 @@ sidebar_position: 4
 
 # AI Conversation API
 
-The AI Conversation API provides a stateless, streaming chat endpoint for interacting with the platform's AI. It can be scoped to a specific directory for context-aware responses.
+The AI Conversation API provides a stateless, streaming chat endpoint for interacting with the platform's AI. It can be scoped to a specific work for context-aware responses.
 
 All endpoints require JWT authentication.
 
@@ -27,21 +27,21 @@ curl -X POST http://localhost:3100/api/ai-conversations/chat/stream \
   -H "Content-Type: application/json" \
   -d '{
     "messages": [
-      { "role": "user", "content": "What categories should I use for a design tools directory?" }
+      { "role": "user", "content": "What categories should I use for a design tools work?" }
     ],
-    "directoryId": "optional-directory-id"
+    "workId": "optional-work-id"
   }'
 ```
 
 ### Request Body
 
-| Field              | Type   | Required | Description                                    |
-| ------------------ | ------ | -------- | ---------------------------------------------- |
-| `messages`         | array  | Yes      | Array of chat messages (`{ role, content }`)   |
-| `model`            | string | No       | Override the AI model                          |
-| `temperature`      | number | No       | Override the temperature                       |
-| `directoryId`      | string | No       | Scope the conversation to a specific directory |
-| `providerOverride` | string | No       | Override the AI provider plugin                |
+| Field              | Type   | Required | Description                                  |
+| ------------------ | ------ | -------- | -------------------------------------------- |
+| `messages`         | array  | Yes      | Array of chat messages (`{ role, content }`) |
+| `model`            | string | No       | Override the AI model                        |
+| `temperature`      | number | No       | Override the temperature                     |
+| `workId`           | string | No       | Scope the conversation to a specific work    |
+| `providerOverride` | string | No       | Override the AI provider plugin              |
 
 ### Response
 

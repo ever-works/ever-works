@@ -92,7 +92,7 @@ Multiple filters combine as a union (packages matching ANY filter run).
 --filter=*-app        # name glob
 ```
 
-### By Directory
+### By Work
 
 ```bash
 --filter=./apps/*           # all packages in apps/

@@ -28,18 +28,18 @@ export type SwitchWebsiteTemplateResponse = APIResponse<{
 
 export const websiteAPI = {
     // Update website repository
-    updateRepository: async (directoryId: string) => {
+    updateRepository: async (workId: string) => {
         return serverMutation<UpdateWebsiteRepositoryResponse>({
-            endpoint: `/directories/${directoryId}/update-website`,
+            endpoint: `/works/${workId}/update-website`,
             data: {},
             method: 'POST',
             wrapInData: false,
         });
     },
 
-    switchTemplate: async (directoryId: string, websiteTemplateId: string) => {
+    switchTemplate: async (workId: string, websiteTemplateId: string) => {
         return serverMutation<SwitchWebsiteTemplateResponse>({
-            endpoint: `/directories/${directoryId}/switch-website-template`,
+            endpoint: `/works/${workId}/switch-website-template`,
             data: { websiteTemplateId },
             method: 'POST',
             wrapInData: false,

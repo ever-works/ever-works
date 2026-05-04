@@ -22,7 +22,7 @@ function main() {
 	fs.mkdirSync(PLUGINS_DEST, { recursive: true });
 
 	if (!fs.existsSync(PLUGINS_SRC)) {
-		console.log('==> No plugins source directory found, skipping.');
+		console.log('==> No plugins source work found, skipping.');
 		return;
 	}
 

@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { ActivepiecesPlugin } from '../activepieces.plugin.js';
-import type { DirectoryReference, GenerationRequest, ExistingItems, PluginContext } from '@ever-works/plugin';
+import type { WorkReference, GenerationRequest, ExistingItems, PluginContext } from '@ever-works/plugin';
 
 // Mock the Activepieces REST client used by the plugin
 const mockValidateFlow = vi.fn();
@@ -58,12 +58,12 @@ function createMockContext(): PluginContext {
 	} as unknown as PluginContext;
 }
 
-function createDirectory(overrides?: Partial<DirectoryReference>): DirectoryReference {
+function createWork(overrides?: Partial<WorkReference>): WorkReference {
 	return {
 		id: 'dir-123',
-		name: 'Test Directory',
-		slug: 'test-directory',
-		description: 'A test directory',
+		name: 'Test Work',
+		slug: 'test-work',
+		description: 'A test work',
 		user: { id: 'user-456' },
 		...overrides
 	};
@@ -273,11 +273,7 @@ describe('ActivepiecesPlugin', () => {
 		});
 
 		it('should fail without user ID', async () => {
-			const result = await plugin.execute(
-				createDirectory({ user: undefined }),
-				createRequest(),
-				createExisting()
-			);
+			const result = await plugin.execute(createWork({ user: undefined }), createRequest(), createExisting());
 			expect(result.success).toBe(false);
 		});
 
@@ -289,13 +285,13 @@ describe('ActivepiecesPlugin', () => {
 			});
 			await plugin.onLoad(ctx);
 
-			const result = await plugin.execute(createDirectory(), createRequest({ config: {} }), createExisting());
+			const result = await plugin.execute(createWork(), createRequest({ config: {} }), createExisting());
 			expect(result.success).toBe(false);
 			expect(result.error).toBeDefined();
 		});
 
 		it('should execute sync flow successfully', async () => {
-			const result = await plugin.execute(createDirectory(), createRequest(), createExisting());
+			const result = await plugin.execute(createWork(), createRequest(), createExisting());
 
 			expect(result.success).toBe(true);
 			expect(result.outputs.items.length).toBeGreaterThan(0);
@@ -303,7 +299,7 @@ describe('ActivepiecesPlugin', () => {
 		});
 
 		it('should return categories and tags from flow output', async () => {
-			const result = await plugin.execute(createDirectory(), createRequest(), createExisting());
+			const result = await plugin.execute(createWork(), createRequest(), createExisting());
 
 			expect(result.success).toBe(true);
 			expect(result.outputs.categories.length).toBeGreaterThan(0);
@@ -314,7 +310,7 @@ describe('ActivepiecesPlugin', () => {
 				items: [{ name: 'Test Item 1', description: 'Existing item' } as never]
 			});
 
-			const result = await plugin.execute(createDirectory(), createRequest(), existing);
+			const result = await plugin.execute(createWork(), createRequest(), existing);
 
 			expect(result.success).toBe(true);
 			const hasExisting = result.outputs.items.some((i) => i.name === 'Test Item 1');
@@ -325,7 +321,7 @@ describe('ActivepiecesPlugin', () => {
 			const abortController = new AbortController();
 			abortController.abort();
 
-			const result = await plugin.execute(createDirectory(), createRequest(), createExisting(), {
+			const result = await plugin.execute(createWork(), createRequest(), createExisting(), {
 				signal: abortController.signal
 			});
 
@@ -333,7 +329,7 @@ describe('ActivepiecesPlugin', () => {
 		});
 
 		it('should track state during execution', async () => {
-			await plugin.execute(createDirectory(), createRequest(), createExisting());
+			await plugin.execute(createWork(), createRequest(), createExisting());
 
 			const state = plugin.getState();
 			expect(state).toBeDefined();
@@ -345,7 +341,7 @@ describe('ActivepiecesPlugin', () => {
 			await plugin.onLoad(ctx);
 
 			await plugin.execute(
-				createDirectory(),
+				createWork(),
 				createRequest({
 					config: {
 						flow_id: 'flow-test-123',
@@ -370,7 +366,7 @@ describe('ActivepiecesPlugin', () => {
 			const ctx = createMockContext();
 			await plugin.onLoad(ctx);
 
-			await plugin.execute(createDirectory(), createRequest(), createExisting());
+			await plugin.execute(createWork(), createRequest(), createExisting());
 
 			const warnCalls = (ctx.logger.warn as ReturnType<typeof vi.fn>).mock.calls;
 			const matched = warnCalls.find(

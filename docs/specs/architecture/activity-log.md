@@ -10,32 +10,32 @@ analytics consumers.
 
 ## 1. Purpose
 
-The activity log is the platform's audit trail — every directory
+The activity log is the platform's audit trail — every work
 mutation, generation run, and notable user action lands as a row in
 `activity_log` (per-action) and/or as a structured `changelog`
-attachment on `directory_generation_history` (per-mutation
+attachment on `work_generation_history` (per-mutation
 audit detail).
 
 This spec covers how those two stores relate, the **synchronous write
 path** every mutation goes through, the **async analytics dispatcher**
 that fans out to PostHog without blocking the request, and the
 **activity-type taxonomy** that drives the History tab and the
-[`directory-changelog`](../features/directory-changelog/spec.md)
+[`work-changelog`](../features/work-changelog/spec.md)
 filter UI.
 
 ## 2. Two Stores, Different Jobs
 
-| Store                          | Granularity            | Drives                                                     |
-| ------------------------------ | ---------------------- | ---------------------------------------------------------- |
-| `activity_log`                 | Per user-action        | Activity feed, security audit, PostHog                     |
-| `directory_generation_history` | Per directory mutation | History tab, schedule failure tracking, generation metrics |
+| Store                     | Granularity       | Drives                                                     |
+| ------------------------- | ----------------- | ---------------------------------------------------------- |
+| `activity_log`            | Per user-action   | Activity feed, security audit, PostHog                     |
+| `work_generation_history` | Per work mutation | History tab, schedule failure tracking, generation metrics |
 
-`directory_generation_history` rows can carry a `changelog` jsonb
-payload — see [`features/directory-changelog/spec`](../features/directory-changelog/spec.md)
+`work_generation_history` rows can carry a `changelog` jsonb
+payload — see [`features/work-changelog/spec`](../features/work-changelog/spec.md)
 for the user-facing shape. `activity_log` rows summarise _what the
-user did_; history rows summarise _what changed in the directory_. The
+user did_; history rows summarise _what changed in the work_. The
 two coexist by design — a single AI generation run produces one
-history row plus one `directory_generation_completed` activity-log
+history row plus one `work_generation_completed` activity-log
 row, plus item-level changelog entries on the history row.
 
 ## 3. The `ActivityLogService`
@@ -46,11 +46,11 @@ Every mutation that needs to be audited goes through
 ```ts
 await activityLogService.recordActivity({
 	userId,
-	directoryId,
-	actionType: ActivityActionType.DIRECTORY_GENERATED,
+	workId,
+	actionType: ActivityActionType.WORK_GENERATED,
 	action: 'generation_completed',
 	status: ActivityStatus.COMPLETED,
-	summary: `Generated 27 items for "${directory.name}"`,
+	summary: `Generated 27 items for "${work.name}"`,
 	details: { runId, itemCount, durationMs },
 	metadata: { triggerSource: 'schedule' },
 	ipAddress,
@@ -77,7 +77,7 @@ History tab:
 
 | Filter group   | `ActivityActionType` values                                                                                 |
 | -------------- | ----------------------------------------------------------------------------------------------------------- |
-| `generation`   | `DIRECTORY_GENERATED`, `DIRECTORY_REGENERATED`, `DIRECTORY_GENERATION_FAILED`                               |
+| `generation`   | `WORK_GENERATED`, `WORK_REGENERATED`, `WORK_GENERATION_FAILED`                                              |
 | `items`        | `ITEM_ADDED`, `ITEM_UPDATED`, `ITEM_REMOVED`                                                                |
 | `comparisons`  | `COMPARISON_ADDED`, `COMPARISON_REMOVED`                                                                    |
 | `taxonomy`     | `CATEGORY_CHANGE`, `TAG_CHANGE`, `COLLECTION_CHANGE`                                                        |
@@ -116,7 +116,7 @@ latency to user requests or risk losing audit rows.
 export class ActivityLog {
 	@PrimaryGeneratedColumn('uuid') id: string;
 	@Column() userId: string;
-	@Column({ nullable: true }) directoryId: string | null;
+	@Column({ nullable: true }) workId: string | null;
 	@Column({ type: 'varchar' }) actionType: ActivityActionType;
 	@Column() action: string;
 	@Column({ type: 'varchar' }) status: ActivityStatus;
@@ -152,9 +152,9 @@ When a mutation produces a structured `changelog` (added/updated/removed
 items, taxonomy entries, comparisons), the writer:
 
 1. Builds the
-   [`DirectoryChangelog`](../features/directory-changelog/spec.md)
+   [`WorkChangelog`](../features/work-changelog/spec.md)
    payload.
-2. Writes it to the `directory_generation_history.changelog` jsonb
+2. Writes it to the `work_generation_history.changelog` jsonb
    column **inside the same transaction** as the underlying mutation.
 3. Records a single `activity_log` row that points at the history row
    via `details.historyId`.
@@ -170,7 +170,7 @@ the snake-case `actionType`:
 
 | `actionType`          | PostHog event name    |
 | --------------------- | --------------------- |
-| `DIRECTORY_GENERATED` | `directory_generated` |
+| `WORK_GENERATED`      | `work_generated`      |
 | `ITEM_ADDED`          | `item_added`          |
 | `COMMUNITY_PR_MERGED` | `community_pr_merged` |
 
@@ -183,12 +183,12 @@ the action context.
 - **Write latency**: < 5 ms typical. The synchronous write is a
   single insert into an indexed table.
 - **Read latency**: < 200 ms for a paginated history page on a
-  directory with 100K rows (offset-based pagination + index on
-  `(directoryId, createdAt DESC)`).
+  work with 100K rows (offset-based pagination + index on
+  `(workId, createdAt DESC)`).
 - **Analytics dispatch** never blocks the write path.
-- **Storage growth**: per-directory partitioning is _not_ used today
+- **Storage growth**: per-work partitioning is _not_ used today
   — the platform uses a single `activity_log` table. At 10K active
-  directories the row count is manageable; at 1M+ this would call
+  works the row count is manageable; at 1M+ this would call
   for partitioning, which is a documented future change.
 
 ## 11. Querying
@@ -198,7 +198,7 @@ the action context.
 | Filter            | Effect                                       |
 | ----------------- | -------------------------------------------- |
 | `userId`          | Required — every query is user-scoped        |
-| `directoryId`     | Restrict to one directory                    |
+| `workId`          | Restrict to one work                         |
 | `actionType`      | Single value or array                        |
 | `actionGroup`     | UI-level group (`generation`, `items`, etc.) |
 | `status`          | One of the four statuses                     |
@@ -218,7 +218,7 @@ themselves where it matters:
 - The schedule dispatcher calls
   `markRunFailed` only once per run via the `isAlreadyMarkedFailed`
   guard (see
-  [Schedule Dispatcher](../../agent-services/directory-schedule-dispatcher.md)).
+  [Schedule Dispatcher](../../agent-services/work-schedule-dispatcher.md)).
 - Pipeline finalisation calls `recordActivity` exactly once per run.
 - Manual mutations (item add / taxonomy change) call once per HTTP
   request — natural idempotency from the request lifecycle.
@@ -246,7 +246,7 @@ themselves where it matters:
     - `packages/agent/src/activity-log/activity-log-summary.ts`
     - `packages/agent/src/entities/activity-log.types.ts`
 - Related specs:
-    - [`features/directory-changelog/spec`](../features/directory-changelog/spec.md)
+    - [`features/work-changelog/spec`](../features/work-changelog/spec.md)
     - [`features/scheduled-updates/spec`](../features/scheduled-updates/spec.md)
     - [`agent-services/distributed-task-lock`](../../agent-services/distributed-task-lock.md)
 - User docs: [`docs/web-dashboard/history-ui.md`](../../web-dashboard/history-ui.md)

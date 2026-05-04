@@ -33,7 +33,7 @@ graph TD
     subgraph Plugin Registry
         PR[PluginRegistryService]
         PS[PluginSettingsService]
-        DPR[DirectoryPluginRepository]
+        DPR[WorkPluginRepository]
     end
 
     subgraph Plugins
@@ -75,7 +75,7 @@ abstract class BaseFacadeService {
 	constructor(
 		protected readonly registry: PluginRegistryService,
 		protected readonly settingsService: PluginSettingsService | undefined,
-		protected readonly directoryPluginRepository?: DirectoryPluginRepository
+		protected readonly workPluginRepository?: WorkPluginRepository
 	) {}
 }
 ```
@@ -87,7 +87,7 @@ The `resolvePlugin<T>()` method follows a four-level priority chain:
 | Priority | Source                   | Description                                                  |
 | -------- | ------------------------ | ------------------------------------------------------------ |
 | 1        | `providerOverride`       | Explicit provider ID from the request                        |
-| 2        | Directory default        | Active provider set for the specific directory               |
+| 2        | Work default             | Active provider set for the specific work                    |
 | 3        | `defaultForCapabilities` | Plugin declaring itself as the default for a capability      |
 | 4        | First enabled            | First loaded and enabled plugin with the required capability |
 
@@ -97,7 +97,7 @@ Plugin settings are resolved through a four-level hierarchy via `PluginSettingsS
 
 | Level | Scope           | Description                                  |
 | ----- | --------------- | -------------------------------------------- |
-| 1     | Directory       | Settings specific to a directory             |
+| 1     | Work            | Settings specific to a work                  |
 | 2     | User            | Settings specific to a user                  |
 | 3     | Admin           | Global admin-configured settings             |
 | 4     | Plugin defaults | Default values from the plugin's JSON Schema |
@@ -201,16 +201,16 @@ Wraps deployment provider plugins (Vercel) for website deployment.
 export class FacadesModule {}
 ```
 
-The module depends on `DatabaseModule` for the `DirectoryPluginRepository`. It relies on `PluginsModule` being registered globally at the application root level.
+The module depends on `DatabaseModule` for the `WorkPluginRepository`. It relies on `PluginsModule` being registered globally at the application root level.
 
 ## Bound Facades (PipelineFacadeService)
 
-Pipeline steps receive pre-bound facades through the `PipelineFacadeService`. Instead of passing `FacadeOptions` with every call, the bound facades capture the directory and user context at creation time:
+Pipeline steps receive pre-bound facades through the `PipelineFacadeService`. Instead of passing `FacadeOptions` with every call, the bound facades capture the work and user context at creation time:
 
 ```typescript
 // Unbound (direct service call)
 await aiFacade.askJson(prompt, schema, options, {
-	directoryId: 'dir-123',
+	workId: 'dir-123',
 	userId: 'user-456',
 	providerOverride: 'openai'
 });
@@ -224,15 +224,15 @@ This pattern eliminates repetitive context passing and ensures consistent provid
 
 ## Service Layer Architecture
 
-Beyond facades, the agent package employs a service layer pattern for directory domain logic. The `DirectoryModule` provides 14 specialized services that follow these patterns:
+Beyond facades, the agent package employs a service layer pattern for work domain logic. The `WorkModule` provides 14 specialized services that follow these patterns:
 
 ### Single Responsibility
 
 Each service handles a specific domain concern:
 
-- `DirectoryLifecycleService` for create/update/delete
-- `DirectoryGenerationService` for orchestrating generation
-- `DirectoryScheduleService` for scheduled regeneration
+- `WorkLifecycleService` for create/update/delete
+- `WorkGenerationService` for orchestrating generation
+- `WorkScheduleService` for scheduled regeneration
 
 ### Dependency Injection
 
@@ -240,7 +240,7 @@ All services use NestJS constructor injection:
 
 ```typescript
 @Injectable()
-export class DirectoryGenerationService {
+export class WorkGenerationService {
 	constructor(
 		private readonly dataGenerator: DataGeneratorService,
 		private readonly markdownGenerator: MarkdownGeneratorService,

@@ -19,29 +19,29 @@ export class WebSearchStep extends BasePipelineStep {
 		context: MutableGenerationContext,
 		execContext: StepExecutionContext
 	): Promise<MutableGenerationContext> {
-		const { request, directory, extractedUrls, searchQueries, processedSourceUrls } = context;
+		const { request, work, extractedUrls, searchQueries, processedSourceUrls } = context;
 		const { logger, searchFacade, contentExtractorFacade } = execContext;
 		const config = request.config || {};
 
 		const facadeOptions: FacadeOptions = {
 			userId: execContext.user!.id,
-			directoryId: execContext.directory.id
+			workId: execContext.work.id
 		};
 
-		logger.log(`[${directory.slug}] Web Search & Content Retrieval - Starting`);
+		logger.log(`[${work.slug}] Web Search & Content Retrieval - Starting`);
 
 		// Process extracted URLs first if any were found
 		let initialWebPages: WebPageData[] = [];
 		if (extractedUrls.length > 0) {
 			initialWebPages = await this.retrieveSpecificUrls(
-				directory.slug,
+				work.slug,
 				extractedUrls,
 				processedSourceUrls,
 				contentExtractorFacade,
 				logger,
 				facadeOptions
 			);
-			logger.debug(`[${directory.slug}] Retrieved ${initialWebPages.length} web pages from extracted URLs`);
+			logger.debug(`[${work.slug}] Retrieved ${initialWebPages.length} web pages from extracted URLs`);
 		}
 
 		// Resolve search provider name for user-facing warnings
@@ -51,7 +51,7 @@ export class WebSearchStep extends BasePipelineStep {
 
 		// Then proceed with normal web search
 		const { pages: searchWebPages, errorReasons } = await this.retrieveWebPages(
-			directory.slug,
+			work.slug,
 			searchQueries,
 			processedSourceUrls,
 			config,
@@ -70,7 +70,7 @@ export class WebSearchStep extends BasePipelineStep {
 		// Combine web pages from both sources
 		const webPages = [...initialWebPages, ...searchWebPages];
 
-		logger.log(`[${directory.slug}] Retrieved ${webPages.length} web pages for processing.`);
+		logger.log(`[${work.slug}] Retrieved ${webPages.length} web pages for processing.`);
 
 		context.webPages = webPages;
 

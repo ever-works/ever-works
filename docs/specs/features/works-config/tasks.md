@@ -1,4 +1,4 @@
-# Task Breakdown: `works.yml` Source-Controlled Directory Configuration
+# Task Breakdown: `works.yml` Source-Controlled Work Configuration
 
 **Feature ID**: `works-config`
 **Plan**: `./plan.md`
@@ -20,7 +20,7 @@ similar future work.
 - [x] **T3**. `WorksConfigImportPlannerService` for pre-import dry-run
       validation.
 - [x] **T4**. `WorksConfigImportApplierService` for atomic application of
-      parsed config to the directory entity.
+      parsed config to the work entity.
 - [x] **T5**. `WorksConfigRestoreService` for re-reading the file when the
       user requests a config refresh.
 
@@ -38,7 +38,7 @@ similar future work.
 ## Phase 3 — Integration
 
 - [x] **T10**. Import flow reads `works.yml` and pre-fills the import form.
-- [x] **T11**. Directory generation pipeline calls the writer at the end of
+- [x] **T11**. Work generation pipeline calls the writer at the end of
       a successful run.
 - [x] **T12**. Activity log entries cover parse failures, plugin-id
       failures, and sync failures.
@@ -47,7 +47,7 @@ similar future work.
 
 - [x] **T13**. User-facing doc at `docs/features/works-config.md`.
 - [x] **T14**. Cross-link from `docs/features/index.md` and the sidebar.
-- [x] **T15**. Retrospective Spec Kit spec/plan/tasks (this directory).
+- [x] **T15**. Retrospective Spec Kit spec/plan/tasks (this work).
 
 ## Definition of Done
 

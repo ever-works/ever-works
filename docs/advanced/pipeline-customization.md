@@ -9,7 +9,7 @@ sidebar_position: 17
 
 ## Overview
 
-The Ever Works pipeline system is a plugin-driven execution engine for directory generation. Pipelines are compiled from step definitions contributed by a primary pipeline plugin and zero or more modifier plugins. The `PipelineBuilderService` compiles these contributions into an `ExecutablePipeline` by applying replacements, injections, disabling, topological sorting, and parallel group identification. The `PipelineOrchestratorService` then routes execution to either the step-based executor (engine-orchestrated) or the full executor (self-managed), depending on the pipeline plugin type.
+The Ever Works pipeline system is a plugin-driven execution engine for work generation. Pipelines are compiled from step definitions contributed by a primary pipeline plugin and zero or more modifier plugins. The `PipelineBuilderService` compiles these contributions into an `ExecutablePipeline` by applying replacements, injections, disabling, topological sorting, and parallel group identification. The `PipelineOrchestratorService` then routes execution to either the step-based executor (engine-orchestrated) or the full executor (self-managed), depending on the pipeline plugin type.
 
 ## Architecture
 
@@ -62,7 +62,7 @@ Compiles an `ExecutablePipeline` from a pipeline plugin's step definitions and m
 ```typescript
 async build(
     pipeline: IPipelinePlugin,
-    directoryId?: string,
+    workId?: string,
     userId?: string,
 ): Promise<ExecutablePipeline> {
     // 1. Start with steps from the resolved pipeline plugin
@@ -71,8 +71,8 @@ async build(
     // 2. Initialize build context (replacements, disables, injections, prepend, append)
     const buildContext: BuildContext = { /* ... */ };
 
-    // 3. Get enabled modifier plugins (directory-scoped filtering)
-    const modifiers = await this.getEnabledModifierPlugins(pipeline.id, directoryId, userId);
+    // 3. Get enabled modifier plugins (work-scoped filtering)
+    const modifiers = await this.getEnabledModifierPlugins(pipeline.id, workId, userId);
 
     // 4. Process each modifier's step contributions
     for (const { modifierPlugin } of modifiers) {
@@ -152,17 +152,17 @@ private identifyParallelGroups(steps: PipelineStepDefinition[]): ParallelGroup[]
 Routes execution based on the pipeline plugin type:
 
 ```typescript
-async execute(directory, request, existing, options?, onProgress?): Promise<PipelineResult> {
-    const plugin = await this.resolvePipelinePlugin(pipelineId, directoryId, userId);
+async execute(work, request, existing, options?, onProgress?): Promise<PipelineResult> {
+    const plugin = await this.resolvePipelinePlugin(pipelineId, workId, userId);
 
     // Routing: step-orchestratable -> StepPipelineExecutorService
     //          self-managed        -> FullPipelineExecutorService
     const mode = isStepOrchestratablePipeline(plugin) ? 'step' : 'full';
 
     if (mode === 'step') {
-        return this.stepExecutor.execute(plugin, directory, request, existing, options, onProgress);
+        return this.stepExecutor.execute(plugin, work, request, existing, options, onProgress);
     }
-    return this.fullExecutor.execute(plugin, directory, request, existing, options, onProgress);
+    return this.fullExecutor.execute(plugin, work, request, existing, options, onProgress);
 }
 ```
 
@@ -300,7 +300,7 @@ export default class MyModifierPlugin implements IPipelineModifierPlugin {
 
 ```typescript
 const result = await this.orchestrator.execute(
-	directory,
+	work,
 	request,
 	existingItems,
 	{
@@ -319,7 +319,7 @@ const result = await this.orchestrator.execute(
 ### Resuming from Checkpoint
 
 ```typescript
-const result = await this.orchestrator.resumeOrExecute(directory, request, existing, options, onProgress);
+const result = await this.orchestrator.resumeOrExecute(work, request, existing, options, onProgress);
 // Automatically resumes from last checkpoint if available,
 // otherwise runs a fresh execution
 ```

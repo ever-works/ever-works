@@ -242,8 +242,8 @@ Classified errors route to the notification service, which creates user-visible 
 export async function notifyForClassifiedError(
 	notificationService: NotificationService,
 	userId: string,
-	directoryId: string,
-	directoryName: string,
+	workId: string,
+	workName: string,
 	classification: ErrorClassification
 ): Promise<void> {
 	switch (classification.type) {
@@ -264,14 +264,14 @@ export async function notifyForClassifiedError(
 
 ```typescript
 try {
-	await this.generateDirectory(directory, user);
+	await this.generateWork(work, user);
 } catch (error) {
 	const classification = classifyGenerationError(error);
 
-	await notifyForClassifiedError(this.notificationService, user.id, directory.id, directory.name, classification);
+	await notifyForClassifiedError(this.notificationService, user.id, work.id, work.name, classification);
 
 	// Re-throw as normalized HTTP exception
-	rethrowAsNormalized(error, this.logger, 'generating directory');
+	rethrowAsNormalized(error, this.logger, 'generating work');
 }
 ```
 

@@ -4,7 +4,7 @@ export interface AccountExportPayload {
     includesSecrets: boolean;
     data: {
         profile: { username: string; email: string; avatar?: string };
-        directories: any[];
+        works: any[];
         userPlugins: any[];
     };
 }
@@ -22,7 +22,7 @@ export interface ImportPreview {
     includesSecrets: boolean;
     hasMaskedSecrets: boolean;
     profile: { username: string; email: string; avatar?: string };
-    directoryCount: number;
+    workCount: number;
     totalItemCount: number;
     userPluginCount: number;
     conflicts: ImportConflict[];
@@ -37,9 +37,9 @@ export interface ConflictResolution {
 
 export interface ImportResult {
     success: boolean;
-    directoriesCreated: number;
-    directoriesUpdated: number;
-    directoriesSkipped: number;
+    worksCreated: number;
+    worksUpdated: number;
+    worksSkipped: number;
     userPluginsImported: number;
     errors: string[];
     warnings: string[];

@@ -1,4 +1,4 @@
-import { DirectoryConfig } from './api';
+import { WorkConfig } from './api';
 
 // Site Configuration - Multi-tenant support via environment variables
 export const APP_NAME = process.env.NEXT_PUBLIC_APP_NAME || process.env.APP_NAME || 'Ever Works';
@@ -49,10 +49,7 @@ export const ALLOWED_REDIRECT_URLS = (process.env.ALLOWED_REDIRECT_URLS || 'loca
     .split(',')
     .map((url) => url.trim());
 
-export const GET_DIRECTORY_LIST_LIMIT = parseInt(
-    process.env.NEXT_PUBLIC_DIRECTORY_LIST_LIMIT || '6',
-    10,
-);
+export const GET_WORK_LIST_LIMIT = parseInt(process.env.NEXT_PUBLIC_WORK_LIST_LIMIT || '6', 10);
 
 export const ONBOARDING_STORAGE_KEY = 'ever-works-onboarding';
 
@@ -71,20 +68,20 @@ export const ROUTES = {
     // Dashboard routes (these are under (dashboard) route group)
     DASHBOARD: '/',
     DASHBOARD_ACTIVITY: '/activity',
-    DASHBOARD_DIRECTORIES: '/directories',
-    DASHBOARD_DIRECTORIES_NEW: '/directories/new',
-    DASHBOARD_DIRECTORY: (id: string) => `/directories/${id}`,
-    DASHBOARD_DIRECTORY_ITEMS: (id: string) => `/directories/${id}/items`,
-    DASHBOARD_DIRECTORY_GENERATOR: (id: string) => `/directories/${id}/generator`,
-    DASHBOARD_DIRECTORY_SCHEDULE: (id: string) => `/directories/${id}/generator/schedule`,
-    DASHBOARD_DIRECTORY_HISTORY: (id: string) => `/directories/${id}/generator/history`,
-    DASHBOARD_DIRECTORY_COMPARISONS: (id: string) => `/directories/${id}/generator/comparisons`,
-    DASHBOARD_DIRECTORY_COMPARISON: (id: string, slug: string) =>
-        `/directories/${id}/generator/comparisons/${slug}`,
-    DASHBOARD_DIRECTORY_DEPLOY: (id: string) => `/directories/${id}/deploy`,
-    DASHBOARD_DIRECTORY_MEMBERS: (id: string) => `/directories/${id}/members`,
-    DASHBOARD_DIRECTORY_SETTINGS: (id: string) => `/directories/${id}/settings`,
-    DASHBOARD_DIRECTORY_PLUGINS: (id: string) => `/directories/${id}/plugins`,
+    DASHBOARD_WORKS: '/works',
+    DASHBOARD_WORKS_NEW: '/works/new',
+    DASHBOARD_WORK: (id: string) => `/works/${id}`,
+    DASHBOARD_WORK_ITEMS: (id: string) => `/works/${id}/items`,
+    DASHBOARD_WORK_GENERATOR: (id: string) => `/works/${id}/generator`,
+    DASHBOARD_WORK_SCHEDULE: (id: string) => `/works/${id}/generator/schedule`,
+    DASHBOARD_WORK_HISTORY: (id: string) => `/works/${id}/generator/history`,
+    DASHBOARD_WORK_COMPARISONS: (id: string) => `/works/${id}/generator/comparisons`,
+    DASHBOARD_WORK_COMPARISON: (id: string, slug: string) =>
+        `/works/${id}/generator/comparisons/${slug}`,
+    DASHBOARD_WORK_DEPLOY: (id: string) => `/works/${id}/deploy`,
+    DASHBOARD_WORK_MEMBERS: (id: string) => `/works/${id}/members`,
+    DASHBOARD_WORK_SETTINGS: (id: string) => `/works/${id}/settings`,
+    DASHBOARD_WORK_PLUGINS: (id: string) => `/works/${id}/plugins`,
     // Plugins
     DASHBOARD_PLUGINS: '/plugins',
     DASHBOARD_PLUGIN_DETAIL: (pluginId: string) => `/plugins/${pluginId}`,
@@ -145,8 +142,8 @@ export const PUBLIC_ROUTES = [
     '/help',
 ] as const;
 
-// Site Configuration - can be merged with directory config from config.yml
-export const getSiteConfig = (config?: DirectoryConfig | null) => {
+// Site Configuration - can be merged with work config from config.yml
+export const getSiteConfig = (config?: WorkConfig | null) => {
     const name = config?.company_name || APP_NAME;
     const website = config?.company_website || WEB_URL;
     const owner = config?.company_owner || COMPANY_OWNER;
@@ -174,12 +171,12 @@ export const getSiteConfig = (config?: DirectoryConfig | null) => {
         description:
             config?.description ||
             process.env.NEXT_PUBLIC_SITE_DESCRIPTION ||
-            'Build Directories with AI',
+            'Build Works with AI',
         keywords:
             config?.keywords ||
             (process.env.NEXT_PUBLIC_SITE_KEYWORDS
                 ? process.env.NEXT_PUBLIC_SITE_KEYWORDS.split(',').map((k) => k.trim())
-                : ['Ever Works', 'Directories', 'AI', 'Automation', 'Productivity', 'Workflow']),
+                : ['Ever Works', 'Works', 'AI', 'Automation', 'Productivity', 'Workflow']),
         author: config?.author || process.env.NEXT_PUBLIC_SITE_AUTHOR || name,
         url: website,
         image: config?.image || process.env.NEXT_PUBLIC_SITE_IMAGE || '/logo-light.png',
@@ -192,7 +189,7 @@ export const getSiteConfig = (config?: DirectoryConfig | null) => {
                 config?.twitter?.description ||
                 process.env.NEXT_PUBLIC_TWITTER_DESCRIPTION ||
                 process.env.NEXT_PUBLIC_SITE_DESCRIPTION ||
-                'Build Directories with AI',
+                'Build Works with AI',
         },
     } as const;
 };

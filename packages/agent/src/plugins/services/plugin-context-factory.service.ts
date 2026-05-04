@@ -62,7 +62,7 @@ export class PluginContextFactoryService {
 
     /**
      * Inject platform services into plugin context.
-     * Call this during module initialization to provide access to UserService, DirectoryService, etc.
+     * Call this during module initialization to provide access to UserService, WorkService, etc.
      */
     injectServices(services: Partial<PluginServices>): void {
         this.injectedServices = { ...this.injectedServices, ...services };
@@ -78,7 +78,7 @@ export class PluginContextFactoryService {
         pluginId: string,
         scopeOptions?: {
             userId?: string;
-            directoryId?: string;
+            workId?: string;
         },
     ): PluginContext {
         const registered = this.registry.get(pluginId);
@@ -118,7 +118,7 @@ export class PluginContextFactoryService {
             },
 
             updateSettings: async (
-                scope: 'user' | 'directory',
+                scope: 'user' | 'work',
                 scopeId: string | undefined,
                 data: PluginSettingsWrite,
             ): Promise<void> => {
@@ -150,19 +150,16 @@ export class PluginContextFactoryService {
                     return;
                 }
 
-                const targetDirectoryId = scopeId ?? scopeOptions?.directoryId;
-                if (!targetDirectoryId) {
+                const targetWorkId = scopeId ?? scopeOptions?.workId;
+                if (!targetWorkId) {
                     throw new Error(
-                        `Plugin "${pluginId}" attempted to update directory settings without a directoryId`,
+                        `Plugin "${pluginId}" attempted to update work settings without a workId`,
                     );
                 }
 
-                await this.settingsService.updateDirectorySettings(
-                    pluginId,
-                    targetDirectoryId,
-                    combined,
-                    { secretKeys },
-                );
+                await this.settingsService.updateWorkSettings(pluginId, targetWorkId, combined, {
+                    secretKeys,
+                });
             },
 
             onEvent: <T extends PluginEventName>(
@@ -223,10 +220,10 @@ export class PluginContextFactoryService {
     }
 
     /**
-     * Create a scoped context for a specific user and/or directory
+     * Create a scoped context for a specific user and/or work
      */
-    createScopedContext(pluginId: string, userId?: string, directoryId?: string): PluginContext {
-        return this.createContext(pluginId, { userId, directoryId });
+    createScopedContext(pluginId: string, userId?: string, workId?: string): PluginContext {
+        return this.createContext(pluginId, { userId, workId });
     }
 
     /**
@@ -397,12 +394,9 @@ export class PluginContextFactoryService {
     /**
      * Create PluginServices for a plugin.
      */
-    private createServices(_scopeOptions?: {
-        userId?: string;
-        directoryId?: string;
-    }): PluginServices {
+    private createServices(_scopeOptions?: { userId?: string; workId?: string }): PluginServices {
         return {
-            directory: this.injectedServices.directory,
+            work: this.injectedServices.work,
             user: this.injectedServices.user,
         };
     }
@@ -456,24 +450,24 @@ export class PluginContextFactoryService {
     private buildSettingsOptions(
         scope?: SettingScope,
         scopeId?: string,
-        defaultScope?: { userId?: string; directoryId?: string },
-    ): { scope?: SettingScope; userId?: string; directoryId?: string } {
-        const options: { scope?: SettingScope; userId?: string; directoryId?: string } = {
+        defaultScope?: { userId?: string; workId?: string },
+    ): { scope?: SettingScope; userId?: string; workId?: string } {
+        const options: { scope?: SettingScope; userId?: string; workId?: string } = {
             scope,
         };
 
         if (scope === 'user' && scopeId) {
             options.userId = scopeId;
-        } else if (scope === 'directory' && scopeId) {
-            options.directoryId = scopeId;
+        } else if (scope === 'work' && scopeId) {
+            options.workId = scopeId;
         }
 
         // Apply defaults from context scope
         if (defaultScope?.userId && !options.userId) {
             options.userId = defaultScope.userId;
         }
-        if (defaultScope?.directoryId && !options.directoryId) {
-            options.directoryId = defaultScope.directoryId;
+        if (defaultScope?.workId && !options.workId) {
+            options.workId = defaultScope.workId;
         }
 
         return options;

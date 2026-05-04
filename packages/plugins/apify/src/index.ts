@@ -1,7 +1,7 @@
 /**
  * Apify Plugin
  *
- * Import items from Apify datasets into your directories.
+ * Import items from Apify datasets into your works.
  *
  * @packageDocumentation
  */

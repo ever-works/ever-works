@@ -18,9 +18,9 @@ export interface PluginEnvironment {
 	readonly baseUrl?: string;
 	/** API base URL */
 	readonly apiBaseUrl?: string;
-	/** Temporary directory path */
+	/** Temporary work path */
 	readonly tempDir: string;
-	/** Plugin data directory path */
+	/** Plugin data work path */
 	readonly dataDir: string;
 	/** Available features/flags */
 	readonly features: ReadonlySet<string>;

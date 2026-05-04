@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { AiFacadeService, type FacadeOptions } from '@ever-works/agent/facades';
-import { DirectoryRepository } from '@ever-works/agent/database';
+import { WorkRepository } from '@ever-works/agent/database';
 import type {
     ChatMessage,
     ChatCompletionOptions,
@@ -17,7 +17,13 @@ import type {
 
 type StreamingResponse = {
     write(chunk: string): void;
-    end(): void;
+    end(payload?: string): void;
+    headersSent: boolean;
+    destroyed: boolean;
+    writableEnded: boolean;
+    status(code: number): void;
+    setHeader(name: string, value: string): void;
+    destroy(error?: Error): void;
 };
 
 @Injectable()
@@ -26,7 +32,7 @@ export class OpenAiCompatService {
 
     constructor(
         private readonly aiFacade: AiFacadeService,
-        private readonly directoryRepository: DirectoryRepository,
+        private readonly workRepository: WorkRepository,
     ) {}
 
     /**
@@ -36,7 +42,7 @@ export class OpenAiCompatService {
         dto: OpenAiChatCompletionRequestDto,
         facadeOptions: FacadeOptions,
     ): Promise<OpenAiChatCompletionResponse> {
-        const resolved = await this.resolveDirectoryContext(facadeOptions);
+        const resolved = await this.resolveWorkContext(facadeOptions);
         const options = this.mapToInternalOptions(dto);
 
         const response = await this.aiFacade.createChatCompletion(options, resolved);
@@ -53,7 +59,7 @@ export class OpenAiCompatService {
         facadeOptions: FacadeOptions,
         res: StreamingResponse,
     ): Promise<void> {
-        const resolved = await this.resolveDirectoryContext(facadeOptions);
+        const resolved = await this.resolveWorkContext(facadeOptions);
         const options = this.mapToInternalOptions(dto);
 
         try {
@@ -279,12 +285,12 @@ export class OpenAiCompatService {
     // Helpers
     // ────────────────────────────────────────────────────────────────
 
-    private async resolveDirectoryContext(options: FacadeOptions): Promise<FacadeOptions> {
-        if (options.directoryId) return options;
+    private async resolveWorkContext(options: FacadeOptions): Promise<FacadeOptions> {
+        if (options.workId) return options;
 
-        const directories = await this.directoryRepository.findByUser(options.userId);
-        if (directories.length > 0) {
-            return { ...options, directoryId: directories[0].id };
+        const works = await this.workRepository.findByUser(options.userId);
+        if (works.length > 0) {
+            return { ...options, workId: works[0].id };
         }
 
         return options;

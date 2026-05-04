@@ -10,7 +10,7 @@ import type { EnvironmentVariables } from '../contracts/plugin-environment.inter
 /**
  * Settings resolution priority (highest to lowest)
  */
-export const SETTINGS_PRIORITY: readonly SettingSource[] = ['user', 'directory', 'admin', 'env', 'default'] as const;
+export const SETTINGS_PRIORITY: readonly SettingSource[] = ['user', 'work', 'admin', 'env', 'default'] as const;
 
 /**
  * Settings layers for resolution
@@ -19,7 +19,7 @@ export interface SettingsLayers {
 	readonly default?: PluginSettings;
 	readonly env?: PluginSettings;
 	readonly admin?: PluginSettings;
-	readonly directory?: PluginSettings;
+	readonly work?: PluginSettings;
 	readonly user?: PluginSettings;
 }
 
@@ -32,7 +32,7 @@ export function resolveSetting<T = unknown>(
 	definition?: SettingDefinition
 ): ResolvedSetting<T> {
 	// Check each layer in priority order
-	for (const scope of ['user', 'directory', 'admin'] as const) {
+	for (const scope of ['user', 'work', 'admin'] as const) {
 		const layer = layers[scope];
 		if (layer && key in layer && layer[key] !== undefined) {
 			return {

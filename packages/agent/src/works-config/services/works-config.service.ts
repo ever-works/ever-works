@@ -1,9 +1,9 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { DirectoryScheduleCadence, type ProvidersDto } from '@ever-works/contracts/api';
+import { WorkScheduleCadence, type ProvidersDto } from '@ever-works/contracts/api';
 import * as yaml from 'yaml';
 import mergeWith from 'lodash/mergeWith';
 import { GitFacadeService } from '@src/facades/git.facade';
-import type { RepositoryTarget } from '@src/entities/directory.entity';
+import type { RepositoryTarget } from '@src/entities/work.entity';
 
 const LEGACY_WORKS_CONFIG_FILEPATHS = ['config.yml', 'config.yaml'] as const;
 const STANDARD_WORKS_CONFIG_FILEPATHS = [
@@ -17,7 +17,7 @@ export interface WorksConfigSummary {
     initialPrompt?: string;
     model?: string;
     websiteRepo?: string;
-    scheduleCadence?: DirectoryScheduleCadence | null;
+    scheduleCadence?: WorkScheduleCadence | null;
     providers?: ProvidersDto;
 }
 
@@ -235,13 +235,19 @@ export class WorksConfigService {
     private readInitialPrompt(raw: Record<string, unknown>): string | undefined {
         return (
             this.readString(raw, ['initial_prompt', 'initialPrompt', 'prompt']) ??
-            this.readString(this.readMetadata(raw), ['initial_prompt', 'initialPrompt', 'prompt']) ??
+            this.readString(this.readMetadata(raw), [
+                'initial_prompt',
+                'initialPrompt',
+                'prompt',
+            ]) ??
             this.asString(this.readLastRequestData(raw)?.prompt)
         );
     }
 
     private readModel(raw: Record<string, unknown>): string | undefined {
-        return this.readString(raw, ['model']) ?? this.asString(this.readLastRequestData(raw)?.model);
+        return (
+            this.readString(raw, ['model']) ?? this.asString(this.readLastRequestData(raw)?.model)
+        );
     }
 
     private readMetadata(raw: Record<string, unknown>): Record<string, unknown> {
@@ -261,7 +267,7 @@ export class WorksConfigService {
             : undefined;
     }
 
-    private readScheduleCadence(raw: Record<string, unknown>): DirectoryScheduleCadence | null {
+    private readScheduleCadence(raw: Record<string, unknown>): WorkScheduleCadence | null {
         const schedule = raw.schedule;
 
         if (typeof schedule === 'string') {
@@ -285,7 +291,7 @@ export class WorksConfigService {
         );
     }
 
-    private normalizeCadence(value?: string | null): DirectoryScheduleCadence | null {
+    private normalizeCadence(value?: string | null): WorkScheduleCadence | null {
         if (!value) {
             return null;
         }
@@ -293,23 +299,23 @@ export class WorksConfigService {
         const normalized = value.trim().toLowerCase();
 
         switch (normalized) {
-            case DirectoryScheduleCadence.HOURLY:
-                return DirectoryScheduleCadence.HOURLY;
-            case DirectoryScheduleCadence.EVERY_3_HOURS:
+            case WorkScheduleCadence.HOURLY:
+                return WorkScheduleCadence.HOURLY;
+            case WorkScheduleCadence.EVERY_3_HOURS:
             case 'every-3-hours':
-                return DirectoryScheduleCadence.EVERY_3_HOURS;
-            case DirectoryScheduleCadence.EVERY_8_HOURS:
+                return WorkScheduleCadence.EVERY_3_HOURS;
+            case WorkScheduleCadence.EVERY_8_HOURS:
             case 'every-8-hours':
-                return DirectoryScheduleCadence.EVERY_8_HOURS;
-            case DirectoryScheduleCadence.EVERY_12_HOURS:
+                return WorkScheduleCadence.EVERY_8_HOURS;
+            case WorkScheduleCadence.EVERY_12_HOURS:
             case 'every-12-hours':
-                return DirectoryScheduleCadence.EVERY_12_HOURS;
-            case DirectoryScheduleCadence.DAILY:
-                return DirectoryScheduleCadence.DAILY;
-            case DirectoryScheduleCadence.WEEKLY:
-                return DirectoryScheduleCadence.WEEKLY;
-            case DirectoryScheduleCadence.MONTHLY:
-                return DirectoryScheduleCadence.MONTHLY;
+                return WorkScheduleCadence.EVERY_12_HOURS;
+            case WorkScheduleCadence.DAILY:
+                return WorkScheduleCadence.DAILY;
+            case WorkScheduleCadence.WEEKLY:
+                return WorkScheduleCadence.WEEKLY;
+            case WorkScheduleCadence.MONTHLY:
+                return WorkScheduleCadence.MONTHLY;
             default:
                 return null;
         }

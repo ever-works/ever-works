@@ -21,7 +21,7 @@ export async function enablePlugin(
     options?: {
         settings?: Record<string, unknown>;
         secretSettings?: Record<string, unknown>;
-        autoEnableForDirectories?: boolean;
+        autoEnableForWorks?: boolean;
     },
 ): Promise<ActionResult> {
     try {
@@ -81,10 +81,10 @@ export async function updatePluginSettings(
 }
 
 /**
- * Enable a plugin for a directory
+ * Enable a plugin for a work
  */
-export async function enableDirectoryPlugin(
-    directoryId: string,
+export async function enableWorkPlugin(
+    workId: string,
     pluginId: string,
     options?: {
         settings?: Record<string, unknown>;
@@ -93,44 +93,41 @@ export async function enableDirectoryPlugin(
     },
 ): Promise<ActionResult> {
     try {
-        const result = await pluginsAPI.enableForDirectory(directoryId, pluginId, options);
-        revalidatePath(`/directories/${directoryId}/plugins`);
+        const result = await pluginsAPI.enableForWork(workId, pluginId, options);
+        revalidatePath(`/works/${workId}/plugins`);
         return { success: true, data: result };
     } catch (error) {
-        console.error('Failed to enable directory plugin:', error);
+        console.error('Failed to enable Work plugin:', error);
         return {
             success: false,
-            error: error instanceof Error ? error.message : 'Failed to enable directory plugin',
+            error: error instanceof Error ? error.message : 'Failed to enable Work plugin',
         };
     }
 }
 
 /**
- * Disable a plugin for a directory
+ * Disable a plugin for a work
  */
-export async function disableDirectoryPlugin(
-    directoryId: string,
-    pluginId: string,
-): Promise<ActionResult> {
+export async function disableWorkPlugin(workId: string, pluginId: string): Promise<ActionResult> {
     try {
-        const result = await pluginsAPI.disableForDirectory(directoryId, pluginId);
-        revalidatePath(`/directories/${directoryId}/plugins`);
+        const result = await pluginsAPI.disableForWork(workId, pluginId);
+        revalidatePath(`/works/${workId}/plugins`);
         return { success: true, data: result };
     } catch (error) {
-        console.error('Failed to disable directory plugin:', error);
+        console.error('Failed to disable Work plugin:', error);
         return {
             success: false,
-            error: error instanceof Error ? error.message : 'Failed to disable directory plugin',
+            error: error instanceof Error ? error.message : 'Failed to disable Work plugin',
         };
     }
 }
 
 /**
- * Update directory plugin settings.
+ * Update work plugin settings.
  * The API automatically validates the connection after saving and returns the result.
  */
-export async function updateDirectoryPluginSettings(
-    directoryId: string,
+export async function updateWorkPluginSettings(
+    workId: string,
     pluginId: string,
     data: {
         settings?: Record<string, unknown>;
@@ -139,17 +136,14 @@ export async function updateDirectoryPluginSettings(
     },
 ): Promise<ActionResult> {
     try {
-        const result = await pluginsAPI.updateDirectorySettings(directoryId, pluginId, data);
-        revalidatePath(`/directories/${directoryId}/plugins`);
+        const result = await pluginsAPI.updateWorkSettings(workId, pluginId, data);
+        revalidatePath(`/works/${workId}/plugins`);
         return { success: true, data: result };
     } catch (error) {
-        console.error('Failed to update directory plugin settings:', error);
+        console.error('Failed to update Work plugin settings:', error);
         return {
             success: false,
-            error:
-                error instanceof Error
-                    ? error.message
-                    : 'Failed to update directory plugin settings',
+            error: error instanceof Error ? error.message : 'Failed to update Work plugin settings',
         };
     }
 }
@@ -171,16 +165,16 @@ export async function fetchModels(pluginId: string): Promise<ActionResult<any[]>
 }
 
 /**
- * Set active capability for a directory plugin
+ * Set active capability for a work plugin
  */
 export async function setActiveCapability(
-    directoryId: string,
+    workId: string,
     pluginId: string,
     capability: string,
 ): Promise<ActionResult> {
     try {
-        const result = await pluginsAPI.setActiveCapability(directoryId, pluginId, capability);
-        revalidatePath(`/directories/${directoryId}/plugins`);
+        const result = await pluginsAPI.setActiveCapability(workId, pluginId, capability);
+        revalidatePath(`/works/${workId}/plugins`);
         return { success: true, data: result };
     } catch (error) {
         console.error('Failed to set active capability:', error);

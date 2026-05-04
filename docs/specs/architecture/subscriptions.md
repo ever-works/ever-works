@@ -43,15 +43,15 @@ internal CLI) can call the same services without going through HTTP.
 
 ## 3. Plan Model
 
-| Plan tier      | What it gates                                              | Stripe price id source |
-| -------------- | ---------------------------------------------------------- | ---------------------- |
-| **Free**       | Default tier; limited active directories, limited cadences | None (no Stripe)       |
-| **Pro**        | More directories, faster cadences, Agent Pipeline          | `STRIPE_PRICE_PRO_*`   |
-| **Team**       | Everything in Pro + members + custom domains               | `STRIPE_PRICE_TEAM_*`  |
-| **Enterprise** | Custom contracts (handled out-of-band)                     | None (manual)          |
+| Plan tier      | What it gates                                        | Stripe price id source |
+| -------------- | ---------------------------------------------------- | ---------------------- |
+| **Free**       | Default tier; limited active works, limited cadences | None (no Stripe)       |
+| **Pro**        | More works, faster cadences, Agent Pipeline          | `STRIPE_PRICE_PRO_*`   |
+| **Team**       | Everything in Pro + members + custom domains         | `STRIPE_PRICE_TEAM_*`  |
+| **Enterprise** | Custom contracts (handled out-of-band)               | None (manual)          |
 
-Each plan exposes machine-readable limits (`maxDirectories`,
-`maxScheduledDirectories`, `allowedCadences`, etc.). The platform
+Each plan exposes machine-readable limits (`maxWorks`,
+`maxScheduledWorks`, `allowedCadences`, etc.). The platform
 reads these via `config.subscriptions.*` so changes to plan shape are
 config-only — not a code change.
 
@@ -61,7 +61,7 @@ see §10.
 
 ## 4. The Two Billing Modes
 
-Every billable operation carries a `DirectoryScheduleBillingMode`:
+Every billable operation carries a `WorkScheduleBillingMode`:
 
 | Mode           | Behaviour                                                                                           |
 | -------------- | --------------------------------------------------------------------------------------------------- |
@@ -69,10 +69,10 @@ Every billable operation carries a `DirectoryScheduleBillingMode`:
 | `usage`        | Pay-per-use. The action proceeds and writes a `UsageLedgerEntry` that the billing provider charges. |
 
 The mode is a **per-resource setting** (per-schedule today; potentially
-per-directory in future). Users on an Enterprise plan typically run
+per-work in future). Users on an Enterprise plan typically run
 everything in `subscription` mode against a custom contract; Pro users
-mix-and-match — they keep their daily directories on `subscription`
-and switch experimental hourly directories to `usage` to bypass plan
+mix-and-match — they keep their daily works on `subscription`
+and switch experimental hourly works to `usage` to bypass plan
 limits.
 
 ## 5. The Usage Ledger
@@ -84,9 +84,9 @@ limits.
 export class UsageLedgerEntry {
 	@PrimaryGeneratedColumn('uuid') id: string;
 	@Column() userId: string;
-	@Column({ nullable: true }) directoryId: string | null;
+	@Column({ nullable: true }) workId: string | null;
 	@Column({ type: 'varchar' }) triggerType: UsageLedgerTriggerType;
-	@Column({ type: 'varchar' }) billingMode: DirectoryScheduleBillingMode;
+	@Column({ type: 'varchar' }) billingMode: WorkScheduleBillingMode;
 	@Column({ nullable: true }) generationHistoryId: string | null;
 	@Column({ type: 'varchar' }) status: UsageLedgerStatus;
 	@Column({ nullable: true }) chargeReference: string | null; // Stripe charge id
@@ -106,7 +106,7 @@ export class UsageLedgerEntry {
 ```ts
 const entry = await usageLedgerService.recordUsage({
 	userId,
-	directoryId: schedule.directoryId,
+	workId: schedule.workId,
 	schedule,
 	triggerType: UsageLedgerTriggerType.SCHEDULED,
 	billingMode: schedule.billingMode,
@@ -186,7 +186,7 @@ allowed), or when the user's plan permits the cadence.
 Used for events where you only know the cost after the work is done
 (generation cost, item count). Always backed by a `UsageLedgerEntry`
 write inside the same transaction as the operation's
-finalisation. See `markRunCompleted` on `DirectoryScheduleService` for
+finalisation. See `markRunCompleted` on `WorkScheduleService` for
 the canonical example.
 
 ## 8. Webhooks
@@ -210,14 +210,14 @@ payload.
 
 ## 9. Schedule-Specific Billing Notes
 
-`DirectoryScheduleService` is the most active billing consumer.
+`WorkScheduleService` is the most active billing consumer.
 Specific behaviours:
 
 - `markRunCompleted` always records a usage entry (no-op when not in
   usage mode).
 - `markRunFailed` does **not** record usage — failed runs are free.
 - Cadence changes are pre-flight checked against the plan; switching
-  a directory from `monthly` (allowed on plan) to `hourly` (not
+  a work from `monthly` (allowed on plan) to `hourly` (not
   allowed) requires either a plan upgrade or `billingMode: usage`.
 - Pay-per-use schedules can override plan limits via the
   `payPerUse: true` flag in `allowedCadences[]` per cadence — the
@@ -249,10 +249,10 @@ object the dashboard consumes for plan-aware UI:
 
 ```ts
 interface PlanLimits {
-	maxDirectories: number | null; // null = unlimited
-	maxScheduledDirectories: number | null;
+	maxWorks: number | null; // null = unlimited
+	maxScheduledWorks: number | null;
 	allowedCadences: Array<{
-		cadence: DirectoryScheduleCadence;
+		cadence: WorkScheduleCadence;
 		allowed: boolean;
 		payPerUse?: boolean;
 		reason?: string; // human-readable upgrade hint

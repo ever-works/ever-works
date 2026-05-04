@@ -9,7 +9,7 @@ import type {
 import { PLUGIN_CAPABILITIES } from '@ever-works/plugin';
 import { PluginRegistryService } from '../plugins/services/plugin-registry.service';
 import { PluginSettingsService } from '../plugins/services/plugin-settings.service';
-import { DirectoryPluginRepository } from '../plugins/repositories/directory-plugin.repository';
+import { WorkPluginRepository } from '../plugins/repositories/work-plugin.repository';
 import { BaseFacadeService, FacadeError } from './base.facade';
 
 export class SearchFacadeError extends FacadeError {
@@ -27,9 +27,9 @@ export class SearchFacadeService extends BaseFacadeService implements ISearchFac
     constructor(
         registry: PluginRegistryService,
         settingsService: PluginSettingsService,
-        @Optional() directoryPluginRepository?: DirectoryPluginRepository,
+        @Optional() workPluginRepository?: WorkPluginRepository,
     ) {
-        super(registry, settingsService, directoryPluginRepository);
+        super(registry, settingsService, workPluginRepository);
     }
 
     async search(
@@ -40,7 +40,7 @@ export class SearchFacadeService extends BaseFacadeService implements ISearchFac
         const plugin = await this.resolvePlugin<ISearchPlugin>(
             facadeOptions.providerOverride,
             facadeOptions.userId,
-            facadeOptions.directoryId,
+            facadeOptions.workId,
         );
 
         const settings = await this.getResolvedSettings(plugin.id, facadeOptions);

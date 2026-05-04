@@ -72,7 +72,7 @@ async function bootstrap() {
     const config = new DocumentBuilder()
         .setTitle('Ever Works API')
         .setDescription(
-            'The Ever Works Platform API - Build and manage AI-powered directories with automated content generation, deployment, and integrations.',
+            'The Ever Works Platform API - Build and manage AI-powered works with automated content generation, deployment, and integrations.',
         )
         .setVersion('1.0')
         .addBearerAuth(
@@ -88,13 +88,13 @@ async function bootstrap() {
         )
         .addTag('Health', 'API health check endpoints')
         .addTag('Auth', 'Authentication and authorization endpoints')
-        .addTag('Directories', 'Directory management endpoints')
+        .addTag('Works', 'Work management endpoints')
         .addTag('Deploy', 'Deployment endpoints')
         .addTag('AI Conversation', 'AI-powered conversation and content generation')
         .addTag('Screenshot', 'Screenshot capture and smart image preview')
         .addTag('Subscriptions', 'Subscription and billing management')
         .addTag('Notifications', 'User notifications')
-        .addTag('Members', 'Directory member management')
+        .addTag('Members', 'Work member management')
         .build();
 
     const document = SwaggerModule.createDocument(app, config);

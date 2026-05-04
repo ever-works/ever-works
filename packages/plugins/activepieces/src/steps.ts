@@ -19,7 +19,7 @@ export const STEP_DEFINITIONS: readonly PipelineStepDefinition<ActivepiecesStepI
 	{
 		id: 'prepare-payload',
 		name: 'Prepare Flow Payload',
-		description: 'Build input payload from directory context, existing items, and config',
+		description: 'Build input payload from work context, existing items, and config',
 		position: { type: 'after', stepId: 'validate-activepieces' },
 		dependencies: [{ stepId: 'validate-activepieces', required: true }],
 		optional: false,

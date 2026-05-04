@@ -3,7 +3,7 @@ import { createHash } from 'node:crypto';
 import type { ExistingItems } from '@ever-works/plugin';
 import { slugify } from '@ever-works/plugin';
 
-import type { DirectoryReference, GenerationRequest } from '@ever-works/plugin';
+import type { WorkReference, GenerationRequest } from '@ever-works/plugin';
 
 import type { WorkspaceSeedFile, WorkspaceSeedManifest } from '../types.js';
 
@@ -22,7 +22,7 @@ function deduplicateSlug(slug: string, existingSlugs: Set<string>): string {
 
 export function buildWorkspaceSeedManifest(
 	workspacePath: string,
-	directory: DirectoryReference,
+	work: WorkReference,
 	request: GenerationRequest,
 	existing: ExistingItems
 ): WorkspaceSeedManifest {
@@ -44,11 +44,11 @@ export function buildWorkspaceSeedManifest(
 	}
 
 	files.push({
-		path: '_meta/directory.json',
+		path: '_meta/work.json',
 		content: JSON.stringify(
 			{
-				name: directory.name,
-				description: directory.description
+				name: work.name,
+				description: work.description
 			},
 			null,
 			2

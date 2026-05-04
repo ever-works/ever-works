@@ -44,9 +44,9 @@ List available deployment providers with their enabled status.
 
 Check if the user has configured a specific deployment provider. Returns `configured`, `available`, and `enabled` flags.
 
-### POST `/api/deploy/directories/:id`
+### POST `/api/deploy/works/:id`
 
-Deploy a directory to its configured provider. The service validates the deploy token, enables GitHub Actions workflows, sets repository secrets (`DEPLOY_TOKEN`, `DATA_REPOSITORY`, `CRON_SECRET`, and provider-specific tokens), then dispatches the deployment workflow with retry logic.
+Deploy a work to its configured provider. The service validates the deploy token, enables GitHub Actions workflows, sets repository secrets (`DEPLOY_TOKEN`, `DATA_REPOSITORY`, `CRON_SECRET`, and provider-specific tokens), then dispatches the deployment workflow with retry logic.
 
 | Body Parameter | Type   | Description                    |
 | -------------- | ------ | ------------------------------ |
@@ -55,7 +55,7 @@ Deploy a directory to its configured provider. The service validates the deploy 
 The deployment flow:
 
 1. Validates deploy token via `DeployFacadeService`
-2. Retrieves git access token for the directory owner
+2. Retrieves git access token for the work owner
 3. Sets required and optional GitHub Actions secrets
 4. Dispatches workflow (`deploy_vercel.yaml` or `deploy_prod.yaml`)
 5. On failure, updates the repository and retries
@@ -69,21 +69,21 @@ Check if the user has a valid deployment provider available.
 
 Get deployment teams from the user's deployment provider.
 
-### POST `/api/deploy/directories/:id/teams`
+### POST `/api/deploy/works/:id/teams`
 
-Get deployment teams for a specific directory. Uses the directory owner's credentials if the requesting user is a collaborator.
+Get deployment teams for a specific work. Uses the work owner's credentials if the requesting user is a collaborator.
 
-### POST `/api/deploy/directories/:id/check`
+### POST `/api/deploy/works/:id/check`
 
-Check deployment capability for a directory. Returns `canDeploy`, `isShared`, `ownerHasToken`, and `userHasToken`.
+Check deployment capability for a work. Returns `canDeploy`, `isShared`, `ownerHasToken`, and `userHasToken`.
 
-### POST `/api/deploy/directories/:id/lookup`
+### POST `/api/deploy/works/:id/lookup`
 
-Look up an existing deployment for a directory. Returns the `website` URL and `deploymentState`.
+Look up an existing deployment for a work. Returns the `website` URL and `deploymentState`.
 
 ### POST `/api/deploy/batch`
 
-Deploy multiple directories at once. Processes in batches of 5 concurrently with a 2-second delay between batches. Returns per-directory results with `status` (`success` | `partial` | `error`).
+Deploy multiple works at once. Processes in batches of 5 concurrently with a 2-second delay between batches. Returns per-work results with `status` (`success` | `partial` | `error`).
 
 ### Deployment Verification
 

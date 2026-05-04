@@ -10,8 +10,8 @@ interface KeyboardShortcutsOptions {
 
 /**
  * Global keyboard shortcuts for the dashboard
- * - Ctrl/Cmd + K: Navigate to directories and focus search
- * - C: Create new directory
+ * - Ctrl/Cmd + K: Navigate to works and focus search
+ * - C: Create new work
  * - ?: Open help drawer (when not in an input field)
  */
 export function useKeyboardShortcuts(options: KeyboardShortcutsOptions = {}) {
@@ -31,11 +31,11 @@ export function useKeyboardShortcuts(options: KeyboardShortcutsOptions = {}) {
             // Check for modifier key (Ctrl on Windows/Linux, Cmd on Mac)
             const modifier = event.ctrlKey || event.metaKey;
 
-            // Ctrl/Cmd + K: Focus search on directories page
+            // Ctrl/Cmd + K: Focus search on works page
             if (modifier && event.key.toLowerCase() === 'k') {
                 event.preventDefault();
-                // Navigate to directories page with focus param
-                router.push(`${ROUTES.DASHBOARD_DIRECTORIES}?focus=search`);
+                // Navigate to works page with focus param
+                router.push(`${ROUTES.DASHBOARD_WORKS}?focus=search`);
                 return;
             }
 
@@ -44,10 +44,10 @@ export function useKeyboardShortcuts(options: KeyboardShortcutsOptions = {}) {
                 return;
             }
 
-            // C: Create new directory
+            // C: Create new work
             if (event.key.toLowerCase() === 'c' && !modifier) {
                 event.preventDefault();
-                router.push(ROUTES.DASHBOARD_DIRECTORIES_NEW);
+                router.push(ROUTES.DASHBOARD_WORKS_NEW);
                 return;
             }
 

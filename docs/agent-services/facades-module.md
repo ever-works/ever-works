@@ -53,7 +53,7 @@ graph TD
 
     BASE --> REG[PluginRegistryService]
     BASE --> SET[PluginSettingsService]
-    BASE --> DIR_REPO[DirectoryPluginRepository]
+    BASE --> DIR_REPO[WorkPluginRepository]
 
     subgraph Plugins
         P1[OpenAI Plugin]
@@ -82,8 +82,8 @@ The `resolvePlugin<T>()` method finds the appropriate plugin implementation usin
 flowchart TD
     A[resolvePlugin called] --> B{Provider override?}
     B -->|Yes| C[Use specified plugin]
-    B -->|No| D{Directory active capability?}
-    D -->|Yes| E[Use directory default]
+    B -->|No| D{Work active capability?}
+    D -->|Yes| E[Use work default]
     D -->|No| F{defaultForCapabilities in manifest?}
     F -->|Yes| G[Use manifest default]
     F -->|No| H{Any enabled plugin?}
@@ -94,7 +94,7 @@ flowchart TD
 **Resolution priority** (highest to lowest):
 
 1. **Explicit override** -- `facadeOptions.providerOverride` specifies a plugin ID directly
-2. **Directory active capability** -- A `DirectoryPluginEntity` is set as the active plugin for this capability
+2. **Work active capability** -- A `WorkPluginEntity` is set as the active plugin for this capability
 3. **Manifest default** -- Plugin declares itself as default via `defaultForCapabilities`
 4. **First enabled** -- Falls back to any loaded plugin with the required capability
 
@@ -104,7 +104,7 @@ The `getResolvedSettings()` method merges settings from multiple scopes:
 
 | Priority    | Source                | Description                           |
 | ----------- | --------------------- | ------------------------------------- |
-| 1 (highest) | Directory settings    | Per-directory plugin configuration    |
+| 1 (highest) | Work settings         | Per-work plugin configuration         |
 | 2           | User settings         | Per-user plugin configuration         |
 | 3           | Admin settings        | Global admin configuration            |
 | 4           | Environment variables | `x-envVar` annotated schema fields    |
@@ -190,7 +190,7 @@ Manages deployment operations and custom domain lifecycle.
 | `removeDomain(options, facadeOptions)`          | Removes a custom domain                    |
 | `verifyDomain(options, facadeOptions)`          | Verifies domain DNS configuration          |
 
-**Domain management**: The facade uses the database `DirectoryCustomDomain` entity as the source of truth for domain state. When adding/removing domains, it synchronizes both the database record and the deployment provider (e.g., Vercel).
+**Domain management**: The facade uses the database `WorkCustomDomain` entity as the source of truth for domain state. When adding/removing domains, it synchronizes both the database record and the deployment provider (e.g., Vercel).
 
 ### SearchFacadeService
 
@@ -200,7 +200,7 @@ Web search abstraction over search plugins (Exa, Tavily, SerpAPI, Brave).
 const results = await searchFacade.search(
 	'best React component libraries 2025',
 	{ maxResults: 10, includeDomains: ['github.com'] },
-	{ userId, directoryId }
+	{ userId, workId }
 );
 // Returns: SearchFacadeResult[] with title, url, score, publishedDate
 ```
@@ -211,12 +211,12 @@ Captures webpage screenshots via screenshot plugins (ScreenshotOne, Urlbox).
 
 **Key methods**:
 
-| Method                                     | Description                                                                 |
-| ------------------------------------------ | --------------------------------------------------------------------------- |
-| `capture(options, facadeOptions)`          | Full screenshot capture with viewport, format, and blocking options         |
-| `getSmartImage(options, facadeOptions)`    | Simplified screenshot for directory item images (1280x800, PNG, ad-blocked) |
-| `getScreenshotUrl(options, facadeOptions)` | Returns a URL to the screenshot without downloading                         |
-| `isAvailable()`                            | Checks if any screenshot plugin is configured                               |
+| Method                                     | Description                                                            |
+| ------------------------------------------ | ---------------------------------------------------------------------- |
+| `capture(options, facadeOptions)`          | Full screenshot capture with viewport, format, and blocking options    |
+| `getSmartImage(options, facadeOptions)`    | Simplified screenshot for work item images (1280x800, PNG, ad-blocked) |
+| `getScreenshotUrl(options, facadeOptions)` | Returns a URL to the screenshot without downloading                    |
+| `isAvailable()`                            | Checks if any screenshot plugin is configured                          |
 
 ### ContentExtractorFacadeService
 
@@ -228,8 +228,8 @@ flowchart TD
     B -->|Yes| C[Use URL-specific plugin]
     B -->|No| D{Provider override?}
     D -->|Yes| E[Use override plugin]
-    D -->|No| F{Directory default?}
-    F -->|Yes| G[Use directory plugin]
+    D -->|No| F{Work default?}
+    F -->|Yes| G[Use work plugin]
     F -->|No| H{System default?}
     H -->|Yes| I[Use system default]
     H -->|No| J[Use last-resort fallback]
@@ -241,7 +241,7 @@ This allows specialized extractors for specific URL patterns (e.g., Notion extra
 
 Aggregates data from multiple data source plugins.
 
-The `queryAll()` method queries all enabled data source plugins and merges their results. This is used when a directory needs to pull items from multiple external sources.
+The `queryAll()` method queries all enabled data source plugins and merges their results. This is used when a work needs to pull items from multiple external sources.
 
 ### OAuthFacadeService
 
@@ -289,12 +289,12 @@ import { AiFacadeService } from '@ever-works/agent/facades';
 export class ItemGeneratorService {
 	constructor(private readonly aiFacade: AiFacadeService) {}
 
-	async generateDescription(item: Item, userId: string, directoryId: string) {
+	async generateDescription(item: Item, userId: string, workId: string) {
 		const result = await this.aiFacade.askJson(
 			`Generate a description for: ${item.name}`,
 			descriptionSchema, // Zod schema
 			{ complexity: 'simple' },
-			{ userId, directoryId }
+			{ userId, workId }
 		);
 		return result;
 	}
@@ -308,9 +308,9 @@ Every facade method accepts a `FacadeOptions` object as its last parameter:
 ```typescript
 interface FacadeOptions {
 	userId?: string; // For user-level settings resolution
-	directoryId?: string; // For directory-level settings resolution
+	workId?: string; // For work-level settings resolution
 	providerOverride?: string; // Force a specific plugin by ID
 }
 ```
 
-This allows the same facade to resolve different plugins and settings depending on the calling context (which user, which directory).
+This allows the same facade to resolve different plugins and settings depending on the calling context (which user, which work).

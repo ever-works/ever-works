@@ -13,10 +13,10 @@
 ```mermaid
 flowchart LR
     UI[Settings → Advanced Prompts] --> Action[Server Action]
-    Action --> API[PUT /directories/:id/advanced-prompts]
-    API --> Svc[DirectoryAdvancedPromptsService]
-    Svc --> Repo[DirectoryAdvancedPromptsRepository]
-    Repo --> DB[(directory_advanced_prompts)]
+    Action --> API[PUT /works/:id/advanced-prompts]
+    API --> Svc[WorkAdvancedPromptsService]
+    Svc --> Repo[WorkAdvancedPromptsRepository]
+    Repo --> DB[(work_advanced_prompts)]
 
     Gen[ItemsGeneratorService.generateItems] --> Repo
     Repo --> Ctx[GenerationContext.advancedPrompts]
@@ -25,7 +25,7 @@ flowchart LR
     Append --> LLM[LangChain provider]
 ```
 
-The feature is purely additive: a new one-to-one entity per directory,
+The feature is purely additive: a new one-to-one entity per work,
 two new endpoints, one new context field, and a single utility
 (`appendCustomPrompt`) called from seven pipeline steps. The base
 prompts shipped with each step remain untouched.
@@ -34,27 +34,27 @@ prompts shipped with each step remain untouched.
 
 | Concern              | Choice                                                          | Rationale                                                                                 |
 | -------------------- | --------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
-| Storage              | New TypeORM entity with `@OneToOne(Directory)` + cascade        | One row per directory, FK-clean delete                                                    |
+| Storage              | New TypeORM entity with `@OneToOne(Work)` + cascade             | One row per work, FK-clean delete                                                         |
 | Field typing         | All seven prompt fields `text NULL`                             | Optional override per step; null means "use base prompt"                                  |
 | Append vs replace    | **Append** with `## Additional User Instructions:` separator    | Preserves correctness of base prompts; users can't break core extraction logic            |
 | Validation           | class-validator `@MaxLength(2000)` + `sanitizeString` Transform | Bounded length keeps token budget predictable; sanitiser strips `<script>`-style payloads |
-| Loading at run start | Repository lookup once per generation, not per step             | Avoids 7× DB hits per directory run; values are immutable for the run's duration          |
+| Loading at run start | Repository lookup once per generation, not per step             | Avoids 7× DB hits per work run; values are immutable for the run's duration               |
 | Checkpoint behaviour | Always reload fresh on resume, **not** restored from checkpoint | Latest user edits take effect on the next attempt without invalidating the checkpoint     |
-| UI shape             | One collapsible section, 7 textareas, single Save               | Matches the rest of the directory settings page; no per-field state machine               |
+| UI shape             | One collapsible section, 7 textareas, single Save               | Matches the rest of the work settings page; no per-field state machine                    |
 
 ## 3. Data Model
 
 ```ts
-// packages/agent/src/entities/directory-advanced-prompts.entity.ts
-@Entity({ name: 'directory_advanced_prompts' })
-export class DirectoryAdvancedPrompts {
+// packages/agent/src/entities/work-advanced-prompts.entity.ts
+@Entity({ name: 'work_advanced_prompts' })
+export class WorkAdvancedPrompts {
 	@PrimaryGeneratedColumn('uuid') id: string;
 
-	@Column({ unique: true }) directoryId: string;
+	@Column({ unique: true }) workId: string;
 
-	@OneToOne(() => Directory, { onDelete: 'CASCADE' })
-	@JoinColumn({ name: 'directoryId' })
-	directory: Directory;
+	@OneToOne(() => Work, { onDelete: 'CASCADE' })
+	@JoinColumn({ name: 'workId' })
+	work: Work;
 
 	@Column({ type: 'text', nullable: true }) relevanceAssessment?: string | null;
 	@Column({ type: 'text', nullable: true }) itemGeneration?: string | null;
@@ -70,22 +70,22 @@ export class DirectoryAdvancedPrompts {
 ```
 
 Migration is additive and forward-only: new table, unique index on
-`directoryId`, no changes to existing tables.
+`workId`, no changes to existing tables.
 
 ## 4. API Surface
 
-| Method | Endpoint                                | Auth                  | Description                       |
-| ------ | --------------------------------------- | --------------------- | --------------------------------- |
-| `GET`  | `/api/directories/:id/advanced-prompts` | JWT (viewer or above) | Returns the prompts row or `null` |
-| `PUT`  | `/api/directories/:id/advanced-prompts` | JWT (editor or above) | Upserts the prompts row           |
+| Method | Endpoint                          | Auth                  | Description                       |
+| ------ | --------------------------------- | --------------------- | --------------------------------- |
+| `GET`  | `/api/works/:id/advanced-prompts` | JWT (viewer or above) | Returns the prompts row or `null` |
+| `PUT`  | `/api/works/:id/advanced-prompts` | JWT (editor or above) | Upserts the prompts row           |
 
-Request DTO (`UpdateDirectoryAdvancedPromptsDto`) has all seven
+Request DTO (`UpdateWorkAdvancedPromptsDto`) has all seven
 fields as `@IsOptional() @IsString() @MaxLength(2000)`.
 Response shape mirrors the entity with timestamps as ISO strings.
 
 Errors:
 
-- `404` — directory not found
+- `404` — work not found
 - `403` — user lacks editor role on PUT
 - `400` — any field exceeds 2000 chars
 
@@ -97,15 +97,15 @@ plugin contract changes.
 
 ## 6. Web / CLI Surface
 
-- New component `apps/web/src/components/directories/detail/settings/AdvancedPromptsSettings.tsx`
-  embedded in the Settings tab of the directory detail page.
-- New server action `updateAdvancedPrompts(directoryId, data)` under
-  `apps/web/src/app/actions/dashboard/directories.ts`.
-- New API client functions under `apps/web/src/lib/api/directory.ts`.
-- Translation keys under `dashboard.directoryDetail.settings.advancedPrompts.*`
+- New component `apps/web/src/components/works/detail/settings/AdvancedPromptsSettings.tsx`
+  embedded in the Settings tab of the work detail page.
+- New server action `updateAdvancedPrompts(workId, data)` under
+  `apps/web/src/app/actions/dashboard/works.ts`.
+- New API client functions under `apps/web/src/lib/api/work.ts`.
+- Translation keys under `dashboard.workDetail.settings.advancedPrompts.*`
   in `apps/web/messages/<locale>.json`.
 
-No CLI surface — the feature is per-directory and exposed only
+No CLI surface — the feature is per-work and exposed only
 through the dashboard.
 
 ## 7. Background Jobs
@@ -116,7 +116,7 @@ because the loader runs at the top of `generateItems`.
 
 ## 8. Security & Permissions
 
-- Authorization gated on directory editor role (Owner / Manager / Editor).
+- Authorization gated on work editor role (Owner / Manager / Editor).
 - Length cap (2000 chars/field) bounds token usage at ~14k extra
   tokens per run worst-case.
 - `sanitizeString` Transform strips HTML/script-like payloads before
@@ -128,7 +128,7 @@ because the loader runs at the top of `generateItems`.
 
 ## 9. Observability
 
-- The activity log records `directory_advanced_prompts_updated`
+- The activity log records `work_advanced_prompts_updated`
   with the field names that changed (not the values — values may
   contain user IP).
 - No new metrics; existing per-step latency / token-count metrics
@@ -165,6 +165,6 @@ short-circuits in `appendCustomPrompt`).
 ## 13. References
 
 - Spec: `./spec.md`
-- Implementation: `packages/agent/src/services/directory-advanced-prompts.service.ts`,
-  `apps/web/src/components/directories/detail/settings/AdvancedPromptsSettings.tsx`
+- Implementation: `packages/agent/src/services/work-advanced-prompts.service.ts`,
+  `apps/web/src/components/works/detail/settings/AdvancedPromptsSettings.tsx`
 - Pipeline integration: `packages/agent/src/items-generator/utils/prompt.util.ts`

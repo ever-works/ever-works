@@ -1,7 +1,7 @@
 {
 	"name": "@ever-works/comparison-generator-plugin",
 	"version": "1.0.0",
-	"description": "Auto-generates SEO-optimized A vs B comparison pages between directory items",
+	"description": "Auto-generates SEO-optimized A vs B comparison pages between Work items",
 	"private": true,
 	"type": "module",
 	"main": "./dist/index.cjs",
@@ -41,7 +41,7 @@
 			"version": "1.0.0",
 			"category": "utility",
 			"capabilities": [],
-			"description": "Auto-generates SEO-optimized A vs B comparison pages between directory items. Runs on a schedule, generating one high-quality comparison per pass. Also supports manual item-to-item comparison.",
+			"description": "Auto-generates SEO-optimized A vs B comparison pages between Work items. Runs on a schedule, generating one high-quality comparison per pass. Also supports manual item-to-item comparison.",
 			"author": {
 				"name": "Ever Works Team"
 			},

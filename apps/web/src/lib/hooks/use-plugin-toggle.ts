@@ -18,12 +18,12 @@ export function usePluginToggle({ pluginId, enabled, visibility }: UsePluginTogg
     const [showEnablePanel, setShowEnablePanel] = useState(false);
     const [autoEnableForDirs, setAutoEnableForDirs] = useState(true);
 
-    const supportsDirectoryScope = visibility !== 'user-only' && visibility !== 'hidden';
+    const supportsWorkScope = visibility !== 'user-only' && visibility !== 'hidden';
 
     const handleToggle = () => {
-        // Enable flow: show panel with auto-enable checkbox if plugin supports directory scope
+        // Enable flow: show panel with auto-enable checkbox if plugin supports work scope
         if (!optimisticEnabled) {
-            if (supportsDirectoryScope && !showEnablePanel) {
+            if (supportsWorkScope && !showEnablePanel) {
                 setShowEnablePanel(true);
                 return;
             }
@@ -33,7 +33,7 @@ export function usePluginToggle({ pluginId, enabled, visibility }: UsePluginTogg
             startTransition(async () => {
                 try {
                     const result = await enablePlugin(pluginId, {
-                        autoEnableForDirectories: autoEnableForDirs,
+                        autoEnableForWorks: autoEnableForDirs,
                     });
                     if (result.success) {
                         router.refresh();

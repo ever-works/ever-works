@@ -50,7 +50,7 @@ const DOMAIN_BADGES: Record<DomainType, DomainBadgeConfig> = {
 	}
 };
 
-const BADGE_PROMPT = `You are an expert evaluator assigning badges for a directory item.
+const BADGE_PROMPT = `You are an expert evaluator assigning badges for a work item.
 
 Item:
 - Name: {name}
@@ -84,7 +84,7 @@ export class BadgeProcessingStep extends BasePipelineStep {
 
 		const facadeOptions: FacadeOptions = {
 			userId: execContext.user!.id,
-			directoryId: execContext.directory.id
+			workId: execContext.work.id
 		};
 
 		if (config.badge_evaluation_enabled) {

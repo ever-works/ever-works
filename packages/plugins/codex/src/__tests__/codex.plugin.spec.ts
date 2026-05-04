@@ -109,11 +109,11 @@ function createMockContext(settingsOverride?: PluginSettings): PluginContext {
 describe('CodexPlugin', () => {
 	let plugin: CodexPlugin;
 
-	const directory = {
+	const work = {
 		id: 'dir1',
-		name: 'Test Directory',
-		slug: 'test-directory',
-		description: 'A test directory',
+		name: 'Test Work',
+		slug: 'test-work',
+		description: 'A test work',
 		user: { id: 'user1' }
 	};
 
@@ -246,7 +246,7 @@ describe('CodexPlugin', () => {
 			await plugin.onLoad(createMockContext());
 
 			const progressUpdates: Array<{ percent: number }> = [];
-			const result = await plugin.execute(directory, request, existing, undefined, (progress) =>
+			const result = await plugin.execute(work, request, existing, undefined, (progress) =>
 				progressUpdates.push(progress)
 			);
 
@@ -279,7 +279,7 @@ describe('CodexPlugin', () => {
 
 			await plugin.onLoad(createMockContext());
 
-			const result = await plugin.execute(directory, request, existing);
+			const result = await plugin.execute(work, request, existing);
 
 			expect(result.success).toBe(false);
 			expect(String(result.error)).toContain('Codex completed without producing any valid item JSON files');
@@ -301,7 +301,7 @@ describe('CodexPlugin', () => {
 
 			await plugin.onLoad(createMockContext());
 
-			const result = await plugin.execute(directory, request, existing);
+			const result = await plugin.execute(work, request, existing);
 
 			expect(result.success).toBe(true);
 			expect(result.warnings).toBeDefined();
@@ -328,7 +328,7 @@ describe('CodexPlugin', () => {
 
 			await plugin.onLoad(createMockContext());
 
-			const result = await plugin.execute(directory, request, existing);
+			const result = await plugin.execute(work, request, existing);
 
 			expect(result.success).toBe(false);
 			expect(String(result.error)).toContain('without producing any valid item JSON files');
@@ -355,7 +355,7 @@ describe('CodexPlugin', () => {
 
 			await plugin.onLoad(createMockContext());
 
-			const result = await plugin.execute(directory, request, existing);
+			const result = await plugin.execute(work, request, existing);
 
 			expect(result.success).toBe(true);
 			expect(result.outputs.items).toHaveLength(1);
@@ -402,7 +402,7 @@ describe('CodexPlugin', () => {
 
 			await plugin.onLoad(createMockContext());
 
-			await plugin.execute(directory, request, existing);
+			await plugin.execute(work, request, existing);
 
 			expect(processRunner.executeCodex).toHaveBeenNthCalledWith(
 				2,
@@ -432,7 +432,7 @@ describe('CodexPlugin', () => {
 
 			await plugin.onLoad(createMockContext());
 
-			const result = await plugin.execute(directory, request, existing);
+			const result = await plugin.execute(work, request, existing);
 
 			expect(result.success).toBe(false);
 			expect(String(result.error)).toContain('Codex completed without producing any valid item JSON files');
@@ -451,7 +451,7 @@ describe('CodexPlugin', () => {
 
 			await plugin.onLoad(createMockContext());
 
-			const result = await plugin.execute(directory, request, existing);
+			const result = await plugin.execute(work, request, existing);
 
 			expect(result.success).toBe(true);
 			expect(processRunner.executeCodex).toHaveBeenCalledWith(
@@ -472,7 +472,7 @@ describe('CodexPlugin', () => {
 
 			await plugin.onLoad(createMockContext());
 
-			const result = await plugin.execute(directory, request, existing);
+			const result = await plugin.execute(work, request, existing);
 
 			expect(result.success).toBe(true);
 			expect(processRunner.executeCodex).toHaveBeenCalledWith(
@@ -492,22 +492,17 @@ describe('CodexPlugin', () => {
 				getScreenshotUrl: vi.fn()
 			};
 
-			const result = await plugin.execute(
-				directory,
-				{ ...request, config: { capture_screenshots: true } },
-				existing,
-				{
-					execContext: {
-						aiFacade: {} as never,
-						searchFacade: {} as never,
-						screenshotFacade: mockScreenshotFacade as never,
-						contentExtractorFacade: {} as never,
-						logger: { log: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
-						directory,
-						user: { id: 'user1' }
-					}
+			const result = await plugin.execute(work, { ...request, config: { capture_screenshots: true } }, existing, {
+				execContext: {
+					aiFacade: {} as never,
+					searchFacade: {} as never,
+					screenshotFacade: mockScreenshotFacade as never,
+					contentExtractorFacade: {} as never,
+					logger: { log: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
+					work,
+					user: { id: 'user1' }
 				}
-			);
+			});
 
 			expect(result.success).toBe(true);
 			expect(screenshotCapture.captureScreenshots).toHaveBeenCalled();

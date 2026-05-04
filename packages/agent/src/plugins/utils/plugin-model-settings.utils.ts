@@ -45,7 +45,7 @@ export function buildProviderModelSummaries(
             label: propSchema.title || key,
             value,
             source: setting?.source,
-            isDirectoryOverride: setting?.source === 'directory',
+            isWorkOverride: setting?.source === 'work',
         });
     }
 

@@ -73,17 +73,17 @@ Common variables:
 - `API_KEY`
 - Package-specific config
 
-## Monorepo Root Directory
+## Monorepo Root Work
 
-For monorepos, set the root directory in Vercel:
+For monorepos, set the root work in Vercel:
 
-1. Project Settings > General > Root Directory
+1. Project Settings > General > Root Work
 2. Set to the package path (e.g., `apps/web`)
 
 Vercel automatically:
 
 - Installs dependencies from monorepo root
-- Runs build from the package directory
+- Runs build from the package work
 - Detects framework settings
 
 ## Build Command

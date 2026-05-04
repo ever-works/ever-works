@@ -42,7 +42,7 @@ export class PromptFacadeService implements IPromptFacade {
             const settings = facadeOptions
                 ? await this.settingsService.getSettings(plugin.id, {
                       userId: facadeOptions.userId,
-                      directoryId: facadeOptions.directoryId,
+                      workId: facadeOptions.workId,
                       includeSecrets: true,
                   })
                 : {};

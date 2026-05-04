@@ -188,11 +188,11 @@ function useKeyboardShortcuts(options: { onOpenHelp?: () => void }): void;
 
 Registers global keyboard event listeners on mount. The registered shortcuts are:
 
-| Shortcut              | Action                                               |
-| --------------------- | ---------------------------------------------------- |
-| `Ctrl+K` (or `Cmd+K`) | Open search                                          |
-| `C`                   | Create new directory (only when no input is focused) |
-| `?`                   | Open help drawer (calls `onOpenHelp`)                |
+| Shortcut              | Action                                          |
+| --------------------- | ----------------------------------------------- |
+| `Ctrl+K` (or `Cmd+K`) | Open search                                     |
+| `C`                   | Create new work (only when no input is focused) |
+| `?`                   | Open help drawer (calls `onOpenHelp`)           |
 
 The hook checks `document.activeElement` to avoid triggering shortcuts while the user is typing in an input, textarea, or contenteditable element. Listeners are cleaned up on unmount.
 
@@ -348,7 +348,7 @@ Implements optimistic UI updates for plugin enable/disable:
 1. When toggled, the local state updates immediately.
 2. The server action is called in the background.
 3. If the server action fails, the local state is rolled back.
-4. A warning is shown when disabling a plugin that may affect active directories.
+4. A warning is shown when disabling a plugin that may affect active works.
 
 ## Implementation Details
 

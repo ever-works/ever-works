@@ -7,7 +7,7 @@ export interface Identifiable {
 }
 
 /**
- * Category for organizing items in a directory
+ * Category for organizing items in a work
  */
 export interface Category {
 	readonly id: string;
@@ -117,7 +117,7 @@ export interface ItemSourceValidation {
 }
 
 /**
- * Core item data structure for directory entries
+ * Core item data structure for work entries
  */
 export interface ItemData {
 	readonly name: string;

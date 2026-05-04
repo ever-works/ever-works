@@ -710,7 +710,7 @@ export class GitHubApiService {
 		return `https://raw.githubusercontent.com/${owner}/${repo}/${branch}/${path}`;
 	}
 
-	async getDirectoryContents(
+	async getWorkContents(
 		owner: string,
 		repo: string,
 		path: string,

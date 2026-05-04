@@ -31,10 +31,8 @@ vi.mock('../utils/screenshot-capture.js', () => ({
 	captureScreenshots: vi.fn()
 }));
 
-function createMockContext(
-	overrides?: Partial<Record<'global' | 'user' | 'directory', PluginSettings>>
-): PluginContext {
-	const toResolved = (scope: 'global' | 'user' | 'directory', settings: PluginSettings = {}) =>
+function createMockContext(overrides?: Partial<Record<'global' | 'user' | 'work', PluginSettings>>): PluginContext {
+	const toResolved = (scope: 'global' | 'user' | 'work', settings: PluginSettings = {}) =>
 		Object.fromEntries(
 			Object.entries(settings).map(([key, value]) => [
 				key,
@@ -81,10 +79,8 @@ function createMockContext(
 			getRequired: vi.fn()
 		},
 		services: {},
-		getSettings: vi.fn(async (scope: 'global' | 'user' | 'directory') => overrides?.[scope] ?? {}),
-		getResolvedSettings: vi.fn(async (scope: 'global' | 'user' | 'directory') =>
-			toResolved(scope, overrides?.[scope])
-		),
+		getSettings: vi.fn(async (scope: 'global' | 'user' | 'work') => overrides?.[scope] ?? {}),
+		getResolvedSettings: vi.fn(async (scope: 'global' | 'user' | 'work') => toResolved(scope, overrides?.[scope])),
 		updateSettings: vi.fn(),
 		onEvent: vi.fn().mockReturnValue({ unsubscribe: vi.fn() }),
 		emitEvent: vi.fn(),
@@ -98,11 +94,11 @@ function createMockContext(
 describe('HermesAgentPlugin', () => {
 	let plugin: HermesAgentPlugin;
 
-	const directory = {
+	const work = {
 		id: 'dir-1',
-		name: 'Test Directory',
-		slug: 'test-directory',
-		description: 'A test directory',
+		name: 'Test Work',
+		slug: 'test-work',
+		description: 'A test work',
 		user: { id: 'user-1' }
 	};
 
@@ -208,7 +204,7 @@ describe('HermesAgentPlugin', () => {
 			});
 		});
 
-		const executionPromise = plugin.execute(directory as never, request as never, existing as never, {
+		const executionPromise = plugin.execute(work as never, request as never, existing as never, {
 			signal: externalController.signal
 		});
 
@@ -255,10 +251,10 @@ describe('HermesAgentPlugin', () => {
 			});
 		});
 
-		const firstExecution = plugin.execute(directory as never, request as never, existing as never);
+		const firstExecution = plugin.execute(work as never, request as never, existing as never);
 		await executionStarted;
 
-		const secondResult = await plugin.execute(directory as never, request as never, existing as never);
+		const secondResult = await plugin.execute(work as never, request as never, existing as never);
 
 		expect(secondResult.success).toBe(false);
 		expect(secondResult.error instanceof Error ? secondResult.error.message : String(secondResult.error)).toBe(

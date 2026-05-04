@@ -31,12 +31,12 @@ interface FieldMapping {
 /**
  * Apify Plugin
  *
- * Imports items from Apify datasets into directories.
+ * Imports items from Apify datasets into works.
  * Implements IDataSourcePlugin and IFormSchemaProvider.
  *
  * Configuration levels:
  * - Level 1: API token (Settings > Plugins)
- * - Level 2: Enable/disable per-directory (DirectoryPlugin entity)
+ * - Level 2: Enable/disable per-work (WorkPlugin entity)
  * - Level 3: Dataset ID, filters (GeneratorForm via IFormSchemaProvider)
  */
 export class ApifyPlugin implements IPlugin, IDataSourcePlugin, IFormSchemaProvider {
@@ -108,7 +108,7 @@ export class ApifyPlugin implements IPlugin, IDataSourcePlugin, IFormSchemaProvi
 
 	/**
 	 * Get form fields for the GeneratorForm (Level 3 configuration).
-	 * Note: Enable/disable is at Level 2 (DirectoryPlugin), not here.
+	 * Note: Enable/disable is at Level 2 (WorkPlugin), not here.
 	 */
 	getFormFields(): FormFieldDefinition[] {
 		return [
@@ -141,7 +141,7 @@ export class ApifyPlugin implements IPlugin, IDataSourcePlugin, IFormSchemaProvi
 				name: 'apify_filterByRelevance',
 				type: 'boolean',
 				label: 'Filter by Relevance',
-				description: 'Only import items relevant to the directory prompt',
+				description: 'Only import items relevant to the work prompt',
 				defaultValue: true,
 				group: 'apify'
 			}
@@ -368,7 +368,7 @@ export class ApifyPlugin implements IPlugin, IDataSourcePlugin, IFormSchemaProvi
 	}
 
 	/**
-	 * Filter items by relevance to the directory's prompt/domain.
+	 * Filter items by relevance to the work's prompt/domain.
 	 * Uses basic keyword matching for now.
 	 */
 	private filterByRelevance(
@@ -427,7 +427,7 @@ export class ApifyPlugin implements IPlugin, IDataSourcePlugin, IFormSchemaProvi
 			id: this.id,
 			name: this.name,
 			version: this.version,
-			description: 'Import data from Apify web scraping datasets into your directory',
+			description: 'Import data from Apify web scraping datasets into your work',
 			category: this.category,
 			capabilities: [...this.capabilities],
 			author: { name: 'Ever Works Team' },
@@ -442,25 +442,25 @@ export class ApifyPlugin implements IPlugin, IDataSourcePlugin, IFormSchemaProvi
 			readme: [
 				'## What does the Apify plugin do?',
 				'',
-				'Apify is a web scraping and automation platform. This plugin imports items from Apify datasets into your directory, enabling you to transform existing scraped data into structured directory content.',
+				'Apify is a web scraping and automation platform. This plugin imports items from Apify datasets into your work, enabling you to transform existing scraped data into structured work content.',
 				'',
 				'## Why use it?',
 				'',
 				'- **Bulk import** — import hundreds or thousands of items from an existing Apify dataset',
-				'- **Field mapping** — map Apify result fields (title, URL, description) to directory item fields',
-				'- **Relevance filtering** — automatically filter imported items by relevance to your directory topic',
+				'- **Field mapping** — map Apify result fields (title, URL, description) to work item fields',
+				'- **Relevance filtering** — automatically filter imported items by relevance to your work topic',
 				'- **Compatible with any actor** — import data from any Apify actor or dataset',
 				'',
 				'## How it works in Ever Works',
 				'',
-				'During directory generation, the data source facade queries the Apify plugin to fetch items from your specified dataset or actor run. The results are fed into the generation pipeline alongside other data sources. You can enable relevance filtering to ensure only topically relevant items are included.',
+				'During work generation, the data source facade queries the Apify plugin to fetch items from your specified dataset or actor run. The results are fed into the generation pipeline alongside other data sources. You can enable relevance filtering to ensure only topically relevant items are included.',
 				'',
 				'## Getting started',
 				'',
 				'1. Create an Apify account at [apify.com](https://apify.com)',
 				'2. Run an actor or prepare a dataset with the items you want to import',
 				'3. Enable the Apify plugin on this page and enter your API token',
-				'4. When creating a directory, provide your dataset ID in the Apify section of the generation form'
+				'4. When creating a work, provide your dataset ID in the Apify section of the generation form'
 			].join('\n')
 		};
 	}

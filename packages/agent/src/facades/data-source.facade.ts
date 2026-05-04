@@ -46,9 +46,9 @@ export class DataSourceFacadeService implements IDataSourceFacade {
         for (const registered of enabledPlugins) {
             const pluginId = registered.plugin.id;
 
-            const isEnabled = await this.isPluginEnabledForDirectory(
+            const isEnabled = await this.isPluginEnabledForWork(
                 pluginId,
-                options.directoryId,
+                options.workId,
                 options.userId,
                 options.pluginConfig,
             );
@@ -73,7 +73,7 @@ export class DataSourceFacadeService implements IDataSourceFacade {
 
                 const resolvedSettings = await this.settingsService.getSettings(pluginId, {
                     userId: options.userId,
-                    directoryId: options.directoryId,
+                    workId: options.workId,
                     includeSecrets: true,
                 });
 
@@ -117,8 +117,8 @@ export class DataSourceFacadeService implements IDataSourceFacade {
         };
     }
 
-    async getEnabledSources(directoryId: string, userId: string): Promise<EnabledDataSource[]> {
-        if (!directoryId) return [];
+    async getEnabledSources(workId: string, userId: string): Promise<EnabledDataSource[]> {
+        if (!workId) return [];
 
         const plugins = this.registry.getByCapability(this.CAPABILITY);
         const enabledPlugins = plugins.filter((p) => p.state === 'loaded');
@@ -126,11 +126,7 @@ export class DataSourceFacadeService implements IDataSourceFacade {
 
         for (const registered of enabledPlugins) {
             const plugin = registered.plugin as IDataSourcePlugin;
-            const isEnabled = await this.isPluginEnabledForDirectory(
-                plugin.id,
-                directoryId,
-                userId,
-            );
+            const isEnabled = await this.isPluginEnabledForWork(plugin.id, workId, userId);
 
             if (isEnabled) {
                 result.push({
@@ -167,9 +163,9 @@ export class DataSourceFacadeService implements IDataSourceFacade {
         });
     }
 
-    private async isPluginEnabledForDirectory(
+    private async isPluginEnabledForWork(
         pluginId: string,
-        directoryId?: string,
+        workId?: string,
         userId?: string,
         pluginConfig?: Record<string, Record<string, unknown>>,
     ): Promise<boolean> {
@@ -177,17 +173,17 @@ export class DataSourceFacadeService implements IDataSourceFacade {
         if (pluginConfig?.[pluginId]?.enabled === true) return true;
 
         // Delegate to registry's scope resolution
-        return this.registry.isPluginEnabledForScope(pluginId, directoryId, userId);
+        return this.registry.isPluginEnabledForScope(pluginId, workId, userId);
     }
 
     async getDefaultProvider(
         capability: string,
-        directoryId?: string,
+        workId?: string,
         userId?: string,
     ): Promise<{ id: string; name: string } | null> {
         const registered = await this.registry.getDefaultForCapabilityScoped(
             capability,
-            directoryId,
+            workId,
             userId,
         );
         if (registered) {

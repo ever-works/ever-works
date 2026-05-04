@@ -7,7 +7,7 @@ sidebar_position: 48
 
 # Comparison Generator Plugin
 
-The Comparison Generator plugin automatically creates detailed A vs B comparison pages between items in your directories. Each comparison includes structured dimensions with scores, a verdict, and a full SEO-optimized markdown article suitable for publishing as a standalone comparison page.
+The Comparison Generator plugin automatically creates detailed A vs B comparison pages between items in your works. Each comparison includes structured dimensions with scores, a verdict, and a full SEO-optimized markdown article suitable for publishing as a standalone comparison page.
 
 **Source:** `packages/plugins/comparison-generator/src/comparison-generator.plugin.ts`
 
@@ -30,7 +30,7 @@ The plugin implements `IPlugin`. It provides a settings schema for configuring c
 
 ```mermaid
 graph TD
-    A[Directory Schedule / Manual Trigger] --> B[Comparison Generator]
+    A[Work Schedule / Manual Trigger] --> B[Comparison Generator]
     B --> C[Pair Selection]
     C --> D{Items in category >= min?}
     D -->|No| E[Skip category]
@@ -58,16 +58,16 @@ graph TD
 
 ### Settings Schema
 
-| Setting                    | Type      | Default           | Description                                                                  |
-| -------------------------- | --------- | ----------------- | ---------------------------------------------------------------------------- |
-| `cadence_override`         | `string`  | `"use_directory"` | How often to auto-generate: `use_directory`, `daily`, `weekly`, or `monthly` |
-| `max_comparisons_mode`     | `string`  | `"custom"`        | Cap mode: `custom` (use limit) or `unlimited` (all possible pairs)           |
-| `max_comparisons`          | `number`  | `50`              | Maximum total comparisons (1--500, only in Custom mode)                      |
-| `min_items_for_comparison` | `number`  | `3`               | Minimum items in a category before generating comparisons (2--20)            |
-| `ai_provider`              | `string`  | --                | Override AI provider for comparison generation (hidden)                      |
-| `ai_model`                 | `string`  | --                | Override AI model for comparison generation (hidden)                         |
-| `custom_prompt`            | `string`  | --                | Additional instructions for comparison prompts (hidden)                      |
-| `extended_analysis`        | `boolean` | `false`           | Generate deeper analysis alongside the standard comparison (hidden)          |
+| Setting                    | Type      | Default      | Description                                                             |
+| -------------------------- | --------- | ------------ | ----------------------------------------------------------------------- |
+| `cadence_override`         | `string`  | `"use_work"` | How often to auto-generate: `use_work`, `daily`, `weekly`, or `monthly` |
+| `max_comparisons_mode`     | `string`  | `"custom"`   | Cap mode: `custom` (use limit) or `unlimited` (all possible pairs)      |
+| `max_comparisons`          | `number`  | `50`         | Maximum total comparisons (1--500, only in Custom mode)                 |
+| `min_items_for_comparison` | `number`  | `3`          | Minimum items in a category before generating comparisons (2--20)       |
+| `ai_provider`              | `string`  | --           | Override AI provider for comparison generation (hidden)                 |
+| `ai_model`                 | `string`  | --           | Override AI model for comparison generation (hidden)                    |
+| `custom_prompt`            | `string`  | --           | Additional instructions for comparison prompts (hidden)                 |
+| `extended_analysis`        | `boolean` | `false`      | Generate deeper analysis alongside the standard comparison (hidden)     |
 
 ### Conditional Visibility
 
@@ -79,18 +79,18 @@ The `max_comparisons` field is only shown when `max_comparisons_mode` is set to 
 
 Comparisons can be generated automatically based on a configurable cadence:
 
-| Cadence         | Behavior                                        |
-| --------------- | ----------------------------------------------- |
-| `use_directory` | Follows the directory's own generation schedule |
-| `daily`         | Generates a new comparison every day            |
-| `weekly`        | Generates a new comparison every week           |
-| `monthly`       | Generates a new comparison every month          |
+| Cadence    | Behavior                                   |
+| ---------- | ------------------------------------------ |
+| `use_work` | Follows the work's own generation schedule |
+| `daily`    | Generates a new comparison every day       |
+| `weekly`   | Generates a new comparison every week      |
+| `monthly`  | Generates a new comparison every month     |
 
 Each scheduled run generates one high-quality comparison per pass to maintain quality and manage API costs.
 
 ### Manual Comparisons
 
-Users can pick any two items and generate a comparison on demand from the Comparisons tab in the directory UI. This bypasses scheduling and category requirements.
+Users can pick any two items and generate a comparison on demand from the Comparisons tab in the work UI. This bypasses scheduling and category requirements.
 
 ### Dimension Scoring
 
@@ -128,13 +128,13 @@ For a category with N items, the maximum number of pairs is N \* (N - 1) / 2. Wi
 ### Enabling Comparisons
 
 1. Enable the Comparison Generator plugin on the Plugins page
-2. Go to the directory Generator settings
+2. Go to the work Generator settings
 3. Configure the comparison cadence and limits
 4. Comparisons will be generated according to the schedule
 
 ### Manual Comparison
 
-1. Navigate to the Comparisons tab in your directory
+1. Navigate to the Comparisons tab in your work
 2. Select two items to compare
 3. The comparison is generated immediately and stored
 

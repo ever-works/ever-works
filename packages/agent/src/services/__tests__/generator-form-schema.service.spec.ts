@@ -3,7 +3,7 @@ import type {
     PluginRegistryService,
     RegisteredPlugin,
 } from '@src/plugins/services/plugin-registry.service';
-import type { DirectoryPluginRepository } from '@src/plugins/repositories/directory-plugin.repository';
+import type { WorkPluginRepository } from '@src/plugins/repositories/work-plugin.repository';
 import type {
     IPlugin,
     IFormSchemaProvider,
@@ -141,7 +141,7 @@ describe('GeneratorFormSchemaService', () => {
 
             const schema = await service.getFormSchema(undefined, {
                 userId: 'user-1',
-                directoryId: 'dir-1',
+                workId: 'dir-1',
             });
 
             expect(schema.pluginFields).toHaveLength(0);
@@ -336,7 +336,7 @@ describe('GeneratorFormSchemaService', () => {
             mockRegistry.isPluginEnabledForScope.mockResolvedValue(false);
 
             await expect(
-                service.validateFormSchemaPlugins({ userId: 'u1', directoryId: 'dir-1' }),
+                service.validateFormSchemaPlugins({ userId: 'u1', workId: 'dir-1' }),
             ).resolves.toBeUndefined();
         });
 
@@ -885,7 +885,7 @@ describe('GeneratorFormSchemaService', () => {
     });
 
     describe('active pipeline provider resolution', () => {
-        it('should resolve pipeline from directory active capabilities when no explicit pipelineId', async () => {
+        it('should resolve pipeline from work active capabilities when no explicit pipelineId', async () => {
             const standardPipeline = createFormSchemaPlugin('standard-pipeline', [], {
                 category: 'pipeline',
                 capabilities: ['pipeline', 'form-schema-provider'],
@@ -915,11 +915,11 @@ describe('GeneratorFormSchemaService', () => {
                 findActiveByCapability: jest.fn().mockResolvedValue({
                     pluginId: 'agent-pipeline',
                 }),
-            } as unknown as jest.Mocked<DirectoryPluginRepository>;
+            } as unknown as jest.Mocked<WorkPluginRepository>;
 
             const svc = new GeneratorFormSchemaService(mockRegistry, mockDirPluginRepo);
 
-            const schema = await svc.getFormSchema(undefined, { directoryId: 'dir-1' });
+            const schema = await svc.getFormSchema(undefined, { workId: 'dir-1' });
 
             expect(schema.resolvedPipelineId).toBe('agent-pipeline');
         });
@@ -952,16 +952,16 @@ describe('GeneratorFormSchemaService', () => {
 
             const mockDirPluginRepo = {
                 findActiveByCapability: jest.fn().mockResolvedValue(null),
-            } as unknown as jest.Mocked<DirectoryPluginRepository>;
+            } as unknown as jest.Mocked<WorkPluginRepository>;
 
             const svc = new GeneratorFormSchemaService(mockRegistry, mockDirPluginRepo);
 
-            const schema = await svc.getFormSchema(undefined, { directoryId: 'dir-1' });
+            const schema = await svc.getFormSchema(undefined, { workId: 'dir-1' });
 
             expect(schema.resolvedPipelineId).toBe('standard-pipeline');
         });
 
-        it('should prefer explicit pipelineId over directory active provider', async () => {
+        it('should prefer explicit pipelineId over work active provider', async () => {
             const standardPipeline = createFormSchemaPlugin('standard-pipeline', [], {
                 category: 'pipeline',
                 capabilities: ['pipeline', 'form-schema-provider'],
@@ -991,16 +991,16 @@ describe('GeneratorFormSchemaService', () => {
                 findActiveByCapability: jest.fn().mockResolvedValue({
                     pluginId: 'agent-pipeline',
                 }),
-            } as unknown as jest.Mocked<DirectoryPluginRepository>;
+            } as unknown as jest.Mocked<WorkPluginRepository>;
 
             const svc = new GeneratorFormSchemaService(mockRegistry, mockDirPluginRepo);
 
-            // Explicit standard-pipeline should win over the directory's agent-pipeline provider
+            // Explicit standard-pipeline should win over the work's agent-pipeline provider
             const schema = await svc.getFormSchema('standard-pipeline', {
-                directoryId: 'dir-1',
+                workId: 'dir-1',
             });
 
-            // Explicit pipelineId takes priority over the directory's active provider
+            // Explicit pipelineId takes priority over the work's active provider
             expect(schema.resolvedPipelineId).toBe('standard-pipeline');
         });
 
@@ -1037,12 +1037,12 @@ describe('GeneratorFormSchemaService', () => {
                 findActiveByCapability: jest.fn().mockResolvedValue({
                     pluginId: 'agent-pipeline',
                 }),
-            } as unknown as jest.Mocked<DirectoryPluginRepository>;
+            } as unknown as jest.Mocked<WorkPluginRepository>;
 
             const svc = new GeneratorFormSchemaService(mockRegistry, mockDirPluginRepo);
 
             const schema = await svc.getFormSchema('standard-pipeline', {
-                directoryId: 'dir-1',
+                workId: 'dir-1',
                 userId: 'user-1',
             });
 

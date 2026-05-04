@@ -6,7 +6,7 @@ jest.mock('@src/generators/data-generator/data-repository', () => ({
 }));
 
 describe('WorksConfigRepositorySyncService', () => {
-    const directory = {
+    const work = {
         id: 'dir-1',
         gitProvider: 'github',
         user: { id: 'owner-1' },
@@ -19,7 +19,7 @@ describe('WorksConfigRepositorySyncService', () => {
     };
 
     const createService = (changes: Array<{ path: string; status: string }> = []) => {
-        const directoryRepository = { findById: jest.fn().mockResolvedValue(directory) };
+        const workRepository = { findById: jest.fn().mockResolvedValue(work) };
         const gitFacade = {
             cloneOrPull: jest.fn().mockResolvedValue('/tmp/data-repo'),
             getStatus: jest.fn().mockResolvedValue(changes),
@@ -38,7 +38,7 @@ describe('WorksConfigRepositorySyncService', () => {
 
         return {
             service: new WorksConfigRepositorySyncService(
-                directoryRepository as any,
+                workRepository as any,
                 gitFacade as any,
                 projection as any,
                 writer as any,
@@ -54,15 +54,15 @@ describe('WorksConfigRepositorySyncService', () => {
     it('writes projected works.yaml and skips commit when the repo is unchanged', async () => {
         const { service, gitFacade, projection, writer } = createService();
 
-        await service.syncDirectory({
-            directoryId: 'dir-1',
+        await service.syncWork({
+            workId: 'dir-1',
             userId: 'user-1',
             reason: 'schedule_updated',
         });
 
-        expect(projection.buildWriteRequest).toHaveBeenCalledWith(directory);
+        expect(projection.buildWriteRequest).toHaveBeenCalledWith(work);
         expect(writer.writeToDataRepository).toHaveBeenCalledWith({
-            directory,
+            work,
             dataRepository: { dir: '/tmp/data-repo' },
             request: {
                 name: 'Compare Cloud Pricing',
@@ -77,8 +77,8 @@ describe('WorksConfigRepositorySyncService', () => {
     it('commits and pushes when projected works.yaml changes the data repo', async () => {
         const { service, gitFacade } = createService([{ path: 'works.yaml', status: 'modified' }]);
 
-        await service.syncDirectory({
-            directoryId: 'dir-1',
+        await service.syncWork({
+            workId: 'dir-1',
             userId: 'user-1',
             reason: 'provider_changed',
         });
@@ -102,8 +102,8 @@ describe('WorksConfigRepositorySyncService', () => {
         ]);
         gitFacade.push.mockRejectedValue(new Error('permission denied'));
 
-        await service.syncDirectory({
-            directoryId: 'dir-1',
+        await service.syncWork({
+            workId: 'dir-1',
             userId: 'user-1',
             reason: 'provider_changed',
         });
@@ -111,7 +111,7 @@ describe('WorksConfigRepositorySyncService', () => {
         expect(eventEmitter.emit).toHaveBeenCalledWith(
             WorksConfigSyncFailedEvent.EVENT_NAME,
             expect.objectContaining({
-                directoryId: 'dir-1',
+                workId: 'dir-1',
                 userId: 'user-1',
                 reason: 'provider_changed',
                 repository: 'ever-works/compare-cloud-pricing-data',

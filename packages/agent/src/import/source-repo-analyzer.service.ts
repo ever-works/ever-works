@@ -1,11 +1,11 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { GitFacadeService } from '@src/facades/git.facade';
-import { ImportSourceType } from '@src/entities/directory.entity';
+import { ImportSourceType } from '@src/entities/work.entity';
 import {
     AnalyzeRepositoryResponseDto,
     AnalyzeForLinkingResponseDto,
     RelatedRepoStatus,
-} from '@src/dto/import-directory.dto';
+} from '@src/dto/import-work.dto';
 import { WorksConfigService } from '@src/works-config/services/works-config.service';
 
 interface ParsedRepoUrl {
@@ -161,10 +161,10 @@ export class SourceRepoAnalyzerService {
 
             const isPublic = !repoInfo.isPrivate;
 
-            // Get root directory contents
+            // Get root work contents
             let contents: RepoContent[] | null;
             try {
-                contents = await this.gitFacade.getDirectoryContents(owner, repo, '', {
+                contents = await this.gitFacade.getWorkContents(owner, repo, '', {
                     token,
                     providerId: provider,
                 });
@@ -225,7 +225,7 @@ export class SourceRepoAnalyzerService {
             if (detectionResult.type === 'data_repo') {
                 response.hasDataRepoWriteAccess = repoInfo.permissions?.push ?? true;
             } else {
-                const ecosystem = await this.detectDirectoryEcosystem(owner, repo, token, provider);
+                const ecosystem = await this.detectWorkEcosystem(owner, repo, token, provider);
                 if (ecosystem) {
                     response.relatedDataRepo = ecosystem.dataRepo;
                     response.baseSlug = ecosystem.baseSlug;
@@ -309,12 +309,10 @@ export class SourceRepoAnalyzerService {
 
         if ((hasConfig || hasWorksConfig) && hasDataFolder) {
             try {
-                const dataContents = await this.gitFacade.getDirectoryContents(
-                    owner,
-                    repo,
-                    'data',
-                    { token, providerId: provider },
-                );
+                const dataContents = await this.gitFacade.getWorkContents(owner, repo, 'data', {
+                    token,
+                    providerId: provider,
+                });
 
                 if (dataContents) {
                     const itemDirs = dataContents.filter((c) => c.type === 'dir');
@@ -379,18 +377,18 @@ export class SourceRepoAnalyzerService {
                 );
 
                 if (readmeContent && this.isAwesomeListReadme(readmeContent)) {
-                    // Check if this is a multi-file structure (links to subdirectories)
-                    const directoryLinks = (
+                    // Check if this is a multi-file structure (links to subworks)
+                    const workLinks = (
                         readmeContent.match(/\[.+?\]\(\.\/[a-zA-Z0-9-_]+\/?/gm) || []
                     ).length;
-                    const isMultiFile = directoryLinks >= 3;
+                    const isMultiFile = workLinks >= 3;
                     structure.isMultiFile = isMultiFile;
 
                     if (isMultiFile) {
                         const subDirs = contents.filter((c) => c.type === 'dir');
                         structure.categoryCount = subDirs.length;
 
-                        // Extract item counts from directory names if available (e.g., "category-123")
+                        // Extract item counts from work names if available (e.g., "category-123")
                         let estimatedItems = 0;
                         for (const dir of subDirs) {
                             const countMatch = dir.name.match(/-(\d+)$/);
@@ -464,14 +462,14 @@ export class SourceRepoAnalyzerService {
         // Pattern 3: Table format links (| [Name](url) |) with http/https URLs
         const tableLinks = (content.match(/\|\s*\[.+?\]\(https?:\/\/.+?\)/gm) || []).length;
 
-        // Pattern 4: Links to internal directories (./folder/ or ./folder-name/)
-        const directoryLinks = (content.match(/\[.+?\]\(\.\/[a-zA-Z0-9-_]+\/?/gm) || []).length;
+        // Pattern 4: Links to internal works (./folder/ or ./folder-name/)
+        const workLinks = (content.match(/\[.+?\]\(\.\/[a-zA-Z0-9-_]+\/?/gm) || []).length;
 
         const totalLinkCount = bulletListLinks + numberedListLinks + tableLinks;
         const hasListLinks = totalLinkCount > 0;
 
-        // Multi-file structure: has directory links AND section headers
-        const isMultiFileStructure = directoryLinks >= 3 && hasSectionHeaders;
+        // Multi-file structure: has work links AND section headers
+        const isMultiFileStructure = workLinks >= 3 && hasSectionHeaders;
 
         // Standard awesome list: has list links AND section headers AND enough items
         const isStandardAwesomeList = hasListLinks && hasSectionHeaders && totalLinkCount >= 5;
@@ -604,12 +602,10 @@ export class SourceRepoAnalyzerService {
             let categoryCount: number | undefined;
 
             try {
-                const dataContents = await this.gitFacade.getDirectoryContents(
-                    owner,
-                    repo,
-                    'data',
-                    { token, providerId: provider },
-                );
+                const dataContents = await this.gitFacade.getWorkContents(owner, repo, 'data', {
+                    token,
+                    providerId: provider,
+                });
                 if (dataContents) {
                     itemCount = dataContents.filter((c) => c.type === 'dir').length;
                 }
@@ -746,7 +742,7 @@ export class SourceRepoAnalyzerService {
         return { hasConflict: true, conflictingRepos, suggestedSlug };
     }
 
-    private async detectDirectoryEcosystem(
+    private async detectWorkEcosystem(
         owner: string,
         repo: string,
         token?: string,
@@ -781,12 +777,10 @@ export class SourceRepoAnalyzerService {
                 return null;
             }
 
-            const contents = await this.gitFacade.getDirectoryContents(
-                owner,
-                candidateDataRepo,
-                '',
-                { token, providerId: provider },
-            );
+            const contents = await this.gitFacade.getWorkContents(owner, candidateDataRepo, '', {
+                token,
+                providerId: provider,
+            });
 
             if (!contents) {
                 return null;

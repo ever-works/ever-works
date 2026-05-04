@@ -55,110 +55,110 @@ Check the current authentication status and see who is logged in.
 ever-works auth status
 ```
 
-## Directory Management (`directory`)
+## Work Management (`work`)
 
-Create, manage, and generate content for your directories.
+Create, manage, and generate content for your works.
 
 ### Create
 
-Create a new directory project. This command is interactive and will prompt you for details like name, slug, description, and repository settings.
+Create a new work project. This command is interactive and will prompt you for details like name, slug, description, and repository settings.
 
 ```bash
-ever-works directory create
+ever-works work create
 ```
 
 **What it does:**
 
 1. Checks for GitHub connection.
-2. Prompts for directory details.
-3. Creates the directory entry in the platform database.
+2. Prompts for work details.
+3. Creates the work entry in the platform database.
 4. Initializes the configuration for future generation.
 
 ### List
 
-List all directories you have access to.
+List all works you have access to.
 
 ```bash
-ever-works directory list
+ever-works work list
 ```
 
 ### Generate
 
-Start the AI content generation pipeline for a directory. This is the core command to populate your directory with data.
+Start the AI content generation pipeline for a work. This is the core command to populate your work with data.
 
 ```bash
-ever-works directory generate
+ever-works work generate
 ```
 
 **Interactive Flow:**
 
-1. Select a directory from the list.
+1. Select a work from the list.
 2. Confirm or edit the prompt/topic.
 3. (Optional) Configure advanced settings like company info, domain type, or custom configuration.
 4. Triggers the generation pipeline on the server.
 
-Use `directory status` to track progress.
+Use `work status` to track progress.
 
 ### Status
 
-Check the status of a directory, including the current state of any running generation pipeline.
+Check the status of a work, including the current state of any running generation pipeline.
 
 ```bash
-ever-works directory status
+ever-works work status
 ```
 
 ### Update
 
-Update a directory's configuration and synchronize changes with its GitHub repository.
+Update a work's configuration and synchronize changes with its GitHub repository.
 
 ```bash
-ever-works directory update
+ever-works work update
 ```
 
 ### Update Website
 
-Update specifically the website repository for a directory (e.g., to apply template updates).
+Update specifically the website repository for a work (e.g., to apply template updates).
 
 ```bash
-ever-works directory update-website
+ever-works work update-website
 ```
 
 ### Deploy
 
-Trigger a deployment of the directory's website to Vercel.
+Trigger a deployment of the work's website to Vercel.
 
 ```bash
-ever-works directory deploy
+ever-works work deploy
 ```
 
 ### Submit Item
 
-Manually submit a single item to a directory.
+Manually submit a single item to a work.
 
 ```bash
-ever-works directory submit-item
+ever-works work submit-item
 ```
 
 ### Remove Item
 
-Remove an item from a directory.
+Remove an item from a work.
 
 ```bash
-ever-works directory remove-item
+ever-works work remove-item
 ```
 
 ### Regenerate Markdown
 
-Regenerate the `README.md` file for a directory based on the latest data.
+Regenerate the `README.md` file for a work based on the latest data.
 
 ```bash
-ever-works directory regenerate-markdown
+ever-works work regenerate-markdown
 ```
 
 ### Delete
 
-Delete a directory and its associated data.
+Delete a work and its associated data.
 
 ```bash
-ever-works directory delete
+ever-works work delete
 ```

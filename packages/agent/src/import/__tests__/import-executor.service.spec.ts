@@ -48,7 +48,7 @@ describe('ImportExecutorService', () => {
         };
     };
 
-    const directory = {
+    const work = {
         id: 'dir-1',
         name: 'Compare Cloud Pricing',
         slug: 'compare-cloud-pricing',
@@ -59,7 +59,7 @@ describe('ImportExecutorService', () => {
     it('passes the full works.yaml config to data generation for awesome README imports', async () => {
         const { service, dataGenerator } = createService();
         const worksConfig = {
-            initialPrompt: 'Build a directory from the awesome list',
+            initialPrompt: 'Build a work from the awesome list',
             model: 'openai/gpt-5.1',
             scheduleCadence: 'weekly',
             providers: {
@@ -69,14 +69,14 @@ describe('ImportExecutorService', () => {
         } as any;
 
         await service.importFromAwesomeReadme({
-            directory,
+            work,
             user,
             sourceUrl: 'https://github.com/ever-works/awesome-cloud',
             worksConfig,
         });
 
         expect(dataGenerator.initialize).toHaveBeenCalledWith(
-            directory,
+            work,
             user,
             expect.objectContaining({
                 model: worksConfig.model,
@@ -89,7 +89,7 @@ describe('ImportExecutorService', () => {
     it('passes the resolved works.yaml config to data generation for config-only imports', async () => {
         const { service, dataGenerator } = createService();
         const worksConfig = {
-            initialPrompt: 'Build a cloud pricing directory',
+            initialPrompt: 'Build a cloud pricing work',
             model: 'openai/gpt-5.1',
             scheduleCadence: 'daily',
             providers: {
@@ -99,14 +99,14 @@ describe('ImportExecutorService', () => {
         } as any;
 
         await service.importFromWorksConfig({
-            directory,
+            work,
             user,
             source: { owner: 'ever-works', repo: 'compare-cloud-pricing' },
             worksConfig,
         });
 
         expect(dataGenerator.initialize).toHaveBeenCalledWith(
-            directory,
+            work,
             user,
             expect.objectContaining({
                 prompt: worksConfig.initialPrompt,

@@ -1,15 +1,9 @@
-import type {
-	DirectoryReference,
-	GenerationRequest,
-	ExistingItems,
-	StepMetrics,
-	PipelineOutputs
-} from '@ever-works/plugin';
+import type { WorkReference, GenerationRequest, ExistingItems, StepMetrics, PipelineOutputs } from '@ever-works/plugin';
 import type { MutableGenerationContext, GenerationContextSnapshot } from './mutable-generation-context.js';
 import type { StepDataKey, StepDataTypes, StandardPipelineMetrics } from './step-data-types.js';
 
 export class TypedGenerationContext implements MutableGenerationContext {
-	directory: DirectoryReference;
+	work: WorkReference;
 	request: GenerationRequest;
 	existing: ExistingItems;
 
@@ -41,8 +35,8 @@ export class TypedGenerationContext implements MutableGenerationContext {
 	warnings: string[] = [];
 	pluginConfig?: Record<string, Record<string, unknown>>;
 
-	constructor(directory: DirectoryReference, request: GenerationRequest, existing: ExistingItems) {
-		this.directory = directory;
+	constructor(work: WorkReference, request: GenerationRequest, existing: ExistingItems) {
+		this.work = work;
 		this.request = request;
 		this.existing = existing;
 		this.pluginConfig = request.pluginConfig;
@@ -215,7 +209,7 @@ export class TypedGenerationContext implements MutableGenerationContext {
 
 	toSnapshot(): GenerationContextSnapshot {
 		return {
-			directory: this.directory,
+			work: this.work,
 			request: this.request,
 			existing: this.existing,
 			extractedUrls: [...this.extractedUrls],
@@ -260,7 +254,7 @@ export class TypedGenerationContext implements MutableGenerationContext {
 	}
 
 	static fromMutableContext(ctx: MutableGenerationContext): TypedGenerationContext {
-		const typed = new TypedGenerationContext(ctx.directory, ctx.request, ctx.existing);
+		const typed = new TypedGenerationContext(ctx.work, ctx.request, ctx.existing);
 		typed.extractedUrls = ctx.extractedUrls;
 		typed.searchQueries = ctx.searchQueries;
 		typed.webPages = ctx.webPages;
@@ -288,7 +282,7 @@ export class TypedGenerationContext implements MutableGenerationContext {
 	}
 
 	static fromSnapshot(snapshot: GenerationContextSnapshot): TypedGenerationContext {
-		const typed = new TypedGenerationContext(snapshot.directory, snapshot.request, snapshot.existing);
+		const typed = new TypedGenerationContext(snapshot.work, snapshot.request, snapshot.existing);
 		typed.extractedUrls = [...snapshot.extractedUrls];
 		typed.searchQueries = [...snapshot.searchQueries];
 		typed.webPages = [...snapshot.webPages];

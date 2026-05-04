@@ -19,7 +19,7 @@ export const STEP_DEFINITIONS: readonly PipelineStepDefinition<SimAiStepId>[] = 
 	{
 		id: 'prepare-payload',
 		name: 'Prepare Workflow Payload',
-		description: 'Build input payload from directory context, existing items, and config',
+		description: 'Build input payload from work context, existing items, and config',
 		position: { type: 'after', stepId: 'validate-sim' },
 		dependencies: [{ stepId: 'validate-sim', required: true }],
 		optional: false,

@@ -7,10 +7,10 @@ sidebar_position: 2
 
 # Community PR Processing
 
-Community PR Processing automates the handling of pull requests submitted by external contributors to a directory's GitHub repository. When someone opens a PR that adds new tools, resources, or listings, the platform uses AI to extract structured items from the PR diff and commits them directly to the data repository — no manual review needed.
+Community PR Processing automates the handling of pull requests submitted by external contributors to a work's GitHub repository. When someone opens a PR that adds new tools, resources, or listings, the platform uses AI to extract structured items from the PR diff and commits them directly to the data repository — no manual review needed.
 
 :::tip When to use this
-Enable Community PR Processing on directories that accept public contributions. Contributors open PRs against the main (Markdown) repository, and the platform takes care of parsing, categorizing, and storing the new items automatically.
+Enable Community PR Processing on works that accept public contributions. Contributors open PRs against the main (Markdown) repository, and the platform takes care of parsing, categorizing, and storing the new items automatically.
 :::
 
 ## Prerequisites
@@ -18,23 +18,23 @@ Enable Community PR Processing on directories that accept public contributions. 
 Before enabling Community PR Processing, make sure the following are in place:
 
 1. **GitHub plugin configured** — The GitHub plugin must be active with a valid access token (see [Plugin System](/plugin-system/built-in-plugins#github)).
-2. **Main repository linked** — The directory must have a connected GitHub main repository.
-3. **Data repository linked** — The directory must have a connected GitHub data repository where items are stored.
+2. **Main repository linked** — The work must have a connected GitHub main repository.
+3. **Data repository linked** — The work must have a connected GitHub data repository where items are stored.
 4. **AI provider active** — At least one AI provider plugin must be enabled for item extraction (see [AI & Generation](/ai-agents)).
 
 ## How It Works
 
-1. **Discovery** — The system queries GitHub for open PRs on the directory's main repository. PRs that have already been processed are skipped (tracked internally by PR number).
-2. **Analysis** — For each new PR, file diffs are fetched and combined with the directory's context (name, description, existing categories) and the PR's title and body.
+1. **Discovery** — The system queries GitHub for open PRs on the work's main repository. PRs that have already been processed are skipped (tracked internally by PR number).
+2. **Analysis** — For each new PR, file diffs are fetched and combined with the work's context (name, description, existing categories) and the PR's title and body.
 3. **AI Extraction** — The combined context is sent to the configured AI provider, which returns structured item data: name, description, source URL, category, and tags.
 4. **Data Sync** — Extracted items are written to the data repository, committed with a message linking back to the original PR, and pushed.
 5. **Feedback** — A comment is posted on the PR listing the items that were added. If auto-close is enabled, the PR is closed automatically.
 
-Processing runs **automatically every hour** for all directories that have the feature enabled. You can also trigger it manually via the API.
+Processing runs **automatically every hour** for all works that have the feature enabled. You can also trigger it manually via the API.
 
 ## Configuration
 
-Community PR Processing is configured per-directory through the Settings page or the `PUT /api/directories/:id` endpoint.
+Community PR Processing is configured per-work through the Settings page or the `PUT /api/works/:id` endpoint.
 
 | Setting                | Type    | Default | Description                                       |
 | ---------------------- | ------- | ------- | ------------------------------------------------- |
@@ -45,17 +45,17 @@ Community PR Processing is configured per-directory through the Settings page or
 
 ### Manually Trigger Processing
 
-Process all unhandled community PRs for a directory on demand.
+Process all unhandled community PRs for a work on demand.
 
-| Method | Endpoint                                     | Auth |
-| ------ | -------------------------------------------- | ---- |
-| `POST` | `/api/directories/:id/process-community-prs` | JWT  |
+| Method | Endpoint                               | Auth |
+| ------ | -------------------------------------- | ---- |
+| `POST` | `/api/works/:id/process-community-prs` | JWT  |
 
 **Path parameters:**
 
-| Parameter | Type   | Description    |
-| --------- | ------ | -------------- |
-| `id`      | string | Directory UUID |
+| Parameter | Type   | Description |
+| --------- | ------ | ----------- |
+| `id`      | string | Work UUID   |
 
 **Response** (`200 OK`):
 
@@ -67,22 +67,22 @@ Process all unhandled community PRs for a directory on demand.
 
 **Errors:**
 
-| Status | Reason                                                    |
-| ------ | --------------------------------------------------------- |
-| `400`  | Community PR processing is not enabled for this directory |
-| `404`  | Directory not found                                       |
+| Status | Reason                                               |
+| ------ | ---------------------------------------------------- |
+| `400`  | Community PR processing is not enabled for this work |
+| `404`  | Work not found                                       |
 
 **Example:**
 
 ```bash
-curl -X POST http://localhost:3100/api/directories/<directory-id>/process-community-prs \
+curl -X POST http://localhost:3100/api/works/<work-id>/process-community-prs \
   -H "Authorization: Bearer <token>"
 ```
 
-### Enable via Directory Update
+### Enable via Work Update
 
 ```bash
-curl -X PUT http://localhost:3100/api/directories/<directory-id> \
+curl -X PUT http://localhost:3100/api/works/<work-id> \
   -H "Authorization: Bearer <token>" \
   -H "Content-Type: application/json" \
   -d '{
@@ -93,13 +93,13 @@ curl -X PUT http://localhost:3100/api/directories/<directory-id> \
 
 ## How Contributors Submit Items
 
-Contributors open a pull request against the directory's main GitHub repository. The PR can add new Markdown files, modify existing ones, or include item data in any text-based format. The AI extraction step reads the raw diff, so there is no strict template requirement — though PRs with clear item names, descriptions, and URLs yield the best results.
+Contributors open a pull request against the work's main GitHub repository. The PR can add new Markdown files, modify existing ones, or include item data in any text-based format. The AI extraction step reads the raw diff, so there is no strict template requirement — though PRs with clear item names, descriptions, and URLs yield the best results.
 
 ## PR Comment Examples
 
 **Items found:**
 
-> Thank you for your contribution! The following items have been added to the directory:
+> Thank you for your contribution! The following items have been added to the work:
 >
 > - **Acme Tool** — A modern build system for JavaScript projects
 > - **WidgetKit** — Open-source UI component library
@@ -108,10 +108,10 @@ Contributors open a pull request against the directory's main GitHub repository.
 
 **No items found:**
 
-> Thank you for your pull request! After analyzing the changes, no new directory items could be extracted. This may happen if the PR contains formatting changes, documentation updates, or content that doesn't match the directory's scope.
+> Thank you for your pull request! After analyzing the changes, no new work items could be extracted. This may happen if the PR contains formatting changes, documentation updates, or content that doesn't match the work's scope.
 
 ## Related
 
-- [Directories API](/api/directories) — Full endpoint reference including Community PR Processing
+- [Works API](/api/works) — Full endpoint reference including Community PR Processing
 - [Collections](./collections) — Another way to organize items into curated groups
 - [Plugin System — GitHub](/plugin-system/built-in-plugins#github) — GitHub plugin configuration

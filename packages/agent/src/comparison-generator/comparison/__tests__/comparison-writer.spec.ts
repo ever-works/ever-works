@@ -249,28 +249,28 @@ describe('generateComparison', () => {
         expect(result.markdown).toBe(MOCK_MARKDOWN);
     });
 
-    it('should pass directory context in prompt when provided', async () => {
+    it('should pass work context in prompt when provided', async () => {
         const askJson = jest.fn().mockResolvedValue(MOCK_STRUCTURE);
         const ai = makeAi({ askJson });
 
         await generateComparison(pair, research, ai, {
             name: 'Hosting Tools',
-            description: 'A directory of hosting platforms',
+            description: 'A work of hosting platforms',
         });
 
         const prompt = askJson.mock.calls[0][0] as string;
         expect(prompt).toContain('Hosting Tools');
-        expect(prompt).toContain('A directory of hosting platforms');
+        expect(prompt).toContain('A work of hosting platforms');
     });
 
-    it('should not include directory context when not provided', async () => {
+    it('should not include work context when not provided', async () => {
         const askJson = jest.fn().mockResolvedValue(MOCK_STRUCTURE);
         const ai = makeAi({ askJson });
 
         await generateComparison(pair, research, ai);
 
         const prompt = askJson.mock.calls[0][0] as string;
-        expect(prompt).not.toContain('Directory Context');
+        expect(prompt).not.toContain('Work Context');
     });
 
     it('should call askText twice when extendedAnalysis is true', async () => {

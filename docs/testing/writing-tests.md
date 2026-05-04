@@ -24,18 +24,18 @@ Most agent package services are tested using NestJS's `Test.createTestingModule`
 import { Test, TestingModule } from '@nestjs/testing';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { PluginRegistryService } from '../services/plugin-registry.service';
-import { DirectoryPluginRepository } from '../repositories/directory-plugin.repository';
+import { WorkPluginRepository } from '../repositories/work-plugin.repository';
 import { UserPluginRepository } from '../repositories/user-plugin.repository';
 
 describe('PluginRegistryService', () => {
 	let service: PluginRegistryService;
 	let eventEmitter: EventEmitter2;
-	let directoryPluginRepository: jest.Mocked<DirectoryPluginRepository>;
+	let workPluginRepository: jest.Mocked<WorkPluginRepository>;
 
 	beforeEach(async () => {
-		directoryPluginRepository = {
-			findByDirectoryAndPlugin: jest.fn()
-		} as unknown as jest.Mocked<DirectoryPluginRepository>;
+		workPluginRepository = {
+			findByWorkAndPlugin: jest.fn()
+		} as unknown as jest.Mocked<WorkPluginRepository>;
 
 		const module: TestingModule = await Test.createTestingModule({
 			providers: [
@@ -45,8 +45,8 @@ describe('PluginRegistryService', () => {
 					useValue: { emit: jest.fn(), on: jest.fn(), off: jest.fn() }
 				},
 				{
-					provide: DirectoryPluginRepository,
-					useValue: directoryPluginRepository
+					provide: WorkPluginRepository,
+					useValue: workPluginRepository
 				},
 				{
 					provide: UserPluginRepository,
@@ -161,7 +161,7 @@ const createMockManifest = (id: string, category = 'utility'): PluginManifest =>
 });
 ```
 
-Place these at the top of the test file or in a shared `__tests__/helpers/` directory if used across multiple test suites.
+Place these at the top of the test file or in a shared `__tests__/helpers/` work if used across multiple test suites.
 
 ## Mocking Facades and Repositories
 
@@ -189,8 +189,8 @@ const mockAiFacade = {
 };
 
 // Mock Repository
-const mockDirectoryRepository = {
-	findById: jest.fn().mockResolvedValue(mockDirectory),
+const mockWorkRepository = {
+	findById: jest.fn().mockResolvedValue(mockWork),
 	update: jest.fn().mockResolvedValue(undefined),
 	increment: jest.fn().mockResolvedValue(undefined)
 };
@@ -198,7 +198,7 @@ const mockDirectoryRepository = {
 
 ## Test File Location
 
-Test files are co-located with their source code in `__tests__/` directories:
+Test files are co-located with their source code in `__tests__/` works:
 
 ```
 packages/agent/src/

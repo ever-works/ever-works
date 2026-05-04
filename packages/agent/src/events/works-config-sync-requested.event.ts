@@ -7,10 +7,10 @@ export type WorksConfigSyncReason =
     | 'pipeline_settings_changed';
 
 export class WorksConfigSyncRequestedEvent extends BaseEvent {
-    static EVENT_NAME = 'directory.works_config.sync_requested';
+    static EVENT_NAME = 'work.works_config.sync_requested';
 
     constructor(
-        public readonly directoryId: string,
+        public readonly workId: string,
         public readonly userId: string,
         public readonly reason: WorksConfigSyncReason,
     ) {

@@ -6,7 +6,7 @@
 
 For the full, always up-to-date project guide, see [`CLAUDE.md`](../CLAUDE.md). This Copilot file only provides lightweight hints and examples.
 
-You're working on **Ever Works**, an open-source directory builder platform with AI-powered content generation.
+You're working on **Ever Works**, an open-source work builder platform with AI-powered content generation.
 
 - **Repository**: https://github.com/ever-works/ever-works
 - **Documentation**: https://github.com/ever-works/ever-works-docs/tree/develop/website/docs
@@ -269,7 +269,7 @@ process.env.NEXT_PUBLIC_API_URL;
 ```
 src/
 ├── auth/              # Authentication
-├── directories/       # Core feature
+├── works/  # legacy dir name kept for compat — see entities       # Core feature
 ├── ai-conversation/   # AI chat
 ├── mail/              # Email service
 └── integrations/      # External APIs

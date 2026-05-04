@@ -7,7 +7,7 @@ sidebar_position: 25
 
 # Tavily Search Plugin
 
-The Tavily plugin provides AI-optimized web search and content extraction through the [Tavily API](https://tavily.com). It is the default search provider in Ever Works and powers source discovery during directory generation.
+The Tavily plugin provides AI-optimized web search and content extraction through the [Tavily API](https://tavily.com). It is the default search provider in Ever Works and powers source discovery during work generation.
 
 **Source:** `packages/plugins/tavily/src/tavily.plugin.ts`
 
@@ -49,7 +49,7 @@ Unlike single-purpose plugins, Tavily handles both search and content extraction
 | `search`            | `search(options)`  | Find web pages relevant to a query |
 | `content-extractor` | `extract(options)` | Pull clean text content from a URL |
 
-During directory generation, the pipeline uses the search capability to discover sources and the content extraction capability to pull full text from those sources.
+During work generation, the pipeline uses the search capability to discover sources and the content extraction capability to pull full text from those sources.
 
 ## Configuration
 
@@ -84,7 +84,7 @@ The `hybrid` configuration mode means:
 
 ```mermaid
 flowchart TB
-    D[Directory-level settings] --> U[User-level settings]
+    D[Work-level settings] --> U[User-level settings]
     U --> A[Admin-level settings]
     A --> E["Environment variable<br/>PLUGIN_TAVILY_API_KEY"]
 
@@ -213,9 +213,9 @@ catch (error) {
 
 ## How Tavily Is Used in the Pipeline
 
-During directory generation, Tavily participates in two stages:
+During work generation, Tavily participates in two stages:
 
-1. **Source Discovery** -- The search facade calls `search()` with queries derived from the directory prompt and subject to find relevant web pages.
+1. **Source Discovery** -- The search facade calls `search()` with queries derived from the work prompt and subject to find relevant web pages.
 2. **Content Extraction** -- The content extraction facade calls `extract()` on discovered URLs to pull full text that the AI uses to generate item descriptions.
 
 ```mermaid
@@ -241,7 +241,7 @@ sequenceDiagram
 1. Create an account at [tavily.com](https://tavily.com).
 2. Copy your API key from the Tavily dashboard.
 3. Enter the key in the plugin settings or set the `PLUGIN_TAVILY_API_KEY` environment variable.
-4. Tavily is auto-enabled and will be used automatically during directory generation.
+4. Tavily is auto-enabled and will be used automatically during work generation.
 
 ## Troubleshooting
 

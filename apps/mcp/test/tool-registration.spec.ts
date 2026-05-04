@@ -13,26 +13,26 @@ describe('ToolRegistrationService', () => {
 
 	const sampleOperations: OpenApiOperation[] = [
 		{
-			operationId: 'DirectoriesController_findAll',
+			operationId: 'WorksController_findAll',
 			method: 'GET',
-			path: '/api/directories',
-			summary: 'List all directories',
+			path: '/api/works',
+			summary: 'List all works',
 			pathParams: [],
 			queryParams: [{ name: 'limit', required: false, schema: { type: 'integer' }, description: 'Max results' }]
 		},
 		{
-			operationId: 'DirectoriesController_findOne',
+			operationId: 'WorksController_findOne',
 			method: 'GET',
-			path: '/api/directories/{id}',
-			summary: 'Get a directory by ID',
+			path: '/api/works/{id}',
+			summary: 'Get a work by ID',
 			pathParams: [{ name: 'id', required: true, schema: { type: 'string' } }],
 			queryParams: []
 		},
 		{
-			operationId: 'DirectoriesController_create',
+			operationId: 'WorksController_create',
 			method: 'POST',
-			path: '/api/directories',
-			summary: 'Create a directory',
+			path: '/api/works',
+			summary: 'Create a work',
 			pathParams: [],
 			queryParams: [],
 			requestBody: {
@@ -73,9 +73,9 @@ describe('ToolRegistrationService', () => {
 		const registeredNames = registry.registerTool.mock.calls.map(
 			(call: unknown[]) => (call[0] as { name: string }).name
 		);
-		expect(registeredNames).toContain('list_directories');
-		expect(registeredNames).toContain('get_directory');
-		expect(registeredNames).toContain('create_directory');
+		expect(registeredNames).toContain('list_works');
+		expect(registeredNames).toContain('get_work');
+		expect(registeredNames).toContain('create_work');
 		expect(registeredNames).toContain('get_plugin');
 	});
 
@@ -85,28 +85,28 @@ describe('ToolRegistrationService', () => {
 		const registeredNames = registry.registerTool.mock.calls.map(
 			(call: unknown[]) => (call[0] as { name: string }).name
 		);
-		expect(registeredNames).not.toContain('deploy_directory');
+		expect(registeredNames).not.toContain('deploy_work');
 	});
 
 	it('uses whitelist toolName when provided', () => {
 		service.registerTools();
 		const firstCall = registry.registerTool.mock.calls[0][0] as { name: string };
-		expect(firstCall.name).toBe('list_directories');
+		expect(firstCall.name).toBe('list_works');
 	});
 
 	it('uses spec summary as description', () => {
 		service.registerTools();
 		const listDirCall = registry.registerTool.mock.calls.find(
-			(call: unknown[]) => (call[0] as { name: string }).name === 'list_directories'
+			(call: unknown[]) => (call[0] as { name: string }).name === 'list_works'
 		);
 		expect(listDirCall).toBeDefined();
-		expect((listDirCall![0] as { description: string }).description).toBe('List all directories');
+		expect((listDirCall![0] as { description: string }).description).toBe('List all works');
 	});
 
 	it('passes annotations from whitelist', () => {
 		service.registerTools();
 		const listDirCall = registry.registerTool.mock.calls.find(
-			(call: unknown[]) => (call[0] as { name: string }).name === 'list_directories'
+			(call: unknown[]) => (call[0] as { name: string }).name === 'list_works'
 		);
 		expect(listDirCall).toBeDefined();
 		expect((listDirCall![0] as { annotations: unknown }).annotations).toEqual({ readOnlyHint: true });
@@ -117,12 +117,12 @@ describe('ToolRegistrationService', () => {
 		service.registerTools();
 
 		const getDirCall = registry.registerTool.mock.calls.find(
-			(call: unknown[]) => (call[0] as { name: string }).name === 'get_directory'
+			(call: unknown[]) => (call[0] as { name: string }).name === 'get_work'
 		);
 		const handler = (getDirCall![0] as { handler: Function }).handler;
 		const result = await handler({ id: 'abc-123' });
 
-		expect(requestSpy).toHaveBeenCalledWith('GET', '/directories/abc-123', undefined);
+		expect(requestSpy).toHaveBeenCalledWith('GET', '/works/abc-123', undefined);
 		expect(result.content[0].text).toContain('"id": "123"');
 	});
 
@@ -131,12 +131,12 @@ describe('ToolRegistrationService', () => {
 		service.registerTools();
 
 		const listDirCall = registry.registerTool.mock.calls.find(
-			(call: unknown[]) => (call[0] as { name: string }).name === 'list_directories'
+			(call: unknown[]) => (call[0] as { name: string }).name === 'list_works'
 		);
 		const handler = (listDirCall![0] as { handler: Function }).handler;
 		await handler({ limit: 10 });
 
-		expect(requestSpy).toHaveBeenCalledWith('GET', '/directories?limit=10', undefined);
+		expect(requestSpy).toHaveBeenCalledWith('GET', '/works?limit=10', undefined);
 	});
 
 	it('creates handler that sends body for POST', async () => {
@@ -144,12 +144,12 @@ describe('ToolRegistrationService', () => {
 		service.registerTools();
 
 		const createDirCall = registry.registerTool.mock.calls.find(
-			(call: unknown[]) => (call[0] as { name: string }).name === 'create_directory'
+			(call: unknown[]) => (call[0] as { name: string }).name === 'create_work'
 		);
 		const handler = (createDirCall![0] as { handler: Function }).handler;
 		await handler({ name: 'Test', slug: 'test' });
 
-		expect(requestSpy).toHaveBeenCalledWith('POST', '/directories', { name: 'Test', slug: 'test' });
+		expect(requestSpy).toHaveBeenCalledWith('POST', '/works', { name: 'Test', slug: 'test' });
 	});
 
 	it('handler returns error on API failure', async () => {
@@ -157,7 +157,7 @@ describe('ToolRegistrationService', () => {
 		service.registerTools();
 
 		const getDirCall = registry.registerTool.mock.calls.find(
-			(call: unknown[]) => (call[0] as { name: string }).name === 'get_directory'
+			(call: unknown[]) => (call[0] as { name: string }).name === 'get_work'
 		);
 		const handler = (getDirCall![0] as { handler: Function }).handler;
 		const result = await handler({ id: '123' });

@@ -102,7 +102,7 @@ export class PluginLoaderService {
 
                 const stats = await fs.stat(resolvedPath);
                 if (stats.isDirectory()) {
-                    const plugins = await this.scanDirectory(resolvedPath);
+                    const plugins = await this.scanWork(resolvedPath);
                     discovered.push(...plugins);
                 }
             } catch (error) {
@@ -115,9 +115,9 @@ export class PluginLoaderService {
     }
 
     /**
-     * Scan a directory for plugins
+     * Scan a work for plugins
      */
-    private async scanDirectory(dirPath: string): Promise<DiscoveredPlugin[]> {
+    private async scanWork(dirPath: string): Promise<DiscoveredPlugin[]> {
         const discovered: DiscoveredPlugin[] = [];
 
         try {
@@ -133,14 +133,14 @@ export class PluginLoaderService {
                 }
             }
         } catch (error) {
-            this.logger.error(`Error scanning directory ${dirPath}:`, error);
+            this.logger.error(`Error scanning work ${dirPath}:`, error);
         }
 
         return discovered;
     }
 
     /**
-     * Try to load a plugin manifest from a package directory
+     * Try to load a plugin manifest from a package work
      */
     private async tryLoadPluginManifest(packagePath: string): Promise<DiscoveredPlugin | null> {
         const packageJsonPath = path.join(packagePath, 'package.json');

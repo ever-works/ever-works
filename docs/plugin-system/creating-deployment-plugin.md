@@ -7,7 +7,7 @@ sidebar_position: 10
 
 # Creating a Deployment Plugin
 
-Ever Works deploys directories as live websites through the cooperation of two plugin types: **git providers** and **deployment providers**. This guide covers how to create both.
+Ever Works deploys works as live websites through the cooperation of two plugin types: **git providers** and **deployment providers**. This guide covers how to create both.
 
 ## How Git and Deployment Work Together
 
@@ -421,7 +421,7 @@ The `IGitProviderPlugin` interface has both required and optional methods. Metho
 - `createBranch()`, `deleteBranch()` -- remote branch management
 - `forkRepository()`, `createRepositoryFromTemplate()` -- fork/template operations
 - `listPullRequests()`, `getPullRequest()`, `getPullRequestFiles()` -- extended PR operations
-- `getFileContent()`, `getReadme()`, `getDirectoryContents()` -- content access
+- `getFileContent()`, `getReadme()`, `getWorkContents()` -- content access
 
 ### Settings Schema
 
@@ -462,7 +462,7 @@ readonly settingsSchema: JsonSchema = {
 - `x-secret`: Value is encrypted and never returned in API responses.
 - `x-envVar`: Pre-populated from the named environment variable on startup.
 - `x-adminOnly`: Visible only to platform administrators.
-- `x-scope`: Controls at which level the setting is stored (`global`, `user`, or `directory`).
+- `x-scope`: Controls at which level the setting is stored (`global`, `user`, or `work`).
 - `x-hidden`: Hidden from the settings UI entirely.
   :::
 
@@ -502,7 +502,7 @@ The `package.json` declares the `deployment` category:
 			"version": "1.0.0",
 			"category": "deployment",
 			"capabilities": ["deployment"],
-			"description": "Deploy directories to Netlify",
+			"description": "Deploy works to Netlify",
 			"author": { "name": "Your Name" },
 			"license": "MIT",
 			"autoEnable": true,
@@ -568,7 +568,7 @@ export class NetlifyPlugin implements IPlugin, IDeploymentPlugin {
 		// - projectName: the site/project name
 		// - sourceDir: path to the built site files
 		// - buildCommand: optional build command
-		// - outputDir: build output directory
+		// - outputDir: build output work
 		// - env: environment variables for the build
 		// - domain: custom domain
 		// - options: provider-specific options
@@ -685,7 +685,7 @@ export class NetlifyPlugin implements IPlugin, IDeploymentPlugin {
 			id: this.id,
 			name: this.name,
 			version: this.version,
-			description: 'Deploy directories to Netlify',
+			description: 'Deploy works to Netlify',
 			category: this.category,
 			capabilities: [...this.capabilities],
 			author: { name: 'Your Name' },
@@ -706,7 +706,7 @@ export class NetlifyPlugin implements IPlugin, IDeploymentPlugin {
 				includeInOnboarding: true,
 				onboardingPriority: 4,
 				completionFields: ['apiToken'],
-				onboardingDescription: 'Add a Netlify token to deploy directories as live websites.'
+				onboardingDescription: 'Add a Netlify token to deploy works as live websites.'
 			},
 			icon: { type: 'lucide', value: 'Globe' }
 		};
@@ -756,7 +756,7 @@ The `IDeploymentPlugin` interface uses well-defined types for its operations:
 ```typescript
 interface DeploymentConfig {
 	readonly projectName: string; // Site/project name
-	readonly sourceDir: string; // Directory containing built files
+	readonly sourceDir: string; // Work containing built files
 	readonly buildCommand?: string; // e.g., "npm run build"
 	readonly outputDir?: string; // e.g., "dist" or ".next"
 	readonly env?: Record<string, string>;
@@ -1026,6 +1026,6 @@ Use this checklist before submitting your deployment or git provider plugin:
 
 - [ ] `pnpm install` run after adding the package
 - [ ] `pnpm build:plugins` passes
-- [ ] `vitest run` passes in the plugin directory
+- [ ] `vitest run` passes in the plugin work
 - [ ] `pnpm type-check` passes
 - [ ] Plugin registered in workspace `pnpm-workspace.yaml` if needed

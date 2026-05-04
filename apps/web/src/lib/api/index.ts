@@ -1,6 +1,6 @@
 export * from './api-keys';
 export * from './auth';
-export * from './directory';
+export * from './work';
 export * from './items-generator';
 export * from './website';
 export * from './server-api';

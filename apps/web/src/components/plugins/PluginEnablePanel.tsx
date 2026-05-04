@@ -51,10 +51,10 @@ export function PluginEnablePanel({
                     />
                     <div>
                         <p className="text-sm font-medium text-text dark:text-text-dark">
-                            {t('autoEnableForDirectories')}
+                            {t('autoEnableForWorks')}
                         </p>
                         <p className="text-xs text-text-muted dark:text-text-muted-dark mt-0.5">
-                            {t('autoEnableForDirectoriesDescription')}
+                            {t('autoEnableForWorksDescription')}
                         </p>
                     </div>
                 </label>

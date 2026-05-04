@@ -9,7 +9,7 @@ sidebar_position: 14
 
 ## Overview
 
-The AI facade in Ever Works provides intelligent routing of AI requests to the appropriate provider and model. The system resolves which plugin handles a request based on a priority chain (explicit override, directory default, user default, first enabled), then selects the appropriate model based on task complexity. It also supports automatic model escalation on failure, streaming responses, OpenRouter model metadata lookup, and cost calculation.
+The AI facade in Ever Works provides intelligent routing of AI requests to the appropriate provider and model. The system resolves which plugin handles a request based on a priority chain (explicit override, work default, user default, first enabled), then selects the appropriate model based on task complexity. It also supports automatic model escalation on failure, streaming responses, OpenRouter model metadata lookup, and cost calculation.
 
 ## Architecture
 
@@ -19,7 +19,7 @@ flowchart TD
 
     B --> C{Provider Resolution}
     C -->|"1. providerOverride"| D[Explicit Plugin]
-    C -->|"2. Directory active plugin"| E[Directory Default]
+    C -->|"2. Work active plugin"| E[Work Default]
     C -->|"3. defaultForCapabilities"| F[Manifest Default]
     C -->|"4. First enabled"| G[Any Loaded Plugin]
 
@@ -69,13 +69,13 @@ export class AiFacadeService extends BaseFacadeService implements IAiFacade {
 		const plugin = await this.resolvePlugin<IAiProviderPlugin>(
 			options?.routing?.providerOverride ?? facadeOptions.providerOverride,
 			facadeOptions.userId,
-			facadeOptions.directoryId
+			facadeOptions.workId
 		);
 
 		// 2. Resolve settings (4-level hierarchy)
 		const settings = await this.getResolvedSettings(plugin.id, {
 			userId: facadeOptions.userId,
-			directoryId: facadeOptions.directoryId
+			workId: facadeOptions.workId
 		});
 
 		// 3. Resolve model
@@ -103,7 +103,7 @@ The base class implements the resolution priority chain:
 protected async resolvePlugin<T extends IPlugin>(
     providerOverride?: string,
     userId?: string,
-    directoryId?: string,
+    workId?: string,
 ): Promise<T> {
     // Priority 1: Explicit override
     if (providerOverride) {
@@ -112,14 +112,14 @@ protected async resolvePlugin<T extends IPlugin>(
         throw new ProviderNotFoundError(providerOverride, this.CAPABILITY);
     }
 
-    // Priority 2: Directory active plugin
-    if (directoryId) {
-        const activePlugin = await this.findActivePluginForDirectory(directoryId);
+    // Priority 2: Work active plugin
+    if (workId) {
+        const activePlugin = await this.findActivePluginForWork(workId);
         if (activePlugin) return activePlugin.plugin as T;
     }
 
     // Priority 3+4: defaultForCapabilities, then first enabled
-    const enabledPlugins = await this.getEnabledPlugins(directoryId, userId);
+    const enabledPlugins = await this.getEnabledPlugins(workId, userId);
     if (enabledPlugins.length > 0) return enabledPlugins[0].plugin as T;
 
     throw new NoProviderError(this.CAPABILITY);
@@ -238,12 +238,12 @@ private async calculateCost(
 
 Settings are resolved by `PluginSettingsService` with this precedence:
 
-| Level | Source                    | Scope                   |
-| ----- | ------------------------- | ----------------------- |
-| 1     | Directory plugin settings | Per-directory overrides |
-| 2     | User plugin settings      | Per-user defaults       |
-| 3     | Admin settings            | Server-wide defaults    |
-| 4     | Plugin manifest defaults  | Built into the plugin   |
+| Level | Source                   | Scope                 |
+| ----- | ------------------------ | --------------------- |
+| 1     | Work plugin settings     | Per-work overrides    |
+| 2     | User plugin settings     | Per-user defaults     |
+| 3     | Admin settings           | Server-wide defaults  |
+| 4     | Plugin manifest defaults | Built into the plugin |
 
 ### Routing Options
 
@@ -275,7 +275,7 @@ const result = await this.aiFacade.askJson(
 		routing: { complexity: 'simple' },
 		temperature: 0.3
 	},
-	{ userId: user.id, directoryId: directory.id }
+	{ userId: user.id, workId: work.id }
 );
 ```
 
@@ -304,7 +304,7 @@ const contextLength = await this.aiFacade.resolveModelContextLength('gpt-4o', { 
 
 ## Best Practices
 
-1. **Always pass `FacadeOptions`** -- include `userId` and `directoryId` so the settings hierarchy resolves correctly.
+1. **Always pass `FacadeOptions`** -- include `userId` and `workId` so the settings hierarchy resolves correctly.
 
 2. **Use complexity routing** -- set `routing.complexity` to `'simple'`, `'medium'`, or `'complex'` to let the settings determine the model.
 

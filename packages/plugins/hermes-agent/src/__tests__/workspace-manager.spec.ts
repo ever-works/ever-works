@@ -26,7 +26,7 @@ afterEach(async () => {
 });
 
 describe('workspace manager', () => {
-	it('creates isolated workspaces for concurrent runs of the same directory', async () => {
+	it('creates isolated workspaces for concurrent runs of the same work', async () => {
 		const workspaceA = await createPluginWorkspace('user-1', 'dir-1');
 		const workspaceB = await createPluginWorkspace('user-1', 'dir-1');
 		tmpDirs.push(path.resolve(BASE_TEMP_DIR));

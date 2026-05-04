@@ -1,6 +1,6 @@
 import { getGlobalFormSchema, getFormSchema } from '@/app/actions/dashboard/generator-form';
 import { buildSelectedProviders } from '@ever-works/plugin';
-import { directoryAPI } from '@/lib/api/directory';
+import { workAPI } from '@/lib/api/work';
 import type { ProvidersDto } from '@ever-works/contracts/api';
 
 export interface ResolvedGenerationConfig {
@@ -12,21 +12,19 @@ export interface ResolvedGenerationConfig {
 /**
  * Resolve generation config — providers + pluginConfig.
  *
- * - With directoryId: reuses last request config if available,
- *   then falls back to directory-scoped schema via getFormSchema().
- * - Without directoryId: uses global schema via getGlobalFormSchema().
+ * - With workId: reuses last request config if available,
+ *   then falls back to work-scoped schema via getFormSchema().
+ * - Without workId: uses global schema via getGlobalFormSchema().
  *
  * Mirrors the same logic as:
- * - DirectoryAICreator (new directory) → getGlobalFormSchema
- * - GeneratorForm (existing directory) → getFormSchema(directoryId)
+ * - WorkAICreator (new work) → getGlobalFormSchema
+ * - GeneratorForm (existing work) → getFormSchema(workId)
  */
-export async function resolveGenerationConfig(
-    directoryId?: string,
-): Promise<ResolvedGenerationConfig> {
-    // For existing directories, try to reuse last request data first
-    if (directoryId) {
+export async function resolveGenerationConfig(workId?: string): Promise<ResolvedGenerationConfig> {
+    // For existing works, try to reuse last request data first
+    if (workId) {
         try {
-            const configRes = await directoryAPI.getConfig(directoryId);
+            const configRes = await workAPI.getConfig(workId);
             const lastRequest = configRes?.config?.metadata?.last_request_data;
 
             if (lastRequest) {
@@ -41,9 +39,9 @@ export async function resolveGenerationConfig(
         }
     }
 
-    // Resolve from form schema — directory-scoped or global
+    // Resolve from form schema — work-scoped or global
     try {
-        const result = directoryId ? await getFormSchema(directoryId) : await getGlobalFormSchema();
+        const result = workId ? await getFormSchema(workId) : await getGlobalFormSchema();
 
         if (!result.success || !result.data) return {};
 

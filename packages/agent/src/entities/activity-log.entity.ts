@@ -9,13 +9,13 @@ import {
     Index,
 } from 'typeorm';
 import { User } from './user.entity';
-import { Directory } from './directory.entity';
+import { Work } from './work.entity';
 import type { ActivityActionType, ActivityStatus } from './activity-log.types';
 
 @Entity({ name: 'activity_log' })
 @Index(['userId', 'createdAt'])
 @Index(['userId', 'actionType'])
-@Index(['userId', 'directoryId'])
+@Index(['userId', 'workId'])
 @Index(['userId', 'status'])
 export class ActivityLog {
     @PrimaryGeneratedColumn('uuid')
@@ -30,11 +30,11 @@ export class ActivityLog {
     user: User;
 
     @Column({ nullable: true })
-    directoryId?: string;
+    workId?: string;
 
-    @ManyToOne(() => Directory, { onDelete: 'SET NULL', nullable: true })
-    @JoinColumn({ name: 'directoryId' })
-    directory?: Directory;
+    @ManyToOne(() => Work, { onDelete: 'SET NULL', nullable: true })
+    @JoinColumn({ name: 'workId' })
+    work?: Work;
 
     @Column({ type: 'varchar', length: 50 })
     actionType: ActivityActionType;

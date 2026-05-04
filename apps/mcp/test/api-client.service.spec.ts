@@ -36,9 +36,9 @@ describe('ApiClientService', () => {
 
 	it('sends correct headers', async () => {
 		mockResponse({ id: '1' });
-		await service.request('GET', '/directories');
+		await service.request('GET', '/works');
 		expect(fetchSpy).toHaveBeenCalledWith(
-			'http://localhost:3100/api/directories',
+			'http://localhost:3100/api/works',
 			expect.objectContaining({
 				headers: {
 					'Content-Type': 'application/json',
@@ -50,13 +50,13 @@ describe('ApiClientService', () => {
 
 	it('parses JSON responses', async () => {
 		mockResponse({ id: '1', name: 'Test' });
-		const result = await service.request('GET', '/directories/1');
+		const result = await service.request('GET', '/works/1');
 		expect(result).toEqual({ id: '1', name: 'Test' });
 	});
 
 	it('throws ApiError on non-OK status', async () => {
 		mockResponse({ message: 'Not Found' }, 404);
-		await expect(service.request('GET', '/directories/missing')).rejects.toThrow(ApiError);
+		await expect(service.request('GET', '/works/missing')).rejects.toThrow(ApiError);
 	});
 
 	it('strips sensitive fields from responses', async () => {
@@ -70,7 +70,7 @@ describe('ApiClientService', () => {
 				lastLoginIp: '127.0.0.1'
 			}
 		});
-		const result = await service.request<Record<string, unknown>>('GET', '/directories/1');
+		const result = await service.request<Record<string, unknown>>('GET', '/works/1');
 		const user = result.user as Record<string, unknown>;
 		expect(user.password).toBeUndefined();
 		expect(user.lastLoginIp).toBeUndefined();
@@ -79,14 +79,14 @@ describe('ApiClientService', () => {
 
 	it('includes AbortSignal.timeout in requests', async () => {
 		mockResponse({ id: '1' });
-		await service.request('GET', '/directories');
+		await service.request('GET', '/works');
 		const callArgs = fetchSpy.mock.calls[0];
 		expect(callArgs[1].signal).toBeDefined();
 	});
 
 	it('sends body for POST requests', async () => {
 		mockResponse({ id: '1' });
-		await service.request('POST', '/directories', { name: 'New Dir' });
+		await service.request('POST', '/works', { name: 'New Dir' });
 		const callArgs = fetchSpy.mock.calls[0];
 		expect(callArgs[1].method).toBe('POST');
 		expect(callArgs[1].body).toBe(JSON.stringify({ name: 'New Dir' }));

@@ -72,8 +72,8 @@ Key steps:
 1. **Install dependencies** with `shamefully-hoist=true` for compatibility.
 2. **Build the API** and all upstream workspace dependencies (`...` suffix).
 3. **Build all plugins** separately.
-4. **Deploy** to a clean directory using `pnpm deploy --prod`, which produces a minimal production installation.
-5. **Prepare plugins** for Docker using a custom script that copies built plugins into the deploy directory.
+4. **Deploy** to a clean work using `pnpm deploy --prod`, which produces a minimal production installation.
+5. **Prepare plugins** for Docker using a custom script that copies built plugins into the deploy work.
 
 ### Stage 4: Production
 
@@ -134,7 +134,7 @@ EXPOSE 3000
 CMD ["node", "server.js"]
 ```
 
-The `NEXT_BUILD_OUTPUT=standalone` environment variable tells Next.js to produce a self-contained server. The `messages/` directory contains i18n translation files.
+The `NEXT_BUILD_OUTPUT=standalone` environment variable tells Next.js to produce a self-contained server. The `messages/` work contains i18n translation files.
 
 A writable volume is created at `/app/apps/web/.next/cache` for Next.js image optimization cache.
 
@@ -224,4 +224,4 @@ docker build -f .deploy/docker/api/Dockerfile -t ever-works-api:local .
 docker build -f .deploy/docker/web/Dockerfile -t ever-works-web:local .
 ```
 
-Note: Both Dockerfiles expect the build context to be the repository root (not the `.deploy/` directory).
+Note: Both Dockerfiles expect the build context to be the repository root (not the `.deploy/` work).

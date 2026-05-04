@@ -1,0 +1,129 @@
+name: E2E Tests
+
+# Playwright e2e suite — auto-starts API (sqlite in-memory) + Next.js dev
+# server in the runner, then runs all specs from apps/web/e2e/.
+#
+# Scope: only the long-lived branches develop / stage / main. Skipping PRs
+# and feature branches deliberately — Playwright on ubicloud-standard-8 is
+# expensive and the existing CI workflow already lints + builds + unit-tests
+# every push.
+#
+# Trigger via "Run workflow" on any branch when you want a one-off run.
+
+on:
+  push:
+    branches: [develop, stage, main]
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  e2e:
+    runs-on: ubicloud-standard-8
+    timeout-minutes: 45
+
+    strategy:
+      fail-fast: false
+      matrix:
+        node-version: [22.x]
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v3
+        with:
+          version: 10.13.1
+
+      - name: Setup Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build all packages (excluding docs)
+        run: pnpm build --filter=!./apps/docs
+
+      - name: Install Playwright browsers
+        working-directory: apps/web
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Start dev servers, wait, run Playwright
+        # Background processes started in one `run:` step are killed when the
+        # step ends — so we spawn API + Web AND wait AND run tests inside the
+        # same step. nohup + disown to fully detach from the shell.
+        #
+        # Both web and Playwright helpers consume API_URL as a bare host —
+        # web's lib/constants.ts auto-appends '/api', and helpers/api.ts
+        # prepends '/api/...' to each request. Keep these aligned.
+        working-directory: apps/web
+        run: |
+          set -e
+
+          echo "::group::Starting API on :3100"
+          nohup pnpm --filter ever-works-api dev > /tmp/api.log 2>&1 &
+          API_PID=$!
+          disown $API_PID
+          echo "API pid=$API_PID"
+          echo "::endgroup::"
+
+          echo "::group::Starting Web on :3000"
+          nohup pnpm --filter ever-works-web dev > /tmp/web.log 2>&1 &
+          WEB_PID=$!
+          disown $WEB_PID
+          echo "Web pid=$WEB_PID"
+          echo "::endgroup::"
+
+          echo "Waiting for API on :3100 ..."
+          timeout 180 bash -c 'until curl -sSf http://localhost:3100/api/health > /dev/null; do sleep 3; done' \
+            || { echo "API never came up — last 80 lines:"; tail -n 80 /tmp/api.log || true; exit 1; }
+          echo "API ready."
+
+          echo "Waiting for Web on :3000 ..."
+          timeout 240 bash -c 'until curl -sSf http://localhost:3000/en/login > /dev/null; do sleep 3; done' \
+            || { echo "Web never came up — last 80 lines:"; tail -n 80 /tmp/web.log || true; exit 1; }
+          echo "Web ready."
+
+          echo "::group::Running Playwright e2e suite"
+          pnpm exec playwright test
+          echo "::endgroup::"
+        env:
+          # API
+          DATABASE_TYPE: sqlite
+          DATABASE_IN_MEMORY: 'true'
+          AUTH_SECRET: ever-works-e2e-ci-secret
+          NODE_ENV: development
+          # Web
+          API_URL: http://localhost:3100
+          NEXT_PUBLIC_API_URL: http://localhost:3100/api
+          # Playwright
+          CI: 'true'
+          PLAYWRIGHT_BASE_URL: http://localhost:3000
+
+      - name: Upload Playwright report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report-${{ github.ref_name }}-${{ github.run_attempt }}
+          path: |
+            apps/web/playwright-report
+            apps/web/e2e/test-results
+          retention-days: 14
+          if-no-files-found: ignore
+
+      - name: Upload server logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: server-logs-${{ github.ref_name }}-${{ github.run_attempt }}
+          path: |
+            /tmp/api.log
+            /tmp/web.log
+          retention-days: 7
+          if-no-files-found: ignore

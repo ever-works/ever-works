@@ -35,20 +35,20 @@ flowchart LR
 ## 3. Data Model
 
 - New enum value `CANCELLED` on `GenerateStatusType`. Migration adds the
-  value to any check constraints on the `directories` table.
+  value to any check constraints on the `works` table.
 - No new tables/columns; reuses existing `generation_history` and
   `activity_log` tables.
 
 ## 4. API Surface
 
-| Method | Endpoint                                 | Description                        |
-| ------ | ---------------------------------------- | ---------------------------------- |
-| `POST` | `/api/directories/:id/cancel-generation` | `202 Accepted` + cancellation mode |
+| Method | Endpoint                           | Description                        |
+| ------ | ---------------------------------- | ---------------------------------- |
+| `POST` | `/api/works/:id/cancel-generation` | `202 Accepted` + cancellation mode |
 
 ## 5. Plugin / Web / CLI Surface
 
-- Web: Cancel button on the directory detail page; activity views also
-  surface cancel for actively-generating directories.
+- Web: Cancel button on the work detail page; activity views also
+  surface cancel for actively-generating works.
 - CLI: not exposed (cancellation is a UI-driven operation).
 - MCP: not exposed.
 
@@ -59,13 +59,13 @@ Trigger.dev run or signals an in-process AbortController.
 
 ## 7. Security & Permissions
 
-- `DirectoryOwnershipService.ensureCanEdit` — owner or member with edit
+- `WorkOwnershipService.ensureCanEdit` — owner or member with edit
   role.
 - Rate-limited via the global Throttler (default tier).
 
 ## 8. Observability
 
-- Activity log: action `directory_generation_cancelled`, status `COMPLETED`,
+- Activity log: action `work_generation_cancelled`, status `COMPLETED`,
   summary "Generation cancelled for `<name>`".
 - Sentry breadcrumb on the cancel path with the chosen mode.
 
@@ -85,8 +85,8 @@ See `spec.md` §9 — all gates satisfied.
 
 - Spec: `./spec.md`
 - Implementation:
-    - `apps/api/src/directories/directories.controller.ts:516`
-    - `packages/agent/src/services/directory-generation.service.ts:330`
+    - `apps/api/src/works/works.controller.ts:516`
+    - `packages/agent/src/services/work-generation.service.ts:330`
 - Cross-cutting: [`architecture/pipeline-executor`](../../architecture/pipeline-executor.md) §7
   (cancellation propagation in the executor),
   [`architecture/trigger-integration`](../../architecture/trigger-integration.md) §8

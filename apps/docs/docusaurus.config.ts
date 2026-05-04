@@ -37,7 +37,7 @@ const config: Config = {
 	// Add custom scripts here that would be placed in <script> tags.
 	scripts: [{ src: 'https://buttons.github.io/buttons.js', async: true }],
 	title: 'Ever Works', // Title for your website.
-	tagline: 'Modern Directory Website Solution',
+	tagline: 'The Workshop for AI',
 	favicon: 'img/favicon.ico',
 	// Set the production Url of your site here
 	url: 'https://docs.ever.works', // Your website URL
@@ -59,6 +59,9 @@ const config: Config = {
 			onBrokenMarkdownLinks: 'warn'
 		}
 	},
+	// Docusaurus built-in field — name is fixed by the framework, do NOT
+	// rename to `staticWorks` (the bulk Directory→Work rename did this and
+	// broke `pnpm --filter ever-works-docs build` with "field not recognized").
 	staticDirectories: ['../../docs/assets', 'static'],
 	// Even if you don't use internationalization, you can use this field to set
 	// useful metadata like html lang. For example, if your site is Chinese, you
@@ -216,7 +219,8 @@ const config: Config = {
 	customFields: {
 		EVER_WORKS_WEBSITE_TEMPLATE_API_URL: process.env.EVER_WORKS_WEBSITE_TEMPLATE_API_URL,
 		footerData: {
-			description: 'Ever Works is an open-source modern directory website solution.',
+			description:
+				'Ever Works is an open agentic runtime that autonomously builds content-rich web apps and Git repositories.',
 			socialLinks: [
 				{
 					title: 'GitHub',
@@ -260,7 +264,7 @@ const config: Config = {
 				{
 					name: 'Ever Works',
 					href: 'https://ever.works',
-					description: 'Modern Directory Website Solution',
+					description: 'The Workshop for AI',
 					icon: '/img/ever-works.svg'
 				}
 			],

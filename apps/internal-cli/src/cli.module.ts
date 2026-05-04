@@ -1,6 +1,6 @@
 import { Module, OnApplicationBootstrap } from '@nestjs/common';
 import { DatabaseConfigurations, DatabaseInitService } from '@ever-works/agent/database';
-import { DirectoryModule } from '@ever-works/agent/services';
+import { WorkModule } from '@ever-works/agent/services';
 import { DatabaseModule } from '@ever-works/agent/database';
 import { DataGeneratorModule } from '@ever-works/agent/generators';
 import { ItemsGeneratorModule } from '@ever-works/agent/items-generator';
@@ -16,7 +16,7 @@ import { LocalEventEmitterModule } from './local-event-emitter.module';
 
 // Commands
 import { ConfigCommands } from './commands/config';
-import { DirectoryCommands } from './commands/directory';
+import { WorkCommands } from './commands/work';
 import { ServeCommands } from './commands/serve';
 import { CacheFactory } from '@ever-works/agent/cache';
 
@@ -35,13 +35,13 @@ import { CacheFactory } from '@ever-works/agent/cache';
         MarkdownGeneratorModule,
         WebsiteGeneratorModule,
         FacadesModule,
-        DirectoryModule,
+        WorkModule,
     ],
     providers: [
         DatabaseInitService,
         // Commands
         ...ConfigCommands,
-        ...DirectoryCommands,
+        ...WorkCommands,
         ...ServeCommands,
     ],
 })

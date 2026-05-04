@@ -3,11 +3,11 @@ import { IsArray, IsOptional, IsString, ValidateNested } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class BatchDeployItemDto {
-    @ApiProperty({ description: 'Directory ID' })
+    @ApiProperty({ description: 'Work ID' })
     @IsString()
-    directoryId: string;
+    workId: string;
 
-    @ApiPropertyOptional({ description: 'Team scope for this directory' })
+    @ApiPropertyOptional({ description: 'Team scope for this work' })
     @IsString()
     @IsOptional()
     teamScope?: string;
@@ -15,13 +15,13 @@ export class BatchDeployItemDto {
 
 export class BatchDeployDto {
     @ApiProperty({
-        description: 'List of directories to deploy',
+        description: 'List of works to deploy',
         type: [BatchDeployItemDto],
     })
     @IsArray()
     @ValidateNested({ each: true })
     @Type(() => BatchDeployItemDto)
-    directories: BatchDeployItemDto[];
+    works: BatchDeployItemDto[];
 
     @ApiPropertyOptional({ description: 'Default team scope for all deployments' })
     @IsString()
@@ -30,7 +30,7 @@ export class BatchDeployDto {
 }
 
 export class BatchDeployItemResultDto {
-    directoryId: string;
+    workId: string;
     slug: string;
     status: 'pending' | 'error';
     message: string;

@@ -13,7 +13,7 @@ import type { FormSchemaProvidersType } from '../provider-categories.js';
  *
  * Configuration Levels:
  * - Level 1: Settings > Plugins (API keys via settingsSchema)
- * - Level 2: Directory > Apps (enable/disable via DirectoryPlugin entity)
+ * - Level 2: Work > Apps (enable/disable via WorkPlugin entity)
  * - Level 3: Generator Form (per-generation options via this interface)
  *
  * getFormFields() should return Level 3 fields only (per-generation options).
@@ -122,6 +122,6 @@ export interface ProviderModelSummary {
 	key: string;
 	label: string;
 	value: string;
-	source?: 'default' | 'env' | 'admin' | 'directory' | 'user';
-	isDirectoryOverride?: boolean;
+	source?: 'default' | 'env' | 'admin' | 'work' | 'user';
+	isWorkOverride?: boolean;
 }

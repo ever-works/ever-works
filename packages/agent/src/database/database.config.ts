@@ -5,14 +5,14 @@ import {
     ApiKey,
     RefreshToken,
     User,
-    Directory,
-    DirectoryAdvancedPrompts,
-    DirectoryCustomDomain,
-    DirectoryMember,
-    DirectoryGenerationHistory,
+    Work,
+    WorkAdvancedPrompts,
+    WorkCustomDomain,
+    WorkMember,
+    WorkGenerationHistory,
     SubscriptionPlan,
     UserSubscription,
-    DirectorySchedule,
+    WorkSchedule,
     UsageLedgerEntry,
     Notification,
     ActivityLog,
@@ -25,7 +25,7 @@ import {
     GitHubAppInstallationRepository,
     GitHubAppUserLink,
 } from '../entities';
-import { PluginEntity, UserPluginEntity, DirectoryPluginEntity } from '../plugins/entities';
+import { PluginEntity, UserPluginEntity, WorkPluginEntity } from '../plugins/entities';
 import { UserSyncConfig } from '../account-transfer/entities/user-sync-config.entity';
 import * as path from 'path';
 import * as os from 'os';
@@ -59,17 +59,17 @@ export interface DatabaseConfig extends Omit<TypeOrmModuleOptions, 'type'> {
 
 export const ENTITIES = [
     ApiKey,
-    Directory,
-    DirectoryAdvancedPrompts,
-    DirectoryCustomDomain,
-    DirectoryMember,
+    Work,
+    WorkAdvancedPrompts,
+    WorkCustomDomain,
+    WorkMember,
     User,
     RefreshToken,
     CacheEntry,
-    DirectoryGenerationHistory,
+    WorkGenerationHistory,
     SubscriptionPlan,
     UserSubscription,
-    DirectorySchedule,
+    WorkSchedule,
     UsageLedgerEntry,
     Notification,
     ActivityLog,
@@ -84,7 +84,7 @@ export const ENTITIES = [
     // Plugin entities
     PluginEntity,
     UserPluginEntity,
-    DirectoryPluginEntity,
+    WorkPluginEntity,
     // Account transfer entities
     UserSyncConfig,
 ];
@@ -126,7 +126,7 @@ export const databaseConfig = registerAs('database', (): DatabaseConfig => {
                 : ':memory:';
         }
 
-        // Ensure directory exists for file-based SQLite databases (SQLite-specific logic)
+        // Ensure work exists for file-based SQLite databases (SQLite-specific logic)
         if (database !== ':memory:' && !database.startsWith(':')) {
             const dbDir = path.dirname(database);
             if (!fs.existsSync(dbDir)) {

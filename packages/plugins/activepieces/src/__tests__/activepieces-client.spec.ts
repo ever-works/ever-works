@@ -153,14 +153,14 @@ describe('ActivepiecesClient', () => {
 
 			const result = await createClient().executeFlow(
 				'flow-1',
-				{ metadata: { directoryId: 'd', directoryName: 'D', directorySlug: 'd', targetItems: 1 } },
+				{ metadata: { workId: 'd', workName: 'D', workSlug: 'd', targetItems: 1 } },
 				createSettings()
 			);
 
 			const [url, init] = fetchSpy.mock.calls[0]!;
 			expect(String(url)).toContain('/api/v1/webhooks/flow-1/sync');
 			expect((init as RequestInit).method).toBe('POST');
-			expect(JSON.parse((init as RequestInit).body as string).metadata.directoryId).toBe('d');
+			expect(JSON.parse((init as RequestInit).body as string).metadata.workId).toBe('d');
 			expect(result.output).toEqual({ items: [{ name: 'A' }] });
 			expect(result.flowDuration).toBeDefined();
 		});
@@ -176,7 +176,7 @@ describe('ActivepiecesClient', () => {
 
 			const result = await createClient().executeFlow(
 				'flow-1',
-				{ metadata: { directoryId: 'd', directoryName: 'D', directorySlug: 'd', targetItems: 1 } },
+				{ metadata: { workId: 'd', workName: 'D', workSlug: 'd', targetItems: 1 } },
 				createSettings()
 			);
 
@@ -206,7 +206,7 @@ describe('ActivepiecesClient', () => {
 
 			const result = await createClient().executeFlow(
 				'flow-1',
-				{ metadata: { directoryId: 'd', directoryName: 'D', directorySlug: 'd', targetItems: 1 } },
+				{ metadata: { workId: 'd', workName: 'D', workSlug: 'd', targetItems: 1 } },
 				createSettings()
 			);
 
@@ -229,7 +229,7 @@ describe('ActivepiecesClient', () => {
 
 			const result = await createClient().executeFlow(
 				'flow-1',
-				{ metadata: { directoryId: 'd', directoryName: 'D', directorySlug: 'd', targetItems: 1 } },
+				{ metadata: { workId: 'd', workName: 'D', workSlug: 'd', targetItems: 1 } },
 				createSettings()
 			);
 
@@ -245,7 +245,7 @@ describe('ActivepiecesClient', () => {
 			await expect(
 				createClient().executeFlow(
 					'flow-1',
-					{ metadata: { directoryId: 'd', directoryName: 'D', directorySlug: 'd', targetItems: 1 } },
+					{ metadata: { workId: 'd', workName: 'D', workSlug: 'd', targetItems: 1 } },
 					createSettings(),
 					undefined,
 					controller.signal
@@ -298,7 +298,7 @@ describe('ActivepiecesClient', () => {
 			try {
 				const promise = createClient().executeFlow(
 					'flow-1',
-					{ metadata: { directoryId: 'd', directoryName: 'D', directorySlug: 'd', targetItems: 1 } },
+					{ metadata: { workId: 'd', workName: 'D', workSlug: 'd', targetItems: 1 } },
 					createSettings({ webhookMode: 'async' })
 				);
 
@@ -319,7 +319,7 @@ describe('ActivepiecesClient', () => {
 			await expect(
 				createClient().executeFlow(
 					'flow-1',
-					{ metadata: { directoryId: 'd', directoryName: 'D', directorySlug: 'd', targetItems: 1 } },
+					{ metadata: { workId: 'd', workName: 'D', workSlug: 'd', targetItems: 1 } },
 					createSettings({ webhookMode: 'async', projectId: undefined })
 				)
 			).rejects.toThrow(/project id/i);

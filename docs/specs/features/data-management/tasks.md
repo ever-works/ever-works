@@ -8,7 +8,7 @@
 
 ## Phase 1 — Export
 
-- [x] T1. Per-directory aggregator service.
+- [x] T1. Per-work aggregator service.
 - [x] T2. Secret redactor based on plugin JSON schemas.
 - [x] T3. `POST /api/account/export` controller.
 
@@ -22,7 +22,7 @@
 
 ## Phase 3 — Import apply
 
-- [x] T9. Per-directory transactional applier.
+- [x] T9. Per-work transactional applier.
 - [x] T10. `MASKED:` skipper with per-plugin warning.
 - [x] T11. Three conflict strategies (skip / overwrite / rename).
 - [x] T12. Data repo writer (clone, write, commit, push).

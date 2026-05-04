@@ -102,7 +102,7 @@ add MCP-specific annotations:
 ```ts
 {
     method: 'POST',
-    path: '/api/directories/:id/cancel-generation',
+    path: '/api/works/:id/cancel-generation',
     toolName: 'cancel_generation',
     annotations: {
         readOnlyHint: false,

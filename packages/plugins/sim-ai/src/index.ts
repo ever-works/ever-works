@@ -1,7 +1,7 @@
 /**
  * SIM AI Workflows Plugin
  *
- * Full pipeline plugin that delegates directory generation to SIM AI
+ * Full pipeline plugin that delegates work generation to SIM AI
  * workflows. Instead of running local AI agents, this plugin triggers
  * deployed SIM workflows and collects structured item results.
  *

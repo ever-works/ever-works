@@ -1,7 +1,7 @@
 /**
  * Pipeline module exports
  *
- * This module provides the plugin-driven pipeline system for directory generation.
+ * This module provides the plugin-driven pipeline system for work generation.
  * It supports step replacement, injection, disabling, and positioning through plugins.
  */
 

@@ -7,7 +7,7 @@ sidebar_position: 36
 
 # Together AI Models via OpenRouter
 
-Ever Works does not include a standalone Together AI plugin. Together AI models -- including open-source models like Llama, Mistral, and Qwen -- are accessed through the **OpenRouter** plugin. This page explains how to configure and use Together AI models for directory generation.
+Ever Works does not include a standalone Together AI plugin. Together AI models -- including open-source models like Llama, Mistral, and Qwen -- are accessed through the **OpenRouter** plugin. This page explains how to configure and use Together AI models for work generation.
 
 **Related source files:**
 

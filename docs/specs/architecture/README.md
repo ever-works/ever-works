@@ -1,6 +1,6 @@
 # Architecture Specs
 
-This directory holds **cross-feature architecture specs** — deep
+This work holds **cross-feature architecture specs** — deep
 descriptions of the substrates that user-facing features under
 `docs/specs/features/` build on top of. Each spec targets AI agents
 and engineers reading the codebase and reasoning about changes,
@@ -33,7 +33,7 @@ wide-angle first.
 | --------------------------------------------- | ----------------------------------------------------------------- |
 | [`pipeline-overview`](./pipeline-overview.md) | Wide-angle: 4 pipeline categories, routing, 3-stage orchestrator  |
 | [`pipeline-executor`](./pipeline-executor.md) | Internals: state machine, step contract, modifiers, checkpointing |
-| [`directory-import`](./directory-import.md)   | Source-repo analyzer + the three import paths                     |
+| [`work-import`](./work-import.md)             | Source-repo analyzer + the three import paths                     |
 
 ### Trigger.dev & background work
 
@@ -96,7 +96,7 @@ internals deep-dive. Read the wide-angle first:
 
 ## Conventions
 
-Every architecture spec in this directory follows the same shape:
+Every architecture spec in this work follows the same shape:
 
 ```markdown
 # Architecture: <Subject>

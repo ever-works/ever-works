@@ -7,18 +7,18 @@ sidebar_position: 20
 
 # Scheduling Interface
 
-The Schedule UI enables users to configure automated, recurring directory generation runs. It provides controls for enabling/disabling automation, selecting cadence, managing billing modes, configuring failure thresholds, and triggering immediate runs.
+The Schedule UI enables users to configure automated, recurring work generation runs. It provides controls for enabling/disabling automation, selecting cadence, managing billing modes, configuring failure thresholds, and triggering immediate runs.
 
 ## Component Hierarchy
 
 ```
-DirectorySchedulePage (server component)
+WorkSchedulePage (server component)
   |
-  +-- DirectoryScheduleHeader
+  +-- WorkScheduleHeader
   |     +-- Page title
-  |     +-- Subtitle with directory name
+  |     +-- Subtitle with work name
   |
-  +-- DirectoryScheduleCard
+  +-- WorkScheduleCard
         |
         +-- ScheduleEmptyState (if no schedule)
         |     +-- Repeat icon
@@ -41,21 +41,21 @@ DirectorySchedulePage (server component)
 
 ## Key Components
 
-### DirectoryScheduleHeader
+### WorkScheduleHeader
 
-**File**: `apps/web/src/components/directories/detail/schedule/DirectoryScheduleHeader.tsx`
+**File**: `apps/web/src/components/works/detail/schedule/WorkScheduleHeader.tsx`
 
-A simple header card displaying the page title and a subtitle personalized with the directory name.
+A simple header card displaying the page title and a subtitle personalized with the work name.
 
-### DirectoryScheduleCard
+### WorkScheduleCard
 
-**File**: `apps/web/src/components/directories/detail/schedule/DirectoryScheduleCard.tsx`
+**File**: `apps/web/src/components/works/detail/schedule/WorkScheduleCard.tsx`
 
 The main schedule management component. If no schedule exists, it shows an empty state with a refresh button. Otherwise, it renders the full `ScheduleForm`.
 
 ```typescript
-type DirectoryScheduleCardProps = {
-	schedule: DirectoryScheduleDto | null;
+type WorkScheduleCardProps = {
+	schedule: WorkScheduleDto | null;
 	pipelineProviders?: ProviderOption[];
 	activeProviders?: ResolvedProvider[];
 };
@@ -63,15 +63,15 @@ type DirectoryScheduleCardProps = {
 
 ### ScheduleForm
 
-The core form component (internal to `DirectoryScheduleCard`) that manages all schedule configuration.
+The core form component (internal to `WorkScheduleCard`) that manages all schedule configuration.
 
 **Data Model**:
 
 ```typescript
-interface DirectoryScheduleDto {
-	status: DirectoryScheduleStatus; // ACTIVE | PAUSED | CANCELLED
-	cadence?: DirectoryScheduleCadence; // HOURLY | DAILY | WEEKLY | MONTHLY
-	billingMode?: DirectoryScheduleBillingMode; // SUBSCRIPTION | USAGE
+interface WorkScheduleDto {
+	status: WorkScheduleStatus; // ACTIVE | PAUSED | CANCELLED
+	cadence?: WorkScheduleCadence; // HOURLY | DAILY | WEEKLY | MONTHLY
+	billingMode?: WorkScheduleBillingMode; // SUBSCRIPTION | USAGE
 	nextRunAt?: string; // ISO datetime
 	lastRunAt?: string; // ISO datetime
 	failureCount: number;
@@ -141,7 +141,7 @@ interface ProviderOption {
 }
 ```
 
-Unconfigured providers are shown but disabled in the dropdown. The "Inherit" option uses the directory's default pipeline.
+Unconfigured providers are shown but disabled in the dropdown. The "Inherit" option uses the work's default pipeline.
 
 ### Create Pull Request Toggle
 
@@ -149,23 +149,23 @@ A `Switch` controlling whether scheduled generation runs create a git pull reque
 
 ## Action Buttons
 
-| Button  | Action                                           | Disabled When                             |
-| ------- | ------------------------------------------------ | ----------------------------------------- |
-| Run Now | `runDirectorySchedule(directoryId)`              | Loading, or schedule status is not ACTIVE |
-| Save    | `updateDirectorySchedule(directoryId, formData)` | Loading                                   |
-| Cancel  | `cancelDirectorySchedule(directoryId)`           | Loading                                   |
+| Button  | Action                                 | Disabled When                             |
+| ------- | -------------------------------------- | ----------------------------------------- |
+| Run Now | `runWorkSchedule(workId)`              | Loading, or schedule status is not ACTIVE |
+| Save    | `updateWorkSchedule(workId, formData)` | Loading                                   |
+| Cancel  | `cancelWorkSchedule(workId)`           | Loading                                   |
 
 Each action uses a separate `useTransition` for independent loading states: `isSaving`, `isRunning`, `isCancelling`.
 
 ## State Management
 
 ```
-DirectoryScheduleCard
+WorkScheduleCard
   |
   +-- ScheduleForm
         |-- form.enable: boolean
-        |-- form.cadence: DirectoryScheduleCadence
-        |-- form.billingMode: DirectoryScheduleBillingMode
+        |-- form.cadence: WorkScheduleCadence
+        |-- form.billingMode: WorkScheduleBillingMode
         |-- form.maxFailureBeforePause: number
         |-- form.alwaysCreatePullRequest: boolean
         |-- form.pipelineOverride: string | undefined
@@ -178,14 +178,14 @@ The form state is initialized from the `schedule` prop via `deriveFormState()` a
 
 ## Background Task Integration
 
-The schedule dispatcher runs as a Trigger.dev cron task defined in `packages/tasks/src/tasks/trigger/directory-schedule-dispatcher.task.ts`:
+The schedule dispatcher runs as a Trigger.dev cron task defined in `packages/tasks/src/tasks/trigger/work-schedule-dispatcher.task.ts`:
 
 ```typescript
-export const directoryScheduleDispatcherTask = schedules.task({
-	id: 'directory-schedule-dispatcher',
+export const workScheduleDispatcherTask = schedules.task({
+	id: 'work-schedule-dispatcher',
 	cron: `*/${interval} * * * *`, // configurable interval
 	run: async () => {
-		const dispatcher = appContext.get(DirectoryScheduleDispatcherService);
+		const dispatcher = appContext.get(WorkScheduleDispatcherService);
 		const dispatched = await dispatcher.dispatchDue();
 		return { dispatched, intervalMinutes: interval };
 	}
@@ -196,20 +196,20 @@ This cron task checks for due schedules and dispatches generation tasks at the c
 
 ## Related API Endpoints
 
-| Action          | Server Action Function                           | HTTP Method |
-| --------------- | ------------------------------------------------ | ----------- |
-| Update schedule | `updateDirectorySchedule(directoryId, formData)` | PATCH       |
-| Run immediately | `runDirectorySchedule(directoryId)`              | POST        |
-| Cancel schedule | `cancelDirectorySchedule(directoryId)`           | POST        |
+| Action          | Server Action Function                 | HTTP Method |
+| --------------- | -------------------------------------- | ----------- |
+| Update schedule | `updateWorkSchedule(workId, formData)` | PATCH       |
+| Run immediately | `runWorkSchedule(workId)`              | POST        |
+| Cancel schedule | `cancelWorkSchedule(workId)`           | POST        |
 
 ## Internationalization
 
 All strings use `next-intl` under these namespaces:
 
-- `dashboard.directoryDetail.schedule.page` -- page header title and subtitle
-- `dashboard.directoryDetail.schedule.card` -- form labels, summaries, actions, cadence labels, billing labels, error messages, success messages
-- `dashboard.directoryDetail.schedule.card.cadence.*` -- cadence option labels (hourly/daily/weekly/monthly)
-- `dashboard.directoryDetail.schedule.card.plans.*` -- plan names (free/standard/premium/unmetered)
+- `dashboard.workDetail.schedule.page` -- page header title and subtitle
+- `dashboard.workDetail.schedule.card` -- form labels, summaries, actions, cadence labels, billing labels, error messages, success messages
+- `dashboard.workDetail.schedule.card.cadence.*` -- cadence option labels (hourly/daily/weekly/monthly)
+- `dashboard.workDetail.schedule.card.plans.*` -- plan names (free/standard/premium/unmetered)
 
 ## Cross-References
 

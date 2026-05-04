@@ -46,7 +46,7 @@ describe('DataRepository', () => {
         await fs.rm(repoDir, { recursive: true, force: true });
     });
 
-    it('counts item directories without parsing malformed item YAML', async () => {
+    it('counts item works without parsing malformed item YAML', async () => {
         const repoDir = await fs.mkdtemp(path.join(os.tmpdir(), 'data-repository-spec-'));
         const itemDir = path.join(repoDir, 'data', 'broken-item');
 

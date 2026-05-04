@@ -196,12 +196,12 @@ Plugins can read API keys from environment variables. The convention is `PLUGIN_
 
 ### Scheduled Updates
 
-| Variable                                      | Default | Description                         |
-| --------------------------------------------- | ------- | ----------------------------------- |
-| `SCHEDULED_UPDATES_ENABLED`                   | `true`  | Enable scheduled directory updates  |
-| `SCHEDULED_UPDATES_DISPATCH_INTERVAL_MINUTES` | `5`     | Dispatch check interval             |
-| `SCHEDULED_UPDATES_MAX_BATCH`                 | `25`    | Max directories to update per batch |
-| `SCHEDULED_UPDATES_MAX_FAILURE_BEFORE_PAUSE`  | `3`     | Failures before pausing a directory |
+| Variable                                      | Default | Description                    |
+| --------------------------------------------- | ------- | ------------------------------ |
+| `SCHEDULED_UPDATES_ENABLED`                   | `true`  | Enable scheduled work updates  |
+| `SCHEDULED_UPDATES_DISPATCH_INTERVAL_MINUTES` | `5`     | Dispatch check interval        |
+| `SCHEDULED_UPDATES_MAX_BATCH`                 | `25`    | Max works to update per batch  |
+| `SCHEDULED_UPDATES_MAX_FAILURE_BEFORE_PAUSE`  | `3`     | Failures before pausing a work |
 
 ## Web Environment Variables
 
@@ -218,16 +218,16 @@ The web app (`apps/web/.env.example`) uses the `NEXT_PUBLIC_` prefix for client-
 
 ### Site Branding (Multi-tenant)
 
-| Variable                       | Default                         | Description            |
-| ------------------------------ | ------------------------------- | ---------------------- |
-| `NEXT_PUBLIC_SITE_NAME`        | `Ever Works`                    | Site display name      |
-| `NEXT_PUBLIC_SITE_TITLE`       | `Ever Works`                    | HTML title / SEO title |
-| `NEXT_PUBLIC_SITE_DESCRIPTION` | `Build Directories with AI`     | Meta description       |
-| `NEXT_PUBLIC_SITE_KEYWORDS`    | `Ever Works,Directories,AI,...` | Meta keywords          |
-| `NEXT_PUBLIC_LOGO_LIGHT`       | `/logo-light.png`               | Logo for light mode    |
-| `NEXT_PUBLIC_LOGO_DARK`        | `/logo-ever-work.png`           | Logo for dark mode     |
-| `NEXT_PUBLIC_FAVICON_LIGHT`    | `/favicon-light.png`            | Favicon for light mode |
-| `NEXT_PUBLIC_FAVICON_DARK`     | `/favicon-dark.png`             | Favicon for dark mode  |
+| Variable                       | Default                   | Description            |
+| ------------------------------ | ------------------------- | ---------------------- |
+| `NEXT_PUBLIC_SITE_NAME`        | `Ever Works`              | Site display name      |
+| `NEXT_PUBLIC_SITE_TITLE`       | `Ever Works`              | HTML title / SEO title |
+| `NEXT_PUBLIC_SITE_DESCRIPTION` | `Build Works with AI`     | Meta description       |
+| `NEXT_PUBLIC_SITE_KEYWORDS`    | `Ever Works,Works,AI,...` | Meta keywords          |
+| `NEXT_PUBLIC_LOGO_LIGHT`       | `/logo-light.png`         | Logo for light mode    |
+| `NEXT_PUBLIC_LOGO_DARK`        | `/logo-ever-work.png`     | Logo for dark mode     |
+| `NEXT_PUBLIC_FAVICON_LIGHT`    | `/favicon-light.png`      | Favicon for light mode |
+| `NEXT_PUBLIC_FAVICON_DARK`     | `/favicon-dark.png`       | Favicon for dark mode  |
 
 ### Internationalization
 
@@ -295,7 +295,7 @@ Plugin settings are resolved through a 4-level hierarchy (highest priority first
 
 ```mermaid
 flowchart TB
-    D[Directory-level settings] --> U[User-level settings]
+    D[Work-level settings] --> U[User-level settings]
     U --> A[Admin-level settings]
     A --> E[Environment variables]
 
@@ -305,7 +305,7 @@ flowchart TB
     style E fill:#f87171,color:#000
 ```
 
-1. **Directory-level**: Per-directory overrides set in the directory plugin settings modal
+1. **Work-level**: Per-work overrides set in the work plugin settings modal
 2. **User-level**: User's personal settings for a plugin (e.g., their own API key)
 3. **Admin-level**: Platform-wide defaults set by the administrator
 4. **Environment variable**: Fallback from `PLUGIN_*` env vars defined in `.env`

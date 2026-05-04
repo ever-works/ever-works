@@ -39,7 +39,7 @@
 - [ ] **T5**. Add service at `packages/agent/src/services/feature-name.service.ts`
     - Public methods: …
     - **Test**: `…service.spec.ts` with mocked repo
-- [ ] **T6**. Wire into module at `packages/agent/src/services/directory.module.ts`
+- [ ] **T6**. Wire into module at `packages/agent/src/services/work.module.ts`
 
 ## Phase 3 — Plugin / facade (if applicable)
 

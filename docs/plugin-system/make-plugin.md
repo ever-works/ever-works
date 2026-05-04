@@ -18,13 +18,13 @@ sidebar_position: 69
 
 ## Overview
 
-The Make.com plugin lets you swap the standard generation pipeline for a [Make.com](https://www.make.com/) (formerly Integromat) scenario. When generation runs, the plugin POSTs the directory's prompt and metadata to a Make webhook and waits for the scenario to return generated items.
+The Make.com plugin lets you swap the standard generation pipeline for a [Make.com](https://www.make.com/) (formerly Integromat) scenario. When generation runs, the plugin POSTs the work's prompt and metadata to a Make webhook and waits for the scenario to return generated items.
 
 This is a no-code/low-code escape hatch — if your team already runs sophisticated Make scenarios for content generation, scraping, or third-party integrations, you can plug those directly into Ever Works without writing a custom plugin.
 
 ## Selecting It
 
-In the directory edit screen, set **Generation Pipeline** to `Make.com Workflows`. The plugin appears once a webhook URL has been configured.
+In the work edit screen, set **Generation Pipeline** to `Make.com Workflows`. The plugin appears once a webhook URL has been configured.
 
 ## Configuration
 

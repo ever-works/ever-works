@@ -11,7 +11,7 @@ import type {
 	PipelineExecutionOptions,
 	PipelineProgressCallback,
 	PipelineResult,
-	DirectoryReference,
+	WorkReference,
 	GenerationRequest,
 	ExistingItems,
 	PluginManifest,
@@ -152,7 +152,7 @@ export class OpenCodePlugin implements IPlugin, IPipelinePlugin, IFormSchemaProv
 		return {
 			success: false,
 			message:
-				'OpenCode uses the active directory AI provider for credentials and model routing. Verify the directory AI provider configuration to confirm this pipeline is runnable.'
+				'OpenCode uses the active work AI provider for credentials and model routing. Verify the work AI provider configuration to confirm this pipeline is runnable.'
 		};
 	}
 
@@ -192,27 +192,27 @@ export class OpenCodePlugin implements IPlugin, IPipelinePlugin, IFormSchemaProv
 			readme: [
 				'# OpenCode Generator Plugin',
 				'',
-				'Use OpenCode as the pipeline engine for directory generation inside Ever Works.',
+				'Use OpenCode as the pipeline engine for work generation inside Ever Works.',
 				'',
-				'OpenCode researches sources and generates structured directory items by using the AI provider configured for the directory in Ever Works.',
+				'OpenCode researches sources and generates structured work items by using the AI provider configured for the work in Ever Works.',
 				'',
 				'Choose this plugin when you want OpenCode-style generation while keeping provider credentials managed by your existing Ever Works AI provider setup.',
 				'',
 				'## What It Does',
 				'',
-				'- Researches sources for the current directory topic.',
+				'- Researches sources for the current work topic.',
 				'- Generates structured item data for Ever Works.',
-				'- Reuses your directory context and existing items during generation.',
+				'- Reuses your work context and existing items during generation.',
 				'- Can work with screenshot providers for item imagery.',
 				'',
 				'## Provider Model',
 				'',
 				'OpenCode does not ask for its own API key in plugin settings.',
-				'It uses the active Ever Works `ai-provider` configured for the directory.',
+				'It uses the active Ever Works `ai-provider` configured for the work.',
 				'',
 				'## Usage',
 				'',
-				'1. Configure an `ai-provider` for the directory.',
+				'1. Configure an `ai-provider` for the work.',
 				'2. Enable the OpenCode plugin.',
 				'3. Select `opencode` as the pipeline provider for generation.'
 			].join('\n'),
@@ -249,7 +249,7 @@ export class OpenCodePlugin implements IPlugin, IPipelinePlugin, IFormSchemaProv
 	}
 
 	async execute(
-		directory: DirectoryReference,
+		work: WorkReference,
 		request: GenerationRequest,
 		existing: ExistingItems,
 		options?: PipelineExecutionOptions,
@@ -261,7 +261,7 @@ export class OpenCodePlugin implements IPlugin, IPipelinePlugin, IFormSchemaProv
 			return this.handleError(new Error('Execution context (execContext) is required for opencode'), startTime);
 		}
 
-		const userId = execContext.user?.id ?? directory.user?.id;
+		const userId = execContext.user?.id ?? work.user?.id;
 		if (!userId) {
 			return this.handleError(new Error('User ID is required'), startTime);
 		}
@@ -283,12 +283,12 @@ export class OpenCodePlugin implements IPlugin, IPipelinePlugin, IFormSchemaProv
 		this.state = initializeState();
 
 		const logger = this.context?.logger ?? console;
-		const facadeOptions: FacadeOptions = { userId, directoryId: directory.id };
+		const facadeOptions: FacadeOptions = { userId, workId: work.id };
 		let sessionConfig: Awaited<ReturnType<typeof prepareOpenCodeSessionConfig>> | null = null;
 		let workspacePath: string | null = null;
 
 		try {
-			const settings = await resolveSettings(this.context, userId, directory.id);
+			const settings = await resolveSettings(this.context, userId, work.id);
 			const version = (settings.version as string) || DEFAULT_CLI_VERSION;
 			const { providerConfig, modelName } = await this.resolveAiProvider(execContext, facadeOptions);
 
@@ -324,16 +324,16 @@ export class OpenCodePlugin implements IPlugin, IPipelinePlugin, IFormSchemaProv
 			const prepareContextStepStartedAt = this.startStep('prepare-context', onLogEntry);
 			reportProgress(onProgress, 1, 20, 'Prepare Context');
 
-			workspacePath = await createWorkspace(userId, directory.id);
+			workspacePath = await createWorkspace(userId, work.id);
 			sessionConfig = await prepareOpenCodeSessionConfig({
 				userId,
-				directoryId: directory.id,
+				workId: work.id,
 				providerConfig,
 				model: modelName
 			});
 			await seedExistingItems(workspacePath, existing.items);
 			await seedMetadata(workspacePath, {
-				directory: { name: directory.name, description: directory.description },
+				work: { name: work.name, description: work.description },
 				request: { prompt: request.prompt, name: request.name },
 				categories: existing.categories,
 				tags: existing.tags,
@@ -357,7 +357,7 @@ export class OpenCodePlugin implements IPlugin, IPipelinePlugin, IFormSchemaProv
 			const generateItemsStepStartedAt = this.startStep('generate-items', onLogEntry);
 			reportProgress(onProgress, 2, 30, 'Generate Items');
 
-			const promptOptions = { directory, request, existing, workspacePath };
+			const promptOptions = { work, request, existing, workspacePath };
 			const promptFacade = execContext?.promptFacade;
 
 			const sysTemplate = (
@@ -458,7 +458,7 @@ export class OpenCodePlugin implements IPlugin, IPipelinePlugin, IFormSchemaProv
 				options?.execContext,
 				items,
 				userId,
-				directory.id,
+				work.id,
 				signal,
 				onProgress,
 				logger,
@@ -566,7 +566,7 @@ export class OpenCodePlugin implements IPlugin, IPipelinePlugin, IFormSchemaProv
 		execContext: PipelineExecutionOptions['execContext'],
 		items: ItemData[],
 		userId: string,
-		directoryId: string,
+		workId: string,
 		signal: AbortSignal,
 		onProgress: PipelineProgressCallback | undefined,
 		logger: { log(...args: unknown[]): void; warn(...args: unknown[]): void },
@@ -594,7 +594,7 @@ export class OpenCodePlugin implements IPlugin, IPipelinePlugin, IFormSchemaProv
 
 		const { status, errors } = await captureScreenshots(items, {
 			screenshotFacade,
-			facadeOptions: { userId, directoryId },
+			facadeOptions: { userId, workId },
 			signal,
 			logger
 		});
@@ -606,7 +606,7 @@ export class OpenCodePlugin implements IPlugin, IPipelinePlugin, IFormSchemaProv
 		}
 
 		if (errors.length > 0) {
-			const facadeOptions = { userId, directoryId };
+			const facadeOptions = { userId, workId };
 			const providerName = await screenshotFacade.getActiveProviderName?.(facadeOptions);
 			const label = providerName ? `Screenshot capture (${providerName})` : 'Screenshot capture';
 			const unique = [...new Set(errors)];

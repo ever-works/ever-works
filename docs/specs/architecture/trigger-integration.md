@@ -11,13 +11,13 @@ contracts look like end-to-end.
 
 ## 1. Purpose
 
-Long-running operations (directory generation, Awesome README import,
+Long-running operations (work generation, Awesome README import,
 scheduled dispatch) cannot run inside an HTTP request — they take
 minutes to hours, must survive API redeploys, and need their own
 resource budget. The platform delegates these to **Trigger.dev**:
 the API enqueues a typed payload, Trigger.dev runs the task on its
 own infrastructure, and the worker calls back into the API over a
-narrow internal HTTP surface to read directory state, write
+narrow internal HTTP surface to read work state, write
 generation history, and update plugin settings.
 
 This spec covers the **integration story** — the dispatch path, the
@@ -34,21 +34,21 @@ package layout and bootstrap pattern**, see the companion
 │  apps/api  (NestJS HTTP server)                                  │
 │                                                                  │
 │  ┌────────────────────────────────────────────────────────────┐  │
-│  │ DirectoryGenerationService.startGeneration()               │  │
-│  │   ├── Create DirectoryGenerationHistory row                │  │
-│  │   ├── Build DirectoryGenerationPayload                     │  │
-│  │   └── Call DIRECTORY_GENERATION_DISPATCHER.dispatch(...)   │  │
+│  │ WorkGenerationService.startGeneration()               │  │
+│  │   ├── Create WorkGenerationHistory row                │  │
+│  │   ├── Build WorkGenerationPayload                     │  │
+│  │   └── Call WORK_GENERATION_DISPATCHER.dispatch(...)   │  │
 │  └────────────────────────────────────────────────────────────┘  │
 │                          │                                       │
 │                          ▼                                       │
 │  ┌────────────────────────────────────────────────────────────┐  │
 │  │ TriggerService (packages/tasks/src/trigger/)               │  │
-│  │   directoryGenerationTask.trigger(payload, { tags, ... })  │  │
+│  │   workGenerationTask.trigger(payload, { tags, ... })  │  │
 │  └────────────────────────────────────────────────────────────┘  │
 │                                                                  │
 │  ┌────────────────────────────────────────────────────────────┐  │
 │  │ TriggerInternalController (POST /internal/trigger/*)       │  │
-│  │   - GET /directories/:id/context                           │  │
+│  │   - GET /works/:id/context                           │  │
 │  │   - POST /remote/call  (SuperJSON envelope)                │  │
 │  │   Auth: x-trigger-secret header                            │  │
 │  └────────────────────────────────────────────────────────────┘  │
@@ -66,7 +66,7 @@ package layout and bootstrap pattern**, see the companion
 ┌──────────────────────────────────────────────────────────────────┐
 │  packages/tasks  (Trigger.dev worker process)                    │
 │                                                                  │
-│  directoryGenerationTask.run(payload)                            │
+│  workGenerationTask.run(payload)                            │
 │    └── withWorkerContext(...)                                    │
 │        ├── NestFactory.createApplicationContext(                 │
 │        │       TriggerWorkerModule)                              │
@@ -110,11 +110,11 @@ generic-RPC endpoint) is described in §6.
 `packages/tasks/src/tasks/trigger/index.ts` ships exactly three tasks
 on `develop`:
 
-| Task                            | Type     | maxDuration | Purpose                                                        |
-| ------------------------------- | -------- | ----------- | -------------------------------------------------------------- |
-| `directory-generation`          | One-shot | 5 hours     | Full Standard / Agent / CLI pipeline run for a directory       |
-| `directory-import`              | One-shot | 2 hours     | Awesome README / existing repo import + post-processing        |
-| `directory-schedule-dispatcher` | Cron     | (short)     | Polls due schedules every N minutes and dispatches generations |
+| Task                       | Type     | maxDuration | Purpose                                                        |
+| -------------------------- | -------- | ----------- | -------------------------------------------------------------- |
+| `work-generation`          | One-shot | 5 hours     | Full Standard / Agent / CLI pipeline run for a work            |
+| `work-import`              | One-shot | 2 hours     | Awesome README / existing repo import + post-processing        |
+| `work-schedule-dispatcher` | Cron     | (short)     | Polls due schedules every N minutes and dispatches generations |
 
 Future cron tasks (cache cleanup, OAuth-token revalidation,
 notification cleanup, source-validation cadence) follow the same
@@ -127,13 +127,13 @@ it up, the worker package implements it. This keeps the API free of
 any direct Trigger.dev SDK dependency:
 
 ```ts
-// packages/agent/src/tasks/directory-generation-dispatcher.ts
-export interface DirectoryGenerationDispatcher {
-	dispatchDirectoryGeneration(payload: DirectoryGenerationPayload): Promise<string | null>;
-	cancelDirectoryGeneration(runId: string): Promise<boolean>;
+// packages/agent/src/tasks/work-generation-dispatcher.ts
+export interface WorkGenerationDispatcher {
+	dispatchWorkGeneration(payload: WorkGenerationPayload): Promise<string | null>;
+	cancelWorkGeneration(runId: string): Promise<boolean>;
 }
 
-export const DIRECTORY_GENERATION_DISPATCHER = Symbol('DIRECTORY_GENERATION_DISPATCHER');
+export const WORK_GENERATION_DISPATCHER = Symbol('WORK_GENERATION_DISPATCHER');
 ```
 
 `packages/tasks/src/trigger/trigger.module.ts` provides the binding:
@@ -143,10 +143,10 @@ export const DIRECTORY_GENERATION_DISPATCHER = Symbol('DIRECTORY_GENERATION_DISP
 @Module({
 	providers: [
 		TriggerService,
-		{ provide: DIRECTORY_GENERATION_DISPATCHER, useExisting: TriggerService },
-		{ provide: DIRECTORY_IMPORT_DISPATCHER, useExisting: TriggerService }
+		{ provide: WORK_GENERATION_DISPATCHER, useExisting: TriggerService },
+		{ provide: WORK_IMPORT_DISPATCHER, useExisting: TriggerService }
 	],
-	exports: [TriggerService, DIRECTORY_GENERATION_DISPATCHER, DIRECTORY_IMPORT_DISPATCHER]
+	exports: [TriggerService, WORK_GENERATION_DISPATCHER, WORK_IMPORT_DISPATCHER]
 })
 export class TriggerModule {}
 ```
@@ -155,10 +155,10 @@ export class TriggerModule {}
 SDK and forwards to the task handle:
 
 ```ts
-async dispatchDirectoryGeneration(payload: DirectoryGenerationPayload) {
+async dispatchWorkGeneration(payload: WorkGenerationPayload) {
     if (!this.ensureConfigured()) return null;          // dev-mode escape hatch
-    const handle = await directoryGenerationTask.trigger(payload, {
-        tags: ['directory-generation', payload.mode, payload.directoryId],
+    const handle = await workGenerationTask.trigger(payload, {
+        tags: ['work-generation', payload.mode, payload.workId],
         machine: this.machine() as any,
     });
     return handle.id;
@@ -176,12 +176,12 @@ makes Trigger.dev opt-in per environment without code-level branching.
 Every payload is plain JSON. Trigger.dev serializes it for the queue,
 so no `Date`, no `Buffer`, no class instances.
 
-### 5.1 `DirectoryGenerationPayload`
+### 5.1 `WorkGenerationPayload`
 
 ```ts
-// packages/agent/src/tasks/directory-generation.types.ts
-export type DirectoryGenerationPayload = {
-	directoryId: string; // UUID
+// packages/agent/src/tasks/work-generation.types.ts
+export type WorkGenerationPayload = {
+	workId: string; // UUID
 	userId: string; // UUID of user who triggered
 	mode: 'create' | 'update'; // CREATE = first run; UPDATE = subsequent
 	dto: CreateItemsGeneratorDto; // Step inputs (categories, tags, prompts, etc.)
@@ -192,19 +192,19 @@ export type DirectoryGenerationPayload = {
 };
 ```
 
-Tags written to the run: `['directory-generation', mode, directoryId]`.
+Tags written to the run: `['work-generation', mode, workId]`.
 
-### 5.2 `DirectoryImportPayload`
+### 5.2 `WorkImportPayload`
 
 ```ts
-// packages/agent/src/tasks/directory-import.types.ts
-export type DirectoryImportPayload = {
-	directoryId: string;
+// packages/agent/src/tasks/work-import.types.ts
+export type WorkImportPayload = {
+	workId: string;
 	userId: string;
 	sourceUrl: string;
 	sourceOwner: string;
 	sourceRepo: string;
-	sourceType: ImportSourceType; // 'awesome' | 'directory' | 'data-only' | ...
+	sourceType: ImportSourceType; // 'awesome' | 'work' | 'data-only' | ...
 	historyId: string;
 	historyStartedAt?: string;
 	triggerSource?: 'user' | 'schedule' | 'api';
@@ -218,11 +218,11 @@ export type DirectoryImportPayload = {
 };
 ```
 
-Tags: `['directory-import', sourceType, directoryId]`.
+Tags: `['work-import', sourceType, workId]`.
 
 ### 5.3 Why a pre-created `historyId`?
 
-The API creates the `DirectoryGenerationHistory` row **before**
+The API creates the `WorkGenerationHistory` row **before**
 dispatch and passes its UUID into the payload. Both ends rely on
 this:
 
@@ -265,15 +265,15 @@ Worker DI bindings look like:
 
 ```ts
 {
-    provide: DirectoryOperationsService,
+    provide: WorkOperationsService,
     useFactory: (apiClient: TriggerInternalApiClient) =>
-        createRemoteProxy(apiClient, 'DirectoryOperationsService'),
+        createRemoteProxy(apiClient, 'WorkOperationsService'),
     inject: [TriggerInternalApiClient],
 },
 ```
 
 The orchestrator code is identical to in-API code — `await
-this.directoryOperations.recordGenerationStartTime(...)` — but every
+this.workOperations.recordGenerationStartTime(...)` — but every
 call is a SuperJSON-enveloped HTTP POST under the hood. The
 `PluginRepository` binding extends this with a `LocalPluginStore` for
 write-only methods (`create`, `upsert`, `update`, `delete`,
@@ -301,23 +301,23 @@ export class TriggerInternalController implements OnModuleInit {
 			AuthAccountRepository: this.authAccountRepository,
 			PluginRepository: this.pluginRepository,
 			UserPluginRepository: this.userPluginRepository,
-			DirectoryPluginRepository: this.directoryPluginRepository,
-			DirectoryOperationsService: this.directoryOperationsService,
+			WorkPluginRepository: this.workPluginRepository,
+			WorkOperationsService: this.workOperationsService,
 			NotificationService: this.notificationService,
-			DirectoryRepository: this.directoryRepository,
+			WorkRepository: this.workRepository,
 			CacheManager: this.cacheManager,
-			DirectoryScheduleDispatcherService: this.scheduleDispatcher,
-			DirectoryScheduleService: this.directoryScheduleService
+			WorkScheduleDispatcherService: this.scheduleDispatcher,
+			WorkScheduleService: this.workScheduleService
 		};
 	}
 
-	@Get('directories/:id/context')
+	@Get('works/:id/context')
 	@Public()
-	async getDirectoryContext(@Headers('x-trigger-secret') secret, @Param('id') id, @Query('userId') userId) {
+	async getWorkContext(@Headers('x-trigger-secret') secret, @Param('id') id, @Query('userId') userId) {
 		this.ensureSecret(secret);
-		const { directory } = await this.ownershipService.ensureAccess(id, userId);
-		const gitToken = await this.gitFacade.getAccessToken({ userId, providerId: directory.gitProvider });
-		return { directory: stripRelations(directory), user: stripSensitiveUserData(directory.user), gitToken };
+		const { work } = await this.ownershipService.ensureAccess(id, userId);
+		const gitToken = await this.gitFacade.getAccessToken({ userId, providerId: work.gitProvider });
+		return { work: stripRelations(work), user: stripSensitiveUserData(work.user), gitToken };
 	}
 
 	@Post('remote/call')
@@ -391,15 +391,15 @@ shape.
 ```
    API: startGeneration
         │
-        │  create DirectoryGenerationHistory(historyId, NOT_STARTED)
-        │  build DirectoryGenerationPayload
+        │  create WorkGenerationHistory(historyId, NOT_STARTED)
+        │  build WorkGenerationPayload
         │
         │  TRIGGER_SECRET_KEY?  ──no──▶ in-process fallback (dev only)
         │           │
         │          yes
         │           ▼
-        │   triggerService.dispatchDirectoryGeneration(payload)
-        │     └── directoryGenerationTask.trigger(payload, { tags, machine })
+        │   triggerService.dispatchWorkGeneration(payload)
+        │     └── workGenerationTask.trigger(payload, { tags, machine })
         │          ▲
         │          │ returns runId
         │          │
@@ -412,7 +412,7 @@ shape.
                                                     Worker picks up run
                                                              │
                                                              ▼
-                                              withWorkerContext('DirectoryGeneration', ...)
+                                              withWorkerContext('WorkGeneration', ...)
                                                              │
                                             ┌───── orchestrator.run({ ... }) ─────┐
                                             │                                      │
@@ -429,16 +429,16 @@ shape.
 
 Three classes of terminal write keep this consistent:
 
-| Where written         | What it sets                                                                           |
-| --------------------- | -------------------------------------------------------------------------------------- |
-| Orchestrator main run | Success path: `GENERATED` on directory + history; warnings + recent logs; stats deltas |
-| Orchestrator catch    | Cancel path: `CANCELLED`; Error path: `ERROR` + `errorMessage` + recent logs           |
-| Task `onFailure` hook | Last-resort `ERROR` write if the orchestrator itself crashed before its `catch` ran    |
-| Task `onCancel` hook  | Last-resort `CANCELLED` write if Trigger.dev cancels mid-orchestration                 |
+| Where written         | What it sets                                                                        |
+| --------------------- | ----------------------------------------------------------------------------------- |
+| Orchestrator main run | Success path: `GENERATED` on work + history; warnings + recent logs; stats deltas   |
+| Orchestrator catch    | Cancel path: `CANCELLED`; Error path: `ERROR` + `errorMessage` + recent logs        |
+| Task `onFailure` hook | Last-resort `ERROR` write if the orchestrator itself crashed before its `catch` ran |
+| Task `onCancel` hook  | Last-resort `CANCELLED` write if Trigger.dev cancels mid-orchestration              |
 
 The `BaseOrchestrator` exposes `handleFailure` and `handleCancellation`
 so both paths converge on the same `recordTerminalState` Promise.all
-(directory status + history status + finishedAt + duration). The
+(work status + history status + finishedAt + duration). The
 task hooks call into those when payload context is available even
 after a fatal exception.
 
@@ -446,16 +446,16 @@ after a fatal exception.
 
 Cancellation is a four-step dance:
 
-1. User calls `DELETE /api/directories/:id/generation`.
+1. User calls `DELETE /api/works/:id/generation`.
 2. The API looks up the latest history row, reads `triggerTaskId`,
-   and calls `triggerService.cancelDirectoryGeneration(runId)`, which
+   and calls `triggerService.cancelWorkGeneration(runId)`, which
    forwards to `runs.cancel(runId)` from `@trigger.dev/sdk`.
 3. Trigger.dev sends an `AbortSignal` into the running task and
    triggers the task's `onCancel` hook.
 4. The orchestrator's `run` method sees `signal.aborted === true`
    at the next `throwIfGenerationCancelled(signal)` checkpoint and
    throws `GENERATION_CANCELLED`. Its `catch` writes `CANCELLED` to
-   the directory + history row.
+   the work + history row.
 
 The signal is threaded through pipeline steps, so cancellation
 propagates into in-flight AI / search / git calls — most of which
@@ -507,22 +507,22 @@ restarting the full pipeline.
 
 ## 10. Cron: Scheduled Dispatcher
 
-`directoryScheduleDispatcherTask` is the only cron task today. It
+`workScheduleDispatcherTask` is the only cron task today. It
 fires on a configurable cadence:
 
 ```ts
-// packages/tasks/src/tasks/trigger/directory-schedule-dispatcher.task.ts
+// packages/tasks/src/tasks/trigger/work-schedule-dispatcher.task.ts
 const interval = Math.max(1, config.subscriptions.getDispatchIntervalMinutes());
 const cronExpression = `*/${interval} * * * *`;
 
-export const directoryScheduleDispatcherTask = schedules.task({
-	id: 'directory-schedule-dispatcher',
+export const workScheduleDispatcherTask = schedules.task({
+	id: 'work-schedule-dispatcher',
 	cron: cronExpression,
 	run: async () => {
 		const appContext = await NestFactory.createApplicationContext(TriggerInternalModule);
 		appContext.useLogger(createTriggerLogger('ScheduleDispatcher'));
 		try {
-			const dispatcher = appContext.get(DirectoryScheduleDispatcherService);
+			const dispatcher = appContext.get(WorkScheduleDispatcherService);
 			const summary = await dispatcher.dispatchDue();
 			return { intervalMinutes: interval, ...summary };
 		} finally {
@@ -537,7 +537,7 @@ than `TriggerWorkerModule` — see [`trigger-worker`](./trigger-worker.md))
 because it only needs the schedule service and its plain-DB
 dependencies.
 
-A CAS-style `UPDATE` claim inside `DirectoryScheduleDispatcherService.dispatchDue`
+A CAS-style `UPDATE` claim inside `WorkScheduleDispatcherService.dispatchDue`
 keeps multiple worker firings race-free; see
 [`features/scheduled-updates`](../features/scheduled-updates/spec.md)
 for the claim contract. That makes Trigger.dev's "single firing per
@@ -545,7 +545,7 @@ cron tick" guarantee a useful default but not a load-bearing one.
 
 ## 11. Plugin Hydration
 
-The worker is **stateless** between runs but the directory generation
+The worker is **stateless** between runs but the work generation
 pipeline is plugin-driven (15-step Standard pipeline, plus
 agent-based / CLI-based / external-platform pipelines). On every
 run, the worker:
@@ -555,7 +555,7 @@ run, the worker:
    to `PluginBootstrapService.bootstrap({ force: true })` — discovers
    manifests under `./plugins/`, registers them in the
    `PluginRegistryService`, applies last-known settings.
-3. Resolves the directory + user via the internal API and calls the
+3. Resolves the work + user via the internal API and calls the
    chosen orchestrator.
 
 Plugin _settings_ (the secret hygiene-sensitive part) come down via
@@ -624,11 +624,11 @@ gracefully than fail dispatch.
 | Concern        | Where to look                                                                                         |
 | -------------- | ----------------------------------------------------------------------------------------------------- |
 | Run logs       | Trigger.dev dashboard (logger bridge surfaces every NestJS log line as run-scoped)                    |
-| Run status     | `DirectoryGenerationHistory` (status, error, recentLogs, durationInSeconds)                           |
-| User-facing UI | `apps/web` directory page streams `recentLogs` + status from the history row                          |
+| Run status     | `WorkGenerationHistory` (status, error, recentLogs, durationInSeconds)                                |
+| User-facing UI | `apps/web` work page streams `recentLogs` + status from the history row                               |
 | Sentry events  | Worker process emits via the same MonitoringModule the API uses (see [`monitoring`](./monitoring.md)) |
-| PostHog events | `event.generation.completed` / `.failed` / `.cancelled` from `directoryOperations`                    |
-| Manual cancel  | `DELETE /api/directories/:id/generation` → `runs.cancel(runId)`                                       |
+| PostHog events | `event.generation.completed` / `.failed` / `.cancelled` from `workOperations`                         |
+| Manual cancel  | `DELETE /api/works/:id/generation` → `runs.cancel(runId)`                                             |
 | Run dashboard  | `https://cloud.trigger.dev/orgs/.../projects/proj_uevrbfmpvojzzazvhffy/runs`                          |
 
 ## 14. File Index
@@ -640,10 +640,10 @@ apps/api/src/trigger/
 └── dto/remote-call.dto.ts            # SuperJSON envelope DTO
 
 packages/agent/src/tasks/
-├── directory-generation.types.ts             # Payload + DirectoryContextResponse
-├── directory-import.types.ts                 # Import payload + result + error codes
-├── directory-generation-dispatcher.ts        # DI symbol + interface
-└── directory-import-dispatcher.ts            # DI symbol + interface
+├── work-generation.types.ts             # Payload + WorkContextResponse
+├── work-import.types.ts                 # Import payload + result + error codes
+├── work-generation-dispatcher.ts        # DI symbol + interface
+└── work-import-dispatcher.ts            # DI symbol + interface
 
 packages/tasks/
 ├── trigger.config.ts                                       # Trigger.dev project config
@@ -653,9 +653,9 @@ packages/tasks/
     │   ├── trigger.module.ts                               # @Global TriggerModule
     │   └── trigger.service.ts                              # Dispatcher implementation
     └── tasks/trigger/
-        ├── directory-generation.task.ts                    # One-shot task definition
-        ├── directory-import.task.ts                        # One-shot task definition
-        ├── directory-schedule-dispatcher.task.ts           # Cron task definition
+        ├── work-generation.task.ts                    # One-shot task definition
+        ├── work-import.task.ts                        # One-shot task definition
+        ├── work-schedule-dispatcher.task.ts           # Cron task definition
         └── index.ts                                        # Task registry
 ```
 

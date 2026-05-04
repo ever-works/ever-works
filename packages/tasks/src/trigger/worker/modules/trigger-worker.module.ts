@@ -1,6 +1,6 @@
 import { Module } from '@nestjs/common';
-import { DirectoryOperationsService } from '@ever-works/agent/directory-operations';
-import { DirectoryRepository } from '@ever-works/agent/database';
+import { WorkOperationsService } from '@ever-works/agent/work-operations';
+import { WorkRepository } from '@ever-works/agent/database';
 import { NotificationService } from '@ever-works/agent/notifications';
 import { DataGeneratorService } from '@ever-works/agent/generators';
 import { MarkdownGeneratorService } from '@ever-works/agent/generators';
@@ -27,9 +27,9 @@ import { TriggerImportOrchestrator } from '../orchestrators/trigger-import.orche
     ],
     providers: [
         {
-            provide: DirectoryOperationsService,
+            provide: WorkOperationsService,
             useFactory: (apiClient: TriggerInternalApiClient) =>
-                createRemoteProxy(apiClient, 'DirectoryOperationsService'),
+                createRemoteProxy(apiClient, 'WorkOperationsService'),
             inject: [TriggerInternalApiClient],
         },
         {
@@ -39,9 +39,9 @@ import { TriggerImportOrchestrator } from '../orchestrators/trigger-import.orche
             inject: [TriggerInternalApiClient],
         },
         {
-            provide: DirectoryRepository,
+            provide: WorkRepository,
             useFactory: (apiClient: TriggerInternalApiClient) =>
-                createRemoteProxy(apiClient, 'DirectoryRepository'),
+                createRemoteProxy(apiClient, 'WorkRepository'),
             inject: [TriggerInternalApiClient],
         },
         DataGeneratorService,

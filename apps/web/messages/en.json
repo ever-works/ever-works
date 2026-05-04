@@ -150,7 +150,7 @@
         },
         "register": {
             "title": "Create your account",
-            "subtitle": "Start building amazing directories today",
+            "subtitle": "Start building amazing works today",
             "form": {
                 "name": {
                     "label": "Full name",
@@ -197,18 +197,18 @@
     "onboarding": {
         "label": "Getting started",
         "title": "Welcome to Ever Works",
-        "subtitle": "Build and publish your first directory in minutes.",
+        "subtitle": "Build and publish your first Work in minutes.",
         "skipButton": "Skip for now",
         "nextButton": "Next",
         "stepIndex": "Step {index}",
         "steps": {
             "welcome": {
                 "title": "What is Ever Works?",
-                "description": "Ever Works is an open-source directory builder. Create structured content directories — tools, jobs, links, products — and publish them as live websites.",
-                "detail": "Let's get you set up. Connect your providers below, then create your first directory.",
+                "description": "Ever Works is an open agentic runtime. Build content-rich web apps and Git repositories — tools, jobs, links, products — and publish them as live websites.",
+                "detail": "Let's get you set up. Connect your providers below, then create your first Work.",
                 "feature1": {
                     "title": "AI-powered content",
-                    "description": "Generate and enrich directory items automatically using your AI provider."
+                    "description": "Generate and enrich items automatically using your AI provider."
                 },
                 "feature2": {
                     "title": "Instant publishing",
@@ -216,18 +216,18 @@
                 },
                 "feature3": {
                     "title": "Git-backed",
-                    "description": "Every directory is a GitHub repository you own and control."
+                    "description": "Every Work is a GitHub repository you own and control."
                 }
             },
-            "directory": {
-                "title": "Create your first directory",
-                "description": "A directory is your content hub. Add items, configure the layout, and publish it in one click.",
-                "detail": "You're all set! Create your first directory to start building and publishing content.",
-                "action": "Create a directory"
+            "work": {
+                "title": "Create your first Work",
+                "description": "A Work is your content hub. Add items, configure the layout, and publish it in one click.",
+                "detail": "You're all set! Create your first Work to start building and publishing content.",
+                "action": "Create a Work"
             },
             "publish": {
                 "title": "Go live",
-                "description": "Connect Vercel or GitHub to deploy your directory as a public website — no hosting configuration needed.",
+                "description": "Connect Vercel or GitHub to deploy your Work as a public website — no hosting configuration needed.",
                 "action": "Set up publishing"
             }
         },
@@ -336,7 +336,7 @@
             "steps": {
                 "model": {
                     "title": "Pick a model",
-                    "description": "Choose the Codex model you want to run for end-to-end directory generation."
+                    "description": "Choose the Codex model you want to run for end-to-end Work generation."
                 },
                 "credentials": {
                     "title": "Add credentials",
@@ -408,7 +408,7 @@
         "simWizard": {
             "label": "SIM AI setup",
             "title": "Set up SIM AI in two steps",
-            "subtitle": "Add your SIM AI API key and verify the connection to start delegating directory generation to SIM workflows.",
+            "subtitle": "Add your SIM AI API key and verify the connection to start delegating Work generation to SIM workflows.",
             "stepIndex": "Step {index}",
             "continueButton": "Continue",
             "steps": {
@@ -431,7 +431,7 @@
         "title": "Dashboard",
         "connectGithub": {
             "title": "Connect your GitHub account",
-            "description": "GitHub is required for creating and managing directory repositories. Connect your account to get started.",
+            "description": "GitHub is required for creating and managing Work repositories. Connect your account to get started.",
             "connect": "Connect GitHub",
             "dismiss": "I'll do this later"
         },
@@ -465,7 +465,7 @@
         },
         "header": {
             "welcome": "Welcome back, {username}!",
-            "subtitle": "Manage your AI-powered directories and track their performance",
+            "subtitle": "Manage your AI-powered works and track their performance",
             "onboarding": {
                 "badge": "Onboarding {currentStep}/{totalSteps}",
                 "dismiss": "Hide onboarding shortcut"
@@ -490,14 +490,14 @@
                 },
                 "quickTips": {
                     "title": "Quick Tips",
-                    "tip1": "Create your first directory by clicking the 'Create Directory' button on the dashboard.",
-                    "tip2": "Use the AI generator to automatically populate your directory with relevant items.",
-                    "tip3": "Connect your GitHub account to sync and deploy your directories as repositories."
+                    "tip1": "Create your first Work by clicking the '+ New Work' button on the dashboard.",
+                    "tip2": "Use the AI generator to automatically populate your Work with relevant items.",
+                    "tip3": "Connect your GitHub account to sync and deploy your works as repositories."
                 },
                 "shortcuts": {
                     "title": "Keyboard Shortcuts",
-                    "search": "Search directories",
-                    "newDirectory": "Create new directory",
+                    "search": "Search works",
+                    "newWork": "Create new Work",
                     "help": "Open help",
                     "hint": "Use Cmd on Mac or Ctrl on Windows/Linux"
                 },
@@ -513,7 +513,7 @@
         },
         "activity": {
             "title": "Activity Log",
-            "subtitle": "Track all operations across your directories",
+            "subtitle": "Track all operations across your works",
             "loading": "Loading...",
             "fetchFailed": "Failed to load activities",
             "exportFailed": "Failed to export activity log",
@@ -521,7 +521,7 @@
             "columns": {
                 "status": "Status",
                 "dateTime": "Date / Time",
-                "directory": "Directory",
+                "work": "Work",
                 "type": "Type",
                 "summary": "Summary"
             },
@@ -532,9 +532,9 @@
                     "generation": "Generation",
                     "comparison": "Comparison",
                     "deployment": "Deployment",
-                    "directoryCreated": "Directory Created",
-                    "directoryUpdated": "Directory Updated",
-                    "directoryDeleted": "Directory Deleted",
+                    "workCreated": "Work Created",
+                    "workUpdated": "Work Updated",
+                    "workDeleted": "Work Deleted",
                     "pluginEnabled": "Plugin Enabled",
                     "pluginDisabled": "Plugin Disabled",
                     "pluginConfigured": "Plugin Configured",
@@ -596,32 +596,32 @@
                 "pageOf": "Page {page} of {total}"
             }
         },
-        "directories": {
-            "title": "Directories",
-            "subtitle": "Manage and organize your AI-powered directories",
+        "works": {
+            "title": "Works",
+            "subtitle": "Manage and organize your AI-powered works",
             "summary": {
-                "totalDirectories": "Total Directories",
+                "totalWorks": "Total Works",
                 "generating": "Generating",
                 "totalItems": "Total Items"
             },
-            "recent": "Recent Directories",
+            "recent": "Recent Works",
             "viewAll": "View all ({count})",
-            "search": "Search directories...",
-            "create": "Create Directory",
-            "showing": "Showing {current} of {total} directories",
-            "searchFailed": "Failed to search directories. Please try again.",
+            "search": "Search works...",
+            "create": "New Work",
+            "showing": "Showing {current} of {total} works",
+            "searchFailed": "Failed to search works. Please try again.",
             "pagination": {
                 "previous": "Previous",
                 "next": "Next"
             },
             "empty": {
-                "title": "No directories yet",
-                "description": "Create your first AI-powered directory to start organizing and showcasing your content.",
-                "action": "Create Your First Directory",
+                "title": "No works yet",
+                "description": "Create your first AI-powered Work to start organizing and showcasing your content.",
+                "action": "Create Your First Work",
                 "notFound": {
-                    "title": "No directories found",
+                    "title": "No works found",
                     "withSearch": "Try adjusting your search terms",
-                    "withoutSearch": "Create your first AI-powered directory to get started"
+                    "withoutSearch": "Create your first AI-powered Work to get started"
                 }
             }
         },
@@ -663,7 +663,7 @@
             },
             "data": {
                 "exportTitle": "Export Data",
-                "exportDescription": "Download your account data including directories, plugin settings, and profile information as a JSON file.",
+                "exportDescription": "Download your account data including works, plugin settings, and profile information as a JSON file.",
                 "includeSecrets": "Include secret settings (API keys, tokens) — exported as masked values",
                 "secretsWarning": "Secret settings will be exported as masked values. You will need to manually replace them with real credentials before importing.",
                 "exportButton": "Export Data",
@@ -671,7 +671,7 @@
                 "exportSuccess": "Data exported successfully",
                 "exportError": "Failed to export data",
                 "importTitle": "Import Data",
-                "importDescription": "Import data from a previously exported JSON file. You can resolve conflicts for directories with matching slugs.",
+                "importDescription": "Import data from a previously exported JSON file. You can resolve conflicts for works with matching slugs.",
                 "importButton": "Import Data",
                 "syncTitle": "GitHub Sync",
                 "syncDescription": "Sync your account configuration to a private GitHub repository for backup and migration between instances.",
@@ -683,13 +683,13 @@
                     "invalidJson": "Invalid JSON file",
                     "previewError": "Failed to analyze import file",
                     "summary": "Import Summary",
-                    "directories": "Directories",
+                    "works": "Works",
                     "items": "Items",
                     "userPlugins": "User Plugins",
                     "version": "Format Version",
                     "missingPlugins": "These plugins are not installed and will be skipped",
                     "conflicts": "Slug Conflicts",
-                    "existingDirectory": "Existing",
+                    "existingWork": "Existing",
                     "incoming": "Incoming",
                     "strategySkip": "Skip (keep existing)",
                     "strategyOverwrite": "Overwrite existing",
@@ -706,9 +706,9 @@
                     "validationErrors": "Validation Errors",
                     "resultSuccess": "Import Completed Successfully",
                     "resultFailed": "Import Failed",
-                    "directoriesCreated": "Directories created",
-                    "directoriesUpdated": "Directories updated",
-                    "directoriesSkipped": "Directories skipped",
+                    "worksCreated": "Works created",
+                    "worksUpdated": "Works updated",
+                    "worksSkipped": "Works skipped",
                     "pluginsImported": "Plugins imported",
                     "warnings": "Warnings",
                     "errors": "Errors"
@@ -757,11 +757,11 @@
                 "backToCategory": "Back to {category}",
                 "pipelineDefault": {
                     "title": "Default Pipeline",
-                    "description": "Choose which pipeline is used by default when generating directory items.",
+                    "description": "Choose which pipeline is used by default when generating items.",
                     "autoLabel": "Auto",
-                    "autoDescription": "Use the system-resolved pipeline for each directory",
+                    "autoDescription": "Use the system-resolved pipeline for each Work",
                     "enforceLabel": "Enforce this default",
-                    "enforceDescription": "Always pre-select this pipeline, even when a directory has its own pipeline configured. You can still switch pipelines manually in the form.",
+                    "enforceDescription": "Always pre-select this pipeline, even when a Work has its own pipeline configured. You can still switch pipelines manually in the form.",
                     "saveFailed": "Failed to save pipeline default"
                 }
             },
@@ -844,8 +844,8 @@
                 "subtitle": "Connect your external accounts for enhanced functionality",
                 "github": {
                     "name": "GitHub",
-                    "connected": "Create and manage directories with GitHub repositories",
-                    "disconnected": "Connect to create directories from repositories",
+                    "connected": "Create and manage works with GitHub repositories",
+                    "disconnected": "Connect to create works from repositories",
                     "scopes": "Scopes",
                     "organizations": "Connected Organizations",
                     "organizationsHint": "Use Reconnect to grant access to additional organizations",
@@ -906,12 +906,12 @@
             }
         },
         "stats": {
-            "totalDirectories": "Total Directories",
+            "totalWorks": "Total Works",
             "totalItems": "Total Items",
             "activeWebsites": "Active Websites",
             "fromLastMonth": "from last month"
         },
-        "directoryCard": {
+        "workCard": {
             "status": {
                 "active": "Active",
                 "notStarted": "Not Started",
@@ -936,14 +936,14 @@
             "views": "{count} views",
             "updated": "Updated {date}",
             "viewAction": "View →",
-            "openingTitle": "Opening directory",
-            "openingMessage": "Preparing your directory. Details will open shortly. Stay on this page."
+            "openingTitle": "Opening work",
+            "openingMessage": "Preparing your work. Details will open shortly. Stay on this page."
         },
-        "directoryList": {
-            "title": "Your Directories",
-            "createButton": "Create Directory"
+        "workList": {
+            "title": "Your Works",
+            "createButton": "New Work"
         },
-        "directoryDetail": {
+        "workDetail": {
             "failedToGenerateItems": "Failed to generate items. Please try again.",
             "generationCompleted": "Generation completed successfully",
             "generationCancelled": "Generation was cancelled",
@@ -978,7 +978,7 @@
             },
             "members": {
                 "title": "Team Members",
-                "subtitle": "Manage who has access to this directory and their permissions.",
+                "subtitle": "Manage who has access to this Work and their permissions.",
                 "inviteMember": "Invite Member",
                 "noMembers": "No team members yet. Invite someone to collaborate.",
                 "roles": {
@@ -990,13 +990,13 @@
                 },
                 "roleDescriptions": {
                     "owner": "Full control including deletion and member management.",
-                    "manager": "Can edit directory and manage members, but cannot delete.",
-                    "editor": "Can edit directory content and run generations.",
-                    "viewer": "Read-only access to view the directory."
+                    "manager": "Can edit Work and manage members, but cannot delete.",
+                    "editor": "Can edit Work content and run generations.",
+                    "viewer": "Read-only access to view the Work."
                 },
                 "invite": {
                     "title": "Invite Team Member",
-                    "description": "Add a new member to collaborate on this directory.",
+                    "description": "Add a new member to collaborate on this Work.",
                     "emailLabel": "Email address",
                     "emailPlaceholder": "colleague@example.com",
                     "roleLabel": "Role",
@@ -1010,7 +1010,7 @@
                 },
                 "confirmRemove": {
                     "title": "Remove Member",
-                    "description": "Are you sure you want to remove {username} from this directory? They will lose all access.",
+                    "description": "Are you sure you want to remove {username} from this Work? They will lose all access.",
                     "confirm": "Remove",
                     "cancel": "Cancel"
                 },
@@ -1025,7 +1025,7 @@
                 "page": {
                     "title": "Scheduled updates",
                     "subtitle": "Automate refreshes for {name} with a dedicated cadence and failure handling.",
-                    "fallbackName": "this directory",
+                    "fallbackName": "this Work",
                     "loadFailed": "Failed to load schedule settings.",
                     "providerCategories": {
                         "pipeline": "Pipeline",
@@ -1126,7 +1126,7 @@
                     },
                     "empty": {
                         "title": "Run a manual generation first",
-                        "description": "Complete one successful manual run to unlock automated scheduling. Once your directory has data we can keep it fresh for you.",
+                        "description": "Complete one successful manual run to unlock automated scheduling. Once your Work has data we can keep it fresh for you.",
                         "refresh": "Refresh status"
                     },
                     "requiresGeneration": "Run at least one item generation before enabling schedules."
@@ -1144,7 +1144,7 @@
             "statusCard": {
                 "notStarted": {
                     "title": "Generation Not Started",
-                    "description": "Start generating items for your directory to populate it with content.",
+                    "description": "Start generating items for your Work to populate it with content.",
                     "action": "Start Generation"
                 },
                 "generating": {
@@ -1158,7 +1158,7 @@
                 },
                 "generated": {
                     "title": "Generation Complete",
-                    "description": "Your directory has been successfully populated with items.",
+                    "description": "Your Work has been successfully populated with items.",
                     "withWarnings": "Completed with warnings:",
                     "viewItems": "View Items",
                     "regenerate": "Regenerate"
@@ -1184,7 +1184,7 @@
             },
             "comparisons": {
                 "title": "Comparisons",
-                "subtitle": "A vs B comparison pages between directory items",
+                "subtitle": "A vs B comparison pages between items in this Work",
                 "vs": "vs",
                 "winner": "Winner: {name}",
                 "tie": "Tie",
@@ -1332,7 +1332,7 @@
                 }
             },
             "info": {
-                "title": "Directory Information",
+                "title": "Work Information",
                 "yourRole": "Your Role",
                 "role": {
                     "owner": "Owner",
@@ -1382,15 +1382,15 @@
             "activity": {
                 "title": "Recent Activity",
                 "noActivity": "No activity yet",
-                "created": "Directory Created",
-                "directoryCreated": "Directory was successfully created",
+                "created": "Work Created",
+                "workCreated": "Work was successfully created",
                 "justNow": "Just now"
             },
             "items": {
-                "title": "Directory Items",
-                "subtitle": "Manage and organize the items in your directory",
+                "title": "Work Items",
+                "subtitle": "Manage and organize the items in your Work",
                 "noItemsTitle": "No Items Yet",
-                "noItemsDescription": "Your directory doesn't have any items yet. Generate items to populate your directory with content.",
+                "noItemsDescription": "Your Work doesn't have any items yet. Generate items to populate it with content.",
                 "generateItems": "Generate Items",
                 "searchPlaceholder": "Search items...",
                 "allCategories": "All Categories",
@@ -1452,14 +1452,14 @@
                     "screenshotFailed": "Failed to capture screenshot",
                     "screenshotError": "An error occurred while capturing screenshot",
                     "featured": "Featured Item",
-                    "featuredHelp": "Mark this item as featured in the directory",
+                    "featuredHelp": "Mark this item as featured in this Work",
                     "updateWithPR": "Create Pull Request",
                     "updateWithPRHelp": "Submit changes as a pull request instead of direct commit",
                     "cancel": "Cancel",
                     "adding": "Adding...",
                     "addItem": "Add Item",
                     "success": "Item added successfully",
-                    "successDescription": "The item has been added to your directory",
+                    "successDescription": "The item has been added to your Work",
                     "failed": "Failed to add item",
                     "error": "An error occurred while adding the item",
                     "errors": {
@@ -1678,7 +1678,7 @@
                     "navigationLabel": "Generator tabs"
                 },
                 "regenerationWarning": "Regeneration Warning",
-                "regenerationWarningDescription": "This directory has already been generated. Starting a new generation will replace existing items.",
+                "regenerationWarningDescription": "This Work has already been generated. Starting a new generation will replace existing items.",
                 "requiredInfo": "Required Information",
                 "updateConfiguration": "Update Configuration",
                 "promptRequired": "Prompt is required",
@@ -1688,7 +1688,7 @@
                 "loadingFormSchema": "Loading form configuration...",
                 "failedToLoadFormSchema": "Failed to load form configuration",
                 "selectOption": "Select an option",
-                "directoryName": "Directory Name",
+                "workName": "Work Name",
                 "generationPrompt": "Generation Prompt",
                 "modelOverride": "AI Model Override",
                 "modelOverridePlaceholder": "e.g. openai/gpt-4.1 or openrouter/openai/gpt-4.1",
@@ -1696,14 +1696,14 @@
                 "websiteTemplateHelperText": "Choose the website template that will be used when the website repository is first created.",
                 "websiteTemplateLockedHelperText": "Template selection is locked after the first website generation.",
                 "recommended": "Recommended",
-                "promptPlaceholder": "Describe what items should be generated for this directory...",
+                "promptPlaceholder": "Describe what items should be generated for this Work...",
                 "promptHelperText": "Be specific about the type of content you want to generate",
                 "repositoryDescription": "Repository Description",
                 "repositoryPlaceholder": "Brief description of the repository (optional)",
                 "startGeneration": "Start Generation",
                 "regenerateItems": "Regenerate Items",
                 "updateItems": "Run Generation",
-                "recreateDirectory": "Recreate Directory",
+                "recreateWork": "Recreate Work",
                 "showAdvancedOptions": "Show Advanced Options",
                 "hideAdvancedOptions": "Hide Advanced Options",
                 "cancel": "Cancel",
@@ -1741,7 +1741,7 @@
                 "websiteRepositoryCreationMethod": "Website Repository Creation Method",
                 "methodDuplicate": "Duplicate",
                 "methodFork": "Fork",
-                "directoryNamePlaceholder": "Enter directory name",
+                "workNamePlaceholder": "Enter Work name",
                 "methodCreateFromTemplate": "Create from Template",
                 "aiProcessingConfiguration": "AI Processing Configuration",
                 "maxSearchQueries": "Max Search Queries",
@@ -1752,7 +1752,7 @@
                 "aiFirstGenerationDescription": "Enable AI-generation of initial items before web search.",
                 "contentFiltering": "Content Filtering",
                 "contentFilteringDescription": "Enable content quality filtering",
-                "recreateConfirmTitle": "Recreate directory data?",
+                "recreateConfirmTitle": "Recreate Work data?",
                 "recreateConfirmDescription": "Recreate will delete existing items and regenerate them from scratch. This action cannot be undone.",
                 "confirmRecreate": "Yes, recreate",
                 "recreateInlineTitle": "Recreate will remove existing items",
@@ -1796,7 +1796,7 @@
                 "aiProviderDescription": "AI model provider for content generation and extraction",
                 "contentExtractorProvider": "Content Extractor",
                 "contentExtractorProviderDescription": "Provider for extracting content from web pages",
-                "useDirectoryDefault": "Use Directory Default",
+                "useWorkDefault": "Use Work Default",
                 "default": "Default",
                 "notConfigured": "Not configured",
                 "notConfiguredTooltip": "This provider requires configuration. Visit Settings → Plugins to set it up.",
@@ -1864,7 +1864,7 @@
                 },
                 "generalSettings": "General Settings",
                 "generalTitle": "General Settings",
-                "directoryName": "Directory Name",
+                "workName": "Work Name",
                 "description": "Description",
                 "organizationRepository": "Organization Repository",
                 "organizationHelp": "Create repositories under an organization instead of your personal account",
@@ -1876,13 +1876,13 @@
                 "customHeaderPlaceholder": "Add custom content to the README header",
                 "overwriteDefaultHeader": "Overwrite default header",
                 "customFooter": "Custom Footer",
-                "cantDeleteWhileGenerating": "Cannot delete the directory while items are being generated.",
+                "cantDeleteWhileGenerating": "Cannot delete the Work while items are being generated.",
                 "customFooterPlaceholder": "Add custom content to the README footer",
                 "overwriteDefaultFooter": "Overwrite default footer",
                 "dangerZone": "Danger Zone",
                 "dangerTitle": "Danger Zone",
-                "deleteWarning": "Once you delete a directory, there is no going back. Please be certain.",
-                "dangerDescription": "Once you delete a directory, there is no going back. Please be certain.",
+                "deleteWarning": "Once you delete a Work, there is no going back. Please be certain.",
+                "dangerDescription": "Once you delete a Work, there is no going back. Please be certain.",
                 "deleteOptions": "Select what to delete:",
                 "deleteDataRepository": "Delete data repository",
                 "deleteDataRepositoryDescription": "Remove the JSON data repository from GitHub",
@@ -1891,14 +1891,14 @@
                 "deleteWebsiteRepository": "Delete website repository",
                 "deleteWebsiteRepositoryDescription": "Remove the deployed website repository",
                 "deleteConfirm": "Are you absolutely sure?",
-                "deleteConfirmDetail": "This action cannot be undone. The directory and selected repositories will be permanently deleted.",
-                "confirmDirectoryName": "Type directory name to confirm",
-                "confirmDirectoryNameDescription": "Type \"{name}\" to confirm deletion",
-                "deleteNameMismatch": "Directory name does not match",
-                "deleteButton": "Delete Directory",
+                "deleteConfirmDetail": "This action cannot be undone. The Work and selected repositories will be permanently deleted.",
+                "confirmWorkName": "Type Work name to confirm",
+                "confirmWorkNameDescription": "Type \"{name}\" to confirm deletion",
+                "deleteNameMismatch": "Work name does not match",
+                "deleteButton": "Delete Work",
                 "deleteConfirmButton": "Yes, Delete",
-                "deleteSuccess": "Directory deleted successfully",
-                "deleteFailed": "Failed to delete directory",
+                "deleteSuccess": "Work deleted successfully",
+                "deleteFailed": "Failed to delete Work",
                 "yesDelete": "Yes, Delete",
                 "cancel": "Cancel",
                 "saveChanges": "Save Changes",
@@ -1907,7 +1907,7 @@
                 "updateFailed": "Failed to update settings",
                 "deployProvider": {
                     "title": "Deploy Provider",
-                    "description": "Select where to deploy your directory website",
+                    "description": "Select where to deploy your Work's website",
                     "configure": "Configure",
                     "ready": "Ready to deploy",
                     "notConfigured": "Not configured",
@@ -1944,7 +1944,7 @@
                     "prompts": {
                         "relevanceAssessment": {
                             "title": "Relevance Assessment",
-                            "description": "Additional instructions for filtering web pages by relevance to your directory topic.",
+                            "description": "Additional instructions for filtering web pages by relevance to your Work's topic.",
                             "placeholder": "e.g., Only include pages that focus on open-source projects..."
                         },
                         "itemGeneration": {
@@ -1995,7 +1995,7 @@
                 "communityPrUpdateFailed": "Failed to update community PR settings",
                 "websiteConfig": {
                     "title": "Website Configuration",
-                    "subtitle": "Customize how your directory website looks and behaves",
+                    "subtitle": "Customize how your Work's website looks and behaves",
                     "loadFailed": "Failed to load website settings",
                     "saveSuccess": "Website settings saved successfully",
                     "saveFailed": "Failed to save website settings",
@@ -2010,13 +2010,13 @@
                         "siteName": {
                             "title": "Site Identity",
                             "label": "Site Name",
-                            "placeholder": "My Directory",
+                            "placeholder": "My Work",
                             "helper": "The name displayed on your website header and browser tab"
                         },
                         "siteUrl": {
                             "label": "Site URL",
                             "placeholder": "https://example.com",
-                            "helper": "The URL of your company or directory website"
+                            "helper": "The URL of your company or Work's website"
                         },
                         "global": {
                             "title": "Global Features",
@@ -2098,7 +2098,7 @@
                 },
                 "committer": {
                     "title": "Git Committer",
-                    "description": "Override the committer name and email for git commits in this directory. Leave empty to use your user-level settings or account defaults.",
+                    "description": "Override the committer name and email for git commits in this Work. Leave empty to use your user-level settings or account defaults.",
                     "nameLabel": "Committer Name",
                     "emailLabel": "Committer Email",
                     "save": "Save Committer",
@@ -2109,13 +2109,13 @@
             "deploy": {
                 "noProviderAlert": {
                     "title": "No Deployment Provider",
-                    "description": "Select a deployment provider to deploy your directory website.",
+                    "description": "Select a deployment provider to deploy your Work's website.",
                     "selectButton": "Select & Continue",
                     "noProviders": "No deployment providers available. Install a deployment plugin first."
                 },
                 "noTokenAlert": {
                     "title": "{provider} Token Required",
-                    "description": "To deploy your directory, you need to configure your {provider} API token in Plugin Settings.",
+                    "description": "To deploy your Work, you need to configure your {provider} API token in Plugin Settings.",
                     "configureButton": "Configure in Plugin Settings",
                     "getTokenButton": "Get API Token",
                     "howTo": {
@@ -2123,25 +2123,25 @@
                         "step1": "Click 'Get API Token' to open your provider dashboard",
                         "step2": "Create a new token with deployment permissions",
                         "step3": "Configure your {provider} API token in Plugin Settings > {provider}",
-                        "step4": "Return here to deploy your directory"
+                        "step4": "Return here to deploy your Work"
                     }
                 },
                 "sharedNoTokenAlert": {
                     "title": "Deployment Not Available",
-                    "description": "The directory owner has not configured deployment. Please contact the directory owner to set up deployment.",
+                    "description": "The Work owner has not configured deployment. Please contact the Work owner to set up deployment.",
                     "hint": "As a collaborator, you can trigger deployments once the owner configures their deployment provider."
                 },
                 "form": {
                     "deployment": {
                         "title": "Deploy Website",
-                        "description": "Deploy your directory website repository.",
+                        "description": "Deploy your Work's website repository.",
                         "deployButton": "Deploy to {provider}",
                         "deployingButton": "Deploying...",
                         "deployingStateButton": "Deploying ({state})...",
                         "successMessage": "Your website has been successfully deployed!",
                         "teamSelection": {
                             "title": "Select Team",
-                            "description": "Choose the team to deploy this directory to.",
+                            "description": "Choose the team to deploy this Work to.",
                             "label": "Team",
                             "placeholder": "Select a team",
                             "confirmButton": "Deploy to team",
@@ -2168,7 +2168,7 @@
                     },
                     "info": {
                         "deployInfo": "Deployment typically takes 1-3 minutes. You'll receive a URL once complete.",
-                        "updateInfo": "Updates sync your directory content to the website repository for the next deployment."
+                        "updateInfo": "Updates sync your Work's content to the website repository for the next deployment."
                     },
                     "websiteTemplate": {
                         "title": "Automatic Template Updates",
@@ -2198,7 +2198,7 @@
                         "title": "Configure Before Deploy",
                         "description": "Review and customize your website settings before deployment",
                         "siteName": "Site Name",
-                        "siteNamePlaceholder": "My Directory",
+                        "siteNamePlaceholder": "My Work",
                         "siteNameHelper": "The name displayed on your website (default: Acme)",
                         "tabGeneral": "Global",
                         "tabHeader": "Header",
@@ -2245,9 +2245,9 @@
                 }
             }
         },
-        "directoryCreation": {
-            "title": "Create New Directory",
-            "subtitle": "Choose how you'd like to create your directory",
+        "workCreation": {
+            "title": "New Work",
+            "subtitle": "Choose how you'd like to start your Work",
             "backToOptions": "Back to options",
             "sidebar": {
                 "selectedProvider": "Git Provider",
@@ -2255,7 +2255,7 @@
             },
             "deployProvider": {
                 "title": "Deploy Provider",
-                "description": "Select where to deploy your directory website",
+                "description": "Select where to deploy your Work's website",
                 "noProviders": "No deploy providers available",
                 "notConfigured": "Not configured",
                 "configured": "Ready to deploy",
@@ -2273,21 +2273,21 @@
             },
             "ai": {
                 "title": "Create with AI",
-                "subtitle": "Describe your directory idea in natural language and let AI handle the setup",
+                "subtitle": "Describe your Work in natural language and let AI handle the setup",
                 "getStarted": "Get started",
-                "formTitle": "Create Directory with AI",
-                "formSubtitle": "Describe your directory idea and let AI handle the setup and initial content generation",
-                "directoryNameLabel": "Directory Name",
-                "directoryNamePlaceholder": "e.g., Awesome AI Tools",
-                "directoryNameHelp": "AI will suggest a name if you leave this empty",
-                "promptLabel": "Describe Your Directory",
+                "formTitle": "New Work — with AI",
+                "formSubtitle": "Describe your Work and let AI handle the setup and initial content generation",
+                "workNameLabel": "Work Name",
+                "workNamePlaceholder": "e.g., Awesome AI Tools",
+                "workNameHelp": "AI will suggest a name if you leave this empty",
+                "promptLabel": "Describe Your Work",
                 "githubRequired": "Please connect your GitHub account first.",
-                "promptPlaceholder": "Describe what kind of directory you want to create, what items it should contain, and any specific requirements...",
+                "promptPlaceholder": "Describe what kind of Work you want to create, what items it should contain, and any specific requirements...",
                 "inspirationText": "Need inspiration? Try one of these:",
                 "examplePrompts": {
                     "0": {
                         "name": "AI Developer Tools",
-                        "prompt": "Create a directory of the best AI tools for developers"
+                        "prompt": "Build a Work cataloguing the best AI tools for developers"
                     },
                     "1": {
                         "name": "React Components Hub",
@@ -2295,7 +2295,7 @@
                     },
                     "2": {
                         "name": "Remote Team Tools",
-                        "prompt": "Generate a directory of productivity apps for remote teams"
+                        "prompt": "Build a Work cataloguing productivity apps for remote teams"
                     },
                     "3": {
                         "name": "Sustainable Fashion",
@@ -2310,23 +2310,23 @@
                     "3": "Set up GitHub repository with proper documentation"
                 },
                 "generateButton": "Generate with AI",
-                "generatingButton": "Generating Directory...",
+                "generatingButton": "Generating Work...",
                 "cancelButton": "Cancel",
                 "noteTitle": "Note:",
-                "noteText": "AI generation typically takes 2-5 minutes depending on the complexity of your request. You'll be notified when your directory is ready.",
+                "noteText": "AI generation typically takes 2-5 minutes depending on the complexity of your request. You'll be notified when your Work is ready.",
                 "errors": {
-                    "promptRequired": "Please describe what kind of directory you want to create",
+                    "promptRequired": "Please describe what kind of Work you want to create",
                     "unconfiguredProviders": "{providers} not configured. Visit Settings → Plugins to set up before generating.",
-                    "nameRequired": "Directory name is required",
-                    "slugRequired": "Directory slug is required",
-                    "descriptionRequired": "Directory description is required",
+                    "nameRequired": "Work name is required",
+                    "slugRequired": "Work slug is required",
+                    "descriptionRequired": "Work description is required",
                     "githubRequired": "Please connect your GitHub account first.",
-                    "createFailed": "Failed to create directory"
+                    "createFailed": "Failed to create Work"
                 },
                 "success": {
-                    "started": "Directory creation started!",
+                    "started": "Work created — generating content…",
                     "generating": "AI is generating content. This may take a few minutes...",
-                    "created": "Directory created successfully!"
+                    "created": "Work created successfully!"
                 },
                 "advancedSettings": "Advanced Settings",
                 "advancedSubtitle": "Configure organization and repository settings",
@@ -2338,14 +2338,14 @@
             },
             "manual": {
                 "title": "Create Manually",
-                "subtitle": "Configure your directory with full control over every setting and option",
+                "subtitle": "Configure your Work with full control over every setting and option",
                 "configureNow": "Configure now",
-                "formTitle": "Create Directory Manually",
-                "formSubtitle": "Configure your directory with full control over every setting",
+                "formTitle": "New Work — Manual Setup",
+                "formSubtitle": "Configure your Work with full control over every setting",
                 "basicInfo": "Basic Information",
-                "nameLabel": "Directory Name *",
+                "nameLabel": "Work Name *",
                 "namePlaceholder": "e.g., Awesome AI Tools",
-                "slugLabel": "Directory Slug *",
+                "slugLabel": "Work Slug *",
                 "slugPlaceholder": "awesome-ai-tools",
                 "githubRequired": "Please connect your GitHub account first.",
                 "slugHelp": "URL-friendly identifier (lowercase letters, numbers, and hyphens only)",
@@ -2354,7 +2354,7 @@
                 "advancedSettings": "Advanced Settings",
                 "advancedSubtitle": "Organization, custom headers, and more",
                 "organizationLabel": "Create under organization",
-                "organizationHelp": "Create this directory under a GitHub organization instead of your personal account",
+                "organizationHelp": "Create this Work under a GitHub organization instead of your personal account",
                 "organizationNameLabel": "Organization Name",
                 "organizationNamePlaceholder": "my-organization",
                 "websiteTemplateHelperText": "Choose the website template that will be used when the website repository is first created.",
@@ -2364,25 +2364,25 @@
                 "footerLabel": "Custom README Footer",
                 "footerPlaceholder": "Add custom content to the bottom of your README file",
                 "footerOverwrite": "Replace default footer entirely",
-                "createButton": "Create Directory",
-                "creatingButton": "Creating Directory...",
+                "createButton": "New Work",
+                "creatingButton": "Creating Work...",
                 "cancelButton": "Cancel",
-                "nameRequired": "Directory name is required",
-                "slugRequired": "Directory slug is required",
-                "descriptionRequired": "Directory description is required",
-                "createFailed": "Failed to create directory",
+                "nameRequired": "Work name is required",
+                "slugRequired": "Work slug is required",
+                "descriptionRequired": "Work description is required",
+                "createFailed": "Failed to create Work",
                 "success": {
-                    "created": "Directory created successfully!"
+                    "created": "Work created successfully!"
                 }
             },
             "import": {
                 "title": "Import Existing",
-                "subtitle": "Import a directory from an existing GitHub repository",
+                "subtitle": "Import a Work from an existing GitHub repository",
                 "importNow": "Import now",
                 "aiProviderSettings": "AI Provider",
                 "aiProviderSettingsDescription": "Choose which AI provider to use for parsing the README",
-                "formTitle": "Import Directory from GitHub",
-                "formSubtitle": "Import items from an existing GitHub repository to create your directory",
+                "formTitle": "Import Work from GitHub",
+                "formSubtitle": "Import items from an existing GitHub repository to create your Work",
                 "sync": {
                     "title": "Keep synchronized",
                     "description": "Automatically pull updates from the source repository."
@@ -2435,13 +2435,13 @@
                     "schedule": "Schedule: {cadence}",
                     "providers": "Providers: {providers}"
                 },
-                "nameLabel": "Directory Name",
-                "namePlaceholder": "e.g., My Awesome Directory",
+                "nameLabel": "Work Name",
+                "namePlaceholder": "e.g., My Awesome Work",
                 "advancedSettings": "Advanced Settings",
                 "advancedSubtitle": "Configure organization and repository settings",
                 "attribution": {
                     "title": "Source Attribution:",
-                    "text": "This directory will reference {url} as its source"
+                    "text": "This Work will reference {url} as its source"
                 },
                 "research": {
                     "title": "Import & Research Mode",
@@ -2464,13 +2464,13 @@
                     "importingButton": "Starting research pipeline..."
                 },
                 "analyzeButton": "Analyze Repository",
-                "importButton": "Import Directory",
+                "importButton": "Import Work",
                 "importingButton": "Importing...",
                 "backButton": "Back",
                 "cancelButton": "Cancel",
                 "importing": {
-                    "title": "Importing Directory",
-                    "subtitle": "Setting up your directory from the source repository..."
+                    "title": "Importing Work",
+                    "subtitle": "Setting up your Work from the source repository..."
                 },
                 "repositorySelector": {
                     "title": "Select Repository",
@@ -2537,17 +2537,17 @@
                     "unsupportedFormat": "This repository format is not supported. Please use a Data Repository or Awesome List format.",
                     "analyzeFailed": "Failed to analyze repository",
                     "analyzeForLinkingFailed": "Failed to analyze for linking",
-                    "nameRequired": "Directory name is required",
+                    "nameRequired": "Work name is required",
                     "noAnalysis": "Please analyze a repository first",
                     "githubRequired": "Please connect your GitHub account first",
                     "providerRequired": "Please select a git provider first",
-                    "importFailed": "Failed to import directory",
-                    "linkFailed": "Failed to link directory",
+                    "importFailed": "Failed to import Work",
+                    "linkFailed": "Failed to link Work",
                     "providerNotConfigured": "{provider} is not configured. Visit Settings → Plugins to set it up before importing."
                 },
                 "success": {
-                    "started": "Import started! Redirecting to your directory...",
-                    "linked": "Directory linked successfully"
+                    "started": "Import started! Redirecting to your Work...",
+                    "linked": "Work linked successfully"
                 },
                 "slugConflict": {
                     "title": "Repository name conflict",
@@ -2560,7 +2560,7 @@
             "connection": {
                 "alert": {
                     "title": "{provider} not connected",
-                    "subtitle": "Connect your {provider} account to create directories",
+                    "subtitle": "Connect your {provider} account to create works",
                     "connectButton": "Connect {provider}",
                     "connectingButton": "Connecting..."
                 }
@@ -2576,7 +2576,7 @@
             },
             "settings": {
                 "title": "Git Provider Connections",
-                "subtitle": "Connect your git provider accounts to import repositories, create directories, and manage your projects.",
+                "subtitle": "Connect your git provider accounts to import repositories, create works, and manage your projects.",
                 "connectedCount": "{count, plural, =0 {No providers connected} =1 {1 provider connected} other {# providers connected}}",
                 "noProvidersConnected": "No providers connected",
                 "canImport": "You can import and manage repositories",
@@ -2607,7 +2607,7 @@
                 "subtitle": "Configure deployment providers in Plugin Settings",
                 "connected": "Connected",
                 "notConnected": "Not Connected",
-                "connectedMessage": "Your deployment provider is configured. You can now deploy directories.",
+                "connectedMessage": "Your deployment provider is configured. You can now deploy works.",
                 "disconnect": "Disconnect",
                 "disconnecting": "Removing...",
                 "apiTokenLabel": "API Token",
@@ -2643,17 +2643,17 @@
             "subtitle": "Choose how you want to be notified about important updates",
             "email": {
                 "title": "Email Notifications",
-                "directoryUpdates": {
-                    "label": "Directory Updates",
-                    "description": "Get notified about important updates to your directories"
+                "workUpdates": {
+                    "label": "Work Updates",
+                    "description": "Get notified about important updates to your works"
                 },
                 "newItems": {
                     "label": "New Items",
-                    "description": "Get notified when new items are added to your directories"
+                    "description": "Get notified when new items are added to your works"
                 },
                 "weeklyDigest": {
                     "label": "Weekly Digest",
-                    "description": "Receive a weekly summary of your directory activity"
+                    "description": "Receive a weekly summary of activity across your works"
                 },
                 "marketing": {
                     "label": "Marketing & Promotions",
@@ -2664,11 +2664,11 @@
                 "title": "In-App Notifications",
                 "newItems": {
                     "label": "New Items",
-                    "description": "Show notifications for new directory items"
+                    "description": "Show notifications for new items"
                 },
                 "comments": {
                     "label": "Comments",
-                    "description": "Get notified about comments on your directories"
+                    "description": "Get notified about comments on your works"
                 },
                 "mentions": {
                     "label": "Mentions",
@@ -2692,12 +2692,12 @@
         "sidebar": {
             "menu": "Menu",
             "aiChat": "AI Chat",
-            "newDirectory": "New Directory",
-            "activityIndicator": "Directory generating",
+            "newWork": "New Work",
+            "activityIndicator": "Work generating",
             "navigation": {
                 "dashboard": "Dashboard",
                 "activity": "Activity",
-                "directories": "Directories",
+                "works": "Works",
                 "plugins": "Plugins",
                 "settings": "Settings"
             },
@@ -2719,7 +2719,7 @@
             "subtitle": "Irreversible and destructive actions",
             "export": {
                 "title": "Export Your Data",
-                "subtitle": "Download all your directories, items, and settings",
+                "subtitle": "Download all your works, items, and settings",
                 "action": "Export Data (Coming Soon)"
             },
             "delete": {
@@ -2729,8 +2729,8 @@
                 "confirmTitle": "⚠️ This will permanently delete:",
                 "confirmItems": [
                     "Your account and profile",
-                    "All your directories",
-                    "All directory items and data",
+                    "All your works",
+                    "All Work items and data",
                     "API keys and integrations",
                     "All associated websites"
                 ],
@@ -2750,13 +2750,13 @@
         "aiChat": {
             "title": "AI Assistant",
             "panelTitle": "Chat",
-            "subtitle": "Create directories with natural language",
+            "subtitle": "Create works with natural language",
             "welcomeTitle": "Welcome to AI Assistant 👋",
-            "welcomeSubtitle": "Your AI-powered assistant. Ask me anything about creating directories, generating content, or organizing your data.",
-            "welcomeMessage": "Hi! I can help you create directories using natural language. Ask something like \"Create a directory for AI tools\" or describe what you need.",
+            "welcomeSubtitle": "Your AI-powered assistant. Ask me anything about creating works, generating content, or organizing your data.",
+            "welcomeMessage": "Hi! I can help you create works using natural language. Ask something like \"Create a Work for AI tools\" or describe what you need.",
             "capabilities": {
-                "directoryCreation": "Directory Creation",
-                "directoryCreationDesc": "Build directories from natural language descriptions",
+                "workCreation": "Work Creation",
+                "workCreationDesc": "Build works from natural language descriptions",
                 "webResearch": "Web Research",
                 "webResearchDesc": "Search and collect data from across the web",
                 "contentGeneration": "Content Generation",
@@ -2786,11 +2786,11 @@
             "selectProvider": "Provider",
             "notConfigured": "Not configured",
             "gitNotConnected": "Git provider not connected",
-            "gitNotConnectedDesc": "Connect your git provider to create and manage directories.",
+            "gitNotConnectedDesc": "Connect your git provider to create and manage works.",
             "connectGithub": "Connect GitHub",
             "gitConnectedAs": "Connected as {username} via {provider}",
             "deployNotConfigured": "Deploy provider not configured",
-            "deployNotConfiguredDesc": "Configure a deployment provider to publish your directory websites.",
+            "deployNotConfiguredDesc": "Configure a deployment provider to publish your works' websites.",
             "configureDeployProvider": "Configure Deploy Provider",
             "deployConfigured": "Deploy provider configured ({provider})",
             "opened": "Opened",
@@ -2800,12 +2800,12 @@
             "historyYesterday": "Yesterday",
             "historyDaysAgo": "{days}d ago",
             "suggestions": {
-                "s1": "Show my directories",
-                "s2": "Create a directory of AI tools",
+                "s1": "Show my works",
+                "s2": "Build a Work for AI tools",
                 "s3": "Check my git connection",
                 "s4": "Show my stats"
             },
-            "feelingLucky": "Suggest a directory to create",
+            "feelingLucky": "Suggest a Work to build",
             "errors": {
                 "unableToSend": "Unable to send message"
             }
@@ -2818,7 +2818,7 @@
             "enabled": "Enabled",
             "disabled": "Disabled",
             "enable": "Enable",
-            "enableDescription": "Configure how this plugin is enabled across your directories.",
+            "enableDescription": "Configure how this plugin is enabled across your works.",
             "disable": "Disable",
             "settings": "Settings",
             "saveSettings": "Save Settings",
@@ -2850,11 +2850,11 @@
                 "pipeline": "Pipeline"
             },
             "alwaysEnabled": "Always enabled",
-            "disableWarning": "Disabling this plugin will also disable it in all your directories",
+            "disableWarning": "Disabling this plugin will also disable it in all your works",
             "cannotDisableSystem": "System plugins cannot be disabled",
             "disableFailed": "Failed to disable plugin",
-            "autoEnableForDirectories": "Also enable for all directories",
-            "autoEnableForDirectoriesDescription": "This plugin will be automatically active in all your directories. You can still disable it per directory.",
+            "autoEnableForWorks": "Also enable for all works",
+            "autoEnableForWorksDescription": "This plugin will be automatically active in all your works. You can still disable it per Work.",
             "confirmDisable": "Confirm Disable",
             "cancel": "Cancel",
             "missingRequiredFields": "Missing required fields: {fields}",
@@ -2929,20 +2929,20 @@
                 "removeLabel": "Remove {login}"
             }
         },
-        "directoryPlugins": {
-            "title": "Directory Plugins",
-            "subtitle": "Configure plugins for this directory",
+        "workPlugins": {
+            "title": "Work Plugins",
+            "subtitle": "Configure plugins for this Work",
             "active": "Active",
             "enable": "Enable",
             "disable": "Disable",
-            "enableForDirectory": "Enable for this directory",
-            "disableForDirectory": "Disable for this directory",
+            "enableForWork": "Enable for this Work",
+            "disableForWork": "Disable for this Work",
             "enableAtUserLevelFirst": "Enable this plugin in your settings first",
             "disabledByUser": "Disabled at user level",
             "systemAlwaysEnabled": "System plugin - always enabled",
             "showSettings": "Show Settings",
             "hideSettings": "Hide Settings",
-            "directorySettingsInfo": "Configure directory-specific settings here",
+            "workSettingsInfo": "Configure Work-specific settings here",
             "save": "Save",
             "saved": "Saved",
             "showInstalledOnly": "Show installed only",
@@ -2950,7 +2950,7 @@
             "noPlugins": "No plugins available",
             "showAllPlugins": "Show all plugins",
             "capabilityProviders": "Capability Providers",
-            "capabilityProvidersDescription": "Select which plugin provides each capability for this directory",
+            "capabilityProvidersDescription": "Select which plugin provides each capability for this Work",
             "noProvidersAvailable": "No providers available",
             "categories": {
                 "git": "Git",
@@ -2968,12 +2968,12 @@
             "errors": {
                 "unableToSend": "Unable to send message."
             },
-            "settingsModalTitle": "Directory Settings",
-            "settingsModalDescription": "Override settings for this directory. Unset fields inherit from your user settings.",
+            "settingsModalTitle": "Work Settings",
+            "settingsModalDescription": "Override settings for this Work. Unset fields inherit from your user settings.",
             "inheritedFrom": "Inherited: {value}",
             "inheritedSecret": "Inherited: ••••••••",
             "resetToDefaults": "Reset to Defaults",
-            "resetConfirm": "This will clear all directory-specific overrides. Settings will fall back to your user-level values.",
+            "resetConfirm": "This will clear all Work-specific overrides. Settings will fall back to your user-level values.",
             "resetSuccess": "Settings reset to defaults",
             "cancel": "Cancel",
             "clickToConfigure": "Click to configure",
@@ -2988,8 +2988,8 @@
         "auth": {
             "backToHome": "Back to home",
             "feature": {
-                "title": "Build Directories with AI",
-                "subtitle": "Create beautiful, searchable directories in minutes using natural language. No coding required.",
+                "title": "Build Works with AI",
+                "subtitle": "Create beautiful, searchable works in minutes using natural language. No coding required.",
                 "badge": "AI-Powered",
                 "benefits": {
                     "ai": {
@@ -3041,8 +3041,8 @@
         }
     },
     "metadata": {
-        "title": "{companyName} - Directory Builder",
-        "description": "A SaaS platform for building and managing directories",
+        "title": "{companyName} — Workshop for AI",
+        "description": "An agentic runtime that autonomously builds and maintains content-rich web apps and Git repositories",
         "pages": {
             "signIn": "Sign In",
             "createAccount": "Create Account",
@@ -3051,9 +3051,9 @@
             "authError": "Authentication Error",
             "dashboard": "Dashboard",
             "activity": "Activity Log",
-            "directories": "Directories",
-            "newDirectory": "New Directory",
-            "directory": "Directory",
+            "works": "Works",
+            "newWork": "New Work",
+            "work": "Work",
             "overview": "Overview",
             "items": "Items",
             "generator": "Generator",
@@ -3087,7 +3087,7 @@
         }
     },
     "actions": {
-        "directories": {
+        "works": {
             "slug": {
                 "required": "Slug is required",
                 "format": "Slug must be lowercase letters, numbers, and hyphens only"
@@ -3106,16 +3106,16 @@
             },
             "oauthRequired": "OAuth connection required. Please connect your {provider} account first.",
             "githubRequired": "GitHub connection required. Please connect your GitHub account first.",
-            "createSuccess": "Directory created successfully!",
-            "createFailed": "Failed to create directory",
-            "updateSuccess": "Directory updated successfully!",
-            "updateFailed": "Failed to update directory",
-            "invalidGeneratedData": "Failed to generate valid directory data",
-            "aiGenerationStarted": "Directory creation started! AI is generating content...",
-            "invalidId": "Invalid directory ID",
-            "deleteSuccess": "Directory deleted successfully",
-            "deleteFailed": "Failed to delete directory",
-            "fetchFailed": "Failed to fetch directories",
+            "createSuccess": "Work created successfully!",
+            "createFailed": "Failed to create Work",
+            "updateSuccess": "Work updated successfully!",
+            "updateFailed": "Failed to update Work",
+            "invalidGeneratedData": "Failed to generate valid Work data",
+            "aiGenerationStarted": "Work created — AI is generating content…",
+            "invalidId": "Invalid Work ID",
+            "deleteSuccess": "Work deleted successfully",
+            "deleteFailed": "Failed to delete Work",
+            "fetchFailed": "Failed to fetch works",
             "organization": {
                 "requiredWhenOwnerProvided": "Organization must be enabled when owner is provided"
             },
@@ -3123,7 +3123,7 @@
                 "invalidUrl": "Please enter a valid URL",
                 "analyzeFailed": "Failed to analyze repository",
                 "started": "Import started successfully",
-                "failed": "Failed to import directory",
+                "failed": "Failed to import Work",
                 "fetchReposFailed": "Failed to fetch repositories"
             }
         },

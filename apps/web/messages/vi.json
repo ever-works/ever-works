@@ -96,7 +96,7 @@
             "success": {
                 "title": "Email đã gửi thành công",
                 "message": "Chúng tôi đã gửi hướng dẫn đặt lại mật khẩu đến {email}",
-                "checkSpam": "Nếu bạn không thấy email, hãy kiểm tra thư mục spam."
+                "checkSpam": "Nếu bạn không thấy email, hãy kiểm tra công việc spam."
             },
             "errors": {
                 "failed": "Không thể gửi email đặt lại. Vui lòng thử lại."
@@ -150,7 +150,7 @@
         },
         "register": {
             "title": "Tạo tài khoản của bạn",
-            "subtitle": "Bắt đầu xây dựng các danh bạ tuyệt vời ngay hôm nay",
+            "subtitle": "Bắt đầu xây dựng các công việc tuyệt vời ngay hôm nay",
             "form": {
                 "name": {
                     "label": "Họ và tên",
@@ -197,18 +197,18 @@
     "onboarding": {
         "label": "Bắt đầu sử dụng",
         "title": "Chào mừng đến với Ever Works",
-        "subtitle": "Xây dựng và xuất bản thư mục đầu tiên của bạn trong vài phút.",
+        "subtitle": "Xây dựng và xuất bản công việc đầu tiên của bạn trong vài phút.",
         "skipButton": "Bỏ qua tạm thời",
         "nextButton": "Tiếp theo",
         "stepIndex": "Bước {index}",
         "steps": {
             "welcome": {
                 "title": "Ever Works là gì?",
-                "description": "Ever Works là một công cụ xây dựng thư mục mã nguồn mở. Tạo các thư mục nội dung có cấu trúc — công cụ, việc làm, liên kết, sản phẩm — và xuất bản chúng dưới dạng trang web trực tiếp.",
-                "detail": "Hãy thiết lập cho bạn. Kết nối nhà cung cấp của bạn bên dưới, sau đó tạo thư mục đầu tiên của bạn.",
+                "description": "Ever Works là một công cụ xây dựng công việc mã nguồn mở. Tạo các công việc nội dung có cấu trúc — công cụ, việc làm, liên kết, sản phẩm — và xuất bản chúng dưới dạng trang web trực tiếp.",
+                "detail": "Hãy thiết lập cho bạn. Kết nối nhà cung cấp của bạn bên dưới, sau đó tạo công việc đầu tiên của bạn.",
                 "feature1": {
                     "title": "Nội dung được hỗ trợ bởi AI",
-                    "description": "Tạo và làm phong phú các mục thư mục tự động bằng nhà cung cấp AI của bạn"
+                    "description": "Tạo và làm phong phú các mục công việc tự động bằng nhà cung cấp AI của bạn"
                 },
                 "feature2": {
                     "title": "Xuất bản ngay lập tức",
@@ -216,18 +216,18 @@
                 },
                 "feature3": {
                     "title": "Dựa trên Git",
-                    "description": "Mọi thư mục đều là kho lưu trữ GitHub mà bạn sở hữu và kiểm soát"
+                    "description": "Mọi công việc đều là kho lưu trữ GitHub mà bạn sở hữu và kiểm soát"
                 }
             },
-            "directory": {
-                "title": "Tạo thư mục đầu tiên của bạn",
-                "description": "Thư mục là trung tâm nội dung của bạn. Thêm các mục, cấu hình bố cục và xuất bản chỉ với một cú nhấp chuột.",
-                "detail": "Bạn đã sẵn sàng! Tạo thư mục đầu tiên của bạn để bắt đầu xây dựng và xuất bản nội dung.",
-                "action": "Tạo thư mục"
+            "work": {
+                "title": "Tạo công việc đầu tiên của bạn",
+                "description": "Công việc là trung tâm nội dung của bạn. Thêm các mục, cấu hình bố cục và xuất bản chỉ với một cú nhấp chuột.",
+                "detail": "Bạn đã sẵn sàng! Tạo công việc đầu tiên của bạn để bắt đầu xây dựng và xuất bản nội dung.",
+                "action": "Tạo công việc"
             },
             "publish": {
                 "title": "Đưa lên trực tuyến",
-                "description": "Kết nối Vercel hoặc GitHub để triển khai thư mục của bạn dưới dạng trang web công khai — không cần cấu hình lưu trữ.",
+                "description": "Kết nối Vercel hoặc GitHub để triển khai công việc của bạn dưới dạng trang web công khai — không cần cấu hình lưu trữ.",
                 "action": "Thiết lập xuất bản"
             }
         },
@@ -336,7 +336,7 @@
             "steps": {
                 "model": {
                     "title": "Chọn một mô hình",
-                    "description": "Chọn mô hình Codex bạn muốn chạy cho việc tạo thư mục từ đầu đến cuối."
+                    "description": "Chọn mô hình Codex bạn muốn chạy cho việc tạo công việc từ đầu đến cuối."
                 },
                 "credentials": {
                     "title": "Thêm thông tin xác thực",
@@ -408,7 +408,7 @@
         "simWizard": {
             "label": "Thiết lập SIM AI",
             "title": "Thiết lập SIM AI trong hai bước",
-            "subtitle": "Thêm khóa API SIM AI của bạn và xác minh kết nối để bắt đầu ủy quyền tạo thư mục cho các quy trình làm việc SIM.",
+            "subtitle": "Thêm khóa API SIM AI của bạn và xác minh kết nối để bắt đầu ủy quyền tạo công việc cho các quy trình làm việc SIM.",
             "stepIndex": "Bước {index}",
             "continueButton": "Tiếp tục",
             "steps": {
@@ -431,7 +431,7 @@
         "title": "Bảng điều khiển",
         "connectGithub": {
             "title": "Kết nối tài khoản GitHub của bạn",
-            "description": "GitHub là bắt buộc để tạo và quản lý kho lưu trữ thư mục. Kết nối tài khoản của bạn để bắt đầu.",
+            "description": "GitHub là bắt buộc để tạo và quản lý kho lưu trữ công việc. Kết nối tài khoản của bạn để bắt đầu.",
             "connect": "Kết nối GitHub",
             "dismiss": "Tôi sẽ làm điều này sau"
         },
@@ -465,7 +465,7 @@
         },
         "header": {
             "welcome": "Chào mừng trở lại, {username}!",
-            "subtitle": "Quản lý các thư mục được hỗ trợ bởi AI của bạn và theo dõi hiệu suất của chúng",
+            "subtitle": "Quản lý các công việc được hỗ trợ bởi AI của bạn và theo dõi hiệu suất của chúng",
             "onboarding": {
                 "badge": "Hướng dẫn {currentStep}/{totalSteps}",
                 "dismiss": "Ẩn lối tắt hướng dẫn"
@@ -490,14 +490,14 @@
                 },
                 "quickTips": {
                     "title": "Mẹo Nhanh",
-                    "tip1": "Tạo thư mục đầu tiên bằng cách nhấp vào nút 'Tạo Thư mục' trên bảng điều khiển.",
-                    "tip2": "Sử dụng trình tạo AI để tự động điền thư mục của bạn với các mục liên quan.",
-                    "tip3": "Kết nối tài khoản GitHub của bạn để đồng bộ và triển khai các thư mục của bạn dưới dạng kho lưu trữ."
+                    "tip1": "Tạo công việc đầu tiên bằng cách nhấp vào nút 'Tạo Công việc' trên bảng điều khiển.",
+                    "tip2": "Sử dụng trình tạo AI để tự động điền công việc của bạn với các mục liên quan.",
+                    "tip3": "Kết nối tài khoản GitHub của bạn để đồng bộ và triển khai các công việc của bạn dưới dạng kho lưu trữ."
                 },
                 "shortcuts": {
                     "title": "Phím Tắt Bàn Phím",
-                    "search": "Tìm kiếm thư mục",
-                    "newDirectory": "Tạo thư mục mới",
+                    "search": "Tìm kiếm công việc",
+                    "newWork": "Tạo công việc mới",
                     "help": "Mở trợ giúp",
                     "hint": "Sử dụng Cmd trên Mac hoặc Ctrl trên Windows/Linux"
                 },
@@ -513,7 +513,7 @@
         },
         "activity": {
             "title": "Nhật ký Hoạt động",
-            "subtitle": "Theo dõi tất cả các hoạt động trên các thư mục của bạn",
+            "subtitle": "Theo dõi tất cả các hoạt động trên các công việc của bạn",
             "loading": "Đang tải...",
             "fetchFailed": "Không tải được hoạt động",
             "exportFailed": "Không xuất được nhật ký hoạt động",
@@ -521,7 +521,7 @@
             "columns": {
                 "status": "Trạng thái",
                 "dateTime": "Ngày / Giờ",
-                "directory": "Thư mục",
+                "work": "Công việc",
                 "type": "Loại",
                 "summary": "Tóm tắt"
             },
@@ -532,9 +532,9 @@
                     "generation": "Tạo",
                     "comparison": "So sánh",
                     "deployment": "Triển khai",
-                    "directoryCreated": "Thư mục Đã Tạo",
-                    "directoryUpdated": "Thư mục Đã Cập nhật",
-                    "directoryDeleted": "Thư mục Đã Xóa",
+                    "workCreated": "Công việc Đã Tạo",
+                    "workUpdated": "Công việc Đã Cập nhật",
+                    "workDeleted": "Công việc Đã Xóa",
                     "pluginEnabled": "Plugin Đã Bật",
                     "pluginDisabled": "Plugin Đã Tắt",
                     "pluginConfigured": "Plugin Đã Cấu hình",
@@ -596,32 +596,32 @@
                 "pageOf": "Trang {page} trong {total}"
             }
         },
-        "directories": {
-            "title": "Thư mục",
-            "subtitle": "Quản lý và tổ chức các thư mục được hỗ trợ bởi AI của bạn",
+        "works": {
+            "title": "Công việc",
+            "subtitle": "Quản lý và tổ chức các công việc được hỗ trợ bởi AI của bạn",
             "summary": {
-                "totalDirectories": "Tổng Thư mục",
+                "totalWorks": "Tổng Công việc",
                 "generating": "Đang tạo",
                 "totalItems": "Tổng Số Mục"
             },
-            "recent": "Thư mục Gần đây",
+            "recent": "Công việc Gần đây",
             "viewAll": "Xem tất cả ({count})",
-            "search": "Tìm kiếm thư mục...",
-            "create": "Tạo Thư mục",
-            "showing": "Hiển thị {current} trong {total} thư mục",
-            "searchFailed": "Không tìm kiếm được thư mục. Vui lòng thử lại.",
+            "search": "Tìm kiếm công việc...",
+            "create": "Tạo Công việc",
+            "showing": "Hiển thị {current} trong {total} công việc",
+            "searchFailed": "Không tìm kiếm được công việc. Vui lòng thử lại.",
             "pagination": {
                 "previous": "Trước",
                 "next": "Tiếp theo"
             },
             "empty": {
-                "title": "Chưa có thư mục nào",
-                "description": "Tạo thư mục được hỗ trợ bởi AI đầu tiên để bắt đầu tổ chức và trưng bày nội dung của bạn.",
-                "action": "Tạo Thư mục Đầu tiên Của Bạn",
+                "title": "Chưa có công việc nào",
+                "description": "Tạo công việc được hỗ trợ bởi AI đầu tiên để bắt đầu tổ chức và trưng bày nội dung của bạn.",
+                "action": "Tạo Công việc Đầu tiên Của Bạn",
                 "notFound": {
-                    "title": "Không tìm thấy thư mục nào",
+                    "title": "Không tìm thấy công việc nào",
                     "withSearch": "Hãy thử điều chỉnh từ khóa tìm kiếm",
-                    "withoutSearch": "Tạo thư mục được hỗ trợ bởi AI đầu tiên để bắt đầu"
+                    "withoutSearch": "Tạo công việc được hỗ trợ bởi AI đầu tiên để bắt đầu"
                 }
             }
         },
@@ -638,7 +638,7 @@
             },
             "data": {
                 "exportTitle": "Xuất dữ liệu",
-                "exportDescription": "Tải xuống dữ liệu tài khoản của bạn bao gồm thư mục, cài đặt plugin và thông tin hồ sơ dưới dạng tệp JSON.",
+                "exportDescription": "Tải xuống dữ liệu tài khoản của bạn bao gồm công việc, cài đặt plugin và thông tin hồ sơ dưới dạng tệp JSON.",
                 "includeSecrets": "Bao gồm cài đặt bí mật (khóa API, token) — xuất dưới dạng giá trị bị che",
                 "secretsWarning": "Cài đặt bí mật sẽ được xuất dưới dạng giá trị bị che. Bạn cần thay thế thủ công chúng bằng thông tin xác thực thực trước khi nhập.",
                 "exportButton": "Xuất dữ liệu",
@@ -646,7 +646,7 @@
                 "exportSuccess": "Xuất dữ liệu thành công",
                 "exportError": "Không thể xuất dữ liệu",
                 "importTitle": "Nhập dữ liệu",
-                "importDescription": "Nhập dữ liệu từ tệp JSON đã xuất trước đó. Bạn có thể giải quyết xung đột cho thư mục có slug trùng khớp.",
+                "importDescription": "Nhập dữ liệu từ tệp JSON đã xuất trước đó. Bạn có thể giải quyết xung đột cho công việc có slug trùng khớp.",
                 "importButton": "Nhập dữ liệu",
                 "syncTitle": "Đồng bộ GitHub",
                 "syncDescription": "Đồng bộ cấu hình tài khoản của bạn với kho lưu trữ GitHub riêng tư để sao lưu và di chuyển giữa các phiên bản.",
@@ -658,13 +658,13 @@
                     "invalidJson": "Tệp JSON không hợp lệ",
                     "previewError": "Không thể phân tích tệp nhập",
                     "summary": "Tóm tắt nhập",
-                    "directories": "Thư mục",
+                    "works": "Công việc",
                     "items": "Mục",
                     "userPlugins": "Plugin người dùng",
                     "version": "Phiên bản định dạng",
                     "missingPlugins": "Các plugin này chưa được cài đặt và sẽ bị bỏ qua",
                     "conflicts": "Xung đột Slug",
-                    "existingDirectory": "Hiện có",
+                    "existingWork": "Hiện có",
                     "incoming": "Đang đến",
                     "strategySkip": "Bỏ qua (giữ hiện có)",
                     "strategyOverwrite": "Ghi đè hiện có",
@@ -681,9 +681,9 @@
                     "validationErrors": "Lỗi xác thực",
                     "resultSuccess": "Nhập hoàn tất thành công",
                     "resultFailed": "Nhập thất bại",
-                    "directoriesCreated": "Thư mục được tạo",
-                    "directoriesUpdated": "Thư mục được cập nhật",
-                    "directoriesSkipped": "Thư mục bị bỏ qua",
+                    "worksCreated": "Công việc được tạo",
+                    "worksUpdated": "Công việc được cập nhật",
+                    "worksSkipped": "Công việc bị bỏ qua",
                     "pluginsImported": "Plugin được nhập",
                     "warnings": "Cảnh báo",
                     "errors": "Lỗi"
@@ -732,11 +732,11 @@
                 "backToCategory": "Quay lại {category}",
                 "pipelineDefault": {
                     "title": "Đường ống mặc định",
-                    "description": "Chọn đường ống nào được sử dụng mặc định khi tạo mục thư mục.",
+                    "description": "Chọn đường ống nào được sử dụng mặc định khi tạo mục công việc.",
                     "autoLabel": "Tự động",
-                    "autoDescription": "Sử dụng đường ống được hệ thống giải quyết cho mỗi thư mục",
+                    "autoDescription": "Sử dụng đường ống được hệ thống giải quyết cho mỗi công việc",
                     "enforceLabel": "Áp dụng mặc định này",
-                    "enforceDescription": "Luôn chọn trước đường ống này, ngay cả khi thư mục có đường ống riêng được cấu hình. Bạn vẫn có thể chuyển đổi đường ống thủ công trong biểu mẫu.",
+                    "enforceDescription": "Luôn chọn trước đường ống này, ngay cả khi công việc có đường ống riêng được cấu hình. Bạn vẫn có thể chuyển đổi đường ống thủ công trong biểu mẫu.",
                     "saveFailed": "Không thể lưu đường ống mặc định"
                 }
             },
@@ -819,8 +819,8 @@
                 "subtitle": "Kết nối tài khoản bên ngoài để tăng cường chức năng",
                 "github": {
                     "name": "GitHub",
-                    "connected": "Tạo và quản lý thư mục với kho lưu trữ GitHub",
-                    "disconnected": "Kết nối để tạo thư mục từ kho lưu trữ",
+                    "connected": "Tạo và quản lý công việc với kho lưu trữ GitHub",
+                    "disconnected": "Kết nối để tạo công việc từ kho lưu trữ",
                     "scopes": "Phạm vi",
                     "organizations": "Tổ chức đã kết nối",
                     "organizationsHint": "Sử dụng Kết nối lại để cấp quyền truy cập vào các tổ chức bổ sung",
@@ -881,12 +881,12 @@
             }
         },
         "stats": {
-            "totalDirectories": "Tổng thư mục",
+            "totalWorks": "Tổng công việc",
             "totalItems": "Tổng mục",
             "activeWebsites": "Trang web hoạt động",
             "fromLastMonth": "từ tháng trước"
         },
-        "directoryCard": {
+        "workCard": {
             "status": {
                 "active": "Hoạt động",
                 "notStarted": "Chưa bắt đầu",
@@ -911,14 +911,14 @@
             "views": "{count} lượt xem",
             "updated": "Cập nhật {date}",
             "viewAction": "Xem →",
-            "openingTitle": "Đang mở thư mục",
-            "openingMessage": "Đang chuẩn bị thư mục của bạn. Chi tiết sẽ mở ngay. Hãy ở lại trang này."
+            "openingTitle": "Đang mở công việc",
+            "openingMessage": "Đang chuẩn bị công việc của bạn. Chi tiết sẽ mở ngay. Hãy ở lại trang này."
         },
-        "directoryList": {
-            "title": "Thư mục của bạn",
-            "createButton": "Tạo thư mục"
+        "workList": {
+            "title": "Công việc của bạn",
+            "createButton": "Tạo công việc"
         },
-        "directoryDetail": {
+        "workDetail": {
             "failedToGenerateItems": "Không thể tạo các mục. Vui lòng thử lại.",
             "generationCompleted": "Tạo hoàn tất thành công",
             "generationCancelled": "Tạo đã bị hủy",
@@ -953,7 +953,7 @@
             },
             "members": {
                 "title": "Thành viên đội ngũ",
-                "subtitle": "Quản lý những người có quyền truy cập vào thư mục này và quyền hạn của họ.",
+                "subtitle": "Quản lý những người có quyền truy cập vào công việc này và quyền hạn của họ.",
                 "inviteMember": "Mời thành viên",
                 "noMembers": "Chưa có thành viên đội ngũ. Mời ai đó để cộng tác.",
                 "roles": {
@@ -965,13 +965,13 @@
                 },
                 "roleDescriptions": {
                     "owner": "Kiểm soát đầy đủ bao gồm xóa và quản lý thành viên.",
-                    "manager": "Có thể chỉnh sửa thư mục và quản lý thành viên, nhưng không thể xóa.",
-                    "editor": "Có thể chỉnh sửa nội dung thư mục và chạy tạo.",
-                    "viewer": "Truy cập chỉ đọc để xem thư mục."
+                    "manager": "Có thể chỉnh sửa công việc và quản lý thành viên, nhưng không thể xóa.",
+                    "editor": "Có thể chỉnh sửa nội dung công việc và chạy tạo.",
+                    "viewer": "Truy cập chỉ đọc để xem công việc."
                 },
                 "invite": {
                     "title": "Mời thành viên đội ngũ",
-                    "description": "Thêm thành viên mới để cộng tác trên thư mục này.",
+                    "description": "Thêm thành viên mới để cộng tác trên công việc này.",
                     "emailLabel": "Địa chỉ email",
                     "emailPlaceholder": "colleague@example.com",
                     "roleLabel": "Vai trò",
@@ -985,7 +985,7 @@
                 },
                 "confirmRemove": {
                     "title": "Xóa thành viên",
-                    "description": "Bạn có chắc chắn muốn xóa {username} khỏi thư mục này không? Họ sẽ mất toàn bộ quyền truy cập.",
+                    "description": "Bạn có chắc chắn muốn xóa {username} khỏi công việc này không? Họ sẽ mất toàn bộ quyền truy cập.",
                     "confirm": "Xóa",
                     "cancel": "Hủy"
                 },
@@ -1000,7 +1000,7 @@
                 "page": {
                     "title": "Cập nhật theo lịch",
                     "subtitle": "Tự động làm mới cho {name} với chu kỳ chuyên dụng và xử lý lỗi.",
-                    "fallbackName": "thư mục này",
+                    "fallbackName": "công việc này",
                     "loadFailed": "Không thể tải cài đặt lịch trình.",
                     "providerCategories": {
                         "pipeline": "Pipeline",
@@ -1101,7 +1101,7 @@
                     },
                     "empty": {
                         "title": "Chạy tạo thủ công trước",
-                        "description": "Hoàn tất một lần chạy thủ công thành công để mở khóa lập lịch tự động. Khi thư mục có dữ liệu, chúng tôi có thể giữ nó mới cho bạn.",
+                        "description": "Hoàn tất một lần chạy thủ công thành công để mở khóa lập lịch tự động. Khi công việc có dữ liệu, chúng tôi có thể giữ nó mới cho bạn.",
                         "refresh": "Làm mới trạng thái"
                     },
                     "requiresGeneration": "Chạy ít nhất một lần tạo mục trước khi bật lịch trình."
@@ -1119,7 +1119,7 @@
             "statusCard": {
                 "notStarted": {
                     "title": "Chưa bắt đầu tạo",
-                    "description": "Bắt đầu tạo mục cho thư mục của bạn để điền nội dung.",
+                    "description": "Bắt đầu tạo mục cho công việc của bạn để điền nội dung.",
                     "action": "Bắt đầu tạo"
                 },
                 "generating": {
@@ -1133,7 +1133,7 @@
                 },
                 "generated": {
                     "title": "Tạo hoàn tất",
-                    "description": "Thư mục của bạn đã được điền mục thành công.",
+                    "description": "Công việc của bạn đã được điền mục thành công.",
                     "withWarnings": "Hoàn tất kèm cảnh báo:",
                     "viewItems": "Xem mục",
                     "regenerate": "Tạo lại"
@@ -1159,7 +1159,7 @@
             },
             "comparisons": {
                 "title": "So sánh",
-                "subtitle": "Trang so sánh A vs B giữa các mục thư mục",
+                "subtitle": "Trang so sánh A vs B giữa các mục công việc",
                 "vs": "vs",
                 "winner": "Người thắng: {name}",
                 "tie": "Hòa",
@@ -1307,7 +1307,7 @@
                 }
             },
             "info": {
-                "title": "Thông tin thư mục",
+                "title": "Thông tin công việc",
                 "yourRole": "Vai trò của bạn",
                 "role": {
                     "owner": "Chủ sở hữu",
@@ -1357,8 +1357,8 @@
             "activity": {
                 "title": "Hoạt động gần đây",
                 "noActivity": "Chưa có hoạt động",
-                "created": "Đã tạo thư mục",
-                "directoryCreated": "Thư mục đã được tạo thành công",
+                "created": "Đã tạo công việc",
+                "workCreated": "Công việc đã được tạo thành công",
                 "justNow": "Vừa xong"
             },
             "items": {
@@ -1653,7 +1653,7 @@
                     "navigationLabel": "Tab Trình tạo"
                 },
                 "regenerationWarning": "Cảnh báo Tái tạo",
-                "regenerationWarningDescription": "Thư mục này đã được tạo. Bắt đầu tạo mới sẽ thay thế các mục hiện có.",
+                "regenerationWarningDescription": "Công việc này đã được tạo. Bắt đầu tạo mới sẽ thay thế các mục hiện có.",
                 "requiredInfo": "Thông tin Bắt buộc",
                 "updateConfiguration": "Cập nhật Cấu hình",
                 "promptRequired": "Prompt là bắt buộc",
@@ -1663,20 +1663,20 @@
                 "loadingFormSchema": "Đang tải cấu hình biểu mẫu...",
                 "failedToLoadFormSchema": "Không thể tải cấu hình biểu mẫu",
                 "selectOption": "Chọn một tùy chọn",
-                "directoryName": "Tên Thư mục",
+                "workName": "Tên Công việc",
                 "generationPrompt": "Prompt Tạo",
                 "modelOverride": "Ghi đè mô hình AI",
                 "modelOverridePlaceholder": "ví dụ: openai/gpt-4.1 hoặc openrouter/openai/gpt-4.1",
                 "modelOverrideHelperText": "Tùy chọn. Mặc định sử dụng mô hình đã nhập hoặc mô hình trước đó trừ khi bạn ghi đè ở đây.",
                 "recommended": "Được khuyến nghị",
-                "promptPlaceholder": "Mô tả các mục nên được tạo cho thư mục này...",
+                "promptPlaceholder": "Mô tả các mục nên được tạo cho công việc này...",
                 "promptHelperText": "Hãy cụ thể về loại nội dung bạn muốn tạo",
                 "repositoryDescription": "Mô tả Kho",
                 "repositoryPlaceholder": "Mô tả ngắn gọn về kho (tùy chọn)",
                 "startGeneration": "Bắt đầu Tạo",
                 "regenerateItems": "Tái tạo Mục",
                 "updateItems": "Chạy Tạo",
-                "recreateDirectory": "Tái tạo Thư mục",
+                "recreateWork": "Tái tạo Công việc",
                 "showAdvancedOptions": "Hiển thị Tùy chọn Nâng cao",
                 "hideAdvancedOptions": "Ẩn Tùy chọn Nâng cao",
                 "cancel": "Hủy",
@@ -1714,7 +1714,7 @@
                 "websiteRepositoryCreationMethod": "Phương thức Tạo Kho Trang web",
                 "methodDuplicate": "Nhân bản",
                 "methodFork": "Fork",
-                "directoryNamePlaceholder": "Nhập tên thư mục",
+                "workNamePlaceholder": "Nhập tên công việc",
                 "methodCreateFromTemplate": "Tạo từ Mẫu",
                 "aiProcessingConfiguration": "Cấu hình Xử lý AI",
                 "maxSearchQueries": "Số truy vấn Tìm kiếm Tối đa",
@@ -1725,7 +1725,7 @@
                 "aiFirstGenerationDescription": "Bật tạo AI cho các mục ban đầu trước tìm kiếm web.",
                 "contentFiltering": "Lọc Nội dung",
                 "contentFilteringDescription": "Bật lọc chất lượng nội dung",
-                "recreateConfirmTitle": "Tái tạo dữ liệu thư mục?",
+                "recreateConfirmTitle": "Tái tạo dữ liệu công việc?",
                 "recreateConfirmDescription": "Tái tạo sẽ xóa các mục hiện có và tạo lại từ đầu. Hành động này không thể hoàn tác.",
                 "confirmRecreate": "Có, tái tạo",
                 "recreateInlineTitle": "Tái tạo sẽ xóa các mục hiện có",
@@ -1769,7 +1769,7 @@
                 "aiProviderDescription": "Nhà cung cấp mô hình AI cho tạo và trích xuất nội dung",
                 "contentExtractorProvider": "Trích xuất Nội dung",
                 "contentExtractorProviderDescription": "Nhà cung cấp trích xuất nội dung từ trang web",
-                "useDirectoryDefault": "Sử dụng Mặc định Thư mục",
+                "useWorkDefault": "Sử dụng Mặc định Công việc",
                 "default": "Mặc định",
                 "notConfigured": "Chưa cấu hình",
                 "notConfiguredTooltip": "Nhà cung cấp này yêu cầu cấu hình. Truy cập Cài đặt → Plugins để thiết lập.",
@@ -1837,7 +1837,7 @@
                 },
                 "generalSettings": "Cài đặt chung",
                 "generalTitle": "Cài đặt chung",
-                "directoryName": "Tên thư mục",
+                "workName": "Tên công việc",
                 "description": "Mô tả",
                 "organizationRepository": "Kho lưu trữ tổ chức",
                 "organizationHelp": "Tạo kho lưu trữ dưới một tổ chức thay vì tài khoản cá nhân của bạn",
@@ -1849,13 +1849,13 @@
                 "customHeaderPlaceholder": "Thêm nội dung tùy chỉnh vào tiêu đề README",
                 "overwriteDefaultHeader": "Ghi đè tiêu đề mặc định",
                 "customFooter": "Chân trang tùy chỉnh",
-                "cantDeleteWhileGenerating": "Không thể xóa thư mục trong khi các mục đang được tạo.",
+                "cantDeleteWhileGenerating": "Không thể xóa công việc trong khi các mục đang được tạo.",
                 "customFooterPlaceholder": "Thêm nội dung tùy chỉnh vào chân trang README",
                 "overwriteDefaultFooter": "Ghi đè chân trang mặc định",
                 "dangerZone": "Vùng nguy hiểm",
                 "dangerTitle": "Vùng nguy hiểm",
-                "deleteWarning": "Một khi bạn xóa thư mục, không thể khôi phục. Vui lòng chắc chắn.",
-                "dangerDescription": "Một khi bạn xóa thư mục, không thể khôi phục. Vui lòng chắc chắn.",
+                "deleteWarning": "Một khi bạn xóa công việc, không thể khôi phục. Vui lòng chắc chắn.",
+                "dangerDescription": "Một khi bạn xóa công việc, không thể khôi phục. Vui lòng chắc chắn.",
                 "deleteOptions": "Chọn những gì để xóa:",
                 "deleteDataRepository": "Xóa kho lưu trữ dữ liệu",
                 "deleteDataRepositoryDescription": "Xóa kho lưu trữ dữ liệu JSON khỏi GitHub",
@@ -1864,14 +1864,14 @@
                 "deleteWebsiteRepository": "Xóa kho lưu trữ trang web",
                 "deleteWebsiteRepositoryDescription": "Xóa kho lưu trữ trang web đã triển khai",
                 "deleteConfirm": "Bạn có chắc chắn không?",
-                "deleteConfirmDetail": "Hành động này không thể hoàn tác. Thư mục và các kho lưu trữ được chọn sẽ bị xóa vĩnh viễn.",
-                "confirmDirectoryName": "Nhập tên thư mục để xác nhận",
-                "confirmDirectoryNameDescription": "Nhập \"{name}\" để xác nhận xóa",
-                "deleteNameMismatch": "Tên thư mục không khớp",
-                "deleteButton": "Xóa Thư mục",
+                "deleteConfirmDetail": "Hành động này không thể hoàn tác. Công việc và các kho lưu trữ được chọn sẽ bị xóa vĩnh viễn.",
+                "confirmWorkName": "Nhập tên công việc để xác nhận",
+                "confirmWorkNameDescription": "Nhập \"{name}\" để xác nhận xóa",
+                "deleteNameMismatch": "Tên công việc không khớp",
+                "deleteButton": "Xóa Công việc",
                 "deleteConfirmButton": "Có, Xóa",
-                "deleteSuccess": "Thư mục đã xóa thành công",
-                "deleteFailed": "Xóa thư mục thất bại",
+                "deleteSuccess": "Công việc đã xóa thành công",
+                "deleteFailed": "Xóa công việc thất bại",
                 "yesDelete": "Có, Xóa",
                 "cancel": "Hủy",
                 "saveChanges": "Lưu thay đổi",
@@ -1880,7 +1880,7 @@
                 "updateFailed": "Cập nhật cài đặt thất bại",
                 "deployProvider": {
                     "title": "Nhà cung cấp triển khai",
-                    "description": "Chọn nơi triển khai trang web thư mục của bạn",
+                    "description": "Chọn nơi triển khai trang web công việc của bạn",
                     "configure": "Cấu hình",
                     "ready": "Sẵn sàng triển khai",
                     "notConfigured": "Chưa cấu hình",
@@ -1917,7 +1917,7 @@
                     "prompts": {
                         "relevanceAssessment": {
                             "title": "Đánh giá độ liên quan",
-                            "description": "Hướng dẫn bổ sung để lọc các trang web theo độ liên quan đến chủ đề thư mục của bạn.",
+                            "description": "Hướng dẫn bổ sung để lọc các trang web theo độ liên quan đến chủ đề công việc của bạn.",
                             "placeholder": "ví dụ, Chỉ bao gồm các trang tập trung vào dự án mã nguồn mở..."
                         },
                         "itemGeneration": {
@@ -1968,7 +1968,7 @@
                 "communityPrUpdateFailed": "Cập nhật cài đặt PR cộng đồng thất bại",
                 "websiteConfig": {
                     "title": "Cấu hình Trang web",
-                    "subtitle": "Tùy chỉnh giao diện và hành vi của trang web thư mục",
+                    "subtitle": "Tùy chỉnh giao diện và hành vi của trang web công việc",
                     "loadFailed": "Tải cài đặt trang web thất bại",
                     "saveSuccess": "Cài đặt trang web lưu thành công",
                     "saveFailed": "Lưu cài đặt trang web thất bại",
@@ -1983,13 +1983,13 @@
                         "siteName": {
                             "title": "Danh tính Trang web",
                             "label": "Tên Trang web",
-                            "placeholder": "Thư mục của tôi",
+                            "placeholder": "Công việc của tôi",
                             "helper": "Tên hiển thị trên tiêu đề trang web và tab trình duyệt"
                         },
                         "siteUrl": {
                             "label": "URL Trang web",
                             "placeholder": "https://example.com",
-                            "helper": "URL của công ty hoặc trang web thư mục của bạn"
+                            "helper": "URL của công ty hoặc trang web công việc của bạn"
                         },
                         "global": {
                             "title": "Tính năng Toàn cục",
@@ -2071,7 +2071,7 @@
                 },
                 "committer": {
                     "title": "Người cam kết Git",
-                    "description": "Ghi đè tên và email người cam kết cho các commit git trong thư mục này. Để trống để sử dụng cài đặt cấp người dùng hoặc mặc định tài khoản.",
+                    "description": "Ghi đè tên và email người cam kết cho các commit git trong công việc này. Để trống để sử dụng cài đặt cấp người dùng hoặc mặc định tài khoản.",
                     "nameLabel": "Tên Người cam kết",
                     "emailLabel": "Email Người cam kết",
                     "save": "Lưu Người cam kết",
@@ -2082,13 +2082,13 @@
             "deploy": {
                 "noProviderAlert": {
                     "title": "Không có Nhà cung cấp Triển khai",
-                    "description": "Chọn nhà cung cấp triển khai để triển khai trang web thư mục của bạn.",
+                    "description": "Chọn nhà cung cấp triển khai để triển khai trang web công việc của bạn.",
                     "selectButton": "Chọn & Tiếp tục",
                     "noProviders": "Không có nhà cung cấp triển khai nào khả dụng. Cài đặt plugin triển khai trước."
                 },
                 "noTokenAlert": {
                     "title": "Cần Token {provider}",
-                    "description": "Để triển khai thư mục của bạn, bạn cần cấu hình token API {provider} trong Cài đặt Plugin.",
+                    "description": "Để triển khai công việc của bạn, bạn cần cấu hình token API {provider} trong Cài đặt Plugin.",
                     "configureButton": "Cấu hình trong Cài đặt Plugin",
                     "getTokenButton": "Lấy Token API",
                     "howTo": {
@@ -2096,25 +2096,25 @@
                         "step1": "Nhấp 'Lấy Token API' để mở bảng điều khiển nhà cung cấp của bạn",
                         "step2": "Tạo token mới với quyền triển khai",
                         "step3": "Cấu hình token API {provider} của bạn trong Cài đặt Plugin > {provider}",
-                        "step4": "Quay lại đây để triển khai thư mục của bạn"
+                        "step4": "Quay lại đây để triển khai công việc của bạn"
                     }
                 },
                 "sharedNoTokenAlert": {
                     "title": "Triển khai Không Khả dụng",
-                    "description": "Chủ sở hữu thư mục chưa cấu hình triển khai. Vui lòng liên hệ chủ sở hữu thư mục để thiết lập triển khai.",
+                    "description": "Chủ sở hữu công việc chưa cấu hình triển khai. Vui lòng liên hệ chủ sở hữu công việc để thiết lập triển khai.",
                     "hint": "Là cộng tác viên, bạn có thể kích hoạt triển khai sau khi chủ sở hữu cấu hình nhà cung cấp triển khai của họ."
                 },
                 "form": {
                     "deployment": {
                         "title": "Triển khai Trang web",
-                        "description": "Triển khai kho lưu trữ trang web thư mục của bạn.",
+                        "description": "Triển khai kho lưu trữ trang web công việc của bạn.",
                         "deployButton": "Triển khai đến {provider}",
                         "deployingButton": "Đang triển khai...",
                         "deployingStateButton": "Đang triển khai ({state})...",
                         "successMessage": "Trang web của bạn đã được triển khai thành công!",
                         "teamSelection": {
                             "title": "Chọn Nhóm",
-                            "description": "Chọn nhóm để triển khai thư mục này.",
+                            "description": "Chọn nhóm để triển khai công việc này.",
                             "label": "Nhóm",
                             "placeholder": "Chọn một nhóm",
                             "confirmButton": "Triển khai đến nhóm",
@@ -2141,7 +2141,7 @@
                     },
                     "info": {
                         "deployInfo": "Triển khai thường mất 1-3 phút. Bạn sẽ nhận được URL khi hoàn tất.",
-                        "updateInfo": "Cập nhật đồng bộ nội dung thư mục của bạn đến kho lưu trữ trang web cho triển khai tiếp theo."
+                        "updateInfo": "Cập nhật đồng bộ nội dung công việc của bạn đến kho lưu trữ trang web cho triển khai tiếp theo."
                     },
                     "websiteTemplate": {
                         "title": "Cập nhật Tự động Mẫu",
@@ -2161,7 +2161,7 @@
                         "title": "Cấu hình Trước Triển khai",
                         "description": "Xem xét và tùy chỉnh cài đặt trang web trước triển khai",
                         "siteName": "Tên Trang web",
-                        "siteNamePlaceholder": "Thư Mục Của Tôi",
+                        "siteNamePlaceholder": "Công Việc Của Tôi",
                         "siteNameHelper": "Tên hiển thị trên trang web của bạn (mặc định: Acme)",
                         "tabGeneral": "Chung",
                         "tabHeader": "Đầu trang",
@@ -2208,9 +2208,9 @@
                 }
             }
         },
-        "directoryCreation": {
-            "title": "Tạo Thư Mục Mới",
-            "subtitle": "Chọn cách bạn muốn tạo thư mục của mình",
+        "workCreation": {
+            "title": "Tạo Công Việc Mới",
+            "subtitle": "Chọn cách bạn muốn tạo công việc của mình",
             "backToOptions": "Quay lại các tùy chọn",
             "sidebar": {
                 "selectedProvider": "Nhà Cung Cấp Git",
@@ -2218,7 +2218,7 @@
             },
             "deployProvider": {
                 "title": "Nhà Cung Cấp Triển Khai",
-                "description": "Chọn nơi triển khai trang web thư mục của bạn",
+                "description": "Chọn nơi triển khai trang web công việc của bạn",
                 "noProviders": "Không có nhà cung cấp triển khai nào khả dụng",
                 "notConfigured": "Chưa cấu hình",
                 "configured": "Sẵn sàng triển khai",
@@ -2236,21 +2236,21 @@
             },
             "ai": {
                 "title": "Tạo Bằng AI",
-                "subtitle": "Mô tả ý tưởng thư mục của bạn bằng ngôn ngữ tự nhiên và để AI xử lý việc thiết lập",
+                "subtitle": "Mô tả ý tưởng công việc của bạn bằng ngôn ngữ tự nhiên và để AI xử lý việc thiết lập",
                 "getStarted": "Bắt đầu",
-                "formTitle": "Tạo Thư Mục Bằng AI",
-                "formSubtitle": "Mô tả ý tưởng thư mục của bạn và để AI xử lý việc thiết lập và tạo nội dung ban đầu",
-                "directoryNameLabel": "Tên Thư Mục",
-                "directoryNamePlaceholder": "ví dụ: Awesome AI Tools",
-                "directoryNameHelp": "AI sẽ gợi ý tên nếu bạn để trống",
-                "promptLabel": "Mô Tả Thư Mục Của Bạn",
+                "formTitle": "Tạo Công Việc Bằng AI",
+                "formSubtitle": "Mô tả ý tưởng công việc của bạn và để AI xử lý việc thiết lập và tạo nội dung ban đầu",
+                "workNameLabel": "Tên Công Việc",
+                "workNamePlaceholder": "ví dụ: Awesome AI Tools",
+                "workNameHelp": "AI sẽ gợi ý tên nếu bạn để trống",
+                "promptLabel": "Mô Tả Công Việc Của Bạn",
                 "githubRequired": "Vui lòng kết nối tài khoản GitHub của bạn trước.",
-                "promptPlaceholder": "Mô tả loại thư mục bạn muốn tạo, các mục nó nên chứa và bất kỳ yêu cầu cụ thể nào...",
+                "promptPlaceholder": "Mô tả loại công việc bạn muốn tạo, các mục nó nên chứa và bất kỳ yêu cầu cụ thể nào...",
                 "inspirationText": "Cần cảm hứng? Thử một trong số này:",
                 "examplePrompts": {
                     "0": {
                         "name": "Công Cụ AI Cho Nhà Phát Triển",
-                        "prompt": "Tạo thư mục các công cụ AI tốt nhất cho nhà phát triển"
+                        "prompt": "Tạo công việc các công cụ AI tốt nhất cho nhà phát triển"
                     },
                     "1": {
                         "name": "Trung Tâm Thành Phần React",
@@ -2258,7 +2258,7 @@
                     },
                     "2": {
                         "name": "Công Cụ Cho Nhóm Từ Xa",
-                        "prompt": "Tạo thư mục các ứng dụng tăng năng suất cho nhóm từ xa"
+                        "prompt": "Tạo công việc các ứng dụng tăng năng suất cho nhóm từ xa"
                     },
                     "3": {
                         "name": "Thời Trang Bền Vững",
@@ -2273,23 +2273,23 @@
                     "3": "Thiết lập kho GitHub với tài liệu phù hợp"
                 },
                 "generateButton": "Tạo Bằng AI",
-                "generatingButton": "Đang Tạo Thư Mục...",
+                "generatingButton": "Đang Tạo Công Việc...",
                 "cancelButton": "Hủy",
                 "noteTitle": "Lưu Ý:",
-                "noteText": "Việc tạo bằng AI thường mất 2-5 phút tùy thuộc vào độ phức tạp của yêu cầu. Bạn sẽ được thông báo khi thư mục sẵn sàng.",
+                "noteText": "Việc tạo bằng AI thường mất 2-5 phút tùy thuộc vào độ phức tạp của yêu cầu. Bạn sẽ được thông báo khi công việc sẵn sàng.",
                 "errors": {
-                    "promptRequired": "Vui lòng mô tả loại thư mục bạn muốn tạo",
+                    "promptRequired": "Vui lòng mô tả loại công việc bạn muốn tạo",
                     "unconfiguredProviders": "{providers} chưa được cấu hình. Truy cập Cài Đặt → Plugins để thiết lập trước khi tạo.",
-                    "nameRequired": "Tên thư mục là bắt buộc",
-                    "slugRequired": "Slug thư mục là bắt buộc",
-                    "descriptionRequired": "Mô tả thư mục là bắt buộc",
+                    "nameRequired": "Tên công việc là bắt buộc",
+                    "slugRequired": "Slug công việc là bắt buộc",
+                    "descriptionRequired": "Mô tả công việc là bắt buộc",
                     "githubRequired": "Vui lòng kết nối tài khoản GitHub của bạn trước.",
-                    "createFailed": "Tạo thư mục thất bại"
+                    "createFailed": "Tạo công việc thất bại"
                 },
                 "success": {
-                    "started": "Bắt đầu tạo thư mục!",
+                    "started": "Bắt đầu tạo công việc!",
                     "generating": "AI đang tạo nội dung. Có thể mất vài phút...",
-                    "created": "Thư mục được tạo thành công!"
+                    "created": "Công việc được tạo thành công!"
                 },
                 "advancedSettings": "Cài Đặt Nâng Cao",
                 "advancedSubtitle": "Cấu hình cài đặt tổ chức và kho lưu trữ",
@@ -2300,14 +2300,14 @@
             },
             "manual": {
                 "title": "Tạo Thủ Công",
-                "subtitle": "Cấu hình thư mục với toàn quyền kiểm soát mọi cài đặt và tùy chọn",
+                "subtitle": "Cấu hình công việc với toàn quyền kiểm soát mọi cài đặt và tùy chọn",
                 "configureNow": "Cấu hình ngay",
-                "formTitle": "Tạo Thư Mục Thủ Công",
-                "formSubtitle": "Cấu hình thư mục với toàn quyền kiểm soát mọi cài đặt",
+                "formTitle": "Tạo Công Việc Thủ Công",
+                "formSubtitle": "Cấu hình công việc với toàn quyền kiểm soát mọi cài đặt",
                 "basicInfo": "Thông Tin Cơ Bản",
-                "nameLabel": "Tên Thư Mục *",
+                "nameLabel": "Tên Công Việc *",
                 "namePlaceholder": "ví dụ: Awesome AI Tools",
-                "slugLabel": "Slug Thư Mục *",
+                "slugLabel": "Slug Công Việc *",
                 "slugPlaceholder": "awesome-ai-tools",
                 "githubRequired": "Vui lòng kết nối tài khoản GitHub của bạn trước.",
                 "slugHelp": "Định danh thân thiện với URL (chữ cái thường, số và dấu gạch ngang chỉ)",
@@ -2316,7 +2316,7 @@
                 "advancedSettings": "Cài Đặt Nâng Cao",
                 "advancedSubtitle": "Tổ chức, tiêu đề tùy chỉnh và hơn thế",
                 "organizationLabel": "Tạo Dưới Tổ Chức",
-                "organizationHelp": "Tạo thư mục này dưới tổ chức GitHub thay vì tài khoản cá nhân của bạn",
+                "organizationHelp": "Tạo công việc này dưới tổ chức GitHub thay vì tài khoản cá nhân của bạn",
                 "organizationNameLabel": "Tên Tổ Chức",
                 "organizationNamePlaceholder": "my-organization",
                 "headerLabel": "Tiêu Đề README Tùy Chỉnh",
@@ -2325,25 +2325,25 @@
                 "footerLabel": "Chân Trang README Tùy Chỉnh",
                 "footerPlaceholder": "Thêm nội dung tùy chỉnh vào cuối file README của bạn",
                 "footerOverwrite": "Thay thế hoàn toàn chân trang mặc định",
-                "createButton": "Tạo Thư Mục",
-                "creatingButton": "Đang Tạo Thư Mục...",
+                "createButton": "Tạo Công Việc",
+                "creatingButton": "Đang Tạo Công Việc...",
                 "cancelButton": "Hủy",
-                "nameRequired": "Tên thư mục là bắt buộc",
-                "slugRequired": "Slug thư mục là bắt buộc",
-                "descriptionRequired": "Mô tả thư mục là bắt buộc",
-                "createFailed": "Tạo thư mục thất bại",
+                "nameRequired": "Tên công việc là bắt buộc",
+                "slugRequired": "Slug công việc là bắt buộc",
+                "descriptionRequired": "Mô tả công việc là bắt buộc",
+                "createFailed": "Tạo công việc thất bại",
                 "success": {
-                    "created": "Thư mục được tạo thành công!"
+                    "created": "Công việc được tạo thành công!"
                 }
             },
             "import": {
-                "title": "Nhập Thư Mục Hiện Có",
-                "subtitle": "Nhập thư mục từ kho GitHub hiện có",
+                "title": "Nhập Công Việc Hiện Có",
+                "subtitle": "Nhập công việc từ kho GitHub hiện có",
                 "importNow": "Nhập ngay",
                 "aiProviderSettings": "Nhà Cung Cấp AI",
                 "aiProviderSettingsDescription": "Chọn nhà cung cấp AI để phân tích README",
-                "formTitle": "Nhập Thư Mục Từ GitHub",
-                "formSubtitle": "Nhập các mục từ kho GitHub hiện có để tạo thư mục của bạn",
+                "formTitle": "Nhập Công Việc Từ GitHub",
+                "formSubtitle": "Nhập các mục từ kho GitHub hiện có để tạo công việc của bạn",
                 "sync": {
                     "title": "Giữ Đồng Bộ",
                     "description": "Tự động kéo cập nhật từ kho nguồn."
@@ -2369,7 +2369,7 @@
                     "title": "Định Dạng Kho Hỗ Trợ",
                     "dataRepo": {
                         "title": "Kho Dữ Liệu",
-                        "description": "Các kho có config.yml và cấu trúc thư mục data/"
+                        "description": "Các kho có config.yml và cấu trúc công việc data/"
                     },
                     "awesomeReadme": {
                         "title": "Danh Sách Awesome",
@@ -2396,13 +2396,13 @@
                     "schedule": "Lịch trình: {cadence}",
                     "providers": "Nhà cung cấp: {providers}"
                 },
-                "nameLabel": "Tên Thư Mục",
-                "namePlaceholder": "ví dụ: Thư Mục Awesome Của Tôi",
+                "nameLabel": "Tên Công Việc",
+                "namePlaceholder": "ví dụ: Công Việc Awesome Của Tôi",
                 "advancedSettings": "Cài Đặt Nâng Cao",
                 "advancedSubtitle": "Cấu hình cài đặt tổ chức và kho lưu trữ",
                 "attribution": {
                     "title": "Ghi Công Nguồn:",
-                    "text": "Thư mục này sẽ tham chiếu {url} làm nguồn"
+                    "text": "Công việc này sẽ tham chiếu {url} làm nguồn"
                 },
                 "research": {
                     "title": "Chế Độ Nhập & Nghiên Cứu",
@@ -2425,13 +2425,13 @@
                     "importingButton": "Đang bắt đầu đường ống nghiên cứu..."
                 },
                 "analyzeButton": "Phân Tích Kho",
-                "importButton": "Nhập Thư Mục",
+                "importButton": "Nhập Công Việc",
                 "importingButton": "Đang Nhập...",
                 "backButton": "Quay Lại",
                 "cancelButton": "Hủy",
                 "importing": {
-                    "title": "Đang Nhập Thư Mục",
-                    "subtitle": "Đang thiết lập thư mục của bạn từ kho nguồn..."
+                    "title": "Đang Nhập Công Việc",
+                    "subtitle": "Đang thiết lập công việc của bạn từ kho nguồn..."
                 },
                 "repositorySelector": {
                     "title": "Chọn Kho",
@@ -2498,17 +2498,17 @@
                     "unsupportedFormat": "Định dạng kho này không được hỗ trợ. Vui lòng sử dụng định dạng Kho Dữ Liệu hoặc Danh Sách Awesome.",
                     "analyzeFailed": "Phân tích kho thất bại",
                     "analyzeForLinkingFailed": "Phân tích để liên kết thất bại",
-                    "nameRequired": "Tên thư mục là bắt buộc",
+                    "nameRequired": "Tên công việc là bắt buộc",
                     "noAnalysis": "Vui lòng phân tích kho trước",
                     "githubRequired": "Vui lòng kết nối tài khoản GitHub của bạn trước",
                     "providerRequired": "Vui lòng chọn nhà cung cấp Git trước",
-                    "importFailed": "Nhập thư mục thất bại",
-                    "linkFailed": "Liên kết thư mục thất bại",
+                    "importFailed": "Nhập công việc thất bại",
+                    "linkFailed": "Liên kết công việc thất bại",
                     "providerNotConfigured": "{provider} chưa được cấu hình. Truy cập Cài Đặt → Plugins để thiết lập trước khi nhập."
                 },
                 "success": {
-                    "started": "Bắt đầu nhập! Đang chuyển hướng đến thư mục của bạn...",
-                    "linked": "Thư mục liên kết thành công"
+                    "started": "Bắt đầu nhập! Đang chuyển hướng đến công việc của bạn...",
+                    "linked": "Công việc liên kết thành công"
                 },
                 "slugConflict": {
                     "title": "Xung đột tên kho",
@@ -2521,7 +2521,7 @@
             "connection": {
                 "alert": {
                     "title": "{provider} chưa được kết nối",
-                    "subtitle": "Kết nối tài khoản {provider} của bạn để tạo thư mục",
+                    "subtitle": "Kết nối tài khoản {provider} của bạn để tạo công việc",
                     "connectButton": "Kết nối {provider}",
                     "connectingButton": "Đang kết nối..."
                 }
@@ -2537,7 +2537,7 @@
             },
             "settings": {
                 "title": "Kết nối Nhà cung cấp Git",
-                "subtitle": "Kết nối tài khoản nhà cung cấp git của bạn để nhập kho lưu trữ, tạo thư mục và quản lý dự án của bạn.",
+                "subtitle": "Kết nối tài khoản nhà cung cấp git của bạn để nhập kho lưu trữ, tạo công việc và quản lý dự án của bạn.",
                 "connectedCount": "{count, plural, =0 {Không có nhà cung cấp nào được kết nối} =1 {1 nhà cung cấp được kết nối} other {# nhà cung cấp được kết nối}}",
                 "noProvidersConnected": "Không có nhà cung cấp nào được kết nối",
                 "canImport": "Bạn có thể nhập và quản lý kho lưu trữ",
@@ -2568,7 +2568,7 @@
                 "subtitle": "Cấu hình nhà cung cấp triển khai trong Cài đặt Plugin",
                 "connected": "Đã kết nối",
                 "notConnected": "Chưa Kết nối",
-                "connectedMessage": "Nhà cung cấp triển khai của bạn đã được cấu hình. Bạn có thể triển khai thư mục ngay bây giờ.",
+                "connectedMessage": "Nhà cung cấp triển khai của bạn đã được cấu hình. Bạn có thể triển khai công việc ngay bây giờ.",
                 "disconnect": "Ngắt kết nối",
                 "disconnecting": "Đang loại bỏ...",
                 "apiTokenLabel": "Mã thông báo API",
@@ -2604,17 +2604,17 @@
             "subtitle": "Chọn cách bạn muốn nhận thông báo về các cập nhật quan trọng",
             "email": {
                 "title": "Thông báo Email",
-                "directoryUpdates": {
-                    "label": "Cập nhật Thư mục",
-                    "description": "Nhận thông báo về các cập nhật quan trọng cho thư mục của bạn"
+                "workUpdates": {
+                    "label": "Cập nhật Công việc",
+                    "description": "Nhận thông báo về các cập nhật quan trọng cho công việc của bạn"
                 },
                 "newItems": {
                     "label": "Mục Mới",
-                    "description": "Nhận thông báo khi có mục mới được thêm vào thư mục của bạn"
+                    "description": "Nhận thông báo khi có mục mới được thêm vào công việc của bạn"
                 },
                 "weeklyDigest": {
                     "label": "Tóm tắt Hàng tuần",
-                    "description": "Nhận tóm tắt hàng tuần về hoạt động thư mục của bạn"
+                    "description": "Nhận tóm tắt hàng tuần về hoạt động công việc của bạn"
                 },
                 "marketing": {
                     "label": "Tiếp thị & Khuyến mãi",
@@ -2625,11 +2625,11 @@
                 "title": "Thông báo Trong Ứng dụng",
                 "newItems": {
                     "label": "Mục Mới",
-                    "description": "Hiển thị thông báo cho các mục thư mục mới"
+                    "description": "Hiển thị thông báo cho các mục công việc mới"
                 },
                 "comments": {
                     "label": "Bình luận",
-                    "description": "Nhận thông báo về bình luận trên thư mục của bạn"
+                    "description": "Nhận thông báo về bình luận trên công việc của bạn"
                 },
                 "mentions": {
                     "label": "Đề cập",
@@ -2653,12 +2653,12 @@
         "sidebar": {
             "menu": "Menu",
             "aiChat": "Trò chuyện AI",
-            "newDirectory": "Thư mục Mới",
-            "activityIndicator": "Đang tạo thư mục",
+            "newWork": "Công việc Mới",
+            "activityIndicator": "Đang tạo công việc",
             "navigation": {
                 "dashboard": "Bảng điều khiển",
                 "activity": "Hoạt động",
-                "directories": "Thư mục",
+                "works": "Công việc",
                 "plugins": "Plugin",
                 "settings": "Cài đặt"
             },
@@ -2680,7 +2680,7 @@
             "subtitle": "Các hành động không thể đảo ngược và phá hủy",
             "export": {
                 "title": "Xuất Dữ liệu Của Bạn",
-                "subtitle": "Tải xuống tất cả thư mục, mục và cài đặt của bạn",
+                "subtitle": "Tải xuống tất cả công việc, mục và cài đặt của bạn",
                 "action": "Xuất Dữ liệu (Sắp ra mắt)"
             },
             "delete": {
@@ -2690,8 +2690,8 @@
                 "confirmTitle": "⚠️ Điều này sẽ xóa vĩnh viễn:",
                 "confirmItems": [
                     "Tài khoản và hồ sơ của bạn",
-                    "Tất cả thư mục của bạn",
-                    "Tất cả mục và dữ liệu thư mục",
+                    "Tất cả công việc của bạn",
+                    "Tất cả mục và dữ liệu công việc",
                     "Khóa API và tích hợp",
                     "Tất cả trang web liên quan"
                 ],
@@ -2711,13 +2711,13 @@
         "aiChat": {
             "title": "Trợ lý AI",
             "panelTitle": "Trò chuyện",
-            "subtitle": "Tạo thư mục bằng ngôn ngữ tự nhiên",
+            "subtitle": "Tạo công việc bằng ngôn ngữ tự nhiên",
             "welcomeTitle": "Chào mừng đến với Trợ lý AI 👋",
-            "welcomeSubtitle": "Trợ lý được hỗ trợ bởi AI của bạn. Hỏi tôi bất cứ điều gì về việc tạo thư mục, tạo nội dung hoặc tổ chức dữ liệu của bạn.",
-            "welcomeMessage": "Chào! Tôi có thể giúp bạn tạo thư mục bằng ngôn ngữ tự nhiên. Hỏi điều gì đó như \"Tạo thư mục cho công cụ AI\" hoặc mô tả những gì bạn cần.",
+            "welcomeSubtitle": "Trợ lý được hỗ trợ bởi AI của bạn. Hỏi tôi bất cứ điều gì về việc tạo công việc, tạo nội dung hoặc tổ chức dữ liệu của bạn.",
+            "welcomeMessage": "Chào! Tôi có thể giúp bạn tạo công việc bằng ngôn ngữ tự nhiên. Hỏi điều gì đó như \"Tạo công việc cho công cụ AI\" hoặc mô tả những gì bạn cần.",
             "capabilities": {
-                "directoryCreation": "Tạo Thư mục",
-                "directoryCreationDesc": "Xây dựng thư mục từ mô tả ngôn ngữ tự nhiên",
+                "workCreation": "Tạo Công việc",
+                "workCreationDesc": "Xây dựng công việc từ mô tả ngôn ngữ tự nhiên",
                 "webResearch": "Nghiên cứu Web",
                 "webResearchDesc": "Tìm kiếm và thu thập dữ liệu từ khắp web",
                 "contentGeneration": "Tạo Nội dung",
@@ -2747,11 +2747,11 @@
             "selectProvider": "Nhà cung cấp",
             "notConfigured": "Chưa cấu hình",
             "gitNotConnected": "Nhà cung cấp Git chưa kết nối",
-            "gitNotConnectedDesc": "Kết nối nhà cung cấp git của bạn để tạo và quản lý thư mục.",
+            "gitNotConnectedDesc": "Kết nối nhà cung cấp git của bạn để tạo và quản lý công việc.",
             "connectGithub": "Kết nối GitHub",
             "gitConnectedAs": "Đã kết nối với tư cách {username} qua {provider}",
             "deployNotConfigured": "Nhà cung cấp triển khai chưa được cấu hình",
-            "deployNotConfiguredDesc": "Cấu hình nhà cung cấp triển khai để xuất bản trang web thư mục của bạn.",
+            "deployNotConfiguredDesc": "Cấu hình nhà cung cấp triển khai để xuất bản trang web công việc của bạn.",
             "configureDeployProvider": "Cấu hình Nhà cung cấp Triển khai",
             "deployConfigured": "Nhà cung cấp triển khai đã cấu hình ({provider})",
             "opened": "Đã mở",
@@ -2761,12 +2761,12 @@
             "historyYesterday": "Hôm qua",
             "historyDaysAgo": "{days} ngày trước",
             "suggestions": {
-                "s1": "Hiển thị thư mục của tôi",
-                "s2": "Tạo thư mục công cụ AI",
+                "s1": "Hiển thị công việc của tôi",
+                "s2": "Tạo công việc công cụ AI",
                 "s3": "Kiểm tra kết nối git của tôi",
                 "s4": "Hiển thị thống kê của tôi"
             },
-            "feelingLucky": "Gợi ý một thư mục để tạo",
+            "feelingLucky": "Gợi ý một công việc để tạo",
             "errors": {
                 "unableToSend": "Không thể gửi tin nhắn"
             }
@@ -2779,7 +2779,7 @@
             "enabled": "Đã bật",
             "disabled": "Đã tắt",
             "enable": "Bật",
-            "enableDescription": "Cấu hình cách plugin này được bật trên các thư mục của bạn.",
+            "enableDescription": "Cấu hình cách plugin này được bật trên các công việc của bạn.",
             "disable": "Tắt",
             "settings": "Cài đặt",
             "saveSettings": "Lưu cài đặt",
@@ -2811,11 +2811,11 @@
                 "pipeline": "Pipeline"
             },
             "alwaysEnabled": "Luôn bật",
-            "disableWarning": "Tắt plugin này cũng sẽ tắt nó trong tất cả thư mục của bạn",
+            "disableWarning": "Tắt plugin này cũng sẽ tắt nó trong tất cả công việc của bạn",
             "cannotDisableSystem": "Plugin hệ thống không thể bị tắt",
             "disableFailed": "Không thể tắt plugin",
-            "autoEnableForDirectories": "Cũng bật cho tất cả thư mục",
-            "autoEnableForDirectoriesDescription": "Plugin này sẽ tự động hoạt động trong tất cả thư mục của bạn. Bạn vẫn có thể tắt nó từng thư mục.",
+            "autoEnableForWorks": "Cũng bật cho tất cả công việc",
+            "autoEnableForWorksDescription": "Plugin này sẽ tự động hoạt động trong tất cả công việc của bạn. Bạn vẫn có thể tắt nó từng công việc.",
             "confirmDisable": "Xác nhận tắt",
             "cancel": "Hủy",
             "missingRequiredFields": "Thiếu các trường bắt buộc: {fields}",
@@ -2890,20 +2890,20 @@
                 "removeLabel": "Xóa {login}"
             }
         },
-        "directoryPlugins": {
-            "title": "Plugin thư mục",
-            "subtitle": "Cấu hình plugin cho thư mục này",
+        "workPlugins": {
+            "title": "Plugin công việc",
+            "subtitle": "Cấu hình plugin cho công việc này",
             "active": "Hoạt động",
             "enable": "Bật",
             "disable": "Tắt",
-            "enableForDirectory": "Bật cho thư mục này",
-            "disableForDirectory": "Tắt cho thư mục này",
+            "enableForWork": "Bật cho công việc này",
+            "disableForWork": "Tắt cho công việc này",
             "enableAtUserLevelFirst": "Bật plugin này trong cài đặt của bạn trước",
             "disabledByUser": "Đã tắt ở cấp người dùng",
             "systemAlwaysEnabled": "Plugin hệ thống - luôn bật",
             "showSettings": "Hiển thị cài đặt",
             "hideSettings": "Ẩn cài đặt",
-            "directorySettingsInfo": "Cấu hình cài đặt cụ thể cho thư mục tại đây",
+            "workSettingsInfo": "Cấu hình cài đặt cụ thể cho công việc tại đây",
             "save": "Lưu",
             "saved": "Đã lưu",
             "showInstalledOnly": "Chỉ hiển thị đã cài đặt",
@@ -2911,7 +2911,7 @@
             "noPlugins": "Không có plugin nào khả dụng",
             "showAllPlugins": "Hiển thị tất cả plugin",
             "capabilityProviders": "Nhà cung cấp khả năng",
-            "capabilityProvidersDescription": "Chọn plugin nào cung cấp từng khả năng cho thư mục này",
+            "capabilityProvidersDescription": "Chọn plugin nào cung cấp từng khả năng cho công việc này",
             "noProvidersAvailable": "Không có nhà cung cấp nào khả dụng",
             "categories": {
                 "git": "Git",
@@ -2929,12 +2929,12 @@
             "errors": {
                 "unableToSend": "Không thể gửi tin nhắn."
             },
-            "settingsModalTitle": "Cài đặt thư mục",
-            "settingsModalDescription": "Ghi đè cài đặt cho thư mục này. Các trường chưa đặt sẽ kế thừa từ cài đặt người dùng của bạn.",
+            "settingsModalTitle": "Cài đặt công việc",
+            "settingsModalDescription": "Ghi đè cài đặt cho công việc này. Các trường chưa đặt sẽ kế thừa từ cài đặt người dùng của bạn.",
             "inheritedFrom": "Kế thừa: {value}",
             "inheritedSecret": "Kế thừa: ••••••••",
             "resetToDefaults": "Đặt lại mặc định",
-            "resetConfirm": "Thao tác này sẽ xóa tất cả ghi đè cụ thể cho thư mục. Cài đặt sẽ quay về giá trị cấp người dùng.",
+            "resetConfirm": "Thao tác này sẽ xóa tất cả ghi đè cụ thể cho công việc. Cài đặt sẽ quay về giá trị cấp người dùng.",
             "resetSuccess": "Đã đặt lại cài đặt về mặc định",
             "cancel": "Hủy",
             "clickToConfigure": "Nhấp để cấu hình",
@@ -2949,8 +2949,8 @@
         "auth": {
             "backToHome": "Quay về trang chủ",
             "feature": {
-                "title": "Xây dựng Danh bạ với AI",
-                "subtitle": "Tạo danh bạ đẹp, có thể tìm kiếm trong vài phút bằng ngôn ngữ tự nhiên. Không cần mã hóa.",
+                "title": "Xây dựng Công việc với AI",
+                "subtitle": "Tạo công việc đẹp, có thể tìm kiếm trong vài phút bằng ngôn ngữ tự nhiên. Không cần mã hóa.",
                 "badge": "Được hỗ trợ bởi AI",
                 "benefits": {
                     "ai": {
@@ -3002,8 +3002,8 @@
         }
     },
     "metadata": {
-        "title": "{companyName} - Trình xây dựng Danh bạ",
-        "description": "Nền tảng SaaS để xây dựng và quản lý danh bạ",
+        "title": "{companyName} - Trình xây dựng Công việc",
+        "description": "Nền tảng SaaS để xây dựng và quản lý công việc",
         "pages": {
             "signIn": "Đăng nhập",
             "createAccount": "Tạo Tài khoản",
@@ -3012,9 +3012,9 @@
             "authError": "Lỗi Xác thực",
             "dashboard": "Bảng điều khiển",
             "activity": "Nhật ký Hoạt động",
-            "directories": "Danh bạ",
-            "newDirectory": "Danh bạ Mới",
-            "directory": "Danh bạ",
+            "works": "Công việc",
+            "newWork": "Công việc Mới",
+            "work": "Công việc",
             "overview": "Tổng quan",
             "items": "Mục",
             "generator": "Trình tạo",
@@ -3048,7 +3048,7 @@
         }
     },
     "actions": {
-        "directories": {
+        "works": {
             "slug": {
                 "required": "Slug là bắt buộc",
                 "format": "Slug chỉ được chứa chữ cái thường, số và dấu gạch ngang"
@@ -3067,16 +3067,16 @@
             },
             "oauthRequired": "Yêu cầu kết nối OAuth. Vui lòng kết nối tài khoản {provider} trước.",
             "githubRequired": "Yêu cầu kết nối GitHub. Vui lòng kết nối tài khoản GitHub trước.",
-            "createSuccess": "Tạo danh bạ thành công!",
-            "createFailed": "Tạo danh bạ thất bại",
-            "updateSuccess": "Cập nhật danh bạ thành công!",
-            "updateFailed": "Cập nhật danh bạ thất bại",
-            "invalidGeneratedData": "Tạo dữ liệu danh bạ hợp lệ thất bại",
-            "aiGenerationStarted": "Tạo danh bạ đã bắt đầu! AI đang tạo nội dung...",
-            "invalidId": "ID danh bạ không hợp lệ",
-            "deleteSuccess": "Xóa danh bạ thành công",
-            "deleteFailed": "Xóa danh bạ thất bại",
-            "fetchFailed": "Lấy danh bạ thất bại",
+            "createSuccess": "Tạo công việc thành công!",
+            "createFailed": "Tạo công việc thất bại",
+            "updateSuccess": "Cập nhật công việc thành công!",
+            "updateFailed": "Cập nhật công việc thất bại",
+            "invalidGeneratedData": "Tạo dữ liệu công việc hợp lệ thất bại",
+            "aiGenerationStarted": "Tạo công việc đã bắt đầu! AI đang tạo nội dung...",
+            "invalidId": "ID công việc không hợp lệ",
+            "deleteSuccess": "Xóa công việc thành công",
+            "deleteFailed": "Xóa công việc thất bại",
+            "fetchFailed": "Lấy công việc thất bại",
             "organization": {
                 "requiredWhenOwnerProvided": "Tổ chức phải được kích hoạt khi chủ sở hữu được cung cấp"
             },
@@ -3084,7 +3084,7 @@
                 "invalidUrl": "Vui lòng nhập URL hợp lệ",
                 "analyzeFailed": "Phân tích kho lưu trữ thất bại",
                 "started": "Nhập đã bắt đầu thành công",
-                "failed": "Nhập danh bạ thất bại",
+                "failed": "Nhập công việc thất bại",
                 "fetchReposFailed": "Lấy kho lưu trữ thất bại"
             }
         },

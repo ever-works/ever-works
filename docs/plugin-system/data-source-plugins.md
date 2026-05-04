@@ -7,7 +7,7 @@ sidebar_position: 12
 
 # Data Source Plugins
 
-Data source plugins import pre-existing items from external APIs and data services into a directory. Unlike search plugins (which discover items from web results), data source plugins pull structured data from specific platforms and transform it into the `ItemData` format used by the Ever Works platform.
+Data source plugins import pre-existing items from external APIs and data services into a work. Unlike search plugins (which discover items from web results), data source plugins pull structured data from specific platforms and transform it into the `ItemData` format used by the Ever Works platform.
 
 ## IDataSourcePlugin Interface
 
@@ -46,17 +46,17 @@ interface DataSourceQueryOptions {
 
 ### Filter Context
 
-Data source plugins receive a `DataSourceFilterContext` that helps them return only items relevant to the directory being generated:
+Data source plugins receive a `DataSourceFilterContext` that helps them return only items relevant to the work being generated:
 
 ```typescript
 interface DataSourceFilterContext {
-	prompt?: string; // Directory description/prompt
-	subject?: string; // Directory subject/topic
+	prompt?: string; // Work description/prompt
+	subject?: string; // Work subject/topic
 	keywords?: string[]; // Keywords extracted from prompt
 }
 ```
 
-Plugins should use this context to filter their results, ensuring that only relevant items are returned for the directory's domain.
+Plugins should use this context to filter their results, ensuring that only relevant items are returned for the work's domain.
 
 ## Query Result
 
@@ -71,7 +71,7 @@ interface DataSourceQueryResult {
 }
 ```
 
-Data sources return items alongside any taxonomy data (categories, tags, brands) that can be used to organize the imported items in the directory.
+Data sources return items alongside any taxonomy data (categories, tags, brands) that can be used to organize the imported items in the work.
 
 ## Available Plugins
 
@@ -85,7 +85,7 @@ Data sources return items alongside any taxonomy data (categories, tags, brands)
 | Dependencies       | `stopword`                 |
 | Configuration Mode | `hybrid`                   |
 
-Apify is a web scraping and automation platform with a marketplace of pre-built "Actors" (scraping templates). The Apify plugin imports items from Apify datasets into Ever Works directories.
+Apify is a web scraping and automation platform with a marketplace of pre-built "Actors" (scraping templates). The Apify plugin imports items from Apify datasets into Ever Works works.
 
 **How it works:**
 
@@ -187,7 +187,7 @@ interface DataSourceSyncResult {
 }
 ```
 
-This allows directories to be kept up-to-date with their external data sources through scheduled sync operations.
+This allows works to be kept up-to-date with their external data sources through scheduled sync operations.
 
 ## Data Source Metadata
 
@@ -211,8 +211,8 @@ This metadata is used by the platform to display information about the data sour
 
 Data source plugins are consumed by the pipeline during the data aggregation phase:
 
-1. The pipeline identifies configured data source plugins for the directory
-2. It calls `query()` with the directory's prompt/subject as filter context
+1. The pipeline identifies configured data source plugins for the work
+2. It calls `query()` with the work's prompt/subject as filter context
 3. Returned items are merged with items discovered through search
 4. Deduplication logic ensures no duplicate items across search results and data sources
 5. The combined items proceed through the rest of the pipeline (category processing, badge processing, etc.)

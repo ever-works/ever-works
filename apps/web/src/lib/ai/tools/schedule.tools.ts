@@ -1,36 +1,36 @@
 import { z } from 'zod';
 import { tool } from 'ai';
 import {
-    updateDirectorySchedule,
-    runDirectorySchedule,
-    cancelDirectorySchedule,
-} from '@/app/actions/dashboard/directory-schedule';
-import { DirectoryScheduleCadence, DirectoryScheduleBillingMode } from '@/lib/api/enums';
+    updateWorkSchedule,
+    runWorkSchedule,
+    cancelWorkSchedule,
+} from '@/app/actions/dashboard/work-schedule';
+import { WorkScheduleCadence, WorkScheduleBillingMode } from '@/lib/api/enums';
 
 export const setSchedule = tool({
-    description: 'Enable or update a scheduled generation for a directory.',
+    description: 'Enable or update a scheduled generation for a Work.',
     inputSchema: z.object({
-        directoryId: z.string().describe('Directory ID'),
+        workId: z.string().describe('Work ID'),
         enable: z.boolean().describe('Enable or disable schedule'),
         cadence: z
             .enum(['hourly', 'daily', 'weekly', 'monthly'])
             .optional()
             .describe('How often to run (required when enabling)'),
     }),
-    execute: async ({ directoryId, enable, cadence }) => {
-        const cadenceMap: Record<string, DirectoryScheduleCadence> = {
-            hourly: DirectoryScheduleCadence.HOURLY,
-            every_3_hours: DirectoryScheduleCadence.EVERY_3_HOURS,
-            every_8_hours: DirectoryScheduleCadence.EVERY_8_HOURS,
-            every_12_hours: DirectoryScheduleCadence.EVERY_12_HOURS,
-            daily: DirectoryScheduleCadence.DAILY,
-            weekly: DirectoryScheduleCadence.WEEKLY,
-            monthly: DirectoryScheduleCadence.MONTHLY,
+    execute: async ({ workId, enable, cadence }) => {
+        const cadenceMap: Record<string, WorkScheduleCadence> = {
+            hourly: WorkScheduleCadence.HOURLY,
+            every_3_hours: WorkScheduleCadence.EVERY_3_HOURS,
+            every_8_hours: WorkScheduleCadence.EVERY_8_HOURS,
+            every_12_hours: WorkScheduleCadence.EVERY_12_HOURS,
+            daily: WorkScheduleCadence.DAILY,
+            weekly: WorkScheduleCadence.WEEKLY,
+            monthly: WorkScheduleCadence.MONTHLY,
         };
-        const result = await updateDirectorySchedule(directoryId, {
+        const result = await updateWorkSchedule(workId, {
             enable,
             cadence: cadenceMap[cadence ?? 'weekly'],
-            billingMode: DirectoryScheduleBillingMode.USAGE,
+            billingMode: WorkScheduleBillingMode.USAGE,
             maxFailureBeforePause: 3,
         });
         return { success: result.success, message: result.message, error: result.error };
@@ -38,12 +38,12 @@ export const setSchedule = tool({
 });
 
 export const runScheduleNow = tool({
-    description: 'Manually trigger a scheduled generation run for a directory.',
+    description: 'Manually trigger a scheduled generation run for a Work.',
     inputSchema: z.object({
-        directoryId: z.string().describe('Directory ID'),
+        workId: z.string().describe('Work ID'),
     }),
-    execute: async ({ directoryId }) => {
-        const result = await runDirectorySchedule(directoryId);
+    execute: async ({ workId }) => {
+        const result = await runWorkSchedule(workId);
         return { success: result.success, message: result.message, error: result.error };
     },
 });
@@ -51,10 +51,10 @@ export const runScheduleNow = tool({
 export const cancelSchedule = tool({
     description: 'Cancel an active scheduled generation.',
     inputSchema: z.object({
-        directoryId: z.string().describe('Directory ID'),
+        workId: z.string().describe('Work ID'),
     }),
-    execute: async ({ directoryId }) => {
-        const result = await cancelDirectorySchedule(directoryId);
+    execute: async ({ workId }) => {
+        const result = await cancelWorkSchedule(workId);
         return { success: result.success, message: result.message, error: result.error };
     },
 });

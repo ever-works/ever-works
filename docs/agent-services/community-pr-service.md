@@ -9,23 +9,23 @@ sidebar_position: 17
 
 ## Overview
 
-The `CommunityPrProcessorService` automates the processing of community pull requests submitted to directory repositories. It scans open PRs for new item submissions, uses AI to extract structured directory items from PR diffs, writes them to the data repository, and optionally auto-closes processed PRs. This enables a fully automated community contribution pipeline.
+The `CommunityPrProcessorService` automates the processing of community pull requests submitted to work repositories. It scans open PRs for new item submissions, uses AI to extract structured work items from PR diffs, writes them to the data repository, and optionally auto-closes processed PRs. This enables a fully automated community contribution pipeline.
 
 ## Architecture
 
-The service operates as a batch processor, typically triggered by a cron job. It iterates over all directories with community PR processing enabled, fetches their open PRs, and processes each unprocessed PR through an AI extraction pipeline.
+The service operates as a batch processor, typically triggered by a cron job. It iterates over all works with community PR processing enabled, fetches their open PRs, and processes each unprocessed PR through an AI extraction pipeline.
 
 ```
 Cron Job / Scheduled Task
         |
         v
-CommunityPrProcessorService.processAllDirectories()
+CommunityPrProcessorService.processAllWorks()
         |
-        +-- DirectoryRepository.findWithCommunityPrEnabled()
+        +-- WorkRepository.findWithCommunityPrEnabled()
         |
-        +-- For each directory:
+        +-- For each work:
                 |
-                +-- processDirectory(directory, state, autoClose)
+                +-- processWork(work, state, autoClose)
                         |
                         +-- GitFacade.listPullRequests()  --> get open PRs
                         |
@@ -49,31 +49,31 @@ CommunityPrProcessorService.processAllDirectories()
 
 ### Methods
 
-#### `processAllDirectories()`
+#### `processAllWorks()`
 
-Processes open PRs for all directories that have community PR processing enabled.
+Processes open PRs for all works that have community PR processing enabled.
 
 **Returns:** `Promise<CommunityPrProcessingResult>`
 
 ```typescript
 interface CommunityPrProcessingResult {
-	processed: number; // total items added across all directories
+	processed: number; // total items added across all works
 	errors: Array<{
-		directoryId: string;
+		workId: string;
 		error: string;
 	}>;
 }
 ```
 
-#### `processDirectory(directory, state?, autoClose?)`
+#### `processWork(work, state?, autoClose?)`
 
-Processes open PRs for a single directory.
+Processes open PRs for a single work.
 
-| Parameter   | Type                          | Description                                                                |
-| ----------- | ----------------------------- | -------------------------------------------------------------------------- |
-| `directory` | `Directory`                   | The directory entity to process                                            |
-| `state`     | `CommunityPrState` (optional) | Existing processing state; loaded from directory if not provided           |
-| `autoClose` | `boolean` (optional)          | Whether to auto-close processed PRs; loaded from directory if not provided |
+| Parameter   | Type                          | Description                                                           |
+| ----------- | ----------------------------- | --------------------------------------------------------------------- |
+| `work`      | `Work`                        | The work entity to process                                            |
+| `state`     | `CommunityPrState` (optional) | Existing processing state; loaded from work if not provided           |
+| `autoClose` | `boolean` (optional)          | Whether to auto-close processed PRs; loaded from work if not provided |
 
 **Returns:** `Promise<number>` -- total items added from all processed PRs.
 
@@ -81,7 +81,7 @@ Processes open PRs for a single directory.
 
 ### State Management
 
-The service tracks processing state in the `communityPrState` field on the directory entity:
+The service tracks processing state in the `communityPrState` field on the work entity:
 
 ```typescript
 interface CommunityPrState {
@@ -108,7 +108,7 @@ For each PR, the service:
 
 The extraction prompt includes:
 
-- Directory name and description for context
+- Work name and description for context
 - Existing category names for proper categorization
 - PR title, body, and diff content
 - Instructions to extract items with name, description, source URL, category, and tags
@@ -131,7 +131,7 @@ z.object({
 
 ### Data Repository Updates
 
-Extracted items are written to the data repository using slugified names as directory paths. Each item gets:
+Extracted items are written to the data repository using slugified names as work paths. Each item gets:
 
 - A JSON data file with structured metadata
 - A markdown file with formatted content
@@ -149,19 +149,19 @@ The service posts comments on PRs at multiple stages:
 
 ## Database Interactions
 
-| Repository            | Method                               | Purpose                                        |
-| --------------------- | ------------------------------------ | ---------------------------------------------- |
-| `DirectoryRepository` | `findWithCommunityPrEnabled()`       | Find all directories with community PR enabled |
-| `DirectoryRepository` | `update(id, { communityPrState })`   | Persist updated processing state               |
-| `DirectoryRepository` | `increment(id, 'itemsCount', count)` | Atomically increment item count                |
+| Repository       | Method                               | Purpose                                  |
+| ---------------- | ------------------------------------ | ---------------------------------------- |
+| `WorkRepository` | `findWithCommunityPrEnabled()`       | Find all works with community PR enabled |
+| `WorkRepository` | `update(id, { communityPrState })`   | Persist updated processing state         |
+| `WorkRepository` | `increment(id, 'itemsCount', count)` | Atomically increment item count          |
 
 ## Event System
 
-This service does not emit domain events. PR processing results are tracked via the `communityPrState` on the directory entity.
+This service does not emit domain events. PR processing results are tracked via the `communityPrState` on the work entity.
 
 ## Error Handling
 
-- **Per-directory isolation:** Each directory is processed in its own try-catch. A failure in one directory does not block others.
+- **Per-work isolation:** Each work is processed in its own try-catch. A failure in one work does not block others.
 - **Per-PR isolation:** Each PR is processed in its own try-catch. Failed PRs have their error recorded in `state.lastError` and their PR number is still added to `processedPrNumbers` to prevent retry loops.
 - **Empty patches:** PRs with no meaningful patch content receive a comment and are counted as processed.
 - **AI extraction failures:** Caught and logged; the PR is marked as processed to avoid infinite retries.
@@ -169,26 +169,26 @@ This service does not emit domain events. PR processing results are tracked via 
 ## Usage Examples
 
 ```typescript
-// Process all directories (cron job)
-const result = await communityPrProcessor.processAllDirectories();
+// Process all works (cron job)
+const result = await communityPrProcessor.processAllWorks();
 console.log(`Added ${result.processed} items`);
 console.log(`Errors: ${result.errors.length}`);
 
-// Process a single directory
-const itemsAdded = await communityPrProcessor.processDirectory(directory);
+// Process a single work
+const itemsAdded = await communityPrProcessor.processWork(work);
 ```
 
 ## Configuration
 
-| Setting                     | Value         | Description                                   |
-| --------------------------- | ------------- | --------------------------------------------- |
-| `MAX_PROCESSED_PR_NUMBERS`  | 500           | Maximum tracked PR numbers before trimming    |
-| `MAX_CHANGE_CONTEXT_LENGTH` | 50,000        | Maximum characters of diff context sent to AI |
-| `communityPrEnabled`        | per-directory | Feature flag on the directory entity          |
-| `communityPrAutoClose`      | per-directory | Whether to close PRs after processing         |
-| AI temperature              | 0.3           | Slightly creative for extraction flexibility  |
+| Setting                     | Value    | Description                                   |
+| --------------------------- | -------- | --------------------------------------------- |
+| `MAX_PROCESSED_PR_NUMBERS`  | 500      | Maximum tracked PR numbers before trimming    |
+| `MAX_CHANGE_CONTEXT_LENGTH` | 50,000   | Maximum characters of diff context sent to AI |
+| `communityPrEnabled`        | per-work | Feature flag on the work entity               |
+| `communityPrAutoClose`      | per-work | Whether to close PRs after processing         |
+| AI temperature              | 0.3      | Slightly creative for extraction flexibility  |
 
 ## Related Services
 
-- [Directory Import Service](/agent-services/directory-import-service) -- alternative data ingestion path
+- [Work Import Service](/agent-services/work-import-service) -- alternative data ingestion path
 - [Import System](/agent-services/import-system) -- used by import service for similar data extraction patterns

@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { ContentRetrievalStep } from '../steps/content-retrieval.step';
-import type { StepExecutionContext, DirectoryReference, GenerationRequest } from '@ever-works/plugin';
+import type { StepExecutionContext, WorkReference, GenerationRequest } from '@ever-works/plugin';
 import type { MutableGenerationContext } from '../context/index.js';
 
 describe('ContentRetrievalStep', () => {
@@ -27,10 +27,10 @@ describe('ContentRetrievalStep', () => {
 		extractContent: vi.fn().mockResolvedValue({ rawContent: 'extracted content' })
 	});
 
-	const createMockDirectory = (): DirectoryReference => ({
+	const createMockWork = (): WorkReference => ({
 		id: 'test-dir-id',
-		slug: 'test-directory',
-		name: 'Test Directory'
+		slug: 'test-work',
+		name: 'Test Work'
 	});
 
 	const createMockRequest = (overrides?: Partial<GenerationRequest>): GenerationRequest =>
@@ -45,7 +45,7 @@ describe('ContentRetrievalStep', () => {
 
 	const createMockContext = (overrides?: Partial<MutableGenerationContext>): MutableGenerationContext =>
 		({
-			directory: createMockDirectory(),
+			work: createMockWork(),
 			request: createMockRequest(),
 			extractedUrls: [],
 			processedSourceUrls: new Set<string>(),
@@ -56,7 +56,7 @@ describe('ContentRetrievalStep', () => {
 			...overrides
 		}) as MutableGenerationContext;
 
-	const expectedFacadeOptions = { userId: 'test-user-id', directoryId: 'test-dir-id' };
+	const expectedFacadeOptions = { userId: 'test-user-id', workId: 'test-dir-id' };
 
 	beforeEach(() => {
 		step = new ContentRetrievalStep();
@@ -68,7 +68,7 @@ describe('ContentRetrievalStep', () => {
 			aiFacade: {} as StepExecutionContext['aiFacade'],
 			screenshotFacade: {} as StepExecutionContext['screenshotFacade'],
 			user: { id: 'test-user-id' },
-			directory: { id: 'test-dir-id' }
+			work: { id: 'test-dir-id' }
 		} as unknown as StepExecutionContext;
 	});
 

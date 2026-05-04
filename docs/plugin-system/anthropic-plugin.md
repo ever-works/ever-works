@@ -7,7 +7,7 @@ sidebar_position: 22
 
 # Anthropic AI Provider Plugin
 
-The Anthropic plugin connects Ever Works to Anthropic's Claude API. Claude is recognized for producing well-structured, nuanced content and adhering closely to instructions, making it particularly suited for directory descriptions and detailed content generation.
+The Anthropic plugin connects Ever Works to Anthropic's Claude API. Claude is recognized for producing well-structured, nuanced content and adhering closely to instructions, making it particularly suited for work descriptions and detailed content generation.
 
 **Source:** `packages/plugins/anthropic/src/anthropic.plugin.ts`
 
@@ -186,7 +186,7 @@ Both plugins share the same `BaseAiProvider` base class and `AiOperations` abstr
 
 When Anthropic is selected as the AI provider:
 
-1. **Content generation** -- Claude generates directory item descriptions, summaries, and metadata. Its instruction-following precision is useful for maintaining consistent formatting.
+1. **Content generation** -- Claude generates work item descriptions, summaries, and metadata. Its instruction-following precision is useful for maintaining consistent formatting.
 2. **Conversational AI** -- Powers the chat assistant in the web dashboard.
 3. **Structured extraction** -- Uses tool calling to extract structured data from web content.
 

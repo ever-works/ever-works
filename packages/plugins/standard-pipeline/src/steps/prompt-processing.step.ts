@@ -44,7 +44,7 @@ Extract specifications for items that should be highlighted:
 - Company-specific products when mentioned
 
 ### 5. Subject Extraction
-Extract the core subject/topic that the user wants to build a directory about.
+Extract the core subject/topic that the user wants to build a work about.
 This is the main theme stripped of decorative words like "Awesome", "Best", "Top", "List of", etc.
 
 Examples:
@@ -88,7 +88,7 @@ Return:
 2. Suggested categories (explicitly mentioned)
 3. Priority categories (with priority indicators)
 4. Featured item hints
-5. Subject (core topic of the directory)
+5. Subject (core topic of the work)
 6. Rewritten prompt (core task only)` as const;
 
 const promptProcessingOutputSchema = z.object({
@@ -106,7 +106,7 @@ const promptProcessingOutputSchema = z.object({
 		),
 	subject: z
 		.string()
-		.describe('The core subject/topic of the directory, stripped of decorative words like "Awesome", "Best", etc.'),
+		.describe('The core subject/topic of the work, stripped of decorative words like "Awesome", "Best", etc.'),
 	rewrittenPrompt: z.string().describe('The prompt rewritten without URLs but preserving context')
 });
 
@@ -124,16 +124,16 @@ export class PromptProcessingStep extends BasePipelineStep {
 		context: MutableGenerationContext,
 		execContext: StepExecutionContext
 	): Promise<MutableGenerationContext> {
-		const { request, existing, directory, metrics } = context;
+		const { request, existing, work, metrics } = context;
 		const { logger, aiFacade, promptFacade } = execContext;
 		const config = request.config || {};
 
 		const facadeOptions: FacadeOptions = {
 			userId: execContext.user!.id,
-			directoryId: execContext.directory.id
+			workId: execContext.work.id
 		};
 
-		logger.log(`[${directory.slug}] Prompt Processing - Starting`);
+		logger.log(`[${work.slug}] Prompt Processing - Starting`);
 
 		const {
 			extractedUrls: extractedUrlsFromPrompt,
@@ -205,9 +205,9 @@ export class PromptProcessingStep extends BasePipelineStep {
 		context.featuredItemHints = featuredItemHints;
 		context.subject = subject;
 
-		logger.log(`[${directory.slug}] Prompt Processing Complete`);
+		logger.log(`[${work.slug}] Prompt Processing Complete`);
 		logger.debug(
-			`[${directory.slug}] Extracted ${extractedUrls.length} URLs, ${allInitialCategories.length} categories`
+			`[${work.slug}] Extracted ${extractedUrls.length} URLs, ${allInitialCategories.length} categories`
 		);
 
 		return context;

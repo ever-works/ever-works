@@ -38,7 +38,7 @@ export const config = {
         appDescription: () =>
             process.env.APP_DESCRIPTION ||
             process.env.NEXT_PUBLIC_SITE_DESCRIPTION ||
-            'A SaaS platform for building and managing directories',
+            'A SaaS platform for building and managing works',
     },
 
     mail: {
@@ -125,7 +125,7 @@ export const config = {
         },
     },
 
-    directory: {
-        staleTimeoutHours: () => parseInt(process.env.DIRECTORY_STALE_TIMEOUT_HOURS || '2', 10),
+    work: {
+        staleTimeoutHours: () => parseInt(process.env.WORK_STALE_TIMEOUT_HOURS || '2', 10),
     },
 };

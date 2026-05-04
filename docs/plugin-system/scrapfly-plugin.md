@@ -224,9 +224,9 @@ Note that a new `ScrapflyClient` is created for each operation, using the API ke
 
 ## How It Works in Ever Works
 
-Scrapfly serves dual purposes during directory generation:
+Scrapfly serves dual purposes during work generation:
 
-1. **Screenshot capture**: Capturing preview images of directory items (websites, products, etc.)
+1. **Screenshot capture**: Capturing preview images of work items (websites, products, etc.)
 2. **Content extraction**: Pulling text content from web pages to enrich item descriptions
 
 Its anti-bot capabilities make it effective for scraping sites that block standard HTTP requests, such as e-commerce platforms and social media sites.

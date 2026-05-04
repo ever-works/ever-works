@@ -5,14 +5,14 @@ import type { IBaseFacade } from './base-facade.interface.js';
 export interface DataSourceFacadeOptions {
 	/** User ID for settings resolution */
 	readonly userId: string;
-	/** Directory ID - required for Level 2 enable check */
-	readonly directoryId?: string;
+	/** Work ID - required for Level 2 enable check */
+	readonly workId?: string;
 	/** Maximum number of items to return per source */
 	readonly limit?: number;
 	/**
 	 * Plugin configuration from GeneratorForm (Level 3 options).
 	 * Contains per-generation settings like datasetId, maxItems, etc.
-	 * Note: Enable/disable is at Level 2 (DirectoryPlugin), not here.
+	 * Note: Enable/disable is at Level 2 (WorkPlugin), not here.
 	 */
 	readonly pluginConfig?: Record<string, Record<string, unknown>>;
 	/**
@@ -50,17 +50,17 @@ export interface EnabledDataSource {
  * Data Source Facade interface for pipeline steps.
  *
  * Provides unified access to external data sources (Apify, etc.).
- * Checks DirectoryPlugin.enabled (Level 2) or autoEnable in manifest.
+ * Checks WorkPlugin.enabled (Level 2) or autoEnable in manifest.
  */
 export interface IDataSourceFacade extends IBaseFacade {
 	/**
 	 * Query all enabled data sources and aggregate their items.
-	 * Checks DirectoryPlugin.enabled or autoEnable manifest flag.
+	 * Checks WorkPlugin.enabled or autoEnable manifest flag.
 	 */
 	queryAll(options: DataSourceFacadeOptions): Promise<DataSourceFacadeResult>;
 
 	/**
-	 * Get a list of all enabled data sources for a directory.
+	 * Get a list of all enabled data sources for a work.
 	 */
-	getEnabledSources(directoryId: string, userId: string): Promise<EnabledDataSource[]>;
+	getEnabledSources(workId: string, userId: string): Promise<EnabledDataSource[]>;
 }

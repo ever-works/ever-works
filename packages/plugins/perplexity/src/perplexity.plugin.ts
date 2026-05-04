@@ -202,14 +202,14 @@ export class PerplexitySearchPlugin implements IPlugin, ISearchPlugin {
 				'',
 				'## How it works in Ever Works',
 				'',
-				'When enabled as the active search provider, Perplexity is used during directory generation to find relevant information about each item. Its AI-powered understanding produces more contextually relevant results than traditional keyword search.',
+				'When enabled as the active search provider, Perplexity is used during work generation to find relevant information about each item. Its AI-powered understanding produces more contextually relevant results than traditional keyword search.',
 				'',
 				'## Getting started',
 				'',
 				'1. Create an account at [perplexity.ai](https://perplexity.ai)',
 				'2. Get your API key from [perplexity.ai/account/api](https://perplexity.ai/account/api)',
 				'3. Enter the key in the **API Key** field below',
-				'4. Enable this plugin to use it for directory generation'
+				'4. Enable this plugin to use it for work generation'
 			].join('\n')
 		};
 	}

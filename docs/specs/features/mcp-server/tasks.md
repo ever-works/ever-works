@@ -27,7 +27,7 @@
 
 ## Phase 4 — Tools (across releases)
 
-- [x] T11. Directories (12), Generation (4), Items (4), Deployment (4),
+- [x] T11. Works (12), Generation (4), Items (4), Deployment (4),
       Plugins (5), Scheduling (4), Comparisons (5) — total 36.
 
 ## Phase 5 — Deployment

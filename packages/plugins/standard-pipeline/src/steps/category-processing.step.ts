@@ -18,7 +18,7 @@ import { itemDataWithCategoriesAndTagsSchema } from '../schemas/item-extraction.
 
 // Base prompt for categorization
 const CATEGORY_PROMPT =
-	`You are directory website builder and your task is to Categorize the given items following these rules and task context.
+	`You are work website builder and your task is to Categorize the given items following these rules and task context.
 
 <rules>
 1. Assign ONE category per item based on primary function
@@ -52,7 +52,7 @@ Items to categorize:
 
 // Enhanced prompt with existing categories/tags context
 const ENHANCED_CATEGORY_PROMPT =
-	`You are directory website builder and your task is to Categorize the given items following these rules and task context.
+	`You are work website builder and your task is to Categorize the given items following these rules and task context.
 
 <rules>
 1. Assign ONE category per item based on primary function
@@ -129,7 +129,7 @@ export class CategoryProcessingStep extends BasePipelineStep {
 	): Promise<MutableGenerationContext> {
 		const {
 			request,
-			directory,
+			work,
 			existing,
 			aggregatedItems,
 			allInitialCategories,
@@ -139,7 +139,7 @@ export class CategoryProcessingStep extends BasePipelineStep {
 		} = context;
 		const { logger } = execContext;
 
-		logger.log(`[${directory.slug}] Category and Tag Generation - Starting`);
+		logger.log(`[${work.slug}] Category and Tag Generation - Starting`);
 
 		// Check entity generation toggles from config
 		const config = request.config || {};
@@ -150,7 +150,7 @@ export class CategoryProcessingStep extends BasePipelineStep {
 
 		// If all entity generation is disabled, skip AI processing entirely
 		if (!generateCategories && !generateTags && !generateBrands) {
-			logger.log(`[${directory.slug}] All entity generation disabled, assigning default category`);
+			logger.log(`[${work.slug}] All entity generation disabled, assigning default category`);
 
 			const defaultCategory = { id: 'uncategorized', name: 'Uncategorized' };
 			const finalItems = aggregatedItems.map((item) => ({
@@ -170,7 +170,7 @@ export class CategoryProcessingStep extends BasePipelineStep {
 		}
 
 		const { categories, tags, collections, brands, finalItems } = await this.processCategoriesAndTags(
-			directory.slug,
+			work.slug,
 			request.prompt || '',
 			allPriorityCategories,
 			aggregatedItems,
@@ -188,7 +188,7 @@ export class CategoryProcessingStep extends BasePipelineStep {
 			execContext
 		);
 
-		logger.log(`[${directory.slug}] Directory data generation complete. Final metrics: ${JSON.stringify(metrics)}`);
+		logger.log(`[${work.slug}] Work data generation complete. Final metrics: ${JSON.stringify(metrics)}`);
 
 		context.finalItems = finalItems;
 		context.finalCategories = categories;
@@ -203,7 +203,7 @@ export class CategoryProcessingStep extends BasePipelineStep {
 	 * Process items to generate categories and tags
 	 */
 	private async processCategoriesAndTags(
-		directorySlug: string,
+		workSlug: string,
 		prompt: string,
 		priorityCategories: string[],
 		extractedItems: MutableItemData[],
@@ -228,13 +228,13 @@ export class CategoryProcessingStep extends BasePipelineStep {
 	}> {
 		const { logger } = execContext;
 
-		logger.log(`[${directorySlug}] Starting category and tag processing for ${extractedItems.length} items`);
+		logger.log(`[${workSlug}] Starting category and tag processing for ${extractedItems.length} items`);
 
 		// Track metrics
 		const startTime = Date.now();
 
 		if (!extractedItems || extractedItems.length === 0) {
-			logger.log(`[${directorySlug}] No items to categorize`);
+			logger.log(`[${workSlug}] No items to categorize`);
 			return { finalItems: [], categories: [], tags: [], collections: [], brands: [] };
 		}
 
@@ -276,7 +276,7 @@ export class CategoryProcessingStep extends BasePipelineStep {
 				execContext
 			);
 
-			logger.log(`[${directorySlug}] Successfully categorized ${categorized.length} items`);
+			logger.log(`[${workSlug}] Successfully categorized ${categorized.length} items`);
 
 			// Extract unique categories and tags based on toggle settings
 			let categories: Category[];
@@ -332,13 +332,13 @@ export class CategoryProcessingStep extends BasePipelineStep {
 			// Calculate processing time
 			const processingTime = (Date.now() - startTime) / 1000;
 			logger.log(
-				`[${directorySlug}] Category processing complete in ${processingTime.toFixed(2)}s. Found ${categories.length} categories, ${tags.length} tags, ${collections.length} collections.`
+				`[${workSlug}] Category processing complete in ${processingTime.toFixed(2)}s. Found ${categories.length} categories, ${tags.length} tags, ${collections.length} collections.`
 			);
 
 			return { finalItems, categories, tags, collections, brands };
 		} catch (error) {
 			logger.error(
-				`[${directorySlug}] Error during category processing: ${this.formatError(error)}`,
+				`[${workSlug}] Error during category processing: ${this.formatError(error)}`,
 				getErrorStack(error)
 			);
 
@@ -378,7 +378,7 @@ export class CategoryProcessingStep extends BasePipelineStep {
 
 		const facadeOptions: FacadeOptions = {
 			userId: execContext.user!.id,
-			directoryId: execContext.directory.id
+			workId: execContext.work.id
 		};
 
 		if (!items || items.length === 0) return [];
@@ -489,7 +489,7 @@ export class CategoryProcessingStep extends BasePipelineStep {
 
 		const facadeOptions: FacadeOptions = {
 			userId: execContext.user!.id,
-			directoryId: execContext.directory.id
+			workId: execContext.work.id
 		};
 
 		// Process items in batches

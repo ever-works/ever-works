@@ -19,7 +19,7 @@ function createToolOptions(overrides?: Partial<FacadeToolOptions>): FacadeToolOp
 describe('facade-tools', () => {
 	const facadeOptions: FacadeOptions = {
 		userId: 'user1',
-		directoryId: 'dir1'
+		workId: 'dir1'
 	};
 
 	describe('createSearchTool', () => {

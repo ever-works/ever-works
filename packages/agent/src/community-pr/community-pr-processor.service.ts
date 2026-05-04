@@ -3,20 +3,17 @@ import { z } from 'zod';
 import { DistributedTaskLockService } from '../cache/distributed-task-lock.service';
 import { GitFacadeService, type GitFacadeOptions } from '../facades/git.facade';
 import { AiFacadeService } from '../facades/ai.facade';
-import { DirectoryRepository } from '../database/repositories/directory.repository';
-import { DirectoryGenerationHistoryRepository } from '../database/repositories/directory-generation-history.repository';
-import type { Directory } from '../entities/directory.entity';
+import { WorkRepository } from '../database/repositories/work.repository';
+import { WorkGenerationHistoryRepository } from '../database/repositories/work-generation-history.repository';
+import type { Work } from '../entities/work.entity';
 import type { CommunityPrState } from '../entities/types';
 import type { GitPullRequest } from '@ever-works/plugin';
 import type { Category } from '@ever-works/contracts';
 import { slugifyText } from '../utils/text.utils';
 import { DataRepository } from '../generators/data-generator/data-repository';
 import { GenerateStatusType } from '../entities/types';
-import {
-    DirectoryHistoryActivityType,
-    type DirectoryHistoryChangeEntry,
-} from '@ever-works/contracts/api';
-import { buildDirectoryChangelog } from '../utils/directory-changelog.utils';
+import { WorkHistoryActivityType, type WorkHistoryChangeEntry } from '@ever-works/contracts/api';
+import { buildWorkChangelog } from '../utils/work-changelog.utils';
 
 const MAX_PROCESSED_PR_NUMBERS = 500;
 const MAX_CHANGE_CONTEXT_LENGTH = 50_000;
@@ -36,7 +33,7 @@ const extractedItemSchema = z.object({
 
 export interface CommunityPrProcessingResult {
     processed: number;
-    errors: Array<{ directoryId: string; error: string }>;
+    errors: Array<{ workId: string; error: string }>;
 }
 
 type CommunityPrTriggerSource = 'user' | 'schedule' | 'api';
@@ -53,22 +50,22 @@ export class CommunityPrProcessorService {
     constructor(
         private readonly gitFacade: GitFacadeService,
         private readonly aiFacade: AiFacadeService,
-        private readonly directoryRepository: DirectoryRepository,
-        private readonly generationHistoryRepository: DirectoryGenerationHistoryRepository,
+        private readonly workRepository: WorkRepository,
+        private readonly generationHistoryRepository: WorkGenerationHistoryRepository,
         private readonly taskLockService: DistributedTaskLockService,
     ) {}
 
     private async recordCommunityPrHistory(params: {
-        directoryId: string;
+        workId: string;
         userId: string;
         prNumber: number;
-        entries: DirectoryHistoryChangeEntry[];
+        entries: WorkHistoryChangeEntry[];
         triggeredBy: CommunityPrTriggerSource;
     }): Promise<void> {
         const now = new Date();
 
         await this.generationHistoryRepository.createEntry({
-            directoryId: params.directoryId,
+            workId: params.workId,
             userId: params.userId,
             status: GenerateStatusType.GENERATED,
             startedAt: now,
@@ -76,16 +73,16 @@ export class CommunityPrProcessorService {
             durationInSeconds: 0,
             newItemsCount: params.entries.length,
             triggeredBy: params.triggeredBy,
-            activityType: DirectoryHistoryActivityType.COMMUNITY_PR_MERGED,
-            changelog: buildDirectoryChangelog(
+            activityType: WorkHistoryActivityType.COMMUNITY_PR_MERGED,
+            changelog: buildWorkChangelog(
                 params.entries,
                 `Community PR #${params.prNumber} merged: ${params.entries.length} item${params.entries.length === 1 ? '' : 's'} added`,
             ),
         });
     }
 
-    private directoryLockKey(directoryId: string): string {
-        return `community-pr:${directoryId}`;
+    private workLockKey(workId: string): string {
+        return `community-pr:${workId}`;
     }
 
     private isPrHandled(state: CommunityPrState, pr: GitPullRequest): boolean {
@@ -127,49 +124,49 @@ export class CommunityPrProcessorService {
         }
     }
 
-    async processAllDirectories(
+    async processAllWorks(
         triggeredBy: CommunityPrTriggerSource = 'schedule',
     ): Promise<CommunityPrProcessingResult> {
-        const directories = await this.directoryRepository.findWithCommunityPrEnabled();
+        const works = await this.workRepository.findWithCommunityPrEnabled();
         const result: CommunityPrProcessingResult = { processed: 0, errors: [] };
 
-        for (const directory of directories) {
+        for (const work of works) {
             try {
-                const state: CommunityPrState = directory.communityPrState || {
+                const state: CommunityPrState = work.communityPrState || {
                     processedPrNumbers: [],
                     totalItemsAdded: 0,
                 };
 
-                const autoClose = directory.communityPrAutoClose;
+                const autoClose = work.communityPrAutoClose;
 
-                const count = await this.processDirectory(directory, state, autoClose, triggeredBy);
+                const count = await this.processWork(work, state, autoClose, triggeredBy);
                 result.processed += count;
             } catch (error) {
                 const message = error instanceof Error ? error.message : String(error);
                 const stack = error instanceof Error ? error.stack : undefined;
-                this.logger.error(`Failed to process directory ${directory.id}: ${message}`, stack);
-                result.errors.push({ directoryId: directory.id, error: message });
+                this.logger.error(`Failed to process work ${work.id}: ${message}`, stack);
+                result.errors.push({ workId: work.id, error: message });
             }
         }
 
         return result;
     }
 
-    async processDirectory(
-        directory: Directory,
+    async processWork(
+        work: Work,
         state?: CommunityPrState,
         autoClose?: boolean,
         triggeredBy: CommunityPrTriggerSource = 'api',
     ): Promise<number> {
         const lockResult = await this.taskLockService.runExclusive(
-            this.directoryLockKey(directory.id),
+            this.workLockKey(work.id),
             async () => {
-                const owner = directory.getRepoOwner();
-                const mainRepo = directory.getMainRepo();
+                const owner = work.getRepoOwner();
+                const mainRepo = work.getMainRepo();
                 const gitOptions: GitFacadeOptions = {
-                    userId: directory.userId,
-                    providerId: directory.gitProvider,
-                    directoryId: directory.id,
+                    userId: work.userId,
+                    providerId: work.gitProvider,
+                    workId: work.id,
                 };
 
                 const openPRs = await this.gitFacade.listPullRequests(
@@ -184,13 +181,13 @@ export class CommunityPrProcessorService {
                 }
 
                 const currentState: CommunityPrState = state ||
-                    directory.communityPrState || {
+                    work.communityPrState || {
                         processedPrNumbers: [],
                         totalItemsAdded: 0,
                     };
 
                 const shouldAutoClose =
-                    autoClose === undefined ? directory.communityPrAutoClose : autoClose;
+                    autoClose === undefined ? work.communityPrAutoClose : autoClose;
 
                 const unprocessedPRs = openPRs.filter((pr) => !this.isPrHandled(currentState, pr));
 
@@ -204,7 +201,7 @@ export class CommunityPrProcessorService {
                 for (const pr of unprocessedPRs) {
                     try {
                         const prResult = await this.processSinglePr(
-                            directory,
+                            work,
                             pr,
                             gitOptions,
                             shouldAutoClose,
@@ -216,7 +213,7 @@ export class CommunityPrProcessorService {
                         const message = error instanceof Error ? error.message : String(error);
                         const stack = error instanceof Error ? error.stack : undefined;
                         this.logger.error(
-                            `Failed to process PR #${pr.number} for directory ${directory.id}: ${message}`,
+                            `Failed to process PR #${pr.number} for work ${work.id}: ${message}`,
                             stack,
                         );
                         lastError = message;
@@ -228,16 +225,12 @@ export class CommunityPrProcessorService {
                 currentState.totalItemsAdded =
                     (currentState.totalItemsAdded || 0) + totalItemsAdded;
 
-                await this.directoryRepository.update(directory.id, {
+                await this.workRepository.update(work.id, {
                     communityPrState: currentState,
                 });
 
                 if (totalItemsAdded > 0) {
-                    await this.directoryRepository.increment(
-                        directory.id,
-                        'itemsCount',
-                        totalItemsAdded,
-                    );
+                    await this.workRepository.increment(work.id, 'itemsCount', totalItemsAdded);
                 }
 
                 return totalItemsAdded;
@@ -246,7 +239,7 @@ export class CommunityPrProcessorService {
                 ttlMs: COMMUNITY_PR_LOCK_TTL_MS,
                 onLocked: () =>
                     this.logger.debug(
-                        `Skipping community PR processing for directory ${directory.id} because another instance is already processing it`,
+                        `Skipping community PR processing for work ${work.id} because another instance is already processing it`,
                     ),
             },
         );
@@ -255,15 +248,15 @@ export class CommunityPrProcessorService {
     }
 
     private async processSinglePr(
-        directory: Directory,
+        work: Work,
         pr: GitPullRequest,
         gitOptions: GitFacadeOptions,
         autoClose: boolean,
         triggeredBy: CommunityPrTriggerSource,
     ): Promise<CommunityPrSinglePrResult> {
-        const owner = directory.getRepoOwner();
-        const mainRepo = directory.getMainRepo();
-        const dataRepo = directory.getDataRepo();
+        const owner = work.getRepoOwner();
+        const mainRepo = work.getMainRepo();
+        const dataRepo = work.getDataRepo();
 
         // Get PR file changes
         const files = await this.gitFacade.getPullRequestFiles(
@@ -297,8 +290,8 @@ export class CommunityPrProcessorService {
 
         // Extract items via AI
         const extractionPrompt = this.buildExtractionPrompt({
-            directoryName: directory.name,
-            directoryDescription: directory.description,
+            workName: work.name,
+            workDescription: work.description,
             categories: categoryNames,
             prTitle: pr.title,
             prBody: pr.body || '',
@@ -309,7 +302,7 @@ export class CommunityPrProcessorService {
             extractionPrompt,
             extractedItemSchema,
             { temperature: 0.3 },
-            { userId: directory.userId, directoryId: directory.id },
+            { userId: work.userId, workId: work.id },
         );
 
         const extractedItems = aiResponse.result;
@@ -319,14 +312,14 @@ export class CommunityPrProcessorService {
         }
 
         // Write items to data repo
-        const addedEntries: DirectoryHistoryChangeEntry[] = [];
+        const addedEntries: WorkHistoryChangeEntry[] = [];
         const seenSlugs = new Set<string>();
 
         for (const item of extractedItems.items) {
             const slug = slugifyText(item.name);
             if (!slug || seenSlugs.has(slug) || (await data.itemExists(slug))) {
                 this.logger.warn(
-                    `Skipping community PR item "${item.name}" for directory ${directory.id} because slug "${slug}" already exists`,
+                    `Skipping community PR item "${item.name}" for work ${work.id} because slug "${slug}" already exists`,
                 );
                 continue;
             }
@@ -361,9 +354,9 @@ export class CommunityPrProcessorService {
         }
 
         // Commit and push
-        await this.gitFacade.add(directory.gitProvider, dest, '.');
+        await this.gitFacade.add(work.gitProvider, dest, '.');
         await this.gitFacade.commit(
-            directory.gitProvider,
+            work.gitProvider,
             dest,
             `Add ${addedEntries.length} item(s) from community PR #${pr.number}`,
         );
@@ -371,8 +364,8 @@ export class CommunityPrProcessorService {
 
         try {
             await this.recordCommunityPrHistory({
-                directoryId: directory.id,
-                userId: directory.userId,
+                workId: work.id,
+                userId: work.userId,
                 prNumber: pr.number,
                 entries: addedEntries,
                 triggeredBy,
@@ -380,7 +373,7 @@ export class CommunityPrProcessorService {
         } catch (error) {
             const message = error instanceof Error ? error.message : String(error);
             this.logger.warn(
-                `Community PR #${pr.number} for directory ${directory.id} was applied but history recording failed: ${message}`,
+                `Community PR #${pr.number} for work ${work.id} was applied but history recording failed: ${message}`,
             );
         }
 
@@ -391,13 +384,13 @@ export class CommunityPrProcessorService {
                 owner,
                 mainRepo,
                 pr.number,
-                `Thank you for your contribution! The following items have been added to the directory:\n\n${itemNames}\n\nThe data repository has been updated automatically.`,
+                `Thank you for your contribution! The following items have been added to the work:\n\n${itemNames}\n\nThe data repository has been updated automatically.`,
                 gitOptions,
             );
         } catch (error) {
             const message = error instanceof Error ? error.message : String(error);
             this.logger.warn(
-                `Community PR #${pr.number} for directory ${directory.id} was applied but commenting failed: ${message}`,
+                `Community PR #${pr.number} for work ${work.id} was applied but commenting failed: ${message}`,
             );
         }
 
@@ -408,7 +401,7 @@ export class CommunityPrProcessorService {
             } catch (error) {
                 const message = error instanceof Error ? error.message : String(error);
                 this.logger.warn(
-                    `Community PR #${pr.number} for directory ${directory.id} was applied but auto-close failed: ${message}`,
+                    `Community PR #${pr.number} for work ${work.id} was applied but auto-close failed: ${message}`,
                 );
             }
         }
@@ -417,16 +410,16 @@ export class CommunityPrProcessorService {
     }
 
     private buildExtractionPrompt(vars: {
-        directoryName: string;
-        directoryDescription: string;
+        workName: string;
+        workDescription: string;
         categories: string;
         prTitle: string;
         prBody: string;
         prChanges: string;
     }): string {
-        return `You are analyzing a community pull request submitted to the "${vars.directoryName}" directory.
+        return `You are analyzing a community pull request submitted to the "${vars.workName}" work.
 
-Directory description: ${vars.directoryDescription}
+Work description: ${vars.workDescription}
 
 Existing categories: ${vars.categories || 'None defined yet'}
 
@@ -445,6 +438,6 @@ Extract all new items being proposed in this PR. For each item, provide:
 
 If the PR does not contain any new items (e.g., it's just formatting changes, typo fixes, or reorganization), return an empty items array.
 
-Only extract items that are clearly being added as new entries to the directory. Do not extract items that are being removed or modified.`;
+Only extract items that are clearly being added as new entries to the work. Do not extract items that are being removed or modified.`;
     }
 }

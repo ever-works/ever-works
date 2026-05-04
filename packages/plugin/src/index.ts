@@ -42,8 +42,8 @@ export {
 	type PluginResponse,
 	type PluginConnectionStatus,
 	type UserPluginResponse,
-	type DirectoryPluginResponse,
+	type WorkPluginResponse,
 	type PluginListResponse,
-	type DirectoryPluginListResponse,
+	type WorkPluginListResponse,
 	type SettingScopeApi
 } from './api/index.js';

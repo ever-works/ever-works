@@ -1,0 +1,245 @@
+'use client';
+
+import { useState } from 'react';
+import { Switch } from '@/components/ui/switch';
+import { cn } from '@/lib/utils';
+import { useTranslations } from 'next-intl';
+import { useSettings } from './SettingsContext';
+import { ExternalLink, Loader2 } from 'lucide-react';
+import { updateWorkSchedule } from '@/app/actions/dashboard/works';
+import { useRouter } from '@/i18n/navigation';
+import { toast } from 'sonner';
+import { formatWorksConfigProviders } from '../../shared/works-config';
+import type { RepositoryTarget } from '@/lib/api/types-only';
+
+export function SourceSettings() {
+    const t = useTranslations('dashboard.workDetail.settings');
+    const { context } = useSettings();
+    const { work } = context;
+    const router = useRouter();
+    const [isSyncing, setIsSyncing] = useState(false);
+
+    if (!work.sourceRepository) {
+        return null;
+    }
+
+    const sourceRepository = work.sourceRepository;
+    const worksConfig = sourceRepository.worksConfig;
+    const relatedWebsiteRepository = sourceRepository.relatedRepositories?.website;
+
+    const sourceTypeLabel = getSourceTypeLabel(sourceRepository.type, t);
+    const supportsSourceSync = sourceRepository.type !== 'link_existing';
+    const fallbackOwner = work.owner || sourceRepository.owner;
+
+    const websiteTarget = getConfiguredWebsiteTarget(
+        relatedWebsiteRepository,
+        worksConfig?.websiteRepo,
+    );
+    const appliedWebsiteRepo = getAppliedWebsiteTarget({
+        relatedWebsiteRepository,
+        fallbackOwner,
+        workSlug: work.slug,
+    });
+
+    const appliedSchedule = work.scheduledUpdatesEnabled
+        ? work.scheduledCadence || t('worksConfig.enabled')
+        : t('worksConfig.disabled');
+
+    const importedProviders = formatWorksConfigProviders(worksConfig?.providers);
+    const appliedProviderOverrides =
+        work.scheduledUpdatesEnabled && worksConfig?.providers ? importedProviders : null;
+
+    const metadataRows = [
+        { label: t('worksConfig.fields.sourceType'), value: sourceTypeLabel },
+        worksConfig?.name
+            ? { label: t('worksConfig.fields.configName'), value: worksConfig.name }
+            : null,
+        worksConfig?.initialPrompt
+            ? {
+                  label: t('worksConfig.fields.initialPrompt'),
+                  value: worksConfig.initialPrompt,
+                  multiline: true,
+              }
+            : null,
+        worksConfig?.model
+            ? {
+                  label: t('worksConfig.fields.model'),
+                  value: worksConfig.model,
+                  hint: t('worksConfig.imported'),
+              }
+            : null,
+        worksConfig?.scheduleCadence
+            ? {
+                  label: t('worksConfig.fields.schedule'),
+                  value: worksConfig.scheduleCadence,
+                  hint: t('worksConfig.applied', { value: appliedSchedule }),
+              }
+            : null,
+        importedProviders
+            ? {
+                  label: t('worksConfig.fields.providers'),
+                  value: importedProviders,
+                  hint: appliedProviderOverrides
+                      ? t('worksConfig.applied', { value: appliedProviderOverrides })
+                      : t('worksConfig.imported'),
+                  multiline: true,
+              }
+            : null,
+        websiteTarget
+            ? {
+                  label: t('worksConfig.fields.websiteRepo'),
+                  value: websiteTarget,
+                  hint: t('worksConfig.applied', { value: appliedWebsiteRepo }),
+              }
+            : null,
+    ].filter(Boolean) as Array<{
+        label: string;
+        value: string;
+        hint?: string;
+        multiline?: boolean;
+    }>;
+
+    const handleSyncToggle = async (enabled: boolean) => {
+        setIsSyncing(true);
+        try {
+            const result = await updateWorkSchedule(work.id, {
+                enable: enabled,
+            });
+
+            if (result.success) {
+                toast.success(enabled ? t('syncEnabled') : t('syncDisabled'));
+                router.refresh();
+            } else {
+                toast.error(result.error || t('syncUpdateFailed'));
+            }
+        } catch (error) {
+            toast.error(t('syncUpdateFailed'));
+        } finally {
+            setIsSyncing(false);
+        }
+    };
+
+    return (
+        <div
+            className={cn(
+                'rounded-lg border overflow-hidden',
+                'bg-card dark:bg-card-primary-dark/30',
+                'border-card-border dark:border-border-secondary-dark',
+            )}
+        >
+            <div className="px-5 py-3.5 border-b border-card-border dark:border-border-secondary-dark">
+                <h3 className="text-sm font-semibold text-text dark:text-text-dark">
+                    {t('sourceSettings')}
+                </h3>
+            </div>
+
+            <div className="px-5 py-4 space-y-4">
+                <div className="flex flex-col gap-1">
+                    <span className="text-xs font-medium text-text-muted dark:text-text-muted-dark">
+                        {t('originalSource')}
+                    </span>
+                    <a
+                        href={work.sourceRepository.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-1 text-sm text-primary hover:underline"
+                    >
+                        {work.sourceRepository.owner}/{work.sourceRepository.repo}
+                        <ExternalLink className="h-3 w-3" />
+                    </a>
+                </div>
+
+                {metadataRows.length > 0 && (
+                    <div className="space-y-3 pt-2">
+                        {metadataRows.map((row) => (
+                            <div key={row.label} className="flex flex-col gap-1">
+                                <span className="text-xs font-medium text-text-muted dark:text-text-muted-dark">
+                                    {row.label}
+                                </span>
+                                {row.multiline ? (
+                                    <div className="rounded-md bg-surface px-3 py-2 text-sm text-text dark:bg-surface-dark dark:text-text-dark">
+                                        {row.value}
+                                    </div>
+                                ) : (
+                                    <span className="text-sm text-text dark:text-text-dark">
+                                        {row.value}
+                                    </span>
+                                )}
+                                {row.hint && (
+                                    <span className="text-xs text-text-muted dark:text-text-muted-dark">
+                                        {row.hint}
+                                    </span>
+                                )}
+                            </div>
+                        ))}
+                    </div>
+                )}
+
+                {supportsSourceSync && (
+                    <div className="flex items-center justify-between pt-2">
+                        <div>
+                            <h4 className="text-xs font-medium text-text dark:text-text-dark">
+                                {t('syncEnabled')}
+                            </h4>
+                            <p className="text-xs text-text-muted dark:text-text-muted-dark">
+                                {t('syncDescription')}
+                            </p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            {isSyncing && (
+                                <Loader2 className="h-4 w-4 animate-spin text-text-muted" />
+                            )}
+                            <Switch
+                                checked={work.scheduledUpdatesEnabled}
+                                onChange={handleSyncToggle}
+                                disabled={isSyncing}
+                            />
+                        </div>
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+}
+
+function getSourceTypeLabel(sourceType: string, t: ReturnType<typeof useTranslations>): string {
+    switch (sourceType) {
+        case 'data_repo':
+            return t('worksConfig.sourceTypes.dataRepo');
+        case 'awesome_readme':
+            return t('worksConfig.sourceTypes.awesomeReadme');
+        case 'link_existing':
+            return t('worksConfig.sourceTypes.linkExisting');
+        case 'works_config':
+            return t('worksConfig.sourceTypes.worksConfig');
+        default:
+            return sourceType.replace(/_/g, ' ');
+    }
+}
+
+function getConfiguredWebsiteTarget(
+    relatedWebsiteRepository: RepositoryTarget | undefined,
+    websiteRepo: string | undefined,
+): string | null {
+    if (relatedWebsiteRepository?.owner && relatedWebsiteRepository.repo) {
+        return `${relatedWebsiteRepository.owner}/${relatedWebsiteRepository.repo}`;
+    }
+
+    return websiteRepo || null;
+}
+
+function getAppliedWebsiteTarget({
+    relatedWebsiteRepository,
+    fallbackOwner,
+    workSlug,
+}: {
+    relatedWebsiteRepository?: RepositoryTarget;
+    fallbackOwner: string;
+    workSlug: string;
+}): string {
+    if (relatedWebsiteRepository?.repo) {
+        return `${relatedWebsiteRepository.owner || fallbackOwner}/${relatedWebsiteRepository.repo}`;
+    }
+
+    return `${fallbackOwner}/${workSlug}-website`;
+}

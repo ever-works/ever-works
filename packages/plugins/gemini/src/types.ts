@@ -33,7 +33,7 @@ export function isGeminiStepId(value: string): value is GeminiStepId {
 }
 
 /**
- * Base temporary directory for all Gemini operations
+ * Base temporary work for all Gemini operations
  */
 export const BASE_TEMP_DIR = path.join(os.tmpdir(), 'gemini-generator');
 

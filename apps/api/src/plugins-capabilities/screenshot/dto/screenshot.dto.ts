@@ -25,12 +25,12 @@ export class CaptureScreenshotDto {
     providerOverride?: string;
 
     @ApiPropertyOptional({
-        description: 'Optional directory context for provider resolution',
+        description: 'Optional work context for provider resolution',
         example: 'a0499a65-9b8c-4bf7-857e-895f52da30b3',
     })
     @IsOptional()
     @IsUUID()
-    directoryId?: string;
+    workId?: string;
 
     @ApiPropertyOptional({
         description: 'Viewport width in pixels',
