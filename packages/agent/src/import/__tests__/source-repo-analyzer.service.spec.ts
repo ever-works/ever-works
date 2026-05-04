@@ -70,7 +70,7 @@ describe('SourceRepoAnalyzerService.checkSlugConflicts', () => {
 });
 
 describe('SourceRepoAnalyzerService.analyzeRepository', () => {
-    it('classifies repos with data/ and works.yml as data_repo', async () => {
+    it('classifies repos with data/ and works.yaml as data_repo', async () => {
         const worksConfig = {
             initialPrompt: 'Keep it updated',
             raw: {},
@@ -114,7 +114,7 @@ describe('SourceRepoAnalyzerService.analyzeRepository', () => {
         });
     });
 
-    it('classifies repos with works.yml but without data/ as works_config', async () => {
+    it('classifies repos with works.yaml but without data/ as works_config', async () => {
         const gitFacade = {
             isConfigured: jest.fn().mockReturnValue(true),
             getRepository: jest.fn().mockResolvedValue({
@@ -147,7 +147,7 @@ describe('SourceRepoAnalyzerService.analyzeRepository', () => {
         });
     });
 
-    it('classifies awesome README repos with works.yml as awesome_readme', async () => {
+    it('classifies awesome README repos with works.yaml as awesome_readme', async () => {
         const gitFacade = {
             isConfigured: jest.fn().mockReturnValue(true),
             getRepository: jest.fn().mockResolvedValue({
