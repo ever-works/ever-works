@@ -14,6 +14,7 @@ import { DynamicPluginFields } from './DynamicPluginFields';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { useRouter } from '@/i18n/navigation';
+import { ROUTES } from '@/lib/constants';
 import {
     Dialog,
     DialogContent,
@@ -45,6 +46,7 @@ interface GeneratorFormProps {
     config?: WorkConfig;
     websiteTemplates: WebsiteTemplateOption[];
     workPlugins?: WorkPlugin[];
+    startInProgressView?: boolean;
 }
 
 export function GeneratorForm({
@@ -53,12 +55,13 @@ export function GeneratorForm({
     config,
     websiteTemplates,
     workPlugins = [],
+    startInProgressView = false,
 }: GeneratorFormProps) {
     const router = useRouter();
     const t = useTranslations('dashboard.workDetail.generator');
     const { updateGenerateStatus } = useWorkDetail();
     const [isPending, startTransition] = useTransition();
-    const [optimisticGenerating, setOptimisticGenerating] = useState(false);
+    const [optimisticGenerating, setOptimisticGenerating] = useState(startInProgressView);
     const [showAdvancedOptions, setShowAdvancedOptions] = useState(false);
     const [confirmRecreate, setConfirmRecreate] = useState(false);
     const [formSchema, setFormSchema] = useState<GeneratorFormSchema | null>(null);
@@ -227,6 +230,15 @@ export function GeneratorForm({
 
         previousAiProviderIdRef.current = currentAiProviderId;
     }, [activeAiProvider?.id]);
+
+    useEffect(() => {
+        if (!startInProgressView) {
+            return;
+        }
+
+        updateGenerateStatus(optimisticGenerateStatus);
+        router.replace(ROUTES.DASHBOARD_WORK_GENERATOR(workId));
+    }, [optimisticGenerateStatus, router, startInProgressView, updateGenerateStatus, workId]);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
