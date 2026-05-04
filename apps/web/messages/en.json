@@ -1693,6 +1693,7 @@
                 "modelOverride": "AI Model Override",
                 "modelOverridePlaceholder": "e.g. openai/gpt-4.1 or openrouter/openai/gpt-4.1",
                 "modelOverrideHelperText": "Optional. Uses the imported or previous model by default unless you override it here.",
+                "modelOverrideUnavailable": "Select a configured AI provider first to choose a model from the available list.",
                 "websiteTemplateHelperText": "Choose the website template that will be used when the website repository is first created.",
                 "websiteTemplateLockedHelperText": "Template selection is locked after the first website generation.",
                 "recommended": "Recommended",

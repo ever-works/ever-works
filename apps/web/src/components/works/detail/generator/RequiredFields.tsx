@@ -5,6 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils/cn';
 import { useTranslations } from 'next-intl';
+import { PluginModelSelect } from '@/components/plugins/form/PluginModelSelect';
 
 interface CoreFormData {
     name: string;
@@ -15,10 +16,20 @@ interface CoreFormData {
 interface RequiredFieldsProps {
     formData: Partial<CoreFormData>;
     onChange: (updates: Partial<CoreFormData>) => void;
+    modelPluginId?: string | null;
+    modelDisabled?: boolean;
+    modelHelperText?: string;
     children?: ReactNode;
 }
 
-export function RequiredFields({ formData, onChange, children }: RequiredFieldsProps) {
+export function RequiredFields({
+    formData,
+    onChange,
+    modelPluginId,
+    modelDisabled = false,
+    modelHelperText,
+    children,
+}: RequiredFieldsProps) {
     const t = useTranslations('dashboard.workDetail.generator');
 
     return (
@@ -56,16 +67,30 @@ export function RequiredFields({ formData, onChange, children }: RequiredFieldsP
                     helperText={t('promptHelperText')}
                 />
 
-                <div className="hidden">
-                    <Input
-                        label={t('modelOverride')}
-                        type="text"
-                        value={formData.model || ''}
-                        onChange={(e) => onChange({ model: e.target.value })}
-                        placeholder={t('modelOverridePlaceholder')}
-                        variant="form"
-                        helperText={t('modelOverrideHelperText')}
-                    />
+                <div className="space-y-1.5">
+                    <label className="block text-sm font-medium text-text dark:text-text-dark">
+                        {t('modelOverride')}
+                    </label>
+                    {modelPluginId ? (
+                        <PluginModelSelect
+                            pluginId={modelPluginId}
+                            value={formData.model || ''}
+                            onChange={(model) => onChange({ model: model || undefined })}
+                            disabled={modelDisabled}
+                            allowCustom={false}
+                        />
+                    ) : (
+                        <Input
+                            type="text"
+                            value=""
+                            placeholder={t('modelOverridePlaceholder')}
+                            variant="form"
+                            disabled
+                        />
+                    )}
+                    <p className="text-xs text-text-muted dark:text-text-muted-dark">
+                        {modelHelperText || t('modelOverrideHelperText')}
+                    </p>
                 </div>
 
                 {children}

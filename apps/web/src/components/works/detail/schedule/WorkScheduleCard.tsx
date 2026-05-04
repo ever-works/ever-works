@@ -285,6 +285,12 @@ function ScheduleFormContent({
             const nextForm = { ...form, enable: !form.enable };
             setForm(nextForm);
             toast.success(form.enable ? t('success.stopped') : t('success.started'));
+
+            if (!form.enable) {
+                router.push(ROUTES.DASHBOARD_WORK_GENERATOR(workId));
+                return;
+            }
+
             router.refresh();
         });
     };
