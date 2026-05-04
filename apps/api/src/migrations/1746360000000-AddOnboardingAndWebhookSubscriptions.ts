@@ -31,7 +31,7 @@ export class AddOnboardingAndWebhookSubscriptions1746360000000 implements Migrat
                     { name: 'work_id', type: 'uuid', isNullable: true },
                     { name: 'status', type: 'varchar', length: '64' },
                     { name: 'failure_code', type: 'varchar', length: '128', isNullable: true },
-                    { name: 'failure_detail', type: 'jsonb', isNullable: true },
+                    { name: 'failure_detail', type: 'jsonb', isNullable: true }, // postgres only; sqlite uses simple-json text via TypeORM transformers
                     { name: 'idempotency_key', type: 'varchar', length: '64', isNullable: true },
                     { name: 'webhook_url', type: 'varchar', length: '512', isNullable: true },
                     { name: 'subdomain', type: 'varchar', length: '64', isNullable: true },

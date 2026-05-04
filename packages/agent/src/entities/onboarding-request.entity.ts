@@ -50,7 +50,7 @@ export class OnboardingRequest {
     @Column({ type: 'varchar', length: 128, nullable: true })
     failureCode: string | null;
 
-    @Column({ type: 'jsonb', nullable: true })
+    @Column({ type: 'simple-json', nullable: true })
     failureDetail: unknown;
 
     @Column({ type: 'varchar', length: 64, nullable: true })
