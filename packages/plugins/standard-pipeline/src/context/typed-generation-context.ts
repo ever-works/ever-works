@@ -1,4 +1,11 @@
-import type { WorkReference, GenerationRequest, ExistingItems, StepMetrics, PipelineOutputs } from '@ever-works/plugin';
+import type {
+	WorkReference,
+	GenerationRequest,
+	ExistingItems,
+	StepMetrics,
+	PipelineOutputs,
+	ReferenceEntry
+} from '@ever-works/plugin';
 import type { MutableGenerationContext, GenerationContextSnapshot } from './mutable-generation-context.js';
 import type { StepDataKey, StepDataTypes, StandardPipelineMetrics } from './step-data-types.js';
 
@@ -11,6 +18,7 @@ export class TypedGenerationContext implements MutableGenerationContext {
 	searchQueries: string[] = [];
 	webPages: MutableGenerationContext['webPages'] = [];
 	processedSourceUrls: Set<string> = new Set();
+	processedReferences: ReferenceEntry[] = [];
 	contentCache: Map<string, string> = new Map();
 
 	initialAiItems: MutableGenerationContext['initialAiItems'] = [];
@@ -77,6 +85,8 @@ export class TypedGenerationContext implements MutableGenerationContext {
 				return this.webPages.length > 0 ? this.webPages : undefined;
 			case 'processedSourceUrls':
 				return this.processedSourceUrls.size > 0 ? this.processedSourceUrls : undefined;
+			case 'processedReferences':
+				return this.processedReferences.length > 0 ? this.processedReferences : undefined;
 			case 'contentCache':
 				return this.contentCache.size > 0 ? this.contentCache : undefined;
 			case 'initialAiItems':
@@ -129,6 +139,9 @@ export class TypedGenerationContext implements MutableGenerationContext {
 				return true;
 			case 'processedSourceUrls':
 				this.processedSourceUrls = value as Set<string>;
+				return true;
+			case 'processedReferences':
+				this.processedReferences = value as ReferenceEntry[];
 				return true;
 			case 'contentCache':
 				this.contentCache = value as Map<string, string>;
@@ -216,6 +229,7 @@ export class TypedGenerationContext implements MutableGenerationContext {
 			searchQueries: [...this.searchQueries],
 			webPages: [...this.webPages],
 			processedSourceUrls: this.processedSourceUrls,
+			processedReferences: [...this.processedReferences],
 			contentCache: this.contentCache,
 			initialAiItems: [...this.initialAiItems],
 			extractedWebItems: [...this.extractedWebItems],
@@ -249,7 +263,10 @@ export class TypedGenerationContext implements MutableGenerationContext {
 			tags: this.finalTags,
 			collections: this.finalCollections,
 			brands: this.finalBrands,
-			domainAnalysis: this.domainAnalysis
+			domainAnalysis: this.domainAnalysis,
+			extra: {
+				references: this.processedReferences
+			}
 		};
 	}
 
@@ -259,6 +276,7 @@ export class TypedGenerationContext implements MutableGenerationContext {
 		typed.searchQueries = ctx.searchQueries;
 		typed.webPages = ctx.webPages;
 		typed.processedSourceUrls = ctx.processedSourceUrls;
+		typed.processedReferences = [...ctx.processedReferences];
 		typed.contentCache = ctx.contentCache;
 		typed.initialAiItems = ctx.initialAiItems;
 		typed.extractedWebItems = ctx.extractedWebItems;
@@ -287,6 +305,7 @@ export class TypedGenerationContext implements MutableGenerationContext {
 		typed.searchQueries = [...snapshot.searchQueries];
 		typed.webPages = [...snapshot.webPages];
 		typed.processedSourceUrls = new Set(snapshot.processedSourceUrls);
+		typed.processedReferences = [...(snapshot.processedReferences || [])];
 		typed.contentCache = new Map(snapshot.contentCache);
 		typed.initialAiItems = [...snapshot.initialAiItems] as MutableGenerationContext['initialAiItems'];
 		typed.extractedWebItems = [...snapshot.extractedWebItems] as MutableGenerationContext['extractedWebItems'];

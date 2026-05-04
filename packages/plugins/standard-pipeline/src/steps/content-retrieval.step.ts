@@ -1,4 +1,11 @@
 import type { StepExecutionContext, WebPageData, FacadeOptions } from '@ever-works/plugin';
+import {
+	createReferenceEntry,
+	findReferenceForUrl,
+	getDefaultReferenceTtlDays,
+	normalizeReferenceUrl,
+	shouldSkipReferenceUrl
+} from '@ever-works/plugin';
 import type { MutableGenerationContext } from '../context/index.js';
 import { BasePipelineStep } from '../base-pipeline-step.js';
 
@@ -21,6 +28,7 @@ export class ContentRetrievalStep extends BasePipelineStep {
 		const { request, work, extractedUrls, processedSourceUrls } = context;
 		const { logger, contentExtractorFacade } = execContext;
 		const config = request.config || {};
+		const referenceTtlDays = (config.references_ttl_days as number) || getDefaultReferenceTtlDays();
 
 		const facadeOptions: FacadeOptions = {
 			userId: execContext.user!.id,
@@ -38,8 +46,23 @@ export class ContentRetrievalStep extends BasePipelineStep {
 			return context;
 		}
 
-		// Filter out already processed URLs
-		const urlsToProcess = allUrls.filter((url) => !processedSourceUrls.has(url));
+		// Filter out already processed URLs, including durable reference history from previous runs.
+		const urlsToProcess = allUrls.filter((url) => {
+			const normalizedUrl = normalizeReferenceUrl(url);
+			if (processedSourceUrls.has(url) || processedSourceUrls.has(normalizedUrl)) {
+				return false;
+			}
+
+			const decision = shouldSkipReferenceUrl(url, context.existing?.references, {
+				ttlDays: referenceTtlDays
+			});
+			if (decision.shouldSkip) {
+				logger.debug(`[${work.slug}] Skipping recently processed reference URL: ${url}`);
+				return false;
+			}
+
+			return true;
+		});
 
 		if (urlsToProcess.length === 0) {
 			logger.log(`[${work.slug}] All URLs have already been processed`);
@@ -60,9 +83,11 @@ export class ContentRetrievalStep extends BasePipelineStep {
 			work.slug,
 			urlsToProcess,
 			processedSourceUrls,
+			context,
 			contentExtractorFacade,
 			logger,
-			facadeOptions
+			facadeOptions,
+			extractorName ?? undefined
 		);
 
 		// Update context
@@ -99,9 +124,11 @@ export class ContentRetrievalStep extends BasePipelineStep {
 		slug: string,
 		urls: string[],
 		processedSourceUrls: Set<string>,
+		context: MutableGenerationContext,
 		contentExtractorFacade: StepExecutionContext['contentExtractorFacade'],
 		logger: StepExecutionContext['logger'],
-		facadeOptions: FacadeOptions
+		facadeOptions: FacadeOptions,
+		providerName?: string
 	): Promise<WebPageData[]> {
 		const pages: WebPageData[] = [];
 
@@ -109,18 +136,46 @@ export class ContentRetrievalStep extends BasePipelineStep {
 
 		for (let i = 0; i < urls.length; i += this.BATCH_SIZE) {
 			const batch = urls.slice(i, i + this.BATCH_SIZE);
+			const processedReferences = context.processedReferences ?? (context.processedReferences = []);
 
 			const extractionPromises = batch.map(async (url) => {
+				const previous = findReferenceForUrl(url, [
+					...(context.existing?.references || []),
+					...processedReferences
+				]);
+
 				try {
 					const content = await contentExtractorFacade.extractContent(url, undefined, facadeOptions);
 
 					if (!content?.rawContent) {
 						logger.warn(`[${slug}] No content extracted from URL: ${url}`);
+						processedReferences.push(
+							createReferenceEntry({
+								url,
+								status: 'empty',
+								pipeline: 'standard-pipeline',
+								provider: providerName,
+								itemsCreated: 0,
+								error: 'No content extracted',
+								previous
+							})
+						);
 						return null;
 					}
 
 					// Mark as processed
 					processedSourceUrls.add(url);
+					processedSourceUrls.add(normalizeReferenceUrl(url));
+					processedReferences.push(
+						createReferenceEntry({
+							url,
+							status: 'success',
+							pipeline: 'standard-pipeline',
+							provider: providerName,
+							itemsCreated: 0,
+							previous
+						})
+					);
 
 					return {
 						source_url: url,
@@ -130,6 +185,17 @@ export class ContentRetrievalStep extends BasePipelineStep {
 				} catch (error) {
 					logger.error(
 						`[${slug}] Error extracting content from ${url}: ${error instanceof Error ? error.message : String(error)}`
+					);
+					processedReferences.push(
+						createReferenceEntry({
+							url,
+							status: 'error',
+							pipeline: 'standard-pipeline',
+							provider: providerName,
+							itemsCreated: 0,
+							error: error instanceof Error ? error.message : String(error),
+							previous
+						})
 					);
 					return null;
 				}

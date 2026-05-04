@@ -217,4 +217,32 @@ describe('DataRepository', () => {
 
         await fs.rm(repoDir, { recursive: true, force: true });
     });
+
+    it('reads and writes processed references', async () => {
+        const repoDir = await fs.mkdtemp(path.join(os.tmpdir(), 'data-repository-spec-'));
+        const repository = await DataRepository.create(repoDir);
+
+        await repository.writeReferences([
+            {
+                url: 'https://example.com/list?utm_source=test',
+                normalized_url: 'https://example.com/list',
+                first_seen_at: '2026-05-02T13:36:33.000Z',
+                last_attempted_at: '2026-05-02T13:36:33.000Z',
+                status: 'success',
+                items_created: 4,
+                pipeline: 'agent-pipeline',
+            },
+        ]);
+
+        await expect(repository.getReferences()).resolves.toEqual([
+            expect.objectContaining({
+                url: 'https://example.com/list?utm_source=test',
+                normalized_url: 'https://example.com/list',
+                status: 'success',
+                items_created: 4,
+            }),
+        ]);
+
+        await fs.rm(repoDir, { recursive: true, force: true });
+    });
 });
