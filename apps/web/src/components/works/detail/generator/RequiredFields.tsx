@@ -82,7 +82,7 @@ export function RequiredFields({
                     ) : (
                         <Input
                             type="text"
-                            value=""
+                            value={formData.model || ''}
                             placeholder={t('modelOverridePlaceholder')}
                             variant="form"
                             disabled
