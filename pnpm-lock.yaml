@@ -62,6 +62,9 @@ importers:
       '@ever-works/agent':
         specifier: workspace:*
         version: link:../../packages/agent
+      '@ever-works/contracts':
+        specifier: workspace:*
+        version: link:../../packages/contracts
       '@ever-works/monitoring':
         specifier: workspace:*
         version: link:../../packages/monitoring
@@ -24942,7 +24945,7 @@ snapshots:
   '@types/react-router@5.1.20':
     dependencies:
       '@types/history': 4.7.11
-      '@types/react': 18.3.28
+      '@types/react': 19.2.14
 
   '@types/react@18.3.28':
     dependencies:
