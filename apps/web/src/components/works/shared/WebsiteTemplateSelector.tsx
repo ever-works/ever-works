@@ -73,8 +73,9 @@ export function WebsiteTemplateSelector({
                 </option>
                 {templates.map((template) => (
                     <option key={template.id} value={template.id}>
-                        {template.name}
-                        {template.isDefault ? ' (Default)' : ''}
+                        {template.isDefault
+                            ? t('optionDefaultLabel', { name: template.name })
+                            : t('optionLabel', { name: template.name })}
                     </option>
                 ))}
             </Select>

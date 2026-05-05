@@ -420,7 +420,7 @@ function WebsiteTemplateSettings({
     const hasTemplateChange = selectedTemplateId !== (work.websiteTemplateId || '');
 
     const handleSwitchTemplate = () => {
-        if (!hasTemplateChange || !selectedTemplateId) {
+        if (!hasTemplateChange) {
             return;
         }
 
@@ -531,7 +531,11 @@ function WebsiteTemplateSettings({
                                 })}
                             </p>
                             <p className="mt-1 text-sm text-text dark:text-text-dark">
-                                {currentTemplate?.name || work.websiteTemplateId}
+                                {currentTemplate?.name ||
+                                    work.websiteTemplateId ||
+                                    t('form.websiteTemplate.unknownTemplate', {
+                                        defaultValue: 'Inherited default',
+                                    })}
                             </p>
                             <p className="mt-1 text-sm text-text-secondary dark:text-text-secondary-dark">
                                 {currentTemplate?.description}

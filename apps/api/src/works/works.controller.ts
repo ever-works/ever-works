@@ -996,7 +996,7 @@ export class WorksController {
     async switchWebsiteTemplate(
         @CurrentUser() auth: AuthenticatedUser,
         @Param('id') id: string,
-        @Body() body: { websiteTemplateId: string },
+        @Body() body: { websiteTemplateId: string | null },
     ): Promise<SwitchWebsiteTemplateResponseDto> {
         const user = await this.authService.getUser(auth.userId);
 

@@ -86,7 +86,7 @@ export interface UpdateWorkDto {
     owner?: string;
     organization?: boolean;
     deployProvider?: string;
-    websiteTemplateId?: string;
+    websiteTemplateId?: string | null;
     readmeConfig?: MarkdownReadmeConfig;
     websiteTemplateAutoUpdate?: boolean;
     websiteTemplateUseBeta?: boolean;

@@ -519,6 +519,7 @@ export class TemplateCatalogService implements OnModuleInit {
         const providerId = 'github';
         const catalogOwner = config.websiteTemplate.getCatalogOrganization();
         const perPage = 100;
+        const maxPages = 50;
 
         try {
             const accessToken = await this.gitFacade.getAccessToken({
@@ -529,7 +530,7 @@ export class TemplateCatalogService implements OnModuleInit {
             const repositories = [];
             let page = 1;
 
-            while (true) {
+            while (page <= maxPages) {
                 const pageRepositories = accessToken
                     ? await this.gitFacade.listRepositories(
                           { providerId, userId, token: accessToken },
@@ -552,6 +553,12 @@ export class TemplateCatalogService implements OnModuleInit {
                 }
 
                 page += 1;
+            }
+
+            if (page > maxPages) {
+                this.logger.warn(
+                    `Template discovery for org ${catalogOwner} hit the ${maxPages}-page safety cap; some repositories may be missing from the catalog.`,
+                );
             }
 
             const standardTemplates = repositories.filter((repository) =>

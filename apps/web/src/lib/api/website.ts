@@ -37,7 +37,7 @@ export const websiteAPI = {
         });
     },
 
-    switchTemplate: async (workId: string, websiteTemplateId: string) => {
+    switchTemplate: async (workId: string, websiteTemplateId: string | null) => {
         return serverMutation<SwitchWebsiteTemplateResponse>({
             endpoint: `/works/${workId}/switch-website-template`,
             data: { websiteTemplateId },

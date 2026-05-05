@@ -3059,6 +3059,8 @@
         "templateSelector": {
             "defaultOption": "Use default",
             "defaultOptionWithName": "Use default ({name})",
+            "optionLabel": "{name}",
+            "optionDefaultLabel": "{name} (Default)",
             "origin": {
                 "standard": "Standard",
                 "forked": "Forked",

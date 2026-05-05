@@ -311,7 +311,7 @@ export class WorkLifecycleService {
 
     async switchWebsiteTemplate(
         id: string,
-        websiteTemplateId: string,
+        websiteTemplateId: string | null | undefined,
         user: User,
     ): Promise<SwitchWebsiteTemplateResponseDto> {
         const { work } = await this.ownershipService.ensureCanEdit(id, user.id);

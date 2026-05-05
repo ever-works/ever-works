@@ -76,7 +76,7 @@ export async function updateWebsiteRepository(workId: string) {
     }
 }
 
-export async function switchWebsiteTemplate(workId: string, websiteTemplateId: string) {
+export async function switchWebsiteTemplate(workId: string, websiteTemplateId: string | null) {
     const user = await getAuthFromCookie();
     if (!user) {
         redirect(ROUTES.AUTH_LOGIN);
@@ -85,7 +85,8 @@ export async function switchWebsiteTemplate(workId: string, websiteTemplateId: s
     const t = await getTranslations('actions.deploy');
 
     try {
-        const response = await websiteAPI.switchTemplate(workId, websiteTemplateId);
+        const normalizedTemplateId = websiteTemplateId?.trim() || null;
+        const response = await websiteAPI.switchTemplate(workId, normalizedTemplateId);
         revalidatePath(ROUTES.DASHBOARD_WORK_DEPLOY(workId));
 
         return {
