@@ -4,15 +4,15 @@ GitHub git provider plugin for Ever Works - repository management, git operation
 
 ## Plugin metadata
 
-| Field         | Value                                                  |
-| ------------- | ------------------------------------------------------ |
-| ID            | `github`                                               |
-| Category      | `git-provider`                                         |
-| Capabilities  | `git-provider`, `oauth`                                |
-| Author        | Ever Works Team                                        |
-| License       | MIT                                                    |
-| Built-in      | yes                                                    |
-| Auto-enable   | yes                                                    |
+| Field        | Value                   |
+| ------------ | ----------------------- |
+| ID           | `github`                |
+| Category     | `git-provider`          |
+| Capabilities | `git-provider`, `oauth` |
+| Author       | Ever Works Team         |
+| License      | MIT                     |
+| Built-in     | yes                     |
+| Auto-enable  | yes                     |
 
 ## What does the GitHub plugin do?
 

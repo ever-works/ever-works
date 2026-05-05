@@ -4,15 +4,15 @@ Local Content Extractor - System plugin for extracting web page content using ax
 
 ## Plugin metadata
 
-| Field        | Value                              |
-| ------------ | ---------------------------------- |
-| ID           | `local-content-extractor`          |
-| Category     | `content-extractor`                |
-| Capabilities | `content-extractor`                |
-| Author       | Ever Works Team                    |
-| License      | MIT                                |
-| Built-in     | yes                                |
-| Auto-enable  | yes                                |
+| Field        | Value                     |
+| ------------ | ------------------------- |
+| ID           | `local-content-extractor` |
+| Category     | `content-extractor`       |
+| Capabilities | `content-extractor`       |
+| Author       | Ever Works Team           |
+| License      | MIT                       |
+| Built-in     | yes                       |
+| Auto-enable  | yes                       |
 
 ## What does the local content extractor plugin do?
 

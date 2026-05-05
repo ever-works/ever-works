@@ -4,15 +4,15 @@ Tavily Plugin - Web search and content extraction using Tavily API
 
 ## Plugin metadata
 
-| Field         | Value                                                  |
-| ------------- | ------------------------------------------------------ |
-| ID            | `tavily`                                               |
-| Category      | `search`                                               |
-| Capabilities  | `search`, `content-extractor`                          |
-| Author        | Ever Works Team                                        |
-| License       | MIT                                                    |
-| Built-in      | yes                                                    |
-| Auto-enable   | yes                                                    |
+| Field        | Value                         |
+| ------------ | ----------------------------- |
+| ID           | `tavily`                      |
+| Category     | `search`                      |
+| Capabilities | `search`, `content-extractor` |
+| Author       | Ever Works Team               |
+| License      | MIT                           |
+| Built-in     | yes                           |
+| Auto-enable  | yes                           |
 
 ## What does Tavily do?
 

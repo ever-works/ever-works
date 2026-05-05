@@ -4,15 +4,15 @@ Claude Code Generator Plugin - Full pipeline plugin that delegates generation to
 
 ## Plugin metadata
 
-| Field        | Value                                |
-| ------------ | ------------------------------------ |
-| ID           | `claude-code`                        |
-| Category     | `pipeline`                           |
-| Capabilities | `pipeline`, `form-schema-provider`   |
-| Author       | Ever Works Team                      |
-| License      | MIT                                  |
-| Built-in     | yes                                  |
-| Auto-enable  | no                                   |
+| Field        | Value                              |
+| ------------ | ---------------------------------- |
+| ID           | `claude-code`                      |
+| Category     | `pipeline`                         |
+| Capabilities | `pipeline`, `form-schema-provider` |
+| Author       | Ever Works Team                    |
+| License      | MIT                                |
+| Built-in     | yes                                |
+| Auto-enable  | no                                 |
 
 ## Claude Code Generator Plugin
 
@@ -31,10 +31,10 @@ The plugin runs 6 sequential steps:
 
 ## Settings
 
-| Setting        | Description                       |
-| -------------- | --------------------------------- |
-| `oauthToken`   | Claude Code OAuth token           |
-| `apiKey`       | Anthropic API key                 |
+| Setting      | Description             |
+| ------------ | ----------------------- |
+| `oauthToken` | Claude Code OAuth token |
+| `apiKey`     | Anthropic API key       |
 
 ### Authentication
 
@@ -48,6 +48,7 @@ claude setup-token
 
 **API Key**:
 Get one from [console.anthropic.com](https://console.anthropic.com)
+
 ## Usage
 
 Enable the plugin for a work and trigger generation with `providers.pipeline: 'claude-code'`.

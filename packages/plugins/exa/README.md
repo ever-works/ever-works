@@ -4,15 +4,15 @@ Exa Plugin - Neural and keyword search using the Exa API
 
 ## Plugin metadata
 
-| Field         | Value                                                  |
-| ------------- | ------------------------------------------------------ |
-| ID            | `exa`                                                  |
-| Category      | `search`                                               |
-| Capabilities  | `search`, `content-extractor`                          |
-| Author        | Ever Works Team                                        |
-| License       | MIT                                                    |
-| Built-in      | yes                                                    |
-| Auto-enable   | no                                                     |
+| Field        | Value                         |
+| ------------ | ----------------------------- |
+| ID           | `exa`                         |
+| Category     | `search`                      |
+| Capabilities | `search`, `content-extractor` |
+| Author       | Ever Works Team               |
+| License      | MIT                           |
+| Built-in     | yes                           |
+| Auto-enable  | no                            |
 
 ## What does Exa do?
 

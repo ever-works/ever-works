@@ -4,15 +4,15 @@ SIM AI Workflow Pipeline Plugin - Delegates Work generation to SIM AI workflows
 
 ## Plugin metadata
 
-| Field         | Value                                                  |
-| ------------- | ------------------------------------------------------ |
-| ID            | `sim-ai`                                               |
-| Category      | `pipeline`                                             |
-| Capabilities  | `pipeline`, `form-schema-provider`                     |
-| Author        | Ever Works Team                                        |
-| License       | MIT                                                    |
-| Built-in      | yes                                                    |
-| Auto-enable   | no                                                     |
+| Field        | Value                              |
+| ------------ | ---------------------------------- |
+| ID           | `sim-ai`                           |
+| Category     | `pipeline`                         |
+| Capabilities | `pipeline`, `form-schema-provider` |
+| Author       | Ever Works Team                    |
+| License      | MIT                                |
+| Built-in     | yes                                |
+| Auto-enable  | no                                 |
 
 ## What does the Sim AI plugin do?
 

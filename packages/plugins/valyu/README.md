@@ -4,15 +4,15 @@ Valyu Plugin - Web search and content extraction using Valyu API
 
 ## Plugin metadata
 
-| Field         | Value                                                  |
-| ------------- | ------------------------------------------------------ |
-| ID            | `valyu`                                                |
-| Category      | `search`                                               |
-| Capabilities  | `search`, `content-extractor`                          |
-| Author        | Ever Works Team                                        |
-| License       | MIT                                                    |
-| Built-in      | yes                                                    |
-| Auto-enable   | no                                                     |
+| Field        | Value                         |
+| ------------ | ----------------------------- |
+| ID           | `valyu`                       |
+| Category     | `search`                      |
+| Capabilities | `search`, `content-extractor` |
+| Author       | Ever Works Team               |
+| License      | MIT                           |
+| Built-in     | yes                           |
+| Auto-enable  | no                            |
 
 ## What does Valyu do?
 

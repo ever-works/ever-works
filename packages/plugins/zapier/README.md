@@ -4,15 +4,15 @@ Zapier Automation Pipeline Plugin - Triggers Zapier actions during Work generati
 
 ## Plugin metadata
 
-| Field         | Value                                                  |
-| ------------- | ------------------------------------------------------ |
-| ID            | `zapier`                                               |
-| Category      | `pipeline`                                             |
-| Capabilities  | `pipeline`, `form-schema-provider`                     |
-| Author        | Ever Works Team                                        |
-| License       | MIT                                                    |
-| Built-in      | yes                                                    |
-| Auto-enable   | no                                                     |
+| Field        | Value                              |
+| ------------ | ---------------------------------- |
+| ID           | `zapier`                           |
+| Category     | `pipeline`                         |
+| Capabilities | `pipeline`, `form-schema-provider` |
+| Author       | Ever Works Team                    |
+| License      | MIT                                |
+| Built-in     | yes                                |
+| Auto-enable  | no                                 |
 
 ## What does the Zapier plugin do?
 
@@ -47,7 +47,7 @@ When this plugin is selected as the active pipeline, the platform invokes a Zapi
 - `accessToken` (**secret**) — Short-lived bearer token from `npx zapier-sdk login`. Use for local development only.
 - `baseUrl` — Override the Zapier SDK base URL (leave empty for the SDK default).
 
-Authentication requires either `accessToken` *or* both `clientId` and `clientSecret`. The generator form additionally exposes per-run options including the action reference (app key, action type, action key, authentication ID), the result shape (`structured` / native record / `side-effect`), the field mapping for native records, and the action timeout.
+Authentication requires either `accessToken` _or_ both `clientId` and `clientSecret`. The generator form additionally exposes per-run options including the action reference (app key, action type, action key, authentication ID), the result shape (`structured` / native record / `side-effect`), the field mapping for native records, and the action timeout.
 
 ## Local development
 

@@ -29,6 +29,46 @@ providers:
         });
     });
 
+    it('parses a works.yml with deployProvider: k8s', () => {
+        const result = service.parse(`
+name: My Site
+deployProvider: k8s
+`);
+
+        expect(result.deployProvider).toBe('k8s');
+    });
+
+    it('parses a works.yml with deployProvider: vercel (provider-agnostic)', () => {
+        const result = service.parse(`
+name: My Site
+deployProvider: vercel
+`);
+
+        expect(result.deployProvider).toBe('vercel');
+    });
+
+    it('parses snake_case deploy_provider as well', () => {
+        const result = service.parse(`
+name: My Site
+deploy_provider: k8s
+`);
+
+        expect(result.deployProvider).toBe('k8s');
+    });
+
+    it('returns undefined deployProvider when the field is empty or absent', () => {
+        const empty = service.parse(`
+name: My Site
+deployProvider: '   '
+`);
+        expect(empty.deployProvider).toBeUndefined();
+
+        const absent = service.parse(`
+name: My Site
+`);
+        expect(absent.deployProvider).toBeUndefined();
+    });
+
     it('supports object-based schedule config', () => {
         const result = service.parse(`
 prompt: Keep this repo up to date

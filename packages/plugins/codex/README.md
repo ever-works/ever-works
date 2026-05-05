@@ -4,15 +4,15 @@ Full pipeline plugin that delegates work generation to the [Codex CLI](https://g
 
 ## Plugin metadata
 
-| Field        | Value                                              |
-| ------------ | -------------------------------------------------- |
-| ID           | `codex`                                            |
-| Category     | `pipeline`                                         |
-| Capabilities | `pipeline`, `form-schema-provider`, `device-auth`  |
-| Author       | Ever Works Team                                    |
-| License      | MIT                                                |
-| Built-in     | yes                                                |
-| Auto-enable  | no                                                 |
+| Field        | Value                                             |
+| ------------ | ------------------------------------------------- |
+| ID           | `codex`                                           |
+| Category     | `pipeline`                                        |
+| Capabilities | `pipeline`, `form-schema-provider`, `device-auth` |
+| Author       | Ever Works Team                                   |
+| License      | MIT                                               |
+| Built-in     | yes                                               |
+| Auto-enable  | no                                                |
 
 ## Pipeline Steps
 

@@ -4,15 +4,15 @@ Bright Data Plugin - Web search and content extraction using Bright Data API
 
 ## Plugin metadata
 
-| Field         | Value                                                  |
-| ------------- | ------------------------------------------------------ |
-| ID            | `brightdata`                                           |
-| Category      | `search`                                               |
-| Capabilities  | `search`, `content-extractor`                          |
-| Author        | Ever Works Team                                        |
-| License       | MIT                                                    |
-| Built-in      | yes                                                    |
-| Auto-enable   | no                                                     |
+| Field        | Value                         |
+| ------------ | ----------------------------- |
+| ID           | `brightdata`                  |
+| Category     | `search`                      |
+| Capabilities | `search`, `content-extractor` |
+| Author       | Ever Works Team               |
+| License      | MIT                           |
+| Built-in     | yes                           |
+| Auto-enable  | no                            |
 
 ## What does Bright Data do?
 

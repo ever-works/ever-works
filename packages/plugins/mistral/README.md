@@ -4,15 +4,15 @@ Mistral AI provider plugin for Ever Works platform
 
 ## Plugin metadata
 
-| Field        | Value             |
-| ------------ | ----------------- |
-| ID           | `mistral`         |
-| Category     | `ai-provider`     |
-| Capabilities | `ai-provider`     |
-| Author       | Ever Works Team   |
-| License      | MIT               |
-| Built-in     | yes               |
-| Auto-enable  | no                |
+| Field        | Value           |
+| ------------ | --------------- |
+| ID           | `mistral`       |
+| Category     | `ai-provider`   |
+| Capabilities | `ai-provider`   |
+| Author       | Ever Works Team |
+| License      | MIT             |
+| Built-in     | yes             |
+| Auto-enable  | no              |
 
 ## What is Mistral?
 

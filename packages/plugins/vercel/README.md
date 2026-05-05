@@ -4,15 +4,15 @@ Vercel deployment plugin for Ever Works - deploy works to Vercel
 
 ## Plugin metadata
 
-| Field         | Value                                                  |
-| ------------- | ------------------------------------------------------ |
-| ID            | `vercel`                                               |
-| Category      | `deployment`                                           |
-| Capabilities  | `deployment`                                           |
-| Author        | Ever Works Team                                        |
-| License       | MIT                                                    |
-| Built-in      | yes                                                    |
-| Auto-enable   | yes                                                    |
+| Field        | Value           |
+| ------------ | --------------- |
+| ID           | `vercel`        |
+| Category     | `deployment`    |
+| Capabilities | `deployment`    |
+| Author       | Ever Works Team |
+| License      | MIT             |
+| Built-in     | yes             |
+| Auto-enable  | yes             |
 
 ## What does the Vercel plugin do?
 

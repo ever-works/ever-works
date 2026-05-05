@@ -13,6 +13,11 @@ const WORKS_CONFIG_FILENAME = 'works.yml';
 export type WorksConfigWriteRequest = Partial<Pick<CreateItemsGeneratorDto, 'name' | 'prompt'>> & {
     model?: string | null;
     providers?: ProvidersDto | null;
+    /**
+     * Deploy provider plugin id (e.g. 'vercel', 'k8s'). Provider-agnostic;
+     * the works-config layer never branches on the value.
+     */
+    deployProvider?: string | null;
 };
 
 export type WriteWorksConfigOptions = {
@@ -59,6 +64,12 @@ export class WorksConfigWriterService {
         });
         const websiteRepo =
             imported?.websiteRepo || this.formatRepositoryTarget(options.work, 'website');
+        const deployProvider = this.resolveDeployProvider({
+            requested: request.deployProvider,
+            imported: imported?.deployProvider,
+            existing: existingRaw.deployProvider ?? existingRaw.deploy_provider,
+            workValue: options.work.deployProvider,
+        });
 
         return this.withoutUndefined({
             ...existingRaw,
@@ -68,7 +79,29 @@ export class WorksConfigWriterService {
             providers,
             website_repo: websiteRepo,
             schedule: this.buildSchedule(options.work, imported),
+            deployProvider,
         });
+    }
+
+    private resolveDeployProvider(args: {
+        requested?: string | null;
+        imported?: string | null;
+        existing?: unknown;
+        workValue?: string | null;
+    }): string | undefined {
+        if (args.requested === null) return undefined;
+        if (typeof args.requested === 'string' && args.requested.trim().length > 0) {
+            return args.requested.trim();
+        }
+        if (typeof args.imported === 'string' && args.imported.trim().length > 0) {
+            return args.imported.trim();
+        }
+        const existing = this.readString(args.existing);
+        if (existing) return existing;
+        if (typeof args.workValue === 'string' && args.workValue.trim().length > 0) {
+            return args.workValue.trim();
+        }
+        return undefined;
     }
 
     private buildSchedule(

@@ -4,15 +4,15 @@ Hermes Agent pipeline plugin for Ever Works.
 
 ## Plugin metadata
 
-| Field        | Value                                |
-| ------------ | ------------------------------------ |
-| ID           | `hermes-agent`                       |
-| Category     | `pipeline`                           |
-| Capabilities | `pipeline`, `form-schema-provider`   |
-| Author       | Ever Works Team                      |
-| License      | MIT                                  |
-| Built-in     | yes                                  |
-| Auto-enable  | no                                   |
+| Field        | Value                              |
+| ------------ | ---------------------------------- |
+| ID           | `hermes-agent`                     |
+| Category     | `pipeline`                         |
+| Capabilities | `pipeline`, `form-schema-provider` |
+| Author       | Ever Works Team                    |
+| License      | MIT                                |
+| Built-in     | yes                                |
+| Auto-enable  | no                                 |
 
 ## Hermes Agent Plugin
 

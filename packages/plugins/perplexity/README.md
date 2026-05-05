@@ -4,15 +4,15 @@ Perplexity Plugin - AI-powered web search with citations
 
 ## Plugin metadata
 
-| Field         | Value                                                  |
-| ------------- | ------------------------------------------------------ |
-| ID            | `perplexity`                                           |
-| Category      | `search`                                               |
-| Capabilities  | `search`                                               |
-| Author        | Ever Works Team                                        |
-| License       | MIT                                                    |
-| Built-in      | yes                                                    |
-| Auto-enable   | no                                                     |
+| Field        | Value           |
+| ------------ | --------------- |
+| ID           | `perplexity`    |
+| Category     | `search`        |
+| Capabilities | `search`        |
+| Author       | Ever Works Team |
+| License      | MIT             |
+| Built-in     | yes             |
+| Auto-enable  | no              |
 
 ## What does Perplexity do?
 

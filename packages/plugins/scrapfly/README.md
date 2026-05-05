@@ -4,15 +4,15 @@ Scrapfly Plugin - Screenshot capture and content extraction using Scrapfly API
 
 ## Plugin metadata
 
-| Field        | Value                                  |
-| ------------ | -------------------------------------- |
-| ID           | `scrapfly`                             |
-| Category     | `content-extractor`                    |
-| Capabilities | `screenshot`, `content-extractor`      |
-| Author       | Ever Works Team                        |
-| License      | MIT                                    |
-| Built-in     | yes                                    |
-| Auto-enable  | no                                     |
+| Field        | Value                             |
+| ------------ | --------------------------------- |
+| ID           | `scrapfly`                        |
+| Category     | `content-extractor`               |
+| Capabilities | `screenshot`, `content-extractor` |
+| Author       | Ever Works Team                   |
+| License      | MIT                               |
+| Built-in     | yes                               |
+| Auto-enable  | no                                |
 
 ## What does Scrapfly do?
 

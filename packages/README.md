@@ -17,15 +17,15 @@ packages/
 
 ## Packages
 
-| Package                                                | Description                                                              | Visibility |
-| ------------------------------------------------------ | ------------------------------------------------------------------------ | ---------- |
-| [`@ever-works/agent`](agent/README.md)                 | Core AI agent logic with 25+ NestJS sub-modules                          | Internal   |
-| [`@ever-works/cli-shared`](cli-shared/README.md)       | Prompt services and validators shared by the public and internal CLIs    | Public     |
-| [`@ever-works/contracts`](contracts/README.md)         | Shared TypeScript types and contracts (item, domain, form, api)          | Public     |
-| [`@ever-works/monitoring`](monitoring/README.md)       | NestJS module with Sentry error tracking + PostHog analytics             | Public     |
-| [`@ever-works/plugin`](plugin/README.md)               | Plugin system contracts, abstract base classes, and test harnesses       | Public     |
-| [`@ever-works/trigger-tasks`](tasks/README.md)         | Trigger.dev background tasks for generation, deployment, and scheduling  | Internal   |
-| [Plugins](plugins/README.md)                           | 40+ first-party plugins (see directory)                                  | Public     |
+| Package                                          | Description                                                             | Visibility |
+| ------------------------------------------------ | ----------------------------------------------------------------------- | ---------- |
+| [`@ever-works/agent`](agent/README.md)           | Core AI agent logic with 25+ NestJS sub-modules                         | Internal   |
+| [`@ever-works/cli-shared`](cli-shared/README.md) | Prompt services and validators shared by the public and internal CLIs   | Public     |
+| [`@ever-works/contracts`](contracts/README.md)   | Shared TypeScript types and contracts (item, domain, form, api)         | Public     |
+| [`@ever-works/monitoring`](monitoring/README.md) | NestJS module with Sentry error tracking + PostHog analytics            | Public     |
+| [`@ever-works/plugin`](plugin/README.md)         | Plugin system contracts, abstract base classes, and test harnesses      | Public     |
+| [`@ever-works/trigger-tasks`](tasks/README.md)   | Trigger.dev background tasks for generation, deployment, and scheduling | Internal   |
+| [Plugins](plugins/README.md)                     | 40+ first-party plugins (see directory)                                 | Public     |
 
 ## Contributing
 

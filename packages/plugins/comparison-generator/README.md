@@ -4,15 +4,15 @@ Auto-generates SEO-optimized A vs B comparison pages between Work items
 
 ## Plugin metadata
 
-| Field         | Value                                                  |
-| ------------- | ------------------------------------------------------ |
-| ID            | `comparison-generator`                                 |
-| Category      | `utility`                                              |
-| Capabilities  | _(none)_                                               |
-| Author        | Ever Works Team                                        |
-| License       | MIT                                                    |
-| Built-in      | yes                                                    |
-| Auto-enable   | no                                                     |
+| Field        | Value                  |
+| ------------ | ---------------------- |
+| ID           | `comparison-generator` |
+| Category     | `utility`              |
+| Capabilities | _(none)_               |
+| Author       | Ever Works Team        |
+| License      | MIT                    |
+| Built-in     | yes                    |
+| Auto-enable  | no                     |
 
 ## What is the Comparison Generator?
 

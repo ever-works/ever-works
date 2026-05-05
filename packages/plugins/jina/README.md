@@ -4,15 +4,15 @@ Jina AI Plugin - Web search and content extraction using Jina AI APIs
 
 ## Plugin metadata
 
-| Field         | Value                                                  |
-| ------------- | ------------------------------------------------------ |
-| ID            | `jina`                                                 |
-| Category      | `content-extractor`                                    |
-| Capabilities  | `search`, `content-extractor`                          |
-| Author        | Ever Works Team                                        |
-| License       | MIT                                                    |
-| Built-in      | yes                                                    |
-| Auto-enable   | no                                                     |
+| Field        | Value                         |
+| ------------ | ----------------------------- |
+| ID           | `jina`                        |
+| Category     | `content-extractor`           |
+| Capabilities | `search`, `content-extractor` |
+| Author       | Ever Works Team               |
+| License      | MIT                           |
+| Built-in     | yes                           |
+| Auto-enable  | no                            |
 
 ## What does Jina AI do?
 
