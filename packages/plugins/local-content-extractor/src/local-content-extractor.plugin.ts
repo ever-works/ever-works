@@ -103,7 +103,12 @@ export class LocalContentExtractorPlugin implements IPlugin, IContentExtractorPl
 				validateStatus: (status) => status >= 200 && status < 400
 			});
 
-			const contentType = response.headers['content-type'] || '';
+			const rawContentType = response.headers['content-type'];
+			const contentType = Array.isArray(rawContentType)
+				? rawContentType.join(', ')
+				: typeof rawContentType === 'string'
+					? rawContentType
+					: '';
 			if (
 				!contentType.includes('text/html') &&
 				!contentType.includes('text/plain') &&

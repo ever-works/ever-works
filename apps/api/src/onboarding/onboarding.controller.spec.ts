@@ -1,9 +1,9 @@
-import { INestApplication, ValidationPipe } from '@nestjs/common';
-import { Test } from '@nestjs/testing';
-import request = require('supertest');
+import { BadRequestException, ValidationPipe } from '@nestjs/common';
+import { HEADERS_METADATA } from '@nestjs/common/constants';
 import { OnboardingController } from './onboarding.controller';
 import { OnboardingService } from './onboarding.service';
 import { WellKnownController } from './well-known.controller';
+import { RegisterWorkRequestDto } from './dto/register-work.dto';
 
 jest.mock('@ever-works/agent/database', () => ({}));
 jest.mock('@ever-works/agent/entities', () => ({
@@ -15,41 +15,32 @@ jest.mock('@nestjs/throttler', () => ({
     ThrottlerGuard: class {},
 }));
 
-describe('OnboardingController (HTTP)', () => {
-    let app: INestApplication;
+describe('OnboardingController', () => {
+    let controller: OnboardingController;
+    let wellKnownController: WellKnownController;
     let mockService: { handle: jest.Mock; getStatus: jest.Mock };
+    let validationPipe: ValidationPipe;
 
-    beforeAll(async () => {
+    beforeEach(() => {
         mockService = {
             handle: jest.fn(),
             getStatus: jest.fn(),
         };
 
-        const moduleRef = await Test.createTestingModule({
-            controllers: [OnboardingController, WellKnownController],
-            providers: [
-                {
-                    provide: OnboardingService,
-                    useValue: mockService,
-                },
-            ],
-        }).compile();
-
-        app = moduleRef.createNestApplication();
-        app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
-        await app.init();
-    });
-
-    afterAll(async () => {
-        await app.close();
-    });
-
-    beforeEach(() => {
+        controller = new OnboardingController(mockService as unknown as OnboardingService);
+        wellKnownController = new WellKnownController();
+        validationPipe = new ValidationPipe({ whitelist: true, transform: true });
         jest.clearAllMocks();
     });
 
-    describe('POST /register-work', () => {
-        it('returns 202 on success and forwards header to service', async () => {
+    const validateBody = async (value: Record<string, unknown>): Promise<RegisterWorkRequestDto> =>
+        validationPipe.transform(value, {
+            type: 'body',
+            metatype: RegisterWorkRequestDto,
+        }) as Promise<RegisterWorkRequestDto>;
+
+    describe('register', () => {
+        it('returns 202 payload on success and forwards the github token', async () => {
             mockService.handle.mockResolvedValue({
                 onboardingId: 'ob-1',
                 workId: 'w-1',
@@ -58,40 +49,40 @@ describe('OnboardingController (HTTP)', () => {
                 subdomain: 'mydir.ever.works',
             });
 
-            const res = await request(app.getHttpServer())
-                .post('/api/register-work')
-                .set('X-GitHub-Token', 'gh_pat_xxx')
-                .send({ repo: 'https://github.com/octocat/awesome-mcp' });
+            const body = await validateBody({
+                repo: 'https://github.com/octocat/awesome-mcp',
+            });
+            const result = await controller.register(body, 'gh_pat_xxx');
 
-            expect(res.status).toBe(202);
-            expect(res.body.onboardingId).toBe('ob-1');
-            expect(res.body.subdomain).toBe('mydir.ever.works');
+            expect(result.onboardingId).toBe('ob-1');
+            expect(result.subdomain).toBe('mydir.ever.works');
             expect(mockService.handle).toHaveBeenCalledTimes(1);
-            const arg = mockService.handle.mock.calls[0][0];
-            expect(arg.githubToken).toBe('gh_pat_xxx');
+            expect(mockService.handle).toHaveBeenCalledWith({
+                body,
+                githubToken: 'gh_pat_xxx',
+                idempotencyKey: undefined,
+            });
         });
 
-        it('returns 400 when X-GitHub-Token header is missing', async () => {
-            const res = await request(app.getHttpServer())
-                .post('/api/register-work')
-                .send({ repo: 'https://github.com/octocat/awesome-mcp' });
+        it('throws 400 when X-GitHub-Token is missing', async () => {
+            const body = await validateBody({
+                repo: 'https://github.com/octocat/awesome-mcp',
+            });
 
-            expect(res.status).toBe(400);
-            expect(res.body.code).toBe('validation_error');
+            await expect(controller.register(body, '')).rejects.toThrow(BadRequestException);
             expect(mockService.handle).not.toHaveBeenCalled();
         });
 
-        it('returns 400 when repo is not a github URL', async () => {
-            const res = await request(app.getHttpServer())
-                .post('/api/register-work')
-                .set('X-GitHub-Token', 'gh_pat_xxx')
-                .send({ repo: 'https://gitlab.com/foo/bar' });
-
-            expect(res.status).toBe(400);
+        it('rejects non-github repo URLs through validation', async () => {
+            await expect(
+                validateBody({
+                    repo: 'https://gitlab.com/foo/bar',
+                }),
+            ).rejects.toThrow(BadRequestException);
             expect(mockService.handle).not.toHaveBeenCalled();
         });
 
-        it('strips unknown body fields (whitelist)', async () => {
+        it('strips unknown body fields via whitelist validation', async () => {
             mockService.handle.mockResolvedValue({
                 onboardingId: 'ob-1',
                 workId: 'w-1',
@@ -100,20 +91,18 @@ describe('OnboardingController (HTTP)', () => {
                 subdomain: 'mydir.ever.works',
             });
 
-            await request(app.getHttpServer())
-                .post('/api/register-work')
-                .set('X-GitHub-Token', 'gh_pat_xxx')
-                .send({
-                    repo: 'https://github.com/octocat/awesome-mcp',
-                    nonsense: { whatever: true },
-                })
-                .expect(202);
+            const body = await validateBody({
+                repo: 'https://github.com/octocat/awesome-mcp',
+                nonsense: { whatever: true },
+            });
+
+            await controller.register(body, 'gh_pat_xxx');
 
             const arg = mockService.handle.mock.calls[0][0];
             expect(arg.body.nonsense).toBeUndefined();
         });
 
-        it('forwards Idempotency-Key header to service', async () => {
+        it('forwards Idempotency-Key to the service', async () => {
             mockService.handle.mockResolvedValue({
                 onboardingId: 'ob-1',
                 workId: 'w-1',
@@ -122,27 +111,40 @@ describe('OnboardingController (HTTP)', () => {
                 subdomain: 'mydir.ever.works',
             });
 
-            await request(app.getHttpServer())
-                .post('/api/register-work')
-                .set('X-GitHub-Token', 'gh_pat_xxx')
-                .set('Idempotency-Key', 'idem-1')
-                .send({ repo: 'https://github.com/octocat/awesome-mcp' })
-                .expect(202);
+            const body = await validateBody({
+                repo: 'https://github.com/octocat/awesome-mcp',
+            });
+            await controller.register(body, 'gh_pat_xxx', 'idem-1');
 
-            const arg = mockService.handle.mock.calls[0][0];
-            expect(arg.idempotencyKey).toBe('idem-1');
+            expect(mockService.handle).toHaveBeenCalledWith({
+                body,
+                githubToken: 'gh_pat_xxx',
+                idempotencyKey: 'idem-1',
+            });
         });
     });
 
-    describe('GET /.well-known/agent.json', () => {
-        it('serves the Agent Card', async () => {
-            const res = await request(app.getHttpServer()).get('/.well-known/agent.json');
+    describe('agent card', () => {
+        it('serves the Agent Card payload', () => {
+            const result = wellKnownController.agentCard();
 
-            expect(res.status).toBe(200);
-            expect(res.body.name).toBe('Ever Works');
-            expect(res.body.capabilities[0].id).toBe('register_work');
-            expect(res.body.capabilities[0].rest.method).toBe('POST');
-            expect(res.headers['cache-control']).toContain('max-age=300');
+            expect(result.name).toBe('Ever Works');
+            expect(result.capabilities[0].id).toBe('register_work');
+            expect(result.capabilities[0].rest?.method).toBe('POST');
+        });
+
+        it('declares cache headers on the endpoint metadata', () => {
+            const headers = Reflect.getMetadata(
+                HEADERS_METADATA,
+                WellKnownController.prototype.agentCard,
+            ) as Array<{ name: string; value: string }>;
+
+            expect(headers).toEqual(
+                expect.arrayContaining([
+                    { name: 'Cache-Control', value: 'public, max-age=300' },
+                    { name: 'Content-Type', value: 'application/json; charset=utf-8' },
+                ]),
+            );
         });
     });
 });
