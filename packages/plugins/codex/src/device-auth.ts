@@ -5,7 +5,7 @@ import * as path from 'node:path';
 
 import type { DeviceAuthStatus } from '@ever-works/plugin';
 
-import { ensureBinary } from './utils/binary-manager.js';
+import { ensureBinary, resolveExistingBinary } from './utils/binary-manager.js';
 import { buildSubprocessEnv } from './utils/subprocess-env.js';
 import { getManagedCodexHome } from './utils/codex-home.js';
 
@@ -94,32 +94,6 @@ export async function startDeviceAuth(
 	onConnected?: PersistDeviceAuthFn
 ): Promise<DeviceAuthStatus> {
 	const codexHome = getManagedCodexHome(userId);
-	const installed = await isCodexInstalled(logger);
-	if (!installed) {
-		return {
-			installed: false,
-			connected: false,
-			pending: false,
-			scope: 'user',
-			flowType: 'device-code',
-			message: 'Codex CLI is not installed on this machine.'
-		};
-	}
-
-	if (await isConnected(codexHome, logger)) {
-		await persistDeviceAuthIfAvailable(codexHome, onConnected);
-		disposeSession(userId);
-		lastFailureByUser.delete(userId);
-		return {
-			installed: true,
-			connected: true,
-			pending: false,
-			scope: 'user',
-			flowType: 'device-code',
-			message: 'Codex device authentication is already connected for this user.'
-		};
-	}
-
 	const existing = getActiveSession(userId);
 	if (existing) {
 		return {
@@ -141,7 +115,34 @@ export async function startDeviceAuth(
 		};
 	}
 
-	const codexCommand = await ensureBinary(undefined, getBinaryLogger(logger));
+	let codexCommand: string;
+	try {
+		codexCommand = await ensureBinary(undefined, getBinaryLogger(logger));
+	} catch {
+		return {
+			installed: false,
+			connected: false,
+			pending: false,
+			scope: 'user',
+			flowType: 'device-code',
+			message: 'Codex CLI is not installed on this machine.'
+		};
+	}
+
+	if (await isConnected(codexHome, logger, codexCommand)) {
+		await persistDeviceAuthIfAvailable(codexHome, onConnected);
+		disposeSession(userId);
+		lastFailureByUser.delete(userId);
+		return {
+			installed: true,
+			connected: true,
+			pending: false,
+			scope: 'user',
+			flowType: 'device-code',
+			message: 'Codex device authentication is already connected for this user.'
+		};
+	}
+
 	await fs.mkdir(codexHome, { recursive: true });
 	lastFailureByUser.delete(userId);
 	const child = spawn(codexCommand, ['login', '--device-auth'], {
@@ -298,31 +299,25 @@ function stripAnsi(value: string): string {
 	return value.replace(/\u001B\[[0-9;]*[A-Za-z]/gu, '');
 }
 
-export async function isCodexInstalled(logger?: LoggerLike): Promise<boolean> {
+export async function isCodexInstalled(_logger?: LoggerLike): Promise<boolean> {
 	try {
-		const codexCommand = await ensureBinary(undefined, getBinaryLogger(logger));
-		return await new Promise((resolve) => {
-			const child = spawn(codexCommand, ['--version'], {
-				cwd: process.cwd(),
-				env: buildSubprocessEnv(),
-				stdio: ['ignore', 'ignore', 'ignore']
-			});
-
-			child.on('exit', (code) => resolve(code === 0));
-			child.on('error', () => resolve(false));
-		});
+		return Boolean(await resolveExistingBinary());
 	} catch {
 		return false;
 	}
 }
 
-async function isConnected(codexHome?: string, logger?: LoggerLike): Promise<boolean> {
+async function isConnected(codexHome?: string, _logger?: LoggerLike, command?: string): Promise<boolean> {
 	if (await hasAuthFile(codexHome)) {
 		return true;
 	}
 
 	try {
-		const codexCommand = await ensureBinary(undefined, getBinaryLogger(logger));
+		const codexCommand = command ?? (await resolveExistingBinary());
+		if (!codexCommand) {
+			return false;
+		}
+
 		return await new Promise((resolve) => {
 			const child = spawn(codexCommand, ['login', 'status'], {
 				cwd: process.cwd(),

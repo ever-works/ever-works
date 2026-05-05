@@ -32,6 +32,7 @@ export {
 export {
     WebhookDeliveryService,
     FetchWebhookHttpClient,
+    WEBHOOK_HTTP_CLIENT,
     WEBHOOK_SIGNATURE_HEADER,
 } from '../services/webhook-delivery.service';
 export type {
