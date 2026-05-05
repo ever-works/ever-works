@@ -103,7 +103,16 @@ export class LocalContentExtractorPlugin implements IPlugin, IContentExtractorPl
 				validateStatus: (status) => status >= 200 && status < 400
 			});
 
-			const contentType = response.headers['content-type'] || '';
+			// axios 1.15.2 narrows response.headers values to
+			// `string | number | true | string[] | AxiosHeaders`. Coerce to
+			// string before string-only ops.
+			const rawContentType = response.headers['content-type'];
+			const contentType =
+				typeof rawContentType === 'string'
+					? rawContentType
+					: Array.isArray(rawContentType)
+						? rawContentType.join(', ')
+						: String(rawContentType ?? '');
 			if (
 				!contentType.includes('text/html') &&
 				!contentType.includes('text/plain') &&
