@@ -3,6 +3,7 @@
 import { useMemo, useState, useTransition } from 'react';
 import Image from 'next/image';
 import { useTranslations } from 'next-intl';
+import { parseGitHubRepositoryUrl } from '@ever-works/contracts';
 import { toast } from 'sonner';
 import {
     LayoutTemplate,
@@ -72,35 +73,6 @@ const EMPTY_FORM: AddTemplateFormState = {
     previewImageUrl: '',
     branch: '',
 };
-
-function parseGitHubRepositoryUrl(input: string): { owner: string; repo: string } | null {
-    try {
-        const url = new URL(input);
-        if (!['https:', 'http:'].includes(url.protocol)) {
-            return null;
-        }
-
-        if (url.hostname.toLowerCase() !== 'github.com') {
-            return null;
-        }
-
-        const segments = url.pathname
-            .replace(/\.git$/, '')
-            .split('/')
-            .filter(Boolean);
-
-        if (segments.length < 2) {
-            return null;
-        }
-
-        return {
-            owner: segments[0],
-            repo: segments[1],
-        };
-    } catch {
-        return null;
-    }
-}
 
 function compareTemplates(a: TemplateCatalogItem, b: TemplateCatalogItem) {
     if (a.sourceType !== b.sourceType) {

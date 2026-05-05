@@ -18,6 +18,7 @@ import {
 import { randomUUID } from 'node:crypto';
 import type { TemplateKind, TemplateSourceType } from '@src/entities/template.entity';
 import { config } from '@src/config';
+import { parseGitHubRepositoryUrl } from '@ever-works/contracts';
 
 export interface TemplateCatalogItem {
     id: string;
@@ -129,7 +130,7 @@ export class TemplateCatalogService implements OnModuleInit {
         },
         userId: string,
     ): Promise<TemplateCatalogItem> {
-        const repository = this.parseGitHubRepository(input.repositoryUrl);
+        const repository = parseGitHubRepositoryUrl(input.repositoryUrl);
         if (!repository) {
             throw new BadRequestException({
                 status: 'error',
@@ -702,41 +703,6 @@ export class TemplateCatalogService implements OnModuleInit {
             .filter(Boolean)
             .map((segment) => segment.charAt(0).toUpperCase() + segment.slice(1))
             .join(' ');
-    }
-
-    private parseGitHubRepository(
-        input: string,
-    ): { owner: string; repo: string; canonicalUrl: string } | null {
-        try {
-            const url = new URL(input);
-            if (url.protocol !== 'https:' && url.protocol !== 'http:') {
-                return null;
-            }
-
-            if (url.hostname.toLowerCase() !== 'github.com') {
-                return null;
-            }
-
-            const segments = url.pathname
-                .replace(/\.git$/, '')
-                .split('/')
-                .filter(Boolean);
-
-            if (segments.length < 2) {
-                return null;
-            }
-
-            const owner = segments[0].toLowerCase();
-            const repo = segments[1].toLowerCase();
-
-            return {
-                owner,
-                repo,
-                canonicalUrl: `https://github.com/${owner}/${repo}`,
-            };
-        } catch {
-            return null;
-        }
     }
 
     private isStandardTemplateRepository(repo: string): boolean {

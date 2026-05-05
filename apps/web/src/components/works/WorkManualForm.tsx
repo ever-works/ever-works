@@ -165,11 +165,6 @@ export function WorkManualForm({
                                 setFormData({ ...formData, websiteTemplateId })
                             }
                             helperText={t('websiteTemplateHelperText')}
-                            defaultOptionLabel={
-                                websiteTemplates.find((template) => template.isDefault)
-                                    ? `Use default (${websiteTemplates.find((template) => template.isDefault)?.name})`
-                                    : 'Use default'
-                            }
                         />
                     </div>
                 </div>

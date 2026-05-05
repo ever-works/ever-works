@@ -3057,6 +3057,8 @@
             }
         },
         "templateSelector": {
+            "defaultOption": "Use default",
+            "defaultOptionWithName": "Use default ({name})",
             "origin": {
                 "standard": "Standard",
                 "forked": "Forked",

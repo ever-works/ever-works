@@ -307,11 +307,6 @@ export function GeneratorForm({
                             ? t('websiteTemplateLockedHelperText')
                             : t('websiteTemplateHelperText')
                     }
-                    defaultOptionLabel={
-                        websiteTemplates.find((template) => template.isDefault)
-                            ? `Use default (${websiteTemplates.find((template) => template.isDefault)?.name})`
-                            : 'Use default'
-                    }
                 />
             </RequiredFields>
 

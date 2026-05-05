@@ -522,11 +522,6 @@ function WebsiteTemplateSettings({
                                               'The selected template controls how the website repository is initialized and updated.',
                                       })
                             }
-                            defaultOptionLabel={
-                                websiteTemplates.find((template) => template.isDefault)
-                                    ? `Use default (${websiteTemplates.find((template) => template.isDefault)?.name})`
-                                    : 'Use default'
-                            }
                         />
 
                         <div className="rounded-lg border border-border dark:border-border-dark p-4 bg-card dark:bg-card-primary-dark/20">

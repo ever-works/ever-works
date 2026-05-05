@@ -245,11 +245,6 @@ export function WorkAICreator({
                 onChange={setWebsiteTemplateId}
                 disabled={isPending}
                 helperText={t('websiteTemplateHelperText')}
-                defaultOptionLabel={
-                    websiteTemplates.find((template) => template.isDefault)
-                        ? `Use default (${websiteTemplates.find((template) => template.isDefault)?.name})`
-                        : 'Use default'
-                }
             />
 
             {formSchema && (

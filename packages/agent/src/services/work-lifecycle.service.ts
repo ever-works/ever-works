@@ -48,6 +48,31 @@ export class WorkLifecycleService {
         return normalized ? normalized : null;
     }
 
+    private async resolveValidatedWebsiteTemplateSelection(
+        value: string | null | undefined,
+        userId: string,
+    ): Promise<string | null> {
+        const normalizedTemplateId = this.normalizeWebsiteTemplateSelection(value);
+
+        if (!normalizedTemplateId) {
+            return null;
+        }
+
+        const visibleTemplate = await this.templateCatalogService.getVisibleTemplateForUser(
+            'website',
+            normalizedTemplateId,
+            userId,
+        );
+        if (!visibleTemplate) {
+            throw new BadRequestException({
+                status: 'error',
+                message: `Unsupported website template: ${normalizedTemplateId}`,
+            });
+        }
+
+        return normalizedTemplateId;
+    }
+
     private async getEffectiveWebsiteTemplateId(
         work: Pick<Work, 'websiteTemplateId'>,
         userId: string,
@@ -139,21 +164,10 @@ export class WorkLifecycleService {
             websiteTemplateId,
         } = createWorkDto;
 
-        const selectedWebsiteTemplateId = this.normalizeWebsiteTemplateSelection(websiteTemplateId);
-
-        if (selectedWebsiteTemplateId) {
-            const visibleTemplate = await this.templateCatalogService.getVisibleTemplateForUser(
-                'website',
-                selectedWebsiteTemplateId,
-                user.id,
-            );
-            if (!visibleTemplate) {
-                throw new BadRequestException({
-                    status: 'error',
-                    message: `Unsupported website template: ${selectedWebsiteTemplateId}`,
-                });
-            }
-        }
+        const selectedWebsiteTemplateId = await this.resolveValidatedWebsiteTemplateSelection(
+            websiteTemplateId,
+            user.id,
+        );
 
         const workData: Partial<CreateWorkDto & { userId: string }> = {
             slug,
@@ -236,25 +250,10 @@ export class WorkLifecycleService {
             }
 
             if (updateDto.websiteTemplateId !== undefined) {
-                const nextTemplateId = this.normalizeWebsiteTemplateSelection(
+                const nextTemplateId = await this.resolveValidatedWebsiteTemplateSelection(
                     updateDto.websiteTemplateId,
+                    user.id,
                 );
-
-                if (nextTemplateId) {
-                    const visibleTemplate =
-                        await this.templateCatalogService.getVisibleTemplateForUser(
-                            'website',
-                            nextTemplateId,
-                            user.id,
-                        );
-
-                    if (!visibleTemplate) {
-                        throw new BadRequestException({
-                            status: 'error',
-                            message: `Unsupported website template: ${nextTemplateId}`,
-                        });
-                    }
-                }
 
                 if (
                     nextTemplateId !==
@@ -316,22 +315,10 @@ export class WorkLifecycleService {
         user: User,
     ): Promise<SwitchWebsiteTemplateResponseDto> {
         const { work } = await this.ownershipService.ensureCanEdit(id, user.id);
-        const nextTemplateId = this.normalizeWebsiteTemplateSelection(websiteTemplateId);
-
-        if (nextTemplateId) {
-            const visibleTemplate = await this.templateCatalogService.getVisibleTemplateForUser(
-                'website',
-                nextTemplateId,
-                user.id,
-            );
-
-            if (!visibleTemplate) {
-                throw new BadRequestException({
-                    status: 'error',
-                    message: `Unsupported website template: ${nextTemplateId}`,
-                });
-            }
-        }
+        const nextTemplateId = await this.resolveValidatedWebsiteTemplateSelection(
+            websiteTemplateId,
+            user.id,
+        );
 
         const websiteRepoInitialized = await this.hasInitializedWebsiteRepository(work, user);
         const websiteOwner = work.getRepoOwner('website');

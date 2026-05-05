@@ -13,7 +13,6 @@ interface WebsiteTemplateSelectorProps {
     label?: string;
     helperText?: string;
     className?: string;
-    defaultOptionLabel?: string;
 }
 
 export function resolveWebsiteTemplateSelection(
@@ -41,7 +40,6 @@ export function WebsiteTemplateSelector({
     label = 'Website Template',
     helperText,
     className,
-    defaultOptionLabel,
 }: WebsiteTemplateSelectorProps) {
     const t = useTranslations('dashboard.templateSelector');
     const { defaultTemplate, effectiveTemplate, isInheritedSelection } =
@@ -69,8 +67,9 @@ export function WebsiteTemplateSelector({
 
             <Select value={value || ''} onValueChange={onChange} disabled={disabled}>
                 <option value="">
-                    {defaultOptionLabel ||
-                        (defaultTemplate ? `Use default (${defaultTemplate.name})` : 'Use default')}
+                    {defaultTemplate
+                        ? t('defaultOptionWithName', { name: defaultTemplate.name })
+                        : t('defaultOption')}
                 </option>
                 {templates.map((template) => (
                     <option key={template.id} value={template.id}>
