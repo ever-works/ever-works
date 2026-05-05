@@ -63,6 +63,15 @@ export class DeploymentVerifierService {
         const startedAt = Date.now();
         const intervalId = { value: null as NodeJS.Timeout | null };
         let lastWebsiteUrl: string | undefined;
+        // Idempotency guard. `cleanup` can be reached more than once for
+        // the same verification run — `startVerification()` invokes the
+        // returned cancel closure while an in-flight poll callback is
+        // still finishing, or the interval can resolve ERROR/TIMEOUT
+        // moments before the external cancel fires. Without this flag,
+        // each invocation re-emits a terminal event, producing
+        // conflicting activity-log entries (e.g. `CANCELED` followed by
+        // `READY`).
+        let terminated = false;
 
         // Record start time and update status
         this.repository.update(work.id, {
@@ -74,10 +83,21 @@ export class DeploymentVerifierService {
         let inVerification = false;
 
         const cleanup = (state?: DeploymentReadyState, error?: string) => {
+            if (terminated) {
+                this.logger.debug(
+                    `Skipping duplicate cleanup for work ${work.id} (already terminal)`,
+                );
+                return;
+            }
+            if (state) {
+                terminated = true;
+            }
+
             this.logger.log(`Cleaning up verification for work ${work.id} - ${state || 'UNKNOWN'}`);
 
             if (intervalId.value) {
                 clearInterval(intervalId.value);
+                intervalId.value = null;
             }
             this.queue.delete(work.id);
 

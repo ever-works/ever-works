@@ -84,8 +84,13 @@ jobs:
 
       - name: Install ingress-nginx
         if: matrix.ingress == true
+        # Pin to a specific controller release tag — using `main` makes
+        # the cluster state non-deterministic across runs (a breaking
+        # change merged to main would silently alter behaviour without a
+        # diff in this repo). Bump this tag deliberately when promoting
+        # a new floor.
         run: |
-          kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/main/deploy/static/provider/kind/deploy.yaml
+          kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.11.3/deploy/static/provider/kind/deploy.yaml
           # The controller takes ~30s to become Ready; we don't need it
           # to be Ready for the test (we only enumerate IngressClass
           # resources), but we wait so the suite reports realistic state.
