@@ -150,6 +150,11 @@ export class TemplateCatalogService implements OnModuleInit {
             });
         }
 
+        const normalizedBranch = input.branch?.trim() || 'main';
+        const normalizedSyncBranches = input.syncBranches?.length
+            ? input.syncBranches
+            : [normalizedBranch];
+
         const created = await this.templateRepository.upsert({
             id: `custom-${randomUUID()}`,
             kind: input.kind,
@@ -163,8 +168,8 @@ export class TemplateCatalogService implements OnModuleInit {
             repositoryUrl: repository.canonicalUrl,
             repositoryOwner: repository.owner,
             repositoryName: repository.repo,
-            branch: input.branch?.trim() || 'main',
-            syncBranches: input.syncBranches?.length ? input.syncBranches : ['main'],
+            branch: normalizedBranch,
+            syncBranches: normalizedSyncBranches,
             betaBranch: input.betaBranch?.trim() || null,
             isActive: true,
             metadata: {},
@@ -217,12 +222,31 @@ export class TemplateCatalogService implements OnModuleInit {
             });
         }
 
+        const resolvedBranch =
+            input.branch === undefined ? template.branch : input.branch.trim() || template.branch;
+        const syncBranches =
+            input.branch === undefined
+                ? template.syncBranches
+                : template.syncBranches.length === 1
+                  ? [resolvedBranch]
+                  : template.syncBranches.map((branch) =>
+                        branch === template.branch ? resolvedBranch : branch,
+                    );
+
         const updated = await this.templateRepository.updateById(template.id, {
-            name: input.name?.trim() || template.name,
-            description: input.description?.trim() || null,
-            framework: input.framework?.trim() || null,
-            previewImageUrl: input.previewImageUrl?.trim() || null,
-            branch: input.branch?.trim() || template.branch,
+            name: input.name === undefined ? template.name : input.name.trim() || template.name,
+            description:
+                input.description === undefined
+                    ? template.description
+                    : input.description.trim() || null,
+            framework:
+                input.framework === undefined ? template.framework : input.framework.trim() || null,
+            previewImageUrl:
+                input.previewImageUrl === undefined
+                    ? template.previewImageUrl
+                    : input.previewImageUrl?.trim() || null,
+            branch: resolvedBranch,
+            syncBranches,
         });
 
         const defaultTemplateId = await this.getDefaultTemplateIdForUser(input.kind, userId);
@@ -497,28 +521,29 @@ export class TemplateCatalogService implements OnModuleInit {
         const perPage = 100;
 
         try {
-            const hasCredentials = await this.gitFacade.hasValidCredentials({
+            const accessToken = await this.gitFacade.getAccessToken({
                 userId,
                 providerId,
             });
-
-            if (!hasCredentials) {
-                return;
-            }
 
             const repositories = [];
             let page = 1;
 
             while (true) {
-                const pageRepositories = await this.gitFacade.listRepositories(
-                    { userId, providerId },
-                    page,
-                    perPage,
-                    {
-                        owner: catalogOwner,
-                        type: 'org',
-                    },
-                );
+                const pageRepositories = accessToken
+                    ? await this.gitFacade.listRepositories(
+                          { providerId, userId, token: accessToken },
+                          page,
+                          perPage,
+                          {
+                              owner: catalogOwner,
+                              type: 'org',
+                          },
+                      )
+                    : await this.gitFacade.listPublicRepositories(providerId, page, perPage, {
+                          owner: catalogOwner,
+                          type: 'org',
+                      });
 
                 repositories.push(...pageRepositories);
 

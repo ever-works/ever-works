@@ -30,7 +30,9 @@ describe('TemplateCatalogService', () => {
         };
         gitFacade = {
             hasValidCredentials: jest.fn().mockResolvedValue(false),
+            getAccessToken: jest.fn().mockResolvedValue(null),
             listRepositories: jest.fn(),
+            listPublicRepositories: jest.fn(),
             getUser: jest.fn(),
             getOrganizations: jest.fn(),
             forkRepository: jest.fn(),
@@ -77,7 +79,7 @@ describe('TemplateCatalogService', () => {
             repositoryOwner: 'user',
             repositoryName: 'repo',
             branch: 'develop',
-            syncBranches: ['main'],
+            syncBranches: ['develop'],
             betaBranch: null,
             isActive: true,
             metadata: {},
@@ -113,10 +115,72 @@ describe('TemplateCatalogService', () => {
                 framework: 'Astro',
                 previewImageUrl: 'https://example.com/preview.png',
                 branch: 'develop',
+                syncBranches: ['develop'],
             }),
         );
         expect(result.name).toBe('New Name');
         expect(result.isDefault).toBe(true);
+    });
+
+    it('preserves omitted metadata fields during partial custom template updates', async () => {
+        templateRepository.findOwnedCustomById.mockResolvedValue({
+            id: 'custom-1',
+            kind: 'website',
+            sourceType: 'custom',
+            ownerUserId: 'user-1',
+            name: 'Old Name',
+            description: 'Old description',
+            framework: 'Next.js',
+            previewImageUrl: 'https://example.com/old.png',
+            repositoryUrl: 'https://github.com/user/repo',
+            repositoryOwner: 'user',
+            repositoryName: 'repo',
+            branch: 'main',
+            syncBranches: ['main'],
+            betaBranch: null,
+            isActive: true,
+            metadata: {},
+        });
+        templateRepository.updateById.mockResolvedValue({
+            id: 'custom-1',
+            kind: 'website',
+            sourceType: 'custom',
+            ownerUserId: 'user-1',
+            name: 'Renamed',
+            description: 'Old description',
+            framework: 'Next.js',
+            previewImageUrl: 'https://example.com/old.png',
+            repositoryUrl: 'https://github.com/user/repo',
+            repositoryOwner: 'user',
+            repositoryName: 'repo',
+            branch: 'main',
+            syncBranches: ['main'],
+            betaBranch: null,
+            isActive: true,
+            metadata: {},
+        });
+        userTemplatePreferenceRepository.findByUserAndKind.mockResolvedValue(null);
+
+        await service.updateCustomTemplateForUser(
+            {
+                kind: 'website',
+                templateId: 'custom-1',
+                name: 'Renamed',
+            },
+            'user-1',
+        );
+
+        expect(templateRepository.updateById).toHaveBeenCalledWith(
+            'custom-1',
+            expect.objectContaining({
+                name: 'Renamed',
+                description: 'Old description',
+                framework: 'Next.js',
+                previewImageUrl: 'https://example.com/old.png',
+                branch: 'main',
+                syncBranches: ['main'],
+            }),
+        );
     });
 
     it('rejects archiving a custom template that is still assigned to works', async () => {
@@ -205,7 +269,7 @@ describe('TemplateCatalogService', () => {
     });
 
     it('refreshes discovered standard templates for website catalogs', async () => {
-        gitFacade.hasValidCredentials.mockResolvedValue(true);
+        gitFacade.getAccessToken.mockResolvedValue(null);
         const firstPageRepositories = Array.from({ length: 100 }, (_, index) => ({
             name: `repo-${index}`,
             owner: 'ever-works',
@@ -230,7 +294,7 @@ describe('TemplateCatalogService', () => {
             defaultBranch: 'main',
             description: 'Docs',
         };
-        gitFacade.listRepositories
+        gitFacade.listPublicRepositories
             .mockResolvedValueOnce(firstPageRepositories)
             .mockResolvedValueOnce([]);
         templateRepository.findBuiltInByRepositoryCoordinates.mockResolvedValue({
@@ -274,7 +338,17 @@ describe('TemplateCatalogService', () => {
         const result = await service.refreshTemplatesForUser('website', 'user-1');
 
         expect(templateRepository.upsert).toHaveBeenCalledTimes(1);
-        expect(gitFacade.listRepositories).toHaveBeenCalledTimes(2);
+        expect(gitFacade.listPublicRepositories).toHaveBeenCalledTimes(2);
+        expect(gitFacade.listPublicRepositories).toHaveBeenNthCalledWith(
+            1,
+            'github',
+            1,
+            100,
+            expect.objectContaining({
+                owner: 'ever-works',
+                type: 'org',
+            }),
+        );
         expect(templateRepository.upsert).toHaveBeenCalledWith(
             expect.objectContaining({
                 id: 'classic',
