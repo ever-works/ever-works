@@ -1,5 +1,5 @@
 import { createHmac, randomUUID, timingSafeEqual } from 'node:crypto';
-import { Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
 import { isSafeWebhookUrl } from '../utils/ssrf-guard';
 
 export interface WebhookHeaders {
@@ -49,6 +49,8 @@ export interface WebhookHttpClient {
     }>;
 }
 
+export const WEBHOOK_HTTP_CLIENT = Symbol.for('WebhookHttpClient');
+
 export class FetchWebhookHttpClient implements WebhookHttpClient {
     async post(args: {
         url: string;
@@ -79,7 +81,11 @@ const SIGNATURE_HEADER = 'X-Hub-Signature-256';
 export class WebhookDeliveryService {
     private readonly logger = new Logger(WebhookDeliveryService.name);
 
-    constructor(private readonly httpClient: WebhookHttpClient = new FetchWebhookHttpClient()) {}
+    constructor(
+        @Optional()
+        @Inject(WEBHOOK_HTTP_CLIENT)
+        private readonly httpClient: WebhookHttpClient = new FetchWebhookHttpClient(),
+    ) {}
 
     /**
      * Build a signed delivery without sending it. Useful for tests and for
