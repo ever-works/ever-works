@@ -1,10 +1,14 @@
 {
     "name": "ever-works-api",
     "version": "0.0.1",
-    "description": "",
-    "author": "",
+    "description": "Ever Works API - NestJS backend service for the Ever Works platform",
+    "author": {
+        "name": "Ever Co. LTD",
+        "email": "ever@ever.co",
+        "url": "https://ever.co"
+    },
+    "license": "AGPL-3.0",
     "private": true,
-    "license": "UNLICENSED",
     "scripts": {
         "dev": "nest start -b swc --watch",
         "start": "nest start -b swc",

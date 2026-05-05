@@ -316,7 +316,7 @@ export class MyPipelinePlugin implements IPlugin, IPipelinePlugin<MyPipelineStep
 			category: this.category,
 			capabilities: [...this.capabilities],
 			author: { name: 'Your Name' },
-			license: 'MIT',
+			license: 'AGPL-3.0',
 			builtIn: true,
 			autoEnable: false,
 			visibility: 'public',
@@ -756,7 +756,7 @@ export class OrchestratedPipelinePlugin implements IPipelinePlugin<MyStepId> {
 			category: this.category,
 			capabilities: [...this.capabilities],
 			author: { name: 'Your Name' },
-			license: 'MIT',
+			license: 'AGPL-3.0',
 			builtIn: true,
 			autoEnable: false,
 			visibility: 'public'
@@ -957,7 +957,7 @@ export class SentimentAnalysisStep extends BasePipelineStep {
 			category: this.category,
 			capabilities: [...this.capabilities],
 			author: { name: 'Your Name' },
-			license: 'MIT',
+			license: 'AGPL-3.0',
 			builtIn: false,
 			autoEnable: false,
 			visibility: 'public'
@@ -1384,7 +1384,7 @@ The `everworks.plugin` metadata in `package.json` is how the platform discovers 
 			"author": {
 				"name": "Your Name"
 			},
-			"license": "MIT",
+			"license": "AGPL-3.0",
 			"builtIn": true,
 			"autoEnable": false,
 			"selectableProviderCategories": ["ai-provider", "search", "screenshot"]

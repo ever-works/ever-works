@@ -2,8 +2,13 @@
 	"name": "@ever-works/plugin",
 	"version": "1.0.0",
 	"description": "Plugin system contracts, helpers, and utilities for Ever Works platform",
+	"author": {
+		"name": "Ever Co. LTD",
+		"email": "ever@ever.co",
+		"url": "https://ever.co"
+	},
+	"license": "AGPL-3.0",
 	"private": false,
-	"license": "MIT",
 	"type": "module",
 	"main": "./dist/index.js",
 	"module": "./dist/index.js",

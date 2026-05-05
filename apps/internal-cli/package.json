@@ -7,8 +7,8 @@
         "email": "ever@ever.co",
         "url": "https://ever.co"
     },
+    "license": "AGPL-3.0",
     "private": true,
-    "license": "UNLICENSED",
     "scripts": {
         "cli": "cd dist && node dist/cli.js",
         "build": "nest build",

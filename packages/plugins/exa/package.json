@@ -2,6 +2,12 @@
 	"name": "@ever-works/exa-plugin",
 	"version": "1.0.0",
 	"description": "Exa Plugin - Neural and keyword search using the Exa API",
+	"author": {
+		"name": "Ever Co. LTD",
+		"email": "ever@ever.co",
+		"url": "https://ever.co"
+	},
+	"license": "AGPL-3.0",
 	"private": true,
 	"type": "module",
 	"main": "./dist/index.cjs",
@@ -50,7 +56,7 @@
 			"author": {
 				"name": "Ever Works Team"
 			},
-			"license": "MIT",
+			"license": "AGPL-3.0",
 			"autoEnable": false,
 			"systemPlugin": false,
 			"builtIn": true,

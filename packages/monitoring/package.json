@@ -2,8 +2,13 @@
     "name": "@ever-works/monitoring",
     "version": "0.1.0",
     "description": "Monitoring package for Sentry and PostHog integration",
+    "author": {
+        "name": "Ever Co. LTD",
+        "email": "ever@ever.co",
+        "url": "https://ever.co"
+    },
+    "license": "AGPL-3.0",
     "private": true,
-    "license": "UNLICENSED",
     "files": [
         "dist"
     ],

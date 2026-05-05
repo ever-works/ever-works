@@ -2,6 +2,12 @@
 	"name": "@ever-works/local-content-extractor-plugin",
 	"version": "1.0.0",
 	"description": "Local Content Extractor - System plugin for extracting web page content using axios + Readability",
+	"author": {
+		"name": "Ever Co. LTD",
+		"email": "ever@ever.co",
+		"url": "https://ever.co"
+	},
+	"license": "AGPL-3.0",
 	"private": true,
 	"type": "module",
 	"main": "./dist/index.cjs",
@@ -53,7 +59,7 @@
 			"author": {
 				"name": "Ever Works Team"
 			},
-			"license": "MIT",
+			"license": "AGPL-3.0",
 			"autoEnable": true,
 			"systemPlugin": true,
 			"builtIn": true,

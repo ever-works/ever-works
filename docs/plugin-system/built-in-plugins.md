@@ -7,7 +7,7 @@ sidebar_position: 5
 
 # Built-in Plugins
 
-The platform ships with 39 plugins across the AI provider, search, content extraction, screenshot, git, deployment, pipeline, data source, and utility categories. This page documents each plugin, its configuration, and environment variables.
+The platform ships with 40 plugins across the AI provider, search, content extraction, screenshot, git, deployment, pipeline, data source, and utility categories. This page documents each plugin, its configuration, and environment variables.
 
 ## AI Providers
 
@@ -452,6 +452,33 @@ Deploy work websites to Vercel. This is the **default deployment provider** and 
 | ------------------ | ------ | ------- | ------------------------------------ |
 | `apiToken`         | string | —       | Vercel API token (required, secret)  |
 | `defaultTeamScope` | string | —       | Default Vercel team scope (optional) |
+
+### Kubernetes
+
+Deploy work websites to any Kubernetes cluster you control as an alternative to Vercel. Selectable per-work via `deployProvider: k8s` (dashboard or `works.yml`). Supports a pluggable container registry (GitHub Container Registry by default) and ingress controller strategies (nginx, Traefik, plus a generic fallback). See [Kubernetes Deployment](../features/k8s-deployment.md) for the full user guide.
+
+| Field              | Value           |
+| ------------------ | --------------- |
+| Plugin ID          | `k8s`           |
+| Configuration Mode | `user-required` |
+| Auto Enable        | Yes             |
+| Default For        | —               |
+| System Plugin      | Yes             |
+
+**Settings:**
+
+| Setting               | Type    | Default           | Description                                                     |
+| --------------------- | ------- | ----------------- | --------------------------------------------------------------- |
+| `kubeconfig`          | string  | —                 | Full kubeconfig YAML (required, secret, user-scoped)            |
+| `kubeContext`         | string  | —                 | Override the kubeconfig's `current-context`                     |
+| `namespace`           | string  | `ever-works`      | Target Kubernetes namespace                                     |
+| `registry.kind`       | string  | `github`          | One of `github`, `dockerhub`, `generic`                         |
+| `registry.owner`      | string  | (auto)            | GHCR owner; defaults to your connected GitHub account           |
+| `registry.visibility` | string  | `auto`            | `auto` mirrors the website repo, or `public` / `private`        |
+| `ingressClass`        | string  | (cluster default) | Detected at validation time; populated from `IngressClass` list |
+| `ingressHost`         | string  | —                 | Default ingress host when a work has no custom domain           |
+| `tlsIssuer`           | string  | —                 | cert-manager `ClusterIssuer` name                               |
+| `replicas`            | integer | `1`               | Pod replicas (1–10)                                             |
 
 ## Screenshot
 

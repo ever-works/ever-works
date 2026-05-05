@@ -7,7 +7,7 @@
 		"email": "ever@ever.co",
 		"url": "https://ever.co"
 	},
-	"license": "MIT",
+	"license": "AGPL-3.0",
 	"main": "dist/index.js",
 	"types": "dist/index.d.ts",
 	"scripts": {

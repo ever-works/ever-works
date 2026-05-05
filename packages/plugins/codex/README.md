@@ -2,6 +2,18 @@
 
 Full pipeline plugin that delegates work generation to the [Codex CLI](https://github.com/openai/codex). A single Codex session researches, creates, and updates work item JSON files inside a temporary workspace.
 
+## Plugin metadata
+
+| Field        | Value                                             |
+| ------------ | ------------------------------------------------- |
+| ID           | `codex`                                           |
+| Category     | `pipeline`                                        |
+| Capabilities | `pipeline`, `form-schema-provider`, `device-auth` |
+| Author       | Ever Works Team                                   |
+| License      | AGPL-3.0                                          |
+| Built-in     | yes                                               |
+| Auto-enable  | no                                                |
+
 ## Pipeline Steps
 
 The plugin runs 6 sequential steps:
@@ -151,3 +163,15 @@ CODEX_SMOKE_BYPASS_SANDBOX=1 pnpm smoke
 ```
 
 Requires either `OPENAI_API_KEY` in the environment or local Codex auth (`codex login`).
+
+## Documentation
+
+- [Ever Works documentation](https://docs.ever.works)
+- [Ever Works repository](https://github.com/ever-works/ever-works)
+- [Plugin system](../../plugin/README.md)
+- [Codex CLI homepage](https://github.com/openai/codex)
+- [OpenAI API keys](https://platform.openai.com/account/api-keys)
+
+## License
+
+AGPL-3.0

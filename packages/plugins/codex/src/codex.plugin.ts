@@ -129,7 +129,7 @@ const MANIFEST: PluginManifest = {
 	capabilities: ['pipeline', 'form-schema-provider', 'device-auth'],
 	description: 'Full pipeline plugin that delegates the entire generation to Codex',
 	author: { name: 'Ever Works Team' },
-	license: 'MIT',
+	license: 'AGPL-3.0',
 	builtIn: true,
 	autoEnable: false,
 	visibility: 'public',

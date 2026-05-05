@@ -211,6 +211,14 @@ export class VercelPlugin implements IPlugin, IDeploymentPlugin {
 		};
 	}
 
+	getWorkflowFilenames(): string[] {
+		return ['deploy_vercel.yaml', 'deploy_prod.yaml'];
+	}
+
+	async getDeploymentSecrets(_settings: Record<string, unknown>): Promise<Record<string, string>> {
+		return {};
+	}
+
 	// IPlugin lifecycle
 
 	async onLoad(context: PluginContext): Promise<void> {
@@ -239,7 +247,7 @@ export class VercelPlugin implements IPlugin, IDeploymentPlugin {
 			category: this.category,
 			capabilities: [...this.capabilities],
 			author: { name: 'Ever Works Team' },
-			license: 'MIT',
+			license: 'AGPL-3.0',
 			builtIn: true,
 			systemPlugin: true,
 			autoEnable: true,

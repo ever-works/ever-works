@@ -459,7 +459,7 @@ export class ScreenshotOnePlugin implements IPlugin, IScreenshotPlugin {
 			category: this.category,
 			capabilities: [...this.capabilities],
 			author: { name: 'Ever Works Team' },
-			license: 'MIT',
+			license: 'AGPL-3.0',
 			builtIn: false,
 			systemPlugin: false,
 			readme: [
