@@ -1,5 +1,5 @@
 import { ConflictException, NotFoundException } from '@nestjs/common';
-import { TemplateCatalogService } from '../template-catalog.service';
+import { TemplateCatalogService } from './template-catalog.service';
 
 describe('TemplateCatalogService', () => {
     let templateRepository: any;

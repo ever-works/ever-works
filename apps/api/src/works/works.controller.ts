@@ -68,10 +68,10 @@ import {
     GeneratorFormSchemaService,
     ItemHealthService,
     ItemSourceValidationSchedulerService,
-    TemplateCatalogService,
     type SourceValidationSettingsDto,
 } from '@ever-works/agent/services';
 import { ComparisonGenerationService } from '@ever-works/agent/comparison-generator';
+import { TemplateCatalogService } from '@ever-works/agent/template-catalog';
 import {
     AnalyzeRepositoryDto,
     AnalyzeRepositoryResponseDto,

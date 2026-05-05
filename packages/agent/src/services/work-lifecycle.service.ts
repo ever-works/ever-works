@@ -25,7 +25,7 @@ import {
 } from '@src/generators/website-generator';
 import { GitFacadeService } from '@src/facades/git.facade';
 import { WebsiteRepositoryCreationMethod } from '@src/items-generator/dto/create-items-generator.dto';
-import { TemplateCatalogService } from './template-catalog.service';
+import { TemplateCatalogService } from '../template-catalog/template-catalog.service';
 
 @Injectable()
 export class WorkLifecycleService {

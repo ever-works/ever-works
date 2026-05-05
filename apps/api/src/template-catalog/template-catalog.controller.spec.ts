@@ -1,4 +1,4 @@
-jest.mock('@ever-works/agent/services', () => ({
+jest.mock('@ever-works/agent/template-catalog', () => ({
     TemplateCatalogService: class TemplateCatalogService {},
 }));
 jest.mock('@src/auth', () => ({

@@ -8,6 +8,7 @@ import { DatabaseModule } from '../database/database.module';
 import { ImportModule } from '../import/import.module';
 import { CommunityPrModule } from '../community-pr/community-pr.module';
 import { ComparisonGeneratorModule } from '../comparison-generator/comparison-generator.module';
+import { TemplateCatalogModule } from '../template-catalog/template-catalog.module';
 import { WorkDetailService } from './work-detail.service';
 import { WorkOwnershipService } from './work-ownership.service';
 import { WorkQueryService } from './work-query.service';
@@ -35,7 +36,6 @@ import { SettingsSchemaValidatorService } from '../plugins/services/settings-sch
 import { SubscriptionsModule } from '@src/subscriptions';
 import { RepositoryManagementService } from './repository-management.service';
 import { NotificationsModule } from '@src/notifications';
-import { TemplateCatalogService } from './template-catalog.service';
 
 /**
  * Work module providing work-related services.
@@ -56,6 +56,7 @@ import { TemplateCatalogService } from './template-catalog.service';
         NotificationsModule,
         CommunityPrModule,
         ComparisonGeneratorModule,
+        TemplateCatalogModule,
     ],
     providers: [
         WorkOwnershipService,
@@ -72,7 +73,6 @@ import { TemplateCatalogService } from './template-catalog.service';
         ItemHealthService,
         ItemSourceValidationSchedulerService,
         RepositoryManagementService,
-        TemplateCatalogService,
         GeneratorFormSchemaService,
         WorksConfigImportPlannerService,
         WorksConfigImportApplierService,
@@ -100,7 +100,6 @@ import { TemplateCatalogService } from './template-catalog.service';
         ItemHealthService,
         ItemSourceValidationSchedulerService,
         RepositoryManagementService,
-        TemplateCatalogService,
         GeneratorFormSchemaService,
         WorksConfigImportPlannerService,
         WorksConfigImportApplierService,
@@ -111,6 +110,7 @@ import { TemplateCatalogService } from './template-catalog.service';
         WorksConfigRepositorySyncService,
         CommunityPrModule,
         ComparisonGeneratorModule,
+        TemplateCatalogModule,
     ],
 })
 export class WorkModule {}

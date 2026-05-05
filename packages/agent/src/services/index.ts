@@ -13,7 +13,6 @@ export * from './repository-management.service';
 export * from './work-taxonomy.service';
 export * from './item-health.service';
 export * from './item-source-validation-scheduler.service';
-export * from './template-catalog.service';
 export * from './generator-form-schema.service';
 export * from './works-manifest.service';
 export * from './webhook-delivery.service';

@@ -10,7 +10,7 @@ import {
     Query,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
-import { TemplateCatalogService } from '@ever-works/agent/services';
+import { TemplateCatalogService } from '@ever-works/agent/template-catalog';
 import { CurrentUser } from '@src/auth';
 import { AuthenticatedUser } from '@src/auth/types/auth.types';
 import {
