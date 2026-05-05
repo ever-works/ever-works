@@ -6,12 +6,13 @@ import { cn } from '@/lib/utils/cn';
 
 interface WebsiteTemplateSelectorProps {
     templates: WebsiteTemplateOption[];
-    value: string;
+    value?: string | null;
     onChange: (value: string) => void;
     disabled?: boolean;
     label?: string;
     helperText?: string;
     className?: string;
+    defaultOptionLabel?: string;
 }
 
 export function WebsiteTemplateSelector({
@@ -22,11 +23,10 @@ export function WebsiteTemplateSelector({
     label = 'Website Template',
     helperText,
     className,
+    defaultOptionLabel,
 }: WebsiteTemplateSelectorProps) {
-    const selectedTemplate =
-        templates.find((template) => template.id === value) ||
-        templates.find((template) => template.isDefault) ||
-        templates[0];
+    const defaultTemplate = templates.find((template) => template.isDefault) || templates[0];
+    const selectedTemplate = templates.find((template) => template.id === value) || defaultTemplate;
 
     if (!selectedTemplate) {
         return null;
@@ -41,11 +41,11 @@ export function WebsiteTemplateSelector({
                 </p>
             </div>
 
-            <Select
-                value={selectedTemplate.id}
-                onValueChange={onChange}
-                disabled={disabled || templates.length <= 1}
-            >
+            <Select value={value || ''} onValueChange={onChange} disabled={disabled}>
+                <option value="">
+                    {defaultOptionLabel ||
+                        (defaultTemplate ? `Use default (${defaultTemplate.name})` : 'Use default')}
+                </option>
                 {templates.map((template) => (
                     <option key={template.id} value={template.id}>
                         {template.name}

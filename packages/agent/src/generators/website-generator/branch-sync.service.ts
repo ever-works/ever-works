@@ -43,7 +43,7 @@ export class BranchSyncService {
         const workOwner = getWorkOwner(work);
         const websiteOwner = work.getRepoOwner('website');
         const websiteRepo = work.getWebsiteRepo();
-        const template = await this.websiteTemplateResolver.resolve(work.websiteTemplateId);
+        const template = await this.websiteTemplateResolver.resolveForWork(work);
 
         const branchMapping =
             work.websiteTemplateUseBeta && template.betaBranch

@@ -43,6 +43,22 @@ export class WorkLifecycleService {
         private readonly templateCatalogService: TemplateCatalogService,
     ) {}
 
+    private normalizeWebsiteTemplateSelection(value?: string | null): string | null {
+        const normalized = value?.trim();
+        return normalized ? normalized : null;
+    }
+
+    private async getEffectiveWebsiteTemplateId(
+        work: Pick<Work, 'websiteTemplateId'>,
+        userId: string,
+    ): Promise<string> {
+        return (
+            this.normalizeWebsiteTemplateSelection(work.websiteTemplateId) ||
+            (await this.templateCatalogService.getDefaultTemplateIdForUser('website', userId)) ||
+            getDefaultWebsiteTemplateId()
+        );
+    }
+
     private isMissingWebsiteRepositoryError(error: unknown): boolean {
         if (error instanceof NotFoundException) {
             return true;
@@ -123,23 +139,21 @@ export class WorkLifecycleService {
             websiteTemplateId,
         } = createWorkDto;
 
-        if (websiteTemplateId) {
+        const selectedWebsiteTemplateId = this.normalizeWebsiteTemplateSelection(websiteTemplateId);
+
+        if (selectedWebsiteTemplateId) {
             const visibleTemplate = await this.templateCatalogService.getVisibleTemplateForUser(
                 'website',
-                websiteTemplateId,
+                selectedWebsiteTemplateId,
                 user.id,
             );
             if (!visibleTemplate) {
                 throw new BadRequestException({
                     status: 'error',
-                    message: `Unsupported website template: ${websiteTemplateId}`,
+                    message: `Unsupported website template: ${selectedWebsiteTemplateId}`,
                 });
             }
         }
-
-        const defaultWebsiteTemplateId =
-            (await this.templateCatalogService.getDefaultTemplateIdForUser('website', user.id)) ||
-            getDefaultWebsiteTemplateId();
 
         const workData: Partial<CreateWorkDto & { userId: string }> = {
             slug,
@@ -149,7 +163,7 @@ export class WorkLifecycleService {
             owner,
             gitProvider,
             deployProvider,
-            websiteTemplateId: websiteTemplateId || defaultWebsiteTemplateId,
+            websiteTemplateId: selectedWebsiteTemplateId,
             readmeConfig,
             organization,
         };
@@ -222,28 +236,30 @@ export class WorkLifecycleService {
             }
 
             if (updateDto.websiteTemplateId !== undefined) {
-                const nextTemplateId =
-                    updateDto.websiteTemplateId ||
-                    (await this.templateCatalogService.getDefaultTemplateIdForUser(
-                        'website',
-                        user.id,
-                    )) ||
-                    getDefaultWebsiteTemplateId();
-
-                const visibleTemplate = await this.templateCatalogService.getVisibleTemplateForUser(
-                    'website',
-                    nextTemplateId,
-                    user.id,
+                const nextTemplateId = this.normalizeWebsiteTemplateSelection(
+                    updateDto.websiteTemplateId,
                 );
 
-                if (!visibleTemplate) {
-                    throw new BadRequestException({
-                        status: 'error',
-                        message: `Unsupported website template: ${nextTemplateId}`,
-                    });
+                if (nextTemplateId) {
+                    const visibleTemplate =
+                        await this.templateCatalogService.getVisibleTemplateForUser(
+                            'website',
+                            nextTemplateId,
+                            user.id,
+                        );
+
+                    if (!visibleTemplate) {
+                        throw new BadRequestException({
+                            status: 'error',
+                            message: `Unsupported website template: ${nextTemplateId}`,
+                        });
+                    }
                 }
 
-                if (nextTemplateId !== work.websiteTemplateId) {
+                if (
+                    nextTemplateId !==
+                    this.normalizeWebsiteTemplateSelection(work.websiteTemplateId)
+                ) {
                     const websiteRepoInitialized = await this.hasInitializedWebsiteRepository(
                         work,
                         user,
@@ -300,41 +316,51 @@ export class WorkLifecycleService {
         user: User,
     ): Promise<SwitchWebsiteTemplateResponseDto> {
         const { work } = await this.ownershipService.ensureCanEdit(id, user.id);
-        const nextTemplateId =
-            websiteTemplateId ||
-            (await this.templateCatalogService.getDefaultTemplateIdForUser('website', user.id)) ||
-            getDefaultWebsiteTemplateId();
+        const nextTemplateId = this.normalizeWebsiteTemplateSelection(websiteTemplateId);
 
-        const visibleTemplate = await this.templateCatalogService.getVisibleTemplateForUser(
-            'website',
-            nextTemplateId,
-            user.id,
-        );
+        if (nextTemplateId) {
+            const visibleTemplate = await this.templateCatalogService.getVisibleTemplateForUser(
+                'website',
+                nextTemplateId,
+                user.id,
+            );
 
-        if (!visibleTemplate) {
-            throw new BadRequestException({
-                status: 'error',
-                message: `Unsupported website template: ${nextTemplateId}`,
-            });
+            if (!visibleTemplate) {
+                throw new BadRequestException({
+                    status: 'error',
+                    message: `Unsupported website template: ${nextTemplateId}`,
+                });
+            }
         }
 
         const websiteRepoInitialized = await this.hasInitializedWebsiteRepository(work, user);
         const websiteOwner = work.getRepoOwner('website');
         const websiteRepo = work.getWebsiteRepo();
+        const currentExplicitTemplateId = this.normalizeWebsiteTemplateSelection(
+            work.websiteTemplateId,
+        );
+        const currentEffectiveTemplateId = await this.getEffectiveWebsiteTemplateId(work, user.id);
+        const nextEffectiveTemplateId =
+            nextTemplateId ||
+            (await this.templateCatalogService.getDefaultTemplateIdForUser('website', user.id)) ||
+            getDefaultWebsiteTemplateId();
 
-        if (nextTemplateId === work.websiteTemplateId) {
+        if (
+            nextTemplateId === currentExplicitTemplateId &&
+            nextEffectiveTemplateId === currentEffectiveTemplateId
+        ) {
             return {
                 status: 'success',
                 slug: work.slug,
                 owner: websiteOwner,
                 repository: `${websiteOwner}/${websiteRepo}`,
-                previousWebsiteTemplateId: work.websiteTemplateId,
-                websiteTemplateId: work.websiteTemplateId,
+                previousWebsiteTemplateId: currentEffectiveTemplateId,
+                websiteTemplateId: currentEffectiveTemplateId,
                 repositoryRecreated: false,
                 switchMode: 'no_change',
                 message: websiteRepoInitialized
                     ? 'Website template is already selected for this work.'
-                    : 'Website template saved. It will be used when the website repository is first created.',
+                    : 'Website template preference is already saved for this work.',
             };
         }
 
@@ -346,13 +372,34 @@ export class WorkLifecycleService {
             websiteTemplateLastCheckedAt: null,
         };
 
-        const previousTemplateId = work.websiteTemplateId;
+        const previousTemplateId = currentExplicitTemplateId;
         const previousTemplateLastCommit = work.websiteTemplateLastCommit;
         const previousTemplateLastError = work.websiteTemplateLastError;
         const previousTemplateLastUpdatedAt = work.websiteTemplateLastUpdatedAt;
         const previousTemplateLastCheckedAt = work.websiteTemplateLastCheckedAt;
 
         work.websiteTemplateId = nextTemplateId;
+
+        if (nextEffectiveTemplateId === currentEffectiveTemplateId) {
+            await this.workRepository.update(id, {
+                websiteTemplateId: nextTemplateId,
+            });
+
+            return {
+                status: 'success',
+                slug: work.slug,
+                owner: websiteOwner,
+                repository: `${websiteOwner}/${websiteRepo}`,
+                previousWebsiteTemplateId: currentEffectiveTemplateId,
+                websiteTemplateId: nextEffectiveTemplateId,
+                repositoryRecreated: false,
+                switchMode: 'no_change',
+                message: nextTemplateId
+                    ? 'Website template is now pinned explicitly for this work.'
+                    : 'Work now inherits your default website template.',
+            };
+        }
+
         work.websiteTemplateLastCommit = null;
         work.websiteTemplateLastError = null;
         work.websiteTemplateLastUpdatedAt = null;
@@ -401,8 +448,8 @@ export class WorkLifecycleService {
                 slug: work.slug,
                 owner: websiteOwner,
                 repository: `${websiteOwner}/${websiteRepo}`,
-                previousWebsiteTemplateId: previousTemplateId,
-                websiteTemplateId: nextTemplateId,
+                previousWebsiteTemplateId: currentEffectiveTemplateId,
+                websiteTemplateId: nextEffectiveTemplateId,
                 repositoryRecreated,
                 switchMode: repositoryRecreated ? 'repository_recreated' : 'repository_reset',
                 message: repositoryRecreated
@@ -418,8 +465,8 @@ export class WorkLifecycleService {
             slug: work.slug,
             owner: websiteOwner,
             repository: `${websiteOwner}/${websiteRepo}`,
-            previousWebsiteTemplateId: previousTemplateId,
-            websiteTemplateId: nextTemplateId,
+            previousWebsiteTemplateId: currentEffectiveTemplateId,
+            websiteTemplateId: nextEffectiveTemplateId,
             repositoryRecreated: false,
             switchMode: 'saved_for_initialization',
             message:

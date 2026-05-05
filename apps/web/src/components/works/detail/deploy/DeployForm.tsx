@@ -343,9 +343,7 @@ function WebsiteTemplateSettings({
     const router = useRouter();
     const [autoUpdate, setAutoUpdate] = useState(work.websiteTemplateAutoUpdate ?? false);
     const [useBeta, setUseBeta] = useState(work.websiteTemplateUseBeta ?? false);
-    const [selectedTemplateId, setSelectedTemplateId] = useState(
-        work.websiteTemplateId || websiteTemplates.find((template) => template.isDefault)?.id || '',
-    );
+    const [selectedTemplateId, setSelectedTemplateId] = useState(work.websiteTemplateId || '');
     const [confirmSwitchOpen, setConfirmSwitchOpen] = useState(false);
 
     const handleAutoUpdateChange = (checked: boolean) => {
@@ -415,8 +413,7 @@ function WebsiteTemplateSettings({
     const currentTemplate =
         websiteTemplates.find((template) => template.id === work.websiteTemplateId) ||
         websiteTemplates.find((template) => template.isDefault);
-    const hasTemplateChange =
-        Boolean(selectedTemplateId) && selectedTemplateId !== work.websiteTemplateId;
+    const hasTemplateChange = selectedTemplateId !== (work.websiteTemplateId || '');
 
     const handleSwitchTemplate = () => {
         if (!hasTemplateChange || !selectedTemplateId) {
@@ -520,6 +517,11 @@ function WebsiteTemplateSettings({
                                           defaultValue:
                                               'The selected template controls how the website repository is initialized and updated.',
                                       })
+                            }
+                            defaultOptionLabel={
+                                websiteTemplates.find((template) => template.isDefault)
+                                    ? `Use default (${websiteTemplates.find((template) => template.isDefault)?.name})`
+                                    : 'Use default'
                             }
                         />
 

@@ -70,10 +70,7 @@ export function GeneratorForm({
     const lastRequestData = config?.metadata?.last_request_data;
     const initialPrompt = lastRequestData?.prompt || config?.metadata?.initial_prompt || '';
     const [selectedWebsiteTemplateId, setSelectedWebsiteTemplateId] = useState(
-        work.websiteTemplateId ||
-            websiteTemplates.find((template) => template.isDefault)?.id ||
-            websiteTemplates[0]?.id ||
-            '',
+        work.websiteTemplateId || '',
     );
 
     // Core form data (always present)
@@ -232,11 +229,7 @@ export function GeneratorForm({
                 return;
             }
 
-            if (
-                !isGenerated &&
-                selectedWebsiteTemplateId &&
-                selectedWebsiteTemplateId !== work.websiteTemplateId
-            ) {
+            if (!isGenerated && selectedWebsiteTemplateId !== (work.websiteTemplateId || '')) {
                 const templateUpdate = await updateWorkTemplate(workId, selectedWebsiteTemplateId);
 
                 if (!templateUpdate.success) {
@@ -313,6 +306,11 @@ export function GeneratorForm({
                         isGenerated
                             ? t('websiteTemplateLockedHelperText')
                             : t('websiteTemplateHelperText')
+                    }
+                    defaultOptionLabel={
+                        websiteTemplates.find((template) => template.isDefault)
+                            ? `Use default (${websiteTemplates.find((template) => template.isDefault)?.name})`
+                            : 'Use default'
                     }
                 />
             </RequiredFields>

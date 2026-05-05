@@ -38,11 +38,7 @@ export function WorkAICreator({
     const [workName, setWorkName] = useState('');
     const [organization, setOrganization] = useState(false);
     const [owner, setOwner] = useState('');
-    const [websiteTemplateId, setWebsiteTemplateId] = useState(
-        websiteTemplates.find((template) => template.isDefault)?.id ||
-            websiteTemplates[0]?.id ||
-            '',
-    );
+    const [websiteTemplateId, setWebsiteTemplateId] = useState('');
     const [isPending, startTransition] = useTransition();
     const router = useRouter();
     const t = useTranslations('dashboard.workCreation.ai');
@@ -249,6 +245,11 @@ export function WorkAICreator({
                 onChange={setWebsiteTemplateId}
                 disabled={isPending}
                 helperText={t('websiteTemplateHelperText')}
+                defaultOptionLabel={
+                    websiteTemplates.find((template) => template.isDefault)
+                        ? `Use default (${websiteTemplates.find((template) => template.isDefault)?.name})`
+                        : 'Use default'
+                }
             />
 
             {formSchema && (

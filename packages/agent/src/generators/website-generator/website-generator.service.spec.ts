@@ -12,7 +12,7 @@ import type { Work } from '../../entities/work.entity';
 import type { User } from '../../entities/user.entity';
 
 const createTemplateResolverMock = (): jest.Mocked<WebsiteTemplateResolverService> =>
-    ({
+    ((config) => ({
         resolve: jest.fn().mockResolvedValue({
             id: 'classic',
             name: 'Classic',
@@ -23,6 +23,16 @@ const createTemplateResolverMock = (): jest.Mocked<WebsiteTemplateResolverServic
             syncBranches: ['main', 'stage', 'preview'],
             betaBranch: 'stage',
         }),
+        resolveForWork: jest.fn().mockResolvedValue(config),
+    }))({
+        id: 'classic',
+        name: 'Classic',
+        description: 'Classic template',
+        owner: 'ever-works',
+        repo: 'directory-web-template',
+        branch: 'main',
+        syncBranches: ['main', 'stage', 'preview'],
+        betaBranch: 'stage',
     }) as unknown as jest.Mocked<WebsiteTemplateResolverService>;
 
 describe('WebsiteGeneratorService', () => {

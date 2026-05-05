@@ -55,7 +55,7 @@ export class WebsiteGeneratorService {
     }
 
     private async ensureTemplateDefaultBranch(work: Work, userId: string): Promise<void> {
-        const template = await this.websiteTemplateResolver.resolve(work.websiteTemplateId);
+        const template = await this.websiteTemplateResolver.resolveForWork(work);
         const targetBranch = template.branch;
         const websiteOwner = work.getRepoOwner('website');
         const websiteRepo = work.getWebsiteRepo();
@@ -92,7 +92,7 @@ export class WebsiteGeneratorService {
 
         const workOwner = getWorkOwner(work);
         const committer = work.resolveCommitter(user);
-        const template = await this.websiteTemplateResolver.resolve(work.websiteTemplateId);
+        const template = await this.websiteTemplateResolver.resolveForWork(work);
 
         await this.cleanup(work);
         throwIfGenerationCancelled(options.signal);
@@ -180,7 +180,7 @@ export class WebsiteGeneratorService {
         const workOwner = getWorkOwner(work);
         const websiteOwner = work.getRepoOwner('website');
         const websiteRepo = work.getWebsiteRepo();
-        const template = await this.websiteTemplateResolver.resolve(work.websiteTemplateId);
+        const template = await this.websiteTemplateResolver.resolveForWork(work);
 
         const createdWebsiteRepository = await this.gitFacade.createRepositoryFromTemplate(
             template.owner,

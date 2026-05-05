@@ -402,7 +402,7 @@ export async function updateWorkTemplate(workId: string, websiteTemplateId: stri
 
     const schema = z.object({
         workId: z.string().uuid(t('invalidId')),
-        websiteTemplateId: z.string().min(1),
+        websiteTemplateId: z.string(),
     });
 
     try {
