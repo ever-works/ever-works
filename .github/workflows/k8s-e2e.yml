@@ -1,0 +1,120 @@
+name: K8s Plugin E2E
+
+# Spins up a kind cluster and runs `@ever-works/k8s-plugin`'s e2e suite
+# (`packages/plugins/k8s/src/__tests__/e2e/`) against it. The unit suite
+# in CI already covers ~133 hermetic test cases; this job catches the
+# things mocks can't:
+#   - real `@kubernetes/client-node` ESM import path (createRequire)
+#   - server-side apply field-manager semantics
+#   - actual IngressClass schema across cluster versions
+#   - rollout-status mapping against a real Deployment
+#
+# Triggered only when files that could affect the runtime path change,
+# so we don't pay 5 minutes of cluster provisioning on docs-only PRs.
+
+on:
+  push:
+    branches: [main, develop, stage]
+    paths:
+      - 'packages/plugins/k8s/**'
+      - '.github/workflows/k8s-e2e.yml'
+  pull_request:
+    branches: [main, develop, stage]
+    paths:
+      - 'packages/plugins/k8s/**'
+      - '.github/workflows/k8s-e2e.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  e2e:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # Each Kubernetes version we want to keep working. kind images
+        # come from kubernetes-sigs/kind release notes — bump versions
+        # here when we promote a new floor.
+        kubernetes:
+          - { version: 'v1.28', image: 'kindest/node:v1.28.15' }
+          - { version: 'v1.30', image: 'kindest/node:v1.30.13' }
+        # Whether ingress-nginx is installed in the cluster — exercises
+        # both the "no ingress controller" and "nginx detected" paths
+        # in `validateConnection.listIngressClasses`.
+        ingress: [false, true]
+
+    name: e2e (k8s ${{ matrix.kubernetes.version }} / ingress=${{ matrix.ingress }})
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v3
+        with:
+          version: 10.13.1
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build agent + plugin contracts (e2e imports compiled deps)
+        run: pnpm --filter @ever-works/plugin --filter @ever-works/agent build
+
+      - name: Create kind cluster
+        uses: helm/kind-action@v1
+        with:
+          cluster_name: ever-works-e2e
+          node_image: ${{ matrix.kubernetes.image }}
+          wait: 120s
+
+      - name: Install ingress-nginx
+        if: matrix.ingress == true
+        run: |
+          kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/main/deploy/static/provider/kind/deploy.yaml
+          # The controller takes ~30s to become Ready; we don't need it
+          # to be Ready for the test (we only enumerate IngressClass
+          # resources), but we wait so the suite reports realistic state.
+          kubectl wait --namespace ingress-nginx \
+              --for=condition=ready pod \
+              --selector=app.kubernetes.io/component=controller \
+              --timeout=180s || echo "ingress-nginx not Ready in time — continuing anyway, IngressClass should still resolve"
+
+      - name: Export kubeconfig for e2e suite
+        run: |
+          kind get kubeconfig --name ever-works-e2e > "$RUNNER_TEMP/kubeconfig"
+          chmod 600 "$RUNNER_TEMP/kubeconfig"
+          echo "KUBECONFIG_E2E_PATH=$RUNNER_TEMP/kubeconfig" >> "$GITHUB_ENV"
+
+      - name: Pre-pull image used by e2e Deployment
+        # Loads nginx-unprivileged into kind nodes so the Deployment's
+        # imagePullPolicy: IfNotPresent path resolves immediately,
+        # cutting test time by ~30s on slow runners.
+        run: |
+          docker pull nginxinc/nginx-unprivileged:1.27-alpine
+          kind load docker-image nginxinc/nginx-unprivileged:1.27-alpine --name ever-works-e2e
+
+      - name: Run k8s plugin e2e suite
+        run: pnpm --filter @ever-works/k8s-plugin test:e2e
+
+      - name: Show cluster state on failure
+        if: failure()
+        run: |
+          kubectl get nodes -o wide || true
+          kubectl get ingressclass -o wide || true
+          kubectl get all -A | head -100 || true
+          kubectl describe deployment -A | head -200 || true
+
+      - name: Tear down kind cluster
+        if: always()
+        run: kind delete cluster --name ever-works-e2e || true

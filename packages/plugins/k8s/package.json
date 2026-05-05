@@ -26,7 +26,8 @@
 		"clean": "rm -rf dist",
 		"test": "vitest run --passWithNoTests",
 		"test:watch": "vitest",
-		"test:coverage": "vitest run --coverage"
+		"test:coverage": "vitest run --coverage",
+		"test:e2e": "vitest run --config vitest.e2e.config.ts --passWithNoTests"
 	},
 	"dependencies": {
 		"@kubernetes/client-node": "^1.0.0",
