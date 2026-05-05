@@ -13,7 +13,7 @@ import {
     ExternalLink,
     GitFork,
 } from 'lucide-react';
-import type { TemplateCatalogItem, TemplateKind } from '@/lib/api/templates';
+import type { TemplateCatalogItem, TemplateKind, TemplateOriginType } from '@/lib/api/templates';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
@@ -108,6 +108,28 @@ function initials(name: string): string {
         .join('');
 }
 
+function originLabelKey(originType: TemplateOriginType) {
+    switch (originType) {
+        case 'standard':
+            return 'card.standard';
+        case 'forked':
+            return 'card.forked';
+        case 'custom_url':
+            return 'card.customUrl';
+    }
+}
+
+function sourceLabelKey(originType: TemplateOriginType) {
+    switch (originType) {
+        case 'standard':
+            return 'card.standardSource';
+        case 'forked':
+            return 'card.forkedSource';
+        case 'custom_url':
+            return 'card.customUrlSource';
+    }
+}
+
 function getTemplatePreviewUrl(template: TemplateCatalogItem): string | null {
     if (template.previewImageUrl) {
         return template.previewImageUrl;
@@ -143,8 +165,8 @@ function TemplateCard({
     const tone = frameworkTone(template.framework);
     const [previewFailed, setPreviewFailed] = useState(false);
     const previewUrl = previewFailed ? null : getTemplatePreviewUrl(template);
-    const sourceLabel =
-        template.sourceType === 'built_in' ? t('card.standardSource') : t('card.customSource');
+    const sourceLabel = t(sourceLabelKey(template.originType));
+    const originLabel = t(originLabelKey(template.originType));
 
     return (
         <article
@@ -200,9 +222,7 @@ function TemplateCard({
                                     </span>
                                 ) : null}
                                 <span className="rounded-full bg-white/12 px-2.5 py-1 text-[11px] font-medium text-white backdrop-blur-sm">
-                                    {template.sourceType === 'built_in'
-                                        ? t('card.builtIn')
-                                        : t('card.custom')}
+                                    {originLabel}
                                 </span>
                                 {isDefault ? (
                                     <span className="rounded-full bg-primary/85 px-2.5 py-1 text-[11px] font-medium text-primary-foreground">

@@ -22,6 +22,7 @@ export interface TemplateCatalogItem {
     id: string;
     kind: TemplateKind;
     sourceType: TemplateSourceType;
+    originType: 'standard' | 'forked' | 'custom_url';
     name: string;
     description?: string | null;
     framework?: string | null;
@@ -94,6 +95,7 @@ export class TemplateCatalogService implements OnModuleInit {
                 id: template.id,
                 kind: template.kind,
                 sourceType: template.sourceType,
+                originType: this.getOriginType(template.sourceType, template.metadata),
                 name: template.name,
                 description: template.description,
                 framework: template.framework,
@@ -464,6 +466,7 @@ export class TemplateCatalogService implements OnModuleInit {
             id: string;
             kind: TemplateKind;
             sourceType: TemplateSourceType;
+            metadata?: Record<string, unknown>;
             name: string;
             description?: string | null;
             framework?: string | null;
@@ -483,6 +486,7 @@ export class TemplateCatalogService implements OnModuleInit {
             id: template.id,
             kind: template.kind,
             sourceType: template.sourceType,
+            originType: this.getOriginType(template.sourceType, template.metadata),
             name: template.name,
             description: template.description,
             framework: template.framework,
@@ -525,6 +529,21 @@ export class TemplateCatalogService implements OnModuleInit {
         }
 
         return null;
+    }
+
+    private getOriginType(
+        sourceType: TemplateSourceType,
+        metadata?: Record<string, unknown>,
+    ): 'standard' | 'forked' | 'custom_url' {
+        if (sourceType === 'built_in') {
+            return 'standard';
+        }
+
+        if (metadata?.forkedFromTemplateId) {
+            return 'forked';
+        }
+
+        return 'custom_url';
     }
 
     private humanizeRepositoryName(repo: string): string {

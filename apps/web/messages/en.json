@@ -2958,8 +2958,12 @@
             "card": {
                 "builtIn": "Built-in",
                 "custom": "Custom",
+                "standard": "Standard",
+                "forked": "Forked",
+                "customUrl": "Custom URL",
                 "standardSource": "Ever Works standard",
-                "customSource": "Your catalog",
+                "forkedSource": "Forked into your GitHub",
+                "customUrlSource": "Added from GitHub URL",
                 "default": "Default",
                 "defaultSelected": "Default selected",
                 "makeDefault": "Make default",
@@ -3013,10 +3017,10 @@
             "messages": {
                 "repositoryUrlRequired": "GitHub repository URL is required.",
                 "forkTargetRequired": "Choose a GitHub account or organization for the fork.",
-                "addSuccess": "Template saved to your catalog.",
+                "addSuccess": "Template saved from GitHub URL.",
                 "addFailed": "Failed to save template.",
-                "forkSuccess": "Forked template to {repository} and set it as your default.",
-                "forkExisting": "{repository} was already in your catalog and is now your default.",
+                "forkSuccess": "Forked {repository}, added it to your catalog, and set it as your default.",
+                "forkExisting": "{repository} was already in your catalog and is now your default forked template.",
                 "forkFailed": "Failed to fork template.",
                 "defaultUpdated": "Default template updated.",
                 "defaultFailed": "Failed to update default template."

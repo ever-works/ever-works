@@ -4,11 +4,13 @@ import { APIResponse } from './types';
 
 export type TemplateKind = 'website' | 'work';
 export type TemplateSourceType = 'built_in' | 'custom';
+export type TemplateOriginType = 'standard' | 'forked' | 'custom_url';
 
 export interface TemplateCatalogItem {
     id: string;
     kind: TemplateKind;
     sourceType: TemplateSourceType;
+    originType: TemplateOriginType;
     name: string;
     description?: string | null;
     framework?: string | null;
