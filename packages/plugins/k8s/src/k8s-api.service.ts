@@ -139,7 +139,7 @@ export const defaultClientFactory: KubernetesClientFactory = {
 		// eslint-disable-next-line @typescript-eslint/no-var-requires
 		const k8s = require('@kubernetes/client-node');
 		return client.makeApiClient(k8s.CoreV1Api);
-	},
+	}
 };
 
 const DEFAULT_CLASS_ANNOTATION = 'ingressclass.kubernetes.io/is-default-class';
@@ -159,7 +159,7 @@ export class KubernetesApiService {
 		options: {
 			contextOverride?: string;
 			hasStrategyFor: (controller: string) => boolean;
-		},
+		}
 	): Promise<KubernetesClusterInfo> {
 		const parsed = parseKubeconfig(kubeconfigYaml, options.contextOverride);
 		const client = this.factory.createKubeConfig(kubeconfigYaml, parsed.currentContext);
@@ -176,7 +176,7 @@ export class KubernetesApiService {
 				serverVersion: versionResp?.gitVersion ?? 'unknown',
 				serverFingerprint: parsed.fingerprint,
 				ingressClasses,
-				requiresExecPlugin: parsed.requiresExecPlugin,
+				requiresExecPlugin: parsed.requiresExecPlugin
 			};
 		} catch (err) {
 			const scrubbed = scrubError(err);
@@ -194,7 +194,7 @@ export class KubernetesApiService {
 	async listIngressClasses(
 		kubeconfigYaml: string,
 		hasStrategyFor: (controller: string) => boolean,
-		contextOverride?: string,
+		contextOverride?: string
 	): Promise<IngressClassDescriptor[]> {
 		const client = this.factory.createKubeConfig(kubeconfigYaml, contextOverride);
 		const networkingApi = this.factory.networkingV1Api(client);
@@ -203,7 +203,7 @@ export class KubernetesApiService {
 
 	private async listIngressClassesInternal(
 		api: NetworkingV1ApiLike,
-		hasStrategyFor: (controller: string) => boolean,
+		hasStrategyFor: (controller: string) => boolean
 	): Promise<IngressClassDescriptor[]> {
 		const resp = await api.listIngressClass();
 		return (resp.items ?? []).map((item) => {
@@ -214,7 +214,7 @@ export class KubernetesApiService {
 				name,
 				controller,
 				isDefault,
-				hasStrategy: hasStrategyFor(controller),
+				hasStrategy: hasStrategyFor(controller)
 			};
 		});
 	}
@@ -223,7 +223,7 @@ export class KubernetesApiService {
 		kubeconfigYaml: string,
 		namespace: string,
 		name: string,
-		contextOverride?: string,
+		contextOverride?: string
 	): Promise<{ metadata?: { name?: string; namespace?: string }; status?: DeploymentStatusInput } | null> {
 		const client = this.factory.createKubeConfig(kubeconfigYaml, contextOverride);
 		const appsApi = this.factory.appsV1Api(client);
@@ -238,7 +238,7 @@ export class KubernetesApiService {
 
 	async listManagedDeployments(
 		kubeconfigYaml: string,
-		contextOverride?: string,
+		contextOverride?: string
 	): Promise<
 		Array<{
 			name: string;
@@ -250,20 +250,20 @@ export class KubernetesApiService {
 		const client = this.factory.createKubeConfig(kubeconfigYaml, contextOverride);
 		const appsApi = this.factory.appsV1Api(client);
 		const resp = await appsApi.listDeploymentForAllNamespaces({
-			labelSelector: 'ever-works.io/managed=true',
+			labelSelector: 'ever-works.io/managed=true'
 		});
 		return (resp.items ?? []).map((item) => ({
 			name: item.metadata?.name ?? '',
 			namespace: item.metadata?.namespace ?? '',
 			workId: item.metadata?.labels?.['ever-works.io/work-id'],
-			status: item.status,
+			status: item.status
 		}));
 	}
 
 	async applyDeployment(
 		kubeconfigYaml: string,
 		manifest: Record<string, unknown>,
-		contextOverride?: string,
+		contextOverride?: string
 	): Promise<void> {
 		const client = this.factory.createKubeConfig(kubeconfigYaml, contextOverride);
 		const apps = this.factory.appsV1Api(client);
@@ -273,14 +273,14 @@ export class KubernetesApiService {
 			namespace: meta.namespace ?? '',
 			body: manifest,
 			fieldManager: FIELD_MANAGER,
-			force: true,
+			force: true
 		});
 	}
 
 	async applyService(
 		kubeconfigYaml: string,
 		manifest: Record<string, unknown>,
-		contextOverride?: string,
+		contextOverride?: string
 	): Promise<void> {
 		const client = this.factory.createKubeConfig(kubeconfigYaml, contextOverride);
 		const core = this.factory.coreV1Api(client);
@@ -290,14 +290,14 @@ export class KubernetesApiService {
 			namespace: meta.namespace ?? '',
 			body: manifest,
 			fieldManager: FIELD_MANAGER,
-			force: true,
+			force: true
 		});
 	}
 
 	async applyIngress(
 		kubeconfigYaml: string,
 		manifest: Record<string, unknown>,
-		contextOverride?: string,
+		contextOverride?: string
 	): Promise<void> {
 		const client = this.factory.createKubeConfig(kubeconfigYaml, contextOverride);
 		const net = this.factory.networkingV1Api(client);
@@ -307,14 +307,14 @@ export class KubernetesApiService {
 			namespace: meta.namespace ?? '',
 			body: manifest,
 			fieldManager: FIELD_MANAGER,
-			force: true,
+			force: true
 		});
 	}
 
 	async applyImagePullSecret(
 		kubeconfigYaml: string,
 		manifest: Record<string, unknown>,
-		contextOverride?: string,
+		contextOverride?: string
 	): Promise<void> {
 		const client = this.factory.createKubeConfig(kubeconfigYaml, contextOverride);
 		const core = this.factory.coreV1Api(client);
@@ -324,7 +324,7 @@ export class KubernetesApiService {
 			namespace: meta.namespace ?? '',
 			body: manifest,
 			fieldManager: FIELD_MANAGER,
-			force: true,
+			force: true
 		});
 	}
 
@@ -332,7 +332,7 @@ export class KubernetesApiService {
 		kubeconfigYaml: string,
 		namespace: string,
 		name: string,
-		contextOverride?: string,
+		contextOverride?: string
 	): Promise<{ metadata?: { name?: string }; spec?: unknown } | null> {
 		const client = this.factory.createKubeConfig(kubeconfigYaml, contextOverride);
 		const net = this.factory.networkingV1Api(client);

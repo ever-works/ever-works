@@ -54,15 +54,13 @@ const SCRUB_PATTERNS: ReadonlyArray<RegExp> = [
 	// Authorization headers.
 	/Authorization:\s*Bearer\s+[A-Za-z0-9._\-+/=]+/gi,
 	// `token: <something>` and `password: <something>` lines anywhere.
-	/(\b(?:token|password|client-certificate-data|client-key-data|certificate-authority-data)\b\s*[:=]\s*)[^\s,;}"']+/gi,
+	/(\b(?:token|password|client-certificate-data|client-key-data|certificate-authority-data)\b\s*[:=]\s*)[^\s,;}"']+/gi
 ];
 
 export function scrubString(input: string, extraPatterns: RegExp[] = []): string {
 	let out = input;
 	for (const pattern of [...SCRUB_PATTERNS, ...extraPatterns]) {
-		out = out.replace(pattern, (_match, prefix?: string) =>
-			prefix ? `${prefix}${REDACTED}` : REDACTED,
-		);
+		out = out.replace(pattern, (_match, prefix?: string) => (prefix ? `${prefix}${REDACTED}` : REDACTED));
 	}
 	return out;
 }
@@ -78,8 +76,7 @@ export function scrubError(err: unknown, extraPatterns: RegExp[] = []): Scrubbed
 		return { code: err.code, message: scrubString(err.message, extraPatterns) };
 	}
 
-	const rawMessage =
-		err instanceof Error ? err.message : typeof err === 'string' ? err : 'Unknown error';
+	const rawMessage = err instanceof Error ? err.message : typeof err === 'string' ? err : 'Unknown error';
 
 	const message = scrubString(rawMessage, extraPatterns);
 	const code = inferCodeFromMessage(message);
@@ -94,7 +91,12 @@ function inferCodeFromMessage(message: string): K8sPluginErrorCode {
 	if (lower.includes('certificate') && (lower.includes('expire') || lower.includes('invalid'))) {
 		return 'CLUSTER_UNREACHABLE';
 	}
-	if (lower.includes('401') || lower.includes('403') || lower.includes('forbidden') || lower.includes('unauthorized')) {
+	if (
+		lower.includes('401') ||
+		lower.includes('403') ||
+		lower.includes('forbidden') ||
+		lower.includes('unauthorized')
+	) {
 		return 'UNAUTHORIZED';
 	}
 	return 'UNKNOWN';

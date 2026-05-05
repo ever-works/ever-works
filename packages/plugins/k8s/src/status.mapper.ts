@@ -25,14 +25,13 @@ export interface DeploymentStatusInput {
  * - everything else                       → 'pending'
  */
 export function mapDeploymentToStatus(
-	deployment: { status?: DeploymentStatusInput } | null | undefined,
+	deployment: { status?: DeploymentStatusInput } | null | undefined
 ): DeploymentStatus {
 	const status = deployment?.status;
 	if (!status) return 'pending';
 
 	const conditions = status.conditions ?? [];
-	const cond = (type: string) =>
-		conditions.find((c) => c.type === type)?.status?.toLowerCase();
+	const cond = (type: string) => conditions.find((c) => c.type === type)?.status?.toLowerCase();
 
 	if (cond('Available') === 'true') return 'ready';
 	if (cond('ReplicaFailure') === 'true') return 'error';

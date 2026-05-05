@@ -55,7 +55,7 @@ export function parseKubeconfig(input: string, contextOverride?: string): Parsed
 	} catch (err) {
 		throw new K8sPluginError(
 			'INVALID_YAML',
-			`kubeconfig YAML is invalid: ${err instanceof Error ? err.message : String(err)}`,
+			`kubeconfig YAML is invalid: ${err instanceof Error ? err.message : String(err)}`
 		);
 	}
 
@@ -66,43 +66,31 @@ export function parseKubeconfig(input: string, contextOverride?: string): Parsed
 	const cfg = doc as RawKubeconfig;
 
 	if (cfg.kind !== undefined && cfg.kind !== 'Config') {
-		throw new K8sPluginError(
-			'INVALID_YAML',
-			`kubeconfig kind must be 'Config' (got '${cfg.kind}')`,
-		);
+		throw new K8sPluginError('INVALID_YAML', `kubeconfig kind must be 'Config' (got '${cfg.kind}')`);
 	}
 
 	const wantedContext = contextOverride?.trim() || cfg['current-context']?.trim();
 	if (!wantedContext) {
 		throw new K8sPluginError(
 			'MISSING_CONTEXT',
-			'kubeconfig is missing a current-context (and no context override was provided)',
+			'kubeconfig is missing a current-context (and no context override was provided)'
 		);
 	}
 
 	const contexts = cfg.contexts ?? [];
 	const ctx = contexts.find((c) => c.name === wantedContext);
 	if (!ctx) {
-		throw new K8sPluginError(
-			'MISSING_CONTEXT',
-			`kubeconfig has no context named '${wantedContext}'`,
-		);
+		throw new K8sPluginError('MISSING_CONTEXT', `kubeconfig has no context named '${wantedContext}'`);
 	}
 
 	const clusters = cfg.clusters ?? [];
 	const cluster = clusters.find((c) => c.name === ctx.context.cluster);
 	if (!cluster) {
-		throw new K8sPluginError(
-			'MISSING_CLUSTER',
-			`kubeconfig has no cluster named '${ctx.context.cluster}'`,
-		);
+		throw new K8sPluginError('MISSING_CLUSTER', `kubeconfig has no cluster named '${ctx.context.cluster}'`);
 	}
 
 	if (!cluster.cluster.server) {
-		throw new K8sPluginError(
-			'MISSING_CLUSTER',
-			`cluster '${cluster.name}' is missing a server URL`,
-		);
+		throw new K8sPluginError('MISSING_CLUSTER', `cluster '${cluster.name}' is missing a server URL`);
 	}
 
 	const users = cfg.users ?? [];
@@ -124,7 +112,7 @@ export function parseKubeconfig(input: string, contextOverride?: string): Parsed
 		namespace: ctx.context.namespace,
 		clusterCa: ca,
 		requiresExecPlugin,
-		fingerprint,
+		fingerprint
 	};
 }
 

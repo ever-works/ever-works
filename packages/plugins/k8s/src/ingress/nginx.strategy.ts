@@ -6,7 +6,7 @@ export class NginxIngressStrategy implements IngressStrategy {
 	annotations(input: IngressStrategyInputs): Record<string, string> {
 		const annotations: Record<string, string> = {
 			'nginx.ingress.kubernetes.io/proxy-body-size': '10m',
-			'nginx.ingress.kubernetes.io/ssl-redirect': input.tlsIssuer ? 'true' : 'false',
+			'nginx.ingress.kubernetes.io/ssl-redirect': input.tlsIssuer ? 'true' : 'false'
 		};
 		if (input.tlsIssuer) {
 			annotations['cert-manager.io/cluster-issuer'] = input.tlsIssuer;
@@ -21,8 +21,8 @@ export class NginxIngressStrategy implements IngressStrategy {
 		return [
 			{
 				hosts: [...input.hosts],
-				secretName: tlsSecretName(input.hosts),
-			},
+				secretName: tlsSecretName(input.hosts)
+			}
 		];
 	}
 }

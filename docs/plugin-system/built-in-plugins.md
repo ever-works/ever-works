@@ -467,18 +467,18 @@ Deploy work websites to any Kubernetes cluster you control as an alternative to 
 
 **Settings:**
 
-| Setting               | Type    | Default        | Description                                                       |
-| --------------------- | ------- | -------------- | ----------------------------------------------------------------- |
-| `kubeconfig`          | string  | —              | Full kubeconfig YAML (required, secret, user-scoped)              |
-| `kubeContext`         | string  | —              | Override the kubeconfig's `current-context`                       |
-| `namespace`           | string  | `ever-works`   | Target Kubernetes namespace                                       |
-| `registry.kind`       | string  | `github`       | One of `github`, `dockerhub`, `generic`                           |
-| `registry.owner`      | string  | (auto)         | GHCR owner; defaults to your connected GitHub account             |
-| `registry.visibility` | string  | `auto`         | `auto` mirrors the website repo, or `public` / `private`          |
-| `ingressClass`        | string  | (cluster default) | Detected at validation time; populated from `IngressClass` list   |
-| `ingressHost`         | string  | —              | Default ingress host when a work has no custom domain             |
-| `tlsIssuer`           | string  | —              | cert-manager `ClusterIssuer` name                                 |
-| `replicas`            | integer | `1`            | Pod replicas (1–10)                                               |
+| Setting               | Type    | Default           | Description                                                     |
+| --------------------- | ------- | ----------------- | --------------------------------------------------------------- |
+| `kubeconfig`          | string  | —                 | Full kubeconfig YAML (required, secret, user-scoped)            |
+| `kubeContext`         | string  | —                 | Override the kubeconfig's `current-context`                     |
+| `namespace`           | string  | `ever-works`      | Target Kubernetes namespace                                     |
+| `registry.kind`       | string  | `github`          | One of `github`, `dockerhub`, `generic`                         |
+| `registry.owner`      | string  | (auto)            | GHCR owner; defaults to your connected GitHub account           |
+| `registry.visibility` | string  | `auto`            | `auto` mirrors the website repo, or `public` / `private`        |
+| `ingressClass`        | string  | (cluster default) | Detected at validation time; populated from `IngressClass` list |
+| `ingressHost`         | string  | —                 | Default ingress host when a work has no custom domain           |
+| `tlsIssuer`           | string  | —                 | cert-manager `ClusterIssuer` name                               |
+| `replicas`            | integer | `1`               | Pod replicas (1–10)                                             |
 
 ## Screenshot
 

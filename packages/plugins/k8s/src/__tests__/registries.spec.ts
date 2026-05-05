@@ -9,16 +9,16 @@ import type { RegistryConfig, RegistryDeployContext } from '../types';
 const ctx = (overrides: Partial<RegistryDeployContext> = {}): RegistryDeployContext => ({
 	workSlug: 'my-site',
 	githubOwner: 'acme',
-	...overrides,
+	...overrides
 });
 
 describe('GitHubRegistryProvider', () => {
 	const p = new GitHubRegistryProvider();
 
 	it('builds image base from explicit owner', () => {
-		expect(
-			p.imageBase({ kind: 'github', owner: 'Acme-Corp' }, ctx({ githubOwner: 'fallback' })),
-		).toBe('ghcr.io/acme-corp');
+		expect(p.imageBase({ kind: 'github', owner: 'Acme-Corp' }, ctx({ githubOwner: 'fallback' }))).toBe(
+			'ghcr.io/acme-corp'
+		);
 	});
 
 	it('falls back to ctx.githubOwner when owner is empty', () => {
@@ -37,29 +37,27 @@ describe('GitHubRegistryProvider', () => {
 	describe('resolveVisibility', () => {
 		it('mirrors public website repo (auto)', () => {
 			expect(
-				p.resolveVisibility({ kind: 'github', visibility: 'auto' }, ctx({ websiteRepoIsPrivate: false })),
+				p.resolveVisibility({ kind: 'github', visibility: 'auto' }, ctx({ websiteRepoIsPrivate: false }))
 			).toBe('public');
 		});
 
 		it('mirrors private website repo (auto)', () => {
 			expect(
-				p.resolveVisibility({ kind: 'github', visibility: 'auto' }, ctx({ websiteRepoIsPrivate: true })),
+				p.resolveVisibility({ kind: 'github', visibility: 'auto' }, ctx({ websiteRepoIsPrivate: true }))
 			).toBe('private');
 		});
 
 		it('honours explicit visibility override even when website is opposite', () => {
 			expect(
-				p.resolveVisibility({ kind: 'github', visibility: 'private' }, ctx({ websiteRepoIsPrivate: false })),
+				p.resolveVisibility({ kind: 'github', visibility: 'private' }, ctx({ websiteRepoIsPrivate: false }))
 			).toBe('private');
 			expect(
-				p.resolveVisibility({ kind: 'github', visibility: 'public' }, ctx({ websiteRepoIsPrivate: true })),
+				p.resolveVisibility({ kind: 'github', visibility: 'public' }, ctx({ websiteRepoIsPrivate: true }))
 			).toBe('public');
 		});
 
 		it('defaults to private when website repo visibility is unknown (safer)', () => {
-			expect(p.resolveVisibility({ kind: 'github' }, ctx({ websiteRepoIsPrivate: undefined }))).toBe(
-				'private',
-			);
+			expect(p.resolveVisibility({ kind: 'github' }, ctx({ websiteRepoIsPrivate: undefined }))).toBe('private');
 		});
 	});
 
@@ -78,7 +76,7 @@ describe('GitHubRegistryProvider', () => {
 		expect(p.workflowLogin({ kind: 'github' })).toEqual({
 			registry: 'ghcr.io',
 			username: '${{ github.actor }}',
-			passwordEnv: 'GITHUB_TOKEN',
+			passwordEnv: 'GITHUB_TOKEN'
 		});
 	});
 });
@@ -99,7 +97,7 @@ describe('DockerHubRegistryProvider', () => {
 		expect(p.pullSecretCredentials(config, ctx(), 'private')).toEqual({
 			server: 'docker.io',
 			username: 'acme',
-			password: 'tok',
+			password: 'tok'
 		});
 	});
 
@@ -114,7 +112,7 @@ describe('GenericRegistryProvider', () => {
 		kind: 'generic',
 		server: 'https://registry.example.com/',
 		username: 'acme',
-		password: 'tok',
+		password: 'tok'
 	};
 
 	it('strips protocol and trailing slashes from the server URL', () => {
@@ -146,7 +144,7 @@ describe('RegistryProviderRegistry', () => {
 			imageBase: () => 'fake.io/x',
 			resolveVisibility: () => 'private' as const,
 			workflowLogin: () => ({ registry: 'fake.io', username: 'u', passwordEnv: 'P' }),
-			pullSecretCredentials: () => ({ server: 'fake.io', username: 'u', password: 'p' }),
+			pullSecretCredentials: () => ({ server: 'fake.io', username: 'u', password: 'p' })
 		};
 		r.register(fake as never);
 		expect(r.resolve('fake' as never)).toBe(fake);

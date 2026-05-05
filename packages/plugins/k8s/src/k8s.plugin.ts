@@ -11,7 +11,7 @@ import type {
 	PluginCategory,
 	PluginContext,
 	PluginHealthCheck,
-	PluginManifest,
+	PluginManifest
 } from '@ever-works/plugin';
 
 import { K8sPluginError, buildSecretPattern, scrubError } from './errors.js';
@@ -24,7 +24,7 @@ import {
 	buildImagePullSecret,
 	buildIngress,
 	buildService,
-	pullSecretNameFor,
+	pullSecretNameFor
 } from './manifest.renderer.js';
 import { parseKubeconfig } from './kubeconfig.parser.js';
 import {
@@ -33,14 +33,14 @@ import {
 	defaultDnsResolver,
 	removeHostFromIngress,
 	verifyDomainResolution,
-	type DnsResolver,
+	type DnsResolver
 } from './domain.handler.js';
 import type {
 	IngressClassDescriptor,
 	KubernetesSettings,
 	RegistryConfig,
 	RegistryDeployContext,
-	ResolvedImageVisibility,
+	ResolvedImageVisibility
 } from './types.js';
 
 const DEFAULT_NAMESPACE = 'ever-works';
@@ -52,11 +52,7 @@ const CONTAINER_PORT = 3000;
  * the GitHub package directly; it goes through `PluginContext.getService`.
  */
 interface GithubPluginLike {
-	getRepository?(
-		owner: string,
-		repo: string,
-		token: string,
-	): Promise<{ isPrivate?: boolean } | null>;
+	getRepository?(owner: string, repo: string, token: string): Promise<{ isPrivate?: boolean } | null>;
 }
 
 interface DeployOptions {
@@ -84,7 +80,7 @@ const REGISTRY_SCHEMA: JsonSchema = {
 				owner: {
 					type: 'string',
 					title: 'GitHub owner',
-					description: 'Defaults to your connected GitHub account.',
+					description: 'Defaults to your connected GitHub account.'
 				},
 				visibility: {
 					type: 'string',
@@ -92,10 +88,10 @@ const REGISTRY_SCHEMA: JsonSchema = {
 					default: 'auto',
 					title: 'Image visibility',
 					description:
-						'auto = match the website repo (public repo → public image, private repo → private image).',
-				},
+						'auto = match the website repo (public repo → public image, private repo → private image).'
+				}
 			},
-			required: ['kind'],
+			required: ['kind']
 		},
 		{
 			title: 'Docker Hub',
@@ -107,10 +103,10 @@ const REGISTRY_SCHEMA: JsonSchema = {
 					title: 'Access token',
 					'x-secret': true,
 					'x-scope': 'user',
-					'x-widget': 'password',
-				},
+					'x-widget': 'password'
+				}
 			},
-			required: ['kind', 'username', 'password'],
+			required: ['kind', 'username', 'password']
 		},
 		{
 			title: 'Generic registry',
@@ -119,7 +115,7 @@ const REGISTRY_SCHEMA: JsonSchema = {
 				server: {
 					type: 'string',
 					title: 'Server URL',
-					description: 'e.g. registry.example.com',
+					description: 'e.g. registry.example.com'
 				},
 				username: { type: 'string', title: 'Username' },
 				password: {
@@ -127,12 +123,12 @@ const REGISTRY_SCHEMA: JsonSchema = {
 					title: 'Password',
 					'x-secret': true,
 					'x-scope': 'user',
-					'x-widget': 'password',
-				},
+					'x-widget': 'password'
+				}
 			},
-			required: ['kind', 'server', 'username', 'password'],
-		},
-	],
+			required: ['kind', 'server', 'username', 'password']
+		}
+	]
 };
 
 export class KubernetesPlugin implements IPlugin, IDeploymentPlugin {
@@ -154,41 +150,41 @@ export class KubernetesPlugin implements IPlugin, IDeploymentPlugin {
 				description: 'Paste the contents of your ~/.kube/config or a service-account-scoped equivalent.',
 				'x-secret': true,
 				'x-scope': 'user',
-				'x-widget': 'textarea',
+				'x-widget': 'textarea'
 			},
 			kubeContext: {
 				type: 'string',
 				title: 'Context (optional)',
-				description: "Defaults to the kubeconfig's current-context.",
+				description: "Defaults to the kubeconfig's current-context."
 			},
 			namespace: {
 				type: 'string',
 				title: 'Namespace',
-				default: DEFAULT_NAMESPACE,
+				default: DEFAULT_NAMESPACE
 			},
 			registry: REGISTRY_SCHEMA,
 			ingressClass: {
 				type: 'string',
 				title: 'Ingress class',
-				description: 'Detected at validation time. Leave blank to use the cluster default.',
+				description: 'Detected at validation time. Leave blank to use the cluster default.'
 			},
 			ingressHost: {
 				type: 'string',
-				title: 'Default ingress host (optional)',
+				title: 'Default ingress host (optional)'
 			},
 			tlsIssuer: {
 				type: 'string',
-				title: 'cert-manager issuer (optional)',
+				title: 'cert-manager issuer (optional)'
 			},
 			replicas: {
 				type: 'integer',
 				title: 'Replicas',
 				default: DEFAULT_REPLICAS,
 				minimum: 1,
-				maximum: 10,
-			},
+				maximum: 10
+			}
 		},
-		required: ['kubeconfig'],
+		required: ['kubeconfig']
 	};
 
 	private context?: PluginContext;
@@ -197,12 +193,14 @@ export class KubernetesPlugin implements IPlugin, IDeploymentPlugin {
 	private readonly ingressStrategies: IngressStrategyRegistry;
 	private readonly dnsResolver: DnsResolver;
 
-	constructor(opts: {
-		api?: KubernetesApiService;
-		registries?: RegistryProviderRegistry;
-		ingressStrategies?: IngressStrategyRegistry;
-		dnsResolver?: DnsResolver;
-	} = {}) {
+	constructor(
+		opts: {
+			api?: KubernetesApiService;
+			registries?: RegistryProviderRegistry;
+			ingressStrategies?: IngressStrategyRegistry;
+			dnsResolver?: DnsResolver;
+		} = {}
+	) {
 		this.api = opts.api ?? new KubernetesApiService();
 		this.registries = opts.registries ?? defaultRegistryProviderRegistry;
 		this.ingressStrategies = opts.ingressStrategies ?? defaultIngressStrategyRegistry;
@@ -224,7 +222,7 @@ export class KubernetesPlugin implements IPlugin, IDeploymentPlugin {
 		return {
 			status: 'healthy',
 			message: 'Kubernetes plugin is ready (cluster reachability is per-token)',
-			checkedAt: Date.now(),
+			checkedAt: Date.now()
 		};
 	}
 
@@ -252,25 +250,25 @@ export class KubernetesPlugin implements IPlugin, IDeploymentPlugin {
 				'- **Bring your own cluster** — EKS / GKE / AKS / k3s / on-prem',
 				'- **GitHub Container Registry by default** — no extra configuration if GitHub is connected',
 				'- **Pluggable ingress** — built-in strategies for ingress-nginx and Traefik, generic fallback for everything else',
-				'- **Custom domains** — patches your work\'s Ingress with cert-manager-friendly annotations',
+				"- **Custom domains** — patches your work's Ingress with cert-manager-friendly annotations",
 				'',
 				'## Getting started',
 				'',
 				'1. Generate a kubeconfig (a service-account-scoped one is recommended).',
 				'2. Paste it in the **kubeconfig** field below and click **Save & verify**.',
 				'3. The platform reports back the cluster name, server version, and detected ingress controllers.',
-				'4. Choose Kubernetes as the deployment provider on a work and deploy.',
+				'4. Choose Kubernetes as the deployment provider on a work and deploy.'
 			].join('\n'),
 			homepage: 'https://kubernetes.io/docs/tasks/access-application-cluster/configure-access-multiple-clusters/',
 			uiHints: {
 				includeInOnboarding: false,
-				completionFields: ['kubeconfig'],
+				completionFields: ['kubeconfig']
 			},
 			icon: {
 				type: 'lucide',
 				value: 'Container',
-				backgroundColor: '#326CE5',
-			},
+				backgroundColor: '#326CE5'
+			}
 		};
 	}
 
@@ -285,8 +283,7 @@ export class KubernetesPlugin implements IPlugin, IDeploymentPlugin {
 		try {
 			const info = await this.api.validateConnection(cfg.kubeconfig, {
 				contextOverride: cfg.kubeContext,
-				hasStrategyFor: (controller) =>
-					Boolean(controller && this.ingressStrategies.hasStrategyFor(controller)),
+				hasStrategyFor: (controller) => Boolean(controller && this.ingressStrategies.hasStrategyFor(controller))
 			});
 
 			const githubReady = await this.checkGithubReadyIfNeeded(cfg.registry);
@@ -303,8 +300,8 @@ export class KubernetesPlugin implements IPlugin, IDeploymentPlugin {
 					serverVersion: info.serverVersion,
 					serverFingerprint: info.serverFingerprint,
 					ingressClasses: info.ingressClasses,
-					requiresExecPlugin: info.requiresExecPlugin,
-				},
+					requiresExecPlugin: info.requiresExecPlugin
+				}
 			};
 		} catch (err) {
 			const scrubPatterns = this.runtimeScrubPatterns(cfg);
@@ -343,7 +340,7 @@ export class KubernetesPlugin implements IPlugin, IDeploymentPlugin {
 		const registryCtx: RegistryDeployContext = {
 			workSlug: slug,
 			githubOwner: opts.githubOwner,
-			websiteRepoIsPrivate: opts.websiteRepoIsPrivate,
+			websiteRepoIsPrivate: opts.websiteRepoIsPrivate
 		};
 		const visibility: ResolvedImageVisibility = provider.resolveVisibility(registry, registryCtx);
 		const imageBase = provider.imageBase(registry, registryCtx);
@@ -360,12 +357,11 @@ export class KubernetesPlugin implements IPlugin, IDeploymentPlugin {
 
 		try {
 			if (pullCreds) {
-				const password =
-					registry.kind === 'github' ? opts.githubReadPackagesToken ?? '' : pullCreds.password;
+				const password = registry.kind === 'github' ? (opts.githubReadPackagesToken ?? '') : pullCreds.password;
 				if (registry.kind === 'github' && !password) {
 					throw new K8sPluginError(
 						'GITHUB_NOT_CONNECTED',
-						'A read:packages token from the GitHub plugin is required to pull a private GHCR image.',
+						'A read:packages token from the GitHub plugin is required to pull a private GHCR image.'
 					);
 				}
 				pullSecretName = pullSecretNameFor(slug);
@@ -376,7 +372,7 @@ export class KubernetesPlugin implements IPlugin, IDeploymentPlugin {
 					username: pullCreds.username,
 					password,
 					workId: config.projectName,
-					workSlug: slug,
+					workSlug: slug
 				});
 				await this.api.applyImagePullSecret(kubeconfig, secret, settings.kubeContext);
 			}
@@ -392,7 +388,7 @@ export class KubernetesPlugin implements IPlugin, IDeploymentPlugin {
 				hosts,
 				ingressClass,
 				tlsIssuer: settings.tlsIssuer,
-				ingressController: controller,
+				ingressController: controller
 			};
 			const deploymentManifest = buildDeployment(renderInputs);
 			const serviceManifest = buildService(renderInputs);
@@ -408,7 +404,7 @@ export class KubernetesPlugin implements IPlugin, IDeploymentPlugin {
 				id: makeDeploymentId(namespace, slug),
 				status: 'deploying',
 				url: hosts.length > 0 ? `https://${hosts[0]}` : undefined,
-				createdAt,
+				createdAt
 			};
 		} catch (err) {
 			const scrubPatterns = this.runtimeScrubPatterns({ kubeconfig, registry });
@@ -418,7 +414,7 @@ export class KubernetesPlugin implements IPlugin, IDeploymentPlugin {
 				status: 'error',
 				error: scrubbed.message,
 				createdAt,
-				completedAt: new Date().toISOString(),
+				completedAt: new Date().toISOString()
 			};
 		}
 	}
@@ -438,7 +434,7 @@ export class KubernetesPlugin implements IPlugin, IDeploymentPlugin {
 				id: deploymentId,
 				status,
 				createdAt,
-				completedAt: status === 'ready' || status === 'error' ? new Date().toISOString() : undefined,
+				completedAt: status === 'ready' || status === 'error' ? new Date().toISOString() : undefined
 			};
 		} catch (err) {
 			const scrubbed = scrubError(err, this.runtimeScrubPatterns({ kubeconfig }));
@@ -447,7 +443,7 @@ export class KubernetesPlugin implements IPlugin, IDeploymentPlugin {
 				status: 'error',
 				error: scrubbed.message,
 				createdAt,
-				completedAt: new Date().toISOString(),
+				completedAt: new Date().toISOString()
 			};
 		}
 	}
@@ -459,7 +455,7 @@ export class KubernetesPlugin implements IPlugin, IDeploymentPlugin {
 			return deployments.map((d) => ({
 				id: makeDeploymentId(d.namespace, d.name),
 				name: d.name,
-				createdAt: new Date().toISOString(),
+				createdAt: new Date().toISOString()
 			}));
 		} catch {
 			return [];
@@ -468,7 +464,7 @@ export class KubernetesPlugin implements IPlugin, IDeploymentPlugin {
 
 	async lookupExistingDeployment(
 		projectName: string,
-		kubeconfig: string,
+		kubeconfig: string
 	): Promise<{ found: boolean; website?: string; deploymentState?: string; projectId?: string }> {
 		const settings = await this.loadSettings();
 		const slug = sanitiseSlug(projectName);
@@ -479,7 +475,7 @@ export class KubernetesPlugin implements IPlugin, IDeploymentPlugin {
 			return {
 				found: true,
 				projectId: makeDeploymentId(namespace, slug),
-				deploymentState: mapDeploymentToStatus(deployment),
+				deploymentState: mapDeploymentToStatus(deployment)
 			};
 		} catch {
 			return { found: false };
@@ -501,59 +497,54 @@ export class KubernetesPlugin implements IPlugin, IDeploymentPlugin {
 	async addDomain(projectId: string, domain: string, kubeconfig: string): Promise<AddDomainResult> {
 		const settings = await this.loadSettings();
 		const { namespace, name } = parseDeploymentId(projectId);
-		const controller = await this.controllerForClassName(
-			kubeconfig,
-			settings.kubeContext,
-			settings.ingressClass,
-		);
+		const controller = await this.controllerForClassName(kubeconfig, settings.kubeContext, settings.ingressClass);
 		const strategy = this.ingressStrategies.selectStrategy(controller);
 
 		const existing = (await this.api.readIngress(kubeconfig, namespace, name, settings.kubeContext)) ?? {
-			spec: { ingressClassName: settings.ingressClass, rules: [], tls: [] },
+			spec: { ingressClassName: settings.ingressClass, rules: [], tls: [] }
 		};
 
-		const patched = appendHostToIngress(existing as { spec?: { rules?: unknown[]; tls?: unknown[]; ingressClassName?: string } }, {
-			host: domain,
-			serviceName: name,
-			strategy,
-			tlsIssuer: settings.tlsIssuer,
-		});
+		const patched = appendHostToIngress(
+			existing as { spec?: { rules?: unknown[]; tls?: unknown[]; ingressClassName?: string } },
+			{
+				host: domain,
+				serviceName: name,
+				strategy,
+				tlsIssuer: settings.tlsIssuer
+			}
+		);
 
 		const body = {
 			apiVersion: 'networking.k8s.io/v1',
 			kind: 'Ingress',
 			metadata: { name, namespace },
-			spec: patched.spec,
+			spec: patched.spec
 		};
 		await this.api.applyIngress(kubeconfig, body, settings.kubeContext);
 
 		return {
 			domain: { name: domain, verified: false, verification: buildDnsGuidance(domain) },
-			verified: false,
+			verified: false
 		};
 	}
 
 	async removeDomain(projectId: string, domain: string, kubeconfig: string): Promise<boolean> {
 		const settings = await this.loadSettings();
 		const { namespace, name } = parseDeploymentId(projectId);
-		const controller = await this.controllerForClassName(
-			kubeconfig,
-			settings.kubeContext,
-			settings.ingressClass,
-		);
+		const controller = await this.controllerForClassName(kubeconfig, settings.kubeContext, settings.ingressClass);
 		const strategy = this.ingressStrategies.selectStrategy(controller);
 		const existing = await this.api.readIngress(kubeconfig, namespace, name, settings.kubeContext);
 		if (!existing) return false;
 
 		const patched = removeHostFromIngress(
 			existing as { spec?: { rules?: unknown[]; tls?: unknown[]; ingressClassName?: string } },
-			{ host: domain, strategy, tlsIssuer: settings.tlsIssuer },
+			{ host: domain, strategy, tlsIssuer: settings.tlsIssuer }
 		);
 		const body = {
 			apiVersion: 'networking.k8s.io/v1',
 			kind: 'Ingress',
 			metadata: { name, namespace },
-			spec: patched.spec,
+			spec: patched.spec
 		};
 		await this.api.applyIngress(kubeconfig, body, settings.kubeContext);
 		return true;
@@ -572,7 +563,7 @@ export class KubernetesPlugin implements IPlugin, IDeploymentPlugin {
 	async getDeploymentSecrets(settings: Record<string, unknown>): Promise<Record<string, string>> {
 		const cfg = this.coerceSettings(settings);
 		const out: Record<string, string> = {
-			K8S_NAMESPACE: cfg.namespace?.trim() || DEFAULT_NAMESPACE,
+			K8S_NAMESPACE: cfg.namespace?.trim() || DEFAULT_NAMESPACE
 		};
 		if (cfg.kubeContext) out.K8S_KUBE_CONTEXT = cfg.kubeContext;
 		if (cfg.ingressClass) out.K8S_INGRESS_CLASS = cfg.ingressClass;
@@ -634,14 +625,14 @@ export class KubernetesPlugin implements IPlugin, IDeploymentPlugin {
 	private async controllerForClassName(
 		kubeconfig: string,
 		contextOverride: string | undefined,
-		className: string | undefined,
+		className: string | undefined
 	): Promise<string | undefined> {
 		if (!className) return undefined;
 		try {
 			const classes = await this.api.listIngressClasses(
 				kubeconfig,
 				(c) => Boolean(c && this.ingressStrategies.hasStrategyFor(c)),
-				contextOverride,
+				contextOverride
 			);
 			return classes.find((c) => c.name === className)?.controller;
 		} catch {
@@ -650,7 +641,7 @@ export class KubernetesPlugin implements IPlugin, IDeploymentPlugin {
 	}
 
 	private async checkGithubReadyIfNeeded(
-		registry: RegistryConfig | undefined,
+		registry: RegistryConfig | undefined
 	): Promise<{ ok: true } | { ok: false; result: ConnectionValidationResult } | null> {
 		if (!registry || registry.kind !== 'github') return null;
 		if (!this.context) {
@@ -664,8 +655,8 @@ export class KubernetesPlugin implements IPlugin, IDeploymentPlugin {
 				ok: false,
 				result: {
 					success: false,
-					message: 'Connect GitHub first to use GitHub Container Registry as the image registry.',
-				},
+					message: 'Connect GitHub first to use GitHub Container Registry as the image registry.'
+				}
 			};
 		}
 		return { ok: true };

@@ -11,8 +11,8 @@ describe('mapDeploymentToStatus', () => {
 	it('returns ready when Available=True', () => {
 		expect(
 			mapDeploymentToStatus({
-				status: { conditions: [{ type: 'Available', status: 'True' }] },
-			}),
+				status: { conditions: [{ type: 'Available', status: 'True' }] }
+			})
 		).toBe('ready');
 	});
 
@@ -22,10 +22,10 @@ describe('mapDeploymentToStatus', () => {
 				status: {
 					conditions: [
 						{ type: 'Available', status: 'False' },
-						{ type: 'ReplicaFailure', status: 'True', reason: 'FailedCreate' },
-					],
-				},
-			}),
+						{ type: 'ReplicaFailure', status: 'True', reason: 'FailedCreate' }
+					]
+				}
+			})
 		).toBe('error');
 	});
 
@@ -33,9 +33,9 @@ describe('mapDeploymentToStatus', () => {
 		expect(
 			mapDeploymentToStatus({
 				status: {
-					conditions: [{ type: 'Progressing', status: 'True', reason: 'NewReplicaSetCreated' }],
-				},
-			}),
+					conditions: [{ type: 'Progressing', status: 'True', reason: 'NewReplicaSetCreated' }]
+				}
+			})
 		).toBe('deploying');
 	});
 
@@ -56,24 +56,24 @@ describe('isRolloutComplete', () => {
 	it('is false when observedGeneration < generation', () => {
 		expect(
 			isRolloutComplete({
-				status: { observedGeneration: 1, generation: 2, replicas: 1, availableReplicas: 1 },
-			}),
+				status: { observedGeneration: 1, generation: 2, replicas: 1, availableReplicas: 1 }
+			})
 		).toBe(false);
 	});
 
 	it('is true when all desired replicas are available', () => {
 		expect(
 			isRolloutComplete({
-				status: { observedGeneration: 2, generation: 2, replicas: 2, availableReplicas: 2 },
-			}),
+				status: { observedGeneration: 2, generation: 2, replicas: 2, availableReplicas: 2 }
+			})
 		).toBe(true);
 	});
 
 	it('is false when replicas is zero', () => {
 		expect(
 			isRolloutComplete({
-				status: { observedGeneration: 2, generation: 2, replicas: 0, availableReplicas: 0 },
-			}),
+				status: { observedGeneration: 2, generation: 2, replicas: 0, availableReplicas: 0 }
+			})
 		).toBe(false);
 	});
 });

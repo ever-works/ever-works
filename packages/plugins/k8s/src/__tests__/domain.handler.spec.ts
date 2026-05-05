@@ -4,7 +4,7 @@ import {
 	buildDnsGuidance,
 	removeHostFromIngress,
 	verifyDomainResolution,
-	type DnsResolver,
+	type DnsResolver
 } from '../domain.handler';
 import { NginxIngressStrategy } from '../ingress/nginx.strategy';
 import { GenericIngressStrategy } from '../ingress/generic.strategy';
@@ -35,7 +35,7 @@ describe('appendHostToIngress', () => {
 			host: 'tools.example.com',
 			serviceName: 'my-site',
 			strategy: new NginxIngressStrategy(),
-			tlsIssuer: 'letsencrypt-prod',
+			tlsIssuer: 'letsencrypt-prod'
 		});
 		const rules = (out.spec.rules as Array<{ host: string }>) ?? [];
 		expect(rules[0].host).toBe('tools.example.com');
@@ -47,23 +47,26 @@ describe('appendHostToIngress', () => {
 			spec: {
 				ingressClassName: 'nginx',
 				rules: [{ host: 'a.example.com' }],
-				tls: [],
-			},
+				tls: []
+			}
 		};
 		const out = appendHostToIngress(ingress, {
 			host: 'a.example.com',
 			serviceName: 's',
-			strategy: new NginxIngressStrategy(),
+			strategy: new NginxIngressStrategy()
 		});
 		expect((out.spec.rules as unknown[]).length).toBe(1);
 	});
 
 	it('omits TLS when no issuer is set', () => {
-		const out = appendHostToIngress({ spec: { rules: [], tls: [] } }, {
-			host: 'a.example.com',
-			serviceName: 's',
-			strategy: new GenericIngressStrategy(),
-		});
+		const out = appendHostToIngress(
+			{ spec: { rules: [], tls: [] } },
+			{
+				host: 'a.example.com',
+				serviceName: 's',
+				strategy: new GenericIngressStrategy()
+			}
+		);
 		expect(out.spec.tls).toBeUndefined();
 	});
 });
@@ -73,12 +76,12 @@ describe('removeHostFromIngress', () => {
 		const ingress = {
 			spec: {
 				rules: [{ host: 'a.example.com' }, { host: 'b.example.com' }],
-				tls: [],
-			},
+				tls: []
+			}
 		};
 		const out = removeHostFromIngress(ingress, {
 			host: 'a.example.com',
-			strategy: new GenericIngressStrategy(),
+			strategy: new GenericIngressStrategy()
 		});
 		const rules = (out.spec.rules as Array<{ host: string }>) ?? [];
 		expect(rules.map((r) => r.host)).toEqual(['b.example.com']);
@@ -88,13 +91,13 @@ describe('removeHostFromIngress', () => {
 describe('verifyDomainResolution', () => {
 	const ok: DnsResolver = {
 		resolveCname: async () => ['lb.cluster.example.com'],
-		resolve4: async () => [],
+		resolve4: async () => []
 	};
 	const noCnameButA: DnsResolver = {
 		resolveCname: async () => {
 			throw new Error('ENOTFOUND');
 		},
-		resolve4: async () => ['203.0.113.10'],
+		resolve4: async () => ['203.0.113.10']
 	};
 	const fail: DnsResolver = {
 		resolveCname: async () => {
@@ -102,7 +105,7 @@ describe('verifyDomainResolution', () => {
 		},
 		resolve4: async () => {
 			throw new Error('ENOTFOUND');
-		},
+		}
 	};
 
 	it('returns verified=true when CNAME points at the expected target', async () => {

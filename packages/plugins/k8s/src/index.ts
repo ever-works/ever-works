@@ -8,21 +8,15 @@ export {
 	buildIngress,
 	buildImagePullSecret,
 	pullSecretNameFor,
-	FIELD_MANAGER,
+	FIELD_MANAGER
 } from './manifest.renderer.js';
 export { mapDeploymentToStatus, isRolloutComplete } from './status.mapper.js';
-export {
-	defaultRegistryProviderRegistry,
-	RegistryProviderRegistry,
-} from './registries/provider.registry.js';
+export { defaultRegistryProviderRegistry, RegistryProviderRegistry } from './registries/provider.registry.js';
 export { GitHubRegistryProvider } from './registries/github.provider.js';
 export { DockerHubRegistryProvider } from './registries/dockerhub.provider.js';
 export { GenericRegistryProvider } from './registries/generic.provider.js';
 export type { RegistryProvider } from './registries/provider.js';
-export {
-	defaultIngressStrategyRegistry,
-	IngressStrategyRegistry,
-} from './ingress/strategy.registry.js';
+export { defaultIngressStrategyRegistry, IngressStrategyRegistry } from './ingress/strategy.registry.js';
 export { NginxIngressStrategy } from './ingress/nginx.strategy.js';
 export { TraefikIngressStrategy } from './ingress/traefik.strategy.js';
 export { GenericIngressStrategy } from './ingress/generic.strategy.js';
@@ -33,6 +27,6 @@ export {
 	verifyDomainResolution,
 	buildDnsGuidance,
 	defaultDnsResolver,
-	type DnsResolver,
+	type DnsResolver
 } from './domain.handler.js';
 export * from './types.js';

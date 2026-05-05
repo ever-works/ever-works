@@ -5,9 +5,7 @@ export class TraefikIngressStrategy implements IngressStrategy {
 
 	annotations(input: IngressStrategyInputs): Record<string, string> {
 		const annotations: Record<string, string> = {
-			'traefik.ingress.kubernetes.io/router.entrypoints': input.tlsIssuer
-				? 'websecure'
-				: 'web',
+			'traefik.ingress.kubernetes.io/router.entrypoints': input.tlsIssuer ? 'websecure' : 'web'
 		};
 		if (input.tlsIssuer) {
 			annotations['traefik.ingress.kubernetes.io/router.tls'] = 'true';

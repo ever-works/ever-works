@@ -3,7 +3,7 @@ import type {
 	RegistryConfig,
 	RegistryDeployContext,
 	RegistryWorkflowLogin,
-	ResolvedImageVisibility,
+	ResolvedImageVisibility
 } from '../types.js';
 import { K8sPluginError } from '../errors.js';
 import type { RegistryProvider } from './provider.js';
@@ -29,14 +29,14 @@ export class DockerHubRegistryProvider implements RegistryProvider {
 		return {
 			registry: DOCKERHUB_HOST,
 			username: '${{ secrets.REGISTRY_USERNAME }}',
-			passwordEnv: 'REGISTRY_PASSWORD',
+			passwordEnv: 'REGISTRY_PASSWORD'
 		};
 	}
 
 	pullSecretCredentials(
 		config: RegistryConfig,
 		_ctx: RegistryDeployContext,
-		visibility: ResolvedImageVisibility,
+		visibility: ResolvedImageVisibility
 	): { server: string; username: string; password: string } | null {
 		if (visibility === 'public') {
 			return null;
@@ -45,7 +45,7 @@ export class DockerHubRegistryProvider implements RegistryProvider {
 		return {
 			server: DOCKERHUB_HOST,
 			username: cfg.username,
-			password: cfg.password,
+			password: cfg.password
 		};
 	}
 
@@ -53,7 +53,7 @@ export class DockerHubRegistryProvider implements RegistryProvider {
 		if (config.kind !== 'dockerhub') {
 			throw new K8sPluginError(
 				'UNKNOWN',
-				`DockerHubRegistryProvider received non-dockerhub config: ${config.kind}`,
+				`DockerHubRegistryProvider received non-dockerhub config: ${config.kind}`
 			);
 		}
 		return config;

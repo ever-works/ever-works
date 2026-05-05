@@ -5,7 +5,7 @@ import {
 	buildImagePullSecret,
 	buildService,
 	pullSecretNameFor,
-	FIELD_MANAGER,
+	FIELD_MANAGER
 } from '../manifest.renderer';
 import { GenericIngressStrategy } from '../ingress/generic.strategy';
 import { NginxIngressStrategy } from '../ingress/nginx.strategy';
@@ -18,7 +18,7 @@ const baseInput: ManifestRenderInputs = {
 	image: 'ghcr.io/acme/my-site:abc1234',
 	replicas: 2,
 	containerPort: 3000,
-	hosts: [],
+	hosts: []
 };
 
 describe('buildDeployment', () => {
@@ -70,7 +70,7 @@ describe('buildIngress', () => {
 	it('emits an Ingress with the strategy annotations', () => {
 		const ing = buildIngress(
 			{ ...baseInput, hosts: ['example.com'], ingressClass: 'nginx', tlsIssuer: 'letsencrypt-prod' },
-			new NginxIngressStrategy(),
+			new NginxIngressStrategy()
 		) as Record<string, any>;
 		expect(ing).not.toBeNull();
 		expect(ing.apiVersion).toBe('networking.k8s.io/v1');
@@ -84,7 +84,7 @@ describe('buildIngress', () => {
 	it('omits the tls block when there is no tlsIssuer', () => {
 		const ing = buildIngress(
 			{ ...baseInput, hosts: ['example.com'], ingressClass: 'nginx' },
-			new NginxIngressStrategy(),
+			new NginxIngressStrategy()
 		) as Record<string, any>;
 		expect(ing.spec.tls).toBeUndefined();
 	});
@@ -99,12 +99,10 @@ describe('buildImagePullSecret', () => {
 			username: 'acme',
 			password: 'p@ss',
 			workId: 'w',
-			workSlug: 'my-site',
+			workSlug: 'my-site'
 		}) as Record<string, any>;
 		expect(sec.type).toBe('kubernetes.io/dockerconfigjson');
-		const decoded = JSON.parse(
-			Buffer.from(sec.data['.dockerconfigjson'], 'base64').toString('utf-8'),
-		);
+		const decoded = JSON.parse(Buffer.from(sec.data['.dockerconfigjson'], 'base64').toString('utf-8'));
 		expect(decoded.auths['ghcr.io'].username).toBe('acme');
 		expect(decoded.auths['ghcr.io'].password).toBe('p@ss');
 		const auth = Buffer.from(decoded.auths['ghcr.io'].auth, 'base64').toString('utf-8');

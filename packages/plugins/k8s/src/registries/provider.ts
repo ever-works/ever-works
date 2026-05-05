@@ -3,7 +3,7 @@ import type {
 	RegistryDeployContext,
 	RegistryKind,
 	RegistryWorkflowLogin,
-	ResolvedImageVisibility,
+	ResolvedImageVisibility
 } from '../types.js';
 
 /**
@@ -46,6 +46,6 @@ export interface RegistryProvider {
 	pullSecretCredentials(
 		config: RegistryConfig,
 		ctx: RegistryDeployContext,
-		visibility: ResolvedImageVisibility,
+		visibility: ResolvedImageVisibility
 	): { server: string; username: string; password: string } | null;
 }

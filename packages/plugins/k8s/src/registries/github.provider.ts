@@ -3,7 +3,7 @@ import type {
 	RegistryConfig,
 	RegistryDeployContext,
 	RegistryWorkflowLogin,
-	ResolvedImageVisibility,
+	ResolvedImageVisibility
 } from '../types.js';
 import { K8sPluginError } from '../errors.js';
 import type { RegistryProvider } from './provider.js';
@@ -19,7 +19,7 @@ export class GitHubRegistryProvider implements RegistryProvider {
 		if (!owner) {
 			throw new K8sPluginError(
 				'GITHUB_NOT_CONNECTED',
-				'No GitHub owner is available — connect GitHub or set the registry owner explicitly.',
+				'No GitHub owner is available — connect GitHub or set the registry owner explicitly.'
 			);
 		}
 		return `${GHCR_HOST}/${owner.toLowerCase()}`;
@@ -44,14 +44,14 @@ export class GitHubRegistryProvider implements RegistryProvider {
 		return {
 			registry: GHCR_HOST,
 			username: '${{ github.actor }}',
-			passwordEnv: 'GITHUB_TOKEN',
+			passwordEnv: 'GITHUB_TOKEN'
 		};
 	}
 
 	pullSecretCredentials(
 		config: RegistryConfig,
 		ctx: RegistryDeployContext,
-		visibility: ResolvedImageVisibility,
+		visibility: ResolvedImageVisibility
 	): { server: string; username: string; password: string } | null {
 		if (visibility === 'public') {
 			return null;
@@ -64,16 +64,13 @@ export class GitHubRegistryProvider implements RegistryProvider {
 		return {
 			server: GHCR_HOST,
 			username: owner,
-			password: '',
+			password: ''
 		};
 	}
 
 	private expect(config: RegistryConfig): GitHubRegistryConfig {
 		if (config.kind !== 'github') {
-			throw new K8sPluginError(
-				'UNKNOWN',
-				`GitHubRegistryProvider received non-github config: ${config.kind}`,
-			);
+			throw new K8sPluginError('UNKNOWN', `GitHubRegistryProvider received non-github config: ${config.kind}`);
 		}
 		return config;
 	}

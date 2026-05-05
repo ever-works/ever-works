@@ -1,10 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import {
-	K8sPluginError,
-	buildSecretPattern,
-	scrubError,
-	scrubString,
-} from '../errors';
+import { K8sPluginError, buildSecretPattern, scrubError, scrubString } from '../errors';
 
 describe('scrubString', () => {
 	it('redacts an embedded kubeconfig blob', () => {
@@ -58,15 +53,9 @@ describe('scrubError', () => {
 	});
 
 	it('infers CLUSTER_UNREACHABLE from common network errors', () => {
-		expect(scrubError(new Error('ENOTFOUND kind.example.com')).code).toBe(
-			'CLUSTER_UNREACHABLE',
-		);
-		expect(scrubError(new Error('connect ECONNREFUSED 127.0.0.1:6443')).code).toBe(
-			'CLUSTER_UNREACHABLE',
-		);
-		expect(scrubError(new Error('x509: certificate has expired')).code).toBe(
-			'CLUSTER_UNREACHABLE',
-		);
+		expect(scrubError(new Error('ENOTFOUND kind.example.com')).code).toBe('CLUSTER_UNREACHABLE');
+		expect(scrubError(new Error('connect ECONNREFUSED 127.0.0.1:6443')).code).toBe('CLUSTER_UNREACHABLE');
+		expect(scrubError(new Error('x509: certificate has expired')).code).toBe('CLUSTER_UNREACHABLE');
 	});
 
 	it('infers UNAUTHORIZED from 401/403/forbidden/unauthorized text', () => {

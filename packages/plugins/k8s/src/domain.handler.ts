@@ -1,9 +1,5 @@
 import { promises as dnsPromises } from 'node:dns';
-import type {
-	AddDomainResult,
-	DeploymentDomain,
-	DeploymentDomainVerification,
-} from '@ever-works/plugin';
+import type { AddDomainResult, DeploymentDomain, DeploymentDomainVerification } from '@ever-works/plugin';
 import type { IngressStrategy } from './ingress/strategy.js';
 
 const PROVIDER_TARGET_HINT = 'cluster ingress load balancer';
@@ -13,10 +9,7 @@ const PROVIDER_TARGET_HINT = 'cluster ingress load balancer';
  * subdomains need a CNAME. Without an `ingressLbHost`, we still return
  * structured guidance with a placeholder value.
  */
-export function buildDnsGuidance(
-	domain: string,
-	ingressLbHost?: string,
-): readonly DeploymentDomainVerification[] {
+export function buildDnsGuidance(domain: string, ingressLbHost?: string): readonly DeploymentDomainVerification[] {
 	const isApex = !domain.includes('.') || domain.split('.').length === 2;
 	if (isApex) {
 		return [
@@ -24,8 +17,8 @@ export function buildDnsGuidance(
 				type: 'A',
 				domain,
 				value: ingressLbHost ?? PROVIDER_TARGET_HINT,
-				reason: 'Point your apex domain to the cluster ingress load balancer.',
-			},
+				reason: 'Point your apex domain to the cluster ingress load balancer.'
+			}
 		];
 	}
 	return [
@@ -33,8 +26,8 @@ export function buildDnsGuidance(
 			type: 'CNAME',
 			domain,
 			value: ingressLbHost ?? PROVIDER_TARGET_HINT,
-			reason: 'Point your subdomain to the cluster ingress load balancer.',
-		},
+			reason: 'Point your subdomain to the cluster ingress load balancer.'
+		}
 	];
 }
 
@@ -49,7 +42,7 @@ export function appendHostToIngress(
 		serviceName: string;
 		strategy: IngressStrategy;
 		tlsIssuer?: string;
-	},
+	}
 ): { spec: Record<string, unknown> } {
 	const spec = (ingress.spec ?? {}) as {
 		rules?: Array<{ host?: string; http?: unknown }>;
@@ -66,10 +59,10 @@ export function appendHostToIngress(
 					{
 						path: '/',
 						pathType: 'Prefix',
-						backend: { service: { name: args.serviceName, port: { number: 80 } } },
-					},
-				],
-			},
+						backend: { service: { name: args.serviceName, port: { number: 80 } } }
+					}
+				]
+			}
 		});
 	}
 
@@ -77,12 +70,12 @@ export function appendHostToIngress(
 	const tls = args.strategy.tls({
 		hosts: allHosts,
 		tlsIssuer: args.tlsIssuer,
-		className: spec.ingressClassName,
+		className: spec.ingressClassName
 	});
 
 	const newSpec: Record<string, unknown> = {
 		ingressClassName: spec.ingressClassName,
-		rules,
+		rules
 	};
 	if (tls.length > 0) newSpec.tls = tls;
 	return { spec: newSpec };
@@ -93,7 +86,7 @@ export function appendHostToIngress(
  */
 export function removeHostFromIngress(
 	ingress: { spec?: { rules?: unknown[]; tls?: unknown[]; ingressClassName?: string } },
-	args: { host: string; strategy: IngressStrategy; tlsIssuer?: string },
+	args: { host: string; strategy: IngressStrategy; tlsIssuer?: string }
 ): { spec: Record<string, unknown> } {
 	const spec = (ingress.spec ?? {}) as {
 		rules?: Array<{ host?: string; http?: unknown }>;
@@ -106,12 +99,12 @@ export function removeHostFromIngress(
 	const tls = args.strategy.tls({
 		hosts: allHosts,
 		tlsIssuer: args.tlsIssuer,
-		className: spec.ingressClassName,
+		className: spec.ingressClassName
 	});
 
 	const newSpec: Record<string, unknown> = {
 		ingressClassName: spec.ingressClassName,
-		rules,
+		rules
 	};
 	if (tls.length > 0) newSpec.tls = tls;
 	return { spec: newSpec };
@@ -128,13 +121,13 @@ export type DnsResolver = {
 
 export const defaultDnsResolver: DnsResolver = {
 	resolveCname: (host) => dnsPromises.resolveCname(host),
-	resolve4: (host) => dnsPromises.resolve4(host),
+	resolve4: (host) => dnsPromises.resolve4(host)
 };
 
 export async function verifyDomainResolution(
 	domain: string,
 	expectedTarget: string | undefined,
-	resolver: DnsResolver = defaultDnsResolver,
+	resolver: DnsResolver = defaultDnsResolver
 ): Promise<DeploymentDomain> {
 	const hostsTried: string[] = [];
 	if (expectedTarget) hostsTried.push(expectedTarget.toLowerCase());
@@ -163,7 +156,7 @@ export async function verifyDomainResolution(
 	return {
 		name: domain,
 		verified: resolved,
-		verification: resolved ? undefined : buildDnsGuidance(domain, expectedTarget),
+		verification: resolved ? undefined : buildDnsGuidance(domain, expectedTarget)
 	};
 }
 

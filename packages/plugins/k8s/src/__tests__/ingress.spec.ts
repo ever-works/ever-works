@@ -16,25 +16,21 @@ describe('NginxIngressStrategy', () => {
 		expect(
 			s.annotations({ hosts: ['x.com'], tlsIssuer: 'letsencrypt-prod' })[
 				'nginx.ingress.kubernetes.io/ssl-redirect'
-			],
+			]
 		).toBe('true');
 	});
 
 	it('adds cert-manager annotation only when tlsIssuer is set', () => {
 		expect(s.annotations({ hosts: ['x.com'] })['cert-manager.io/cluster-issuer']).toBeUndefined();
 		expect(
-			s.annotations({ hosts: ['x.com'], tlsIssuer: 'letsencrypt-prod' })[
-				'cert-manager.io/cluster-issuer'
-			],
+			s.annotations({ hosts: ['x.com'], tlsIssuer: 'letsencrypt-prod' })['cert-manager.io/cluster-issuer']
 		).toBe('letsencrypt-prod');
 	});
 
 	it('produces a TLS entry only when tlsIssuer + hosts are present', () => {
 		expect(s.tls({ hosts: [] })).toEqual([]);
 		expect(s.tls({ hosts: ['x.com'] })).toEqual([]);
-		expect(s.tls({ hosts: ['x.com'], tlsIssuer: 'le' })).toEqual([
-			{ hosts: ['x.com'], secretName: 'x-com-tls' },
-		]);
+		expect(s.tls({ hosts: ['x.com'], tlsIssuer: 'le' })).toEqual([{ hosts: ['x.com'], secretName: 'x-com-tls' }]);
 	});
 });
 
@@ -46,19 +42,13 @@ describe('TraefikIngressStrategy', () => {
 	});
 
 	it('uses websecure entrypoint with TLS, web without', () => {
+		expect(s.annotations({ hosts: ['x.com'] })['traefik.ingress.kubernetes.io/router.entrypoints']).toBe('web');
 		expect(
-			s.annotations({ hosts: ['x.com'] })['traefik.ingress.kubernetes.io/router.entrypoints'],
-		).toBe('web');
-		expect(
-			s.annotations({ hosts: ['x.com'], tlsIssuer: 'le' })[
-				'traefik.ingress.kubernetes.io/router.entrypoints'
-			],
+			s.annotations({ hosts: ['x.com'], tlsIssuer: 'le' })['traefik.ingress.kubernetes.io/router.entrypoints']
 		).toBe('websecure');
-		expect(
-			s.annotations({ hosts: ['x.com'], tlsIssuer: 'le' })[
-				'traefik.ingress.kubernetes.io/router.tls'
-			],
-		).toBe('true');
+		expect(s.annotations({ hosts: ['x.com'], tlsIssuer: 'le' })['traefik.ingress.kubernetes.io/router.tls']).toBe(
+			'true'
+		);
 	});
 });
 
@@ -74,9 +64,7 @@ describe('GenericIngressStrategy', () => {
 	});
 
 	it('still adds cert-manager annotation when tlsIssuer is set', () => {
-		expect(
-			s.annotations({ hosts: ['x.com'], tlsIssuer: 'le' })['cert-manager.io/cluster-issuer'],
-		).toBe('le');
+		expect(s.annotations({ hosts: ['x.com'], tlsIssuer: 'le' })['cert-manager.io/cluster-issuer']).toBe('le');
 	});
 });
 

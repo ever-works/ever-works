@@ -4,10 +4,7 @@ import { resolve } from 'node:path';
 import type { PluginContext } from '@ever-works/plugin';
 import { KubernetesPlugin } from '../k8s.plugin';
 import { KubernetesApiService } from '../k8s-api.service';
-import type {
-	IngressClassDescriptor,
-	KubernetesClusterInfo,
-} from '../types';
+import type { IngressClassDescriptor, KubernetesClusterInfo } from '../types';
 
 const VALID = readFileSync(resolve(__dirname, 'fixtures/kubeconfig-valid.yml'), 'utf-8');
 
@@ -19,7 +16,7 @@ function createMockContext(settings: Record<string, unknown> = {}): PluginContex
 			get: vi.fn(),
 			set: vi.fn(),
 			delete: vi.fn(),
-			clear: vi.fn(),
+			clear: vi.fn()
 		} as unknown as PluginContext['cache'],
 		http: {} as PluginContext['http'],
 		env: {} as PluginContext['env'],
@@ -31,38 +28,41 @@ function createMockContext(settings: Record<string, unknown> = {}): PluginContex
 		onEvent: vi.fn(),
 		emitEvent: vi.fn(),
 		registerCustomCapability: vi.fn(),
-		getCustomCapability: vi.fn(),
+		getCustomCapability: vi.fn()
 	} as unknown as PluginContext;
 }
 
 function makeMockApi(overrides: Partial<KubernetesApiService> = {}): KubernetesApiService {
 	const stub = {
-		validateConnection: vi.fn(async (_yaml: string, opts: { hasStrategyFor: (c: string) => boolean }) => ({
-			clusterName: 'kind-dev',
-			serverUrl: 'https://kind.example.com:6443',
-			serverVersion: 'v1.30.4',
-			serverFingerprint: 'abc123def4567890',
-			ingressClasses: [
-				{
-					name: 'nginx',
-					controller: 'k8s.io/ingress-nginx',
-					isDefault: true,
-					hasStrategy: opts.hasStrategyFor('k8s.io/ingress-nginx'),
-				},
-			] as IngressClassDescriptor[],
-			requiresExecPlugin: false,
-		} satisfies KubernetesClusterInfo)),
+		validateConnection: vi.fn(
+			async (_yaml: string, opts: { hasStrategyFor: (c: string) => boolean }) =>
+				({
+					clusterName: 'kind-dev',
+					serverUrl: 'https://kind.example.com:6443',
+					serverVersion: 'v1.30.4',
+					serverFingerprint: 'abc123def4567890',
+					ingressClasses: [
+						{
+							name: 'nginx',
+							controller: 'k8s.io/ingress-nginx',
+							isDefault: true,
+							hasStrategy: opts.hasStrategyFor('k8s.io/ingress-nginx')
+						}
+					] as IngressClassDescriptor[],
+					requiresExecPlugin: false
+				}) satisfies KubernetesClusterInfo
+		),
 		listIngressClasses: vi.fn(async () => [
 			{
 				name: 'nginx',
 				controller: 'k8s.io/ingress-nginx',
 				isDefault: true,
-				hasStrategy: true,
-			},
+				hasStrategy: true
+			}
 		]),
 		getDeployment: vi.fn(async () => ({
 			metadata: { name: 'my-site', namespace: 'ever-works' },
-			status: { conditions: [{ type: 'Available', status: 'True' }] },
+			status: { conditions: [{ type: 'Available', status: 'True' }] }
 		})),
 		listManagedDeployments: vi.fn(async () => []),
 		applyDeployment: vi.fn(async () => undefined),
@@ -71,10 +71,10 @@ function makeMockApi(overrides: Partial<KubernetesApiService> = {}): KubernetesA
 		applyImagePullSecret: vi.fn(async () => undefined),
 		readIngress: vi.fn(async () => ({
 			metadata: { name: 'my-site' },
-			spec: { ingressClassName: 'nginx', rules: [], tls: [] },
+			spec: { ingressClassName: 'nginx', rules: [], tls: [] }
 		})),
 		getServerVersion: vi.fn(async () => 'v1.30.4'),
-		...overrides,
+		...overrides
 	};
 	return stub as unknown as KubernetesApiService;
 }
@@ -153,7 +153,7 @@ describe('KubernetesPlugin.validateConnection', () => {
 		const failing = makeMockApi({
 			validateConnection: vi.fn(async () => {
 				throw new Error('connection failed: token: leaked-secret-12345');
-			}),
+			})
 		});
 		const p = new KubernetesPlugin({ api: failing });
 		const r = await p.validateConnection({ kubeconfig: VALID });
@@ -190,7 +190,7 @@ describe('KubernetesPlugin.getDeploymentSecrets', () => {
 			ingressClass: 'nginx',
 			ingressHost: 'a.example.com',
 			tlsIssuer: 'letsencrypt-prod',
-			replicas: 3,
+			replicas: 3
 		});
 		expect(out.K8S_NAMESPACE).toBe('apps');
 		expect(out.K8S_INGRESS_CLASS).toBe('nginx');
@@ -200,7 +200,9 @@ describe('KubernetesPlugin.getDeploymentSecrets', () => {
 	});
 
 	it('emits github-specific vars without leaking auth (no GITHUB_TOKEN here)', async () => {
-		const out = await plugin.getDeploymentSecrets({ registry: { kind: 'github', owner: 'acme', visibility: 'auto' } });
+		const out = await plugin.getDeploymentSecrets({
+			registry: { kind: 'github', owner: 'acme', visibility: 'auto' }
+		});
 		expect(out.K8S_REGISTRY_KIND).toBe('github');
 		expect(out.K8S_REGISTRY_OWNER).toBe('acme');
 		expect(out.K8S_REGISTRY_VISIBILITY).toBe('auto');
@@ -210,7 +212,7 @@ describe('KubernetesPlugin.getDeploymentSecrets', () => {
 
 	it('emits dockerhub username + password as REGISTRY_USERNAME / REGISTRY_PASSWORD', async () => {
 		const out = await plugin.getDeploymentSecrets({
-			registry: { kind: 'dockerhub', username: 'acme', password: 'mYr3gistryPwD!' },
+			registry: { kind: 'dockerhub', username: 'acme', password: 'mYr3gistryPwD!' }
 		});
 		expect(out.REGISTRY_USERNAME).toBe('acme');
 		expect(out.REGISTRY_PASSWORD).toBe('mYr3gistryPwD!');
@@ -218,7 +220,7 @@ describe('KubernetesPlugin.getDeploymentSecrets', () => {
 
 	it('emits generic REGISTRY_SERVER alongside username/password', async () => {
 		const out = await plugin.getDeploymentSecrets({
-			registry: { kind: 'generic', server: 'registry.example.com', username: 'acme', password: 'p' },
+			registry: { kind: 'generic', server: 'registry.example.com', username: 'acme', password: 'p' }
 		});
 		expect(out.REGISTRY_SERVER).toBe('registry.example.com');
 		expect(out.REGISTRY_USERNAME).toBe('acme');
@@ -228,7 +230,7 @@ describe('KubernetesPlugin.getDeploymentSecrets', () => {
 	it('does NOT leak the kubeconfig in any returned value', async () => {
 		const out = await plugin.getDeploymentSecrets({
 			kubeconfig: VALID,
-			registry: { kind: 'github' },
+			registry: { kind: 'github' }
 		});
 		for (const v of Object.values(out)) {
 			expect(v).not.toContain('apiVersion: v1');
@@ -249,7 +251,7 @@ describe('KubernetesPlugin.deploy (mocked api)', () => {
 	const ctx = createMockContext({
 		kubeconfig: VALID,
 		namespace: 'ever-works',
-		registry: { kind: 'github', visibility: 'auto' },
+		registry: { kind: 'github', visibility: 'auto' }
 	});
 
 	beforeEach(async () => {
@@ -260,8 +262,12 @@ describe('KubernetesPlugin.deploy (mocked api)', () => {
 
 	it('public website repo → no pull secret applied', async () => {
 		const result = await plugin.deploy(
-			{ projectName: 'work-1', sourceDir: '.', options: { gitSha: 'abc1234', githubOwner: 'acme', websiteRepoIsPrivate: false } },
-			VALID,
+			{
+				projectName: 'work-1',
+				sourceDir: '.',
+				options: { gitSha: 'abc1234', githubOwner: 'acme', websiteRepoIsPrivate: false }
+			},
+			VALID
 		);
 		expect(result.status).toBe('deploying');
 		expect(api.applyImagePullSecret).not.toHaveBeenCalled();
@@ -278,10 +284,10 @@ describe('KubernetesPlugin.deploy (mocked api)', () => {
 					gitSha: 'abc1234',
 					githubOwner: 'acme',
 					websiteRepoIsPrivate: true,
-					githubReadPackagesToken: 'ghp_fake',
-				},
+					githubReadPackagesToken: 'ghp_fake'
+				}
 			},
-			VALID,
+			VALID
 		);
 		expect(result.status).toBe('deploying');
 		expect(api.applyImagePullSecret).toHaveBeenCalledTimes(1);
@@ -292,9 +298,9 @@ describe('KubernetesPlugin.deploy (mocked api)', () => {
 			{
 				projectName: 'work-1',
 				sourceDir: '.',
-				options: { gitSha: 'abc1234', githubOwner: 'acme', websiteRepoIsPrivate: true },
+				options: { gitSha: 'abc1234', githubOwner: 'acme', websiteRepoIsPrivate: true }
 			},
-			VALID,
+			VALID
 		);
 		expect(result.status).toBe('error');
 		expect(result.error).toMatch(/read:packages/i);
@@ -305,13 +311,13 @@ describe('KubernetesPlugin.deploy (mocked api)', () => {
 		const failing = makeMockApi({
 			applyDeployment: vi.fn(async () => {
 				throw new Error('403 Forbidden — token: leak-12345');
-			}),
+			})
 		});
 		const p = new KubernetesPlugin({ api: failing });
 		await p.onLoad(ctx);
 		const result = await p.deploy(
 			{ projectName: 'work-1', sourceDir: '.', options: { githubOwner: 'acme', websiteRepoIsPrivate: false } },
-			VALID,
+			VALID
 		);
 		expect(result.status).toBe('error');
 		expect(result.error).not.toContain('leak-12345');

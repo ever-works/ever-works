@@ -8,10 +8,7 @@
  * Defaults to `{ kind: 'github' }` so users with a connected GitHub account
  * can deploy without configuring anything else.
  */
-export type RegistryConfig =
-	| GitHubRegistryConfig
-	| DockerHubRegistryConfig
-	| GenericRegistryConfig;
+export type RegistryConfig = GitHubRegistryConfig | DockerHubRegistryConfig | GenericRegistryConfig;
 
 export interface GitHubRegistryConfig {
 	kind: 'github';

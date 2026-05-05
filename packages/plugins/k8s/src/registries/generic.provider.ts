@@ -3,7 +3,7 @@ import type {
 	RegistryConfig,
 	RegistryDeployContext,
 	RegistryWorkflowLogin,
-	ResolvedImageVisibility,
+	ResolvedImageVisibility
 } from '../types.js';
 import { K8sPluginError } from '../errors.js';
 import type { RegistryProvider } from './provider.js';
@@ -25,14 +25,14 @@ export class GenericRegistryProvider implements RegistryProvider {
 		return {
 			registry: normaliseHost(cfg.server),
 			username: '${{ secrets.REGISTRY_USERNAME }}',
-			passwordEnv: 'REGISTRY_PASSWORD',
+			passwordEnv: 'REGISTRY_PASSWORD'
 		};
 	}
 
 	pullSecretCredentials(
 		config: RegistryConfig,
 		_ctx: RegistryDeployContext,
-		visibility: ResolvedImageVisibility,
+		visibility: ResolvedImageVisibility
 	): { server: string; username: string; password: string } | null {
 		if (visibility === 'public') {
 			return null;
@@ -41,16 +41,13 @@ export class GenericRegistryProvider implements RegistryProvider {
 		return {
 			server: normaliseHost(cfg.server),
 			username: cfg.username,
-			password: cfg.password,
+			password: cfg.password
 		};
 	}
 
 	private expect(config: RegistryConfig): GenericRegistryConfig {
 		if (config.kind !== 'generic') {
-			throw new K8sPluginError(
-				'UNKNOWN',
-				`GenericRegistryProvider received non-generic config: ${config.kind}`,
-			);
+			throw new K8sPluginError('UNKNOWN', `GenericRegistryProvider received non-generic config: ${config.kind}`);
 		}
 		return config;
 	}
