@@ -2,6 +2,13 @@ import { createHmac, randomUUID, timingSafeEqual } from 'node:crypto';
 import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
 import { isSafeWebhookUrl } from '../utils/ssrf-guard';
 
+/**
+ * DI token for the optional `WebhookHttpClient` override. Tests and the
+ * Trigger.dev runtime can bind a custom client; production wiring leaves
+ * the token unbound and the service falls back to global `fetch`.
+ */
+export const WEBHOOK_HTTP_CLIENT = Symbol.for('WebhookHttpClient');
+
 export interface WebhookHeaders {
     readonly 'Content-Type': 'application/json; charset=utf-8';
     readonly 'X-Hub-Signature-256': string;
@@ -75,17 +82,26 @@ export class FetchWebhookHttpClient implements WebhookHttpClient {
 
 const DEFAULT_TIMEOUT_MS = 10_000;
 const SIGNATURE_HEADER = 'X-Hub-Signature-256';
-export const WEBHOOK_HTTP_CLIENT = Symbol.for('WebhookHttpClient');
 
 @Injectable()
 export class WebhookDeliveryService {
     private readonly logger = new Logger(WebhookDeliveryService.name);
+    private readonly httpClient: WebhookHttpClient;
 
     constructor(
         @Optional()
         @Inject(WEBHOOK_HTTP_CLIENT)
-        private readonly httpClient: WebhookHttpClient = new FetchWebhookHttpClient(),
-    ) {}
+        httpClient?: WebhookHttpClient,
+    ) {
+        // Default value lives in the body — NOT the parameter signature —
+        // because NestJS resolves constructor params via emitted decorator
+        // metadata. With an interface-typed parameter (no class to inject),
+        // a default-in-signature still triggers `Nest can't resolve
+        // dependencies of WebhookDeliveryService (?)` even when @Optional()
+        // is present. Keeping the parameter optional and applying the
+        // fallback inside the body sidesteps that resolution path.
+        this.httpClient = httpClient ?? new FetchWebhookHttpClient();
+    }
 
     /**
      * Build a signed delivery without sending it. Useful for tests and for
