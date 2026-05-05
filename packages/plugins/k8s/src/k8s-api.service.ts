@@ -5,6 +5,7 @@
  * Real cluster I/O is delegated to the official client; we never construct
  * raw HTTP requests ourselves.
  */
+import { createRequire } from 'node:module';
 import type { IngressClassDescriptor, KubernetesClusterInfo } from './types.js';
 import type { ParsedKubeconfig } from './kubeconfig.parser.js';
 import type { DeploymentStatusInput } from './status.mapper.js';
@@ -41,6 +42,11 @@ interface NetworkingV1ApiLike {
 	readNamespacedIngress(args: { name: string; namespace: string }): Promise<{
 		metadata?: { name?: string };
 		spec?: unknown;
+		status?: {
+			loadBalancer?: {
+				ingress?: Array<{ hostname?: string; ip?: string }>;
+			};
+		};
 	}>;
 	patchNamespacedIngress(args: {
 		name: string;
@@ -103,42 +109,53 @@ export interface KubernetesClientFactory {
 }
 
 /**
- * Default factory using the real `@kubernetes/client-node`. Loaded with
- * dynamic import so this module is fast to import even when only the
- * pure parts (parser, renderer) are needed.
+ * Default factory using the real `@kubernetes/client-node`.
+ *
+ * The package ships as `"type": "module"` and tsup emits an ESM bundle, so
+ * synchronous `require()` is **not available** at runtime in the ESM path.
+ * Using `createRequire(import.meta.url)` here gives us the same lazy-load
+ * behaviour as `require()` while staying ESM-safe. This avoids paying
+ * `@kubernetes/client-node`'s parse cost in unit tests that mock the whole
+ * factory.
+ *
+ * Calls are wrapped in a single cached load so we don't re-resolve the
+ * module on every API client request.
  */
+const k8sClientLoader = (() => {
+	let cached: typeof import('@kubernetes/client-node') | null = null;
+	return (): typeof import('@kubernetes/client-node') => {
+		if (cached) return cached;
+		const _require = createRequire(import.meta.url);
+		cached = _require('@kubernetes/client-node') as typeof import('@kubernetes/client-node');
+		return cached;
+	};
+})();
+
 export const defaultClientFactory: KubernetesClientFactory = {
 	createKubeConfig(yamlContent: string, contextOverride?: string) {
-		// Lazy require avoids paying client-node's load cost in unit tests
-		// that mock the factory entirely.
-		// eslint-disable-next-line @typescript-eslint/no-var-requires
-		const k8s = require('@kubernetes/client-node');
+		const k8s = k8sClientLoader();
 		const kc = new k8s.KubeConfig();
 		kc.loadFromString(yamlContent);
 		if (contextOverride) {
 			kc.setCurrentContext(contextOverride);
 		}
-		return kc;
+		return kc as unknown as KubernetesApiClientLike;
 	},
 	versionApi(client) {
-		// eslint-disable-next-line @typescript-eslint/no-var-requires
-		const k8s = require('@kubernetes/client-node');
-		return client.makeApiClient(k8s.VersionApi);
+		const k8s = k8sClientLoader();
+		return client.makeApiClient(k8s.VersionApi as never);
 	},
 	networkingV1Api(client) {
-		// eslint-disable-next-line @typescript-eslint/no-var-requires
-		const k8s = require('@kubernetes/client-node');
-		return client.makeApiClient(k8s.NetworkingV1Api);
+		const k8s = k8sClientLoader();
+		return client.makeApiClient(k8s.NetworkingV1Api as never);
 	},
 	appsV1Api(client) {
-		// eslint-disable-next-line @typescript-eslint/no-var-requires
-		const k8s = require('@kubernetes/client-node');
-		return client.makeApiClient(k8s.AppsV1Api);
+		const k8s = k8sClientLoader();
+		return client.makeApiClient(k8s.AppsV1Api as never);
 	},
 	coreV1Api(client) {
-		// eslint-disable-next-line @typescript-eslint/no-var-requires
-		const k8s = require('@kubernetes/client-node');
-		return client.makeApiClient(k8s.CoreV1Api);
+		const k8s = k8sClientLoader();
+		return client.makeApiClient(k8s.CoreV1Api as never);
 	}
 };
 
@@ -294,6 +311,47 @@ export class KubernetesApiService {
 		});
 	}
 
+	/**
+	 * Idempotently create a namespace if it doesn't already exist. Apply
+	 * helpers (`applyDeployment`, `applyService`, `applyIngress`) target a
+	 * specific namespace and will 404 against a fresh cluster, so callers
+	 * should run this first.
+	 */
+	async ensureNamespace(kubeconfigYaml: string, namespace: string, contextOverride?: string): Promise<void> {
+		if (!namespace) return;
+		const client = this.factory.createKubeConfig(kubeconfigYaml, contextOverride);
+		const core = this.factory.coreV1Api(client);
+		try {
+			await core.readNamespace({ name: namespace });
+			return;
+		} catch (err) {
+			if (!isNotFound(err)) {
+				const scrubbed = scrubError(err);
+				throw new K8sPluginError(scrubbed.code, scrubbed.message, err);
+			}
+		}
+		try {
+			await core.createNamespace({
+				body: {
+					apiVersion: 'v1',
+					kind: 'Namespace',
+					metadata: {
+						name: namespace,
+						labels: {
+							'ever-works.io/managed': 'true',
+							'app.kubernetes.io/managed-by': FIELD_MANAGER
+						}
+					}
+				}
+			});
+		} catch (err) {
+			// 409 (already-exists) is fine — the readNamespace race lost.
+			if (isAlreadyExists(err)) return;
+			const scrubbed = scrubError(err);
+			throw new K8sPluginError(scrubbed.code, scrubbed.message, err);
+		}
+	}
+
 	async applyIngress(
 		kubeconfigYaml: string,
 		manifest: Record<string, unknown>,
@@ -333,7 +391,11 @@ export class KubernetesApiService {
 		namespace: string,
 		name: string,
 		contextOverride?: string
-	): Promise<{ metadata?: { name?: string }; spec?: unknown } | null> {
+	): Promise<{
+		metadata?: { name?: string };
+		spec?: unknown;
+		status?: { loadBalancer?: { ingress?: Array<{ hostname?: string; ip?: string }> } };
+	} | null> {
 		const client = this.factory.createKubeConfig(kubeconfigYaml, contextOverride);
 		const net = this.factory.networkingV1Api(client);
 		try {
@@ -344,12 +406,42 @@ export class KubernetesApiService {
 			throw new K8sPluginError(scrubbed.code, scrubbed.message, err);
 		}
 	}
+
+	/**
+	 * Read the cluster-side ingress load-balancer host/IP for a work's
+	 * Ingress, used as the expected DNS target when verifying custom
+	 * domains. Returns null when:
+	 *   - the Ingress doesn't exist yet (no `ingressHost` configured),
+	 *   - the cluster hasn't assigned a LoadBalancer address yet
+	 *     (ingress controller still spinning up).
+	 *
+	 * Without a target, `verifyDomain` falls back to "any A/CNAME exists"
+	 * which is a false-positive trap — see [`domain.handler.spec.ts`].
+	 */
+	async getIngressLoadBalancerHost(
+		kubeconfigYaml: string,
+		namespace: string,
+		name: string,
+		contextOverride?: string
+	): Promise<string | null> {
+		const ingress = await this.readIngress(kubeconfigYaml, namespace, name, contextOverride);
+		const lb = ingress?.status?.loadBalancer?.ingress?.[0];
+		return lb?.hostname?.toLowerCase() || lb?.ip || null;
+	}
 }
 
 function isNotFound(err: unknown): boolean {
+	return isStatusCode(err, 404);
+}
+
+function isAlreadyExists(err: unknown): boolean {
+	return isStatusCode(err, 409);
+}
+
+function isStatusCode(err: unknown, code: number): boolean {
 	if (err && typeof err === 'object') {
 		const e = err as { statusCode?: number; code?: number; response?: { statusCode?: number } };
-		return e.statusCode === 404 || e.code === 404 || e.response?.statusCode === 404;
+		return e.statusCode === code || e.code === code || e.response?.statusCode === code;
 	}
 	return false;
 }

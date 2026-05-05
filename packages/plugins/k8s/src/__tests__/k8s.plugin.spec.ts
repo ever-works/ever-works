@@ -69,10 +69,13 @@ function makeMockApi(overrides: Partial<KubernetesApiService> = {}): KubernetesA
 		applyService: vi.fn(async () => undefined),
 		applyIngress: vi.fn(async () => undefined),
 		applyImagePullSecret: vi.fn(async () => undefined),
+		ensureNamespace: vi.fn(async () => undefined),
 		readIngress: vi.fn(async () => ({
 			metadata: { name: 'my-site' },
-			spec: { ingressClassName: 'nginx', rules: [], tls: [] }
+			spec: { ingressClassName: 'nginx', rules: [], tls: [] },
+			status: { loadBalancer: { ingress: [{ hostname: 'lb.cluster.example.com' }] } }
 		})),
+		getIngressLoadBalancerHost: vi.fn(async () => 'lb.cluster.example.com'),
 		getServerVersion: vi.fn(async () => 'v1.30.4'),
 		...overrides
 	};

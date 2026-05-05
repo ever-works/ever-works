@@ -353,6 +353,11 @@ export class KubernetesPlugin implements IPlugin, IDeploymentPlugin {
 		let pullSecretName: string | undefined;
 
 		try {
+			// Idempotently ensure the namespace exists. Without this, the
+			// SSA patches below 404 against a fresh cluster (e.g. the
+			// default `ever-works` namespace on a brand-new EKS cluster).
+			await this.api.ensureNamespace(kubeconfig, namespace, settings.kubeContext);
+
 			if (pullCreds) {
 				const password = registry.kind === 'github' ? (opts.githubReadPackagesToken ?? '') : pullCreds.password;
 				if (registry.kind === 'github' && !password) {
@@ -485,10 +490,23 @@ export class KubernetesPlugin implements IPlugin, IDeploymentPlugin {
 		const ingress = await this.api.readIngress(kubeconfig, namespace, name, settings.kubeContext);
 		if (!ingress?.spec) return [];
 		const spec = ingress.spec as { rules?: Array<{ host?: string }> };
+		const lbHost =
+			ingress.status?.loadBalancer?.ingress?.[0]?.hostname?.toLowerCase() ||
+			ingress.status?.loadBalancer?.ingress?.[0]?.ip ||
+			undefined;
+		// Listing domains does not perform live DNS — that's `verifyDomain`'s
+		// job. Returning `verified: false` here matches `addDomain` and lets
+		// the UI show "pending verification" for hosts the user hasn't
+		// explicitly verified yet. (Previously this returned
+		// `verified: true` blindly, masking misconfigured DNS.)
 		return (spec.rules ?? [])
 			.map((r) => r.host)
 			.filter((h): h is string => Boolean(h))
-			.map((host) => ({ name: host, verified: true }));
+			.map((host) => ({
+				name: host,
+				verified: false,
+				verification: buildDnsGuidance(host, lbHost)
+			}));
 	}
 
 	async addDomain(projectId: string, domain: string, kubeconfig: string): Promise<AddDomainResult> {
@@ -547,8 +565,37 @@ export class KubernetesPlugin implements IPlugin, IDeploymentPlugin {
 		return true;
 	}
 
-	async verifyDomain(_projectId: string, domain: string, _kubeconfig: string): Promise<DeploymentDomain> {
-		return verifyDomainResolution(domain, undefined, this.dnsResolver);
+	async verifyDomain(projectId: string, domain: string, kubeconfig: string): Promise<DeploymentDomain> {
+		const settings = await this.loadSettings();
+		const { namespace, name } = parseDeploymentId(projectId);
+		// Resolve the cluster's actual ingress LB host/IP. Without this, any
+		// domain with any DNS record was returned `verified: true` —
+		// including domains pointing at a completely unrelated server.
+		// Passing the LB target makes the resolver assert "domain points
+		// HERE", not just "domain points somewhere".
+		let expectedTarget: string | undefined;
+		try {
+			expectedTarget =
+				(await this.api.getIngressLoadBalancerHost(kubeconfig, namespace, name, settings.kubeContext)) ??
+				undefined;
+		} catch {
+			// Cluster unreachable mid-verify — fall through with no target.
+			// Returning `verified: false` + DNS guidance is the right
+			// behaviour: we can't confirm, so don't claim success.
+			expectedTarget = undefined;
+		}
+		const result = await verifyDomainResolution(domain, expectedTarget, this.dnsResolver);
+		// If we couldn't resolve a target at all (LB pending, ingress not
+		// applied yet), force `verified: false` — `verifyDomainResolution`
+		// would otherwise return true on "any record exists".
+		if (!expectedTarget) {
+			return {
+				name: result.name,
+				verified: false,
+				verification: result.verification ?? buildDnsGuidance(domain)
+			};
+		}
+		return result;
 	}
 
 	// Optional contract methods for the deploy service ----------------------

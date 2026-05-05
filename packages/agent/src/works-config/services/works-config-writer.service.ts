@@ -71,8 +71,24 @@ export class WorksConfigWriterService {
             workValue: options.work.deployProvider,
         });
 
+        // The works-config parser accepts both `deployProvider` (camelCase)
+        // and `deploy_provider` (snake_case). When the caller explicitly
+        // clears the field (request.deployProvider === null), strip BOTH
+        // forms — otherwise the snake_case key from `existingRaw` survives
+        // the spread and the parser silently re-applies the old value on
+        // the next sync.
+        const baseRaw = { ...existingRaw };
+        if (request.deployProvider === null) {
+            delete baseRaw.deployProvider;
+            delete baseRaw.deploy_provider;
+        } else if (deployProvider !== undefined) {
+            // Canonicalise on the camelCase key — drop the snake_case alias
+            // so we don't end up with both at once.
+            delete baseRaw.deploy_provider;
+        }
+
         return this.withoutUndefined({
-            ...existingRaw,
+            ...baseRaw,
             name: request.name || imported?.name || options.work.name,
             initial_prompt: initialPrompt,
             model,
