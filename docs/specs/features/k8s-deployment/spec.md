@@ -27,7 +27,10 @@ Two adjacent changes ship as part of this feature so the new plugin doesn't land
 
 - **Given** I am signed in and visit `/en/settings/plugins/deployment`, **when** the page loads, **then** I see both **Vercel** and **Kubernetes** as available deployment providers, with the Kubernetes card showing a "Not configured" state.
 - **Given** I open the Kubernetes plugin settings, **when** I paste a valid `kubeconfig` YAML and click **Save & verify**, **then** the platform validates the kubeconfig against the cluster API, marks the plugin as configured, and shows the cluster name, server URL, Kubernetes server version, **and the ingress controllers it detected** (e.g. "nginx, traefik").
-- **Given** I am configuring the Kubernetes plugin, **when** I do not change the **Registry** field, **then** the registry defaults to **GitHub Container Registry** (`ghcr.io/<my-github-owner>`) because the platform already holds my GitHub credentials, and the cluster pull secret is provisioned automatically.
+- **Given** I am configuring the Kubernetes plugin, **when** I do not change the **Registry** field, **then** the registry defaults to **GitHub Container Registry** (`ghcr.io/<my-github-owner>`) because the platform already holds my GitHub credentials.
+- **Given** my work's website repo is **public**, **when** I deploy via GHCR with the default registry settings, **then** the resulting GHCR image is **public**, no `imagePullSecret` is provisioned, and the Deployment has no `imagePullSecrets`.
+- **Given** my work's website repo is **private**, **when** I deploy via GHCR with the default registry settings, **then** the resulting GHCR image is **private**, an `imagePullSecret` is provisioned in the target namespace using a GHCR read token from the GitHub plugin, and the Deployment references it.
+- **Given** I want to override visibility, **when** I set the registry's `visibility` field to `public` or `private` in the plugin form, **then** that explicit choice wins over the website-repo-derived default for all subsequent deploys.
 - **Given** I have a configured Kubernetes plugin, **when** I open `/en/plugins`, **then** the **Kubernetes** entry appears under **Deployment** with status "Configured" and a working **Settings** link.
 - **Given** my work is set to `deployProvider = 'k8s'` (either via the dashboard or in `works.yml`), **when** I deploy it, **then** the platform builds a container image of the website, pushes it to the configured registry (GHCR by default), applies a Deployment, Service and (optional) Ingress to the configured namespace, and reports the resulting URL back through the standard deploy facade.
 - **Given** my work's `works.yml` declares `deployProvider: k8s`, **when** I import or sync the work, **then** the platform sets `work.deployProvider = 'k8s'` accordingly. The same behaviour applies to `deployProvider: vercel` and to any future provider IDs registered through the deploy capability.
@@ -69,6 +72,11 @@ Two adjacent changes ship as part of this feature so the new plugin doesn't land
 - **FR-17** The works-config layer MUST recognise an optional `deployProvider` field in `works.yml`. Importing or syncing a work whose config carries `deployProvider: <id>` MUST set `work.deployProvider` accordingly, validated against `DeployFacadeService.getAvailableProviders()`. This applies to **all** deploy providers (k8s, vercel, future) — there are no hardcoded provider ids in the works-config layer.
 - **FR-18** When the work also has a dashboard-set `deployProvider`, the works-config value MUST take precedence on sync so the data repo remains the source of truth (Constitution Principle III). A conflict event MUST be written to the activity log when the two disagree at sync time.
 - **FR-19** Adding `deployProvider` support to the works-config layer MUST be a single change reused by Vercel and Kubernetes — no plugin-specific branches.
+- **FR-20** When the registry kind is `github`, the image's default visibility MUST mirror the visibility of the work's website repository (public website repo → public image; private website repo → private image). The user MAY override the default to either `public` or `private` in the registry sub-form. The platform MUST read the website repo's visibility through the existing GitHub plugin (no new GitHub-API calls outside the plugin).
+- **FR-21** When a private image is required, the platform MUST provision an `imagePullSecret` in the target namespace and reference it from the `Deployment.spec.template.spec.imagePullSecrets`. When the image is public, no pull secret is created and the Deployment carries no `imagePullSecrets`.
+- **FR-22** Plugin settings (kubeconfig, registry config, namespace, ingress preferences, replicas) MUST be persisted in the existing `plugin_settings` store with `x-scope: 'user'`, exactly like the Vercel plugin's `apiToken`. There is no separate Kubernetes-specific persistence layer.
+- **FR-23** Each user/tenant MAY configure **at most one Kubernetes cluster** through the plugin. All works owned by that user that have `deployProvider = 'k8s'` deploy to the same cluster, into namespaces derived from the plugin's `namespace` setting (default `ever-works`). Per-work cluster overrides are explicitly out of scope for v1.
+- **FR-24** Ingress detection MUST run on every save (no per-cluster caching in v1) so the user always sees the live state of the cluster. If profiling shows `validateConnection` exceeding the §4 P95 budget of 3 s, a per-`(userId, clusterFingerprint)` cache MAY be added in a follow-up — but it is not required for v1.
 
 ## 4. Non-Functional Requirements
 
@@ -85,7 +93,7 @@ Two adjacent changes ship as part of this feature so the new plugin doesn't land
 | `KubernetesPlugin` | The plugin class implementing `IPlugin` + `IDeploymentPlugin` for `id = 'k8s'`. |
 | `kubeconfig` | The standard YAML file holding cluster, user, and context entries; stored as a single secret string in plugin settings. |
 | `KubernetesSettings` | Plugin settings shape: `{ kubeconfig, namespace, kubeContext?, registry, ingressClass?, ingressHost?, tlsIssuer?, replicas? }`. |
-| `RegistryConfig` | Discriminated union — `{ kind: 'github', owner?, visibility? } \| { kind: 'dockerhub', username, password } \| { kind: 'generic', server, username, password }`. The plugin's deploy code knows only the abstraction. |
+| `RegistryConfig` | Discriminated union — `{ kind: 'github', owner?, visibility?: 'auto' \| 'public' \| 'private' } \| { kind: 'dockerhub', username, password } \| { kind: 'generic', server, username, password }`. The plugin's deploy code knows only the abstraction. `visibility` defaults to `'auto'` which mirrors the website repo's visibility (per FR-20). |
 | `RegistryProvider` | Strategy that maps a `RegistryConfig` to (a) the image reference base (`ghcr.io/<owner>`, `docker.io/<user>`, …) and (b) the `docker login` / pull-secret credentials at deploy time. |
 | `IngressStrategy` | Strategy that takes manifest inputs and emits Ingress annotations specific to a controller (nginx, traefik, generic). Registered in a controller→strategy map. |
 | `IngressClassDescriptor` | What `validateConnection` reports per detected class: `{ name, controller, hasStrategy: boolean }`. |
@@ -113,7 +121,9 @@ Two adjacent changes ship as part of this feature so the new plugin doesn't land
 - [ ] **Discovery**: a user opening `/en/settings/plugins/deployment` sees both Vercel and Kubernetes; opening `/en/plugins` shows Kubernetes under Deployment.
 - [ ] **Configure & verify**: pasting a valid kubeconfig (against any reachable cluster, e.g. kind, k3d, EKS) shows cluster name, server URL, server version, and the list of detected ingress controllers on save.
 - [ ] **Configure & reject**: an invalid kubeconfig produces a specific, non-stack-trace error and does not mark the plugin as configured.
-- [ ] **GHCR default**: with GitHub already connected, leaving the registry field at default deploys an image to `ghcr.io/<owner>/<work-slug>:<sha>` and provisions a pull secret in the namespace without further input.
+- [ ] **GHCR default**: with GitHub already connected, leaving the registry field at default deploys an image to `ghcr.io/<owner>/<work-slug>:<sha>`. The image visibility (and whether an `imagePullSecret` is provisioned) follows the website repo's visibility.
+- [ ] **GHCR visibility override**: setting `registry.visibility = 'private'` on a public-website work produces a private image with a pull secret; setting `'public'` on a private-website work produces a public image with no pull secret.
+- [ ] **One cluster per user**: a user with two works that both have `deployProvider = 'k8s'` deploys both to the same cluster (the user's stored kubeconfig). Per-work cluster choice is not exposed.
 - [ ] **Registry switch**: switching the registry kind to Docker Hub or generic uses the supplied credentials end-to-end with no GHCR fallback.
 - [ ] **Ingress detection**: clusters with nginx and Traefik installed list both in the dropdown; selecting Traefik produces a Traefik-annotated Ingress; selecting an unknown class falls back to the generic strategy.
 - [ ] **Deploy**: a work with `deployProvider = 'k8s'` builds an image, pushes it, applies a Deployment + Service (+ Ingress if `ingressHost` set), and reaches `ready` once rollout completes.
@@ -127,17 +137,16 @@ Two adjacent changes ship as part of this feature so the new plugin doesn't land
 
 ## 8. Open Questions
 
-All four prior questions have been resolved by product input and are recorded here as decisions:
+All prior questions have been resolved by product input and are recorded here as decisions:
 
 - **D1 — Image build location**: build runs in a **GitHub Actions** workflow inside the user's website-template fork (mirrors Vercel). No Trigger.dev / Ever-Works compute is used. (FR-6.)
 - **D2 — Default registry**: **GitHub Container Registry** (`ghcr.io/<owner>/<work-slug>`) is the zero-config default, reusing the user's connected GitHub account. The registry is pluggable; Docker Hub and a generic kind ship in v1, cloud-provider registries are post-v1. No platform-hosted registry. (FR-13, FR-14.)
-- **D3 — Ingress detection**: `validateConnection()` actively probes `IngressClass` resources and reports them in the response. Strategies for `nginx` and `traefik` ship in v1, with a generic fallback for unknown controllers and a strategy-registry for adding more over time. (FR-15, FR-16.)
+- **D3 — Ingress detection**: `validateConnection()` actively probes `IngressClass` resources and reports them in the response on every save. Strategies for `nginx` and `traefik` ship in v1, with a generic fallback for unknown controllers and a strategy-registry for adding more over time. No caching in v1 (cluster round-trip is fast); a per-`(userId, clusterFingerprint)` cache is a follow-up if needed. (FR-15, FR-16, FR-24.)
 - **D4 — Provider visibility & works-config**: the plugin's `visibility` is `'user-only'` (matches Vercel). Independently of visibility, both the dashboard **and** `works.yml` can set `deployProvider`; the works-config layer is extended generically so this works for k8s, Vercel, and any future deploy plugin. (FR-17, FR-18, FR-19.)
+- **D5 — GHCR image visibility**: defaults to **mirror the website repo's visibility** — public repo → public image (no pull secret); private repo → private image (pull secret provisioned). The user can override by setting the registry sub-form's `visibility` field explicitly. The platform reads the website repo's visibility through the existing GitHub plugin. (FR-20, FR-21.)
+- **D6 — Cluster scope**: **one cluster per user/tenant**. Plugin settings live in the existing `plugin_settings` store with `x-scope: 'user'` (same shape as Vercel's `apiToken`). Per-work cluster overrides are out of scope. (FR-22, FR-23.)
 
-Newly opened questions (none blocking):
-
-- `[NEEDS CLARIFICATION: when GHCR is selected and the user's GitHub account is connected via OAuth (not PAT), do we mint a fine-grained PAT on their behalf for the cluster pull-secret, or push public images by default?]`
-- `[NEEDS CLARIFICATION: should ingress detection cache results per-cluster on the platform side to avoid round-tripping every time the deployment settings page loads?]`
+No open questions remain at the time of writing. New questions surfaced during implementation should be appended below with the `[NEEDS CLARIFICATION: …]` marker so they can be grepped before merge.
 
 ## 9. Constitution Gates
 

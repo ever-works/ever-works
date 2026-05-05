@@ -96,9 +96,14 @@ export interface KubernetesSettings {
 }
 
 export type RegistryConfig =
-  | { kind: 'github'; owner?: string; visibility?: 'public' | 'private' }
+  | { kind: 'github'; owner?: string; visibility?: 'auto' | 'public' | 'private' }
   | { kind: 'dockerhub'; username: string; password: string }
   | { kind: 'generic'; server: string; username: string; password: string };
+
+// Resolved visibility used at deploy time when the user picks `auto`:
+//   - read work.websiteRepoVisibility via the GitHub plugin
+//   - public repo  → 'public'
+//   - private repo → 'private'
 
 export interface KubernetesClusterInfo {
   clusterName: string;
@@ -240,7 +245,13 @@ Notably **no `defaultForCapabilities`** — Vercel keeps that role; users opt in
           properties: {
             kind:       { const: 'github' },
             owner:      { type: 'string', title: 'GitHub owner', description: 'Defaults to your connected GitHub account.' },
-            visibility: { type: 'string', enum: ['public', 'private'], default: 'private' }
+            visibility: {
+              type: 'string',
+              enum: ['auto', 'public', 'private'],
+              default: 'auto',
+              title: 'Image visibility',
+              description: 'auto = match the website repo (public repo → public image, private repo → private image).'
+            }
           }
         },
         {
@@ -368,9 +379,22 @@ This is the cleanest extension: zero hardcoded plugin ids in the deploy service,
 When `registry.kind = 'github'`, the k8s plugin reads the user's GitHub identity from the GitHub plugin's already-stored OAuth/PAT to:
 
 1. Resolve the default `owner` (their GitHub login or selected org).
-2. Mint or reuse a token scoped for `read:packages` to populate the cluster pull-secret.
+2. Resolve the **effective image visibility** when the user leaves `visibility = 'auto'`:
+   - Call the existing GitHub plugin method `getRepository(owner, repo, token)` (defined in [`packages/plugins/github/src/github.plugin.ts:116`](../../../../packages/plugins/github/src/github.plugin.ts) and returning `{ isPrivate: boolean, ... }`).
+   - `isPrivate === false` → public image (no pull secret); `isPrivate === true` → private image (pull secret).
+3. **Only when a private image is needed**, mint or reuse a token scoped for `read:packages` to populate the cluster `imagePullSecret`. Public images need no pull secret at all, so this step is skipped — closing FR-21.
 
 The interaction goes through `PluginContext.getService('github')` (existing pattern) — the k8s plugin does NOT import `@ever-works/github-plugin` directly. If the GitHub plugin is not loaded or not authenticated, `validateConnection` returns `success: false` with a "connect GitHub first" message and a `setupLink` to the GitHub plugin (FR-14).
+
+### Cluster scope (one per user/tenant)
+
+Plugin settings live in the existing `plugin_settings` row keyed by `(pluginId='k8s', userId)` with `x-scope: 'user'` — identical to Vercel's `apiToken` storage. There is no separate `kubernetes_clusters` table, no per-work cluster column, and no per-namespace overrides. All works owned by a user that have `deployProvider = 'k8s'` deploy to the same cluster, into namespaces derived from the plugin's `namespace` setting.
+
+If a future requirement emerges for "different clusters per work", it would be additive: a new `cluster?` field on the work plus a `KubernetesClusterRef` table, behind a feature flag. **Not in v1 scope** (FR-23, decision D6).
+
+### Ingress detection caching
+
+`validateConnection()` lists `IngressClass` resources on every call (FR-24, decision D3). The K8s API list call is fast on healthy clusters (single round-trip, small payload). If profiling at the §4 P95 budget shows it exceeds 3 s, the follow-up is a small per-`(userId, clusterFingerprint)` in-memory cache with a 60 s TTL inside `KubernetesApiService`. Not implemented in v1.
 
 ### Works-config plumbing
 

@@ -54,10 +54,13 @@ You can deploy to any OCI-compatible registry. Three kinds ship today:
 
 ### GitHub Container Registry (default)
 
-If you've already connected your GitHub account (most users have, since GitHub is also the default git provider), the plugin pushes images to `ghcr.io/<your-github-owner>/<work-slug>` automatically. The deploy workflow authenticates to GHCR with the workflow's built-in `GITHUB_TOKEN`; the cluster pull-secret reuses a fine-grained read token from your GitHub plugin settings.
+If you've already connected your GitHub account (most users have, since GitHub is also the default git provider), the plugin pushes images to `ghcr.io/<your-github-owner>/<work-slug>` automatically. The deploy workflow authenticates to GHCR with the workflow's built-in `GITHUB_TOKEN`.
 
 - **Owner**: defaults to your GitHub login. Override with an org you have package-write access to.
-- **Visibility**: defaults to **private**. Set to **public** if your image should be pulled without auth.
+- **Visibility**: defaults to **`auto`** — the image's visibility mirrors your website repository:
+    - **Public website repo** → public image. No pull secret needed in your cluster; the Deployment has no `imagePullSecrets`.
+    - **Private website repo** → private image. Ever Works provisions an `imagePullSecret` in the target namespace using a fine-grained `read:packages` token from your GitHub plugin settings.
+    - You can override this by setting `visibility` to `public` or `private` explicitly.
 
 If GitHub isn't connected, Ever Works tells you to connect it first and links you to the GitHub plugin's OAuth flow.
 
@@ -153,6 +156,7 @@ If a work was deployed to Vercel and you switch it to Kubernetes (or vice-versa)
 
 ## Limits and out-of-scope (v1)
 
+- **One cluster per user.** All your works that target Kubernetes deploy to the same cluster (the kubeconfig you save in plugin settings). Per-work cluster overrides are not supported in v1; ask if you need them.
 - **Single cluster per work.** Multi-cluster failover is not in v1.
 - **Stateless only.** No databases or stateful workloads — the website is stateless.
 - **No Helm/Kustomize input.** The plugin renders its own manifests; if you need custom manifests, edit the website template's `k8s/` folder.

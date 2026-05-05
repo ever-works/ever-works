@@ -114,8 +114,13 @@
 - [ ] **T9c**. `registries/github.provider.ts`:
     - `imageBase({ kind: 'github', owner })` → `ghcr.io/<owner>` (owner falls back to `ctx.githubOwner`).
     - `workflowLogin` → `docker login ghcr.io -u $GITHUB_ACTOR --password-stdin` using `GITHUB_TOKEN`.
-    - `pullSecret` → uses a stored GitHub token (read via `PluginContext.getService('github')`); if unavailable, returns `null` and the deploy fails fast with a clear message.
-    - **Test**: `__tests__/registries/github.provider.spec.ts` — assertions on the returned image base, login step, and pull-secret payload (mocked GitHub plugin context).
+    - `resolveVisibility(config, ctx)` → if `config.visibility === 'auto'` (default) call `ctx.githubService.getRepository(owner, websiteRepo, token)` (signature already exists at [`packages/plugins/github/src/github.plugin.ts:116`](../../../../packages/plugins/github/src/github.plugin.ts)) and return `'public'` or `'private'` based on `isPrivate`. If `'public'` or `'private'` is set explicitly, return it as-is.
+    - `pullSecret(config, ctx)` → returns `null` when resolved visibility is `'public'`. Otherwise uses a stored GitHub token (read via `PluginContext.getService('github')`) scoped for `read:packages`; if unavailable, returns an error and the deploy fails fast with a clear message.
+    - **Test**: `__tests__/registries/github.provider.spec.ts` — assertions on the returned image base, login step, and pull-secret payload, plus visibility-resolution matrix:
+        - `visibility: 'auto'` × public website repo → no pull secret.
+        - `visibility: 'auto'` × private website repo → pull secret with `read:packages` token.
+        - `visibility: 'public'` × private website repo → no pull secret (explicit override wins).
+        - `visibility: 'private'` × public website repo → pull secret (explicit override wins).
 - [ ] **T9d**. `registries/dockerhub.provider.ts`.
     - **Test**: `__tests__/registries/dockerhub.provider.spec.ts`.
 - [ ] **T9e**. `registries/generic.provider.ts`.
@@ -316,6 +321,11 @@
 | FR-17 (works-config field) | `works-config.service.spec.ts`, `works-config-import-applier.service.spec.ts` | Parses `deployProvider`; applies it via lifecycle service; rejects unknown ids. |
 | FR-18 (data-repo wins) | `works-config-sync.listener.spec.ts` (or applier spec) | Conflict event emitted; data repo value applied. |
 | FR-19 (provider-agnostic plumbing) | works-config tests, `deploy.service.spec.ts` | Vercel and k8s both pass through the same code path with no plugin-specific branches. |
+| FR-20 (visibility mirrors website repo) | `registries/github.provider.spec.ts`, `deploy-k8s.e2e-spec.ts` | `auto` resolves to public/private based on `isPrivate`; both branches covered. |
+| FR-21 (pull secret iff private) | `registries/github.provider.spec.ts`, `manifest.renderer.spec.ts` | Public → Deployment has no `imagePullSecrets`; private → Deployment references the secret. |
+| FR-22 (settings persistence) | `k8s.plugin.metadata.spec.ts`, manual: `GET /api/plugins/k8s/settings` returns no secrets | Settings live in `plugin_settings` (no new table). |
+| FR-23 (one cluster per user) | `k8s.plugin.deploy.spec.ts` | Two works, same user, both use the same kubeconfig from plugin settings. |
+| FR-24 (no caching in v1) | `k8s-api.service.spec.ts` | `listIngressClasses` is called on every `validateConnection` invocation. |
 | Capability contract additive | `deployment.interface.spec.ts`, `vercel.plugin.deployment-secrets.spec.ts`, `k8s.plugin.deployment-secrets.spec.ts` | Existing plugins without the new optional methods still type-check and run. |
 
 ### Test infrastructure
