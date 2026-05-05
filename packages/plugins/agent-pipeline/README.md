@@ -10,7 +10,7 @@ Autonomous tool-based pipeline that researches and generates Work items using an
 | Category     | `pipeline`                         |
 | Capabilities | `pipeline`, `form-schema-provider` |
 | Author       | Ever Works Team                    |
-| License      | AGPL-3.0                                |
+| License      | AGPL-3.0                           |
 | Built-in     | yes                                |
 | Auto-enable  | yes                                |
 
