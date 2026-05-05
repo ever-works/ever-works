@@ -7,6 +7,20 @@ import { redirect } from 'next/navigation';
 import { revalidatePath } from 'next/cache';
 import { getTranslations } from 'next-intl/server';
 
+function getResponseMessage(response: unknown): string | null {
+    if (
+        response &&
+        typeof response === 'object' &&
+        'message' in response &&
+        typeof response.message === 'string' &&
+        response.message.trim()
+    ) {
+        return response.message;
+    }
+
+    return null;
+}
+
 export async function addCustomTemplate(input: {
     kind: 'website' | 'work';
     repositoryUrl: string;
@@ -31,7 +45,10 @@ export async function addCustomTemplate(input: {
         return {
             success: response.status === 'success',
             template: response.template,
-            error: response.status === 'error' ? t('messages.addFailed') : null,
+            error:
+                response.status === 'error'
+                    ? getResponseMessage(response) || t('messages.addFailed')
+                    : null,
         };
     } catch (error) {
         console.error('Add custom template error:', error);
@@ -60,7 +77,10 @@ export async function setDefaultTemplate(input: { kind: 'website' | 'work'; temp
         return {
             success: response.status === 'success',
             defaultTemplateId: response.defaultTemplateId,
-            error: response.status === 'error' ? t('messages.defaultFailed') : null,
+            error:
+                response.status === 'error'
+                    ? getResponseMessage(response) || t('messages.defaultFailed')
+                    : null,
         };
     } catch (error) {
         console.error('Set default template error:', error);
@@ -96,7 +116,10 @@ export async function forkTemplate(input: {
             template: response.template ?? null,
             repository: response.repository ?? null,
             defaultTemplateId: response.defaultTemplateId ?? null,
-            error: response.status === 'error' ? t('messages.forkFailed') : null,
+            error:
+                response.status === 'error'
+                    ? getResponseMessage(response) || t('messages.forkFailed')
+                    : null,
         };
     } catch (error) {
         console.error('Fork template error:', error);

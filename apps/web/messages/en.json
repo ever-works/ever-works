@@ -2190,6 +2190,11 @@
                         "lastUpdated": "Last updated",
                         "lastChecked": "Last checked",
                         "lastError": "Last error",
+                        "inheritedState": "This work is inheriting your current default template.",
+                        "explicitState": "This work is pinned to an explicit template selection.",
+                        "originStandard": "Standard",
+                        "originForked": "Forked",
+                        "originCustomUrl": "Custom URL",
                         "updateSuccess": "Settings updated successfully",
                         "updateFailed": "Failed to update settings",
                         "githubRequired": "GitHub connection required. Please connect your GitHub account in Settings to enable automatic updates."
@@ -3016,6 +3021,7 @@
             },
             "messages": {
                 "repositoryUrlRequired": "GitHub repository URL is required.",
+                "repositoryUrlInvalid": "Enter a valid GitHub repository URL like https://github.com/owner/repository.",
                 "forkTargetRequired": "Choose a GitHub account or organization for the fork.",
                 "addSuccess": "Template saved from GitHub URL.",
                 "addFailed": "Failed to save template.",
@@ -3024,6 +3030,20 @@
                 "forkFailed": "Failed to fork template.",
                 "defaultUpdated": "Default template updated.",
                 "defaultFailed": "Failed to update default template."
+            }
+        },
+        "templateSelector": {
+            "origin": {
+                "standard": "Standard",
+                "forked": "Forked",
+                "customUrl": "Custom URL"
+            },
+            "state": {
+                "defaultBadge": "Inherited default",
+                "inheritedTitle": "Using default template",
+                "inheritedDescription": "This work will follow your current default template until you pin a specific one.",
+                "pinnedTitle": "Pinned template",
+                "pinnedDescription": "This work will keep using this template even if your default changes later."
             }
         },
         "workPlugins": {

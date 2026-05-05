@@ -24,6 +24,7 @@ import { DeployConfigDialog, type DeployConfigData } from './DeployConfigDialog'
 import { updateWebsiteSettings } from '@/app/actions/dashboard/works';
 import { formatDistanceToNow } from 'date-fns';
 import { WebsiteTemplateSelector } from '@/components/works/shared/WebsiteTemplateSelector';
+import { resolveWebsiteTemplateSelection } from '@/components/works/shared/WebsiteTemplateSelector';
 import {
     Dialog,
     DialogContent,
@@ -407,12 +408,15 @@ function WebsiteTemplateSettings({
     const lastUpdated = formatDate(work.websiteTemplateLastUpdatedAt);
     const lastChecked = formatDate(work.websiteTemplateLastCheckedAt);
     const hasError = Boolean(work.websiteTemplateLastError);
-    const selectedTemplate =
-        websiteTemplates.find((template) => template.id === selectedTemplateId) ||
-        websiteTemplates.find((template) => template.isDefault);
-    const currentTemplate =
-        websiteTemplates.find((template) => template.id === work.websiteTemplateId) ||
-        websiteTemplates.find((template) => template.isDefault);
+    const selectedTemplateState = resolveWebsiteTemplateSelection(
+        websiteTemplates,
+        selectedTemplateId,
+    );
+    const currentTemplateState = resolveWebsiteTemplateSelection(
+        websiteTemplates,
+        work.websiteTemplateId,
+    );
+    const currentTemplate = currentTemplateState.effectiveTemplate;
     const hasTemplateChange = selectedTemplateId !== (work.websiteTemplateId || '');
 
     const handleSwitchTemplate = () => {
@@ -536,6 +540,20 @@ function WebsiteTemplateSettings({
                             </p>
                             <p className="mt-1 text-sm text-text-secondary dark:text-text-secondary-dark">
                                 {currentTemplate?.description}
+                            </p>
+                            <p className="mt-2 text-xs text-text-muted dark:text-text-muted-dark">
+                                {currentTemplateState.isInheritedSelection
+                                    ? t('form.websiteTemplate.inheritedState')
+                                    : t('form.websiteTemplate.explicitState')}
+                                {currentTemplate
+                                    ? ` · ${
+                                          currentTemplate.originType === 'standard'
+                                              ? t('form.websiteTemplate.originStandard')
+                                              : currentTemplate.originType === 'forked'
+                                                ? t('form.websiteTemplate.originForked')
+                                                : t('form.websiteTemplate.originCustomUrl')
+                                      }`
+                                    : ''}
                             </p>
                         </div>
 

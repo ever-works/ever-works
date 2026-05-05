@@ -64,6 +64,8 @@ export interface WebsiteTemplateOption {
     name: string;
     description: string;
     isDefault: boolean;
+    sourceType: 'built_in' | 'custom';
+    originType: 'standard' | 'forked' | 'custom_url';
 }
 
 export interface CreateWorkDto {

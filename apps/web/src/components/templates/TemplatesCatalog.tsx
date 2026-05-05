@@ -65,6 +65,35 @@ const EMPTY_FORM: AddTemplateFormState = {
     branch: '',
 };
 
+function parseGitHubRepositoryUrl(input: string): { owner: string; repo: string } | null {
+    try {
+        const url = new URL(input);
+        if (!['https:', 'http:'].includes(url.protocol)) {
+            return null;
+        }
+
+        if (url.hostname.toLowerCase() !== 'github.com') {
+            return null;
+        }
+
+        const segments = url.pathname
+            .replace(/\.git$/, '')
+            .split('/')
+            .filter(Boolean);
+
+        if (segments.length < 2) {
+            return null;
+        }
+
+        return {
+            owner: segments[0],
+            repo: segments[1],
+        };
+    } catch {
+        return null;
+    }
+}
+
 function compareTemplates(a: TemplateCatalogItem, b: TemplateCatalogItem) {
     if (a.sourceType !== b.sourceType) {
         return a.sourceType === 'custom' ? -1 : 1;
@@ -426,6 +455,11 @@ export function TemplatesCatalog({
         const repositoryUrl = formState.repositoryUrl.trim();
         if (!repositoryUrl) {
             toast.error(t('messages.repositoryUrlRequired'));
+            return;
+        }
+
+        if (!parseGitHubRepositoryUrl(repositoryUrl)) {
+            toast.error(t('messages.repositoryUrlInvalid'));
             return;
         }
 

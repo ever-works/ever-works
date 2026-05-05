@@ -204,6 +204,8 @@ export class WorksController {
                 id: template.id,
                 name: template.name,
                 description: template.description,
+                sourceType: template.sourceType,
+                originType: template.originType,
                 isDefault:
                     template.isDefault ||
                     (!hasExplicitDefault && template.id === getDefaultWebsiteTemplateId()),
