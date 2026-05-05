@@ -128,4 +128,16 @@ export const config = {
     work: {
         staleTimeoutHours: () => parseInt(process.env.WORK_STALE_TIMEOUT_HOURS || '2', 10),
     },
+
+    features: {
+        /**
+         * Master switch for the agent zero-friction onboarding endpoint
+         * (`POST /api/register-work`) and the matching MCP tool. Default
+         * `true` once the feature reaches Phase 8 of its rollout; gate
+         * remains here so an operator can disable the public surface
+         * quickly via env var without redeploy.
+         */
+        zeroFrictionOnboarding: () =>
+            (process.env.FEATURE_ZERO_FRICTION_ONBOARDING ?? 'true').toLowerCase() !== 'false',
+    },
 };

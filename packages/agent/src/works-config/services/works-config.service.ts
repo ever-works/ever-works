@@ -1,16 +1,17 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { WorkScheduleCadence, type ProvidersDto } from '@ever-works/contracts/api';
 import * as yaml from 'yaml';
+import mergeWith from 'lodash/mergeWith';
 import { GitFacadeService } from '@src/facades/git.facade';
 import type { RepositoryTarget } from '@src/entities/work.entity';
 
-const WORKS_CONFIG_FILEPATHS = [
-    'works.yml',
-    'works.yaml',
+const LEGACY_WORKS_CONFIG_FILEPATHS = ['config.yml', 'config.yaml'] as const;
+const STANDARD_WORKS_CONFIG_FILEPATHS = [
     'works_config/works.yml',
     'works_config/works.yaml',
+    'works.yml',
+    'works.yaml',
 ] as const;
-
 export interface WorksConfigSummary {
     name?: string;
     initialPrompt?: string;
@@ -40,56 +41,26 @@ export class WorksConfigService {
         providerId?: string,
         token?: string,
     ): Promise<ParsedWorksConfig | null> {
-        for (const filePath of WORKS_CONFIG_FILEPATHS) {
-            let file: { content: string; encoding: string } | null = null;
-
-            try {
-                file = await this.gitFacade.getFileContent(owner, repo, filePath, {
-                    token,
-                    providerId,
-                });
-            } catch (error) {
-                this.logger.debug(
-                    `Failed to read ${filePath} from ${owner}/${repo}: ${
-                        error instanceof Error ? error.message : String(error)
-                    }`,
-                );
-
-                continue;
-            }
-
-            if (!file?.content) {
-                continue;
-            }
-
-            try {
-                return this.parse(file.content);
-            } catch (error) {
-                throw new Error(
-                    `Invalid works config at ${filePath}: ${
-                        error instanceof Error ? error.message : String(error)
-                    }`,
-                );
-            }
-        }
-
-        return null;
+        const raw = await this.loadRawFromRepository(owner, repo, providerId, token);
+        return raw ? this.toParsed(raw) : null;
     }
 
     parse(content: string): ParsedWorksConfig {
         const parsed = yaml.parse(content);
 
         if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
-            throw new Error('works.yml must contain a YAML object at the root');
+            throw new Error('works.yaml must contain a YAML object at the root');
         }
 
-        const raw = parsed as Record<string, unknown>;
+        return this.toParsed(parsed as Record<string, unknown>);
+    }
 
+    private toParsed(raw: Record<string, unknown>): ParsedWorksConfig {
         return {
             raw,
             name: this.readString(raw, ['name', 'title']),
-            initialPrompt: this.readString(raw, ['initial_prompt', 'initialPrompt', 'prompt']),
-            model: this.readString(raw, ['model']),
+            initialPrompt: this.readInitialPrompt(raw),
+            model: this.readModel(raw),
             websiteRepo: this.readString(raw, [
                 'website_repo',
                 'websiteRepo',
@@ -107,6 +78,82 @@ export class WorksConfigService {
                 ]),
             ),
         };
+    }
+
+    private async loadRawFromRepository(
+        owner: string,
+        repo: string,
+        providerId?: string,
+        token?: string,
+    ): Promise<Record<string, unknown> | null> {
+        let mergedRaw: Record<string, unknown> | null = null;
+
+        for (const filePath of [
+            ...LEGACY_WORKS_CONFIG_FILEPATHS,
+            ...STANDARD_WORKS_CONFIG_FILEPATHS,
+        ]) {
+            const raw = await this.readRawFile(owner, repo, filePath, providerId, token);
+            if (raw) {
+                mergedRaw = this.mergeRaw(mergedRaw ?? {}, raw);
+            }
+        }
+
+        return mergedRaw;
+    }
+
+    private async readRawFile(
+        owner: string,
+        repo: string,
+        filePath: string,
+        providerId?: string,
+        token?: string,
+    ): Promise<Record<string, unknown> | null> {
+        let file: { content: string; encoding: string } | null = null;
+
+        try {
+            file = await this.gitFacade.getFileContent(owner, repo, filePath, {
+                token,
+                providerId,
+            });
+        } catch (error) {
+            this.logger.debug(
+                `Failed to read ${filePath} from ${owner}/${repo}: ${
+                    error instanceof Error ? error.message : String(error)
+                }`,
+            );
+
+            return null;
+        }
+
+        if (!file?.content) {
+            return null;
+        }
+
+        try {
+            const parsed = yaml.parse(file.content);
+            if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+                throw new Error('works.yaml must contain a YAML object at the root');
+            }
+            return parsed as Record<string, unknown>;
+        } catch (error) {
+            throw new Error(
+                `Invalid works config at ${filePath}: ${
+                    error instanceof Error ? error.message : String(error)
+                }`,
+            );
+        }
+    }
+
+    private mergeRaw(
+        base: Record<string, unknown>,
+        override: Record<string, unknown>,
+    ): Record<string, unknown> {
+        return mergeWith({}, base, override, (_objValue, srcValue) => {
+            if (Array.isArray(srcValue)) {
+                return srcValue;
+            }
+            return undefined;
+        });
     }
 
     parseRepositoryReference(value?: string): RepositoryTarget | undefined {
@@ -134,16 +181,15 @@ export class WorksConfigService {
     }
 
     private readProviders(raw: Record<string, unknown>): ProvidersDto | undefined {
-        const providersValue = raw.providers;
-        if (
-            !providersValue ||
-            typeof providersValue !== 'object' ||
-            Array.isArray(providersValue)
-        ) {
+        const providersValue = this.mergeProviderSources(
+            this.readLastRequestData(raw)?.providers,
+            raw.providers,
+        );
+        if (!providersValue) {
             return undefined;
         }
 
-        const providers = providersValue as Record<string, unknown>;
+        const providers = providersValue;
         const normalized: ProvidersDto = {};
 
         const ai = this.asString(providers.ai);
@@ -161,6 +207,64 @@ export class WorksConfigService {
         if (pipeline) normalized.pipeline = pipeline;
 
         return Object.keys(normalized).length > 0 ? normalized : undefined;
+    }
+
+    private mergeProviderSources(
+        base: unknown,
+        override: unknown,
+    ): Record<string, unknown> | undefined {
+        const baseRecord =
+            base && typeof base === 'object' && !Array.isArray(base)
+                ? (base as Record<string, unknown>)
+                : undefined;
+        const overrideRecord =
+            override && typeof override === 'object' && !Array.isArray(override)
+                ? (override as Record<string, unknown>)
+                : undefined;
+
+        if (!baseRecord && !overrideRecord) {
+            return undefined;
+        }
+
+        return {
+            ...(baseRecord ?? {}),
+            ...(overrideRecord ?? {}),
+        };
+    }
+
+    private readInitialPrompt(raw: Record<string, unknown>): string | undefined {
+        return (
+            this.readString(raw, ['initial_prompt', 'initialPrompt', 'prompt']) ??
+            this.readString(this.readMetadata(raw), [
+                'initial_prompt',
+                'initialPrompt',
+                'prompt',
+            ]) ??
+            this.asString(this.readLastRequestData(raw)?.prompt)
+        );
+    }
+
+    private readModel(raw: Record<string, unknown>): string | undefined {
+        return (
+            this.readString(raw, ['model']) ?? this.asString(this.readLastRequestData(raw)?.model)
+        );
+    }
+
+    private readMetadata(raw: Record<string, unknown>): Record<string, unknown> {
+        return raw.metadata && typeof raw.metadata === 'object' && !Array.isArray(raw.metadata)
+            ? (raw.metadata as Record<string, unknown>)
+            : {};
+    }
+
+    private readLastRequestData(raw: Record<string, unknown>): Record<string, unknown> | undefined {
+        const metadata = this.readMetadata(raw);
+        const lastRequestData = metadata.last_request_data ?? metadata.lastRequestData;
+
+        return lastRequestData &&
+            typeof lastRequestData === 'object' &&
+            !Array.isArray(lastRequestData)
+            ? (lastRequestData as Record<string, unknown>)
+            : undefined;
     }
 
     private readScheduleCadence(raw: Record<string, unknown>): WorkScheduleCadence | null {

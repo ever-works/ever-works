@@ -6,7 +6,8 @@ import type {
 	Brand,
 	DomainAnalysis,
 	WebPageData,
-	PipelineMetrics
+	PipelineMetrics,
+	ReferenceEntry
 } from '@ever-works/plugin';
 
 export type StepDataKey =
@@ -14,6 +15,7 @@ export type StepDataKey =
 	| 'searchQueries'
 	| 'webPages'
 	| 'processedSourceUrls'
+	| 'processedReferences'
 	| 'contentCache'
 	| 'initialAiItems'
 	| 'extractedWebItems'
@@ -37,6 +39,7 @@ export interface StepDataTypes {
 	searchQueries: string[];
 	webPages: WebPageData[];
 	processedSourceUrls: Set<string>;
+	processedReferences: ReferenceEntry[];
 	contentCache: Map<string, string>;
 	initialAiItems: MutableItemData[];
 	extractedWebItems: MutableItemData[];

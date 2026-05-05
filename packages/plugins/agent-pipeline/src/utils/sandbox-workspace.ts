@@ -122,6 +122,16 @@ export async function createWorkspace(
 		metaWrites.push(writeFile(join(metaDir, 'brands.json'), JSON.stringify(existing.brands, null, 2), 'utf-8'));
 	}
 
+	if (existing.references?.length) {
+		metaWrites.push(
+			writeFile(
+				join(metaDir, 'references.jsonl'),
+				existing.references.map((reference) => JSON.stringify(reference)).join('\n') + '\n',
+				'utf-8'
+			)
+		);
+	}
+
 	await Promise.all(metaWrites);
 
 	return workspacePath;

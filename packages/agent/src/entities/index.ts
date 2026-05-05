@@ -23,4 +23,6 @@ export * from './auth-verification.entity';
 export * from './github-app-installation.entity';
 export * from './github-app-installation-repository.entity';
 export * from './github-app-user-link.entity';
+export * from './onboarding-request.entity';
+export * from './webhook-subscription.entity';
 export * from './types';

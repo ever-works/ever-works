@@ -17,4 +17,6 @@ export * from './repositories/conversation.repository';
 export * from './repositories/github-app-installation.repository';
 export * from './repositories/github-app-installation-repository.repository';
 export * from './repositories/github-app-user-link.repository';
+export * from './repositories/onboarding-request.repository';
+export * from './repositories/webhook-subscription.repository';
 export * from './database-init.service';

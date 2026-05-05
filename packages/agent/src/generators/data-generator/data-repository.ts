@@ -13,6 +13,7 @@ import type {
     ItemData,
     Tag,
 } from '@ever-works/contracts';
+import type { ReferenceEntry } from '@ever-works/plugin';
 import { CreateItemsGeneratorDto } from '../../items-generator/dto';
 
 export type PRUpdate = {
@@ -206,7 +207,13 @@ const createDefaultConfig = (overrides: Partial<IDataConfig> = {}): IDataConfig 
 
 export class DataRepository {
     private static readonly logger = new Logger(DataRepository.name);
-    private static readonly CONFIG_FILENAMES = ['config.yml', 'config.yaml'] as const;
+    private static readonly CONFIG_FILENAME = 'works.yaml';
+    private static readonly CONFIG_FILENAMES = [
+        'works.yaml',
+        'works.yml',
+        'config.yaml',
+        'config.yml',
+    ] as const;
     private config?: IDataConfig;
     private categories?: Category[];
 
@@ -217,6 +224,7 @@ export class DataRepository {
         private categoriesPath: string,
         private readonly tagsPath: string,
         private readonly collectionsPath: string,
+        private readonly referencesPath: string,
         private readonly markdownTemplatePath: string,
         public readonly dataDir: string,
         private readonly defaultConfigOverrides: Partial<IDataConfig>,
@@ -228,7 +236,7 @@ export class DataRepository {
     ): Promise<DataRepository> {
         /*
          *   File structure:
-         *      - config.yml
+         *      - works.yaml
          *      - categories.yml
          *      - tags.yml
          *      - data/
@@ -246,14 +254,16 @@ export class DataRepository {
         const categoriesPath = await this.getCollectionPath(dir, 'categories');
         const tagsPath = await this.getCollectionPath(dir, 'tags');
         const collectionsPath = await this.getCollectionPath(dir, 'collections');
+        const referencesPath = await this.getCollectionPath(dir, 'references');
 
         const repo = new DataRepository(
             dir,
-            path.join(dir, 'config.yml'),
+            path.join(dir, this.CONFIG_FILENAME),
             await this.resolveConfigFallbackPaths(dir),
             categoriesPath,
             tagsPath,
             collectionsPath,
+            referencesPath,
             path.join(dir, 'markdown'),
             path.join(dir, 'data'),
             defaultConfigOverrides,
@@ -284,7 +294,10 @@ export class DataRepository {
         return fallbackPaths;
     }
 
-    private static async shouldeUseDir(dir: string, type: 'categories' | 'tags' | 'collections') {
+    private static async shouldeUseDir(
+        dir: string,
+        type: 'categories' | 'tags' | 'collections' | 'references',
+    ) {
         try {
             const dirpath = path.join(dir, type);
             const stat = await fs.stat(dirpath);
@@ -299,7 +312,7 @@ export class DataRepository {
 
     private static async getCollectionPath(
         dir: string,
-        type: 'categories' | 'tags' | 'collections',
+        type: 'categories' | 'tags' | 'collections' | 'references',
     ) {
         const useDir = await this.shouldeUseDir(dir, type);
         const collectionPath = useDir
@@ -347,32 +360,27 @@ export class DataRepository {
         if (this.config) {
             return this.config;
         }
-        try {
-            const config = await fs.readFile(this.configPath, 'utf-8');
-            this.config = yaml.parse(config);
 
-            return this.config;
-        } catch (err) {
-            if (err?.code === 'ENOENT') {
-                const fallbackConfig = await this.readFallbackConfig();
-                if (fallbackConfig) {
-                    this.config = fallbackConfig;
-                    return fallbackConfig;
-                }
-
-                const defaultConfig = createDefaultConfig(this.defaultConfigOverrides);
-                await this.writeConfig(defaultConfig);
-                return defaultConfig;
-            }
-            throw err;
+        const config = await this.readMergedConfig();
+        if (config) {
+            return config;
         }
+
+        const defaultConfig = createDefaultConfig(this.defaultConfigOverrides);
+        await this.writeConfig(defaultConfig);
+        return defaultConfig;
     }
 
-    private async readFallbackConfig(): Promise<IDataConfig | null> {
-        for (const fallbackPath of this.configFallbackPaths) {
+    private async readMergedConfig(): Promise<IDataConfig | null> {
+        let mergedConfig: IDataConfig | null = null;
+
+        for (const filePath of [...this.configFallbackPaths].reverse().concat(this.configPath)) {
             try {
-                const config = await fs.readFile(fallbackPath, 'utf-8');
-                return yaml.parse(config);
+                const config = await fs.readFile(filePath, 'utf-8');
+                const parsed = yaml.parse(config);
+                if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+                    mergedConfig = mergeDataConfig(mergedConfig ?? {}, parsed);
+                }
             } catch (err) {
                 if ((err as NodeJS.ErrnoException | undefined)?.code === 'ENOENT') {
                     continue;
@@ -381,7 +389,8 @@ export class DataRepository {
             }
         }
 
-        return null;
+        this.config = mergedConfig ?? undefined;
+        return mergedConfig;
     }
 
     async getCategories(): Promise<Category[]> {
@@ -491,6 +500,14 @@ export class DataRepository {
         this.config = config;
         const str = yaml.stringify(config);
         await fs.writeFile(this.configPath, str, 'utf-8');
+        await Promise.all(
+            this.configFallbackPaths
+                .filter((filePath) => {
+                    const filename = path.basename(filePath);
+                    return filename.startsWith('config.') || filename === 'works.yml';
+                })
+                .map((filePath) => fs.rm(filePath, { force: true })),
+        );
     }
     async getNextVersion(config?: IDataConfig) {
         const theConfig = config ?? (await this.getConfig());
@@ -516,12 +533,13 @@ export class DataRepository {
         return version.format();
     }
     /**
-     * Ensure a config.yml exists; if missing, create it with defaults merged with optional overrides.
+     * Ensure a works.yaml exists; legacy config.yaml/config.yml files are still read as fallbacks.
      */
     async ensureDefaultConfig(overrides: Partial<IDataConfig> = {}): Promise<IDataConfig> {
         const exists = await this.fileExists(this.configPath);
+        const fallbackExists = await this.hasFallbackConfig();
 
-        if (!exists) {
+        if (!exists && !fallbackExists) {
             const defaultConfig = createDefaultConfig({
                 ...this.defaultConfigOverrides,
                 ...overrides,
@@ -531,6 +549,16 @@ export class DataRepository {
         }
 
         return this.getConfig();
+    }
+
+    private async hasFallbackConfig(): Promise<boolean> {
+        for (const fallbackPath of this.configFallbackPaths) {
+            if (await this.fileExists(fallbackPath)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     async writeCategories(categories: Category[]) {
@@ -559,6 +587,23 @@ export class DataRepository {
     async writeCollections(collections: Collection[]) {
         const str = yaml.stringify(collections);
         await fs.writeFile(this.collectionsPath, str, 'utf-8');
+    }
+
+    async getReferences(): Promise<ReferenceEntry[]> {
+        try {
+            const references = await fs.readFile(this.referencesPath, 'utf-8');
+            return yaml.parse(references) || [];
+        } catch (err) {
+            if (err?.code === 'ENOENT') {
+                return [];
+            }
+            throw err;
+        }
+    }
+
+    async writeReferences(references: ReferenceEntry[]): Promise<void> {
+        const str = yaml.stringify(references);
+        await fs.writeFile(this.referencesPath, str, 'utf-8');
     }
 
     private get comparisonsDir(): string {

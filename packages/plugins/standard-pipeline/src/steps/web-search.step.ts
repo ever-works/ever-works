@@ -1,4 +1,11 @@
 import type { StepExecutionContext, WebPageData, FacadeOptions } from '@ever-works/plugin';
+import {
+	createReferenceEntry,
+	findReferenceForUrl,
+	getDefaultReferenceTtlDays,
+	normalizeReferenceUrl,
+	shouldSkipReferenceUrl
+} from '@ever-works/plugin';
 import type { MutableGenerationContext } from '../context/index.js';
 import { BasePipelineStep } from '../base-pipeline-step.js';
 import { sanitizeErrorForUser } from '../utils/error.utils.js';
@@ -22,6 +29,7 @@ export class WebSearchStep extends BasePipelineStep {
 		const { request, work, extractedUrls, searchQueries, processedSourceUrls } = context;
 		const { logger, searchFacade, contentExtractorFacade } = execContext;
 		const config = request.config || {};
+		const referenceTtlDays = (config.references_ttl_days as number) || getDefaultReferenceTtlDays();
 
 		const facadeOptions: FacadeOptions = {
 			userId: execContext.user!.id,
@@ -37,9 +45,11 @@ export class WebSearchStep extends BasePipelineStep {
 				work.slug,
 				extractedUrls,
 				processedSourceUrls,
+				context,
 				contentExtractorFacade,
 				logger,
-				facadeOptions
+				facadeOptions,
+				referenceTtlDays
 			);
 			logger.debug(`[${work.slug}] Retrieved ${initialWebPages.length} web pages from extracted URLs`);
 		}
@@ -55,10 +65,12 @@ export class WebSearchStep extends BasePipelineStep {
 			searchQueries,
 			processedSourceUrls,
 			config,
+			context,
 			searchFacade,
 			contentExtractorFacade,
 			logger,
-			facadeOptions
+			facadeOptions,
+			referenceTtlDays
 		);
 
 		// Surface unique search errors as warnings
@@ -96,10 +108,12 @@ export class WebSearchStep extends BasePipelineStep {
 		searchQueries: string[],
 		processedSourceUrls: Set<string>,
 		config: Record<string, unknown>,
+		context: MutableGenerationContext,
 		searchFacade: StepExecutionContext['searchFacade'],
 		contentExtractorFacade: StepExecutionContext['contentExtractorFacade'],
 		logger: StepExecutionContext['logger'],
-		facadeOptions: FacadeOptions
+		facadeOptions: FacadeOptions,
+		referenceTtlDays: number
 	): Promise<{ pages: WebPageData[]; errorReasons: string[] }> {
 		const allFetchedPages: WebPageData[] = [];
 		const currentRunProcessedUrls = new Set<string>();
@@ -161,12 +175,21 @@ export class WebSearchStep extends BasePipelineStep {
 				}
 
 				// Skip already processed URLs
-				if (processedSourceUrls.has(source_url) || currentRunProcessedUrls.has(source_url)) {
+				const normalizedUrl = normalizeReferenceUrl(source_url);
+				const referenceDecision = shouldSkipReferenceUrl(source_url, context.existing?.references, {
+					ttlDays: referenceTtlDays
+				});
+				if (
+					processedSourceUrls.has(source_url) ||
+					processedSourceUrls.has(normalizedUrl) ||
+					currentRunProcessedUrls.has(normalizedUrl) ||
+					referenceDecision.shouldSkip
+				) {
 					continue;
 				}
 
 				urlsToFetch.push({ url: source_url, query: result.query });
-				currentRunProcessedUrls.add(source_url);
+				currentRunProcessedUrls.add(normalizedUrl);
 			}
 		}
 
@@ -177,8 +200,14 @@ export class WebSearchStep extends BasePipelineStep {
 
 		for (let i = 0; i < urlsToProcess.length; i += this.BATCH_SIZE) {
 			const batch = urlsToProcess.slice(i, i + this.BATCH_SIZE);
+			const processedReferences = context.processedReferences ?? (context.processedReferences = []);
 
 			const extractionPromises = batch.map(async ({ url, query }) => {
+				const previous = findReferenceForUrl(url, [
+					...(context.existing?.references || []),
+					...processedReferences
+				]);
+
 				try {
 					// Use ContentExtractorFacade for all content extraction
 					const response = await contentExtractorFacade.extractContent(url, undefined, facadeOptions);
@@ -187,11 +216,30 @@ export class WebSearchStep extends BasePipelineStep {
 						logger.warn(
 							`[${slug}] Skipping document with missing extraction results for query "${query}". URL: ${url}`
 						);
+						processedReferences.push(
+							createReferenceEntry({
+								url,
+								status: 'empty',
+								pipeline: 'standard-pipeline',
+								itemsCreated: 0,
+								error: 'No content extracted',
+								previous
+							})
+						);
 						return null;
 					}
 
 					// Mark URL as processed
 					processedSourceUrls.add(url);
+					processedSourceUrls.add(normalizeReferenceUrl(url));
+					processedReferences.push(
+						createReferenceEntry({
+							url,
+							status: 'success',
+							pipeline: 'standard-pipeline',
+							previous
+						})
+					);
 
 					return {
 						source_url: url,
@@ -201,6 +249,16 @@ export class WebSearchStep extends BasePipelineStep {
 				} catch (error) {
 					logger.error(
 						`[${slug}] Error fetching content from ${url}: ${error instanceof Error ? error.message : String(error)}`
+					);
+					processedReferences.push(
+						createReferenceEntry({
+							url,
+							status: 'error',
+							pipeline: 'standard-pipeline',
+							itemsCreated: 0,
+							error: error instanceof Error ? error.message : String(error),
+							previous
+						})
 					);
 					return null;
 				}
@@ -233,15 +291,27 @@ export class WebSearchStep extends BasePipelineStep {
 		slug: string,
 		urls: string[],
 		processedSourceUrls: Set<string>,
+		context: MutableGenerationContext,
 		contentExtractorFacade: StepExecutionContext['contentExtractorFacade'],
 		logger: StepExecutionContext['logger'],
-		facadeOptions: FacadeOptions
+		facadeOptions: FacadeOptions,
+		referenceTtlDays: number
 	): Promise<WebPageData[]> {
 		const dedupedUrls = [...new Set(urls)];
 		const allFetchedPages: WebPageData[] = [];
 
 		// Filter out already processed URLs
-		const urlsToProcess = dedupedUrls.filter((url) => !processedSourceUrls.has(url));
+		const urlsToProcess = dedupedUrls.filter((url) => {
+			const normalizedUrl = normalizeReferenceUrl(url);
+			if (processedSourceUrls.has(url) || processedSourceUrls.has(normalizedUrl)) {
+				return false;
+			}
+
+			const decision = shouldSkipReferenceUrl(url, context.existing?.references, {
+				ttlDays: referenceTtlDays
+			});
+			return !decision.shouldSkip;
+		});
 
 		if (urlsToProcess.length === 0) {
 			logger.debug(`[${slug}] All URLs have already been processed. Skipping.`);
@@ -253,18 +323,43 @@ export class WebSearchStep extends BasePipelineStep {
 		// Process all URLs using ContentExtractorFacade (unified content extraction)
 		for (let i = 0; i < urlsToProcess.length; i += this.BATCH_SIZE) {
 			const batch = urlsToProcess.slice(i, i + this.BATCH_SIZE);
+			const processedReferences = context.processedReferences ?? (context.processedReferences = []);
 
 			const extractionPromises = batch.map(async (url) => {
+				const previous = findReferenceForUrl(url, [
+					...(context.existing?.references || []),
+					...processedReferences
+				]);
+
 				try {
 					const content = await contentExtractorFacade.extractContent(url, undefined, facadeOptions);
 
 					if (!content?.rawContent) {
 						logger.warn(`[${slug}] Skipping URL with missing extraction results: ${url}`);
+						processedReferences.push(
+							createReferenceEntry({
+								url,
+								status: 'empty',
+								pipeline: 'standard-pipeline',
+								itemsCreated: 0,
+								error: 'No content extracted',
+								previous
+							})
+						);
 						return null;
 					}
 
 					// Mark URL as processed
 					processedSourceUrls.add(url);
+					processedSourceUrls.add(normalizeReferenceUrl(url));
+					processedReferences.push(
+						createReferenceEntry({
+							url,
+							status: 'success',
+							pipeline: 'standard-pipeline',
+							previous
+						})
+					);
 
 					return {
 						source_url: url,
@@ -274,6 +369,16 @@ export class WebSearchStep extends BasePipelineStep {
 				} catch (error) {
 					logger.error(
 						`[${slug}] Error extracting content from ${url}: ${error instanceof Error ? error.message : String(error)}`
+					);
+					processedReferences.push(
+						createReferenceEntry({
+							url,
+							status: 'error',
+							pipeline: 'standard-pipeline',
+							itemsCreated: 0,
+							error: error instanceof Error ? error.message : String(error),
+							previous
+						})
 					);
 					return null;
 				}

@@ -597,7 +597,8 @@ export class CodexPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvide
 				request: { prompt: request.prompt, name: request.name },
 				categories: existing.categories,
 				tags: existing.tags,
-				brands: existing.brands
+				brands: existing.brands,
+				references: existing.references
 			});
 
 			executionAuthEnv =
