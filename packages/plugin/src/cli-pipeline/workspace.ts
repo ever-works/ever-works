@@ -2,13 +2,8 @@ import * as fs from 'fs/promises';
 import * as path from 'path';
 import { createHash } from 'node:crypto';
 import type { Brand, Category, ItemData, Tag } from '../common/index.js';
-import {
-	collectMetadataFromItems,
-	jsonrepair,
-	normalizeItemTags,
-	slugify,
-	validateRequiredItemFields
-} from '../pipeline/workspace-utils.js';
+import type { ReferenceEntry } from '../pipeline/references.js';
+import { jsonrepair, normalizeItemTags, slugify, validateRequiredItemFields } from '../pipeline/workspace-utils.js';
 
 export { collectMetadataFromItems, slugify, unslugify } from '../pipeline/workspace-utils.js';
 
@@ -24,6 +19,7 @@ export interface WorkspaceMetadataSeed {
 	categories?: readonly Category[];
 	tags?: readonly Tag[];
 	brands?: readonly Brand[];
+	references?: readonly ReferenceEntry[];
 }
 
 const WRITE_CONCURRENCY = 64;
@@ -116,6 +112,11 @@ export async function seedMetadata(workspacePath: string, metadata: WorkspaceMet
 
 	if (metadata.brands?.length) {
 		await fs.writeFile(path.join(metaDir, 'brands.json'), JSON.stringify(metadata.brands, null, 2), 'utf-8');
+	}
+
+	if (metadata.references?.length) {
+		const lines = metadata.references.map((reference) => JSON.stringify(reference)).join('\n');
+		await fs.writeFile(path.join(metaDir, 'references.jsonl'), lines + '\n', 'utf-8');
 	}
 }
 

@@ -23,9 +23,10 @@ import type {
 	FacadeOptions,
 	FormFieldDefinition,
 	FormFieldGroup,
-	MutableItemData
+	MutableItemData,
+	ReferenceEntry
 } from '@ever-works/plugin';
-import { buildSuccessPipelineResult, substituteVariables } from '@ever-works/plugin';
+import { buildSuccessPipelineResult, getDefaultReferenceTtlDays, substituteVariables } from '@ever-works/plugin';
 import { collectMetadataFromItems, createItemLookupIndex, isItemDuplicate } from '@ever-works/plugin';
 
 import type { AgentPipelineStepId, TokenUsageBreakdown, AgentTokenUsage } from './types.js';
@@ -221,6 +222,7 @@ export class AgentPipelinePlugin implements IPlugin, IPipelinePlugin<AgentPipeli
 		const facadeOptions: FacadeOptions = { userId, workId: work.id };
 
 		const tokenAccumulator = new TokenUsageAccumulator();
+		const processedReferences: ReferenceEntry[] = [];
 		let workspacePath: string | null = null;
 
 		try {
@@ -274,7 +276,8 @@ export class AgentPipelinePlugin implements IPlugin, IPipelinePlugin<AgentPipeli
 				signal,
 				logger,
 				tokenAccumulator,
-				onLogEntry
+				onLogEntry,
+				processedReferences
 			);
 
 			if (signal.aborted) {
@@ -334,7 +337,15 @@ export class AgentPipelinePlugin implements IPlugin, IPipelinePlugin<AgentPipeli
 			reportProgress(onProgress, 5, 100, 'Complete');
 			this.state = finalizeCompletedState(this.state!);
 
-			return this.buildSuccessResult(items, metadata, startTime, warnings, tokenUsage, totalCost);
+			return this.buildSuccessResult(
+				items,
+				metadata,
+				startTime,
+				warnings,
+				tokenUsage,
+				totalCost,
+				processedReferences
+			);
 		} catch (error) {
 			const err = error instanceof Error ? error : new Error(String(error));
 			logger.error(`Agent pipeline failed: ${err.message}`);
@@ -457,7 +468,8 @@ export class AgentPipelinePlugin implements IPlugin, IPipelinePlugin<AgentPipeli
 		signal: AbortSignal,
 		logger: PluginLogger,
 		tokenAccumulator: TokenUsageAccumulator,
-		onLogEntry?: PipelineExecutionOptions['onLogEntry']
+		onLogEntry: PipelineExecutionOptions['onLogEntry'] | undefined,
+		processedReferences: ReferenceEntry[]
 	): Promise<{ warnings: string[]; tokenUsage: TokenUsageBreakdown }> {
 		// Two-model resolution: parent (orchestrator) and worker (extraction)
 		const { parentModelName, workerModelName } = this.getExecutionModelNames(providerConfig);
@@ -512,6 +524,7 @@ export class AgentPipelinePlugin implements IPlugin, IPipelinePlugin<AgentPipeli
 
 		const maxPagesToProcess =
 			((request.config || {}).max_pages_to_process as number) || DEFAULT_MAX_PAGES_TO_PROCESS;
+		const referenceTtlDays = ((request.config || {}).references_ttl_days as number) || getDefaultReferenceTtlDays();
 
 		const { tools, breaker } = createParentTools({
 			workspacePath,
@@ -533,7 +546,11 @@ export class AgentPipelinePlugin implements IPlugin, IPipelinePlugin<AgentPipeli
 			tokenAccumulator,
 			signal,
 			promptFacade: execContext.promptFacade,
-			onLogEntry
+			onLogEntry,
+			referenceTtlDays,
+			onReferenceProcessed: (reference) => {
+				processedReferences.push(reference);
+			}
 		});
 
 		const promptOptions = { work, request, existing };
@@ -899,7 +916,8 @@ export class AgentPipelinePlugin implements IPlugin, IPipelinePlugin<AgentPipeli
 		startTime: number,
 		warnings?: string[],
 		tokenUsage?: TokenUsageBreakdown,
-		totalCost?: number
+		totalCost?: number,
+		references: ReferenceEntry[] = []
 	): PipelineResult {
 		const duration = Date.now() - startTime;
 		return buildSuccessPipelineResult(
@@ -908,7 +926,10 @@ export class AgentPipelinePlugin implements IPlugin, IPipelinePlugin<AgentPipeli
 				categories: metadata.categories,
 				tags: metadata.tags,
 				brands: metadata.brands,
-				collections: metadata.collections
+				collections: metadata.collections,
+				extra: {
+					references
+				}
 			},
 			{
 				metrics: buildMetrics(startTime, duration, items.length, tokenUsage, totalCost),

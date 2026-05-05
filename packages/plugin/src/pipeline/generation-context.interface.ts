@@ -1,4 +1,5 @@
 import type { ItemData, Category, Collection, Tag, Brand } from '@ever-works/contracts';
+import type { ReferenceEntry } from './references.js';
 
 /**
  * User reference for settings resolution and context.
@@ -108,6 +109,7 @@ export interface ExistingItems {
 	readonly tags: readonly Tag[];
 	readonly collections?: readonly Collection[];
 	readonly brands?: readonly Brand[];
+	readonly references?: readonly ReferenceEntry[];
 	/** Configuration from previous generation */
 	readonly existingConfig?: ExistingConfig;
 }

@@ -29,7 +29,9 @@ import type {
     ExistingItems as PluginExistingItems,
     PipelineResult,
     PipelineProgress,
+    ReferenceEntry,
 } from '@ever-works/plugin';
+import { mergeReferences } from '@ever-works/plugin';
 import type { WorkHistoryChangeEntry } from '@ever-works/contracts/api';
 import type { GenerationLogCollector } from './generation-log-collector';
 import { throwIfGenerationCancelled } from '@src/utils';
@@ -124,6 +126,7 @@ export class DataGeneratorService {
             existingCategories: [],
             existingTags: [],
             existingCollections: [],
+            existingReferences: [],
             existingConfig: null,
         };
         let existingItemsBeforeGeneration: ItemData[] = [];
@@ -157,6 +160,18 @@ export class DataGeneratorService {
             options?.signal,
         );
 
+        if (!pipelineResult) {
+            return {
+                success: false,
+                error: {
+                    code: 'GENERATION_FAILED' as const,
+                    message: 'Pipeline execution returned no result',
+                    cause: new Error('Pipeline execution returned no result'),
+                },
+                warnings: [],
+            };
+        }
+
         const warnings = pipelineResult.warnings?.slice();
 
         // If pipeline failed or no items were generated, handle appropriately
@@ -178,7 +193,17 @@ export class DataGeneratorService {
         throwIfCancelled();
 
         // If no items were generated, we don't need to do anything else
-        if (!pipelineResult || pipelineResult.outputs.items.length === 0) {
+        if (pipelineResult.outputs.items.length === 0) {
+            const generatedReferences = this.extractPipelineReferences(pipelineResult);
+            if (generatedReferences.length > 0) {
+                await this.persistReferencesToExistingDataRepository(
+                    work,
+                    user,
+                    generatedReferences,
+                    existingData.existingReferences,
+                );
+            }
+
             const stats: GenerationStats = {
                 newItemsCount: 0,
                 updatedItemsCount: 0,
@@ -196,6 +221,7 @@ export class DataGeneratorService {
             collections: newCollections,
         } = pipelineResult.outputs;
         const { existingCategories, existingTags, existingCollections } = existingData;
+        const existingReferences = existingData.existingReferences;
 
         this.logger.debug(
             `Generated ${newCategories.length} categories, ${newItems.length} items, ${newTags.length} tags, ${newCollections.length} collections.`,
@@ -342,6 +368,13 @@ export class DataGeneratorService {
                 data.writeTags(this.merge(existingTags, [...newTags])),
                 data.writeCollections(this.merge(existingCollections, [...newCollections])),
             ];
+
+            const generatedReferences = this.extractPipelineReferences(pipelineResult);
+            if (generatedReferences.length > 0) {
+                promises.push(
+                    data.writeReferences(mergeReferences(existingReferences, generatedReferences)),
+                );
+            }
 
             const { title: prTitle, body: prBody } = this.getPRDetails(work);
 
@@ -1093,6 +1126,7 @@ export class DataGeneratorService {
             existingCategories: Category[];
             existingTags: Tag[];
             existingCollections: Collection[];
+            existingReferences: ReferenceEntry[];
             existingConfig: any;
         },
         onProgress?: (progress: PipelineProgress) => void,
@@ -1108,6 +1142,7 @@ export class DataGeneratorService {
                 existingCategories: [],
                 existingTags: [],
                 existingCollections: [],
+                existingReferences: [],
                 existingConfig: null,
             };
         }
@@ -1147,6 +1182,7 @@ export class DataGeneratorService {
             tags: existing.existingTags ?? [],
             collections: existing.existingCollections ?? [],
             brands: [],
+            references: existing.existingReferences ?? [],
             existingConfig: existing.existingConfig,
         };
 
@@ -1239,19 +1275,22 @@ export class DataGeneratorService {
             );
             const data = await DataRepository.create(dest, getWorkDefaultDataConfig(work));
 
-            const [categories, tags, collections, existingItems, config] = await Promise.all([
-                data.getCategories().catch(() => []),
-                data.getTags().catch(() => []),
-                data.getCollections().catch(() => []),
-                data.getItems().catch(() => []),
-                data.getConfig().catch(() => null),
-            ]);
+            const [categories, tags, collections, references, existingItems, config] =
+                await Promise.all([
+                    data.getCategories().catch(() => []),
+                    data.getTags().catch(() => []),
+                    data.getCollections().catch(() => []),
+                    data.getReferences().catch(() => []),
+                    data.getItems().catch(() => []),
+                    data.getConfig().catch(() => null),
+                ]);
 
             return {
                 existingItems,
                 existingCategories: categories,
                 existingTags: tags,
                 existingCollections: collections,
+                existingReferences: references,
                 existingConfig: config,
             };
         } catch {
@@ -1260,9 +1299,75 @@ export class DataGeneratorService {
                 existingCategories: [],
                 existingTags: [],
                 existingCollections: [],
+                existingReferences: [],
                 existingConfig: null,
             };
         }
+    }
+
+    private extractPipelineReferences(result: PipelineResult): ReferenceEntry[] {
+        const references = result.outputs.extra?.references;
+        return Array.isArray(references) ? (references as ReferenceEntry[]) : [];
+    }
+
+    private async persistReferencesToExistingDataRepository(
+        work: Work,
+        user: User,
+        references: ReferenceEntry[],
+        existingReferences: ReferenceEntry[],
+    ): Promise<void> {
+        const workOwner = this.getWorkOwner(work);
+        const owner = work.getRepoOwner();
+        const repo = work.getDataRepo();
+
+        const repoExists = await this.gitFacade
+            .repositoryExists(owner, repo, {
+                userId: workOwner.id,
+                providerId: work.gitProvider,
+                workId: work.id,
+            })
+            .catch(() => false);
+
+        if (!repoExists) {
+            return;
+        }
+
+        const dest = await this.gitFacade.cloneOrPull(
+            {
+                owner,
+                repo,
+                committer: work.resolveCommitter(user),
+            },
+            {
+                userId: workOwner.id,
+                providerId: work.gitProvider,
+                workId: work.id,
+            },
+        );
+
+        const data = await DataRepository.create(dest, getWorkDefaultDataConfig(work));
+        await data.writeReferences(mergeReferences(existingReferences, references));
+
+        const changes = await this.gitFacade.getStatus(work.gitProvider, data.dir);
+        if (changes.length === 0) {
+            return;
+        }
+
+        await this.gitFacade.addAll(work.gitProvider, data.dir);
+        await this.gitFacade.commit(
+            work.gitProvider,
+            data.dir,
+            'update processed references',
+            work.resolveCommitter(user),
+        );
+        await this.gitFacade.push(
+            { dir: data.dir },
+            {
+                userId: workOwner.id,
+                providerId: work.gitProvider,
+                workId: work.id,
+            },
+        );
     }
 
     private async writeItemToDisk(data: DataRepository, item: ItemData) {

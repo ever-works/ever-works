@@ -13,6 +13,7 @@ import type {
     ItemData,
     Tag,
 } from '@ever-works/contracts';
+import type { ReferenceEntry } from '@ever-works/plugin';
 import { CreateItemsGeneratorDto } from '../../items-generator/dto';
 
 export type PRUpdate = {
@@ -223,6 +224,7 @@ export class DataRepository {
         private categoriesPath: string,
         private readonly tagsPath: string,
         private readonly collectionsPath: string,
+        private readonly referencesPath: string,
         private readonly markdownTemplatePath: string,
         public readonly dataDir: string,
         private readonly defaultConfigOverrides: Partial<IDataConfig>,
@@ -252,6 +254,7 @@ export class DataRepository {
         const categoriesPath = await this.getCollectionPath(dir, 'categories');
         const tagsPath = await this.getCollectionPath(dir, 'tags');
         const collectionsPath = await this.getCollectionPath(dir, 'collections');
+        const referencesPath = await this.getCollectionPath(dir, 'references');
 
         const repo = new DataRepository(
             dir,
@@ -260,6 +263,7 @@ export class DataRepository {
             categoriesPath,
             tagsPath,
             collectionsPath,
+            referencesPath,
             path.join(dir, 'markdown'),
             path.join(dir, 'data'),
             defaultConfigOverrides,
@@ -290,7 +294,10 @@ export class DataRepository {
         return fallbackPaths;
     }
 
-    private static async shouldeUseDir(dir: string, type: 'categories' | 'tags' | 'collections') {
+    private static async shouldeUseDir(
+        dir: string,
+        type: 'categories' | 'tags' | 'collections' | 'references',
+    ) {
         try {
             const dirpath = path.join(dir, type);
             const stat = await fs.stat(dirpath);
@@ -305,7 +312,7 @@ export class DataRepository {
 
     private static async getCollectionPath(
         dir: string,
-        type: 'categories' | 'tags' | 'collections',
+        type: 'categories' | 'tags' | 'collections' | 'references',
     ) {
         const useDir = await this.shouldeUseDir(dir, type);
         const collectionPath = useDir
@@ -580,6 +587,23 @@ export class DataRepository {
     async writeCollections(collections: Collection[]) {
         const str = yaml.stringify(collections);
         await fs.writeFile(this.collectionsPath, str, 'utf-8');
+    }
+
+    async getReferences(): Promise<ReferenceEntry[]> {
+        try {
+            const references = await fs.readFile(this.referencesPath, 'utf-8');
+            return yaml.parse(references) || [];
+        } catch (err) {
+            if (err?.code === 'ENOENT') {
+                return [];
+            }
+            throw err;
+        }
+    }
+
+    async writeReferences(references: ReferenceEntry[]): Promise<void> {
+        const str = yaml.stringify(references);
+        await fs.writeFile(this.referencesPath, str, 'utf-8');
     }
 
     private get comparisonsDir(): string {
