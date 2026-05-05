@@ -57,7 +57,7 @@ export class WorksConfigImportPlannerService {
         userId: string,
     ): Promise<void> {
         if (!worksConfig?.initialPrompt) {
-            throw new BadRequestException('works.yaml is missing initial_prompt');
+            throw new BadRequestException('works.yml is missing initial_prompt');
         }
 
         await this.validateProviderSettings(worksConfig, userId, { validateDefaults: true });

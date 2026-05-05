@@ -2369,7 +2369,7 @@
                     "title": "지원 저장소 형식",
                     "dataRepo": {
                         "title": "데이터 저장소",
-                        "description": "config.yml과 data/ 폴더 구조를 가진 저장소"
+                        "description": "works.yml과 data/ 폴더 구조를 가진 저장소"
                     },
                     "awesomeReadme": {
                         "title": "Awesome 목록",
@@ -2492,7 +2492,7 @@
                     "linkRepos": "저장소 연결"
                 },
                 "detectionFailed": "형식을 자동 감지할 수 없습니다. 이 저장소를 가져오는 방법을 선택하세요.",
-                "detectionFailedMissingConfig": "지원되는 설정을 찾을 수 없습니다. 저장소에 config.yml, works.yml 또는 works_config/works.yml을 추가하거나 아래 수동 가져오기 형식을 선택하세요.",
+                "detectionFailedMissingConfig": "지원되는 설정을 찾을 수 없습니다. 저장소에 works.yml을 추가하거나 아래 수동 가져오기 형식을 선택하세요.",
                 "errors": {
                     "urlRequired": "GitHub 저장소 URL을 입력하세요",
                     "unsupportedFormat": "이 저장소 형식을 지원하지 않습니다. 데이터 저장소 또는 Awesome 목록 형식을 사용하세요.",

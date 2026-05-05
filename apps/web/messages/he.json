@@ -2369,7 +2369,7 @@
                     "title": "פורמטי מאגרים נתמכים",
                     "dataRepo": {
                         "title": "מאגר נתונים",
-                        "description": "מאגרים עם config.yml ומבנה תיקיית data/"
+                        "description": "מאגרים עם works.yml ומבנה תיקיית data/"
                     },
                     "awesomeReadme": {
                         "title": "רשימת Awesome",
@@ -2492,7 +2492,7 @@
                     "linkRepos": "קשר מאגרים"
                 },
                 "detectionFailed": "לא הצלחנו לזהות את הפורמט אוטומטית. נא בחר כיצד לייבא מאגר זה.",
-                "detectionFailedMissingConfig": "לא נמצאה תצורה נתמכת. הוסף config.yml, works.yml או works_config/works.yml למאגר, או בחר בפורמט ייבוא ידני למטה.",
+                "detectionFailedMissingConfig": "לא נמצאה תצורה נתמכת. הוסף works.yml למאגר, או בחר בפורמט ייבוא ידני למטה.",
                 "errors": {
                     "urlRequired": "נא הזן URL מאגר GitHub",
                     "unsupportedFormat": "פורמט מאגר זה לא נתמך. נא השתמש בפורמט מאגר נתונים או רשימת Awesome.",

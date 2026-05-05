@@ -142,7 +142,7 @@ export const PUBLIC_ROUTES = [
     '/help',
 ] as const;
 
-// Site Configuration - can be merged with work config from config.yml
+// Site Configuration - can be merged with work config from works.yml
 export const getSiteConfig = (config?: WorkConfig | null) => {
     const name = config?.company_name || APP_NAME;
     const website = config?.company_website || WEB_URL;

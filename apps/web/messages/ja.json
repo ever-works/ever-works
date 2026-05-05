@@ -2369,7 +2369,7 @@
                     "title": "サポートされるリポジトリ形式",
                     "dataRepo": {
                         "title": "データ リポジトリ",
-                        "description": "config.yml と data/ フォルダ構造を持つリポジトリ"
+                        "description": "works.yml と data/ フォルダ構造を持つリポジトリ"
                     },
                     "awesomeReadme": {
                         "title": "Awesome リスト",
@@ -2492,7 +2492,7 @@
                     "linkRepos": "リポジトリをリンク"
                 },
                 "detectionFailed": "形式を自動検出できませんでした。このリポジトリのインポート方法を選択してください。",
-                "detectionFailedMissingConfig": "サポートされている設定が見つかりませんでした。リポジトリに config.yml、works.yml、または works_config/works.yml を追加するか、以下の手動インポート形式を選択してください。",
+                "detectionFailedMissingConfig": "サポートされている設定が見つかりませんでした。リポジトリに works.yml を追加するか、以下の手動インポート形式を選択してください。",
                 "errors": {
                     "urlRequired": "GitHub リポジトリ URL を入力してください",
                     "unsupportedFormat": "このリポジトリ形式はサポートされていません。データ リポジトリまたは Awesome リスト形式を使用してください。",
