@@ -8,6 +8,7 @@ import {
 } from '@nestjs/common';
 import { TemplateRepository } from '@src/database/repositories/template.repository';
 import { UserTemplatePreferenceRepository } from '@src/database/repositories/user-template-preference.repository';
+import { GitFacadeService } from '@src/facades/git.facade';
 import {
     getDefaultWebsiteTemplateId,
     listWebsiteTemplates,
@@ -15,6 +16,7 @@ import {
 } from '@src/generators/website-generator/config/website-template.config';
 import { randomUUID } from 'node:crypto';
 import type { TemplateKind, TemplateSourceType } from '@src/entities/template.entity';
+import { config } from '@src/config';
 
 export interface TemplateCatalogItem {
     id: string;
@@ -42,6 +44,7 @@ export class TemplateCatalogService implements OnModuleInit {
     constructor(
         private readonly templateRepository: TemplateRepository,
         private readonly userTemplatePreferenceRepository: UserTemplatePreferenceRepository,
+        private readonly gitFacade: GitFacadeService,
     ) {}
 
     async onModuleInit() {
@@ -64,6 +67,10 @@ export class TemplateCatalogService implements OnModuleInit {
         kind: TemplateKind,
         userId: string,
     ): Promise<{ defaultTemplateId: string | null; templates: TemplateCatalogItem[] }> {
+        if (kind === 'website') {
+            await this.syncDiscoveredWebsiteTemplatesForUser(userId);
+        }
+
         const [templates, defaultTemplateId] = await Promise.all([
             this.templateRepository.findVisibleByKind(kind, userId),
             this.getDefaultTemplateIdForUser(kind, userId),
@@ -209,6 +216,66 @@ export class TemplateCatalogService implements OnModuleInit {
         return null;
     }
 
+    private async syncDiscoveredWebsiteTemplatesForUser(userId: string): Promise<void> {
+        const providerId = 'github';
+        const catalogOwner = config.websiteTemplate.getCatalogOrganization();
+
+        try {
+            const hasCredentials = await this.gitFacade.hasValidCredentials({
+                userId,
+                providerId,
+            });
+
+            if (!hasCredentials) {
+                return;
+            }
+
+            const repositories = await this.gitFacade.listRepositories(
+                { userId, providerId },
+                1,
+                100,
+                {
+                    owner: catalogOwner,
+                    type: 'org',
+                },
+            );
+
+            const standardTemplates = repositories.filter((repository) =>
+                this.isStandardTemplateRepository(repository.name),
+            );
+
+            await Promise.all(
+                standardTemplates.map((repository) =>
+                    this.templateRepository.upsert({
+                        id: repository.name.toLowerCase(),
+                        kind: 'website',
+                        sourceType: 'built_in',
+                        name: this.humanizeRepositoryName(repository.name),
+                        description: repository.description || null,
+                        framework: this.inferFrameworkFromRepository(repository.name),
+                        repositoryUrl: repository.url,
+                        repositoryOwner: repository.owner,
+                        repositoryName: repository.name,
+                        branch: repository.defaultBranch || 'main',
+                        syncBranches: [repository.defaultBranch || 'main'],
+                        betaBranch: null,
+                        isActive: true,
+                        metadata: {
+                            discoveredFromOrganization: catalogOwner,
+                            fullName: repository.fullName,
+                        },
+                    }),
+                ),
+            );
+        } catch (error) {
+            this.logger.warn(
+                `Failed to sync discovered website templates for user ${userId}: ${
+                    error instanceof Error ? error.message : String(error)
+                }`,
+            );
+        }
+    }
+
     private toBuiltInWebsiteTemplateRecord(template: WebsiteTemplateConfig) {
         return {
             id: template.id,
@@ -297,5 +364,9 @@ export class TemplateCatalogService implements OnModuleInit {
         } catch {
             return null;
         }
+    }
+
+    private isStandardTemplateRepository(repo: string): boolean {
+        return /template$/i.test(repo.trim());
     }
 }

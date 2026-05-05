@@ -21,7 +21,7 @@ export class TemplateRepository {
                 { kind, ownerUserId: userId, sourceType: 'custom', isActive: true },
             ],
             order: {
-                sourceType: 'ASC',
+                sourceType: 'DESC',
                 name: 'ASC',
             },
         });
