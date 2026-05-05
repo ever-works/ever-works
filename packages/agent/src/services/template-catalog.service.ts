@@ -263,6 +263,24 @@ export class TemplateCatalogService implements OnModuleInit {
                             : `This template is still assigned to ${usageCount} works. Reassign those works before archiving the template.`,
                 });
             }
+
+            const defaultTemplateId = await this.getDefaultTemplateIdForUser(input.kind, userId);
+            if (defaultTemplateId === template.id) {
+                const inheritedUsageCount =
+                    await this.workRepository.countByUserAndInheritedWebsiteTemplateSelection(
+                        userId,
+                    );
+
+                if (inheritedUsageCount > 0) {
+                    throw new ConflictException({
+                        status: 'error',
+                        message:
+                            inheritedUsageCount === 1
+                                ? 'This template is your current default and 1 work inherits it. Reassign that work or change your default template before archiving.'
+                                : `This template is your current default and ${inheritedUsageCount} works inherit it. Reassign those works or change your default template before archiving.`,
+                    });
+                }
+            }
         }
 
         await this.templateRepository.updateById(template.id, { isActive: false });
@@ -475,6 +493,7 @@ export class TemplateCatalogService implements OnModuleInit {
     private async syncDiscoveredWebsiteTemplatesForUser(userId: string): Promise<void> {
         const providerId = 'github';
         const catalogOwner = config.websiteTemplate.getCatalogOrganization();
+        const perPage = 100;
 
         try {
             const hasCredentials = await this.gitFacade.hasValidCredentials({
@@ -486,24 +505,46 @@ export class TemplateCatalogService implements OnModuleInit {
                 return;
             }
 
-            const repositories = await this.gitFacade.listRepositories(
-                { userId, providerId },
-                1,
-                100,
-                {
-                    owner: catalogOwner,
-                    type: 'org',
-                },
-            );
+            const repositories = [];
+            let page = 1;
+
+            while (true) {
+                const pageRepositories = await this.gitFacade.listRepositories(
+                    { userId, providerId },
+                    page,
+                    perPage,
+                    {
+                        owner: catalogOwner,
+                        type: 'org',
+                    },
+                );
+
+                repositories.push(...pageRepositories);
+
+                if (pageRepositories.length < perPage) {
+                    break;
+                }
+
+                page += 1;
+            }
 
             const standardTemplates = repositories.filter((repository) =>
                 this.isStandardTemplateRepository(repository.name),
             );
 
             await Promise.all(
-                standardTemplates.map((repository) =>
-                    this.templateRepository.upsert({
-                        id: repository.name.toLowerCase(),
+                standardTemplates.map(async (repository) => {
+                    const discoveredId = repository.name.toLowerCase();
+                    const canonicalTemplate =
+                        await this.templateRepository.findBuiltInByRepositoryCoordinates(
+                            'website',
+                            repository.owner,
+                            repository.name,
+                        );
+                    const canonicalId = canonicalTemplate?.id || discoveredId;
+
+                    await this.templateRepository.upsert({
+                        id: canonicalId,
                         kind: 'website',
                         sourceType: 'built_in',
                         name: this.humanizeRepositoryName(repository.name),
@@ -520,8 +561,27 @@ export class TemplateCatalogService implements OnModuleInit {
                             discoveredFromOrganization: catalogOwner,
                             fullName: repository.fullName,
                         },
-                    }),
-                ),
+                    });
+
+                    if (canonicalId !== discoveredId) {
+                        const duplicateTemplate =
+                            await this.templateRepository.findById(discoveredId);
+
+                        if (
+                            duplicateTemplate &&
+                            duplicateTemplate.id !== canonicalId &&
+                            duplicateTemplate.kind === 'website' &&
+                            duplicateTemplate.sourceType === 'built_in' &&
+                            duplicateTemplate.repositoryOwner === repository.owner &&
+                            duplicateTemplate.repositoryName === repository.name &&
+                            duplicateTemplate.isActive
+                        ) {
+                            await this.templateRepository.updateById(discoveredId, {
+                                isActive: false,
+                            });
+                        }
+                    }
+                }),
             );
         } catch (error) {
             this.logger.warn(

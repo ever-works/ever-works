@@ -15,6 +15,8 @@ describe('TemplateCatalogService', () => {
             findOwnedCustomById: jest.fn(),
             findOwnedCustomByRepositoryUrl: jest.fn(),
             findOwnedCustomByRepositoryCoordinates: jest.fn(),
+            findBuiltInByRepositoryCoordinates: jest.fn(),
+            findById: jest.fn(),
             upsert: jest.fn(),
             updateById: jest.fn(),
         };
@@ -24,6 +26,7 @@ describe('TemplateCatalogService', () => {
         };
         workRepository = {
             countByUserAndWebsiteTemplateId: jest.fn(),
+            countByUserAndInheritedWebsiteTemplateSelection: jest.fn(),
         };
         gitFacade = {
             hasValidCredentials: jest.fn().mockResolvedValue(false),
@@ -139,6 +142,39 @@ describe('TemplateCatalogService', () => {
         expect(templateRepository.updateById).not.toHaveBeenCalled();
     });
 
+    it('rejects archiving a custom template that is the current default for inheriting works', async () => {
+        templateRepository.findOwnedCustomById.mockResolvedValue({
+            id: 'custom-1',
+            kind: 'website',
+            sourceType: 'custom',
+            ownerUserId: 'user-1',
+            isActive: true,
+        });
+        workRepository.countByUserAndWebsiteTemplateId.mockResolvedValue(0);
+        workRepository.countByUserAndInheritedWebsiteTemplateSelection.mockResolvedValue(3);
+        userTemplatePreferenceRepository.findByUserAndKind.mockResolvedValue({
+            templateId: 'custom-1',
+        });
+        templateRepository.findVisibleById.mockResolvedValue({
+            id: 'custom-1',
+            kind: 'website',
+            sourceType: 'custom',
+            isActive: true,
+        });
+
+        await expect(
+            service.archiveCustomTemplateForUser(
+                {
+                    kind: 'website',
+                    templateId: 'custom-1',
+                },
+                'user-1',
+            ),
+        ).rejects.toThrow(ConflictException);
+
+        expect(templateRepository.updateById).not.toHaveBeenCalled();
+    });
+
     it('archives an unused custom template', async () => {
         templateRepository.findOwnedCustomById.mockResolvedValue({
             id: 'custom-1',
@@ -148,6 +184,8 @@ describe('TemplateCatalogService', () => {
             isActive: true,
         });
         workRepository.countByUserAndWebsiteTemplateId.mockResolvedValue(0);
+        workRepository.countByUserAndInheritedWebsiteTemplateSelection.mockResolvedValue(0);
+        userTemplatePreferenceRepository.findByUserAndKind.mockResolvedValue(null);
 
         const result = await service.archiveCustomTemplateForUser(
             {
@@ -168,36 +206,61 @@ describe('TemplateCatalogService', () => {
 
     it('refreshes discovered standard templates for website catalogs', async () => {
         gitFacade.hasValidCredentials.mockResolvedValue(true);
-        gitFacade.listRepositories.mockResolvedValue([
-            {
-                name: 'next-template',
-                owner: 'ever-works',
-                url: 'https://github.com/ever-works/next-template',
-                fullName: 'ever-works/next-template',
-                defaultBranch: 'main',
-                description: 'Next template',
-            },
-            {
-                name: 'docs',
-                owner: 'ever-works',
-                url: 'https://github.com/ever-works/docs',
-                fullName: 'ever-works/docs',
-                defaultBranch: 'main',
-                description: 'Docs',
-            },
-        ]);
+        const firstPageRepositories = Array.from({ length: 100 }, (_, index) => ({
+            name: `repo-${index}`,
+            owner: 'ever-works',
+            url: `https://github.com/ever-works/repo-${index}`,
+            fullName: `ever-works/repo-${index}`,
+            defaultBranch: 'main',
+            description: `Repository ${index}`,
+        }));
+        firstPageRepositories[0] = {
+            name: 'directory-web-template',
+            owner: 'ever-works',
+            url: 'https://github.com/ever-works/directory-web-template',
+            fullName: 'ever-works/directory-web-template',
+            defaultBranch: 'main',
+            description: 'Classic template',
+        };
+        firstPageRepositories[1] = {
+            name: 'docs',
+            owner: 'ever-works',
+            url: 'https://github.com/ever-works/docs',
+            fullName: 'ever-works/docs',
+            defaultBranch: 'main',
+            description: 'Docs',
+        };
+        gitFacade.listRepositories
+            .mockResolvedValueOnce(firstPageRepositories)
+            .mockResolvedValueOnce([]);
+        templateRepository.findBuiltInByRepositoryCoordinates.mockResolvedValue({
+            id: 'classic',
+            kind: 'website',
+            sourceType: 'built_in',
+            repositoryOwner: 'ever-works',
+            repositoryName: 'directory-web-template',
+            isActive: true,
+        });
+        templateRepository.findById.mockResolvedValue({
+            id: 'directory-web-template',
+            kind: 'website',
+            sourceType: 'built_in',
+            repositoryOwner: 'ever-works',
+            repositoryName: 'directory-web-template',
+            isActive: true,
+        });
         templateRepository.findVisibleByKind.mockResolvedValue([
             {
-                id: 'next-template',
+                id: 'classic',
                 kind: 'website',
                 sourceType: 'built_in',
-                name: 'Next Template',
-                description: 'Next template',
-                framework: 'Next.js',
+                name: 'Classic',
+                description: 'Classic template',
+                framework: null,
                 previewImageUrl: null,
-                repositoryUrl: 'https://github.com/ever-works/next-template',
+                repositoryUrl: 'https://github.com/ever-works/directory-web-template',
                 repositoryOwner: 'ever-works',
-                repositoryName: 'next-template',
+                repositoryName: 'directory-web-template',
                 branch: 'main',
                 syncBranches: ['main'],
                 betaBranch: null,
@@ -211,16 +274,20 @@ describe('TemplateCatalogService', () => {
         const result = await service.refreshTemplatesForUser('website', 'user-1');
 
         expect(templateRepository.upsert).toHaveBeenCalledTimes(1);
+        expect(gitFacade.listRepositories).toHaveBeenCalledTimes(2);
         expect(templateRepository.upsert).toHaveBeenCalledWith(
             expect.objectContaining({
-                id: 'next-template',
+                id: 'classic',
                 sourceType: 'built_in',
-                repositoryName: 'next-template',
+                repositoryName: 'directory-web-template',
             }),
         );
+        expect(templateRepository.updateById).toHaveBeenCalledWith('directory-web-template', {
+            isActive: false,
+        });
         expect(result.templates[0]).toEqual(
             expect.objectContaining({
-                id: 'next-template',
+                id: 'classic',
                 originType: 'standard',
             }),
         );

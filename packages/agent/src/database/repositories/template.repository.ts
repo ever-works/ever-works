@@ -78,6 +78,24 @@ export class TemplateRepository {
         });
     }
 
+    async findBuiltInByRepositoryCoordinates(
+        kind: TemplateKind,
+        repositoryOwner: string,
+        repositoryName: string,
+    ): Promise<Template | null> {
+        return this.repository.findOne({
+            where: {
+                kind,
+                sourceType: 'built_in',
+                repositoryOwner,
+                repositoryName,
+            },
+            order: {
+                id: 'ASC',
+            },
+        });
+    }
+
     async upsert(template: Partial<Template> & { id: string }): Promise<Template> {
         const existing = await this.findById(template.id);
 
