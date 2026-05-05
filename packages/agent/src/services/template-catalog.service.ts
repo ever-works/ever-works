@@ -8,6 +8,7 @@ import {
 } from '@nestjs/common';
 import { TemplateRepository } from '@src/database/repositories/template.repository';
 import { UserTemplatePreferenceRepository } from '@src/database/repositories/user-template-preference.repository';
+import { WorkRepository } from '@src/database/repositories/work.repository';
 import { GitFacadeService } from '@src/facades/git.facade';
 import {
     getDefaultWebsiteTemplateId,
@@ -57,6 +58,7 @@ export class TemplateCatalogService implements OnModuleInit {
     constructor(
         private readonly templateRepository: TemplateRepository,
         private readonly userTemplatePreferenceRepository: UserTemplatePreferenceRepository,
+        private readonly workRepository: WorkRepository,
         private readonly gitFacade: GitFacadeService,
     ) {}
 
@@ -188,6 +190,94 @@ export class TemplateCatalogService implements OnModuleInit {
         await this.userTemplatePreferenceRepository.upsertDefault(userId, kind, template.id);
 
         return { defaultTemplateId: template.id };
+    }
+
+    async updateCustomTemplateForUser(
+        input: {
+            kind: TemplateKind;
+            templateId: string;
+            name?: string;
+            description?: string;
+            framework?: string;
+            previewImageUrl?: string | null;
+            branch?: string;
+        },
+        userId: string,
+    ): Promise<TemplateCatalogItem> {
+        const template = await this.templateRepository.findOwnedCustomById(
+            input.templateId,
+            userId,
+        );
+
+        if (!template || template.kind !== input.kind || !template.isActive) {
+            throw new NotFoundException({
+                status: 'error',
+                message: 'Custom template not found for this user and kind.',
+            });
+        }
+
+        const updated = await this.templateRepository.updateById(template.id, {
+            name: input.name?.trim() || template.name,
+            description: input.description?.trim() || null,
+            framework: input.framework?.trim() || null,
+            previewImageUrl: input.previewImageUrl?.trim() || null,
+            branch: input.branch?.trim() || template.branch,
+        });
+
+        const defaultTemplateId = await this.getDefaultTemplateIdForUser(input.kind, userId);
+
+        return this.toCatalogItem(updated, defaultTemplateId);
+    }
+
+    async archiveCustomTemplateForUser(
+        input: {
+            kind: TemplateKind;
+            templateId: string;
+        },
+        userId: string,
+    ): Promise<{ templateId: string; archived: true }> {
+        const template = await this.templateRepository.findOwnedCustomById(
+            input.templateId,
+            userId,
+        );
+
+        if (!template || template.kind !== input.kind || !template.isActive) {
+            throw new NotFoundException({
+                status: 'error',
+                message: 'Custom template not found for this user and kind.',
+            });
+        }
+
+        if (input.kind === 'website') {
+            const usageCount = await this.workRepository.countByUserAndWebsiteTemplateId(
+                userId,
+                template.id,
+            );
+
+            if (usageCount > 0) {
+                throw new ConflictException({
+                    status: 'error',
+                    message:
+                        usageCount === 1
+                            ? 'This template is still assigned to 1 work. Reassign that work before archiving the template.'
+                            : `This template is still assigned to ${usageCount} works. Reassign those works before archiving the template.`,
+                });
+            }
+        }
+
+        await this.templateRepository.updateById(template.id, { isActive: false });
+
+        return {
+            templateId: template.id,
+            archived: true,
+        };
+    }
+
+    async refreshTemplatesForUser(
+        kind: TemplateKind,
+        userId: string,
+    ): Promise<{ defaultTemplateId: string | null; templates: TemplateCatalogItem[] }> {
+        return this.listTemplatesForUser(kind, userId);
     }
 
     async forkTemplateForUser(

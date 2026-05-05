@@ -12,6 +12,9 @@ import {
     Github,
     ExternalLink,
     GitFork,
+    PencilLine,
+    RefreshCw,
+    Trash2,
 } from 'lucide-react';
 import type { TemplateCatalogItem, TemplateKind, TemplateOriginType } from '@/lib/api/templates';
 import { Button } from '@/components/ui/button';
@@ -29,8 +32,11 @@ import {
 } from '@/components/ui/dialog';
 import {
     addCustomTemplate,
+    archiveCustomTemplate,
     forkTemplate,
+    refreshTemplates,
     setDefaultTemplate,
+    updateCustomTemplate,
 } from '@/app/actions/dashboard/templates';
 import { cn } from '@/lib/utils/cn';
 
@@ -54,6 +60,7 @@ interface AddTemplateFormState {
     name: string;
     description: string;
     framework: string;
+    previewImageUrl: string;
     branch: string;
 }
 
@@ -62,6 +69,7 @@ const EMPTY_FORM: AddTemplateFormState = {
     name: '',
     description: '',
     framework: '',
+    previewImageUrl: '',
     branch: '',
 };
 
@@ -180,15 +188,21 @@ function TemplateCard({
     isDefault,
     onSetDefault,
     onFork,
+    onEdit,
+    onArchive,
     loading,
     forkLoading,
+    archiveLoading,
 }: {
     template: TemplateCatalogItem;
     isDefault: boolean;
     onSetDefault: (templateId: string) => void;
     onFork: (template: TemplateCatalogItem) => void;
+    onEdit: (template: TemplateCatalogItem) => void;
+    onArchive: (template: TemplateCatalogItem) => void;
     loading: boolean;
     forkLoading: boolean;
+    archiveLoading: boolean;
 }) {
     const t = useTranslations('dashboard.templates');
     const tone = frameworkTone(template.framework);
@@ -350,7 +364,31 @@ function TemplateCard({
                                 <GitFork className="h-4 w-4" />
                                 {t('card.fork')}
                             </Button>
-                        ) : null}
+                        ) : (
+                            <>
+                                <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    disabled={loading || archiveLoading}
+                                    onClick={() => onEdit(template)}
+                                    className="shrink-0 rounded-xl"
+                                >
+                                    <PencilLine className="h-4 w-4" />
+                                    {t('card.edit')}
+                                </Button>
+                                <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    loading={archiveLoading}
+                                    disabled={loading || archiveLoading}
+                                    onClick={() => onArchive(template)}
+                                    className="shrink-0 rounded-xl text-destructive hover:text-destructive"
+                                >
+                                    <Trash2 className="h-4 w-4" />
+                                    {t('card.archive')}
+                                </Button>
+                            </>
+                        )}
                         <Button
                             variant={isDefault ? 'secondary' : 'primary'}
                             size="sm"
@@ -380,12 +418,18 @@ export function TemplatesCatalog({
     const [searchQuery, setSearchQuery] = useState('');
     const [filterMode, setFilterMode] = useState<FilterMode>('all');
     const [dialogOpen, setDialogOpen] = useState(false);
+    const [editingTemplate, setEditingTemplate] = useState<TemplateCatalogItem | null>(null);
     const [forkDialogTemplate, setForkDialogTemplate] = useState<TemplateCatalogItem | null>(null);
+    const [archiveDialogTemplate, setArchiveDialogTemplate] = useState<TemplateCatalogItem | null>(
+        null,
+    );
     const [formState, setFormState] = useState<AddTemplateFormState>(EMPTY_FORM);
     const [forkTargetOwner, setForkTargetOwner] = useState(forkTargets[0]?.login || '');
     const [isSavingDefault, startSavingDefault] = useTransition();
     const [isAddingTemplate, startAddingTemplate] = useTransition();
     const [isForkingTemplate, startForkingTemplate] = useTransition();
+    const [isArchivingTemplate, startArchivingTemplate] = useTransition();
+    const [isRefreshingTemplates, startRefreshingTemplates] = useTransition();
 
     const filteredTemplates = useMemo(() => {
         const normalizedQuery = searchQuery.trim().toLowerCase();
@@ -421,12 +465,17 @@ export function TemplatesCatalog({
 
     const resetDialog = () => {
         setFormState(EMPTY_FORM);
+        setEditingTemplate(null);
         setDialogOpen(false);
     };
 
     const resetForkDialog = () => {
         setForkDialogTemplate(null);
         setForkTargetOwner(forkTargets[0]?.login || '');
+    };
+
+    const resetArchiveDialog = () => {
+        setArchiveDialogTemplate(null);
     };
 
     const handleSetDefault = (templateId: string) => {
@@ -451,39 +500,58 @@ export function TemplatesCatalog({
         });
     };
 
-    const handleAddTemplate = () => {
+    const handleSaveTemplate = () => {
         const repositoryUrl = formState.repositoryUrl.trim();
-        if (!repositoryUrl) {
+        if (!editingTemplate && !repositoryUrl) {
             toast.error(t('messages.repositoryUrlRequired'));
             return;
         }
 
-        if (!parseGitHubRepositoryUrl(repositoryUrl)) {
+        if (!editingTemplate && !parseGitHubRepositoryUrl(repositoryUrl)) {
             toast.error(t('messages.repositoryUrlInvalid'));
             return;
         }
 
         startAddingTemplate(() => {
             void (async () => {
-                const result = await addCustomTemplate({
-                    kind,
-                    repositoryUrl,
-                    name: formState.name.trim() || undefined,
-                    description: formState.description.trim() || undefined,
-                    framework: formState.framework.trim() || undefined,
-                    branch: formState.branch.trim() || undefined,
-                });
+                const result = editingTemplate
+                    ? await updateCustomTemplate(editingTemplate.id, {
+                          kind,
+                          name: formState.name.trim() || undefined,
+                          description: formState.description.trim() || undefined,
+                          framework: formState.framework.trim() || undefined,
+                          previewImageUrl: formState.previewImageUrl.trim() || null,
+                          branch: formState.branch.trim() || undefined,
+                      })
+                    : await addCustomTemplate({
+                          kind,
+                          repositoryUrl,
+                          name: formState.name.trim() || undefined,
+                          description: formState.description.trim() || undefined,
+                          framework: formState.framework.trim() || undefined,
+                          previewImageUrl: formState.previewImageUrl.trim() || undefined,
+                          branch: formState.branch.trim() || undefined,
+                      });
 
                 if (!result.success || !result.template) {
-                    toast.error(result.error || t('messages.addFailed'));
+                    toast.error(
+                        result.error ||
+                            (editingTemplate
+                                ? t('messages.updateFailed')
+                                : t('messages.addFailed')),
+                    );
                     return;
                 }
 
                 setTemplates((current) => {
-                    const next = [...current, result.template];
+                    const next = current
+                        .filter((template) => template.id !== result.template?.id)
+                        .concat(result.template);
                     return next.sort(compareTemplates);
                 });
-                toast.success(t('messages.addSuccess'));
+                toast.success(
+                    editingTemplate ? t('messages.updateSuccess') : t('messages.addSuccess'),
+                );
                 resetDialog();
             })();
         });
@@ -539,6 +607,52 @@ export function TemplatesCatalog({
         });
     };
 
+    const handleArchiveTemplate = () => {
+        if (!archiveDialogTemplate) {
+            return;
+        }
+
+        startArchivingTemplate(() => {
+            void (async () => {
+                const result = await archiveCustomTemplate(archiveDialogTemplate.id, { kind });
+
+                if (!result.success || !result.templateId) {
+                    toast.error(result.error || t('messages.archiveFailed'));
+                    return;
+                }
+
+                const refreshed = await refreshTemplates({ kind });
+                if (refreshed.success) {
+                    setTemplates(refreshed.templates.sort(compareTemplates));
+                    setCurrentDefaultTemplateId(refreshed.defaultTemplateId);
+                } else {
+                    setTemplates((current) =>
+                        current.filter((template) => template.id !== result.templateId),
+                    );
+                }
+                toast.success(t('messages.archiveSuccess'));
+                resetArchiveDialog();
+            })();
+        });
+    };
+
+    const handleRefreshTemplates = () => {
+        startRefreshingTemplates(() => {
+            void (async () => {
+                const result = await refreshTemplates({ kind });
+
+                if (!result.success) {
+                    toast.error(result.error || t('messages.refreshFailed'));
+                    return;
+                }
+
+                setTemplates(result.templates.sort(compareTemplates));
+                setCurrentDefaultTemplateId(result.defaultTemplateId);
+                toast.success(t('messages.refreshSuccess'));
+            })();
+        });
+    };
+
     return (
         <div className="space-y-8">
             <section className="overflow-hidden rounded-[2rem] border border-border bg-white dark:border-border-dark dark:bg-surface-dark">
@@ -564,6 +678,16 @@ export function TemplatesCatalog({
                             >
                                 <Plus className="h-4 w-4" />
                                 {t('actions.addTemplate')}
+                            </Button>
+                            <Button
+                                size="sm"
+                                variant="ghost"
+                                className="rounded-xl"
+                                onClick={handleRefreshTemplates}
+                                loading={isRefreshingTemplates}
+                            >
+                                <RefreshCw className="h-4 w-4" />
+                                {t('actions.refreshTemplates')}
                             </Button>
                             <p className="text-xs text-text-muted dark:text-text-muted-dark">
                                 {t('hero.catalogHint')}
@@ -649,6 +773,18 @@ export function TemplatesCatalog({
                     <p className="mx-auto mt-2 max-w-md text-sm leading-7 text-text-secondary dark:text-text-secondary-dark">
                         {searchQuery ? t('empty.search') : t('empty.default')}
                     </p>
+                    {(searchQuery || filterMode !== 'all') && (
+                        <Button
+                            variant="ghost"
+                            className="mt-5 rounded-xl"
+                            onClick={() => {
+                                setSearchQuery('');
+                                setFilterMode('all');
+                            }}
+                        >
+                            {t('empty.resetFilters')}
+                        </Button>
+                    )}
                 </section>
             ) : (
                 <section className="grid grid-cols-1 gap-5 @3xl/main:grid-cols-2">
@@ -662,9 +798,27 @@ export function TemplatesCatalog({
                                 setForkDialogTemplate(selectedTemplate);
                                 setForkTargetOwner(forkTargets[0]?.login || '');
                             }}
+                            onEdit={(selectedTemplate) => {
+                                setEditingTemplate(selectedTemplate);
+                                setFormState({
+                                    repositoryUrl: selectedTemplate.repositoryUrl || '',
+                                    name: selectedTemplate.name,
+                                    description: selectedTemplate.description || '',
+                                    framework: selectedTemplate.framework || '',
+                                    previewImageUrl: selectedTemplate.previewImageUrl || '',
+                                    branch: selectedTemplate.branch || '',
+                                });
+                                setDialogOpen(true);
+                            }}
+                            onArchive={(selectedTemplate) =>
+                                setArchiveDialogTemplate(selectedTemplate)
+                            }
                             loading={isSavingDefault}
                             forkLoading={
                                 isForkingTemplate && forkDialogTemplate?.id === template.id
+                            }
+                            archiveLoading={
+                                isArchivingTemplate && archiveDialogTemplate?.id === template.id
                             }
                         />
                     ))}
@@ -679,25 +833,36 @@ export function TemplatesCatalog({
                             <DialogClose onClose={resetDialog} />
                             <DialogHeader className="mb-6 pr-8">
                                 <DialogTitle className="text-xl font-semibold text-text dark:text-text-dark">
-                                    {t('dialog.title')}
+                                    {editingTemplate ? t('dialog.editTitle') : t('dialog.title')}
                                 </DialogTitle>
                                 <DialogDescription className="mt-2 max-w-xl leading-6">
-                                    {t('dialog.description')}
+                                    {editingTemplate
+                                        ? t('dialog.editDescription')
+                                        : t('dialog.description')}
                                 </DialogDescription>
                             </DialogHeader>
 
                             <div className="space-y-4">
-                                <Input
-                                    label={t('dialog.repositoryUrlLabel')}
-                                    placeholder={t('dialog.repositoryUrlPlaceholder')}
-                                    value={formState.repositoryUrl}
-                                    onChange={(event) =>
-                                        setFormState((current) => ({
-                                            ...current,
-                                            repositoryUrl: event.target.value,
-                                        }))
-                                    }
-                                />
+                                {!editingTemplate ? (
+                                    <Input
+                                        label={t('dialog.repositoryUrlLabel')}
+                                        placeholder={t('dialog.repositoryUrlPlaceholder')}
+                                        value={formState.repositoryUrl}
+                                        onChange={(event) =>
+                                            setFormState((current) => ({
+                                                ...current,
+                                                repositoryUrl: event.target.value,
+                                            }))
+                                        }
+                                    />
+                                ) : (
+                                    <Input
+                                        label={t('dialog.repositoryUrlLabel')}
+                                        value={formState.repositoryUrl}
+                                        disabled
+                                        helperText={t('dialog.repositoryUrlLockedHelp')}
+                                    />
+                                )}
 
                                 <div className="grid gap-4 md:grid-cols-2">
                                     <Input
@@ -723,6 +888,19 @@ export function TemplatesCatalog({
                                         }
                                     />
                                 </div>
+
+                                <Input
+                                    label={t('dialog.previewImageLabel')}
+                                    placeholder={t('dialog.previewImagePlaceholder')}
+                                    value={formState.previewImageUrl}
+                                    onChange={(event) =>
+                                        setFormState((current) => ({
+                                            ...current,
+                                            previewImageUrl: event.target.value,
+                                        }))
+                                    }
+                                    helperText={t('dialog.previewImageHelp')}
+                                />
 
                                 <Textarea
                                     rows={4}
@@ -760,11 +938,11 @@ export function TemplatesCatalog({
                                     {t('dialog.cancel')}
                                 </Button>
                                 <Button
-                                    onClick={handleAddTemplate}
+                                    onClick={handleSaveTemplate}
                                     loading={isAddingTemplate}
                                     className="rounded-xl"
                                 >
-                                    {t('dialog.submit')}
+                                    {editingTemplate ? t('dialog.saveChanges') : t('dialog.submit')}
                                 </Button>
                             </DialogFooter>
                         </div>
@@ -860,6 +1038,60 @@ export function TemplatesCatalog({
                                     className="rounded-xl"
                                 >
                                     {t('forkDialog.submit')}
+                                </Button>
+                            </DialogFooter>
+                        </div>
+                    </div>
+                </DialogContent>
+            </Dialog>
+
+            <Dialog
+                open={!!archiveDialogTemplate}
+                onOpenChange={(open) => !open && resetArchiveDialog()}
+            >
+                <DialogContent className="max-w-lg rounded-[2rem] p-0">
+                    <div className="relative overflow-hidden rounded-[2rem] border border-border bg-white dark:border-border-dark dark:bg-surface-dark">
+                        <div className="absolute inset-x-0 top-0 h-28 bg-gradient-to-br from-red-500/14 via-orange-500/8 to-transparent" />
+                        <div className="relative p-6">
+                            <DialogClose onClose={resetArchiveDialog} />
+                            <DialogHeader className="mb-6 pr-8">
+                                <DialogTitle className="text-xl font-semibold text-text dark:text-text-dark">
+                                    {t('archiveDialog.title')}
+                                </DialogTitle>
+                                <DialogDescription className="mt-2 max-w-xl leading-6">
+                                    {t('archiveDialog.description')}
+                                </DialogDescription>
+                            </DialogHeader>
+
+                            <div className="rounded-2xl border border-border bg-surface px-4 py-4 dark:border-border-dark dark:bg-white/4">
+                                <p className="text-xs uppercase tracking-[0.18em] text-text-muted dark:text-text-muted-dark">
+                                    {t('archiveDialog.templateLabel')}
+                                </p>
+                                <p className="mt-2 text-base font-semibold text-text dark:text-text-dark">
+                                    {archiveDialogTemplate?.name}
+                                </p>
+                                <p className="mt-1 text-sm text-text-secondary dark:text-text-secondary-dark">
+                                    {archiveDialogTemplate
+                                        ? `${archiveDialogTemplate.repositoryOwner}/${archiveDialogTemplate.repositoryName}`
+                                        : ''}
+                                </p>
+                            </div>
+
+                            <DialogFooter className="mt-8">
+                                <Button
+                                    variant="ghost"
+                                    onClick={resetArchiveDialog}
+                                    disabled={isArchivingTemplate}
+                                >
+                                    {t('archiveDialog.cancel')}
+                                </Button>
+                                <Button
+                                    variant="danger"
+                                    onClick={handleArchiveTemplate}
+                                    loading={isArchivingTemplate}
+                                    className="rounded-xl"
+                                >
+                                    {t('archiveDialog.submit')}
                                 </Button>
                             </DialogFooter>
                         </div>

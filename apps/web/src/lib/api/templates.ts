@@ -36,6 +36,15 @@ export type AddCustomTemplateResponse = APIResponse<{
     template: TemplateCatalogItem;
 }>;
 
+export type UpdateCustomTemplateResponse = APIResponse<{
+    template: TemplateCatalogItem;
+}>;
+
+export type ArchiveCustomTemplateResponse = APIResponse<{
+    templateId: string;
+    archived: boolean;
+}>;
+
 export type SetDefaultTemplateResponse = APIResponse<{
     kind: TemplateKind;
     defaultTemplateId: string;
@@ -52,6 +61,12 @@ export type ForkTemplateResponse = APIResponse<{
         fullName: string;
         url: string;
     };
+}>;
+
+export type RefreshTemplatesResponse = APIResponse<{
+    kind: TemplateKind;
+    defaultTemplateId: string | null;
+    templates: TemplateCatalogItem[];
 }>;
 
 export const templatesAPI = {
@@ -76,6 +91,34 @@ export const templatesAPI = {
         });
     },
 
+    updateCustom: async (
+        templateId: string,
+        data: {
+            kind: TemplateKind;
+            name?: string;
+            description?: string;
+            framework?: string;
+            previewImageUrl?: string | null;
+            branch?: string;
+        },
+    ) => {
+        return serverMutation<UpdateCustomTemplateResponse>({
+            endpoint: `/templates/custom/${templateId}`,
+            data,
+            method: 'PUT',
+            wrapInData: false,
+        });
+    },
+
+    archiveCustom: async (templateId: string, data: { kind: TemplateKind }) => {
+        return serverMutation<ArchiveCustomTemplateResponse>({
+            endpoint: `/templates/custom/${templateId}/archive`,
+            data,
+            method: 'POST',
+            wrapInData: false,
+        });
+    },
+
     setDefault: async (data: { kind: TemplateKind; templateId: string }) => {
         return serverMutation<SetDefaultTemplateResponse>({
             endpoint: '/templates/default',
@@ -88,6 +131,15 @@ export const templatesAPI = {
     fork: async (data: { kind: TemplateKind; templateId: string; targetOwner: string }) => {
         return serverMutation<ForkTemplateResponse>({
             endpoint: '/templates/fork',
+            data,
+            method: 'POST',
+            wrapInData: false,
+        });
+    },
+
+    refresh: async (data: { kind: TemplateKind }) => {
+        return serverMutation<RefreshTemplatesResponse>({
+            endpoint: '/templates/refresh',
             data,
             method: 'POST',
             wrapInData: false,

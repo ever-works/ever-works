@@ -36,6 +36,16 @@ export class TemplateRepository {
         });
     }
 
+    async findOwnedCustomById(id: string, userId: string): Promise<Template | null> {
+        return this.repository.findOne({
+            where: {
+                id,
+                ownerUserId: userId,
+                sourceType: 'custom',
+            },
+        });
+    }
+
     async findOwnedCustomByRepositoryUrl(
         kind: TemplateKind,
         userId: string,
@@ -77,5 +87,10 @@ export class TemplateRepository {
         }
 
         return this.repository.save(this.repository.create(template));
+    }
+
+    async updateById(id: string, template: Partial<Template>): Promise<Template> {
+        await this.repository.update(id, template);
+        return this.repository.findOneOrFail({ where: { id } });
     }
 }

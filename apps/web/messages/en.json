@@ -2937,9 +2937,10 @@
         },
         "templates": {
             "title": "Templates",
-            "subtitle": "Browse built-in website templates, save or fork GitHub-based templates, and manage which template new works start from.",
+            "subtitle": "Browse built-in website templates, manage your custom catalog, and control which template new works start from.",
             "actions": {
-                "addTemplate": "Add custom template"
+                "addTemplate": "Add custom template",
+                "refreshTemplates": "Refresh templates"
             },
             "hero": {
                 "eyebrow": "Template catalog",
@@ -2973,6 +2974,8 @@
                 "defaultSelected": "Default selected",
                 "makeDefault": "Make default",
                 "fork": "Fork",
+                "edit": "Edit",
+                "archive": "Archive",
                 "catalogOnly": "Catalog item",
                 "openRepository": "Open repository",
                 "previewAlt": "{name} preview",
@@ -2985,19 +2988,26 @@
             "dialog": {
                 "title": "Add custom template",
                 "description": "Save a GitHub repository into your personal template catalog. This first slice stores the template metadata so it can be selected in the next assignment flow.",
+                "editTitle": "Edit custom template",
+                "editDescription": "Update the display details and preview image used for this custom template in your catalog.",
                 "repositoryUrlLabel": "GitHub repository URL",
                 "repositoryUrlPlaceholder": "https://github.com/your-org/your-template",
+                "repositoryUrlLockedHelp": "The source repository URL cannot be changed after the template is added.",
                 "nameLabel": "Template name",
                 "namePlaceholder": "Optional display name",
                 "frameworkLabel": "Framework",
                 "frameworkPlaceholder": "Next.js, Astro, ...",
+                "previewImageLabel": "Preview image URL",
+                "previewImagePlaceholder": "https://example.com/template-preview.png",
+                "previewImageHelp": "Optional. Use a curated screenshot if you want to override the GitHub repository preview.",
                 "descriptionLabel": "Short description",
                 "descriptionPlaceholder": "What this template is best for",
                 "branchLabel": "Default branch",
                 "branchPlaceholder": "main",
                 "branchHelp": "Leave empty to default to main.",
                 "cancel": "Cancel",
-                "submit": "Save template"
+                "submit": "Save template",
+                "saveChanges": "Save changes"
             },
             "forkDialog": {
                 "title": "Fork standard template",
@@ -3014,10 +3024,18 @@
                 "cancel": "Cancel",
                 "submit": "Fork and make default"
             },
+            "archiveDialog": {
+                "title": "Archive custom template",
+                "description": "Archive this template from your catalog. You can only archive templates that are not currently assigned to any works.",
+                "templateLabel": "Template",
+                "cancel": "Cancel",
+                "submit": "Archive template"
+            },
             "empty": {
                 "title": "No templates found",
                 "default": "No templates match this view yet.",
-                "search": "Try a different search term or clear the current filter."
+                "search": "Try a different search term or clear the current filter.",
+                "resetFilters": "Reset filters"
             },
             "messages": {
                 "repositoryUrlRequired": "GitHub repository URL is required.",
@@ -3025,9 +3043,15 @@
                 "forkTargetRequired": "Choose a GitHub account or organization for the fork.",
                 "addSuccess": "Template saved from GitHub URL.",
                 "addFailed": "Failed to save template.",
+                "updateSuccess": "Template details updated.",
+                "updateFailed": "Failed to update template details.",
+                "archiveSuccess": "Template archived from your catalog.",
+                "archiveFailed": "Failed to archive template.",
                 "forkSuccess": "Forked {repository}, added it to your catalog, and set it as your default.",
                 "forkExisting": "{repository} was already in your catalog and is now your default forked template.",
                 "forkFailed": "Failed to fork template.",
+                "refreshSuccess": "Template catalog refreshed.",
+                "refreshFailed": "Failed to refresh templates.",
                 "defaultUpdated": "Default template updated.",
                 "defaultFailed": "Failed to update default template."
             }

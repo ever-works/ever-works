@@ -64,6 +64,48 @@ export class SetDefaultTemplateDto {
     templateId: string;
 }
 
+export class UpdateCustomTemplateDto {
+    @ApiProperty({ enum: TEMPLATE_KINDS })
+    @IsString()
+    @IsIn(TEMPLATE_KINDS)
+    kind: 'website' | 'work';
+
+    @ApiProperty({ required: false })
+    @IsOptional()
+    @IsString()
+    name?: string;
+
+    @ApiProperty({ required: false })
+    @IsOptional()
+    @IsString()
+    description?: string;
+
+    @ApiProperty({ required: false })
+    @IsOptional()
+    @IsString()
+    framework?: string;
+
+    @ApiProperty({ required: false, nullable: true })
+    @IsOptional()
+    @IsUrl({
+        protocols: ['http', 'https'],
+        require_protocol: true,
+    })
+    previewImageUrl?: string | null;
+
+    @ApiProperty({ required: false })
+    @IsOptional()
+    @IsString()
+    branch?: string;
+}
+
+export class ArchiveCustomTemplateDto {
+    @ApiProperty({ enum: TEMPLATE_KINDS })
+    @IsString()
+    @IsIn(TEMPLATE_KINDS)
+    kind: 'website' | 'work';
+}
+
 export class ForkTemplateDto {
     @ApiProperty({ enum: TEMPLATE_KINDS })
     @IsString()
@@ -77,4 +119,11 @@ export class ForkTemplateDto {
     @ApiProperty()
     @IsString()
     targetOwner: string;
+}
+
+export class RefreshTemplatesDto {
+    @ApiProperty({ enum: TEMPLATE_KINDS })
+    @IsString()
+    @IsIn(TEMPLATE_KINDS)
+    kind: 'website' | 'work';
 }

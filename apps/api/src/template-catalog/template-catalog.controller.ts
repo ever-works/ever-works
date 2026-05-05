@@ -1,13 +1,26 @@
-import { Body, Controller, Get, HttpCode, HttpStatus, Post, Put, Query } from '@nestjs/common';
+import {
+    Body,
+    Controller,
+    Get,
+    HttpCode,
+    HttpStatus,
+    Param,
+    Post,
+    Put,
+    Query,
+} from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { TemplateCatalogService } from '@ever-works/agent/services';
 import { CurrentUser } from '@src/auth';
 import { AuthenticatedUser } from '@src/auth/types/auth.types';
 import {
     AddCustomTemplateDto,
+    ArchiveCustomTemplateDto,
     ForkTemplateDto,
     ListTemplatesQueryDto,
+    RefreshTemplatesDto,
     SetDefaultTemplateDto,
+    UpdateCustomTemplateDto,
 } from './dto/list-templates.dto';
 
 @ApiTags('Templates')
@@ -59,6 +72,58 @@ export class TemplateCatalogController {
         };
     }
 
+    @Put('templates/custom/:templateId')
+    @HttpCode(HttpStatus.OK)
+    @ApiOperation({
+        summary: 'Update custom template',
+        description: 'Update editable metadata for a custom template owned by the current user.',
+    })
+    @ApiResponse({ status: 200, description: 'Custom template updated' })
+    async updateCustomTemplate(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('templateId') templateId: string,
+        @Body() body: UpdateCustomTemplateDto,
+    ) {
+        const template = await this.templateCatalogService.updateCustomTemplateForUser(
+            {
+                ...body,
+                templateId,
+            },
+            auth.userId,
+        );
+
+        return {
+            status: 'success',
+            template,
+        };
+    }
+
+    @Post('templates/custom/:templateId/archive')
+    @HttpCode(HttpStatus.OK)
+    @ApiOperation({
+        summary: 'Archive custom template',
+        description: 'Archive a custom template owned by the current user.',
+    })
+    @ApiResponse({ status: 200, description: 'Custom template archived' })
+    async archiveCustomTemplate(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('templateId') templateId: string,
+        @Body() body: ArchiveCustomTemplateDto,
+    ) {
+        const result = await this.templateCatalogService.archiveCustomTemplateForUser(
+            {
+                ...body,
+                templateId,
+            },
+            auth.userId,
+        );
+
+        return {
+            status: 'success',
+            ...result,
+        };
+    }
+
     @Put('templates/default')
     @HttpCode(HttpStatus.OK)
     @ApiOperation({
@@ -98,6 +163,31 @@ export class TemplateCatalogController {
             status: 'success',
             kind: body.kind,
             ...result,
+        };
+    }
+
+    @Post('templates/refresh')
+    @HttpCode(HttpStatus.OK)
+    @ApiOperation({
+        summary: 'Refresh templates catalog',
+        description:
+            'Refresh discovered templates and return the latest catalog for the current user.',
+    })
+    @ApiResponse({ status: 200, description: 'Templates refreshed' })
+    async refreshTemplates(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Body() body: RefreshTemplatesDto,
+    ) {
+        const result = await this.templateCatalogService.refreshTemplatesForUser(
+            body.kind,
+            auth.userId,
+        );
+
+        return {
+            status: 'success',
+            kind: body.kind,
+            defaultTemplateId: result.defaultTemplateId,
+            templates: result.templates,
         };
     }
 }

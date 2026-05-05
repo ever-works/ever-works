@@ -60,6 +60,84 @@ export async function addCustomTemplate(input: {
     }
 }
 
+export async function updateCustomTemplate(
+    templateId: string,
+    input: {
+        kind: 'website' | 'work';
+        name?: string;
+        description?: string;
+        framework?: string;
+        previewImageUrl?: string | null;
+        branch?: string;
+    },
+) {
+    const user = await getAuthFromCookie();
+    if (!user) {
+        redirect(ROUTES.AUTH_LOGIN);
+    }
+
+    const t = await getTranslations('dashboard.templates');
+
+    try {
+        const response = await templatesAPI.updateCustom(templateId, input);
+
+        revalidatePath(ROUTES.DASHBOARD_TEMPLATES);
+
+        return {
+            success: response.status === 'success',
+            template: response.template ?? null,
+            error:
+                response.status === 'error'
+                    ? getResponseMessage(response) || t('messages.updateFailed')
+                    : null,
+        };
+    } catch (error) {
+        console.error('Update custom template error:', error);
+        return {
+            success: false,
+            template: null,
+            error: error instanceof Error ? error.message : t('messages.updateFailed'),
+        };
+    }
+}
+
+export async function archiveCustomTemplate(
+    templateId: string,
+    input: { kind: 'website' | 'work' },
+) {
+    const user = await getAuthFromCookie();
+    if (!user) {
+        redirect(ROUTES.AUTH_LOGIN);
+    }
+
+    const t = await getTranslations('dashboard.templates');
+
+    try {
+        const response = await templatesAPI.archiveCustom(templateId, input);
+
+        revalidatePath(ROUTES.DASHBOARD_TEMPLATES);
+        revalidatePath(ROUTES.DASHBOARD_WORKS_NEW);
+
+        return {
+            success: response.status === 'success',
+            templateId: response.templateId ?? null,
+            archived: response.archived ?? false,
+            error:
+                response.status === 'error'
+                    ? getResponseMessage(response) || t('messages.archiveFailed')
+                    : null,
+        };
+    } catch (error) {
+        console.error('Archive custom template error:', error);
+        return {
+            success: false,
+            templateId: null,
+            archived: false,
+            error: error instanceof Error ? error.message : t('messages.archiveFailed'),
+        };
+    }
+}
+
 export async function setDefaultTemplate(input: { kind: 'website' | 'work'; templateId: string }) {
     const user = await getAuthFromCookie();
     if (!user) {
@@ -130,6 +208,39 @@ export async function forkTemplate(input: {
             repository: null,
             defaultTemplateId: null,
             error: error instanceof Error ? error.message : t('messages.forkFailed'),
+        };
+    }
+}
+
+export async function refreshTemplates(input: { kind: 'website' | 'work' }) {
+    const user = await getAuthFromCookie();
+    if (!user) {
+        redirect(ROUTES.AUTH_LOGIN);
+    }
+
+    const t = await getTranslations('dashboard.templates');
+
+    try {
+        const response = await templatesAPI.refresh(input);
+
+        revalidatePath(ROUTES.DASHBOARD_TEMPLATES);
+
+        return {
+            success: response.status === 'success',
+            templates: response.templates ?? [],
+            defaultTemplateId: response.defaultTemplateId ?? null,
+            error:
+                response.status === 'error'
+                    ? getResponseMessage(response) || t('messages.refreshFailed')
+                    : null,
+        };
+    } catch (error) {
+        console.error('Refresh templates error:', error);
+        return {
+            success: false,
+            templates: [],
+            defaultTemplateId: null,
+            error: error instanceof Error ? error.message : t('messages.refreshFailed'),
         };
     }
 }
