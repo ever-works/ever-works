@@ -47,7 +47,8 @@ vi.mock('../utils/screenshot-capture.js', () => ({
 }));
 
 vi.mock('../utils/binary-manager.js', () => ({
-	ensureBinary: vi.fn()
+	ensureBinary: vi.fn(),
+	resolveExistingBinary: vi.fn()
 }));
 
 vi.mock('../utils/taxonomy-watcher.js', () => ({

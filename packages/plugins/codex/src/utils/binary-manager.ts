@@ -159,3 +159,21 @@ export async function ensureBinary(version: string = DEFAULT_CLI_VERSION, logger
 		`Failed to resolve a runnable Codex CLI. System codex error: ${systemBinary.error ?? 'unavailable'}`
 	);
 }
+
+export async function resolveExistingBinary(version: string = DEFAULT_CLI_VERSION): Promise<string | null> {
+	const platform = await detectPlatform();
+	const binaryPath = getBinaryPath(version, platform.platformString);
+
+	try {
+		await fs.access(binaryPath, fs.constants.X_OK);
+		const cachedBinary = await canExecute(binaryPath);
+		if (cachedBinary.ok) {
+			return binaryPath;
+		}
+	} catch {
+		// No cached binary available.
+	}
+
+	const systemBinary = await canExecute('codex');
+	return systemBinary.ok ? 'codex' : null;
+}
