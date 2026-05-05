@@ -21,6 +21,8 @@ import { ConversationRepository } from './repositories/conversation.repository';
 import { GitHubAppInstallationRepository } from './repositories/github-app-installation.repository';
 import { GitHubAppInstallationRepoRepository } from './repositories/github-app-installation-repository.repository';
 import { GitHubAppUserLinkRepository } from './repositories/github-app-user-link.repository';
+import { OnboardingRequestRepository } from './repositories/onboarding-request.repository';
+import { WebhookSubscriptionRepository } from './repositories/webhook-subscription.repository';
 
 @Module({
     imports: [
@@ -57,6 +59,8 @@ import { GitHubAppUserLinkRepository } from './repositories/github-app-user-link
         GitHubAppInstallationRepository,
         GitHubAppInstallationRepoRepository,
         GitHubAppUserLinkRepository,
+        OnboardingRequestRepository,
+        WebhookSubscriptionRepository,
     ],
     exports: [
         TypeOrmModule,
@@ -79,6 +83,8 @@ import { GitHubAppUserLinkRepository } from './repositories/github-app-user-link
         GitHubAppInstallationRepository,
         GitHubAppInstallationRepoRepository,
         GitHubAppUserLinkRepository,
+        OnboardingRequestRepository,
+        WebhookSubscriptionRepository,
     ],
 })
 export class DatabaseModule {}

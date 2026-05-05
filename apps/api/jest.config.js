@@ -10,7 +10,8 @@ module.exports = {
                 diagnostics: {
                     // 151002: ts-jest specific warning
                     // 2307: cross-package @src path alias not resolved by TS (handled by moduleNameMapper)
-                    ignoreCodes: [151002, 2307],
+                    // 2589: deep type instantiation in zodToJsonSchema chain reachable via @ever-works/agent
+                    ignoreCodes: [151002, 2307, 2589],
                 },
             },
         ],

@@ -23,6 +23,7 @@ interface PluginModelSelectProps {
     value: string;
     onChange: (value: string) => void;
     disabled?: boolean;
+    allowCustom?: boolean;
 }
 
 type ModelLoadResult = {
@@ -77,6 +78,7 @@ export function PluginModelSelect({
     value,
     onChange,
     disabled = false,
+    allowCustom = true,
 }: PluginModelSelectProps) {
     const t = useTranslations('dashboard.plugins.modelSelect');
     const [models, setModels] = useState<AiModel[]>([]);
@@ -262,49 +264,50 @@ export function PluginModelSelect({
                         ))}
                     </div>
 
-                    {/* Custom model input */}
-                    <div className="border-t border-border dark:border-border-dark p-2">
-                        {showCustomInput ? (
-                            <div className="flex gap-2">
-                                <input
-                                    type="text"
-                                    value={customModel}
-                                    onChange={(e) => setCustomModel(e.target.value)}
-                                    placeholder={t('customModelPlaceholder')}
-                                    className={cn(
-                                        'flex-1 px-2 py-1 text-sm rounded-md',
-                                        'bg-surface-secondary dark:bg-surface-secondary-dark',
-                                        'text-text dark:text-text-dark',
-                                        'border border-border dark:border-border-dark',
-                                        'focus:outline-none focus:ring-1 focus:ring-primary/50',
-                                    )}
-                                    onKeyDown={(e) => {
-                                        if (e.key === 'Enter') {
-                                            e.preventDefault();
-                                            handleCustomSubmit();
-                                        }
-                                        if (e.key === 'Escape') setShowCustomInput(false);
-                                    }}
-                                    autoFocus
-                                />
+                    {allowCustom && (
+                        <div className="border-t border-border dark:border-border-dark p-2">
+                            {showCustomInput ? (
+                                <div className="flex gap-2">
+                                    <input
+                                        type="text"
+                                        value={customModel}
+                                        onChange={(e) => setCustomModel(e.target.value)}
+                                        placeholder={t('customModelPlaceholder')}
+                                        className={cn(
+                                            'flex-1 px-2 py-1 text-sm rounded-md',
+                                            'bg-surface-secondary dark:bg-surface-secondary-dark',
+                                            'text-text dark:text-text-dark',
+                                            'border border-border dark:border-border-dark',
+                                            'focus:outline-none focus:ring-1 focus:ring-primary/50',
+                                        )}
+                                        onKeyDown={(e) => {
+                                            if (e.key === 'Enter') {
+                                                e.preventDefault();
+                                                handleCustomSubmit();
+                                            }
+                                            if (e.key === 'Escape') setShowCustomInput(false);
+                                        }}
+                                        autoFocus
+                                    />
+                                    <button
+                                        type="button"
+                                        onClick={handleCustomSubmit}
+                                        className="px-3 py-1 text-sm bg-primary text-white rounded-md hover:bg-primary/90"
+                                    >
+                                        {t('add')}
+                                    </button>
+                                </div>
+                            ) : (
                                 <button
                                     type="button"
-                                    onClick={handleCustomSubmit}
-                                    className="px-3 py-1 text-sm bg-primary text-white rounded-md hover:bg-primary/90"
+                                    onClick={() => setShowCustomInput(true)}
+                                    className="w-full text-left text-sm text-primary hover:text-primary/80 px-1 py-0.5"
                                 >
-                                    {t('add')}
+                                    {t('addCustomModel')}
                                 </button>
-                            </div>
-                        ) : (
-                            <button
-                                type="button"
-                                onClick={() => setShowCustomInput(true)}
-                                className="w-full text-left text-sm text-primary hover:text-primary/80 px-1 py-0.5"
-                            >
-                                {t('addCustomModel')}
-                            </button>
-                        )}
-                    </div>
+                            )}
+                        </div>
+                    )}
                 </div>
             )}
         </div>

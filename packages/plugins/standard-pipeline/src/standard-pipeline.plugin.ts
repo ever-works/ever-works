@@ -579,7 +579,6 @@ export class StandardPipelinePlugin implements IPipelinePlugin<BuiltInStepId>, I
 				validation: { min: 1, max: 1000 },
 				group: 'search'
 			},
-
 			// Volume
 			{
 				name: 'data_volume_mode',

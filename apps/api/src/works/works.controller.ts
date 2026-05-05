@@ -12,6 +12,7 @@ import {
     Post,
     Put,
     Query,
+    Logger,
     UseGuards,
 } from '@nestjs/common';
 import {
@@ -110,6 +111,8 @@ import {
 @Controller('api')
 @UseGuards(AuthSessionGuard)
 export class WorksController {
+    private readonly logger = new Logger(WorksController.name);
+
     constructor(
         @Inject(CACHE_MANAGER) private cacheManager: Cache,
         private readonly cacheEntryRepository: CacheEntryRepository,
@@ -577,7 +580,12 @@ export class WorksController {
 
         if (updateScheduleDto.runImmediately && schedule.status === WorkScheduleStatus.ACTIVE) {
             const scheduleEntity = await this.workScheduleService.getScheduleEntity(id, user);
-            await this.workGenerationService.runScheduledUpdate(scheduleEntity);
+            void this.workGenerationService.runScheduledUpdate(scheduleEntity).catch((error) => {
+                this.logger.error(
+                    `Failed to start immediate scheduled update for work ${id}`,
+                    error instanceof Error ? error.stack : String(error),
+                );
+            });
         }
 
         this.activityLogService
@@ -657,8 +665,18 @@ export class WorksController {
             })
             .catch(() => {});
 
-        const response = await this.workGenerationService.runScheduledUpdate(schedule);
-        return response;
+        void this.workGenerationService.runScheduledUpdate(schedule).catch((error) => {
+            this.logger.error(
+                `Failed to run scheduled update for work ${id}`,
+                error instanceof Error ? error.stack : String(error),
+            );
+        });
+
+        return {
+            status: 'pending',
+            slug: schedule.work?.slug ?? id,
+            message: 'Scheduled update started',
+        };
     }
 
     @Post('works/:id/submit-item')

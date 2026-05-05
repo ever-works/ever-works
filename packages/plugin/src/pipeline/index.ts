@@ -10,3 +10,4 @@ export * from './workspace-utils.js';
 export * from './item-schema.js';
 export * from './dedup-utils.js';
 export * from './pipeline-result.utils.js';
+export * from './references.js';

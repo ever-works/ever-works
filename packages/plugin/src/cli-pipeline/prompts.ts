@@ -23,9 +23,13 @@ Today is {date}. Use this when searching the web to find current, up-to-date inf
   - \`_meta/categories.json\` - **Live category registry** (auto-updated as you create items)
   - \`_meta/tags.json\` - **Live tag registry** (auto-updated as you create items)
   - \`_meta/brands.json\` - **Live brand registry** (auto-updated as you create items)
+  - \`_meta/references.jsonl\` - Previously processed research/extraction URLs
 
 **Important:** The \`_meta/\` folder is managed by the system — do NOT create or modify files in \`_meta/\`.
 The taxonomy files are **automatically kept up-to-date** as you create items.
+
+If \`_meta/references.jsonl\` exists, treat it as a durable source ledger. Do NOT browse, fetch, or extract URLs
+listed there with a recent \`last_attempted_at\` unless the user explicitly asks to refresh old sources.
 
 When setting \`category\`, \`tags\`, and \`brands\` fields in your item JSON files:
 - **Always re-read** \`_meta/categories.json\` before choosing a category to see what already exists
