@@ -186,20 +186,14 @@ function TemplateCard({
     return (
         <article
             className={cn(
-                'group relative overflow-hidden rounded-3xl border bg-white dark:bg-surface-dark',
-                'border-border dark:border-border-dark',
-                'shadow-[0_20px_50px_-35px_rgba(15,23,42,0.35)] dark:shadow-[0_24px_60px_-40px_rgba(0,0,0,0.7)]',
+                'group overflow-hidden rounded-xl border bg-card dark:bg-card-primary-dark/30',
+                'border-card-border dark:border-border-secondary-dark',
+                'shadow-xs transition-colors hover:border-primary/35 dark:hover:border-white/15',
             )}
         >
-            <div
-                className={cn(
-                    'absolute inset-x-0 top-0 h-32 bg-gradient-to-br opacity-100',
-                    tone.shell,
-                )}
-            />
-            <div className="relative p-5">
-                <div className="mb-5 overflow-hidden rounded-[1.6rem] border border-border/70 bg-slate-950 dark:border-white/8">
-                    <div className="relative aspect-[1.55]">
+            <div className="p-4">
+                <div className="mb-4 overflow-hidden rounded-lg border border-card-border dark:border-border-dark bg-slate-950">
+                    <div className="relative aspect-[1.8]">
                         {previewUrl ? (
                             <Image
                                 src={previewUrl}
@@ -222,25 +216,25 @@ function TemplateCard({
                             </div>
                         )}
 
-                        <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(15,23,42,0.08),rgba(15,23,42,0.76))]" />
+                        <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(15,23,42,0.12),rgba(15,23,42,0.68))]" />
 
                         <div className="absolute inset-x-0 top-0 flex items-start justify-between gap-3 p-4">
                             <div className="flex flex-wrap gap-2">
                                 {template.framework ? (
                                     <span
                                         className={cn(
-                                            'rounded-full px-2.5 py-1 text-[11px] font-medium backdrop-blur-sm',
+                                            'rounded-full px-2 py-0.5 text-[11px] font-medium backdrop-blur-sm',
                                             tone.badge,
                                         )}
                                     >
                                         {template.framework}
                                     </span>
                                 ) : null}
-                                <span className="rounded-full bg-white/12 px-2.5 py-1 text-[11px] font-medium text-white backdrop-blur-sm">
+                                <span className="rounded-full bg-white/12 px-2 py-0.5 text-[11px] font-medium text-white backdrop-blur-sm">
                                     {originLabel}
                                 </span>
                                 {isDefault ? (
-                                    <span className="rounded-full bg-primary/85 px-2.5 py-1 text-[11px] font-medium text-primary-foreground">
+                                    <span className="rounded-full bg-primary/85 px-2 py-0.5 text-[11px] font-medium text-primary-foreground">
                                         {t('card.default')}
                                     </span>
                                 ) : null}
@@ -248,26 +242,26 @@ function TemplateCard({
 
                             <div
                                 className={cn(
-                                    'flex h-14 w-14 shrink-0 items-end rounded-2xl border px-3 py-2 text-white shadow-lg backdrop-blur-sm',
+                                    'flex h-10 w-10 shrink-0 items-end rounded-xl border px-2 py-1.5 text-white shadow-md backdrop-blur-sm',
                                     'bg-white/10',
                                     tone.accent,
                                 )}
                             >
-                                <span className="text-lg font-semibold tracking-tight">
+                                <span className="text-sm font-semibold tracking-tight">
                                     {initials(template.name)}
                                 </span>
                             </div>
                         </div>
 
-                        <div className="absolute inset-x-0 bottom-0 p-4">
-                            <div className="rounded-[1.35rem] border border-white/12 bg-black/35 p-4 backdrop-blur-md">
+                        <div className="absolute inset-x-0 bottom-0 p-3">
+                            <div className="rounded-lg border border-white/12 bg-black/35 p-3 backdrop-blur-md">
                                 <p className="text-[11px] uppercase tracking-[0.24em] text-white/62">
                                     {sourceLabel}
                                 </p>
-                                <h3 className="mt-2 text-lg font-semibold leading-tight text-white">
+                                <h3 className="mt-1.5 text-base font-semibold leading-tight text-white">
                                     {template.name}
                                 </h3>
-                                <p className="mt-2 flex items-center gap-2 text-xs text-white/72">
+                                <p className="mt-1.5 flex items-center gap-2 text-xs text-white/72">
                                     <Github className="h-3.5 w-3.5" />
                                     <span className="truncate">
                                         {template.repositoryOwner}/{template.repositoryName}
@@ -278,52 +272,54 @@ function TemplateCard({
                     </div>
                 </div>
 
-                <div className="space-y-3">
-                    <div className="flex flex-wrap gap-2">
+                <div className="space-y-2.5">
+                    <div className="flex flex-wrap gap-1.5">
                         {!template.framework ? (
-                            <span className="rounded-full bg-surface-secondary px-2.5 py-1 text-[11px] font-medium text-text-secondary dark:bg-white/6 dark:text-text-secondary-dark">
+                            <span className="rounded-full bg-surface-secondary px-2 py-0.5 text-[11px] font-medium text-text-secondary dark:bg-white/6 dark:text-text-secondary-dark">
                                 {t('card.frameworkAgnostic')}
                             </span>
                         ) : null}
                     </div>
-                    <div className="space-y-3">
-                        <div className="flex flex-wrap gap-2">
-                            <span className="rounded-full border border-border bg-surface px-2.5 py-1 text-[11px] font-medium text-text-secondary dark:border-border-dark dark:bg-white/4 dark:text-text-secondary-dark">
+                    <div className="space-y-2.5">
+                        <div className="flex flex-wrap gap-1.5">
+                            <span className="rounded-full border border-border bg-surface px-2 py-0.5 text-[11px] font-medium text-text-secondary dark:border-border-dark dark:bg-white/4 dark:text-text-secondary-dark">
                                 {t('card.branch', { branch: template.branch })}
                             </span>
-                            <span className="rounded-full border border-border bg-surface px-2.5 py-1 text-[11px] font-medium text-text-secondary dark:border-border-dark dark:bg-white/4 dark:text-text-secondary-dark">
+                            <span className="rounded-full border border-border bg-surface px-2 py-0.5 text-[11px] font-medium text-text-secondary dark:border-border-dark dark:bg-white/4 dark:text-text-secondary-dark">
                                 {t('card.syncBranches', { count: template.syncBranches.length })}
                             </span>
                             {template.betaBranch ? (
-                                <span className="rounded-full border border-amber-500/25 bg-amber-500/8 px-2.5 py-1 text-[11px] font-medium text-amber-700 dark:text-amber-300">
+                                <span className="rounded-full border border-amber-500/25 bg-amber-500/8 px-2 py-0.5 text-[11px] font-medium text-amber-700 dark:text-amber-300">
                                     {t('card.betaBranch', { branch: template.betaBranch })}
                                 </span>
                             ) : null}
                         </div>
-                        <p className="text-sm leading-6 text-text-secondary dark:text-text-secondary-dark">
+                        <p className="text-sm leading-6 text-text-secondary dark:text-text-secondary-dark line-clamp-3 min-h-[4.5rem]">
                             {template.description || t('card.noDescription')}
                         </p>
                     </div>
                 </div>
 
-                <div className="mt-6 flex items-center justify-between gap-3 border-t border-border/70 pt-4 dark:border-border-dark/70">
-                    {template.repositoryUrl ? (
-                        <a
-                            href={template.repositoryUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="inline-flex items-center gap-1.5 text-sm text-text-secondary transition-colors hover:text-text dark:text-text-secondary-dark dark:hover:text-text-dark"
-                        >
-                            <ExternalLink className="h-4 w-4" />
-                            {t('card.openRepository')}
-                        </a>
-                    ) : (
-                        <span className="text-sm text-text-muted dark:text-text-muted-dark">
-                            {t('card.catalogOnly')}
-                        </span>
-                    )}
+                <div className="mt-4 space-y-3 border-t border-card-border pt-3 dark:border-border-secondary-dark">
+                    <div className="flex items-center justify-between gap-3">
+                        {template.repositoryUrl ? (
+                            <a
+                                href={template.repositoryUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center gap-1.5 text-sm text-text-secondary transition-colors hover:text-text dark:text-text-secondary-dark dark:hover:text-text-dark"
+                            >
+                                <ExternalLink className="h-4 w-4" />
+                                {t('card.openRepository')}
+                            </a>
+                        ) : (
+                            <span className="text-sm text-text-muted dark:text-text-muted-dark">
+                                {t('card.catalogOnly')}
+                            </span>
+                        )}
+                    </div>
 
-                    <div className="flex items-center gap-2">
+                    <div className="flex flex-wrap items-center gap-2">
                         {template.sourceType === 'built_in' ? (
                             <Button
                                 variant="ghost"
@@ -331,7 +327,7 @@ function TemplateCard({
                                 loading={forkLoading}
                                 disabled={loading || forkLoading}
                                 onClick={() => onFork(template)}
-                                className="shrink-0 rounded-xl"
+                                className="shrink-0"
                             >
                                 <GitFork className="h-4 w-4" />
                                 {t('card.fork')}
@@ -343,7 +339,7 @@ function TemplateCard({
                                     size="sm"
                                     disabled={loading || archiveLoading}
                                     onClick={() => onEdit(template)}
-                                    className="shrink-0 rounded-xl"
+                                    className="shrink-0"
                                 >
                                     <PencilLine className="h-4 w-4" />
                                     {t('card.edit')}
@@ -354,7 +350,7 @@ function TemplateCard({
                                     loading={archiveLoading}
                                     disabled={loading || archiveLoading}
                                     onClick={() => onArchive(template)}
-                                    className="shrink-0 rounded-xl text-destructive hover:text-destructive"
+                                    className="shrink-0 text-destructive hover:text-destructive"
                                 >
                                     <Trash2 className="h-4 w-4" />
                                     {t('card.archive')}
@@ -367,7 +363,7 @@ function TemplateCard({
                             loading={loading}
                             disabled={isDefault || loading}
                             onClick={() => onSetDefault(template.id)}
-                            className="shrink-0 rounded-xl"
+                            className="shrink-0"
                         >
                             {isDefault ? t('card.defaultSelected') : t('card.makeDefault')}
                         </Button>
@@ -626,9 +622,9 @@ export function TemplatesCatalog({
     };
 
     return (
-        <div className="space-y-8">
-            <section className="overflow-hidden rounded-[2rem] border border-border bg-white dark:border-border-dark dark:bg-surface-dark">
-                <div className="grid gap-6 px-6 py-6 lg:grid-cols-[1.35fr_0.95fr] lg:px-8 lg:py-8">
+        <div className="space-y-6">
+            <section className="overflow-hidden rounded-xl border border-card-border bg-card dark:border-border-secondary-dark dark:bg-card-primary-dark/30">
+                <div className="grid gap-5 px-5 py-5 lg:grid-cols-[1.35fr_0.95fr] lg:px-6 lg:py-6">
                     <div className="space-y-4">
                         <div className="inline-flex items-center gap-2 rounded-full border border-border bg-surface-secondary px-3 py-1 text-xs font-medium text-text-secondary dark:border-border-dark dark:bg-white/6 dark:text-text-secondary-dark">
                             <Sparkles className="h-3.5 w-3.5" />
@@ -667,37 +663,37 @@ export function TemplatesCatalog({
                         </div>
                     </div>
 
-                    <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-1 xl:grid-cols-3">
-                        <div className="rounded-3xl border border-border bg-surface px-4 py-4 dark:border-border-dark dark:bg-white/4">
-                            <p className="text-xs uppercase tracking-[0.18em] text-text-muted dark:text-text-muted-dark">
+                    <div className="grid gap-3 sm:grid-cols-3">
+                        <div className="rounded-lg border border-card-border bg-surface px-3 py-3 dark:border-border-dark dark:bg-white/4">
+                            <p className="text-[11px] uppercase tracking-[0.14em] text-text-muted dark:text-text-muted-dark">
                                 {t('stats.defaultLabel')}
                             </p>
-                            <p className="mt-3 text-lg font-semibold text-text dark:text-text-dark">
+                            <p className="mt-2 text-sm font-semibold text-text dark:text-text-dark line-clamp-1">
                                 {activeDefaultTemplate?.name || t('stats.none')}
                             </p>
-                            <p className="mt-1 text-xs text-text-secondary dark:text-text-secondary-dark">
+                            <p className="mt-1 text-xs leading-5 text-text-secondary dark:text-text-secondary-dark">
                                 {t('stats.defaultHint')}
                             </p>
                         </div>
-                        <div className="rounded-3xl border border-border bg-surface px-4 py-4 dark:border-border-dark dark:bg-white/4">
-                            <p className="text-xs uppercase tracking-[0.18em] text-text-muted dark:text-text-muted-dark">
+                        <div className="rounded-lg border border-card-border bg-surface px-3 py-3 dark:border-border-dark dark:bg-white/4">
+                            <p className="text-[11px] uppercase tracking-[0.14em] text-text-muted dark:text-text-muted-dark">
                                 {t('stats.builtInLabel')}
                             </p>
-                            <p className="mt-3 text-2xl font-semibold text-text dark:text-text-dark">
+                            <p className="mt-2 text-lg font-semibold text-text dark:text-text-dark">
                                 {builtInCount}
                             </p>
-                            <p className="mt-1 text-xs text-text-secondary dark:text-text-secondary-dark">
+                            <p className="mt-1 text-xs leading-5 text-text-secondary dark:text-text-secondary-dark">
                                 {t('stats.builtInHint')}
                             </p>
                         </div>
-                        <div className="rounded-3xl border border-border bg-surface px-4 py-4 dark:border-border-dark dark:bg-white/4">
-                            <p className="text-xs uppercase tracking-[0.18em] text-text-muted dark:text-text-muted-dark">
+                        <div className="rounded-lg border border-card-border bg-surface px-3 py-3 dark:border-border-dark dark:bg-white/4">
+                            <p className="text-[11px] uppercase tracking-[0.14em] text-text-muted dark:text-text-muted-dark">
                                 {t('stats.customLabel')}
                             </p>
-                            <p className="mt-3 text-2xl font-semibold text-text dark:text-text-dark">
+                            <p className="mt-2 text-lg font-semibold text-text dark:text-text-dark">
                                 {customCount}
                             </p>
-                            <p className="mt-1 text-xs text-text-secondary dark:text-text-secondary-dark">
+                            <p className="mt-1 text-xs leading-5 text-text-secondary dark:text-text-secondary-dark">
                                 {t('stats.customHint')}
                             </p>
                         </div>
@@ -705,14 +701,14 @@ export function TemplatesCatalog({
                 </div>
             </section>
 
-            <section className="flex flex-col gap-4 rounded-[2rem] border border-border bg-white px-5 py-5 dark:border-border-dark dark:bg-surface-dark lg:flex-row lg:items-center lg:justify-between">
+            <section className="flex flex-col gap-4 rounded-xl border border-card-border bg-card px-5 py-5 dark:border-border-secondary-dark dark:bg-card-primary-dark/30 lg:flex-row lg:items-center lg:justify-between">
                 <div className="relative flex-1">
                     <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-text-muted dark:text-text-muted-dark" />
                     <Input
                         value={searchQuery}
                         onChange={(event) => setSearchQuery(event.target.value)}
                         placeholder={t('filters.searchPlaceholder')}
-                        className="rounded-2xl pl-11"
+                        className="rounded-xl pl-11"
                     />
                 </div>
                 <div className="flex flex-wrap gap-2">
@@ -735,7 +731,7 @@ export function TemplatesCatalog({
             </section>
 
             {filteredTemplates.length === 0 ? (
-                <section className="rounded-[2rem] border border-dashed border-border bg-white px-6 py-16 text-center dark:border-border-dark dark:bg-surface-dark">
+                <section className="rounded-xl border border-dashed border-card-border bg-card px-6 py-16 text-center dark:border-border-secondary-dark dark:bg-card-primary-dark/30">
                     <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-surface-secondary dark:bg-white/6">
                         <LayoutTemplate className="h-6 w-6 text-text-muted dark:text-text-muted-dark" />
                     </div>
@@ -748,7 +744,7 @@ export function TemplatesCatalog({
                     {(searchQuery || filterMode !== 'all') && (
                         <Button
                             variant="ghost"
-                            className="mt-5 rounded-xl"
+                            className="mt-5"
                             onClick={() => {
                                 setSearchQuery('');
                                 setFilterMode('all');
@@ -759,7 +755,7 @@ export function TemplatesCatalog({
                     )}
                 </section>
             ) : (
-                <section className="grid grid-cols-1 gap-5 @3xl/main:grid-cols-2">
+                <section className="grid grid-cols-1 gap-4 @3xl/main:grid-cols-2 @5xl/main:grid-cols-3">
                     {filteredTemplates.map((template) => (
                         <TemplateCard
                             key={template.id}
