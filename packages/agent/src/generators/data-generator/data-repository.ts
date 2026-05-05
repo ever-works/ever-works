@@ -207,13 +207,7 @@ const createDefaultConfig = (overrides: Partial<IDataConfig> = {}): IDataConfig 
 
 export class DataRepository {
     private static readonly logger = new Logger(DataRepository.name);
-    private static readonly CONFIG_FILENAME = 'works.yaml';
-    private static readonly CONFIG_FILENAMES = [
-        'works.yaml',
-        'works.yml',
-        'config.yaml',
-        'config.yml',
-    ] as const;
+    private static readonly CONFIG_FILENAME = 'works.yml';
     private config?: IDataConfig;
     private categories?: Category[];
 
@@ -236,7 +230,7 @@ export class DataRepository {
     ): Promise<DataRepository> {
         /*
          *   File structure:
-         *      - works.yaml
+         *      - works.yml
          *      - categories.yml
          *      - tags.yml
          *      - data/
@@ -259,7 +253,7 @@ export class DataRepository {
         const repo = new DataRepository(
             dir,
             path.join(dir, this.CONFIG_FILENAME),
-            await this.resolveConfigFallbackPaths(dir),
+            [],
             categoriesPath,
             tagsPath,
             collectionsPath,
@@ -270,28 +264,6 @@ export class DataRepository {
         );
 
         return repo;
-    }
-
-    private static async resolveConfigFallbackPaths(dir: string): Promise<string[]> {
-        const fallbackPaths: string[] = [];
-
-        for (const filename of this.CONFIG_FILENAMES.slice(1)) {
-            const candidatePath = path.join(dir, filename);
-
-            try {
-                const stat = await fs.stat(candidatePath);
-                if (stat.isFile()) {
-                    fallbackPaths.push(candidatePath);
-                }
-            } catch (err) {
-                if ((err as NodeJS.ErrnoException | undefined)?.code === 'ENOENT') {
-                    continue;
-                }
-                throw err;
-            }
-        }
-
-        return fallbackPaths;
     }
 
     private static async shouldeUseDir(
@@ -500,14 +472,6 @@ export class DataRepository {
         this.config = config;
         const str = yaml.stringify(config);
         await fs.writeFile(this.configPath, str, 'utf-8');
-        await Promise.all(
-            this.configFallbackPaths
-                .filter((filePath) => {
-                    const filename = path.basename(filePath);
-                    return filename.startsWith('config.') || filename === 'works.yml';
-                })
-                .map((filePath) => fs.rm(filePath, { force: true })),
-        );
     }
     async getNextVersion(config?: IDataConfig) {
         const theConfig = config ?? (await this.getConfig());
@@ -533,13 +497,12 @@ export class DataRepository {
         return version.format();
     }
     /**
-     * Ensure a works.yaml exists; legacy config.yaml/config.yml files are still read as fallbacks.
+     * Ensure a works.yml exists.
      */
     async ensureDefaultConfig(overrides: Partial<IDataConfig> = {}): Promise<IDataConfig> {
         const exists = await this.fileExists(this.configPath);
-        const fallbackExists = await this.hasFallbackConfig();
 
-        if (!exists && !fallbackExists) {
+        if (!exists) {
             const defaultConfig = createDefaultConfig({
                 ...this.defaultConfigOverrides,
                 ...overrides,
@@ -549,16 +512,6 @@ export class DataRepository {
         }
 
         return this.getConfig();
-    }
-
-    private async hasFallbackConfig(): Promise<boolean> {
-        for (const fallbackPath of this.configFallbackPaths) {
-            if (await this.fileExists(fallbackPath)) {
-                return true;
-            }
-        }
-
-        return false;
     }
 
     async writeCategories(categories: Category[]) {

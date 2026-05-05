@@ -2369,7 +2369,7 @@
                     "title": "Formats de dépôts pris en charge",
                     "dataRepo": {
                         "title": "Dépôt de données",
-                        "description": "Dépôts avec config.yml et structure de dossier data/"
+                        "description": "Dépôts avec works.yml et structure de dossier data/"
                     },
                     "awesomeReadme": {
                         "title": "Liste Awesome",
@@ -2492,7 +2492,7 @@
                     "linkRepos": "Lier les dépôts"
                 },
                 "detectionFailed": "Nous n'avons pas pu détecter automatiquement le format. Veuillez sélectionner comment importer ce dépôt.",
-                "detectionFailedMissingConfig": "Aucune configuration prise en charge n'a été trouvée. Ajoutez config.yml, works.yml ou works_config/works.yml dans le dépôt, ou choisissez un format d'importation manuelle ci-dessous.",
+                "detectionFailedMissingConfig": "Aucune configuration prise en charge n'a été trouvée. Ajoutez works.yml dans le dépôt, ou choisissez un format d'importation manuelle ci-dessous.",
                 "errors": {
                     "urlRequired": "Veuillez saisir une URL de dépôt GitHub",
                     "unsupportedFormat": "Ce format de dépôt n'est pas pris en charge. Veuillez utiliser un format Dépôt de données ou Liste Awesome.",

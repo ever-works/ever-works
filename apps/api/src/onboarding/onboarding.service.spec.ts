@@ -359,30 +359,22 @@ spec:
         });
     });
 
-    it('falls back to .yaml extension when works.yml is absent but works.yaml exists', async () => {
+    it('rejects when only works.yaml is present', async () => {
         const repo = fakeRepository();
         repo.findOne.mockResolvedValueOnce(null).mockResolvedValueOnce(null);
         const git = fakeGitFacade();
-        git.getFileContent.mockResolvedValueOnce(null).mockResolvedValueOnce({
-            content: Buffer.from(validManifestYaml).toString('base64'),
-            encoding: 'base64',
-        });
+        git.getFileContent.mockResolvedValueOnce(null);
 
         const { service } = createService({ repo, git });
-        await service.handle({ body: validBody as any, githubToken: 'token-aaaa' });
+        await expect(
+            service.handle({ body: validBody as any, githubToken: 'token-aaaa' }),
+        ).rejects.toMatchObject({ response: { code: 'manifest_missing' } });
 
-        expect(git.getFileContent).toHaveBeenNthCalledWith(
-            1,
+        expect(git.getFileContent).toHaveBeenCalledTimes(1);
+        expect(git.getFileContent).toHaveBeenCalledWith(
             'octocat',
             'awesome-mcp',
             'works.yml',
-            expect.anything(),
-        );
-        expect(git.getFileContent).toHaveBeenNthCalledWith(
-            2,
-            'octocat',
-            'awesome-mcp',
-            'works.yaml',
             expect.anything(),
         );
     });

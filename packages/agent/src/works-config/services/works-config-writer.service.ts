@@ -2,17 +2,13 @@ import { Injectable } from '@nestjs/common';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import * as yaml from 'yaml';
-import mergeWith from 'lodash/mergeWith';
 import type { CreateItemsGeneratorDto } from '@src/items-generator/dto';
 import type { ProvidersDto } from '@ever-works/contracts/api';
 import { Work, type RepositoryTarget } from '@src/entities/work.entity';
 import type { DataRepository } from '@src/generators/data-generator/data-repository';
 import { WorksConfigService, type ResolvedWorksConfig } from './works-config.service';
 
-const WORKS_CONFIG_FILENAME = 'works.yaml';
-const WORKS_CONFIG_FALLBACK_FILENAMES = ['works.yaml', 'works.yml'] as const;
-const LEGACY_DATA_CONFIG_FILENAMES = ['config.yaml', 'config.yml'] as const;
-const OBSOLETE_DATA_CONFIG_FILENAMES = ['config.yaml', 'config.yml', 'works.yml'] as const;
+const WORKS_CONFIG_FILENAME = 'works.yml';
 
 export type WorksConfigWriteRequest = Partial<Pick<CreateItemsGeneratorDto, 'name' | 'prompt'>> & {
     model?: string | null;
@@ -33,11 +29,10 @@ export class WorksConfigWriterService {
 
     async writeToDataRepository(options: WriteWorksConfigOptions): Promise<void> {
         const filePath = await this.resolveWorksConfigPath(options.dataRepository.dir);
-        const existingRaw = await this.readExistingRaw(options.dataRepository.dir);
+        const existingRaw = await this.readExistingRaw(filePath);
         const nextConfig = this.buildConfig(existingRaw, options);
 
         await fs.writeFile(filePath, yaml.stringify(nextConfig), 'utf-8');
-        await this.removeLegacyDataConfigFiles(options.dataRepository.dir);
     }
 
     private buildConfig(
@@ -130,58 +125,17 @@ export class WorksConfigWriterService {
         return path.join(repoDir, WORKS_CONFIG_FILENAME);
     }
 
-    private async readExistingRaw(repoDir: string): Promise<Record<string, unknown>> {
-        let existingRaw: Record<string, unknown> = {};
-
-        for (const filename of LEGACY_DATA_CONFIG_FILENAMES) {
-            try {
-                const content = await fs.readFile(path.join(repoDir, filename), 'utf-8');
-                existingRaw = this.mergeRaw(
-                    existingRaw,
-                    this.worksConfigService.parse(content).raw,
-                );
-            } catch (error) {
-                if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
-                    throw error;
-                }
+    private async readExistingRaw(filePath: string): Promise<Record<string, unknown>> {
+        try {
+            const content = await fs.readFile(filePath, 'utf-8');
+            return this.worksConfigService.parse(content).raw;
+        } catch (error) {
+            if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+                return {};
             }
+
+            throw error;
         }
-
-        for (const filename of [...WORKS_CONFIG_FALLBACK_FILENAMES].reverse()) {
-            try {
-                const content = await fs.readFile(path.join(repoDir, filename), 'utf-8');
-                existingRaw = this.mergeRaw(
-                    existingRaw,
-                    this.worksConfigService.parse(content).raw,
-                );
-            } catch (error) {
-                if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
-                    throw error;
-                }
-            }
-        }
-
-        return existingRaw;
-    }
-
-    private mergeRaw(
-        base: Record<string, unknown>,
-        override: Record<string, unknown>,
-    ): Record<string, unknown> {
-        return mergeWith({}, base, override, (_objValue, srcValue) => {
-            if (Array.isArray(srcValue)) {
-                return srcValue;
-            }
-            return undefined;
-        });
-    }
-
-    private async removeLegacyDataConfigFiles(repoDir: string): Promise<void> {
-        await Promise.all(
-            OBSOLETE_DATA_CONFIG_FILENAMES.map((filename) =>
-                fs.rm(path.join(repoDir, filename), { force: true }),
-            ),
-        );
     }
 
     private withoutUndefined(value: Record<string, unknown>): Record<string, unknown> {

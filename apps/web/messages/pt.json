@@ -2369,7 +2369,7 @@
                     "title": "Formatos de Repositório Suportados",
                     "dataRepo": {
                         "title": "Repositório de Dados",
-                        "description": "Repositórios com estrutura config.yml e pasta data/"
+                        "description": "Repositórios com estrutura works.yml e pasta data/"
                     },
                     "awesomeReadme": {
                         "title": "Lista Awesome",
@@ -2492,7 +2492,7 @@
                     "linkRepos": "Vincular repositórios"
                 },
                 "detectionFailed": "Não pudemos detectar o formato automaticamente. Por favor, selecione como importar este repositório.",
-                "detectionFailedMissingConfig": "Nenhuma configuração suportada foi encontrada. Adicione config.yml, works.yml ou works_config/works.yml ao repositório, ou escolha um formato de importação manual abaixo.",
+                "detectionFailedMissingConfig": "Nenhuma configuração suportada foi encontrada. Adicione works.yml ao repositório, ou escolha um formato de importação manual abaixo.",
                 "errors": {
                     "urlRequired": "Por favor, digite uma URL de repositório GitHub",
                     "unsupportedFormat": "Este formato de repositório não é suportado. Por favor, use formato Repositório de Dados ou Lista Awesome.",

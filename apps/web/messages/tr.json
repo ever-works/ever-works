@@ -2369,7 +2369,7 @@
                     "title": "Desteklenen Depo Formatları",
                     "dataRepo": {
                         "title": "Veri Deposu",
-                        "description": "config.yml ve data/ klasör yapısına sahip depolar"
+                        "description": "works.yml ve data/ klasör yapısına sahip depolar"
                     },
                     "awesomeReadme": {
                         "title": "Harika Liste",
@@ -2492,7 +2492,7 @@
                     "linkRepos": "Depoları bağla"
                 },
                 "detectionFailed": "Formatı otomatik tespit edemedik. Lütfen bu deposunu nasıl içe aktaracağınızı seçin.",
-                "detectionFailedMissingConfig": "Desteklenen bir yapılandırma bulunamadı. Depoya config.yml, works.yml veya works_config/works.yml ekleyin veya aşağıdan manuel içe aktarma biçimini seçin.",
+                "detectionFailedMissingConfig": "Desteklenen bir yapılandırma bulunamadı. Depoya works.yml ekleyin veya aşağıdan manuel içe aktarma biçimini seçin.",
                 "errors": {
                     "urlRequired": "Lütfen GitHub depo URL'si girin",
                     "unsupportedFormat": "Bu depo formatı desteklenmiyor. Lütfen Veri Deposu veya Harika Liste formatı kullanın.",

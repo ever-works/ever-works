@@ -2369,7 +2369,7 @@
                     "title": "Định Dạng Kho Hỗ Trợ",
                     "dataRepo": {
                         "title": "Kho Dữ Liệu",
-                        "description": "Các kho có config.yml và cấu trúc công việc data/"
+                        "description": "Các kho có works.yml và cấu trúc công việc data/"
                     },
                     "awesomeReadme": {
                         "title": "Danh Sách Awesome",
@@ -2492,7 +2492,7 @@
                     "linkRepos": "Liên kết kho"
                 },
                 "detectionFailed": "Chúng tôi không thể tự động phát hiện định dạng. Vui lòng chọn cách nhập kho này.",
-                "detectionFailedMissingConfig": "Không tìm thấy cấu hình được hỗ trợ. Thêm config.yml, works.yml hoặc works_config/works.yml vào kho, hoặc chọn định dạng nhập thủ công bên dưới.",
+                "detectionFailedMissingConfig": "Không tìm thấy cấu hình được hỗ trợ. Thêm works.yml vào kho, hoặc chọn định dạng nhập thủ công bên dưới.",
                 "errors": {
                     "urlRequired": "Vui lòng nhập URL kho GitHub",
                     "unsupportedFormat": "Định dạng kho này không được hỗ trợ. Vui lòng sử dụng định dạng Kho Dữ Liệu hoặc Danh Sách Awesome.",

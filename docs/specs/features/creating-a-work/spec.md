@@ -33,7 +33,7 @@ and (for AI/Import) generation kicked off as a background job.
   detail page shows zero items.
 - **Import — data repo**: **Given** I have a previously-generated Ever
   Works data repo, **when** I import its URL, **then** the platform
-  detects the `config.yml`, copies items/categories/tags verbatim, and
+  detects the `works.yml`, copies items/categories/tags verbatim, and
   creates the work with the existing content.
 - **Import — Awesome README**: **Given** I supply a GitHub Awesome List,
   **when** I configure expansion factor and providers, **then** the

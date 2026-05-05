@@ -91,7 +91,7 @@ Read-only query operations:
 - **`getWork(id, userId)`** -- single work with access check
 - **`workExists(slug, owner)`** -- uniqueness check
 - **`workItems(work)`** -- fetch items from the data repository
-- **`workConfig(work)`** -- fetch config.yml from the data repository
+- **`workConfig(work)`** -- fetch works.yml from the data repository
 - **`getWebsiteSettings(work)` / `updateWebsiteSettings(...)`** -- read/write website configuration
 - **`workGenerationHistory(workId)`** -- fetch generation run history
 

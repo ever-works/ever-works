@@ -103,7 +103,7 @@ export function GeneratorForm({
     // Plugin-specific configuration (dynamic fields from pipeline plugin)
     const [pluginConfig, setPluginConfig] = useState<Record<string, unknown>>({});
 
-    // Provider selection (seeded from config.yaml)
+    // Provider selection (seeded from works.yml)
     const {
         providers,
         handleProviderChange,
