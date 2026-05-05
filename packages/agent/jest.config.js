@@ -16,6 +16,13 @@ module.exports = {
     collectCoverageFrom: ['**/*.(t|j)s'],
     coverageDirectory: '../coverage',
     testEnvironment: 'node',
+    // Raise the per-test timeout from Jest's 5s default. Some specs that pass
+    // locally in <100ms time out at 5000ms on shared GitHub-Actions runners
+    // because ts-jest's first-run type-checking + the test's own awaited work
+    // race past the budget. 30s is the standard "ts-jest on CI" recommendation
+    // and matches what other NestJS+ts-jest monorepos use; truly slow tests
+    // still surface, just not via spurious timeouts.
+    testTimeout: 30000,
     moduleNameMapper: {
         '^@src/(.*)$': '<rootDir>/$1',
         // Map workspace packages to their source TypeScript files for testing

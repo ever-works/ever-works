@@ -55,7 +55,7 @@ export class WorksConfigRepositorySyncService {
 
             const changes = await this.gitFacade.getStatus(work.gitProvider, dataRepository.dir);
             if (changes.length === 0) {
-                this.logger.debug(`works.yaml already up to date for ${owner}/${repo}`);
+                this.logger.debug(`works.yml already up to date for ${owner}/${repo}`);
                 return;
             }
 
@@ -63,7 +63,7 @@ export class WorksConfigRepositorySyncService {
             await this.gitFacade.commit(
                 work.gitProvider,
                 dataRepository.dir,
-                `sync works.yaml after ${options.reason}`,
+                `sync works.yml after ${options.reason}`,
                 committer,
             );
             await this.gitFacade.pull(dest, committer, {
@@ -74,7 +74,7 @@ export class WorksConfigRepositorySyncService {
         } catch (error) {
             const errorMessage = error instanceof Error ? error.message : String(error);
 
-            this.logger.warn(`Failed to sync works.yaml for ${owner}/${repo}: ${errorMessage}`);
+            this.logger.warn(`Failed to sync works.yml for ${owner}/${repo}: ${errorMessage}`);
             this.eventEmitter?.emit(
                 WorksConfigSyncFailedEvent.EVENT_NAME,
                 new WorksConfigSyncFailedEvent(
@@ -96,9 +96,7 @@ export class WorksConfigRepositorySyncService {
                 throw error;
             }
 
-            this.logger.warn(
-                'works.yaml sync push was rejected as non-fast-forward; force pushing',
-            );
+            this.logger.warn('works.yml sync push was rejected as non-fast-forward; force pushing');
             await this.gitFacade.push({ dir, force: true }, { userId, providerId });
         }
     }

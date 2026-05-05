@@ -116,7 +116,7 @@ The `output` property is dynamically set from `NEXT_BUILD_OUTPUT`. When set to `
 
 ## Site Configuration Object
 
-The `getSiteConfig()` function in `lib/constants.ts` merges environment variables with optional work-level `config.yml` overrides. This supports multi-tenant scenarios where a deployed work site can override the base branding:
+The `getSiteConfig()` function in `lib/constants.ts` merges environment variables with optional work-level `works.yml` overrides. This supports multi-tenant scenarios where a deployed work site can override the base branding:
 
 ```typescript
 const config = getSiteConfig(workConfig);
@@ -125,7 +125,7 @@ const config = getSiteConfig(workConfig);
 
 The precedence order is:
 
-1. Work `config.yml` values (if present)
+1. Work `works.yml` values (if present)
 2. `NEXT_PUBLIC_*` environment variables
 3. Hardcoded defaults
 

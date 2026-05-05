@@ -70,7 +70,7 @@ describe('SourceRepoAnalyzerService.checkSlugConflicts', () => {
 });
 
 describe('SourceRepoAnalyzerService.analyzeRepository', () => {
-    it('classifies repos with data/ and works.yaml as data_repo', async () => {
+    it('classifies repos with data/ and works.yml as data_repo', async () => {
         const worksConfig = {
             initialPrompt: 'Keep it updated',
             raw: {},
@@ -85,7 +85,7 @@ describe('SourceRepoAnalyzerService.analyzeRepository', () => {
             getWorkContents: jest
                 .fn()
                 .mockResolvedValueOnce([
-                    { name: 'works_config', type: 'dir', path: 'works_config' },
+                    { name: 'works.yml', type: 'file', path: 'works.yml' },
                     { name: 'data', type: 'dir', path: 'data' },
                     { name: 'README.md', type: 'file', path: 'README.md' },
                 ])
@@ -114,7 +114,7 @@ describe('SourceRepoAnalyzerService.analyzeRepository', () => {
         });
     });
 
-    it('classifies repos with works.yaml but without data/ as works_config', async () => {
+    it('classifies repos with works.yml but without data/ as works_config', async () => {
         const gitFacade = {
             isConfigured: jest.fn().mockReturnValue(true),
             getRepository: jest.fn().mockResolvedValue({
@@ -123,7 +123,7 @@ describe('SourceRepoAnalyzerService.analyzeRepository', () => {
             }),
             getWorkContents: jest
                 .fn()
-                .mockResolvedValue([{ name: 'works_config', type: 'dir', path: 'works_config' }]),
+                .mockResolvedValue([{ name: 'works.yml', type: 'file', path: 'works.yml' }]),
         };
 
         const worksConfigService = {
@@ -147,7 +147,7 @@ describe('SourceRepoAnalyzerService.analyzeRepository', () => {
         });
     });
 
-    it('classifies awesome README repos with works.yaml as awesome_readme', async () => {
+    it('classifies awesome README repos with works.yml as awesome_readme', async () => {
         const gitFacade = {
             isConfigured: jest.fn().mockReturnValue(true),
             getRepository: jest.fn().mockResolvedValue({

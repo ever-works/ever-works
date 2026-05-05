@@ -28,7 +28,7 @@ The Data Generator manages the **data repository** for each work - a GitHub repo
 │                    GitHub Data Repository                        │
 │                                                                  │
 │  {owner}/{work-slug}-data/                                 │
-│  ├── config.yml           # Work configuration             │
+│  ├── works.yml           # Work configuration             │
 │  ├── items/               # Item JSON files                     │
 │  │   ├── item-slug-1.json                                       │
 │  │   ├── item-slug-2.json                                       │
@@ -49,7 +49,7 @@ DataGeneratorService.initialize(payload)
     │
     ├── Clone/pull data repository
     │
-    ├── Read existing config.yml, items/, categories.yml, tags.yml
+    ├── Read existing works.yml, items/, categories.yml, tags.yml
     │
     ├── Call ItemsGeneratorService.generateItems()
     │   └── Returns: {items, categories, tags, brands, metrics, contentCache}
@@ -60,7 +60,7 @@ DataGeneratorService.initialize(payload)
     │   ├── Preserve manual edits (featured, order)
     │
     ├── Write to repository
-    │   ├── Update config.yml (increment version)
+    │   ├── Update works.yml (increment version)
     │   ├── Write item JSON files
     │   ├── Update categories.yml
     │   ├── Update tags.yml
@@ -113,7 +113,7 @@ class DataRepository {
 
 ## Repository Structure
 
-### config.yml
+### works.yml
 
 ```yaml
 name: "My Work"
@@ -284,7 +284,7 @@ const prUpdate = {
 
 ## Version Management
 
-The `version` field in config.yml auto-increments on each update:
+The `version` field in works.yml auto-increments on each update:
 
 ```typescript
 // In DataGeneratorService

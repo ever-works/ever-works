@@ -19,6 +19,11 @@ module.exports = {
     collectCoverageFrom: ['**/*.(t|j)s'],
     coverageDirectory: '../coverage',
     testEnvironment: 'node',
+    // Raise the per-test timeout from Jest's 5s default. ts-jest's first-run
+    // type-checking on shared CI runners can push a fast async test past the
+    // 5s budget; 30s matches the agent package and is the standard ts-jest
+    // recommendation for CI stability.
+    testTimeout: 30000,
     moduleNameMapper: {
         '^@src/generators/(.*)$': '<rootDir>/../../../packages/agent/src/generators/$1/index.ts',
         '^@src/(.*)$': '<rootDir>/$1',

@@ -2369,7 +2369,7 @@
                     "title": "支持的仓库格式",
                     "dataRepo": {
                         "title": "数据仓库",
-                        "description": "具有 config.yml 和 data/ 文件夹结构的仓库"
+                        "description": "具有 works.yml 和 data/ 文件夹结构的仓库"
                     },
                     "awesomeReadme": {
                         "title": "Awesome 列表",
@@ -2492,7 +2492,7 @@
                     "linkRepos": "链接仓库"
                 },
                 "detectionFailed": "我们无法自动检测格式。请选择导入此仓库的方式。",
-                "detectionFailedMissingConfig": "未找到支持的配置。请在仓库中添加 config.yml、works.yml 或 works_config/works.yml，或者在下面选择手动导入格式。",
+                "detectionFailedMissingConfig": "未找到支持的配置。请在仓库中添加 works.yml，或者在下面选择手动导入格式。",
                 "errors": {
                     "urlRequired": "请输入 GitHub 仓库 URL",
                     "unsupportedFormat": "不支持此仓库格式。请使用数据仓库或 Awesome 列表格式。",

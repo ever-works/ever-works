@@ -13,11 +13,11 @@ Work Import lets you bootstrap a new work from an existing source rather than st
 
 The platform supports three import types, each suited to a different starting point:
 
-| Type                | Source                                             | What Happens                                                                | AI Required | Async     |
-| ------------------- | -------------------------------------------------- | --------------------------------------------------------------------------- | ----------- | --------- |
-| **Data Repository** | An Ever Works-format repo (`config.yml` + `data/`) | Clones and copies all items, categories, tags verbatim                      | No          | Yes       |
-| **Awesome README**  | Any curated list repo (e.g., `awesome-react`)      | Uses source as research seeds, then AI discovers and enriches far beyond it | Yes         | Yes       |
-| **Link Existing**   | A data repo you already own                        | Links without copying — the platform manages your existing repo             | No          | No (sync) |
+| Type                | Source                                            | What Happens                                                                | AI Required | Async     |
+| ------------------- | ------------------------------------------------- | --------------------------------------------------------------------------- | ----------- | --------- |
+| **Data Repository** | An Ever Works-format repo (`works.yml` + `data/`) | Clones and copies all items, categories, tags verbatim                      | No          | Yes       |
+| **Awesome README**  | Any curated list repo (e.g., `awesome-react`)     | Uses source as research seeds, then AI discovers and enriches far beyond it | Yes         | Yes       |
+| **Link Existing**   | A data repo you already own                       | Links without copying — the platform manages your existing repo             | No          | No (sync) |
 
 ## How It Works — The Full Lifecycle
 
@@ -47,7 +47,7 @@ Before any import begins, the platform analyzes the source repository to underst
 
 **Type detection.** The analyzer inspects the root work contents of the repository:
 
-- If the repo contains a `config.yml` (or `config.yaml`) **and** a `data/` work, it's classified as a **data repository** — an existing Ever Works-format repo with structured items.
+- If the repo contains a root `works.yml` **and** a `data/` work, it's classified as a **data repository** — an existing Ever Works-format repo with structured items.
 - If the repo contains a `README.md` that has section headers and multiple categorized links (at least 5 list-style links, or 3+ internal work links for multi-file awesome lists), it's classified as an **Awesome README**.
 - If neither pattern matches, the type is `null` and the import cannot proceed.
 
@@ -77,7 +77,7 @@ The data repository import is the most straightforward path. It performs a direc
     - **Items** — each subwork inside `data/` represents one item, with a YAML metadata file and an optional markdown description.
     - **Categories** — from `categories.yml` at the root.
     - **Tags** — from `tags.yml` at the root.
-    - **Config** — from `config.yml`, including work-level settings and metadata.
+    - **Config** — from `works.yml`, including work-level settings and metadata.
 
 3. **Initialize the target.** All extracted data is passed to the data generator, which writes it into the new work's own data repository. Import metadata (source owner/repo, timestamp, import type) is embedded in the config.
 
@@ -208,7 +208,7 @@ To skip creating the automatic sync schedule, pass `"sync": false` in the import
 A valid data repository must have this structure at the root:
 
 ```
-config.yml              # Work configuration (name, description, settings)
+works.yml              # Work configuration (name, description, settings)
 categories.yml          # Category definitions (id, name, description, icon)
 tags.yml                # Tag definitions (optional)
 data/
@@ -220,7 +220,7 @@ data/
     ...
 ```
 
-The minimum requirement is `config.yml` (or `config.yaml`) and a `data/` work with at least one item.
+The minimum requirement is a root `works.yml` and a `data/` work with at least one item.
 
 ### Awesome README Format
 

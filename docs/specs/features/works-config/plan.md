@@ -88,12 +88,12 @@ and a migration step in the parser.
 
 ## 11. Risks & Mitigations
 
-| Risk                                                 | Likelihood | Impact | Mitigation                                                                                           |
-| ---------------------------------------------------- | ---------- | ------ | ---------------------------------------------------------------------------------------------------- |
-| User commits a secret in `works.yml` accidentally    | Low        | Med    | Writer never writes secret fields; reviewer convention; docs                                         |
-| Renaming a field breaks existing hand-authored files | Med        | Med    | Field aliases (multiple keys map to the same parsed property)                                        |
-| Sync push race vs concurrent manual edits            | Low        | Low    | Writer runs inside the same git session that just committed                                          |
-| YAML round-trip drops comments                       | High       | Low    | Documented limitation; users who want comments use `works_config/works.yml` and accept the trade-off |
+| Risk                                                 | Likelihood | Impact | Mitigation                                                                              |
+| ---------------------------------------------------- | ---------- | ------ | --------------------------------------------------------------------------------------- |
+| User commits a secret in `works.yml` accidentally    | Low        | Med    | Writer never writes secret fields; reviewer convention; docs                            |
+| Renaming a field breaks existing hand-authored files | Med        | Med    | Field aliases (multiple keys map to the same parsed property)                           |
+| Sync push race vs concurrent manual edits            | Low        | Low    | Writer runs inside the same git session that just committed                             |
+| YAML round-trip drops comments                       | High       | Low    | Documented limitation; users who want comments use `works.yml` and accept the trade-off |
 
 ## 12. Constitution Reconciliation
 

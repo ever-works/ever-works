@@ -163,7 +163,7 @@ Taxonomy data is stored in the data repository as YAML files:
   categories.yml        # Array of category objects
   tags.yml              # Array of tag objects
   collections.yml       # Array of collection objects
-  config.yml            # Work configuration
+  works.yml            # Work configuration
   data/
     item-slug/
       item.yml          # References category and tags by ID
