@@ -2175,6 +2175,7 @@
                         "description": "Keep your website automatically synced with the latest template changes.",
                         "selectorLabel": "Website template",
                         "currentTemplateLabel": "Current template",
+                        "unknownTemplate": "Inherited default",
                         "currentHelperText": "The selected template controls how the website repository is initialized and updated.",
                         "switchHelperText": "Applying a new template will reset the existing website repository from the selected template if it already exists.",
                         "switchAction": "Apply template to website repository",
