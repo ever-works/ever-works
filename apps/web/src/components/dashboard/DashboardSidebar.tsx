@@ -107,8 +107,8 @@ export function DashboardSidebar({
             href: ROUTES.DASHBOARD_WORKS,
             icon: FolderClosed,
         },
-        { name: t('navigation.plugins'), href: ROUTES.DASHBOARD_PLUGINS, icon: Plug },
         { name: t('navigation.templates'), href: ROUTES.DASHBOARD_TEMPLATES, icon: LayoutTemplate },
+        { name: t('navigation.plugins'), href: ROUTES.DASHBOARD_PLUGINS, icon: Plug },
         { name: t('navigation.activity'), href: ROUTES.DASHBOARD_ACTIVITY, icon: Activity },
         { name: t('navigation.settings'), href: ROUTES.DASHBOARD_SETTINGS, icon: Settings },
     ];
