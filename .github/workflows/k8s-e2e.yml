@@ -68,8 +68,12 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Build agent + plugin contracts (e2e imports compiled deps)
-        run: pnpm --filter @ever-works/plugin --filter @ever-works/agent build
+      - name: Build k8s plugin and its workspace deps
+        # `@ever-works/k8s-plugin...` builds k8s and every upstream
+        # workspace dep (contracts, plugin, agent). Without `contracts`,
+        # the plugin's dts build can't resolve `@ever-works/contracts`
+        # imports. Cheaper than a full `pnpm build`.
+        run: pnpm --filter '@ever-works/k8s-plugin...' build
 
       - name: Create kind cluster
         uses: helm/kind-action@v1
