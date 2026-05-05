@@ -131,7 +131,7 @@ export class AgentPipelinePlugin implements IPlugin, IPipelinePlugin<AgentPipeli
 			category: this.category,
 			capabilities: [...this.capabilities],
 			author: { name: 'Ever Works Team' },
-			license: 'MIT',
+			license: 'AGPL-3.0',
 			builtIn: true,
 			autoEnable: true,
 			systemPlugin: true,

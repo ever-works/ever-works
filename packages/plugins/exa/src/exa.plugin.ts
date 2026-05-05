@@ -299,7 +299,7 @@ export class ExaSearchPlugin implements IPlugin, ISearchPlugin, IContentExtracto
 			category: this.category,
 			capabilities: [...this.capabilities],
 			author: { name: 'Ever Works Team' },
-			license: 'MIT',
+			license: 'AGPL-3.0',
 			builtIn: true,
 			systemPlugin: false,
 			autoEnable: false,

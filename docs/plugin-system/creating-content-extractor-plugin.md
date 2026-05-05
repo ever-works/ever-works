@@ -217,7 +217,7 @@ packages/plugins/my-extractor/
 			"author": {
 				"name": "Your Name"
 			},
-			"license": "MIT",
+			"license": "AGPL-3.0",
 			"builtIn": true,
 			"autoEnable": false
 		}
@@ -485,7 +485,7 @@ export class MyExtractorPlugin implements IPlugin, IContentExtractorPlugin {
 			category: this.category,
 			capabilities: [...this.capabilities],
 			author: { name: 'Your Name' },
-			license: 'MIT',
+			license: 'AGPL-3.0',
 			builtIn: true,
 			systemPlugin: true,
 			autoEnable: true,
@@ -738,7 +738,7 @@ export class DevDocsExtractorPlugin implements IPlugin, IContentExtractorPlugin 
 			category: this.category,
 			capabilities: [...this.capabilities],
 			author: { name: 'Your Name' },
-			license: 'MIT',
+			license: 'AGPL-3.0',
 			builtIn: false,
 			systemPlugin: false,
 			supplementary: true,

@@ -207,7 +207,7 @@ export class ZapierPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvid
 			category: this.category,
 			capabilities: [...this.capabilities],
 			author: { name: 'Ever Works Team' },
-			license: 'MIT',
+			license: 'AGPL-3.0',
 			builtIn: true,
 			autoEnable: false,
 			visibility: 'public',

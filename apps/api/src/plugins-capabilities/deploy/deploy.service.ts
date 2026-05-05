@@ -1,4 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { randomBytes } from 'crypto';
 import { DeployFacadeService, GitFacadeService } from '@ever-works/agent/facades';
 import { WorkRepository } from '@ever-works/agent/database';
@@ -9,7 +10,17 @@ import {
     getWebsiteTemplateBranch,
     getWebsiteTemplateConfig,
 } from '@ever-works/agent/generators';
+import { DeploymentDispatchedEvent } from '@ever-works/agent/events';
+import type { IDeploymentPlugin } from '@ever-works/plugin';
 import type { BatchDeployItemDto, BatchDeployItemResultDto } from './dto/batch-deploy.dto';
+
+/**
+ * Default workflow filenames to dispatch when a deployment plugin does not
+ * implement `getWorkflowFilenames()` (e.g. older plugins without the optional
+ * contract method). Vercel returns ['deploy_vercel.yaml', 'deploy_prod.yaml']
+ * via the new method; this fallback covers everything else.
+ */
+const DEFAULT_WORKFLOW_FILES: readonly string[] = ['deploy_prod.yaml'];
 
 interface RepoContext {
     owner: string;
@@ -37,6 +48,7 @@ export class DeployService {
         private readonly workRepository: WorkRepository,
         private readonly pluginRegistry: PluginRegistryService,
         private readonly websiteUpdateService: WebsiteUpdateService,
+        private readonly eventEmitter: EventEmitter2,
     ) {}
 
     /**
@@ -47,10 +59,11 @@ export class DeployService {
         userId: string,
         options: { teamScope?: string },
     ): Promise<boolean> {
-        const { plugin, token, work } = await this.deployFacade.getPluginAndToken({
-            userId,
-            workId,
-        });
+        const { plugin, token, work, settings } =
+            await this.deployFacade.getPluginAndTokenAndSettings({
+                userId,
+                workId,
+            });
 
         const user = work.user as User;
         const gitToken = await this.gitFacade.getAccessToken({
@@ -74,11 +87,29 @@ export class DeployService {
             withDelay: false,
         });
 
-        await this.setRequiredSecrets(ctx, token, work);
+        await this.setRequiredSecrets(ctx, token, work, plugin, settings);
         await this.setOptionalSecrets(ctx, options.teamScope, gitToken);
         await this.ensureCronSecret(ctx);
 
-        return this.dispatchWithRetry(work, user, gitToken);
+        const dispatched = await this.dispatchWithRetry(work, user, gitToken, plugin);
+
+        // Fire-and-forget event so the activity-log listener (and any
+        // future subscribers — Sentry breadcrumbs, metrics, etc.) can
+        // record the dispatch without DeployService taking a hard
+        // dependency on ActivityLogService.
+        if (dispatched) {
+            this.eventEmitter.emit(
+                DeploymentDispatchedEvent.EVENT_NAME,
+                new DeploymentDispatchedEvent({
+                    work,
+                    userId,
+                    providerId: plugin.id,
+                    providerName: plugin.providerName ?? plugin.name ?? plugin.id,
+                }),
+            );
+        }
+
+        return dispatched;
     }
 
     /**
@@ -201,7 +232,13 @@ export class DeployService {
         return this.setActionVariable({ key, value, owner: ctx.owner, repo: ctx.repo }, ctx.token);
     }
 
-    private async setRequiredSecrets(ctx: RepoContext, deployToken: string, work: Work) {
+    private async setRequiredSecrets(
+        ctx: RepoContext,
+        deployToken: string,
+        work: Work,
+        plugin?: IDeploymentPlugin,
+        settings?: Record<string, unknown>,
+    ) {
         const provider = work.deployProvider || 'vercel';
         try {
             await this.setVariable(ctx, 'DEPLOY_PROVIDER', provider);
@@ -217,6 +254,32 @@ export class DeployService {
             this.setSecret(ctx, `${provider.toUpperCase()}_TOKEN`, deployToken),
             this.setSecret(ctx, 'DEPLOY_TOKEN', deployToken),
         ]);
+
+        // Plugin-specific extra secrets (k8s registry creds, namespace, etc.)
+        // The plugin returns a Record<string, string> of secret name → value;
+        // the deploy service pushes each one as a GitHub Actions secret.
+        // Older plugins without `getDeploymentSecrets` simply contribute
+        // nothing here.
+        if (plugin?.getDeploymentSecrets && settings) {
+            try {
+                const extras = await plugin.getDeploymentSecrets(settings);
+                const entries = Object.entries(extras);
+                if (entries.length > 0) {
+                    await Promise.all(
+                        entries.map(([key, value]) => this.setSecret(ctx, key, value)),
+                    );
+                    this.logger.log(
+                        `Pushed ${entries.length} plugin-specific secrets for ${plugin.id} to ${ctx.owner}/${ctx.repo}`,
+                    );
+                }
+            } catch (error) {
+                this.logger.error(
+                    `Failed to push plugin-specific secrets for ${plugin.id} on ${ctx.owner}/${ctx.repo}: ${
+                        error instanceof Error ? error.message : String(error)
+                    }`,
+                );
+            }
+        }
     }
 
     private async setOptionalSecrets(ctx: RepoContext, teamScope?: string, gitToken?: string) {
@@ -245,8 +308,19 @@ export class DeployService {
         return randomBytes(this.CRON_SECRET_LENGTH).toString('hex');
     }
 
-    private async dispatchWithRetry(work: Work, user: User, gitToken: string): Promise<boolean> {
-        const workflowFilesToTry = ['deploy_vercel.yaml', 'deploy_prod.yaml'];
+    private async dispatchWithRetry(
+        work: Work,
+        user: User,
+        gitToken: string,
+        plugin?: IDeploymentPlugin,
+    ): Promise<boolean> {
+        // Resolve workflow files from the plugin (capability-driven). Plugins
+        // without `getWorkflowFilenames` use the default fallback list. This
+        // replaces the hardcoded `['deploy_vercel.yaml', 'deploy_prod.yaml']`
+        // that pre-dated the optional contract method.
+        const workflowFilesToTry = plugin?.getWorkflowFilenames
+            ? plugin.getWorkflowFilenames()
+            : [...DEFAULT_WORKFLOW_FILES];
         const owner = work.getRepoOwner('website');
         const repo = work.getWebsiteRepo();
         const template = getWebsiteTemplateConfig(work.websiteTemplateId);

@@ -431,7 +431,7 @@ export class ApifyPlugin implements IPlugin, IDataSourcePlugin, IFormSchemaProvi
 			category: this.category,
 			capabilities: [...this.capabilities],
 			author: { name: 'Ever Works Team' },
-			license: 'MIT',
+			license: 'AGPL-3.0',
 			builtIn: false,
 			systemPlugin: false,
 			homepage: 'https://apify.com',

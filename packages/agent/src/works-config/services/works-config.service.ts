@@ -12,6 +12,12 @@ export interface WorksConfigSummary {
     websiteRepo?: string;
     scheduleCadence?: WorkScheduleCadence | null;
     providers?: ProvidersDto;
+    /**
+     * Deploy provider plugin id declared in `works.yml` (e.g. 'vercel', 'k8s').
+     * Validated against `DeployFacadeService.getAvailableProviders()` at apply
+     * time; the works-config layer itself is provider-agnostic.
+     */
+    deployProvider?: string;
 }
 
 export interface ParsedWorksConfig extends WorksConfigSummary {
@@ -70,6 +76,7 @@ export class WorksConfigService {
                     'websiteRepository',
                 ]),
             ),
+            deployProvider: this.readString(raw, ['deployProvider', 'deploy_provider']),
         };
     }
 

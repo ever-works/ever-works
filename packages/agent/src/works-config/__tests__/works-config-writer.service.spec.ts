@@ -207,4 +207,99 @@ describe('WorksConfigWriterService', () => {
 
         await fs.rm(repoDir, { recursive: true, force: true });
     });
+
+    describe('deployProvider field (provider-agnostic)', () => {
+        it('writes deployProvider when provided in the request', async () => {
+            const repoDir = await fs.mkdtemp(path.join(os.tmpdir(), 'works-config-writer-deploy-'));
+            const service = new WorksConfigWriterService(new WorksConfigService({} as any));
+
+            await service.writeToDataRepository({
+                work: createWork(),
+                dataRepository: { dir: repoDir } as any,
+                request: { deployProvider: 'k8s' },
+            });
+
+            const written = yaml.parse(await fs.readFile(path.join(repoDir, 'works.yml'), 'utf-8'));
+            expect(written.deployProvider).toBe('k8s');
+
+            await fs.rm(repoDir, { recursive: true, force: true });
+        });
+
+        it('preserves existing works.yml deployProvider when no override', async () => {
+            const repoDir = await fs.mkdtemp(path.join(os.tmpdir(), 'works-config-writer-deploy-'));
+            await fs.writeFile(
+                path.join(repoDir, 'works.yml'),
+                'deployProvider: vercel\n',
+                'utf-8',
+            );
+
+            const service = new WorksConfigWriterService(new WorksConfigService({} as any));
+            await service.writeToDataRepository({
+                work: createWork(),
+                dataRepository: { dir: repoDir } as any,
+            });
+
+            const written = yaml.parse(await fs.readFile(path.join(repoDir, 'works.yml'), 'utf-8'));
+            expect(written.deployProvider).toBe('vercel');
+
+            await fs.rm(repoDir, { recursive: true, force: true });
+        });
+
+        it('falls back to work.deployProvider when YAML and request are silent', async () => {
+            const repoDir = await fs.mkdtemp(path.join(os.tmpdir(), 'works-config-writer-deploy-'));
+            const service = new WorksConfigWriterService(new WorksConfigService({} as any));
+            const work = { ...createWork(), deployProvider: 'k8s' };
+
+            await service.writeToDataRepository({
+                work,
+                dataRepository: { dir: repoDir } as any,
+            });
+
+            const written = yaml.parse(await fs.readFile(path.join(repoDir, 'works.yml'), 'utf-8'));
+            expect(written.deployProvider).toBe('k8s');
+
+            await fs.rm(repoDir, { recursive: true, force: true });
+        });
+
+        it('clears deployProvider when request explicitly passes null', async () => {
+            const repoDir = await fs.mkdtemp(path.join(os.tmpdir(), 'works-config-writer-deploy-'));
+            await fs.writeFile(
+                path.join(repoDir, 'works.yml'),
+                'deployProvider: vercel\n',
+                'utf-8',
+            );
+
+            const service = new WorksConfigWriterService(new WorksConfigService({} as any));
+            await service.writeToDataRepository({
+                work: createWork(),
+                dataRepository: { dir: repoDir } as any,
+                request: { deployProvider: null },
+            });
+
+            const written = yaml.parse(await fs.readFile(path.join(repoDir, 'works.yml'), 'utf-8'));
+            expect(written.deployProvider).toBeUndefined();
+
+            await fs.rm(repoDir, { recursive: true, force: true });
+        });
+
+        it('imported works.yml deployProvider beats the work entity value', async () => {
+            const repoDir = await fs.mkdtemp(path.join(os.tmpdir(), 'works-config-writer-deploy-'));
+            const service = new WorksConfigWriterService(new WorksConfigService({} as any));
+            const work = { ...createWork(), deployProvider: 'vercel' };
+
+            await service.writeToDataRepository({
+                work,
+                dataRepository: { dir: repoDir } as any,
+                importedWorksConfig: { deployProvider: 'k8s' } as any,
+            });
+
+            const written = yaml.parse(await fs.readFile(path.join(repoDir, 'works.yml'), 'utf-8'));
+            // Provider-agnostic: imported value wins over work entity, just
+            // like other works-config fields. (Spec FR-18 — data repo is
+            // source of truth.)
+            expect(written.deployProvider).toBe('k8s');
+
+            await fs.rm(repoDir, { recursive: true, force: true });
+        });
+    });
 });

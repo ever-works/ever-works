@@ -56,6 +56,7 @@ const sidebars: SidebarsConfig = {
 				'features/taxonomy-system',
 				'features/api-keys',
 				'features/custom-domains',
+				'features/k8s-deployment',
 				'features/mcp-server',
 				'features/data-management'
 			]

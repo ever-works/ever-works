@@ -2,6 +2,18 @@
 
 Full pipeline plugin that delegates work generation to the [OpenCode CLI](https://github.com/sst/opencode). A single OpenCode CLI session autonomously handles web search, content creation, and file generation inside a temporary workspace while using the active Ever Works AI provider for model access.
 
+## Plugin metadata
+
+| Field        | Value                              |
+| ------------ | ---------------------------------- |
+| ID           | `opencode`                         |
+| Category     | `pipeline`                         |
+| Capabilities | `pipeline`, `form-schema-provider` |
+| Author       | Ever Works Team                    |
+| License      | AGPL-3.0                           |
+| Built-in     | yes                                |
+| Auto-enable  | no                                 |
+
 ## Pipeline Steps
 
 The plugin runs 6 sequential steps:
@@ -111,3 +123,14 @@ pnpm test:watch
 # Coverage
 pnpm test:coverage
 ```
+
+## Documentation
+
+- [Ever Works documentation](https://docs.ever.works)
+- [Ever Works repository](https://github.com/ever-works/ever-works)
+- [Plugin system](../../plugin/README.md)
+- [OpenCode CLI homepage](https://github.com/sst/opencode)
+
+## License
+
+AGPL-3.0

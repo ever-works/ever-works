@@ -13,6 +13,11 @@ const WORKS_CONFIG_FILENAME = 'works.yml';
 export type WorksConfigWriteRequest = Partial<Pick<CreateItemsGeneratorDto, 'name' | 'prompt'>> & {
     model?: string | null;
     providers?: ProvidersDto | null;
+    /**
+     * Deploy provider plugin id (e.g. 'vercel', 'k8s'). Provider-agnostic;
+     * the works-config layer never branches on the value.
+     */
+    deployProvider?: string | null;
 };
 
 export type WriteWorksConfigOptions = {
@@ -59,16 +64,60 @@ export class WorksConfigWriterService {
         });
         const websiteRepo =
             imported?.websiteRepo || this.formatRepositoryTarget(options.work, 'website');
+        const deployProvider = this.resolveDeployProvider({
+            requested: request.deployProvider,
+            imported: imported?.deployProvider,
+            existing: existingRaw.deployProvider ?? existingRaw.deploy_provider,
+            workValue: options.work.deployProvider,
+        });
+
+        // The works-config parser accepts both `deployProvider` (camelCase)
+        // and `deploy_provider` (snake_case). When the caller explicitly
+        // clears the field (request.deployProvider === null), strip BOTH
+        // forms — otherwise the snake_case key from `existingRaw` survives
+        // the spread and the parser silently re-applies the old value on
+        // the next sync.
+        const baseRaw = { ...existingRaw };
+        if (request.deployProvider === null) {
+            delete baseRaw.deployProvider;
+            delete baseRaw.deploy_provider;
+        } else if (deployProvider !== undefined) {
+            // Canonicalise on the camelCase key — drop the snake_case alias
+            // so we don't end up with both at once.
+            delete baseRaw.deploy_provider;
+        }
 
         return this.withoutUndefined({
-            ...existingRaw,
+            ...baseRaw,
             name: request.name || imported?.name || options.work.name,
             initial_prompt: initialPrompt,
             model,
             providers,
             website_repo: websiteRepo,
             schedule: this.buildSchedule(options.work, imported),
+            deployProvider,
         });
+    }
+
+    private resolveDeployProvider(args: {
+        requested?: string | null;
+        imported?: string | null;
+        existing?: unknown;
+        workValue?: string | null;
+    }): string | undefined {
+        if (args.requested === null) return undefined;
+        if (typeof args.requested === 'string' && args.requested.trim().length > 0) {
+            return args.requested.trim();
+        }
+        if (typeof args.imported === 'string' && args.imported.trim().length > 0) {
+            return args.imported.trim();
+        }
+        const existing = this.readString(args.existing);
+        if (existing) return existing;
+        if (typeof args.workValue === 'string' && args.workValue.trim().length > 0) {
+            return args.workValue.trim();
+        }
+        return undefined;
     }
 
     private buildSchedule(

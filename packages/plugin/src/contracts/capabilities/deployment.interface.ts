@@ -177,6 +177,26 @@ export interface IDeploymentPlugin extends IPlugin {
 	 * Verify a domain on a project
 	 */
 	verifyDomain?(projectId: string, domain: string, token: string, teamScope?: string): Promise<DeploymentDomain>;
+
+	/**
+	 * Workflow filenames to dispatch when deploying, in priority order.
+	 *
+	 * The deploy service tries these in order; the first one present in the
+	 * website repo wins. If a plugin does not implement this, the deploy
+	 * service falls back to its built-in default list.
+	 */
+	getWorkflowFilenames?(): string[];
+
+	/**
+	 * Extra GitHub Actions secrets/variables to push to the website repo
+	 * before dispatching the deploy workflow.
+	 *
+	 * Keys are uppercase secret names; values are the secret values.
+	 * Called server-side only — must never include the plugin's primary
+	 * secret (e.g. kubeconfig, API token); the deploy service handles that
+	 * via the existing `<PROVIDER>_TOKEN` push.
+	 */
+	getDeploymentSecrets?(settings: Record<string, unknown>): Promise<Record<string, string>>;
 }
 
 /**

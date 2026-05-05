@@ -175,7 +175,7 @@ export class AnthropicPlugin extends BaseAiProvider {
 			category: this.category,
 			capabilities: [...this.capabilities],
 			author: { name: 'Ever Works Team' },
-			license: 'MIT',
+			license: 'AGPL-3.0',
 			builtIn: true,
 			autoEnable: false,
 			visibility: 'public',
