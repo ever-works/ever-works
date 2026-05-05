@@ -2369,7 +2369,7 @@
                     "title": "Format Repositori yang Didukung",
                     "dataRepo": {
                         "title": "Repositori Data",
-                        "description": "Repositori dengan config.yml dan struktur folder data/"
+                        "description": "Repositori dengan works.yml dan struktur folder data/"
                     },
                     "awesomeReadme": {
                         "title": "Daftar Hebat",
@@ -2492,7 +2492,7 @@
                     "linkRepos": "Hubungkan repositori"
                 },
                 "detectionFailed": "Kami tidak dapat mendeteksi format secara otomatis. Harap pilih cara mengimpor repositori ini.",
-                "detectionFailedMissingConfig": "Tidak ditemukan konfigurasi yang didukung. Tambahkan config.yml, works.yml, atau works_config/works.yml ke repositori, atau pilih format impor manual di bawah ini.",
+                "detectionFailedMissingConfig": "Tidak ditemukan konfigurasi yang didukung. Tambahkan works.yml ke repositori, atau pilih format impor manual di bawah ini.",
                 "errors": {
                     "urlRequired": "Harap masukkan URL repositori GitHub",
                     "unsupportedFormat": "Format repositori ini tidak didukung. Harap gunakan format Repositori Data atau Daftar Hebat.",

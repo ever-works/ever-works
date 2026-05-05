@@ -2409,7 +2409,7 @@
                     "title": "Supported Repository Formats",
                     "dataRepo": {
                         "title": "Data Repository",
-                        "description": "Repositories with config.yml and data/ folder structure"
+                        "description": "Repositories with works.yml and data/ folder structure"
                     },
                     "awesomeReadme": {
                         "title": "Awesome List",
@@ -2532,7 +2532,7 @@
                     "linkRepos": "Link repositories"
                 },
                 "detectionFailed": "We could not automatically detect the format. Please select how to import this repository.",
-                "detectionFailedMissingConfig": "No supported config was found. Add config.yml, works.yml, or works_config/works.yml to the repository, or choose a manual import format below.",
+                "detectionFailedMissingConfig": "No supported config was found. Add works.yml to the repository, or choose a manual import format below.",
                 "errors": {
                     "urlRequired": "Please enter a GitHub repository URL",
                     "unsupportedFormat": "This repository format is not supported. Please use a Data Repository or Awesome List format.",

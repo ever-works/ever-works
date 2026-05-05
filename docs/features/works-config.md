@@ -21,14 +21,9 @@ Use `works.yml` when you want to onboard an existing data repo into the platform
 
 ## File Locations
 
-When the platform reads from a repo it tries each of these paths in order and uses the first one that exists:
+When the platform reads from a repo it only uses `works.yml` at the data-repository root.
 
-1. `works.yml`
-2. `works.yaml`
-3. `works_config/works.yml`
-4. `works_config/works.yaml`
-
-When the platform writes the config back after generation, it uses **`works.yml`** at the data-repository root (preserving the path it originally read from when present).
+When the platform writes the config back after generation, it uses **`works.yml`** at the data-repository root.
 
 ## Schema
 

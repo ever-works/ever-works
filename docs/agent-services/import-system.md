@@ -65,7 +65,7 @@ The `analyzeRepository()` method inspects repository contents to determine the s
 
 | Detection          | Criteria                                                     | Result Type      |
 | ------------------ | ------------------------------------------------------------ | ---------------- |
-| Data Repository    | Has `config.yml`/`config.yaml` AND `data/` work              | `data_repo`      |
+| Data Repository    | Has root `works.yml` AND `data/` work                        | `data_repo`      |
 | Awesome List       | Has `README.md` with section headers + list links (5+ items) | `awesome_readme` |
 | Multi-file Awesome | Has `README.md` with 3+ internal work links                  | `awesome_readme` |
 | Unrecognized       | None of the above                                            | `null`           |

@@ -2369,7 +2369,7 @@
                     "title": "صيغ المستودعات المدعومة",
                     "dataRepo": {
                         "title": "مستودع بيانات",
-                        "description": "مستودعات مع config.yml وهيكل مجلد data/"
+                        "description": "مستودعات مع works.yml وهيكل مجلد data/"
                     },
                     "awesomeReadme": {
                         "title": "قائمة Awesome",
@@ -2492,7 +2492,7 @@
                     "linkRepos": "ربط المستودعات"
                 },
                 "detectionFailed": "لم نتمكن من كشف الصيغة تلقائيًا. يرجى اختيار كيفية استيراد هذا المستودع.",
-                "detectionFailedMissingConfig": "لم يتم العثور على تكوين مدعوم. أضف config.yml أو works.yml أو works_config/works.yml إلى المستودع، أو اختر تنسيق استيراد يدوي أدناه.",
+                "detectionFailedMissingConfig": "لم يتم العثور على تكوين مدعوم. أضف works.yml إلى المستودع، أو اختر تنسيق استيراد يدوي أدناه.",
                 "errors": {
                     "urlRequired": "يرجى إدخال رابط مستودع GitHub",
                     "unsupportedFormat": "صيغة هذا المستودع غير مدعومة. يرجى استخدام صيغة مستودع بيانات أو قائمة Awesome.",

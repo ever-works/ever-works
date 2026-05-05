@@ -64,7 +64,7 @@ flowchart LR
 | Webhook delivery           | New `WebhookDeliveryService` using BullMQ queue with exponential retry  | BullMQ already in deps; built-in retry; out-of-band from the Trigger.dev pipeline                     |
 | GitHub credential validate | Existing `git-provider` capability via `GitFacade`                      | No new direct integration; Principle I                                                                |
 | Manifest schema            | Zod schema in `@ever-works/contracts`                                   | Already used by some DTOs; lets us share the schema between API (validation) and CLI (lint)           |
-| Manifest format            | YAML 1.2, parsed with `js-yaml` (already a transitive dep)              | Human-readable; agents and humans both edit it; matches existing `config.yml` ergonomics              |
+| Manifest format            | YAML 1.2, parsed with `js-yaml` (already a transitive dep)              | Human-readable; agents and humans both edit it; matches existing `works.yml` ergonomics               |
 | Webhook signing            | HMAC-SHA256 over raw body, GitHub-style `X-Hub-Signature-256` header    | Matches FR-12; reuses helper from `github-app-webhook.controller.ts` if exposed, else new shared util |
 | Public endpoint protection | `@Public()` + `@Throttle()` (existing decorators)                       | The endpoint is the bootstrap; no JWT possible; throttling guards against abuse                       |
 | MCP tool placement         | Inside `apps/mcp/`, no per-tool authentication for `register_work`      | Matches FR-15 (per-tool auth, not per-server); avoids a second MCP server                             |

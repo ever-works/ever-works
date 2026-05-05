@@ -49,7 +49,7 @@ interface ParsedRepoCoords {
     canonicalUrl: string;
 }
 
-const MANIFEST_PATHS = ['works.yml', 'works.yaml'];
+const MANIFEST_PATHS = ['works.yml'] as const;
 
 @Injectable()
 export class OnboardingService {

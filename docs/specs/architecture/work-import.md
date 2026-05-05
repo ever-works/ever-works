@@ -61,10 +61,10 @@ of source the URL points at. The algorithm:
 1. Resolve the URL to `(owner, repo)`. Strip protocol and `.git`.
 2. Verify it exists via `GitFacadeService.repositoryExists`.
 3. Probe for **data-repo markers**:
-    - `config.yml` at root
+    - `works.yml` at root
     - `data/` work with at least one item file
     - `categories.yml` (optional but indicative)
-    - `works.yml` / `works.yaml` (see [`works-config`](../features/works-config/spec.md))
+    - root `works.yml` (see [`works-config`](../features/works-config/spec.md))
 4. Probe for **Awesome README markers**:
     - `README.md` with at least 5 link-list entries
     - Repo description containing "awesome" or repo name starting `awesome-`
@@ -105,7 +105,7 @@ snappy.
 Source repo                          Platform
     │                                    │
     ├─ clone ───────────────────────────▶│
-    │                                    ├─ read config.yml
+    │                                    ├─ read works.yml
     │                                    ├─ read works.yml (if present)
     │                                    ├─ read categories.yml
     │                                    ├─ read tags.yml
