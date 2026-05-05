@@ -35,6 +35,7 @@ describe('WorkLifecycleService', () => {
     let ownershipService: any;
     let deployFacade: any;
     let gitFacade: any;
+    let templateCatalogService: any;
     let service: WorkLifecycleService;
 
     afterAll(() => {
@@ -79,6 +80,12 @@ describe('WorkLifecycleService', () => {
             hasValidCredentials: jest.fn().mockResolvedValue(false),
             repositoryExists: jest.fn(),
         };
+        templateCatalogService = {
+            getDefaultTemplateIdForUser: jest.fn().mockResolvedValue(null),
+            getVisibleTemplateForUser: jest.fn().mockImplementation(async (_kind, templateId) => ({
+                id: templateId,
+            })),
+        };
 
         service = new WorkLifecycleService(
             workRepository,
@@ -89,6 +96,7 @@ describe('WorkLifecycleService', () => {
             ownershipService,
             deployFacade,
             gitFacade,
+            templateCatalogService,
         );
     });
 

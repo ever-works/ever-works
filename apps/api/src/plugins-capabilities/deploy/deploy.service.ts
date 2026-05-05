@@ -7,7 +7,7 @@ import { Work, User } from '@ever-works/agent/entities';
 import {
     WebsiteUpdateService,
     getWebsiteTemplateBranch,
-    getWebsiteTemplateConfig,
+    WebsiteTemplateResolverService,
 } from '@ever-works/agent/generators';
 import type { BatchDeployItemDto, BatchDeployItemResultDto } from './dto/batch-deploy.dto';
 
@@ -37,6 +37,7 @@ export class DeployService {
         private readonly workRepository: WorkRepository,
         private readonly pluginRegistry: PluginRegistryService,
         private readonly websiteUpdateService: WebsiteUpdateService,
+        private readonly websiteTemplateResolver: WebsiteTemplateResolverService,
     ) {}
 
     /**
@@ -249,7 +250,7 @@ export class DeployService {
         const workflowFilesToTry = ['deploy_vercel.yaml', 'deploy_prod.yaml'];
         const owner = work.getRepoOwner('website');
         const repo = work.getWebsiteRepo();
-        const template = getWebsiteTemplateConfig(work.websiteTemplateId);
+        const template = await this.websiteTemplateResolver.resolve(work.websiteTemplateId);
 
         const tryDispatch = async (): Promise<boolean> => {
             for (const workflowFile of workflowFilesToTry) {
@@ -318,7 +319,7 @@ export class DeployService {
         const workOwner = work.user as User;
         const websiteOwner = work.getRepoOwner('website');
         const websiteRepo = work.getWebsiteRepo();
-        const template = getWebsiteTemplateConfig(work.websiteTemplateId);
+        const template = await this.websiteTemplateResolver.resolve(work.websiteTemplateId);
 
         try {
             const repoDir = await this.gitFacade.cloneOrPull(

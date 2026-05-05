@@ -193,6 +193,38 @@ export class TemplateCatalogService implements OnModuleInit {
         return { defaultTemplateId: template.id };
     }
 
+    async getVisibleTemplateForUser(
+        kind: TemplateKind,
+        templateId: string,
+        userId: string,
+    ): Promise<TemplateCatalogItem | null> {
+        const template = await this.templateRepository.findVisibleById(templateId, userId);
+        if (!template || template.kind !== kind) {
+            return null;
+        }
+
+        const defaultTemplateId = await this.getDefaultTemplateIdForUser(kind, userId);
+
+        return {
+            id: template.id,
+            kind: template.kind,
+            sourceType: template.sourceType,
+            name: template.name,
+            description: template.description,
+            framework: template.framework,
+            previewImageUrl: template.previewImageUrl,
+            repositoryUrl: template.repositoryUrl,
+            repositoryOwner: template.repositoryOwner,
+            repositoryName: template.repositoryName,
+            branch: template.branch,
+            syncBranches: template.syncBranches,
+            betaBranch: template.betaBranch,
+            isActive: template.isActive,
+            isDefault: template.id === defaultTemplateId,
+            ownerUserId: template.ownerUserId,
+        };
+    }
+
     async getDefaultTemplateIdForUser(kind: TemplateKind, userId: string): Promise<string | null> {
         const preference = await this.userTemplatePreferenceRepository.findByUserAndKind(
             userId,

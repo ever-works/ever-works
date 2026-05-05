@@ -85,7 +85,7 @@ import {
     SwitchWebsiteTemplateResponseDto,
     UpdateWebsiteRepositoryResponseDto,
 } from '@ever-works/agent/generators';
-import { getDefaultWebsiteTemplateId, listWebsiteTemplates } from '@ever-works/agent/generators';
+import { getDefaultWebsiteTemplateId } from '@ever-works/agent/generators';
 import { CommunityPrProcessorService } from '@ever-works/agent/community-pr';
 import { WorkRepository } from '@ever-works/agent/database';
 import { AuthService, CurrentUser, AuthSessionGuard } from '../auth';
@@ -196,22 +196,17 @@ export class WorksController {
             'website',
             auth.userId,
         );
-        const builtInDefaultIds = new Set(
-            templateCatalog.templates
-                .filter((template) => template.sourceType === 'built_in' && template.isDefault)
-                .map((template) => template.id),
-        );
-        const fallbackDefaultTemplateId =
-            builtInDefaultIds.size > 0 ? null : getDefaultWebsiteTemplateId();
+        const hasExplicitDefault = templateCatalog.templates.some((template) => template.isDefault);
 
         return {
             status: 'success',
-            templates: listWebsiteTemplates().map((template) => ({
+            templates: templateCatalog.templates.map((template) => ({
                 id: template.id,
                 name: template.name,
                 description: template.description,
                 isDefault:
-                    builtInDefaultIds.has(template.id) || template.id === fallbackDefaultTemplateId,
+                    template.isDefault ||
+                    (!hasExplicitDefault && template.id === getDefaultWebsiteTemplateId()),
             })),
         };
     }

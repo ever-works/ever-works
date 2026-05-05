@@ -20,12 +20,12 @@ import { rethrowAsNormalized } from './utils/error.utils';
 import { GenerateStatusType } from '@src/entities/types';
 import { DeployFacadeService } from '@src/facades/deploy.facade';
 import {
-    findWebsiteTemplateConfig,
     getDefaultWebsiteTemplateId,
     SwitchWebsiteTemplateResponseDto,
 } from '@src/generators/website-generator';
 import { GitFacadeService } from '@src/facades/git.facade';
 import { WebsiteRepositoryCreationMethod } from '@src/items-generator/dto/create-items-generator.dto';
+import { TemplateCatalogService } from './template-catalog.service';
 
 @Injectable()
 export class WorkLifecycleService {
@@ -40,6 +40,7 @@ export class WorkLifecycleService {
         private readonly ownershipService: WorkOwnershipService,
         private readonly deployFacade: DeployFacadeService,
         private readonly gitFacade: GitFacadeService,
+        private readonly templateCatalogService: TemplateCatalogService,
     ) {}
 
     private isMissingWebsiteRepositoryError(error: unknown): boolean {
@@ -122,12 +123,23 @@ export class WorkLifecycleService {
             websiteTemplateId,
         } = createWorkDto;
 
-        if (websiteTemplateId && !findWebsiteTemplateConfig(websiteTemplateId)) {
-            throw new BadRequestException({
-                status: 'error',
-                message: `Unsupported website template: ${websiteTemplateId}`,
-            });
+        if (websiteTemplateId) {
+            const visibleTemplate = await this.templateCatalogService.getVisibleTemplateForUser(
+                'website',
+                websiteTemplateId,
+                user.id,
+            );
+            if (!visibleTemplate) {
+                throw new BadRequestException({
+                    status: 'error',
+                    message: `Unsupported website template: ${websiteTemplateId}`,
+                });
+            }
         }
+
+        const defaultWebsiteTemplateId =
+            (await this.templateCatalogService.getDefaultTemplateIdForUser('website', user.id)) ||
+            getDefaultWebsiteTemplateId();
 
         const workData: Partial<CreateWorkDto & { userId: string }> = {
             slug,
@@ -137,7 +149,7 @@ export class WorkLifecycleService {
             owner,
             gitProvider,
             deployProvider,
-            websiteTemplateId: websiteTemplateId || getDefaultWebsiteTemplateId(),
+            websiteTemplateId: websiteTemplateId || defaultWebsiteTemplateId,
             readmeConfig,
             organization,
         };
@@ -210,9 +222,21 @@ export class WorkLifecycleService {
             }
 
             if (updateDto.websiteTemplateId !== undefined) {
-                const nextTemplateId = updateDto.websiteTemplateId || getDefaultWebsiteTemplateId();
+                const nextTemplateId =
+                    updateDto.websiteTemplateId ||
+                    (await this.templateCatalogService.getDefaultTemplateIdForUser(
+                        'website',
+                        user.id,
+                    )) ||
+                    getDefaultWebsiteTemplateId();
 
-                if (!findWebsiteTemplateConfig(nextTemplateId)) {
+                const visibleTemplate = await this.templateCatalogService.getVisibleTemplateForUser(
+                    'website',
+                    nextTemplateId,
+                    user.id,
+                );
+
+                if (!visibleTemplate) {
                     throw new BadRequestException({
                         status: 'error',
                         message: `Unsupported website template: ${nextTemplateId}`,
@@ -276,9 +300,18 @@ export class WorkLifecycleService {
         user: User,
     ): Promise<SwitchWebsiteTemplateResponseDto> {
         const { work } = await this.ownershipService.ensureCanEdit(id, user.id);
-        const nextTemplateId = websiteTemplateId || getDefaultWebsiteTemplateId();
+        const nextTemplateId =
+            websiteTemplateId ||
+            (await this.templateCatalogService.getDefaultTemplateIdForUser('website', user.id)) ||
+            getDefaultWebsiteTemplateId();
 
-        if (!findWebsiteTemplateConfig(nextTemplateId)) {
+        const visibleTemplate = await this.templateCatalogService.getVisibleTemplateForUser(
+            'website',
+            nextTemplateId,
+            user.id,
+        );
+
+        if (!visibleTemplate) {
             throw new BadRequestException({
                 status: 'error',
                 message: `Unsupported website template: ${nextTemplateId}`,
