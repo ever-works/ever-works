@@ -25,7 +25,7 @@
 	},
 	"dependencies": {
 		"@notionhq/client": "^2.3.0",
-		"axios": "^1.15.0"
+		"axios": "^1.15.2"
 	},
 	"peerDependencies": {
 		"@ever-works/plugin": "workspace:*"
