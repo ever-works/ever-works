@@ -10,7 +10,7 @@ Jina AI Plugin - Web search and content extraction using Jina AI APIs
 | Category     | `content-extractor`           |
 | Capabilities | `search`, `content-extractor` |
 | Author       | Ever Works Team               |
-| License      | AGPL-3.0                           |
+| License      | AGPL-3.0                      |
 | Built-in     | yes                           |
 | Auto-enable  | no                            |
 

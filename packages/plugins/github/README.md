@@ -10,7 +10,7 @@ GitHub git provider plugin for Ever Works - repository management, git operation
 | Category     | `git-provider`          |
 | Capabilities | `git-provider`, `oauth` |
 | Author       | Ever Works Team         |
-| License      | AGPL-3.0                     |
+| License      | AGPL-3.0                |
 | Built-in     | yes                     |
 | Auto-enable  | yes                     |
 

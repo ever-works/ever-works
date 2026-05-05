@@ -10,7 +10,7 @@ Auto-generates SEO-optimized A vs B comparison pages between Work items
 | Category     | `utility`              |
 | Capabilities | _(none)_               |
 | Author       | Ever Works Team        |
-| License      | AGPL-3.0                    |
+| License      | AGPL-3.0               |
 | Built-in     | yes                    |
 | Auto-enable  | no                     |
 

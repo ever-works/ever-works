@@ -10,7 +10,7 @@ Full pipeline plugin that delegates work generation to the [Codex CLI](https://g
 | Category     | `pipeline`                                        |
 | Capabilities | `pipeline`, `form-schema-provider`, `device-auth` |
 | Author       | Ever Works Team                                   |
-| License      | AGPL-3.0                                               |
+| License      | AGPL-3.0                                          |
 | Built-in     | yes                                               |
 | Auto-enable  | no                                                |
 

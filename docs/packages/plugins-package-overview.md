@@ -19,7 +19,7 @@ The `packages/plugins/` work contains all first-party plugin implementations for
 | **Test runner**     | Vitest                                      |
 | **Plugin contract** | `@ever-works/plugin` (workspace dependency) |
 | **Total plugins**   | 30                                          |
-| **License**         | AGPL-3.0 (individual packages)                   |
+| **License**         | AGPL-3.0 (individual packages)              |
 
 ## Module Structure
 

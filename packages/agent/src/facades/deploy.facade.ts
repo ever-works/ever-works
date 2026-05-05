@@ -289,6 +289,27 @@ export class DeployFacadeService implements IDeployFacade {
         return this.resolvePluginAndTokenWithWork(options);
     }
 
+    /**
+     * Get the resolved plugin, token, work AND raw settings for deployment.
+     * Settings include secrets — only the deploy service / orchestrators
+     * should call this so it can push plugin-specific secrets via
+     * `IDeploymentPlugin.getDeploymentSecrets(settings)`.
+     */
+    async getPluginAndTokenAndSettings(options: DeployFacadeOptions): Promise<{
+        plugin: IDeploymentPlugin;
+        token: string;
+        work: Work;
+        settings: Record<string, unknown>;
+    }> {
+        const result = await this.resolvePluginAndTokenWithWork(options);
+        const settings = await this.settingsService.getSettings(result.plugin.id, {
+            userId: options.userId,
+            workId: options.workId,
+            includeSecrets: true,
+        });
+        return { ...result, settings };
+    }
+
     // Domain management methods
     // DB is the primary source of truth; provider APIs are used for sync and verification.
 

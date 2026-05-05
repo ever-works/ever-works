@@ -10,7 +10,7 @@ ScreenshotOne screenshot plugin for Ever Works - capture website screenshots usi
 | Category     | `screenshot`    |
 | Capabilities | `screenshot`    |
 | Author       | Ever Works Team |
-| License      | AGPL-3.0             |
+| License      | AGPL-3.0        |
 | Built-in     | no              |
 | Auto-enable  | no              |
 

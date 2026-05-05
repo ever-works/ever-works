@@ -10,7 +10,7 @@ Valyu Plugin - Web search and content extraction using Valyu API
 | Category     | `search`                      |
 | Capabilities | `search`, `content-extractor` |
 | Author       | Ever Works Team               |
-| License      | AGPL-3.0                           |
+| License      | AGPL-3.0                      |
 | Built-in     | yes                           |
 | Auto-enable  | no                            |
 

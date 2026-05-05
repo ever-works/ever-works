@@ -10,7 +10,7 @@ Scrapfly Plugin - Screenshot capture and content extraction using Scrapfly API
 | Category     | `content-extractor`               |
 | Capabilities | `screenshot`, `content-extractor` |
 | Author       | Ever Works Team                   |
-| License      | AGPL-3.0                               |
+| License      | AGPL-3.0                          |
 | Built-in     | yes                               |
 | Auto-enable  | no                                |
 

@@ -10,7 +10,7 @@ Perplexity Plugin - AI-powered web search with citations
 | Category     | `search`        |
 | Capabilities | `search`        |
 | Author       | Ever Works Team |
-| License      | AGPL-3.0             |
+| License      | AGPL-3.0        |
 | Built-in     | yes             |
 | Auto-enable  | no              |
 

@@ -10,7 +10,7 @@ Apify - Import items from Apify datasets into your Work
 | Category     | `data-source`                         |
 | Capabilities | `data-source`, `form-schema-provider` |
 | Author       | Ever Works Team                       |
-| License      | AGPL-3.0                                   |
+| License      | AGPL-3.0                              |
 | Built-in     | no                                    |
 | Auto-enable  | no                                    |
 

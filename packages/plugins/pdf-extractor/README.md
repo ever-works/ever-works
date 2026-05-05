@@ -10,7 +10,7 @@ PDF Content Extractor - Extract text from PDFs with OCR fallback via Mistral AI
 | Category     | `content-extractor` |
 | Capabilities | `content-extractor` |
 | Author       | Ever Works Team     |
-| License      | AGPL-3.0                 |
+| License      | AGPL-3.0            |
 | Built-in     | yes                 |
 | Auto-enable  | no                  |
 
