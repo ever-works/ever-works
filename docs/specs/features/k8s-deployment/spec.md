@@ -4,11 +4,16 @@
 > Describe **what** the system does, not how it's structured. Implementation lives in [`./plan.md`](./plan.md).
 
 **Feature ID**: `k8s-deployment`
-**Branch**: `feat/k8s-deployment`
-**Status**: `Draft`
+**Branch**: `feat/k8s-deployment` (merged via [#460](https://github.com/ever-works/ever-works/pull/460))
+**Status**: `Implemented`
 **Created**: 2026-05-05
 **Last updated**: 2026-05-05
 **Owner**: Ever Works Team
+
+**Shipped via**:
+
+- Platform: [#460](https://github.com/ever-works/ever-works/pull/460) (plugin), [#462](https://github.com/ever-works/ever-works/pull/462) (deploy service consumer change), [#463](https://github.com/ever-works/ever-works/pull/463) (review-pass fixes)
+- Templates: [ever-works/directory-web-template#734](https://github.com/ever-works/directory-web-template/pull/734), [ever-works/directory-web-minimal-template#2](https://github.com/ever-works/directory-web-minimal-template/pull/2)
 
 ---
 

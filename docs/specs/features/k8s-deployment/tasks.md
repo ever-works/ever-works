@@ -6,7 +6,7 @@
 **Feature ID**: `k8s-deployment`
 **Plan**: `./plan.md`
 **Spec**: `./spec.md`
-**Status**: `Draft`
+**Status**: `Done`
 **Last updated**: 2026-05-05
 
 ---

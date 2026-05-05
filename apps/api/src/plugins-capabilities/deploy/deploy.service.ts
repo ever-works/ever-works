@@ -1,4 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { randomBytes } from 'crypto';
 import { DeployFacadeService, GitFacadeService } from '@ever-works/agent/facades';
 import { WorkRepository } from '@ever-works/agent/database';
@@ -9,6 +10,7 @@ import {
     getWebsiteTemplateBranch,
     getWebsiteTemplateConfig,
 } from '@ever-works/agent/generators';
+import { DeploymentDispatchedEvent } from '@ever-works/agent/events';
 import type { IDeploymentPlugin } from '@ever-works/plugin';
 import type { BatchDeployItemDto, BatchDeployItemResultDto } from './dto/batch-deploy.dto';
 
@@ -46,6 +48,7 @@ export class DeployService {
         private readonly workRepository: WorkRepository,
         private readonly pluginRegistry: PluginRegistryService,
         private readonly websiteUpdateService: WebsiteUpdateService,
+        private readonly eventEmitter: EventEmitter2,
     ) {}
 
     /**
@@ -88,7 +91,25 @@ export class DeployService {
         await this.setOptionalSecrets(ctx, options.teamScope, gitToken);
         await this.ensureCronSecret(ctx);
 
-        return this.dispatchWithRetry(work, user, gitToken, plugin);
+        const dispatched = await this.dispatchWithRetry(work, user, gitToken, plugin);
+
+        // Fire-and-forget event so the activity-log listener (and any
+        // future subscribers — Sentry breadcrumbs, metrics, etc.) can
+        // record the dispatch without DeployService taking a hard
+        // dependency on ActivityLogService.
+        if (dispatched) {
+            this.eventEmitter.emit(
+                DeploymentDispatchedEvent.EVENT_NAME,
+                new DeploymentDispatchedEvent({
+                    work,
+                    userId,
+                    providerId: plugin.id,
+                    providerName: plugin.providerName ?? plugin.name ?? plugin.id,
+                }),
+            );
+        }
+
+        return dispatched;
     }
 
     /**
