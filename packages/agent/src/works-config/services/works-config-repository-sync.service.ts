@@ -96,9 +96,7 @@ export class WorksConfigRepositorySyncService {
                 throw error;
             }
 
-            this.logger.warn(
-                'works.yml sync push was rejected as non-fast-forward; force pushing',
-            );
+            this.logger.warn('works.yml sync push was rejected as non-fast-forward; force pushing');
             await this.gitFacade.push({ dir, force: true }, { userId, providerId });
         }
     }

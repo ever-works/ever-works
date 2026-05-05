@@ -780,8 +780,7 @@ export class SourceRepoAnalyzerService {
                 return null;
             }
 
-            const hasConfig =
-                contents.some((c) => c.name === 'works.yml' && c.type === 'file');
+            const hasConfig = contents.some((c) => c.name === 'works.yml' && c.type === 'file');
             const hasDataFolder = contents.some((c) => c.name === 'data' && c.type === 'dir');
 
             if (!hasConfig || !hasDataFolder) {
