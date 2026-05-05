@@ -247,7 +247,7 @@ export class VercelPlugin implements IPlugin, IDeploymentPlugin {
 			category: this.category,
 			capabilities: [...this.capabilities],
 			author: { name: 'Ever Works Team' },
-			license: 'MIT',
+			license: 'AGPL-3.0',
 			builtIn: true,
 			systemPlugin: true,
 			autoEnable: true,

@@ -10,7 +10,7 @@ Standard Pipeline Plugin - Provides the standard 15-step generation pipeline.
 | Category     | `pipeline`                         |
 | Capabilities | `pipeline`, `form-schema-provider` |
 | Author       | Ever Works Team                    |
-| License      | MIT                                |
+| License      | AGPL-3.0                                |
 | Built-in     | yes                                |
 | Auto-enable  | yes                                |
 
@@ -67,4 +67,4 @@ pnpm --filter @ever-works/standard-pipeline-plugin test
 
 ## License
 
-MIT
+AGPL-3.0

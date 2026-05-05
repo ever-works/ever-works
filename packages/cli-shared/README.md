@@ -54,4 +54,4 @@ pnpm --filter @ever-works/cli-shared dev     # tsc --watch
 
 ## License
 
-MIT
+AGPL-3.0

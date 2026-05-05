@@ -10,7 +10,7 @@ Langfuse Plugin - External prompt management with versioning, labels, and A/B te
 | Category     | `utility`         |
 | Capabilities | `prompt-provider` |
 | Author       | Ever Works Team   |
-| License      | MIT               |
+| License      | AGPL-3.0               |
 | Built-in     | yes               |
 | Auto-enable  | yes               |
 
@@ -67,4 +67,4 @@ pnpm --filter @ever-works/langfuse-plugin test
 
 ## License
 
-MIT
+AGPL-3.0

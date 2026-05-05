@@ -10,7 +10,7 @@ Urlbox screenshot plugin for Ever Works - capture website screenshots using the 
 | Category     | `screenshot`    |
 | Capabilities | `screenshot`    |
 | Author       | Ever Works Team |
-| License      | MIT             |
+| License      | AGPL-3.0             |
 | Built-in     | no              |
 | Auto-enable  | no              |
 
@@ -67,4 +67,4 @@ pnpm --filter @ever-works/urlbox-plugin test
 
 ## License
 
-MIT
+AGPL-3.0

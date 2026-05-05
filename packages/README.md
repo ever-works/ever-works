@@ -42,4 +42,4 @@ packages/
 
 ## License
 
-See each package's own `package.json` and `README.md` for licensing. Most packages are MIT; `@ever-works/agent` and `@ever-works/trigger-tasks` are private/internal.
+All Ever Works packages are licensed under [GNU AGPL v3.0](../LICENSE). The public CLI ([`apps/cli`](../apps/cli)) is the only exception and is released under MIT.

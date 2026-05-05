@@ -1,6 +1,13 @@
 {
 	"name": "ever-works-mcp",
 	"version": "0.1.0",
+	"description": "Ever Works MCP - Model Context Protocol server for the Ever Works platform",
+	"author": {
+		"name": "Ever Co. LTD",
+		"email": "ever@ever.co",
+		"url": "https://ever.co"
+	},
+	"license": "AGPL-3.0",
 	"private": true,
 	"type": "module",
 	"scripts": {

@@ -309,7 +309,7 @@ describe('PluginLoaderService', () => {
                 getManifest: jest.fn().mockReturnValue({
                     ...createMockManifest(),
                     homepage: 'https://github.com/example/repo',
-                    license: 'MIT',
+                    license: 'AGPL-3.0',
                     icon: { type: 'svg', value: '<svg/>' },
                 }),
             };
@@ -331,7 +331,7 @@ describe('PluginLoaderService', () => {
                 plugin,
                 expect.objectContaining({
                     homepage: 'https://github.com/example/repo',
-                    license: 'MIT',
+                    license: 'AGPL-3.0',
                     icon: { type: 'svg', value: '<svg/>' },
                 }),
                 expect.any(Object),

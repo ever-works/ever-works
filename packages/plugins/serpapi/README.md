@@ -10,7 +10,7 @@ SerpAPI Plugin - Web search using SerpAPI (Google, Bing, Yahoo, and more)
 | Category     | `search`        |
 | Capabilities | `search`        |
 | Author       | Ever Works Team |
-| License      | MIT             |
+| License      | AGPL-3.0             |
 | Built-in     | yes             |
 | Auto-enable  | no              |
 
@@ -63,4 +63,4 @@ pnpm --filter @ever-works/serpapi-plugin test
 
 ## License
 
-MIT
+AGPL-3.0

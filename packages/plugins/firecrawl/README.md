@@ -10,7 +10,7 @@ Firecrawl Plugin - Web search and content extraction using the Firecrawl API
 | Category     | `search`                      |
 | Capabilities | `search`, `content-extractor` |
 | Author       | Ever Works Team               |
-| License      | MIT                           |
+| License      | AGPL-3.0                           |
 | Built-in     | yes                           |
 | Auto-enable  | no                            |
 
@@ -62,4 +62,4 @@ pnpm --filter @ever-works/firecrawl-plugin test
 
 ## License
 
-MIT
+AGPL-3.0

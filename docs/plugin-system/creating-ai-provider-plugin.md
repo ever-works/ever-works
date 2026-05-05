@@ -89,7 +89,7 @@ packages/plugins/my-ai/
 	"description": "My AI provider plugin for Ever Works platform",
 	"private": false,
 	"type": "module",
-	"license": "MIT",
+	"license": "AGPL-3.0",
 	"main": "./dist/index.cjs",
 	"module": "./dist/index.js",
 	"types": "./dist/index.d.ts",
@@ -130,7 +130,7 @@ packages/plugins/my-ai/
 			"author": {
 				"name": "Your Name"
 			},
-			"license": "MIT",
+			"license": "AGPL-3.0",
 			"builtIn": true,
 			"autoEnable": false
 		}
@@ -439,7 +439,7 @@ export class MyAiPlugin extends BaseAiProvider {
 			category: this.category,
 			capabilities: [...this.capabilities],
 			author: { name: 'Your Name' },
-			license: 'MIT',
+			license: 'AGPL-3.0',
 			builtIn: true,
 			autoEnable: false,
 			visibility: 'public',

@@ -19,7 +19,7 @@ The `packages/plugins/` work contains all first-party plugin implementations for
 | **Test runner**     | Vitest                                      |
 | **Plugin contract** | `@ever-works/plugin` (workspace dependency) |
 | **Total plugins**   | 30                                          |
-| **License**         | MIT (individual packages)                   |
+| **License**         | AGPL-3.0 (individual packages)                   |
 
 ## Module Structure
 
@@ -142,7 +142,7 @@ Every plugin declares its identity and capabilities in the `everworks.plugin` fi
 			"capabilities": ["ai-provider"],
 			"description": "OpenAI AI provider plugin for Ever Works platform",
 			"author": { "name": "Ever Works Team" },
-			"license": "MIT",
+			"license": "AGPL-3.0",
 			"builtIn": true,
 			"autoEnable": false
 		}
@@ -337,7 +337,7 @@ export class MySearchPlugin implements IPlugin {
 			category: this.category,
 			capabilities: [...this.capabilities],
 			author: { name: 'Your Name' },
-			license: 'MIT',
+			license: 'AGPL-3.0',
 			builtIn: true,
 			autoEnable: false
 		};

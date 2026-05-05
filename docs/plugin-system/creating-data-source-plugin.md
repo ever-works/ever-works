@@ -164,7 +164,7 @@ Your `package.json` must include the `everworks.plugin` metadata:
 			"capabilities": ["data-source", "form-schema-provider"],
 			"description": "Import items from Your Source into works",
 			"author": { "name": "Your Name" },
-			"license": "MIT",
+			"license": "AGPL-3.0",
 			"systemPlugin": false,
 			"builtIn": false,
 			"isDefault": false
@@ -534,7 +534,7 @@ export class YourSourcePlugin implements IPlugin, IDataSourcePlugin, IFormSchema
 			category: this.category,
 			capabilities: [...this.capabilities],
 			author: { name: 'Your Name' },
-			license: 'MIT',
+			license: 'AGPL-3.0',
 			builtIn: false,
 			systemPlugin: false,
 			icon: {

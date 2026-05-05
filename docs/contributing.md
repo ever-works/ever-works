@@ -226,8 +226,8 @@ See the [Plugin System documentation](/plugin-system) for architecture details.
 
 ## License
 
-- **Ever Works Platform** and **Work Web Template** are licensed under the **GNU Affero General Public License v3.0 (AGPL-3.0)**.
-- The **Plugin SDK** (`@ever-works/plugin` and `@ever-works/contracts`) is licensed under **MIT**, allowing third-party plugins with any license.
+- **Ever Works Platform** and **Work Web Template** are licensed under the **GNU Affero General Public License v3.0 (AGPL-3.0)**. This applies to all packages in `apps/` and `packages/`, including the **Plugin SDK** (`@ever-works/plugin` and `@ever-works/contracts`) and all first-party plugins.
+- The only exception is the **public CLI** (`apps/cli`), which is released under the **MIT** license so it can be freely embedded in projects with any license.
 - By submitting a contribution, you agree that your work will be licensed under the same license as the repository you are contributing to.
 
 ## Code of Conduct

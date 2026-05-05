@@ -1,12 +1,14 @@
 {
 	"name": "ever-works-docs",
 	"version": "0.1.0",
-	"private": true,
+	"description": "Ever Works Documentation - Docusaurus site for the Ever Works platform",
 	"author": {
 		"name": "Ever Co. LTD",
 		"email": "ever@ever.co",
 		"url": "https://ever.co"
 	},
+	"license": "AGPL-3.0",
+	"private": true,
 	"scripts": {
 		"docusaurus": "docusaurus start",
 		"dev": "docusaurus start",

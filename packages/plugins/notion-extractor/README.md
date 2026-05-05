@@ -10,7 +10,7 @@ Notion Page Extractor - Extract content from Notion pages using the Notion API o
 | Category     | `content-extractor` |
 | Capabilities | `content-extractor` |
 | Author       | Ever Works Team     |
-| License      | MIT                 |
+| License      | AGPL-3.0                 |
 | Built-in     | no                  |
 | Auto-enable  | no                  |
 
@@ -61,4 +61,4 @@ pnpm --filter @ever-works/notion-extractor-plugin test
 
 ## License
 
-MIT
+AGPL-3.0

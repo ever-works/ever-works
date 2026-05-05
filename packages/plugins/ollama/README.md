@@ -10,7 +10,7 @@ Ollama AI provider plugin for Ever Works platform
 | Category     | `ai-provider`   |
 | Capabilities | `ai-provider`   |
 | Author       | Ever Works Team |
-| License      | MIT             |
+| License      | AGPL-3.0             |
 | Built-in     | yes             |
 | Auto-enable  | no              |
 
@@ -66,4 +66,4 @@ pnpm --filter @ever-works/ollama-plugin test
 
 ## License
 
-MIT
+AGPL-3.0

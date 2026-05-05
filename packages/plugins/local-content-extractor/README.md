@@ -10,7 +10,7 @@ Local Content Extractor - System plugin for extracting web page content using ax
 | Category     | `content-extractor`       |
 | Capabilities | `content-extractor`       |
 | Author       | Ever Works Team           |
-| License      | MIT                       |
+| License      | AGPL-3.0                       |
 | Built-in     | yes                       |
 | Auto-enable  | yes                       |
 
@@ -57,4 +57,4 @@ pnpm --filter @ever-works/local-content-extractor-plugin test
 
 ## License
 
-MIT
+AGPL-3.0

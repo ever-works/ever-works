@@ -10,7 +10,7 @@ Full pipeline plugin that delegates work generation to the [Codex CLI](https://g
 | Category     | `pipeline`                                        |
 | Capabilities | `pipeline`, `form-schema-provider`, `device-auth` |
 | Author       | Ever Works Team                                   |
-| License      | MIT                                               |
+| License      | AGPL-3.0                                               |
 | Built-in     | yes                                               |
 | Auto-enable  | no                                                |
 
@@ -174,4 +174,4 @@ Requires either `OPENAI_API_KEY` in the environment or local Codex auth (`codex 
 
 ## License
 
-MIT
+AGPL-3.0

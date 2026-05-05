@@ -59,4 +59,4 @@ pnpm --filter @ever-works/contracts type-check # tsc --noEmit
 
 ## License
 
-MIT
+AGPL-3.0

@@ -10,7 +10,7 @@ SIM AI Workflow Pipeline Plugin - Delegates Work generation to SIM AI workflows
 | Category     | `pipeline`                         |
 | Capabilities | `pipeline`, `form-schema-provider` |
 | Author       | Ever Works Team                    |
-| License      | MIT                                |
+| License      | AGPL-3.0                                |
 | Built-in     | yes                                |
 | Auto-enable  | no                                 |
 
@@ -68,4 +68,4 @@ pnpm --filter @ever-works/sim-ai-plugin test
 
 ## License
 
-MIT
+AGPL-3.0

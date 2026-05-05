@@ -10,7 +10,7 @@ Brave Plugin - Privacy-focused web search using Brave Search API
 | Category     | `search`        |
 | Capabilities | `search`        |
 | Author       | Ever Works Team |
-| License      | MIT             |
+| License      | AGPL-3.0             |
 | Built-in     | yes             |
 | Auto-enable  | no              |
 
@@ -59,4 +59,4 @@ pnpm --filter @ever-works/brave-plugin test
 
 ## License
 
-MIT
+AGPL-3.0
