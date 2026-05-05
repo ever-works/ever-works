@@ -35,6 +35,7 @@ import { SettingsSchemaValidatorService } from '../plugins/services/settings-sch
 import { SubscriptionsModule } from '@src/subscriptions';
 import { RepositoryManagementService } from './repository-management.service';
 import { NotificationsModule } from '@src/notifications';
+import { TemplateCatalogService } from './template-catalog.service';
 
 /**
  * Work module providing work-related services.
@@ -71,6 +72,7 @@ import { NotificationsModule } from '@src/notifications';
         ItemHealthService,
         ItemSourceValidationSchedulerService,
         RepositoryManagementService,
+        TemplateCatalogService,
         GeneratorFormSchemaService,
         WorksConfigImportPlannerService,
         WorksConfigImportApplierService,
@@ -98,6 +100,7 @@ import { NotificationsModule } from '@src/notifications';
         ItemHealthService,
         ItemSourceValidationSchedulerService,
         RepositoryManagementService,
+        TemplateCatalogService,
         GeneratorFormSchemaService,
         WorksConfigImportPlannerService,
         WorksConfigImportApplierService,

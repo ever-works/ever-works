@@ -2699,6 +2699,7 @@
                 "activity": "Activity",
                 "works": "Works",
                 "plugins": "Plugins",
+                "templates": "Templates",
                 "settings": "Settings"
             },
             "tooltips": {
@@ -2929,6 +2930,74 @@
                 "removeLabel": "Remove {login}"
             }
         },
+        "templates": {
+            "title": "Templates",
+            "subtitle": "Browse built-in website templates, save your own GitHub-based templates, and manage which built-in template new works start from.",
+            "actions": {
+                "addTemplate": "Add custom template"
+            },
+            "hero": {
+                "eyebrow": "Template catalog",
+                "catalogHint": "Built-in defaults apply immediately to new works. Custom templates are saved to your template library for the next assignment step."
+            },
+            "stats": {
+                "defaultLabel": "Active default",
+                "defaultHint": "New works start from this built-in website template.",
+                "builtInLabel": "Built-in",
+                "builtInHint": "Maintained Ever Works templates.",
+                "customLabel": "Custom",
+                "customHint": "Saved from your own GitHub repositories.",
+                "none": "No default"
+            },
+            "filters": {
+                "all": "All",
+                "builtIn": "Built-in",
+                "custom": "Custom",
+                "searchPlaceholder": "Search templates, frameworks, or repositories..."
+            },
+            "card": {
+                "builtIn": "Built-in",
+                "custom": "Custom",
+                "default": "Default",
+                "defaultSelected": "Default selected",
+                "makeDefault": "Make default",
+                "catalogOnly": "Catalog item",
+                "customCatalogHint": "Saved in your catalog",
+                "openRepository": "Open repository",
+                "branch": "Branch: {branch}",
+                "syncBranches": "{count} sync branches",
+                "noDescription": "No description yet."
+            },
+            "dialog": {
+                "title": "Add custom template",
+                "description": "Save a GitHub repository into your personal template catalog. This first slice stores the template metadata so it can be selected in the next assignment flow.",
+                "repositoryUrlLabel": "GitHub repository URL",
+                "repositoryUrlPlaceholder": "https://github.com/your-org/your-template",
+                "nameLabel": "Template name",
+                "namePlaceholder": "Optional display name",
+                "frameworkLabel": "Framework",
+                "frameworkPlaceholder": "Next.js, Astro, ...",
+                "descriptionLabel": "Short description",
+                "descriptionPlaceholder": "What this template is best for",
+                "branchLabel": "Default branch",
+                "branchPlaceholder": "main",
+                "branchHelp": "Leave empty to default to main.",
+                "cancel": "Cancel",
+                "submit": "Save template"
+            },
+            "empty": {
+                "title": "No templates found",
+                "default": "No templates match this view yet.",
+                "search": "Try a different search term or clear the current filter."
+            },
+            "messages": {
+                "repositoryUrlRequired": "GitHub repository URL is required.",
+                "addSuccess": "Template saved to your catalog.",
+                "addFailed": "Failed to save template.",
+                "defaultUpdated": "Default template updated.",
+                "defaultFailed": "Failed to update default template."
+            }
+        },
         "workPlugins": {
             "title": "Work Plugins",
             "subtitle": "Configure plugins for this Work",
@@ -3063,6 +3132,7 @@
             "history": "History",
             "comparisons": "Comparisons",
             "plugins": "Plugins",
+            "templates": "Templates",
             "profile": "Profile",
             "security": "Security",
             "apiKeys": "API Keys",

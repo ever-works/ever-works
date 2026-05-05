@@ -26,6 +26,7 @@ import { AiConversationModule } from './ai-conversation/ai-conversation.module';
 import { AccountModule } from './account/account.module';
 import { ActivityLogModule } from './activity-log/activity-log.module';
 import { OnboardingModule } from './onboarding/onboarding.module';
+import { TemplateCatalogModule } from './template-catalog/template-catalog.module';
 import {
     PluginsModule as AgentPluginsModule,
     PluginBootstrapService,
@@ -70,6 +71,7 @@ import { CacheFactory } from '@ever-works/agent/cache';
         AccountModule,
         ActivityLogModule,
         OnboardingModule,
+        TemplateCatalogModule,
     ],
     providers: [
         {

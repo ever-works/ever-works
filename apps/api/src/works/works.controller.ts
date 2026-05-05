@@ -68,6 +68,7 @@ import {
     GeneratorFormSchemaService,
     ItemHealthService,
     ItemSourceValidationSchedulerService,
+    TemplateCatalogService,
     type SourceValidationSettingsDto,
 } from '@ever-works/agent/services';
 import { ComparisonGenerationService } from '@ever-works/agent/comparison-generator';
@@ -132,6 +133,7 @@ export class WorksController {
         private readonly sourceValidationService: ItemSourceValidationSchedulerService,
         private readonly subscriptionService: SubscriptionService,
         private readonly activityLogService: ActivityLogService,
+        private readonly templateCatalogService: TemplateCatalogService,
     ) {}
 
     private async invalidateWorkCaches(workId: string): Promise<void> {
@@ -189,8 +191,18 @@ export class WorksController {
         description: 'Get the available website templates for work website generation',
     })
     @ApiResponse({ status: 200, description: 'Available website templates' })
-    async getWebsiteTemplates() {
-        const defaultTemplateId = getDefaultWebsiteTemplateId();
+    async getWebsiteTemplates(@CurrentUser() auth: AuthenticatedUser) {
+        const templateCatalog = await this.templateCatalogService.listTemplatesForUser(
+            'website',
+            auth.userId,
+        );
+        const builtInDefaultIds = new Set(
+            templateCatalog.templates
+                .filter((template) => template.sourceType === 'built_in' && template.isDefault)
+                .map((template) => template.id),
+        );
+        const fallbackDefaultTemplateId =
+            builtInDefaultIds.size > 0 ? null : getDefaultWebsiteTemplateId();
 
         return {
             status: 'success',
@@ -198,7 +210,8 @@ export class WorksController {
                 id: template.id,
                 name: template.name,
                 description: template.description,
-                isDefault: template.id === defaultTemplateId,
+                isDefault:
+                    builtInDefaultIds.has(template.id) || template.id === fallbackDefaultTemplateId,
             })),
         };
     }
