@@ -2,6 +2,20 @@
 
 Full pipeline plugin that delegates work generation to the [Gemini CLI](https://github.com/google-gemini/gemini-cli). A single Gemini CLI session autonomously handles web search, content creation, and file generation inside a temporary workspace.
 
+> **Note:** This is the Gemini **CLI** pipeline. For the Gemini **AI provider** (chat completions / embeddings via the Generative Language API), see [`@ever-works/google-plugin`](../google/README.md).
+
+## Plugin metadata
+
+| Field        | Value                                |
+| ------------ | ------------------------------------ |
+| ID           | `gemini`                             |
+| Category     | `pipeline`                           |
+| Capabilities | `pipeline`, `form-schema-provider`   |
+| Author       | Ever Works Team                      |
+| License      | MIT                                  |
+| Built-in     | yes                                  |
+| Auto-enable  | no                                   |
+
 ## Pipeline Steps
 
 The plugin runs 6 sequential steps:
@@ -114,3 +128,15 @@ pnpm test:watch
 # Coverage
 pnpm test:coverage
 ```
+
+## Documentation
+
+- [Ever Works documentation](https://docs.ever.works)
+- [Ever Works repository](https://github.com/ever-works/ever-works)
+- [Plugin system](../../plugin/README.md)
+- [Gemini CLI homepage](https://github.com/google-gemini/gemini-cli)
+- [Google AI Studio (API keys)](https://aistudio.google.com/apikey)
+
+## License
+
+MIT
