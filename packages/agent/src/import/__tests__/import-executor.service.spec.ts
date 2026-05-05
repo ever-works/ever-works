@@ -56,7 +56,7 @@ describe('ImportExecutorService', () => {
 
     const user = { id: 'user-1' } as any;
 
-    it('passes the full works.yaml config to data generation for awesome README imports', async () => {
+    it('passes the full works.yml config to data generation for awesome README imports', async () => {
         const { service, dataGenerator } = createService();
         const worksConfig = {
             initialPrompt: 'Build a work from the awesome list',
@@ -86,7 +86,7 @@ describe('ImportExecutorService', () => {
         );
     });
 
-    it('passes the resolved works.yaml config to data generation for config-only imports', async () => {
+    it('passes the resolved works.yml config to data generation for config-only imports', async () => {
         const { service, dataGenerator } = createService();
         const worksConfig = {
             initialPrompt: 'Build a cloud pricing work',

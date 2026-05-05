@@ -266,14 +266,8 @@ export class SourceRepoAnalyzerService {
         };
         worksConfig?: ReturnType<WorksConfigService['parse']>;
     }> {
-        const hasLegacyConfig =
-            contents.some((c) => c.name === 'config.yml' && c.type === 'file') ||
-            contents.some((c) => c.name === 'config.yaml' && c.type === 'file');
-        const hasWorksConfig =
-            contents.some((c) => c.name === 'works.yaml' && c.type === 'file') ||
-            contents.some((c) => c.name === 'works.yml' && c.type === 'file') ||
-            contents.some((c) => c.name === 'works_config' && c.type === 'dir');
-        const hasConfig = hasWorksConfig || hasLegacyConfig;
+        const hasWorksConfig = contents.some((c) => c.name === 'works.yml' && c.type === 'file');
+        const hasConfig = hasWorksConfig;
 
         const hasDataFolder = contents.some((c) => c.name === 'data' && c.type === 'dir');
 
@@ -787,10 +781,7 @@ export class SourceRepoAnalyzerService {
             }
 
             const hasConfig =
-                contents.some((c) => c.name === 'works.yaml' && c.type === 'file') ||
-                contents.some((c) => c.name === 'works.yml' && c.type === 'file') ||
-                contents.some((c) => c.name === 'config.yaml' && c.type === 'file') ||
-                contents.some((c) => c.name === 'config.yml' && c.type === 'file');
+                contents.some((c) => c.name === 'works.yml' && c.type === 'file');
             const hasDataFolder = contents.some((c) => c.name === 'data' && c.type === 'dir');
 
             if (!hasConfig || !hasDataFolder) {

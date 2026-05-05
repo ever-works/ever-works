@@ -75,13 +75,13 @@ describe('DataRepository', () => {
         await fs.rm(repoDir, { recursive: true, force: true });
     });
 
-    it('uses works.yaml as the primary data config', async () => {
+    it('uses works.yml as the primary data config', async () => {
         const repoDir = await fs.mkdtemp(path.join(os.tmpdir(), 'data-repository-spec-'));
 
         await fs.mkdir(path.join(repoDir, 'data'), { recursive: true });
         await Promise.all([
             fs.writeFile(
-                path.join(repoDir, 'works.yaml'),
+                path.join(repoDir, 'works.yml'),
                 'name: Compare Cloud Pricing\n',
                 'utf-8',
             ),
@@ -101,68 +101,14 @@ describe('DataRepository', () => {
             version: 1,
         } as any);
 
-        await expect(fs.readFile(path.join(repoDir, 'works.yaml'), 'utf-8')).resolves.toContain(
+        await expect(fs.readFile(path.join(repoDir, 'works.yml'), 'utf-8')).resolves.toContain(
             'name: Generated Config',
         );
 
         await fs.rm(repoDir, { recursive: true, force: true });
     });
 
-    it('removes stale works.yml after writing canonical works.yaml', async () => {
-        const repoDir = await fs.mkdtemp(path.join(os.tmpdir(), 'data-repository-spec-'));
-
-        await Promise.all([
-            fs.writeFile(path.join(repoDir, 'works.yml'), 'providers:\n  ai: openai\n', 'utf-8'),
-            fs.writeFile(path.join(repoDir, 'config.yaml'), 'company_name: Legacy\n', 'utf-8'),
-        ]);
-
-        const repository = await DataRepository.create(repoDir);
-
-        await repository.writeConfig({
-            company_name: 'Generated Config',
-        } as any);
-
-        await expect(fs.readFile(path.join(repoDir, 'works.yaml'), 'utf-8')).resolves.toContain(
-            'company_name: Generated Config',
-        );
-        await expect(fs.access(path.join(repoDir, 'works.yml'))).rejects.toMatchObject({
-            code: 'ENOENT',
-        });
-        await expect(fs.access(path.join(repoDir, 'config.yaml'))).rejects.toMatchObject({
-            code: 'ENOENT',
-        });
-
-        await fs.rm(repoDir, { recursive: true, force: true });
-    });
-
-    it('overlays works.yaml values on top of legacy config.yaml values when reading', async () => {
-        const repoDir = await fs.mkdtemp(path.join(os.tmpdir(), 'data-repository-spec-'));
-
-        await Promise.all([
-            fs.writeFile(
-                path.join(repoDir, 'config.yaml'),
-                ['company_name: Legacy Directory', 'item_name: Legacy Item', ''].join('\n'),
-                'utf-8',
-            ),
-            fs.writeFile(
-                path.join(repoDir, 'works.yaml'),
-                ['company_name: Works Directory', 'items_name: Works Items', ''].join('\n'),
-                'utf-8',
-            ),
-        ]);
-
-        const repository = await DataRepository.create(repoDir);
-
-        await expect(repository.getConfig()).resolves.toMatchObject({
-            company_name: 'Works Directory',
-            item_name: 'Legacy Item',
-            items_name: 'Works Items',
-        });
-
-        await fs.rm(repoDir, { recursive: true, force: true });
-    });
-
-    it('uses provided default config overrides when creating works.yaml', async () => {
+    it('uses provided default config overrides when creating works.yml', async () => {
         const repoDir = await fs.mkdtemp(path.join(os.tmpdir(), 'data-repository-spec-'));
 
         const repository = await DataRepository.create(repoDir, {
@@ -172,48 +118,9 @@ describe('DataRepository', () => {
         await expect(repository.getConfig()).resolves.toMatchObject({
             company_name: 'Compare Cloud Pricing',
         });
-        await expect(fs.readFile(path.join(repoDir, 'works.yaml'), 'utf-8')).resolves.toContain(
+        await expect(fs.readFile(path.join(repoDir, 'works.yml'), 'utf-8')).resolves.toContain(
             'company_name: Compare Cloud Pricing',
         );
-
-        await fs.rm(repoDir, { recursive: true, force: true });
-    });
-
-    it('reads legacy config.yaml when works.yaml is missing', async () => {
-        const repoDir = await fs.mkdtemp(path.join(os.tmpdir(), 'data-repository-spec-'));
-
-        await fs.writeFile(
-            path.join(repoDir, 'config.yaml'),
-            'company_name: Legacy Directory\n',
-            'utf-8',
-        );
-
-        const repository = await DataRepository.create(repoDir);
-
-        await expect(repository.ensureDefaultConfig()).resolves.toMatchObject({
-            company_name: 'Legacy Directory',
-        });
-        await expect(fs.access(path.join(repoDir, 'works.yaml'))).rejects.toMatchObject({
-            code: 'ENOENT',
-        });
-
-        await fs.rm(repoDir, { recursive: true, force: true });
-    });
-
-    it('removes legacy config files when writing works.yaml', async () => {
-        const repoDir = await fs.mkdtemp(path.join(os.tmpdir(), 'data-repository-spec-'));
-
-        await fs.writeFile(path.join(repoDir, 'config.yaml'), 'company_name: Legacy\n', 'utf-8');
-        const repository = await DataRepository.create(repoDir);
-
-        await repository.writeConfig({ company_name: 'Works' });
-
-        await expect(fs.readFile(path.join(repoDir, 'works.yaml'), 'utf-8')).resolves.toContain(
-            'company_name: Works',
-        );
-        await expect(fs.access(path.join(repoDir, 'config.yaml'))).rejects.toMatchObject({
-            code: 'ENOENT',
-        });
 
         await fs.rm(repoDir, { recursive: true, force: true });
     });
