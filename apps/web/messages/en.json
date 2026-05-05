@@ -2958,14 +2958,19 @@
             "card": {
                 "builtIn": "Built-in",
                 "custom": "Custom",
+                "standardSource": "Ever Works standard",
+                "customSource": "Your catalog",
                 "default": "Default",
                 "defaultSelected": "Default selected",
                 "makeDefault": "Make default",
                 "fork": "Fork",
                 "catalogOnly": "Catalog item",
                 "openRepository": "Open repository",
+                "previewAlt": "{name} preview",
+                "frameworkAgnostic": "Framework agnostic",
                 "branch": "Branch: {branch}",
                 "syncBranches": "{count} sync branches",
+                "betaBranch": "Beta: {branch}",
                 "noDescription": "No description yet."
             },
             "dialog": {
