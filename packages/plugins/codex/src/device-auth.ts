@@ -299,7 +299,7 @@ function stripAnsi(value: string): string {
 	return value.replace(/\u001B\[[0-9;]*[A-Za-z]/gu, '');
 }
 
-export async function isCodexInstalled(logger?: LoggerLike): Promise<boolean> {
+export async function isCodexInstalled(_logger?: LoggerLike): Promise<boolean> {
 	try {
 		return Boolean(await resolveExistingBinary());
 	} catch {
@@ -307,7 +307,7 @@ export async function isCodexInstalled(logger?: LoggerLike): Promise<boolean> {
 	}
 }
 
-async function isConnected(codexHome?: string, logger?: LoggerLike, command?: string): Promise<boolean> {
+async function isConnected(codexHome?: string, _logger?: LoggerLike, command?: string): Promise<boolean> {
 	if (await hasAuthFile(codexHome)) {
 		return true;
 	}
