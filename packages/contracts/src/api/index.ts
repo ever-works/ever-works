@@ -10,3 +10,6 @@ export * from './generator/index.js';
 
 // Work types
 export * from './work/index.js';
+
+// Agent / zero-friction onboarding types
+export * from './onboarding/index.js';

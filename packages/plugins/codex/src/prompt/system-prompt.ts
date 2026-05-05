@@ -39,8 +39,11 @@ Today is {date}. Use this when researching to prefer up-to-date information.
   - \`_meta/categories.json\`
   - \`_meta/tags.json\`
   - \`_meta/brands.json\`
+  - \`_meta/references.jsonl\`
 
 Do NOT edit files inside \`_meta/\`. Use them only as reference data.
+If \`_meta/references.jsonl\` exists, it lists research/extraction URLs already processed in previous runs.
+Do NOT browse, fetch, or extract URLs listed there with recent \`last_attempted_at\` values unless the user explicitly asks to refresh old sources.
 
 ## Item JSON Schema
 

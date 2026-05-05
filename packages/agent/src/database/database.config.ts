@@ -24,6 +24,8 @@ import {
     GitHubAppInstallation,
     GitHubAppInstallationRepository,
     GitHubAppUserLink,
+    OnboardingRequest,
+    WebhookSubscription,
 } from '../entities';
 import { PluginEntity, UserPluginEntity, WorkPluginEntity } from '../plugins/entities';
 import { UserSyncConfig } from '../account-transfer/entities/user-sync-config.entity';
@@ -81,6 +83,8 @@ export const ENTITIES = [
     GitHubAppInstallation,
     GitHubAppInstallationRepository,
     GitHubAppUserLink,
+    OnboardingRequest,
+    WebhookSubscription,
     // Plugin entities
     PluginEntity,
     UserPluginEntity,

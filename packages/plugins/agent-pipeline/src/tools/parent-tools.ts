@@ -9,7 +9,15 @@ import type {
 	PipelineProgressCallback,
 	PipelineExecutionOptions,
 	PluginLogger,
-	ExistingItems
+	ExistingItems,
+	ReferenceEntry
+} from '@ever-works/plugin';
+import {
+	createReferenceEntry,
+	findReferenceForUrl,
+	getDefaultReferenceTtlDays,
+	normalizeReferenceUrl,
+	shouldSkipReferenceUrl
 } from '@ever-works/plugin';
 
 import { createSearchTool, createReportProgressTool } from './facade-tools.js';
@@ -43,6 +51,8 @@ export interface ParentToolContext {
 	signal?: AbortSignal;
 	promptFacade?: IPromptFacade;
 	onLogEntry?: PipelineExecutionOptions['onLogEntry'];
+	referenceTtlDays?: number;
+	onReferenceProcessed?: (reference: ReferenceEntry) => void;
 }
 
 export interface ParentToolsResult {
@@ -54,31 +64,6 @@ export function createParentTools(ctx: ParentToolContext): ParentToolsResult {
 	const breaker = new ToolCircuitBreaker({ logger: ctx.logger });
 	const toolOptions: FacadeToolOptions = { breaker, logger: ctx.logger };
 	const processedUrls = new Map<string, { status: 'created' | 'empty' | 'error'; count: number }>();
-
-	const normalizeTrackedUrl = (raw: string): string => {
-		const trimmed = raw.trim();
-		if (!trimmed) {
-			return trimmed;
-		}
-
-		try {
-			const parsed = new URL(trimmed);
-			const pathname = parsed.pathname.replace(/\/+$/, '') || '/';
-			const searchParams = [...parsed.searchParams.entries()]
-				.filter(([key]) => !key.toLowerCase().startsWith('utm_'))
-				.sort(([leftKey, leftValue], [rightKey, rightValue]) => {
-					if (leftKey === rightKey) {
-						return leftValue.localeCompare(rightValue);
-					}
-					return leftKey.localeCompare(rightKey);
-				});
-			const search = new URLSearchParams(searchParams).toString();
-
-			return `${parsed.protocol.toLowerCase()}//${parsed.host.toLowerCase()}${pathname}${search ? `?${search}` : ''}`;
-		} catch {
-			return trimmed.toLowerCase().replace(/\/+$/, '');
-		}
-	};
 
 	const classifyProcessedUrlStatus = (result: { count: number; error?: string }): 'created' | 'empty' | 'error' => {
 		if (result.count > 0) {
@@ -104,7 +89,7 @@ export function createParentTools(ctx: ParentToolContext): ParentToolsResult {
 			url: z.string().url()
 		}),
 		execute: async ({ url }) => {
-			const normalizedUrl = normalizeTrackedUrl(url);
+			const normalizedUrl = normalizeReferenceUrl(url);
 			const existingRecord = processedUrls.get(normalizedUrl);
 			if (existingRecord) {
 				return {
@@ -115,6 +100,34 @@ export function createParentTools(ctx: ParentToolContext): ParentToolsResult {
 					error: `URL already processed earlier (${existingRecord.status}). Do not retry it.`,
 					previousStatus: existingRecord.status,
 					previousCount: existingRecord.count,
+					remainingUrlBudget: Math.max(0, ctx.maxPagesToProcess - processedUrls.size)
+				};
+			}
+
+			const previousReferences = [
+				...(ctx.existing.references || []),
+				...Array.from(processedUrls.entries()).map(([normalized, record]) =>
+					createReferenceEntry({
+						url: normalized,
+						status: record.status === 'created' ? 'success' : record.status,
+						itemsCreated: record.count,
+						pipeline: 'agent-pipeline'
+					})
+				)
+			];
+			const previous = findReferenceForUrl(url, previousReferences);
+			const decision = shouldSkipReferenceUrl(url, ctx.existing.references, {
+				ttlDays: ctx.referenceTtlDays ?? getDefaultReferenceTtlDays()
+			});
+			if (decision.shouldSkip) {
+				return {
+					url,
+					files: [],
+					count: 0,
+					skipped: true,
+					error: decision.reason ?? 'URL was processed recently. Do not retry it.',
+					previousStatus: decision.reference?.status,
+					previousCount: decision.reference?.items_created,
 					remainingUrlBudget: Math.max(0, ctx.maxPagesToProcess - processedUrls.size)
 				};
 			}
@@ -149,10 +162,22 @@ export function createParentTools(ctx: ParentToolContext): ParentToolsResult {
 
 			try {
 				const result = await processUrlWorker(url, workerCtx);
+				const status = classifyProcessedUrlStatus(result);
 				processedUrls.set(normalizedUrl, {
-					status: classifyProcessedUrlStatus(result),
+					status,
 					count: result.count
 				});
+				ctx.onReferenceProcessed?.(
+					createReferenceEntry({
+						url,
+						status: status === 'created' ? 'success' : status,
+						itemsCreated: result.count,
+						pipeline: 'agent-pipeline',
+						provider: result.extractionProvider,
+						error: result.error,
+						previous
+					})
+				);
 				return {
 					...result,
 					remainingUrlBudget: Math.max(0, ctx.maxPagesToProcess - processedUrls.size)
@@ -162,6 +187,16 @@ export function createParentTools(ctx: ParentToolContext): ParentToolsResult {
 					status: 'error',
 					count: 0
 				});
+				ctx.onReferenceProcessed?.(
+					createReferenceEntry({
+						url,
+						status: 'error',
+						itemsCreated: 0,
+						pipeline: 'agent-pipeline',
+						error: error instanceof Error ? error.message : String(error),
+						previous
+					})
+				);
 				return {
 					url,
 					files: [],

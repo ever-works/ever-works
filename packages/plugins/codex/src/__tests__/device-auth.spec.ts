@@ -13,7 +13,8 @@ vi.mock('node:child_process', () => ({
 }));
 
 vi.mock('../utils/binary-manager.js', () => ({
-	ensureBinary: vi.fn().mockResolvedValue('/tmp/codex-generator/bin/codex')
+	ensureBinary: vi.fn().mockResolvedValue('/tmp/codex-generator/bin/codex'),
+	resolveExistingBinary: vi.fn().mockResolvedValue('/tmp/codex-generator/bin/codex')
 }));
 
 class MockStream extends EventEmitter {

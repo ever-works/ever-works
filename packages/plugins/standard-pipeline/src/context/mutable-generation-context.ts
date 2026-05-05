@@ -12,6 +12,7 @@ import type {
 	GenerationRequest,
 	ExistingItems
 } from '@ever-works/plugin';
+import type { ReferenceEntry } from '@ever-works/plugin';
 import type { StandardPipelineMetrics } from './step-data-types.js';
 
 export interface AdvancedPromptsContext {
@@ -33,6 +34,7 @@ export interface MutableGenerationContext extends IPipelineContext {
 	searchQueries: string[];
 	webPages: WebPageData[];
 	processedSourceUrls: Set<string>;
+	processedReferences: ReferenceEntry[];
 	contentCache: Map<string, string>;
 
 	initialAiItems: MutableItemData[];
@@ -66,6 +68,7 @@ export interface GenerationContextSnapshot {
 	readonly searchQueries: readonly string[];
 	readonly webPages: readonly WebPageData[];
 	readonly processedSourceUrls: ReadonlySet<string>;
+	readonly processedReferences?: readonly ReferenceEntry[];
 	readonly contentCache: ReadonlyMap<string, string>;
 	readonly initialAiItems: readonly ItemData[];
 	readonly extractedWebItems: readonly ItemData[];

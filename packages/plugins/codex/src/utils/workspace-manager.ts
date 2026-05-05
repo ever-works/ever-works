@@ -2,7 +2,7 @@ import * as fs from 'fs/promises';
 import * as path from 'path';
 import { createHash, randomUUID } from 'node:crypto';
 
-import type { Brand, Category, ItemData, Tag } from '@ever-works/plugin';
+import type { Brand, Category, ItemData, ReferenceEntry, Tag } from '@ever-works/plugin';
 import { jsonrepair, normalizeItemTags, slugify, validateRequiredItemFields } from '@ever-works/plugin';
 
 import { BASE_TEMP_DIR } from '../types.js';
@@ -172,6 +172,7 @@ export async function seedMetadata(
 		categories?: readonly Category[];
 		tags?: readonly Tag[];
 		brands?: readonly Brand[];
+		references?: readonly ReferenceEntry[];
 	}
 ): Promise<void> {
 	const metaDir = path.join(workspacePath, '_meta');
@@ -194,6 +195,10 @@ export async function seedMetadata(
 	}
 	if (metadata.brands?.length) {
 		await fs.writeFile(path.join(metaDir, 'brands.json'), JSON.stringify(metadata.brands, null, 2), 'utf-8');
+	}
+	if (metadata.references?.length) {
+		const lines = metadata.references.map((reference) => JSON.stringify(reference)).join('\n');
+		await fs.writeFile(path.join(metaDir, 'references.jsonl'), lines + '\n', 'utf-8');
 	}
 }
 

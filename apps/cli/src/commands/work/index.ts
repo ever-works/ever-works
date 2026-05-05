@@ -11,6 +11,7 @@ import { deployCommand } from './deploy';
 import { deleteCommand } from './delete';
 import { statusCommand } from './status';
 import { pluginsCommand } from './plugins';
+import { registerCommand } from './register';
 
 export const workCommand = new Command('work')
     .description('Work management commands')
@@ -26,6 +27,7 @@ export const workCommand = new Command('work')
     .addCommand(deleteCommand)
     .addCommand(statusCommand)
     .addCommand(pluginsCommand)
+    .addCommand(registerCommand)
     .action(() => {
         console.log('Available work commands:');
         console.log('  create              - Create a new work');
@@ -40,5 +42,6 @@ export const workCommand = new Command('work')
         console.log('  delete              - Delete a work');
         console.log('  status              - Check the status of a work');
         console.log('  plugins             - Manage plugins for a work');
+        console.log('  register            - Zero-friction registration from a works.yml repo');
         console.log('\nUse "work <command> --help" for more information about a command.');
     });

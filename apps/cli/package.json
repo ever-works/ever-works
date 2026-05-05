@@ -29,7 +29,7 @@
         "@ever-works/cli-shared": "workspace:*",
         "@ever-works/contracts": "workspace:*",
         "@ever-works/plugin": "workspace:*",
-        "axios": "^1.15.0",
+        "axios": "^1.15.2",
         "chalk": "^4.1.2",
         "commander": "^14.0.2",
         "dotenv": "^17.2.3",

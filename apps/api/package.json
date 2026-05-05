@@ -26,6 +26,7 @@
     },
     "dependencies": {
         "@ever-works/agent": "workspace:*",
+        "@ever-works/contracts": "workspace:*",
         "@ever-works/monitoring": "workspace:*",
         "@ever-works/plugin": "workspace:*",
         "@ever-works/trigger-tasks": "workspace:*",
@@ -44,7 +45,7 @@
         "@nestjs/throttler": "^6.5.0",
         "@nestjs/typeorm": "^11.0.1",
         "@scalar/nestjs-api-reference": "^1.1.6",
-        "axios": "^1.15.0",
+        "axios": "^1.15.2",
         "bcrypt": "^6.0.0",
         "better-auth": "^1.5.6",
         "better-sqlite3": "^12.5.0",
