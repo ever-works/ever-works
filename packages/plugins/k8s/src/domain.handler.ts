@@ -8,6 +8,13 @@ const PROVIDER_TARGET_HINT = 'cluster ingress load balancer';
  * Compute the DNS-record advice for a domain. Apex domains need an A record;
  * subdomains need a CNAME. Without an `ingressLbHost`, we still return
  * structured guidance with a placeholder value.
+ *
+ * Note: the apex heuristic is "exactly two label parts" (e.g. example.com).
+ * Multi-level public suffixes (example.co.uk, example.com.br) are
+ * intentionally not detected — the recommendation will incorrectly suggest a
+ * CNAME for those. Adding a public-suffix-list dependency for v1 isn't worth
+ * the build-size cost; the user can override the record type manually if the
+ * suggestion is wrong.
  */
 export function buildDnsGuidance(domain: string, ingressLbHost?: string): readonly DeploymentDomainVerification[] {
 	const isApex = !domain.includes('.') || domain.split('.').length === 2;
@@ -129,9 +136,6 @@ export async function verifyDomainResolution(
 	expectedTarget: string | undefined,
 	resolver: DnsResolver = defaultDnsResolver
 ): Promise<DeploymentDomain> {
-	const hostsTried: string[] = [];
-	if (expectedTarget) hostsTried.push(expectedTarget.toLowerCase());
-
 	let resolved = false;
 	try {
 		const cnames = (await resolver.resolveCname(domain)).map((c) => c.toLowerCase());

@@ -1,7 +1,15 @@
 export { KubernetesPlugin, KubernetesPlugin as default } from './k8s.plugin.js';
-export { KubernetesApiService } from './k8s-api.service.js';
-export { K8sPluginError, scrubError, scrubString, buildSecretPattern } from './errors.js';
-export { parseKubeconfig } from './kubeconfig.parser.js';
+export { KubernetesApiService, defaultClientFactory } from './k8s-api.service.js';
+export type { KubernetesClientFactory, KubernetesApiClientLike } from './k8s-api.service.js';
+export {
+	K8sPluginError,
+	scrubError,
+	scrubString,
+	buildSecretPattern,
+	type K8sPluginErrorCode,
+	type ScrubbedError
+} from './errors.js';
+export { parseKubeconfig, type ParsedKubeconfig } from './kubeconfig.parser.js';
 export {
 	buildDeployment,
 	buildService,
@@ -10,7 +18,7 @@ export {
 	pullSecretNameFor,
 	FIELD_MANAGER
 } from './manifest.renderer.js';
-export { mapDeploymentToStatus, isRolloutComplete } from './status.mapper.js';
+export { mapDeploymentToStatus, isRolloutComplete, type DeploymentStatusInput } from './status.mapper.js';
 export { defaultRegistryProviderRegistry, RegistryProviderRegistry } from './registries/provider.registry.js';
 export { GitHubRegistryProvider } from './registries/github.provider.js';
 export { DockerHubRegistryProvider } from './registries/dockerhub.provider.js';
@@ -27,6 +35,7 @@ export {
 	verifyDomainResolution,
 	buildDnsGuidance,
 	defaultDnsResolver,
+	toAddDomainResult,
 	type DnsResolver
 } from './domain.handler.js';
 export * from './types.js';

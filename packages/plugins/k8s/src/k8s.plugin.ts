@@ -47,14 +47,6 @@ const DEFAULT_NAMESPACE = 'ever-works';
 const DEFAULT_REPLICAS = 1;
 const CONTAINER_PORT = 3000;
 
-/**
- * GitHub plugin surface the k8s plugin uses. The k8s plugin never imports
- * the GitHub package directly; it goes through `PluginContext.getService`.
- */
-interface GithubPluginLike {
-	getRepository?(owner: string, repo: string, token: string): Promise<{ isPrivate?: boolean } | null>;
-}
-
 interface DeployOptions {
 	/** Short git SHA (or any deterministic version tag). */
 	gitSha?: string;
@@ -74,6 +66,7 @@ const REGISTRY_SCHEMA: JsonSchema = {
 	default: { kind: 'github' },
 	oneOf: [
 		{
+			type: 'object',
 			title: 'GitHub Container Registry (default)',
 			properties: {
 				kind: { type: 'string', const: 'github' },
@@ -94,6 +87,7 @@ const REGISTRY_SCHEMA: JsonSchema = {
 			required: ['kind']
 		},
 		{
+			type: 'object',
 			title: 'Docker Hub',
 			properties: {
 				kind: { type: 'string', const: 'dockerhub' },
@@ -109,6 +103,7 @@ const REGISTRY_SCHEMA: JsonSchema = {
 			required: ['kind', 'username', 'password']
 		},
 		{
+			type: 'object',
 			title: 'Generic registry',
 			properties: {
 				kind: { type: 'string', const: 'generic' },
@@ -286,10 +281,12 @@ export class KubernetesPlugin implements IPlugin, IDeploymentPlugin {
 				hasStrategyFor: (controller) => Boolean(controller && this.ingressStrategies.hasStrategyFor(controller))
 			});
 
-			const githubReady = await this.checkGithubReadyIfNeeded(cfg.registry);
-			if (githubReady && !githubReady.ok) {
-				return githubReady.result;
-			}
+			// Note: when registry.kind === 'github' we do NOT reach into the
+			// GitHub plugin from here — there's no registered cross-plugin
+			// capability surface for it yet. GHCR-specific validation (e.g.
+			// "is GitHub connected?") happens at deploy time, where the
+			// deploy service resolves GitHub credentials from plugin-settings
+			// and passes them via DeploymentConfig.options.
 
 			return {
 				success: true,
@@ -640,28 +637,6 @@ export class KubernetesPlugin implements IPlugin, IDeploymentPlugin {
 		}
 	}
 
-	private async checkGithubReadyIfNeeded(
-		registry: RegistryConfig | undefined
-	): Promise<{ ok: true } | { ok: false; result: ConnectionValidationResult } | null> {
-		if (!registry || registry.kind !== 'github') return null;
-		if (!this.context) {
-			// No context yet (e.g. tests calling validateConnection directly).
-			// Treat as OK; deploy() will fail loudly if GitHub is needed and missing.
-			return { ok: true };
-		}
-		const github = await tryGetService<GithubPluginLike>(this.context, 'github');
-		if (!github) {
-			return {
-				ok: false,
-				result: {
-					success: false,
-					message: 'Connect GitHub first to use GitHub Container Registry as the image registry.'
-				}
-			};
-		}
-		return { ok: true };
-	}
-
 	private formatSuccessMessage(clusterName: string, version: string): string {
 		return `Connected to cluster '${clusterName}' (${version}).`;
 	}
@@ -694,22 +669,6 @@ export class KubernetesPlugin implements IPlugin, IDeploymentPlugin {
 export default KubernetesPlugin;
 
 // Internal helpers -----------------------------------------------------------
-
-async function tryGetService<T>(context: PluginContext, id: string): Promise<T | null> {
-	try {
-		// PluginContext exposes getCustomCapability<T>(name) — that's the
-		// plugin-to-plugin lookup channel. Anything else (e.g. a future
-		// getService) is ignored if absent.
-		const cap = context.getCustomCapability<T>(id);
-		if (cap) return cap;
-		const fn = (context as PluginContext & { getService?: (id: string) => Promise<T> }).getService;
-		if (typeof fn !== 'function') return null;
-		const svc = await fn.call(context, id);
-		return svc ?? null;
-	} catch {
-		return null;
-	}
-}
 
 function makeDeploymentId(namespace: string, name: string): string {
 	return `${namespace}/${name}`;

@@ -288,9 +288,9 @@
 
 ## Phase 6 — Docs & default-on (PR #6)
 
-- [ ] **T35**. User-facing doc at `docs/features/k8s-deployment.md`; cross-link from `docs/features/index.md` and `apps/docs/sidebarsPlatform.ts`.
-- [ ] **T36**. Add k8s row to `docs/plugin-system/built-in-plugins.md` (already done in T6 if Phase 1 covered it; otherwise here).
-- [ ] **T37**. Update spec status to `Implemented`; mark plan and tasks `Done`.
+- [x] **T35**. User-facing doc at `docs/features/k8s-deployment.md` (shipped together with the spec/plan in this same PR); cross-linked from `apps/docs/sidebarsPlatform.ts`. (No separate `docs/features/index.md` exists; the sidebar is the index.)
+- [x] **T36**. K8s row added to `docs/plugin-system/built-in-plugins.md` (covered by T6 in Phase 1).
+- [ ] **T37**. Update spec status to `Implemented`; mark plan and tasks `Done`. _(Pending Phase 5 template-repo PRs landing.)_
 - [ ] **T38**. Run `pnpm format && pnpm lint && pnpm type-check && pnpm test && pnpm build` from repo root and confirm green.
 - [ ] **T39**. Cut a release note to `apps/docs/changelog/` (or wherever existing release notes live).
 

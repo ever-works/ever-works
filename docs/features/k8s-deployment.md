@@ -89,9 +89,21 @@ If your cluster has multiple controllers, pick which one this work's Ingress sho
 Kubeconfigs that rely on `users[].user.exec` (for example, `aws-iam-authenticator`, `gke-gcloud-auth-plugin`, or Azure CLI auth) will not work in our deploy workflow runner — there is no `aws`/`gcloud`/`az` binary on the runner. Use a static service-account token kubeconfig instead. Generate one with:
 
 ```bash
+# Create the namespace first if it doesn't exist
+kubectl create namespace ever-works
+
+# Service account scoped to the deployment namespace
 kubectl create serviceaccount ever-works -n ever-works
-kubectl create clusterrolebinding ever-works --clusterrole=edit --serviceaccount=ever-works:ever-works
-# then mint a token and embed it in a kubeconfig
+
+# Namespace-scoped binding — DO NOT use `clusterrolebinding`; that would
+# give the token write access to every namespace in the cluster.
+kubectl create rolebinding ever-works \
+  --clusterrole=edit \
+  --serviceaccount=ever-works:ever-works \
+  -n ever-works
+
+# Then mint a token and embed it in a kubeconfig:
+#   kubectl create token ever-works -n ever-works --duration=8760h
 ```
 
 :::
@@ -125,9 +137,13 @@ For each deployed work, the plugin maintains:
 | Resource                     | Name               | Notes                                                     |
 | ---------------------------- | ------------------ | --------------------------------------------------------- |
 | `Deployment`                 | `<work-slug>`      | Single container, port 3000, configured `replicas`.       |
-| `Service`                    | `<work-slug>`      | `ClusterIP`, port 80 → 3000.                              |
+| `Service`                    | `<work-slug>`      | Always `ClusterIP`, port 80 → 3000.                       |
 | `Ingress`                    | `<work-slug>`      | Only if `ingressHost` or a verified custom domain exists. |
-| `Secret` (`docker-registry`) | `<work-slug>-pull` | Only if registry credentials are set.                     |
+| `Secret` (`docker-registry`) | `<work-slug>-pull` | Only if registry credentials are set (private images).    |
+
+:::note Reaching the work without an Ingress
+The Service is always `ClusterIP` — it is **not** reachable from outside the cluster on its own. To make the work publicly accessible you need either (a) an `Ingress` (set `ingressHost` or a custom domain), or (b) a temporary `kubectl port-forward svc/<work-slug> 8080:80 -n <namespace>` for local testing. v1 does not auto-create a `LoadBalancer` Service — it would require a cloud-provider-specific load balancer dependency that not every cluster has.
+:::
 
 All resources carry these labels:
 
