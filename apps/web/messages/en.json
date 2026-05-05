@@ -2932,21 +2932,21 @@
         },
         "templates": {
             "title": "Templates",
-            "subtitle": "Browse built-in website templates, save your own GitHub-based templates, and manage which built-in template new works start from.",
+            "subtitle": "Browse built-in website templates, save or fork GitHub-based templates, and manage which template new works start from.",
             "actions": {
                 "addTemplate": "Add custom template"
             },
             "hero": {
                 "eyebrow": "Template catalog",
-                "catalogHint": "Built-in defaults apply immediately to new works. Custom templates are saved to your template library for the next assignment step."
+                "catalogHint": "Any template in this catalog can become your default. Fork a built-in template to turn it into your own starting point."
             },
             "stats": {
                 "defaultLabel": "Active default",
-                "defaultHint": "New works start from this built-in website template.",
+                "defaultHint": "New works start from this template unless you override it per work.",
                 "builtInLabel": "Built-in",
                 "builtInHint": "Maintained Ever Works templates.",
                 "customLabel": "Custom",
-                "customHint": "Saved from your own GitHub repositories.",
+                "customHint": "Saved from your own GitHub repositories or forks.",
                 "none": "No default"
             },
             "filters": {
@@ -2961,8 +2961,8 @@
                 "default": "Default",
                 "defaultSelected": "Default selected",
                 "makeDefault": "Make default",
+                "fork": "Fork",
                 "catalogOnly": "Catalog item",
-                "customCatalogHint": "Saved in your catalog",
                 "openRepository": "Open repository",
                 "branch": "Branch: {branch}",
                 "syncBranches": "{count} sync branches",
@@ -2985,6 +2985,21 @@
                 "cancel": "Cancel",
                 "submit": "Save template"
             },
+            "forkDialog": {
+                "title": "Fork standard template",
+                "description": "Create your own GitHub copy of this standard template, add it to your catalog, and make it the default for new works.",
+                "sourceLabel": "Template source",
+                "targetLabel": "Fork destination",
+                "targetPlaceholder": "Select a GitHub account or organization",
+                "targetHelp": "The fork will be created under {target}.",
+                "personalTarget": "Personal account ({login})",
+                "organizationTarget": "Organization ({login})",
+                "noTargets": "Connect GitHub and load your organizations before forking a template.",
+                "resultLabel": "New repository",
+                "none": "your selected account",
+                "cancel": "Cancel",
+                "submit": "Fork and make default"
+            },
             "empty": {
                 "title": "No templates found",
                 "default": "No templates match this view yet.",
@@ -2992,8 +3007,12 @@
             },
             "messages": {
                 "repositoryUrlRequired": "GitHub repository URL is required.",
+                "forkTargetRequired": "Choose a GitHub account or organization for the fork.",
                 "addSuccess": "Template saved to your catalog.",
                 "addFailed": "Failed to save template.",
+                "forkSuccess": "Forked template to {repository} and set it as your default.",
+                "forkExisting": "{repository} was already in your catalog and is now your default.",
+                "forkFailed": "Failed to fork template.",
                 "defaultUpdated": "Default template updated.",
                 "defaultFailed": "Failed to update default template."
             }

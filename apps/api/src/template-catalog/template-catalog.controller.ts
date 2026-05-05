@@ -5,6 +5,7 @@ import { CurrentUser } from '@src/auth';
 import { AuthenticatedUser } from '@src/auth/types/auth.types';
 import {
     AddCustomTemplateDto,
+    ForkTemplateDto,
     ListTemplatesQueryDto,
     SetDefaultTemplateDto,
 } from './dto/list-templates.dto';
@@ -74,6 +75,24 @@ export class TemplateCatalogController {
             body.templateId,
             auth.userId,
         );
+
+        return {
+            status: 'success',
+            kind: body.kind,
+            ...result,
+        };
+    }
+
+    @Post('templates/fork')
+    @HttpCode(HttpStatus.OK)
+    @ApiOperation({
+        summary: 'Fork a standard template',
+        description:
+            'Fork a standard template to the current user GitHub account or organization and set it as default.',
+    })
+    @ApiResponse({ status: 200, description: 'Template forked and set as default' })
+    async forkTemplate(@CurrentUser() auth: AuthenticatedUser, @Body() body: ForkTemplateDto) {
+        const result = await this.templateCatalogService.forkTemplateForUser(body, auth.userId);
 
         return {
             status: 'success',

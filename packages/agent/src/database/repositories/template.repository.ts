@@ -51,6 +51,23 @@ export class TemplateRepository {
         });
     }
 
+    async findOwnedCustomByRepositoryCoordinates(
+        kind: TemplateKind,
+        userId: string,
+        repositoryOwner: string,
+        repositoryName: string,
+    ): Promise<Template | null> {
+        return this.repository.findOne({
+            where: {
+                kind,
+                ownerUserId: userId,
+                sourceType: 'custom',
+                repositoryOwner,
+                repositoryName,
+            },
+        });
+    }
+
     async upsert(template: Partial<Template> & { id: string }): Promise<Template> {
         const existing = await this.findById(template.id);
 

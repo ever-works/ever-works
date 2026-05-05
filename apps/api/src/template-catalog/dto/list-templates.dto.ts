@@ -63,3 +63,18 @@ export class SetDefaultTemplateDto {
     @IsString()
     templateId: string;
 }
+
+export class ForkTemplateDto {
+    @ApiProperty({ enum: TEMPLATE_KINDS })
+    @IsString()
+    @IsIn(TEMPLATE_KINDS)
+    kind: 'website' | 'work';
+
+    @ApiProperty()
+    @IsString()
+    templateId: string;
+
+    @ApiProperty()
+    @IsString()
+    targetOwner: string;
+}

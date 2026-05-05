@@ -3,10 +3,19 @@
 import { useMemo, useState, useTransition } from 'react';
 import { useTranslations } from 'next-intl';
 import { toast } from 'sonner';
-import { LayoutTemplate, Search, Plus, Sparkles, Github, ExternalLink } from 'lucide-react';
+import {
+    LayoutTemplate,
+    Search,
+    Plus,
+    Sparkles,
+    Github,
+    ExternalLink,
+    GitFork,
+} from 'lucide-react';
 import type { TemplateCatalogItem, TemplateKind } from '@/lib/api/templates';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Select } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import {
     Dialog,
@@ -17,7 +26,11 @@ import {
     DialogHeader,
     DialogTitle,
 } from '@/components/ui/dialog';
-import { addCustomTemplate, setDefaultTemplate } from '@/app/actions/dashboard/templates';
+import {
+    addCustomTemplate,
+    forkTemplate,
+    setDefaultTemplate,
+} from '@/app/actions/dashboard/templates';
 import { cn } from '@/lib/utils/cn';
 
 type FilterMode = 'all' | 'built_in' | 'custom';
@@ -26,6 +39,13 @@ interface TemplatesCatalogProps {
     kind: TemplateKind;
     templates: TemplateCatalogItem[];
     defaultTemplateId: string | null;
+    forkTargets: ForkTarget[];
+}
+
+interface ForkTarget {
+    login: string;
+    label: string;
+    kind: 'personal' | 'organization';
 }
 
 interface AddTemplateFormState {
@@ -43,6 +63,14 @@ const EMPTY_FORM: AddTemplateFormState = {
     framework: '',
     branch: '',
 };
+
+function compareTemplates(a: TemplateCatalogItem, b: TemplateCatalogItem) {
+    if (a.sourceType !== b.sourceType) {
+        return a.sourceType === 'custom' ? -1 : 1;
+    }
+
+    return a.name.localeCompare(b.name);
+}
 
 function frameworkTone(framework?: string | null) {
     const value = framework?.toLowerCase() || '';
@@ -82,15 +110,17 @@ function initials(name: string): string {
 function TemplateCard({
     template,
     isDefault,
-    canSetDefault,
     onSetDefault,
+    onFork,
     loading,
+    forkLoading,
 }: {
     template: TemplateCatalogItem;
     isDefault: boolean;
-    canSetDefault: boolean;
     onSetDefault: (templateId: string) => void;
+    onFork: (template: TemplateCatalogItem) => void;
     loading: boolean;
+    forkLoading: boolean;
 }) {
     const t = useTranslations('dashboard.templates');
     const tone = frameworkTone(template.framework);
@@ -192,7 +222,20 @@ function TemplateCard({
                         </span>
                     )}
 
-                    {canSetDefault ? (
+                    <div className="flex items-center gap-2">
+                        {template.sourceType === 'built_in' ? (
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                loading={forkLoading}
+                                disabled={loading || forkLoading}
+                                onClick={() => onFork(template)}
+                                className="shrink-0 rounded-xl"
+                            >
+                                <GitFork className="h-4 w-4" />
+                                {t('card.fork')}
+                            </Button>
+                        ) : null}
                         <Button
                             variant={isDefault ? 'secondary' : 'primary'}
                             size="sm"
@@ -203,11 +246,7 @@ function TemplateCard({
                         >
                             {isDefault ? t('card.defaultSelected') : t('card.makeDefault')}
                         </Button>
-                    ) : (
-                        <span className="text-xs text-text-muted dark:text-text-muted-dark">
-                            {t('card.customCatalogHint')}
-                        </span>
-                    )}
+                    </div>
                 </div>
             </div>
         </article>
@@ -218,6 +257,7 @@ export function TemplatesCatalog({
     kind,
     templates: initialTemplates,
     defaultTemplateId,
+    forkTargets,
 }: TemplatesCatalogProps) {
     const t = useTranslations('dashboard.templates');
     const [templates, setTemplates] = useState(initialTemplates);
@@ -225,9 +265,12 @@ export function TemplatesCatalog({
     const [searchQuery, setSearchQuery] = useState('');
     const [filterMode, setFilterMode] = useState<FilterMode>('all');
     const [dialogOpen, setDialogOpen] = useState(false);
+    const [forkDialogTemplate, setForkDialogTemplate] = useState<TemplateCatalogItem | null>(null);
     const [formState, setFormState] = useState<AddTemplateFormState>(EMPTY_FORM);
+    const [forkTargetOwner, setForkTargetOwner] = useState(forkTargets[0]?.login || '');
     const [isSavingDefault, startSavingDefault] = useTransition();
     const [isAddingTemplate, startAddingTemplate] = useTransition();
+    const [isForkingTemplate, startForkingTemplate] = useTransition();
 
     const filteredTemplates = useMemo(() => {
         const normalizedQuery = searchQuery.trim().toLowerCase();
@@ -264,6 +307,11 @@ export function TemplatesCatalog({
     const resetDialog = () => {
         setFormState(EMPTY_FORM);
         setDialogOpen(false);
+    };
+
+    const resetForkDialog = () => {
+        setForkDialogTemplate(null);
+        setForkTargetOwner(forkTargets[0]?.login || '');
     };
 
     const handleSetDefault = (templateId: string) => {
@@ -313,15 +361,60 @@ export function TemplatesCatalog({
 
                 setTemplates((current) => {
                     const next = [...current, result.template];
-                    return next.sort((a, b) => {
-                        if (a.sourceType !== b.sourceType) {
-                            return a.sourceType.localeCompare(b.sourceType);
-                        }
-                        return a.name.localeCompare(b.name);
-                    });
+                    return next.sort(compareTemplates);
                 });
                 toast.success(t('messages.addSuccess'));
                 resetDialog();
+            })();
+        });
+    };
+
+    const handleForkTemplate = () => {
+        if (!forkDialogTemplate) {
+            return;
+        }
+
+        if (!forkTargetOwner) {
+            toast.error(t('messages.forkTargetRequired'));
+            return;
+        }
+
+        startForkingTemplate(() => {
+            void (async () => {
+                const result = await forkTemplate({
+                    kind,
+                    templateId: forkDialogTemplate.id,
+                    targetOwner: forkTargetOwner,
+                });
+
+                if (!result.success || !result.template || !result.defaultTemplateId) {
+                    toast.error(result.error || t('messages.forkFailed'));
+                    return;
+                }
+
+                setCurrentDefaultTemplateId(result.defaultTemplateId);
+                setTemplates((current) => {
+                    const withoutPrevious = current.filter(
+                        (template) => template.id !== result.template?.id,
+                    );
+                    const next = [...withoutPrevious, result.template];
+
+                    return next.sort(compareTemplates).map((template) => ({
+                        ...template,
+                        isDefault: template.id === result.defaultTemplateId,
+                    }));
+                });
+
+                toast.success(
+                    result.created
+                        ? t('messages.forkSuccess', {
+                              repository: result.repository?.fullName || forkDialogTemplate.name,
+                          })
+                        : t('messages.forkExisting', {
+                              repository: result.repository?.fullName || forkDialogTemplate.name,
+                          }),
+                );
+                resetForkDialog();
             })();
         });
     };
@@ -444,9 +537,15 @@ export function TemplatesCatalog({
                             key={template.id}
                             template={template}
                             isDefault={template.id === currentDefaultTemplateId}
-                            canSetDefault={template.sourceType === 'built_in'}
                             onSetDefault={handleSetDefault}
+                            onFork={(selectedTemplate) => {
+                                setForkDialogTemplate(selectedTemplate);
+                                setForkTargetOwner(forkTargets[0]?.login || '');
+                            }}
                             loading={isSavingDefault}
+                            forkLoading={
+                                isForkingTemplate && forkDialogTemplate?.id === template.id
+                            }
                         />
                     ))}
                 </section>
@@ -546,6 +645,101 @@ export function TemplatesCatalog({
                                     className="rounded-xl"
                                 >
                                     {t('dialog.submit')}
+                                </Button>
+                            </DialogFooter>
+                        </div>
+                    </div>
+                </DialogContent>
+            </Dialog>
+
+            <Dialog open={!!forkDialogTemplate} onOpenChange={(open) => !open && resetForkDialog()}>
+                <DialogContent className="max-w-xl rounded-[2rem] p-0">
+                    <div className="relative overflow-hidden rounded-[2rem] border border-border bg-white dark:border-border-dark dark:bg-surface-dark">
+                        <div className="absolute inset-x-0 top-0 h-28 bg-gradient-to-br from-slate-900/14 via-slate-500/8 to-transparent dark:from-white/10 dark:via-white/5" />
+                        <div className="relative p-6">
+                            <DialogClose onClose={resetForkDialog} />
+                            <DialogHeader className="mb-6 pr-8">
+                                <DialogTitle className="text-xl font-semibold text-text dark:text-text-dark">
+                                    {t('forkDialog.title')}
+                                </DialogTitle>
+                                <DialogDescription className="mt-2 max-w-xl leading-6">
+                                    {t('forkDialog.description')}
+                                </DialogDescription>
+                            </DialogHeader>
+
+                            <div className="space-y-5">
+                                <div className="rounded-2xl border border-border bg-surface px-4 py-4 dark:border-border-dark dark:bg-white/4">
+                                    <p className="text-xs uppercase tracking-[0.18em] text-text-muted dark:text-text-muted-dark">
+                                        {t('forkDialog.sourceLabel')}
+                                    </p>
+                                    <p className="mt-2 text-base font-semibold text-text dark:text-text-dark">
+                                        {forkDialogTemplate?.name}
+                                    </p>
+                                    <p className="mt-1 text-sm text-text-secondary dark:text-text-secondary-dark">
+                                        {forkDialogTemplate
+                                            ? `${forkDialogTemplate.repositoryOwner}/${forkDialogTemplate.repositoryName}`
+                                            : ''}
+                                    </p>
+                                </div>
+
+                                <div className="space-y-2">
+                                    <label className="block text-sm font-medium text-text dark:text-text-dark">
+                                        {t('forkDialog.targetLabel')}
+                                    </label>
+                                    <Select
+                                        value={forkTargetOwner}
+                                        onValueChange={setForkTargetOwner}
+                                        placeholder={t('forkDialog.targetPlaceholder')}
+                                        disabled={forkTargets.length === 0 || isForkingTemplate}
+                                    >
+                                        {forkTargets.map((target) => (
+                                            <option key={target.login} value={target.login}>
+                                                {target.kind === 'personal'
+                                                    ? t('forkDialog.personalTarget', {
+                                                          login: target.login,
+                                                      })
+                                                    : t('forkDialog.organizationTarget', {
+                                                          login: target.login,
+                                                      })}
+                                            </option>
+                                        ))}
+                                    </Select>
+                                    <p className="text-xs text-text-muted dark:text-text-muted-dark">
+                                        {forkTargets.length > 0
+                                            ? t('forkDialog.targetHelp', {
+                                                  target: forkTargetOwner || t('forkDialog.none'),
+                                              })
+                                            : t('forkDialog.noTargets')}
+                                    </p>
+                                </div>
+
+                                <div className="rounded-2xl border border-dashed border-border px-4 py-4 dark:border-border-dark">
+                                    <p className="text-xs uppercase tracking-[0.18em] text-text-muted dark:text-text-muted-dark">
+                                        {t('forkDialog.resultLabel')}
+                                    </p>
+                                    <p className="mt-2 text-sm text-text-secondary dark:text-text-secondary-dark">
+                                        {forkDialogTemplate
+                                            ? `${forkTargetOwner || '...'}/${forkDialogTemplate.repositoryName}`
+                                            : ''}
+                                    </p>
+                                </div>
+                            </div>
+
+                            <DialogFooter className="mt-8">
+                                <Button
+                                    variant="ghost"
+                                    onClick={resetForkDialog}
+                                    disabled={isForkingTemplate}
+                                >
+                                    {t('forkDialog.cancel')}
+                                </Button>
+                                <Button
+                                    onClick={handleForkTemplate}
+                                    loading={isForkingTemplate}
+                                    disabled={forkTargets.length === 0}
+                                    className="rounded-xl"
+                                >
+                                    {t('forkDialog.submit')}
                                 </Button>
                             </DialogFooter>
                         </div>

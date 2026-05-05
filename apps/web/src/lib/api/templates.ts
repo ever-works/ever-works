@@ -39,6 +39,19 @@ export type SetDefaultTemplateResponse = APIResponse<{
     defaultTemplateId: string;
 }>;
 
+export type ForkTemplateResponse = APIResponse<{
+    kind: TemplateKind;
+    defaultTemplateId: string;
+    created: boolean;
+    template: TemplateCatalogItem;
+    repository: {
+        owner: string;
+        name: string;
+        fullName: string;
+        url: string;
+    };
+}>;
+
 export const templatesAPI = {
     list: async (kind: TemplateKind) => {
         return serverFetch<ListTemplatesResponse>(`/templates?kind=${kind}`);
@@ -66,6 +79,15 @@ export const templatesAPI = {
             endpoint: '/templates/default',
             data,
             method: 'PUT',
+            wrapInData: false,
+        });
+    },
+
+    fork: async (data: { kind: TemplateKind; templateId: string; targetOwner: string }) => {
+        return serverMutation<ForkTemplateResponse>({
+            endpoint: '/templates/fork',
+            data,
+            method: 'POST',
             wrapInData: false,
         });
     },

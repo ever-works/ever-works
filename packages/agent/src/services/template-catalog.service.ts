@@ -37,6 +37,18 @@ export interface TemplateCatalogItem {
     ownerUserId?: string | null;
 }
 
+export interface ForkTemplateResult {
+    defaultTemplateId: string;
+    template: TemplateCatalogItem;
+    repository: {
+        owner: string;
+        name: string;
+        fullName: string;
+        url: string;
+    };
+    created: boolean;
+}
+
 @Injectable()
 export class TemplateCatalogService implements OnModuleInit {
     private readonly logger = new Logger(TemplateCatalogService.name);
@@ -155,24 +167,7 @@ export class TemplateCatalogService implements OnModuleInit {
 
         const defaultTemplateId = await this.getDefaultTemplateIdForUser(input.kind, userId);
 
-        return {
-            id: created.id,
-            kind: created.kind,
-            sourceType: created.sourceType,
-            name: created.name,
-            description: created.description,
-            framework: created.framework,
-            previewImageUrl: created.previewImageUrl,
-            repositoryUrl: created.repositoryUrl,
-            repositoryOwner: created.repositoryOwner,
-            repositoryName: created.repositoryName,
-            branch: created.branch,
-            syncBranches: created.syncBranches,
-            betaBranch: created.betaBranch,
-            isActive: created.isActive,
-            isDefault: created.id === defaultTemplateId,
-            ownerUserId: created.ownerUserId,
-        };
+        return this.toCatalogItem(created, defaultTemplateId);
     }
 
     async setDefaultTemplateForUser(
@@ -193,6 +188,160 @@ export class TemplateCatalogService implements OnModuleInit {
         return { defaultTemplateId: template.id };
     }
 
+    async forkTemplateForUser(
+        input: {
+            kind: TemplateKind;
+            templateId: string;
+            targetOwner: string;
+        },
+        userId: string,
+    ): Promise<ForkTemplateResult> {
+        const template = await this.templateRepository.findVisibleById(input.templateId, userId);
+        if (!template || template.kind !== input.kind) {
+            throw new NotFoundException({
+                status: 'error',
+                message: 'Template not found for this user and kind.',
+            });
+        }
+
+        if (template.sourceType !== 'built_in') {
+            throw new BadRequestException({
+                status: 'error',
+                message: 'Only standard templates can be forked.',
+            });
+        }
+
+        const providerId = 'github';
+        const targetOwner = input.targetOwner.trim();
+        if (!targetOwner) {
+            throw new BadRequestException({
+                status: 'error',
+                message: 'A target account or organization is required.',
+            });
+        }
+
+        const [gitUser, organizations] = await Promise.all([
+            this.gitFacade.getUser({ userId, providerId }),
+            this.gitFacade.getOrganizations({ userId, providerId }),
+        ]);
+
+        const isPersonalTarget = gitUser.login.toLowerCase() === targetOwner.toLowerCase();
+        const organization = organizations.find(
+            (org) => org.login.toLowerCase() === targetOwner.toLowerCase(),
+        );
+
+        if (!isPersonalTarget && !organization) {
+            throw new BadRequestException({
+                status: 'error',
+                message: 'The selected fork target is not available for this GitHub connection.',
+            });
+        }
+
+        const existingTemplate =
+            await this.templateRepository.findOwnedCustomByRepositoryCoordinates(
+                input.kind,
+                userId,
+                targetOwner,
+                template.repositoryName,
+            );
+
+        if (existingTemplate) {
+            await this.userTemplatePreferenceRepository.upsertDefault(
+                userId,
+                input.kind,
+                existingTemplate.id,
+            );
+
+            return {
+                defaultTemplateId: existingTemplate.id,
+                template: this.toCatalogItem(existingTemplate, existingTemplate.id),
+                repository: {
+                    owner: existingTemplate.repositoryOwner,
+                    name: existingTemplate.repositoryName,
+                    fullName: `${existingTemplate.repositoryOwner}/${existingTemplate.repositoryName}`,
+                    url:
+                        existingTemplate.repositoryUrl ||
+                        this.gitFacade.getWebUrl(
+                            providerId,
+                            existingTemplate.repositoryOwner,
+                            existingTemplate.repositoryName,
+                        ),
+                },
+                created: false,
+            };
+        }
+
+        const forkedRepository = await this.gitFacade.forkRepository(
+            template.repositoryOwner,
+            template.repositoryName,
+            {
+                organization: isPersonalTarget ? undefined : organization?.login,
+            },
+            { userId, providerId },
+        );
+
+        if (!forkedRepository) {
+            throw new BadRequestException({
+                status: 'error',
+                message: 'Forking the selected template failed.',
+            });
+        }
+
+        const createdTemplate = await this.templateRepository.upsert({
+            id: `custom-${randomUUID()}`,
+            kind: input.kind,
+            sourceType: 'custom',
+            ownerUserId: userId,
+            name: template.name,
+            description: template.description || null,
+            framework: template.framework || null,
+            previewImageUrl: template.previewImageUrl || null,
+            repositoryUrl:
+                forkedRepository.url ||
+                this.gitFacade.getWebUrl(providerId, forkedRepository.owner, forkedRepository.name),
+            repositoryOwner: forkedRepository.owner,
+            repositoryName: forkedRepository.name,
+            branch: forkedRepository.defaultBranch || template.branch,
+            syncBranches:
+                template.syncBranches.length > 0
+                    ? template.syncBranches
+                    : [forkedRepository.defaultBranch || template.branch],
+            betaBranch: template.betaBranch || null,
+            isActive: true,
+            metadata: {
+                forkedFromTemplateId: template.id,
+                forkedFromRepositoryUrl: template.repositoryUrl,
+                forkedFromOwner: template.repositoryOwner,
+                forkedFromRepositoryName: template.repositoryName,
+                forkTargetType: isPersonalTarget ? 'personal' : 'organization',
+            },
+        });
+
+        await this.userTemplatePreferenceRepository.upsertDefault(
+            userId,
+            input.kind,
+            createdTemplate.id,
+        );
+
+        return {
+            defaultTemplateId: createdTemplate.id,
+            template: this.toCatalogItem(createdTemplate, createdTemplate.id),
+            repository: {
+                owner: forkedRepository.owner,
+                name: forkedRepository.name,
+                fullName: forkedRepository.fullName,
+                url:
+                    forkedRepository.url ||
+                    this.gitFacade.getWebUrl(
+                        providerId,
+                        forkedRepository.owner,
+                        forkedRepository.name,
+                    ),
+            },
+            created: true,
+        };
+    }
+
     async getVisibleTemplateForUser(
         kind: TemplateKind,
         templateId: string,
@@ -205,24 +354,7 @@ export class TemplateCatalogService implements OnModuleInit {
 
         const defaultTemplateId = await this.getDefaultTemplateIdForUser(kind, userId);
 
-        return {
-            id: template.id,
-            kind: template.kind,
-            sourceType: template.sourceType,
-            name: template.name,
-            description: template.description,
-            framework: template.framework,
-            previewImageUrl: template.previewImageUrl,
-            repositoryUrl: template.repositoryUrl,
-            repositoryOwner: template.repositoryOwner,
-            repositoryName: template.repositoryName,
-            branch: template.branch,
-            syncBranches: template.syncBranches,
-            betaBranch: template.betaBranch,
-            isActive: template.isActive,
-            isDefault: template.id === defaultTemplateId,
-            ownerUserId: template.ownerUserId,
-        };
+        return this.toCatalogItem(template, defaultTemplateId);
     }
 
     async getDefaultTemplateIdForUser(kind: TemplateKind, userId: string): Promise<string | null> {
@@ -324,6 +456,46 @@ export class TemplateCatalogService implements OnModuleInit {
             betaBranch: template.betaBranch,
             isActive: true,
             metadata: {},
+        };
+    }
+
+    private toCatalogItem(
+        template: {
+            id: string;
+            kind: TemplateKind;
+            sourceType: TemplateSourceType;
+            name: string;
+            description?: string | null;
+            framework?: string | null;
+            previewImageUrl?: string | null;
+            repositoryUrl?: string | null;
+            repositoryOwner: string;
+            repositoryName: string;
+            branch: string;
+            syncBranches: string[];
+            betaBranch?: string | null;
+            isActive: boolean;
+            ownerUserId?: string | null;
+        },
+        defaultTemplateId: string | null,
+    ): TemplateCatalogItem {
+        return {
+            id: template.id,
+            kind: template.kind,
+            sourceType: template.sourceType,
+            name: template.name,
+            description: template.description,
+            framework: template.framework,
+            previewImageUrl: template.previewImageUrl,
+            repositoryUrl: template.repositoryUrl,
+            repositoryOwner: template.repositoryOwner,
+            repositoryName: template.repositoryName,
+            branch: template.branch,
+            syncBranches: template.syncBranches,
+            betaBranch: template.betaBranch,
+            isActive: template.isActive,
+            isDefault: template.id === defaultTemplateId,
+            ownerUserId: template.ownerUserId,
         };
     }
 

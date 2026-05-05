@@ -71,3 +71,42 @@ export async function setDefaultTemplate(input: { kind: 'website' | 'work'; temp
         };
     }
 }
+
+export async function forkTemplate(input: {
+    kind: 'website' | 'work';
+    templateId: string;
+    targetOwner: string;
+}) {
+    const user = await getAuthFromCookie();
+    if (!user) {
+        redirect(ROUTES.AUTH_LOGIN);
+    }
+
+    const t = await getTranslations('dashboard.templates');
+
+    try {
+        const response = await templatesAPI.fork(input);
+
+        revalidatePath(ROUTES.DASHBOARD_TEMPLATES);
+        revalidatePath(ROUTES.DASHBOARD_WORKS_NEW);
+
+        return {
+            success: response.status === 'success',
+            created: response.created ?? false,
+            template: response.template ?? null,
+            repository: response.repository ?? null,
+            defaultTemplateId: response.defaultTemplateId ?? null,
+            error: response.status === 'error' ? t('messages.forkFailed') : null,
+        };
+    } catch (error) {
+        console.error('Fork template error:', error);
+        return {
+            success: false,
+            created: false,
+            template: null,
+            repository: null,
+            defaultTemplateId: null,
+            error: error instanceof Error ? error.message : t('messages.forkFailed'),
+        };
+    }
+}
