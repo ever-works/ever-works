@@ -4,15 +4,15 @@ Autonomous tool-based pipeline that researches and generates Work items using an
 
 ## Plugin metadata
 
-| Field        | Value                                |
-| ------------ | ------------------------------------ |
-| ID           | `agent-pipeline`                     |
-| Category     | `pipeline`                           |
-| Capabilities | `pipeline`, `form-schema-provider`   |
-| Author       | Ever Works Team                      |
-| License      | MIT                                  |
-| Built-in     | yes                                  |
-| Auto-enable  | yes                                  |
+| Field        | Value                              |
+| ------------ | ---------------------------------- |
+| ID           | `agent-pipeline`                   |
+| Category     | `pipeline`                         |
+| Capabilities | `pipeline`, `form-schema-provider` |
+| Author       | Ever Works Team                    |
+| License      | MIT                                |
+| Built-in     | yes                                |
+| Auto-enable  | yes                                |
 
 ## Agent Pipeline Plugin
 

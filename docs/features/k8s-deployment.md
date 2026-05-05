@@ -18,8 +18,8 @@ Use the Kubernetes provider when you need to host on your own infrastructure —
 - A Kubernetes cluster running version **1.27 or newer**.
 - A `kubeconfig` file with permissions to create/patch `Deployment`, `Service`, `Ingress`, and `Secret` resources in your target namespace.
 - A container registry. By default Ever Works uses **GitHub Container Registry** (`ghcr.io`) reusing the GitHub account you already connected — no extra setup required. You can also pick **Docker Hub** or any **generic** OCI registry (Harbor, Quay, GitLab CR, self-hosted) and supply credentials.
-- *(Optional)* An Ingress controller installed in the cluster — for example, **ingress-nginx**, **Traefik**, or any class supported by your cloud. Ever Works probes the cluster on save and lists every detected `IngressClass` for you to choose from. Without an Ingress controller, your work is exposed via a `Service` only.
-- *(Optional)* `cert-manager` with a `ClusterIssuer` if you want automatic TLS for custom domains.
+- _(Optional)_ An Ingress controller installed in the cluster — for example, **ingress-nginx**, **Traefik**, or any class supported by your cloud. Ever Works probes the cluster on save and lists every detected `IngressClass` for you to choose from. Without an Ingress controller, your work is exposed via a `Service` only.
+- _(Optional)_ `cert-manager` with a `ClusterIssuer` if you want automatic TLS for custom domains.
 
 ## How it works
 
@@ -35,16 +35,16 @@ Use the Kubernetes provider when you need to host on your own infrastructure —
 2. Find the **Kubernetes** card and click **Configure**.
 3. Fill in the form:
 
-| Field | Required | Notes |
-| ----- | -------- | ----- |
-| **kubeconfig** | yes | Paste the contents of your `~/.kube/config` (or a service-account-scoped equivalent). Stored encrypted, never returned by the API. |
-| **Context** | no | Defaults to the kubeconfig's `current-context`. Set this if you want to target a non-default context without editing the file. |
-| **Namespace** | no | Defaults to `ever-works`. The namespace must already exist or your kubeconfig must have permission to create it. |
-| **Registry** | no | Defaults to **GitHub Container Registry** using your connected GitHub account. Switch to **Docker Hub** or **Generic** to use a different registry. See [Registries](#registries) below. |
-| **Ingress class** | no | Populated from your cluster's `IngressClass` resources. Leave blank to use the cluster default. |
-| **Default ingress host** | no | Used when a work has no custom domain configured. |
-| **TLS issuer** | no | Name of a cert-manager `ClusterIssuer`. Adds the necessary annotations on the Ingress. |
-| **Replicas** | no | Defaults to `1`. Min 1, max 10 in v1. |
+| Field                    | Required | Notes                                                                                                                                                                                    |
+| ------------------------ | -------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **kubeconfig**           | yes      | Paste the contents of your `~/.kube/config` (or a service-account-scoped equivalent). Stored encrypted, never returned by the API.                                                       |
+| **Context**              | no       | Defaults to the kubeconfig's `current-context`. Set this if you want to target a non-default context without editing the file.                                                           |
+| **Namespace**            | no       | Defaults to `ever-works`. The namespace must already exist or your kubeconfig must have permission to create it.                                                                         |
+| **Registry**             | no       | Defaults to **GitHub Container Registry** using your connected GitHub account. Switch to **Docker Hub** or **Generic** to use a different registry. See [Registries](#registries) below. |
+| **Ingress class**        | no       | Populated from your cluster's `IngressClass` resources. Leave blank to use the cluster default.                                                                                          |
+| **Default ingress host** | no       | Used when a work has no custom domain configured.                                                                                                                                        |
+| **TLS issuer**           | no       | Name of a cert-manager `ClusterIssuer`. Adds the necessary annotations on the Ingress.                                                                                                   |
+| **Replicas**             | no       | Defaults to `1`. Min 1, max 10 in v1.                                                                                                                                                    |
 
 4. Click **Save & verify**. The platform validates the kubeconfig against the cluster API and reports back the cluster name, server URL, Kubernetes server version, and the list of ingress controllers it detected.
 
@@ -93,6 +93,7 @@ kubectl create serviceaccount ever-works -n ever-works
 kubectl create clusterrolebinding ever-works --clusterrole=edit --serviceaccount=ever-works:ever-works
 # then mint a token and embed it in a kubeconfig
 ```
+
 :::
 
 ## Pick the provider for a work
@@ -121,12 +122,12 @@ If you've configured a `tlsIssuer`, the Ingress is annotated for cert-manager an
 
 For each deployed work, the plugin maintains:
 
-| Resource | Name | Notes |
-| -------- | ---- | ----- |
-| `Deployment` | `<work-slug>` | Single container, port 3000, configured `replicas`. |
-| `Service` | `<work-slug>` | `ClusterIP`, port 80 → 3000. |
-| `Ingress` | `<work-slug>` | Only if `ingressHost` or a verified custom domain exists. |
-| `Secret` (`docker-registry`) | `<work-slug>-pull` | Only if registry credentials are set. |
+| Resource                     | Name               | Notes                                                     |
+| ---------------------------- | ------------------ | --------------------------------------------------------- |
+| `Deployment`                 | `<work-slug>`      | Single container, port 3000, configured `replicas`.       |
+| `Service`                    | `<work-slug>`      | `ClusterIP`, port 80 → 3000.                              |
+| `Ingress`                    | `<work-slug>`      | Only if `ingressHost` or a verified custom domain exists. |
+| `Secret` (`docker-registry`) | `<work-slug>-pull` | Only if registry credentials are set.                     |
 
 All resources carry these labels:
 

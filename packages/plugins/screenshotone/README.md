@@ -4,15 +4,15 @@ ScreenshotOne screenshot plugin for Ever Works - capture website screenshots usi
 
 ## Plugin metadata
 
-| Field         | Value                                                  |
-| ------------- | ------------------------------------------------------ |
-| ID            | `screenshotone`                                        |
-| Category      | `screenshot`                                           |
-| Capabilities  | `screenshot`                                           |
-| Author        | Ever Works Team                                        |
-| License       | MIT                                                    |
-| Built-in      | no                                                     |
-| Auto-enable   | no                                                     |
+| Field        | Value           |
+| ------------ | --------------- |
+| ID           | `screenshotone` |
+| Category     | `screenshot`    |
+| Capabilities | `screenshot`    |
+| Author       | Ever Works Team |
+| License      | MIT             |
+| Built-in     | no              |
+| Auto-enable  | no              |
 
 ## What does ScreenshotOne do?
 

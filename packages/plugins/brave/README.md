@@ -4,15 +4,15 @@ Brave Plugin - Privacy-focused web search using Brave Search API
 
 ## Plugin metadata
 
-| Field         | Value                                                  |
-| ------------- | ------------------------------------------------------ |
-| ID            | `brave`                                                |
-| Category      | `search`                                               |
-| Capabilities  | `search`                                               |
-| Author        | Ever Works Team                                        |
-| License       | MIT                                                    |
-| Built-in      | yes                                                    |
-| Auto-enable   | no                                                     |
+| Field        | Value           |
+| ------------ | --------------- |
+| ID           | `brave`         |
+| Category     | `search`        |
+| Capabilities | `search`        |
+| Author       | Ever Works Team |
+| License      | MIT             |
+| Built-in     | yes             |
+| Auto-enable  | no              |
 
 ## What does Brave Search do?
 

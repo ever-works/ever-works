@@ -16,13 +16,13 @@ pnpm add @ever-works/contracts
 
 ## Subpath exports
 
-| Import path                  | Contents                                                          |
-| ---------------------------- | ----------------------------------------------------------------- |
-| `@ever-works/contracts`      | Re-exports of `item`, `domain`, and `form` (default barrel)       |
-| `@ever-works/contracts/item` | `ItemData`, item lifecycle states, item field shapes              |
-| `@ever-works/contracts/domain` | `DomainType`, domain category metadata                          |
-| `@ever-works/contracts/form` | Form field schemas (`x-widget`, `x-secret`, etc.) consumed by UIs |
-| `@ever-works/contracts/api`  | REST API request/response shapes                                  |
+| Import path                    | Contents                                                          |
+| ------------------------------ | ----------------------------------------------------------------- |
+| `@ever-works/contracts`        | Re-exports of `item`, `domain`, and `form` (default barrel)       |
+| `@ever-works/contracts/item`   | `ItemData`, item lifecycle states, item field shapes              |
+| `@ever-works/contracts/domain` | `DomainType`, domain category metadata                            |
+| `@ever-works/contracts/form`   | Form field schemas (`x-widget`, `x-secret`, etc.) consumed by UIs |
+| `@ever-works/contracts/api`    | REST API request/response shapes                                  |
 
 ## Usage
 
@@ -32,9 +32,9 @@ import type { DomainType } from '@ever-works/contracts/domain';
 import type { JsonSchema } from '@ever-works/contracts/form';
 
 const item: ItemData = {
-    name: 'Example',
-    slug: 'example',
-    // ...
+	name: 'Example',
+	slug: 'example'
+	// ...
 };
 ```
 

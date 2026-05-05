@@ -4,15 +4,15 @@ Langfuse Plugin - External prompt management with versioning, labels, and A/B te
 
 ## Plugin metadata
 
-| Field         | Value                                                  |
-| ------------- | ------------------------------------------------------ |
-| ID            | `langfuse`                                             |
-| Category      | `utility`                                              |
-| Capabilities  | `prompt-provider`                                      |
-| Author        | Ever Works Team                                        |
-| License       | MIT                                                    |
-| Built-in      | yes                                                    |
-| Auto-enable   | yes                                                    |
+| Field        | Value             |
+| ------------ | ----------------- |
+| ID           | `langfuse`        |
+| Category     | `utility`         |
+| Capabilities | `prompt-provider` |
+| Author       | Ever Works Team   |
+| License      | MIT               |
+| Built-in     | yes               |
+| Auto-enable  | yes               |
 
 ## What is the Langfuse plugin?
 

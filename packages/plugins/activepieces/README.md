@@ -4,15 +4,15 @@ Activepieces Automation Pipeline Plugin - Delegates Work generation steps to Act
 
 ## Plugin metadata
 
-| Field         | Value                                                  |
-| ------------- | ------------------------------------------------------ |
-| ID            | `activepieces`                                         |
-| Category      | `pipeline`                                             |
-| Capabilities  | `pipeline`, `form-schema-provider`                     |
-| Author        | Ever Works Team                                        |
-| License       | MIT                                                    |
-| Built-in      | yes                                                    |
-| Auto-enable   | no                                                     |
+| Field        | Value                              |
+| ------------ | ---------------------------------- |
+| ID           | `activepieces`                     |
+| Category     | `pipeline`                         |
+| Capabilities | `pipeline`, `form-schema-provider` |
+| Author       | Ever Works Team                    |
+| License      | MIT                                |
+| Built-in     | yes                                |
+| Auto-enable  | no                                 |
 
 ## What does the Activepieces plugin do?
 

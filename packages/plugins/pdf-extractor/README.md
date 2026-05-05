@@ -4,15 +4,15 @@ PDF Content Extractor - Extract text from PDFs with OCR fallback via Mistral AI
 
 ## Plugin metadata
 
-| Field        | Value                  |
-| ------------ | ---------------------- |
-| ID           | `pdf-extractor`        |
-| Category     | `content-extractor`    |
-| Capabilities | `content-extractor`    |
-| Author       | Ever Works Team        |
-| License      | MIT                    |
-| Built-in     | yes                    |
-| Auto-enable  | no                     |
+| Field        | Value               |
+| ------------ | ------------------- |
+| ID           | `pdf-extractor`     |
+| Category     | `content-extractor` |
+| Capabilities | `content-extractor` |
+| Author       | Ever Works Team     |
+| License      | MIT                 |
+| Built-in     | yes                 |
+| Auto-enable  | no                  |
 
 ## What does the PDF Extractor do?
 

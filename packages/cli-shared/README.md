@@ -19,24 +19,18 @@ pnpm add @ever-works/cli-shared
 import { BasePromptService, WorkPromptService } from '@ever-works/cli-shared';
 
 // Utilities
-import {
-    checkConfig,
-    slugify,
-    validateSlug,
-    validateUrl,
-    generatorSteps
-} from '@ever-works/cli-shared';
+import { checkConfig, slugify, validateSlug, validateUrl, generatorSteps } from '@ever-works/cli-shared';
 ```
 
-| Export                | Purpose                                                                  |
-| --------------------- | ------------------------------------------------------------------------ |
-| `BasePromptService`   | Base class for `inquirer`-driven CLI flows (theming, error formatting)   |
-| `WorkPromptService`   | Prompt flow for creating and editing a Work via the CLI                  |
-| `checkConfig`         | Validate that a config file is present and well-formed                   |
-| `slugify`             | Convert a string into a URL-safe slug                                    |
-| `validateSlug`        | Slug validator usable as an inquirer `validate` callback                 |
-| `validateUrl`         | URL validator usable as an inquirer `validate` callback                  |
-| `generatorSteps`      | Canonical list of work-generation steps shown in CLI progress output     |
+| Export              | Purpose                                                                |
+| ------------------- | ---------------------------------------------------------------------- |
+| `BasePromptService` | Base class for `inquirer`-driven CLI flows (theming, error formatting) |
+| `WorkPromptService` | Prompt flow for creating and editing a Work via the CLI                |
+| `checkConfig`       | Validate that a config file is present and well-formed                 |
+| `slugify`           | Convert a string into a URL-safe slug                                  |
+| `validateSlug`      | Slug validator usable as an inquirer `validate` callback               |
+| `validateUrl`       | URL validator usable as an inquirer `validate` callback                |
+| `generatorSteps`    | Canonical list of work-generation steps shown in CLI progress output   |
 
 ## Dependencies
 

@@ -215,6 +215,7 @@
     - Secrets read: `KUBECONFIG`; **registry-kind-conditional** secrets — `GITHUB_TOKEN` (auto, for GHCR), or `REGISTRY_USERNAME` + `REGISTRY_PASSWORD` (for dockerhub/generic), or `REGISTRY_SERVER` (generic only).
     - The workflow's `docker login` step is generated from the registry strategy's `workflowLogin()` output (T9c–T9e); same for the cluster pull-secret apply step.
 - [ ] **T24** (parallel with T23). Same for `directory-web-minimal-template`.
+
 ### Capability contract extension (provider-agnostic)
 
 - [ ] **T24a**. Extend `IDeploymentPlugin` at
@@ -300,33 +301,33 @@
 > Each functional requirement in `spec.md` §3 must map to at least one passing test.
 > Tick when the test exists and is in CI.
 
-| FR | Test file(s) | Description |
-| -- | ------------ | ----------- |
-| FR-1 (plugin discovery) | `discovery.spec.ts`, `k8s.plugin.metadata.spec.ts` | Plugin appears in `/api/plugins`, has correct metadata. |
-| FR-2 (settings schema) | `k8s.plugin.metadata.spec.ts` | Required fields, secret + scope + widget hints. |
-| FR-3 (validate on save) | `k8s.plugin.validate.spec.ts` | Save flow rejects unreachable cluster. |
-| FR-4 (auto UI discovery) | Playwright e2e under `apps/web/e2e/plugins-deployment.spec.ts` | Both Vercel and Kubernetes cards render on `/en/settings/plugins/deployment`. |
-| FR-5 (end-to-end deploy) | `deploy-k8s.e2e-spec.ts` | Kind cluster, fixture work, deploys to ready. |
-| FR-6 (image build & apply order) | `k8s.plugin.deploy.spec.ts` | Manifest application order asserted via mock. |
-| FR-7 (rolling update) | `deploy-k8s.e2e-spec.ts` (rollback test) | Second deploy preserves rollout history. |
-| FR-8 (domain CRUD) | `domain.handler.spec.ts`, `deploy-k8s.e2e-spec.ts` | Ingress patches; DNS guidance returned. |
-| FR-9 (status mapping) | `status.mapper.spec.ts` | Each rollout state mapped correctly. |
-| FR-10 (secret hygiene) | `errors.spec.ts`, `k8s.plugin.deploy.spec.ts` | scrubError covers each leak; deploy errors never include kubeconfig substring. |
-| FR-11 (not default) | `k8s.plugin.metadata.spec.ts` | Manifest excludes `defaultForCapabilities`. |
-| FR-12 (cluster info on success) | `k8s.plugin.validate.spec.ts` | Details object includes name, server URL, version. |
-| FR-13 (registry abstraction) | `registries/*.spec.ts`, `provider.registry.spec.ts` | Each kind builds the right image base, login, pull secret. |
-| FR-14 (GHCR via GitHub plugin) | `registries/github.provider.spec.ts`, `k8s.plugin.validate.spec.ts` | Uses GitHub plugin context; "connect GitHub first" path. |
-| FR-15 (ingress detection) | `k8s-api.service.spec.ts`, `k8s.plugin.validate.spec.ts` | `listIngressClasses` populates `details.ingressClasses` with `hasStrategy`. |
-| FR-16 (ingress strategies) | `ingress/*.spec.ts`, `strategy.registry.spec.ts` | Snapshot annotations per controller; generic fallback. |
-| FR-17 (works-config field) | `works-config.service.spec.ts`, `works-config-import-applier.service.spec.ts` | Parses `deployProvider`; applies it via lifecycle service; rejects unknown ids. |
-| FR-18 (data-repo wins) | `works-config-sync.listener.spec.ts` (or applier spec) | Conflict event emitted; data repo value applied. |
-| FR-19 (provider-agnostic plumbing) | works-config tests, `deploy.service.spec.ts` | Vercel and k8s both pass through the same code path with no plugin-specific branches. |
-| FR-20 (visibility mirrors website repo) | `registries/github.provider.spec.ts`, `deploy-k8s.e2e-spec.ts` | `auto` resolves to public/private based on `isPrivate`; both branches covered. |
-| FR-21 (pull secret iff private) | `registries/github.provider.spec.ts`, `manifest.renderer.spec.ts` | Public → Deployment has no `imagePullSecrets`; private → Deployment references the secret. |
-| FR-22 (settings persistence) | `k8s.plugin.metadata.spec.ts`, manual: `GET /api/plugins/k8s/settings` returns no secrets | Settings live in `plugin_settings` (no new table). |
-| FR-23 (one cluster per user) | `k8s.plugin.deploy.spec.ts` | Two works, same user, both use the same kubeconfig from plugin settings. |
-| FR-24 (no caching in v1) | `k8s-api.service.spec.ts` | `listIngressClasses` is called on every `validateConnection` invocation. |
-| Capability contract additive | `deployment.interface.spec.ts`, `vercel.plugin.deployment-secrets.spec.ts`, `k8s.plugin.deployment-secrets.spec.ts` | Existing plugins without the new optional methods still type-check and run. |
+| FR                                      | Test file(s)                                                                                                        | Description                                                                                |
+| --------------------------------------- | ------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| FR-1 (plugin discovery)                 | `discovery.spec.ts`, `k8s.plugin.metadata.spec.ts`                                                                  | Plugin appears in `/api/plugins`, has correct metadata.                                    |
+| FR-2 (settings schema)                  | `k8s.plugin.metadata.spec.ts`                                                                                       | Required fields, secret + scope + widget hints.                                            |
+| FR-3 (validate on save)                 | `k8s.plugin.validate.spec.ts`                                                                                       | Save flow rejects unreachable cluster.                                                     |
+| FR-4 (auto UI discovery)                | Playwright e2e under `apps/web/e2e/plugins-deployment.spec.ts`                                                      | Both Vercel and Kubernetes cards render on `/en/settings/plugins/deployment`.              |
+| FR-5 (end-to-end deploy)                | `deploy-k8s.e2e-spec.ts`                                                                                            | Kind cluster, fixture work, deploys to ready.                                              |
+| FR-6 (image build & apply order)        | `k8s.plugin.deploy.spec.ts`                                                                                         | Manifest application order asserted via mock.                                              |
+| FR-7 (rolling update)                   | `deploy-k8s.e2e-spec.ts` (rollback test)                                                                            | Second deploy preserves rollout history.                                                   |
+| FR-8 (domain CRUD)                      | `domain.handler.spec.ts`, `deploy-k8s.e2e-spec.ts`                                                                  | Ingress patches; DNS guidance returned.                                                    |
+| FR-9 (status mapping)                   | `status.mapper.spec.ts`                                                                                             | Each rollout state mapped correctly.                                                       |
+| FR-10 (secret hygiene)                  | `errors.spec.ts`, `k8s.plugin.deploy.spec.ts`                                                                       | scrubError covers each leak; deploy errors never include kubeconfig substring.             |
+| FR-11 (not default)                     | `k8s.plugin.metadata.spec.ts`                                                                                       | Manifest excludes `defaultForCapabilities`.                                                |
+| FR-12 (cluster info on success)         | `k8s.plugin.validate.spec.ts`                                                                                       | Details object includes name, server URL, version.                                         |
+| FR-13 (registry abstraction)            | `registries/*.spec.ts`, `provider.registry.spec.ts`                                                                 | Each kind builds the right image base, login, pull secret.                                 |
+| FR-14 (GHCR via GitHub plugin)          | `registries/github.provider.spec.ts`, `k8s.plugin.validate.spec.ts`                                                 | Uses GitHub plugin context; "connect GitHub first" path.                                   |
+| FR-15 (ingress detection)               | `k8s-api.service.spec.ts`, `k8s.plugin.validate.spec.ts`                                                            | `listIngressClasses` populates `details.ingressClasses` with `hasStrategy`.                |
+| FR-16 (ingress strategies)              | `ingress/*.spec.ts`, `strategy.registry.spec.ts`                                                                    | Snapshot annotations per controller; generic fallback.                                     |
+| FR-17 (works-config field)              | `works-config.service.spec.ts`, `works-config-import-applier.service.spec.ts`                                       | Parses `deployProvider`; applies it via lifecycle service; rejects unknown ids.            |
+| FR-18 (data-repo wins)                  | `works-config-sync.listener.spec.ts` (or applier spec)                                                              | Conflict event emitted; data repo value applied.                                           |
+| FR-19 (provider-agnostic plumbing)      | works-config tests, `deploy.service.spec.ts`                                                                        | Vercel and k8s both pass through the same code path with no plugin-specific branches.      |
+| FR-20 (visibility mirrors website repo) | `registries/github.provider.spec.ts`, `deploy-k8s.e2e-spec.ts`                                                      | `auto` resolves to public/private based on `isPrivate`; both branches covered.             |
+| FR-21 (pull secret iff private)         | `registries/github.provider.spec.ts`, `manifest.renderer.spec.ts`                                                   | Public → Deployment has no `imagePullSecrets`; private → Deployment references the secret. |
+| FR-22 (settings persistence)            | `k8s.plugin.metadata.spec.ts`, manual: `GET /api/plugins/k8s/settings` returns no secrets                           | Settings live in `plugin_settings` (no new table).                                         |
+| FR-23 (one cluster per user)            | `k8s.plugin.deploy.spec.ts`                                                                                         | Two works, same user, both use the same kubeconfig from plugin settings.                   |
+| FR-24 (no caching in v1)                | `k8s-api.service.spec.ts`                                                                                           | `listIngressClasses` is called on every `validateConnection` invocation.                   |
+| Capability contract additive            | `deployment.interface.spec.ts`, `vercel.plugin.deployment-secrets.spec.ts`, `k8s.plugin.deployment-secrets.spec.ts` | Existing plugins without the new optional methods still type-check and run.                |
 
 ### Test infrastructure
 

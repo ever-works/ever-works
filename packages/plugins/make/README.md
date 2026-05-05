@@ -4,15 +4,15 @@ Make.com Workflow Pipeline Plugin - Delegates Work generation to Make.com scenar
 
 ## Plugin metadata
 
-| Field         | Value                                                  |
-| ------------- | ------------------------------------------------------ |
-| ID            | `make`                                                 |
-| Category      | `pipeline`                                             |
-| Capabilities  | `pipeline`, `form-schema-provider`                     |
-| Author        | Ever Works Team                                        |
-| License       | MIT                                                    |
-| Built-in      | yes                                                    |
-| Auto-enable   | no                                                     |
+| Field        | Value                              |
+| ------------ | ---------------------------------- |
+| ID           | `make`                             |
+| Category     | `pipeline`                         |
+| Capabilities | `pipeline`, `form-schema-provider` |
+| Author       | Ever Works Team                    |
+| License      | MIT                                |
+| Built-in     | yes                                |
+| Auto-enable  | no                                 |
 
 ## What does the Make.com plugin do?
 

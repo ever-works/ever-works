@@ -4,15 +4,15 @@ Standard Pipeline Plugin - Provides the standard 15-step generation pipeline.
 
 ## Plugin metadata
 
-| Field        | Value                                |
-| ------------ | ------------------------------------ |
-| ID           | `standard-pipeline`                  |
-| Category     | `pipeline`                           |
-| Capabilities | `pipeline`, `form-schema-provider`   |
-| Author       | Ever Works Team                      |
-| License      | MIT                                  |
-| Built-in     | yes                                  |
-| Auto-enable  | yes                                  |
+| Field        | Value                              |
+| ------------ | ---------------------------------- |
+| ID           | `standard-pipeline`                |
+| Category     | `pipeline`                         |
+| Capabilities | `pipeline`, `form-schema-provider` |
+| Author       | Ever Works Team                    |
+| License      | MIT                                |
+| Built-in     | yes                                |
+| Auto-enable  | yes                                |
 
 ## What is the Standard Pipeline?
 

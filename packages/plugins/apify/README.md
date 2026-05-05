@@ -4,15 +4,15 @@ Apify - Import items from Apify datasets into your Work
 
 ## Plugin metadata
 
-| Field        | Value                                      |
-| ------------ | ------------------------------------------ |
-| ID           | `apify`                                    |
-| Category     | `data-source`                              |
-| Capabilities | `data-source`, `form-schema-provider`      |
-| Author       | Ever Works Team                            |
-| License      | MIT                                        |
-| Built-in     | no                                         |
-| Auto-enable  | no                                         |
+| Field        | Value                                 |
+| ------------ | ------------------------------------- |
+| ID           | `apify`                               |
+| Category     | `data-source`                         |
+| Capabilities | `data-source`, `form-schema-provider` |
+| Author       | Ever Works Team                       |
+| License      | MIT                                   |
+| Built-in     | no                                    |
+| Auto-enable  | no                                    |
 
 ## What does the Apify plugin do?
 

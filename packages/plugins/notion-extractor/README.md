@@ -4,15 +4,15 @@ Notion Page Extractor - Extract content from Notion pages using the Notion API o
 
 ## Plugin metadata
 
-| Field        | Value                  |
-| ------------ | ---------------------- |
-| ID           | `notion-extractor`     |
-| Category     | `content-extractor`    |
-| Capabilities | `content-extractor`    |
-| Author       | Ever Works Team        |
-| License      | MIT                    |
-| Built-in     | no                     |
-| Auto-enable  | no                     |
+| Field        | Value               |
+| ------------ | ------------------- |
+| ID           | `notion-extractor`  |
+| Category     | `content-extractor` |
+| Capabilities | `content-extractor` |
+| Author       | Ever Works Team     |
+| License      | MIT                 |
+| Built-in     | no                  |
+| Auto-enable  | no                  |
 
 ## What does the Notion Extractor do?
 

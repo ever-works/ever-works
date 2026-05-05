@@ -4,15 +4,15 @@ Linkup Plugin - Web search and content extraction using Linkup API
 
 ## Plugin metadata
 
-| Field         | Value                                                  |
-| ------------- | ------------------------------------------------------ |
-| ID            | `linkup`                                               |
-| Category      | `search`                                               |
-| Capabilities  | `search`, `content-extractor`                          |
-| Author        | Ever Works Team                                        |
-| License       | MIT                                                    |
-| Built-in      | yes                                                    |
-| Auto-enable   | no                                                     |
+| Field        | Value                         |
+| ------------ | ----------------------------- |
+| ID           | `linkup`                      |
+| Category     | `search`                      |
+| Capabilities | `search`, `content-extractor` |
+| Author       | Ever Works Team               |
+| License      | MIT                           |
+| Built-in     | yes                           |
+| Auto-enable  | no                            |
 
 ## What does Linkup do?
 

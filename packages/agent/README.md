@@ -18,34 +18,34 @@ It is consumed by:
 
 The package exposes 25+ sub-paths so consumers only import what they need. Each sub-path maps to a folder under `src/` with its own NestJS module, services, DTOs and entities.
 
-| Subpath                                | Purpose                                                                        |
-| -------------------------------------- | ------------------------------------------------------------------------------ |
-| `@ever-works/agent/generators`         | Prompt and output generators used by AI providers and pipelines                |
-| `@ever-works/agent/items-generator`    | Item enrichment, screenshotting, content extraction orchestration              |
-| `@ever-works/agent/pipeline`           | Pipeline registry, executor, and built-in step contracts                       |
-| `@ever-works/agent/database`           | TypeORM data source, migrations, and repository helpers                        |
-| `@ever-works/agent/entities`           | TypeORM entities (Work, Item, Category, Tag, User, etc.)                       |
-| `@ever-works/agent/dto`                | Shared DTOs used between the API and the agent                                 |
-| `@ever-works/agent/git`                | `isomorphic-git` wrappers shared by all git provider plugins                   |
-| `@ever-works/agent/work-operations`    | Work lifecycle: create, generate, regenerate, cancel, delete                   |
-| `@ever-works/agent/import`             | Importers for existing data sources (CSV, Notion, etc.)                        |
-| `@ever-works/agent/subscriptions`      | Plan limits, billing-aware feature gating                                      |
-| `@ever-works/agent/notifications`      | Multi-channel notification dispatching                                         |
-| `@ever-works/agent/events`             | Event bus, event types, and listeners                                          |
-| `@ever-works/agent/tasks`              | BullMQ queue definitions and processors                                        |
-| `@ever-works/agent/cache`              | Cache module wrapper with TTL helpers                                          |
-| `@ever-works/agent/config`             | NestJS `ConfigModule` setup, validation, and typed accessors                   |
-| `@ever-works/agent/constants`          | Shared constants                                                               |
-| `@ever-works/agent/services`           | Cross-cutting domain services                                                  |
-| `@ever-works/agent/plugins`            | Plugin registry, loader, and sandboxed execution                               |
-| `@ever-works/agent/facades`            | Capability facades (AI, Search, Deploy, Screenshot, Content-Extractor, …)     |
-| `@ever-works/agent/community-pr`       | Community pull request workflow                                                |
-| `@ever-works/agent/comparison-generator` | Generates comparison pages between items                                     |
-| `@ever-works/agent/account-transfer`   | Account ownership transfer flow                                                |
-| `@ever-works/agent/activity-log`       | Audit/activity log domain                                                      |
-| `@ever-works/agent/works-config`       | Works configuration and templates                                              |
-| `@ever-works/agent/onboarding`         | Onboarding flow logic                                                          |
-| `@ever-works/agent/utils`              | General utilities                                                              |
+| Subpath                                  | Purpose                                                                   |
+| ---------------------------------------- | ------------------------------------------------------------------------- |
+| `@ever-works/agent/generators`           | Prompt and output generators used by AI providers and pipelines           |
+| `@ever-works/agent/items-generator`      | Item enrichment, screenshotting, content extraction orchestration         |
+| `@ever-works/agent/pipeline`             | Pipeline registry, executor, and built-in step contracts                  |
+| `@ever-works/agent/database`             | TypeORM data source, migrations, and repository helpers                   |
+| `@ever-works/agent/entities`             | TypeORM entities (Work, Item, Category, Tag, User, etc.)                  |
+| `@ever-works/agent/dto`                  | Shared DTOs used between the API and the agent                            |
+| `@ever-works/agent/git`                  | `isomorphic-git` wrappers shared by all git provider plugins              |
+| `@ever-works/agent/work-operations`      | Work lifecycle: create, generate, regenerate, cancel, delete              |
+| `@ever-works/agent/import`               | Importers for existing data sources (CSV, Notion, etc.)                   |
+| `@ever-works/agent/subscriptions`        | Plan limits, billing-aware feature gating                                 |
+| `@ever-works/agent/notifications`        | Multi-channel notification dispatching                                    |
+| `@ever-works/agent/events`               | Event bus, event types, and listeners                                     |
+| `@ever-works/agent/tasks`                | BullMQ queue definitions and processors                                   |
+| `@ever-works/agent/cache`                | Cache module wrapper with TTL helpers                                     |
+| `@ever-works/agent/config`               | NestJS `ConfigModule` setup, validation, and typed accessors              |
+| `@ever-works/agent/constants`            | Shared constants                                                          |
+| `@ever-works/agent/services`             | Cross-cutting domain services                                             |
+| `@ever-works/agent/plugins`              | Plugin registry, loader, and sandboxed execution                          |
+| `@ever-works/agent/facades`              | Capability facades (AI, Search, Deploy, Screenshot, Content-Extractor, …) |
+| `@ever-works/agent/community-pr`         | Community pull request workflow                                           |
+| `@ever-works/agent/comparison-generator` | Generates comparison pages between items                                  |
+| `@ever-works/agent/account-transfer`     | Account ownership transfer flow                                           |
+| `@ever-works/agent/activity-log`         | Audit/activity log domain                                                 |
+| `@ever-works/agent/works-config`         | Works configuration and templates                                         |
+| `@ever-works/agent/onboarding`           | Onboarding flow logic                                                     |
+| `@ever-works/agent/utils`                | General utilities                                                         |
 
 ## Installation
 
@@ -67,7 +67,7 @@ import { PipelineModule } from '@ever-works/agent/pipeline';
 import { FacadesModule } from '@ever-works/agent/facades';
 
 @Module({
-    imports: [WorkOperationsModule, PipelineModule, FacadesModule]
+    imports: [WorkOperationsModule, PipelineModule, FacadesModule],
 })
 export class AppModule {}
 ```

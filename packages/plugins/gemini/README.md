@@ -6,15 +6,15 @@ Full pipeline plugin that delegates work generation to the [Gemini CLI](https://
 
 ## Plugin metadata
 
-| Field        | Value                                |
-| ------------ | ------------------------------------ |
-| ID           | `gemini`                             |
-| Category     | `pipeline`                           |
-| Capabilities | `pipeline`, `form-schema-provider`   |
-| Author       | Ever Works Team                      |
-| License      | MIT                                  |
-| Built-in     | yes                                  |
-| Auto-enable  | no                                   |
+| Field        | Value                              |
+| ------------ | ---------------------------------- |
+| ID           | `gemini`                           |
+| Category     | `pipeline`                         |
+| Capabilities | `pipeline`, `form-schema-provider` |
+| Author       | Ever Works Team                    |
+| License      | MIT                                |
+| Built-in     | yes                                |
+| Auto-enable  | no                                 |
 
 ## Pipeline Steps
 

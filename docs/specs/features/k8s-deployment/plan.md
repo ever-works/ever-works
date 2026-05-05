@@ -46,22 +46,22 @@ flowchart LR
 
 ## 2. Tech Choices
 
-| Concern | Choice | Rationale |
-| ------- | ------ | --------- |
-| Cluster client | `@kubernetes/client-node` ^1.0 | Official client; supports kubeconfig parsing, exec auth, in-cluster auth, watches. Same library NestJS Terminus uses. |
-| YAML parsing | `js-yaml` ^4 | Already a transitive dep across the monorepo; minimal footprint; safe-load by default. |
-| Image build & push | GitHub Actions `docker/build-push-action@v6` running inside the website-template repo | Mirrors Vercel's "workflow-dispatch from website repo" pattern; no Ever Works compute. (Decision **D1** in spec §8.) |
-| Default registry | **GitHub Container Registry** (`ghcr.io/<owner>`) authenticated via the workflow's `GITHUB_TOKEN` (push) and the GitHub plugin's stored credentials (cluster pull-secret) | Zero configuration for users who already authenticated GitHub; image lives next to the source repo; same auth surface as the existing `git-provider` plugin. (Decision **D2**.) |
-| Other registries | `dockerhub` (username + PAT) and `generic` (server URL + creds) ship in v1; future kinds (ECR/GCR/ACR) plug in via the same `RegistryProvider` interface | Covers self-hosted Harbor, Quay, GitLab CR, and the major clouds in one abstraction. |
-| Registry strategy | Discriminated union `RegistryConfig` + `RegistryProvider` interface returning `{ imageBase, dockerLogin(workflow), pullSecret(cluster) }` | Single extension point for new kinds; deploy code never branches on `kind`. |
-| Manifest rendering | Hand-written TypeScript renderer producing typed JS objects (no Helm, no string templates) | Strong typing; testable as pure functions; no runtime template engine. |
-| Apply strategy | Server-Side Apply (SSA) with `fieldManager: 'ever-works-k8s-plugin'` | Idempotent, conflict-aware, lets users hand-edit fields the plugin doesn't own. |
-| Ingress detection | Probe `IngressClass` resources via `NetworkingV1Api.listIngressClass()` during `validateConnection`, parse `spec.controller`, mark which classes have a built-in `IngressStrategy` | One round-trip; user-visible result; covers the "multiple controllers in one cluster" scenario. (Decision **D3**.) |
-| Ingress strategy | Strategy-registry keyed on the controller string (`k8s.io/ingress-nginx`, `traefik.io/ingress-controller`, …) with a `generic` fallback | Same extension-point pattern as registries; new strategy = new module + map entry. |
-| Status polling | Existing `DeploymentVerifierService` calling `plugin.getDeploymentStatus()` | Reuses Vercel's pattern; no new background infrastructure. |
-| Works-config field | Add optional `deployProvider: string` to `WorksConfig` shape in `packages/agent/src/works-config/services/works-config.service.ts`; works-config layer dispatches the value through the lifecycle service | Single change benefits k8s, Vercel, and future plugins. (Decision **D4**.) |
-| Build tooling | tsup (CJS+ESM), tsc for `--noEmit` type-check, Vitest, mirroring `packages/plugins/vercel/` | Consistency with sibling plugin. |
-| Secret encryption | Existing plugin-settings store with `x-secret: true` | No new crypto code. |
+| Concern            | Choice                                                                                                                                                                                                    | Rationale                                                                                                                                                                       |
+| ------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Cluster client     | `@kubernetes/client-node` ^1.0                                                                                                                                                                            | Official client; supports kubeconfig parsing, exec auth, in-cluster auth, watches. Same library NestJS Terminus uses.                                                           |
+| YAML parsing       | `js-yaml` ^4                                                                                                                                                                                              | Already a transitive dep across the monorepo; minimal footprint; safe-load by default.                                                                                          |
+| Image build & push | GitHub Actions `docker/build-push-action@v6` running inside the website-template repo                                                                                                                     | Mirrors Vercel's "workflow-dispatch from website repo" pattern; no Ever Works compute. (Decision **D1** in spec §8.)                                                            |
+| Default registry   | **GitHub Container Registry** (`ghcr.io/<owner>`) authenticated via the workflow's `GITHUB_TOKEN` (push) and the GitHub plugin's stored credentials (cluster pull-secret)                                 | Zero configuration for users who already authenticated GitHub; image lives next to the source repo; same auth surface as the existing `git-provider` plugin. (Decision **D2**.) |
+| Other registries   | `dockerhub` (username + PAT) and `generic` (server URL + creds) ship in v1; future kinds (ECR/GCR/ACR) plug in via the same `RegistryProvider` interface                                                  | Covers self-hosted Harbor, Quay, GitLab CR, and the major clouds in one abstraction.                                                                                            |
+| Registry strategy  | Discriminated union `RegistryConfig` + `RegistryProvider` interface returning `{ imageBase, dockerLogin(workflow), pullSecret(cluster) }`                                                                 | Single extension point for new kinds; deploy code never branches on `kind`.                                                                                                     |
+| Manifest rendering | Hand-written TypeScript renderer producing typed JS objects (no Helm, no string templates)                                                                                                                | Strong typing; testable as pure functions; no runtime template engine.                                                                                                          |
+| Apply strategy     | Server-Side Apply (SSA) with `fieldManager: 'ever-works-k8s-plugin'`                                                                                                                                      | Idempotent, conflict-aware, lets users hand-edit fields the plugin doesn't own.                                                                                                 |
+| Ingress detection  | Probe `IngressClass` resources via `NetworkingV1Api.listIngressClass()` during `validateConnection`, parse `spec.controller`, mark which classes have a built-in `IngressStrategy`                        | One round-trip; user-visible result; covers the "multiple controllers in one cluster" scenario. (Decision **D3**.)                                                              |
+| Ingress strategy   | Strategy-registry keyed on the controller string (`k8s.io/ingress-nginx`, `traefik.io/ingress-controller`, …) with a `generic` fallback                                                                   | Same extension-point pattern as registries; new strategy = new module + map entry.                                                                                              |
+| Status polling     | Existing `DeploymentVerifierService` calling `plugin.getDeploymentStatus()`                                                                                                                               | Reuses Vercel's pattern; no new background infrastructure.                                                                                                                      |
+| Works-config field | Add optional `deployProvider: string` to `WorksConfig` shape in `packages/agent/src/works-config/services/works-config.service.ts`; works-config layer dispatches the value through the lifecycle service | Single change benefits k8s, Vercel, and future plugins. (Decision **D4**.)                                                                                                      |
+| Build tooling      | tsup (CJS+ESM), tsc for `--noEmit` type-check, Vitest, mirroring `packages/plugins/vercel/`                                                                                                               | Consistency with sibling plugin.                                                                                                                                                |
+| Secret encryption  | Existing plugin-settings store with `x-secret: true`                                                                                                                                                      | No new crypto code.                                                                                                                                                             |
 
 ## 3. Data Model
 
@@ -85,20 +85,20 @@ The internal plugin types live in `packages/plugins/k8s/src/types.ts`:
 
 ```ts
 export interface KubernetesSettings {
-  kubeconfig?: string;             // YAML (secret)
-  kubeContext?: string;            // override current-context
-  namespace?: string;              // default 'ever-works'
-  registry?: RegistryConfig;       // discriminated; default { kind: 'github' }
-  ingressClass?: string;           // e.g. 'nginx'
-  ingressHost?: string;            // default host (per-domain hosts come from custom_domains)
-  tlsIssuer?: string;              // cert-manager ClusterIssuer name
-  replicas?: number;               // default 1
+	kubeconfig?: string; // YAML (secret)
+	kubeContext?: string; // override current-context
+	namespace?: string; // default 'ever-works'
+	registry?: RegistryConfig; // discriminated; default { kind: 'github' }
+	ingressClass?: string; // e.g. 'nginx'
+	ingressHost?: string; // default host (per-domain hosts come from custom_domains)
+	tlsIssuer?: string; // cert-manager ClusterIssuer name
+	replicas?: number; // default 1
 }
 
 export type RegistryConfig =
-  | { kind: 'github'; owner?: string; visibility?: 'auto' | 'public' | 'private' }
-  | { kind: 'dockerhub'; username: string; password: string }
-  | { kind: 'generic'; server: string; username: string; password: string };
+	| { kind: 'github'; owner?: string; visibility?: 'auto' | 'public' | 'private' }
+	| { kind: 'dockerhub'; username: string; password: string }
+	| { kind: 'generic'; server: string; username: string; password: string };
 
 // Resolved visibility used at deploy time when the user picks `auto`:
 //   - read work.websiteRepoVisibility via the GitHub plugin
@@ -106,18 +106,18 @@ export type RegistryConfig =
 //   - private repo → 'private'
 
 export interface KubernetesClusterInfo {
-  clusterName: string;
-  serverUrl: string;
-  serverVersion: string;
-  serverFingerprint: string;       // sha256 of CA bundle, for activity-log identity
-  ingressClasses: IngressClassDescriptor[];
+	clusterName: string;
+	serverUrl: string;
+	serverVersion: string;
+	serverFingerprint: string; // sha256 of CA bundle, for activity-log identity
+	ingressClasses: IngressClassDescriptor[];
 }
 
 export interface IngressClassDescriptor {
-  name: string;                    // metadata.name
-  controller: string;              // spec.controller
-  isDefault: boolean;              // ingressclass.kubernetes.io/is-default-class
-  hasStrategy: boolean;            // built-in strategy available
+	name: string; // metadata.name
+	controller: string; // spec.controller
+	isDefault: boolean; // ingressclass.kubernetes.io/is-default-class
+	hasStrategy: boolean; // built-in strategy available
 }
 ```
 
@@ -131,16 +131,16 @@ Add `deployProvider?: string` to the `WorksConfig` Zod/interface schema in
 
 **No new endpoints.** Every k8s-related interaction reuses existing endpoints:
 
-| Method | Endpoint | Description | Status |
-| ------ | -------- | ----------- | ------ |
-| `GET` | `/api/plugins?category=deployment` | Lists all deploy plugins; now returns Kubernetes too | Existing |
-| `GET` | `/api/plugins/k8s` | Plugin manifest + settings schema | Existing |
-| `POST` | `/api/plugins/k8s/settings` | Save settings; runs `validateConnection()` | Existing |
-| `POST` | `/api/plugins/k8s/validate-connection` | Explicit connection test | Existing |
-| `GET` | `/api/deploy/providers` | Lists deploy providers; includes `k8s` | Existing |
-| `GET` | `/api/deploy/providers/k8s/configured?userId=…` | Whether the user has a kubeconfig | Existing |
-| `POST` | `/api/deploy/works/:id` | Deploy a work; resolves to `KubernetesPlugin` when `work.deployProvider = 'k8s'` | Existing |
-| `GET\|POST\|DELETE` | `/api/deploy/works/:id/domains[…]` | Domain CRUD; routes through `KubernetesPlugin.addDomain/...` | Existing |
+| Method              | Endpoint                                        | Description                                                                      | Status   |
+| ------------------- | ----------------------------------------------- | -------------------------------------------------------------------------------- | -------- |
+| `GET`               | `/api/plugins?category=deployment`              | Lists all deploy plugins; now returns Kubernetes too                             | Existing |
+| `GET`               | `/api/plugins/k8s`                              | Plugin manifest + settings schema                                                | Existing |
+| `POST`              | `/api/plugins/k8s/settings`                     | Save settings; runs `validateConnection()`                                       | Existing |
+| `POST`              | `/api/plugins/k8s/validate-connection`          | Explicit connection test                                                         | Existing |
+| `GET`               | `/api/deploy/providers`                         | Lists deploy providers; includes `k8s`                                           | Existing |
+| `GET`               | `/api/deploy/providers/k8s/configured?userId=…` | Whether the user has a kubeconfig                                                | Existing |
+| `POST`              | `/api/deploy/works/:id`                         | Deploy a work; resolves to `KubernetesPlugin` when `work.deployProvider = 'k8s'` | Existing |
+| `GET\|POST\|DELETE` | `/api/deploy/works/:id/domains[…]`              | Domain CRUD; routes through `KubernetesPlugin.addDomain/...`                     | Existing |
 
 **Auth**: same JWT or API-key auth as the existing deploy controller; work-edit permission required for mutations.
 **Rate limit**: existing tier; deploy endpoint already throttled per-user.
@@ -204,21 +204,21 @@ packages/plugins/k8s/
 
 ```json
 {
-  "name": "@ever-works/k8s-plugin",
-  "version": "1.0.0",
-  "everworks": {
-    "plugin": {
-      "id": "k8s",
-      "name": "Kubernetes",
-      "category": "deployment",
-      "capabilities": ["deployment"],
-      "description": "Deploy works to a Kubernetes cluster",
-      "builtIn": true,
-      "systemPlugin": true,
-      "autoEnable": true,
-      "visibility": "user-only"
-    }
-  }
+	"name": "@ever-works/k8s-plugin",
+	"version": "1.0.0",
+	"everworks": {
+		"plugin": {
+			"id": "k8s",
+			"name": "Kubernetes",
+			"category": "deployment",
+			"capabilities": ["deployment"],
+			"description": "Deploy works to a Kubernetes cluster",
+			"builtIn": true,
+			"systemPlugin": true,
+			"autoEnable": true,
+			"visibility": "user-only"
+		}
+	}
 }
 ```
 
@@ -334,21 +334,22 @@ Both registries follow the same shape:
 ```ts
 // registries/provider.ts
 export interface RegistryProvider {
-  readonly kind: RegistryConfig['kind'];
-  imageBase(config: RegistryConfig, ctx: { workSlug: string; githubOwner?: string }): string;
-  workflowLogin(config: RegistryConfig, ctx: WorkflowCtx): WorkflowLoginStep[];
-  pullSecret(config: RegistryConfig, ctx: ClusterCtx): V1Secret | null;
+	readonly kind: RegistryConfig['kind'];
+	imageBase(config: RegistryConfig, ctx: { workSlug: string; githubOwner?: string }): string;
+	workflowLogin(config: RegistryConfig, ctx: WorkflowCtx): WorkflowLoginStep[];
+	pullSecret(config: RegistryConfig, ctx: ClusterCtx): V1Secret | null;
 }
 
 // ingress/strategy.ts
 export interface IngressStrategy {
-  readonly controller: string;        // matches IngressClass.spec.controller
-  annotations(input: IngressInput): Record<string, string>;
-  tlsSection(input: IngressInput): V1IngressTLS[];
+	readonly controller: string; // matches IngressClass.spec.controller
+	annotations(input: IngressInput): Record<string, string>;
+	tlsSection(input: IngressInput): V1IngressTLS[];
 }
 ```
 
 Default registrations live in `index.ts` and are immutable for the plugin's own use; the registries also expose a `register()` method so external code (e.g. an enterprise plugin) could register additional kinds without forking. v1 ships:
+
 - Registries: `github` (default), `dockerhub`, `generic`.
 - Ingress strategies: `k8s.io/ingress-nginx`, `traefik.io/ingress-controller`, plus a `generic` fallback selected when no controller match.
 
@@ -357,18 +358,20 @@ Default registrations live in `index.ts` and are immutable for the plugin's own 
 **Two small, additive changes** required so the deploy controller can stay capability-driven instead of growing an `if (provider === 'k8s')` branch:
 
 1. **Extend `IDeploymentPlugin`** in `packages/plugin/src/contracts/capabilities/deployment.interface.ts` with two OPTIONAL methods:
-   ```ts
-   /** Workflow filenames to try in order when dispatching a deploy. Defaults to ['deploy_prod.yaml']. */
-   getWorkflowFilenames?(): string[];
-   /** Extra GitHub Actions secrets to push to the website repo before dispatch.
-    *  Keys are secret names (uppercase), values are the secret values. Called server-side only. */
-   getDeploymentSecrets?(settings: Record<string, unknown>): Promise<Record<string, string>>;
-   ```
-   Both are optional — every existing plugin (Vercel) keeps working with no change.
+
+    ```ts
+    /** Workflow filenames to try in order when dispatching a deploy. Defaults to ['deploy_prod.yaml']. */
+    getWorkflowFilenames?(): string[];
+    /** Extra GitHub Actions secrets to push to the website repo before dispatch.
+     *  Keys are secret names (uppercase), values are the secret values. Called server-side only. */
+    getDeploymentSecrets?(settings: Record<string, unknown>): Promise<Record<string, string>>;
+    ```
+
+    Both are optional — every existing plugin (Vercel) keeps working with no change.
 
 2. **Update `DeployService.dispatchWithRetry`** in `apps/api/src/plugins-capabilities/deploy/deploy.service.ts:248` to:
-   - Replace the hardcoded `['deploy_vercel.yaml', 'deploy_prod.yaml']` with `plugin.getWorkflowFilenames?.() ?? ['deploy_prod.yaml']`.
-   - In `setRequiredSecrets` (line 204), after the existing block, call `plugin.getDeploymentSecrets?.(settings)` and push each entry through `setSecret`.
+    - Replace the hardcoded `['deploy_vercel.yaml', 'deploy_prod.yaml']` with `plugin.getWorkflowFilenames?.() ?? ['deploy_prod.yaml']`.
+    - In `setRequiredSecrets` (line 204), after the existing block, call `plugin.getDeploymentSecrets?.(settings)` and push each entry through `setSecret`.
 
 For Vercel, `getWorkflowFilenames()` returns `['deploy_vercel.yaml', 'deploy_prod.yaml']` (preserves today's behaviour). For Kubernetes, it returns `['deploy_k8s.yaml']` and `getDeploymentSecrets` returns the registry-kind-conditional secrets (`REGISTRY_USERNAME`/`REGISTRY_PASSWORD`/`REGISTRY_SERVER`, `K8S_NAMESPACE`, `K8S_INGRESS_CLASS`, etc.). The kubeconfig itself flows through the existing `<PROVIDER>_TOKEN` pattern — `setRequiredSecrets` already pushes `K8S_TOKEN = <kubeconfig YAML>` because of `setSecret(ctx, '\${provider.toUpperCase()}_TOKEN', deployToken)` (line 217).
 
@@ -380,8 +383,8 @@ When `registry.kind = 'github'`, the k8s plugin reads the user's GitHub identity
 
 1. Resolve the default `owner` (their GitHub login or selected org).
 2. Resolve the **effective image visibility** when the user leaves `visibility = 'auto'`:
-   - Call the existing GitHub plugin method `getRepository(owner, repo, token)` (defined in [`packages/plugins/github/src/github.plugin.ts:116`](../../../../packages/plugins/github/src/github.plugin.ts) and returning `{ isPrivate: boolean, ... }`).
-   - `isPrivate === false` → public image (no pull secret); `isPrivate === true` → private image (pull secret).
+    - Call the existing GitHub plugin method `getRepository(owner, repo, token)` (defined in [`packages/plugins/github/src/github.plugin.ts:116`](../../../../packages/plugins/github/src/github.plugin.ts) and returning `{ isPrivate: boolean, ... }`).
+    - `isPrivate === false` → public image (no pull secret); `isPrivate === true` → private image (pull secret).
 3. **Only when a private image is needed**, mint or reuse a token scoped for `read:packages` to populate the cluster `imagePullSecret`. Public images need no pull secret at all, so this step is skipped — closing FR-21.
 
 The interaction goes through `PluginContext.getService('github')` (existing pattern) — the k8s plugin does NOT import `@ever-works/github-plugin` directly. If the GitHub plugin is not loaded or not authenticated, `validateConnection` returns `success: false` with a "connect GitHub first" message and a `setupLink` to the GitHub plugin (FR-14).
@@ -402,8 +405,8 @@ Single change in `packages/agent/src/works-config/services/works-config.service.
 
 ```ts
 export interface WorksConfig {
-  // … existing fields …
-  deployProvider?: string;            // new
+	// … existing fields …
+	deployProvider?: string; // new
 }
 ```
 
@@ -413,15 +416,15 @@ This is provider-agnostic — Vercel benefits from it on day one too (FR-19).
 
 ### Vercel parity check
 
-| Method | Vercel | Kubernetes |
-| ------ | ------ | ---------- |
-| `validateToken` | `getAuthUser()` | `getServerVersion()` |
-| `getTeams` | Vercel teams API | returns `[]` (no concept) |
-| `listProjects` | Vercel projects API | namespaces filtered by label `ever-works.io/managed=true` |
-| `lookupExistingDeployment` | search projects by name | find `Deployment` by label `ever-works.io/work-id=<id>` |
-| `getDeploymentStatus` | poll Vercel | read Deployment rollout status |
-| `addDomain` | Vercel domains API | patch Ingress hosts |
-| `verifyDomain` | Vercel DNS verification | resolve CNAME/A; check it points to Ingress LB |
+| Method                     | Vercel                  | Kubernetes                                                |
+| -------------------------- | ----------------------- | --------------------------------------------------------- |
+| `validateToken`            | `getAuthUser()`         | `getServerVersion()`                                      |
+| `getTeams`                 | Vercel teams API        | returns `[]` (no concept)                                 |
+| `listProjects`             | Vercel projects API     | namespaces filtered by label `ever-works.io/managed=true` |
+| `lookupExistingDeployment` | search projects by name | find `Deployment` by label `ever-works.io/work-id=<id>`   |
+| `getDeploymentStatus`      | poll Vercel             | read Deployment rollout status                            |
+| `addDomain`                | Vercel domains API      | patch Ingress hosts                                       |
+| `verifyDomain`             | Vercel DNS verification | resolve CNAME/A; check it points to Ingress LB            |
 
 ### Vercel-side changes shipping in this feature
 
@@ -437,6 +440,7 @@ Two small Vercel changes ride along, both of them parity work:
 **No code changes** — the existing `apps/web/src/app/[locale]/(dashboard)/settings/plugins/[category]/page.tsx` is data-driven by `category` and renders any plugin with `category = 'deployment'`. The plugin's `settingsSchema` with `x-widget: 'textarea'` produces the kubeconfig text area automatically.
 
 **Optional polish** (not required for v1):
+
 - Custom UI hint `uiHints.helpLinks: [{ url: 'https://kubernetes.io/docs/tasks/access-application-cluster/configure-access-multiple-clusters/', label: 'How to get a kubeconfig' }]`.
 - A "Test connection" button calling `POST /api/plugins/k8s/validate-connection` that streams the server version back.
 - Rendering the "Connected to cluster X" details on the card after successful validation.
@@ -455,8 +459,8 @@ No new MCP tools.
 
 **No new Trigger.dev tasks.** Status polling reuses `DeploymentVerifierService`, which already calls `plugin.getDeploymentStatus()` via the facade.
 
-| Trigger | When | What it does | Idempotency |
-| ------- | ---- | ------------ | ----------- |
+| Trigger                      | When                                       | What it does                                                        | Idempotency               |
+| ---------------------------- | ------------------------------------------ | ------------------------------------------------------------------- | ------------------------- |
 | existing `deployment-verify` | every 30 s after deploy starts, max 30 min | Calls `KubernetesPlugin.getDeploymentStatus()` to map rollout state | Status query is read-only |
 
 ## 8. Security & Permissions
@@ -464,24 +468,24 @@ No new MCP tools.
 - **Endpoints**: same auth/permission rules as Vercel. No new `@Public()` endpoints.
 - **Settings access**: `kubeconfig`, `imageRegistryPassword` are `x-secret: true`, `x-scope: 'user'` — never returned by `GET /api/plugins/k8s/settings`.
 - **Error scrubbing**: `errors.ts` exports `scrubError(e)` that removes:
-  - The kubeconfig YAML string entirely (matched by `apiVersion: v1\nkind: Config`).
-  - Any `Authorization: Bearer …` headers.
-  - Client-cert PEM blocks (`-----BEGIN CERTIFICATE-----` … `-----END CERTIFICATE-----`).
-  - Registry password substrings.
+    - The kubeconfig YAML string entirely (matched by `apiVersion: v1\nkind: Config`).
+    - Any `Authorization: Bearer …` headers.
+    - Client-cert PEM blocks (`-----BEGIN CERTIFICATE-----` … `-----END CERTIFICATE-----`).
+    - Registry password substrings.
 - **Workflow runner**: when the GitHub Actions workflow uses the kubeconfig, it writes it via `mktemp -d` and deletes the directory in a `finally`-equivalent step. Never `echo $KUBECONFIG`.
 - **Activity log**: events carry only `{ workId, namespace, clusterFingerprint }`. Cluster fingerprint is `sha256(server URL + CA fingerprint)[:16]` — non-reversible cluster identity.
 - **Image registry**: passwords pushed to user's GitHub repo as encrypted Actions secrets (existing `setRequiredSecrets` mechanism).
 
 ## 9. Observability
 
-| Event | When | Fields |
-| ----- | ---- | ------ |
-| `deployment_started` | Plugin's `deploy()` enters | `provider=k8s, workId, namespace, clusterFingerprint, imageTag` |
-| `deployment_image_pushed` | After image push step | `imageTag, registry` |
-| `deployment_applied` | After SSA apply | `manifests=[deployment,service,ingress?]` |
-| `deployment_succeeded` | Rollout reaches `available` | `durationMs, url` |
-| `deployment_failed` | Rollout fails or any step errors | `step, error (scrubbed)` |
-| `domain_added/verified/removed` | per `custom-domains` spec | already wired |
+| Event                           | When                             | Fields                                                          |
+| ------------------------------- | -------------------------------- | --------------------------------------------------------------- |
+| `deployment_started`            | Plugin's `deploy()` enters       | `provider=k8s, workId, namespace, clusterFingerprint, imageTag` |
+| `deployment_image_pushed`       | After image push step            | `imageTag, registry`                                            |
+| `deployment_applied`            | After SSA apply                  | `manifests=[deployment,service,ingress?]`                       |
+| `deployment_succeeded`          | Rollout reaches `available`      | `durationMs, url`                                               |
+| `deployment_failed`             | Rollout fails or any step errors | `step, error (scrubbed)`                                        |
+| `domain_added/verified/removed` | per `custom-domains` spec        | already wired                                                   |
 
 Sentry tags: `provider:k8s`, `clusterId:<fingerprint>`, `step:<image-build|push|apply|rollout|domain>`. No metric dashboards required for v1; rollout failures already raise Sentry events.
 
@@ -498,17 +502,17 @@ Phases 1–4 ship behind `visibility: 'hidden'` so we can land them gradually wi
 
 ## 11. Risks & Mitigations
 
-| Risk | Likelihood | Impact | Mitigation |
-| ---- | ---------- | ------ | ---------- |
-| Kubeconfig with `exec` plugin (e.g. `aws-iam-authenticator`) won't work in headless workflow runners | Medium | High | Detect `users[].user.exec` at parse time; warn in `validateConnection`; document static-token alternative. |
-| Cluster behind private VPN; workflow runner can't reach API | High for self-hosted clusters | High | Document tailscale/wireguard sidecar pattern; offer optional self-hosted GitHub Actions runner instructions. |
-| Image registry rate limits during heavy deploys | Low | Medium | Use deterministic tag → cache hits; document Docker Hub auth for private pulls. |
-| Server-side apply field-manager conflicts when users hand-edit Deployments | Medium | Low | Document our field manager; surface SSA conflict errors verbatim; users can `kubectl apply --force-conflicts` to take ownership back. |
-| Kubeconfig leaks in logs from a future maintainer | Medium | Critical | `errors.ts` scrubber + a Vitest test that asserts every code path runs through it. |
-| Rolling update gets stuck because new pod doesn't pass readiness probe | Medium | Medium | Map "progressing for > N minutes" to `error` with a specific message; don't hang the deploy facade indefinitely. |
-| GHCR default surprises users who don't want public images | Low | Medium | Default `visibility: 'private'` and surface the resulting image URL in the UI before first deploy. |
-| Ingress detection misses a vendor controller (e.g. AWS Load Balancer Controller) | Medium | Low | Generic strategy still produces a working Ingress; document how to add a strategy in `packages/plugins/k8s/src/ingress/README.md`. |
-| works-config and dashboard disagree on `deployProvider` | Medium | Medium | Source-of-truth = data repo (Principle III); log a conflict event so users can spot drift. |
+| Risk                                                                                                 | Likelihood                    | Impact   | Mitigation                                                                                                                            |
+| ---------------------------------------------------------------------------------------------------- | ----------------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| Kubeconfig with `exec` plugin (e.g. `aws-iam-authenticator`) won't work in headless workflow runners | Medium                        | High     | Detect `users[].user.exec` at parse time; warn in `validateConnection`; document static-token alternative.                            |
+| Cluster behind private VPN; workflow runner can't reach API                                          | High for self-hosted clusters | High     | Document tailscale/wireguard sidecar pattern; offer optional self-hosted GitHub Actions runner instructions.                          |
+| Image registry rate limits during heavy deploys                                                      | Low                           | Medium   | Use deterministic tag → cache hits; document Docker Hub auth for private pulls.                                                       |
+| Server-side apply field-manager conflicts when users hand-edit Deployments                           | Medium                        | Low      | Document our field manager; surface SSA conflict errors verbatim; users can `kubectl apply --force-conflicts` to take ownership back. |
+| Kubeconfig leaks in logs from a future maintainer                                                    | Medium                        | Critical | `errors.ts` scrubber + a Vitest test that asserts every code path runs through it.                                                    |
+| Rolling update gets stuck because new pod doesn't pass readiness probe                               | Medium                        | Medium   | Map "progressing for > N minutes" to `error` with a specific message; don't hang the deploy facade indefinitely.                      |
+| GHCR default surprises users who don't want public images                                            | Low                           | Medium   | Default `visibility: 'private'` and surface the resulting image URL in the UI before first deploy.                                    |
+| Ingress detection misses a vendor controller (e.g. AWS Load Balancer Controller)                     | Medium                        | Low      | Generic strategy still produces a working Ingress; document how to add a strategy in `packages/plugins/k8s/src/ingress/README.md`.    |
+| works-config and dashboard disagree on `deployProvider`                                              | Medium                        | Medium   | Source-of-truth = data repo (Principle III); log a conflict event so users can spot drift.                                            |
 
 ## 12. Constitution Reconciliation
 

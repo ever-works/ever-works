@@ -4,15 +4,15 @@ Urlbox screenshot plugin for Ever Works - capture website screenshots using the 
 
 ## Plugin metadata
 
-| Field         | Value                                                  |
-| ------------- | ------------------------------------------------------ |
-| ID            | `urlbox`                                               |
-| Category      | `screenshot`                                           |
-| Capabilities  | `screenshot`                                           |
-| Author        | Ever Works Team                                        |
-| License       | MIT                                                    |
-| Built-in      | no                                                     |
-| Auto-enable   | no                                                     |
+| Field        | Value           |
+| ------------ | --------------- |
+| ID           | `urlbox`        |
+| Category     | `screenshot`    |
+| Capabilities | `screenshot`    |
+| Author       | Ever Works Team |
+| License      | MIT             |
+| Built-in     | no              |
+| Auto-enable  | no              |
 
 ## What does Urlbox do?
 

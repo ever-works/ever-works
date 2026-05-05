@@ -4,15 +4,15 @@ SerpAPI Plugin - Web search using SerpAPI (Google, Bing, Yahoo, and more)
 
 ## Plugin metadata
 
-| Field         | Value                                                  |
-| ------------- | ------------------------------------------------------ |
-| ID            | `serpapi`                                              |
-| Category      | `search`                                               |
-| Capabilities  | `search`                                               |
-| Author        | Ever Works Team                                        |
-| License       | MIT                                                    |
-| Built-in      | yes                                                    |
-| Auto-enable   | no                                                     |
+| Field        | Value           |
+| ------------ | --------------- |
+| ID           | `serpapi`       |
+| Category     | `search`        |
+| Capabilities | `search`        |
+| Author       | Ever Works Team |
+| License      | MIT             |
+| Built-in     | yes             |
+| Auto-enable  | no              |
 
 ## What does SerpAPI do?
 
