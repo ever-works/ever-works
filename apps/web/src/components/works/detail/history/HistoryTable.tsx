@@ -208,20 +208,21 @@ function GenerationInfoButton({
         <Popover as="span" className="inline-flex">
             <PopoverButton
                 type="button"
-                className="inline-flex h-5 w-5 items-center justify-center rounded-full text-text-muted transition-colors hover:bg-muted/70 hover:text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 dark:text-text-muted-dark dark:hover:bg-muted/20 dark:hover:text-text-dark"
+                className="inline-flex h-5 w-5 items-center justify-center rounded-md text-text-muted transition-colors hover:bg-surface-secondary hover:text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 dark:text-text-muted-dark dark:hover:bg-surface-secondary-dark dark:hover:text-text-dark"
                 aria-label={t('generationInfo.label')}
             >
                 <Info className="h-3.5 w-3.5" />
             </PopoverButton>
             <PopoverPanel
+                transition
                 portal
-                anchor="bottom start"
-                className="z-[100] w-72 rounded-md border border-border bg-card p-3 text-left shadow-xl ring-1 ring-black/5 [--anchor-gap:8px] dark:border-border-dark dark:bg-card-dark dark:ring-white/10"
+                anchor={{ to: 'bottom start', gap: 8, padding: 12 }}
+                className="z-50 w-72 overflow-hidden rounded-lg border border-border bg-surface text-left shadow-lg transition duration-100 ease-out focus:outline-none data-[closed]:scale-95 data-[closed]:opacity-0 data-[leave]:duration-75 data-[leave]:ease-in dark:border-border-dark dark:bg-surface-dark"
             >
-                <span className="mb-2 block text-[11px] font-semibold uppercase text-text-muted dark:text-text-muted-dark">
+                <span className="block border-b border-border px-3 py-2 text-xs font-semibold text-text dark:border-border-dark dark:text-text-dark">
                     {t('generationInfo.label')}
                 </span>
-                <span className="grid gap-1.5">
+                <span className="grid gap-1.5 p-3">
                     {rows.map((row) => (
                         <span
                             key={row.label}
