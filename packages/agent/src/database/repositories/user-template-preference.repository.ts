@@ -38,4 +38,12 @@ export class UserTemplatePreferenceRepository {
             }),
         );
     }
+
+    async deleteByUserKindAndTemplateId(
+        userId: string,
+        kind: TemplateKind,
+        templateId: string,
+    ): Promise<void> {
+        await this.repository.delete({ userId, kind, templateId });
+    }
 }

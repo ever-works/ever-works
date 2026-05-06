@@ -1,7 +1,8 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { TemplateRepository } from '@src/database/repositories/template.repository';
 import { UserTemplatePreferenceRepository } from '@src/database/repositories/user-template-preference.repository';
 import {
+    findWebsiteTemplateConfig,
     getDefaultWebsiteTemplateId,
     getWebsiteTemplateConfig as getStaticWebsiteTemplateConfig,
     type WebsiteTemplateConfig,
@@ -10,6 +11,8 @@ import type { Work } from '@src/entities/work.entity';
 
 @Injectable()
 export class WebsiteTemplateResolverService {
+    private readonly logger = new Logger(WebsiteTemplateResolverService.name);
+
     constructor(
         private readonly templateRepository: TemplateRepository,
         private readonly userTemplatePreferenceRepository: UserTemplatePreferenceRepository,
@@ -40,12 +43,24 @@ export class WebsiteTemplateResolverService {
     }
 
     async resolve(templateId?: string | null): Promise<WebsiteTemplateConfig> {
+        if (!templateId) {
+            return getStaticWebsiteTemplateConfig(templateId);
+        }
+
         const catalogTemplate = await this.findCatalogTemplateConfig(templateId);
         if (catalogTemplate) {
             return catalogTemplate;
         }
 
-        return getStaticWebsiteTemplateConfig(templateId);
+        const staticTemplate = findWebsiteTemplateConfig(templateId);
+        if (staticTemplate) {
+            return staticTemplate;
+        }
+
+        this.logger.error(
+            `Website template "${templateId}" is unavailable or inactive and cannot be resolved`,
+        );
+        throw new Error(`Website template "${templateId}" is unavailable or inactive.`);
     }
 
     async resolveForWork(

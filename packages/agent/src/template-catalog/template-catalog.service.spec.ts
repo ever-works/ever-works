@@ -24,6 +24,7 @@ describe('TemplateCatalogService', () => {
         userTemplatePreferenceRepository = {
             findByUserAndKind: jest.fn(),
             upsertDefault: jest.fn(),
+            deleteByUserKindAndTemplateId: jest.fn(),
         };
         workRepository = {
             countByUserAndWebsiteTemplateId: jest.fn(),
@@ -263,6 +264,11 @@ describe('TemplateCatalogService', () => {
         expect(templateRepository.updateById).toHaveBeenCalledWith('custom-1', {
             isActive: false,
         });
+        expect(userTemplatePreferenceRepository.deleteByUserKindAndTemplateId).toHaveBeenCalledWith(
+            'user-1',
+            'website',
+            'custom-1',
+        );
         expect(result).toEqual({
             templateId: 'custom-1',
             archived: true,

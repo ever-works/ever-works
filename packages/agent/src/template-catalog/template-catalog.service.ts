@@ -319,6 +319,12 @@ export class TemplateCatalogService implements OnModuleInit {
 
         await this.templateRepository.updateById(template.id, { isActive: false });
 
+        await this.userTemplatePreferenceRepository.deleteByUserKindAndTemplateId(
+            userId,
+            input.kind,
+            template.id,
+        );
+
         return {
             templateId: template.id,
             archived: true,
