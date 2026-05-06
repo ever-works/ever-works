@@ -75,6 +75,8 @@ const EMPTY_FORM: AddTemplateFormState = {
     branch: '',
 };
 
+const FRAMEWORK_OPTIONS = ['Next.js', 'Astro'] as const;
+
 function compareTemplates(a: TemplateCatalogItem, b: TemplateCatalogItem) {
     if (a.sourceType !== b.sourceType) {
         return a.sourceType === 'custom' ? -1 : 1;
@@ -705,17 +707,29 @@ export function TemplatesCatalog({
                                     }))
                                 }
                             />
-                            <Input
-                                label={t('dialog.frameworkLabel')}
-                                placeholder={t('dialog.frameworkPlaceholder')}
-                                value={formState.framework}
-                                onChange={(event) =>
-                                    setFormState((current) => ({
-                                        ...current,
-                                        framework: event.target.value,
-                                    }))
-                                }
-                            />
+                            <div className="space-y-2">
+                                <label className="block text-sm font-medium text-text dark:text-text-dark">
+                                    {t('dialog.frameworkLabel')}
+                                </label>
+                                <Select
+                                    value={formState.framework}
+                                    onValueChange={(value) =>
+                                        setFormState((current) => ({
+                                            ...current,
+                                            framework: value,
+                                        }))
+                                    }
+                                    placeholder={t('dialog.frameworkSelectPlaceholder')}
+                                    className="w-full"
+                                >
+                                    <option value="">{t('dialog.frameworkUnspecified')}</option>
+                                    {FRAMEWORK_OPTIONS.map((framework) => (
+                                        <option key={framework} value={framework}>
+                                            {framework}
+                                        </option>
+                                    ))}
+                                </Select>
+                            </div>
                         </div>
 
                         <Input
