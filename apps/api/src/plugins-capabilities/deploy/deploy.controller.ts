@@ -50,8 +50,8 @@ export class DeployController {
         description: 'Get list of available deployment providers',
     })
     @ApiResponse({ status: 200, description: 'List of providers' })
-    async listProviders() {
-        const providers = this.deployFacade.getAvailableProviders();
+    async listProviders(@CurrentUser() auth: AuthenticatedUser) {
+        const providers = await this.deployFacade.getAvailableProvidersForUser(auth.userId);
         return {
             status: 'success',
             providers,
@@ -94,12 +94,16 @@ export class DeployController {
             };
         }
 
+        const configured = await this.deployFacade.isProviderConfigured(providerId, auth.userId);
+
         return {
             status: 'success',
-            configured: true,
+            configured,
             available: true,
             enabled: true,
-            message: `Provider '${providerId}' is available. Token validation will occur during deployment.`,
+            message: configured
+                ? `Provider '${providerId}' is configured.`
+                : `Provider '${providerId}' is available but not configured.`,
         };
     }
 
@@ -158,14 +162,19 @@ export class DeployController {
             { teamScope: deployDto.teamScope },
         );
 
-        if (deploymentInitiated) {
-            // Start verification
-            this.deploymentVerifier.startVerification(
-                work,
-                isCreator ? auth.userId : work.user.id,
-                deployDto.teamScope,
-            );
+        if (!deploymentInitiated) {
+            throw new BadRequestException({
+                status: 'error',
+                message: `Failed to initiate ${providerName} deployment. Check that the repository has the provider workflow configured.`,
+            });
         }
+
+        // Start verification after the workflow dispatch has actually succeeded.
+        this.deploymentVerifier.startVerification(
+            work,
+            isCreator ? auth.userId : work.user.id,
+            deployDto.teamScope,
+        );
 
         this.activityLogService
             .log({
@@ -197,8 +206,8 @@ export class DeployController {
     })
     @ApiResponse({ status: 200, description: 'Token validation result' })
     async validateToken(@CurrentUser() auth: AuthenticatedUser) {
-        const providers = this.deployFacade.getAvailableProviders();
-        const enabledProvider = providers.find((p) => p.enabled);
+        const providers = await this.deployFacade.getAvailableProvidersForUser(auth.userId);
+        const enabledProvider = providers.find((p) => p.enabled && p.configured);
 
         return {
             status: 'success',

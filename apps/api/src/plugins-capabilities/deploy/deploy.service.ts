@@ -374,10 +374,8 @@ export class DeployService {
                 return true;
             }
 
-            this.logger.log(
-                `Manual dispatch failed, but push to main completed for ${owner}/${repo}`,
-            );
-            return true;
+            this.logger.warn(`Workflow dispatch still failed after updating ${owner}/${repo}`);
+            return false;
         } catch (error) {
             this.logger.error(`Failed to update repository for ${owner}/${repo}: ${error.message}`);
             return false;

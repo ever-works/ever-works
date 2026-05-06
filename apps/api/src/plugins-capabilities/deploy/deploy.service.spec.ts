@@ -129,7 +129,7 @@ describe('DeployService — plugin-driven dispatch + secrets', () => {
             },
         });
 
-        await service.deploy('work-1', 'user-1', {});
+        const result = await service.deploy('work-1', 'user-1', {});
 
         const { dispatches } = captureCalls(githubPlugin);
         const workflows = dispatches.map((d: any) => d.workflow);
@@ -141,7 +141,7 @@ describe('DeployService — plugin-driven dispatch + secrets', () => {
             plugin: { id: 'legacy' },
         });
 
-        await service.deploy('work-1', 'user-1', {});
+        const result = await service.deploy('work-1', 'user-1', {});
 
         const { dispatches } = captureCalls(githubPlugin);
         expect(dispatches.map((d: any) => d.workflow)).toEqual(['deploy_prod.yaml']);
@@ -275,19 +275,13 @@ describe('DeployService — plugin-driven dispatch + secrets', () => {
         // resolves so the service's catch path runs cleanly.)
         githubPlugin.dispatchWorkflow.mockRejectedValue(new Error('dispatch failed'));
 
-        await service.deploy('work-1', 'user-1', {});
+        const result = await service.deploy('work-1', 'user-1', {});
 
-        // dispatchWithRetry's retry path returns true after the
-        // updateRepository fallback even when no dispatch ever lands;
-        // assert the event is NOT emitted only when the ultimate result
-        // is falsy. Skip if behaviour returns true — captured here as
-        // documentation that the path is best-effort.
         const emitted = eventEmitter.emit.mock.calls.find(
             (c: any[]) => c[0] === 'deployment.dispatched',
         );
-        // Either way, the test verifies emit is gated on the boolean
-        // result, not on getDeploymentSecrets:
-        expect(emitted === undefined || emitted[1].payload.providerId === 'k8s').toBe(true);
+        expect(result).toBe(false);
+        expect(emitted).toBeUndefined();
     });
 
     it('logs but does not fail the deploy if getDeploymentSecrets throws', async () => {

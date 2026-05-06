@@ -30,7 +30,7 @@
 		"test:e2e": "vitest run --config vitest.e2e.config.ts --passWithNoTests"
 	},
 	"dependencies": {
-		"@kubernetes/client-node": "^1.0.0",
+		"@kubernetes/client-node": "^1.4.0",
 		"js-yaml": "^4.1.0"
 	},
 	"peerDependencies": {

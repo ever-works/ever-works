@@ -474,10 +474,12 @@ export class KubernetesPlugin implements IPlugin, IDeploymentPlugin {
 		try {
 			const deployment = await this.api.getDeployment(kubeconfig, namespace, slug, settings.kubeContext);
 			if (!deployment) return { found: false };
+			const projectId = makeDeploymentId(namespace, slug);
 			return {
 				found: true,
-				projectId: makeDeploymentId(namespace, slug),
-				deploymentState: mapDeploymentToStatus(deployment)
+				projectId,
+				website: await this.resolveWebsiteUrl(kubeconfig, namespace, slug, settings),
+				deploymentState: toVerifierDeploymentState(mapDeploymentToStatus(deployment))
 			};
 		} catch {
 			return { found: false };
@@ -666,6 +668,22 @@ export class KubernetesPlugin implements IPlugin, IDeploymentPlugin {
 		return Array.from(hosts);
 	}
 
+	private async resolveWebsiteUrl(
+		kubeconfig: string,
+		namespace: string,
+		name: string,
+		settings: KubernetesSettings
+	): Promise<string | undefined> {
+		try {
+			const ingress = await this.api.readIngress(kubeconfig, namespace, name, settings.kubeContext);
+			const rules = (ingress?.spec as { rules?: Array<{ host?: string }> } | undefined)?.rules ?? [];
+			const host = rules.find((rule) => typeof rule.host === 'string' && rule.host.trim().length > 0)?.host;
+			return host ? `https://${host}` : undefined;
+		} catch {
+			return undefined;
+		}
+	}
+
 	private async controllerForClassName(
 		kubeconfig: string,
 		contextOverride: string | undefined,
@@ -741,6 +759,24 @@ function sanitiseSlug(input: string): string {
 function clampReplicas(input: number | undefined): number {
 	if (typeof input !== 'number' || !Number.isFinite(input)) return DEFAULT_REPLICAS;
 	return Math.min(10, Math.max(1, Math.floor(input)));
+}
+
+function toVerifierDeploymentState(status: DeploymentResult['status']): string {
+	switch (status) {
+		case 'ready':
+			return 'READY';
+		case 'error':
+			return 'ERROR';
+		case 'cancelled':
+			return 'CANCELED';
+		case 'building':
+			return 'BUILDING';
+		case 'deploying':
+			return 'BUILDING';
+		case 'pending':
+		default:
+			return 'INITIALIZING';
+	}
 }
 
 export type { IngressClassDescriptor };
