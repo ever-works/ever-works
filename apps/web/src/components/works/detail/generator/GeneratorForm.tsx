@@ -319,7 +319,7 @@ export function GeneratorForm({
 
             setTemplateSwitchModeEnabled(false);
             toast.success(
-                templateSwitch.data.message ||
+                templateSwitch.data?.message ||
                     'Template changed. Start generation again to continue with the new template.',
             );
             router.refresh();

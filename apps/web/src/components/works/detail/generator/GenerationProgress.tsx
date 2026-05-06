@@ -217,8 +217,8 @@ export function GenerationProgress({ work }: GenerationProgressProps) {
                         </button>
 
                         <CancelGenerationButton
+                            key={`${currentWork.id}-${isGenerating ? 'generating' : 'idle'}`}
                             workId={currentWork.id}
-                            isGenerationActive={isGenerating}
                             labels={{
                                 stop: t('stop'),
                                 stopping: t('stopping'),

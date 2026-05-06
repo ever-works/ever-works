@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useTransition } from 'react';
+import { useEffect, useRef, useState, useTransition } from 'react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { cancelGeneration } from '@/app/actions/dashboard/generator';
@@ -15,7 +15,6 @@ type CancelGenerationButtonLabels = {
 interface CancelGenerationButtonProps {
     workId: string;
     labels: CancelGenerationButtonLabels;
-    isGenerationActive?: boolean;
     onCancelled?: () => void;
     onAlreadyFinished?: () => void;
     className?: string;
@@ -24,35 +23,21 @@ interface CancelGenerationButtonProps {
 export function CancelGenerationButton({
     workId,
     labels,
-    isGenerationActive,
     onCancelled,
     onAlreadyFinished,
     className,
 }: CancelGenerationButtonProps) {
     const [isPending, startTransition] = useTransition();
     const [stopRequested, setStopRequested] = useState(false);
+    const resetTimerRef = useRef<number | null>(null);
 
     useEffect(() => {
-        setStopRequested(false);
-    }, [workId]);
-
-    useEffect(() => {
-        if (isGenerationActive === false) {
-            setStopRequested(false);
-        }
-    }, [isGenerationActive]);
-
-    useEffect(() => {
-        if (!stopRequested) {
-            return;
-        }
-
-        const timer = window.setTimeout(() => {
-            setStopRequested(false);
-        }, 10000);
-
-        return () => window.clearTimeout(timer);
-    }, [stopRequested]);
+        return () => {
+            if (resetTimerRef.current !== null) {
+                window.clearTimeout(resetTimerRef.current);
+            }
+        };
+    }, []);
 
     const handleClick = () => {
         if (stopRequested) {
@@ -74,6 +59,13 @@ export function CancelGenerationButton({
             }
 
             setStopRequested(true);
+            if (resetTimerRef.current !== null) {
+                window.clearTimeout(resetTimerRef.current);
+            }
+            resetTimerRef.current = window.setTimeout(() => {
+                setStopRequested(false);
+                resetTimerRef.current = null;
+            }, 10000);
             toast.success(result.message || labels.stopRequested);
             onCancelled?.();
         });
