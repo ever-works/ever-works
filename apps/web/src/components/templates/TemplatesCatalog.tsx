@@ -17,7 +17,7 @@ import {
     Trash2,
     Star,
 } from 'lucide-react';
-import type { TemplateCatalogItem, TemplateKind, TemplateOriginType } from '@/lib/api/templates';
+import type { TemplateCatalogItem, TemplateKind } from '@/lib/api/templates';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
@@ -83,17 +83,6 @@ function compareTemplates(a: TemplateCatalogItem, b: TemplateCatalogItem) {
     return a.name.localeCompare(b.name);
 }
 
-function originLabelKey(originType: TemplateOriginType) {
-    switch (originType) {
-        case 'standard':
-            return 'card.standard';
-        case 'forked':
-            return 'card.forked';
-        case 'custom_url':
-            return 'card.customUrl';
-    }
-}
-
 function getTemplatePreviewUrl(template: TemplateCatalogItem): string | null {
     if (template.previewImageUrl) {
         return template.previewImageUrl;
@@ -134,7 +123,6 @@ function TemplateCard({
     const t = useTranslations('dashboard.templates');
     const [previewFailed, setPreviewFailed] = useState(false);
     const previewUrl = previewFailed ? null : getTemplatePreviewUrl(template);
-    const originLabel = t(originLabelKey(template.originType));
 
     return (
         <article
@@ -147,7 +135,7 @@ function TemplateCard({
                 isDefault && 'border-primary/40 dark:border-primary/40',
             )}
         >
-            <div className="relative aspect-[16/9] bg-surface-secondary dark:bg-white/5 overflow-hidden">
+            <div className="relative aspect-[2.4/1] bg-surface-secondary dark:bg-white/5 overflow-hidden">
                 {previewUrl ? (
                     <Image
                         src={previewUrl}
@@ -161,7 +149,7 @@ function TemplateCard({
                     <div className="flex h-full w-full items-center justify-center">
                         <LayoutTemplate
                             strokeWidth={1}
-                            className="h-10 w-10 text-text-muted dark:text-text-muted-dark"
+                            className="h-8 w-8 text-text-muted dark:text-text-muted-dark"
                         />
                     </div>
                 )}
@@ -174,19 +162,21 @@ function TemplateCard({
             </div>
 
             <div className="flex flex-col flex-1 p-4">
-                <div className="flex items-start justify-between gap-3 mb-1">
+                <div className="flex items-start justify-between gap-2 mb-1.5">
                     <h3 className="text-sm font-semibold text-text dark:text-text-dark line-clamp-1">
                         {template.name}
                     </h3>
-                    <span className="shrink-0 text-[11px] text-text-muted dark:text-text-muted-dark">
-                        {originLabel}
-                    </span>
+                    {template.framework ? (
+                        <span className="shrink-0 inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-gray-100 text-gray-700 dark:bg-white/8 dark:text-gray-200">
+                            {template.framework}
+                        </span>
+                    ) : null}
                 </div>
 
                 {template.repositoryOwner && template.repositoryName ? (
-                    <div className="inline-flex items-center gap-1 mb-3 bg-primary-400/10 dark:bg-white/10 self-start max-w-full px-1.5 py-0.5 rounded-full">
+                    <div className="inline-flex items-center gap-1 mb-2 bg-primary-400/10 dark:bg-white/10 self-start max-w-full px-1.5 py-0.5 rounded-full">
                         <Github className="w-3 h-3 shrink-0 text-gray-600 dark:text-gray-200" />
-                        <span className="text-xs text-gray-600 dark:text-gray-200 truncate">
+                        <span className="text-[11px] text-gray-600 dark:text-gray-200 truncate">
                             <span className="text-gray-400 dark:text-gray-400">
                                 {template.repositoryOwner}/
                             </span>
@@ -195,7 +185,7 @@ function TemplateCard({
                     </div>
                 ) : null}
 
-                <p className="text-xs leading-4.5 line-clamp-2 min-h-[2lh] mb-4">
+                <p className="text-xs leading-4.5 line-clamp-2 mb-3">
                     {template.description ? (
                         <span className="text-text-secondary dark:text-text-secondary-dark">
                             {template.description}
@@ -207,40 +197,25 @@ function TemplateCard({
                     )}
                 </p>
 
-                <div className="flex flex-wrap items-center gap-1.5 mb-4">
-                    {template.framework ? (
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-normal bg-gray-100 text-gray-700 dark:bg-white/8 dark:text-gray-200">
-                            {template.framework}
-                        </span>
-                    ) : null}
-                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-normal bg-surface dark:bg-white/4 text-text-secondary dark:text-text-secondary-dark border border-border dark:border-border-dark">
-                        {t('card.branch', { branch: template.branch })}
-                    </span>
-                    {template.betaBranch ? (
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-normal bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300">
-                            {t('card.betaBranch', { branch: template.betaBranch })}
-                        </span>
-                    ) : null}
-                </div>
-
-                <div className="flex items-center justify-between gap-2 pt-4 border-t border-border dark:border-border-dark mt-auto">
+                <div className="flex items-center justify-between gap-2 pt-3 border-t border-border dark:border-border-dark mt-auto">
                     {template.repositoryUrl ? (
                         <a
                             href={template.repositoryUrl}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="inline-flex items-center gap-1.5 text-xs text-text-muted hover:text-text dark:text-text-muted-dark dark:hover:text-text-dark transition-colors"
+                            className="inline-flex items-center gap-1 text-[11px] text-text-muted hover:text-text dark:text-text-muted-dark dark:hover:text-text-dark transition-colors"
+                            title={t('card.openRepository')}
                         >
                             <ExternalLink className="h-3.5 w-3.5" />
-                            {t('card.openRepository')}
+                            <span className="truncate">{template.branch}</span>
                         </a>
                     ) : (
-                        <span className="text-xs text-text-muted dark:text-text-muted-dark">
-                            {t('card.catalogOnly')}
+                        <span className="text-[11px] text-text-muted dark:text-text-muted-dark">
+                            {template.branch}
                         </span>
                     )}
 
-                    <div className="flex items-center gap-1">
+                    <div className="flex items-center gap-1 shrink-0">
                         {template.sourceType === 'built_in' ? (
                             <Button
                                 variant="ghost"
@@ -248,7 +223,7 @@ function TemplateCard({
                                 loading={forkLoading}
                                 disabled={loading || forkLoading}
                                 onClick={() => onFork(template)}
-                                title={t('card.fork')}
+                                className="whitespace-nowrap"
                             >
                                 <GitFork className="h-3.5 w-3.5" />
                                 {t('card.fork')}
@@ -283,6 +258,7 @@ function TemplateCard({
                             loading={loading}
                             disabled={isDefault || loading}
                             onClick={() => onSetDefault(template.id)}
+                            className="whitespace-nowrap"
                         >
                             {isDefault ? t('card.defaultSelected') : t('card.makeDefault')}
                         </Button>
@@ -643,7 +619,7 @@ export function TemplatesCatalog({
                     }
                 />
             ) : (
-                <section className="grid grid-cols-1 gap-4 @3xl/main:grid-cols-2 @5xl/main:grid-cols-3">
+                <section className="grid grid-cols-1 gap-4 @lg/main:grid-cols-2 @4xl/main:grid-cols-3">
                     {filteredTemplates.map((template) => (
                         <TemplateCard
                             key={template.id}
