@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useTransition, useEffect, useCallback, useRef, useMemo } from 'react';
+import { useState, useTransition, useEffect, useCallback, useRef } from 'react';
 import {
     Work,
     CreateItemsGeneratorDto,
@@ -39,7 +39,6 @@ import { GenerationProgress } from './GenerationProgress';
 import type { WebsiteTemplateOption } from '@/lib/api/work';
 import type { WorkPlugin } from '@/lib/api/plugins';
 import { useWorkDetail } from '../WorkDetailContext';
-import { resolveEffectiveDefault } from '@ever-works/plugin';
 
 interface GeneratorFormProps {
     workId: string;
@@ -71,7 +70,6 @@ export function GeneratorForm({
     const [isLoadingSchema, setIsLoadingSchema] = useState(false);
     const fetchVersionRef = useRef(0);
     const lastFetchedPipelineRef = useRef<string | undefined>(undefined);
-    const previousAiProviderIdRef = useRef<string | null | undefined>(undefined);
 
     // Check if work has been generated before
     const isGenerated = !!config?.metadata;
@@ -205,33 +203,6 @@ export function GeneratorForm({
         ...work,
         generateStatus: optimisticGenerateStatus,
     };
-    const activeAiProvider = useMemo(() => {
-        const aiProviders = formSchema?.providers.ai ?? [];
-
-        if (providers.ai) {
-            return aiProviders.find((provider) => provider.id === providers.ai) ?? null;
-        }
-
-        return resolveEffectiveDefault(aiProviders) ?? null;
-    }, [formSchema, providers.ai]);
-
-    useEffect(() => {
-        const currentAiProviderId = activeAiProvider?.id ?? null;
-        const previousAiProviderId = previousAiProviderIdRef.current;
-
-        if (
-            previousAiProviderId !== undefined &&
-            previousAiProviderId !== null &&
-            previousAiProviderId !== currentAiProviderId
-        ) {
-            setCoreData((prev) => ({
-                ...prev,
-                model: undefined,
-            }));
-        }
-
-        previousAiProviderIdRef.current = currentAiProviderId;
-    }, [activeAiProvider?.id]);
 
     useEffect(() => {
         if (!startInProgressView) {
@@ -411,18 +382,13 @@ export function GeneratorForm({
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
-            <RequiredFields
-                formData={coreData}
-                onChange={handleCoreDataChange}
-                modelPluginId={activeAiProvider?.configured ? activeAiProvider.id : null}
-                modelDisabled={isPending || isLoadingSchema || !activeAiProvider?.configured}
-                modelHelperText={
-                    activeAiProvider?.configured
-                        ? t('modelOverrideHelperText')
-                        : t('modelOverrideUnavailable')
-                }
-            >
+            <RequiredFields formData={coreData} onChange={handleCoreDataChange}>
                 <WebsiteTemplateSelector
+                    key={
+                        templateSwitchModeEnabled
+                            ? 'template-selector-enabled'
+                            : 'template-selector-locked'
+                    }
                     templates={websiteTemplates}
                     value={selectedWebsiteTemplateId}
                     onChange={setSelectedWebsiteTemplateId}
