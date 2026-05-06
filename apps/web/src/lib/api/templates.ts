@@ -82,6 +82,7 @@ export const templatesAPI = {
         framework?: string;
         previewImageUrl?: string;
         branch?: string;
+        betaBranch?: string;
     }) => {
         return serverMutation<AddCustomTemplateResponse>({
             endpoint: '/templates/custom',
@@ -100,6 +101,7 @@ export const templatesAPI = {
             framework?: string;
             previewImageUrl?: string | null;
             branch?: string;
+            betaBranch?: string | null;
         },
     ) => {
         return serverMutation<UpdateCustomTemplateResponse>({

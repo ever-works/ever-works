@@ -216,6 +216,7 @@ export class TemplateCatalogService implements OnModuleInit {
             framework?: string;
             previewImageUrl?: string | null;
             branch?: string;
+            betaBranch?: string | null;
         },
         userId: string,
     ): Promise<TemplateCatalogItem> {
@@ -256,6 +257,10 @@ export class TemplateCatalogService implements OnModuleInit {
                     : input.previewImageUrl?.trim() || null,
             branch: resolvedBranch,
             syncBranches,
+            betaBranch:
+                input.betaBranch === undefined
+                    ? template.betaBranch
+                    : input.betaBranch?.trim() || null,
         });
 
         const defaultTemplateId = await this.getDefaultTemplateIdForUser(input.kind, userId);
@@ -391,6 +396,8 @@ export class TemplateCatalogService implements OnModuleInit {
             });
         }
 
+        const targetOrganizationLogin = isPersonalTarget ? undefined : organization!.login;
+
         const existingTemplate =
             await this.templateRepository.findOwnedCustomByRepositoryCoordinates(
                 input.kind,
@@ -429,7 +436,7 @@ export class TemplateCatalogService implements OnModuleInit {
             template.repositoryOwner,
             template.repositoryName,
             {
-                organization: isPersonalTarget ? undefined : organization?.login,
+                organization: targetOrganizationLogin,
             },
             { userId, providerId },
         );

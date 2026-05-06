@@ -3008,6 +3008,9 @@
                 "branchLabel": "Default branch",
                 "branchPlaceholder": "main",
                 "branchHelp": "Leave empty to default to main.",
+                "betaBranchLabel": "Beta branch",
+                "betaBranchPlaceholder": "beta",
+                "betaBranchHelp": "Optional. Branch used for beta deployments.",
                 "cancel": "Cancel",
                 "submit": "Save template",
                 "saveChanges": "Save changes"

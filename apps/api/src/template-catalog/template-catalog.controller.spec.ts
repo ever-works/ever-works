@@ -1,6 +1,21 @@
 jest.mock('@ever-works/agent/template-catalog', () => ({
     TemplateCatalogService: class TemplateCatalogService {},
 }));
+jest.mock('@ever-works/agent/activity-log', () => ({
+    ActivityLogService: class ActivityLogService {},
+}));
+jest.mock('@ever-works/agent/entities', () => ({
+    ActivityActionType: {
+        TEMPLATE_ADDED: 'template_added',
+        TEMPLATE_UPDATED: 'template_updated',
+        TEMPLATE_ARCHIVED: 'template_archived',
+        TEMPLATE_FORKED: 'template_forked',
+        TEMPLATE_DEFAULT_SET: 'template_default_set',
+    },
+    ActivityStatus: {
+        COMPLETED: 'completed',
+    },
+}));
 jest.mock('@src/auth', () => ({
     CurrentUser: () => () => {},
 }));
@@ -14,6 +29,7 @@ describe('TemplateCatalogController', () => {
         archiveCustomTemplateForUser: jest.Mock;
         refreshTemplatesForUser: jest.Mock;
     };
+    let activityLogService: { log: jest.Mock };
 
     beforeEach(() => {
         templateCatalogService = {
@@ -21,8 +37,14 @@ describe('TemplateCatalogController', () => {
             archiveCustomTemplateForUser: jest.fn(),
             refreshTemplatesForUser: jest.fn(),
         };
+        activityLogService = {
+            log: jest.fn().mockResolvedValue(undefined),
+        };
 
-        controller = new TemplateCatalogController(templateCatalogService as any);
+        controller = new TemplateCatalogController(
+            templateCatalogService as any,
+            activityLogService as any,
+        );
     });
 
     it('forwards custom template updates to the service', async () => {

@@ -21,6 +21,13 @@ export enum ActivityActionType {
     PLUGIN_DISABLED = 'plugin_disabled',
     PLUGIN_CONFIGURED = 'plugin_configured',
 
+    // Templates
+    TEMPLATE_ADDED = 'template_added',
+    TEMPLATE_UPDATED = 'template_updated',
+    TEMPLATE_ARCHIVED = 'template_archived',
+    TEMPLATE_FORKED = 'template_forked',
+    TEMPLATE_DEFAULT_SET = 'template_default_set',
+
     // Members
     MEMBER_INVITED = 'member_invited',
     MEMBER_ROLE_CHANGED = 'member_role_changed',

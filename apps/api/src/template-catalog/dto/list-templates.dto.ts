@@ -51,6 +51,11 @@ export class AddCustomTemplateDto {
     @IsOptional()
     @IsString()
     branch?: string;
+
+    @ApiProperty({ required: false })
+    @IsOptional()
+    @IsString()
+    betaBranch?: string;
 }
 
 export class SetDefaultTemplateDto {
@@ -97,6 +102,11 @@ export class UpdateCustomTemplateDto {
     @IsOptional()
     @IsString()
     branch?: string;
+
+    @ApiProperty({ required: false, nullable: true })
+    @IsOptional()
+    @IsString()
+    betaBranch?: string | null;
 }
 
 export class ArchiveCustomTemplateDto {

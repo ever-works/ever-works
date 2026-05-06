@@ -29,6 +29,7 @@ export async function addCustomTemplate(input: {
     framework?: string;
     previewImageUrl?: string;
     branch?: string;
+    betaBranch?: string;
 }) {
     const user = await getAuthFromCookie();
     if (!user) {
@@ -69,6 +70,7 @@ export async function updateCustomTemplate(
         framework?: string;
         previewImageUrl?: string | null;
         branch?: string;
+        betaBranch?: string | null;
     },
 ) {
     const user = await getAuthFromCookie();

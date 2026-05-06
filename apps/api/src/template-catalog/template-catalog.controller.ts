@@ -11,6 +11,8 @@ import {
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { TemplateCatalogService } from '@ever-works/agent/template-catalog';
+import { ActivityLogService } from '@ever-works/agent/activity-log';
+import { ActivityActionType, ActivityStatus } from '@ever-works/agent/entities';
 import { CurrentUser } from '@src/auth';
 import { AuthenticatedUser } from '@src/auth/types/auth.types';
 import {
@@ -27,7 +29,10 @@ import {
 @ApiBearerAuth('JWT-auth')
 @Controller('api')
 export class TemplateCatalogController {
-    constructor(private readonly templateCatalogService: TemplateCatalogService) {}
+    constructor(
+        private readonly templateCatalogService: TemplateCatalogService,
+        private readonly activityLogService: ActivityLogService,
+    ) {}
 
     @Get('templates')
     @HttpCode(HttpStatus.OK)
@@ -66,6 +71,17 @@ export class TemplateCatalogController {
     ) {
         const template = await this.templateCatalogService.addCustomTemplate(body, auth.userId);
 
+        this.activityLogService
+            .log({
+                userId: auth.userId,
+                actionType: ActivityActionType.TEMPLATE_ADDED,
+                action: 'template.added',
+                status: ActivityStatus.COMPLETED,
+                summary: `Added ${body.kind} template: ${template.name}`,
+                metadata: { templateId: template.id, kind: body.kind },
+            })
+            .catch(() => {});
+
         return {
             status: 'success',
             template,
@@ -91,6 +107,17 @@ export class TemplateCatalogController {
             },
             auth.userId,
         );
+
+        this.activityLogService
+            .log({
+                userId: auth.userId,
+                actionType: ActivityActionType.TEMPLATE_UPDATED,
+                action: 'template.updated',
+                status: ActivityStatus.COMPLETED,
+                summary: `Updated ${body.kind} template: ${template.name}`,
+                metadata: { templateId: template.id, kind: body.kind },
+            })
+            .catch(() => {});
 
         return {
             status: 'success',
@@ -118,6 +145,17 @@ export class TemplateCatalogController {
             auth.userId,
         );
 
+        this.activityLogService
+            .log({
+                userId: auth.userId,
+                actionType: ActivityActionType.TEMPLATE_ARCHIVED,
+                action: 'template.archived',
+                status: ActivityStatus.COMPLETED,
+                summary: `Archived ${body.kind} template`,
+                metadata: { templateId: result.templateId, kind: body.kind },
+            })
+            .catch(() => {});
+
         return {
             status: 'success',
             ...result,
@@ -141,6 +179,17 @@ export class TemplateCatalogController {
             auth.userId,
         );
 
+        this.activityLogService
+            .log({
+                userId: auth.userId,
+                actionType: ActivityActionType.TEMPLATE_DEFAULT_SET,
+                action: 'template.default_set',
+                status: ActivityStatus.COMPLETED,
+                summary: `Set default ${body.kind} template`,
+                metadata: { templateId: result.defaultTemplateId, kind: body.kind },
+            })
+            .catch(() => {});
+
         return {
             status: 'success',
             kind: body.kind,
@@ -158,6 +207,24 @@ export class TemplateCatalogController {
     @ApiResponse({ status: 200, description: 'Template forked and set as default' })
     async forkTemplate(@CurrentUser() auth: AuthenticatedUser, @Body() body: ForkTemplateDto) {
         const result = await this.templateCatalogService.forkTemplateForUser(body, auth.userId);
+
+        if (result.created) {
+            this.activityLogService
+                .log({
+                    userId: auth.userId,
+                    actionType: ActivityActionType.TEMPLATE_FORKED,
+                    action: 'template.forked',
+                    status: ActivityStatus.COMPLETED,
+                    summary: `Forked ${body.kind} template to ${result.repository.fullName}`,
+                    metadata: {
+                        templateId: result.template.id,
+                        kind: body.kind,
+                        targetOwner: body.targetOwner,
+                        repositoryFullName: result.repository.fullName,
+                    },
+                })
+                .catch(() => {});
+        }
 
         return {
             status: 'success',

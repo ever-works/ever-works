@@ -64,6 +64,7 @@ interface AddTemplateFormState {
     framework: string;
     previewImageUrl: string;
     branch: string;
+    betaBranch: string;
 }
 
 const EMPTY_FORM: AddTemplateFormState = {
@@ -73,6 +74,7 @@ const EMPTY_FORM: AddTemplateFormState = {
     framework: '',
     previewImageUrl: '',
     branch: '',
+    betaBranch: '',
 };
 
 const FRAMEWORK_OPTIONS = ['Next.js', 'Astro'] as const;
@@ -387,6 +389,7 @@ export function TemplatesCatalog({
                           framework: formState.framework.trim() || undefined,
                           previewImageUrl: formState.previewImageUrl.trim() || null,
                           branch: formState.branch.trim() || undefined,
+                          betaBranch: formState.betaBranch.trim() || null,
                       })
                     : await addCustomTemplate({
                           kind,
@@ -396,6 +399,7 @@ export function TemplatesCatalog({
                           framework: formState.framework.trim() || undefined,
                           previewImageUrl: formState.previewImageUrl.trim() || undefined,
                           branch: formState.branch.trim() || undefined,
+                          betaBranch: formState.betaBranch.trim() || undefined,
                       });
 
                 if (!result.success || !result.template) {
@@ -641,6 +645,7 @@ export function TemplatesCatalog({
                                     framework: selectedTemplate.framework || '',
                                     previewImageUrl: selectedTemplate.previewImageUrl || '',
                                     branch: selectedTemplate.branch || '',
+                                    betaBranch: selectedTemplate.betaBranch || '',
                                 });
                                 setDialogOpen(true);
                             }}
@@ -769,6 +774,19 @@ export function TemplatesCatalog({
                                 }))
                             }
                             helperText={t('dialog.branchHelp')}
+                        />
+
+                        <Input
+                            label={t('dialog.betaBranchLabel')}
+                            placeholder={t('dialog.betaBranchPlaceholder')}
+                            value={formState.betaBranch}
+                            onChange={(event) =>
+                                setFormState((current) => ({
+                                    ...current,
+                                    betaBranch: event.target.value,
+                                }))
+                            }
+                            helperText={t('dialog.betaBranchHelp')}
                         />
                     </div>
 
