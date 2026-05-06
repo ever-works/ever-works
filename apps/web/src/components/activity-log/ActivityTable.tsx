@@ -23,6 +23,8 @@ interface ActivityTableProps {
 }
 
 const dateTimeFormatterCache = new Map<string, Intl.DateTimeFormat>();
+const dateFormatterCache = new Map<string, Intl.DateTimeFormat>();
+const timeFormatterCache = new Map<string, Intl.DateTimeFormat>();
 
 function formatActivityDateTime(value: string, locale: string) {
     if (!dateTimeFormatterCache.has(locale)) {
@@ -38,13 +40,43 @@ function formatActivityDateTime(value: string, locale: string) {
     return dateTimeFormatterCache.get(locale)!.format(new Date(value));
 }
 
+function formatActivityDate(value: string, locale: string) {
+    if (!dateFormatterCache.has(locale)) {
+        dateFormatterCache.set(
+            locale,
+            new Intl.DateTimeFormat(locale, {
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit',
+            }),
+        );
+    }
+
+    return dateFormatterCache.get(locale)!.format(new Date(value));
+}
+
+function formatActivityTime(value: string, locale: string) {
+    if (!timeFormatterCache.has(locale)) {
+        timeFormatterCache.set(
+            locale,
+            new Intl.DateTimeFormat(locale, {
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit',
+            }),
+        );
+    }
+
+    return timeFormatterCache.get(locale)!.format(new Date(value));
+}
+
 function ActivityTimestamp({
     value,
     variant = 'absolute',
     className,
 }: {
     value: string;
-    variant?: 'absolute' | 'relative';
+    variant?: 'absolute' | 'relative' | 'stacked';
     className?: string;
 }) {
     const locale = useLocale();
@@ -55,6 +87,8 @@ function ActivityTimestamp({
     }
 
     const absoluteValue = formatActivityDateTime(value, locale);
+    const dateValue = formatActivityDate(value, locale);
+    const timeValue = formatActivityTime(value, locale);
 
     return (
         <time
@@ -62,9 +96,16 @@ function ActivityTimestamp({
             title={variant === 'relative' ? absoluteValue : undefined}
             className={className}
         >
-            {variant === 'relative'
-                ? formatDistanceToNow(new Date(value), { addSuffix: true })
-                : absoluteValue}
+            {variant === 'relative' ? (
+                formatDistanceToNow(new Date(value), { addSuffix: true })
+            ) : variant === 'stacked' ? (
+                <span className="inline-flex flex-col leading-4 whitespace-nowrap">
+                    <span>{dateValue}</span>
+                    <span>{timeValue}</span>
+                </span>
+            ) : (
+                absoluteValue
+            )}
         </time>
     );
 }
@@ -359,7 +400,7 @@ export function ActivityTable({ activities, loading, onStopRequested }: Activity
                                         <td className="px-4 py-3 text-xs text-text-muted dark:text-text-muted-dark whitespace-nowrap">
                                             <ActivityTimestamp
                                                 value={activity.createdAt}
-                                                variant="relative"
+                                                variant="stacked"
                                             />
                                         </td>
                                         <td className="px-4 py-3 text-xs">

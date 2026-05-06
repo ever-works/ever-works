@@ -28,11 +28,20 @@ const LEVEL_COLORS: Record<string, string> = {
 
 function formatTime(timestamp: string): string {
     try {
-        return new Date(timestamp).toLocaleTimeString([], {
-            hour: '2-digit',
-            minute: '2-digit',
-            second: '2-digit',
-        });
+        const date = new Date(timestamp);
+
+        return [
+            date.toLocaleDateString([], {
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit',
+            }),
+            date.toLocaleTimeString([], {
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit',
+            }),
+        ].join('\n');
     } catch {
         return '';
     }
@@ -45,7 +54,9 @@ function LogLine({ log }: { log: GenerationStepLog }) {
 
     return (
         <div className="flex gap-0 font-mono text-[11px] leading-5 hover:bg-white/3 -mx-4 px-4">
-            <span className="text-slate-600 shrink-0 w-17.5">{time}</span>
+            <span className="text-slate-600 shrink-0 w-27 whitespace-pre-line leading-4 pt-0.5">
+                {time}
+            </span>
             <span className={cn('shrink-0 w-22.5 truncate', sourceColor)}>[{log.source}]</span>
             <span className={cn('flex-1 break-all', levelColor)}>{log.message}</span>
             {log.durationMs != null && (
