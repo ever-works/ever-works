@@ -79,7 +79,7 @@ async function extractContentForUrl(
 	return {
 		content,
 		attempts: content?.extraction?.attempts ?? [],
-		error: content ? undefined : `Content extraction failed for URL: ${url}`
+		error: content ? undefined : `Processing failed for URL: ${url}`
 	};
 }
 
@@ -102,7 +102,7 @@ export async function processUrlWorker(url: string, ctx: UrlWorkerContext): Prom
 		let extractionError: string | null = null;
 		const extractionResult = await extractContentForUrl(url, contentExtractorFacade, facadeOptions).catch((err) => {
 			extractionError = err instanceof Error ? err.message : String(err);
-			logger.warn(`Worker: content extraction threw for ${url}: ${extractionError}`);
+			logger.warn(`Worker: content processing threw for ${url}: ${extractionError}`);
 			breaker.recordFailure('contentExtractor', extractionError);
 			return {
 				content: null,
@@ -115,29 +115,29 @@ export async function processUrlWorker(url: string, ctx: UrlWorkerContext): Prom
 
 		if (!extracted) {
 			if (!extractionError) {
-				logger.warn(`Worker: content extraction returned null for ${url} (no provider or extraction failed)`);
+				logger.warn(`Worker: content processing returned null for ${url} (no provider or processing failed)`);
 				breaker.recordFailure(
 					'contentExtractor',
-					extractionResult.error ?? `extraction returned null for ${url}`
+					extractionResult.error ?? `processing returned null for ${url}`
 				);
 			}
 			return {
 				url,
 				files: [],
 				count: 0,
-				error: extractionError ?? extractionResult.error ?? `Content extraction failed for URL: ${url}`,
+				error: extractionError ?? extractionResult.error ?? `Processing failed for URL: ${url}`,
 				errorKind: 'extraction',
 				extractionAttempts
 			};
 		}
 
 		if (!extracted.rawContent) {
-			logger.warn(`Worker: content extraction returned empty content for ${url}`);
+			logger.warn(`Worker: content processing returned empty content for ${url}`);
 			return {
 				url,
 				files: [],
 				count: 0,
-				error: 'Content extraction returned empty content',
+				error: 'Content processing returned empty content',
 				errorKind: 'empty',
 				extractionProvider: extracted.extraction?.providerName,
 				extractionAttempts
@@ -306,7 +306,7 @@ export async function processUrlWorker(url: string, ctx: UrlWorkerContext): Prom
 				url,
 				files: [],
 				count: 0,
-				error: 'No items extracted',
+				error: `No items retrieved from URL: ${url}`,
 				errorKind: 'empty',
 				extractionProvider: extracted.extraction?.providerName,
 				extractionAttempts

@@ -160,7 +160,7 @@ describe('processUrlWorker', () => {
 		expect(callArgs.tools).toHaveProperty('validateItemJson');
 	});
 
-	it('returns error when content extraction fails', async () => {
+	it('returns error when content processing fails', async () => {
 		const ctx = createMockContext({
 			contentExtractorFacade: {
 				extractContent: vi.fn().mockResolvedValue(null)
@@ -170,7 +170,7 @@ describe('processUrlWorker', () => {
 		const result = await processUrlWorker('https://example.com', ctx);
 
 		expect(result.count).toBe(0);
-		expect(result.error).toBe('Content extraction failed for URL: https://example.com');
+		expect(result.error).toBe('Processing failed for URL: https://example.com');
 	});
 
 	it('returns error when no items are created by agent', async () => {
@@ -184,7 +184,7 @@ describe('processUrlWorker', () => {
 		const result = await processUrlWorker('https://example.com', ctx);
 
 		expect(result.count).toBe(0);
-		expect(result.error).toBe('No items extracted');
+		expect(result.error).toBe('No items retrieved from URL: https://example.com');
 	});
 
 	it('handles abort signal', async () => {
@@ -209,7 +209,7 @@ describe('processUrlWorker', () => {
 		const result = await processUrlWorker('https://example.com', ctx);
 
 		expect(result.count).toBe(0);
-		expect(result.error).toBe('No items extracted');
+		expect(result.error).toBe('No items retrieved from URL: https://example.com');
 	});
 
 	it('tracks files created via onCreated callback', async () => {

@@ -148,4 +148,34 @@ describe('DataRepository', () => {
 
         await fs.rm(repoDir, { recursive: true, force: true });
     });
+
+    it('normalizes public reference errors before writing references.yaml', async () => {
+        const repoDir = await fs.mkdtemp(path.join(os.tmpdir(), 'data-repository-spec-'));
+        const repository = await DataRepository.create(repoDir);
+
+        await repository.writeReferences([
+            {
+                url: 'https://example.com/empty',
+                normalized_url: 'https://example.com/empty',
+                last_attempted_at: '2026-05-02T13:36:33.000Z',
+                status: 'empty',
+                error: 'No items extracted',
+            },
+            {
+                url: 'https://example.com/error',
+                normalized_url: 'https://example.com/error',
+                last_attempted_at: '2026-05-02T13:36:33.000Z',
+                status: 'error',
+                error: 'Content extraction failed for URL: https://example.com/error',
+            },
+        ]);
+
+        const referencesYaml = await fs.readFile(path.join(repoDir, 'references.yml'), 'utf-8');
+        expect(referencesYaml).toContain('No items retrieved from URL: https://example.com/empty');
+        expect(referencesYaml).toContain('Processing failed for URL: https://example.com/error');
+        expect(referencesYaml).not.toContain('No items extracted');
+        expect(referencesYaml).not.toContain('Content extraction failed');
+
+        await fs.rm(repoDir, { recursive: true, force: true });
+    });
 });

@@ -1304,6 +1304,15 @@
                     "collection_change": "Collection Change",
                     "community_pr_merged": "Community PR"
                 },
+                "generationInfo": {
+                    "label": "Generation details",
+                    "itemsAdded": "Items added",
+                    "itemsUpdated": "Items updated",
+                    "totalItems": "Total items",
+                    "pagesProcessed": "Pages processed",
+                    "tokensUsed": "Tokens used",
+                    "existingReferencesUsed": "Existing references used"
+                },
                 "detail": {
                     "added": "Added",
                     "updated": "Updated",

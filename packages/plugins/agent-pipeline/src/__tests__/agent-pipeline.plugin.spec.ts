@@ -312,7 +312,7 @@ describe('AgentPipelinePlugin', () => {
 								url: 'https://a.com',
 								files: [],
 								count: 0,
-								error: 'Content extraction failed for URL: https://a.com',
+								error: 'Processing failed for URL: https://a.com',
 								errorKind: 'extraction'
 							}
 						},
@@ -322,7 +322,7 @@ describe('AgentPipelinePlugin', () => {
 								url: 'https://b.com',
 								files: [],
 								count: 0,
-								error: 'No items extracted',
+								error: 'No items retrieved from URL: https://b.com',
 								errorKind: 'empty'
 							}
 						}
@@ -333,7 +333,7 @@ describe('AgentPipelinePlugin', () => {
 			const summary = (plugin as any).collectProcessUrlFailures(steps);
 			expect(summary.totalUrls).toBe(2);
 			expect(summary.failedUrls).toBe(2);
-			expect(summary.failureCauses).toEqual(['1 extraction failure', '1 extracted page with no items']);
+			expect(summary.failureCauses).toEqual(['1 processing failure', '1 processed page with no items']);
 		});
 	});
 
