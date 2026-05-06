@@ -350,27 +350,6 @@ export function TemplatesCatalog({
         (template) => template.id === currentDefaultTemplateId,
     );
 
-    const summaryCards = [
-        {
-            label: t('stats.defaultLabel'),
-            value: activeDefaultTemplate?.name || t('stats.none'),
-            accent: 'text-primary',
-            isText: true as const,
-        },
-        {
-            label: t('stats.builtInLabel'),
-            value: builtInCount,
-            accent: 'text-blue-600 dark:text-blue-300',
-            isText: false as const,
-        },
-        {
-            label: t('stats.customLabel'),
-            value: customCount,
-            accent: 'text-emerald-600 dark:text-emerald-300',
-            isText: false as const,
-        },
-    ];
-
     const resetDialog = () => {
         setFormState(EMPTY_FORM);
         setEditingTemplate(null);
@@ -573,29 +552,25 @@ export function TemplatesCatalog({
                     </p>
                 </div>
 
-                <div className="flex flex-wrap gap-2">
-                    {summaryCards.map((card) => (
-                        <div
-                            key={card.label}
-                            className={cn(
-                                'rounded-lg border px-3 py-2 bg-card dark:bg-card-primary-dark text-left min-w-[120px]',
-                                'border-border dark:border-border-dark',
-                            )}
-                        >
-                            <p className="text-[11px] uppercase tracking-wide text-text-muted dark:text-text-muted-dark">
-                                {card.label}
-                            </p>
-                            <p
-                                className={cn(
-                                    'mt-1 font-semibold',
-                                    card.accent,
-                                    card.isText ? 'text-sm line-clamp-1' : 'text-lg',
-                                )}
-                            >
-                                {card.isText ? card.value : card.value.toLocaleString()}
-                            </p>
-                        </div>
-                    ))}
+                <div className="flex flex-wrap items-center gap-2">
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs bg-primary/10 text-primary border border-primary/20 max-w-[220px]">
+                        <Star className="w-3 h-3 fill-current shrink-0" />
+                        <span className="truncate">
+                            {activeDefaultTemplate?.name || t('stats.none')}
+                        </span>
+                    </span>
+                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs bg-surface dark:bg-white/5 text-text-secondary dark:text-text-secondary-dark border border-border dark:border-border-dark">
+                        {t('stats.builtInLabel')}
+                        <span className="font-semibold text-text dark:text-text-dark">
+                            {builtInCount}
+                        </span>
+                    </span>
+                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs bg-surface dark:bg-white/5 text-text-secondary dark:text-text-secondary-dark border border-border dark:border-border-dark">
+                        {t('stats.customLabel')}
+                        <span className="font-semibold text-text dark:text-text-dark">
+                            {customCount}
+                        </span>
+                    </span>
                 </div>
             </div>
 
