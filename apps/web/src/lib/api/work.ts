@@ -194,6 +194,7 @@ export interface Work {
     websiteTemplateLastError?: string | null;
     websiteTemplateLastUpdatedAt?: string | null;
     websiteTemplateLastCheckedAt?: string | null;
+    websiteRepositoryInitialized?: boolean;
     // Community PR Processing
     communityPrEnabled?: boolean;
     communityPrAutoClose?: boolean;

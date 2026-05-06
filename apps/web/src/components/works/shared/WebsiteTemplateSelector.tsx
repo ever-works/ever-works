@@ -14,6 +14,7 @@ interface WebsiteTemplateSelectorProps {
     label?: string;
     helperText?: string;
     helperLinkHref?: string;
+    helperLinkOnClick?: () => void;
     className?: string;
 }
 
@@ -42,6 +43,7 @@ export function WebsiteTemplateSelector({
     label = 'Website Template',
     helperText,
     helperLinkHref,
+    helperLinkOnClick,
     className,
 }: WebsiteTemplateSelectorProps) {
     const t = useTranslations('dashboard.templateSelector');
@@ -119,6 +121,17 @@ export function WebsiteTemplateSelector({
                             >
                                 {t('changeAnywayLink')}
                             </Link>
+                        </>
+                    ) : helperLinkOnClick ? (
+                        <>
+                            {' '}
+                            <button
+                                type="button"
+                                onClick={helperLinkOnClick}
+                                className="font-medium text-primary hover:underline dark:text-primary-dark"
+                            >
+                                {t('changeAnywayLink')}
+                            </button>
                         </>
                     ) : null}
                 </p>

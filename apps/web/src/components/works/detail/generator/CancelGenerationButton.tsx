@@ -1,6 +1,6 @@
 'use client';
 
-import { useTransition } from 'react';
+import { useEffect, useState, useTransition } from 'react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { cancelGeneration } from '@/app/actions/dashboard/generator';
@@ -28,8 +28,17 @@ export function CancelGenerationButton({
     className,
 }: CancelGenerationButtonProps) {
     const [isPending, startTransition] = useTransition();
+    const [stopRequested, setStopRequested] = useState(false);
+
+    useEffect(() => {
+        setStopRequested(false);
+    }, [workId]);
 
     const handleClick = () => {
+        if (stopRequested) {
+            return;
+        }
+
         startTransition(async () => {
             const result = await cancelGeneration(workId);
 
@@ -44,6 +53,7 @@ export function CancelGenerationButton({
                 return;
             }
 
+            setStopRequested(true);
             toast.success(result.message || labels.stopRequested);
             onCancelled?.();
         });
@@ -53,11 +63,12 @@ export function CancelGenerationButton({
         <Button
             variant="danger"
             size="sm"
-            loading={isPending}
+            loading={isPending || stopRequested}
             onClick={handleClick}
             className={className}
+            disabled={isPending || stopRequested}
         >
-            {isPending ? labels.stopping : labels.stop}
+            {isPending || stopRequested ? labels.stopping : labels.stop}
         </Button>
     );
 }

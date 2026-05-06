@@ -34,8 +34,8 @@ describe('WorkLifecycleService', () => {
     let websiteUpdateService: any;
     let ownershipService: any;
     let deployFacade: any;
-    let gitFacade: any;
     let templateCatalogService: any;
+    let websiteRepositoryState: any;
     let service: WorkLifecycleService;
 
     afterAll(() => {
@@ -76,15 +76,14 @@ describe('WorkLifecycleService', () => {
         deployFacade = {
             getAvailableProviders: jest.fn().mockReturnValue([]),
         };
-        gitFacade = {
-            hasValidCredentials: jest.fn().mockResolvedValue(false),
-            repositoryExists: jest.fn(),
-        };
         templateCatalogService = {
             getDefaultTemplateIdForUser: jest.fn().mockResolvedValue(null),
             getVisibleTemplateForUser: jest.fn().mockImplementation(async (_kind, templateId) => ({
                 id: templateId,
             })),
+        };
+        websiteRepositoryState = {
+            isInitialized: jest.fn().mockResolvedValue(false),
         };
 
         service = new WorkLifecycleService(
@@ -95,8 +94,8 @@ describe('WorkLifecycleService', () => {
             websiteUpdateService,
             ownershipService,
             deployFacade,
-            gitFacade,
             templateCatalogService,
+            websiteRepositoryState,
         );
     });
 
@@ -151,6 +150,7 @@ describe('WorkLifecycleService', () => {
         } as any;
 
         ownershipService.ensureCanEdit.mockResolvedValue({ work });
+        websiteRepositoryState.isInitialized.mockResolvedValue(true);
 
         await expect(
             service.updateWork(work.id, { websiteTemplateId: 'minimal' } as any, user),
@@ -177,6 +177,7 @@ describe('WorkLifecycleService', () => {
         } as any;
 
         ownershipService.ensureCanEdit.mockResolvedValue({ work });
+        websiteRepositoryState.isInitialized.mockResolvedValue(true);
 
         const result = await service.switchWebsiteTemplate(work.id, 'classic', user);
 
@@ -209,6 +210,7 @@ describe('WorkLifecycleService', () => {
         } as any;
 
         ownershipService.ensureCanEdit.mockResolvedValue({ work });
+        websiteRepositoryState.isInitialized.mockResolvedValue(true);
 
         const result = await service.switchWebsiteTemplate(work.id, 'minimal', user);
 
@@ -253,6 +255,7 @@ describe('WorkLifecycleService', () => {
         } as any;
 
         ownershipService.ensureCanEdit.mockResolvedValue({ work });
+        websiteRepositoryState.isInitialized.mockResolvedValue(true);
         websiteUpdateService.updateRepository.mockRejectedValueOnce(
             new NotFoundException(
                 "Website repository 'ever-works/test-work-website' does not exist",
@@ -294,6 +297,7 @@ describe('WorkLifecycleService', () => {
         } as any;
 
         ownershipService.ensureCanEdit.mockResolvedValue({ work });
+        websiteRepositoryState.isInitialized.mockResolvedValue(true);
         websiteUpdateService.updateRepository.mockRejectedValueOnce(new Error('sync failed'));
 
         await expect(service.switchWebsiteTemplate(work.id, 'minimal', user)).rejects.toThrow(

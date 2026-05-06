@@ -31,6 +31,7 @@ import {
 } from '@/lib/api/enums';
 import { getFormSchema } from '@/app/actions/dashboard/generator-form';
 import { updateWorkTemplate } from '@/app/actions/dashboard/works';
+import { switchWebsiteTemplate } from '@/app/actions/dashboard/deploy';
 import { useProviderSelection } from '@/lib/hooks/use-provider-selection';
 import { ProviderSelectionSection } from '@/components/works/shared/ProviderSelectionSection';
 import { WebsiteTemplateSelector } from '@/components/works/shared/WebsiteTemplateSelector';
@@ -59,11 +60,13 @@ export function GeneratorForm({
 }: GeneratorFormProps) {
     const router = useRouter();
     const t = useTranslations('dashboard.workDetail.generator');
+    const deployT = useTranslations('dashboard.workDetail.deploy');
     const { updateGenerateStatus } = useWorkDetail();
     const [isPending, startTransition] = useTransition();
     const [optimisticGenerating, setOptimisticGenerating] = useState(startInProgressView);
     const [showAdvancedOptions, setShowAdvancedOptions] = useState(false);
     const [confirmRecreate, setConfirmRecreate] = useState(false);
+    const [confirmTemplateSwitch, setConfirmTemplateSwitch] = useState(false);
     const [formSchema, setFormSchema] = useState<GeneratorFormSchema | null>(null);
     const [isLoadingSchema, setIsLoadingSchema] = useState(false);
     const fetchVersionRef = useRef(0);
@@ -72,6 +75,8 @@ export function GeneratorForm({
 
     // Check if work has been generated before
     const isGenerated = !!config?.metadata;
+    const isWebsiteTemplateLocked = work.websiteRepositoryInitialized ?? false;
+    const [templateSwitchModeEnabled, setTemplateSwitchModeEnabled] = useState(false);
     const lastRequestData = config?.metadata?.last_request_data;
     const initialPrompt = lastRequestData?.prompt || config?.metadata?.initial_prompt || '';
     const [selectedWebsiteTemplateId, setSelectedWebsiteTemplateId] = useState(
@@ -253,7 +258,17 @@ export function GeneratorForm({
         await submitGeneration();
     };
 
-    const submitGeneration = async () => {
+    const submitGeneration = async ({ skipTemplateSwitchCheck = false } = {}) => {
+        const hasLockedTemplateChange =
+            isWebsiteTemplateLocked &&
+            templateSwitchModeEnabled &&
+            selectedWebsiteTemplateId !== (work.websiteTemplateId || '');
+
+        if (hasLockedTemplateChange && !skipTemplateSwitchCheck) {
+            setConfirmTemplateSwitch(true);
+            return;
+        }
+
         startTransition(async () => {
             let result;
             const selectedProviders = buildSelectedProviders(formSchema);
@@ -268,6 +283,20 @@ export function GeneratorForm({
             if (unconfigured.length > 0) {
                 toast.error(t('unconfiguredProviders', { providers: unconfigured.join(', ') }));
                 return;
+            }
+
+            if (hasLockedTemplateChange) {
+                const templateSwitch = await switchWebsiteTemplate(
+                    workId,
+                    selectedWebsiteTemplateId,
+                );
+
+                if (!templateSwitch.success) {
+                    toast.error(templateSwitch.error || t('failedToStartOperation'));
+                    return;
+                }
+
+                setTemplateSwitchModeEnabled(false);
             }
 
             if (!isGenerated && selectedWebsiteTemplateId !== (work.websiteTemplateId || '')) {
@@ -337,6 +366,51 @@ export function GeneratorForm({
 
     return (
         <form onSubmit={handleSubmit} className="space-y-6 max-w-4xl">
+            <Dialog open={confirmTemplateSwitch} onOpenChange={setConfirmTemplateSwitch}>
+                <DialogContent className="max-w-lg">
+                    <DialogHeader>
+                        <DialogTitle>
+                            {deployT('form.websiteTemplate.switchConfirmTitle', {
+                                defaultValue: 'Switch website template?',
+                            })}
+                        </DialogTitle>
+                        <p className="text-sm text-text-secondary dark:text-text-secondary-dark">
+                            {deployT('form.websiteTemplate.switchConfirmDescription', {
+                                defaultValue:
+                                    'If the website repository already exists, its contents will be replaced from the selected template. Any custom code in that repository will be lost.',
+                            })}
+                        </p>
+                    </DialogHeader>
+                    <DialogFooter>
+                        <Button
+                            type="button"
+                            variant="secondary"
+                            size="sm"
+                            onClick={() => setConfirmTemplateSwitch(false)}
+                            disabled={isPending}
+                        >
+                            {deployT('form.websiteTemplate.switchCancel', {
+                                defaultValue: 'Cancel',
+                            })}
+                        </Button>
+                        <Button
+                            type="button"
+                            variant="danger"
+                            size="sm"
+                            onClick={async () => {
+                                setConfirmTemplateSwitch(false);
+                                await submitGeneration({ skipTemplateSwitchCheck: true });
+                            }}
+                            disabled={isPending}
+                            loading={isPending}
+                        >
+                            {deployT('form.websiteTemplate.switchConfirmButton', {
+                                defaultValue: 'Switch template',
+                            })}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
             <RequiredFields
                 formData={coreData}
                 onChange={handleCoreDataChange}
@@ -352,12 +426,21 @@ export function GeneratorForm({
                     templates={websiteTemplates}
                     value={selectedWebsiteTemplateId}
                     onChange={setSelectedWebsiteTemplateId}
-                    disabled={isGenerated || isPending}
-                    helperLinkHref={isGenerated ? `/works/${workId}/deploy` : undefined}
+                    disabled={(isWebsiteTemplateLocked && !templateSwitchModeEnabled) || isPending}
+                    helperLinkOnClick={
+                        isWebsiteTemplateLocked && !templateSwitchModeEnabled
+                            ? () => setTemplateSwitchModeEnabled(true)
+                            : undefined
+                    }
                     helperText={
-                        isGenerated
+                        isWebsiteTemplateLocked && !templateSwitchModeEnabled
                             ? t('websiteTemplateLockedHelperText')
-                            : t('websiteTemplateHelperText')
+                            : isWebsiteTemplateLocked
+                              ? deployT('form.websiteTemplate.switchHelperText', {
+                                    defaultValue:
+                                        'Applying a new template will reset the existing website repository from the selected template if it already exists.',
+                                })
+                              : t('websiteTemplateHelperText')
                     }
                 />
             </RequiredFields>

@@ -23,9 +23,9 @@ import {
     getDefaultWebsiteTemplateId,
     SwitchWebsiteTemplateResponseDto,
 } from '@src/generators/website-generator';
-import { GitFacadeService } from '@src/facades/git.facade';
 import { WebsiteRepositoryCreationMethod } from '@src/items-generator/dto/create-items-generator.dto';
 import { TemplateCatalogService } from '../template-catalog/template-catalog.service';
+import { WorkWebsiteRepositoryStateService } from './work-website-repository-state.service';
 
 @Injectable()
 export class WorkLifecycleService {
@@ -39,8 +39,8 @@ export class WorkLifecycleService {
         private readonly websiteUpdateService: WebsiteUpdateService,
         private readonly ownershipService: WorkOwnershipService,
         private readonly deployFacade: DeployFacadeService,
-        private readonly gitFacade: GitFacadeService,
         private readonly templateCatalogService: TemplateCatalogService,
+        private readonly websiteRepositoryState: WorkWebsiteRepositoryStateService,
     ) {}
 
     private normalizeWebsiteTemplateSelection(value?: string | null): string | null {
@@ -105,50 +105,7 @@ export class WorkLifecycleService {
     }
 
     private async hasInitializedWebsiteRepository(work: Work, user: User): Promise<boolean> {
-        if (
-            work.website ||
-            work.deployProjectId ||
-            work.websiteTemplateLastCommit ||
-            work.websiteTemplateLastUpdatedAt ||
-            work.websiteTemplateLastCheckedAt
-        ) {
-            return true;
-        }
-
-        const userIds = [...new Set([user.id, work.userId].filter(Boolean))];
-
-        for (const userId of userIds) {
-            const authOptions = {
-                userId,
-                providerId: work.gitProvider,
-                workId: work.id,
-            };
-
-            const hasCredentials = await this.gitFacade.hasValidCredentials(authOptions);
-            if (!hasCredentials) {
-                continue;
-            }
-
-            try {
-                const exists = await this.gitFacade.repositoryExists(
-                    work.getRepoOwner('website'),
-                    work.getWebsiteRepo(),
-                    authOptions,
-                );
-
-                if (exists) {
-                    return true;
-                }
-            } catch (error) {
-                this.logger.warn(
-                    `Failed to verify website repository initialization for work ${work.id}: ${
-                        error instanceof Error ? error.message : String(error)
-                    }`,
-                );
-            }
-        }
-
-        return false;
+        return this.websiteRepositoryState.isInitialized(work, user);
     }
 
     async createWork(createWorkDto: CreateWorkDto, user: User) {
