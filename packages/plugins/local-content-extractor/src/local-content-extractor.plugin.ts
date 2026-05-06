@@ -20,7 +20,7 @@ import TurndownService from 'turndown';
 
 export class LocalContentExtractorPlugin implements IPlugin, IContentExtractorPlugin {
 	readonly id = 'local-content-extractor';
-	readonly name = 'Local Content Extractor';
+	readonly name = 'Local Content Processor';
 	readonly version = '1.0.0';
 	readonly category: PluginCategory = 'content-extractor';
 	readonly capabilities: readonly string[] = ['content-extractor'];
@@ -401,7 +401,7 @@ export class LocalContentExtractorPlugin implements IPlugin, IContentExtractorPl
 
 	async onLoad(context: PluginContext): Promise<void> {
 		this.context = context;
-		context.logger.log('Local Content Extractor Plugin loaded');
+		context.logger.log('Local Content Processor Plugin loaded');
 	}
 
 	async onUnload(): Promise<void> {
@@ -411,7 +411,7 @@ export class LocalContentExtractorPlugin implements IPlugin, IContentExtractorPl
 	async healthCheck(): Promise<PluginHealthCheck> {
 		return {
 			status: 'healthy',
-			message: 'Local content extractor is ready',
+			message: 'Local content processor is ready',
 			checkedAt: Date.now()
 		};
 	}
@@ -421,7 +421,7 @@ export class LocalContentExtractorPlugin implements IPlugin, IContentExtractorPl
 			id: this.id,
 			name: this.name,
 			version: this.version,
-			description: 'System plugin for extracting web page content using axios + Readability',
+			description: 'System plugin for processing web page content using axios + Readability',
 			category: this.category,
 			capabilities: [...this.capabilities],
 			author: { name: 'Ever Works Team' },

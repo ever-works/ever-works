@@ -59,8 +59,9 @@ export default async function NewWorkPage() {
         const deployProvidersResult = await deployAPI.getProviders();
         if (deployProvidersResult.providers) {
             deployProviders = deployProvidersResult.providers;
+            const firstConfigured = deployProviders.find((p) => p.enabled && p.configured);
             const firstEnabled = deployProviders.find((p) => p.enabled);
-            defaultDeployProviderId = firstEnabled?.id || null;
+            defaultDeployProviderId = firstConfigured?.id || firstEnabled?.id || null;
         }
     } catch (error) {
         console.error('Failed to fetch deploy providers:', error);

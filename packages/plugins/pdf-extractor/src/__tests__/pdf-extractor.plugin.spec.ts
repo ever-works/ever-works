@@ -44,7 +44,7 @@ describe('PdfExtractorPlugin', () => {
 	describe('Plugin Metadata', () => {
 		it('should have correct plugin metadata', () => {
 			expect(plugin.id).toBe('pdf-extractor');
-			expect(plugin.name).toBe('PDF Content Extractor');
+			expect(plugin.name).toBe('PDF Content Processor');
 			expect(plugin.version).toBe('1.0.0');
 			expect(plugin.category).toBe('content-extractor');
 			expect(plugin.capabilities).toContain('content-extractor');
@@ -106,7 +106,7 @@ describe('PdfExtractorPlugin', () => {
 	describe('Lifecycle', () => {
 		it('should initialize services on load', async () => {
 			await plugin.onLoad(mockContext);
-			expect(mockContext.logger.log).toHaveBeenCalledWith('PDF Extractor Plugin loaded');
+			expect(mockContext.logger.log).toHaveBeenCalledWith('PDF Processor Plugin loaded');
 		});
 
 		it('should clear services on unload', async () => {
@@ -240,7 +240,7 @@ describe('PdfExtractorPlugin', () => {
 		it('should return correct manifest', () => {
 			const manifest = plugin.getManifest();
 			expect(manifest.id).toBe('pdf-extractor');
-			expect(manifest.name).toBe('PDF Content Extractor');
+			expect(manifest.name).toBe('PDF Content Processor');
 			expect(manifest.builtIn).toBe(true);
 			expect(manifest.systemPlugin).toBe(false);
 			expect(manifest.capabilities).toContain('content-extractor');

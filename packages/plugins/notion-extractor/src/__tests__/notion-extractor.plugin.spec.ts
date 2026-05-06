@@ -31,7 +31,7 @@ describe('NotionExtractorPlugin', () => {
 	describe('Plugin Metadata', () => {
 		it('should have correct plugin metadata', () => {
 			expect(plugin.id).toBe('notion-extractor');
-			expect(plugin.name).toBe('Notion Page Extractor');
+			expect(plugin.name).toBe('Notion Page Processor');
 			expect(plugin.version).toBe('1.0.0');
 			expect(plugin.category).toBe('content-extractor');
 			expect(plugin.capabilities).toContain('content-extractor');
@@ -89,7 +89,7 @@ describe('NotionExtractorPlugin', () => {
 	describe('Lifecycle', () => {
 		it('should initialize NotionService on load', async () => {
 			await plugin.onLoad(mockContext);
-			expect(mockContext.logger.log).toHaveBeenCalledWith('Notion Extractor Plugin loaded');
+			expect(mockContext.logger.log).toHaveBeenCalledWith('Notion Processor Plugin loaded');
 		});
 	});
 
@@ -111,7 +111,7 @@ describe('NotionExtractorPlugin', () => {
 		it('should return correct manifest', () => {
 			const manifest = plugin.getManifest();
 			expect(manifest.id).toBe('notion-extractor');
-			expect(manifest.name).toBe('Notion Page Extractor');
+			expect(manifest.name).toBe('Notion Page Processor');
 			expect(manifest.systemPlugin).toBe(false);
 			expect(manifest.capabilities).toContain('content-extractor');
 		});
