@@ -353,6 +353,7 @@ export function GeneratorForm({
                     value={selectedWebsiteTemplateId}
                     onChange={setSelectedWebsiteTemplateId}
                     disabled={isGenerated || isPending}
+                    helperLinkHref={isGenerated ? `/works/${workId}/deploy` : undefined}
                     helperText={
                         isGenerated
                             ? t('websiteTemplateLockedHelperText')

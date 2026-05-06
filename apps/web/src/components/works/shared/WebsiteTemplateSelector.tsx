@@ -1,6 +1,7 @@
 'use client';
 
 import { useTranslations } from 'next-intl';
+import { Link } from '@/i18n/navigation';
 import { Select } from '@/components/ui/select';
 import type { WebsiteTemplateOption } from '@/lib/api/work';
 import { cn } from '@/lib/utils/cn';
@@ -12,6 +13,7 @@ interface WebsiteTemplateSelectorProps {
     disabled?: boolean;
     label?: string;
     helperText?: string;
+    helperLinkHref?: string;
     className?: string;
 }
 
@@ -39,6 +41,7 @@ export function WebsiteTemplateSelector({
     disabled = false,
     label = 'Website Template',
     helperText,
+    helperLinkHref,
     className,
 }: WebsiteTemplateSelectorProps) {
     const t = useTranslations('dashboard.templateSelector');
@@ -105,7 +108,20 @@ export function WebsiteTemplateSelector({
             </div>
 
             {helperText ? (
-                <p className="text-xs text-text-muted dark:text-text-muted-dark">{helperText}</p>
+                <p className="text-xs text-text-muted dark:text-text-muted-dark">
+                    <span>{helperText}</span>
+                    {helperLinkHref ? (
+                        <>
+                            {' '}
+                            <Link
+                                href={helperLinkHref}
+                                className="font-medium text-primary hover:underline dark:text-primary-dark"
+                            >
+                                {t('changeAnywayLink')}
+                            </Link>
+                        </>
+                    ) : null}
+                </p>
             ) : null}
         </div>
     );

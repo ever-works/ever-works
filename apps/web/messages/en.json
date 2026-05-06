@@ -3064,6 +3064,7 @@
             "defaultOptionWithName": "Use default ({name})",
             "optionLabel": "{name}",
             "optionDefaultLabel": "{name} (Default)",
+            "changeAnywayLink": "Change anyway",
             "origin": {
                 "standard": "Standard",
                 "forked": "Forked",
