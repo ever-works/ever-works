@@ -229,46 +229,37 @@ export function GeneratorForm({
         await submitGeneration();
     };
 
-    const submitGeneration = async ({ skipTemplateSwitchCheck = false } = {}) => {
+    const submitGeneration = async () => {
+        const selectedProviders = buildSelectedProviders(formSchema);
+        const promptChanged = coreData.prompt.trim() !== initialPrompt.trim();
+        const requiresFullGeneration =
+            !isGenerated ||
+            showAdvancedOptions ||
+            coreData.generation_method === GenerationMethod.RECREATE ||
+            promptChanged;
         const hasLockedTemplateChange =
             isWebsiteTemplateLocked &&
             templateSwitchModeEnabled &&
             selectedWebsiteTemplateId !== (work.websiteTemplateId || '');
 
-        if (hasLockedTemplateChange && !skipTemplateSwitchCheck) {
+        const unconfigured = getUnconfiguredProviders(formSchema);
+        if (unconfigured.length > 0) {
+            toast.error(t('unconfiguredProviders', { providers: unconfigured.join(', ') }));
+            return;
+        }
+
+        if (requiresFullGeneration && !coreData.prompt.trim()) {
+            toast.error(t('promptRequired'));
+            return;
+        }
+
+        if (hasLockedTemplateChange) {
             setConfirmTemplateSwitch(true);
             return;
         }
 
         startTransition(async () => {
             let result;
-            const selectedProviders = buildSelectedProviders(formSchema);
-            const promptChanged = coreData.prompt.trim() !== initialPrompt.trim();
-            const requiresFullGeneration =
-                !isGenerated ||
-                showAdvancedOptions ||
-                coreData.generation_method === GenerationMethod.RECREATE ||
-                promptChanged;
-
-            const unconfigured = getUnconfiguredProviders(formSchema);
-            if (unconfigured.length > 0) {
-                toast.error(t('unconfiguredProviders', { providers: unconfigured.join(', ') }));
-                return;
-            }
-
-            if (hasLockedTemplateChange) {
-                const templateSwitch = await switchWebsiteTemplate(
-                    workId,
-                    selectedWebsiteTemplateId,
-                );
-
-                if (!templateSwitch.success) {
-                    toast.error(templateSwitch.error || t('failedToStartOperation'));
-                    return;
-                }
-
-                setTemplateSwitchModeEnabled(false);
-            }
 
             if (!isGenerated && selectedWebsiteTemplateId !== (work.websiteTemplateId || '')) {
                 const templateUpdate = await updateWorkTemplate(workId, selectedWebsiteTemplateId);
@@ -290,11 +281,6 @@ export function GeneratorForm({
                 result = await updateItems(workId, updateData);
             } else {
                 // Full generation - send core data + plugin config
-                if (!coreData.prompt.trim()) {
-                    toast.error(t('promptRequired'));
-                    return;
-                }
-
                 const generateData: CreateItemsGeneratorDto = {
                     name: coreData.name,
                     prompt: coreData.prompt,
@@ -317,6 +303,26 @@ export function GeneratorForm({
             } else {
                 toast.error(result.error || t('failedToStartOperation'));
             }
+        });
+    };
+
+    const handleConfirmTemplateSwitch = () => {
+        setConfirmTemplateSwitch(false);
+
+        startTransition(async () => {
+            const templateSwitch = await switchWebsiteTemplate(workId, selectedWebsiteTemplateId);
+
+            if (!templateSwitch.success) {
+                toast.error(templateSwitch.error || t('failedToStartOperation'));
+                return;
+            }
+
+            setTemplateSwitchModeEnabled(false);
+            toast.success(
+                templateSwitch.data.message ||
+                    'Template changed. Start generation again to continue with the new template.',
+            );
+            router.refresh();
         });
     };
 
@@ -368,10 +374,7 @@ export function GeneratorForm({
                             type="button"
                             variant="danger"
                             size="sm"
-                            onClick={async () => {
-                                setConfirmTemplateSwitch(false);
-                                await submitGeneration({ skipTemplateSwitchCheck: true });
-                            }}
+                            onClick={handleConfirmTemplateSwitch}
                             disabled={isPending}
                             loading={isPending}
                         >

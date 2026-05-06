@@ -15,6 +15,7 @@ type CancelGenerationButtonLabels = {
 interface CancelGenerationButtonProps {
     workId: string;
     labels: CancelGenerationButtonLabels;
+    isGenerationActive?: boolean;
     onCancelled?: () => void;
     onAlreadyFinished?: () => void;
     className?: string;
@@ -23,6 +24,7 @@ interface CancelGenerationButtonProps {
 export function CancelGenerationButton({
     workId,
     labels,
+    isGenerationActive,
     onCancelled,
     onAlreadyFinished,
     className,
@@ -33,6 +35,24 @@ export function CancelGenerationButton({
     useEffect(() => {
         setStopRequested(false);
     }, [workId]);
+
+    useEffect(() => {
+        if (isGenerationActive === false) {
+            setStopRequested(false);
+        }
+    }, [isGenerationActive]);
+
+    useEffect(() => {
+        if (!stopRequested) {
+            return;
+        }
+
+        const timer = window.setTimeout(() => {
+            setStopRequested(false);
+        }, 10000);
+
+        return () => window.clearTimeout(timer);
+    }, [stopRequested]);
 
     const handleClick = () => {
         if (stopRequested) {
