@@ -16,6 +16,7 @@ describe('TemplateCatalogService', () => {
             findOwnedCustomByRepositoryUrl: jest.fn(),
             findOwnedCustomByRepositoryCoordinates: jest.fn(),
             findBuiltInByRepositoryCoordinates: jest.fn(),
+            hasRecentDiscoveredBuiltInTemplates: jest.fn(),
             findById: jest.fn(),
             upsert: jest.fn(),
             updateById: jest.fn(),
@@ -268,7 +269,8 @@ describe('TemplateCatalogService', () => {
         });
     });
 
-    it('does not sync discovered templates during a normal list read', async () => {
+    it('does not sync discovered templates during a normal list read when discovery is fresh', async () => {
+        templateRepository.hasRecentDiscoveredBuiltInTemplates.mockResolvedValue(true);
         templateRepository.findVisibleByKind.mockResolvedValue([]);
         userTemplatePreferenceRepository.findByUserAndKind.mockResolvedValue(null);
 
@@ -282,7 +284,24 @@ describe('TemplateCatalogService', () => {
         });
     });
 
+    it('syncs discovered templates during a list read when discovery is stale', async () => {
+        templateRepository.hasRecentDiscoveredBuiltInTemplates.mockResolvedValue(false);
+        gitFacade.getAccessToken.mockResolvedValue(null);
+        gitFacade.listPublicRepositories.mockResolvedValueOnce([]);
+        templateRepository.findVisibleByKind.mockResolvedValue([]);
+        userTemplatePreferenceRepository.findByUserAndKind.mockResolvedValue(null);
+
+        const result = await service.listTemplatesForUser('website', 'user-1');
+
+        expect(gitFacade.listPublicRepositories).toHaveBeenCalledTimes(1);
+        expect(result).toEqual({
+            defaultTemplateId: 'classic',
+            templates: [],
+        });
+    });
+
     it('refreshes discovered standard templates for website catalogs', async () => {
+        templateRepository.hasRecentDiscoveredBuiltInTemplates.mockResolvedValue(true);
         gitFacade.getAccessToken.mockResolvedValue(null);
         const firstPageRepositories = Array.from({ length: 100 }, (_, index) => ({
             name: `repo-${index}`,

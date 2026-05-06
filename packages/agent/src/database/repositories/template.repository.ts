@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { MoreThanOrEqual, Repository, Raw } from 'typeorm';
 import { Template, TemplateKind } from '../../entities/template.entity';
 
 @Injectable()
@@ -94,6 +94,24 @@ export class TemplateRepository {
             },
             order: {
                 id: 'ASC',
+            },
+        });
+    }
+
+    async hasRecentDiscoveredBuiltInTemplates(
+        kind: TemplateKind,
+        catalogOwner: string,
+        updatedSince: Date,
+    ): Promise<boolean> {
+        return this.repository.exists({
+            where: {
+                kind,
+                sourceType: 'built_in',
+                isActive: true,
+                updatedAt: MoreThanOrEqual(updatedSince),
+                metadata: Raw((alias) => `${alias} LIKE :ownerMarker`, {
+                    ownerMarker: `%"discoveredFromOrganization":"${catalogOwner}"%`,
+                }),
             },
         });
     }

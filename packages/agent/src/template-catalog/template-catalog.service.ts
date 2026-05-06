@@ -55,6 +55,7 @@ export interface ForkTemplateResult {
 @Injectable()
 export class TemplateCatalogService implements OnModuleInit {
     private readonly logger = new Logger(TemplateCatalogService.name);
+    private readonly WEBSITE_DISCOVERY_SYNC_TTL_MS = 1000 * 60 * 60;
 
     constructor(
         private readonly templateRepository: TemplateRepository,
@@ -91,6 +92,10 @@ export class TemplateCatalogService implements OnModuleInit {
         kind: TemplateKind,
         userId: string,
     ): Promise<{ defaultTemplateId: string | null; templates: TemplateCatalogItem[] }> {
+        if (kind === 'website') {
+            await this.syncDiscoveredWebsiteTemplatesIfStale(userId);
+        }
+
         const [templates, defaultTemplateId] = await Promise.all([
             this.templateRepository.findVisibleByKind(kind, userId),
             this.getDefaultTemplateIdForUser(kind, userId),
@@ -521,6 +526,21 @@ export class TemplateCatalogService implements OnModuleInit {
         }
 
         return null;
+    }
+
+    private async syncDiscoveredWebsiteTemplatesIfStale(userId: string): Promise<void> {
+        const catalogOwner = config.websiteTemplate.getCatalogOrganization();
+        const updatedSince = new Date(Date.now() - this.WEBSITE_DISCOVERY_SYNC_TTL_MS);
+        const hasRecentDiscovery =
+            await this.templateRepository.hasRecentDiscoveredBuiltInTemplates(
+                'website',
+                catalogOwner,
+                updatedSince,
+            );
+
+        if (!hasRecentDiscovery) {
+            await this.syncDiscoveredWebsiteTemplatesForUser(userId);
+        }
     }
 
     private async syncDiscoveredWebsiteTemplatesForUser(userId: string): Promise<void> {
