@@ -64,7 +64,15 @@ export class TemplateCatalogService implements OnModuleInit {
     ) {}
 
     async onModuleInit() {
-        await this.seedBuiltInTemplates();
+        try {
+            await this.seedBuiltInTemplates();
+        } catch (error) {
+            this.logger.warn(
+                `Failed to seed built-in templates during startup: ${
+                    error instanceof Error ? error.message : String(error)
+                }`,
+            );
+        }
     }
 
     async seedBuiltInTemplates(): Promise<void> {
@@ -83,10 +91,6 @@ export class TemplateCatalogService implements OnModuleInit {
         kind: TemplateKind,
         userId: string,
     ): Promise<{ defaultTemplateId: string | null; templates: TemplateCatalogItem[] }> {
-        if (kind === 'website') {
-            await this.syncDiscoveredWebsiteTemplatesForUser(userId);
-        }
-
         const [templates, defaultTemplateId] = await Promise.all([
             this.templateRepository.findVisibleByKind(kind, userId),
             this.getDefaultTemplateIdForUser(kind, userId),
@@ -320,6 +324,10 @@ export class TemplateCatalogService implements OnModuleInit {
         kind: TemplateKind,
         userId: string,
     ): Promise<{ defaultTemplateId: string | null; templates: TemplateCatalogItem[] }> {
+        if (kind === 'website') {
+            await this.syncDiscoveredWebsiteTemplatesForUser(userId);
+        }
+
         return this.listTemplatesForUser(kind, userId);
     }
 
@@ -527,7 +535,7 @@ export class TemplateCatalogService implements OnModuleInit {
                 providerId,
             });
 
-            const repositories = [];
+            let repositories = [];
             let page = 1;
 
             while (page <= maxPages) {

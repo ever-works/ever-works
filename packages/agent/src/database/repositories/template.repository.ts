@@ -56,6 +56,7 @@ export class TemplateRepository {
                 kind,
                 ownerUserId: userId,
                 sourceType: 'custom',
+                isActive: true,
                 repositoryUrl,
             },
         });
@@ -72,6 +73,7 @@ export class TemplateRepository {
                 kind,
                 ownerUserId: userId,
                 sourceType: 'custom',
+                isActive: true,
                 repositoryOwner,
                 repositoryName,
             },

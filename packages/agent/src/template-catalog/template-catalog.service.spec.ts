@@ -268,6 +268,20 @@ describe('TemplateCatalogService', () => {
         });
     });
 
+    it('does not sync discovered templates during a normal list read', async () => {
+        templateRepository.findVisibleByKind.mockResolvedValue([]);
+        userTemplatePreferenceRepository.findByUserAndKind.mockResolvedValue(null);
+
+        const result = await service.listTemplatesForUser('website', 'user-1');
+
+        expect(gitFacade.listRepositories).not.toHaveBeenCalled();
+        expect(gitFacade.listPublicRepositories).not.toHaveBeenCalled();
+        expect(result).toEqual({
+            defaultTemplateId: 'classic',
+            templates: [],
+        });
+    });
+
     it('refreshes discovered standard templates for website catalogs', async () => {
         gitFacade.getAccessToken.mockResolvedValue(null);
         const firstPageRepositories = Array.from({ length: 100 }, (_, index) => ({
@@ -379,5 +393,20 @@ describe('TemplateCatalogService', () => {
                 'user-1',
             ),
         ).rejects.toThrow(NotFoundException);
+    });
+
+    it('swallows startup seed errors during module init', async () => {
+        const warnSpy = jest
+            .spyOn((service as any).logger, 'warn')
+            .mockImplementation(() => undefined);
+        templateRepository.upsert.mockRejectedValue(new Error('db unavailable'));
+
+        await expect(service.onModuleInit()).resolves.toBeUndefined();
+
+        expect(warnSpy).toHaveBeenCalledWith(
+            expect.stringContaining(
+                'Failed to seed built-in templates during startup: db unavailable',
+            ),
+        );
     });
 });
