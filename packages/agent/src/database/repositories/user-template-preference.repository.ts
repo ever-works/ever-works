@@ -23,20 +23,12 @@ export class UserTemplatePreferenceRepository {
         kind: TemplateKind,
         templateId: string,
     ): Promise<UserTemplatePreference> {
-        const existing = await this.findByUserAndKind(userId, kind);
-
-        if (existing) {
-            await this.repository.update(existing.id, { templateId });
-            return this.repository.findOneOrFail({ where: { id: existing.id } });
-        }
-
-        return this.repository.save(
-            this.repository.create({
-                userId,
-                kind,
-                templateId,
-            }),
+        await this.repository.upsert(
+            { userId, kind, templateId },
+            { conflictPaths: ['userId', 'kind'] },
         );
+
+        return this.repository.findOneOrFail({ where: { userId, kind } });
     }
 
     async deleteByUserKindAndTemplateId(
