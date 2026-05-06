@@ -113,18 +113,56 @@ export class DeployFacadeService implements IDeployFacade {
     }
 
     /**
+     * Check whether a specific deployment provider has user credentials.
+     * This is used by provider listing/configuration UI where there may be no
+     * work selected yet.
+     */
+    async isProviderConfigured(
+        providerId: string,
+        userId: string,
+        workId?: string,
+    ): Promise<boolean> {
+        const registered = this.registry.get(providerId);
+        if (!registered || registered.state !== 'loaded') {
+            return false;
+        }
+        if (!registered.manifest.capabilities.includes(this.CAPABILITY)) {
+            return false;
+        }
+        return !!(await this.getTokenFromSettings(providerId, userId, workId));
+    }
+
+    /**
      * Get list of available deployment providers
      */
     getAvailableProviders(): DeployProviderInfo[] {
         const plugins = this.registry.getByCapability(this.CAPABILITY);
         return plugins.map((p) => ({
             id: p.plugin.id,
-            name: (p.plugin as IDeploymentPlugin).providerName || p.plugin.name,
+            name: p.plugin.name || (p.plugin as IDeploymentPlugin).providerName || p.plugin.id,
             enabled: p.state === 'loaded',
             icon: p.manifest.icon,
             description: p.manifest.description,
             homepage: p.manifest.homepage,
         }));
+    }
+
+    /**
+     * Get deployment providers with user-scoped credential state.
+     *
+     * `enabled` means the plugin is loaded. `configured` means this user has
+     * supplied the provider's primary credential.
+     */
+    async getAvailableProvidersForUser(userId: string): Promise<DeployProviderInfo[]> {
+        const providers = this.getAvailableProviders();
+        return Promise.all(
+            providers.map(async (provider) => ({
+                ...provider,
+                configured: provider.enabled
+                    ? await this.isProviderConfigured(provider.id, userId)
+                    : false,
+            })),
+        );
     }
 
     /**
@@ -287,6 +325,27 @@ export class DeployFacadeService implements IDeployFacade {
         work: Work;
     }> {
         return this.resolvePluginAndTokenWithWork(options);
+    }
+
+    /**
+     * Get the resolved plugin, token, work AND raw settings for deployment.
+     * Settings include secrets — only the deploy service / orchestrators
+     * should call this so it can push plugin-specific secrets via
+     * `IDeploymentPlugin.getDeploymentSecrets(settings)`.
+     */
+    async getPluginAndTokenAndSettings(options: DeployFacadeOptions): Promise<{
+        plugin: IDeploymentPlugin;
+        token: string;
+        work: Work;
+        settings: Record<string, unknown>;
+    }> {
+        const result = await this.resolvePluginAndTokenWithWork(options);
+        const settings = await this.settingsService.getSettings(result.plugin.id, {
+            userId: options.userId,
+            workId: options.workId,
+            includeSecrets: true,
+        });
+        return { ...result, settings };
     }
 
     // Domain management methods
@@ -703,9 +762,12 @@ export class DeployFacadeService implements IDeployFacade {
                 includeSecrets: true,
             });
 
-            // Look for apiToken (Vercel) or generic token fields
+            // Look for provider primary credential fields.
+            // Vercel uses apiToken; Kubernetes uses kubeconfig; other
+            // providers commonly use token/accessToken.
             const token =
                 (settings.apiToken?.value as string) ||
+                (settings.kubeconfig?.value as string) ||
                 (settings.token?.value as string) ||
                 (settings.accessToken?.value as string);
 

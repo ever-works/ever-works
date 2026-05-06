@@ -103,12 +103,16 @@ export class LocalContentExtractorPlugin implements IPlugin, IContentExtractorPl
 				validateStatus: (status) => status >= 200 && status < 400
 			});
 
+			// axios 1.15.2 narrows response.headers values to
+			// `string | number | true | string[] | AxiosHeaders`. Coerce to
+			// string before string-only ops.
 			const rawContentType = response.headers['content-type'];
-			const contentType = Array.isArray(rawContentType)
-				? rawContentType.join(', ')
-				: typeof rawContentType === 'string'
+			const contentType =
+				typeof rawContentType === 'string'
 					? rawContentType
-					: '';
+					: Array.isArray(rawContentType)
+						? rawContentType.join(', ')
+						: String(rawContentType ?? '');
 			if (
 				!contentType.includes('text/html') &&
 				!contentType.includes('text/plain') &&
@@ -421,7 +425,7 @@ export class LocalContentExtractorPlugin implements IPlugin, IContentExtractorPl
 			category: this.category,
 			capabilities: [...this.capabilities],
 			author: { name: 'Ever Works Team' },
-			license: 'MIT',
+			license: 'AGPL-3.0',
 			builtIn: true,
 			systemPlugin: true,
 			autoEnable: true,

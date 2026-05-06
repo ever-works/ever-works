@@ -6,9 +6,10 @@ import {
     ONBOARDING_GIT_PROVIDER,
     ONBOARDING_WORK_CREATOR,
     OnboardingRequestRepository,
-    StateMarkerService,
+    FetchWebhookHttpClient,
     WebhookDeliveryService,
     WebhookSubscriptionRepository,
+    WEBHOOK_HTTP_CLIENT,
     WorksManifestService,
 } from '@ever-works/agent/onboarding';
 import { FacadesModule, GitFacadeService } from '@ever-works/agent/facades';
@@ -35,9 +36,14 @@ import { WellKnownController } from './well-known.controller';
         OnboardingAccountAdapter,
         OnboardingWorkAdapter,
         WorksManifestService,
+        FetchWebhookHttpClient,
         WebhookDeliveryService,
         OnboardingRequestRepository,
         WebhookSubscriptionRepository,
+        {
+            provide: WEBHOOK_HTTP_CLIENT,
+            useExisting: FetchWebhookHttpClient,
+        },
         {
             provide: ONBOARDING_GIT_PROVIDER,
             useExisting: GitFacadeService,

@@ -10,7 +10,12 @@ import {
 } from '@/lib/api';
 import { getTranslations } from 'next-intl/server';
 import { checkGitProviderConnection } from './oauth';
-import { sanitizeName, sanitizePrompt, sanitizeStringArray } from '@/lib/utils/sanitize';
+import {
+    sanitizeName,
+    sanitizePrompt,
+    sanitizeStringArray,
+    sanitizeText,
+} from '@/lib/utils/sanitize';
 
 /**
  * Sanitize plugin-specific configuration values.
@@ -63,6 +68,7 @@ export async function generateItems(workId: string, data: CreateItemsGeneratorDt
         const sanitizedData: CreateItemsGeneratorDto = {
             name: sanitizeName(data.name, 200),
             prompt: sanitizePrompt(data.prompt, 5000),
+            model: sanitizeText(data.model, { maxLength: 200 }) || undefined,
             generation_method: data.generation_method,
             update_with_pull_request: data.update_with_pull_request,
             website_repository_creation_method: data.website_repository_creation_method,

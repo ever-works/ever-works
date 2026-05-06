@@ -2369,7 +2369,7 @@
                     "title": "Obsługiwane formaty repozytoriów",
                     "dataRepo": {
                         "title": "Repozytorium danych",
-                        "description": "Repozytoria z config.yml i strukturą folderu data/"
+                        "description": "Repozytoria z works.yml i strukturą folderu data/"
                     },
                     "awesomeReadme": {
                         "title": "Lista Awesome",
@@ -2492,7 +2492,7 @@
                     "linkRepos": "Połącz repozytoria"
                 },
                 "detectionFailed": "Nie mogliśmy automatycznie wykryć formatu. Wybierz, jak zaimportować to repozytorium.",
-                "detectionFailedMissingConfig": "Nie znaleziono obsługiwanej konfiguracji. Dodaj config.yml, works.yml lub works_config/works.yml do repozytorium lub wybierz format importu ręcznego poniżej.",
+                "detectionFailedMissingConfig": "Nie znaleziono obsługiwanej konfiguracji. Dodaj works.yml do repozytorium lub wybierz format importu ręcznego poniżej.",
                 "errors": {
                     "urlRequired": "Wprowadź URL repozytorium GitHub",
                     "unsupportedFormat": "Ten format repozytorium nie jest obsługiwany. Użyj formatu Repozytorium danych lub Lista Awesome.",

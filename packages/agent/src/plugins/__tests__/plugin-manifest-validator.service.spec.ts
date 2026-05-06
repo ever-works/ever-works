@@ -224,7 +224,7 @@ describe('PluginManifestValidatorService', () => {
                 name: 'my-package',
                 version: '2.0.0',
                 description: 'Package description',
-                license: 'MIT',
+                license: 'AGPL-3.0',
                 everworks: {
                     plugin: {
                         id: 'my-plugin',
@@ -238,7 +238,7 @@ describe('PluginManifestValidatorService', () => {
             expect(manifest?.name).toBe('my-package');
             expect(manifest?.version).toBe('2.0.0');
             expect(manifest?.description).toBe('Package description');
-            expect(manifest?.license).toBe('MIT');
+            expect(manifest?.license).toBe('AGPL-3.0');
         });
 
         it('should not produce undefined keys when neither source has optional fields', () => {

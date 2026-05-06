@@ -180,7 +180,7 @@ export class ActivepiecesPlugin implements IPlugin, IPipelinePlugin, IFormSchema
 			category: this.category,
 			capabilities: [...this.capabilities],
 			author: { name: 'Ever Works Team' },
-			license: 'MIT',
+			license: 'AGPL-3.0',
 			builtIn: true,
 			autoEnable: false,
 			visibility: 'public',

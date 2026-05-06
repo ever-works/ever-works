@@ -9,8 +9,7 @@
 ## 1. Purpose
 
 `@ever-works/plugin` is the standalone TypeScript SDK that every Ever Works
-plugin builds against. It is **NestJS-free**, **runtime-free**, and **MIT
-licensed** — plugins are ESM packages that ship `dist/` with a `package.json`
+plugin builds against. It is **NestJS-free**, **runtime-free**, and **AGPL-3.0 licensed** — plugins are ESM packages that ship `dist/` with a `package.json`
 declaring an `everworks.plugin` block.
 
 The SDK gives plugins three things:
@@ -225,7 +224,7 @@ The `everworks.plugin` block in a plugin's `package.json`:
 			"defaultFor": null,
 			"autoEnable": false,
 			"author": { "name": "Ever Works Team" },
-			"license": "MIT"
+			"license": "AGPL-3.0"
 		}
 	}
 }

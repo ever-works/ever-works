@@ -47,6 +47,8 @@ export async function updateWorkSchedule(
     try {
         await workAPI.updateSchedule(workId, validation.data);
         revalidatePath(ROUTES.DASHBOARD_WORK(workId));
+        revalidatePath(ROUTES.DASHBOARD_WORK_GENERATOR(workId));
+        revalidatePath(ROUTES.DASHBOARD_WORK_SCHEDULE(workId));
 
         return {
             success: true,
@@ -71,6 +73,7 @@ export async function runWorkSchedule(workId: string) {
     try {
         await workAPI.runSchedule(workId);
         revalidatePath(ROUTES.DASHBOARD_WORK(workId));
+        revalidatePath(ROUTES.DASHBOARD_WORK_GENERATOR(workId));
         return { success: true, message: t('runStarted') };
     } catch (error) {
         return {

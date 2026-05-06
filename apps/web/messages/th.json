@@ -2369,7 +2369,7 @@
                     "title": "รูปแบบ Repository ที่รองรับ",
                     "dataRepo": {
                         "title": "Data Repository",
-                        "description": "Repository ที่มีโครงสร้าง config.yml และโฟลเดอร์ data/"
+                        "description": "Repository ที่มีโครงสร้าง works.yml และโฟลเดอร์ data/"
                     },
                     "awesomeReadme": {
                         "title": "Awesome List",
@@ -2492,7 +2492,7 @@
                     "linkRepos": "ลิงก์ repository"
                 },
                 "detectionFailed": "เราไม่สามารถตรวจจับรูปแบบโดยอัตโนมัติได้ กรุณาเลือกวิธีนำเข้าของ repository นี้",
-                "detectionFailedMissingConfig": "ไม่พบการตั้งค่าที่รองรับ เพิ่ม config.yml, works.yml หรือ works_config/works.yml ลงในคลัง หรือเลือกการนำเข้าด้วยตนเองด้านล่าง",
+                "detectionFailedMissingConfig": "ไม่พบการตั้งค่าที่รองรับ เพิ่ม works.yml ลงในคลัง หรือเลือกการนำเข้าด้วยตนเองด้านล่าง",
                 "errors": {
                     "urlRequired": "กรุณาป้อน URL GitHub repository",
                     "unsupportedFormat": "รูปแบบ repository นี้ไม่รองรับ กรุณาใช้รูปแบบ Data Repository หรือ Awesome List",

@@ -55,9 +55,7 @@ existing repo and writes it back after every successful generation.
 
 ## 3. Functional Requirements
 
-- **FR-1** The system MUST attempt to read `works.yml` from a data repo at
-  paths in this priority order: `works.yml`, `works.yaml`,
-  `works_config/works.yml`, `works_config/works.yaml`.
+- **FR-1** The system MUST attempt to read `works.yml` from the data repo root.
 - **FR-2** The system MUST parse a successfully-read `works.yml` into a
   typed config and surface its values in the import flow's UI fields.
 - **FR-3** The system MUST validate plugin id references in

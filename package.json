@@ -50,13 +50,13 @@
 		"prettier": "^3.7.4",
 		"prettier-eslint-cli": "^8.0.1",
 		"prettier-plugin-tailwindcss": "^0.5.14",
-		"turbo": "^2.9.8"
+		"turbo": "^2.9.9"
 	},
 	"engines": {
 		"node": ">=22",
 		"pnpm": ">=9.9.0"
 	},
-	"packageManager": "pnpm@10.33.2",
+	"packageManager": "pnpm@10.33.3",
 	"pnpm": {
 		"overrides": {
 			"protobufjs@<7.5.5": ">=7.5.5",

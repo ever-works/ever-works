@@ -13,6 +13,9 @@ import {
     WorkCreatedEvent,
     WorkGenerationCompletedEvent,
     WorksConfigSyncFailedEvent,
+    DeploymentDispatchedEvent,
+    DeploymentCompletedEvent,
+    DeploymentFailedEvent,
 } from '@ever-works/agent/events';
 
 @Injectable()
@@ -173,6 +176,66 @@ export class ActivityLogListener {
             });
         } catch (error) {
             this.logger.error('Failed to log member invited activity:', error);
+        }
+    }
+
+    @OnEvent(DeploymentDispatchedEvent.EVENT_NAME)
+    async onDeploymentDispatched(event: DeploymentDispatchedEvent) {
+        try {
+            const { work, userId, providerId, providerName } = event.payload;
+            await this.activityLogService.log({
+                userId,
+                workId: work.id,
+                actionType: ActivityActionType.DEPLOYMENT,
+                action: 'deployment.dispatched',
+                status: ActivityStatus.IN_PROGRESS,
+                summary: `Dispatched deployment workflow for ${work.name} via ${providerName}`,
+                details: { providerId, providerName },
+            });
+        } catch (error) {
+            this.logger.error('Failed to log deployment dispatched activity:', error);
+        }
+    }
+
+    @OnEvent(DeploymentCompletedEvent.EVENT_NAME)
+    async onDeploymentCompleted(event: DeploymentCompletedEvent) {
+        try {
+            const { work, userId, providerId, providerName, url } = event.payload;
+            await this.activityLogService.log({
+                userId,
+                workId: work.id,
+                actionType: ActivityActionType.DEPLOYMENT,
+                action: 'deployment.succeeded',
+                status: ActivityStatus.COMPLETED,
+                summary: url
+                    ? `Deployed ${work.name} to ${url}`
+                    : `Deployed ${work.name} via ${providerName}`,
+                details: { providerId, providerName, url },
+            });
+        } catch (error) {
+            this.logger.error('Failed to log deployment completed activity:', error);
+        }
+    }
+
+    @OnEvent(DeploymentFailedEvent.EVENT_NAME)
+    async onDeploymentFailed(event: DeploymentFailedEvent) {
+        try {
+            const { work, userId, providerId, providerName, terminalState, error } = event.payload;
+            const action =
+                terminalState === 'CANCELED' ? 'deployment.cancelled' : 'deployment.failed';
+            const status =
+                terminalState === 'CANCELED' ? ActivityStatus.CANCELLED : ActivityStatus.FAILED;
+            await this.activityLogService.log({
+                userId,
+                workId: work.id,
+                actionType: ActivityActionType.DEPLOYMENT,
+                action,
+                status,
+                summary: `Deployment ${terminalState.toLowerCase()} for ${work.name} via ${providerName}`,
+                details: { providerId, providerName, terminalState, error },
+            });
+        } catch (err) {
+            this.logger.error('Failed to log deployment failed activity:', err);
         }
     }
 }

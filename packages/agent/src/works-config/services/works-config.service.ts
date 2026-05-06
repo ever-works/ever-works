@@ -1,17 +1,10 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { WorkScheduleCadence, type ProvidersDto } from '@ever-works/contracts/api';
 import * as yaml from 'yaml';
-import mergeWith from 'lodash/mergeWith';
 import { GitFacadeService } from '@src/facades/git.facade';
 import type { RepositoryTarget } from '@src/entities/work.entity';
 
-const LEGACY_WORKS_CONFIG_FILEPATHS = ['config.yml', 'config.yaml'] as const;
-const STANDARD_WORKS_CONFIG_FILEPATHS = [
-    'works_config/works.yml',
-    'works_config/works.yaml',
-    'works.yml',
-    'works.yaml',
-] as const;
+const WORKS_CONFIG_FILEPATHS = ['works.yml'] as const;
 export interface WorksConfigSummary {
     name?: string;
     initialPrompt?: string;
@@ -19,6 +12,12 @@ export interface WorksConfigSummary {
     websiteRepo?: string;
     scheduleCadence?: WorkScheduleCadence | null;
     providers?: ProvidersDto;
+    /**
+     * Deploy provider plugin id declared in `works.yml` (e.g. 'vercel', 'k8s').
+     * Validated against `DeployFacadeService.getAvailableProviders()` at apply
+     * time; the works-config layer itself is provider-agnostic.
+     */
+    deployProvider?: string;
 }
 
 export interface ParsedWorksConfig extends WorksConfigSummary {
@@ -49,7 +48,7 @@ export class WorksConfigService {
         const parsed = yaml.parse(content);
 
         if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
-            throw new Error('works.yaml must contain a YAML object at the root');
+            throw new Error('works.yml must contain a YAML object at the root');
         }
 
         return this.toParsed(parsed as Record<string, unknown>);
@@ -77,6 +76,7 @@ export class WorksConfigService {
                     'websiteRepository',
                 ]),
             ),
+            deployProvider: this.readString(raw, ['deployProvider', 'deploy_provider']),
         };
     }
 
@@ -86,19 +86,14 @@ export class WorksConfigService {
         providerId?: string,
         token?: string,
     ): Promise<Record<string, unknown> | null> {
-        let mergedRaw: Record<string, unknown> | null = null;
-
-        for (const filePath of [
-            ...LEGACY_WORKS_CONFIG_FILEPATHS,
-            ...STANDARD_WORKS_CONFIG_FILEPATHS,
-        ]) {
+        for (const filePath of WORKS_CONFIG_FILEPATHS) {
             const raw = await this.readRawFile(owner, repo, filePath, providerId, token);
             if (raw) {
-                mergedRaw = this.mergeRaw(mergedRaw ?? {}, raw);
+                return raw;
             }
         }
 
-        return mergedRaw;
+        return null;
     }
 
     private async readRawFile(
@@ -132,7 +127,7 @@ export class WorksConfigService {
         try {
             const parsed = yaml.parse(file.content);
             if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
-                throw new Error('works.yaml must contain a YAML object at the root');
+                throw new Error('works.yml must contain a YAML object at the root');
             }
             return parsed as Record<string, unknown>;
         } catch (error) {
@@ -142,18 +137,6 @@ export class WorksConfigService {
                 }`,
             );
         }
-    }
-
-    private mergeRaw(
-        base: Record<string, unknown>,
-        override: Record<string, unknown>,
-    ): Record<string, unknown> {
-        return mergeWith({}, base, override, (_objValue, srcValue) => {
-            if (Array.isArray(srcValue)) {
-                return srcValue;
-            }
-            return undefined;
-        });
     }
 
     parseRepositoryReference(value?: string): RepositoryTarget | undefined {

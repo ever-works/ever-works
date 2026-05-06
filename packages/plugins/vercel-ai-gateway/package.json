@@ -2,9 +2,14 @@
 	"name": "@ever-works/vercel-ai-gateway-plugin",
 	"version": "1.0.0",
 	"description": "Vercel AI Gateway plugin for Ever Works platform",
+	"author": {
+		"name": "Ever Co. LTD",
+		"email": "ever@ever.co",
+		"url": "https://ever.co"
+	},
+	"license": "AGPL-3.0",
 	"private": false,
 	"type": "module",
-	"license": "MIT",
 	"main": "./dist/index.cjs",
 	"module": "./dist/index.js",
 	"types": "./dist/index.d.ts",
@@ -50,7 +55,7 @@
 			"author": {
 				"name": "Ever Works Team"
 			},
-			"license": "MIT",
+			"license": "AGPL-3.0",
 			"builtIn": true,
 			"autoEnable": false,
 			"systemPlugin": false

@@ -14,7 +14,7 @@
 flowchart LR
     Orch[TriggerGenerationOrchestrator] --> DG[DataGeneratorService.initialize]
     DG --> Repo[DataRepository — local clone of data repo]
-    Repo --> Read[Read config.yml + items/ + categories/tags/brands.yml]
+    Repo --> Read[Read works.yml + items/ + categories/tags/brands.yml]
     DG --> Items[ItemsGeneratorService.generateItems]
     Items --> Pipeline[15-step Standard Pipeline / Agent / CLI]
     DG --> Merge[Merge new + existing items]
@@ -40,7 +40,7 @@ commit/PR. It does not own the pipeline itself (lives in
 | Item merge unit      | `slug`                                           | Stable identity; preserves user-edited fields (`featured`, `order`)     |
 | Commit strategy      | Direct push **or** PR per work setting           | PR mode supports review-driven works; direct mode for single-owner      |
 | Branch naming        | `ever-update-<unix-timestamp>` for PR mode       | Sortable, no collision risk                                             |
-| Version field        | Auto-increment integer in `config.yml`           | Cache-busting signal for the markdown / website / API consumers         |
+| Version field        | Auto-increment integer in `works.yml`            | Cache-busting signal for the markdown / website / API consumers         |
 | Error recovery       | Idempotent writes; retry clone/push with backoff | Network-related failures are common; everything else fails the run loud |
 
 ## 3. Data Model
@@ -50,7 +50,7 @@ state is the **data repository on GitHub**:
 
 ```text
 {owner}/{work-slug}-data/
-├── config.yml          # WorkConfig (name, slug, version, metadata)
+├── works.yml          # WorkConfig (name, slug, version, metadata)
 ├── items/              # One JSON file per item (filename = slug)
 │   ├── tool-a.json
 │   └── tool-b.json
@@ -59,7 +59,7 @@ state is the **data repository on GitHub**:
 └── brands.yml          # Brand[] — id, name, logo_url
 ```
 
-`config.yml.metadata.last_request_data` stores the most recent
+`works.yml.metadata.last_request_data` stores the most recent
 `CreateItemsGeneratorDto` so subsequent runs can be diffed and
 re-runs reproduce the prior parameters.
 
@@ -130,7 +130,7 @@ own task.
 - Git access tokens are fetched via `GitFacadeService.getAccessToken`,
   which reads encrypted credentials from `auth_accounts` and is the
   only place tokens are materialised in worker memory.
-- `config.yml` and `last_request_data` may contain user prompts;
+- `works.yml` and `last_request_data` may contain user prompts;
   the activity log records only the field names that changed, never
   the prompt content (mirrors the `advanced-prompts` policy).
 
@@ -173,7 +173,7 @@ behaviour. Future changes follow the standard /specify → /plan →
 - **VII (Secret hygiene)**: tokens never logged; activity log records change names only
 - **VIII (Plugin counts)**: `git-github` is the canonical git provider plugin
 - **IX (Behaviour-first)**: spec describes observable behaviour — repository structure, modes, merge semantics
-- **X (Backwards-compat)**: `config.yml.version` allows additive schema changes without breaking older clones
+- **X (Backwards-compat)**: `works.yml.version` allows additive schema changes without breaking older clones
 
 ## 13. References
 

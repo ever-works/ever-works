@@ -11,6 +11,7 @@ export interface DeployProvider {
     id: string;
     name: string;
     enabled: boolean;
+    configured?: boolean;
     icon?: PluginIconType;
     description?: string;
     homepage?: string;
@@ -82,12 +83,12 @@ export function DeployProviderSelector({
                                     <span
                                         className={cn(
                                             'text-[11px] mt-0.5 leading-none',
-                                            provider.enabled
+                                            provider.configured
                                                 ? 'text-emerald-500 dark:text-emerald-400'
                                                 : 'text-text-muted dark:text-text-muted-dark',
                                         )}
                                     >
-                                        {provider.enabled ? t('configured') : t('notConfigured')}
+                                        {provider.configured ? t('configured') : t('notConfigured')}
                                     </span>
                                 </div>
                                 {isSelected && (
@@ -98,7 +99,7 @@ export function DeployProviderSelector({
                                 )}
                             </button>
 
-                            {isSelected && !provider.enabled && (
+                            {isSelected && provider.enabled && !provider.configured && (
                                 <Link
                                     href={`/plugins/${provider.id}`}
                                     className={cn(
@@ -146,12 +147,12 @@ export function DeployProviderSelector({
                                 <span
                                     className={cn(
                                         'text-[11px] mt-0.5 leading-none',
-                                        provider.enabled
+                                        provider.configured
                                             ? 'text-emerald-500 dark:text-emerald-400'
                                             : 'text-text-muted dark:text-text-muted-dark',
                                     )}
                                 >
-                                    {provider.enabled ? t('configured') : t('notConfigured')}
+                                    {provider.configured ? t('configured') : t('notConfigured')}
                                 </span>
                             </div>
                             {isSelected && (
@@ -162,7 +163,7 @@ export function DeployProviderSelector({
                             )}
                         </button>
 
-                        {isSelected && !provider.enabled && (
+                        {isSelected && provider.enabled && !provider.configured && (
                             <Link
                                 href={`/plugins/${provider.id}`}
                                 className={cn(

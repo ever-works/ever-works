@@ -14,10 +14,14 @@ export async function generateMetadata(): Promise<Metadata> {
     return { title: t('generator') };
 }
 
-type Params = { params: Promise<{ id: string }> };
+type Params = {
+    params: Promise<{ id: string }>;
+    searchParams: Promise<{ starting?: string }>;
+};
 
-export default async function WorkGeneratorPage({ params }: Params) {
+export default async function WorkGeneratorPage({ params, searchParams }: Params) {
     const { id } = await params;
+    const { starting } = await searchParams;
 
     let work;
 
@@ -52,6 +56,7 @@ export default async function WorkGeneratorPage({ params }: Params) {
             config={configRes.config}
             websiteTemplates={websiteTemplatesRes.templates}
             workPlugins={pluginsRes.plugins}
+            startInProgressView={starting === '1'}
         />
     );
 }

@@ -106,7 +106,7 @@ The `everworks.plugin` field is how the platform discovers your plugin at startu
 			"author": {
 				"name": "Your Name"
 			},
-			"license": "MIT",
+			"license": "AGPL-3.0",
 			"builtIn": true,
 			"autoEnable": false,
 			"envVars": [
@@ -628,7 +628,7 @@ export class MyScreenshotPlugin implements IPlugin, IScreenshotPlugin {
 			category: this.category,
 			capabilities: [...this.capabilities],
 			author: { name: 'Your Name' },
-			license: 'MIT',
+			license: 'AGPL-3.0',
 			builtIn: true,
 			systemPlugin: false,
 			readme: [

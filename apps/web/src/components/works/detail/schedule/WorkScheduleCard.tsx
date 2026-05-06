@@ -238,6 +238,7 @@ function ScheduleFormContent({
 
     const [isSaving, startSaving] = useTransition();
     const [isRunning, startRunning] = useTransition();
+    const generatorStartingRoute = `${ROUTES.DASHBOARD_WORK_GENERATOR(workId)}?starting=1`;
 
     const subscriptionsEnabled = schedule.subscriptionsEnabled;
     const readOnlyReason = readOnly ? schedule.blockingReason : null;
@@ -285,6 +286,12 @@ function ScheduleFormContent({
             const nextForm = { ...form, enable: !form.enable };
             setForm(nextForm);
             toast.success(form.enable ? t('success.stopped') : t('success.started'));
+
+            if (!form.enable) {
+                router.push(generatorStartingRoute);
+                return;
+            }
+
             router.refresh();
         });
     };
@@ -353,7 +360,7 @@ function ScheduleFormContent({
             }
 
             toast.success(result.message || t('success.runStarted'));
-            router.push(ROUTES.DASHBOARD_WORK_GENERATOR(workId));
+            router.push(generatorStartingRoute);
         });
     };
 

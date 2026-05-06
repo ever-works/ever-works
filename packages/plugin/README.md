@@ -299,4 +299,4 @@ import { createMockPluginContext, createTestHarness } from '@ever-works/plugin/t
 
 ## License
 
-MIT
+AGPL-3.0

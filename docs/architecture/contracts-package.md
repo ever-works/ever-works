@@ -14,7 +14,7 @@ The `@ever-works/contracts` package provides shared TypeScript type definitions 
 | Property          | Value                        |
 | ----------------- | ---------------------------- |
 | **Package name**  | `@ever-works/contracts`      |
-| **License**       | MIT                          |
+| **License**       | AGPL-3.0                     |
 | **Module format** | Dual ESM/CJS (via tsup)      |
 | **Build tool**    | tsup                         |
 | **Dependencies**  | None (pure type definitions) |
