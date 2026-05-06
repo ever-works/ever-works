@@ -72,7 +72,7 @@ export function createParentTools(ctx: ParentToolContext): ParentToolsResult {
 
 		const errorMessage = result.error?.toLowerCase() || '';
 		if (
-			errorMessage.includes('no items extracted') ||
+			errorMessage.includes('no items retrieved') ||
 			errorMessage.includes('empty content') ||
 			errorMessage.includes('returned empty content')
 		) {

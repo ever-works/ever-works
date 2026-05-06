@@ -20,7 +20,7 @@ export const addItemTool = tool({
     execute: async ({ workId, sourceUrl }) => {
         const extracted = await extractItemDetails(sourceUrl);
         if (!extracted.success || !extracted.data) {
-            return { success: false, error: extracted.error ?? 'Failed to extract item details' };
+            return { success: false, error: extracted.error ?? 'Failed to retrieve item details' };
         }
 
         const data = extracted.data;

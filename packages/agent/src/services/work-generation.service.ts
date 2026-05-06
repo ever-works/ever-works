@@ -676,7 +676,7 @@ Only include image URLs that are absolute URLs (starting with http).`;
                     brand_logo_url: result.brand_logo_url,
                     images: result.images?.filter((url) => url.startsWith('http')) || [],
                 },
-                message: 'Item details extracted successfully',
+                message: 'Item details retrieved successfully',
             };
         } catch (error) {
             this.logger.error(`Failed to extract item details from ${source_url}:`, error);

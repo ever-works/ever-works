@@ -745,7 +745,7 @@
                 "deployment": "Deployment",
                 "search": "Search",
                 "screenshot": "Screenshots",
-                "content-extractor": "Content Extractors",
+                "content-extractor": "Content Processors",
                 "data-source": "Data Sources",
                 "git-provider": "Git Providers",
                 "pipeline": "Pipeline"
@@ -1032,7 +1032,7 @@
                         "ai": "AI",
                         "search": "Search",
                         "screenshot": "Screenshot",
-                        "contentExtractor": "Extractor"
+                        "contentExtractor": "Processor"
                     }
                 },
                 "card": {
@@ -1304,6 +1304,15 @@
                     "collection_change": "Collection Change",
                     "community_pr_merged": "Community PR"
                 },
+                "generationInfo": {
+                    "label": "Generation details",
+                    "itemsAdded": "Items added",
+                    "itemsUpdated": "Items updated",
+                    "totalItems": "Total items",
+                    "pagesProcessed": "Pages processed",
+                    "tokensUsed": "Tokens used",
+                    "existingReferencesUsed": "Existing references used"
+                },
                 "detail": {
                     "added": "Added",
                     "updated": "Updated",
@@ -1415,11 +1424,11 @@
                     "title": "Add New Item",
                     "sourceUrl": "Source URL",
                     "sourceUrlPlaceholder": "https://example.com/product",
-                    "sourceUrlHelp": "Click 'Extract' to automatically fetch item details from the URL",
-                    "extract": "Extract",
-                    "extractSuccess": "Item details extracted successfully",
-                    "extractFailed": "Failed to extract item details",
-                    "extractError": "An error occurred while extracting details",
+                    "sourceUrlHelp": "Click 'Retrieve' to automatically fetch item details from the URL",
+                    "extract": "Retrieve",
+                    "extractSuccess": "Item details retrieved successfully",
+                    "extractFailed": "Failed to retrieve item details",
+                    "extractError": "An error occurred while retrieving details",
                     "name": "Name",
                     "namePlaceholder": "Enter item name",
                     "description": "Description",
@@ -1768,7 +1777,7 @@
                 "websiteRepositoryCreationMethodDescription": "How the website repository is created. Template is recommended for most cases.",
                 "maxSearchQueriesDescription": "Number of search queries the AI will generate to find relevant content (1-50).",
                 "resultsPerQueryDescription": "Maximum results to retrieve per search query (1-20).",
-                "maxPagesToProcessDescription": "Maximum web pages to process for content extraction (1-100).",
+                "maxPagesToProcessDescription": "Maximum web pages to process for content retrieval (1-100).",
                 "relevanceThresholdDescription": "Minimum relevance score (0-1) for content to be included. Higher values mean stricter filtering.",
                 "dataGeneration": "Data Generation Options",
                 "dataGenerationDescription": "Configure data volume and entity generation",
@@ -1795,8 +1804,8 @@
                 "screenshotProviderDescription": "Provider for capturing screenshots of items",
                 "aiProvider": "AI Provider",
                 "aiProviderDescription": "AI model provider for content generation and extraction",
-                "contentExtractorProvider": "Content Extractor",
-                "contentExtractorProviderDescription": "Provider for extracting content from web pages",
+                "contentExtractorProvider": "Content Processor",
+                "contentExtractorProviderDescription": "Provider for processing content from web pages",
                 "useWorkDefault": "Use Work Default",
                 "default": "Default",
                 "notConfigured": "Not configured",
@@ -1817,7 +1826,7 @@
                     "webSearch": "Searching the web",
                     "contentRetrieval": "Retrieving content",
                     "contentFiltering": "Filtering relevant content",
-                    "itemsExtraction": "Extracting items from content",
+                    "itemsExtraction": "Processing items from content",
                     "deduplicationDataAggregation": "Removing duplicates and aggregating data",
                     "categoriesTagsProcessing": "Processing categories and tags",
                     "sourcesValidation": "Validating sources",
@@ -1954,7 +1963,7 @@
                             "placeholder": "e.g., Focus on enterprise-grade solutions with active maintenance..."
                         },
                         "itemExtraction": {
-                            "title": "Item Extraction",
+                            "title": "Item Processing",
                             "description": "Additional instructions for extracting items from web page content.",
                             "placeholder": "e.g., Prioritize tools with official documentation links..."
                         },
@@ -1965,7 +1974,7 @@
                         },
                         "categorization": {
                             "title": "Categorization",
-                            "description": "Additional instructions for categorizing and tagging extracted items.",
+                            "description": "Additional instructions for categorizing and tagging processed items.",
                             "placeholder": "e.g., Use technical categories like 'CLI Tools', 'Libraries', 'Frameworks'..."
                         },
                         "deduplication": {

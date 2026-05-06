@@ -178,20 +178,20 @@ export class ContentExtractorFacadeService
                     error: message,
                 });
                 this.logger.warn(
-                    `Content extraction failed for ${url} (plugin: ${candidate.id}): ${message}`,
+                    `Content processing failed for ${url} (plugin: ${candidate.id}): ${message}`,
                 );
             }
         }
 
         this.logger.warn(
-            `Content extraction failed for ${url}; tried ${attempts
+            `Content processing failed for ${url}; tried ${attempts
                 .map((attempt) => `${attempt.providerId}: ${attempt.error || 'failed'}`)
                 .join(', ')}`,
         );
         return {
             content: null,
             attempts,
-            error: `Content extraction failed for URL: ${url}`,
+            error: `Processing failed for URL: ${url}`,
         };
     }
 

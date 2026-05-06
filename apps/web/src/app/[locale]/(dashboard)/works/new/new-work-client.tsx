@@ -35,7 +35,11 @@ export default function NewWorkClient({
         defaultProviderId || providers[0]?.provider.id || null,
     );
     const [selectedDeployProviderId, setSelectedDeployProviderId] = useState<string | null>(
-        defaultDeployProviderId || deployProviders[0]?.id || null,
+        defaultDeployProviderId ||
+            deployProviders.find((provider) => provider.enabled && provider.configured)?.id ||
+            deployProviders.find((provider) => provider.enabled)?.id ||
+            deployProviders[0]?.id ||
+            null,
     );
     const t = useTranslations('dashboard.workCreation');
 

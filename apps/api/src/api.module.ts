@@ -31,9 +31,11 @@ import {
     PluginBootstrapService,
 } from '@ever-works/agent/plugins';
 import { CacheFactory } from '@ever-works/agent/cache';
+import { DatabaseModule } from '@ever-works/agent/database';
 
 @Module({
     imports: [
+        DatabaseModule,
         CacheFactory.TypeORM({
             isGlobal: true,
         }),
