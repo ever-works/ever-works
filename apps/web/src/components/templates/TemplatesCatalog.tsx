@@ -9,19 +9,20 @@ import {
     LayoutTemplate,
     Search,
     Plus,
-    Sparkles,
     Github,
     ExternalLink,
     GitFork,
     PencilLine,
     RefreshCw,
     Trash2,
+    Star,
 } from 'lucide-react';
 import type { TemplateCatalogItem, TemplateKind, TemplateOriginType } from '@/lib/api/templates';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
+import { EmptyState } from '@/components/common/EmptyState';
 import {
     Dialog,
     DialogClose,
@@ -82,41 +83,6 @@ function compareTemplates(a: TemplateCatalogItem, b: TemplateCatalogItem) {
     return a.name.localeCompare(b.name);
 }
 
-function frameworkTone(framework?: string | null) {
-    const value = framework?.toLowerCase() || '';
-
-    if (value.includes('astro')) {
-        return {
-            shell: 'from-orange-500/20 via-amber-500/10 to-transparent',
-            badge: 'bg-orange-500/12 text-orange-700 dark:text-orange-300',
-            accent: 'border-orange-500/30',
-        };
-    }
-
-    if (value.includes('next')) {
-        return {
-            shell: 'from-slate-900/20 via-slate-500/10 to-transparent dark:from-white/12 dark:via-white/6',
-            badge: 'bg-slate-900/8 text-slate-700 dark:text-slate-200',
-            accent: 'border-slate-900/15 dark:border-white/10',
-        };
-    }
-
-    return {
-        shell: 'from-teal-500/18 via-cyan-500/8 to-transparent',
-        badge: 'bg-teal-500/12 text-teal-700 dark:text-teal-300',
-        accent: 'border-teal-500/20',
-    };
-}
-
-function initials(name: string): string {
-    return name
-        .split(/\s+/)
-        .filter(Boolean)
-        .slice(0, 2)
-        .map((part) => part.charAt(0).toUpperCase())
-        .join('');
-}
-
 function originLabelKey(originType: TemplateOriginType) {
     switch (originType) {
         case 'standard':
@@ -125,17 +91,6 @@ function originLabelKey(originType: TemplateOriginType) {
             return 'card.forked';
         case 'custom_url':
             return 'card.customUrl';
-    }
-}
-
-function sourceLabelKey(originType: TemplateOriginType) {
-    switch (originType) {
-        case 'standard':
-            return 'card.standardSource';
-        case 'forked':
-            return 'card.forkedSource';
-        case 'custom_url':
-            return 'card.customUrlSource';
     }
 }
 
@@ -177,149 +132,115 @@ function TemplateCard({
     archiveLoading: boolean;
 }) {
     const t = useTranslations('dashboard.templates');
-    const tone = frameworkTone(template.framework);
     const [previewFailed, setPreviewFailed] = useState(false);
     const previewUrl = previewFailed ? null : getTemplatePreviewUrl(template);
-    const sourceLabel = t(sourceLabelKey(template.originType));
     const originLabel = t(originLabelKey(template.originType));
 
     return (
         <article
             className={cn(
-                'group overflow-hidden rounded-xl border bg-card dark:bg-card-primary-dark/30',
-                'border-card-border dark:border-border-secondary-dark',
-                'shadow-xs transition-colors hover:border-primary/35 dark:hover:border-white/15',
+                'group relative flex flex-col rounded-lg shadow-xs overflow-hidden',
+                'bg-card dark:bg-card-primary-dark/70',
+                'border border-card-border dark:border-white/9',
+                'hover:border-primary-500/50 dark:hover:border-white/20',
+                'transition-colors',
+                isDefault && 'border-primary/40 dark:border-primary/40',
             )}
         >
-            <div className="p-4">
-                <div className="mb-4 overflow-hidden rounded-lg border border-card-border dark:border-border-dark bg-slate-950">
-                    <div className="relative aspect-[1.8]">
-                        {previewUrl ? (
-                            <Image
-                                src={previewUrl}
-                                alt={t('card.previewAlt', { name: template.name })}
-                                fill
-                                sizes="(min-width: 1600px) 30vw, (min-width: 1024px) 44vw, 100vw"
-                                className="object-cover transition-transform duration-300 group-hover:scale-[1.02]"
-                                onError={() => setPreviewFailed(true)}
-                            />
-                        ) : (
-                            <div
-                                className={cn(
-                                    'absolute inset-0 bg-gradient-to-br',
-                                    tone.shell,
-                                    'from-slate-950 via-slate-900 to-slate-800 dark:from-slate-950 dark:via-slate-900 dark:to-black',
-                                )}
-                            >
-                                <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.22),transparent_34%),radial-gradient(circle_at_80%_20%,rgba(255,255,255,0.12),transparent_28%),linear-gradient(135deg,rgba(255,255,255,0.06),transparent_55%)]" />
-                                <div className="absolute inset-x-0 bottom-0 top-1/3 bg-[linear-gradient(180deg,transparent,rgba(15,23,42,0.92))]" />
-                            </div>
-                        )}
-
-                        <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(15,23,42,0.12),rgba(15,23,42,0.68))]" />
-
-                        <div className="absolute inset-x-0 top-0 flex items-start justify-between gap-3 p-4">
-                            <div className="flex flex-wrap gap-2">
-                                {template.framework ? (
-                                    <span
-                                        className={cn(
-                                            'rounded-full px-2 py-0.5 text-[11px] font-medium backdrop-blur-sm',
-                                            tone.badge,
-                                        )}
-                                    >
-                                        {template.framework}
-                                    </span>
-                                ) : null}
-                                <span className="rounded-full bg-white/12 px-2 py-0.5 text-[11px] font-medium text-white backdrop-blur-sm">
-                                    {originLabel}
-                                </span>
-                                {isDefault ? (
-                                    <span className="rounded-full bg-primary/85 px-2 py-0.5 text-[11px] font-medium text-primary-foreground">
-                                        {t('card.default')}
-                                    </span>
-                                ) : null}
-                            </div>
-
-                            <div
-                                className={cn(
-                                    'flex h-10 w-10 shrink-0 items-end rounded-xl border px-2 py-1.5 text-white shadow-md backdrop-blur-sm',
-                                    'bg-white/10',
-                                    tone.accent,
-                                )}
-                            >
-                                <span className="text-sm font-semibold tracking-tight">
-                                    {initials(template.name)}
-                                </span>
-                            </div>
-                        </div>
-
-                        <div className="absolute inset-x-0 bottom-0 p-3">
-                            <div className="rounded-lg border border-white/12 bg-black/35 p-3 backdrop-blur-md">
-                                <p className="text-[11px] uppercase tracking-[0.24em] text-white/62">
-                                    {sourceLabel}
-                                </p>
-                                <h3 className="mt-1.5 text-base font-semibold leading-tight text-white">
-                                    {template.name}
-                                </h3>
-                                <p className="mt-1.5 flex items-center gap-2 text-xs text-white/72">
-                                    <Github className="h-3.5 w-3.5" />
-                                    <span className="truncate">
-                                        {template.repositoryOwner}/{template.repositoryName}
-                                    </span>
-                                </p>
-                            </div>
-                        </div>
+            <div className="relative aspect-[16/9] bg-surface-secondary dark:bg-white/5 overflow-hidden">
+                {previewUrl ? (
+                    <Image
+                        src={previewUrl}
+                        alt={t('card.previewAlt', { name: template.name })}
+                        fill
+                        sizes="(min-width: 1600px) 30vw, (min-width: 1024px) 44vw, 100vw"
+                        className="object-cover transition-transform duration-300 group-hover:scale-[1.02]"
+                        onError={() => setPreviewFailed(true)}
+                    />
+                ) : (
+                    <div className="flex h-full w-full items-center justify-center">
+                        <LayoutTemplate
+                            strokeWidth={1}
+                            className="h-10 w-10 text-text-muted dark:text-text-muted-dark"
+                        />
                     </div>
+                )}
+                {isDefault && (
+                    <span className="absolute top-2 right-2 inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-normal bg-primary/90 text-primary-foreground backdrop-blur-sm">
+                        <Star className="w-3 h-3 fill-current" />
+                        {t('card.default')}
+                    </span>
+                )}
+            </div>
+
+            <div className="flex flex-col flex-1 p-4">
+                <div className="flex items-start justify-between gap-3 mb-1">
+                    <h3 className="text-sm font-semibold text-text dark:text-text-dark line-clamp-1">
+                        {template.name}
+                    </h3>
+                    <span className="shrink-0 text-[11px] text-text-muted dark:text-text-muted-dark">
+                        {originLabel}
+                    </span>
                 </div>
 
-                <div className="space-y-2.5">
-                    <div className="flex flex-wrap gap-1.5">
-                        {!template.framework ? (
-                            <span className="rounded-full bg-surface-secondary px-2 py-0.5 text-[11px] font-medium text-text-secondary dark:bg-white/6 dark:text-text-secondary-dark">
-                                {t('card.frameworkAgnostic')}
+                {template.repositoryOwner && template.repositoryName ? (
+                    <div className="inline-flex items-center gap-1 mb-3 bg-primary-400/10 dark:bg-white/10 self-start max-w-full px-1.5 py-0.5 rounded-full">
+                        <Github className="w-3 h-3 shrink-0 text-gray-600 dark:text-gray-200" />
+                        <span className="text-xs text-gray-600 dark:text-gray-200 truncate">
+                            <span className="text-gray-400 dark:text-gray-400">
+                                {template.repositoryOwner}/
                             </span>
-                        ) : null}
+                            {template.repositoryName}
+                        </span>
                     </div>
-                    <div className="space-y-2.5">
-                        <div className="flex flex-wrap gap-1.5">
-                            <span className="rounded-full border border-border bg-surface px-2 py-0.5 text-[11px] font-medium text-text-secondary dark:border-border-dark dark:bg-white/4 dark:text-text-secondary-dark">
-                                {t('card.branch', { branch: template.branch })}
-                            </span>
-                            <span className="rounded-full border border-border bg-surface px-2 py-0.5 text-[11px] font-medium text-text-secondary dark:border-border-dark dark:bg-white/4 dark:text-text-secondary-dark">
-                                {t('card.syncBranches', { count: template.syncBranches.length })}
-                            </span>
-                            {template.betaBranch ? (
-                                <span className="rounded-full border border-amber-500/25 bg-amber-500/8 px-2 py-0.5 text-[11px] font-medium text-amber-700 dark:text-amber-300">
-                                    {t('card.betaBranch', { branch: template.betaBranch })}
-                                </span>
-                            ) : null}
-                        </div>
-                        <p className="text-sm leading-6 text-text-secondary dark:text-text-secondary-dark line-clamp-3 min-h-[4.5rem]">
-                            {template.description || t('card.noDescription')}
-                        </p>
-                    </div>
+                ) : null}
+
+                <p className="text-xs leading-4.5 line-clamp-2 min-h-[2lh] mb-4">
+                    {template.description ? (
+                        <span className="text-text-secondary dark:text-text-secondary-dark">
+                            {template.description}
+                        </span>
+                    ) : (
+                        <span className="text-text-muted dark:text-text-muted-dark italic">
+                            {t('card.noDescription')}
+                        </span>
+                    )}
+                </p>
+
+                <div className="flex flex-wrap items-center gap-1.5 mb-4">
+                    {template.framework ? (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-normal bg-gray-100 text-gray-700 dark:bg-white/8 dark:text-gray-200">
+                            {template.framework}
+                        </span>
+                    ) : null}
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-normal bg-surface dark:bg-white/4 text-text-secondary dark:text-text-secondary-dark border border-border dark:border-border-dark">
+                        {t('card.branch', { branch: template.branch })}
+                    </span>
+                    {template.betaBranch ? (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-normal bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300">
+                            {t('card.betaBranch', { branch: template.betaBranch })}
+                        </span>
+                    ) : null}
                 </div>
 
-                <div className="mt-4 space-y-3 border-t border-card-border pt-3 dark:border-border-secondary-dark">
-                    <div className="flex items-center justify-between gap-3">
-                        {template.repositoryUrl ? (
-                            <a
-                                href={template.repositoryUrl}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="inline-flex items-center gap-1.5 text-sm text-text-secondary transition-colors hover:text-text dark:text-text-secondary-dark dark:hover:text-text-dark"
-                            >
-                                <ExternalLink className="h-4 w-4" />
-                                {t('card.openRepository')}
-                            </a>
-                        ) : (
-                            <span className="text-sm text-text-muted dark:text-text-muted-dark">
-                                {t('card.catalogOnly')}
-                            </span>
-                        )}
-                    </div>
+                <div className="flex items-center justify-between gap-2 pt-4 border-t border-border dark:border-border-dark mt-auto">
+                    {template.repositoryUrl ? (
+                        <a
+                            href={template.repositoryUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1.5 text-xs text-text-muted hover:text-text dark:text-text-muted-dark dark:hover:text-text-dark transition-colors"
+                        >
+                            <ExternalLink className="h-3.5 w-3.5" />
+                            {t('card.openRepository')}
+                        </a>
+                    ) : (
+                        <span className="text-xs text-text-muted dark:text-text-muted-dark">
+                            {t('card.catalogOnly')}
+                        </span>
+                    )}
 
-                    <div className="flex flex-wrap items-center gap-2">
+                    <div className="flex items-center gap-1">
                         {template.sourceType === 'built_in' ? (
                             <Button
                                 variant="ghost"
@@ -327,9 +248,9 @@ function TemplateCard({
                                 loading={forkLoading}
                                 disabled={loading || forkLoading}
                                 onClick={() => onFork(template)}
-                                className="shrink-0"
+                                title={t('card.fork')}
                             >
-                                <GitFork className="h-4 w-4" />
+                                <GitFork className="h-3.5 w-3.5" />
                                 {t('card.fork')}
                             </Button>
                         ) : (
@@ -339,10 +260,9 @@ function TemplateCard({
                                     size="sm"
                                     disabled={loading || archiveLoading}
                                     onClick={() => onEdit(template)}
-                                    className="shrink-0"
+                                    title={t('card.edit')}
                                 >
-                                    <PencilLine className="h-4 w-4" />
-                                    {t('card.edit')}
+                                    <PencilLine className="h-3.5 w-3.5" />
                                 </Button>
                                 <Button
                                     variant="ghost"
@@ -350,10 +270,10 @@ function TemplateCard({
                                     loading={archiveLoading}
                                     disabled={loading || archiveLoading}
                                     onClick={() => onArchive(template)}
-                                    className="shrink-0 text-destructive hover:text-destructive"
+                                    title={t('card.archive')}
+                                    className="text-destructive hover:text-destructive"
                                 >
-                                    <Trash2 className="h-4 w-4" />
-                                    {t('card.archive')}
+                                    <Trash2 className="h-3.5 w-3.5" />
                                 </Button>
                             </>
                         )}
@@ -363,7 +283,6 @@ function TemplateCard({
                             loading={loading}
                             disabled={isDefault || loading}
                             onClick={() => onSetDefault(template.id)}
-                            className="shrink-0"
                         >
                             {isDefault ? t('card.defaultSelected') : t('card.makeDefault')}
                         </Button>
@@ -430,6 +349,27 @@ export function TemplatesCatalog({
     const activeDefaultTemplate = templates.find(
         (template) => template.id === currentDefaultTemplateId,
     );
+
+    const summaryCards = [
+        {
+            label: t('stats.defaultLabel'),
+            value: activeDefaultTemplate?.name || t('stats.none'),
+            accent: 'text-primary',
+            isText: true as const,
+        },
+        {
+            label: t('stats.builtInLabel'),
+            value: builtInCount,
+            accent: 'text-blue-600 dark:text-blue-300',
+            isText: false as const,
+        },
+        {
+            label: t('stats.customLabel'),
+            value: customCount,
+            accent: 'text-emerald-600 dark:text-emerald-300',
+            isText: false as const,
+        },
+    ];
 
     const resetDialog = () => {
         setFormState(EMPTY_FORM);
@@ -622,102 +562,62 @@ export function TemplatesCatalog({
     };
 
     return (
-        <div className="space-y-6">
-            <section className="overflow-hidden rounded-xl border border-card-border bg-card dark:border-border-secondary-dark dark:bg-card-primary-dark/30">
-                <div className="grid gap-5 px-5 py-5 lg:grid-cols-[1.35fr_0.95fr] lg:px-6 lg:py-6">
-                    <div className="space-y-4">
-                        <div className="inline-flex items-center gap-2 rounded-full border border-border bg-surface-secondary px-3 py-1 text-xs font-medium text-text-secondary dark:border-border-dark dark:bg-white/6 dark:text-text-secondary-dark">
-                            <Sparkles className="h-3.5 w-3.5" />
-                            {t('hero.eyebrow')}
-                        </div>
-                        <div className="space-y-3">
-                            <h1 className="text-3xl font-semibold tracking-tight text-text dark:text-text-dark">
-                                {t('title')}
-                            </h1>
-                            <p className="max-w-2xl text-sm leading-7 text-text-secondary dark:text-text-secondary-dark">
-                                {t('subtitle')}
-                            </p>
-                        </div>
-                        <div className="flex flex-wrap items-center gap-3">
-                            <Button
-                                size="sm"
-                                className="rounded-xl"
-                                onClick={() => setDialogOpen(true)}
-                            >
-                                <Plus className="h-4 w-4" />
-                                {t('actions.addTemplate')}
-                            </Button>
-                            <Button
-                                size="sm"
-                                variant="ghost"
-                                className="rounded-xl"
-                                onClick={handleRefreshTemplates}
-                                loading={isRefreshingTemplates}
-                            >
-                                <RefreshCw className="h-4 w-4" />
-                                {t('actions.refreshTemplates')}
-                            </Button>
-                            <p className="text-xs text-text-muted dark:text-text-muted-dark">
-                                {t('hero.catalogHint')}
-                            </p>
-                        </div>
-                    </div>
+        <div className="w-full">
+            <div className="mb-8 flex flex-col gap-4 @lg/main:flex-row @lg/main:items-start @lg/main:justify-between">
+                <div>
+                    <h1 className="text-3xl font-bold text-text dark:text-text-dark">
+                        {t('title')}
+                    </h1>
+                    <p className="mt-2 text-text-secondary dark:text-text-secondary-dark">
+                        {t('subtitle')}
+                    </p>
+                </div>
 
-                    <div className="grid gap-3 sm:grid-cols-3">
-                        <div className="rounded-lg border border-card-border bg-surface px-3 py-3 dark:border-border-dark dark:bg-white/4">
-                            <p className="text-[11px] uppercase tracking-[0.14em] text-text-muted dark:text-text-muted-dark">
-                                {t('stats.defaultLabel')}
+                <div className="flex flex-wrap gap-2">
+                    {summaryCards.map((card) => (
+                        <div
+                            key={card.label}
+                            className={cn(
+                                'rounded-lg border px-3 py-2 bg-card dark:bg-card-primary-dark text-left min-w-[120px]',
+                                'border-border dark:border-border-dark',
+                            )}
+                        >
+                            <p className="text-[11px] uppercase tracking-wide text-text-muted dark:text-text-muted-dark">
+                                {card.label}
                             </p>
-                            <p className="mt-2 text-sm font-semibold text-text dark:text-text-dark line-clamp-1">
-                                {activeDefaultTemplate?.name || t('stats.none')}
-                            </p>
-                            <p className="mt-1 text-xs leading-5 text-text-secondary dark:text-text-secondary-dark">
-                                {t('stats.defaultHint')}
-                            </p>
-                        </div>
-                        <div className="rounded-lg border border-card-border bg-surface px-3 py-3 dark:border-border-dark dark:bg-white/4">
-                            <p className="text-[11px] uppercase tracking-[0.14em] text-text-muted dark:text-text-muted-dark">
-                                {t('stats.builtInLabel')}
-                            </p>
-                            <p className="mt-2 text-lg font-semibold text-text dark:text-text-dark">
-                                {builtInCount}
-                            </p>
-                            <p className="mt-1 text-xs leading-5 text-text-secondary dark:text-text-secondary-dark">
-                                {t('stats.builtInHint')}
-                            </p>
-                        </div>
-                        <div className="rounded-lg border border-card-border bg-surface px-3 py-3 dark:border-border-dark dark:bg-white/4">
-                            <p className="text-[11px] uppercase tracking-[0.14em] text-text-muted dark:text-text-muted-dark">
-                                {t('stats.customLabel')}
-                            </p>
-                            <p className="mt-2 text-lg font-semibold text-text dark:text-text-dark">
-                                {customCount}
-                            </p>
-                            <p className="mt-1 text-xs leading-5 text-text-secondary dark:text-text-secondary-dark">
-                                {t('stats.customHint')}
+                            <p
+                                className={cn(
+                                    'mt-1 font-semibold',
+                                    card.accent,
+                                    card.isText ? 'text-sm line-clamp-1' : 'text-lg',
+                                )}
+                            >
+                                {card.isText ? card.value : card.value.toLocaleString()}
                             </p>
                         </div>
+                    ))}
+                </div>
+            </div>
+
+            <div className="flex flex-col @sm/main:flex-row gap-4 mb-6">
+                <div className="flex-1">
+                    <div className="relative">
+                        <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-text-muted dark:text-text-muted-dark" />
+                        <Input
+                            value={searchQuery}
+                            onChange={(event) => setSearchQuery(event.target.value)}
+                            placeholder={t('filters.searchPlaceholder')}
+                            className="pl-10"
+                        />
                     </div>
                 </div>
-            </section>
 
-            <section className="flex flex-col gap-4 rounded-xl border border-card-border bg-card px-5 py-5 dark:border-border-secondary-dark dark:bg-card-primary-dark/30 lg:flex-row lg:items-center lg:justify-between">
-                <div className="relative flex-1">
-                    <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-text-muted dark:text-text-muted-dark" />
-                    <Input
-                        value={searchQuery}
-                        onChange={(event) => setSearchQuery(event.target.value)}
-                        placeholder={t('filters.searchPlaceholder')}
-                        className="rounded-xl pl-11"
-                    />
-                </div>
                 <div className="flex flex-wrap gap-2">
                     {(['all', 'built_in', 'custom'] as const).map((mode) => (
                         <Button
                             key={mode}
                             variant={filterMode === mode ? 'primary' : 'ghost'}
                             size="sm"
-                            className="rounded-full"
                             onClick={() => setFilterMode(mode)}
                         >
                             {mode === 'all'
@@ -727,33 +627,46 @@ export function TemplatesCatalog({
                                   : t('filters.custom')}
                         </Button>
                     ))}
+                    <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={handleRefreshTemplates}
+                        loading={isRefreshingTemplates}
+                        title={t('actions.refreshTemplates')}
+                    >
+                        <RefreshCw className="h-4 w-4" />
+                    </Button>
+                    <Button size="sm" onClick={() => setDialogOpen(true)}>
+                        <Plus className="h-4 w-4" />
+                        {t('actions.addTemplate')}
+                    </Button>
                 </div>
-            </section>
+            </div>
 
             {filteredTemplates.length === 0 ? (
-                <section className="rounded-xl border border-dashed border-card-border bg-card px-6 py-16 text-center dark:border-border-secondary-dark dark:bg-card-primary-dark/30">
-                    <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-surface-secondary dark:bg-white/6">
-                        <LayoutTemplate className="h-6 w-6 text-text-muted dark:text-text-muted-dark" />
-                    </div>
-                    <h2 className="mt-5 text-lg font-semibold text-text dark:text-text-dark">
-                        {t('empty.title')}
-                    </h2>
-                    <p className="mx-auto mt-2 max-w-md text-sm leading-7 text-text-secondary dark:text-text-secondary-dark">
-                        {searchQuery ? t('empty.search') : t('empty.default')}
-                    </p>
-                    {(searchQuery || filterMode !== 'all') && (
-                        <Button
-                            variant="ghost"
-                            className="mt-5"
-                            onClick={() => {
-                                setSearchQuery('');
-                                setFilterMode('all');
-                            }}
-                        >
-                            {t('empty.resetFilters')}
-                        </Button>
-                    )}
-                </section>
+                <EmptyState
+                    icon={
+                        <div className="p-4 bg-surface dark:bg-surface-dark rounded-full mb-4">
+                            <LayoutTemplate
+                                strokeWidth={1.5}
+                                className="w-12 h-12 text-text-muted dark:text-text-muted-dark"
+                            />
+                        </div>
+                    }
+                    title={t('empty.title')}
+                    description={searchQuery ? t('empty.search') : t('empty.default')}
+                    action={
+                        searchQuery || filterMode !== 'all'
+                            ? {
+                                  label: t('empty.resetFilters'),
+                                  onClick: () => {
+                                      setSearchQuery('');
+                                      setFilterMode('all');
+                                  },
+                              }
+                            : undefined
+                    }
+                />
             ) : (
                 <section className="grid grid-cols-1 gap-4 @3xl/main:grid-cols-2 @5xl/main:grid-cols-3">
                     {filteredTemplates.map((template) => (
@@ -794,222 +707,201 @@ export function TemplatesCatalog({
             )}
 
             <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-                <DialogContent className="max-w-2xl rounded-[2rem] p-0">
-                    <div className="relative overflow-hidden rounded-[2rem] border border-border bg-white dark:border-border-dark dark:bg-surface-dark">
-                        <div className="absolute inset-x-0 top-0 h-28 bg-gradient-to-br from-cyan-500/14 via-teal-500/8 to-transparent" />
-                        <div className="relative p-6">
-                            <DialogClose onClose={resetDialog} />
-                            <DialogHeader className="mb-6 pr-8">
-                                <DialogTitle className="text-xl font-semibold text-text dark:text-text-dark">
-                                    {editingTemplate ? t('dialog.editTitle') : t('dialog.title')}
-                                </DialogTitle>
-                                <DialogDescription className="mt-2 max-w-xl leading-6">
-                                    {editingTemplate
-                                        ? t('dialog.editDescription')
-                                        : t('dialog.description')}
-                                </DialogDescription>
-                            </DialogHeader>
+                <DialogContent className="max-w-2xl">
+                    <DialogClose onClose={resetDialog} />
+                    <DialogHeader>
+                        <DialogTitle className="text-lg font-semibold text-text dark:text-text-dark">
+                            {editingTemplate ? t('dialog.editTitle') : t('dialog.title')}
+                        </DialogTitle>
+                        <DialogDescription>
+                            {editingTemplate
+                                ? t('dialog.editDescription')
+                                : t('dialog.description')}
+                        </DialogDescription>
+                    </DialogHeader>
 
-                            <div className="space-y-4">
-                                {!editingTemplate ? (
-                                    <Input
-                                        label={t('dialog.repositoryUrlLabel')}
-                                        placeholder={t('dialog.repositoryUrlPlaceholder')}
-                                        value={formState.repositoryUrl}
-                                        onChange={(event) =>
-                                            setFormState((current) => ({
-                                                ...current,
-                                                repositoryUrl: event.target.value,
-                                            }))
-                                        }
-                                    />
-                                ) : (
-                                    <Input
-                                        label={t('dialog.repositoryUrlLabel')}
-                                        value={formState.repositoryUrl}
-                                        disabled
-                                        helperText={t('dialog.repositoryUrlLockedHelp')}
-                                    />
-                                )}
+                    <div className="space-y-4">
+                        {!editingTemplate ? (
+                            <Input
+                                label={t('dialog.repositoryUrlLabel')}
+                                placeholder={t('dialog.repositoryUrlPlaceholder')}
+                                value={formState.repositoryUrl}
+                                onChange={(event) =>
+                                    setFormState((current) => ({
+                                        ...current,
+                                        repositoryUrl: event.target.value,
+                                    }))
+                                }
+                            />
+                        ) : (
+                            <Input
+                                label={t('dialog.repositoryUrlLabel')}
+                                value={formState.repositoryUrl}
+                                disabled
+                                helperText={t('dialog.repositoryUrlLockedHelp')}
+                            />
+                        )}
 
-                                <div className="grid gap-4 md:grid-cols-2">
-                                    <Input
-                                        label={t('dialog.nameLabel')}
-                                        placeholder={t('dialog.namePlaceholder')}
-                                        value={formState.name}
-                                        onChange={(event) =>
-                                            setFormState((current) => ({
-                                                ...current,
-                                                name: event.target.value,
-                                            }))
-                                        }
-                                    />
-                                    <Input
-                                        label={t('dialog.frameworkLabel')}
-                                        placeholder={t('dialog.frameworkPlaceholder')}
-                                        value={formState.framework}
-                                        onChange={(event) =>
-                                            setFormState((current) => ({
-                                                ...current,
-                                                framework: event.target.value,
-                                            }))
-                                        }
-                                    />
-                                </div>
-
-                                <Input
-                                    label={t('dialog.previewImageLabel')}
-                                    placeholder={t('dialog.previewImagePlaceholder')}
-                                    value={formState.previewImageUrl}
-                                    onChange={(event) =>
-                                        setFormState((current) => ({
-                                            ...current,
-                                            previewImageUrl: event.target.value,
-                                        }))
-                                    }
-                                    helperText={t('dialog.previewImageHelp')}
-                                />
-
-                                <Textarea
-                                    rows={4}
-                                    label={t('dialog.descriptionLabel')}
-                                    placeholder={t('dialog.descriptionPlaceholder')}
-                                    value={formState.description}
-                                    onChange={(event) =>
-                                        setFormState((current) => ({
-                                            ...current,
-                                            description: event.target.value,
-                                        }))
-                                    }
-                                />
-
-                                <Input
-                                    label={t('dialog.branchLabel')}
-                                    placeholder={t('dialog.branchPlaceholder')}
-                                    value={formState.branch}
-                                    onChange={(event) =>
-                                        setFormState((current) => ({
-                                            ...current,
-                                            branch: event.target.value,
-                                        }))
-                                    }
-                                    helperText={t('dialog.branchHelp')}
-                                />
-                            </div>
-
-                            <DialogFooter className="mt-8">
-                                <Button
-                                    variant="ghost"
-                                    onClick={resetDialog}
-                                    disabled={isAddingTemplate}
-                                >
-                                    {t('dialog.cancel')}
-                                </Button>
-                                <Button
-                                    onClick={handleSaveTemplate}
-                                    loading={isAddingTemplate}
-                                    className="rounded-xl"
-                                >
-                                    {editingTemplate ? t('dialog.saveChanges') : t('dialog.submit')}
-                                </Button>
-                            </DialogFooter>
+                        <div className="grid gap-4 md:grid-cols-2">
+                            <Input
+                                label={t('dialog.nameLabel')}
+                                placeholder={t('dialog.namePlaceholder')}
+                                value={formState.name}
+                                onChange={(event) =>
+                                    setFormState((current) => ({
+                                        ...current,
+                                        name: event.target.value,
+                                    }))
+                                }
+                            />
+                            <Input
+                                label={t('dialog.frameworkLabel')}
+                                placeholder={t('dialog.frameworkPlaceholder')}
+                                value={formState.framework}
+                                onChange={(event) =>
+                                    setFormState((current) => ({
+                                        ...current,
+                                        framework: event.target.value,
+                                    }))
+                                }
+                            />
                         </div>
+
+                        <Input
+                            label={t('dialog.previewImageLabel')}
+                            placeholder={t('dialog.previewImagePlaceholder')}
+                            value={formState.previewImageUrl}
+                            onChange={(event) =>
+                                setFormState((current) => ({
+                                    ...current,
+                                    previewImageUrl: event.target.value,
+                                }))
+                            }
+                            helperText={t('dialog.previewImageHelp')}
+                        />
+
+                        <Textarea
+                            rows={4}
+                            label={t('dialog.descriptionLabel')}
+                            placeholder={t('dialog.descriptionPlaceholder')}
+                            value={formState.description}
+                            onChange={(event) =>
+                                setFormState((current) => ({
+                                    ...current,
+                                    description: event.target.value,
+                                }))
+                            }
+                        />
+
+                        <Input
+                            label={t('dialog.branchLabel')}
+                            placeholder={t('dialog.branchPlaceholder')}
+                            value={formState.branch}
+                            onChange={(event) =>
+                                setFormState((current) => ({
+                                    ...current,
+                                    branch: event.target.value,
+                                }))
+                            }
+                            helperText={t('dialog.branchHelp')}
+                        />
                     </div>
+
+                    <DialogFooter>
+                        <Button variant="ghost" onClick={resetDialog} disabled={isAddingTemplate}>
+                            {t('dialog.cancel')}
+                        </Button>
+                        <Button onClick={handleSaveTemplate} loading={isAddingTemplate}>
+                            {editingTemplate ? t('dialog.saveChanges') : t('dialog.submit')}
+                        </Button>
+                    </DialogFooter>
                 </DialogContent>
             </Dialog>
 
             <Dialog open={!!forkDialogTemplate} onOpenChange={(open) => !open && resetForkDialog()}>
-                <DialogContent className="max-w-xl rounded-[2rem] p-0">
-                    <div className="relative overflow-hidden rounded-[2rem] border border-border bg-white dark:border-border-dark dark:bg-surface-dark">
-                        <div className="absolute inset-x-0 top-0 h-28 bg-gradient-to-br from-slate-900/14 via-slate-500/8 to-transparent dark:from-white/10 dark:via-white/5" />
-                        <div className="relative p-6">
-                            <DialogClose onClose={resetForkDialog} />
-                            <DialogHeader className="mb-6 pr-8">
-                                <DialogTitle className="text-xl font-semibold text-text dark:text-text-dark">
-                                    {t('forkDialog.title')}
-                                </DialogTitle>
-                                <DialogDescription className="mt-2 max-w-xl leading-6">
-                                    {t('forkDialog.description')}
-                                </DialogDescription>
-                            </DialogHeader>
+                <DialogContent className="max-w-xl">
+                    <DialogClose onClose={resetForkDialog} />
+                    <DialogHeader>
+                        <DialogTitle className="text-lg font-semibold text-text dark:text-text-dark">
+                            {t('forkDialog.title')}
+                        </DialogTitle>
+                        <DialogDescription>{t('forkDialog.description')}</DialogDescription>
+                    </DialogHeader>
 
-                            <div className="space-y-5">
-                                <div className="rounded-2xl border border-border bg-surface px-4 py-4 dark:border-border-dark dark:bg-white/4">
-                                    <p className="text-xs uppercase tracking-[0.18em] text-text-muted dark:text-text-muted-dark">
-                                        {t('forkDialog.sourceLabel')}
-                                    </p>
-                                    <p className="mt-2 text-base font-semibold text-text dark:text-text-dark">
-                                        {forkDialogTemplate?.name}
-                                    </p>
-                                    <p className="mt-1 text-sm text-text-secondary dark:text-text-secondary-dark">
-                                        {forkDialogTemplate
-                                            ? `${forkDialogTemplate.repositoryOwner}/${forkDialogTemplate.repositoryName}`
-                                            : ''}
-                                    </p>
-                                </div>
+                    <div className="space-y-4">
+                        <div className="rounded-lg border border-border bg-surface px-4 py-3 dark:border-border-dark dark:bg-white/4">
+                            <p className="text-[11px] uppercase tracking-wide text-text-muted dark:text-text-muted-dark">
+                                {t('forkDialog.sourceLabel')}
+                            </p>
+                            <p className="mt-1 text-sm font-semibold text-text dark:text-text-dark">
+                                {forkDialogTemplate?.name}
+                            </p>
+                            <p className="mt-0.5 text-xs text-text-secondary dark:text-text-secondary-dark">
+                                {forkDialogTemplate
+                                    ? `${forkDialogTemplate.repositoryOwner}/${forkDialogTemplate.repositoryName}`
+                                    : ''}
+                            </p>
+                        </div>
 
-                                <div className="space-y-2">
-                                    <label className="block text-sm font-medium text-text dark:text-text-dark">
-                                        {t('forkDialog.targetLabel')}
-                                    </label>
-                                    <Select
-                                        value={forkTargetOwner}
-                                        onValueChange={setForkTargetOwner}
-                                        placeholder={t('forkDialog.targetPlaceholder')}
-                                        disabled={forkTargets.length === 0 || isForkingTemplate}
-                                    >
-                                        {forkTargets.map((target) => (
-                                            <option key={target.login} value={target.login}>
-                                                {target.kind === 'personal'
-                                                    ? t('forkDialog.personalTarget', {
-                                                          login: target.login,
-                                                      })
-                                                    : t('forkDialog.organizationTarget', {
-                                                          login: target.login,
-                                                      })}
-                                            </option>
-                                        ))}
-                                    </Select>
-                                    <p className="text-xs text-text-muted dark:text-text-muted-dark">
-                                        {forkTargets.length > 0
-                                            ? t('forkDialog.targetHelp', {
-                                                  target: forkTargetOwner || t('forkDialog.none'),
+                        <div className="space-y-2">
+                            <label className="block text-sm font-medium text-text dark:text-text-dark">
+                                {t('forkDialog.targetLabel')}
+                            </label>
+                            <Select
+                                value={forkTargetOwner}
+                                onValueChange={setForkTargetOwner}
+                                placeholder={t('forkDialog.targetPlaceholder')}
+                                disabled={forkTargets.length === 0 || isForkingTemplate}
+                            >
+                                {forkTargets.map((target) => (
+                                    <option key={target.login} value={target.login}>
+                                        {target.kind === 'personal'
+                                            ? t('forkDialog.personalTarget', {
+                                                  login: target.login,
                                               })
-                                            : t('forkDialog.noTargets')}
-                                    </p>
-                                </div>
+                                            : t('forkDialog.organizationTarget', {
+                                                  login: target.login,
+                                              })}
+                                    </option>
+                                ))}
+                            </Select>
+                            <p className="text-xs text-text-muted dark:text-text-muted-dark">
+                                {forkTargets.length > 0
+                                    ? t('forkDialog.targetHelp', {
+                                          target: forkTargetOwner || t('forkDialog.none'),
+                                      })
+                                    : t('forkDialog.noTargets')}
+                            </p>
+                        </div>
 
-                                <div className="rounded-2xl border border-dashed border-border px-4 py-4 dark:border-border-dark">
-                                    <p className="text-xs uppercase tracking-[0.18em] text-text-muted dark:text-text-muted-dark">
-                                        {t('forkDialog.resultLabel')}
-                                    </p>
-                                    <p className="mt-2 text-sm text-text-secondary dark:text-text-secondary-dark">
-                                        {forkDialogTemplate
-                                            ? `${forkTargetOwner || '...'}/${forkDialogTemplate.repositoryName}`
-                                            : ''}
-                                    </p>
-                                </div>
-                            </div>
-
-                            <DialogFooter className="mt-8">
-                                <Button
-                                    variant="ghost"
-                                    onClick={resetForkDialog}
-                                    disabled={isForkingTemplate}
-                                >
-                                    {t('forkDialog.cancel')}
-                                </Button>
-                                <Button
-                                    onClick={handleForkTemplate}
-                                    loading={isForkingTemplate}
-                                    disabled={forkTargets.length === 0}
-                                    className="rounded-xl"
-                                >
-                                    {t('forkDialog.submit')}
-                                </Button>
-                            </DialogFooter>
+                        <div className="rounded-lg border border-dashed border-border px-4 py-3 dark:border-border-dark">
+                            <p className="text-[11px] uppercase tracking-wide text-text-muted dark:text-text-muted-dark">
+                                {t('forkDialog.resultLabel')}
+                            </p>
+                            <p className="mt-1 text-sm text-text-secondary dark:text-text-secondary-dark">
+                                {forkDialogTemplate
+                                    ? `${forkTargetOwner || '...'}/${forkDialogTemplate.repositoryName}`
+                                    : ''}
+                            </p>
                         </div>
                     </div>
+
+                    <DialogFooter>
+                        <Button
+                            variant="ghost"
+                            onClick={resetForkDialog}
+                            disabled={isForkingTemplate}
+                        >
+                            {t('forkDialog.cancel')}
+                        </Button>
+                        <Button
+                            onClick={handleForkTemplate}
+                            loading={isForkingTemplate}
+                            disabled={forkTargets.length === 0}
+                        >
+                            {t('forkDialog.submit')}
+                        </Button>
+                    </DialogFooter>
                 </DialogContent>
             </Dialog>
 
@@ -1017,53 +909,45 @@ export function TemplatesCatalog({
                 open={!!archiveDialogTemplate}
                 onOpenChange={(open) => !open && resetArchiveDialog()}
             >
-                <DialogContent className="max-w-lg rounded-[2rem] p-0">
-                    <div className="relative overflow-hidden rounded-[2rem] border border-border bg-white dark:border-border-dark dark:bg-surface-dark">
-                        <div className="absolute inset-x-0 top-0 h-28 bg-gradient-to-br from-red-500/14 via-orange-500/8 to-transparent" />
-                        <div className="relative p-6">
-                            <DialogClose onClose={resetArchiveDialog} />
-                            <DialogHeader className="mb-6 pr-8">
-                                <DialogTitle className="text-xl font-semibold text-text dark:text-text-dark">
-                                    {t('archiveDialog.title')}
-                                </DialogTitle>
-                                <DialogDescription className="mt-2 max-w-xl leading-6">
-                                    {t('archiveDialog.description')}
-                                </DialogDescription>
-                            </DialogHeader>
+                <DialogContent>
+                    <DialogClose onClose={resetArchiveDialog} />
+                    <DialogHeader>
+                        <DialogTitle className="text-lg font-semibold text-text dark:text-text-dark">
+                            {t('archiveDialog.title')}
+                        </DialogTitle>
+                        <DialogDescription>{t('archiveDialog.description')}</DialogDescription>
+                    </DialogHeader>
 
-                            <div className="rounded-2xl border border-border bg-surface px-4 py-4 dark:border-border-dark dark:bg-white/4">
-                                <p className="text-xs uppercase tracking-[0.18em] text-text-muted dark:text-text-muted-dark">
-                                    {t('archiveDialog.templateLabel')}
-                                </p>
-                                <p className="mt-2 text-base font-semibold text-text dark:text-text-dark">
-                                    {archiveDialogTemplate?.name}
-                                </p>
-                                <p className="mt-1 text-sm text-text-secondary dark:text-text-secondary-dark">
-                                    {archiveDialogTemplate
-                                        ? `${archiveDialogTemplate.repositoryOwner}/${archiveDialogTemplate.repositoryName}`
-                                        : ''}
-                                </p>
-                            </div>
-
-                            <DialogFooter className="mt-8">
-                                <Button
-                                    variant="ghost"
-                                    onClick={resetArchiveDialog}
-                                    disabled={isArchivingTemplate}
-                                >
-                                    {t('archiveDialog.cancel')}
-                                </Button>
-                                <Button
-                                    variant="danger"
-                                    onClick={handleArchiveTemplate}
-                                    loading={isArchivingTemplate}
-                                    className="rounded-xl"
-                                >
-                                    {t('archiveDialog.submit')}
-                                </Button>
-                            </DialogFooter>
-                        </div>
+                    <div className="rounded-lg border border-border bg-surface px-4 py-3 dark:border-border-dark dark:bg-white/4">
+                        <p className="text-[11px] uppercase tracking-wide text-text-muted dark:text-text-muted-dark">
+                            {t('archiveDialog.templateLabel')}
+                        </p>
+                        <p className="mt-1 text-sm font-semibold text-text dark:text-text-dark">
+                            {archiveDialogTemplate?.name}
+                        </p>
+                        <p className="mt-0.5 text-xs text-text-secondary dark:text-text-secondary-dark">
+                            {archiveDialogTemplate
+                                ? `${archiveDialogTemplate.repositoryOwner}/${archiveDialogTemplate.repositoryName}`
+                                : ''}
+                        </p>
                     </div>
+
+                    <DialogFooter>
+                        <Button
+                            variant="ghost"
+                            onClick={resetArchiveDialog}
+                            disabled={isArchivingTemplate}
+                        >
+                            {t('archiveDialog.cancel')}
+                        </Button>
+                        <Button
+                            variant="danger"
+                            onClick={handleArchiveTemplate}
+                            loading={isArchivingTemplate}
+                        >
+                            {t('archiveDialog.submit')}
+                        </Button>
+                    </DialogFooter>
                 </DialogContent>
             </Dialog>
         </div>
