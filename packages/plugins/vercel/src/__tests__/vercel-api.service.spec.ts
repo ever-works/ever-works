@@ -4,6 +4,35 @@ import { VercelApiService } from '../vercel-api.service';
 describe('VercelApiService', () => {
 	let service: VercelApiService;
 
+	const mockSdkFailure = (message = 'Unauthorized') => {
+		service.createSDK = async () =>
+			({
+				teams: {
+					getTeams: async () => {
+						throw new Error(message);
+					}
+				},
+				projects: {
+					getProjects: async () => {
+						throw new Error(message);
+					},
+					getProjectDomains: async () => {
+						throw new Error(message);
+					}
+				},
+				deployments: {
+					getDeployments: async () => {
+						throw new Error(message);
+					}
+				},
+				user: {
+					getAuthUser: async () => {
+						throw new Error(message);
+					}
+				}
+			}) as any;
+	};
+
 	beforeEach(() => {
 		service = new VercelApiService();
 	});
@@ -42,14 +71,7 @@ describe('VercelApiService', () => {
 		});
 
 		it('should return null for invalid token when the API rejects', async () => {
-			service.createSDK = async () =>
-				({
-					user: {
-						getAuthUser: async () => {
-							throw new Error('Unauthorized');
-						}
-					}
-				}) as any;
+			mockSdkFailure();
 
 			const result = await service.validateToken('invalid-token-123');
 			expect(result).toBeNull();
@@ -58,6 +80,8 @@ describe('VercelApiService', () => {
 
 	describe('getTeams', () => {
 		it('should return empty array for invalid token', async () => {
+			mockSdkFailure();
+
 			const result = await service.getTeams('invalid-token');
 			expect(result).toEqual([]);
 		});
@@ -65,11 +89,15 @@ describe('VercelApiService', () => {
 
 	describe('getProjects', () => {
 		it('should return empty array for invalid token', async () => {
+			mockSdkFailure();
+
 			const result = await service.getProjects('invalid-token', {});
 			expect(result).toEqual([]);
 		});
 
 		it('should accept teamScope option', async () => {
+			mockSdkFailure();
+
 			const result = await service.getProjects('token', { teamScope: 'my-team' });
 			expect(result).toEqual([]);
 		});
@@ -77,12 +105,16 @@ describe('VercelApiService', () => {
 
 	describe('lookupProject', () => {
 		it('should return not found for invalid token', async () => {
+			mockSdkFailure();
+
 			const result = await service.lookupProject('project-name', 'invalid-token');
 			expect(result.found).toBe(false);
 			expect(result.project).toBeUndefined();
 		});
 
 		it('should accept teamScope parameter', async () => {
+			mockSdkFailure();
+
 			const result = await service.lookupProject('project-name', 'token', 'team-scope');
 			expect(result.found).toBe(false);
 		});
@@ -90,6 +122,8 @@ describe('VercelApiService', () => {
 
 	describe('lookupDeploymentAcrossScopes', () => {
 		it('should return not found for invalid token', async () => {
+			mockSdkFailure();
+
 			const result = await service.lookupDeploymentAcrossScopes(
 				'project-name',
 				'invalid-token',
@@ -118,6 +152,8 @@ describe('VercelApiService', () => {
 		});
 
 		it('should throw from getProjectDomains with invalid token', async () => {
+			mockSdkFailure();
+
 			await expect(service.getProjectDomains('project-id', 'invalid-token')).rejects.toThrow();
 		});
 	});
