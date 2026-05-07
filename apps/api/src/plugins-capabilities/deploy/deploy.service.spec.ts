@@ -90,6 +90,10 @@ describe('DeployService — plugin-driven dispatch + secrets', () => {
             updateRepository: jest.fn().mockResolvedValue(undefined),
         };
 
+        const websiteTemplateResolver = {
+            resolveForWork: jest.fn().mockResolvedValue({ branch: 'main' }),
+        };
+
         const eventEmitter = {
             emit: jest.fn(),
         };
@@ -100,6 +104,7 @@ describe('DeployService — plugin-driven dispatch + secrets', () => {
             workRepository as any,
             pluginRegistry as any,
             websiteUpdateService as any,
+            websiteTemplateResolver as any,
             eventEmitter as any,
         );
 

@@ -20,12 +20,12 @@ import { rethrowAsNormalized } from './utils/error.utils';
 import { GenerateStatusType } from '@src/entities/types';
 import { DeployFacadeService } from '@src/facades/deploy.facade';
 import {
-    findWebsiteTemplateConfig,
     getDefaultWebsiteTemplateId,
     SwitchWebsiteTemplateResponseDto,
 } from '@src/generators/website-generator';
-import { GitFacadeService } from '@src/facades/git.facade';
 import { WebsiteRepositoryCreationMethod } from '@src/items-generator/dto/create-items-generator.dto';
+import { TemplateCatalogService } from '../template-catalog/template-catalog.service';
+import { WorkWebsiteRepositoryStateService } from './work-website-repository-state.service';
 
 @Injectable()
 export class WorkLifecycleService {
@@ -39,8 +39,50 @@ export class WorkLifecycleService {
         private readonly websiteUpdateService: WebsiteUpdateService,
         private readonly ownershipService: WorkOwnershipService,
         private readonly deployFacade: DeployFacadeService,
-        private readonly gitFacade: GitFacadeService,
+        private readonly templateCatalogService: TemplateCatalogService,
+        private readonly websiteRepositoryState: WorkWebsiteRepositoryStateService,
     ) {}
+
+    private normalizeWebsiteTemplateSelection(value?: string | null): string | null {
+        const normalized = value?.trim();
+        return normalized ? normalized : null;
+    }
+
+    private async resolveValidatedWebsiteTemplateSelection(
+        value: string | null | undefined,
+        userId: string,
+    ): Promise<string | null> {
+        const normalizedTemplateId = this.normalizeWebsiteTemplateSelection(value);
+
+        if (!normalizedTemplateId) {
+            return null;
+        }
+
+        const visibleTemplate = await this.templateCatalogService.getVisibleTemplateForUser(
+            'website',
+            normalizedTemplateId,
+            userId,
+        );
+        if (!visibleTemplate) {
+            throw new BadRequestException({
+                status: 'error',
+                message: `Unsupported website template: ${normalizedTemplateId}`,
+            });
+        }
+
+        return normalizedTemplateId;
+    }
+
+    private async getEffectiveWebsiteTemplateId(
+        work: Pick<Work, 'websiteTemplateId'>,
+        userId: string,
+    ): Promise<string> {
+        return (
+            this.normalizeWebsiteTemplateSelection(work.websiteTemplateId) ||
+            (await this.templateCatalogService.getDefaultTemplateIdForUser('website', userId)) ||
+            getDefaultWebsiteTemplateId()
+        );
+    }
 
     private isMissingWebsiteRepositoryError(error: unknown): boolean {
         if (error instanceof NotFoundException) {
@@ -63,50 +105,7 @@ export class WorkLifecycleService {
     }
 
     private async hasInitializedWebsiteRepository(work: Work, user: User): Promise<boolean> {
-        if (
-            work.website ||
-            work.deployProjectId ||
-            work.websiteTemplateLastCommit ||
-            work.websiteTemplateLastUpdatedAt ||
-            work.websiteTemplateLastCheckedAt
-        ) {
-            return true;
-        }
-
-        const userIds = [...new Set([user.id, work.userId].filter(Boolean))];
-
-        for (const userId of userIds) {
-            const authOptions = {
-                userId,
-                providerId: work.gitProvider,
-                workId: work.id,
-            };
-
-            const hasCredentials = await this.gitFacade.hasValidCredentials(authOptions);
-            if (!hasCredentials) {
-                continue;
-            }
-
-            try {
-                const exists = await this.gitFacade.repositoryExists(
-                    work.getRepoOwner('website'),
-                    work.getWebsiteRepo(),
-                    authOptions,
-                );
-
-                if (exists) {
-                    return true;
-                }
-            } catch (error) {
-                this.logger.warn(
-                    `Failed to verify website repository initialization for work ${work.id}: ${
-                        error instanceof Error ? error.message : String(error)
-                    }`,
-                );
-            }
-        }
-
-        return false;
+        return this.websiteRepositoryState.isInitialized(work, user);
     }
 
     async createWork(createWorkDto: CreateWorkDto, user: User) {
@@ -122,12 +121,10 @@ export class WorkLifecycleService {
             websiteTemplateId,
         } = createWorkDto;
 
-        if (websiteTemplateId && !findWebsiteTemplateConfig(websiteTemplateId)) {
-            throw new BadRequestException({
-                status: 'error',
-                message: `Unsupported website template: ${websiteTemplateId}`,
-            });
-        }
+        const selectedWebsiteTemplateId = await this.resolveValidatedWebsiteTemplateSelection(
+            websiteTemplateId,
+            user.id,
+        );
 
         const workData: Partial<CreateWorkDto & { userId: string }> = {
             slug,
@@ -137,7 +134,7 @@ export class WorkLifecycleService {
             owner,
             gitProvider,
             deployProvider,
-            websiteTemplateId: websiteTemplateId || getDefaultWebsiteTemplateId(),
+            websiteTemplateId: selectedWebsiteTemplateId,
             readmeConfig,
             organization,
         };
@@ -210,16 +207,15 @@ export class WorkLifecycleService {
             }
 
             if (updateDto.websiteTemplateId !== undefined) {
-                const nextTemplateId = updateDto.websiteTemplateId || getDefaultWebsiteTemplateId();
+                const nextTemplateId = await this.resolveValidatedWebsiteTemplateSelection(
+                    updateDto.websiteTemplateId,
+                    user.id,
+                );
 
-                if (!findWebsiteTemplateConfig(nextTemplateId)) {
-                    throw new BadRequestException({
-                        status: 'error',
-                        message: `Unsupported website template: ${nextTemplateId}`,
-                    });
-                }
-
-                if (nextTemplateId !== work.websiteTemplateId) {
+                if (
+                    nextTemplateId !==
+                    this.normalizeWebsiteTemplateSelection(work.websiteTemplateId)
+                ) {
                     const websiteRepoInitialized = await this.hasInitializedWebsiteRepository(
                         work,
                         user,
@@ -272,36 +268,43 @@ export class WorkLifecycleService {
 
     async switchWebsiteTemplate(
         id: string,
-        websiteTemplateId: string,
+        websiteTemplateId: string | null | undefined,
         user: User,
     ): Promise<SwitchWebsiteTemplateResponseDto> {
         const { work } = await this.ownershipService.ensureCanEdit(id, user.id);
-        const nextTemplateId = websiteTemplateId || getDefaultWebsiteTemplateId();
-
-        if (!findWebsiteTemplateConfig(nextTemplateId)) {
-            throw new BadRequestException({
-                status: 'error',
-                message: `Unsupported website template: ${nextTemplateId}`,
-            });
-        }
+        const nextTemplateId = await this.resolveValidatedWebsiteTemplateSelection(
+            websiteTemplateId,
+            user.id,
+        );
 
         const websiteRepoInitialized = await this.hasInitializedWebsiteRepository(work, user);
         const websiteOwner = work.getRepoOwner('website');
         const websiteRepo = work.getWebsiteRepo();
+        const currentExplicitTemplateId = this.normalizeWebsiteTemplateSelection(
+            work.websiteTemplateId,
+        );
+        const currentEffectiveTemplateId = await this.getEffectiveWebsiteTemplateId(work, user.id);
+        const nextEffectiveTemplateId =
+            nextTemplateId ||
+            (await this.templateCatalogService.getDefaultTemplateIdForUser('website', user.id)) ||
+            getDefaultWebsiteTemplateId();
 
-        if (nextTemplateId === work.websiteTemplateId) {
+        if (
+            nextTemplateId === currentExplicitTemplateId &&
+            nextEffectiveTemplateId === currentEffectiveTemplateId
+        ) {
             return {
                 status: 'success',
                 slug: work.slug,
                 owner: websiteOwner,
                 repository: `${websiteOwner}/${websiteRepo}`,
-                previousWebsiteTemplateId: work.websiteTemplateId,
-                websiteTemplateId: work.websiteTemplateId,
+                previousWebsiteTemplateId: currentEffectiveTemplateId,
+                websiteTemplateId: currentEffectiveTemplateId,
                 repositoryRecreated: false,
                 switchMode: 'no_change',
                 message: websiteRepoInitialized
                     ? 'Website template is already selected for this work.'
-                    : 'Website template saved. It will be used when the website repository is first created.',
+                    : 'Website template preference is already saved for this work.',
             };
         }
 
@@ -313,13 +316,34 @@ export class WorkLifecycleService {
             websiteTemplateLastCheckedAt: null,
         };
 
-        const previousTemplateId = work.websiteTemplateId;
+        const previousTemplateId = currentExplicitTemplateId;
         const previousTemplateLastCommit = work.websiteTemplateLastCommit;
         const previousTemplateLastError = work.websiteTemplateLastError;
         const previousTemplateLastUpdatedAt = work.websiteTemplateLastUpdatedAt;
         const previousTemplateLastCheckedAt = work.websiteTemplateLastCheckedAt;
 
         work.websiteTemplateId = nextTemplateId;
+
+        if (nextEffectiveTemplateId === currentEffectiveTemplateId) {
+            await this.workRepository.update(id, {
+                websiteTemplateId: nextTemplateId,
+            });
+
+            return {
+                status: 'success',
+                slug: work.slug,
+                owner: websiteOwner,
+                repository: `${websiteOwner}/${websiteRepo}`,
+                previousWebsiteTemplateId: currentEffectiveTemplateId,
+                websiteTemplateId: nextEffectiveTemplateId,
+                repositoryRecreated: false,
+                switchMode: 'no_change',
+                message: nextTemplateId
+                    ? 'Website template is now pinned explicitly for this work.'
+                    : 'Work now inherits your default website template.',
+            };
+        }
+
         work.websiteTemplateLastCommit = null;
         work.websiteTemplateLastError = null;
         work.websiteTemplateLastUpdatedAt = null;
@@ -368,8 +392,8 @@ export class WorkLifecycleService {
                 slug: work.slug,
                 owner: websiteOwner,
                 repository: `${websiteOwner}/${websiteRepo}`,
-                previousWebsiteTemplateId: previousTemplateId,
-                websiteTemplateId: nextTemplateId,
+                previousWebsiteTemplateId: currentEffectiveTemplateId,
+                websiteTemplateId: nextEffectiveTemplateId,
                 repositoryRecreated,
                 switchMode: repositoryRecreated ? 'repository_recreated' : 'repository_reset',
                 message: repositoryRecreated
@@ -385,8 +409,8 @@ export class WorkLifecycleService {
             slug: work.slug,
             owner: websiteOwner,
             repository: `${websiteOwner}/${websiteRepo}`,
-            previousWebsiteTemplateId: previousTemplateId,
-            websiteTemplateId: nextTemplateId,
+            previousWebsiteTemplateId: currentEffectiveTemplateId,
+            websiteTemplateId: nextEffectiveTemplateId,
             repositoryRecreated: false,
             switchMode: 'saved_for_initialization',
             message:

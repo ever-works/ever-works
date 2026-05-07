@@ -15,4 +15,5 @@ export * from './plugins-capabilities/device-auth';
 export * from './plugins-capabilities/oauth';
 export * from './account-transfer.types';
 export * from './github-app';
+export * from './templates';
 export * from './types';

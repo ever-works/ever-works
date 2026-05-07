@@ -1,6 +1,6 @@
 import { config } from '@src/config';
 
-export type WebsiteTemplateId = 'classic' | 'minimal';
+export type WebsiteTemplateId = string;
 
 export interface WebsiteTemplateConfig {
     id: WebsiteTemplateId;

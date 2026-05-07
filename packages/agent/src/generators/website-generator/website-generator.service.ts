@@ -4,12 +4,12 @@ import { BranchSyncService } from './branch-sync.service';
 import { WebsiteRepositoryCreationMethod } from '../../items-generator/dto/create-items-generator.dto';
 import { Work } from '../../entities/work.entity';
 import { User } from '../../entities/user.entity';
-import { getWebsiteTemplateConfig } from './config/website-template.config';
 import { getWorkOwner } from '../../utils/work.utils';
 import * as fs from 'node:fs/promises';
 import { cloneFreshRepository } from '../../utils/fresh-repository-clone.utils';
 import { assertCreatedRepositoryTarget } from '../../utils/git-repository.utils';
 import { throwIfGenerationCancelled } from '../../utils/generation-cancellation.utils';
+import { WebsiteTemplateResolverService } from './website-template-resolver.service';
 
 type WebsiteGenerationOptions = {
     signal?: AbortSignal;
@@ -22,6 +22,7 @@ export class WebsiteGeneratorService {
     constructor(
         private readonly gitFacade: GitFacadeService,
         private readonly branchSyncService: BranchSyncService,
+        private readonly websiteTemplateResolver: WebsiteTemplateResolverService,
     ) {}
 
     private async waitForTargetRepository(
@@ -54,7 +55,7 @@ export class WebsiteGeneratorService {
     }
 
     private async ensureTemplateDefaultBranch(work: Work, userId: string): Promise<void> {
-        const template = getWebsiteTemplateConfig(work.websiteTemplateId);
+        const template = await this.websiteTemplateResolver.resolveForWork(work);
         const targetBranch = template.branch;
         const websiteOwner = work.getRepoOwner('website');
         const websiteRepo = work.getWebsiteRepo();
@@ -91,7 +92,7 @@ export class WebsiteGeneratorService {
 
         const workOwner = getWorkOwner(work);
         const committer = work.resolveCommitter(user);
-        const template = getWebsiteTemplateConfig(work.websiteTemplateId);
+        const template = await this.websiteTemplateResolver.resolveForWork(work);
 
         await this.cleanup(work);
         throwIfGenerationCancelled(options.signal);
@@ -179,7 +180,7 @@ export class WebsiteGeneratorService {
         const workOwner = getWorkOwner(work);
         const websiteOwner = work.getRepoOwner('website');
         const websiteRepo = work.getWebsiteRepo();
-        const template = getWebsiteTemplateConfig(work.websiteTemplateId);
+        const template = await this.websiteTemplateResolver.resolveForWork(work);
 
         const createdWebsiteRepository = await this.gitFacade.createRepositoryFromTemplate(
             template.owner,

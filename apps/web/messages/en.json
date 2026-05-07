@@ -2185,6 +2185,7 @@
                         "description": "Keep your website automatically synced with the latest template changes.",
                         "selectorLabel": "Website template",
                         "currentTemplateLabel": "Current template",
+                        "unknownTemplate": "Inherited default",
                         "currentHelperText": "The selected template controls how the website repository is initialized and updated.",
                         "switchHelperText": "Applying a new template will reset the existing website repository from the selected template if it already exists.",
                         "switchAction": "Apply template to website repository",
@@ -2200,6 +2201,11 @@
                         "lastUpdated": "Last updated",
                         "lastChecked": "Last checked",
                         "lastError": "Last error",
+                        "inheritedState": "This work is inheriting your current default template.",
+                        "explicitState": "This work is pinned to an explicit template selection.",
+                        "originStandard": "Standard",
+                        "originForked": "Forked",
+                        "originCustomUrl": "Custom URL",
                         "updateSuccess": "Settings updated successfully",
                         "updateFailed": "Failed to update settings",
                         "githubRequired": "GitHub connection required. Please connect your GitHub account in Settings to enable automatic updates."
@@ -2709,6 +2715,7 @@
                 "activity": "Activity",
                 "works": "Works",
                 "plugins": "Plugins",
+                "templates": "Templates",
                 "settings": "Settings"
             },
             "tooltips": {
@@ -2939,6 +2946,150 @@
                 "removeLabel": "Remove {login}"
             }
         },
+        "templates": {
+            "title": "Templates",
+            "subtitle": "Browse built-in website templates, manage your custom catalog, and control which template new works start from.",
+            "actions": {
+                "addTemplate": "Add custom template",
+                "refreshTemplates": "Refresh templates"
+            },
+            "hero": {
+                "eyebrow": "Template catalog",
+                "catalogHint": "Any template in this catalog can become your default. Fork a built-in template to turn it into your own starting point."
+            },
+            "stats": {
+                "defaultLabel": "Active default",
+                "defaultHint": "New works start from this template unless you override it per work.",
+                "builtInLabel": "Built-in",
+                "builtInHint": "Maintained Ever Works templates.",
+                "customLabel": "Custom",
+                "customHint": "Saved from your own GitHub repositories or forks.",
+                "none": "No default"
+            },
+            "filters": {
+                "all": "All",
+                "builtIn": "Built-in",
+                "custom": "Custom",
+                "searchPlaceholder": "Search templates, frameworks, or repositories..."
+            },
+            "card": {
+                "builtIn": "Built-in",
+                "custom": "Custom",
+                "standard": "Standard",
+                "forked": "Forked",
+                "customUrl": "Custom URL",
+                "standardSource": "Ever Works standard",
+                "forkedSource": "Forked into your GitHub",
+                "customUrlSource": "Added from GitHub URL",
+                "default": "Default",
+                "defaultSelected": "Default selected",
+                "makeDefault": "Make default",
+                "fork": "Fork",
+                "edit": "Edit",
+                "archive": "Archive",
+                "catalogOnly": "Catalog item",
+                "openRepository": "Open repository",
+                "previewAlt": "{name} preview",
+                "frameworkAgnostic": "Framework agnostic",
+                "branch": "Branch: {branch}",
+                "syncBranches": "{count} sync branches",
+                "betaBranch": "Beta: {branch}",
+                "noDescription": "No description yet."
+            },
+            "dialog": {
+                "title": "Add custom template",
+                "description": "Save a GitHub repository into your personal template catalog. This first slice stores the template metadata so it can be selected in the next assignment flow.",
+                "editTitle": "Edit custom template",
+                "editDescription": "Update the display details and preview image used for this custom template in your catalog.",
+                "repositoryUrlLabel": "GitHub repository URL",
+                "repositoryUrlPlaceholder": "https://github.com/your-org/your-template",
+                "repositoryUrlLockedHelp": "The source repository URL cannot be changed after the template is added.",
+                "nameLabel": "Template name",
+                "namePlaceholder": "Optional display name",
+                "frameworkLabel": "Framework",
+                "frameworkSelectPlaceholder": "Select a framework",
+                "frameworkUnspecified": "Not specified",
+                "previewImageLabel": "Preview image URL",
+                "previewImagePlaceholder": "https://example.com/template-preview.png",
+                "previewImageHelp": "Optional. Use a curated screenshot if you want to override the GitHub repository preview.",
+                "descriptionLabel": "Short description",
+                "descriptionPlaceholder": "What this template is best for",
+                "branchLabel": "Default branch",
+                "branchPlaceholder": "main",
+                "branchHelp": "Leave empty to default to main.",
+                "betaBranchLabel": "Beta branch",
+                "betaBranchPlaceholder": "beta",
+                "betaBranchHelp": "Optional. Branch used for beta deployments.",
+                "cancel": "Cancel",
+                "submit": "Save template",
+                "saveChanges": "Save changes"
+            },
+            "forkDialog": {
+                "title": "Fork standard template",
+                "description": "Create your own GitHub copy of this standard template, add it to your catalog, and make it the default for new works.",
+                "sourceLabel": "Template source",
+                "targetLabel": "Fork destination",
+                "targetPlaceholder": "Select a GitHub account or organization",
+                "targetHelp": "The fork will be created under {target}.",
+                "personalTarget": "Personal account ({login})",
+                "organizationTarget": "Organization ({login})",
+                "noTargets": "Connect GitHub and load your organizations before forking a template.",
+                "resultLabel": "New repository",
+                "none": "your selected account",
+                "cancel": "Cancel",
+                "submit": "Fork and make default"
+            },
+            "archiveDialog": {
+                "title": "Archive custom template",
+                "description": "Archive this template from your catalog. You can only archive templates that are not currently assigned to any works.",
+                "templateLabel": "Template",
+                "cancel": "Cancel",
+                "submit": "Archive template"
+            },
+            "empty": {
+                "title": "No templates found",
+                "default": "No templates match this view yet.",
+                "search": "Try a different search term or clear the current filter.",
+                "resetFilters": "Reset filters"
+            },
+            "messages": {
+                "repositoryUrlRequired": "GitHub repository URL is required.",
+                "repositoryUrlInvalid": "Enter a valid GitHub repository URL like https://github.com/owner/repository.",
+                "forkTargetRequired": "Choose a GitHub account or organization for the fork.",
+                "addSuccess": "Template saved from GitHub URL.",
+                "addFailed": "Failed to save template.",
+                "updateSuccess": "Template details updated.",
+                "updateFailed": "Failed to update template details.",
+                "archiveSuccess": "Template archived from your catalog.",
+                "archiveFailed": "Failed to archive template.",
+                "forkSuccess": "Forked {repository}, added it to your catalog, and set it as your default.",
+                "forkExisting": "{repository} was already in your catalog and is now your default forked template.",
+                "forkFailed": "Failed to fork template.",
+                "refreshSuccess": "Template catalog refreshed.",
+                "refreshFailed": "Failed to refresh templates.",
+                "defaultUpdated": "Default template updated.",
+                "defaultFailed": "Failed to update default template."
+            }
+        },
+        "templateSelector": {
+            "defaultOption": "Use default",
+            "defaultOptionWithName": "Use default ({name})",
+            "optionLabel": "{name}",
+            "optionDefaultLabel": "{name} (Default)",
+            "changeAnywayLink": "Change anyway",
+            "origin": {
+                "standard": "Standard",
+                "forked": "Forked",
+                "customUrl": "Custom URL"
+            },
+            "state": {
+                "defaultBadge": "Inherited default",
+                "inheritedTitle": "Using default template",
+                "inheritedDescription": "This work will follow your current default template until you pin a specific one.",
+                "pinnedTitle": "Pinned template",
+                "pinnedDescription": "This work will keep using this template even if your default changes later."
+            }
+        },
         "workPlugins": {
             "title": "Work Plugins",
             "subtitle": "Configure plugins for this Work",
@@ -3073,6 +3224,7 @@
             "history": "History",
             "comparisons": "Comparisons",
             "plugins": "Plugins",
+            "templates": "Templates",
             "profile": "Profile",
             "security": "Security",
             "apiKeys": "API Keys",

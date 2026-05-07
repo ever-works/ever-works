@@ -13,6 +13,7 @@ describe('WorkQueryService', () => {
     let dataGenerator: any;
     let generationHistoryRepository: any;
     let ownershipService: any;
+    let websiteRepositoryState: any;
     let service: WorkQueryService;
 
     beforeEach(() => {
@@ -29,6 +30,9 @@ describe('WorkQueryService', () => {
             findLatestPositiveItemCounts: jest.fn(),
         };
         ownershipService = {};
+        websiteRepositoryState = {
+            isInitialized: jest.fn().mockResolvedValue(false),
+        };
 
         service = new WorkQueryService(
             workRepository,
@@ -36,6 +40,7 @@ describe('WorkQueryService', () => {
             dataGenerator as any,
             generationHistoryRepository,
             ownershipService as any,
+            websiteRepositoryState,
         );
     });
 
@@ -152,6 +157,34 @@ describe('WorkQueryService', () => {
                 id: 'owned-work-1',
                 slug: 'my-work',
                 userRole: WorkMemberRole.OWNER,
+            }),
+        );
+    });
+
+    it('returns the authoritative website repository initialization state on getWork', async () => {
+        const work = {
+            id: 'work-1',
+            userId: user.id,
+            owner: 'ever-works',
+            slug: 'my-work',
+            name: 'My Work',
+            getRepoOwner: jest.fn().mockReturnValue('ever-works'),
+        } as any;
+
+        ownershipService.ensureAccess = jest.fn().mockResolvedValue({
+            work,
+            role: WorkMemberRole.EDITOR,
+        });
+        websiteRepositoryState.isInitialized.mockResolvedValue(true);
+
+        const result = await service.getWork(work.id, user);
+
+        expect(websiteRepositoryState.isInitialized).toHaveBeenCalledWith(work, user);
+        expect(result.work).toEqual(
+            expect.objectContaining({
+                id: 'work-1',
+                userRole: WorkMemberRole.EDITOR,
+                websiteRepositoryInitialized: true,
             }),
         );
     });

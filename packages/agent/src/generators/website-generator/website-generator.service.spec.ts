@@ -7,8 +7,33 @@ import { WebsiteUpdateService } from './website-update.service';
 import { WebsiteRepositoryCreationMethod } from '../../items-generator/dto/create-items-generator.dto';
 import type { GitFacadeService } from '../../facades/git.facade';
 import type { BranchSyncService } from './branch-sync.service';
+import type { WebsiteTemplateResolverService } from './website-template-resolver.service';
 import type { Work } from '../../entities/work.entity';
 import type { User } from '../../entities/user.entity';
+
+const createTemplateResolverMock = (): jest.Mocked<WebsiteTemplateResolverService> =>
+    ((config) => ({
+        resolve: jest.fn().mockResolvedValue({
+            id: 'classic',
+            name: 'Classic',
+            description: 'Classic template',
+            owner: 'ever-works',
+            repo: 'directory-web-template',
+            branch: 'main',
+            syncBranches: ['main', 'stage', 'preview'],
+            betaBranch: 'stage',
+        }),
+        resolveForWork: jest.fn().mockResolvedValue(config),
+    }))({
+        id: 'classic',
+        name: 'Classic',
+        description: 'Classic template',
+        owner: 'ever-works',
+        repo: 'directory-web-template',
+        branch: 'main',
+        syncBranches: ['main', 'stage', 'preview'],
+        betaBranch: 'stage',
+    }) as unknown as jest.Mocked<WebsiteTemplateResolverService>;
 
 describe('WebsiteGeneratorService', () => {
     const createWork = (): Work =>
@@ -66,7 +91,8 @@ describe('WebsiteGeneratorService', () => {
     it('reasserts the template default branch after create-using-template sync', async () => {
         const gitFacade = createGitFacadeMock();
         const branchSyncService = createBranchSyncMock();
-        const service = new WebsiteGeneratorService(gitFacade, branchSyncService);
+        const templateResolver = createTemplateResolverMock();
+        const service = new WebsiteGeneratorService(gitFacade, branchSyncService, templateResolver);
         const work = createWork();
         const user = createUser();
 
@@ -136,7 +162,8 @@ describe('WebsiteUpdateService', () => {
     it('reasserts the template default branch after repository update sync', async () => {
         const gitFacade = createGitFacadeMock();
         const branchSyncService = createBranchSyncMock();
-        const service = new WebsiteUpdateService(gitFacade, branchSyncService);
+        const templateResolver = createTemplateResolverMock();
+        const service = new WebsiteUpdateService(gitFacade, branchSyncService, templateResolver);
         const work = createWork();
         const user = createUser();
 

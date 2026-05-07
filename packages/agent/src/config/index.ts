@@ -164,6 +164,9 @@ export const config = {
         autoUpdateEnabled() {
             return process.env.WEBSITE_TEMPLATE_AUTO_UPDATE_ENABLED !== 'false';
         },
+        getCatalogOrganization() {
+            return process.env.WEBSITE_TEMPLATE_CATALOG_ORG || 'ever-works';
+        },
         getDefaultTemplateId() {
             return process.env.WEBSITE_TEMPLATE_DEFAULT_ID || 'classic';
         },

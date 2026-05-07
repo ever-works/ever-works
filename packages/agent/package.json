@@ -113,6 +113,10 @@
             "types": "./dist/comparison-generator/index.d.ts",
             "default": "./dist/comparison-generator/index.js"
         },
+        "./template-catalog": {
+            "types": "./dist/template-catalog/index.d.ts",
+            "default": "./dist/template-catalog/index.js"
+        },
         "./account-transfer": {
             "types": "./dist/account-transfer/index.d.ts",
             "default": "./dist/account-transfer/index.js"
