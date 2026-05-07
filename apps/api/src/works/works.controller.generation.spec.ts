@@ -229,8 +229,10 @@ describe('WorksController — generation + cancellation endpoints', () => {
             const result = await controller.getGeneratorFormSchema(auth, 'w-1', 'pipe-1');
 
             // Order must be: getUser → ensureAccess → getFormSchema
-            const ensureAccessOrder = s.workOwnershipService.ensureAccess.mock.invocationCallOrder[0];
-            const getFormSchemaOrder = s.generatorFormSchemaService.getFormSchema.mock.invocationCallOrder[0];
+            const ensureAccessOrder =
+                s.workOwnershipService.ensureAccess.mock.invocationCallOrder[0];
+            const getFormSchemaOrder =
+                s.generatorFormSchemaService.getFormSchema.mock.invocationCallOrder[0];
             expect(ensureAccessOrder).toBeLessThan(getFormSchemaOrder);
 
             expect(s.workOwnershipService.ensureAccess).toHaveBeenCalledWith('w-1', 'user-1');
@@ -244,9 +246,9 @@ describe('WorksController — generation + cancellation endpoints', () => {
         it('does NOT call getFormSchema when ensureAccess rejects', async () => {
             s.workOwnershipService.ensureAccess.mockRejectedValue(new Error('forbidden'));
 
-            await expect(
-                controller.getGeneratorFormSchema(auth, 'w-1', 'pipe-1'),
-            ).rejects.toThrow('forbidden');
+            await expect(controller.getGeneratorFormSchema(auth, 'w-1', 'pipe-1')).rejects.toThrow(
+                'forbidden',
+            );
             expect(s.generatorFormSchemaService.getFormSchema).not.toHaveBeenCalled();
         });
 
@@ -344,9 +346,9 @@ describe('WorksController — generation + cancellation endpoints', () => {
             s.workGenerationService.updateItemsGenerator.mockResolvedValue({ generationId: 'g-2' });
             s.activityLogService.log.mockRejectedValueOnce(new Error('log down'));
 
-            await expect(
-                controller.updateItemsGenerator(auth, 'w-1', {} as any),
-            ).resolves.toEqual({ generationId: 'g-2' });
+            await expect(controller.updateItemsGenerator(auth, 'w-1', {} as any)).resolves.toEqual({
+                generationId: 'g-2',
+            });
         });
 
         it('uses an OBJECT payload for updateItemsGenerator (not positional args)', async () => {

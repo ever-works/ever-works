@@ -110,10 +110,7 @@ describe('OpenAiCompatService', () => {
                 choices: [],
             } as any);
 
-            await service.handleCompletion(
-                { model: 'auto', messages: [] } as any,
-                { userId: 'u' },
-            );
+            await service.handleCompletion({ model: 'auto', messages: [] } as any, { userId: 'u' });
 
             const [opts] = aiFacade.createChatCompletion.mock.calls[0];
             expect(opts.model).toBeUndefined();
@@ -125,14 +122,15 @@ describe('OpenAiCompatService', () => {
                 created: 0,
                 model: 'm',
                 choices: [
-                    { index: 0, message: { role: 'assistant', content: 'a' }, finishReason: 'stop' },
+                    {
+                        index: 0,
+                        message: { role: 'assistant', content: 'a' },
+                        finishReason: 'stop',
+                    },
                 ],
             } as any);
 
-            const result = await service.handleCompletion(
-                { messages: [] } as any,
-                { userId: 'u' },
-            );
+            const result = await service.handleCompletion({ messages: [] } as any, { userId: 'u' });
 
             expect(result.usage).toBeUndefined();
         });
@@ -143,14 +141,15 @@ describe('OpenAiCompatService', () => {
                 created: 0,
                 model: 'm',
                 choices: [
-                    { index: 0, message: { role: 'assistant', content: null }, finishReason: 'stop' },
+                    {
+                        index: 0,
+                        message: { role: 'assistant', content: null },
+                        finishReason: 'stop',
+                    },
                 ],
             } as any);
 
-            const result = await service.handleCompletion(
-                { messages: [] } as any,
-                { userId: 'u' },
-            );
+            const result = await service.handleCompletion({ messages: [] } as any, { userId: 'u' });
 
             expect(result.choices[0].message.content).toBeNull();
         });
@@ -179,10 +178,7 @@ describe('OpenAiCompatService', () => {
                 ],
             } as any);
 
-            const result = await service.handleCompletion(
-                { messages: [] } as any,
-                { userId: 'u' },
-            );
+            const result = await service.handleCompletion({ messages: [] } as any, { userId: 'u' });
 
             expect(result.choices[0].message.tool_calls).toEqual([
                 {
@@ -202,10 +198,7 @@ describe('OpenAiCompatService', () => {
                 choices: [],
             } as any);
 
-            await service.handleCompletion(
-                { messages: [] } as any,
-                { userId: 'user-1' },
-            );
+            await service.handleCompletion({ messages: [] } as any, { userId: 'user-1' });
 
             const [, facadeOpts] = aiFacade.createChatCompletion.mock.calls[0];
             expect(facadeOpts).toEqual({ userId: 'user-1', workId: 'auto-w' });
@@ -220,10 +213,7 @@ describe('OpenAiCompatService', () => {
                 choices: [],
             } as any);
 
-            await service.handleCompletion(
-                { messages: [] } as any,
-                { userId: 'user-1' },
-            );
+            await service.handleCompletion({ messages: [] } as any, { userId: 'user-1' });
 
             const [, facadeOpts] = aiFacade.createChatCompletion.mock.calls[0];
             expect(facadeOpts).toEqual({ userId: 'user-1' });
@@ -241,9 +231,7 @@ describe('OpenAiCompatService', () => {
 
             await service.handleCompletion(
                 {
-                    messages: [
-                        { role: 'tool', content: 'ok', tool_call_id: 'tc-1' },
-                    ],
+                    messages: [{ role: 'tool', content: 'ok', tool_call_id: 'tc-1' }],
                 } as any,
                 { userId: 'u', workId: 'w' },
             );
@@ -320,10 +308,10 @@ describe('OpenAiCompatService', () => {
                 choices: [],
             } as any);
 
-            await service.handleCompletion(
-                { messages: [{ role: 'user', content: null }] } as any,
-                { userId: 'u', workId: 'w' },
-            );
+            await service.handleCompletion({ messages: [{ role: 'user', content: null }] } as any, {
+                userId: 'u',
+                workId: 'w',
+            });
 
             const [opts] = aiFacade.createChatCompletion.mock.calls[0];
             expect(opts.messages[0].content).toBe('');
@@ -376,17 +364,13 @@ describe('OpenAiCompatService', () => {
                         id: 'c-1',
                         created: 1700000000000,
                         model: 'gpt-4o',
-                        choices: [
-                            { index: 0, delta: { role: 'assistant' }, finishReason: null },
-                        ],
+                        choices: [{ index: 0, delta: { role: 'assistant' }, finishReason: null }],
                     },
                     {
                         id: 'c-1',
                         created: 1700000000000,
                         model: 'gpt-4o',
-                        choices: [
-                            { index: 0, delta: { content: 'Hello' }, finishReason: null },
-                        ],
+                        choices: [{ index: 0, delta: { content: 'Hello' }, finishReason: null }],
                     },
                     {
                         id: 'c-1',
@@ -421,9 +405,7 @@ describe('OpenAiCompatService', () => {
                         id: 'c-1',
                         created: 0,
                         model: 'm',
-                        choices: [
-                            { index: 0, delta: { role: 'assistant' }, finishReason: null },
-                        ],
+                        choices: [{ index: 0, delta: { role: 'assistant' }, finishReason: null }],
                     },
                     {
                         id: 'c-1',
@@ -552,7 +534,9 @@ describe('OpenAiCompatService', () => {
                             id: 'c-1',
                             created: 0,
                             model: 'm',
-                            choices: [{ index: 0, delta: { content: 'partial' }, finishReason: null }],
+                            choices: [
+                                { index: 0, delta: { content: 'partial' }, finishReason: null },
+                            ],
                         },
                     ],
                     new Error('mid-stream fail'),
@@ -625,10 +609,7 @@ describe('OpenAiCompatService', () => {
 
         it('redacts Bearer tokens from error messages', async () => {
             aiFacade.createStreamingChatCompletion.mockReturnValue(
-                asyncThrow(
-                    [],
-                    new Error('Auth failed: Bearer abcdef1234567890ghijk'),
-                ) as any,
+                asyncThrow([], new Error('Auth failed: Bearer abcdef1234567890ghijk')) as any,
             );
             const res = makeRes();
 

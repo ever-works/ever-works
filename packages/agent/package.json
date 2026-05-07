@@ -128,7 +128,7 @@
         "build:dev": "nest build -b swc --watch",
         "build:types": "tsc -p tsconfig.types.json",
         "build:types:dev": "tsc -p tsconfig.types.json --watch",
-        "test": "jest",
+        "test": "jest --maxWorkers=2",
         "test:watch": "jest --watch",
         "test:cov": "jest --coverage"
     },

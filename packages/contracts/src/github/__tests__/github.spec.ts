@@ -25,9 +25,7 @@ describe('parseGitHubRepositoryUrl', () => {
 	});
 
 	it('ignores extra path segments past <owner>/<repo>', () => {
-		const r = parseGitHubRepositoryUrl(
-			'https://github.com/ever-works/ever-works/tree/main/packages/contracts'
-		);
+		const r = parseGitHubRepositoryUrl('https://github.com/ever-works/ever-works/tree/main/packages/contracts');
 		expect(r?.owner).toBe('ever-works');
 		expect(r?.repo).toBe('ever-works');
 	});

@@ -100,12 +100,9 @@ describe('ConversationTitleService', () => {
         expect(opts.messages[1].content).toContain('user: hi');
         expect(opts.messages[1].content).toContain('user: tell me about cats');
         expect(opts.messages[1].content).toContain('assistant: cats are great');
-        expect(conversationRepo.updateTitle).toHaveBeenCalledWith(
-            'c-1',
-            'user-1',
-            'My Cat Title',
-            { aiTitle: true },
-        );
+        expect(conversationRepo.updateTitle).toHaveBeenCalledWith('c-1', 'user-1', 'My Cat Title', {
+            aiTitle: true,
+        });
     });
 
     it('truncates long generated titles to 100 chars', async () => {
@@ -132,12 +129,9 @@ describe('ConversationTitleService', () => {
 
         await service.maybeGenerateTitle('c-1', 'user-1');
 
-        expect(conversationRepo.updateTitle).toHaveBeenCalledWith(
-            'c-1',
-            'user-1',
-            'Spaced Title',
-            { aiTitle: true },
-        );
+        expect(conversationRepo.updateTitle).toHaveBeenCalledWith('c-1', 'user-1', 'Spaced Title', {
+            aiTitle: true,
+        });
     });
 
     it('skips updateTitle when AI returns empty content', async () => {

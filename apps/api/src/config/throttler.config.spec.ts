@@ -49,8 +49,7 @@ describe('throttlerConfig', () => {
     });
 
     it('limit values rise with the window — short.limit < medium.limit < long.limit', () => {
-        const get = (name: string) =>
-            cfg.throttlers.find((t) => t.name === name)!.limit as number;
+        const get = (name: string) => cfg.throttlers.find((t) => t.name === name)!.limit as number;
         expect(get('short')).toBeLessThan(get('medium'));
         expect(get('medium')).toBeLessThan(get('long'));
     });

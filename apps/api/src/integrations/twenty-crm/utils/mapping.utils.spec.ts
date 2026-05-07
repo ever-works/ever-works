@@ -1,9 +1,5 @@
 import { MappingUtils } from './mapping.utils';
-import {
-    EverWorksClient,
-    EverWorksCompany,
-    EverWorksItem,
-} from '../types/mapping.types';
+import { EverWorksClient, EverWorksCompany, EverWorksItem } from '../types/mapping.types';
 
 describe('MappingUtils', () => {
     describe('mapClientToContact', () => {
@@ -199,43 +195,37 @@ describe('MappingUtils', () => {
 
     describe('validateOrganizationData', () => {
         it('passes when name is set', () => {
-            expect(
-                MappingUtils.validateOrganizationData({ name: 'Acme' }),
-            ).toEqual([]);
+            expect(MappingUtils.validateOrganizationData({ name: 'Acme' })).toEqual([]);
         });
 
         it('reports a missing-name error when name is empty', () => {
-            expect(
-                MappingUtils.validateOrganizationData({ name: '' as any }),
-            ).toEqual(['Organization name is required']);
+            expect(MappingUtils.validateOrganizationData({ name: '' as any })).toEqual([
+                'Organization name is required',
+            ]);
         });
     });
 
     describe('validateProductData', () => {
         it('passes when name is set', () => {
-            expect(
-                MappingUtils.validateProductData({ name: 'Widget' }),
-            ).toEqual([]);
+            expect(MappingUtils.validateProductData({ name: 'Widget' })).toEqual([]);
         });
 
         it('reports a missing-name error when name is empty', () => {
-            expect(
-                MappingUtils.validateProductData({ name: '' as any }),
-            ).toEqual(['Product name is required']);
+            expect(MappingUtils.validateProductData({ name: '' as any })).toEqual([
+                'Product name is required',
+            ]);
         });
     });
 
     describe('validateDealData', () => {
         it('passes when title is set', () => {
-            expect(MappingUtils.validateDealData({ title: 'Big Deal' })).toEqual(
-                [],
-            );
+            expect(MappingUtils.validateDealData({ title: 'Big Deal' })).toEqual([]);
         });
 
         it('reports a missing-title error when title is empty', () => {
-            expect(
-                MappingUtils.validateDealData({ title: '' as any }),
-            ).toEqual(['Deal title is required']);
+            expect(MappingUtils.validateDealData({ title: '' as any })).toEqual([
+                'Deal title is required',
+            ]);
         });
     });
 });

@@ -1,10 +1,18 @@
 import { Module } from '@nestjs/common';
 import { WorkOperationsService } from '@ever-works/agent/work-operations';
-import { WorkRepository } from '@ever-works/agent/database';
+import {
+    TemplateRepository,
+    UserTemplatePreferenceRepository,
+    WorkRepository,
+} from '@ever-works/agent/database';
 import { NotificationService } from '@ever-works/agent/notifications';
 import { DataGeneratorService } from '@ever-works/agent/generators';
 import { MarkdownGeneratorService } from '@ever-works/agent/generators';
-import { WebsiteGeneratorService, BranchSyncService } from '@ever-works/agent/generators';
+import {
+    WebsiteGeneratorService,
+    BranchSyncService,
+    WebsiteTemplateResolverService,
+} from '@ever-works/agent/generators';
 import { SourceRepoAnalyzerService, ImportExecutorService } from '@ever-works/agent/import';
 import { WorksConfigService, WorksConfigWriterService } from '@ever-works/agent/works-config';
 import { TriggerPluginsModule } from './trigger-plugins.module';
@@ -44,10 +52,23 @@ import { TriggerImportOrchestrator } from '../orchestrators/trigger-import.orche
                 createRemoteProxy(apiClient, 'WorkRepository'),
             inject: [TriggerInternalApiClient],
         },
+        {
+            provide: TemplateRepository,
+            useFactory: (apiClient: TriggerInternalApiClient) =>
+                createRemoteProxy(apiClient, 'TemplateRepository'),
+            inject: [TriggerInternalApiClient],
+        },
+        {
+            provide: UserTemplatePreferenceRepository,
+            useFactory: (apiClient: TriggerInternalApiClient) =>
+                createRemoteProxy(apiClient, 'UserTemplatePreferenceRepository'),
+            inject: [TriggerInternalApiClient],
+        },
         DataGeneratorService,
         MarkdownGeneratorService,
         WebsiteGeneratorService,
         BranchSyncService,
+        WebsiteTemplateResolverService,
         WorksConfigService,
         WorksConfigWriterService,
         SourceRepoAnalyzerService,

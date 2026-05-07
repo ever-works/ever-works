@@ -111,7 +111,9 @@ describe('SentryInterceptor', () => {
     it('handles missing body without throwing', async () => {
         const req = { method: 'GET', originalUrl: '/x', headers: {}, body: undefined };
         const next: CallHandler = { handle: () => of({}) };
-        await expect(lastValueFrom(interceptor.intercept(buildExecCtx(req), next))).resolves.toEqual({});
+        await expect(
+            lastValueFrom(interceptor.intercept(buildExecCtx(req), next)),
+        ).resolves.toEqual({});
     });
 
     it('sets the transaction tag from method + originalUrl', async () => {
@@ -132,7 +134,9 @@ describe('SentryInterceptor', () => {
         };
         const next: CallHandler = { handle: () => throwError(() => err) };
 
-        await expect(lastValueFrom(interceptor.intercept(buildExecCtx(req), next))).rejects.toBe(err);
+        await expect(lastValueFrom(interceptor.intercept(buildExecCtx(req), next))).rejects.toBe(
+            err,
+        );
         expect(sentryMock.captureException).toHaveBeenCalledTimes(1);
         const [capturedErr, ctx] = sentryMock.captureException.mock.calls[0];
         expect(capturedErr).toBe(err);
@@ -146,7 +150,9 @@ describe('SentryInterceptor', () => {
         const err = new Error('mystery');
         const req = { method: 'GET', originalUrl: '/x', headers: {}, body: undefined };
         const next: CallHandler = { handle: () => throwError(() => err) };
-        await expect(lastValueFrom(interceptor.intercept(buildExecCtx(req), next))).rejects.toBe(err);
+        await expect(lastValueFrom(interceptor.intercept(buildExecCtx(req), next))).rejects.toBe(
+            err,
+        );
         const ctx = sentryMock.captureException.mock.calls[0][1];
         expect(ctx.tags.statusCode).toBe(500);
     });

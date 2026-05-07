@@ -1,6 +1,8 @@
 jest.mock('@ever-works/agent/database', () => ({
     WorkRepository: class WorkRepository {},
     AuthAccountRepository: class AuthAccountRepository {},
+    TemplateRepository: class TemplateRepository {},
+    UserTemplatePreferenceRepository: class UserTemplatePreferenceRepository {},
 }));
 jest.mock('@ever-works/agent/entities', () => ({}));
 jest.mock('@ever-works/agent/cache', () => ({
@@ -55,6 +57,8 @@ describe('TriggerInternalController', () => {
     let userPluginRepository: any;
     let workPluginRepository: any;
     let authAccountRepository: any;
+    let templateRepository: any;
+    let userTemplatePreferenceRepository: any;
     let controller: TriggerInternalController;
 
     const buildController = () => {
@@ -71,6 +75,8 @@ describe('TriggerInternalController', () => {
             userPluginRepository,
             workPluginRepository,
             authAccountRepository,
+            templateRepository,
+            userTemplatePreferenceRepository,
         );
         c.onModuleInit();
         return c;
@@ -92,6 +98,8 @@ describe('TriggerInternalController', () => {
         userPluginRepository = { name: 'UserPluginRepository' };
         workPluginRepository = { name: 'WorkPluginRepository' };
         authAccountRepository = { name: 'AuthAccountRepository' };
+        templateRepository = { name: 'TemplateRepository' };
+        userTemplatePreferenceRepository = { name: 'UserTemplatePreferenceRepository' };
 
         controller = buildController();
     });
@@ -143,19 +151,19 @@ describe('TriggerInternalController', () => {
             await expect(
                 controller.getWorkContext(VALID_SECRET, 'work-1', undefined as any),
             ).rejects.toBeInstanceOf(BadRequestException);
-            await expect(
-                controller.getWorkContext(VALID_SECRET, 'work-1', ''),
-            ).rejects.toThrow('Missing userId');
+            await expect(controller.getWorkContext(VALID_SECRET, 'work-1', '')).rejects.toThrow(
+                'Missing userId',
+            );
             expect(ownershipService.ensureAccess).not.toHaveBeenCalled();
         });
 
         it('throws ForbiddenException when secret is missing or wrong', async () => {
-            await expect(
-                controller.getWorkContext('', 'work-1', 'user-1'),
-            ).rejects.toBeInstanceOf(ForbiddenException);
-            await expect(
-                controller.getWorkContext('wrong', 'work-1', 'user-1'),
-            ).rejects.toThrow('Invalid trigger secret');
+            await expect(controller.getWorkContext('', 'work-1', 'user-1')).rejects.toBeInstanceOf(
+                ForbiddenException,
+            );
+            await expect(controller.getWorkContext('wrong', 'work-1', 'user-1')).rejects.toThrow(
+                'Invalid trigger secret',
+            );
             expect(ownershipService.ensureAccess).not.toHaveBeenCalled();
         });
 
@@ -184,11 +192,13 @@ describe('TriggerInternalController', () => {
     });
 
     describe('callRemote', () => {
-        const buildBody = (overrides: Partial<{
-            name: string;
-            method: string;
-            args: unknown[];
-        }> = {}) => {
+        const buildBody = (
+            overrides: Partial<{
+                name: string;
+                method: string;
+                args: unknown[];
+            }> = {},
+        ) => {
             const args = overrides.args ?? [];
             return {
                 name: overrides.name ?? 'PluginRepository',
@@ -200,10 +210,7 @@ describe('TriggerInternalController', () => {
         it('dispatches to the registered remote target/method and returns superjson-serialized result', async () => {
             const echoSpy = jest.spyOn(pluginRepository, 'echo');
 
-            const out = await controller.callRemote(
-                VALID_SECRET,
-                buildBody({ args: ['hello'] }),
-            );
+            const out = await controller.callRemote(VALID_SECRET, buildBody({ args: ['hello'] }));
 
             expect(echoSpy).toHaveBeenCalledWith('hello');
             const deserialized = superjson.deserialize(out.result as any);
@@ -218,14 +225,11 @@ describe('TriggerInternalController', () => {
                 return d;
             });
 
-            const out = await controller.callRemote(
-                VALID_SECRET,
-                {
-                    name: 'PluginRepository',
-                    method: 'withDate',
-                    args: superjson.serialize([fixedDate]) as any,
-                },
-            );
+            const out = await controller.callRemote(VALID_SECRET, {
+                name: 'PluginRepository',
+                method: 'withDate',
+                args: superjson.serialize([fixedDate]) as any,
+            });
 
             const deserialized = superjson.deserialize(out.result as any) as Date;
             expect(deserialized).toBeInstanceOf(Date);
@@ -234,16 +238,10 @@ describe('TriggerInternalController', () => {
 
         it('throws BadRequestException for unknown remote target', async () => {
             await expect(
-                controller.callRemote(
-                    VALID_SECRET,
-                    buildBody({ name: 'NotARealTarget' }),
-                ),
+                controller.callRemote(VALID_SECRET, buildBody({ name: 'NotARealTarget' })),
             ).rejects.toBeInstanceOf(BadRequestException);
             await expect(
-                controller.callRemote(
-                    VALID_SECRET,
-                    buildBody({ name: 'NotARealTarget' }),
-                ),
+                controller.callRemote(VALID_SECRET, buildBody({ name: 'NotARealTarget' })),
             ).rejects.toThrow('Unknown remote target: NotARealTarget');
         });
 
@@ -287,14 +285,11 @@ describe('TriggerInternalController', () => {
 
             for (const target of expectedTargets) {
                 await expect(
-                    controller.callRemote(
-                        VALID_SECRET,
-                        {
-                            name: target,
-                            method: 'doesNotExist',
-                            args: superjson.serialize([]) as any,
-                        },
-                    ),
+                    controller.callRemote(VALID_SECRET, {
+                        name: target,
+                        method: 'doesNotExist',
+                        args: superjson.serialize([]) as any,
+                    }),
                 ).rejects.toThrow('Unknown method: doesNotExist');
             }
         });

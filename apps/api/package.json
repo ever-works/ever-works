@@ -17,7 +17,7 @@
         "start:prod": "node dist/main",
         "build": "nest build -b swc",
         "format": "prettier --write \"**/*.{ts,tsx,jsx,json,css,md}\"",
-        "test": "jest",
+        "test": "jest --maxWorkers=2",
         "test:watch": "jest --watch",
         "test:cov": "jest --coverage",
         "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",

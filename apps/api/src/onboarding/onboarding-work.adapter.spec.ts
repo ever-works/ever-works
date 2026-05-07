@@ -55,10 +55,7 @@ describe('OnboardingWorkAdapter', () => {
         } else {
             mocks.workLifecycle.createWork.mockResolvedValue({ work: { id: 'work-42' } });
         }
-        const adapter = new OnboardingWorkAdapter(
-            mocks.workLifecycle as any,
-            mocks.users as any,
-        );
+        const adapter = new OnboardingWorkAdapter(mocks.workLifecycle as any, mocks.users as any);
         return { adapter, mocks };
     };
 

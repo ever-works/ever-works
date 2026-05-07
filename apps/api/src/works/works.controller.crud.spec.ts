@@ -403,7 +403,9 @@ describe('WorksController — core CRUD endpoints', () => {
         it('does NOT emit an activity log if updateWork rejects', async () => {
             s.workLifecycleService.updateWork.mockRejectedValue(new Error('not found'));
 
-            await expect(controller.updateWork(auth, 'w-1', {} as any)).rejects.toThrow('not found');
+            await expect(controller.updateWork(auth, 'w-1', {} as any)).rejects.toThrow(
+                'not found',
+            );
             expect(s.activityLogService.log).not.toHaveBeenCalled();
         });
     });
@@ -447,7 +449,9 @@ describe('WorksController — core CRUD endpoints', () => {
 
             const result = await controller.getWorkConfig(auth, 'w-1');
 
-            expect(s.cacheManager.wrap.mock.calls[0][0]).toBe(getWorkConfigCacheKey('w-1', 'auth-1'));
+            expect(s.cacheManager.wrap.mock.calls[0][0]).toBe(
+                getWorkConfigCacheKey('w-1', 'auth-1'),
+            );
             expect(s.cacheManager.wrap.mock.calls[0][2]).toBe(WORK_CACHE_TTL_MS);
             expect(s.workQueryService.workConfig).toHaveBeenCalledWith('w-1', { id: 'user-1' });
             expect(result).toEqual({ a: 1 });
@@ -499,9 +503,9 @@ describe('WorksController — core CRUD endpoints', () => {
         it('does not invalidate caches or log when updateWebsiteSettings rejects', async () => {
             s.workQueryService.updateWebsiteSettings.mockRejectedValue(new Error('forbidden'));
 
-            await expect(
-                controller.updateWebsiteSettings(auth, 'w-1', {} as any),
-            ).rejects.toThrow('forbidden');
+            await expect(controller.updateWebsiteSettings(auth, 'w-1', {} as any)).rejects.toThrow(
+                'forbidden',
+            );
             expect(
                 s.cacheEntryRepository.typeormAdapter.deleteUnscopedEntriesLike,
             ).not.toHaveBeenCalled();
@@ -512,9 +516,9 @@ describe('WorksController — core CRUD endpoints', () => {
             s.workQueryService.updateWebsiteSettings.mockResolvedValue({ ok: true });
             s.activityLogService.log.mockRejectedValueOnce(new Error('log down'));
 
-            await expect(
-                controller.updateWebsiteSettings(auth, 'w-1', {} as any),
-            ).resolves.toEqual({ ok: true });
+            await expect(controller.updateWebsiteSettings(auth, 'w-1', {} as any)).resolves.toEqual(
+                { ok: true },
+            );
         });
     });
 

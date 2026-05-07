@@ -5,8 +5,8 @@ const { fsMock } = vi.hoisted(() => ({
     fsMock: {
         existsSync: vi.fn(),
         readdirSync: vi.fn(),
-        readFileSync: vi.fn()
-    }
+        readFileSync: vi.fn(),
+    },
 }));
 
 vi.mock('fs', () => fsMock);
@@ -38,15 +38,13 @@ describe('collectPluginDependencies', () => {
         expect(result).toEqual([]);
         expect(warnSpy).toHaveBeenCalledWith(
             '[collectPluginDeps] Plugin source not found:',
-            PLUGINS_DIR
+            PLUGINS_DIR,
         );
     });
 
     it('skips entries that are not directories', () => {
         fsMock.existsSync.mockReturnValue(true);
-        fsMock.readdirSync.mockReturnValue([
-            { name: 'README.md', isDirectory: () => false }
-        ]);
+        fsMock.readdirSync.mockReturnValue([{ name: 'README.md', isDirectory: () => false }]);
 
         const result = collectPluginDependencies();
         expect(result).toEqual([]);
@@ -56,9 +54,7 @@ describe('collectPluginDependencies', () => {
         fsMock.existsSync.mockImplementation((p: any) => {
             return typeof p === 'string' && p === PLUGINS_DIR;
         });
-        fsMock.readdirSync.mockReturnValue([
-            { name: 'pluginA', isDirectory: () => true }
-        ]);
+        fsMock.readdirSync.mockReturnValue([{ name: 'pluginA', isDirectory: () => true }]);
 
         const result = collectPluginDependencies();
         expect(result).toEqual([]);
@@ -66,11 +62,9 @@ describe('collectPluginDependencies', () => {
 
     it('skips packages without an everworks.plugin manifest', () => {
         fsMock.existsSync.mockReturnValue(true);
-        fsMock.readdirSync.mockReturnValue([
-            { name: 'pluginA', isDirectory: () => true }
-        ]);
+        fsMock.readdirSync.mockReturnValue([{ name: 'pluginA', isDirectory: () => true }]);
         fsMock.readFileSync.mockReturnValue(
-            JSON.stringify({ name: 'pluginA', dependencies: { axios: '^1.0.0' } })
+            JSON.stringify({ name: 'pluginA', dependencies: { axios: '^1.0.0' } }),
         );
 
         const result = collectPluginDependencies();
@@ -79,9 +73,7 @@ describe('collectPluginDependencies', () => {
 
     it('skips workspace: dependencies and @ever-works/* packages', () => {
         fsMock.existsSync.mockReturnValue(true);
-        fsMock.readdirSync.mockReturnValue([
-            { name: 'pluginA', isDirectory: () => true }
-        ]);
+        fsMock.readdirSync.mockReturnValue([{ name: 'pluginA', isDirectory: () => true }]);
         fsMock.readFileSync.mockReturnValue(
             JSON.stringify({
                 name: 'pluginA',
@@ -90,9 +82,9 @@ describe('collectPluginDependencies', () => {
                     axios: '^1.0.0',
                     '@ever-works/plugin': 'workspace:*',
                     '@ever-works/contracts': '^1.0.0',
-                    '@some-vendor/sdk': 'workspace:^1.0.0'
-                }
-            })
+                    '@some-vendor/sdk': 'workspace:^1.0.0',
+                },
+            }),
         );
 
         const result = collectPluginDependencies();
@@ -102,18 +94,18 @@ describe('collectPluginDependencies', () => {
     it('aggregates dependencies and peerDependencies and dedupes across plugins', () => {
         const pkgA = {
             everworks: { plugin: { id: 'a' } },
-            dependencies: { axios: '^1.0.0', lodash: '^4.0.0' }
+            dependencies: { axios: '^1.0.0', lodash: '^4.0.0' },
         };
         const pkgB = {
             everworks: { plugin: { id: 'b' } },
             dependencies: { axios: '^1.0.0' },
-            peerDependencies: { 'date-fns': '^3.0.0' }
+            peerDependencies: { 'date-fns': '^3.0.0' },
         };
 
         fsMock.existsSync.mockReturnValue(true);
         fsMock.readdirSync.mockReturnValue([
             { name: 'a', isDirectory: () => true },
-            { name: 'b', isDirectory: () => true }
+            { name: 'b', isDirectory: () => true },
         ]);
         fsMock.readFileSync.mockImplementation((p: any) => {
             const str = String(p).replace(/\\/g, '/');
@@ -127,14 +119,12 @@ describe('collectPluginDependencies', () => {
 
     it('logs the dependency count via console.log', () => {
         fsMock.existsSync.mockReturnValue(true);
-        fsMock.readdirSync.mockReturnValue([
-            { name: 'a', isDirectory: () => true }
-        ]);
+        fsMock.readdirSync.mockReturnValue([{ name: 'a', isDirectory: () => true }]);
         fsMock.readFileSync.mockReturnValue(
             JSON.stringify({
                 everworks: { plugin: { id: 'a' } },
-                dependencies: { axios: '^1.0.0' }
-            })
+                dependencies: { axios: '^1.0.0' },
+            }),
         );
 
         collectPluginDependencies();
@@ -143,14 +133,12 @@ describe('collectPluginDependencies', () => {
 
     it('returns sorted alphabetically', () => {
         fsMock.existsSync.mockReturnValue(true);
-        fsMock.readdirSync.mockReturnValue([
-            { name: 'a', isDirectory: () => true }
-        ]);
+        fsMock.readdirSync.mockReturnValue([{ name: 'a', isDirectory: () => true }]);
         fsMock.readFileSync.mockReturnValue(
             JSON.stringify({
                 everworks: { plugin: { id: 'a' } },
-                dependencies: { zlib: '^1.0.0', alpha: '^1.0.0', mu: '^1.0.0' }
-            })
+                dependencies: { zlib: '^1.0.0', alpha: '^1.0.0', mu: '^1.0.0' },
+            }),
         );
 
         const result = collectPluginDependencies();

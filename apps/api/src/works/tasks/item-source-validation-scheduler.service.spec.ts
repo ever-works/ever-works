@@ -2,10 +2,7 @@ jest.mock('@ever-works/agent/cache', () => ({}));
 jest.mock('@ever-works/agent/services', () => ({}));
 
 import { ItemSourceValidationCronService } from './item-source-validation-scheduler.service';
-import type {
-    CacheEntryRepository,
-    DistributedTaskLockService,
-} from '@ever-works/agent/cache';
+import type { CacheEntryRepository, DistributedTaskLockService } from '@ever-works/agent/cache';
 import type { ItemSourceValidationSchedulerService } from '@ever-works/agent/services';
 import {
     WORK_CATEGORIES_TAGS_CACHE_KEY_PREFIX,
@@ -35,12 +32,8 @@ describe('ItemSourceValidationCronService', () => {
             taskLockService as unknown as DistributedTaskLockService,
         );
         logSpy = jest.spyOn((service as any).logger, 'log').mockImplementation(() => undefined);
-        errorSpy = jest
-            .spyOn((service as any).logger, 'error')
-            .mockImplementation(() => undefined);
-        debugSpy = jest
-            .spyOn((service as any).logger, 'debug')
-            .mockImplementation(() => undefined);
+        errorSpy = jest.spyOn((service as any).logger, 'error').mockImplementation(() => undefined);
+        debugSpy = jest.spyOn((service as any).logger, 'debug').mockImplementation(() => undefined);
     });
 
     afterEach(() => {
@@ -110,7 +103,9 @@ describe('ItemSourceValidationCronService', () => {
             'Error during scheduled item source validation',
             boom.stack,
         );
-        expect(cacheEntryRepository.typeormAdapter.deleteUnscopedEntriesLike).not.toHaveBeenCalled();
+        expect(
+            cacheEntryRepository.typeormAdapter.deleteUnscopedEntriesLike,
+        ).not.toHaveBeenCalled();
     });
 
     it('logs error with String(error) when thrown value is not an Error', async () => {

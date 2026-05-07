@@ -118,9 +118,9 @@ describe('GitHubAppController', () => {
         it('does not call issueSession when completeUserAuth fails', async () => {
             const { controller, onboardingService, authProvider } = createController();
             onboardingService.completeUserAuth.mockRejectedValue(new Error('auth failed'));
-            await expect(
-                controller.callback({ code: 'c', state: 's' } as any),
-            ).rejects.toThrow('auth failed');
+            await expect(controller.callback({ code: 'c', state: 's' } as any)).rejects.toThrow(
+                'auth failed',
+            );
             expect(authProvider.issueSession).not.toHaveBeenCalled();
         });
 

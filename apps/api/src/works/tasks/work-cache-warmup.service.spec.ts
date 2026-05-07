@@ -13,9 +13,7 @@ jest.mock('@ever-works/agent/entities', () => ({
 
 import { WorkCacheWarmupService } from './work-cache-warmup.service';
 import type { Cache } from '@ever-works/agent/cache';
-import type {
-    DistributedTaskLockService,
-} from '@ever-works/agent/cache';
+import type { DistributedTaskLockService } from '@ever-works/agent/cache';
 import type { WorkRepository } from '@ever-works/agent/database';
 import type { WorkQueryService } from '@ever-works/agent/services';
 import {
@@ -68,13 +66,9 @@ describe('WorkCacheWarmupService', () => {
             taskLockService as unknown as DistributedTaskLockService,
         );
         logSpy = jest.spyOn((service as any).logger, 'log').mockImplementation(() => undefined);
-        errorSpy = jest
-            .spyOn((service as any).logger, 'error')
-            .mockImplementation(() => undefined);
+        errorSpy = jest.spyOn((service as any).logger, 'error').mockImplementation(() => undefined);
         warnSpy = jest.spyOn((service as any).logger, 'warn').mockImplementation(() => undefined);
-        debugSpy = jest
-            .spyOn((service as any).logger, 'debug')
-            .mockImplementation(() => undefined);
+        debugSpy = jest.spyOn((service as any).logger, 'debug').mockImplementation(() => undefined);
     });
 
     afterEach(() => {
@@ -144,11 +138,7 @@ describe('WorkCacheWarmupService', () => {
         );
         // total-eligible<=BATCH so cursor is set to 0 with the 30-day TTL
         const cursorTtl = 1000 * 60 * 60 * 24 * 30;
-        expect(cacheManager.set).toHaveBeenCalledWith(
-            'work-cache-warmup-offset',
-            0,
-            cursorTtl,
-        );
+        expect(cacheManager.set).toHaveBeenCalledWith('work-cache-warmup-offset', 0, cursorTtl);
         expect(logSpy).toHaveBeenCalledWith(
             expect.stringContaining(
                 'Work detail cache warm-up completed: 1 warmed, 0 skipped, 0 errors',
@@ -168,9 +158,7 @@ describe('WorkCacheWarmupService', () => {
 
         await service.warmWorkCaches();
         expect(workQueryService.workItems).not.toHaveBeenCalled();
-        expect(logSpy).toHaveBeenCalledWith(
-            expect.stringContaining('0 warmed, 2 skipped'),
-        );
+        expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('0 warmed, 2 skipped'));
     });
 
     it('counts errors when query services throw, logs the per-work warning', async () => {

@@ -3,10 +3,7 @@ import type { ClientService } from '../services/client.service';
 
 describe('PeopleController', () => {
     let client: jest.Mocked<
-        Pick<
-            ClientService,
-            'getContacts' | 'createContact' | 'updateContact' | 'deleteContact'
-        >
+        Pick<ClientService, 'getContacts' | 'createContact' | 'updateContact' | 'deleteContact'>
     >;
     let controller: PeopleController;
 
@@ -22,9 +19,7 @@ describe('PeopleController', () => {
 
     it('GET /people delegates to ClientService.getContacts', async () => {
         client.getContacts.mockResolvedValue([{ id: 'p-1', firstName: 'Ada' }]);
-        await expect(controller.getContacts()).resolves.toEqual([
-            { id: 'p-1', firstName: 'Ada' },
-        ]);
+        await expect(controller.getContacts()).resolves.toEqual([{ id: 'p-1', firstName: 'Ada' }]);
         expect(client.getContacts).toHaveBeenCalledTimes(1);
     });
 

@@ -6,7 +6,7 @@ const {
     workGenTriggerMock,
     workImportTriggerMock,
     triggerConfig,
-    subscriptionsConfig
+    subscriptionsConfig,
 } = vi.hoisted(() => {
     return {
         configureMock: vi.fn(),
@@ -19,9 +19,9 @@ const {
             getApiUrl: vi.fn(),
             getMachine: vi.fn(),
             getInternalBaseUrl: vi.fn(),
-            getInternalSecret: vi.fn()
+            getInternalSecret: vi.fn(),
         },
-        subscriptionsConfig: { getDispatchIntervalMinutes: vi.fn(() => 5) }
+        subscriptionsConfig: { getDispatchIntervalMinutes: vi.fn(() => 5) },
     };
 });
 
@@ -30,26 +30,26 @@ vi.mock('@trigger.dev/sdk', () => ({
     runs: { cancel: runsCancelMock },
     task: vi.fn().mockImplementation(() => ({ id: 'mock-task' })),
     schedules: { task: vi.fn().mockImplementation(() => ({ id: 'mock-schedule-task' })) },
-    logger: { log: vi.fn(), error: vi.fn(), warn: vi.fn(), debug: vi.fn() }
+    logger: { log: vi.fn(), error: vi.fn(), warn: vi.fn(), debug: vi.fn() },
 }));
 
 vi.mock('@ever-works/agent/config', () => ({
     config: {
         trigger: triggerConfig,
-        subscriptions: subscriptionsConfig
-    }
+        subscriptions: subscriptionsConfig,
+    },
 }));
 
 vi.mock('@ever-works/agent/tasks', () => ({
     WORK_GENERATION_DISPATCHER: Symbol('WORK_GENERATION_DISPATCHER'),
-    WORK_IMPORT_DISPATCHER: Symbol('WORK_IMPORT_DISPATCHER')
+    WORK_IMPORT_DISPATCHER: Symbol('WORK_IMPORT_DISPATCHER'),
 }));
 
 vi.mock('../tasks/trigger/work-generation.task', () => ({
-    workGenerationTask: { trigger: workGenTriggerMock }
+    workGenerationTask: { trigger: workGenTriggerMock },
 }));
 vi.mock('../tasks/trigger/work-import.task', () => ({
-    workImportTask: { trigger: workImportTriggerMock }
+    workImportTask: { trigger: workImportTriggerMock },
 }));
 
 import { TriggerService } from '../trigger/trigger.service';
@@ -79,7 +79,7 @@ describe('TriggerService', () => {
             const out = await service.dispatchWorkGeneration({
                 workId: 'w1',
                 userId: 'u1',
-                mode: 'full'
+                mode: 'full',
             } as any);
 
             expect(out).toBeNull();
@@ -92,7 +92,7 @@ describe('TriggerService', () => {
             const out = await service.dispatchWorkGeneration({
                 workId: 'w1',
                 userId: 'u1',
-                mode: 'full'
+                mode: 'full',
             } as any);
 
             expect(out).toBeNull();
@@ -105,20 +105,20 @@ describe('TriggerService', () => {
             const out = await service.dispatchWorkGeneration({
                 workId: 'w1',
                 userId: 'u1',
-                mode: 'full'
+                mode: 'full',
             } as any);
 
             expect(out).toBe('run_123');
             expect(configureMock).toHaveBeenCalledWith({
                 accessToken: 'tr_test_secret',
-                baseURL: 'https://api.trigger.test'
+                baseURL: 'https://api.trigger.test',
             });
             expect(workGenTriggerMock).toHaveBeenCalledWith(
                 expect.objectContaining({ workId: 'w1' }),
                 expect.objectContaining({
                     tags: ['work-generation', 'full', 'w1'],
-                    machine: 'small-1x'
-                })
+                    machine: 'small-1x',
+                }),
             );
         });
 
@@ -127,12 +127,12 @@ describe('TriggerService', () => {
             await service.dispatchWorkGeneration({
                 workId: 'w1',
                 userId: 'u1',
-                mode: 'full'
+                mode: 'full',
             } as any);
             await service.dispatchWorkGeneration({
                 workId: 'w2',
                 userId: 'u1',
-                mode: 'full'
+                mode: 'full',
             } as any);
 
             expect(configureMock).toHaveBeenCalledTimes(1);
@@ -146,12 +146,12 @@ describe('TriggerService', () => {
             await service.dispatchWorkGeneration({
                 workId: 'w1',
                 userId: 'u1',
-                mode: 'full'
+                mode: 'full',
             } as any);
 
             expect(workGenTriggerMock).toHaveBeenCalledWith(
                 expect.anything(),
-                expect.objectContaining({ machine: undefined })
+                expect.objectContaining({ machine: undefined }),
             );
         });
 
@@ -161,7 +161,7 @@ describe('TriggerService', () => {
             const out = await service.dispatchWorkGeneration({
                 workId: 'w1',
                 userId: 'u1',
-                mode: 'full'
+                mode: 'full',
             } as any);
 
             expect(out).toBeNull();
@@ -196,7 +196,7 @@ describe('TriggerService', () => {
             const out = await service.dispatchWorkImport({
                 workId: 'w1',
                 userId: 'u1',
-                sourceType: 'github'
+                sourceType: 'github',
             } as any);
 
             expect(out).toBeNull();
@@ -209,7 +209,7 @@ describe('TriggerService', () => {
             const out = await service.dispatchWorkImport({
                 workId: 'w1',
                 userId: 'u1',
-                sourceType: 'github'
+                sourceType: 'github',
             } as any);
 
             expect(out).toBe('imp_42');
@@ -217,8 +217,8 @@ describe('TriggerService', () => {
                 expect.objectContaining({ workId: 'w1', sourceType: 'github' }),
                 expect.objectContaining({
                     tags: ['work-import', 'github', 'w1'],
-                    machine: 'small-1x'
-                })
+                    machine: 'small-1x',
+                }),
             );
         });
 
@@ -228,7 +228,7 @@ describe('TriggerService', () => {
             const out = await service.dispatchWorkImport({
                 workId: 'w1',
                 userId: 'u1',
-                sourceType: 'github'
+                sourceType: 'github',
             } as any);
 
             expect(out).toBeNull();
@@ -243,7 +243,7 @@ describe('TriggerService', () => {
             'small-2x',
             'medium-2x',
             'large-1x',
-            'large-2x'
+            'large-2x',
         ])('forwards %s as a supported machine', async (machine) => {
             triggerConfig.getMachine.mockReturnValue(machine);
             workGenTriggerMock.mockResolvedValue({ id: 'run' });
@@ -251,12 +251,12 @@ describe('TriggerService', () => {
             await service.dispatchWorkGeneration({
                 workId: 'w',
                 userId: 'u',
-                mode: 'full'
+                mode: 'full',
             } as any);
 
             expect(workGenTriggerMock).toHaveBeenCalledWith(
                 expect.anything(),
-                expect.objectContaining({ machine })
+                expect.objectContaining({ machine }),
             );
         });
     });

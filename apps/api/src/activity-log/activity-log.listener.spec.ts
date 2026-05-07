@@ -102,9 +102,7 @@ describe('ActivityLogListener', () => {
             updateStatus: jest.fn().mockResolvedValue(undefined),
             findLatestByUserWorkActionStatus: jest.fn().mockResolvedValue(null),
             resolveGenerationActivityStatus: jest.fn().mockReturnValue(ActivityStatus.COMPLETED),
-            formatGenerationCompletionSummary: jest
-                .fn()
-                .mockReturnValue('Generated 12 items'),
+            formatGenerationCompletionSummary: jest.fn().mockReturnValue('Generated 12 items'),
         };
         generationHistoryRepository = {
             findLatestCompletedByWork: jest.fn().mockResolvedValue(null),

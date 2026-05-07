@@ -26,12 +26,8 @@ describe('ComparisonSchedulerService', () => {
             taskLockService as unknown as DistributedTaskLockService,
         );
         logSpy = jest.spyOn((service as any).logger, 'log').mockImplementation(() => undefined);
-        errorSpy = jest
-            .spyOn((service as any).logger, 'error')
-            .mockImplementation(() => undefined);
-        debugSpy = jest
-            .spyOn((service as any).logger, 'debug')
-            .mockImplementation(() => undefined);
+        errorSpy = jest.spyOn((service as any).logger, 'error').mockImplementation(() => undefined);
+        debugSpy = jest.spyOn((service as any).logger, 'debug').mockImplementation(() => undefined);
     });
 
     afterEach(() => {
@@ -151,9 +147,6 @@ describe('ComparisonSchedulerService', () => {
         });
 
         await service.handleComparisonGeneration();
-        expect(errorSpy).toHaveBeenCalledWith(
-            'Error during comparison generation',
-            'outer-string',
-        );
+        expect(errorSpy).toHaveBeenCalledWith('Error during comparison generation', 'outer-string');
     });
 });

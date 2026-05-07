@@ -14,7 +14,12 @@ import {
 import superjson from 'superjson';
 import { Public } from '../auth/decorators/public.decorator';
 import { config } from '@ever-works/agent/config';
-import { WorkRepository, AuthAccountRepository } from '@ever-works/agent/database';
+import {
+    WorkRepository,
+    AuthAccountRepository,
+    TemplateRepository,
+    UserTemplatePreferenceRepository,
+} from '@ever-works/agent/database';
 import { Work, User } from '@ever-works/agent/entities';
 import { CACHE_MANAGER, Cache } from '@ever-works/agent/cache';
 import { WorkOperationsService } from '@ever-works/agent/work-operations';
@@ -52,6 +57,8 @@ export class TriggerInternalController implements OnModuleInit {
         private readonly userPluginRepository: UserPluginRepository,
         private readonly workPluginRepository: WorkPluginRepository,
         private readonly authAccountRepository: AuthAccountRepository,
+        private readonly templateRepository: TemplateRepository,
+        private readonly userTemplatePreferenceRepository: UserTemplatePreferenceRepository,
     ) {}
 
     onModuleInit() {
@@ -63,6 +70,8 @@ export class TriggerInternalController implements OnModuleInit {
             WorkOperationsService: this.workOperationsService,
             NotificationService: this.notificationService,
             WorkRepository: this.workRepository,
+            TemplateRepository: this.templateRepository,
+            UserTemplatePreferenceRepository: this.userTemplatePreferenceRepository,
             CacheManager: this.cacheManager,
             WorkScheduleDispatcherService: this.scheduleDispatcher,
             WorkScheduleService: this.workScheduleService,

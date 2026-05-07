@@ -104,10 +104,7 @@ describe('GitHubAppWebhookController', () => {
                 'raw-body',
                 'sig=good',
             );
-            expect(gitHubAppSyncService.handleWebhook).toHaveBeenCalledWith(
-                'pull_request',
-                body,
-            );
+            expect(gitHubAppSyncService.handleWebhook).toHaveBeenCalledWith('pull_request', body);
             expect(result).toEqual({ ok: true });
         });
 
@@ -116,11 +113,7 @@ describe('GitHubAppWebhookController', () => {
             gitHubAppService.verifyWebhookSignature.mockReturnValue(true);
             gitHubAppSyncService.handleWebhook.mockRejectedValue(new Error('handler boom'));
             await expect(
-                controller.handleWebhook(
-                    makeReq('raw', {}) as any,
-                    'sig',
-                    'installation',
-                ),
+                controller.handleWebhook(makeReq('raw', {}) as any, 'sig', 'installation'),
             ).rejects.toThrow('handler boom');
         });
 

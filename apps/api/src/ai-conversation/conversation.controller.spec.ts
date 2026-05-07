@@ -170,7 +170,11 @@ describe('ConversationController', () => {
                 },
             ]);
             // Whitespace is normalised
-            expect(repo.updateTitle).toHaveBeenCalledWith('c-1', 'user-1', 'Hello world with spaces');
+            expect(repo.updateTitle).toHaveBeenCalledWith(
+                'c-1',
+                'user-1',
+                'Hello world with spaces',
+            );
             expect(titleService.maybeGenerateTitle).toHaveBeenCalledWith('c-1', 'user-1');
             expect(result).toEqual({ success: true });
         });

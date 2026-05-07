@@ -243,11 +243,9 @@ describe('WorksController — items mutation endpoints', () => {
 
             const result = await controller.updateItemMetadata(auth, 'w-1', dto);
 
-            expect(s.workGenerationService.updateItemMetadata).toHaveBeenCalledWith(
-                'w-1',
-                dto,
-                { id: 'user-1' },
-            );
+            expect(s.workGenerationService.updateItemMetadata).toHaveBeenCalledWith('w-1', dto, {
+                id: 'user-1',
+            });
             expect(
                 s.cacheEntryRepository.typeormAdapter.deleteUnscopedEntriesLike,
             ).toHaveBeenCalledWith('w-1');
@@ -386,11 +384,9 @@ describe('WorksController — items mutation endpoints', () => {
 
             const result = await controller.bulkCaptureImages(auth, 'w-1', dto);
 
-            expect(s.workGenerationService.bulkCaptureImages).toHaveBeenCalledWith(
-                'w-1',
-                dto,
-                { id: 'user-1' },
-            );
+            expect(s.workGenerationService.bulkCaptureImages).toHaveBeenCalledWith('w-1', dto, {
+                id: 'user-1',
+            });
             // Note: bulkCaptureImages does NOT call invalidateWorkCaches.
             expect(
                 s.cacheEntryRepository.typeormAdapter.deleteUnscopedEntriesLike,

@@ -161,9 +161,9 @@ describe('AuthService', () => {
                 isActive: false,
             } as any);
 
-            await expect(
-                service.validateSocialUser(socialUser() as any),
-            ).rejects.toThrow(UnauthorizedException);
+            await expect(service.validateSocialUser(socialUser() as any)).rejects.toThrow(
+                UnauthorizedException,
+            );
         });
 
         it('rejects unverified email when no existing provider link', async () => {
@@ -195,10 +195,13 @@ describe('AuthService', () => {
             );
 
             expect(result).toBe(updated);
-            expect(userRepo.update).toHaveBeenCalledWith('u-1', expect.objectContaining({
-                lastLoginAt: expect.any(Date),
-                registrationProvider: 'github',
-            }));
+            expect(userRepo.update).toHaveBeenCalledWith(
+                'u-1',
+                expect.objectContaining({
+                    lastLoginAt: expect.any(Date),
+                    registrationProvider: 'github',
+                }),
+            );
         });
 
         it('upserts provider account with correct fields', async () => {
@@ -348,7 +351,9 @@ describe('AuthService', () => {
             userRepo.findById.mockResolvedValue(null);
             userRepo.update.mockResolvedValue({} as any);
 
-            await expect(service.verifyEmail('t')).rejects.toThrow('User not found after verification');
+            await expect(service.verifyEmail('t')).rejects.toThrow(
+                'User not found after verification',
+            );
         });
     });
 
@@ -439,7 +444,9 @@ describe('AuthService', () => {
             } as any);
             userRepo.clearPasswordResetToken.mockResolvedValue(false);
 
-            await expect(service.consumePasswordResetToken('t')).rejects.toThrow('Invalid reset token');
+            await expect(service.consumePasswordResetToken('t')).rejects.toThrow(
+                'Invalid reset token',
+            );
         });
 
         it('returns the user when consumed', async () => {

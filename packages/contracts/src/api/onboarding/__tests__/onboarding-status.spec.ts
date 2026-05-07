@@ -16,12 +16,9 @@ describe('isTerminalOnboardingStatus', () => {
 		expect(isTerminalOnboardingStatus(s)).toBe(true);
 	});
 
-	it.each(['received', 'validating', 'validated', 'queued', 'generating'] as const)(
-		'returns false for %s',
-		(s) => {
-			expect(isTerminalOnboardingStatus(s)).toBe(false);
-		}
-	);
+	it.each(['received', 'validating', 'validated', 'queued', 'generating'] as const)('returns false for %s', (s) => {
+		expect(isTerminalOnboardingStatus(s)).toBe(false);
+	});
 
 	it('every OnboardingStatus value is classified as either terminal or non-terminal', () => {
 		const all: OnboardingStatus[] = [

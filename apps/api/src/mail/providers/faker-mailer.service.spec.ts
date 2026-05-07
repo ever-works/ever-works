@@ -6,9 +6,7 @@ describe('FakerMailerService', () => {
 
     beforeEach(() => {
         service = new FakerMailerService();
-        debugSpy = jest
-            .spyOn((service as any).logger, 'debug')
-            .mockImplementation(() => undefined);
+        debugSpy = jest.spyOn((service as any).logger, 'debug').mockImplementation(() => undefined);
     });
 
     afterEach(() => {

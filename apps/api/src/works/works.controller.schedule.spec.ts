@@ -192,17 +192,13 @@ describe('WorksController — schedule endpoints', () => {
 
             const result = await controller.updateWorkSchedule(auth, 'w-1', dto);
 
-            expect(s.workScheduleService.updateSchedule).toHaveBeenCalledWith(
-                'w-1',
-                dto,
-                { id: 'user-1' },
-            );
+            expect(s.workScheduleService.updateSchedule).toHaveBeenCalledWith('w-1', dto, {
+                id: 'user-1',
+            });
             expect(s.workScheduleService.getScheduleEntity).toHaveBeenCalledWith('w-1', {
                 id: 'user-1',
             });
-            expect(s.workGenerationService.runScheduledUpdate).toHaveBeenCalledWith(
-                scheduleEntity,
-            );
+            expect(s.workGenerationService.runScheduledUpdate).toHaveBeenCalledWith(scheduleEntity);
             expect(s.activityLogService.log).toHaveBeenCalledWith({
                 userId: 'auth-1',
                 workId: 'w-1',
@@ -246,7 +242,10 @@ describe('WorksController — schedule endpoints', () => {
             // The controller doesn't await runScheduledUpdate, so the response
             // resolves before the rejection is logged. Resolve any microtasks.
             const result = await controller.updateWorkSchedule(auth, 'w-1', dto);
-            expect(result).toEqual({ status: 'success', schedule: { id: 's-1', status: 'ACTIVE' } });
+            expect(result).toEqual({
+                status: 'success',
+                schedule: { id: 's-1', status: 'ACTIVE' },
+            });
 
             // Flush microtasks so the .catch handler runs.
             await new Promise((resolve) => setImmediate(resolve));
