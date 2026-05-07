@@ -617,6 +617,26 @@ export class TemplateCatalogService implements OnModuleInit {
                         );
                     const canonicalId = canonicalTemplate?.id || discoveredId;
 
+                    if (!canonicalTemplate) {
+                        const existingTemplateWithDiscoveredId =
+                            await this.templateRepository.findById(discoveredId);
+
+                        if (
+                            existingTemplateWithDiscoveredId &&
+                            (existingTemplateWithDiscoveredId.kind !== 'website' ||
+                                existingTemplateWithDiscoveredId.sourceType !== 'built_in' ||
+                                existingTemplateWithDiscoveredId.repositoryOwner !==
+                                    repository.owner ||
+                                existingTemplateWithDiscoveredId.repositoryName !==
+                                    repository.name)
+                        ) {
+                            this.logger.warn(
+                                `Skipping discovered template "${repository.fullName}" because id "${discoveredId}" is already used by ${existingTemplateWithDiscoveredId.repositoryOwner}/${existingTemplateWithDiscoveredId.repositoryName}.`,
+                            );
+                            return;
+                        }
+                    }
+
                     await this.templateRepository.upsert({
                         id: canonicalId,
                         kind: 'website',

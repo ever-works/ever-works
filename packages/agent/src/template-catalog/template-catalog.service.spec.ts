@@ -406,6 +406,53 @@ describe('TemplateCatalogService', () => {
         );
     });
 
+    it('skips discovered templates whose repo-name id collides with a different built-in record', async () => {
+        const warnSpy = jest
+            .spyOn((service as any).logger, 'warn')
+            .mockImplementation(() => undefined);
+
+        templateRepository.hasRecentDiscoveredBuiltInTemplates.mockResolvedValue(true);
+        gitFacade.getAccessToken.mockResolvedValue(null);
+        gitFacade.listPublicRepositories
+            .mockResolvedValueOnce([
+                {
+                    name: 'astro-template',
+                    owner: 'ever-works',
+                    url: 'https://github.com/ever-works/astro-template',
+                    fullName: 'ever-works/astro-template',
+                    defaultBranch: 'main',
+                    description: 'Astro template',
+                },
+            ])
+            .mockResolvedValueOnce([]);
+        templateRepository.findBuiltInByRepositoryCoordinates.mockResolvedValue(null);
+        templateRepository.findById.mockResolvedValue({
+            id: 'astro-template',
+            kind: 'website',
+            sourceType: 'built_in',
+            repositoryOwner: 'other-org',
+            repositoryName: 'astro-template',
+            isActive: true,
+        });
+        templateRepository.findVisibleByKind.mockResolvedValue([]);
+        userTemplatePreferenceRepository.findByUserAndKind.mockResolvedValue(null);
+
+        await service.refreshTemplatesForUser('website', 'user-1');
+
+        expect(templateRepository.upsert).not.toHaveBeenCalledWith(
+            expect.objectContaining({
+                id: 'astro-template',
+                repositoryOwner: 'ever-works',
+                repositoryName: 'astro-template',
+            }),
+        );
+        expect(warnSpy).toHaveBeenCalledWith(
+            expect.stringContaining(
+                'Skipping discovered template "ever-works/astro-template" because id "astro-template" is already used',
+            ),
+        );
+    });
+
     it('rejects updates for custom templates the user does not own', async () => {
         templateRepository.findOwnedCustomById.mockResolvedValue(null);
 
