@@ -82,9 +82,7 @@ describe('LinkupSearchPlugin', () => {
 		});
 
 		it('throws when apiKey is missing', async () => {
-			await expect(plugin.search({ query: 'hello', settings: {} })).rejects.toThrow(
-				/API key not configured/i
-			);
+			await expect(plugin.search({ query: 'hello', settings: {} })).rejects.toThrow(/API key not configured/i);
 			expect(fetchMock).not.toHaveBeenCalled();
 		});
 

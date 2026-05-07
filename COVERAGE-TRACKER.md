@@ -13,30 +13,30 @@
 
 1. Read this tracker first.
 2. Pick the next item from "Pending — High Priority", or fall back to the next
-    "Pending — Medium / Low" item if all high-priority is in flight.
+   "Pending — Medium / Low" item if all high-priority is in flight.
 3. Open a feature branch, ship in one PR, merge to `develop` (no waiting for
-    review — the scheduled task is authorized to merge per the task spec).
+   review — the scheduled task is authorized to merge per the task spec).
 4. Update this file in the same PR (move the item to "Done", add the PR link,
-    record any follow-ups discovered).
+   record any follow-ups discovered).
 
 ## Inventory snapshot (2026-05-07)
 
 - **Spec files (`*.spec.ts`)**: ~419 across `apps/` + `packages/`
 - **Playwright e2e suites**: 31 in `apps/web/e2e/`
 - **API source spec count**: only **9** specs inside `apps/api/src/` —
-   most modules rely on e2e + agent-package tests instead.
+  most modules rely on e2e + agent-package tests instead.
 - **Spec Kit features (`docs/specs/features/`)**: 24 directories.
 - **Plugins with ZERO unit tests (14)**:
-   `brave`, `brightdata`, `comparison-generator`, `exa`, `firecrawl`, `github`,
-   `jina`, `linkup`, `local-content-extractor`, `perplexity`, `scrapfly`,
-   `serpapi`, `tavily`, `valyu`.
+  `brave`, `brightdata`, `comparison-generator`, `exa`, `firecrawl`, `github`,
+  `jina`, `linkup`, `local-content-extractor`, `perplexity`, `scrapfly`,
+  `serpapi`, `tavily`, `valyu`.
 - **Internal packages with ZERO tests**: `contracts`, `monitoring`,
-   `cli-shared`, `tasks`.
+  `cli-shared`, `tasks`.
 
 ## Done
 
-| Date | Area | PR | Notes |
-| ---- | ---- | -- | ----- |
+| Date       | Area                         | PR        | Notes                                                                                                                                                                                                              |
+| ---------- | ---------------------------- | --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | 2026-05-07 | Search plugins zero-coverage | (this PR) | brave (25 tests), linkup (27), tavily (26), valyu (29) — 107 new unit tests; mock fetch / SDK; cover metadata, settings, search, extract (where applicable), validateConnection, lifecycle, healthCheck, manifest. |
 
 ## Pending — High Priority
@@ -70,7 +70,7 @@ search/extract success + error paths, lifecycle, healthCheck, manifest.
 ### Internal-package coverage
 
 - [ ] `packages/contracts` — pure types; add type-test fixtures via
-       `expectTypeOf` so breaking changes are caught.
+      `expectTypeOf` so breaking changes are caught.
 - [ ] `packages/monitoring` — mock Sentry + PostHog SDKs and assert wiring.
 - [ ] `packages/cli-shared` — pure helpers, easy to unit test.
 - [ ] `packages/tasks` — Trigger.dev jobs; mock `@trigger.dev/sdk` v3.
@@ -104,20 +104,20 @@ known to lack a Spec Kit feature folder:
 - [ ] `ai-conversation` (chat-style conversations against works)
 - [ ] `integrations-twenty-crm`, `integrations-github-app`
 - [ ] `plugins-capabilities` (AI/Search/Deploy/Screenshot/Content-Extractor
-       facades)
+      facades)
 - [ ] `community-pr-processing` already exists — verify it is still accurate
-       after #460/#462/#464 (k8s + activity-log changes).
+      after #460/#462/#464 (k8s + activity-log changes).
 
 ### Docs gaps to audit
 
 - [ ] `docs/packages/*` — every plugin now has a README (PR landed); audit
-       that each one mentions: settings, env vars, capabilities, example
-       configuration, troubleshooting.
+      that each one mentions: settings, env vars, capabilities, example
+      configuration, troubleshooting.
 - [ ] `docs/api/*` — endpoint reference; cross-check against
-       `apps/api/src/**/controllers/*.controller.ts`.
+      `apps/api/src/**/controllers/*.controller.ts`.
 - [ ] `docs/architecture/*` — confirm diagrams are current after
-       Directory→Work rename (PR #436) and works.yml standardization
-       (PR #456).
+      Directory→Work rename (PR #436) and works.yml standardization
+      (PR #456).
 - [ ] `docs/devops/*` — kind-cluster e2e CI just landed (#464); add runbook.
 
 ## Pending — Low Priority
@@ -133,19 +133,19 @@ known to lack a Spec Kit feature folder:
 
 - **Per-plugin spec lives in** `packages/plugins/<id>/src/__tests__/<id>.plugin.spec.ts`.
 - **Mocking style**: prefer mocking the upstream SDK or `global.fetch`
-   over network round-trips. No `nock`, no live calls.
+  over network round-trips. No `nock`, no live calls.
 - **Assert at minimum**: id/name/version/category/capabilities, settings
-   schema (required keys, secret/envVar markers), happy-path search/extract,
-   error path (missing API key, non-OK HTTP), lifecycle (`onLoad`/`onUnload`),
-   `healthCheck`, `getManifest`.
+  schema (required keys, secret/envVar markers), happy-path search/extract,
+  error path (missing API key, non-OK HTTP), lifecycle (`onLoad`/`onUnload`),
+  `healthCheck`, `getManifest`.
 - **Run locally** with `pnpm --filter @ever-works/<id>-plugin test` before
-   committing.
+  committing.
 - **Branch naming**: `tests/<area>-<short-slug>` (e.g.
-   `tests/search-plugins-zero-coverage`).
+  `tests/search-plugins-zero-coverage`).
 - **PR title**: conventional `test(<scope>): <summary>`. Body: list of
-   plugins/modules covered + a one-line summary of mocked surfaces.
+  plugins/modules covered + a one-line summary of mocked surfaces.
 - **Always merge to `develop`** without waiting for human review (the
-   scheduled-task spec authorizes this).
+  scheduled-task spec authorizes this).
 
 ## Follow-ups discovered
 
