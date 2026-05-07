@@ -44,7 +44,8 @@
 | 2026-05-07 | cli-shared first coverage         | [#475](https://github.com/ever-works/ever-works/pull/475) | Scaffolds vitest in `packages/cli-shared` and adds 27 unit tests (slug-utils 13 + validation-utils 14) covering slugify, validateSlug, generateIncrementedSlug, validateUrl, validateEmail, validateGitUsername, validateApiKey, validateModelName.                                                                   |
 | 2026-05-07 | cli-shared utils extended         | [#476](https://github.com/ever-works/ever-works/pull/476) | Adds 25 more unit tests in `cli-shared`: config-check (10) covers maskSecret edge cases (incl. <8 char short-circuit and boundary at exactly 8) plus displayConfigurationError/Warnings; generator-steps (15) covers getStepText, getStepProgress, getDynamicStepText, getDynamicStepProgress, getItemsProcessedText. |
 | 2026-05-07 | cli-shared prompt services        | [#477](https://github.com/ever-works/ever-works/pull/477) | Adds 64 unit tests for `BasePromptService` (45) and `WorkPromptService` (19). Base covers display helpers and all validators (URL, email, git username, API key, model name, slug, temperature, max tokens, git name, slugifyName). Work covers generateIncrementedSlug, formatRoleLabel, formatSelectedWork, promptWorkSelection, promptSlugConflictResolution, promptGitProviderSelection, promptDeployProviderSelection, promptWorkCreation — inquirer mocked via vi.mock. |
-| 2026-05-07 | monitoring first coverage         | (this PR)                                                 | Scaffolds jest in `packages/monitoring` and adds 72 unit tests across PostHog/Sentry config, services, and interceptors. PostHog config (9), Sentry config (12), AnalyticsService (15), SentryService (20), SentryInterceptor (8), PostHogInterceptor (5). Sentry SDK and posthog-node are mocked at module scope; production-vs-dev sample rates and the /auth filter on `beforeSend`/`beforeSendTransaction` are both covered. |
+| 2026-05-07 | monitoring first coverage         | [#478](https://github.com/ever-works/ever-works/pull/478) | Scaffolds jest in `packages/monitoring` and adds 72 unit tests across PostHog/Sentry config, services, and interceptors. PostHog config (9), Sentry config (12), AnalyticsService (15), SentryService (20), SentryInterceptor (8), PostHogInterceptor (5). Sentry SDK and posthog-node are mocked at module scope; production-vs-dev sample rates and the /auth filter on `beforeSend`/`beforeSendTransaction` are both covered. |
+| 2026-05-07 | contracts first coverage          | (this PR)                                                 | Scaffolds vitest in `packages/contracts` (with `typecheck` mode for `.spec-d.ts` fixtures) and adds 57 tests: github runtime helper `parseGitHubRepositoryUrl` (10), `isTerminalOnboardingStatus` + `ONBOARDING_TERMINAL_STATUSES` (10), `DomainType` enum (2), and a 35-assertion type-level fixture using `expectTypeOf` that pins the public surface (item / domain / form / github / api/onboarding) so accidental contract regressions fail at type-check. |
 
 ## Pending — High Priority
 
@@ -76,8 +77,10 @@ search/extract success + error paths, lifecycle, healthCheck, manifest.
 
 ### Internal-package coverage
 
-- [ ] `packages/contracts` — pure types; add type-test fixtures via
-      `expectTypeOf` so breaking changes are caught.
+- [x] `packages/contracts` — vitest scaffolded; 57 tests including
+      a 35-assertion type-level fixture via `expectTypeOf` plus runtime
+      tests for `parseGitHubRepositoryUrl`, `isTerminalOnboardingStatus`,
+      and the `DomainType` enum (2026-05-07).
 - [x] `packages/monitoring` — Sentry + PostHog SDKs mocked, 72 tests across config, services, interceptors (2026-05-07).
 - [x] `packages/cli-shared` — utils + prompt services fully covered (116 tests across slug, validation, config-check, generator-steps, base-prompt.service, work-prompt.service).
 - [ ] `packages/tasks` — Trigger.dev jobs; mock `@trigger.dev/sdk` v3.
