@@ -35,10 +35,11 @@
 
 ## Done
 
-| Date       | Area                              | PR                                                        | Notes                                                                                                                                                                                                              |
-| ---------- | --------------------------------- | --------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| 2026-05-07 | Search plugins zero-coverage      | [#471](https://github.com/ever-works/ever-works/pull/471) | brave (25 tests), linkup (27), tavily (26), valyu (29) — 107 new unit tests; mock fetch / SDK; cover metadata, settings, search, extract (where applicable), validateConnection, lifecycle, healthCheck, manifest. |
-| 2026-05-07 | Search plugins zero-coverage (b2) | (this PR)                                                 | exa (30 tests), perplexity (22), serpapi (22), firecrawl (28) — 102 new unit tests; same coverage shape as batch 1.                                                                                                |
+| Date       | Area                              | PR                                                        | Notes                                                                                                                                                                                                               |
+| ---------- | --------------------------------- | --------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 2026-05-07 | Search plugins zero-coverage      | [#471](https://github.com/ever-works/ever-works/pull/471) | brave (25 tests), linkup (27), tavily (26), valyu (29) — 107 new unit tests; mock fetch / SDK; cover metadata, settings, search, extract (where applicable), validateConnection, lifecycle, healthCheck, manifest.  |
+| 2026-05-07 | Search plugins zero-coverage (b2) | [#472](https://github.com/ever-works/ever-works/pull/472) | exa (30 tests), perplexity (22), serpapi (22), firecrawl (28) — 102 new unit tests; same coverage shape as batch 1.                                                                                                 |
+| 2026-05-07 | Plugin coverage (b3)              | (this PR)                                                 | jina (25 tests), comparison-generator (12), brightdata (28), scrapfly (26) — 91 new unit tests; covers remaining zero-coverage search plugins plus utility (comparison-generator) and content-extractor (scrapfly). |
 
 ## Pending — High Priority
 
@@ -58,13 +59,13 @@ search/extract success + error paths, lifecycle, healthCheck, manifest.
 - [x] `perplexity` (SDK `@perplexity-ai/perplexity_ai`, search) — 22 tests, 2026-05-07
 - [x] `serpapi` (fetch-based, search) — 22 tests, 2026-05-07
 - [x] `firecrawl` (SDK `@mendable/firecrawl-js`, search + content-extractor) — 28 tests, 2026-05-07
-- [ ] `jina` (TBD)
-- [ ] `scrapfly` (search + content-extractor + screenshot)
-- [ ] `brightdata` (TBD)
+- [x] `jina` (fetch-based, search + content-extractor) — 25 tests, 2026-05-07
+- [x] `scrapfly` (SDK `scrapfly-sdk`, content-extractor + screenshot) — 26 tests, 2026-05-07
+- [x] `brightdata` (SDK `@brightdata/sdk`, search + content-extractor) — 28 tests, 2026-05-07
 
 ### Other zero-coverage plugins
 
-- [ ] `comparison-generator` (utility category)
+- [x] `comparison-generator` (utility category) — 12 tests, 2026-05-07
 - [ ] `github` (git-provider + OAuth)
 - [ ] `local-content-extractor` (content-extractor — default)
 
