@@ -43,7 +43,8 @@
 | 2026-05-07 | Plugin coverage (b4)              | [#474](https://github.com/ever-works/ever-works/pull/474) | local-content-extractor (20 tests, axios mock), github (20 tests, fetch + libsodium mock for OAuth flow) — 40 new unit tests; closes the high-priority zero-coverage plugin list.                                                                                                                                     |
 | 2026-05-07 | cli-shared first coverage         | [#475](https://github.com/ever-works/ever-works/pull/475) | Scaffolds vitest in `packages/cli-shared` and adds 27 unit tests (slug-utils 13 + validation-utils 14) covering slugify, validateSlug, generateIncrementedSlug, validateUrl, validateEmail, validateGitUsername, validateApiKey, validateModelName.                                                                   |
 | 2026-05-07 | cli-shared utils extended         | [#476](https://github.com/ever-works/ever-works/pull/476) | Adds 25 more unit tests in `cli-shared`: config-check (10) covers maskSecret edge cases (incl. <8 char short-circuit and boundary at exactly 8) plus displayConfigurationError/Warnings; generator-steps (15) covers getStepText, getStepProgress, getDynamicStepText, getDynamicStepProgress, getItemsProcessedText. |
-| 2026-05-07 | cli-shared prompt services        | (this PR)                                                 | Adds 64 unit tests for `BasePromptService` (45) and `WorkPromptService` (19). Base covers display helpers and all validators (URL, email, git username, API key, model name, slug, temperature, max tokens, git name, slugifyName). Work covers generateIncrementedSlug, formatRoleLabel, formatSelectedWork, promptWorkSelection, promptSlugConflictResolution, promptGitProviderSelection, promptDeployProviderSelection, promptWorkCreation — inquirer mocked via vi.mock. |
+| 2026-05-07 | cli-shared prompt services        | [#477](https://github.com/ever-works/ever-works/pull/477) | Adds 64 unit tests for `BasePromptService` (45) and `WorkPromptService` (19). Base covers display helpers and all validators (URL, email, git username, API key, model name, slug, temperature, max tokens, git name, slugifyName). Work covers generateIncrementedSlug, formatRoleLabel, formatSelectedWork, promptWorkSelection, promptSlugConflictResolution, promptGitProviderSelection, promptDeployProviderSelection, promptWorkCreation — inquirer mocked via vi.mock. |
+| 2026-05-07 | monitoring first coverage         | (this PR)                                                 | Scaffolds jest in `packages/monitoring` and adds 72 unit tests across PostHog/Sentry config, services, and interceptors. PostHog config (9), Sentry config (12), AnalyticsService (15), SentryService (20), SentryInterceptor (8), PostHogInterceptor (5). Sentry SDK and posthog-node are mocked at module scope; production-vs-dev sample rates and the /auth filter on `beforeSend`/`beforeSendTransaction` are both covered. |
 
 ## Pending — High Priority
 
@@ -77,7 +78,7 @@ search/extract success + error paths, lifecycle, healthCheck, manifest.
 
 - [ ] `packages/contracts` — pure types; add type-test fixtures via
       `expectTypeOf` so breaking changes are caught.
-- [ ] `packages/monitoring` — mock Sentry + PostHog SDKs and assert wiring.
+- [x] `packages/monitoring` — Sentry + PostHog SDKs mocked, 72 tests across config, services, interceptors (2026-05-07).
 - [x] `packages/cli-shared` — utils + prompt services fully covered (116 tests across slug, validation, config-check, generator-steps, base-prompt.service, work-prompt.service).
 - [ ] `packages/tasks` — Trigger.dev jobs; mock `@trigger.dev/sdk` v3.
 
