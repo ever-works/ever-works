@@ -8,7 +8,6 @@ import { DeployTokenAlert } from '@/components/works/detail/deploy/DeployTokenAl
 import { DeployProviderSelector } from '@/components/works/detail/deploy/DeployProviderSelector';
 import { SharedWorkNoTokenAlert } from '@/components/works/detail/deploy/SharedWorkNoTokenAlert';
 import { DomainManagement } from '@/components/works/detail/deploy/DomainManagement';
-import { GenerateStatusType } from '@/lib/api/enums';
 import { canDeploy } from '@/lib/permissions';
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -45,7 +44,7 @@ export default async function DeployPage({ params }: DeployPageParams) {
         notFound();
     }
 
-    if (work.generateStatus?.status !== GenerateStatusType.GENERATED) {
+    if (!work.websiteRepositoryInitialized && !work.website) {
         redirect(ROUTES.DASHBOARD_WORK(id));
     }
 

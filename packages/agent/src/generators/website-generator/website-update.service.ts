@@ -3,13 +3,11 @@ import { GitFacadeService } from '../../facades/git.facade';
 import { BranchSyncService, BranchSyncSummary } from './branch-sync.service';
 import { Work } from '../../entities/work.entity';
 import { User } from '../../entities/user.entity';
-import {
-    getWebsiteTemplateBranch,
-    getWebsiteTemplateConfig,
-} from './config/website-template.config';
+import { getWebsiteTemplateBranch } from './config/website-template.config';
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 import { getWorkOwner } from '../../utils/work.utils';
+import { WebsiteTemplateResolverService } from './website-template-resolver.service';
 
 @Injectable()
 export class WebsiteUpdateService {
@@ -18,10 +16,11 @@ export class WebsiteUpdateService {
     constructor(
         private readonly gitFacade: GitFacadeService,
         private readonly branchSyncService: BranchSyncService,
+        private readonly websiteTemplateResolver: WebsiteTemplateResolverService,
     ) {}
 
     private async ensureTemplateDefaultBranch(work: Work, userId: string): Promise<void> {
-        const template = getWebsiteTemplateConfig(work.websiteTemplateId);
+        const template = await this.websiteTemplateResolver.resolveForWork(work);
         const targetBranch = template.branch;
         const websiteOwner = work.getRepoOwner('website');
         const websiteRepo = work.getWebsiteRepo();
@@ -72,7 +71,7 @@ export class WebsiteUpdateService {
         const workOwner = getWorkOwner(work);
         const websiteOwner = work.getRepoOwner('website');
         const websiteRepo = work.getWebsiteRepo();
-        const template = getWebsiteTemplateConfig(work.websiteTemplateId);
+        const template = await this.websiteTemplateResolver.resolveForWork(work);
         const branch = options?.branch || template.branch;
 
         // Check if the target repository exists
@@ -154,7 +153,7 @@ export class WebsiteUpdateService {
         error?: string;
     }> {
         const workOwner = getWorkOwner(work);
-        const template = getWebsiteTemplateConfig(work.websiteTemplateId);
+        const template = await this.websiteTemplateResolver.resolveForWork(work);
         const branch = getWebsiteTemplateBranch(template, work.websiteTemplateUseBeta);
 
         const hasCredentials = await this.gitFacade.hasValidCredentials({
@@ -202,7 +201,7 @@ export class WebsiteUpdateService {
         const committer = work.resolveCommitter(user);
         const websiteOwner = work.getRepoOwner('website');
         const websiteRepo = work.getWebsiteRepo();
-        const template = getWebsiteTemplateConfig(work.websiteTemplateId);
+        const template = await this.websiteTemplateResolver.resolveForWork(work);
 
         try {
             // Clone the target repository
@@ -252,7 +251,7 @@ export class WebsiteUpdateService {
         const workOwner = getWorkOwner(work);
         const websiteOwner = work.getRepoOwner('website');
         const websiteRepo = work.getWebsiteRepo();
-        const template = getWebsiteTemplateConfig(work.websiteTemplateId);
+        const template = await this.websiteTemplateResolver.resolveForWork(work);
         const resolvedBranch = branch || template.branch;
 
         await this.gitFacade.removeLocalDir(work.gitProvider, template.owner, template.repo);
@@ -306,7 +305,7 @@ export class WebsiteUpdateService {
         const committer = work.resolveCommitter(user);
         const websiteOwner = work.getRepoOwner('website');
         const websiteRepo = work.getWebsiteRepo();
-        const template = getWebsiteTemplateConfig(work.websiteTemplateId);
+        const template = await this.websiteTemplateResolver.resolveForWork(work);
         const resolvedBranch = branch || template.branch;
 
         // Clone both repositories

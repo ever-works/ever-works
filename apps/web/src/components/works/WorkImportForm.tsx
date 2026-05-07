@@ -45,7 +45,7 @@ interface ImportProviderErrors {
 
 function formatProviderLabel(providerType: string): string {
     if (providerType === 'contentExtractor') {
-        return 'Content extractor';
+        return 'Content processor';
     }
 
     return providerType.charAt(0).toUpperCase() + providerType.slice(1);

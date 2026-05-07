@@ -63,8 +63,21 @@ export function WorkLayoutClient({
     useEffect(() => {
         const lastStatus = lastGenerateStatus.current;
         const currentStatus = syncedWork.generateStatus?.status;
+        const errorMessage = syncedWork.generateStatus?.error?.toLowerCase();
+        const looksLikeCancellationError = Boolean(
+            currentStatus === GenerateStatusType.ERROR && errorMessage?.includes('cancel'),
+        );
 
         if (lastStatus !== currentStatus && currentStatus === GenerateStatusType.ERROR) {
+            if (looksLikeCancellationError) {
+                toast.info(t('generationCancelled'), {
+                    id: 'generation-cancelled',
+                });
+                lastGenerateStatus.current = GenerateStatusType.CANCELLED;
+                router.refresh();
+                return;
+            }
+
             toast.error(t('failedToGenerateItems'), {
                 id: 'failed-to-generate-items',
             });

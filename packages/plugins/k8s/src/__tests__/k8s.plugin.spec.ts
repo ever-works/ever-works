@@ -343,6 +343,54 @@ describe('KubernetesPlugin.getDeploymentStatus', () => {
 	});
 });
 
+describe('KubernetesPlugin.lookupExistingDeployment', () => {
+	it('returns verifier-compatible terminal state and ingress website URL', async () => {
+		const api = makeMockApi({
+			readIngress: vi.fn(async () => ({
+				metadata: { name: 'my-site' },
+				spec: { rules: [{ host: 'my-site.example.com' }] },
+				status: { loadBalancer: { ingress: [{ hostname: 'lb.cluster.example.com' }] } }
+			}))
+		});
+		const plugin = new KubernetesPlugin({ api });
+
+		const result = await plugin.lookupExistingDeployment('my-site', VALID);
+
+		expect(result).toEqual({
+			found: true,
+			projectId: 'ever-works/my-site',
+			website: 'https://my-site.example.com',
+			deploymentState: 'READY'
+		});
+	});
+
+	it('maps in-progress Kubernetes rollout state to the verifier BUILDING state', async () => {
+		const api = makeMockApi({
+			getDeployment: vi.fn(async () => ({
+				metadata: { name: 'my-site', namespace: 'ever-works' },
+				status: { conditions: [{ type: 'Progressing', status: 'True' }], replicas: 1 }
+			}))
+		});
+		const plugin = new KubernetesPlugin({ api });
+
+		const result = await plugin.lookupExistingDeployment('my-site', VALID);
+
+		expect(result.found).toBe(true);
+		expect(result.deploymentState).toBe('BUILDING');
+	});
+
+	it('does not fail lookup when the deployment has no ingress yet', async () => {
+		const api = makeMockApi({ readIngress: vi.fn(async () => null) });
+		const plugin = new KubernetesPlugin({ api });
+
+		const result = await plugin.lookupExistingDeployment('my-site', VALID);
+
+		expect(result.found).toBe(true);
+		expect(result.website).toBeUndefined();
+		expect(result.deploymentState).toBe('READY');
+	});
+});
+
 describe('KubernetesPlugin.getTeams', () => {
 	it('returns an empty list (k8s has no team concept)', async () => {
 		expect(await new KubernetesPlugin().getTeams('whatever')).toEqual([]);

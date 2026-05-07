@@ -14,6 +14,7 @@ import {
 } from '@src/dto/work-generation-history.dto';
 import { WorkGenerationHistory } from '@src/entities/work-generation-history.entity';
 import { WorkHistoryActivityType } from '@ever-works/contracts/api';
+import { WorkWebsiteRepositoryStateService } from './work-website-repository-state.service';
 
 // Extended work response type with userRole for API responses
 // Uses Omit to exclude class methods from Work, then adds userRole
@@ -30,6 +31,7 @@ type WorkMethods =
 
 export type WorkWithRole = Omit<Work, WorkMethods> & {
     userRole: WorkMemberRole;
+    websiteRepositoryInitialized?: boolean;
 };
 
 @Injectable()
@@ -42,6 +44,7 @@ export class WorkQueryService {
         private readonly dataGenerator: DataGeneratorService,
         private readonly generationHistoryRepository: WorkGenerationHistoryRepository,
         private readonly ownershipService: WorkOwnershipService,
+        private readonly websiteRepositoryState: WorkWebsiteRepositoryStateService,
     ) {}
 
     async getWorks(options: { limit?: number; offset?: number; search?: string } = {}, user: User) {
@@ -165,11 +168,16 @@ export class WorkQueryService {
             const accessResult = await this.ownershipService.ensureAccess(id, user.id);
             const work = accessResult.work;
             work.owner = work.getRepoOwner();
+            const websiteRepositoryInitialized = await this.websiteRepositoryState.isInitialized(
+                work,
+                user,
+            );
 
             // Return work with user's role
             const workWithRole: WorkWithRole = {
                 ...work,
                 userRole: accessResult.role,
+                websiteRepositoryInitialized,
             };
 
             return {

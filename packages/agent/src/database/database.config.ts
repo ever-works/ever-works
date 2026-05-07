@@ -25,6 +25,8 @@ import {
     GitHubAppInstallationRepository,
     GitHubAppUserLink,
     OnboardingRequest,
+    Template,
+    UserTemplatePreference,
     WebhookSubscription,
 } from '../entities';
 import { PluginEntity, UserPluginEntity, WorkPluginEntity } from '../plugins/entities';
@@ -84,6 +86,8 @@ export const ENTITIES = [
     GitHubAppInstallationRepository,
     GitHubAppUserLink,
     OnboardingRequest,
+    Template,
+    UserTemplatePreference,
     WebhookSubscription,
     // Plugin entities
     PluginEntity,

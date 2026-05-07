@@ -9,6 +9,7 @@ export interface DeployProvider {
     id: string;
     name: string;
     enabled: boolean;
+    configured?: boolean;
     icon?: PluginIcon;
     description?: string;
     homepage?: string;

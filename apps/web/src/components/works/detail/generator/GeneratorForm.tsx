@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useTransition, useEffect, useCallback, useRef, useMemo } from 'react';
+import { useState, useTransition, useEffect, useCallback, useRef } from 'react';
 import {
     Work,
     CreateItemsGeneratorDto,
@@ -31,6 +31,7 @@ import {
 } from '@/lib/api/enums';
 import { getFormSchema } from '@/app/actions/dashboard/generator-form';
 import { updateWorkTemplate } from '@/app/actions/dashboard/works';
+import { switchWebsiteTemplate } from '@/app/actions/dashboard/deploy';
 import { useProviderSelection } from '@/lib/hooks/use-provider-selection';
 import { ProviderSelectionSection } from '@/components/works/shared/ProviderSelectionSection';
 import { WebsiteTemplateSelector } from '@/components/works/shared/WebsiteTemplateSelector';
@@ -38,7 +39,6 @@ import { GenerationProgress } from './GenerationProgress';
 import type { WebsiteTemplateOption } from '@/lib/api/work';
 import type { WorkPlugin } from '@/lib/api/plugins';
 import { useWorkDetail } from '../WorkDetailContext';
-import { resolveEffectiveDefault } from '@ever-works/plugin';
 
 interface GeneratorFormProps {
     workId: string;
@@ -59,26 +59,26 @@ export function GeneratorForm({
 }: GeneratorFormProps) {
     const router = useRouter();
     const t = useTranslations('dashboard.workDetail.generator');
+    const deployT = useTranslations('dashboard.workDetail.deploy');
     const { updateGenerateStatus } = useWorkDetail();
     const [isPending, startTransition] = useTransition();
     const [optimisticGenerating, setOptimisticGenerating] = useState(startInProgressView);
     const [showAdvancedOptions, setShowAdvancedOptions] = useState(false);
     const [confirmRecreate, setConfirmRecreate] = useState(false);
+    const [confirmTemplateSwitch, setConfirmTemplateSwitch] = useState(false);
     const [formSchema, setFormSchema] = useState<GeneratorFormSchema | null>(null);
     const [isLoadingSchema, setIsLoadingSchema] = useState(false);
     const fetchVersionRef = useRef(0);
     const lastFetchedPipelineRef = useRef<string | undefined>(undefined);
-    const previousAiProviderIdRef = useRef<string | null | undefined>(undefined);
 
     // Check if work has been generated before
     const isGenerated = !!config?.metadata;
+    const isWebsiteTemplateLocked = work.websiteRepositoryInitialized ?? false;
+    const [templateSwitchModeEnabled, setTemplateSwitchModeEnabled] = useState(false);
     const lastRequestData = config?.metadata?.last_request_data;
     const initialPrompt = lastRequestData?.prompt || config?.metadata?.initial_prompt || '';
     const [selectedWebsiteTemplateId, setSelectedWebsiteTemplateId] = useState(
-        work.websiteTemplateId ||
-            websiteTemplates.find((template) => template.isDefault)?.id ||
-            websiteTemplates[0]?.id ||
-            '',
+        work.websiteTemplateId || '',
     );
 
     // Core form data (always present)
@@ -203,33 +203,6 @@ export function GeneratorForm({
         ...work,
         generateStatus: optimisticGenerateStatus,
     };
-    const activeAiProvider = useMemo(() => {
-        const aiProviders = formSchema?.providers.ai ?? [];
-
-        if (providers.ai) {
-            return aiProviders.find((provider) => provider.id === providers.ai) ?? null;
-        }
-
-        return resolveEffectiveDefault(aiProviders) ?? null;
-    }, [formSchema, providers.ai]);
-
-    useEffect(() => {
-        const currentAiProviderId = activeAiProvider?.id ?? null;
-        const previousAiProviderId = previousAiProviderIdRef.current;
-
-        if (
-            previousAiProviderId !== undefined &&
-            previousAiProviderId !== null &&
-            previousAiProviderId !== currentAiProviderId
-        ) {
-            setCoreData((prev) => ({
-                ...prev,
-                model: undefined,
-            }));
-        }
-
-        previousAiProviderIdRef.current = currentAiProviderId;
-    }, [activeAiProvider?.id]);
 
     useEffect(() => {
         if (!startInProgressView) {
@@ -257,27 +230,38 @@ export function GeneratorForm({
     };
 
     const submitGeneration = async () => {
+        const selectedProviders = buildSelectedProviders(formSchema);
+        const promptChanged = coreData.prompt.trim() !== initialPrompt.trim();
+        const requiresFullGeneration =
+            !isGenerated ||
+            showAdvancedOptions ||
+            coreData.generation_method === GenerationMethod.RECREATE ||
+            promptChanged;
+        const hasLockedTemplateChange =
+            isWebsiteTemplateLocked &&
+            templateSwitchModeEnabled &&
+            selectedWebsiteTemplateId !== (work.websiteTemplateId || '');
+
+        const unconfigured = getUnconfiguredProviders(formSchema);
+        if (unconfigured.length > 0) {
+            toast.error(t('unconfiguredProviders', { providers: unconfigured.join(', ') }));
+            return;
+        }
+
+        if (requiresFullGeneration && !coreData.prompt.trim()) {
+            toast.error(t('promptRequired'));
+            return;
+        }
+
+        if (hasLockedTemplateChange) {
+            setConfirmTemplateSwitch(true);
+            return;
+        }
+
         startTransition(async () => {
             let result;
-            const selectedProviders = buildSelectedProviders(formSchema);
-            const promptChanged = coreData.prompt.trim() !== initialPrompt.trim();
-            const requiresFullGeneration =
-                !isGenerated ||
-                showAdvancedOptions ||
-                coreData.generation_method === GenerationMethod.RECREATE ||
-                promptChanged;
 
-            const unconfigured = getUnconfiguredProviders(formSchema);
-            if (unconfigured.length > 0) {
-                toast.error(t('unconfiguredProviders', { providers: unconfigured.join(', ') }));
-                return;
-            }
-
-            if (
-                !isGenerated &&
-                selectedWebsiteTemplateId &&
-                selectedWebsiteTemplateId !== work.websiteTemplateId
-            ) {
+            if (!isGenerated && selectedWebsiteTemplateId !== (work.websiteTemplateId || '')) {
                 const templateUpdate = await updateWorkTemplate(workId, selectedWebsiteTemplateId);
 
                 if (!templateUpdate.success) {
@@ -297,11 +281,6 @@ export function GeneratorForm({
                 result = await updateItems(workId, updateData);
             } else {
                 // Full generation - send core data + plugin config
-                if (!coreData.prompt.trim()) {
-                    toast.error(t('promptRequired'));
-                    return;
-                }
-
                 const generateData: CreateItemsGeneratorDto = {
                     name: coreData.name,
                     prompt: coreData.prompt,
@@ -327,6 +306,26 @@ export function GeneratorForm({
         });
     };
 
+    const handleConfirmTemplateSwitch = () => {
+        setConfirmTemplateSwitch(false);
+
+        startTransition(async () => {
+            const templateSwitch = await switchWebsiteTemplate(workId, selectedWebsiteTemplateId);
+
+            if (!templateSwitch.success) {
+                toast.error(templateSwitch.error || t('failedToStartOperation'));
+                return;
+            }
+
+            setTemplateSwitchModeEnabled(false);
+            toast.success(
+                templateSwitch.data?.message ||
+                    'Template changed. Start generation again to continue with the new template.',
+            );
+            router.refresh();
+        });
+    };
+
     // Determine button text based on context
     const getButtonText = () => {
         if (!isGenerated) {
@@ -344,26 +343,73 @@ export function GeneratorForm({
 
     return (
         <form onSubmit={handleSubmit} className="space-y-6 max-w-4xl">
-            <RequiredFields
-                formData={coreData}
-                onChange={handleCoreDataChange}
-                modelPluginId={activeAiProvider?.configured ? activeAiProvider.id : null}
-                modelDisabled={isPending || isLoadingSchema || !activeAiProvider?.configured}
-                modelHelperText={
-                    activeAiProvider?.configured
-                        ? t('modelOverrideHelperText')
-                        : t('modelOverrideUnavailable')
-                }
-            >
+            <Dialog open={confirmTemplateSwitch} onOpenChange={setConfirmTemplateSwitch}>
+                <DialogContent className="max-w-lg">
+                    <DialogHeader>
+                        <DialogTitle>
+                            {deployT('form.websiteTemplate.switchConfirmTitle', {
+                                defaultValue: 'Switch website template?',
+                            })}
+                        </DialogTitle>
+                        <p className="text-sm text-text-secondary dark:text-text-secondary-dark">
+                            {deployT('form.websiteTemplate.switchConfirmDescription', {
+                                defaultValue:
+                                    'If the website repository already exists, its contents will be replaced from the selected template. Any custom code in that repository will be lost.',
+                            })}
+                        </p>
+                    </DialogHeader>
+                    <DialogFooter>
+                        <Button
+                            type="button"
+                            variant="secondary"
+                            size="sm"
+                            onClick={() => setConfirmTemplateSwitch(false)}
+                            disabled={isPending}
+                        >
+                            {deployT('form.websiteTemplate.switchCancel', {
+                                defaultValue: 'Cancel',
+                            })}
+                        </Button>
+                        <Button
+                            type="button"
+                            variant="danger"
+                            size="sm"
+                            onClick={handleConfirmTemplateSwitch}
+                            disabled={isPending}
+                            loading={isPending}
+                        >
+                            {deployT('form.websiteTemplate.switchConfirmButton', {
+                                defaultValue: 'Switch template',
+                            })}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+            <RequiredFields formData={coreData} onChange={handleCoreDataChange}>
                 <WebsiteTemplateSelector
+                    key={
+                        templateSwitchModeEnabled
+                            ? 'template-selector-enabled'
+                            : 'template-selector-locked'
+                    }
                     templates={websiteTemplates}
                     value={selectedWebsiteTemplateId}
                     onChange={setSelectedWebsiteTemplateId}
-                    disabled={isGenerated || isPending}
+                    disabled={(isWebsiteTemplateLocked && !templateSwitchModeEnabled) || isPending}
+                    helperLinkOnClick={
+                        isWebsiteTemplateLocked && !templateSwitchModeEnabled
+                            ? () => setTemplateSwitchModeEnabled(true)
+                            : undefined
+                    }
                     helperText={
-                        isGenerated
+                        isWebsiteTemplateLocked && !templateSwitchModeEnabled
                             ? t('websiteTemplateLockedHelperText')
-                            : t('websiteTemplateHelperText')
+                            : isWebsiteTemplateLocked
+                              ? deployT('form.websiteTemplate.switchHelperText', {
+                                    defaultValue:
+                                        'Applying a new template will reset the existing website repository from the selected template if it already exists.',
+                                })
+                              : t('websiteTemplateHelperText')
                     }
                 />
             </RequiredFields>

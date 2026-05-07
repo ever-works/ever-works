@@ -4,4 +4,5 @@ export * from './dto/update-website-repository.dto';
 export * from './dto/switch-website-template.dto';
 export * from './website-generator.module';
 export * from './website-generator.service';
+export * from './website-template-resolver.service';
 export * from './website-update.service';

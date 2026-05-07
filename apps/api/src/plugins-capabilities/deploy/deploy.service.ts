@@ -8,7 +8,7 @@ import { Work, User } from '@ever-works/agent/entities';
 import {
     WebsiteUpdateService,
     getWebsiteTemplateBranch,
-    getWebsiteTemplateConfig,
+    WebsiteTemplateResolverService,
 } from '@ever-works/agent/generators';
 import { DeploymentDispatchedEvent } from '@ever-works/agent/events';
 import type { IDeploymentPlugin } from '@ever-works/plugin';
@@ -48,6 +48,7 @@ export class DeployService {
         private readonly workRepository: WorkRepository,
         private readonly pluginRegistry: PluginRegistryService,
         private readonly websiteUpdateService: WebsiteUpdateService,
+        private readonly websiteTemplateResolver: WebsiteTemplateResolverService,
         private readonly eventEmitter: EventEmitter2,
     ) {}
 
@@ -323,7 +324,7 @@ export class DeployService {
             : [...DEFAULT_WORKFLOW_FILES];
         const owner = work.getRepoOwner('website');
         const repo = work.getWebsiteRepo();
-        const template = getWebsiteTemplateConfig(work.websiteTemplateId);
+        const template = await this.websiteTemplateResolver.resolveForWork(work);
 
         const tryDispatch = async (): Promise<boolean> => {
             for (const workflowFile of workflowFilesToTry) {
@@ -374,10 +375,8 @@ export class DeployService {
                 return true;
             }
 
-            this.logger.log(
-                `Manual dispatch failed, but push to main completed for ${owner}/${repo}`,
-            );
-            return true;
+            this.logger.warn(`Workflow dispatch still failed after updating ${owner}/${repo}`);
+            return false;
         } catch (error) {
             this.logger.error(`Failed to update repository for ${owner}/${repo}: ${error.message}`);
             return false;
@@ -392,7 +391,7 @@ export class DeployService {
         const workOwner = work.user as User;
         const websiteOwner = work.getRepoOwner('website');
         const websiteRepo = work.getWebsiteRepo();
-        const template = getWebsiteTemplateConfig(work.websiteTemplateId);
+        const template = await this.websiteTemplateResolver.resolveForWork(work);
 
         try {
             const repoDir = await this.gitFacade.cloneOrPull(

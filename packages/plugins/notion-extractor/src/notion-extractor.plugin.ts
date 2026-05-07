@@ -37,7 +37,7 @@ export class NotionExtractorPlugin implements IPlugin, IContentExtractorPlugin {
 	// ============================================================================
 
 	readonly id = 'notion-extractor';
-	readonly name = 'Notion Page Extractor';
+	readonly name = 'Notion Page Processor';
 	readonly version = '1.0.0';
 	readonly category: PluginCategory = 'content-extractor';
 	readonly capabilities: readonly string[] = ['content-extractor'];
@@ -267,7 +267,7 @@ export class NotionExtractorPlugin implements IPlugin, IContentExtractorPlugin {
 		this.context = context;
 		// Create NotionService with logger from context
 		this.notionService = new NotionService(context.logger);
-		context.logger.log('Notion Extractor Plugin loaded');
+		context.logger.log('Notion Processor Plugin loaded');
 	}
 
 	async onUnload(): Promise<void> {
@@ -289,7 +289,7 @@ export class NotionExtractorPlugin implements IPlugin, IContentExtractorPlugin {
 
 			return {
 				status: 'healthy',
-				message: 'Notion extractor is ready (Splitbee API)',
+				message: 'Notion processor is ready (Splitbee API)',
 				checkedAt: Date.now()
 			};
 		} catch (error) {
@@ -306,7 +306,7 @@ export class NotionExtractorPlugin implements IPlugin, IContentExtractorPlugin {
 			id: this.id,
 			name: this.name,
 			version: this.version,
-			description: 'Extract content from Notion pages to use as source material for your work',
+			description: 'Process content from Notion pages to use as source material for your work',
 			category: this.category,
 			capabilities: [...this.capabilities],
 			author: { name: 'Ever Works Team' },
@@ -320,24 +320,24 @@ export class NotionExtractorPlugin implements IPlugin, IContentExtractorPlugin {
 				value: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><path d="M8 10h8"/><path d="M8 14h6"/></svg>'
 			},
 			readme: [
-				'## What does the Notion Extractor do?',
+				'## What does the Notion Page Processor do?',
 				'',
-				'This plugin extracts content from Notion pages and converts it to clean markdown for use as source material during work generation. It supports both public and private Notion pages.',
+				'This plugin processes content from Notion pages and converts it to clean markdown for use as source material during work generation. It supports both public and private Notion pages.',
 				'',
 				'## Why use it?',
 				'',
 				'- **Leverage existing content** — use Notion pages as source material without manual copy-pasting',
-				'- **Public and private pages** — extracts published pages out of the box and private pages with an API key',
+				'- **Public and private pages** — processes published pages out of the box and private pages with an API key',
 				'- **Clean markdown output** — preserves headings, formatting, and document structure',
-				'- **No API key required for public pages** — public pages are extracted via the Splitbee API at no cost',
+				'- **No API key required for public pages** — public pages are processed via the Splitbee API at no cost',
 				'',
 				'## How it works in Ever Works',
 				'',
-				'When a source URL points to a Notion page (notion.so or notion.site), the content extractor facade delegates to this plugin instead of the default extractor. It retrieves the page content as structured markdown, which the AI then uses to generate work items during the pipeline.',
+				'When a source URL points to a Notion page (notion.so or notion.site), the content processor delegates to this plugin instead of the default processor. It retrieves the page content as structured markdown, which the AI then uses to generate work items during the pipeline.',
 				'',
 				'## Getting started',
 				'',
-				'1. Enable the Notion Extractor plugin on this page',
+				'1. Enable the Notion Page Processor plugin on this page',
 				'2. For public pages, no additional configuration is required',
 				'3. For private pages, create a Notion integration at [notion.so/my-integrations](https://www.notion.so/my-integrations) and enter the API key in the settings below',
 				'4. Add Notion page URLs as source material when generating your work'

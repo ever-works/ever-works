@@ -124,6 +124,7 @@ export function WorkStatusCard({ work }: WorkStatusCardProps) {
                         </div>
                         <div className="flex items-center gap-2">
                             <CancelGenerationButton
+                                key={`${currentWork.id}-${isGenerating ? 'generating' : 'idle'}`}
                                 workId={currentWork.id}
                                 labels={{
                                     stop: t('generating.stop'),

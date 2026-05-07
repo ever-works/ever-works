@@ -203,6 +203,27 @@ export class WorkRepository {
         return count > 0;
     }
 
+    async countByUserAndWebsiteTemplateId(
+        userId: string,
+        websiteTemplateId: string,
+    ): Promise<number> {
+        return this.repository.count({
+            where: {
+                userId,
+                websiteTemplateId,
+            },
+        });
+    }
+
+    async countByUserAndInheritedWebsiteTemplateSelection(userId: string): Promise<number> {
+        return this.repository.count({
+            where: {
+                userId,
+                websiteTemplateId: IsNull(),
+            },
+        });
+    }
+
     async findByUser(userId: string): Promise<Work[]> {
         return await this.repository.find({ where: { userId } });
     }

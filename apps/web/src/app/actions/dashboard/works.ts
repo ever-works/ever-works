@@ -397,12 +397,12 @@ export async function updateWork(workId: string, data: UpdateWorkDto) {
     }
 }
 
-export async function updateWorkTemplate(workId: string, websiteTemplateId: string) {
+export async function updateWorkTemplate(workId: string, websiteTemplateId: string | null) {
     const t = await getTranslations('actions.works');
 
     const schema = z.object({
         workId: z.string().uuid(t('invalidId')),
-        websiteTemplateId: z.string().min(1),
+        websiteTemplateId: z.string().nullable(),
     });
 
     try {
@@ -414,8 +414,10 @@ export async function updateWorkTemplate(workId: string, websiteTemplateId: stri
             };
         }
 
+        const normalizedTemplateId = validation.data.websiteTemplateId?.trim() || null;
+
         await workAPI.update(validation.data.workId, {
-            websiteTemplateId: validation.data.websiteTemplateId,
+            websiteTemplateId: normalizedTemplateId,
         });
 
         revalidatePath(ROUTES.DASHBOARD_WORK_GENERATOR(validation.data.workId));

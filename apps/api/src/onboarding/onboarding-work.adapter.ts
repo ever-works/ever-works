@@ -65,7 +65,6 @@ export class OnboardingWorkAdapter implements OnboardingWorkCreator {
             organization: false,
             gitProvider: 'github',
             deployProvider: manifest.spec.deployment?.target ?? 'vercel',
-            websiteTemplateId: 'classic',
         };
 
         try {

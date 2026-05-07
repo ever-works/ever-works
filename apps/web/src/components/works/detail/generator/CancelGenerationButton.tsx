@@ -1,6 +1,6 @@
 'use client';
 
-import { useTransition } from 'react';
+import { useEffect, useRef, useState, useTransition } from 'react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { cancelGeneration } from '@/app/actions/dashboard/generator';
@@ -28,8 +28,22 @@ export function CancelGenerationButton({
     className,
 }: CancelGenerationButtonProps) {
     const [isPending, startTransition] = useTransition();
+    const [stopRequested, setStopRequested] = useState(false);
+    const resetTimerRef = useRef<number | null>(null);
+
+    useEffect(() => {
+        return () => {
+            if (resetTimerRef.current !== null) {
+                window.clearTimeout(resetTimerRef.current);
+            }
+        };
+    }, []);
 
     const handleClick = () => {
+        if (stopRequested) {
+            return;
+        }
+
         startTransition(async () => {
             const result = await cancelGeneration(workId);
 
@@ -44,6 +58,14 @@ export function CancelGenerationButton({
                 return;
             }
 
+            setStopRequested(true);
+            if (resetTimerRef.current !== null) {
+                window.clearTimeout(resetTimerRef.current);
+            }
+            resetTimerRef.current = window.setTimeout(() => {
+                setStopRequested(false);
+                resetTimerRef.current = null;
+            }, 10000);
             toast.success(result.message || labels.stopRequested);
             onCancelled?.();
         });
@@ -53,11 +75,12 @@ export function CancelGenerationButton({
         <Button
             variant="danger"
             size="sm"
-            loading={isPending}
+            loading={isPending || stopRequested}
             onClick={handleClick}
             className={className}
+            disabled={isPending || stopRequested}
         >
-            {isPending ? labels.stopping : labels.stop}
+            {isPending || stopRequested ? labels.stopping : labels.stop}
         </Button>
     );
 }

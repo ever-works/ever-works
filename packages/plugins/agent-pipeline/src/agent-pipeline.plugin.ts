@@ -848,8 +848,8 @@ export class AgentPipelinePlugin implements IPlugin, IPipelinePlugin<AgentPipeli
 
 	private classifyProcessUrlError(error: string): string {
 		const normalized = error.toLowerCase();
-		if (normalized.includes('content extraction')) return 'extraction';
-		if (normalized.includes('no items extracted') || normalized.includes('empty content')) return 'empty';
+		if (normalized.includes('processing failed') || normalized.includes('content extraction')) return 'extraction';
+		if (normalized.includes('no items retrieved') || normalized.includes('empty content')) return 'empty';
 		if (normalized.includes('aborted')) return 'aborted';
 		return 'worker';
 	}
@@ -859,9 +859,9 @@ export class AgentPipelinePlugin implements IPlugin, IPipelinePlugin<AgentPipeli
 
 		switch (kind) {
 			case 'extraction':
-				return `${count} extraction failure${plural}`;
+				return `${count} processing failure${plural}`;
 			case 'empty':
-				return `${count} extracted page${plural} with no items`;
+				return `${count} processed page${plural} with no items`;
 			case 'aborted':
 				return `${count} aborted URL${plural}`;
 			default:

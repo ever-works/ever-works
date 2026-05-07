@@ -43,8 +43,7 @@ export function WorkManualForm({
         description: '',
         organization: false,
         owner: '',
-        websiteTemplateId:
-            websiteTemplates.find((template) => template.isDefault)?.id || websiteTemplates[0]?.id,
+        websiteTemplateId: '',
     });
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -161,7 +160,7 @@ export function WorkManualForm({
 
                         <WebsiteTemplateSelector
                             templates={websiteTemplates}
-                            value={formData.websiteTemplateId || websiteTemplates[0]?.id || ''}
+                            value={formData.websiteTemplateId}
                             onChange={(websiteTemplateId) =>
                                 setFormData({ ...formData, websiteTemplateId })
                             }

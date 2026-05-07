@@ -538,7 +538,7 @@ describe('ContentExtractorFacadeService', () => {
             );
 
             expect(result.content).toBeNull();
-            expect(result.error).toBe('Content extraction failed for URL: https://example.com');
+            expect(result.error).toBe('Processing failed for URL: https://example.com');
             expect(result.attempts).toEqual([
                 expect.objectContaining({ providerId: 'jina', success: false, error: 'blocked' }),
                 expect.objectContaining({

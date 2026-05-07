@@ -11,6 +11,7 @@ import { FacadesModule } from '@ever-works/agent/facades';
 import { WorkModule } from '@ever-works/agent/services';
 import { AuthModule } from '../auth';
 import { ActivityLogModule } from '@ever-works/agent/activity-log';
+import { DatabaseModule } from '@ever-works/agent/database';
 
 import { PluginsController } from './plugins.controller';
 import { PluginValidationService } from './plugin-validation.service';
@@ -22,6 +23,7 @@ import { PluginValidationService } from './plugin-validation.service';
  */
 @Module({
     imports: [
+        DatabaseModule,
         TypeOrmModule.forFeature([PluginEntity, UserPluginEntity, WorkPluginEntity]),
         FacadesModule,
         WorkModule,
