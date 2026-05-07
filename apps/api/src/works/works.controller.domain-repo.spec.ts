@@ -424,11 +424,9 @@ describe('WorksController — domain + repository endpoints', () => {
 
             await controller.switchWebsiteTemplate(auth, 'w-1', { websiteTemplateId: null });
 
-            expect(s.workLifecycleService.switchWebsiteTemplate).toHaveBeenCalledWith(
-                'w-1',
-                null,
-                { id: 'user-1' },
-            );
+            expect(s.workLifecycleService.switchWebsiteTemplate).toHaveBeenCalledWith('w-1', null, {
+                id: 'user-1',
+            });
         });
 
         it('does not emit a log when switchWebsiteTemplate rejects', async () => {
@@ -513,10 +511,9 @@ describe('WorksController — domain + repository endpoints', () => {
             const result = await controller.getRepositoryVisibility(auth, 'w-1');
 
             expect(s.workOwnershipService.ensureAccess).toHaveBeenCalledWith('w-1', 'user-1');
-            expect(s.repositoryManagementService.getRepositoriesStatus).toHaveBeenCalledWith(
-                work,
-                { id: 'user-1' },
-            );
+            expect(s.repositoryManagementService.getRepositoriesStatus).toHaveBeenCalledWith(work, {
+                id: 'user-1',
+            });
 
             const accessOrder = s.workOwnershipService.ensureAccess.mock.invocationCallOrder[0];
             const statusOrder =
@@ -553,9 +550,12 @@ describe('WorksController — domain + repository endpoints', () => {
             });
 
             expect(s.workOwnershipService.ensureAccess).toHaveBeenCalledWith('w-1', 'user-1');
-            expect(
-                s.repositoryManagementService.updateRepositoryVisibility,
-            ).toHaveBeenCalledWith(work, { id: 'user-1' }, 'website', false);
+            expect(s.repositoryManagementService.updateRepositoryVisibility).toHaveBeenCalledWith(
+                work,
+                { id: 'user-1' },
+                'website',
+                false,
+            );
 
             const accessOrder = s.workOwnershipService.ensureAccess.mock.invocationCallOrder[0];
             const updateOrder =
@@ -576,9 +576,7 @@ describe('WorksController — domain + repository endpoints', () => {
                     isPrivate: true,
                 }),
             ).rejects.toThrow('not member');
-            expect(
-                s.repositoryManagementService.updateRepositoryVisibility,
-            ).not.toHaveBeenCalled();
+            expect(s.repositoryManagementService.updateRepositoryVisibility).not.toHaveBeenCalled();
         });
 
         it('forwards isPrivate=true verbatim with the data repoType', async () => {
@@ -590,9 +588,7 @@ describe('WorksController — domain + repository endpoints', () => {
                 isPrivate: true,
             });
 
-            expect(
-                s.repositoryManagementService.updateRepositoryVisibility,
-            ).toHaveBeenCalledWith(
+            expect(s.repositoryManagementService.updateRepositoryVisibility).toHaveBeenCalledWith(
                 expect.objectContaining({ id: 'w-1' }),
                 { id: 'user-1' },
                 'data',

@@ -26,12 +26,8 @@ describe('NotificationCleanupService', () => {
         );
         // Suppress and spy on logger so we can assert on log output
         logSpy = jest.spyOn((service as any).logger, 'log').mockImplementation(() => undefined);
-        errorSpy = jest
-            .spyOn((service as any).logger, 'error')
-            .mockImplementation(() => undefined);
-        debugSpy = jest
-            .spyOn((service as any).logger, 'debug')
-            .mockImplementation(() => undefined);
+        errorSpy = jest.spyOn((service as any).logger, 'error').mockImplementation(() => undefined);
+        debugSpy = jest.spyOn((service as any).logger, 'debug').mockImplementation(() => undefined);
     });
 
     afterEach(() => {

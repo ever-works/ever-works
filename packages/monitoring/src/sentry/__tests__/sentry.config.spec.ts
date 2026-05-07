@@ -87,7 +87,9 @@ describe('sentry.config', () => {
 
         it('beforeSend filters out /auth events but keeps others', () => {
             const cfg = createSentryConfig();
-            expect(cfg.beforeSend({ request: { url: 'https://api.example/auth/login' } })).toBeNull();
+            expect(
+                cfg.beforeSend({ request: { url: 'https://api.example/auth/login' } }),
+            ).toBeNull();
             const kept = cfg.beforeSend({ request: { url: 'https://api.example/works' } });
             expect(kept).toEqual({ request: { url: 'https://api.example/works' } });
         });
@@ -97,7 +99,9 @@ describe('sentry.config', () => {
             expect(
                 cfg.beforeSendTransaction({ request: { url: 'https://api.example/auth/refresh' } }),
             ).toBeNull();
-            const kept = cfg.beforeSendTransaction({ request: { url: 'https://api.example/works' } });
+            const kept = cfg.beforeSendTransaction({
+                request: { url: 'https://api.example/works' },
+            });
             expect(kept).toEqual({ request: { url: 'https://api.example/works' } });
         });
 
@@ -128,10 +132,12 @@ describe('sentry.config', () => {
         it('calls Sentry.init when DSN is provided via config arg', () => {
             const ok = initSentry({ dsn: 'cfg-dsn', environment: 'staging' });
             expect(ok).toBe(true);
-            expect(sentryInitMock).toHaveBeenCalledWith(expect.objectContaining({
-                dsn: 'cfg-dsn',
-                environment: 'staging',
-            }));
+            expect(sentryInitMock).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    dsn: 'cfg-dsn',
+                    environment: 'staging',
+                }),
+            );
         });
     });
 

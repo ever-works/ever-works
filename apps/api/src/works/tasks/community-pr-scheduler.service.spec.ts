@@ -21,12 +21,8 @@ describe('CommunityPrSchedulerService', () => {
             taskLockService as unknown as DistributedTaskLockService,
         );
         logSpy = jest.spyOn((service as any).logger, 'log').mockImplementation(() => undefined);
-        errorSpy = jest
-            .spyOn((service as any).logger, 'error')
-            .mockImplementation(() => undefined);
-        debugSpy = jest
-            .spyOn((service as any).logger, 'debug')
-            .mockImplementation(() => undefined);
+        errorSpy = jest.spyOn((service as any).logger, 'error').mockImplementation(() => undefined);
+        debugSpy = jest.spyOn((service as any).logger, 'debug').mockImplementation(() => undefined);
     });
 
     afterEach(() => {
@@ -78,10 +74,7 @@ describe('CommunityPrSchedulerService', () => {
         });
 
         await expect(service.handleCommunityPrProcessing()).resolves.toBeUndefined();
-        expect(errorSpy).toHaveBeenCalledWith(
-            'Error during community PR processing',
-            boom.stack,
-        );
+        expect(errorSpy).toHaveBeenCalledWith('Error during community PR processing', boom.stack);
     });
 
     it('logs error with String(error) when thrown value is not an Error', async () => {

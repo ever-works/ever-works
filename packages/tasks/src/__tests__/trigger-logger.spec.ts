@@ -7,12 +7,12 @@ const { triggerLoggerMock } = vi.hoisted(() => ({
         warn: vi.fn(),
         debug: vi.fn(),
         info: vi.fn(),
-        trace: vi.fn()
-    }
+        trace: vi.fn(),
+    },
 }));
 
 vi.mock('@trigger.dev/sdk', () => ({
-    logger: triggerLoggerMock
+    logger: triggerLoggerMock,
 }));
 
 import { TriggerLogger, createTriggerLogger } from '../trigger/worker/trigger-logger';
@@ -73,7 +73,7 @@ describe('TriggerLogger', () => {
             logger.log('hi', err);
             expect(triggerLoggerMock.log).toHaveBeenCalledWith(
                 'hi',
-                expect.objectContaining({ error: 'boom', stack: expect.any(String) })
+                expect.objectContaining({ error: 'boom', stack: expect.any(String) }),
             );
         });
 
@@ -96,7 +96,7 @@ describe('TriggerLogger', () => {
             logger.error('failed', new Error('nope'));
             expect(triggerLoggerMock.error).toHaveBeenCalledWith(
                 'failed',
-                expect.objectContaining({ error: 'nope', stack: expect.any(String) })
+                expect.objectContaining({ error: 'nope', stack: expect.any(String) }),
             );
         });
     });
@@ -135,7 +135,7 @@ describe('TriggerLogger', () => {
             logger.verbose?.('detail', { a: 1 });
             expect(triggerLoggerMock.debug).toHaveBeenCalledWith('detail', {
                 level: 'verbose',
-                a: 1
+                a: 1,
             });
         });
     });
@@ -152,7 +152,7 @@ describe('TriggerLogger', () => {
             logger.fatal?.('die', { reason: 'oom' });
             expect(triggerLoggerMock.error).toHaveBeenCalledWith('die', {
                 level: 'fatal',
-                reason: 'oom'
+                reason: 'oom',
             });
         });
     });

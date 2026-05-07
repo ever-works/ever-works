@@ -46,9 +46,9 @@ describe('CrmTenantService', () => {
 
     describe('getTenantEndpointPrefix', () => {
         it('returns `/tenants/<tenantId>`', () => {
-            expect(
-                service.getTenantEndpointPrefix({ tenantId: 'work_42' }),
-            ).toBe('/tenants/work_42');
+            expect(service.getTenantEndpointPrefix({ tenantId: 'work_42' })).toBe(
+                '/tenants/work_42',
+            );
         });
     });
 
@@ -62,9 +62,7 @@ describe('CrmTenantService', () => {
         });
 
         it('returns false when tenantId is undefined', () => {
-            expect(
-                service.validateTenantContext({ tenantId: undefined as any }),
-            ).toBe(false);
+            expect(service.validateTenantContext({ tenantId: undefined as any })).toBe(false);
         });
     });
 

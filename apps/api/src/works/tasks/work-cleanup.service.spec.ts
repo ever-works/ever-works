@@ -28,14 +28,8 @@ import {
 } from '@ever-works/agent/events';
 import { GenerateStatusType } from '@ever-works/agent/entities';
 import type { EventEmitter2 } from '@nestjs/event-emitter';
-import type {
-    CacheEntryRepository,
-    DistributedTaskLockService,
-} from '@ever-works/agent/cache';
-import type {
-    WorkRepository,
-    WorkGenerationHistoryRepository,
-} from '@ever-works/agent/database';
+import type { CacheEntryRepository, DistributedTaskLockService } from '@ever-works/agent/cache';
+import type { WorkRepository, WorkGenerationHistoryRepository } from '@ever-works/agent/database';
 
 describe('WorkCleanupService', () => {
     let workRepository: {
@@ -83,12 +77,8 @@ describe('WorkCleanupService', () => {
             taskLockService as unknown as DistributedTaskLockService,
         );
         logSpy = jest.spyOn((service as any).logger, 'log').mockImplementation(() => undefined);
-        errorSpy = jest
-            .spyOn((service as any).logger, 'error')
-            .mockImplementation(() => undefined);
-        debugSpy = jest
-            .spyOn((service as any).logger, 'debug')
-            .mockImplementation(() => undefined);
+        errorSpy = jest.spyOn((service as any).logger, 'error').mockImplementation(() => undefined);
+        debugSpy = jest.spyOn((service as any).logger, 'debug').mockImplementation(() => undefined);
     });
 
     afterEach(() => {
@@ -208,9 +198,7 @@ describe('WorkCleanupService', () => {
         });
 
         await service.handleStalledGenerations();
-        expect(logSpy).toHaveBeenCalledWith(
-            'Found 2 orphaned history record(s), marking as error',
-        );
+        expect(logSpy).toHaveBeenCalledWith('Found 2 orphaned history record(s), marking as error');
         expect(generationHistoryRepository.updateEntry).toHaveBeenCalledTimes(2);
         const firstUpdate = generationHistoryRepository.updateEntry.mock.calls[0];
         expect(firstUpdate[0]).toBe('h1');
@@ -256,9 +244,9 @@ describe('WorkCleanupService', () => {
             // wait microtasks so the .then() runs
             await Promise.resolve();
             await Promise.resolve();
-            expect(
-                cacheRepository.typeormAdapter.deleteUnscopedEntriesLike,
-            ).toHaveBeenCalledWith('w42');
+            expect(cacheRepository.typeormAdapter.deleteUnscopedEntriesLike).toHaveBeenCalledWith(
+                'w42',
+            );
             expect(logSpy).toHaveBeenCalledWith('Cache cleared for work w42');
         });
 

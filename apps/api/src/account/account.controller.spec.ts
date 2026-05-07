@@ -156,7 +156,9 @@ describe('AccountController', () => {
 
             const result = await controller.pushToGitHub(auth, { includeSecrets: true });
 
-            expect(syncService.pushToGitHub).toHaveBeenCalledWith('user-1', { includeSecrets: true });
+            expect(syncService.pushToGitHub).toHaveBeenCalledWith('user-1', {
+                includeSecrets: true,
+            });
             expect(result).toEqual({ status: 'success' });
         });
 

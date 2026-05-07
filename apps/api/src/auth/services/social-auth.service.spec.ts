@@ -303,9 +303,7 @@ describe('SocialAuthService', () => {
         });
 
         it('GitHub: throws when /user/emails returns no usable email and profile email is null', async () => {
-            httpService.post.mockReturnValueOnce(
-                of({ data: { access_token: 'gh-access' } }),
-            );
+            httpService.post.mockReturnValueOnce(of({ data: { access_token: 'gh-access' } }));
             httpService.get
                 .mockReturnValueOnce(
                     of({
@@ -341,9 +339,7 @@ describe('SocialAuthService', () => {
                 )
                 .mockReturnValueOnce(
                     of({
-                        data: [
-                            { email: 'octo@github.test', primary: true, verified: true },
-                        ],
+                        data: [{ email: 'octo@github.test', primary: true, verified: true }],
                     }),
                 );
             authService.validateSocialUser.mockResolvedValue('ok');
@@ -371,9 +367,7 @@ describe('SocialAuthService', () => {
                 )
                 .mockReturnValueOnce(
                     of({
-                        data: [
-                            { email: 'fallback@github.test', primary: true, verified: true },
-                        ],
+                        data: [{ email: 'fallback@github.test', primary: true, verified: true }],
                     }),
                 );
             authService.validateSocialUser.mockResolvedValue('ok');
@@ -387,9 +381,7 @@ describe('SocialAuthService', () => {
 
         it('Google: throws when email missing', async () => {
             httpService.post.mockReturnValueOnce(of({ data: { access_token: 'g' } }));
-            httpService.get.mockReturnValueOnce(
-                of({ data: { sub: 's', email: '' } }),
-            );
+            httpService.get.mockReturnValueOnce(of({ data: { sub: 's', email: '' } }));
 
             await expect(service.authenticate(AuthProvider.GOOGLE, 'c')).rejects.toThrow(
                 'No email found in Google profile',
@@ -537,9 +529,7 @@ describe('SocialAuthService', () => {
 
             await service.authenticate(AuthProvider.LINKEDIN, 'c');
 
-            expect(httpService.get.mock.calls[0][0]).toBe(
-                'https://api.linkedin.com/v2/userinfo',
-            );
+            expect(httpService.get.mock.calls[0][0]).toBe('https://api.linkedin.com/v2/userinfo');
             expect(authService.validateSocialUser).toHaveBeenCalledWith(
                 expect.objectContaining({
                     provider: AuthProvider.LINKEDIN,
@@ -653,9 +643,7 @@ describe('SocialAuthService', () => {
                     },
                 }),
             );
-            httpService.get.mockReturnValueOnce(
-                of({ data: { sub: 's', email: 'g@google.test' } }),
-            );
+            httpService.get.mockReturnValueOnce(of({ data: { sub: 's', email: 'g@google.test' } }));
             authService.validateSocialUser.mockResolvedValue('ok');
 
             await service.authenticate(AuthProvider.GOOGLE, 'c');
@@ -676,9 +664,7 @@ describe('SocialAuthService', () => {
                     },
                 }),
             );
-            httpService.get.mockReturnValueOnce(
-                of({ data: { sub: 's', email: 'g@google.test' } }),
-            );
+            httpService.get.mockReturnValueOnce(of({ data: { sub: 's', email: 'g@google.test' } }));
             authService.validateSocialUser.mockResolvedValue('ok');
 
             await service.authenticate(AuthProvider.GOOGLE, 'c');

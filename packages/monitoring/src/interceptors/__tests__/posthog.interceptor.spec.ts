@@ -33,7 +33,9 @@ describe('PostHogInterceptor', () => {
     it('does not throw when PostHog is not initialized', async () => {
         const req = { method: 'GET', originalUrl: '/x', headers: {}, body: undefined };
         const next: CallHandler = { handle: () => of({}) };
-        await expect(lastValueFrom(interceptor.intercept(buildExecCtx(req), next))).resolves.toEqual({});
+        await expect(
+            lastValueFrom(interceptor.intercept(buildExecCtx(req), next)),
+        ).resolves.toEqual({});
         expect(captureMock).not.toHaveBeenCalled();
     });
 

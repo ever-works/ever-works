@@ -50,13 +50,9 @@ describe('WebsiteTemplateSchedulerService', () => {
             taskLockService as unknown as DistributedTaskLockService,
         );
         logSpy = jest.spyOn((service as any).logger, 'log').mockImplementation(() => undefined);
-        errorSpy = jest
-            .spyOn((service as any).logger, 'error')
-            .mockImplementation(() => undefined);
+        errorSpy = jest.spyOn((service as any).logger, 'error').mockImplementation(() => undefined);
         warnSpy = jest.spyOn((service as any).logger, 'warn').mockImplementation(() => undefined);
-        debugSpy = jest
-            .spyOn((service as any).logger, 'debug')
-            .mockImplementation(() => undefined);
+        debugSpy = jest.spyOn((service as any).logger, 'debug').mockImplementation(() => undefined);
         autoUpdateEnabled.mockReturnValue(true);
         taskLockService.runExclusive.mockImplementation(async (_k, w) => {
             await w();
@@ -132,9 +128,7 @@ describe('WebsiteTemplateSchedulerService', () => {
         expect(logSpy).toHaveBeenCalledWith('Checking 2 works for website template updates');
         expect(logSpy).toHaveBeenCalledWith('Update available for s1: abc -> def');
         expect(logSpy).toHaveBeenCalledWith('Successfully updated s1 using merge method');
-        expect(debugSpy).toHaveBeenCalledWith(
-            'No update available for work s2 (branch: main)',
-        );
+        expect(debugSpy).toHaveBeenCalledWith('No update available for work s2 (branch: main)');
         expect(logSpy).toHaveBeenCalledWith('Website template update check completed');
 
         // Update calls: lastChecked for both, success-update for w1
@@ -154,11 +148,9 @@ describe('WebsiteTemplateSchedulerService', () => {
         });
 
         expect(websiteUpdateService.updateRepository).toHaveBeenCalledTimes(1);
-        expect(websiteUpdateService.updateRepository).toHaveBeenCalledWith(
-            work1,
-            work1.user,
-            { branch: 'main' },
-        );
+        expect(websiteUpdateService.updateRepository).toHaveBeenCalledWith(work1, work1.user, {
+            branch: 'main',
+        });
     });
 
     it('falls back to updateCheck.latestCommit when result.commitSha is missing', async () => {
@@ -243,7 +235,9 @@ describe('WebsiteTemplateSchedulerService', () => {
         expect(workRepository.update).toHaveBeenCalledWith('w1', {
             websiteTemplateLastError: 'git push failed',
         });
-        expect(errorSpy).toHaveBeenCalledWith('Failed to update template for work s1: git push failed');
+        expect(errorSpy).toHaveBeenCalledWith(
+            'Failed to update template for work s1: git push failed',
+        );
     });
 
     it('records "Unknown error during template update" when non-Error is thrown', async () => {

@@ -13,12 +13,10 @@ describe('CrmSyncGuard', () => {
         const guard = new CrmSyncGuard(config);
         // Silence the Logger to keep the test output clean — we only assert
         // on the boolean return.
-        const warn = jest
-            .spyOn((guard as any).logger, 'warn')
-            .mockImplementation(() => undefined);
+        const warn = jest.spyOn((guard as any).logger, 'warn').mockImplementation(() => undefined);
 
         expect(guard.canActivate(stubExecutionContext)).toBe(false);
-        expect((config.validateConfig as jest.Mock)).not.toHaveBeenCalled();
+        expect(config.validateConfig as jest.Mock).not.toHaveBeenCalled();
         expect(warn).toHaveBeenCalledWith('CRM integration is disabled - request blocked');
     });
 
@@ -30,7 +28,7 @@ describe('CrmSyncGuard', () => {
         const guard = new CrmSyncGuard(config);
 
         expect(guard.canActivate(stubExecutionContext)).toBe(true);
-        expect((config.validateConfig as jest.Mock)).toHaveBeenCalledTimes(1);
+        expect(config.validateConfig as jest.Mock).toHaveBeenCalledTimes(1);
     });
 
     it('returns false (and logs error) when validateConfig throws', () => {

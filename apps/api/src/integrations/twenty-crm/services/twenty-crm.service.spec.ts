@@ -4,12 +4,14 @@ import { of, throwError } from 'rxjs';
 import { TwentyCrmService } from './twenty-crm.service';
 import type { CrmConfigService } from '../config/crm-config.service';
 
-const buildConfig = (overrides: Partial<{
-    apiUrl: string;
-    apiKey: string;
-    workspaceId: string;
-    timeout: number;
-}> = {}) => ({
+const buildConfig = (
+    overrides: Partial<{
+        apiUrl: string;
+        apiKey: string;
+        workspaceId: string;
+        timeout: number;
+    }> = {},
+) => ({
     twentyCrmConfig: {
         apiUrl: 'https://crm.example.com',
         apiKey: 'secret',
@@ -29,10 +31,7 @@ describe('TwentyCrmService.makeRequest', () => {
     beforeEach(() => {
         httpService = { request: jest.fn() };
         configService = buildConfig() as unknown as CrmConfigService;
-        service = new TwentyCrmService(
-            httpService as unknown as HttpService,
-            configService,
-        );
+        service = new TwentyCrmService(httpService as unknown as HttpService, configService);
         jest.spyOn((service as any).logger, 'debug').mockImplementation(() => undefined);
         jest.spyOn((service as any).logger, 'error').mockImplementation(() => undefined);
     });
@@ -72,11 +71,10 @@ describe('TwentyCrmService.makeRequest', () => {
     });
 
     it('falls back to "default" workspace id when none is configured', async () => {
-        configService = buildConfig({ workspaceId: undefined as any }) as unknown as CrmConfigService;
-        service = new TwentyCrmService(
-            httpService as unknown as HttpService,
-            configService,
-        );
+        configService = buildConfig({
+            workspaceId: undefined as any,
+        }) as unknown as CrmConfigService;
+        service = new TwentyCrmService(httpService as unknown as HttpService, configService);
         jest.spyOn((service as any).logger, 'debug').mockImplementation(() => undefined);
         httpService.request.mockReturnValue(of({ data: 'ok' }));
 

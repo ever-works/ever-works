@@ -10,13 +10,7 @@ import type { ClientService } from '../services/client.service';
 
 describe('CompaniesController', () => {
     let client: jest.Mocked<
-        Pick<
-            ClientService,
-            | 'getCompanies'
-            | 'createCompany'
-            | 'updateCompany'
-            | 'deleteCompany'
-        >
+        Pick<ClientService, 'getCompanies' | 'createCompany' | 'updateCompany' | 'deleteCompany'>
     >;
     let controller: CompaniesController;
 
@@ -32,9 +26,7 @@ describe('CompaniesController', () => {
 
     it('GET /companies delegates to ClientService.getCompanies', async () => {
         client.getCompanies.mockResolvedValue([{ id: 'co-1', name: 'Acme' }]);
-        await expect(controller.getCompanies()).resolves.toEqual([
-            { id: 'co-1', name: 'Acme' },
-        ]);
+        await expect(controller.getCompanies()).resolves.toEqual([{ id: 'co-1', name: 'Acme' }]);
         expect(client.getCompanies).toHaveBeenCalledTimes(1);
     });
 

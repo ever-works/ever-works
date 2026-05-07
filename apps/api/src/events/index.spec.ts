@@ -123,13 +123,7 @@ describe('events/* event objects', () => {
         });
 
         it('extends BaseUserEvent', () => {
-            const evt = new UserPasswordChangedEvent(
-                fakeUser,
-                new Date(),
-                'ip',
-                'loc',
-                'dev',
-            );
+            const evt = new UserPasswordChangedEvent(fakeUser, new Date(), 'ip', 'loc', 'dev');
             expect(evt instanceof BaseUserEvent).toBe(true);
         });
     });

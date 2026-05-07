@@ -316,8 +316,7 @@ describe('config/constants', () => {
 
         it('privateKey: undefined when unset, escaped \\n replaced with real newlines when set', () => {
             expect(config.githubApp.privateKey()).toBeUndefined();
-            process.env.GITHUB_APP_PRIVATE_KEY =
-                '-----BEGIN-----\\nline1\\nline2\\n-----END-----';
+            process.env.GITHUB_APP_PRIVATE_KEY = '-----BEGIN-----\\nline1\\nline2\\n-----END-----';
             expect(config.githubApp.privateKey()).toBe(
                 '-----BEGIN-----\nline1\nline2\n-----END-----',
             );

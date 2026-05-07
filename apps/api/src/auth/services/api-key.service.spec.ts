@@ -69,15 +69,18 @@ describe('ApiKeyService', () => {
 
         it('creates a key with ew_live_ prefix and returns the raw key once', async () => {
             repo.countByUserId.mockResolvedValue(3);
-            repo.create.mockImplementation(async (input) => ({
-                id: 'key-1',
-                name: input.name,
-                hashedKey: input.hashedKey,
-                prefix: input.prefix,
-                expiresAt: input.expiresAt,
-                createdAt: new Date('2026-05-07'),
-                userId: input.userId,
-            } as any));
+            repo.create.mockImplementation(
+                async (input) =>
+                    ({
+                        id: 'key-1',
+                        name: input.name,
+                        hashedKey: input.hashedKey,
+                        prefix: input.prefix,
+                        expiresAt: input.expiresAt,
+                        createdAt: new Date('2026-05-07'),
+                        userId: input.userId,
+                    }) as any,
+            );
 
             const result = await service.createKey('user-1', 'CI key');
 
@@ -86,7 +89,9 @@ describe('ApiKeyService', () => {
             expect(createInput.userId).toBe('user-1');
             expect(createInput.name).toBe('CI key');
             expect(createInput.expiresAt).toBeNull();
-            expect(createInput.prefix).toBe('ew_live_'.length === 8 ? 'ew_live_' + result.key.substring(8, 12) : '');
+            expect(createInput.prefix).toBe(
+                'ew_live_'.length === 8 ? 'ew_live_' + result.key.substring(8, 12) : '',
+            );
             // 12-char prefix is "ew_live_" (8 chars) + 4 hex chars
             expect(result.key.startsWith('ew_live_')).toBe(true);
             expect(result.key).toHaveLength('ew_live_'.length + 64); // 8 + 32 bytes hex
@@ -103,15 +108,18 @@ describe('ApiKeyService', () => {
         it('creates a key with a future expiresAt', async () => {
             repo.countByUserId.mockResolvedValue(0);
             const future = new Date(Date.now() + 86400000).toISOString();
-            repo.create.mockImplementation(async (input) => ({
-                id: 'key-2',
-                name: input.name,
-                hashedKey: input.hashedKey,
-                prefix: input.prefix,
-                expiresAt: input.expiresAt,
-                createdAt: new Date(),
-                userId: input.userId,
-            } as any));
+            repo.create.mockImplementation(
+                async (input) =>
+                    ({
+                        id: 'key-2',
+                        name: input.name,
+                        hashedKey: input.hashedKey,
+                        prefix: input.prefix,
+                        expiresAt: input.expiresAt,
+                        createdAt: new Date(),
+                        userId: input.userId,
+                    }) as any,
+            );
 
             const result = await service.createKey('u', 'n', future);
 
@@ -123,11 +131,14 @@ describe('ApiKeyService', () => {
 
         it('generates unique keys across calls', async () => {
             repo.countByUserId.mockResolvedValue(0);
-            repo.create.mockImplementation(async (input) => ({
-                id: 'k',
-                ...input,
-                createdAt: new Date(),
-            } as any));
+            repo.create.mockImplementation(
+                async (input) =>
+                    ({
+                        id: 'k',
+                        ...input,
+                        createdAt: new Date(),
+                    }) as any,
+            );
 
             const r1 = await service.createKey('u', 'a');
             const r2 = await service.createKey('u', 'b');

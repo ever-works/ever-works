@@ -41,12 +41,8 @@ describe('MailerService', () => {
             resendClient,
         );
         logSpy = jest.spyOn((service as any).logger, 'log').mockImplementation(() => undefined);
-        debugSpy = jest
-            .spyOn((service as any).logger, 'debug')
-            .mockImplementation(() => undefined);
-        warnSpy = jest
-            .spyOn((service as any).logger, 'warn')
-            .mockImplementation(() => undefined);
+        debugSpy = jest.spyOn((service as any).logger, 'debug').mockImplementation(() => undefined);
+        warnSpy = jest.spyOn((service as any).logger, 'warn').mockImplementation(() => undefined);
         return service;
     };
 
@@ -170,9 +166,7 @@ describe('MailerService', () => {
                 subject: 'Hi',
                 html: '<p>Hello</p>',
             });
-            expect(logSpy).toHaveBeenCalledWith(
-                'Email sent via Resend to=r@test.example id=r-1',
-            );
+            expect(logSpy).toHaveBeenCalledWith('Email sent via Resend to=r@test.example id=r-1');
             expect(fs.readFile).not.toHaveBeenCalled();
         });
 
@@ -205,15 +199,11 @@ describe('MailerService', () => {
 
             await service.sendMail({ to: 'r@test.example', subject: 'Bare' });
 
-            expect(resend.emails.send).toHaveBeenCalledWith(
-                expect.objectContaining({ html: '' }),
-            );
+            expect(resend.emails.send).toHaveBeenCalledWith(expect.objectContaining({ html: '' }));
         });
 
         it('renders Handlebars template via fs.readFile when "template" is set', async () => {
-            (fs.readFile as jest.Mock).mockResolvedValue(
-                'Hello {{name}}, your code is {{code}}',
-            );
+            (fs.readFile as jest.Mock).mockResolvedValue('Hello {{name}}, your code is {{code}}');
             const service = buildService(resend as unknown as Resend);
 
             await service.sendMail({
@@ -258,9 +248,9 @@ describe('MailerService', () => {
             // either keeps it or makes the bug visible by failing this test.
             const service = buildService(resend as unknown as Resend);
 
-            await expect(
-                service.sendMail({ subject: 'Anon', html: '<p>hi</p>' }),
-            ).rejects.toThrow(/'address' in/);
+            await expect(service.sendMail({ subject: 'Anon', html: '<p>hi</p>' })).rejects.toThrow(
+                /'address' in/,
+            );
 
             expect(logSpy).toHaveBeenCalledWith(
                 expect.stringContaining('Sending email via Resend to=unknown'),
@@ -300,10 +290,7 @@ describe('MailerService', () => {
             // Spy on Logger.prototype.log so we capture the constructor log
             // before our per-instance spy is installed.
             const protoSpy = jest
-                .spyOn(
-                    require('@nestjs/common').Logger.prototype,
-                    'log' as any,
-                )
+                .spyOn(require('@nestjs/common').Logger.prototype, 'log' as any)
                 .mockImplementation(() => undefined);
 
             new MailerService(
@@ -311,9 +298,7 @@ describe('MailerService', () => {
                 faker as unknown as FakerMailerService,
             );
 
-            expect(protoSpy).toHaveBeenCalledWith(
-                'Mailer service initialized with provider: smtp',
-            );
+            expect(protoSpy).toHaveBeenCalledWith('Mailer service initialized with provider: smtp');
         });
     });
 });

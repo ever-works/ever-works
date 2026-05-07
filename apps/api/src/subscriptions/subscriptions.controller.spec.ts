@@ -115,9 +115,9 @@ describe('SubscriptionsController', () => {
             await expect(
                 controller.updatePlan(auth, { planCode: 'pro' as any }),
             ).rejects.toBeInstanceOf(BadRequestException);
-            await expect(
-                controller.updatePlan(auth, { planCode: 'pro' as any }),
-            ).rejects.toThrow('Subscriptions are disabled');
+            await expect(controller.updatePlan(auth, { planCode: 'pro' as any })).rejects.toThrow(
+                'Subscriptions are disabled',
+            );
             expect(authService.getUser).not.toHaveBeenCalled();
             expect(subscriptionService.assignPlanToUser).not.toHaveBeenCalled();
         });
@@ -186,9 +186,9 @@ describe('SubscriptionsController', () => {
             subscriptionService.isEnabled.mockReturnValue(true);
             authService.getUser.mockRejectedValue(new Error('User not found'));
 
-            await expect(
-                controller.updatePlan(auth, { planCode: 'pro' as any }),
-            ).rejects.toThrow('User not found');
+            await expect(controller.updatePlan(auth, { planCode: 'pro' as any })).rejects.toThrow(
+                'User not found',
+            );
             expect(subscriptionService.assignPlanToUser).not.toHaveBeenCalled();
         });
     });

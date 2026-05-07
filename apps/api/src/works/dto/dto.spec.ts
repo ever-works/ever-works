@@ -129,10 +129,7 @@ describe('works DTOs validation', () => {
         it('accepts valid array with multiple items + per-item teamScope + default teamScope', async () => {
             const dto = plainToInstance(BatchDeployDto, {
                 teamScope: 'team-x',
-                works: [
-                    { workId: 'w-1', teamScope: 'team-y' },
-                    { workId: 'w-2' },
-                ],
+                works: [{ workId: 'w-1', teamScope: 'team-y' }, { workId: 'w-2' }],
             });
             expect(await validate(dto)).toHaveLength(0);
         });

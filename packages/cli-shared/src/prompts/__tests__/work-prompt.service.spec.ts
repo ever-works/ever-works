@@ -20,8 +20,7 @@ import inquirer from 'inquirer';
 const mockedPrompt = inquirer.prompt as unknown as ReturnType<typeof vi.fn>;
 
 class TestWorkPromptService extends WorkPromptService {
-	public exposeFormatRoleLabel = (role: WorkMemberRole, isShared: boolean) =>
-		this.formatRoleLabel(role, isShared);
+	public exposeFormatRoleLabel = (role: WorkMemberRole, isShared: boolean) => this.formatRoleLabel(role, isShared);
 }
 
 const makeWork = (overrides: Partial<Work> = {}): Work => ({
@@ -160,9 +159,7 @@ describe('WorkPromptService.promptSlugConflictResolution', () => {
 	});
 
 	it('prompts again for a custom slug when user picks "modify"', async () => {
-		mockedPrompt
-			.mockResolvedValueOnce({ value: 'modify' })
-			.mockResolvedValueOnce({ value: 'my-custom-slug' });
+		mockedPrompt.mockResolvedValueOnce({ value: 'modify' }).mockResolvedValueOnce({ value: 'my-custom-slug' });
 
 		const r = await svc.promptSlugConflictResolution('mine', 'mine-2');
 		expect(r).toEqual({ action: 'modify', finalSlug: 'my-custom-slug' });
@@ -233,18 +230,14 @@ describe('WorkPromptService.promptDeployProviderSelection', () => {
 	it('returns null when user picks "None"', async () => {
 		mockedPrompt.mockResolvedValueOnce({ value: '__none__' });
 
-		const r = await svc.promptDeployProviderSelection([
-			{ id: 'vercel', name: 'Vercel', enabled: true }
-		]);
+		const r = await svc.promptDeployProviderSelection([{ id: 'vercel', name: 'Vercel', enabled: true }]);
 		expect(r).toBeNull();
 	});
 
 	it('returns the selected provider id when user picks an enabled provider', async () => {
 		mockedPrompt.mockResolvedValueOnce({ value: 'vercel' });
 
-		const r = await svc.promptDeployProviderSelection([
-			{ id: 'vercel', name: 'Vercel', enabled: true }
-		]);
+		const r = await svc.promptDeployProviderSelection([{ id: 'vercel', name: 'Vercel', enabled: true }]);
 		expect(r).toBe('vercel');
 	});
 
@@ -253,9 +246,7 @@ describe('WorkPromptService.promptDeployProviderSelection', () => {
 			.mockResolvedValueOnce({ value: '__disabled__netlify' })
 			.mockResolvedValueOnce({ value: '__none__' });
 
-		const r = await svc.promptDeployProviderSelection([
-			{ id: 'netlify', name: 'Netlify', enabled: false }
-		]);
+		const r = await svc.promptDeployProviderSelection([{ id: 'netlify', name: 'Netlify', enabled: false }]);
 		expect(r).toBeNull();
 		expect(mockedPrompt).toHaveBeenCalledTimes(2);
 	});

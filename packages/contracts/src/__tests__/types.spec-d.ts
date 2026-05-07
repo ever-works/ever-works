@@ -94,18 +94,12 @@ describe('item contracts (type)', () => {
 	});
 
 	it('ItemHealthStatus is the closed union of 5 known states', () => {
-		expectTypeOf<ItemHealthStatus>().toEqualTypeOf<
-			'unchecked' | 'healthy' | 'unknown' | 'warning' | 'broken'
-		>();
+		expectTypeOf<ItemHealthStatus>().toEqualTypeOf<'unchecked' | 'healthy' | 'unknown' | 'warning' | 'broken'>();
 	});
 
 	it('ItemSourceReachabilityStatus / ItemSourceAccuracyStatus are closed unions', () => {
-		expectTypeOf<ItemSourceReachabilityStatus>().toEqualTypeOf<
-			'reachable' | 'broken' | 'unknown'
-		>();
-		expectTypeOf<ItemSourceAccuracyStatus>().toEqualTypeOf<
-			'accurate' | 'generic' | 'weak' | 'unknown'
-		>();
+		expectTypeOf<ItemSourceReachabilityStatus>().toEqualTypeOf<'reachable' | 'broken' | 'unknown'>();
+		expectTypeOf<ItemSourceAccuracyStatus>().toEqualTypeOf<'accurate' | 'generic' | 'weak' | 'unknown'>();
 	});
 
 	it('ItemHealth optional metadata can be null where stated', () => {
@@ -155,12 +149,8 @@ describe('item contracts (type)', () => {
 	});
 
 	it('Comparison verdict_winner is the closed union "item_a" | "item_b" | "tie"', () => {
-		expectTypeOf<ComparisonData['verdict_winner']>().toEqualTypeOf<
-			'item_a' | 'item_b' | 'tie' | undefined
-		>();
-		expectTypeOf<ComparisonDimension['winner']>().toEqualTypeOf<
-			'item_a' | 'item_b' | 'tie' | undefined
-		>();
+		expectTypeOf<ComparisonData['verdict_winner']>().toEqualTypeOf<'item_a' | 'item_b' | 'tie' | undefined>();
+		expectTypeOf<ComparisonDimension['winner']>().toEqualTypeOf<'item_a' | 'item_b' | 'tie' | undefined>();
 	});
 
 	it('ComparisonData.dimensions / sources are readonly arrays', () => {
@@ -179,12 +169,8 @@ describe('domain contracts (type)', () => {
 
 	it('DomainAnalysis confidence is a number, optional arrays are readonly string[]', () => {
 		expectTypeOf<DomainAnalysis['confidence']>().toBeNumber();
-		expectTypeOf<DomainAnalysis['expected_attributes']>().toEqualTypeOf<
-			readonly string[] | undefined
-		>();
-		expectTypeOf<DomainAnalysis['official_source_patterns']>().toEqualTypeOf<
-			readonly string[] | undefined
-		>();
+		expectTypeOf<DomainAnalysis['expected_attributes']>().toEqualTypeOf<readonly string[] | undefined>();
+		expectTypeOf<DomainAnalysis['official_source_patterns']>().toEqualTypeOf<readonly string[] | undefined>();
 	});
 
 	it('WebPageData has the three core fields', () => {
@@ -261,21 +247,12 @@ describe('github contracts (type)', () => {
 describe('api/onboarding contracts (type)', () => {
 	it('OnboardingStatus is the closed union of 8 states', () => {
 		expectTypeOf<OnboardingStatus>().toEqualTypeOf<
-			| 'received'
-			| 'validating'
-			| 'validated'
-			| 'queued'
-			| 'generating'
-			| 'deployed'
-			| 'failed'
-			| 'rejected'
+			'received' | 'validating' | 'validated' | 'queued' | 'generating' | 'deployed' | 'failed' | 'rejected'
 		>();
 	});
 
 	it('WebhookEventTerminal.status is restricted to terminal statuses only', () => {
-		expectTypeOf<WebhookEventTerminal['status']>().toEqualTypeOf<
-			'deployed' | 'failed' | 'rejected'
-		>();
+		expectTypeOf<WebhookEventTerminal['status']>().toEqualTypeOf<'deployed' | 'failed' | 'rejected'>();
 	});
 
 	it('WebhookEvent is a discriminated union over `event`', () => {
