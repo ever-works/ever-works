@@ -627,8 +627,7 @@ export class TemplateCatalogService implements OnModuleInit {
                                 existingTemplateWithDiscoveredId.sourceType !== 'built_in' ||
                                 existingTemplateWithDiscoveredId.repositoryOwner !==
                                     repository.owner ||
-                                existingTemplateWithDiscoveredId.repositoryName !==
-                                    repository.name)
+                                existingTemplateWithDiscoveredId.repositoryName !== repository.name)
                         ) {
                             this.logger.warn(
                                 `Skipping discovered template "${repository.fullName}" because id "${discoveredId}" is already used by ${existingTemplateWithDiscoveredId.repositoryOwner}/${existingTemplateWithDiscoveredId.repositoryName}.`,
