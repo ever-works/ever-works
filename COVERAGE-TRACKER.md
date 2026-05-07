@@ -166,7 +166,7 @@ Cross-check `docs/specs/features/` against actual capabilities. Candidates
 known to lack a Spec Kit feature folder:
 
 - [ ] `auth-jwt-oauth` (JWT issuance, OAuth GitHub/Google flow)
-- [ ] `notifications` (in-app + email delivery, channels)
+- [x] `notifications` (in-app + email delivery, channels) — spec / plan / tasks authored 2026-05-08 at `docs/specs/features/notifications/`. Covers per-user delivery, deduplication via `deduplicationKey` w/ DB-level partial-unique race recovery (Postgres `23505` / MySQL `ER_DUP_ENTRY` / SQLite `SQLITE_CONSTRAINT`), persistent-notification refusal of dismissal, all 6 controller endpoints behind `AuthSessionGuard`, cross-user reject via `findByIdAndUserId`, cleanup cadence (expired / 7-day-dismissed / 30-day) under a `DistributedTaskLockService` lock, and the 5 producer convenience methods.
 - [ ] `subscriptions` (plan/feature gating)
 - [ ] `activity-log` (event taxonomy + persistence)
 - [ ] `mail-providers` (provider abstraction + templates)
