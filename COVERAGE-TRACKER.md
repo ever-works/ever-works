@@ -42,7 +42,8 @@
 | 2026-05-07 | Plugin coverage (b3)              | [#473](https://github.com/ever-works/ever-works/pull/473) | jina (25 tests), comparison-generator (12), brightdata (28), scrapfly (26) — 91 new unit tests; covers remaining zero-coverage search plugins plus utility (comparison-generator) and content-extractor (scrapfly).                                                                                                   |
 | 2026-05-07 | Plugin coverage (b4)              | [#474](https://github.com/ever-works/ever-works/pull/474) | local-content-extractor (20 tests, axios mock), github (20 tests, fetch + libsodium mock for OAuth flow) — 40 new unit tests; closes the high-priority zero-coverage plugin list.                                                                                                                                     |
 | 2026-05-07 | cli-shared first coverage         | [#475](https://github.com/ever-works/ever-works/pull/475) | Scaffolds vitest in `packages/cli-shared` and adds 27 unit tests (slug-utils 13 + validation-utils 14) covering slugify, validateSlug, generateIncrementedSlug, validateUrl, validateEmail, validateGitUsername, validateApiKey, validateModelName.                                                                   |
-| 2026-05-07 | cli-shared utils extended         | (this PR)                                                 | Adds 25 more unit tests in `cli-shared`: config-check (10) covers maskSecret edge cases (incl. <8 char short-circuit and boundary at exactly 8) plus displayConfigurationError/Warnings; generator-steps (15) covers getStepText, getStepProgress, getDynamicStepText, getDynamicStepProgress, getItemsProcessedText. |
+| 2026-05-07 | cli-shared utils extended         | [#476](https://github.com/ever-works/ever-works/pull/476) | Adds 25 more unit tests in `cli-shared`: config-check (10) covers maskSecret edge cases (incl. <8 char short-circuit and boundary at exactly 8) plus displayConfigurationError/Warnings; generator-steps (15) covers getStepText, getStepProgress, getDynamicStepText, getDynamicStepProgress, getItemsProcessedText. |
+| 2026-05-07 | cli-shared prompt services        | (this PR)                                                 | Adds 64 unit tests for `BasePromptService` (45) and `WorkPromptService` (19). Base covers display helpers and all validators (URL, email, git username, API key, model name, slug, temperature, max tokens, git name, slugifyName). Work covers generateIncrementedSlug, formatRoleLabel, formatSelectedWork, promptWorkSelection, promptSlugConflictResolution, promptGitProviderSelection, promptDeployProviderSelection, promptWorkCreation — inquirer mocked via vi.mock. |
 
 ## Pending — High Priority
 
@@ -77,7 +78,7 @@ search/extract success + error paths, lifecycle, healthCheck, manifest.
 - [ ] `packages/contracts` — pure types; add type-test fixtures via
       `expectTypeOf` so breaking changes are caught.
 - [ ] `packages/monitoring` — mock Sentry + PostHog SDKs and assert wiring.
-- [~] `packages/cli-shared` — utils fully covered (52 tests across slug, validation, config-check, generator-steps). Prompt services (`base-prompt.service.ts`, `work-prompt.service.ts`) still pending.
+- [x] `packages/cli-shared` — utils + prompt services fully covered (116 tests across slug, validation, config-check, generator-steps, base-prompt.service, work-prompt.service).
 - [ ] `packages/tasks` — Trigger.dev jobs; mock `@trigger.dev/sdk` v3.
 
 ### API module unit tests
