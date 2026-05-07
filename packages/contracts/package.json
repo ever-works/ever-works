@@ -47,12 +47,16 @@
 		"build": "tsup",
 		"dev": "tsup --watch",
 		"clean": "rm -rf dist",
-		"type-check": "tsc --noEmit"
+		"type-check": "tsc --noEmit",
+		"test": "vitest run --passWithNoTests",
+		"test:watch": "vitest",
+		"test:coverage": "vitest run --coverage"
 	},
 	"devDependencies": {
 		"@types/node": "^22.19.3",
 		"tsup": "^8.0.0",
-		"typescript": "^5.9.3"
+		"typescript": "^5.9.3",
+		"vitest": "^3.0.0"
 	},
 	"peerDependencies": {},
 	"dependencies": {}
