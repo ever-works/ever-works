@@ -21,7 +21,10 @@
         "prepare:plugins": "node scripts/prepare-plugins.js",
         "dev:trigger": "npx --yes trigger.dev@4.4.5 dev",
         "predeploy:trigger": "pnpm prepare:plugins",
-        "deploy:trigger": "npx trigger.dev@4.4.5 deploy"
+        "deploy:trigger": "npx trigger.dev@4.4.5 deploy",
+        "test": "vitest run --passWithNoTests",
+        "test:watch": "vitest",
+        "test:coverage": "vitest run --coverage"
     },
     "dependencies": {
         "@ever-works/agent": "workspace:*",
@@ -41,6 +44,7 @@
     "devDependencies": {
         "@trigger.dev/build": "^4.4.5",
         "@types/node": "^22.19.3",
-        "typescript": "^5.9.3"
+        "typescript": "^5.9.3",
+        "vitest": "^3.0.0"
     }
 }
