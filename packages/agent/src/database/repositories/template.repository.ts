@@ -117,14 +117,8 @@ export class TemplateRepository {
     }
 
     async upsert(template: Partial<Template> & { id: string }): Promise<Template> {
-        const existing = await this.findById(template.id);
-
-        if (existing) {
-            await this.repository.update(existing.id, template);
-            return this.repository.findOneOrFail({ where: { id: existing.id } });
-        }
-
-        return this.repository.save(this.repository.create(template));
+        await this.repository.upsert(template, { conflictPaths: ['id'] });
+        return this.repository.findOneOrFail({ where: { id: template.id } });
     }
 
     async updateById(id: string, template: Partial<Template>): Promise<Template> {
