@@ -168,8 +168,8 @@ export class Work {
     @Column({ type: 'boolean', default: false })
     comparisonsEnabled: boolean;
 
-    @Column({ type: 'varchar', default: 'classic' })
-    websiteTemplateId: string;
+    @Column({ type: 'varchar', nullable: true, default: null })
+    websiteTemplateId?: string | null;
 
     // Website Template Auto-Update FIELDS
     @Column({ type: 'boolean', default: false })

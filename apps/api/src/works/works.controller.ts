@@ -72,6 +72,7 @@ import {
     type SourceValidationSettingsDto,
 } from '@ever-works/agent/services';
 import { ComparisonGenerationService } from '@ever-works/agent/comparison-generator';
+import { TemplateCatalogService } from '@ever-works/agent/template-catalog';
 import {
     AnalyzeRepositoryDto,
     AnalyzeRepositoryResponseDto,
@@ -85,7 +86,7 @@ import {
     SwitchWebsiteTemplateResponseDto,
     UpdateWebsiteRepositoryResponseDto,
 } from '@ever-works/agent/generators';
-import { getDefaultWebsiteTemplateId, listWebsiteTemplates } from '@ever-works/agent/generators';
+import { getDefaultWebsiteTemplateId } from '@ever-works/agent/generators';
 import { CommunityPrProcessorService } from '@ever-works/agent/community-pr';
 import { WorkRepository } from '@ever-works/agent/database';
 import { AuthService, CurrentUser, AuthSessionGuard } from '../auth';
@@ -135,6 +136,7 @@ export class WorksController {
         private readonly sourceValidationService: ItemSourceValidationSchedulerService,
         private readonly subscriptionService: SubscriptionService,
         private readonly activityLogService: ActivityLogService,
+        private readonly templateCatalogService: TemplateCatalogService,
     ) {}
 
     private async invalidateWorkCaches(workId: string): Promise<void> {
@@ -192,16 +194,24 @@ export class WorksController {
         description: 'Get the available website templates for work website generation',
     })
     @ApiResponse({ status: 200, description: 'Available website templates' })
-    async getWebsiteTemplates() {
-        const defaultTemplateId = getDefaultWebsiteTemplateId();
+    async getWebsiteTemplates(@CurrentUser() auth: AuthenticatedUser) {
+        const templateCatalog = await this.templateCatalogService.listTemplatesForUser(
+            'website',
+            auth.userId,
+        );
+        const hasExplicitDefault = templateCatalog.templates.some((template) => template.isDefault);
 
         return {
             status: 'success',
-            templates: listWebsiteTemplates().map((template) => ({
+            templates: templateCatalog.templates.map((template) => ({
                 id: template.id,
                 name: template.name,
                 description: template.description,
-                isDefault: template.id === defaultTemplateId,
+                sourceType: template.sourceType,
+                originType: template.originType,
+                isDefault:
+                    template.isDefault ||
+                    (!hasExplicitDefault && template.id === getDefaultWebsiteTemplateId()),
             })),
         };
     }
@@ -1004,7 +1014,7 @@ export class WorksController {
     async switchWebsiteTemplate(
         @CurrentUser() auth: AuthenticatedUser,
         @Param('id') id: string,
-        @Body() body: { websiteTemplateId: string },
+        @Body() body: { websiteTemplateId: string | null },
     ): Promise<SwitchWebsiteTemplateResponseDto> {
         const user = await this.authService.getUser(auth.userId);
 

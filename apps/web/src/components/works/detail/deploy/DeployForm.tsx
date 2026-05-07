@@ -24,6 +24,7 @@ import { DeployConfigDialog, type DeployConfigData } from './DeployConfigDialog'
 import { updateWebsiteSettings } from '@/app/actions/dashboard/works';
 import { formatDistanceToNow } from 'date-fns';
 import { WebsiteTemplateSelector } from '@/components/works/shared/WebsiteTemplateSelector';
+import { resolveWebsiteTemplateSelection } from '@/components/works/shared/WebsiteTemplateSelector';
 import {
     Dialog,
     DialogContent,
@@ -343,9 +344,7 @@ function WebsiteTemplateSettings({
     const router = useRouter();
     const [autoUpdate, setAutoUpdate] = useState(work.websiteTemplateAutoUpdate ?? false);
     const [useBeta, setUseBeta] = useState(work.websiteTemplateUseBeta ?? false);
-    const [selectedTemplateId, setSelectedTemplateId] = useState(
-        work.websiteTemplateId || websiteTemplates.find((template) => template.isDefault)?.id || '',
-    );
+    const [selectedTemplateId, setSelectedTemplateId] = useState(work.websiteTemplateId || '');
     const [confirmSwitchOpen, setConfirmSwitchOpen] = useState(false);
 
     const handleAutoUpdateChange = (checked: boolean) => {
@@ -409,17 +408,19 @@ function WebsiteTemplateSettings({
     const lastUpdated = formatDate(work.websiteTemplateLastUpdatedAt);
     const lastChecked = formatDate(work.websiteTemplateLastCheckedAt);
     const hasError = Boolean(work.websiteTemplateLastError);
-    const selectedTemplate =
-        websiteTemplates.find((template) => template.id === selectedTemplateId) ||
-        websiteTemplates.find((template) => template.isDefault);
-    const currentTemplate =
-        websiteTemplates.find((template) => template.id === work.websiteTemplateId) ||
-        websiteTemplates.find((template) => template.isDefault);
-    const hasTemplateChange =
-        Boolean(selectedTemplateId) && selectedTemplateId !== work.websiteTemplateId;
+    const selectedTemplateState = resolveWebsiteTemplateSelection(
+        websiteTemplates,
+        selectedTemplateId,
+    );
+    const currentTemplateState = resolveWebsiteTemplateSelection(
+        websiteTemplates,
+        work.websiteTemplateId,
+    );
+    const currentTemplate = currentTemplateState.effectiveTemplate;
+    const hasTemplateChange = selectedTemplateId !== (work.websiteTemplateId || '');
 
     const handleSwitchTemplate = () => {
-        if (!hasTemplateChange || !selectedTemplateId) {
+        if (!hasTemplateChange) {
             return;
         }
 
@@ -530,10 +531,28 @@ function WebsiteTemplateSettings({
                                 })}
                             </p>
                             <p className="mt-1 text-sm text-text dark:text-text-dark">
-                                {currentTemplate?.name || work.websiteTemplateId}
+                                {currentTemplate?.name ||
+                                    work.websiteTemplateId ||
+                                    t('form.websiteTemplate.unknownTemplate', {
+                                        defaultValue: 'Inherited default',
+                                    })}
                             </p>
                             <p className="mt-1 text-sm text-text-secondary dark:text-text-secondary-dark">
                                 {currentTemplate?.description}
+                            </p>
+                            <p className="mt-2 text-xs text-text-muted dark:text-text-muted-dark">
+                                {currentTemplateState.isInheritedSelection
+                                    ? t('form.websiteTemplate.inheritedState')
+                                    : t('form.websiteTemplate.explicitState')}
+                                {currentTemplate
+                                    ? ` · ${
+                                          currentTemplate.originType === 'standard'
+                                              ? t('form.websiteTemplate.originStandard')
+                                              : currentTemplate.originType === 'forked'
+                                                ? t('form.websiteTemplate.originForked')
+                                                : t('form.websiteTemplate.originCustomUrl')
+                                      }`
+                                    : ''}
                             </p>
                         </div>
 

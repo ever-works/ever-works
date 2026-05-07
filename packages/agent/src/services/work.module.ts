@@ -8,6 +8,7 @@ import { DatabaseModule } from '../database/database.module';
 import { ImportModule } from '../import/import.module';
 import { CommunityPrModule } from '../community-pr/community-pr.module';
 import { ComparisonGeneratorModule } from '../comparison-generator/comparison-generator.module';
+import { TemplateCatalogModule } from '../template-catalog/template-catalog.module';
 import { WorkDetailService } from './work-detail.service';
 import { WorkOwnershipService } from './work-ownership.service';
 import { WorkQueryService } from './work-query.service';
@@ -20,6 +21,7 @@ import { WorkImportService } from './work-import.service';
 import { WorkAdvancedPromptsService } from './work-advanced-prompts.service';
 import { WorkTaxonomyService } from './work-taxonomy.service';
 import { GeneratorFormSchemaService } from './generator-form-schema.service';
+import { WorkWebsiteRepositoryStateService } from './work-website-repository-state.service';
 import { WorksConfigImportApplierService } from '@src/works-config/services/works-config-import-applier.service';
 import { WorksConfigImportPlannerService } from '@src/works-config/services/works-config-import-planner.service';
 import { WorksConfigProjectionService } from '@src/works-config/services/works-config-projection.service';
@@ -55,9 +57,11 @@ import { NotificationsModule } from '@src/notifications';
         NotificationsModule,
         CommunityPrModule,
         ComparisonGeneratorModule,
+        TemplateCatalogModule,
     ],
     providers: [
         WorkOwnershipService,
+        WorkWebsiteRepositoryStateService,
         WorkQueryService,
         WorkLifecycleService,
         WorkGenerationService,
@@ -85,6 +89,7 @@ import { NotificationsModule } from '@src/notifications';
     ],
     exports: [
         WorkOwnershipService,
+        WorkWebsiteRepositoryStateService,
         WorkQueryService,
         WorkLifecycleService,
         WorkGenerationService,
@@ -108,6 +113,7 @@ import { NotificationsModule } from '@src/notifications';
         WorksConfigRepositorySyncService,
         CommunityPrModule,
         ComparisonGeneratorModule,
+        TemplateCatalogModule,
     ],
 })
 export class WorkModule {}

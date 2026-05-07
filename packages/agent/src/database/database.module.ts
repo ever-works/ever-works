@@ -22,6 +22,8 @@ import { GitHubAppInstallationRepository } from './repositories/github-app-insta
 import { GitHubAppInstallationRepoRepository } from './repositories/github-app-installation-repository.repository';
 import { GitHubAppUserLinkRepository } from './repositories/github-app-user-link.repository';
 import { OnboardingRequestRepository } from './repositories/onboarding-request.repository';
+import { TemplateRepository } from './repositories/template.repository';
+import { UserTemplatePreferenceRepository } from './repositories/user-template-preference.repository';
 import { WebhookSubscriptionRepository } from './repositories/webhook-subscription.repository';
 
 @Module({
@@ -60,6 +62,8 @@ import { WebhookSubscriptionRepository } from './repositories/webhook-subscripti
         GitHubAppInstallationRepoRepository,
         GitHubAppUserLinkRepository,
         OnboardingRequestRepository,
+        TemplateRepository,
+        UserTemplatePreferenceRepository,
         WebhookSubscriptionRepository,
     ],
     exports: [
@@ -84,6 +88,8 @@ import { WebhookSubscriptionRepository } from './repositories/webhook-subscripti
         GitHubAppInstallationRepoRepository,
         GitHubAppUserLinkRepository,
         OnboardingRequestRepository,
+        TemplateRepository,
+        UserTemplatePreferenceRepository,
         WebhookSubscriptionRepository,
     ],
 })

@@ -41,6 +41,8 @@ export interface DeployProviderInfo {
 	readonly name: string;
 	/** Whether the provider is enabled */
 	readonly enabled: boolean;
+	/** Whether the current user has configured credentials for this provider */
+	readonly configured?: boolean;
 	/** Provider icon from plugin manifest */
 	readonly icon?: PluginIcon;
 	/** Provider description from plugin manifest */

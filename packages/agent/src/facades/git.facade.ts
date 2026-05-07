@@ -336,6 +336,19 @@ export class GitFacadeService implements IGitFacade {
         return [];
     }
 
+    async listPublicRepositories(
+        providerId: string,
+        page?: number,
+        perPage?: number,
+        listOptions?: ListRepositoriesOptions,
+    ): Promise<GitRepositoryWithPermissions[]> {
+        const plugin = this.getPluginSync(providerId);
+        if (plugin.listRepositories) {
+            return plugin.listRepositories('', page, perPage, listOptions);
+        }
+        return [];
+    }
+
     async createRepository(
         createOptions: CreateRepoOptions,
         options: GitFacadeOptions,

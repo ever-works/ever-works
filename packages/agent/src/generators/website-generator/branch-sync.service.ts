@@ -1,11 +1,12 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { GitFacadeService } from '../../facades/git.facade';
-import { getWebsiteTemplateConfig, WebsiteTemplateConfig } from './config/website-template.config';
+import { WebsiteTemplateConfig } from './config/website-template.config';
 import { getWorkOwner } from '../../utils/work.utils';
 import type { GitCommitter } from '@ever-works/plugin';
 import { Work } from '../../entities/work.entity';
 import { User } from '../../entities/user.entity';
 import * as fs from 'node:fs/promises';
+import { WebsiteTemplateResolverService } from './website-template-resolver.service';
 
 export interface BranchSyncResult {
     branch: string;
@@ -29,7 +30,10 @@ export class BranchSyncService {
     // based on owner+repo (not branch), so parallel syncs corrupt each other.
     private readonly MAX_CONCURRENT_SYNCS = 1;
 
-    constructor(private readonly gitFacade: GitFacadeService) {}
+    constructor(
+        private readonly gitFacade: GitFacadeService,
+        private readonly websiteTemplateResolver: WebsiteTemplateResolverService,
+    ) {}
 
     async syncFromTemplate(
         work: Work,
@@ -39,7 +43,7 @@ export class BranchSyncService {
         const workOwner = getWorkOwner(work);
         const websiteOwner = work.getRepoOwner('website');
         const websiteRepo = work.getWebsiteRepo();
-        const template = getWebsiteTemplateConfig(work.websiteTemplateId);
+        const template = await this.websiteTemplateResolver.resolveForWork(work);
 
         const branchMapping =
             work.websiteTemplateUseBeta && template.betaBranch

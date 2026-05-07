@@ -2,7 +2,9 @@
 
 import { cn } from '@/lib/utils/cn';
 import { useEffect, useRef } from 'react';
+import { useLocale } from 'next-intl';
 import type { GenerationStepLog } from '@/lib/api/types-only';
+import { useMounted } from '@/lib/hooks/use-mounted';
 
 interface TerminalLogViewerProps {
     logs: GenerationStepLog[];
@@ -26,26 +28,59 @@ const LEVEL_COLORS: Record<string, string> = {
     info: 'text-emerald-400',
 };
 
-function formatTime(timestamp: string): string {
+const dateFormatterCache = new Map<string, Intl.DateTimeFormat>();
+const timeFormatterCache = new Map<string, Intl.DateTimeFormat>();
+
+function formatTime(timestamp: string, locale: string): string {
     try {
-        return new Date(timestamp).toLocaleTimeString([], {
-            hour: '2-digit',
-            minute: '2-digit',
-            second: '2-digit',
-        });
+        if (!dateFormatterCache.has(locale)) {
+            dateFormatterCache.set(
+                locale,
+                new Intl.DateTimeFormat(locale, {
+                    year: 'numeric',
+                    month: '2-digit',
+                    day: '2-digit',
+                }),
+            );
+        }
+
+        if (!timeFormatterCache.has(locale)) {
+            timeFormatterCache.set(
+                locale,
+                new Intl.DateTimeFormat(locale, {
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    second: '2-digit',
+                }),
+            );
+        }
+
+        const date = new Date(timestamp);
+
+        return [
+            dateFormatterCache.get(locale)!.format(date),
+            timeFormatterCache.get(locale)!.format(date),
+        ].join('\n');
     } catch {
         return '';
     }
 }
 
 function LogLine({ log }: { log: GenerationStepLog }) {
-    const time = log.timestamp ? formatTime(log.timestamp) : '';
+    const locale = useLocale();
+    const mounted = useMounted();
+    const time = mounted && log.timestamp ? formatTime(log.timestamp, locale) : '';
     const levelColor = LEVEL_COLORS[log.level] ?? LEVEL_COLORS.info;
     const sourceColor = SOURCE_COLORS[log.source] ?? SOURCE_COLORS.system;
 
     return (
         <div className="flex gap-0 font-mono text-[11px] leading-5 hover:bg-white/3 -mx-4 px-4">
-            <span className="text-slate-600 shrink-0 w-17.5">{time}</span>
+            <span
+                suppressHydrationWarning
+                className="text-slate-600 shrink-0 w-27 whitespace-pre-line leading-4 pt-0.5"
+            >
+                {time}
+            </span>
             <span className={cn('shrink-0 w-22.5 truncate', sourceColor)}>[{log.source}]</span>
             <span className={cn('flex-1 break-all', levelColor)}>{log.message}</span>
             {log.durationMs != null && (

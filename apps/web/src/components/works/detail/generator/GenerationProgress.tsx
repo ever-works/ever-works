@@ -142,6 +142,7 @@ export function GenerationProgress({ work }: GenerationProgressProps) {
         syncedWork.generateStatus?.status === GenerateStatusType.GENERATING;
     const currentWork = useSyncedWork ? syncedWork : work;
     const generateStatus = currentWork.generateStatus;
+    const isGenerating = generateStatus?.status === GenerateStatusType.GENERATING;
     const progressPercentage = getStepProgress(generateStatus);
     const stepText = getStepText(generateStatus, t('steps.processing'));
     const itemsText = getItemsProcessedText(generateStatus);
@@ -216,6 +217,7 @@ export function GenerationProgress({ work }: GenerationProgressProps) {
                         </button>
 
                         <CancelGenerationButton
+                            key={`${currentWork.id}-${isGenerating ? 'generating' : 'idle'}`}
                             workId={currentWork.id}
                             labels={{
                                 stop: t('stop'),

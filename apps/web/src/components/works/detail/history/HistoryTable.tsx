@@ -1,11 +1,12 @@
 'use client';
 
 import { WorkGenerationHistoryEntry } from '@/lib/api/types-only';
+import { Popover, PopoverButton, PopoverPanel } from '@headlessui/react';
 import { useTranslations } from 'next-intl';
 import { Fragment, useState } from 'react';
 import { cn } from '@/lib/utils/cn';
 import { ShowDateTime } from '@/components/ui/show-datetime';
-import { ChevronDown, ChevronRight, ExternalLink } from 'lucide-react';
+import { ChevronDown, ChevronRight, ExternalLink, Info } from 'lucide-react';
 import { HistoryExpandedDetail } from './HistoryExpandedDetail';
 
 interface HistoryTableProps {
@@ -136,6 +137,111 @@ function renderMetricCount(
     return value;
 }
 
+function getOptionalMetric(metrics: WorkGenerationHistoryEntry['metrics'], keys: string[]) {
+    if (!metrics) return null;
+
+    const metricRecord = metrics as Record<string, unknown>;
+    for (const key of keys) {
+        const value = metricRecord[key];
+        if (typeof value === 'number' && Number.isFinite(value)) {
+            return value;
+        }
+    }
+
+    return null;
+}
+
+function formatInfoCount(value?: number | null, locale?: string) {
+    if (typeof value !== 'number' || !Number.isFinite(value)) {
+        return '—';
+    }
+
+    return value.toLocaleString(locale);
+}
+
+function GenerationInfoButton({
+    entry,
+    locale,
+    t,
+}: {
+    entry: WorkGenerationHistoryEntry;
+    locale: string;
+    t: ReturnType<typeof useTranslations>;
+}) {
+    const existingReferencesUsed = getOptionalMetric(entry.metrics, [
+        'existing_references_used',
+        'existingReferencesUsed',
+        'references_used',
+        'referencesUsed',
+    ]);
+
+    const rows = [
+        {
+            label: t('generationInfo.itemsAdded'),
+            value: formatInfoCount(entry.newItemsCount, locale),
+        },
+        {
+            label: t('generationInfo.itemsUpdated'),
+            value: formatInfoCount(entry.updatedItemsCount, locale),
+        },
+        {
+            label: t('generationInfo.totalItems'),
+            value: formatInfoCount(entry.totalItemsCount, locale),
+        },
+        {
+            label: t('generationInfo.pagesProcessed'),
+            value: formatInfoCount(entry.metrics?.pages_processed, locale),
+        },
+        {
+            label: t('generationInfo.tokensUsed'),
+            value: formatTokens(entry.metrics?.total_tokens_used),
+        },
+        existingReferencesUsed !== null
+            ? {
+                  label: t('generationInfo.existingReferencesUsed'),
+                  value: formatInfoCount(existingReferencesUsed, locale),
+              }
+            : null,
+    ].filter((row): row is { label: string; value: string } => row !== null);
+
+    return (
+        <Popover as="span" className="inline-flex">
+            <PopoverButton
+                type="button"
+                className="inline-flex h-5 w-5 items-center justify-center rounded-md text-text-muted transition-colors hover:bg-surface-secondary hover:text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 dark:text-text-muted-dark dark:hover:bg-surface-secondary-dark dark:hover:text-text-dark"
+                aria-label={t('generationInfo.label')}
+            >
+                <Info className="h-3.5 w-3.5" />
+            </PopoverButton>
+            <PopoverPanel
+                transition
+                portal
+                anchor={{ to: 'bottom start', gap: 8, padding: 12 }}
+                className="z-50 w-72 overflow-hidden rounded-lg border border-border bg-surface text-left shadow-lg transition duration-100 ease-out focus:outline-none data-[closed]:scale-95 data-[closed]:opacity-0 data-[leave]:duration-75 data-[leave]:ease-in dark:border-border-dark dark:bg-surface-dark"
+            >
+                <span className="block border-b border-border px-3 py-2 text-xs font-semibold text-text dark:border-border-dark dark:text-text-dark">
+                    {t('generationInfo.label')}
+                </span>
+                <span className="grid gap-1.5 p-3">
+                    {rows.map((row) => (
+                        <span
+                            key={row.label}
+                            className="flex items-center justify-between gap-4 text-xs"
+                        >
+                            <span className="text-text-secondary dark:text-text-secondary-dark">
+                                {row.label}
+                            </span>
+                            <span className="font-medium text-text dark:text-text-dark tabular-nums">
+                                {row.value}
+                            </span>
+                        </span>
+                    ))}
+                </span>
+            </PopoverPanel>
+        </Popover>
+    );
+}
+
 export function HistoryTable({ entries, locale }: HistoryTableProps) {
     const t = useTranslations('dashboard.workDetail.history');
     const tStatus = useTranslations('dashboard.workDetail.status');
@@ -246,13 +352,23 @@ export function HistoryTable({ entries, locale }: HistoryTableProps) {
                                                                 ? tStatus('generatedWithWarnings')
                                                                 : getStatusLabel(statusKey, t)}
                                                         </span>
-                                                        <span className="text-xs text-text-secondary dark:text-text-secondary-dark">
-                                                            {getActivityLabel(
-                                                                entry.activityType,
-                                                                t,
-                                                            )}
+                                                        <span className="inline-flex items-center gap-1.5 text-xs text-text-secondary dark:text-text-secondary-dark">
+                                                            <span>
+                                                                {getActivityLabel(
+                                                                    entry.activityType,
+                                                                    t,
+                                                                )}
+                                                            </span>
+                                                            {entry.activityType === 'generation' ? (
+                                                                <GenerationInfoButton
+                                                                    entry={entry}
+                                                                    locale={locale}
+                                                                    t={t}
+                                                                />
+                                                            ) : null}
                                                         </span>
-                                                        {entry.changelog?.summary ? (
+                                                        {entry.activityType !== 'generation' &&
+                                                        entry.changelog?.summary ? (
                                                             <p className="max-w-sm text-xs text-text-secondary dark:text-text-secondary-dark">
                                                                 {entry.changelog.summary}
                                                             </p>

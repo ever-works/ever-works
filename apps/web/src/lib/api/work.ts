@@ -64,6 +64,8 @@ export interface WebsiteTemplateOption {
     name: string;
     description: string;
     isDefault: boolean;
+    sourceType: 'built_in' | 'custom';
+    originType: 'standard' | 'forked' | 'custom_url';
 }
 
 export interface CreateWorkDto {
@@ -84,7 +86,7 @@ export interface UpdateWorkDto {
     owner?: string;
     organization?: boolean;
     deployProvider?: string;
-    websiteTemplateId?: string;
+    websiteTemplateId?: string | null;
     readmeConfig?: MarkdownReadmeConfig;
     websiteTemplateAutoUpdate?: boolean;
     websiteTemplateUseBeta?: boolean;
@@ -192,6 +194,7 @@ export interface Work {
     websiteTemplateLastError?: string | null;
     websiteTemplateLastUpdatedAt?: string | null;
     websiteTemplateLastCheckedAt?: string | null;
+    websiteRepositoryInitialized?: boolean;
     // Community PR Processing
     communityPrEnabled?: boolean;
     communityPrAutoClose?: boolean;

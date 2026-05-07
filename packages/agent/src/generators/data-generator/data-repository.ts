@@ -555,8 +555,44 @@ export class DataRepository {
     }
 
     async writeReferences(references: ReferenceEntry[]): Promise<void> {
-        const str = yaml.stringify(references);
+        const str = yaml.stringify(
+            references.map((reference) => this.normalizeReferenceForStorage(reference)),
+        );
         await fs.writeFile(this.referencesPath, str, 'utf-8');
+    }
+
+    private normalizeReferenceForStorage(reference: ReferenceEntry): ReferenceEntry {
+        if (!reference.error) {
+            return reference;
+        }
+
+        return {
+            ...reference,
+            error: this.normalizeReferenceError(reference.error, reference.url),
+        };
+    }
+
+    private normalizeReferenceError(error: string, url: string): string {
+        if (error === 'No items extracted') {
+            return `No items retrieved from URL: ${url}`;
+        }
+
+        return error
+            .replace(
+                /^Content extraction failed for URL:\s*(.+)$/s,
+                'Processing failed for URL: $1',
+            )
+            .replace(
+                /^Content extraction failed for\s+(.+?);\s+tried/s,
+                'Content processing failed for $1; tried',
+            )
+            .replace(
+                /^Content extraction failed for\s+(.+?)\s+\(plugin:/s,
+                'Content processing failed for $1 (plugin:',
+            )
+            .replace(/\bcontent extraction\b/gi, 'content processing')
+            .replace(/\bextraction failed\b/gi, 'processing failed')
+            .replace(/\bextracted\b/gi, 'retrieved');
     }
 
     private get comparisonsDir(): string {

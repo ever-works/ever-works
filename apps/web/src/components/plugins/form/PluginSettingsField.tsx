@@ -6,6 +6,7 @@ import { PluginSettingsSchemaProperty } from '@/lib/api/plugins';
 import { cn } from '@/lib/utils/cn';
 import { Select } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import { Eye, EyeOff, Pencil, X, KeyRound } from 'lucide-react';
 import { useState } from 'react';
 import { PluginModelSelect } from './PluginModelSelect';
@@ -39,6 +40,7 @@ export function PluginSettingsField({
     const description = schema.description;
     const isSecret = schema.secret;
     const primaryType = getPrimaryType(schema.type);
+    const isTextarea = schema.widget === 'textarea';
 
     // Check if the current value is a masked placeholder from the API
     const isMaskedValue = isSecret && typeof value === 'string' && value.includes('••••');
@@ -212,6 +214,22 @@ export function PluginSettingsField({
                         {t('modify')}
                     </button>
                 </div>
+            );
+        }
+
+        if (isTextarea) {
+            return (
+                <Textarea
+                    value={String(value ?? schema.default ?? '')}
+                    onChange={(e) => onChange(e.currentTarget.value)}
+                    maxLength={schema.maxLength}
+                    required={required}
+                    autoFocus={isEffectivelyEditing}
+                    placeholder={isEffectivelyEditing ? t('enterNewValue') : undefined}
+                    variant="form"
+                    rows={8}
+                    className="font-mono resize-y"
+                />
             );
         }
 

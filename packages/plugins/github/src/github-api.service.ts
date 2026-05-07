@@ -29,7 +29,7 @@ function sanitizeDescription(description?: string): string {
 export class GitHubApiService {
 	private createOctokit(token: string, baseUrl?: string): Octokit {
 		return new Octokit({
-			auth: token,
+			...(token ? { auth: token } : {}),
 			baseUrl: baseUrl || 'https://api.github.com'
 		});
 	}
