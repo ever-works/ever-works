@@ -1,6 +1,8 @@
 jest.mock('@ever-works/agent/database', () => ({
     WorkRepository: class WorkRepository {},
     AuthAccountRepository: class AuthAccountRepository {},
+    TemplateRepository: class TemplateRepository {},
+    UserTemplatePreferenceRepository: class UserTemplatePreferenceRepository {},
 }));
 jest.mock('@ever-works/agent/entities', () => ({}));
 jest.mock('@ever-works/agent/cache', () => ({
@@ -55,6 +57,8 @@ describe('TriggerInternalController', () => {
     let userPluginRepository: any;
     let workPluginRepository: any;
     let authAccountRepository: any;
+    let templateRepository: any;
+    let userTemplatePreferenceRepository: any;
     let controller: TriggerInternalController;
 
     const buildController = () => {
@@ -71,6 +75,8 @@ describe('TriggerInternalController', () => {
             userPluginRepository,
             workPluginRepository,
             authAccountRepository,
+            templateRepository,
+            userTemplatePreferenceRepository,
         );
         c.onModuleInit();
         return c;
@@ -92,6 +98,8 @@ describe('TriggerInternalController', () => {
         userPluginRepository = { name: 'UserPluginRepository' };
         workPluginRepository = { name: 'WorkPluginRepository' };
         authAccountRepository = { name: 'AuthAccountRepository' };
+        templateRepository = { name: 'TemplateRepository' };
+        userTemplatePreferenceRepository = { name: 'UserTemplatePreferenceRepository' };
 
         controller = buildController();
     });
