@@ -35,12 +35,13 @@
 
 ## Done
 
-| Date       | Area                              | PR                                                        | Notes                                                                                                                                                                                                               |
-| ---------- | --------------------------------- | --------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 2026-05-07 | Search plugins zero-coverage      | [#471](https://github.com/ever-works/ever-works/pull/471) | brave (25 tests), linkup (27), tavily (26), valyu (29) — 107 new unit tests; mock fetch / SDK; cover metadata, settings, search, extract (where applicable), validateConnection, lifecycle, healthCheck, manifest.  |
-| 2026-05-07 | Search plugins zero-coverage (b2) | [#472](https://github.com/ever-works/ever-works/pull/472) | exa (30 tests), perplexity (22), serpapi (22), firecrawl (28) — 102 new unit tests; same coverage shape as batch 1.                                                                                                 |
-| 2026-05-07 | Plugin coverage (b3)              | [#473](https://github.com/ever-works/ever-works/pull/473) | jina (25 tests), comparison-generator (12), brightdata (28), scrapfly (26) — 91 new unit tests; covers remaining zero-coverage search plugins plus utility (comparison-generator) and content-extractor (scrapfly). |
-| 2026-05-07 | Plugin coverage (b4)              | (this PR)                                                 | local-content-extractor (20 tests, axios mock), github (20 tests, fetch + libsodium mock for OAuth flow) — 40 new unit tests; closes the high-priority zero-coverage plugin list.                                   |
+| Date       | Area                              | PR                                                        | Notes                                                                                                                                                                                                                                               |
+| ---------- | --------------------------------- | --------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 2026-05-07 | Search plugins zero-coverage      | [#471](https://github.com/ever-works/ever-works/pull/471) | brave (25 tests), linkup (27), tavily (26), valyu (29) — 107 new unit tests; mock fetch / SDK; cover metadata, settings, search, extract (where applicable), validateConnection, lifecycle, healthCheck, manifest.                                  |
+| 2026-05-07 | Search plugins zero-coverage (b2) | [#472](https://github.com/ever-works/ever-works/pull/472) | exa (30 tests), perplexity (22), serpapi (22), firecrawl (28) — 102 new unit tests; same coverage shape as batch 1.                                                                                                                                 |
+| 2026-05-07 | Plugin coverage (b3)              | [#473](https://github.com/ever-works/ever-works/pull/473) | jina (25 tests), comparison-generator (12), brightdata (28), scrapfly (26) — 91 new unit tests; covers remaining zero-coverage search plugins plus utility (comparison-generator) and content-extractor (scrapfly).                                 |
+| 2026-05-07 | Plugin coverage (b4)              | [#474](https://github.com/ever-works/ever-works/pull/474) | local-content-extractor (20 tests, axios mock), github (20 tests, fetch + libsodium mock for OAuth flow) — 40 new unit tests; closes the high-priority zero-coverage plugin list.                                                                   |
+| 2026-05-07 | cli-shared first coverage         | (this PR)                                                 | Scaffolds vitest in `packages/cli-shared` and adds 27 unit tests (slug-utils 13 + validation-utils 14) covering slugify, validateSlug, generateIncrementedSlug, validateUrl, validateEmail, validateGitUsername, validateApiKey, validateModelName. |
 
 ## Pending — High Priority
 
@@ -75,7 +76,7 @@ search/extract success + error paths, lifecycle, healthCheck, manifest.
 - [ ] `packages/contracts` — pure types; add type-test fixtures via
       `expectTypeOf` so breaking changes are caught.
 - [ ] `packages/monitoring` — mock Sentry + PostHog SDKs and assert wiring.
-- [ ] `packages/cli-shared` — pure helpers, easy to unit test.
+- [~] `packages/cli-shared` — utils 27 tests added (this PR). Prompts (`base-prompt.service.ts`, `work-prompt.service.ts`) and remaining utils (`config-check`, `generator-steps`) still pending.
 - [ ] `packages/tasks` — Trigger.dev jobs; mock `@trigger.dev/sdk` v3.
 
 ### API module unit tests
