@@ -14,7 +14,9 @@
         "build": "nest build",
         "build:cli": "node build.js",
         "publish:cli": "npm run build:cli && cd dist && npm publish",
-        "test:cli": "cd dist && npm install && node cli.js --help"
+        "test:cli": "cd dist && npm install && node cli.js --help",
+        "test": "vitest run",
+        "test:watch": "vitest"
     },
     "dependencies": {
         "@ever-works/agent": "workspace:*",
@@ -46,6 +48,7 @@
         "ts-loader": "^9.5.4",
         "ts-node": "^10.9.2",
         "tsconfig-paths": "^4.2.0",
-        "typescript": "^5.9.3"
+        "typescript": "^5.9.3",
+        "vitest": "^3.2.1"
     }
 }

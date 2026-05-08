@@ -118,14 +118,14 @@ timeZoneName:'short'})`.
       with `APP_NAME`/`NEXT_PUBLIC_APP_NAME` fallback chain pinned,
       default `expiresIn = '1 hour'` (forgot-password) /
       `'24 hours'` (account-deletion), default `dashboardUrl =
-      ${webAppUrl}/works/new` with `WEB_URL` env override AND
+${webAppUrl}/works/new` with `WEB_URL` env override AND
       `http://localhost:3000` last-resort fallback,
       `formatDateTime` Intl.DateTimeFormat shape (year + long
       month assertions, TZ-agnostic), `formatRoleName`
       capitalise-first/lowercase-rest including mid-word casing,
       single-letter input, and empty-string no-crash, the
       per-handler `try/catch + logger.error('Failed to send …',
-      err?.stack ?? err)` swallowing policy (sendMail rejection
+err?.stack ?? err)` swallowing policy (sendMail rejection
       MUST NOT propagate back to the event-bus), and the
       member-invitation log routing pinned against the
       INVITEE's email (NOT the inviter's). Closes the
