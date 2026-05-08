@@ -59,7 +59,9 @@ All tiers apply simultaneously. If any tier's limit is exceeded, the API returns
 | **AI Conversation** | `/api/ai-conversations`      | Streaming AI chat                                | [AI Conversation](/api/ai-conversation)                                                 |
 | **Git Providers**   | `/api/git-providers`         | Git provider connections, repos, orgs            | [Other Modules](/api/other-modules#git-provider-api)                                    |
 | **Generator Form**  | `/api/generator-form`        | Dynamic pipeline form schemas                    | [Other Modules](/api/other-modules#generator-form-schema)                               |
-| **Screenshot**      | `/api/screenshot`            | Screenshot capture                               | [Other Modules](/api/other-modules#screenshot-api)                                      |
+| **Screenshot**      | `/api/screenshot`            | Screenshot capture                               | [Screenshot Capability](/api/screenshot-capability)                                     |
+| **Search**          | `/api/search`                | Web search via the user's first configured plugin | [Search Capability](/api/search-capability)                                             |
+| **Plugin Device Auth** | `/api/device-auth`        | Per-user device-code OAuth for plugins (CLI tools) | [Device Auth Capability](/api/device-auth-capability)                                  |
 | **Subscriptions**   | `/api/subscriptions`         | Plans, billing, usage tracking                   | [Other Modules](/api/other-modules#subscriptions-api)                                   |
 | **Notifications**   | `/api/notifications`         | User notifications                               | [Other Modules](/api/other-modules#notifications-api)                                   |
 | **Members**         | `/api/works/:id/members`     | Work member management                           | [Works](/api/works)                                                                     |
