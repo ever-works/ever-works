@@ -305,7 +305,8 @@ const sidebars: SidebarsConfig = {
 				'devops/logging-aggregation',
 				'devops/disaster-recovery',
 				'devops/performance-monitoring',
-				'devops/kubernetes'
+				'devops/kubernetes',
+				'devops/k8s-e2e-runbook'
 			]
 		},
 		{
