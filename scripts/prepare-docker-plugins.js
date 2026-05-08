@@ -85,10 +85,7 @@ function main() {
 			fs.unlinkSync('/app/pnpm-workspace.yaml');
 		} catch {}
 
-		fs.writeFileSync(
-			path.join(PLUGINS_DEST, 'package.json'),
-			JSON.stringify({ private: true, dependencies: {} }, null, 2) + '\n'
-		);
+		writePluginDepsPackageJson();
 		// Ensure hoisting so plugins at /app/plugins/<plugin>/ can resolve deps from /app/plugins/node_modules
 		fs.writeFileSync(path.join(PLUGINS_DEST, '.npmrc'), 'shamefully-hoist=true\n');
 
@@ -154,6 +151,25 @@ function collectMissingDeps(deps, missingDeps) {
 
 function isInstalled(name, nodeModulesPath) {
 	return fs.existsSync(path.join(nodeModulesPath, ...name.split('/')));
+}
+
+function writePluginDepsPackageJson() {
+	const pkgPath = path.join(PLUGINS_DEST, 'package.json');
+	const existingPkg = fs.existsSync(pkgPath) ? JSON.parse(fs.readFileSync(pkgPath, 'utf-8')) : {};
+
+	fs.writeFileSync(
+		pkgPath,
+		JSON.stringify(
+			{
+				...existingPkg,
+				name: 'ever-works-plugins',
+				private: true,
+				dependencies: existingPkg.dependencies ?? {}
+			},
+			null,
+			2
+		) + '\n'
+	);
 }
 
 function copyDirSync(src, dest) {
