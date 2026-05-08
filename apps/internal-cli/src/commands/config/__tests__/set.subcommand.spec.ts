@@ -68,7 +68,16 @@ describe('SetSubCommand.run (validation paths)', () => {
     });
 
     it('accepts each documented AI provider value (case-insensitive)', async () => {
-        for (const v of ['openai', 'OpenAI', 'GOOGLE', 'anthropic', 'openrouter', 'ollama', 'groq', 'custom']) {
+        for (const v of [
+            'openai',
+            'OpenAI',
+            'GOOGLE',
+            'anthropic',
+            'openrouter',
+            'ollama',
+            'groq',
+            'custom',
+        ]) {
             stub.saveConfig.mockClear();
             await cmd.run(['AI_DEFAULT_PROVIDER', v], {});
             expect(stub.saveConfig).toHaveBeenCalledTimes(1);

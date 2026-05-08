@@ -74,10 +74,9 @@ describe('ConfigCheckService', () => {
         it('returns false and reports the wrapped error when loadConfig throws', async () => {
             stub.loadConfig.mockRejectedValue(new Error('disk error'));
             await expect(service.checkConfiguration()).resolves.toBe(false);
-            expect(displayConfigurationError).toHaveBeenCalledWith(
-                'Failed to load configuration',
-                ['disk error'],
-            );
+            expect(displayConfigurationError).toHaveBeenCalledWith('Failed to load configuration', [
+                'disk error',
+            ]);
         });
     });
 

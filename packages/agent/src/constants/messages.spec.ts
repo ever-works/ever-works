@@ -1,8 +1,4 @@
-import {
-    GENERATION_CANCELLED,
-    GIT_TOKEN_NOT_AVAILABLE,
-    IMPORT_CANCELLED,
-} from './messages';
+import { GENERATION_CANCELLED, GIT_TOKEN_NOT_AVAILABLE, IMPORT_CANCELLED } from './messages';
 import * as constantsBarrel from './index';
 
 describe('constants/messages.ts', () => {

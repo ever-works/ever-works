@@ -70,8 +70,10 @@ describe('DistributedTaskLockService', () => {
             await service.runExclusive('task-1', fn);
 
             // First createQueryBuilder call is the cleanup, before insert
-            const firstQB = (cacheEntryRepository.createQueryBuilder as jest.Mock).mock.invocationCallOrder[0];
-            const insertOrder = (cacheEntryRepository.insert as jest.Mock).mock.invocationCallOrder[0];
+            const firstQB = (cacheEntryRepository.createQueryBuilder as jest.Mock).mock
+                .invocationCallOrder[0];
+            const insertOrder = (cacheEntryRepository.insert as jest.Mock).mock
+                .invocationCallOrder[0];
             expect(firstQB).toBeLessThan(insertOrder);
 
             expect(queryBuilder.where).toHaveBeenCalledWith('key = :key', {

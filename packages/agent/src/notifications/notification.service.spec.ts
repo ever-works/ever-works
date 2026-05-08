@@ -312,7 +312,10 @@ describe('NotificationService', () => {
             } as any);
 
             expect(result).toBe(out);
-            expect(repository.findByUserId).toHaveBeenCalledWith('u', { unreadOnly: true, limit: 10 });
+            expect(repository.findByUserId).toHaveBeenCalledWith('u', {
+                unreadOnly: true,
+                limit: 10,
+            });
         });
 
         it('forwards undefined options when caller omits them', async () => {
@@ -386,9 +389,7 @@ describe('NotificationService', () => {
 
         it('refuses to dismiss a persistent notification with the documented error message', async () => {
             const { service, repository } = makeService({
-                findByIdAndUserId: jest
-                    .fn()
-                    .mockResolvedValue({ id: 'n', isPersistent: true }),
+                findByIdAndUserId: jest.fn().mockResolvedValue({ id: 'n', isPersistent: true }),
             });
 
             await expect(service.dismiss('u', 'n')).rejects.toThrow(
@@ -399,9 +400,7 @@ describe('NotificationService', () => {
 
         it('calls repository.dismiss for non-persistent notifications', async () => {
             const { service, repository } = makeService({
-                findByIdAndUserId: jest
-                    .fn()
-                    .mockResolvedValue({ id: 'n', isPersistent: false }),
+                findByIdAndUserId: jest.fn().mockResolvedValue({ id: 'n', isPersistent: false }),
                 dismiss: jest.fn().mockResolvedValue(undefined),
             });
 
@@ -541,9 +540,7 @@ describe('NotificationService', () => {
             expect(args.type).toBe(NotificationType.WARNING);
             expect(args.category).toBe(NotificationCategory.GENERATION);
             expect(args.title).toBe('Schedule Paused');
-            expect(args.message).toBe(
-                'Scheduled updates for "My Work" paused: Quota exhausted',
-            );
+            expect(args.message).toBe('Scheduled updates for "My Work" paused: Quota exhausted');
             expect(args.actionUrl).toBe('/works/w42/generator/schedule');
             expect(args.actionLabel).toBe('View Schedule');
             expect(args.metadata).toEqual({ workId: 'w42', workName: 'My Work' });
@@ -564,9 +561,7 @@ describe('NotificationService', () => {
             expect(args.type).toBe(NotificationType.ERROR);
             expect(args.category).toBe(NotificationCategory.SECURITY);
             expect(args.title).toBe('Git Authentication Expired');
-            expect(args.message).toBe(
-                'Your GitHub authentication has expired. Please reconnect.',
-            );
+            expect(args.message).toBe('Your GitHub authentication has expired. Please reconnect.');
             expect(args.actionUrl).toBe('/settings/oauth');
             expect(args.actionLabel).toBe('Reconnect');
             expect(args.isPersistent).toBe(true);

@@ -240,10 +240,7 @@ describe('workGenerationTask', () => {
                     {},
                 );
 
-                expect(scheduleService.markRunFailed).toHaveBeenCalledWith(
-                    'sched-1',
-                    'cancelled',
-                );
+                expect(scheduleService.markRunFailed).toHaveBeenCalledWith('sched-1', 'cancelled');
                 expect(scheduleService.markRunCompleted).not.toHaveBeenCalled();
             });
 
