@@ -23,10 +23,7 @@ type SessionRepoMock = {
     save: jest.Mock;
 };
 
-function createService(opts?: {
-    apiSession?: any;
-    apiSessionError?: Error;
-}) {
+function createService(opts?: { apiSession?: any; apiSessionError?: Error }) {
     const sessionRepository: SessionRepoMock = {
         findOne: jest.fn(),
         delete: jest.fn().mockResolvedValue(undefined),
@@ -101,9 +98,7 @@ describe('AuthProviderService', () => {
                 expiresAt: new Date(Date.now() - 1000),
             });
 
-            const result = await service.authenticate(
-                new Headers({ authorization: 'Bearer t' }),
-            );
+            const result = await service.authenticate(new Headers({ authorization: 'Bearer t' }));
 
             expect(result).toBeNull();
             expect(sessionRepository.delete).toHaveBeenCalledWith({ token: 't' });
@@ -128,9 +123,7 @@ describe('AuthProviderService', () => {
                 avatar: 'https://img/a.png',
             });
 
-            const result = await service.authenticate(
-                new Headers({ authorization: 'Bearer t' }),
-            );
+            const result = await service.authenticate(new Headers({ authorization: 'Bearer t' }));
 
             expect(result).toMatchObject({
                 userId: 'u1',
@@ -163,9 +156,7 @@ describe('AuthProviderService', () => {
                 avatar: null,
             });
 
-            const result = await service.authenticate(
-                new Headers({ authorization: 'Bearer t' }),
-            );
+            const result = await service.authenticate(new Headers({ authorization: 'Bearer t' }));
 
             expect(result?.provider).toBe('local');
             expect(result?.avatar).toBeNull();
@@ -188,9 +179,7 @@ describe('AuthProviderService', () => {
                 avatar: '',
             });
 
-            const result = await service.authenticate(
-                new Headers({ authorization: 'Bearer t' }),
-            );
+            const result = await service.authenticate(new Headers({ authorization: 'Bearer t' }));
 
             expect(result?.avatar).toBeNull();
         });
@@ -760,9 +749,9 @@ describe('AuthProviderService', () => {
             const { service, auth } = createService({ apiSession: null });
             auth.api.getSession.mockResolvedValue(null);
 
-            await expect(
-                service.changePassword('old', 'new', new Headers()),
-            ).rejects.toThrow(new UnauthorizedException('Missing session token'));
+            await expect(service.changePassword('old', 'new', new Headers())).rejects.toThrow(
+                new UnauthorizedException('Missing session token'),
+            );
         });
     });
 

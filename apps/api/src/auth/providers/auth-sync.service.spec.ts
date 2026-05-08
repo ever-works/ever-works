@@ -56,7 +56,12 @@ describe('AuthSyncService', () => {
     describe('ensureCredentialAccount', () => {
         it('returns the existing credential row WITHOUT writing when one exists', async () => {
             const { service, repository } = createService();
-            const existing = { id: 'a1', userId: 'u1', providerId: 'credential', password: 'oldHash' };
+            const existing = {
+                id: 'a1',
+                userId: 'u1',
+                providerId: 'credential',
+                password: 'oldHash',
+            };
             repository.findOne.mockResolvedValue(existing);
 
             const result = await service.ensureCredentialAccount('u1', 'newHash');
@@ -70,7 +75,13 @@ describe('AuthSyncService', () => {
             const { service, repository } = createService();
             repository.findOne.mockResolvedValue(null);
 
-            const draft = { id: 'generated-uuid', userId: 'u1', providerId: 'credential', accountId: 'u1', password: 'h' };
+            const draft = {
+                id: 'generated-uuid',
+                userId: 'u1',
+                providerId: 'credential',
+                accountId: 'u1',
+                password: 'h',
+            };
             repository.create.mockReturnValue(draft);
             const saved = { ...draft, id: 'persisted' };
             repository.save.mockResolvedValue(saved);
@@ -139,7 +150,12 @@ describe('AuthSyncService', () => {
 
         it('updates the existing row by id when a credential account exists', async () => {
             const { service, repository } = createService();
-            const existing = { id: 'a1', userId: 'u1', providerId: 'credential', password: 'oldHash' };
+            const existing = {
+                id: 'a1',
+                userId: 'u1',
+                providerId: 'credential',
+                password: 'oldHash',
+            };
             repository.findOne.mockResolvedValue(existing);
 
             await service.syncCredentialPassword('u1', 'newHash');
