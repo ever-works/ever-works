@@ -229,10 +229,56 @@ known to lack a Spec Kit feature folder:
       user-documented; the onboarding surface is captured implicitly via
       the well-known controller, which hosts the public agent-card
       endpoint and could be a follow-up `well-known.md` page.
-- [ ] `docs/architecture/*` — confirm diagrams are current after
-      Directory→Work rename (PR #436) and works.yml standardization
-      (PR #456).
-- [ ] `docs/devops/*` — kind-cluster e2e CI just landed (#464); add runbook.
+- [x] `docs/architecture/*` — audit completed 2026-05-08. No stale
+      `directory`/`directories` references remain after the
+      Directory→Work rename (PR #436) — `grep -ri 'director' docs/architecture/`
+      returns zero matches. Refreshed `docs/architecture/agent-package.md`
+      to reflect the post-#456 module map: bumped the export count
+      from **20 → 27** and added the six newly-shipped sub-modules
+      (`./onboarding`, `./constants`, `./activity-log`, `./works-config`,
+      `./template-catalog`, `./account-transfer`); flagged the legacy
+      `./git` export as a re-export from `facades/git.facade.ts` +
+      `utils/git-repository.utils.ts` (the standalone `src/git/` directory
+      no longer exists); updated the source-tree ASCII diagram to add the
+      seven new directories (`account-transfer/`, `activity-log/`,
+      `onboarding/`, `template-catalog/`, `types/`, `works-config/`,
+      and the moved `work-operations/`); updated the service-layer table
+      from **14 → 19** entries (added `WorkWebsiteRepositoryStateService`,
+      `WorksManifestService`, `ItemHealthService`,
+      `ItemSourceValidationSchedulerService`, `StateMarkerService`,
+      `WebhookDeliveryService`). `WorksManifestService` is the post-#456
+      canonical `works.yml` parser/writer surface, so the rename is now
+      reflected in the diagram. Other architecture pages (`pipeline-system`,
+      `event-system`, `events-deep-dive`, `generator-system`, etc.)
+      do not reference the legacy `directory.yml` shape and need no
+      edits.
+- [x] `docs/devops/*` — added 2026-05-08 at `docs/devops/k8s-e2e-runbook.md`
+      (registered in `apps/docs/sidebarsPlatform.ts` at sidebar position 15,
+      after `devops/kubernetes`). Documents the `.github/workflows/k8s-e2e.yml`
+      job (#464): the `paths:` filter that gates the workflow on
+      `packages/plugins/k8s/**` so docs-only PRs don't pay the ~5-minute
+      cluster-provisioning cost; the four-cell test matrix
+      (`v1.28.15` × `v1.30.13` × `ingress=false` × `ingress=true`); the
+      pinned `kindest/node:v1.30.13` and `controller-v1.11.3`
+      ingress-nginx images and *why* they are pinned (deterministic state
+      across runs); the six-test e2e suite (`validateConnection`,
+      `ensureNamespace` idempotency, `applyDeployment`+`applyService`
+      convergence, `listManagedDeployments`, `getDeployment`-null,
+      `getIngressLoadBalancerHost`-null) and what each one catches that
+      mocks cannot; the `KUBECONFIG_E2E_PATH`-gated `describe.skip`
+      pattern; the full local-reproduction recipe (kind create →
+      ingress-nginx apply + wait → `kind load docker-image` → kubeconfig
+      export → `pnpm --filter '@ever-works/k8s-plugin...' build` →
+      `pnpm --filter @ever-works/k8s-plugin test:e2e` → `kind delete`);
+      the on-failure debug hooks (`kubectl get nodes / ingressclass /
+      all -A | head -100` + `kubectl describe deployment -A | head -200`);
+      a 5-row triage table mapping common failure modes to the right
+      next step; and the operating envelope (one test image, one
+      namespace per run, no persistent volumes, no external network).
+      Cross-links to the workflow source, the `k8s-deployment` Spec Kit
+      feature, the plugin README, kind release notes (for bumping node
+      images), and ingress-nginx releases (for bumping the pinned
+      controller tag).
 
 ## Pending — Low Priority
 
