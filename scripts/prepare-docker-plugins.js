@@ -13,6 +13,7 @@ const PLUGINS_SRC = path.resolve('/app/packages/plugins');
 const DEPLOY_DIR = path.resolve('/app/deploy');
 const PLUGINS_DEST = path.join(DEPLOY_DIR, 'plugins');
 const DEPLOY_NODE_MODULES = path.join(DEPLOY_DIR, 'node_modules');
+const PLUGINS_NODE_MODULES = path.join(PLUGINS_DEST, 'node_modules');
 
 function main() {
 	console.log('==> Preparing plugins for production...');
@@ -79,16 +80,18 @@ function main() {
 
 		console.log(`==> Installing ${missingDeps.size} missing plugin deps via pnpm...`);
 
-		// Remove workspace marker so pnpm treats deploy dir as standalone
+		// Remove workspace marker so pnpm treats plugin deps as standalone
 		try {
 			fs.unlinkSync('/app/pnpm-workspace.yaml');
 		} catch {}
-		// Ensure hoisting so plugins at /app/plugins/ can resolve deps
-		fs.writeFileSync(path.join(DEPLOY_DIR, '.npmrc'), 'shamefully-hoist=true\n');
+
+		writePluginDepsPackageJson();
+		// Ensure hoisting so plugins at /app/plugins/<plugin>/ can resolve deps from /app/plugins/node_modules
+		fs.writeFileSync(path.join(PLUGINS_DEST, '.npmrc'), 'shamefully-hoist=true\n');
 
 		try {
 			execSync(`pnpm add ${depsToInstall}`, {
-				cwd: DEPLOY_DIR,
+				cwd: PLUGINS_DEST,
 				stdio: 'inherit'
 			});
 		} catch (error) {
@@ -140,11 +143,33 @@ function collectMissingDeps(deps, missingDeps) {
 		if (name.startsWith('@ever-works/')) continue;
 		if (missingDeps.has(name)) continue;
 
-		const depPath = path.join(DEPLOY_NODE_MODULES, ...name.split('/'));
-		if (fs.existsSync(depPath)) continue;
+		if (isInstalled(name, DEPLOY_NODE_MODULES) || isInstalled(name, PLUGINS_NODE_MODULES)) continue;
 
 		missingDeps.set(name, version);
 	}
+}
+
+function isInstalled(name, nodeModulesPath) {
+	return fs.existsSync(path.join(nodeModulesPath, ...name.split('/')));
+}
+
+function writePluginDepsPackageJson() {
+	const pkgPath = path.join(PLUGINS_DEST, 'package.json');
+	const existingPkg = fs.existsSync(pkgPath) ? JSON.parse(fs.readFileSync(pkgPath, 'utf-8')) : {};
+
+	fs.writeFileSync(
+		pkgPath,
+		JSON.stringify(
+			{
+				...existingPkg,
+				name: 'ever-works-plugins',
+				private: true,
+				dependencies: existingPkg.dependencies ?? {}
+			},
+			null,
+			2
+		) + '\n'
+	);
 }
 
 function copyDirSync(src, dest) {

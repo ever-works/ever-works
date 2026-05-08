@@ -108,23 +108,42 @@ timeZoneName:'short'})`.
     - Mocks `fs/promises.readFile` at module scope.
 - [x] T20. `faker-mailer.service.spec.ts` (2 tests): debug log
       shape + undefined-recipient tolerance.
-- [ ] T21. **Follow-up**: `mail.service.spec.ts` (`apps/api/src/mail`)
-      — currently only the providers are unit-tested; the seven
-      `@OnEvent` handlers + branding-context merge + default
-      `dashboardUrl`/`expiresIn` + `formatDateTime`/`formatRoleName`
-      have no dedicated suite. Pattern lives in
-      `apps/api/src/activity-log/activity-log.listener.spec.ts` —
-      replicate it. Will close the listener-side coverage gap
-      called out in `spec.md` §9 / Constitution Gate VI.
+- [x] T21. `mail.service.spec.ts` (`apps/api/src/mail`) —
+      28 listener-side unit tests covering all seven `@OnEvent`
+      handlers (`sendSignupConfirmation`/`sendForgotPassword`/
+      `sendPasswordChanged`/`sendWelcomeEmail`/`sendNewDeviceAlert`/
+      `sendAccountDeletionConfirmation`/`sendMemberInvitation`),
+      `getBrandingContext` merge across all four branding fields
+      (`appName`/`companyOwner`/`platformWebsite`/`currentYear`)
+      with `APP_NAME`/`NEXT_PUBLIC_APP_NAME` fallback chain pinned,
+      default `expiresIn = '1 hour'` (forgot-password) /
+      `'24 hours'` (account-deletion), default `dashboardUrl =
+      ${webAppUrl}/works/new` with `WEB_URL` env override AND
+      `http://localhost:3000` last-resort fallback,
+      `formatDateTime` Intl.DateTimeFormat shape (year + long
+      month assertions, TZ-agnostic), `formatRoleName`
+      capitalise-first/lowercase-rest including mid-word casing,
+      single-letter input, and empty-string no-crash, the
+      per-handler `try/catch + logger.error('Failed to send …',
+      err?.stack ?? err)` swallowing policy (sendMail rejection
+      MUST NOT propagate back to the event-bus), and the
+      member-invitation log routing pinned against the
+      INVITEE's email (NOT the inviter's). Closes the
+      listener-side coverage gap called out in `spec.md` §9 /
+      Constitution Gate VI.
 
 ## Phase 7 — Bug Fixes
 
-- [ ] T22. **Follow-up (FR-9 / OQ-1)**:
-      `MailerService.sendMail` Resend branch crashes when `to` is
-      omitted. Short-circuit Resend the same way the log line
-      does (e.g. `to: data.to ? this.getDestination(data.to) : []`).
-      Update the corresponding assertion in
-      `mailer.service.spec.ts` so the test pins the new behaviour.
+- [x] T22. (FR-9 / OQ-1): `MailerService.sendMail` Resend branch
+      no longer crashes when `to` is omitted. The call site
+      `to: this.getDestination(data.to)` is now short-circuited to
+      `to: data.to ? this.getDestination(data.to) : []`, mirroring
+      the log line's `data.to ? this.getDestination(data.to).join(', ') : 'unknown'`
+      gate. The corresponding assertion in `mailer.service.spec.ts`
+      flipped from "rejects with `'address' in` TypeError" to
+      "forwards `to: []` to `resend.emails.send`". The "to=unknown"
+      log line still fires, mirroring the SMTP / faker branches'
+      tolerance of a missing `to` field.
 
 ## Phase 8 — Docs
 
@@ -144,17 +163,11 @@ timeZoneName:'short'})`.
 - [x] Per-handler `try/catch` + `logger.error` means a delivery
       failure does NOT propagate back to the originating event.
 - [x] Both providers are unit-tested with branching coverage; the
-      Resend-`to`-undefined edge case is pinned (and tracked as a
-      follow-up to fix).
+      Resend-`to`-undefined edge case now forwards `to: []` instead
+      of crashing.
 
 ## Follow-ups discovered
 
-- **T21** — listener-side unit suite for `MailService`. Cover all
-  seven `@OnEvent` handlers, default `dashboardUrl`/`expiresIn`,
-  `formatDateTime`/`formatRoleName`, branding-context merge, and
-  the per-handler error-swallowing policy.
-- **T22** — fix the Resend `to=undefined` crash documented in
-  OQ-1 / FR-9 / `mailer.service.spec.ts` follow-up.
 - **T24** — operator-facing devops doc covering SMTP vs Resend
   configuration, `tls.rejectUnauthorized` audit guidance, and the
   new-template workflow.
