@@ -281,9 +281,7 @@ describe('UsageLedgerService', () => {
             const { service } = makeService(
                 { record: jest.fn().mockResolvedValue({ id: 'led-4' }) },
                 {
-                    recordUsageCharge: jest
-                        .fn()
-                        .mockRejectedValue(new Error('stripe down')),
+                    recordUsageCharge: jest.fn().mockRejectedValue(new Error('stripe down')),
                 },
             );
 

@@ -10,10 +10,7 @@ import {
     type WorkContextUserDto,
     type WorkGenerationPayload,
 } from './work-generation.types';
-import {
-    WORK_IMPORT_DISPATCHER,
-    type WorkImportDispatcher,
-} from './work-import-dispatcher';
+import { WORK_IMPORT_DISPATCHER, type WorkImportDispatcher } from './work-import-dispatcher';
 import {
     WorkImportErrorCode,
     type WorkImportPayload,

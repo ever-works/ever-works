@@ -4,10 +4,7 @@ import { TokenUsageTracker } from '../token-usage.tracker.js';
 
 const baseGenerations = [[{ text: 'hi' } as never]];
 
-const result = (
-	llmOutput?: Record<string, unknown>,
-	generationInfo?: Record<string, unknown>
-): LLMResult =>
+const result = (llmOutput?: Record<string, unknown>, generationInfo?: Record<string, unknown>): LLMResult =>
 	({
 		llmOutput,
 		generations: generationInfo ? [[{ text: 'hi', generationInfo }]] : baseGenerations

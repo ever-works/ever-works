@@ -3,10 +3,7 @@ import { plainToInstance } from 'class-transformer';
 import { validate } from 'class-validator';
 
 import * as dtoBarrel from './index';
-import {
-    CreateWorkDto,
-    MarkdownReadmeConfigDto,
-} from './create-work.dto';
+import { CreateWorkDto, MarkdownReadmeConfigDto } from './create-work.dto';
 import { GenerateDataDto } from './generate-data.dto';
 import {
     AnalyzeRepositoryDto,
@@ -137,18 +134,19 @@ describe('agent/dto submodule', () => {
                 });
                 const errs = await expectValidationErrors(dto);
                 // either Min/Max or IsInt depending on the value
-                expect(
-                    errs.some((e) => ['min', 'max', 'isInt'].includes(e)),
-                ).toBe(true);
+                expect(errs.some((e) => ['min', 'max', 'isInt'].includes(e))).toBe(true);
             },
         );
 
-        it.each([1, 5, 10])('accepts maxFailureBeforePause=%j (in-range integers)', async (value) => {
-            const dto = plainToInstance(UpdateWorkScheduleDto, {
-                maxFailureBeforePause: value,
-            });
-            await expectValid(dto);
-        });
+        it.each([1, 5, 10])(
+            'accepts maxFailureBeforePause=%j (in-range integers)',
+            async (value) => {
+                const dto = plainToInstance(UpdateWorkScheduleDto, {
+                    maxFailureBeforePause: value,
+                });
+                await expectValid(dto);
+            },
+        );
 
         it('rejects an out-of-enum cadence', async () => {
             const dto = plainToInstance(UpdateWorkScheduleDto, { cadence: 'random' });
@@ -176,15 +174,12 @@ describe('agent/dto submodule', () => {
             'categorization',
             'deduplication',
             'sourceValidation',
-        ] as const)(
-            '%s: empty/whitespace-only string is normalised to null',
-            (field) => {
-                for (const value of ['', '   ', '\n\t']) {
-                    const dto = plainToInstance(UpdateWorkAdvancedPromptsDto, { [field]: value });
-                    expect((dto as any)[field]).toBeNull();
-                }
-            },
-        );
+        ] as const)('%s: empty/whitespace-only string is normalised to null', (field) => {
+            for (const value of ['', '   ', '\n\t']) {
+                const dto = plainToInstance(UpdateWorkAdvancedPromptsDto, { [field]: value });
+                expect((dto as any)[field]).toBeNull();
+            }
+        });
 
         it.each([
             'relevanceAssessment',
@@ -617,9 +612,7 @@ describe('agent/dto submodule', () => {
 
         it('SettingsHeaderDto: accepts each documented theme_default literal', async () => {
             for (const theme of ['light', 'dark', 'system']) {
-                await expectValid(
-                    plainToInstance(SettingsHeaderDto, { theme_default: theme }),
-                );
+                await expectValid(plainToInstance(SettingsHeaderDto, { theme_default: theme }));
             }
         });
 

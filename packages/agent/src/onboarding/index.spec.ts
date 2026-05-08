@@ -24,8 +24,12 @@ describe('agent/onboarding barrel', () => {
 
         it('ONBOARDING_ACCOUNT_UPSERT is Symbol.for("OnboardingAccountUpsert")', () => {
             expect(typeof onboarding.ONBOARDING_ACCOUNT_UPSERT).toBe('symbol');
-            expect(onboarding.ONBOARDING_ACCOUNT_UPSERT.description).toBe('OnboardingAccountUpsert');
-            expect(onboarding.ONBOARDING_ACCOUNT_UPSERT).toBe(Symbol.for('OnboardingAccountUpsert'));
+            expect(onboarding.ONBOARDING_ACCOUNT_UPSERT.description).toBe(
+                'OnboardingAccountUpsert',
+            );
+            expect(onboarding.ONBOARDING_ACCOUNT_UPSERT).toBe(
+                Symbol.for('OnboardingAccountUpsert'),
+            );
         });
 
         it('ONBOARDING_WORK_CREATOR is Symbol.for("OnboardingWorkCreator")', () => {
@@ -49,7 +53,9 @@ describe('agent/onboarding barrel', () => {
             // someone refactored these to bare `Symbol(...)` we would silently
             // break NestJS DI token equality across module boundaries.
             expect(Symbol.for('OnboardingGitProvider')).toBe(onboarding.ONBOARDING_GIT_PROVIDER);
-            expect(Symbol.for('OnboardingAccountUpsert')).toBe(onboarding.ONBOARDING_ACCOUNT_UPSERT);
+            expect(Symbol.for('OnboardingAccountUpsert')).toBe(
+                onboarding.ONBOARDING_ACCOUNT_UPSERT,
+            );
             expect(Symbol.for('OnboardingWorkCreator')).toBe(onboarding.ONBOARDING_WORK_CREATOR);
         });
     });

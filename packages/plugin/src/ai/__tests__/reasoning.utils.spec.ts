@@ -162,9 +162,7 @@ describe('per-provider getter convenience functions', () => {
 	});
 
 	it('getOpenRouterReasoningConfig matches getReasoningConfig("openrouter", …)', () => {
-		expect(getOpenRouterReasoningConfig('openai/gpt-5')).toEqual(
-			getReasoningConfig('openrouter', 'openai/gpt-5')
-		);
+		expect(getOpenRouterReasoningConfig('openai/gpt-5')).toEqual(getReasoningConfig('openrouter', 'openai/gpt-5'));
 		expect(getOpenRouterReasoningConfig('anthropic/claude-sonnet-4')).toEqual({
 			reasoning: { effort: 'none' }
 		});

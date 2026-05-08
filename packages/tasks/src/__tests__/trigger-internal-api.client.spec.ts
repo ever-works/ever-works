@@ -127,9 +127,7 @@ describe('TriggerInternalApiClient', () => {
             await client.fetchWorkContext('work-1', 'user with spaces & symbols');
 
             const [url] = fetchSpy.mock.calls[0];
-            expect(url).toContain(
-                'userId=user+with+spaces+%26+symbols',
-            );
+            expect(url).toContain('userId=user+with+spaces+%26+symbols');
         });
     });
 
@@ -179,9 +177,7 @@ describe('TriggerInternalApiClient', () => {
 
             // Server returns a SuperJSON-serialized envelope; the client deserializes it.
             const serverPayload = superjson.serialize({ value: 42, when: new Date('2026-01-01') });
-            fetchSpy.mockResolvedValueOnce(
-                okJsonResponse(200, { result: serverPayload }),
-            );
+            fetchSpy.mockResolvedValueOnce(okJsonResponse(200, { result: serverPayload }));
 
             const result = await client.callRemote('SomeService', 'doIt', {
                 json: { foo: 'bar' },
