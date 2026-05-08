@@ -239,23 +239,26 @@ describe('MailerService', () => {
             );
         });
 
-        it('logs to=unknown for Resend when "to" is omitted (then crashes inside Resend send because getDestination is unguarded)', async () => {
-            // Documents the current behavior: the "to=unknown" log fires
-            // because `data.to ? this.getDestination(data.to) : 'unknown'`
-            // is evaluated for the log line, but the call site
-            // `to: this.getDestination(data.to)` inside resend.emails.send is
-            // unguarded and throws. This pins behavior so a future refactor
-            // either keeps it or makes the bug visible by failing this test.
+        it('forwards to=[] (empty recipient list) when "to" is omitted, instead of crashing', async () => {
+            // Pins the post-fix behaviour: the Resend branch now mirrors the
+            // SMTP/faker branches' tolerance of a missing `to` field by
+            // passing an empty `to: []` to `resend.emails.send` instead of
+            // throwing `TypeError: Cannot use 'in' operator to search for
+            // 'address' in undefined`. The "to=unknown" log line still fires.
             const service = buildService(resend as unknown as Resend);
 
-            await expect(service.sendMail({ subject: 'Anon', html: '<p>hi</p>' })).rejects.toThrow(
-                /'address' in/,
-            );
+            await service.sendMail({ subject: 'Anon', html: '<p>hi</p>' });
 
             expect(logSpy).toHaveBeenCalledWith(
                 expect.stringContaining('Sending email via Resend to=unknown'),
             );
-            expect(resend.emails.send).not.toHaveBeenCalled();
+            expect(resend.emails.send).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    to: [],
+                    subject: 'Anon',
+                    html: '<p>hi</p>',
+                }),
+            );
         });
     });
 
